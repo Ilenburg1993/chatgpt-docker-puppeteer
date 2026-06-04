@@ -14,6 +14,7 @@ import {
     compactTerminalDiagnosticId,
     compactTerminalOperatorToolText,
     formatTerminalToolPathForOperator,
+    getTerminalHumanToolName,
     isTerminalInternalCallIdentifier,
 } from '../events/tool-activity-presenter.js';
 
@@ -187,7 +188,7 @@ function compactHumanText(value) {
  * @returns {string}
  */
 function compactOperatorDetail(value) {
-    return compactHumanText(value)
+    return humanizeKnownToolIdentifiers(compactHumanText(value))
         .replace(/\bmodelo=/giu, 'modelo ')
         .replace(/\bcusto=/giu, 'custo ')
         .replace(/\bstatus=success\b/giu, 'concluída')
@@ -206,12 +207,25 @@ function compactOperatorDetail(value) {
  * @returns {string}
  */
 function compactActivityLabel(value) {
-    return compactHumanText(value)
+    return humanizeKnownToolIdentifiers(compactHumanText(value))
+        .replace(/^Executando tool\b/iu, 'Executando ferramenta')
+        .replace(/^Tool em andamento\b/iu, 'Ferramenta em andamento')
         .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
         .replace(/^Tool falhou\b/iu, 'Ferramenta falhou')
         .replace(/^I\/O read concluído\b/iu, 'I/O leitura concluída')
         .replace(/^I\/O write concluído\b/iu, 'I/O escrita concluída')
         .replace(/^ask_user SDK solicitado\b/iu, 'Pergunta ao operador solicitada');
+}
+
+/**
+ * @param {string} text
+ * @returns {string}
+ */
+function humanizeKnownToolIdentifiers(text) {
+    return text.replace(/\b[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+\b/giu, (token) => {
+        const label = getTerminalHumanToolName(token);
+        return label === token ? token : label;
+    });
 }
 
 /**

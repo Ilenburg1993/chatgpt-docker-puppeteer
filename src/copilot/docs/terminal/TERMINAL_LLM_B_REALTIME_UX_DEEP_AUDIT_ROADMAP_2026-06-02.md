@@ -6283,3 +6283,115 @@
       `executando ferramenta não classificada`, preservando detalhe técnico apenas em raw/detail.
 - [x] Teste unitário: `test_tool_activity_presenter.spec.js` cobre ferramenta desconhecida sem
       regressão para `tool genérica`.
+
+### 12.43 Diagnóstico full sem taxonomia crua
+
+- [x] Auditoria pós-compactação: `/health full`/`/diagnose full` ainda preservavam rótulos de
+      implementação em uma tela humana detalhada: `MCP bridge`, `Hub storage`, `Boot report`,
+      `Shutdown`, `Timers` e `preflight SDK`.
+- [x] Decisão UX: `full` é painel humano detalhado, não dump bruto. Termos de implementação ficam
+      em `detail`, `raw`, `/events --raw`, JSON/export ou em código/testes; a tela humana deve usar
+      nomes operacionais consistentes com a gramática do restante do terminal.
+- [x] Correção aplicada: `diagnose.js` removeu o mini-sistema ANSI local e passou a usar
+      `terminalThemeText()` como fonte única de cores. A seção de infraestrutura agora fala em
+      `MCP remoto`, `Histórico`, `Inicialização`, `Encerramento`, `Temporizadores` e
+      `Ciclo de vida`.
+- [x] Correção aplicada: métricas de ciclo de vida agora traduzem `sdk-preflight` para
+      `checagem do SDK`, `boot` para `inicialização`, `shutdown` para `encerramento`, e evitam
+      `n/d`, `handlers` e `report` na superfície humana.
+- [x] Teste unitário: `test_commands_diagnose.spec.js` bloqueia regressão para os rótulos antigos e
+      usa regex para validar colunas alinhadas sem depender de espaçamento fixo.
+- [x] Validação escopada: `node --check`, `vitest` de `test_commands_diagnose.spec.js` e `eslint`
+      para `diagnose.js`/teste passaram.
+- [ ] Próxima frente UX: auditar `/status`, `/usage`, `/activity detail` e comandos de sessão para
+      o mesmo contrato: default/full humano, detail/raw técnico, sem misturar IDs e nomes internos
+      no fluxo principal do operador.
+
+### 12.44 Activity sem identificadores de tool no fluxo humano
+
+- [x] Auditoria: `/activity` ainda podia mostrar `Executando tool` e `web_fetch` no modo padrão,
+      reproduzindo o aspecto cru das screenshots mesmo depois das correções de `report_intent`.
+- [x] Decisão UX: detalhes textuais compactos podem conter o nome operacional da ferramenta, mas
+      não o identificador técnico quando existir nome humano canônico no presenter central.
+- [x] Correção aplicada: `tool-activity-presenter.js` ganhou nomes humanos para ferramentas web
+      (`web_fetch`, `web_search`, `fetch_url`), e `activity.js` passou a humanizar identificadores
+      conhecidos dentro de labels e detalhes compactos.
+- [x] Correção aplicada: `Executando tool`, `Tool em andamento`, `Tool concluída` e `Tool falhou`
+      são normalizados para `ferramenta` antes de renderizar a superfície humana.
+- [x] Teste unitário: `test_commands_activity.spec.js` exige `Executando ferramenta` e
+      `Buscar na web`, bloqueando retorno de `Executando tool` e `web_fetch` no default.
+- [x] Validação escopada: `node --check`, `vitest` de `/activity` + presenter e `eslint` dos
+      arquivos alterados passaram.
+- [ ] Próxima frente UX: revisar `/metrics` e `/usage now` para traduzir `Context window`,
+      `Premium Request`, `provider`, `runtime alvo`, `bridge/live`, `Sync Hub`, `Billing`, `Inject`
+      e IDs de sessão conforme o mesmo contrato de humano/default versus detail/raw.
+
+### 12.45 Usage e metrics com português operacional
+
+- [x] Auditoria: `/usage now` ainda mostrava `Context window`, `Premium Request`, `provider` e
+      `boot/probe`; `/metrics` ainda mostrava `runtime alvo`, `sessão SDK`, `modo sdk`,
+      `bridge/live`, `Sync Hub`, `Billing`, `Inject`, `preflight`, `autostart` e IDs completos no
+      modo padrão.
+- [x] Decisão UX: `/usage now` é prelude humano e deve explicar contexto, cobrança histórica e
+      vínculo sem inglês técnico. `/metrics` default é painel operacional; digests e IDs completos
+      ficam em `detail`.
+- [x] Correção aplicada: `/usage now` passou para `Janela de contexto`, `Pedido premium`,
+      `provedor`, `boot/sonda`, `ferramenta/automação` e `sem pedido premium`.
+- [x] Correção aplicada: `/metrics` passou para `Runtime alvo`, `Sessão SDK`, `Sessão hub`,
+      `Modo SDK`, `Turnos`, `Timeline`, `Sincronização`, `Cobrança`, `Injeção`, `Transporte`,
+      `checagem` e `auto-início`, ocultando IDs/digests no default.
+- [x] Correção aplicada: `cmdMetrics` ganhou modo `detail` para preservar digest/IDs quando o
+      operador quer diagnóstico técnico.
+- [x] Teste unitário: `test_commands_metrics_usage.spec.js` bloqueia retorno de `Context window`,
+      `Premium Request`, `bridge/live`, `Inject`, IDs completos e digest no default, preservando
+      detail para diagnóstico.
+- [x] Validação escopada: `node --check`, `vitest` e `eslint` de `/usage`/`/metrics` passaram.
+- [ ] Próxima frente UX: auditar comandos com ANSI manual (`byok.js`, `git.js`,
+      `workspace-index.js`, caminhos legados de `session.js`) e priorizar os que aparecem nas lives
+      ou no fluxo BYOK/terminal.
+
+### 12.46 Linha viva e diagnose sem `Executando tool`
+
+- [x] Auditoria: a linha viva ainda aceitava `ferramenta · Executando tool`, e `/diagnose full`
+      herdava `Executando tool`/`web_fetch` da atividade atual.
+- [x] Decisão UX: a linha viva é a superfície mais sensível do terminal; qualquer identificador de
+      ferramenta conhecido deve ser traduzido antes de chegar nela. Diagnose full deve seguir o
+      mesmo contrato.
+- [x] Correção aplicada: `live-status-line.js` humaniza identificadores conhecidos em labels e
+      detalhes compactos, troca `Executando tool`/`Tool concluída`/`Tool falhou` por
+      `ferramenta`, e mantém IDs internos compactados como `id interno`.
+- [x] Correção aplicada: `diagnose.js` passou a humanizar labels/detalhes de atividade antes de
+      renderizar `Atividade`/`Atual`.
+- [x] Teste unitário: `test_live_status_line.spec.js` bloqueia retorno de `Executando tool` e
+      `read_file_content`; `test_commands_diagnose.spec.js` bloqueia `Executando tool` e
+      `web_fetch`.
+- [x] Validação escopada: `node --check`, `vitest` e `eslint` de linha viva/diagnose passaram.
+- [ ] Próxima frente UX: revisar os eventos BYOK/runtime que ainda dizem `provider BYOK`,
+      `Premium Request` e `provider ...` em linhas de erro/uso, escolhendo uma terminologia
+      consistente sem ocultar informação operacional.
+
+### 12.47 BYOK/runtime com terminologia consistente
+
+- [x] Auditoria: eventos runtime/BYOK ainda emitiam `provider BYOK`, `provider openai`,
+      `Premium Request`, `sem Premium Request`, `Provider BYOK`, `Fallback` e mensagens de ação com
+      `provider/modelo` no fluxo humano.
+- [x] Decisão UX: “BYOK” pode permanecer como termo de domínio, mas a interface humana deve usar
+      `provedor`, `pedido premium`, `sem pedido premium` e `troque provedor/modelo`; campos
+      estruturados continuam disponíveis em SSE/raw/export.
+- [x] Correção aplicada: `agent-runtime-events.js` normaliza detalhes recuperáveis BYOK, linhas
+      visíveis, labels de atividade e linhas de uso/cobrança para a terminologia nova.
+- [x] Correção aplicada: `/events` traduz `byok_provider_failure`, `provider`, `provider BYOK` e
+      `Premium Request` também quando chegam dentro de `operatorMeaning` legado.
+- [x] Correção aplicada: a linha viva especial de erro BYOK mostra `provedor BYOK`, mantendo a linha
+      curta e sem despejar `/byok model`, modelo ou detalhe cru.
+- [x] Correção aplicada: `dialog/engine.js` removeu ANSI manual do erro BYOK de turno, trocando a
+      linha crua `[byok] ... sem Premium Request` por rows temáticas `BYOK` e `Ação`.
+- [x] Correção aplicada: admission control e atividades de falha BYOK passaram a usar `provedor
+      BYOK` e `sem pedido premium`.
+- [x] Teste unitário: `test_commands_events.spec.js` e `test_live_status_line.spec.js` bloqueiam
+      retorno de `provider BYOK`/`provider openai` no output humano.
+- [x] Validação escopada: `vitest` de eventos/linha viva/activity e `eslint` dos arquivos alterados
+      passaram.
+- [ ] Próxima frente UX: auditar `session.js`/`context.js` para `Sync Hub`, `Billing/modelo`,
+      `Inject port`, `sessão SDK` e IDs completos no modo padrão, priorizando rotas que aparecem em
+      `/status`, `/now`, `/session` e menu.

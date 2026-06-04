@@ -33,9 +33,60 @@ function yesNoPt(value) {
 function humanMetricStatus(value) {
     const status = String(value ?? '').trim().toLowerCase();
     if (status === 'completed' || status === 'success' || status === 'ok') return 'concluído';
+    if (status === 'idle') return 'ocioso';
+    if (status === 'processing') return 'trabalhando';
+    if (status === 'waiting_for_input') return 'aguardando você';
+    if (status === 'starting') return 'iniciando';
+    if (status === 'stopped') return 'parado';
     if (status === 'error' || status === 'failed') return 'falhou';
     if (status === 'pending') return 'pendente';
-    return status || 'n/d';
+    return status || 'sem leitura';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanMetricSdkMode(value) {
+    const mode = String(value ?? '').trim();
+    if (mode === 'interactive') return 'interativo';
+    if (mode === 'plan') return 'plano';
+    if (mode === 'autopilot') return 'autopiloto';
+    return mode.replace(/[._-]+/gu, ' ') || 'desconhecido';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanMetricPromptState(value) {
+    const state = String(value ?? '').trim();
+    if (state === 'stale') return 'desatualizado';
+    if (state === 'live-reload') return 'recarregando';
+    if (state === 'ok') return 'ok';
+    return state.replace(/[._-]+/gu, ' ') || 'sem leitura';
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @param {boolean} detail
+ * @param {string} visibleLabel
+ * @returns {string}
+ */
+function renderMetricBinding(value, detail, visibleLabel) {
+    if (!value) return `sem ${visibleLabel}`;
+    return detail ? value : visibleLabel;
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @param {boolean} detail
+ * @returns {string}
+ */
+function renderMetricRuntimeTarget(value, detail) {
+    const runtimeId = String(value ?? '').trim();
+    if (!runtimeId || runtimeId === 'default') return 'principal';
+    return detail ? runtimeId : runtimeId;
 }
 
 /**
@@ -46,7 +97,8 @@ function humanMetricStatus(value) {
  * @returns {void}
  */
 export function cmdMetrics({ println }, arg = '') {
-    const { runtimeId } = extractRuntimeTarget(arg);
+    const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
+    const detail = /\b(?:detail|debug|--detail|--debug)\b/iu.test(cleanArg);
     const projection = callWithRuntimeTarget(readTerminalMetricsProjection, runtimeId);
     const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
     const {
@@ -77,7 +129,7 @@ export function cmdMetrics({ println }, arg = '') {
     // ── Session info ─────────────────────────────────────────────────
     const model = snap['model'] ?? '?';
     const status = snap['status'] ?? '?';
-    const sessionId = runtimeSessionId ?? '?';
+    const sessionId = renderMetricBinding(runtimeSessionId, detail, 'ativa');
     const byok = configProjection.byok;
     const byokActive = byok?.enabled === true;
 
@@ -120,12 +172,12 @@ export function cmdMetrics({ println }, arg = '') {
               : 'nenhuma ação imediata';
     const promptLabel =
         promptIsStale === true
-            ? terminalThemeText('error', 'stale')
+            ? terminalThemeText('error', 'desatualizado')
             : promptAction === 'observe-live-reload'
-              ? terminalThemeText('warn', 'live-reload')
+              ? terminalThemeText('warn', 'recarregando')
               : promptIsStale === false
                 ? terminalThemeText('success', 'ok')
-                : terminalThemeText('muted', '(n/d)');
+                : terminalThemeText('muted', '(sem leitura)');
     const latestInjectOutcome = latestInject?.outcome ?? (latestInject?.ok ? 'completed' : 'error');
     const latestInjectTimeout =
         typeof latestInject?.timeoutMs === 'number'
@@ -134,12 +186,12 @@ export function cmdMetrics({ println }, arg = '') {
     const latestInjectPrompt = latestInject?.promptDigest ?? promptDigest ?? '-';
     const latestInjectFreshness =
         latestInject?.promptIsStale === true
-            ? 'stale'
+            ? 'desatualizado'
             : latestInject?.promptRecommendedAction === 'observe-live-reload'
-              ? 'live-reload'
+              ? 'recarregando'
               : latestInject?.promptIsStale === false
                 ? 'ok'
-                : 'n/d';
+                : 'sem leitura';
     const latestInjectReason = latestInject?.promptFreshnessReason ?? promptReason;
     const latestInjectDiagnostics =
         latestInject?.diagnostics && typeof latestInject.diagnostics === 'object' ? latestInject.diagnostics : null;
@@ -175,28 +227,36 @@ export function cmdMetrics({ println }, arg = '') {
         typeof latestInject?.transportTimeoutMs === 'number'
             ? `${latestInject.transportTimeoutMs}ms${latestInject.transportTimeoutStrategy ? ` (${latestInject.transportTimeoutStrategy})` : ''}`
             : latestInject?.transportTimeoutStrategy === 'disabled'
-              ? `disabled (${latestInject.transportTimeoutStrategy})`
-              : 'n/d';
+              ? 'desabilitado'
+              : 'sem leitura';
 
     println('');
     println(terminalThemeHeadline('command', 'Métricas da sessão'));
     println(terminalThemeDivider(52));
     println(terminalThemeRow('Sessão', sessionId, { role: 'muted' }));
-    println(terminalThemeRow('runtime alvo', projection.runtimeId, { role: 'muted' }));
-    println(terminalThemeRow('sessão SDK', binding.sdkSessionId ?? '(sem sdk)', { role: 'muted' }));
-    println(terminalThemeRow('sessão hub', binding.hubSessionId ?? '(sem hub)', { role: 'muted' }));
-    println(terminalThemeRow('Status', String(status), { role: 'info' }));
+    println(terminalThemeRow('Runtime alvo', renderMetricRuntimeTarget(projection.runtimeId, detail), { role: 'muted' }));
+    println(terminalThemeRow('Sessão SDK', renderMetricBinding(binding.sdkSessionId, detail, 'ativa'), { role: 'muted' }));
+    println(terminalThemeRow('Sessão hub', renderMetricBinding(binding.hubSessionId, detail, 'ativa'), { role: 'muted' }));
+    println(terminalThemeRow('Status', humanMetricStatus(status), { role: 'info' }));
     println(terminalThemeRow('Modelo', String(model), { role: 'assistant' }));
-    println(terminalThemeRow('modo sdk', configProjection.sdkSessionMode ?? 'interactive', { role: 'muted' }));
+    println(terminalThemeRow('Modo SDK', humanMetricSdkMode(configProjection.sdkSessionMode), { role: 'muted' }));
     println(terminalThemeRow('Plano', configProjection.sdkPlanOperation ?? '(sem alterações)', { role: 'muted' }));
 
     println(terminalThemeHeadline('command', 'Uso'));
-    println(terminalThemeRow('Turns', `${turnCount} ${terminalThemeText('muted', '(timeline canônica)')}`, { role: 'info' }));
-    println(terminalThemeRow('bridge/live', `${bridgeTurnCount} ${terminalThemeText('muted', `(${timelineSource} · ${timelineAuthority} · ${timelineReconciliationStatus})`)}`, { role: 'info', width: 11 }));
-    println(terminalThemeRow('Sync Hub', `${timelineSyncStatus} ${terminalThemeText('muted', `(pendentes ${timelineSyncPendingCount} · agendados ${timelineSyncTelemetry.scheduledTotal} · gravados ${timelineSyncTelemetry.turnsSyncedTotal} · falhas ${timelineSyncTelemetry.failedTotal} · retentativas ${timelineSyncTelemetry.retryTotal} · cache ${timelineSyncTelemetry.completedCacheSize}/${timelineSyncTelemetry.failureCacheSize})`)}`, { role: 'info' }));
+    println(terminalThemeRow('Turnos', `${turnCount} ${terminalThemeText('muted', '(timeline canônica)')}`, { role: 'info' }));
+    println(terminalThemeRow('Timeline', `${bridgeTurnCount} ${terminalThemeText('muted', `(${timelineSource} · ${timelineAuthority} · ${timelineReconciliationStatus})`)}`, { role: 'info' }));
+    println(terminalThemeRow('Sincronização', `${timelineSyncStatus} ${terminalThemeText('muted', `(pendentes ${timelineSyncPendingCount} · agendados ${timelineSyncTelemetry.scheduledTotal} · gravados ${timelineSyncTelemetry.turnsSyncedTotal} · falhas ${timelineSyncTelemetry.failedTotal} · retentativas ${timelineSyncTelemetry.retryTotal} · cache ${timelineSyncTelemetry.completedCacheSize}/${timelineSyncTelemetry.failureCacheSize})`)}`, { role: 'info' }));
     println(terminalThemeRow('Contexto', ctxStr, { role: 'info' }));
-    println(terminalThemeRow('Billing', billingLine, { role: 'info' }));
-    println(terminalThemeRow('Prompt', `${promptLabel} ${terminalThemeText('muted', `(digest ${promptDigest ?? '-'} · ação ${promptActionLabel})`)}`, { role: 'info' }));
+    println(terminalThemeRow('Cobrança', billingLine, { role: 'info' }));
+    println(
+        terminalThemeRow(
+            'Prompt',
+            detail
+                ? `${promptLabel} ${terminalThemeText('muted', `(digest ${promptDigest ?? '-'} · ação ${promptActionLabel})`)}`
+                : `${promptLabel} ${terminalThemeText('muted', `(ação ${promptActionLabel})`)}`,
+            { role: 'info' },
+        ),
+    );
 
     println(terminalThemeHeadline('tool', 'Ferramentas'));
     println(terminalThemeRow('Chamadas', String(toolCallCount), { role: 'info' }));
@@ -207,7 +267,7 @@ export function cmdMetrics({ println }, arg = '') {
     println(terminalThemeRow('Buffer', String(errorStats.buffered), { role: 'info' }));
 
     println(terminalThemeHeadline('thinking', 'Atividade'));
-    println(terminalThemeRow('Fase', String(activity.phase), { role: 'thinking' }));
+    println(terminalThemeRow('Fase', humanMetricStatus(activity.phase), { role: 'thinking' }));
     println(terminalThemeRow('Label', `${activity.label}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}`, { role: 'thinking' }));
     println(terminalThemeRow('Detalhe', activity.detail ?? '(nenhum)', { role: activity.detail ? 'muted' : 'muted' }));
 
@@ -223,12 +283,12 @@ export function cmdMetrics({ println }, arg = '') {
     println(terminalThemeRow('Arquivo', sseEventArchive.enabled ? sseEventArchive.path ?? '(aguardando primeiro evento)' : 'desabilitado', { role: 'muted' }));
     if (sseEventArchive.error) println(terminalThemeRow('Erro SSE', sseEventArchive.error, { role: 'error' }));
 
-    println(terminalThemeHeadline('command', 'Inject'));
+    println(terminalThemeHeadline('command', 'Injeção'));
     println(terminalThemeRow('Último', latestInject ? `${humanMetricStatus(latestInjectOutcome)} · ${latestInject.durationMs}ms${latestInjectTimeout}` : '(nenhum)', { role: latestInject ? 'info' : 'muted' }));
-    println(terminalThemeRow('transporte', latestInjectTransport, { role: 'muted' }));
-    println(terminalThemeRow('Prompt', `${latestInjectPrompt} · ${latestInjectFreshness}`, { role: 'muted' }));
+    println(terminalThemeRow('Transporte', latestInjectTransport, { role: 'muted' }));
+    println(terminalThemeRow('Prompt', detail ? `${latestInjectPrompt} · ${latestInjectFreshness}` : humanMetricPromptState(latestInjectFreshness), { role: 'muted' }));
     println(terminalThemeRow('Motivo', latestInjectReason, { role: 'muted' }));
-    println(terminalThemeRow('Fases', `preflight ${latestInjectPreflightMs ?? '-'}ms · contexto ${latestInjectContextMs ?? '-'}ms · anexos ${latestInjectAttachmentsMs ?? '-'}ms · diálogo ${latestInjectDialogMs ?? '-'}ms`, { role: 'muted' }));
-    println(terminalThemeRow('Runtime', `autostart ${yesNoPt(latestInjectAutoStart)} · recuperação ${yesNoPt(latestInjectRecovery)}`, { role: 'muted' }));
+    println(terminalThemeRow('Fases', `checagem ${latestInjectPreflightMs ?? '-'}ms · contexto ${latestInjectContextMs ?? '-'}ms · anexos ${latestInjectAttachmentsMs ?? '-'}ms · diálogo ${latestInjectDialogMs ?? '-'}ms`, { role: 'muted' }));
+    println(terminalThemeRow('Runtime', `auto-início ${yesNoPt(latestInjectAutoStart)} · recuperação ${yesNoPt(latestInjectRecovery)}`, { role: 'muted' }));
     println(terminalThemeDivider(52));
 }

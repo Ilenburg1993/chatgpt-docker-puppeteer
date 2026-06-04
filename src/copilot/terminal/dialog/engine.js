@@ -856,7 +856,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 }),
             );
             println(
-                terminalThemeRow('Bloqueado', 'turno não enviado ao provider BYOK; estimativa excede o limite declarado antes do streaming', {
+                terminalThemeRow('Bloqueado', 'turno não enviado ao provedor BYOK; estimativa excede o limite declarado antes do streaming', {
                     role: 'error',
                 }),
             );
@@ -1313,18 +1313,22 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             if (!revisedTrace) {
                 completeTerminalTurnTrace({ timestamp: now, status: 'failed' });
             }
-            recordTerminalActivity('error', 'Falha de provider BYOK no turno', {
+            recordTerminalActivity('error', 'Falha de provedor BYOK no turno', {
                 detail:
                     `${byokFailure.errorContext} · perfil ${byokFailure.profile ?? '-'} · ` +
-                    `provider ${byokFailure.provider ?? '-'} · modelo ${byokFailure.model ?? '-'} · ` +
-                    'sem Premium Request',
+                    `provedor ${byokFailure.provider ?? '-'} · modelo ${byokFailure.model ?? '-'} · ` +
+                    'sem pedido premium',
                 severity: 'error',
                 source: 'dialog',
             });
             println(
-                `\x1b[31m[byok] ${byokFailure.errorContext}: ${byokFailure.message} · ${byokFailure.failure.operatorLabel} · sem Premium Request\x1b[0m`,
+                terminalThemeRow(
+                    'BYOK',
+                    `${byokFailure.errorContext}: ${byokFailure.message} · ${byokFailure.failure.operatorLabel} · sem pedido premium`,
+                    { role: 'error' },
+                ),
             );
-            println(`\x1b[90m       ação: ${byokFailure.failure.operatorAction}\x1b[0m`);
+            println(terminalThemeRow('Ação', byokFailure.failure.operatorAction, { role: 'command' }));
             await printByokAutoAfterFailureHint(byokFailure);
         } else {
             clearTerminalTurnMaterialization();

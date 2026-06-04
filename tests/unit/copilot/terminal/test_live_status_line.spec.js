@@ -110,8 +110,9 @@ describe('terminal/live-status-line', () => {
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
 
         expect(line).toContain('LLM-B');
-        expect(line).toContain('ferramenta · Executando tool');
+        expect(line).toContain('ferramenta · Executando ferramenta');
         expect(line).toContain('Ler arquivo');
+        expect(line).not.toContain('Executando tool');
         expect(line).not.toContain('tool/');
         expect(line).not.toContain('read_file_content');
         expect(line).toContain('lendo arquivo');
@@ -438,7 +439,8 @@ describe('terminal/live-status-line', () => {
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:03.000-03:00') });
 
         expect(line).toContain('erro');
-        expect(line).toContain('provider BYOK');
+        expect(line).toContain('provedor BYOK');
+        expect(line).not.toContain('provider BYOK');
         expect(line).toContain('3s');
         expect(line).not.toContain('Erro do SDK sem mensagem estruturada');
         expect(line).not.toContain('/byok model');

@@ -30,9 +30,9 @@ function humanLlmUsageKind(llmClass, llmReason) {
     if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
         return 'continuação da pergunta humana';
     }
-    if (/tool/iu.test(llmClass) || /tool/iu.test(llmReason)) return 'tool/automação';
+    if (/tool/iu.test(llmClass) || /tool/iu.test(llmReason)) return 'ferramenta/automação';
     if (/stream|delta/iu.test(llmClass) || /stream|delta/iu.test(llmReason)) return 'streaming';
-    if (llmClass === 'unknown' && llmReason === 'n/d') return 'n/d';
+    if (llmClass === 'unknown' && llmReason === 'n/d') return 'sem classificação';
     return llmClass.replace(/[_-]+/gu, ' ');
 }
 
@@ -75,13 +75,13 @@ export function cmdUsage({ println }, arg) {
             const pct = (ctx.utilization * 100).toFixed(0);
             const bar = _renderBar(ctx.utilization);
             println('');
-            println(terminalThemeHeadline('command', 'Context window', [`${bar} ${pct}%`]));
+            println(terminalThemeHeadline('command', 'Janela de contexto', [`${bar} ${pct}%`]));
             println(terminalThemeRow('Tokens', `${ctx.tokens.toLocaleString('pt-BR')} / ${ctx.tokenLimit.toLocaleString('pt-BR')}`, {
                 role: 'info',
             }));
         } else {
             println('');
-            println(terminalThemeRow('Atenção', 'dados de context window não disponíveis', { role: 'warn' }));
+            println(terminalThemeRow('Atenção', 'dados da janela de contexto não disponíveis', { role: 'warn' }));
         }
 
         const modelBilling = projection.modelBilling;
@@ -102,7 +102,7 @@ export function cmdUsage({ println }, arg) {
                 println(
                     terminalThemeRow(
                         'BYOK ativo',
-                        `provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
+                        `provedor ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
                         { role: 'success' },
                     ),
                 );
@@ -110,7 +110,7 @@ export function cmdUsage({ println }, arg) {
                 println(
                     terminalThemeRow(
                         'Telemetria PR',
-                        `${modelLabel} · custo ${cost} · histórica; não implica consumo neste boot/probe`,
+                        `${modelLabel} · custo ${cost} · histórica; não implica consumo neste boot/sonda`,
                     ),
                 );
             }
@@ -119,12 +119,12 @@ export function cmdUsage({ println }, arg) {
             println(
                 terminalThemeRow(
                     'BYOK ativo',
-                    `provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
+                    `provedor ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
                     { role: 'success' },
                 ),
             );
         } else {
-            println(terminalThemeRow('Premium Request', 'sem snapshot histórico classificado'));
+            println(terminalThemeRow('Pedido premium', 'sem snapshot histórico classificado'));
         }
         if (projection.llmUsage) {
             const llmCost =
@@ -139,8 +139,8 @@ export function cmdUsage({ println }, arg) {
                     : 'n/d';
             const premiumRequest =
                 projection.llmUsage['premiumRequest'] === true
-                    ? 'Premium Request nesta telemetria'
-                    : 'sem Premium Request';
+                    ? 'com pedido premium nesta telemetria'
+                    : 'sem pedido premium';
             const llmUsageKind = humanLlmUsageKind(llmClass, llmReason);
             if (detail) {
                 println(
@@ -156,7 +156,7 @@ export function cmdUsage({ println }, arg) {
                         `modelo ${projection.llmUsageBilling.displayModel} · custo ${llmCost}`,
                     ),
                 );
-                println(terminalThemeRow('Request', premiumRequest));
+                println(terminalThemeRow('Pedido', premiumRequest));
                 println(terminalThemeRow('Tipo', llmUsageKind));
                 println(terminalThemeRow('Detalhe', '/usage now detail para classe técnica', { role: 'command' }));
             }

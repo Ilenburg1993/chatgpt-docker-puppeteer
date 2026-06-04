@@ -167,8 +167,10 @@ describe('terminal/commands/activity', () => {
 
         expect(ctx.output()).toContain('Atividade Atual da LLM-B');
         expect(ctx.output()).not.toContain('\x1b[36mAtividade Atual da LLM-B');
-        expect(ctx.output()).toContain('Executando tool');
-        expect(ctx.output()).toContain('web_fetch');
+        expect(ctx.output()).toContain('Executando ferramenta');
+        expect(ctx.output()).toContain('Buscar na web');
+        expect(ctx.output()).not.toContain('Executando tool');
+        expect(ctx.output()).not.toContain('web_fetch');
         expect(ctx.output()).toContain('tela full');
         expect(ctx.output()).not.toContain('display=full');
         expect(ctx.output()).toContain('Estado');

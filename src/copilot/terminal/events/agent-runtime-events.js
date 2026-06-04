@@ -260,9 +260,9 @@ function renderRuntimeArgsLabel(args) {
 const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
 const RECOVERABLE_MODEL_ERROR_RENDER_THROTTLE_MS = 30_000;
 const RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL =
-    'roteamento/retry delegado ao SDK; auto é a única recuperação permitida quando aplicável; sem Premium Request confirmada';
+    'roteamento/retry delegado ao SDK; auto é a única recuperação permitida quando aplicável; sem pedido premium confirmado';
 const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
-    'erro de provider BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provider/modelo via /byok use ou /byok model; sem Premium Request';
+    'erro de provedor BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provedor/modelo via /byok use ou /byok model; sem pedido premium';
 
 /**
  * @param {Record<string, unknown>} evt
@@ -280,10 +280,10 @@ function renderRecoverableByokModelCallErrorForOperator(evt, message) {
     const model = typeof evt['byokModel'] === 'string' ? evt['byokModel'] : '-';
     return [
         '',
-        terminalThemeRow('Provider BYOK', message, { role: 'warn' }),
-        terminalThemeRow('Ação', 'troque provider/modelo com /byok use ou /byok model', { role: 'command' }),
-        terminalThemeRow('Fallback', 'Copilot auto bloqueado por contrato · sem Premium Request', { role: 'muted' }),
-        terminalThemeRow('Contexto', `provider ${provider} · perfil ${profile} · modelo ${model}`, { role: 'muted' }),
+        terminalThemeRow('Provedor BYOK', message, { role: 'warn' }),
+        terminalThemeRow('Ação', 'troque provedor/modelo com /byok use ou /byok model', { role: 'command' }),
+        terminalThemeRow('Fallback', 'Copilot auto bloqueado por contrato · sem pedido premium', { role: 'muted' }),
+        terminalThemeRow('Contexto', `provedor ${provider} · perfil ${profile} · modelo ${model}`, { role: 'muted' }),
     ].join('\n');
 }
 
@@ -320,7 +320,7 @@ function resolveRecoverableModelCallOperatorDetail(evt) {
     const model = typeof evt?.['byokModel'] === 'string' ? evt['byokModel'].trim() : '';
     const bits = [
         RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL,
-        providerType ? `provider ${providerType}` : null,
+        providerType ? `provedor ${providerType}` : null,
         profile ? `perfil ${profile}` : null,
         model ? `modelo ${model}` : null,
     ].filter(Boolean);
@@ -457,12 +457,12 @@ function resolveByokSessionErrorDescriptor({ errorType, message }) {
     const provider = byok.preset ?? byok.providerType ?? null;
     const model = byok.model ?? runtimeState.model ?? null;
     const bits = [
-        'erro de sessão BYOK vindo do SDK; registrado como saúde do provider/modelo',
+        'erro de sessão BYOK vindo do SDK; registrado como saúde do provedor/modelo',
         failure.kind !== 'unknown' ? failure.operatorLabel : null,
-        provider ? `provider ${provider}` : null,
+        provider ? `provedor ${provider}` : null,
         byok.profile ? `perfil ${byok.profile}` : null,
         model ? `modelo ${model}` : null,
-        'sem Premium Request',
+        'sem pedido premium',
         `ação: ${failure.operatorAction}`,
     ].filter(Boolean);
     return {
@@ -814,7 +814,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const isByokModelCall = isRecoverableModelCall && isByokRecoverableModelCall(evt);
         const operatorDetail = isRecoverableModelCall ? resolveRecoverableModelCallOperatorDetail(evt) : null;
         const label = isByokModelCall
-            ? 'Erro de provider BYOK'
+            ? 'Erro de provedor BYOK'
             : isRecoverableModelCall
               ? 'Erro recuperável de modelo SDK'
               : 'Erro do agente';
@@ -1092,8 +1092,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const showUsage = getShowUsage();
         const shouldPersist = showUsage || billing.mismatch;
         const label = billing.mismatch
-            ? 'Premium Request classificada com divergência de modelo'
-            : 'Premium Request classificada';
+            ? 'Pedido premium classificado com divergência de modelo'
+            : 'Pedido premium classificado';
         recordTerminalActivity('system', label, {
             detail,
             source: 'agent',
@@ -1102,7 +1102,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         if ((showUsage || billing.mismatch) && !isTerminalRenderLocked()) {
             println(
-                terminalThemeRow('Premium Request', detail, {
+                terminalThemeRow('Pedido premium', detail, {
                     role: billing.mismatch ? 'warn' : 'muted',
                 }),
             );
@@ -1141,8 +1141,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const showUsage = getShowUsage();
         const shouldPersist = showUsage || billing.mismatch;
         const label = billing.mismatch
-            ? 'Uso BYOK sem Premium Request com divergência de modelo'
-            : 'Uso BYOK sem Premium Request';
+            ? 'Uso BYOK sem pedido premium com divergência de modelo'
+            : 'Uso BYOK sem pedido premium';
         recordTerminalActivity('system', label, {
             detail: operatorDetail,
             source: 'agent',

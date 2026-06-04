@@ -396,7 +396,7 @@ function humanPayloadKind(value) {
     if (text === 'session.background') return 'sessão em segundo plano';
     if (text === 'session.shutdown') return 'sessão encerrada';
     if (text === 'model_retry') return 'retry do modelo';
-    if (text === 'byok_provider_failure') return 'falha do provider BYOK';
+    if (text === 'byok_provider_failure') return 'falha do provedor BYOK';
     if (text === 'model_call') return 'chamada do modelo';
     if (text === 'recoverable_model_call') return 'erro recuperável do modelo';
     if (text === 'erroroccurred' || text === 'error_occurred') return 'erro capturado';
@@ -414,7 +414,11 @@ function humanEventMessage(value) {
     const text = normalizeEventSummaryText(value);
     if (!text) return '';
     if (text === 'Operation cancelled by user') return 'operação cancelada pelo operador';
-    return text;
+    return text
+        .replace(/\bprovider BYOK\b/giu, 'provedor BYOK')
+        .replace(/\bprovider\/modelo\b/giu, 'provedor/modelo')
+        .replace(/\bprovider\b/giu, 'provedor')
+        .replace(/\bPremium Request\b/giu, 'pedido premium');
 }
 
 /**
@@ -423,7 +427,7 @@ function humanEventMessage(value) {
  */
 function summarizeAgentErrorPayload(payload) {
     const isByok = payload['byokEnabled'] === true || typeof payload['byokProviderType'] === 'string';
-    const provider = typeof payload['byokProviderType'] === 'string' ? `provider ${compact(payload['byokProviderType'], 28)}` : null;
+    const provider = typeof payload['byokProviderType'] === 'string' ? `provedor ${compact(payload['byokProviderType'], 28)}` : null;
     const profile = typeof payload['byokProfile'] === 'string' ? `perfil ${compact(payload['byokProfile'], 28)}` : null;
     const model = typeof payload['byokModel'] === 'string' ? `modelo ${compact(payload['byokModel'], 42)}` : null;
     const recoverable = payload['recoverable'] === true ? 'recuperável' : null;
@@ -431,7 +435,7 @@ function summarizeAgentErrorPayload(payload) {
     const context = humanPayloadKind(payload['errorContext']);
     const message = humanEventMessage(payload['operatorMeaning'] ?? payload['message']);
     return [
-        isByok ? 'falha do provider BYOK' : null,
+        isByok ? 'falha do provedor BYOK' : null,
         provider,
         profile,
         model,

@@ -63,6 +63,14 @@ function hasHumanPendingQuestion(runtime) {
  */
 function compactLiveStatusText(value, max) {
     const text = String(value ?? '')
+        .replace(/\b[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+\b/giu, (token) => {
+            const label = getTerminalHumanToolName(token);
+            return label === token ? token : label;
+        })
+        .replace(/^Executando tool\b/iu, 'Executando ferramenta')
+        .replace(/^Tool em andamento\b/iu, 'Ferramenta em andamento')
+        .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
+        .replace(/^Tool falhou\b/iu, 'Ferramenta falhou')
         .replace(/\b(?:chatcmpl-tool|toolu|call)_[a-z0-9_-]+\b/giu, 'id interno')
         .replace(/\bchatcmpl-tool-[a-z0-9-]+\b/giu, 'id interno')
         .replace(/\bturnId=\d+\b/giu, 'turno concluído')
@@ -207,7 +215,7 @@ function isEmptyAfterUserInputActivity(activity) {
  */
 function isByokProviderErrorActivity(activity) {
     const text = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase();
-    return activity.phase === 'error' && text.includes('provider byok');
+    return activity.phase === 'error' && (text.includes('provider byok') || text.includes('provedor byok'));
 }
 
 /**
@@ -292,7 +300,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText('warn', 'erro')}` +
-            `${terminalThemeText('muted', ` · provider BYOK · ${formatLiveDuration(ageMs)}`)}` +
+            `${terminalThemeText('muted', ` · provedor BYOK · ${formatLiveDuration(ageMs)}`)}` +
             '\x1b[K'
         );
     }

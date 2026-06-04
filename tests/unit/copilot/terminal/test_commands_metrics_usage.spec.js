@@ -303,14 +303,14 @@ describe('commands/metrics + usage', () => {
         const ctx = mockCtx();
 
         try {
-            cmdMetrics({ println: ctx.println }, '--runtime alt');
+            cmdMetrics({ println: ctx.println }, '--runtime alt detail');
 
-            expect(ctx.output()).toContain('transporte');
+            expect(ctx.output()).toContain('Transporte');
             expect(ctx.output()).toContain('digest-alt');
             expect(ctx.output()).toContain('retomar sessão');
-            expect(ctx.output()).toContain('preflight 5ms');
+            expect(ctx.output()).toContain('checagem 5ms');
             expect(ctx.output()).toContain('diálogo 100ms');
-            expect(ctx.output()).toContain('autostart sim');
+            expect(ctx.output()).toContain('auto-início sim');
             expect(ctx.output()).toContain('recuperação não');
             expect(ctx.output()).not.toContain('digest-default');
         } finally {
@@ -323,18 +323,27 @@ describe('commands/metrics + usage', () => {
 
         cmdMetrics({ println: ctx.println });
 
-        expect(ctx.output()).toContain('sessão SDK');
-        expect(ctx.output()).toContain('sessão hub');
-        expect(ctx.output()).toContain('modo sdk');
+        expect(ctx.output()).toContain('Sessão SDK');
+        expect(ctx.output()).toContain('Sessão hub');
+        expect(ctx.output()).toContain('Modo SDK');
+        expect(ctx.output()).not.toContain('sessão SDK');
+        expect(ctx.output()).not.toContain('sessão hub');
+        expect(ctx.output()).not.toContain('modo sdk');
         expect(ctx.output()).not.toContain('plan local');
         expect(ctx.output()).toContain('timeline canônica');
-        expect(ctx.output()).toContain('bridge/live 0');
+        expect(ctx.output()).toMatch(/Timeline\s+0/u);
+        expect(ctx.output()).not.toContain('bridge/live');
         expect(ctx.output()).toContain('Atividade');
-        expect(ctx.output()).toContain('Inject');
+        expect(ctx.output()).toContain('Injeção');
+        expect(ctx.output()).not.toContain('Inject');
         expect(ctx.output()).toContain('Registro SSE');
         expect(ctx.output()).not.toContain('Archive SSE');
         expect(ctx.output()).toContain('binding ok');
         expect(ctx.output()).toContain('Processando mensagem');
+        expect(ctx.output()).not.toContain('bound-default');
+        expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
+        expect(ctx.output()).not.toContain('sdk-4567890123456789012345');
+        expect(ctx.output()).not.toContain('hub-4567890123456789012345');
     });
 
     it('cmdMetrics encaminha runtimeId explícito para as projections', () => {
@@ -342,7 +351,7 @@ describe('commands/metrics + usage', () => {
 
         cmdMetrics({ println: ctx.println }, '--runtime alt');
 
-        expect(ctx.output()).toContain('runtime alvo');
+        expect(ctx.output()).toContain('Runtime alvo');
         expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');
@@ -353,7 +362,8 @@ describe('commands/metrics + usage', () => {
 
         cmdUsage({ println: ctx.println }, 'now');
 
-        expect(ctx.output()).toContain('Context window');
+        expect(ctx.output()).toContain('Janela de contexto');
+        expect(ctx.output()).not.toContain('Context window');
         expect(ctx.output()).toContain('Vínculo');
         expect(ctx.output()).toContain('runtime, SDK e hub conectados');
         expect(ctx.output()).not.toContain('runtime-456789…');
@@ -365,7 +375,8 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('gpt-5-mini');
         expect(ctx.output()).toMatch(/Telemetria PR|Quota Copilot/);
         expect(ctx.output()).not.toContain('side-channel');
-        expect(ctx.output()).toMatch(/não implica consumo neste boot\/probe|não é cobrança BYOK/);
+        expect(ctx.output()).toMatch(/não implica consumo neste boot\/sonda|não é cobrança BYOK/);
+        expect(ctx.output()).not.toContain('Premium Request');
         expect(ctx.output()).not.toContain('\x1b[');
     });
 
@@ -411,8 +422,10 @@ describe('commands/metrics + usage', () => {
             expect(ctx.output()).toContain('Telemetria LLM');
             expect(ctx.output()).toContain('Tipo');
             expect(ctx.output()).not.toContain('tipo=');
-            expect(ctx.output()).toContain('Request');
-            expect(ctx.output()).toContain('sem Premium Request');
+            expect(ctx.output()).toContain('Pedido');
+            expect(ctx.output()).toContain('sem pedido premium');
+            expect(ctx.output()).not.toContain('Request');
+            expect(ctx.output()).not.toContain('Premium Request');
             expect(ctx.output()).toContain('continuação da pergunta humana');
             expect(ctx.output()).not.toContain('ask_user_continuation');
             expect(ctx.output()).not.toContain(

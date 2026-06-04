@@ -8,7 +8,7 @@
  * Inclui:
  *
  * - Estado do agente e dialog loop
- * - Status do MCP bridge (circuit breaker, tools count, disponibilidade)
+ * - Status do MCP remoto (circuit breaker, tools count, disponibilidade)
  * - Estado do ConversationHub (sessão ativa, storage)
  * - TODOs pendentes (top-5)
  * - Tool stats top-5 por latência
@@ -40,17 +40,14 @@ import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from '
  * @property {(text: string) => void} println
  */
 
-/** ANSI helpers */
-const C = {
-    reset: '\x1b[0m',
-    bold: '\x1b[1m',
-    cyan: '\x1b[36m',
-    green: '\x1b[32m',
-    yellow: '\x1b[33m',
-    red: '\x1b[31m',
-    grey: '\x1b[90m',
-    magenta: '\x1b[35m',
-};
+/**
+ * @param {'assistant' | 'command' | 'error' | 'muted' | 'question' | 'success' | 'tool' | 'warn'} role
+ * @param {string} text
+ * @returns {string}
+ */
+function diagnoseText(role, text) {
+    return terminalThemeText(role, text);
+}
 
 /**
  * @param {string[]} commands
@@ -58,6 +55,21 @@ const C = {
  */
 function renderCommandList(commands) {
     return commands.map((command) => terminalThemeText('command', command)).join(terminalThemeText('muted', ' · '));
+}
+
+/**
+ * @param {string} text
+ * @returns {string}
+ */
+function humanizeDiagnoseToolIdentifiers(text) {
+    return text
+        .replace(/\b[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+\b/giu, (token) => {
+            const label = getTerminalHumanToolName(token);
+            return label === token ? token : label;
+        })
+        .replace(/^Executando tool\b/iu, 'Executando ferramenta')
+        .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
+        .replace(/^Tool falhou\b/iu, 'Ferramenta falhou');
 }
 
 /**
@@ -114,10 +126,10 @@ function renderDiagnosePermissionMode(value) {
  */
 function renderDiagnoseLifecycleMetricLabel(value) {
     const id = String(value ?? '').trim();
-    if (!id) return 'n/d';
-    if (id === 'sdk-preflight') return 'preflight SDK';
-    if (id === 'boot') return 'boot';
-    if (id === 'shutdown') return 'shutdown';
+    if (!id) return 'sem amostra';
+    if (id === 'sdk-preflight') return 'checagem do SDK';
+    if (id === 'boot') return 'inicialização';
+    if (id === 'shutdown') return 'encerramento';
     return id
         .replace(/^terminal[._-]+/u, '')
         .replace(/^bootstrap[._-]+/u, '')
@@ -130,14 +142,14 @@ function renderDiagnoseLifecycleMetricLabel(value) {
  * @returns {string}
  */
 function renderDiagnoseLifecycleMetricsLine(slowestBootPhase, slowestShutdownHandler) {
-    if (!slowestBootPhase && !slowestShutdownHandler) return `${C.grey}n/d${C.reset}`;
+    if (!slowestBootPhase && !slowestShutdownHandler) return diagnoseText('muted', 'sem amostra');
     const bootLine = slowestBootPhase
-        ? `boot ${renderDiagnoseLifecycleMetricLabel(slowestBootPhase.id)} · média ${slowestBootPhase.avgDurationMs ?? '?'}ms`
-        : 'boot n/d';
+        ? `inicialização ${renderDiagnoseLifecycleMetricLabel(slowestBootPhase.id)} · média ${slowestBootPhase.avgDurationMs ?? '?'}ms`
+        : 'inicialização sem amostra';
     const shutdownLine = slowestShutdownHandler
-        ? `shutdown ${renderDiagnoseLifecycleMetricLabel(slowestShutdownHandler.name)} · média ${slowestShutdownHandler.avgDurationMs ?? '?'}ms`
-        : 'shutdown n/d';
-    return `${bootLine} ${C.grey}·${C.reset} ${shutdownLine}`;
+        ? `encerramento ${renderDiagnoseLifecycleMetricLabel(slowestShutdownHandler.name)} · média ${slowestShutdownHandler.avgDurationMs ?? '?'}ms`
+        : 'encerramento sem amostra';
+    return `${bootLine} ${diagnoseText('muted', '·')} ${shutdownLine}`;
 }
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
@@ -186,39 +198,42 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
 
     const mcpLine =
         mcp.available && !mcp.circuitOpen && mcp.toolCount > 0
-            ? `${C.green}ok · ${pluralPt(mcp.toolCount, 'ferramenta', 'ferramentas')} · latência ${mcp.latencyMs ?? '?'}ms${C.reset}`
+            ? diagnoseText(
+                  'success',
+                  `ok · ${pluralPt(mcp.toolCount, 'ferramenta', 'ferramentas')} · latência ${mcp.latencyMs ?? '?'}ms`,
+              )
             : mcp.circuitOpen
-              ? `${C.red}falha · circuito aberto${C.reset}`
-              : `${C.yellow}aviso · indisponível${C.reset}`;
+              ? diagnoseText('error', 'falha · circuito aberto')
+              : diagnoseText('warn', 'aviso · remoto indisponível');
     const hubSummary = renderDiagnoseHubStorageSummary(hub.summary, detail);
     const hubLine =
-        hubSummary === 'sem storage'
-            ? `${C.grey}${hubSummary}${C.reset}`
+        hubSummary === 'sem histórico local'
+            ? diagnoseText('muted', hubSummary)
             : hubSummary.includes('não inicializado')
-              ? `${C.yellow}aviso · ${hubSummary}${C.reset}`
+              ? diagnoseText('warn', `aviso · ${hubSummary}`)
               : hubSummary.includes('erro')
-                ? `${C.red}falha · ${hubSummary}${C.reset}`
-                : `${C.green}ok · ${hubSummary}${C.reset}`;
+                ? diagnoseText('error', `falha · ${hubSummary}`)
+                : diagnoseText('success', `ok · ${hubSummary}`);
     const todoLines =
         todos.length === 0
-            ? `${C.green}nenhum pendente${C.reset}`
-            : todos.map((task) => `  ${C.grey}•${C.reset} [${task.id.slice(0, 6)}] ${task.title}`).join('\n');
+            ? diagnoseText('success', 'nenhum pendente')
+            : todos.map((task) => `  ${diagnoseText('muted', '•')} [${task.id.slice(0, 6)}] ${task.title}`).join('\n');
     const statsLines =
         topToolStats.length === 0
-            ? `${C.grey}nenhum dado registrado${C.reset}`
+            ? diagnoseText('muted', 'nenhum dado registrado')
             : topToolStats
                   .map(([name, stat]) => {
                       const calls = Number(stat['calls'] ?? 0);
                       const errors = Number(stat['errors'] ?? 0);
                       const rate = calls > 0 ? Math.round(((calls - errors) / calls) * 100) : 0;
-                      const col = rate >= 90 ? C.green : rate >= 70 ? C.yellow : C.red;
+                      const role = rate >= 90 ? 'success' : rate >= 70 ? 'warn' : 'error';
                       const visualName = compactTerminalToolText(getTerminalHumanToolName(name), 28).padEnd(28);
-                      return `  ${C.grey}•${C.reset} ${visualName} ${col}${rate}%${C.reset} média ${stat['avgLatencyMs'] ?? 0}ms (${pluralPt(calls, 'uso', 'usos')})`;
+                      return `  ${diagnoseText('muted', '•')} ${visualName} ${diagnoseText(role, `${rate}%`)} média ${stat['avgLatencyMs'] ?? 0}ms (${pluralPt(calls, 'uso', 'usos')})`;
                   })
                   .join('\n');
     const activityDetail = activity.detail
-        ? `${C.grey}${activity.detail}${C.reset}`
-        : `${C.grey}(sem detalhe)${C.reset}`;
+        ? diagnoseText('muted', humanizeDiagnoseToolIdentifiers(activity.detail))
+        : diagnoseText('muted', '(sem detalhe)');
     const actionLine = renderCompactActionLine(health?.['recommendedAction']);
     const askUserLine = health?.['pendingQuestion']
         ? `vivo${
@@ -236,20 +251,20 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const askUserAgeLine =
         typeof health?.['pendingQuestionShadowAgeMs'] === 'number'
             ? `${Math.round(Number(health['pendingQuestionShadowAgeMs']) / 1000)}s`
-            : `${C.grey}-${C.reset}`;
+            : diagnoseText('muted', '-');
     const askUserRemainingLine =
         typeof health?.['pendingQuestionShadowRemainingMs'] === 'number'
             ? `${Math.round(Number(health['pendingQuestionShadowRemainingMs']) / 1000)}s`
-            : `${C.grey}-${C.reset}`;
+            : diagnoseText('muted', '-');
     const sdkModeLine = configProjection.sdkSessionMode
-        ? `${C.magenta}${renderDiagnoseSdkMode(configProjection.sdkSessionMode)}${C.reset}`
-        : `${C.grey}desconhecido${C.reset}`;
+        ? diagnoseText('assistant', renderDiagnoseSdkMode(configProjection.sdkSessionMode))
+        : diagnoseText('muted', 'desconhecido');
     const permissionMode = normalizeDiagnosePermissionMode(configProjection.permissionMode);
-    const permissionLine = `${C.magenta}${renderDiagnosePermissionMode(permissionMode)}${C.reset} ${C.grey}· prompts SDK ${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'ignorados' : 'seletivos'}${C.reset}`;
+    const permissionLine = `${diagnoseText('assistant', renderDiagnosePermissionMode(permissionMode))} ${diagnoseText('muted', `· prompts SDK ${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'ignorados' : 'seletivos'}`)}`;
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const byokLine = byok.enabled
-        ? `${byok.ready ? `${C.green}pronto${C.reset}` : `${C.red}incompleto${C.reset}`} ${C.grey}preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · autenticação ${renderCompactAuthLabel(byok.auth)}${C.reset}`
-        : `${C.grey}off${C.reset}`;
+        ? `${byok.ready ? diagnoseText('success', 'pronto') : diagnoseText('error', 'incompleto')} ${diagnoseText('muted', `preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · autenticação ${renderCompactAuthLabel(byok.auth)}`)}`
+        : diagnoseText('muted', 'off');
     const gatewayProjection = configProjection.modelGatewayProjection ?? {
         providerCount: 0,
         modelCount: 0,
@@ -260,30 +275,33 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         gatewayProjection.active && typeof gatewayProjection.active === 'object' ? gatewayProjection.active : null;
     const gatewayLine =
         gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0
-            ? `${C.grey}${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${renderGatewayActiveLabel(gatewayActive)}${C.reset}`
-            : `${C.grey}off${C.reset}`;
+            ? diagnoseText(
+                  'muted',
+                  `${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${renderGatewayActiveLabel(gatewayActive)}`,
+              )
+            : diagnoseText('muted', 'off');
     const planOpLine = configProjection.sdkPlanOperation
-        ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${formatTerminalTimeLabel(configProjection.sdkPlanChangedAt, { mode: 'dual' })}${C.reset}` : ''}`
-        : `${C.grey}(sem alteração)${C.reset}`;
+        ? `${diagnoseText('warn', configProjection.sdkPlanOperation)}${configProjection.sdkPlanChangedAt ? ` ${diagnoseText('muted', `@ ${formatTerminalTimeLabel(configProjection.sdkPlanChangedAt, { mode: 'dual' })}`)}` : ''}`
+        : diagnoseText('muted', '(sem alteração)');
     const runtimesLine =
         Array.isArray(configProjection.agentRuntimes) && configProjection.agentRuntimes.length > 0
             ? renderDiagnoseRuntimeMap(configProjection.agentRuntimes, detail)
             : '(nenhum runtime registrado)';
     const bootReport = lifecycle.lastBootReport;
     const bootLine = bootReport
-        ? `${bootReport.status === 'ok' ? C.green : C.red}${bootReport.status}${C.reset} ${C.grey}${bootReport.okCount}/${bootReport.phaseCount} fases · ${bootReport.durationMs}ms${bootReport.failedPhase ? ` · falha=${bootReport.failedPhase}` : ''}${C.reset}`
-        : `${C.grey}n/d${C.reset}`;
+        ? `${diagnoseText(bootReport.status === 'ok' ? 'success' : 'error', bootReport.status === 'ok' ? 'ok' : 'problema')} ${diagnoseText('muted', `${bootReport.okCount}/${bootReport.phaseCount} fases · ${bootReport.durationMs}ms${bootReport.failedPhase ? ` · falha em ${renderDiagnoseLifecycleMetricLabel(bootReport.failedPhase)}` : ''}`)}`
+        : diagnoseText('muted', 'sem amostra');
     const shutdownReport = lifecycle.lastShutdownReport;
     const shutdownLine = lifecycle.shuttingDown
-        ? `${C.yellow}em andamento${C.reset} ${C.grey}${lifecycle.shutdownHandlers.length} handlers${C.reset}`
+        ? `${diagnoseText('warn', 'em andamento')} ${diagnoseText('muted', pluralPt(lifecycle.shutdownHandlers.length, 'rotina', 'rotinas'))}`
         : shutdownReport
-          ? `${shutdownReport.failedCount || shutdownReport.timeoutCount ? C.yellow : C.green}${shutdownReport.reason}${C.reset} ${C.grey}${shutdownReport.okCount}/${shutdownReport.handlerCount} handlers · ${shutdownReport.durationMs}ms${C.reset}`
-          : `${C.grey}n/d${C.reset}`;
+          ? `${diagnoseText(shutdownReport.failedCount || shutdownReport.timeoutCount ? 'warn' : 'success', renderDiagnoseLifecycleReason(shutdownReport.reason))} ${diagnoseText('muted', `${shutdownReport.okCount}/${shutdownReport.handlerCount} rotinas · ${shutdownReport.durationMs}ms`)}`
+          : diagnoseText('muted', 'sem amostra');
     const activeTimers = lifecycle.activeTimers ?? [];
     const timerLine =
         activeTimers.length === 0
-            ? `${C.green}0 ativos${C.reset}`
-            : `${C.yellow}${activeTimers.length} ativos${C.reset}${activeTimers[0] ? ` ${C.grey}· mais antigo ${renderDiagnoseTimerLabel(activeTimers[0].id, detail)} há ${Math.round(activeTimers[0].ageMs / 1000)}s${C.reset}` : ''}`;
+            ? diagnoseText('success', '0 ativos')
+            : `${diagnoseText('warn', `${activeTimers.length} ativos`)}${activeTimers[0] ? ` ${diagnoseText('muted', `· mais antigo ${renderDiagnoseTimerLabel(activeTimers[0].id, detail)} há ${Math.round(activeTimers[0].ageMs / 1000)}s`)}` : ''}`;
     const bootMetrics = lifecycle.bootMetrics ?? [];
     const slowestBootPhase = bootMetrics[0] ?? null;
     const shutdownMetrics = lifecycle.shutdownMetrics ?? [];
@@ -292,10 +310,10 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const keepaliveRunning = Boolean(health?.['checks']?.['io']?.['keepaliveRunning']);
     const keepaliveOk = Boolean(health?.['checks']?.['io']?.['ok']);
     const keepaliveLine = keepaliveRunning
-        ? `${C.green}rodando${C.reset}`
+        ? diagnoseText('success', 'rodando')
         : keepaliveOk
-          ? `${C.green}standby da conversa${C.reset}`
-          : `${C.yellow}parado${C.reset}`;
+          ? diagnoseText('success', 'standby da conversa')
+          : diagnoseText('warn', 'parado');
     const runtimeSessionLabel = renderDiagnoseSessionId(runtimeSessionId, detail, 'sem runtime', 'ativa');
     const sdkSessionLabel = renderDiagnoseSessionId(binding.sdkSessionId, detail, 'sem SDK', 'ativa');
     const hubSessionLabel = renderDiagnoseSessionId(hub.activeHubSessionId, detail, 'sem hub', 'ativo');
@@ -306,7 +324,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
                 ? ` · ${health['backgroundPendingCount']} tarefa(s) em segundo plano`
                 : '';
         const activityProgress = typeof activity.progress === 'number' ? ` (${activity.progress}%)` : '';
-        const activityDetailLine = activity.detail ? ` · ${activity.detail}` : '';
+        const activityDetailLine = activity.detail ? ` · ${humanizeDiagnoseToolIdentifiers(activity.detail)}` : '';
         println('');
         println(terminalThemeHeadline('assistant', 'Saúde do Terminal LLM-B'));
         println(terminalThemeDivider(36));
@@ -327,7 +345,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         println(terminalThemeRow('Entrada', `${askUserLine}${backgroundLine}`, { role: askUserLine === 'nenhum' ? 'muted' : 'question' }));
         println(terminalThemeRow('Ferramentas', renderCompactMcpLine(mcp, toolLoad), { role: renderCompactMcpRole(mcp, toolLoad) }));
         println(
-            terminalThemeRow('Atividade', `${activity.label}${activityProgress}${activityDetailLine}`, {
+            terminalThemeRow('Atividade', `${humanizeDiagnoseToolIdentifiers(activity.label)}${activityProgress}${activityDetailLine}`, {
                 role: renderActivityRole(activity.severity),
             }),
         );
@@ -379,7 +397,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
 
     println('');
     println(terminalThemeHeadline('thinking', 'Atividade', ['pulso', 'display']));
-    println(terminalThemeRow('Atual', `${activity.label}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}`, { role: renderActivityRole(activity.severity) }));
+    println(terminalThemeRow('Atual', `${humanizeDiagnoseToolIdentifiers(activity.label)}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}`, { role: renderActivityRole(activity.severity) }));
     println(terminalThemeRow('Detalhe', activityDetail));
     println(terminalThemeRow('Tarefas', String(health?.['backgroundPendingCount'] ?? 0)));
     println(terminalThemeRow('Pulso', keepaliveLine));
@@ -411,12 +429,12 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
 
     println('');
     println(terminalThemeHeadline('system', 'Infraestrutura', ['MCP', 'hub', 'timers']));
-    println(terminalThemeRow('MCP bridge', mcpLine));
-    println(terminalThemeRow('Hub storage', hubLine));
-    println(terminalThemeRow('Boot report', bootLine));
-    println(terminalThemeRow('Shutdown', shutdownLine));
-    println(terminalThemeRow('Timers', timerLine));
-    println(terminalThemeRow('Ciclo vida', lifecycleMetricsLine));
+    println(terminalThemeRow('MCP remoto', mcpLine));
+    println(terminalThemeRow('Histórico', hubLine));
+    println(terminalThemeRow('Inicialização', bootLine));
+    println(terminalThemeRow('Encerramento', shutdownLine));
+    println(terminalThemeRow('Temporizadores', timerLine));
+    println(terminalThemeRow('Ciclo de vida', lifecycleMetricsLine));
     println(terminalThemeRow('Uptime', `${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s`));
     println(terminalThemeRow('Memória RSS', `${memMB}MB`, { role: memMB > 400 ? 'warn' : 'muted' }));
     println(terminalThemeRow('Rota SDK/FS', `${renderDiagnoseSdkFsRouteMode(sdkFsRouting.mode)} · ${sdkFsRouting.reason}`, { role: sdkFsRouting.mode === 'local-fs-primary' ? 'success' : sdkFsRouting.mode === 'sdk-workspace-only' ? 'warn' : 'error' }));
@@ -433,7 +451,10 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
 
     if (configProjection.runtimeFallbackWarning) {
         println(
-            `${C.yellow}  Nota: ${configProjection.runtimeFallbackWarning} Diagnóstico exibido para o runtime default (${configProjection.runtimeId}).${C.reset}`,
+            diagnoseText(
+                'warn',
+                `  Nota: ${configProjection.runtimeFallbackWarning} Diagnóstico exibido para o runtime default (${configProjection.runtimeId}).`,
+            ),
         );
     }
 }
@@ -457,9 +478,22 @@ function renderDiagnoseSessionId(value, detail, emptyLabel, activeLabel) {
  */
 function renderDiagnoseHubStorageSummary(summary, detail) {
     const value = String(summary ?? '').trim();
-    if (!value) return 'sem storage';
+    if (!value) return 'sem histórico local';
     if (detail) return value;
     return value.replace(/^sessão\s+[a-z0-9_-]+…?$/iu, 'sessão ativa');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderDiagnoseLifecycleReason(value) {
+    const reason = String(value ?? '').trim();
+    if (!reason) return 'sem motivo registrado';
+    if (reason === 'process-exit') return 'encerramento do processo';
+    if (reason === 'operator') return 'solicitado pelo operador';
+    if (reason === 'shutdown') return 'encerramento';
+    return reason.replace(/[._-]+/gu, ' ');
 }
 
 /**
