@@ -1956,6 +1956,19 @@ async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, t
     return summary;
 }
 
+function hasDefaultUxInformativeLineInsidePrompt(plain) {
+    const text = String(plain ?? '');
+    const durableIntrusion =
+        /voc[eê]\[[^\n]*?›\s*(?:\r?\n)+\s{2,}(?:Skills|Configuração|Ferramentas)\b[\s\S]{0,260}?(?:^|\n)(?:voc[eê]\[[^\n]*?›\s*)?\/(?:session sdk 6|quit)\b/imu.test(
+            text,
+        );
+    const liveIntrusion =
+        /voc[eê]\[[^\n]*?›\s*(?:\r?\n){1,4}voc[eê]\[[^\n]*?›[\s\S]{0,260}(?:LLM-B sessão · Configuração|LLM-B trabalhando · Configuração|LLM-B sessão · skills|LLM-B sessão · ferramentas)[\s\S]{0,180}\/(?:session sdk 6|quit)\b/imu.test(
+            text,
+        );
+    return durableIntrusion || liveIntrusion;
+}
+
 function diagnosticUxCycleCriteria(boot) {
     const raw = String(boot?.raw ?? '');
     const plain = String(boot?.plain ?? '');
@@ -2586,6 +2599,11 @@ function defaultUxCycleCriteria(boot) {
             id: 'ux-cycle-command-order',
             pass: surfacesRenderedInOrder,
             detail: 'default UX surfaces appeared in the same order as the operator commands',
+        },
+        {
+            id: 'ux-cycle-no-informative-event-inside-prompt',
+            pass: !hasDefaultUxInformativeLineInsidePrompt(plain),
+            detail: 'informative SDK session events did not render between the prompt and the next operator command',
         },
         {
             id: 'ux-cycle-help-compact',

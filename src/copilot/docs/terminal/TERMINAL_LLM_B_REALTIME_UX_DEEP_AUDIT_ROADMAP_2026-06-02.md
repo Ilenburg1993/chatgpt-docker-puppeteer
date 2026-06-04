@@ -7282,9 +7282,22 @@
     `você[terminal-…/high]› /session sdk 6` e `você[terminal-…/high]› /quit`, sem `Skills`,
     `Configuração`, `chatcmpl-tool`, `request_user_input`, `report_intent` ou `toolu_` na
     superfície default.
+- [x] Guardrail automatizado no harness:
+  - `--ux-cycle` ganhou o critério `ux-cycle-no-informative-event-inside-prompt`;
+  - a regra falha quando `Skills`, `Configuração` ou `Ferramentas` aparecem como linha informativa
+    entre prompt e próximo comando do operador;
+  - prova local do regex:
+    - `artifacts/terminal-live/2026-06-04T18-00-46-885Z/default-ux-cycle.plain.log`: detecta o
+      vazamento de `Skills`;
+    - `artifacts/terminal-live/2026-06-04T18-04-58-891Z/default-ux-cycle.plain.log`: detecta o
+      vazamento de `Configuração` antes de `/quit`;
+    - `artifacts/terminal-live/2026-06-04T18-07-09-883Z/default-ux-cycle.plain.log`: detecta a linha
+      viva longa de configuração colada ao prompt;
+    - `artifacts/terminal-live/2026-06-04T18-08-33-540Z/default-ux-cycle.plain.log`: passa.
+  - live positiva com critério ativo:
+    - `artifacts/terminal-live/2026-06-04T18-12-49-450Z/summary.md`: `PASS`, 28/28 critérios,
+      incluindo `ux-cycle-no-informative-event-inside-prompt`.
 - [ ] Próxima frente:
   - revisar `/events` default e `/intent` para garantir que o glossário compartilhado não precise
     de uma segunda camada paralela;
-  - reforçar o harness para falhar quando linhas informativas de sessão aparecem entre prompt e
-    comando no plain log;
   - só depois retomar a avaliação visual de TUI completa (`gum`, `fzf`, `bat`, `glow`, `delta`).
