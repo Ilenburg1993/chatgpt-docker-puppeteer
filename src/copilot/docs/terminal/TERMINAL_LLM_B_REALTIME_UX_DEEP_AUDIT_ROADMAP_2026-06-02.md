@@ -8627,6 +8627,7 @@
   - adicionar política testável de tentativa única para `dialog.empty_after_user_input`;
   - enfileirar a continuação via `sendTurn()` depois do turno atual, sem disputar o mutex de envio;
   - emitir `dialog.empty_after_user_input.auto_recovery` antes da tentativa;
+  - tratar retorno nulo da continuação automática como falha explícita em activity/SSE;
   - atualizar `/events` e summary quando necessário para diferenciar `tentando recuperar` de
     `recuperação manual necessária`.
 - [ ] Validação:
@@ -8659,4 +8660,24 @@
 - [x] Validação:
   - testes focados de usage/diagnose passaram junto da bateria de wiring/eventos/display;
   - lint escopado dos arquivos tocados passou sem erros;
+  - runner live ganhou critério `ux-human-runtime-vocabulary` para reprovar o vocabulário antigo
+    antes dos diagnósticos raw;
+  - live PTY em `artifacts/terminal-live/2026-06-04T22-50-51-354Z/summary.md` terminou PASS com
+    `ux-human-runtime-vocabulary`, `/usage now` usando `ambiente, SDK e hub conectados` e
+    `/health full` usando `Agente · ambiente · modelo · entrada`;
   - em próxima live, confirmar ausência de `runtime, SDK e hub conectados` e do cabeçalho antigo.
+
+### 12.88 Runner live import-safe — 2026-06-04
+
+- [x] Achado:
+  - `node --input-type=module -e "await import('./scripts/.../model-gateway-terminal-llm-b-live-test.mjs')"`
+    executava uma live real por causa de `await main()` no topo do módulo;
+  - isso torna validação ESM perigosa, lenta e surpreendente, além de poder consumir chamada real sem
+    intenção explícita do operador.
+- [x] Correção:
+  - runner passou a comparar `import.meta.url` com `pathToFileURL(process.argv[1])`;
+  - execução direta continua chamando `main()`;
+  - import dinâmico agora apenas carrega o módulo.
+- [x] Validação:
+  - import dinâmico retornou `import-ok` sem iniciar terminal;
+  - `node --check`, `eslint` do runner e `git diff --check` passaram.

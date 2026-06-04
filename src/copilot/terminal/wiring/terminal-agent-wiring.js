@@ -590,28 +590,36 @@ export function registerAgentEventListeners(printBanner) {
                                 'terminal-agent-wiring/dialog.empty_after_user_input.auto_recovery',
                             ),
                         );
-                        setImmediate(() => {
-                            void sendTurn(EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE, 'user').catch((error) => {
-                                const message = error instanceof Error ? error.message : String(error);
-                                recordTerminalActivity('error', 'Recuperação pós-pergunta falhou ao enfileirar', {
-                                    detail: message,
-                                    severity: 'error',
-                                    source: 'dialog.turn_end',
-                                    updateCurrent: false,
-                                });
-                                broadcastSse(
-                                    'dialog.empty_after_user_input.auto_recovery_failed',
-                                    withTerminalAgentSseEnvelope(
-                                        {
-                                            turnId,
-                                            requestId: lastUserInputCompleted?.requestId ?? null,
-                                            recoveryKey: autoRecovery.key,
-                                            message,
-                                        },
-                                        'terminal-agent-wiring/dialog.empty_after_user_input.auto_recovery_failed',
-                                    ),
-                                );
+                        const reportAutoRecoveryFailure = (/** @type {string} */ message) => {
+                            recordTerminalActivity('error', 'Recuperação pós-pergunta falhou ao enfileirar', {
+                                detail: message,
+                                severity: 'error',
+                                source: 'dialog.turn_end',
+                                updateCurrent: false,
                             });
+                            broadcastSse(
+                                'dialog.empty_after_user_input.auto_recovery_failed',
+                                withTerminalAgentSseEnvelope(
+                                    {
+                                        turnId,
+                                        requestId: lastUserInputCompleted?.requestId ?? null,
+                                        recoveryKey: autoRecovery.key,
+                                        message,
+                                    },
+                                    'terminal-agent-wiring/dialog.empty_after_user_input.auto_recovery_failed',
+                                ),
+                            );
+                        };
+                        setImmediate(() => {
+                            void sendTurn(EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE, 'user')
+                                .then((result) => {
+                                    if (result === null) {
+                                        reportAutoRecoveryFailure('continuação automática não retornou resposta');
+                                    }
+                                })
+                                .catch((error) => {
+                                    reportAutoRecoveryFailure(error instanceof Error ? error.message : String(error));
+                                });
                         });
                         return;
                     }

@@ -13,7 +13,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { modelGatewayScriptPath } from '../index.mjs';
 
@@ -4952,6 +4952,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 : 'health tool stats leaked technical names or was not rendered',
         },
         {
+            id: 'ux-human-runtime-vocabulary',
+            pass: !/runtime, SDK e hub conectados|Agente\s+·\s+runtime\s+·\s+modelo\s+·\s+entrada/iu.test(
+                beforeRawDiagnosticsPlain,
+            ),
+            detail: 'operator-facing usage/health surfaces used ambiente vocabulary instead of runtime vocabulary',
+        },
+        {
             id: 'ux-human-answer-confirmation',
             pass:
                 /Resposta\s+enviada para pergunta pendente\./u.test(plain) &&
@@ -7018,4 +7025,11 @@ async function main() {
     }
 }
 
-await main();
+function isDirectCliInvocation() {
+    const entrypoint = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
+    return import.meta.url === entrypoint;
+}
+
+if (isDirectCliInvocation()) {
+    await main();
+}
