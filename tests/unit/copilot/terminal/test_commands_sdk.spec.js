@@ -283,6 +283,22 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).not.toContain('2026-05-01');
     });
 
+    it('/sdk quota traduz Premium Requests como quota SDK, não como cobrança BYOK atual', async () => {
+        runtimeMocks.getTerminalSdkQuota.mockResolvedValueOnce({
+            quotaSnapshots: {
+                premium_interactions: { remainingPercentage: 0, resetDate: '2026-05-01' },
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdSdk({ println: ctx.println }, 'quota');
+
+        expect(ctx.output()).toContain('Pedidos premium SDK');
+        expect(ctx.output()).toContain('entitlement do SDK');
+        expect(ctx.output()).not.toContain('Premium Requests');
+        expect(ctx.output()).not.toContain('premium_interactions');
+    });
+
     it('/sdk capabilities exibe capacidades consolidadas da sessão SDK', async () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'capabilities');

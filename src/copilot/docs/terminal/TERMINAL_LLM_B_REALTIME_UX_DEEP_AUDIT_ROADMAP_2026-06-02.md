@@ -7166,5 +7166,21 @@
     `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-usage-byok-history-guardrail-pass-20260604 --timeout-ms 140000`;
   - artefato: `artifacts/terminal-live/2026-06-04T17-07-17-596Z/summary.md`;
   - resultado: PASS em 22/22 criterios, sem linhas acima de 132 colunas no plain log filtrado.
+- [x] `/sdk` default sem rótulo `Premium Requests` no painel BYOK:
+  - achado live: `/sdk` mostrava `Quota Premium Requests · 0.0% restante`, o que podia ser lido
+    como bloqueio/cobranca atual, embora seja entitlement SDK lateral ao runtime BYOK;
+  - decisao UX: manter a informacao, mas nomear como quota SDK, nao como produto/cobranca atual;
+  - correcao: `premium_interactions` agora renderiza `Pedidos premium SDK`; o escopo tecnico bruto
+    permanece escondido;
+  - teste focado:
+    `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js --hookTimeout=30000`;
+  - resultado: PASS em 40/40 testes;
+  - harness live reforcado: `ux-cycle-sdk-human` agora falha se `/sdk` default voltar a expor
+    `Premium Requests` ou `premium_interactions`;
+  - live final:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-sdk-premium-quota-humanized-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T17-10-45-648Z/summary.md`;
+  - resultado: PASS em 22/22 criterios, com `Pedidos premium SDK` e sem linhas acima de 132
+    colunas no plain log filtrado.
 - [ ] Próxima lacuna: validar visualmente TUI completa `fzf`/`gum` quando for aceitável tomar o TTY
       real, mantendo o fluxo filtrado como prova automatizada.

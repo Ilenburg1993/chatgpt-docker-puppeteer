@@ -2654,7 +2654,8 @@ function defaultUxCycleCriteria(boot) {
                 ) &&
                 !/SDK do Terminal[\s\S]*(reasoning=|restante=|\[OK\]|\[ERR\]|\n\s{14,}\/sdk skills|\n\s{14,}\/sdk quota|\n\s{14,}\/sdk headers)/iu.test(
                     sdkSurface,
-                ),
+                ) &&
+                !/Premium Requests|premium_interactions/iu.test(sdkSurface),
             detail: '/sdk default rendered a themed operations panel with named command rows instead of raw counters or anonymous continuations',
         },
         {

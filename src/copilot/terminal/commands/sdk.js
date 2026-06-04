@@ -203,7 +203,7 @@ function renderSdkQuotaScopeLabel(value) {
     const scope = String(value ?? '').trim();
     if (scope === 'copilot_sdk_entitlement') return 'entitlement do SDK';
     if (scope === 'copilot_chat') return 'chat Copilot';
-    if (scope === 'premium_interactions') return 'Premium Requests';
+    if (scope === 'premium_interactions') return 'quota premium SDK';
     return scope.replace(/[._-]+/gu, ' ') || 'n/d';
 }
 
@@ -213,7 +213,7 @@ function renderSdkQuotaScopeLabel(value) {
  */
 function renderSdkQuotaIdLabel(value) {
     const quotaId = String(value ?? '').trim();
-    if (quotaId === 'premium_interactions') return 'Premium Requests';
+    if (quotaId === 'premium_interactions') return 'Pedidos premium SDK';
     if (quotaId === 'completions') return 'completions';
     if (quotaId === 'chat') return 'chat';
     return quotaId.replace(/[._-]+/gu, ' ') || 'quota';
