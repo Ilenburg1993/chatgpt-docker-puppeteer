@@ -67,7 +67,7 @@ import {
     terminalThemeText,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
-import { formatTerminalIsoTimestamp } from '../state/ui/index.js';
+import { formatTerminalTimeLabel } from '../state/ui/index.js';
 import { printTerminalHumanQuestionCard } from './human-question-renderer.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import {
@@ -207,7 +207,7 @@ function renderRuntimeSessionLabel(value) {
  */
 function renderRuntimeTimestampLabel(value) {
     if (!value) return null;
-    return formatTerminalIsoTimestamp(value);
+    return formatTerminalTimeLabel(value, { mode: 'dual' });
 }
 
 /**

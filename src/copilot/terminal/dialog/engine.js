@@ -43,7 +43,7 @@ import {
 } from '../frontend/gateways/index.js';
 import { normalizeTerminalModelBillingProjection } from '../frontend/projections/index.js';
 import {
-    formatTerminalIsoTimestamp,
+    formatTerminalTimeLabel,
     markTerminalActivityIdle,
     recordTerminalActivity,
     terminalThemeHeadline,
@@ -998,7 +998,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         await ensureDialogLoop();
 
         if (actor === 'llm-a') {
-            const tsNow = formatTerminalIsoTimestamp(Date.now());
+            const tsNow = formatTerminalTimeLabel(Date.now(), { mode: 'dual' });
             println(SEPARATOR);
             println(terminalThemeHeadline('system', 'LLM-A', [`[${tsNow}]`]));
             println('');

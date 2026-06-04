@@ -5165,3 +5165,32 @@
 - [ ] Próxima lacuna do harness: adicionar heartbeat/diagnóstico textual próprio quando o cenário
       fica mais de 60s sem eventos relevantes após deltas, para não deixar o operador sem saber se
       o modelo, o SDK ou o runner estão travados.
+
+### 12.32 Investigação oficial de libs auxiliares e contrato de tempo dual
+
+- [x] Auditoria retomada em 2026-06-04 com foco no pedido explícito do operador: investigar
+      profundamente `gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`, `zoxide`, `jq` e `yq` antes de
+      qualquer nova integração.
+- [x] Documento complementar atualizado:
+      `src/copilot/docs/terminal/TERMINAL_AUXILIARY_LIBS_INTEGRATION_AUDIT_2026-06-03.md`.
+- [x] Decisão consolidada: `fzf`, `gum`, `bat`, `glow`, `delta`, `jq` e `yq` seguem como
+      enriquecimentos opcionais e explícitos; `atuin` e `zoxide` continuam adiados por mexerem em
+      histórico/cwd pessoal do operador.
+- [x] Risco oficial reavaliado: `fzf --preview` executa comando via shell, portanto preview dentro
+      de picker fica bloqueado até existir adapter próprio sem shell livre.
+- [x] Risco oficial reavaliado: Atuin depende de hooks de shell interativo e tem documentação
+      específica sobre IDEs/AI tools; não deve ser backend automático do terminal.
+- [x] Risco oficial reavaliado: `yq` tem operadores de arquivo/env; adapter estruturado deve
+      continuar usando stdin e flags de segurança.
+- [x] `terminal/time-format` ganhou `formatTerminalTimeParts` e `formatTerminalTimestamp`, mantendo
+      `formatTerminalTimeLabel` como wrapper compatível.
+- [x] Default humano confirmado como `dual`: ISO 8601 local até segundos + tempo relativo.
+- [x] Cabeçalhos de LLM-A/LLM-B, raciocínio, `printExchange`, runtime timestamps e comandos humanos
+      selecionados migraram de ISO cru/milissegundos para helper dual.
+- [ ] Próxima lacuna: auditar comandos remanescentes que ainda mostram apenas ISO ou apenas relativo
+      por decisão local (`/sdk`, `/workspace-index`, `/export`, `/byok`) e classificar se são
+      humanos ou raw/export.
+- [ ] Próxima validação: testes escopados de `time-format`, turn display, commands alterados e
+      typecheck strict de `src/copilot`.
+- [ ] Próxima live: repetir cenário canônico até `ask_user` real para validar linha viva curta,
+      timestamps dual e ausência de disputa com input.

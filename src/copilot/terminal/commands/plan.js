@@ -25,7 +25,7 @@ import {
     updateTerminalSdkPlanProjection,
 } from '../frontend/index.js';
 import {
-    formatTerminalIsoTimestamp,
+    formatTerminalTimeLabel,
     terminalThemeDivider,
     terminalThemeHeadline,
     terminalThemeRow,
@@ -71,7 +71,7 @@ export async function cmdPlan({ println }, arg) {
             ? projection.plan.content.slice(0, 160) + (projection.plan.content.length > 160 ? '…' : '')
             : null;
         const op = projection.lastObservedPlanOperation
-            ? `${projection.lastObservedPlanOperation}${projection.lastObservedPlanChangedAt ? ` @ ${formatTerminalIsoTimestamp(projection.lastObservedPlanChangedAt)}` : ''}`
+            ? `${projection.lastObservedPlanOperation}${projection.lastObservedPlanChangedAt ? ` @ ${formatTerminalTimeLabel(projection.lastObservedPlanChangedAt, { mode: 'dual' })}` : ''}`
             : '(sem alterações observadas)';
 
         println('');

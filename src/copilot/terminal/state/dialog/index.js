@@ -11,7 +11,13 @@ export { recordTerminalStreamDeltaDiagnostic } from '../stream-diagnostics-state
 export { formatTerminalThinkingRef } from '../thinking-labels.js';
 export { readTerminalTurnCorrelation, withTerminalTurnCorrelation } from '../turn-correlation-state.js';
 export { readTerminalTurnMaterialization } from '../turn-materialization-state.js';
-export { formatTerminalIsoTimestamp, formatTerminalIsoTimestampSeconds, formatTerminalTimeLabel } from '../time-format.js';
+export {
+    formatTerminalIsoTimestamp,
+    formatTerminalIsoTimestampSeconds,
+    formatTerminalTimeLabel,
+    formatTerminalTimeParts,
+    formatTerminalTimestamp,
+} from '../time-format.js';
 export { getTerminalDetailLevel } from '../ui-preferences.js';
 export {
     terminalThemeDivider,

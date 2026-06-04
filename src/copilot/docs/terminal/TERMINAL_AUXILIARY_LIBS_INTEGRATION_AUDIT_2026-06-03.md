@@ -2,6 +2,8 @@
 
 Data: 2026-06-03
 
+Atualização canônica: 2026-06-04
+
 Escopo: `src/copilot/terminal`, integrações diretas com `src/copilot/model-gateway`, comandos canônicos e lives da LLM-B.
 
 Documento-guia complementar ao roadmap principal:
@@ -40,6 +42,16 @@ legível, previsível e poderoso, preservando portabilidade e mantendo o prompt 
 
 ## 3. Fontes oficiais consultadas
 
+Atualização 2026-06-04:
+
+- [x] A investigação foi refeita contra documentação oficial antes de qualquer nova integração.
+- [x] A conclusão continua: as libs são aceleradores de UX, não fundação obrigatória.
+- [x] `fzf`, `gum`, `bat`, `glow`, `delta`, `jq` e `yq` ficam aceitos como enriquecimento explícito.
+- [x] `atuin` e `zoxide` seguem adiados porque alteram estado pessoal do shell e do operador.
+- [x] O terminal LLM-B deve sempre ser capaz de explicar qual renderer foi usado e qual fallback foi aplicado.
+- [x] O fluxo canônico continua sendo JS/Node para contratos internos; binários externos só em preview,
+      seleção ou diagnóstico explícitos.
+
 ### 3.1 `gum`
 
 Fonte oficial:
@@ -54,6 +66,9 @@ Achados técnicos:
 - [x] `gum confirm` usa código de saída para afirmar ou negar.
 - [x] `gum filter` e `gum choose` podem selecionar múltiplos itens.
 - [x] `gum input` e `gum write` tomam controle do TTY, portanto competem com o prompt vivo.
+- [x] A própria lista oficial de comandos mostra que `gum` mistura componentes passivos
+      (`style`, `table`, `format`) com componentes interativos (`input`, `choose`, `filter`,
+      `pager`), logo o adaptador precisa declarar o tipo de tomada de TTY de cada subcomando.
 
 Decisão:
 
@@ -77,12 +92,18 @@ Achados técnicos:
       modelos BYOK e resultados de busca.
 - [x] Preview com `bat` é padrão de uso documentado pela comunidade do próprio `bat` e compatível
       com arquitetura de preview opcional.
+- [x] A documentação oficial de `fzf --preview` alerta que o preview é executado por `$SHELL -c`
+      e que não deve ser colocado globalmente em `FZF_DEFAULT_OPTS`.
+- [x] Decisão de segurança: nosso adapter de `fzf` pode usar preview apenas com comandos próprios
+      e argumentos escapados/controlados; a fase atual aceita seleção sem preview shell livre.
 
 Decisão:
 
 - [x] Aceitar como alto valor para `pickers` opt-in.
 - [x] Implementar apenas após existir registry de capacidades e fallback textual.
 - [x] Nunca abrir `fzf` durante streaming automático da LLM-B.
+- [x] Evitar `--preview` no primeiro ciclo real; preview de arquivos deve ser produzido pelo nosso
+      adapter (`bat`/JS) antes ou depois da seleção, não por string shell ad hoc dentro do `fzf`.
 
 ### 3.3 `bat`
 
@@ -96,6 +117,8 @@ Achados técnicos:
 - [x] A documentação oficial mostra uso com stdin e linguagem explícita.
 - [x] A documentação oficial recomenda `--color=always` e `--line-range` para preview com `fzf`.
 - [x] Em Debian/Ubuntu antigos o binário pode chamar `batcat`, não `bat`.
+- [x] Como `bat` pode paginar automaticamente, o adapter precisa forçar `--paging=never` em
+      superfícies não interativas.
 
 Decisão:
 
@@ -115,6 +138,9 @@ Achados técnicos:
 - [x] A documentação oficial descreve TUI local e CLI para arquivo, stdin, GitHub/GitLab e HTTP.
 - [x] `glow -w` controla largura; `glow -p` usa pager.
 - [x] A TUI é útil para docs, mas toma o terminal.
+- [x] A documentação atual de Glow separa explicitamente TUI Mode, CLI Mode, Styling & Themes e
+      Command Reference; o terminal deve preferir CLI/stdin para preview curto e reservar TUI/pager
+      para comando explícito.
 
 Decisão:
 
@@ -135,6 +161,8 @@ Achados técnicos:
 - [x] Pode ficar próximo ao diff padrão ou mudar layout/estilo profundamente.
 - [x] A documentação oficial descreve uso como pager de Git e também sobre unified diff via stdin.
 - [x] Para nosso terminal, o valor está em `/git diff`, `/gh pr diff`, previews de patch e revisão.
+- [x] `delta` também suporta modos ricos como side-by-side e line numbers, mas a primeira integração
+      deve permanecer próxima do diff padrão para reduzir surpresa visual.
 
 Decisão:
 
@@ -155,6 +183,11 @@ Achados técnicos:
 - [x] A documentação oficial indica hooks de shell e suportes para zsh, bash, fish, nushell, xonsh
       e PowerShell.
 - [x] A integração real depende do shell interativo; IDEs podem iniciar shell sem carregar hooks.
+- [x] A documentação oficial sobre IDEs e AI coding assistants reforça que Atuin depende de hooks
+      `preexec`/`precmd`, shell interativo e configuração do shell, podendo falhar em terminais
+      embutidos.
+- [x] A própria documentação recomenda filtros (`history_filter`, `cwd_filter`) e variáveis de
+      exclusão quando ferramentas automatizadas geram ruído ou comandos sensíveis.
 
 Decisão:
 
@@ -162,6 +195,8 @@ Decisão:
 - [x] Não integrar ao terminal LLM-B como backend de histórico neste momento.
 - [x] Pode ser documentado como ferramenta pessoal do operador, não como componente do produto.
 - [x] Qualquer uso futuro deve ser opt-in, sem sync automático e sem ler histórico externo por padrão.
+- [x] Não chamar `atuin search`, `atuin history` ou `atuin sync` automaticamente; qualquer futura
+      integração precisa de consentimento explícito e isolamento de histórico do operador.
 
 ### 3.7 `zoxide`
 
@@ -176,12 +211,16 @@ Achados técnicos:
 - [x] A documentação oficial mostra comandos `z`, `zi` e integração interativa com `fzf`.
 - [x] A configuração depende de `zoxide init <shell>` e hooks por prompt ou mudança de diretório.
 - [x] O terminal LLM-B opera em workspace fixo e tem escopo controlado por segurança/UX.
+- [x] O valor de `zoxide` vem de memória pessoal de navegação; isso é precisamente o que não deve
+      alterar o cwd canônico do terminal LLM-B por default.
 
 Decisão:
 
 - [x] Adiar.
 - [x] Não usar para navegação automática do terminal LLM-B.
 - [x] Pode ser útil para operador humano fora do produto, mas não deve afetar cwd canônico.
+- [x] Um futuro `/cd --interactive` pode consultar `zoxide` apenas se o operador pedir e se o
+      escopo permitir; defaults seguem presos ao workspace do produto.
 
 ### 3.8 `jq`
 
@@ -196,6 +235,8 @@ Achados técnicos:
 - [x] É escrito em C portátil e pode existir como binário único sem dependências de runtime.
 - [x] Nosso sistema já deve manter parser/validador JS como fonte canônica, mas `jq` é excelente
       para diagnóstico, pretty print, consultas ad hoc e contracts de CLI.
+- [x] A documentação oficial define `jq` como linguagem de filtros de entrada/saída; isso combina
+      com comandos pipeáveis e não com mutação de estado interno do terminal.
 
 Decisão:
 
@@ -218,6 +259,8 @@ Achados técnicos:
 - [x] O README oficial inclui nota de segurança para Docker/Podman com privilégios restritos.
 - [x] Valor real para nós: `.env`, YAML de configs futuras, GitHub Actions, manifests, relatórios e
       contratos estruturados externos.
+- [x] A documentação de `yq` inclui operadores de arquivo e `eval`; por isso, no terminal LLM-B,
+      o adapter deve desabilitar operações de env/file quando estiver formatando stdin diagnóstico.
 
 Decisão:
 
@@ -230,15 +273,22 @@ Decisão:
 - [x] O terminal já possui tema central: `terminalThemeHeadline`, `terminalThemeRow`,
       `terminalThemeRows`, `terminalThemeDivider`, `terminalThemeText` e chips.
 - [x] O terminal já possui contrato central de tempo: `formatTerminalTimeLabel`.
+- [x] O contrato de tempo já permite `relative`, `iso`, `dual` e `elapsed`; o default humano deve
+      ser `dual`, com ISO 8601 local até segundos e idade relativa.
 - [x] O terminal já possui comandos com estilo humano crescente: `/byok`, `/activity`, `/events`,
       `/session sdk`, `/status`, `/now`, `/gh`, `/fs`, `/model`.
 - [x] O terminal já possui registry central de binários externos para as libs auditadas.
 - [x] O terminal já possui adapters read-only de preview, Markdown, diff e dados estruturados.
 - [x] O terminal já possui planner/guarda textual para pickers externos, sem lançar TUI ainda.
-- [x] O terminal já possui contrato central de TTY exclusivo para futuras TUIs externas.
+- [x] O terminal já possui contrato central de TTY exclusivo e executor opt-in para `fzf`/`gum`,
+      validado em modo filtrado porque o harness PTY não emula TUI visual completa.
 - [x] Alguns comandos ainda fazem rendering local de snippets e listas, dificultando enriquecimento
       incremental por `bat`, `fzf`, `glow` ou `delta`.
 - [x] O terminal já deve continuar funcional sem qualquer lib externa.
+- [x] O `request_user_input` já foi humanizado em várias superfícies, mas lives canônicas ainda
+      precisam repetir validação até ocorrer `ask_user` real após a compactação da linha viva.
+- [x] Algumas superfícies humanas ainda usam ISO com milissegundos ou apenas relativo; a próxima
+      camada deve padronizar ISO até segundos + relativo por helper geral.
 
 ## 5. Situação ideal
 
@@ -254,18 +304,19 @@ Decisão:
 ### 5.2 Adapters sem dependência obrigatória
 
 - [x] Criar adapter de preview read-only.
-- [ ] Criar adapter de picker interativo com handoff real de TTY.
+- [x] Criar adapter de picker interativo com handoff real de TTY.
 - [x] Criar adapter de Markdown.
 - [x] Criar adapter de diff.
 - [x] Criar adapter de JSON/YAML query/format.
 - [x] Garantir fallback JS para preview, Markdown, diff e dados estruturados.
-- [ ] Garantir fallback textual e handoff seguro para pickers interativos.
+- [x] Garantir fallback textual e handoff seguro para pickers interativos.
+- [ ] Criar camada de preview seguro dentro de picker sem usar `fzf --preview` com shell livre.
 
 ### 5.3 Integração UX
 
 - [x] `/menu` pode oferecer picker textual seguro se o operador pedir e o terminal ainda nao
       tiver controle exclusivo do TTY para `fzf`/`gum`.
-- [ ] `/menu` pode abrir picker externo real se `fzf`/`gum` estiverem disponíveis, o operador pedir
+- [x] `/menu` pode abrir picker externo real se `fzf`/`gum` estiverem disponíveis, o operador pedir
       e o REPL entregar handoff exclusivo de TTY.
 - [ ] `/search` pode oferecer preview com `bat`/`glow` sem mudar resultado canônico.
 - [x] `/fs read` pode previewar com `bat` quando explicitamente solicitado.
@@ -279,13 +330,24 @@ Decisão:
 
 - [x] TUI externa nao deve sequestrar o prompt vivo sem handoff explícito; `/menu picker`
       atualmente renderiza guarda textual.
-- [ ] Dependência ausente quebrar fluxo principal.
-- [ ] ANSI externo vazar para logs/testes.
-- [ ] Tool externa ler arquivo sensível em preview sem ação explícita.
-- [ ] Shell quoting inseguro ao montar comandos com paths.
-- [ ] Windows/WSL/macOS/Linux divergirem em nomes de binário.
-- [ ] Atuin/zoxide alterarem estado do operador fora do controle do produto.
-- [ ] `jq`/`yq` virarem fonte canônica paralela e divergente do JS.
+- [x] Dependência ausente quebrar fluxo principal: mitigado por registry/fallback; continuar
+      cobrindo em teste com `PATH` controlado.
+- [x] ANSI externo vazar para logs/testes: mitigado por `--color=never`/sanitização em previews;
+      continuar verificando em comandos default.
+- [x] Tool externa ler arquivo sensível em preview sem ação explícita: mitigado por exigir `/fs
+      preview`/`--preview`; não acionar preview automático por fluxo da LLM-B.
+- [x] Shell quoting inseguro ao montar comandos com paths: mitigado por `spawnSync` com arrays;
+      proibido `shell: true`.
+- [x] Windows/WSL/macOS/Linux divergirem em nomes de binário: mitigado para `batcat`; pendente
+      auditar nomes/versões em Windows se houver uso nativo.
+- [x] Atuin/zoxide alterarem estado do operador fora do controle do produto: mitigado por decisão
+      `deferred` e `defaultEnabled=false`.
+- [x] `jq`/`yq` virarem fonte canônica paralela e divergente do JS: mitigado por contrato
+      "diagnóstico/preview apenas".
+- [ ] Preview shell dentro de `fzf --preview` introduzir vetor de quoting: decisão atual é não
+      usar `--preview` até haver adapter próprio de preview tokenizado.
+- [ ] TUI completa visual em terminal real ainda não foi validada manualmente; automação filtrada
+      prova handoff, seleção e restauração, mas não prova estética completa.
 
 ## 7. Decisões de arquitetura
 
@@ -484,8 +546,8 @@ Decisão:
 ### Faixa G: pickers interativos
 
 - [x] Fase G.0: criar planner/guarda seguro para pickers externos.
-- [ ] Fase G.1: criar adapter `fzf` para listas com handoff real de TTY.
-- [ ] Fase G.2: avaliar `gum filter`/`gum choose` como alternativa com o mesmo handoff.
+- [x] Fase G.1: criar adapter `fzf` para listas com handoff real de TTY.
+- [x] Fase G.2: avaliar `gum filter`/`gum choose` como alternativa com o mesmo handoff.
 - [x] Fase G.3: plugar `/menu picker` como opção explícita textual e segura.
 - [x] Fase G.4: impedir execução sem autorização interativa explícita ou com pergunta humana pendente.
 - [x] Fase G.5: criar contrato central para pausar linha viva/readline, entregar TTY exclusivo
@@ -496,6 +558,8 @@ Decisão:
       automatizada por `fzf --filter`.
 - [ ] Fase G.9: auditar TUI visual completa em terminal real/manual, validando seleção/cancelamento
       em `fzf` e, quando instalado, `gum`.
+- [ ] Fase G.10: projetar preview integrado ao picker sem string shell livre, ou rejeitar preview
+      de picker e manter preview antes/depois da seleção.
 
 ### Faixa H: contratos estruturados
 
@@ -506,22 +570,46 @@ Decisão:
 - [x] Fase H.5: validar em live PTY com critérios dedicados.
 - [x] Fase H.6: manter parsers JS como fonte canônica.
 - [ ] Fase H.7: documentar pipe seguro para LLM e operador.
+- [ ] Fase H.8: adicionar exemplos humanos em `/terminal libs detail` e `/help full` para
+      `--json | jq` e `--yaml --query`, sem tornar isso obrigatório.
 
 ### Faixa I: lives e validação UX
 
-- [ ] Fase I.1: live PTY com todas as libs ausentes.
-- [ ] Fase I.2: live PTY com libs simuladas no PATH.
-- [ ] Fase I.3: live real quando ferramentas existirem no ambiente.
-- [ ] Fase I.4: confirmar que prompt vivo não é roubado.
-- [ ] Fase I.5: confirmar que `ask_user` segue nobre e não vira tool comum.
+- [x] Fase I.1: live PTY com libs ausentes/indisponíveis no fluxo default.
+- [x] Fase I.2: live PTY com adapters exercidos por comandos explícitos.
+- [x] Fase I.3: live PTY filtrada de picker interativo com `fzf --filter`.
+- [x] Fase I.4: confirmar que prompt vivo não é roubado no modo guard/default.
+- [x] Fase I.5: confirmar que `ask_user` segue nobre e não vira tool comum em live canônico
+      anterior; repetir após compactação de linha viva.
+- [ ] Fase I.6: repetir live canônico até uma execução com `ask_user` real pós-compactação.
+- [ ] Fase I.7: validar manualmente TUI visual completa em terminal real quando o operador quiser.
+
+### Faixa J: tempo humano e auditabilidade
+
+- [x] Fase J.1: criar helper central capaz de ISO, relativo, dual e elapsed.
+- [x] Fase J.2: default humano `dual`: ISO local até segundos + relativo.
+- [ ] Fase J.3: adicionar helper de partes (`iso`, `relative`, `elapsed`, `label`) para callers
+      que precisam compor layout sem reparsear timestamps.
+- [ ] Fase J.4: substituir superfícies humanas remanescentes que usam apenas ISO com milissegundos
+      por `formatTerminalTimeLabel` ou helper equivalente.
+- [ ] Fase J.5: manter raw/export técnico com ISO estável quando isso for melhor para máquina.
+- [ ] Fase J.6: testar turn display, runtime events e comandos de erro/audit/search/session.
+
+### Faixa K: integração com roadmap principal de UX
+
+- [ ] Fase K.1: referenciar este documento na seção corrente do roadmap principal.
+- [ ] Fase K.2: registrar que libs externas não substituem a revolução de UX nativa; elas apenas
+      enriquecem caminhos explícitos.
+- [ ] Fase K.3: transformar achados de tempo e picker em critérios live.
 
 ## 9. Próxima ação recomendada
 
-Implementar Faixas B e C primeiro.
+Implementar Faixa J e atualizar o roadmap principal.
 
 Motivo:
 
-- Elas não mudam o fluxo principal.
-- Elas criam transparência para operador e LLM.
-- Elas dão base para qualquer uso posterior.
-- Elas reduzem risco antes de acoplar preview, picker ou pager.
+- A maior parte das Faixas B-H já foi implementada e validada de modo escopado.
+- O pedido atual exige ISO 8601 até segundos e tempo relativo em superfícies humanas.
+- O helper já existe, mas precisa ser ampliado para callers compostos e aplicado onde ainda há
+  ISO cru com milissegundos.
+- Essa mudança melhora auditabilidade e legibilidade sem depender de nenhuma lib externa.

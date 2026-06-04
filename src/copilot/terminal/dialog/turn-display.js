@@ -11,7 +11,7 @@
 import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../../presentation/state/index.js';
 import {
     formatTerminalThinkingRef,
-    formatTerminalIsoTimestamp,
+    formatTerminalTimeLabel,
     recordTerminalActivity,
     recordTerminalStreamDeltaDiagnostic,
     readTerminalTurnCorrelation,
@@ -230,7 +230,7 @@ export function createReasoningCallback(state) {
                 source: 'dialog',
             });
             if (state.showThinking) {
-        const tsNow = formatTerminalIsoTimestamp(Date.now());
+        const tsNow = formatTerminalTimeLabel(Date.now(), { mode: 'dual' });
         println(SEPARATOR);
         println(
             terminalThemeHeadline('thinking', 'Raciocínio capturado', [`[${tsNow}]`, state.model, state.effort]),
@@ -378,7 +378,7 @@ export function createDeltaCallback(state) {
             } else {
                 clearInlineStatus();
             }
-            const tsNow = formatTerminalIsoTimestamp(now);
+            const tsNow = formatTerminalTimeLabel(now, { mode: 'dual' });
             println(SEPARATOR);
             println(
                 terminalThemeHeadline('assistant', 'LLM-B', [`[${tsNow}]`, state.model, state.effort]),

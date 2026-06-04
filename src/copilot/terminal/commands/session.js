@@ -49,7 +49,6 @@ import {
 } from '../events/tool-activity-presenter.js';
 import {
     readTerminalSseEventArchiveTail,
-    formatTerminalIsoTimestamp,
     formatTerminalTimeLabel,
     renderTerminalPendingQuestionKindLabel,
     terminalPermissionModeSkipsSdkPrompts,
@@ -684,7 +683,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const effort = configProjection.currentReasoningEffort;
     const sdkMode = projection.sdkSessionMode ?? 'interactive';
     const sdkPlanOpLabel = projection.sdkPlanOperation
-        ? `${projection.sdkPlanOperation}${projection.sdkPlanChangedAt ? ` @ ${formatTerminalIsoTimestamp(projection.sdkPlanChangedAt)}` : ''}`
+        ? `${projection.sdkPlanOperation}${projection.sdkPlanChangedAt ? ` @ ${formatTerminalTimeLabel(projection.sdkPlanChangedAt, { mode: 'dual' })}` : ''}`
         : 'sem alterações';
     const ws = projection.workspace;
     const branchStr = ws.currentBranch ? ws.currentBranch : 'sem branch';
@@ -713,7 +712,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const inputChannel = projection.dialogInputChannel;
     const shadowExpiry =
         typeof projection.pendingQuestionShadowExpiresAt === 'number'
-            ? formatTerminalIsoTimestamp(projection.pendingQuestionShadowExpiresAt)
+            ? formatTerminalTimeLabel(projection.pendingQuestionShadowExpiresAt, { mode: 'dual' })
             : null;
     const shadowAgeLabel =
         typeof projection.pendingQuestionShadowAgeMs === 'number'
@@ -1063,7 +1062,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     if (projection.timelineSyncStatus === 'failed') {
         const retryLabel =
             typeof projection.timelineSyncNextRetryAt === 'number'
-                ? ` próxima tentativa ${formatTerminalIsoTimestamp(projection.timelineSyncNextRetryAt)}`
+                ? ` próxima tentativa ${formatTerminalTimeLabel(projection.timelineSyncNextRetryAt, { mode: 'dual' })}`
                 : '';
         println(
             terminalThemeRow('Sync Hub', `falhou: ${projection.timelineSyncLastError ?? 'erro desconhecido'}${retryLabel}`, {
@@ -2544,7 +2543,7 @@ export async function cmdSessionList({ println }) {
         const createdAt = s['createdAt'];
         const date =
             typeof createdAt === 'number' || typeof createdAt === 'string'
-                ? formatTerminalIsoTimestamp(createdAt)
+                ? formatTerminalTimeLabel(createdAt, { mode: 'dual' })
                 : 'data inválida';
         println(
             `    ${String(s['snapshotId'] ?? '')}  ${date}  modelo ${String(s['model'] ?? '')}  ${String(s['reason'] ?? '')}`,
@@ -2576,7 +2575,7 @@ export async function cmdSessionRestore({ println }, snapshotId) {
     const createdAt = snap['createdAt'];
     const createdAtIso =
         typeof createdAt === 'number' || typeof createdAt === 'string'
-            ? formatTerminalIsoTimestamp(createdAt)
+            ? formatTerminalTimeLabel(createdAt, { mode: 'dual' })
             : 'data inválida';
     println(`    Criado: ${createdAtIso}`);
     println(`    Sessão: ${String(snap['sessionId'] ?? '(nenhuma)')}`);
@@ -2601,10 +2600,10 @@ export async function cmdSessionRestore({ println }, snapshotId) {
         const shadowKind = typeof shadow.meta?.kind === 'string' ? ` [${shadow.meta.kind}]` : '';
         println(`    Pergunta restaurada${shadowKind}: ${String(shadow.question ?? '(sem texto)')}`);
         if (typeof shadow.restoredAt === 'number') {
-            println(`    Restaurada em: ${formatTerminalIsoTimestamp(shadow.restoredAt)}`);
+            println(`    Restaurada em: ${formatTerminalTimeLabel(shadow.restoredAt, { mode: 'dual' })}`);
         }
         if (typeof shadow.expiresAt === 'number') {
-            println(`    Expira em: ${formatTerminalIsoTimestamp(shadow.expiresAt)}`);
+            println(`    Expira em: ${formatTerminalTimeLabel(shadow.expiresAt, { mode: 'dual' })}`);
         }
     }
     if (snap['prMetrics']) {

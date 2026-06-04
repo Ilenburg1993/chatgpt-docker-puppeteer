@@ -10,6 +10,27 @@
 
 /** @typedef {'relative' | 'iso' | 'dual' | 'elapsed'} TerminalTimeDisplayMode */
 /** @typedef {'seconds' | 'milliseconds'} TerminalIsoPrecision */
+/**
+ * @typedef {{
+ *     mode?: TerminalTimeDisplayMode | null;
+ *     now?: number;
+ *     isoPrecision?: TerminalIsoPrecision;
+ *     dualSeparator?: string;
+ *     relativeWrapper?: 'parentheses' | 'suffix' | 'none';
+ * }} TerminalTimeFormatOptions
+ */
+/**
+ * @typedef {{
+ *     value: number | string | Date | null | undefined;
+ *     timestamp: number | null;
+ *     valid: boolean;
+ *     mode: TerminalTimeDisplayMode;
+ *     iso: string;
+ *     relative: string;
+ *     elapsed: string;
+ *     label: string;
+ * }} TerminalTimeParts
+ */
 
 /** @type {readonly TerminalTimeDisplayMode[]} */
 export const TERMINAL_TIME_DISPLAY_MODES = Object.freeze(['relative', 'iso', 'dual', 'elapsed']);
@@ -139,32 +160,76 @@ export function resolveTerminalTimeDisplayMode(value = process.env['COPILOT_TERM
 }
 
 /**
- * Formata um instante em modo configurável para superfícies humanas do terminal.
- *
- * @param {number | string | Date | null | undefined} value
- * @param {{
- *     mode?: TerminalTimeDisplayMode | null;
- *     now?: number;
- *     isoPrecision?: TerminalIsoPrecision;
- *     dualSeparator?: string;
- *     relativeWrapper?: 'parentheses' | 'suffix' | 'none';
- * }} [options]
+ * @param {string} iso
+ * @param {string} relative
+ * @param {TerminalTimeFormatOptions} options
  * @returns {string}
  */
-export function formatTerminalTimeLabel(value, options = {}) {
-    const mode = resolveTerminalTimeDisplayMode(options.mode ?? undefined);
-    const now = options.now ?? Date.now();
-    if (mode === 'elapsed') {
-        const timestamp = parseTerminalTimestamp(value, now);
-        return formatTerminalElapsedDuration(Math.max(0, now - (Number.isFinite(timestamp) ? timestamp : now)));
-    }
-    const iso = formatTerminalIsoTimestamp(value, { precision: options.isoPrecision ?? 'seconds' });
-    if (mode === 'iso') return iso;
-    const relative = formatTerminalRelativeAge(value, now);
-    if (mode === 'relative') return relative;
+function formatDualTerminalTimeLabel(iso, relative, options) {
     const separator = options.dualSeparator ?? ' ';
     const wrapper = options.relativeWrapper ?? 'parentheses';
     if (wrapper === 'suffix') return `${iso}${separator}${relative}`;
     if (wrapper === 'none') return `${iso}${separator}${relative}`;
     return `${iso}${separator}(${relative})`;
+}
+
+/**
+ * Gera todas as partes temporais canônicas de uma vez. Use quando a superfície precisa montar layout próprio
+ * sem reparsear o timestamp ou quando precisa exibir ISO e relativo em campos separados.
+ *
+ * @param {number | string | Date | null | undefined} value
+ * @param {TerminalTimeFormatOptions} [options]
+ * @returns {TerminalTimeParts}
+ */
+export function formatTerminalTimeParts(value, options = {}) {
+    const mode = resolveTerminalTimeDisplayMode(options.mode ?? undefined);
+    const now = options.now ?? Date.now();
+    const timestamp = parseTerminalTimestamp(value, now);
+    const valid = Number.isFinite(timestamp);
+    const safeTimestamp = valid ? timestamp : now;
+    const iso = valid ? formatTerminalIsoTimestamp(safeTimestamp, { precision: options.isoPrecision ?? 'seconds' }) : 'tempo inválido';
+    const relative = valid ? formatTerminalRelativeAge(safeTimestamp, now) : 'tempo relativo indisponível';
+    const elapsed = valid ? formatTerminalElapsedDuration(Math.max(0, now - safeTimestamp)) : '0s';
+    const label =
+        mode === 'elapsed'
+            ? elapsed
+            : mode === 'iso'
+              ? iso
+              : mode === 'relative'
+                ? relative
+                : valid
+                  ? formatDualTerminalTimeLabel(iso, relative, options)
+                  : iso;
+    return {
+        value,
+        timestamp: valid ? timestamp : null,
+        valid,
+        mode,
+        iso,
+        relative,
+        elapsed,
+        label,
+    };
+}
+
+/**
+ * Formata um instante em modo configurável para superfícies humanas do terminal.
+ *
+ * @param {number | string | Date | null | undefined} value
+ * @param {TerminalTimeFormatOptions} [options]
+ * @returns {string}
+ */
+export function formatTerminalTimeLabel(value, options = {}) {
+    return formatTerminalTimeParts(value, options).label;
+}
+
+/**
+ * Alias semântico para callers novos: o timestamp humano do terminal é configurável, com default dual.
+ *
+ * @param {number | string | Date | null | undefined} value
+ * @param {TerminalTimeFormatOptions} [options]
+ * @returns {string}
+ */
+export function formatTerminalTimestamp(value, options = {}) {
+    return formatTerminalTimeLabel(value, options);
 }

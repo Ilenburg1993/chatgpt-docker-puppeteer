@@ -14,7 +14,7 @@ import {
     rememberTerminalMemoryProjection,
 } from '../frontend/index.js';
 import {
-    formatTerminalIsoTimestamp,
+    formatTerminalTimeLabel,
     terminalThemeDivider,
     terminalThemeHeadline,
     terminalThemeRow,
@@ -59,7 +59,7 @@ export function cmdRecall({ println }, arg) {
     println(terminalThemeHeadline('assistant', 'Memórias', [label ? String(arg) : 'todas']));
     println(terminalThemeDivider(45));
     for (const m of memories) {
-        const ts = formatTerminalIsoTimestamp(String(m['created_at'] ?? ''));
+        const ts = formatTerminalTimeLabel(String(m['created_at'] ?? ''), { mode: 'dual' });
         println(terminalThemeRow(String(m['tag'] ?? 'memória'), `${ts} · ${m['content'] ?? ''}`));
     }
     println(terminalThemeDivider(45));

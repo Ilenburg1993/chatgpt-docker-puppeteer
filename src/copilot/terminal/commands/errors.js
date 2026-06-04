@@ -11,7 +11,7 @@
  */
 
 import { readTerminalErrorsProjection } from '../frontend/index.js';
-import { formatTerminalIsoTimestamp, terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
+import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 
 /**
  * @typedef {object} ErrorsContext
@@ -45,7 +45,7 @@ export function cmdErrors({ println }, arg) {
     }
 
     for (const err of recent) {
-        const ts = formatTerminalIsoTimestamp(err.timestamp);
+        const ts = formatTerminalTimeLabel(err.timestamp, { mode: 'dual' });
         const type = err.errorType ?? 'Error';
         const src = err.source ? ` · fonte ${err.source}` : '';
         println(terminalThemeRow(type, `${ts}${src} · ${err.message}`, { role: 'error', width: 18 }));

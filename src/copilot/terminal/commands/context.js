@@ -13,7 +13,7 @@
 
 import { readTerminalContextProjection, requestTerminalCompactionProjection } from '../frontend/index.js';
 import {
-    formatTerminalIsoTimestamp,
+    formatTerminalTimeLabel,
     terminalThemeHeadline,
     terminalThemeRow,
     terminalThemeText,
@@ -121,7 +121,7 @@ export function cmdContext({ println }, arg = '') {
     if (projection.syncStatus === 'failed') {
         const retryLabel =
             typeof projection.syncNextRetryAt === 'number'
-                ? ` próxima tentativa ${formatTerminalIsoTimestamp(projection.syncNextRetryAt)}`
+                ? ` próxima tentativa ${formatTerminalTimeLabel(projection.syncNextRetryAt, { mode: 'dual' })}`
                 : '';
         println(terminalThemeRow('Sync Hub', `falhou: ${projection.syncLastError ?? 'erro desconhecido'}${retryLabel}`, { role: 'warn' }));
     }

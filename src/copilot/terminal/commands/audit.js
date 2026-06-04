@@ -11,7 +11,7 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
-import { formatTerminalIsoTimestamp, terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
+import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 
 /**
  * @typedef {object} AuditContext
@@ -48,7 +48,7 @@ export async function cmdAudit({ println }, arg) {
         const e = /** @type {Record<string, unknown>} */ (entry);
         const type = typeof e['type'] === 'string' ? e['type'] : 'unknown';
         categories[type] = (categories[type] ?? 0) + 1;
-        const ts = typeof e['ts'] === 'number' ? formatTerminalIsoTimestamp(e['ts']) : 'sem horário';
+        const ts = typeof e['ts'] === 'number' ? formatTerminalTimeLabel(e['ts'], { mode: 'dual' }) : 'sem horário';
         const desc = typeof e['description'] === 'string' ? e['description'] : type;
         println(terminalThemeRow(type, `${ts} · ${desc}`, { role: 'command', width: 18 }));
     }

@@ -20,7 +20,7 @@
 
 import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
 import {
-    formatTerminalIsoTimestamp,
+    formatTerminalTimeLabel,
     renderTerminalPendingQuestionKindLabel,
     terminalPermissionModeSkipsSdkPrompts,
     terminalThemeDivider,
@@ -263,7 +263,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
             ? `${C.grey}${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${renderGatewayActiveLabel(gatewayActive)}${C.reset}`
             : `${C.grey}off${C.reset}`;
     const planOpLine = configProjection.sdkPlanOperation
-        ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${formatTerminalIsoTimestamp(configProjection.sdkPlanChangedAt)}${C.reset}` : ''}`
+        ? `${C.yellow}${configProjection.sdkPlanOperation}${C.reset}${configProjection.sdkPlanChangedAt ? ` ${C.grey}@ ${formatTerminalTimeLabel(configProjection.sdkPlanChangedAt, { mode: 'dual' })}${C.reset}` : ''}`
         : `${C.grey}(sem alteração)${C.reset}`;
     const runtimesLine =
         Array.isArray(configProjection.agentRuntimes) && configProjection.agentRuntimes.length > 0

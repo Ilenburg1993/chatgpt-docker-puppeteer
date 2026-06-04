@@ -47,6 +47,8 @@ export {
     formatTerminalIsoTimestamp,
     formatTerminalIsoTimestampSeconds,
     formatTerminalRelativeAge,
+    formatTerminalTimeParts,
     formatTerminalTimeLabel,
+    formatTerminalTimestamp,
     resolveTerminalTimeDisplayMode,
 } from '../time-format.js';

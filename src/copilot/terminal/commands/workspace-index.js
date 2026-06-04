@@ -18,7 +18,7 @@ import {
     getIoIndexStats,
     searchIoIndex,
 } from '../../infra/index.js';
-import { formatTerminalIsoTimestamp } from '../state/ui/index.js';
+import { formatTerminalTimeLabel } from '../state/ui/index.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} IndexCommandContext
@@ -175,7 +175,7 @@ function printStats(ctx) {
         return;
     }
     const latest =
-        typeof stats['latestIndexedAtMs'] === 'number' ? formatTerminalIsoTimestamp(stats['latestIndexedAtMs']) : '-';
+        typeof stats['latestIndexedAtMs'] === 'number' ? formatTerminalTimeLabel(stats['latestIndexedAtMs'], { mode: 'dual' }) : '-';
     ctx.println('\n  \x1b[36mÍndice L2 local\x1b[0m');
     ctx.println(
         `  disponibilidade ${boolLabel(stats['available'])} · arquivos ${numberLabel(stats['files'])} · frescos ${numberLabel(stats['freshFiles'])} · falhas ${numberLabel(stats['failedFiles'])}`,

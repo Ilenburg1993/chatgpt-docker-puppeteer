@@ -9,7 +9,7 @@
 
 import {
     clearTerminalIntentHistory,
-    formatTerminalIsoTimestamp,
+    formatTerminalTimeLabel,
     readTerminalIntentHistory,
     readTerminalIntentStats,
     terminalThemeDivider,
@@ -38,7 +38,7 @@ function printBlock(ctx, lines) {
  * @returns {string}
  */
 function formatTime(timestamp) {
-    return formatTerminalIsoTimestamp(timestamp);
+    return formatTerminalTimeLabel(timestamp, { mode: 'dual' });
 }
 
 /**
