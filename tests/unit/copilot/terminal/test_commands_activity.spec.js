@@ -168,6 +168,7 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Evento');
         expect(ctx.output()).toContain('Ferramentas');
         expect(ctx.output()).toContain('Timeline recente');
+        expect(ctx.output()).toContain('Operador');
         expect(ctx.output()).not.toContain('\x1b[36mTimeline recente');
         expect(ctx.output()).toContain('Resumo do turno atual');
         expect(ctx.output()).toContain('Último turno concluído');
@@ -359,5 +360,78 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('ASK-CANONICAL?');
         expect(ctx.output()).toContain('resposta SIM');
         expect(ctx.output()).not.toContain('resposta=');
+    });
+
+    it('humaniza fases internas na timeline padrão', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'system',
+                label: 'Uso BYOK sem Premium Request',
+                detail: 'modelo kilo-auto/free',
+                source: 'agent',
+                severity: 'info',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 0,
+            },
+            history: [
+                {
+                    phase: 'system',
+                    label: 'Uso BYOK sem Premium Request',
+                    detail: 'modelo kilo-auto/free',
+                    source: 'agent',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                    ts: 2,
+                },
+                {
+                    phase: 'task',
+                    label: 'Tarefa em segundo plano concluída',
+                    detail: 'Pergunta pendente persistida limpa',
+                    source: 'agent',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                    ts: 2,
+                },
+                {
+                    phase: 'boot',
+                    label: 'Inicializando terminal',
+                    detail: 'Preparando aliases',
+                    source: 'terminal',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                    ts: 2,
+                },
+            ],
+            turnTrace: {
+                current: null,
+                recent: [],
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '5');
+
+        expect(ctx.output()).toContain('Estado       sistema');
+        expect(ctx.output()).toContain('sistema · Uso BYOK sem Premium Request');
+        expect(ctx.output()).toContain('tarefa · Tarefa em segundo plano concluída');
+        expect(ctx.output()).toContain('inicialização · Inicializando terminal');
+        expect(ctx.output()).not.toContain('system · Uso BYOK');
+        expect(ctx.output()).not.toContain('task · Tarefa');
+        expect(ctx.output()).not.toContain('boot · Inicializando');
     });
 });

@@ -73,6 +73,13 @@ function renderActivityPhaseLabel(phase) {
     if (phase === 'tool') return 'ferramenta';
     if (phase === 'turn') return 'turno';
     if (phase === 'thinking') return 'pensando';
+    if (phase === 'streaming') return 'streaming';
+    if (phase === 'question') return 'pergunta';
+    if (phase === 'task') return 'tarefa';
+    if (phase === 'boot') return 'inicialização';
+    if (phase === 'system') return 'sistema';
+    if (phase === 'compaction') return 'compactação';
+    if (phase === 'subagent') return 'subagente';
     if (phase === 'error') return 'erro';
     return phase;
 }
@@ -236,7 +243,7 @@ function printTurnTraceSummary(println, title, trace, opts) {
     println(terminalThemeRow('Estado', renderStatusLabel(trace.status), { role: renderStatusRole(trace.status) }));
     println(terminalThemeRow('Ferramentas', String(trace.toolCount)));
     println(terminalThemeRow('Arquivos', String(trace.fileCount)));
-    println(terminalThemeRow('Input humano', String(trace.userInputCount ?? trace.userInputs?.length ?? 0)));
+    println(terminalThemeRow('Operador', String(trace.userInputCount ?? trace.userInputs?.length ?? 0)));
     if (opts.detail) {
         println(terminalThemeRow('Trace', compactTerminalDiagnosticId(trace.traceId) ?? String(trace.traceId ?? 'sem trace')));
     }

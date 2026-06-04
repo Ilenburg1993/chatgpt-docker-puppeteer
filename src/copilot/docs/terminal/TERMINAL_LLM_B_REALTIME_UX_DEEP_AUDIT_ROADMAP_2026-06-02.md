@@ -5454,3 +5454,12 @@
   - `node --check src/copilot/terminal/events/assistant-transcript-renderer.js`;
   - `npx eslint src/copilot/terminal/events/assistant-transcript-renderer.js tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js`;
   - `npx vitest run tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js`.
+- [x] Lacuna visual encontrada na mesma live: `/activity` ainda mostrava enums internos como
+      `system`, `task` e `boot` na timeline humana.
+- [x] Correção aplicada: fases internas de `/activity` foram humanizadas (`sistema`, `tarefa`,
+      `inicialização`, `pergunta`, `streaming`, `compactação`, `subagente`) e o contador
+      `Input humano` virou `Operador`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/activity.js`;
+  - `npx eslint src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
