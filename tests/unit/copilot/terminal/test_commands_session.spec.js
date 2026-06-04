@@ -588,8 +588,8 @@ describe('commands/session — sync commands', () => {
         try {
             cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
             expect(ctx.output()).toContain('Agora - Detalhe');
-            expect(ctx.output()).toContain('Runtime');
-            expect(ctx.output()).toContain('default');
+            expect(ctx.output()).toContain('Ambiente');
+            expect(ctx.output()).toContain('principal');
             expect(ctx.output()).toContain('Conversa');
             expect(ctx.output()).toContain('inativa');
             expect(ctx.output()).not.toContain('loop inativo');
@@ -640,7 +640,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('Sinais');
         expect(ctx.output()).toContain('SSE');
         expect(ctx.output()).toContain('Trace');
-        expect(ctx.output()).toMatch(/Runtime\s+principal/u);
+        expect(ctx.output()).toMatch(/Ambiente\s+principal/u);
         expect(ctx.output()).toContain('Contexto');
         expect(ctx.output()).not.toContain('Runtime     default');
         expect(ctx.output()).not.toContain('persistent only');
@@ -752,7 +752,8 @@ describe('commands/session — sync commands', () => {
         cmdAnswer({ println: ctx.println }, '--runtime alt resposta-alt');
         expect(altAnswerPendingQuestion).toHaveBeenCalledWith('resposta-alt');
         expect(ctx.output()).toContain('resposta-alt');
-        expect(ctx.output()).toContain('runtime alt');
+        expect(ctx.output()).toContain('ambiente alt');
+        expect(ctx.output()).not.toContain('runtime alt');
     });
 
     it('cmdAnswer explica quando só resta shadow expirada', () => {

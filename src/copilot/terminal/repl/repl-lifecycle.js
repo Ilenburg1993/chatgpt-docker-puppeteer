@@ -160,7 +160,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         }
         const runtimeSuffix =
             pendingAnswer.runtimeId && pendingAnswer.runtimeId !== 'default'
-                ? ` · runtime ${pendingAnswer.runtimeId}`
+                ? ` · ambiente ${pendingAnswer.runtimeId}`
                 : '';
         const shouldRedrawPrompt = pendingAnswer.ok !== true || shouldResumePromptAfterPendingAnswer(pendingAnswer);
         println(

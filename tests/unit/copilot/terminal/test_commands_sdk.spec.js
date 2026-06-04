@@ -523,7 +523,11 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('security-scan');
         expect(ctx.output()).toContain('SessionConfig.customAgents');
         expect(ctx.output()).toContain('subagent.*');
+        expect(ctx.output()).toContain('Sessão off');
+        expect(ctx.output()).toContain('Subagente');
         expect(ctx.output()).toContain('não reescreve automaticamente');
+        expect(ctx.output()).not.toContain('Runtime off');
+        expect(ctx.output()).not.toContain('desativadas runtime');
     });
 
     it('/sdk skills agents projeta preload por custom agent sem confundir com subagent runtime', async () => {
@@ -542,13 +546,15 @@ describe('terminal/commands/sdk', () => {
         const disableCtx = mockCtx();
         await cmdSdk({ println: disableCtx.println }, 'skills disable docs-helper');
         expect(runtimeMocks.setTerminalSdkDisabledSkills).toHaveBeenCalledWith(['docs-helper', 'security-scan']);
-        expect(disableCtx.output()).toContain('disabledSkills runtime atualizadas');
+        expect(disableCtx.output()).toContain('lista da sessão atualizada');
         expect(disableCtx.output()).toContain('server RPC');
+        expect(disableCtx.output()).not.toContain('Runtime off');
+        expect(disableCtx.output()).not.toContain('runtime atualizadas');
 
         const enableCtx = mockCtx();
         await cmdSdk({ println: enableCtx.println }, 'skills enable security-scan');
         expect(runtimeMocks.setTerminalSdkDisabledSkills).toHaveBeenCalledWith([]);
-        expect(enableCtx.output()).toContain('disabledSkills runtime atualizadas');
+        expect(enableCtx.output()).toContain('lista da sessão atualizada');
     });
 
     it('/sdk headers configura, exibe e limpa headers one-shot do próximo turno', async () => {

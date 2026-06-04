@@ -8681,3 +8681,31 @@
 - [x] Validação:
   - import dinâmico retornou `import-ok` sem iniciar terminal;
   - `node --check`, `eslint` do runner e `git diff --check` passaram.
+
+### 12.89 Higiene de vocabulário humano em superfícies detalhadas — 2026-06-04
+
+- [x] Achado:
+  - depois da troca principal de `/usage now` e `/health full`, ainda havia resíduos visuais em telas
+    menos frequentes:
+    - auto-brief detalhado exibia `Runtime`;
+    - `/now full` exibia `Runtime default`;
+    - `/live full` exibia `Runtime principal`;
+    - `/answer --runtime alt` confirmava `runtime alt`;
+    - `/sdk skills status/config/disable` usava `Runtime`, `Runtime off`,
+      `disabledSkills runtime atualizadas` e `runtime/CLI`;
+    - `/metrics detail` usava `Runtime` para resumir auto-início/recuperação da injeção.
+- [x] Decisão UX:
+  - `runtime` permanece nome interno, opção CLI (`--runtime`) e contrato de código;
+  - superfícies humanas usam `Ambiente`, `ambiente <id>`, `sessão`, `Subagente` e `Retomada`;
+  - rótulos devem comunicar função operacional, não classe interna.
+- [x] Correção:
+  - auto-brief detalhado passou a renderizar `Ambiente principal`;
+  - `/now full` e `/live full` passaram a renderizar `Ambiente`;
+  - resposta pendente no REPL e `/answer` passaram a dizer `ambiente <id>`;
+  - `/sdk skills` passou a usar `Ambiente`, `Sessão off`, `Subagente` e
+    `lista da sessão atualizada`;
+  - `/metrics detail` passou a usar `Retomada` para auto-início/recuperação.
+- [x] Validação:
+  - [x] testes unitários focados de auto-brief, sessão, SDK e métricas;
+  - [x] `node --check`/lint escopado dos arquivos alterados;
+  - [ ] próxima live PTY canônica deve continuar passando `ux-human-runtime-vocabulary`.

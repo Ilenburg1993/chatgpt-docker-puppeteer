@@ -289,6 +289,6 @@ export function cmdMetrics({ println }, arg = '') {
     println(terminalThemeRow('Prompt', detail ? `${latestInjectPrompt} · ${latestInjectFreshness}` : humanMetricPromptState(latestInjectFreshness), { role: 'muted' }));
     println(terminalThemeRow('Motivo', latestInjectReason, { role: 'muted' }));
     println(terminalThemeRow('Fases', `checagem ${latestInjectPreflightMs ?? '-'}ms · contexto ${latestInjectContextMs ?? '-'}ms · anexos ${latestInjectAttachmentsMs ?? '-'}ms · diálogo ${latestInjectDialogMs ?? '-'}ms`, { role: 'muted' }));
-    println(terminalThemeRow('Runtime', `auto-início ${yesNoPt(latestInjectAutoStart)} · recuperação ${yesNoPt(latestInjectRecovery)}`, { role: 'muted' }));
+    println(terminalThemeRow('Retomada', `auto-início ${yesNoPt(latestInjectAutoStart)} · recuperação ${yesNoPt(latestInjectRecovery)}`, { role: 'muted' }));
     println(terminalThemeDivider(52));
 }

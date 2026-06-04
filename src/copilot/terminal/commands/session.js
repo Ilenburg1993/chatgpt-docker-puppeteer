@@ -1205,7 +1205,12 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
     println('');
     println(terminalThemeHeadline('assistant', 'Agora - Detalhe'));
     println(terminalThemeDivider(37));
-    println(terminalThemeRow('Runtime', `${projection.runtimeId} · sessão ${projection.runtimeSessionId ?? 'sem sessão'}`));
+    println(
+        terminalThemeRow(
+            'Ambiente',
+            `${renderRuntimeTargetLabel(projection.runtimeId)} · sessão ${projection.runtimeSessionId ?? 'sem sessão'}`,
+        ),
+    );
     println(
         terminalThemeRow(
             'Conversa',
@@ -1331,7 +1336,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     );
     println(
         terminalThemeRow(
-            'Runtime',
+            'Ambiente',
             `${renderLiveRuntimeTarget(status.runtimeId)} · ${renderHumanTerminalStatus(status.snap['status'])} · conversa ${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${status.snap['dialogPaused'] ? 'pausada' : 'contínua'}`,
         ),
     );
@@ -1635,7 +1640,10 @@ export function cmdAnswer({ println }, arg) {
     const { runtimeId, arg: answer } = extractRuntimeTarget(arg);
     const result = tryAnswerTerminalPendingQuestionInput(answer, runtimeId);
     if (result.ok) {
-        const runtimeSuffix = result.runtimeId && result.runtimeId !== 'default' ? ` · runtime ${result.runtimeId}` : '';
+        const runtimeSuffix =
+            result.runtimeId && result.runtimeId !== 'default'
+                ? ` · ambiente ${renderRuntimeTargetLabel(result.runtimeId)}`
+                : '';
         println(
             terminalThemeRow('Resposta', `enviada para pergunta pendente${runtimeSuffix}: "${result.answer}"`, {
                 role: 'success',

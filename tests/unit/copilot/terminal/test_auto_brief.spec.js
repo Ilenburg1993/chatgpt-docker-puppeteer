@@ -172,7 +172,8 @@ describe('terminal/repl/auto-brief', () => {
         const text = brief.lines.join('\n');
 
         expect(text).toContain('Briefing detalhado (boot)');
-        expect(text).toContain('Runtime');
+        expect(text).toContain('Ambiente');
+        expect(text).toContain('principal · modelo auto/high');
         expect(text).toContain('Estado    parcial');
         expect(text).toContain('acerto 0%');
         expect(text).toContain('arquivos 0');

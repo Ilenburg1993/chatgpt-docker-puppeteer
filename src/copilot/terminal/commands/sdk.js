@@ -1305,7 +1305,7 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
         const state = readTerminalRuntimeState(runtimeId);
         println('');
         println(terminalThemeHeadline('accent', 'Status das Skills SDK'));
-        println(terminalThemeRow('Runtime', state.runtimeId));
+        println(terminalThemeRow('Ambiente', renderRuntimeTargetLabel(state.runtimeId)));
         println(
             terminalThemeRows(
                 'Uso',
@@ -1428,20 +1428,20 @@ async function renderSdkSkillsConfig({ println }, runtimeId) {
     println(
         terminalThemeRow(
             'Resumo',
-            `diretórios ${skillDirectories.length} · desativadas no boot ${disabledSkills.length} · desativadas runtime ${discoveredDisabled.length}`,
+            `diretórios ${skillDirectories.length} · desativadas no boot ${disabledSkills.length} · desativadas na sessão ${discoveredDisabled.length}`,
         ),
     );
     println(terminalThemeRow('Dirs sessão', skillDirectories.length > 0 ? skillDirectories.join(', ') : '-'));
     println(terminalThemeRow('Boot off', disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'));
-    println(terminalThemeRow('Runtime off', discoveredDisabled.length > 0 ? discoveredDisabled.join(', ') : '-'));
+    println(terminalThemeRow('Sessão off', discoveredDisabled.length > 0 ? discoveredDisabled.join(', ') : '-'));
     println(terminalThemeRow('Semântica', String(semantics['customAgentDefinition'] ?? '-')));
-    println(terminalThemeRow('Runtime', String(semantics['subagentRuntime'] ?? '-')));
+    println(terminalThemeRow('Subagente', String(semantics['subagentRuntime'] ?? '-')));
     println(terminalThemeRow('Mutação', String(semantics['disabledSkillsMutationScope'] ?? '-')));
     println(
         terminalThemeRows(
             'Observação',
             [
-                'disable/enable ajusta disabledSkills no runtime/CLI atual',
+                'disable/enable ajusta disabledSkills na sessão/CLI atual',
                 'não reescreve automaticamente o env do processo',
             ],
         ),
@@ -1567,13 +1567,13 @@ async function updateSdkDisabledSkills({ println }, action, names, runtimeId) {
     await callWithRuntimeTarget(setTerminalSdkDisabledSkills, runtimeId, disabledSkills);
 
     println('');
-    println(terminalThemeRow('Skills', `disabledSkills runtime atualizadas via SDK (${action})`, { role: 'success' }));
+    println(terminalThemeRow('Skills', `lista da sessão atualizada via SDK (${action})`, { role: 'success' }));
     println(terminalThemeRow('Solicitadas', requested.join(', ')));
-    println(terminalThemeRow('Runtime off', disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'));
+    println(terminalThemeRow('Sessão off', disabledSkills.length > 0 ? disabledSkills.join(', ') : '-'));
     println(
         terminalThemeRow(
             'Escopo',
-            'altera o runtime/CLI atual via server RPC; não reescreve automaticamente COPILOT_DISABLED_SKILLS do processo',
+            'altera a sessão/CLI atual via server RPC; não reescreve automaticamente COPILOT_DISABLED_SKILLS do processo',
         ),
     );
     println('');

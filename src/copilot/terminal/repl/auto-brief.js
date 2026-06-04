@@ -64,6 +64,16 @@ function renderAutoBriefRoutingMode(mode) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderAutoBriefEnvironmentLabel(value) {
+    const runtimeId = String(value ?? '').trim();
+    if (!runtimeId || runtimeId === 'default') return 'principal';
+    return runtimeId.replace(/[._-]+/gu, ' ');
+}
+
+/**
  * @param {number | null | undefined} value
  * @returns {string}
  */
@@ -227,8 +237,8 @@ export function buildTerminalAutoBrief(input = {}) {
     lines.push(`Briefing detalhado (${phase})`);
     lines.push(
         briefLine(
-            'Runtime',
-            `${projection.runtimeId} · modelo ${model}/${reasoning} · sessão ${sessionTag} · tela ${displayPreset}`,
+            'Ambiente',
+            `${renderAutoBriefEnvironmentLabel(projection.runtimeId)} · modelo ${model}/${reasoning} · sessão ${sessionTag} · tela ${displayPreset}`,
         ),
     );
     lines.push(
