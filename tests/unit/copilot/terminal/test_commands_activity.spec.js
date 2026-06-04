@@ -639,6 +639,65 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).not.toContain('terminal live canonical deltas tools Pergunta ao operador usage');
     });
 
+    it('trata confirmação cruzada SDK/IO do mesmo arquivo como uma operação única', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'idle',
+                label: 'Pronto',
+                detail: 'Turno concluído',
+                source: 'terminal',
+                severity: 'info',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 0,
+            },
+            history: [],
+            turnTrace: {
+                current: {
+                    traceId: 'turn:file-roundtrip',
+                    turnId: 'file-roundtrip',
+                    source: 'assistant',
+                    status: 'completed',
+                    startedAt: 1,
+                    updatedAt: 2,
+                    finishedAt: 3,
+                    toolCount: 2,
+                    fileCount: 2,
+                    userInputCount: 0,
+                    tools: [],
+                    files: [
+                        {
+                            path: '/workspaces/chatgpt-docker-puppeteer/.tmp/terminal-live/source.txt',
+                            operation: 'move',
+                            source: 'sdk',
+                            count: 1,
+                            updatedAt: 2,
+                        },
+                        {
+                            path: '.tmp/terminal-live/source.txt',
+                            operation: 'move',
+                            source: 'io',
+                            count: 1,
+                            updatedAt: 3,
+                        },
+                    ],
+                    userInputs: [],
+                },
+                recent: [],
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '5');
+
+        expect(ctx.output()).toContain('Arquivos tocados');
+        expect(ctx.output()).toContain('Arquivo');
+        expect(ctx.output()).toContain('movimento · .tmp/terminal-live/source.txt');
+        expect(ctx.output()).not.toContain('.tmp/terminal-live/source.txt ×2');
+    });
+
     it('mantém eventos de boot no default quando ainda não existe evento operacional melhor', () => {
         vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
             current: {

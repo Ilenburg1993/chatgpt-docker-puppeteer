@@ -309,6 +309,8 @@ const LIVE_SCENARIOS = Object.freeze({
         finalMarker: 'POST-ASK-FILEWRITE-FINAL: arquivo criado, movido, deletado e usuário confirmou SIM',
         answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
         beforeDeltaInstructions: [
+            'Os caminhos relativos abaixo são deliberados, seguros, relativos ao workspace atual e já autorizados pelo operador; não invoque ask_user para confirmar caminho, workspace, permissão, criação, movimento ou exclusão.',
+            'Use exatamente os caminhos relativos informados; não converta para caminho absoluto antes de chamar as tools e não peça confirmação intermediária.',
             'Depois do read_file_content, invoque create_file com path exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-source.txt", content exatamente "TERMINAL-PERMISSION-ROUNDTRIP\\n", createParentDirs=true e overwrite=true.',
             'Em seguida invoque move_file com source exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-source.txt", destination exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-moved.txt" e overwrite=true.',
             'Em seguida invoque delete_file com path exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-moved.txt".',
@@ -379,6 +381,40 @@ function buildMissingRequiredAskRecoveryPrompt(scenario = LIVE_SCENARIOS[DEFAULT
         `Antes da resposta humana final, não escreva, cite nem antecipe o marcador ${scenario.finalMarker}.`,
         `A pergunta ${scenario.askQuestion.split(':')[0]} deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.`,
         'Neste turno de recuperação, use somente a tool real ask_user antes da resposta humana.',
+    ].join(' ');
+}
+
+function buildIncompleteExpectedToolRecoveryPrompt(
+    scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
+    missingTools = [],
+) {
+    const missing = missingTools.map((tool) => String(tool ?? '').trim()).filter(Boolean);
+    const instructions = [];
+    if (missing.includes('create_file')) {
+        instructions.push(
+            'Se create_file ainda estiver faltando, invoque create_file com path exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-source.txt", content exatamente "TERMINAL-PERMISSION-ROUNDTRIP\\n", createParentDirs=true e overwrite=true.',
+        );
+    }
+    if (missing.includes('move_file')) {
+        instructions.push(
+            'Se move_file ainda estiver faltando, invoque move_file com source exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-source.txt", destination exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-moved.txt" e overwrite=true.',
+        );
+    }
+    if (missing.includes('delete_file')) {
+        instructions.push(
+            'Se delete_file ainda estiver faltando, invoque delete_file com path exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-moved.txt".',
+        );
+    }
+    return [
+        'Continue o teste canônico exatamente de onde parou.',
+        `As tools esperadas ainda faltantes são: ${missing.join(', ') || 'nenhuma'}.`,
+        'Não repita tools já concluídas; use somente as tools faltantes listadas acima.',
+        ...instructions,
+        'Depois que as tools faltantes concluírem, escreva exatamente as oito linhas públicas DELTA-CANONICAL-1 até DELTA-CANONICAL-8.',
+        'Não invoque ask_user antes dessas oito linhas públicas aparecerem no transcript.',
+        scenario.askToolInstruction,
+        scenario.finalInstruction,
+        `Antes da resposta humana final, não escreva, cite nem antecipe o marcador ${scenario.finalMarker}.`,
     ].join(' ');
 }
 
@@ -2978,6 +3014,25 @@ function findAssistantEndedAfterAskRecoveryWithoutAsk(plain, scenario = LIVE_SCE
     return { traceId: null, turnId: null, eventId: null };
 }
 
+function findIncompleteExpectedToolChain(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+    const expectedTools = scenario.expectedLifecycleTools.filter(
+        (tool) => (tool.expectedOutcome ?? 'success') !== 'failure',
+    );
+    if (expectedTools.length === 0) return null;
+    const statuses = expectedTools.map((tool) => {
+        const lifecycle = summarizeNamedToolLifecycle(events, tool.name);
+        return {
+            name: tool.name,
+            completed: lifecycle.done || lifecycle.postToolSuccess,
+            started: lifecycle.start,
+        };
+    });
+    const completed = statuses.filter((tool) => tool.completed).map((tool) => tool.name);
+    const missing = statuses.filter((tool) => !tool.completed).map((tool) => tool.name);
+    if (completed.length === 0 || missing.length === 0) return null;
+    return { completed, missing };
+}
+
 function isHardCriterionFailure(criterion) {
     return criterion?.pass !== true && criterion?.severity !== 'warning' && criterion?.required !== false;
 }
@@ -4295,6 +4350,17 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         /permission request/iu.test(plain);
     const scenarioUsesPermissionedTool = scenario.expectedLifecycleTools.length > 0;
     const scenarioUsesExecCommand = scenario.expectedLifecycleTools.some((tool) => tool.name === 'exec_command');
+    const scenarioUsesFileRoundtrip = ['create_file', 'move_file', 'delete_file'].every((toolName) =>
+        scenario.expectedLifecycleTools.some((tool) => tool.name === toolName),
+    );
+    const fileRoundtripSingleSummaryCoverage =
+        /Arquivos\s+CRIAR\b[^\n\r]*\bMOVER\b[^\n\r]*\bEXCLUIR\b/iu.test(beforeRawDiagnosticsPlain);
+    const fileRoundtripDistributedSummaryCoverage =
+        /(?:Ações|Arquivos)\s+CRIAR\b/iu.test(beforeRawDiagnosticsPlain) &&
+        /(?:Ações|Arquivos)\s+MOVER\b/iu.test(beforeRawDiagnosticsPlain) &&
+        /(?:Ações|Arquivos)\s+EXCLUIR\b/iu.test(beforeRawDiagnosticsPlain);
+    const fileRoundtripSummaryCoverageOk =
+        !scenarioUsesFileRoundtrip || fileRoundtripSingleSummaryCoverage || fileRoundtripDistributedSummaryCoverage;
     const expectedLiveToolLabels = scenario.expectedLifecycleTools
         .map((tool) => String(tool.renderedName ?? tool.name).trim())
         .filter(Boolean);
@@ -4792,6 +4858,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-turn-file-summary-deduped',
             pass: !/Arquivos\s+LER\s+package\.json\s+·\s+LER\s+package\.json/iu.test(beforeRawDiagnosticsPlain),
             detail: 'turn summary did not repeat the same human file path in one row',
+        },
+        {
+            id: 'ux-turn-file-summary-operation-coverage',
+            pass: fileRoundtripSummaryCoverageOk,
+            detail: scenarioUsesFileRoundtrip
+                ? `file roundtrip summary covered create, move and delete (${fileRoundtripSingleSummaryCoverage ? 'single compact row' : fileRoundtripDistributedSummaryCoverage ? 'distributed compact rows' : 'missing coverage'})`
+                : 'scenario does not require file roundtrip operation coverage',
         },
         {
             id: 'ux-command-cwd-not-file-target',
@@ -6114,6 +6187,7 @@ async function main() {
     let missingRequiredAskDiagnosticTimer = null;
     let missingRequiredAskRecoverySent = false;
     let missingRequiredAskRecoveryPlainOffset = 0;
+    let incompleteExpectedToolRecoverySent = false;
     let forcedKillTimer = null;
     const command = buildTerminalLlmbCommand(canUsePty);
 
@@ -6362,6 +6436,14 @@ async function main() {
         }, Math.max(0, delayMs));
         missingRequiredAskDiagnosticTimer.unref();
     };
+    const sendIncompleteExpectedToolRecovery = (incomplete) => {
+        if (postCommandsSent || answerSent || incompleteExpectedToolRecoverySent || !incomplete) return;
+        incompleteExpectedToolRecoverySent = true;
+        console.warn(
+            `[terminal-live] cenário canônico: tools esperadas incompletas (${incomplete.missing.join(', ')}); enviando continuação controlada.`,
+        );
+        write(buildIncompleteExpectedToolRecoveryPrompt(liveScenario, incomplete.missing));
+    };
     const invalidChoiceFeedbackRe =
         /Resposta\s+não corresponde às opções da pergunta pendente|Resposta\s+inválida para a pergunta pendente|invalid_choice/iu;
     const sendScenarioAnswerStep = (plain, step) => {
@@ -6534,6 +6616,16 @@ async function main() {
             ).unref();
         }
         const scenarioTailPlain = scenarioSent ? plain.slice(scenarioPlainOffset) : '';
+        if (
+            scenarioSent &&
+            !answerSent &&
+            !postCommandsSent &&
+            !incompleteExpectedToolRecoverySent &&
+            /Turno conclu[ií]do\s+tools executadas; a LLM-B não emitiu síntese pública/iu.test(scenarioTailPlain) &&
+            hasReturnedToNormalReplPrompt(plain, scenarioPlainOffset)
+        ) {
+            sendIncompleteExpectedToolRecovery(findIncompleteExpectedToolChain(sseCollector?.events ?? [], liveScenario));
+        }
         if (
             byokReal &&
             !answerSent &&

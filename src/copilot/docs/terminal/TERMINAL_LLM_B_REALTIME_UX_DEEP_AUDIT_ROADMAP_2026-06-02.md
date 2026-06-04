@@ -8191,3 +8191,118 @@
   - `ask_user`, resposta humana, export, SSE e `/health full` permaneceram coerentes;
   - neste run específico não houve vazio pré-ação, portanto `terminal.turn.empty_recovery` não foi
     necessário; o contrato permanece coberto por teste unitário e pelo blocker anterior.
+
+### 12.79 Roundtrip de arquivos: prompt único e confirmação cruzada SDK/IO — 2026-06-04
+
+- [x] Live real `file-write-roundtrip` executado com criação, movimento e exclusão reais:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T20-51-40-410Z/summary.md`;
+  - status FAIL apenas em `no-prompt-double-render`;
+  - critérios positivos: `create_file`, `move_file`, `delete_file`, ausência de prompt de permissão,
+    `ask_user`, resposta final, export, SSE, `/errors`, `/health full` e fechamento limpo;
+  - a autorização automática permaneceu funcional para escrita/movimento/exclusão.
+- [x] Achado UX principal:
+  - quando o modelo estava ocioso e uma intervenção era roteada como novo turno, a linha permanente
+    `Intervenção · modelo ocioso; encaminhada como novo turno` redesenhava prompt idle antes de o
+    novo turno entrar em estado ocupado;
+  - em PTY estreito isso produzia `você›` vazio e, logo em seguida, o prompt vivo do turno, o que
+    violava a regra de uma única superfície de input.
+- [x] Correção aplicada:
+  - o caminho `handleImmediateIntervention()` imprime a intervenção ociosa com
+    `{ redrawPrompt: false }`;
+  - `queueUserTurn()` passa a ser o único responsável pelo próximo prompt/linha viva.
+- [x] Achado UX secundário:
+  - `/activity` mostrava `Arquivo movimento ... ×2` para o mesmo caminho quando SDK e IO reportavam
+    a mesma operação;
+  - isso sugeria duas ações humanas, quando na prática era confirmação cruzada de observabilidade.
+- [x] Correção aplicada:
+  - `aggregateTurnTraceFiles()` mantém contagem acumulada apenas quando a origem é a mesma;
+  - quando origens diferentes confirmam a mesma operação/caminho, a linha humana permanece única e
+    o detalhe preserva a origem como `múltiplas origens`.
+- [x] Correção fundacional adicional:
+  - `recordTerminalTurnToolActivity()` deixou de contar `started` e `completed` da mesma
+    `toolCallId` como duas operações de arquivo;
+  - `recordTerminalTurnFileActivity()` ganhou `dedupeKey` opcional para que alvos extras do
+    lifecycle também sejam deduplicados por chamada;
+  - chamadas distintas ao mesmo arquivo continuam podendo renderizar `×2` quando isso representa
+    repetição real.
+- [x] Teste unitário de regressão:
+  - `/activity` default não renderiza `×2` para confirmação cruzada SDK/IO do mesmo arquivo.
+- [x] Reexecutar live `file-write-roundtrip` e confirmar `Status: PASS`, prompt único e `/activity`
+      sem duplicidade artificial de arquivo:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T21-05-26-400Z/summary.md`;
+  - status PASS;
+  - `no-prompt-double-render` passou;
+  - `create_file`, `move_file`, `delete_file`, `ask_user`, resposta humana, export, SSE,
+    `/errors`, `/health full` e fechamento limpo passaram;
+  - `/activity 40` mostrou arquivos sem `×2` falso para start/complete da mesma tool.
+- [x] Achado UX pós-PASS:
+  - o resumo compacto do turno selecionava os três primeiros arquivos únicos, então um roundtrip
+    podia mostrar `CRIAR · MOVER · MOVER` e deixar `EXCLUIR` de fora;
+  - isso é tecnicamente correto, mas comunica pior o fluxo canônico do operador.
+- [x] Correção aplicada:
+  - `selectTerminalTurnTraceSummaryFiles()` agora prioriza diversidade de operação antes de preencher
+    detalhes laterais;
+  - com limite curto, o resumo prefere `CRIAR`, `MOVER` e `EXCLUIR` a repetir dois lados do move.
+- [x] Contrato live reforçado:
+  - o runner ganhou `ux-turn-file-summary-operation-coverage`;
+  - em cenários com `create_file`, `move_file` e `delete_file`, a linha compacta `Arquivos` deve
+    cobrir `CRIAR`, `MOVER` e `EXCLUIR`.
+- [x] Live de confirmação encontrou fricção canônica de autonomia antes de medir a nova linha:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T21-10-32-808Z/summary.md`;
+  - status BLOCKED;
+  - blocker `assistant-asked-before-required-deltas`;
+  - a LLM-B invocou `ask_user` para confirmar caminho relativo/workspace antes de executar
+    `create_file`, `move_file` e `delete_file`;
+  - a UX da pergunta permaneceu limpa, mas o comportamento viola o contrato de autorização máxima
+    do cenário.
+- [x] Correção aplicada no harness:
+  - o prompt do cenário `file-write-roundtrip` declara que caminhos relativos `data/...` são
+    deliberados, relativos ao workspace atual e já autorizados pelo operador;
+  - o cenário proíbe confirmação intermediária sobre caminho, workspace, permissão, criação,
+    movimento ou exclusão.
+- [x] Live pós-endurecimento removeu a pergunta intermediária e completou o fluxo real, mas revelou
+      que o novo critério estava rígido demais:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T21-16-48-282Z/summary.md`;
+  - status FAIL apenas em `ux-turn-file-summary-operation-coverage`;
+  - `create_file`, `move_file`, `delete_file`, deltas, `ask_user`, resposta humana, final pós-ask,
+    `/activity`, `/events`, `/errors`, `/health full` e export passaram;
+  - o SDK repartiu `CRIAR`, `MOVER` e `EXCLUIR` em turnos separados, portanto a cobertura visual
+    ficou distribuída em linhas compactas diferentes.
+- [x] Correção do contrato live:
+  - `ux-turn-file-summary-operation-coverage` agora aceita cobertura em uma única linha compacta ou
+    distribuída em linhas `Ações`/`Arquivos` separadas;
+  - o critério continua exigindo que `CRIAR`, `MOVER` e `EXCLUIR` estejam visíveis ao operador.
+- [x] Live seguinte encontrou uma segunda variação de provedor:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T21-19-34-926Z/summary.md`;
+  - status BLOCKED;
+  - blocker `assistant-empty-turn`;
+  - após `create_file` e `move_file`, a LLM-B encerrou um turno com tools executadas, sem síntese
+    pública e sem `delete_file`;
+  - o terminal foi corretamente conservador: depois de tools com efeito colateral, não é seguro
+    repetir ou continuar automaticamente dentro do produto sem instrução explícita.
+- [x] Correção aplicada no harness live:
+  - o runner agora detecta cadeia incompleta de tools esperadas via lifecycle estruturado;
+  - quando o terminal retorna ao prompt com `tools executadas; sem síntese pública`, o runner envia
+    uma continuação explícita para executar apenas as tools faltantes;
+  - isso mantém a segurança do produto e torna o teste live mais robusto contra divisão real de
+    turnos pelo provider.
+- [x] Reexecutar live dirigido para confirmar a cobertura visual do roundtrip completo:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T21-28-51-100Z/summary.md`;
+  - status PASS;
+  - `ux-turn-file-summary-operation-coverage` passou com cobertura distribuída em linhas compactas;
+  - `CRIAR`, `MOVER` e `EXCLUIR` ficaram visíveis ao operador;
+  - `no-prompt-double-render`, ausência de prompt SDK de permissão, foco de tool, `ask_user`,
+    resposta humana, final pós-ask, export, SSE, `/errors`, `/health full` e fechamento limpo
+    também passaram.
+- [x] Decisão de UX consolidada:
+  - a linha compacta ideal deve cobrir diversidade de operação quando o turno contém múltiplas
+    ações de arquivo;
+  - quando o provider reparte o roundtrip em turnos distintos, a obrigação visual migra para a
+    cobertura distribuída em linhas `Ações`/`Arquivos` recentes, sem exigir uma linha artificial
+    única que não corresponda ao envelope real do SDK.

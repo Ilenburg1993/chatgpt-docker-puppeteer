@@ -63,6 +63,60 @@ describe('terminal/turn-trace-state', () => {
         expect(projection.recent[0]?.tools[0]?.path).toBe('tmp/live.md');
     });
 
+    it('não conta start e complete da mesma tool como duas operações de arquivo', () => {
+        beginTerminalTurnTrace({ turnId: 'turn-file', timestamp: 10 });
+        recordTerminalTurnToolActivity({
+            toolName: 'delete_file',
+            operation: 'delete',
+            path: 'tmp/live.md',
+            toolCallId: 'tool-delete-1',
+            status: 'started',
+            timestamp: 20,
+        });
+        recordTerminalTurnToolActivity({
+            toolName: 'delete_file',
+            operation: 'delete',
+            path: 'tmp/live.md',
+            toolCallId: 'tool-delete-1',
+            status: 'completed',
+            success: true,
+            timestamp: 30,
+        });
+
+        const trace = readTerminalTurnTraceProjection(3).current;
+
+        expect(trace?.toolCount).toBe(1);
+        expect(trace?.tools[0]?.count).toBe(2);
+        expect(trace?.fileCount).toBe(1);
+        expect(trace?.files[0]).toMatchObject({ path: 'tmp/live.md', operation: 'delete', count: 1 });
+    });
+
+    it('mantém contagem para chamadas distintas ao mesmo arquivo', () => {
+        beginTerminalTurnTrace({ turnId: 'turn-file-repeat', timestamp: 10 });
+        recordTerminalTurnToolActivity({
+            toolName: 'read_file_content',
+            operation: 'read',
+            path: 'package.json',
+            toolCallId: 'tool-read-1',
+            status: 'started',
+            timestamp: 20,
+        });
+        recordTerminalTurnToolActivity({
+            toolName: 'read_file_content',
+            operation: 'read',
+            path: 'package.json',
+            toolCallId: 'tool-read-2',
+            status: 'started',
+            timestamp: 30,
+        });
+
+        const trace = readTerminalTurnTraceProjection(3).current;
+
+        expect(trace?.toolCount).toBe(2);
+        expect(trace?.fileCount).toBe(1);
+        expect(trace?.files[0]).toMatchObject({ path: 'package.json', operation: 'read', count: 2 });
+    });
+
     it('cria trace implícito quando uma tool aparece antes do assistant.turn_start', () => {
         recordTerminalTurnToolActivity({
             toolName: 'external_tool',

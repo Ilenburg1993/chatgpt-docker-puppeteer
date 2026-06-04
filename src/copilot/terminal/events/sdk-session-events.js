@@ -395,9 +395,24 @@ export function selectTerminalTurnTraceSummaryFiles(files, limit) {
         if (!selected.has(key)) {
             selected.set(key, { ...file, path: displayPath });
         }
-        if (selected.size >= max) break;
     }
-    return [...selected.values()];
+    const uniqueFiles = [...selected.values()];
+    if (uniqueFiles.length <= max) return uniqueFiles;
+    /** @type {import('../state/turn-trace-state.js').TerminalTurnTraceFileEntry[]} */
+    const summary = [];
+    const seenOperations = new Set();
+    for (const file of uniqueFiles) {
+        if (seenOperations.has(file.operation)) continue;
+        summary.push(file);
+        seenOperations.add(file.operation);
+        if (summary.length >= max) return summary;
+    }
+    for (const file of uniqueFiles) {
+        if (summary.includes(file)) continue;
+        summary.push(file);
+        if (summary.length >= max) return summary;
+    }
+    return summary;
 }
 
 /**

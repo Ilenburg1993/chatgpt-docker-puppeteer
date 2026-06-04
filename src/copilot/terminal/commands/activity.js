@@ -274,9 +274,13 @@ function aggregateTurnTraceFiles(files) {
         existing.repeatedRows += 1;
         const updatedAt = Math.max(existing.updatedAt ?? 0, file.updatedAt ?? 0);
         if (updatedAt > 0) existing.updatedAt = updatedAt;
-        if (existing.source !== file.source) existing.source = 'múltiplas origens';
         const previousCount = existing.count ?? 1;
-        existing.count = previousCount > 1 || count > 1 ? Math.max(previousCount, count) : previousCount + count;
+        if (existing.source !== file.source) {
+            existing.source = 'múltiplas origens';
+            existing.count = Math.max(previousCount, count);
+            continue;
+        }
+        existing.count = Math.max(previousCount, count);
     }
     return [...groups.values()].map(({ repeatedRows: _repeatedRows, ...file }) => file);
 }

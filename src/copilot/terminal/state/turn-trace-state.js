@@ -29,6 +29,7 @@ const MAX_RECENT_TURN_TRACES = 20;
  *     source: string;
  *     count: number;
  *     updatedAt: number;
+ *     dedupeKeys?: string[];
  * }} TerminalTurnTraceFileEntry
  */
 
@@ -296,6 +297,7 @@ export function recordTerminalTurnToolActivity({
     const actionKey =
         normalizedToolCallId ?? `${toolName}\u241f${operation}\u241f${effectiveTarget ?? ''}\u241f${source}`;
     const existingIndex = trace.toolIndex.get(actionKey);
+    let shouldRecordPrimaryFile = false;
 
     if (existingIndex == null) {
         trace.toolIndex.set(actionKey, trace.tools.length);
@@ -310,9 +312,11 @@ export function recordTerminalTurnToolActivity({
             count: 1,
             updatedAt: timestamp,
         });
+        shouldRecordPrimaryFile = Boolean(path);
     } else {
         const existing = trace.tools[existingIndex];
         if (existing) {
+            shouldRecordPrimaryFile = Boolean(path && !existing.path);
             existing.status = status;
             existing.success = success;
             existing.updatedAt = timestamp;
@@ -331,8 +335,15 @@ export function recordTerminalTurnToolActivity({
         }
     }
 
-    if (path) {
-        recordTerminalTurnFileActivity({ path, operation, source, turnId: trace.turnId, timestamp });
+    if (path && shouldRecordPrimaryFile) {
+        recordTerminalTurnFileActivity({
+            path,
+            operation,
+            source,
+            dedupeKey: normalizedToolCallId ? `${normalizedToolCallId}\u241fprimary\u241f${path}` : null,
+            turnId: trace.turnId,
+            timestamp,
+        });
     }
 
     return toSnapshot(trace);
@@ -468,6 +479,7 @@ export function recordTerminalTurnUserInputActivity({
  *     path: string;
  *     operation?: TerminalTurnTraceOperation;
  *     source?: string;
+ *     dedupeKey?: string | null;
  *     turnId?: string | null;
  *     timestamp?: number;
  * }} input
@@ -477,6 +489,7 @@ export function recordTerminalTurnFileActivity({
     path,
     operation = 'unknown',
     source = 'sdk',
+    dedupeKey = null,
     turnId = null,
     timestamp = Date.now(),
 }) {
@@ -486,12 +499,26 @@ export function recordTerminalTurnFileActivity({
     const existingIndex = trace.fileIndex.get(fileKey);
     if (existingIndex == null) {
         trace.fileIndex.set(fileKey, trace.files.length);
-        trace.files.push({ path, operation, source, count: 1, updatedAt: timestamp });
+        trace.files.push({
+            path,
+            operation,
+            source,
+            count: 1,
+            updatedAt: timestamp,
+            ...(dedupeKey ? { dedupeKeys: [dedupeKey] } : {}),
+        });
     } else {
         const existing = trace.files[existingIndex];
         if (existing) {
+            if (dedupeKey && existing.dedupeKeys?.includes(dedupeKey)) {
+                existing.updatedAt = timestamp;
+                return toSnapshot(trace);
+            }
             existing.count += 1;
             existing.updatedAt = timestamp;
+            if (dedupeKey) {
+                existing.dedupeKeys = [...(existing.dedupeKeys ?? []), dedupeKey];
+            }
         }
     }
     trace.updatedAt = timestamp;

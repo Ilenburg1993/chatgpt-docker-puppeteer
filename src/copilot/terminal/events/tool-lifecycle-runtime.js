@@ -405,6 +405,7 @@ function recordToolTurnProjection(presentation, status, toolCallId, success = nu
             path: fileTarget,
             operation: presentation.operation,
             source: 'sdk',
+            dedupeKey: toolCallId ? `${toolCallId}\u241fextra\u241f${fileTarget}` : null,
         });
     }
 }
