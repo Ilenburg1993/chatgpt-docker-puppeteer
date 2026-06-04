@@ -35,6 +35,7 @@ export {
 
 export {
     dispatchAgentDialogTurn,
+    dispatchAgentDialogTurnDetailed,
     isAgentDialogLoopPaused,
     pauseAgentDialogLoop,
     readAgentDialogLastPrInfo,

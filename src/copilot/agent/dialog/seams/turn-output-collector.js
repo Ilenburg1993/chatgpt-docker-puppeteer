@@ -48,9 +48,15 @@ const MAX_DELTA_FALLBACK_CHARS = 50_000;
  *     snapshot: () => {
  *         dispatched: boolean;
  *         assistantMessageCandidate: string | null;
+ *         assistantMessageCount: number;
  *         deltaChars: number;
  *         deltaEligible: boolean;
  *         pendingProtocolReply: string | null;
+ *         pendingProtocolKind: 'reply' | 'ready' | 'stopped' | null;
+ *         toolSignalCount: number;
+ *         lastDeltaSeq: number;
+ *         lastToolSignalSeq: number;
+ *         lastResolutionSource: 'assistant.message' | 'delta' | 'pending_protocol' | null;
  *     };
  *     cleanup: () => void;
  * }}
@@ -65,9 +71,15 @@ export function createDialogTurnOutputCollector(host, helpers) {
             snapshot: () => ({
                 dispatched: false,
                 assistantMessageCandidate: null,
+                assistantMessageCount: 0,
                 deltaChars: 0,
                 deltaEligible: false,
                 pendingProtocolReply: null,
+                pendingProtocolKind: null,
+                toolSignalCount: 0,
+                lastDeltaSeq: 0,
+                lastToolSignalSeq: 0,
+                lastResolutionSource: null,
             }),
             cleanup: () => {},
         };
@@ -78,9 +90,15 @@ export function createDialogTurnOutputCollector(host, helpers) {
     let assistantMessageCandidate = null;
     /** @type {string} */
     let deltaCandidate = '';
+    let assistantMessageCount = 0;
+    let deltaCharsObserved = 0;
+    let lastResolutionDeltaEligible = false;
     let signalSeq = 0;
     let lastDeltaSeq = 0;
     let lastToolSignalSeq = 0;
+    let toolSignalCount = 0;
+    /** @type {'assistant.message' | 'delta' | 'pending_protocol' | null} */
+    let lastResolutionSource = null;
     /** @type {Set<() => void>} */
     const turnEndListeners = new Set();
     /** @type {Set<() => void>} */
@@ -99,6 +117,7 @@ export function createDialogTurnOutputCollector(host, helpers) {
         const normalized = helpers.normalizeAssistantReplyCandidate(content);
         if (normalized) {
             assistantMessageCandidate = normalized;
+            assistantMessageCount += 1;
             for (const listener of [...assistantMessageCandidateListeners]) {
                 listener();
             }
@@ -111,7 +130,9 @@ export function createDialogTurnOutputCollector(host, helpers) {
         if (typeof chunk !== 'string' || chunk.length === 0) return;
         const remaining = MAX_DELTA_FALLBACK_CHARS - deltaCandidate.length;
         if (remaining > 0) {
-            deltaCandidate += chunk.slice(0, remaining);
+            const appendable = chunk.slice(0, remaining);
+            deltaCandidate += appendable;
+            deltaCharsObserved += appendable.length;
             signalSeq += 1;
             lastDeltaSeq = signalSeq;
         }
@@ -121,6 +142,7 @@ export function createDialogTurnOutputCollector(host, helpers) {
         if (!dispatched) return;
         signalSeq += 1;
         lastToolSignalSeq = signalSeq;
+        toolSignalCount += 1;
     };
 
     const onAssistantTurnEnd = () => {
@@ -144,9 +166,14 @@ export function createDialogTurnOutputCollector(host, helpers) {
             dispatched = true;
             assistantMessageCandidate = null;
             deltaCandidate = '';
+            assistantMessageCount = 0;
+            deltaCharsObserved = 0;
+            lastResolutionDeltaEligible = false;
             signalSeq = 0;
             lastDeltaSeq = 0;
             lastToolSignalSeq = 0;
+            toolSignalCount = 0;
+            lastResolutionSource = null;
         },
         onTurnEnd: (listener) => {
             turnEndListeners.add(listener);
@@ -180,6 +207,8 @@ export function createDialogTurnOutputCollector(host, helpers) {
                     : 'none';
             const reply = assistantMessageCandidate ?? deltaReplyCandidate ?? pendingProtocolReply ?? null;
             if (!reply) return false;
+            lastResolutionSource = replySource === 'none' ? null : replySource;
+            lastResolutionDeltaEligible = isDeltaCandidateEligible();
             assistantMessageCandidate = null;
             deltaCandidate = '';
             signalSeq = 0;
@@ -194,16 +223,25 @@ export function createDialogTurnOutputCollector(host, helpers) {
             resolve(reply);
             return true;
         },
-        snapshot: () => ({
-            dispatched,
-            assistantMessageCandidate,
-            deltaChars: deltaCandidate.length,
-            deltaEligible: isDeltaCandidateEligible(),
-            pendingProtocolReply:
-                typeof helpers.readPendingProtocolSnapshot(host)?.reply === 'string'
-                    ? helpers.normalizeAssistantReplyCandidate(helpers.readPendingProtocolSnapshot(host)?.reply ?? '')
-                    : null,
-        }),
+        snapshot: () => {
+            const pendingProtocol = helpers.readPendingProtocolSnapshot(host);
+            return {
+                dispatched,
+                assistantMessageCandidate,
+                assistantMessageCount,
+                deltaChars: deltaCharsObserved,
+                deltaEligible: lastResolutionSource ? lastResolutionDeltaEligible : isDeltaCandidateEligible(),
+                pendingProtocolReply:
+                    typeof pendingProtocol?.reply === 'string'
+                        ? helpers.normalizeAssistantReplyCandidate(pendingProtocol.reply)
+                        : null,
+                pendingProtocolKind: pendingProtocol?.kind ?? null,
+                toolSignalCount,
+                lastDeltaSeq,
+                lastToolSignalSeq,
+                lastResolutionSource,
+            };
+        },
         cleanup: () => {
             turnEndListeners.clear();
             assistantMessageCandidateListeners.clear();

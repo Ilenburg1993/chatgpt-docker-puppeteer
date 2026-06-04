@@ -61,6 +61,11 @@
  * @property {string[]} searchTerms - Termos de busca (se aplicável)
  * @property {{ start: number | null; end: number | null } | null} lineRange - Range de linhas
  * @property {string[]} patchFiles - Arquivos com patches
+ * @property {string[]} [commands] - Previews seguros de comandos
+ * @property {string[]} [filters] - Filtros estruturados da operação
+ * @property {number | null} [resultCount] - Contagem de resultados materializada
+ * @property {string | null} [resultSummary] - Resumo curto e seguro do resultado
+ * @property {string | null} [primaryTargetKind] - Tipo do alvo operacional principal
  * @property {number | null} progress - Percentual de progresso (0-100)
  * @property {string | null} progressMessage - Mensagem de progresso
  * @property {string | null} partialOutput - Saída parcial (streaming)
@@ -93,6 +98,11 @@
  * @property {string[]} [searchTerms]
  * @property {{ start: number | null; end: number | null } | null} [lineRange]
  * @property {string[]} [patchFiles]
+ * @property {string[]} [commands]
+ * @property {string[]} [filters]
+ * @property {number | null} [resultCount]
+ * @property {string | null} [resultSummary]
+ * @property {string | null} [primaryTargetKind]
  * @property {number | null} [progress]
  * @property {string | null} [progressMessage]
  * @property {string | null} [partialOutput]
@@ -140,6 +150,11 @@ export function buildToolLifecycleEvent(type, source, fields) {
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
         patchFiles: fields.patchFiles ?? [],
+        commands: fields.commands ?? [],
+        filters: fields.filters ?? [],
+        resultCount: fields.resultCount ?? null,
+        resultSummary: fields.resultSummary ?? null,
+        primaryTargetKind: fields.primaryTargetKind ?? null,
 
         progress: fields.progress ?? null,
         progressMessage: fields.progressMessage ?? null,
@@ -176,6 +191,11 @@ export function buildToolLifecycleEvent(type, source, fields) {
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
  *     patchFiles?: string[];
+ *     commands?: string[];
+ *     filters?: string[];
+ *     resultCount?: number | null;
+ *     resultSummary?: string | null;
+ *     primaryTargetKind?: string | null;
  * }} fields
  * @returns {ToolLifecycleEvent}
  */
@@ -192,6 +212,11 @@ export function buildToolLifecycleStart(fields) {
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
         patchFiles: fields.patchFiles ?? [],
+        commands: fields.commands ?? [],
+        filters: fields.filters ?? [],
+        resultCount: fields.resultCount ?? null,
+        resultSummary: fields.resultSummary ?? null,
+        primaryTargetKind: fields.primaryTargetKind ?? null,
     });
 }
 
@@ -209,6 +234,11 @@ export function buildToolLifecycleStart(fields) {
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
  *     patchFiles?: string[];
+ *     commands?: string[];
+ *     filters?: string[];
+ *     resultCount?: number | null;
+ *     resultSummary?: string | null;
+ *     primaryTargetKind?: string | null;
  *     progress?: number | null;
  *     progressMessage?: string | null;
  * }} fields
@@ -226,6 +256,11 @@ export function buildToolLifecycleProgress(fields) {
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
         patchFiles: fields.patchFiles ?? [],
+        commands: fields.commands ?? [],
+        filters: fields.filters ?? [],
+        resultCount: fields.resultCount ?? null,
+        resultSummary: fields.resultSummary ?? null,
+        primaryTargetKind: fields.primaryTargetKind ?? null,
         progress: fields.progress ?? null,
         progressMessage: fields.progressMessage ?? null,
     });
@@ -245,6 +280,11 @@ export function buildToolLifecycleProgress(fields) {
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
  *     patchFiles?: string[];
+ *     commands?: string[];
+ *     filters?: string[];
+ *     resultCount?: number | null;
+ *     resultSummary?: string | null;
+ *     primaryTargetKind?: string | null;
  *     partialOutput: string;
  * }} fields
  * @returns {ToolLifecycleEvent}
@@ -261,6 +301,11 @@ export function buildToolLifecyclePartialResult(fields) {
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
         patchFiles: fields.patchFiles ?? [],
+        commands: fields.commands ?? [],
+        filters: fields.filters ?? [],
+        resultCount: fields.resultCount ?? null,
+        resultSummary: fields.resultSummary ?? null,
+        primaryTargetKind: fields.primaryTargetKind ?? null,
         partialOutput: fields.partialOutput,
     });
 }
@@ -280,6 +325,11 @@ export function buildToolLifecyclePartialResult(fields) {
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
  *     patchFiles?: string[];
+ *     commands?: string[];
+ *     filters?: string[];
+ *     resultCount?: number | null;
+ *     resultSummary?: string | null;
+ *     primaryTargetKind?: string | null;
  *     success: boolean;
  *     durationMs: number;
  * }} fields
@@ -298,6 +348,11 @@ export function buildToolLifecycleComplete(fields) {
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
         patchFiles: fields.patchFiles ?? [],
+        commands: fields.commands ?? [],
+        filters: fields.filters ?? [],
+        resultCount: fields.resultCount ?? null,
+        resultSummary: fields.resultSummary ?? null,
+        primaryTargetKind: fields.primaryTargetKind ?? null,
         success: fields.success,
         durationMs: fields.durationMs,
     });
@@ -318,6 +373,11 @@ export function buildToolLifecycleComplete(fields) {
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
  *     patchFiles?: string[];
+ *     commands?: string[];
+ *     filters?: string[];
+ *     resultCount?: number | null;
+ *     resultSummary?: string | null;
+ *     primaryTargetKind?: string | null;
  * }} fields
  * @returns {ToolLifecycleEvent}
  */
@@ -334,6 +394,11 @@ export function buildToolLifecycleExternalRequested(fields) {
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
         patchFiles: fields.patchFiles ?? [],
+        commands: fields.commands ?? [],
+        filters: fields.filters ?? [],
+        resultCount: fields.resultCount ?? null,
+        resultSummary: fields.resultSummary ?? null,
+        primaryTargetKind: fields.primaryTargetKind ?? null,
     });
 }
 
@@ -353,6 +418,11 @@ export function buildToolLifecycleExternalRequested(fields) {
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
  *     patchFiles?: string[];
+ *     commands?: string[];
+ *     filters?: string[];
+ *     resultCount?: number | null;
+ *     resultSummary?: string | null;
+ *     primaryTargetKind?: string | null;
  * }} fields
  * @returns {ToolLifecycleEvent}
  */
@@ -370,6 +440,11 @@ export function buildToolLifecycleExternalCompleted(fields) {
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
         patchFiles: fields.patchFiles ?? [],
+        commands: fields.commands ?? [],
+        filters: fields.filters ?? [],
+        resultCount: fields.resultCount ?? null,
+        resultSummary: fields.resultSummary ?? null,
+        primaryTargetKind: fields.primaryTargetKind ?? null,
     });
 }
 

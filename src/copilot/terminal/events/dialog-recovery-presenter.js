@@ -38,7 +38,8 @@ export function buildEmptyAfterUserInputRecoveryRows(input = {}) {
     const detail = compactTerminalRecoveryText(input.detail, 132);
     const answerPreview = compactTerminalRecoveryText(input.answerPreview, 80);
     const turnId = compactTerminalRecoveryText(input.turnId, 40);
-    return [
+    /** @type {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' } | null>} */
+    const rows = [
         {
             label: 'Estado',
             value: 'resposta humana registrada; a LLM-B encerrou sem texto publico',
@@ -52,7 +53,13 @@ export function buildEmptyAfterUserInputRecoveryRows(input = {}) {
         input.includeModelSwitch
             ? { label: 'Alternativa', value: `${EMPTY_AFTER_USER_INPUT_MODEL_COMMAND} para trocar modelo`, role: 'command' }
             : null,
-    ].filter((row) => row && row.value);
+    ];
+    /** @type {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' }>} */
+    const visibleRows = [];
+    for (const row of rows) {
+        if (row && row.value.length > 0) visibleRows.push(row);
+    }
+    return visibleRows;
 }
 
 /**

@@ -8,8 +8,12 @@
  * @module copilot/core/tool-target-introspection
  */
 
+import { redactSecretText } from './security/redaction.js';
+
 const MAX_DISCOVERED_VALUES = 24;
 const MAX_RECURSION_DEPTH = 5;
+const MAX_COMMAND_PREVIEW_CHARS = 160;
+const MAX_FILTER_PREVIEW_CHARS = 96;
 
 const FILE_KEYS = new Set([
     'path',
@@ -36,6 +40,21 @@ const URL_KEYS = new Set(['url', 'uri', 'href', 'link', 'page', 'webpage', 'endp
 
 const QUERY_KEYS = new Set(['query', 'pattern', 'search', 'needle', 'regex', 'text', 'lineContent']);
 
+const COMMAND_KEYS = new Set(['command', 'cmd', 'shellCommand', 'script']);
+
+const FILTER_KEYS = new Set(['category', 'filter', 'scope', 'kind', 'type', 'language']);
+
+const RESULT_COUNT_KEYS = new Set([
+    'count',
+    'total',
+    'totalCount',
+    'resultCount',
+    'resultsCount',
+    'matchCount',
+    'matchesCount',
+    'returnedCount',
+]);
+
 const START_LINE_KEYS = new Set(['startLine', 'start', 'fromLine']);
 const END_LINE_KEYS = new Set(['endLine', 'end', 'toLine']);
 
@@ -54,7 +73,12 @@ const RESULT_LINE_RANGE_KEYS = new Set(['returnedLines', 'lineRange']);
  *     searchTerms: string[];
  *     patchFiles: string[];
  *     lineRange: ToolLineRange | null;
+ *     commands: string[];
+ *     filters: string[];
+ *     resultCount: number | null;
+ *     resultSummary: string | null;
  *     primaryTarget: string | null;
+ *     primaryTargetKind: 'file' | 'url' | 'search' | 'patch' | 'command' | 'filter' | null;
  * }} ToolTargetIntrospection
  */
 
@@ -124,6 +148,17 @@ function addIfPresent(target, value) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {number} maxLength
+ * @returns {string | null}
+ */
+function asSafePreview(value, maxLength) {
+    const text = asCleanString(value);
+    if (!text) return null;
+    return redactSecretText(text.replace(/[\r\n\t]+/gu, ' ').replace(/\s+/gu, ' ').trim(), { maxLength });
+}
+
+/**
  * @param {ToolLineRange} target
  * @param {ToolLineRange | null} candidate
  * @returns {void}
@@ -154,9 +189,17 @@ function extractStructuredLineRange(value) {
  *     urlTargets: Set<string>;
  *     searchTerms: Set<string>;
  *     patchFiles: Set<string>;
+ *     commands: Set<string>;
+ *     filters: Set<string>;
  *     lineRange: ToolLineRange;
  *     allowPatchKeys: boolean;
  *     allowQueryKeys: boolean;
+ *     allowCommandKeys: boolean;
+ *     allowFilterKeys: boolean;
+ *     allowResultMetadata: boolean;
+ *     resultCount: number | null;
+ *     resultSuccess: boolean | null;
+ *     resultExitCode: number | null;
  * }} state
  * @returns {void}
  */
@@ -173,6 +216,17 @@ function processStructuredEntry(keyName, raw, state) {
     }
     if (RESULT_LINE_RANGE_KEYS.has(keyName)) {
         mergeLineRange(state.lineRange, extractStructuredLineRange(raw));
+    }
+    if (state.allowResultMetadata && RESULT_COUNT_KEYS.has(keyName)) {
+        const count = asFiniteNumber(raw);
+        if (count !== null && count >= 0) state.resultCount = count;
+    }
+    if (state.allowResultMetadata && keyName === 'success' && typeof raw === 'boolean') {
+        state.resultSuccess = raw;
+    }
+    if (state.allowResultMetadata && keyName === 'exitCode') {
+        const exitCode = asFiniteNumber(raw);
+        if (exitCode !== null) state.resultExitCode = exitCode;
     }
 
     if (!text) return;
@@ -196,6 +250,14 @@ function processStructuredEntry(keyName, raw, state) {
     if (state.allowQueryKeys && QUERY_KEYS.has(keyName)) {
         addIfPresent(state.searchTerms, text);
     }
+
+    if (state.allowCommandKeys && COMMAND_KEYS.has(keyName)) {
+        addIfPresent(state.commands, asSafePreview(text, MAX_COMMAND_PREVIEW_CHARS));
+    }
+
+    if (state.allowFilterKeys && FILTER_KEYS.has(keyName)) {
+        addIfPresent(state.filters, asSafePreview(`${keyName}: ${text}`, MAX_FILTER_PREVIEW_CHARS));
+    }
 }
 
 /**
@@ -205,9 +267,17 @@ function processStructuredEntry(keyName, raw, state) {
  *     urlTargets: Set<string>;
  *     searchTerms: Set<string>;
  *     patchFiles: Set<string>;
+ *     commands: Set<string>;
+ *     filters: Set<string>;
  *     lineRange: ToolLineRange;
  *     allowPatchKeys: boolean;
  *     allowQueryKeys: boolean;
+ *     allowCommandKeys: boolean;
+ *     allowFilterKeys: boolean;
+ *     allowResultMetadata: boolean;
+ *     resultCount: number | null;
+ *     resultSuccess: boolean | null;
+ *     resultExitCode: number | null;
  * }} state
  * @param {number} depth
  * @returns {void}
@@ -287,6 +357,10 @@ export function introspectToolTargets({ args, result }) {
     const searchTerms = new Set();
     /** @type {Set<string>} */
     const patchFiles = new Set();
+    /** @type {Set<string>} */
+    const commands = new Set();
+    /** @type {Set<string>} */
+    const filters = new Set();
 
     /** @type {ToolLineRange} */
     const lineRange = { start: null, end: null };
@@ -296,14 +370,25 @@ export function introspectToolTargets({ args, result }) {
         urlTargets,
         searchTerms,
         patchFiles,
+        commands,
+        filters,
         lineRange,
         allowPatchKeys: true,
         allowQueryKeys: true,
+        allowCommandKeys: true,
+        allowFilterKeys: true,
+        allowResultMetadata: false,
+        resultCount: null,
+        resultSuccess: null,
+        resultExitCode: null,
     };
     visitStructuredMetadata(args, state, 0);
 
     state.allowPatchKeys = false;
     state.allowQueryKeys = false;
+    state.allowCommandKeys = false;
+    state.allowFilterKeys = false;
+    state.allowResultMetadata = true;
     visitStructuredMetadata(result, state, 0);
 
     walkTextNodes(
@@ -325,11 +410,40 @@ export function introspectToolTargets({ args, result }) {
     const normalizedUrls = Array.from(urlTargets).slice(0, MAX_DISCOVERED_VALUES);
     const normalizedQueries = Array.from(searchTerms).slice(0, MAX_DISCOVERED_VALUES);
     const normalizedPatchFiles = Array.from(patchFiles).slice(0, MAX_DISCOVERED_VALUES);
+    const normalizedCommands = Array.from(commands).slice(0, MAX_DISCOVERED_VALUES);
+    const normalizedFilters = Array.from(filters).slice(0, MAX_DISCOVERED_VALUES);
 
     const primaryTarget =
-        normalizedFiles[0] ?? normalizedUrls[0] ?? normalizedQueries[0] ?? normalizedPatchFiles[0] ?? null;
+        normalizedFiles[0] ??
+        normalizedUrls[0] ??
+        normalizedQueries[0] ??
+        normalizedPatchFiles[0] ??
+        normalizedCommands[0] ??
+        normalizedFilters[0] ??
+        null;
+    const primaryTargetKind =
+        normalizedFiles.length > 0
+            ? 'file'
+            : normalizedUrls.length > 0
+              ? 'url'
+              : normalizedQueries.length > 0
+                ? 'search'
+                : normalizedPatchFiles.length > 0
+                  ? 'patch'
+                  : normalizedCommands.length > 0
+                    ? 'command'
+                    : normalizedFilters.length > 0
+                      ? 'filter'
+                      : null;
 
     const hasRange = lineRange.start !== null || lineRange.end !== null;
+    const resultSummary = [
+        state.resultSuccess === null ? null : state.resultSuccess ? 'sucesso' : 'falha',
+        state.resultExitCode === null ? null : `saída ${state.resultExitCode}`,
+        state.resultCount === null ? null : `${state.resultCount} resultado${state.resultCount === 1 ? '' : 's'}`,
+    ]
+        .filter(Boolean)
+        .join(' · ');
 
     return {
         fileTargets: normalizedFiles,
@@ -337,6 +451,11 @@ export function introspectToolTargets({ args, result }) {
         searchTerms: normalizedQueries,
         patchFiles: normalizedPatchFiles,
         lineRange: hasRange ? lineRange : null,
+        commands: normalizedCommands,
+        filters: normalizedFilters,
+        resultCount: state.resultCount,
+        resultSummary: resultSummary || null,
         primaryTarget,
+        primaryTargetKind,
     };
 }

@@ -54,6 +54,83 @@ import {
 /** @typedef {import('../../types.js').DialogTurnHost} TurnHost */
 
 /**
+ * Resultado semântico canônico de um turno explícito do dialog loop.
+ *
+ * APIs legadas ainda podem projetar apenas `reply`; consumidores que precisam explicar o turno devem usar este
+ * contrato, sem reconstituir semântica a partir de eventos concorrentes.
+ *
+ * @typedef {{
+ *     reply: string;
+ *     outcome: 'public_reply' | 'pending_human_input' | 'tool_only' | 'protocol_transition' | 'empty';
+ *     replySource:
+ *         | 'loop.reply'
+ *         | 'assistant.message'
+ *         | 'delta'
+ *         | 'pending_protocol'
+ *         | 'direct_dispatch'
+ *         | 'unknown';
+ *     diagnostics: {
+ *         dispatched: boolean;
+ *         assistantMessageCount: number;
+ *         deltaChars: number;
+ *         deltaEligible: boolean;
+ *         pendingProtocolKind: 'reply' | 'ready' | 'stopped' | null;
+ *         pendingHumanInput: boolean;
+ *         toolSignalCount: number;
+ *         lastDeltaSeq: number;
+ *         lastToolSignalSeq: number;
+ *     };
+ * }} DialogTurnSemanticResult
+ */
+
+/**
+ * @param {string} reply
+ * @param {string | null | undefined} replySource
+ * @param {ReturnType<typeof createDialogTurnOutputCollector>} collector
+ * @param {TurnHost} host
+ * @returns {DialogTurnSemanticResult}
+ */
+function buildDialogTurnSemanticResult(reply, replySource, collector, host) {
+    const snapshot = collector.snapshot();
+    const publicReply = typeof reply === 'string' && reply.trim().length > 0;
+    const pendingQuestion = host.getPendingQuestionSnapshot?.() ?? null;
+    const pendingHumanInput = pendingQuestion?.kind === 'question' && pendingQuestion.protocolControlled !== true;
+    const outcome = publicReply
+        ? 'public_reply'
+        : pendingHumanInput
+          ? 'pending_human_input'
+          : snapshot.toolSignalCount > 0
+            ? 'tool_only'
+            : snapshot.pendingProtocolKind === 'ready' || snapshot.pendingProtocolKind === 'stopped'
+              ? 'protocol_transition'
+              : 'empty';
+    const semanticSource =
+        replySource === 'loop.reply' ||
+        replySource === 'assistant.message' ||
+        replySource === 'delta' ||
+        replySource === 'pending_protocol' ||
+        replySource === 'direct_dispatch'
+            ? replySource
+            : 'unknown';
+    return {
+        reply,
+        outcome,
+        replySource: semanticSource,
+        diagnostics: {
+            dispatched: snapshot.dispatched,
+            assistantMessageCount: snapshot.assistantMessageCount,
+            deltaChars: snapshot.deltaChars,
+            deltaEligible: snapshot.deltaEligible,
+            pendingProtocolKind: snapshot.pendingProtocolKind,
+            pendingHumanInput,
+            toolSignalCount: snapshot.toolSignalCount,
+            lastDeltaSeq: snapshot.lastDeltaSeq,
+            lastToolSignalSeq: snapshot.lastToolSignalSeq,
+        },
+    };
+}
+
+/**
  * Cria um listener que aceita `unknown` e faz cast para o tipo esperado.
  *
  * @template T
@@ -361,7 +438,7 @@ export function waitForRestartAndReply(emitter, host, message, timeout, stopReas
  *     host: TurnHost;
  *     sendCountRef: { sendCount: number };
  * }} ctx
- * @returns {Promise<string>}
+ * @returns {Promise<DialogTurnSemanticResult>}
  */
 export function executeTurnImpl(emitter, message, { timeout, signal, traceId, allowDirectDispatch = false }, ctx) {
     const { host, sendCountRef } = ctx;
@@ -397,15 +474,19 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                 /** @type {(() => void) | null} */
                 let removeAssistantMessageAutoResolve = null;
 
-                /** @param {string} value */
-                const settleResolve = (value) => {
+                /**
+                 * @param {string} value
+                 * @param {string | null | undefined} [replySource]
+                 */
+                const settleResolve = (value, replySource) => {
                     if (settled) return;
                     settled = true;
+                    const result = buildDialogTurnSemanticResult(value, replySource, turnOutputCollector, host);
                     detachAbortListener(signal, onAbort);
                     removeTurnEndAutoResolve?.();
                     removeAssistantMessageAutoResolve?.();
                     turnOutputCollector.cleanup();
-                    resolve(value);
+                    resolve(result);
                 };
 
                 /** @param {Error} error */
@@ -426,7 +507,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                         timeout,
                         message,
                         pendingListenerRef,
-                        resolve: settleResolve,
+                        resolve: (/** @type {string} */ reply) => settleResolve(reply, 'loop.reply'),
                         reject: settleReject,
                         waitForRestartAndReplyFn: waitFn,
                         ...(traceId ? { traceId } : {}),
@@ -445,7 +526,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                         (reply) => {
                             clearTurnTimeout();
                             clearOuterLoopListeners();
-                            settleResolve(reply);
+                            settleResolve(reply, turnOutputCollector.snapshot().lastResolutionSource);
                         },
                         (replyTurnStart, reply) =>
                             finalizeTurnReply(replyTurnStart, reply, {
@@ -462,7 +543,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                         (reply) => {
                             clearTurnTimeout();
                             clearOuterLoopListeners();
-                            settleResolve(reply);
+                            settleResolve(reply, turnOutputCollector.snapshot().lastResolutionSource);
                         },
                         (replyTurnStart, reply) =>
                             finalizeTurnReply(replyTurnStart, reply, {
@@ -506,7 +587,7 @@ export function executeTurnImpl(emitter, message, { timeout, signal, traceId, al
                     onReplyOuter,
                     onReadyOuter,
                     onStopOuter,
-                    resolve: settleResolve,
+                    resolve: (/** @type {string} */ reply) => settleResolve(reply, 'direct_dispatch'),
                     reject: settleReject,
                     waitForRestartAndReplyFn: waitFn,
                     allowDirectDispatch,

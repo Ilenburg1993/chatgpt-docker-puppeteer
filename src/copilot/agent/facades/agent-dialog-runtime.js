@@ -25,6 +25,16 @@
  *               },
  *           ) => Promise<string>)
  *         | undefined;
+ *     sendDialogTurnDetailed?:
+ *         | ((
+ *               message: string,
+ *               options?: {
+ *                   timeout?: number | null;
+ *                   signal?: AbortSignal;
+ *                   traceId?: string;
+ *               },
+ *           ) => Promise<import('../dialog/executors/turn-executor.js').DialogTurnSemanticResult>)
+ *         | undefined;
  *     pauseDialogLoop?: ((sessionId: string | null) => Promise<void>) | undefined;
  *     isDialogLoopPaused?: (() => boolean) | undefined;
  *     getDialogPrMetricsSnapshot?:
@@ -42,6 +52,10 @@
  *         message: string,
  *         options?: { timeout?: number | null; signal?: AbortSignal; traceId?: string },
  *     ) => Promise<string>;
+ *     sendDialogTurnDetailed?: (
+ *         message: string,
+ *         options?: { timeout?: number | null; signal?: AbortSignal; traceId?: string },
+ *     ) => Promise<import('../dialog/executors/turn-executor.js').DialogTurnSemanticResult>;
  * }} AgentDialogTurnTarget
  */
 
@@ -92,6 +106,35 @@ export async function sendAgentDialogTurn(runtime, message, options) {
 }
 
 /**
+ * @param {AgentDialogTurnTarget} runtime
+ * @param {string} message
+ * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [options]
+ * @returns {Promise<import('../dialog/executors/turn-executor.js').DialogTurnSemanticResult>}
+ */
+export async function sendAgentDialogTurnDetailed(runtime, message, options) {
+    if (typeof runtime.sendDialogTurnDetailed === 'function') {
+        return options ? runtime.sendDialogTurnDetailed(message, options) : runtime.sendDialogTurnDetailed(message);
+    }
+    const reply = await sendAgentDialogTurn(runtime, message, options);
+    return {
+        reply,
+        outcome: reply.trim().length > 0 ? 'public_reply' : 'empty',
+        replySource: 'unknown',
+        diagnostics: {
+            dispatched: true,
+            assistantMessageCount: 0,
+            deltaChars: 0,
+            deltaEligible: false,
+            pendingProtocolKind: null,
+            pendingHumanInput: false,
+            toolSignalCount: 0,
+            lastDeltaSeq: 0,
+            lastToolSignalSeq: 0,
+        },
+    };
+}
+
+/**
  * @param {AgentDialogContextTarget} runtime
  * @param {string} message
  * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [options]
@@ -102,6 +145,35 @@ export async function dispatchAgentDialogTurn(runtime, message, options) {
         throw new Error('AGENT_DIALOG_TURN_UNAVAILABLE');
     }
     return options ? runtime.sendDialogTurn(message, options) : runtime.sendDialogTurn(message);
+}
+
+/**
+ * @param {AgentDialogContextTarget} runtime
+ * @param {string} message
+ * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [options]
+ * @returns {Promise<import('../dialog/executors/turn-executor.js').DialogTurnSemanticResult>}
+ */
+export async function dispatchAgentDialogTurnDetailed(runtime, message, options) {
+    if (typeof runtime.sendDialogTurnDetailed === 'function') {
+        return options ? runtime.sendDialogTurnDetailed(message, options) : runtime.sendDialogTurnDetailed(message);
+    }
+    const reply = await dispatchAgentDialogTurn(runtime, message, options);
+    return {
+        reply,
+        outcome: reply.trim().length > 0 ? 'public_reply' : 'empty',
+        replySource: 'unknown',
+        diagnostics: {
+            dispatched: true,
+            assistantMessageCount: 0,
+            deltaChars: 0,
+            deltaEligible: false,
+            pendingProtocolKind: null,
+            pendingHumanInput: false,
+            toolSignalCount: 0,
+            lastDeltaSeq: 0,
+            lastToolSignalSeq: 0,
+        },
+    };
 }
 
 /**

@@ -22,6 +22,18 @@ import {
     stopDialogMode,
 } from '../../../src/copilot/channel/client-dialog.js';
 
+const EMPTY_SEMANTIC_DIAGNOSTICS = {
+    dispatched: true,
+    assistantMessageCount: 0,
+    deltaChars: 0,
+    deltaEligible: false,
+    pendingProtocolKind: null,
+    pendingHumanInput: false,
+    toolSignalCount: 0,
+    lastDeltaSeq: 0,
+    lastToolSignalSeq: 0,
+};
+
 // ─── Mock Agent ───────────────────────────────────────────────────────────────
 
 function createMockAgent() {
@@ -431,6 +443,9 @@ describe('client-dialog › dialogTurnDetailed', () => {
             reply: 'reply text',
             replySource: 'runtime_return',
             hadReplyEvent: false,
+            semanticOutcome: 'public_reply',
+            semanticReplySource: 'unknown',
+            semanticDiagnostics: EMPTY_SEMANTIC_DIAGNOSTICS,
         });
     });
 
@@ -446,6 +461,9 @@ describe('client-dialog › dialogTurnDetailed', () => {
             reply: 'reply via evento',
             replySource: 'transport_mirror',
             hadReplyEvent: true,
+            semanticOutcome: 'empty',
+            semanticReplySource: 'unknown',
+            semanticDiagnostics: EMPTY_SEMANTIC_DIAGNOSTICS,
         });
     });
 
@@ -457,6 +475,34 @@ describe('client-dialog › dialogTurnDetailed', () => {
             reply: '',
             replySource: 'empty',
             hadReplyEvent: false,
+            semanticOutcome: 'empty',
+            semanticReplySource: 'unknown',
+            semanticDiagnostics: EMPTY_SEMANTIC_DIAGNOSTICS,
+        });
+    });
+
+    it('preserva classificação semântica produzida pelo Agent', async () => {
+        const agent = createMockAgent();
+        agent.sendDialogTurnDetailed = vi.fn(async () => ({
+            reply: '',
+            outcome: 'tool_only',
+            replySource: 'loop.reply',
+            diagnostics: {
+                ...EMPTY_SEMANTIC_DIAGNOSTICS,
+                toolSignalCount: 4,
+            },
+        }));
+
+        await expect(dialogTurnDetailed(agent, 'hello')).resolves.toEqual({
+            reply: '',
+            replySource: 'empty',
+            hadReplyEvent: false,
+            semanticOutcome: 'tool_only',
+            semanticReplySource: 'loop.reply',
+            semanticDiagnostics: {
+                ...EMPTY_SEMANTIC_DIAGNOSTICS,
+                toolSignalCount: 4,
+            },
         });
     });
 });

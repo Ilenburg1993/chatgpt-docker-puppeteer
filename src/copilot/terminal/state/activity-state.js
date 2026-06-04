@@ -39,6 +39,7 @@ const FOCUSED_ACTIVITY_MAX_AGE_MS = 10 * 60_000;
  * @property {TerminalActivitySeverity} severity
  * @property {number | null} progress
  * @property {string | null} toolName
+ * @property {string | null} [toolTarget]
  * @property {number} startedAt
  * @property {number} updatedAt
  * @property {number} ageMs
@@ -61,6 +62,7 @@ let _currentActivity = {
     severity: 'info',
     progress: null,
     toolName: null,
+    toolTarget: null,
     startedAt: Date.now(),
     updatedAt: Date.now(),
     ageMs: 0,
@@ -177,6 +179,7 @@ function readFocusedActivity() {
  *     severity?: TerminalActivitySeverity;
  *     progress?: number | null;
  *     toolName?: string | null;
+ *     toolTarget?: string | null;
  *     recordHistory?: boolean;
  *     updateCurrent?: boolean;
  *     timestamp?: number;
@@ -190,13 +193,15 @@ export function recordTerminalActivity(phase, label, opts = {}) {
     const severity = opts.severity ?? 'info';
     const progress = normalizeProgress(opts.progress ?? null);
     const toolName = opts.toolName ?? null;
+    const toolTarget = opts.toolTarget ?? null;
     const recordHistory = opts.recordHistory !== false;
     const updateCurrent = opts.updateCurrent !== false;
     const keepStart =
         _currentActivity.phase === phase &&
         _currentActivity.label === label &&
         _currentActivity.source === source &&
-        _currentActivity.toolName === toolName;
+        _currentActivity.toolName === toolName &&
+        _currentActivity.toolTarget === toolTarget;
     const sameSemanticPayload =
         keepStart &&
         _currentActivity.detail === detail &&
@@ -220,6 +225,7 @@ export function recordTerminalActivity(phase, label, opts = {}) {
         severity,
         progress,
         toolName,
+        toolTarget,
         startedAt: updateCurrent && keepStart ? _currentActivity.startedAt : timestamp,
         updatedAt: timestamp,
         ageMs: 0,

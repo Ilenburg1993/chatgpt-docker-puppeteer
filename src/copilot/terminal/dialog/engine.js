@@ -61,6 +61,7 @@ import {
     readTerminalTurnCorrelation,
     reviseRecentTerminalTurnTraceStatus,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
+    waitForTerminalTurnMaterializationQuiescence,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
 import {
@@ -450,6 +451,10 @@ function hasPendingHumanInputOutcome(runtimeState) {
  *     actor: string;
  *     byok: ReturnType<typeof readConfiguredByokSummary>;
  *     materialization: ReturnType<typeof completeTerminalTurnMaterialization>;
+ *     semanticOutcome?: import('../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['outcome'];
+ *     semanticReplySource?: import('../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['replySource'];
+ *     semanticDiagnostics?: import('../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['diagnostics'];
+ *     quiescence?: Awaited<ReturnType<typeof waitForTerminalTurnMaterializationQuiescence>> | null;
  *     timestamp?: number;
  * }} input
  * @returns {{ expectedPendingInput: boolean; emptyOutputFailure: boolean }}
@@ -461,7 +466,8 @@ function recordTerminalExplicitEmptyOutput(input) {
 
     const timestamp = input.timestamp ?? Date.now();
     const runtimeState = readTerminalRuntimeState();
-    if (hasPendingHumanInputOutcome(runtimeState)) {
+    const semanticOutcome = input.semanticOutcome ?? 'empty';
+    if (hasPendingHumanInputOutcome(runtimeState) || semanticOutcome === 'pending_human_input') {
         recordTerminalActivity('question', 'Turno sem transcript final aguardando input humano', {
             detail: `pergunta humana pendente · origem ${input.materialization.sourceDetail}`,
             source: 'dialog',
@@ -471,10 +477,56 @@ function recordTerminalExplicitEmptyOutput(input) {
         return { expectedPendingInput: true, emptyOutputFailure: false };
     }
 
+    const semanticDetail =
+        `resultado ${semanticOutcome} · origem agent ${input.semanticReplySource ?? 'n/d'} · ` +
+        `sinais tool ${input.semanticDiagnostics?.toolSignalCount ?? 0}`;
     const failureDetail =
         `autor ${input.actor} · origem ${input.materialization.sourceDetail} · ` +
         `fragmentos ${input.materialization.diagnostics.deltaSlices}/${input.materialization.diagnostics.deltaChars} caracteres · ` +
-        `mensagens assistente ${input.materialization.diagnostics.assistantMessageCount}`;
+        `mensagens assistente ${input.materialization.diagnostics.assistantMessageCount} · ${semanticDetail}` +
+        (input.quiescence ? ` · quiescência ${input.quiescence.settledBy}/${input.quiescence.waitedMs}ms` : '');
+
+    if (semanticOutcome === 'tool_only' || semanticOutcome === 'protocol_transition') {
+        const toolOnly = semanticOutcome === 'tool_only';
+        reviseRecentTerminalTurnTraceStatus({ timestamp, status: 'completed' });
+        recordTerminalActivity('turn', toolOnly ? 'Turno tool-only sem síntese pública' : 'Transição de protocolo sem transcript', {
+            detail: failureDetail,
+            source: 'dialog',
+            severity: toolOnly ? 'warn' : 'info',
+        });
+        broadcastSse(
+            'terminal.turn.non_text_outcome',
+            withTerminalTurnCorrelation({
+                source: 'terminal-dialog/non-text-outcome',
+                actor: input.actor,
+                semanticOutcome,
+                semanticReplySource: input.semanticReplySource ?? null,
+                semanticDiagnostics: input.semanticDiagnostics ?? null,
+                sourceDetail: input.materialization.sourceDetail,
+                pendingQuestionKind: runtimeState.pendingQuestionKind,
+                runtimeStatus: runtimeState.status,
+                timestamp,
+            }),
+        );
+        println(
+            terminalThemeRow(
+                toolOnly ? 'Turno concluído' : 'Transição',
+                toolOnly
+                    ? 'tools executadas; a LLM-B não emitiu síntese pública'
+                    : 'protocolo avançou sem resposta pública',
+                { role: toolOnly ? 'warn' : 'info' },
+            ),
+        );
+        if (toolOnly) {
+            println(
+                terminalThemeRow('Próximo passo', 'peça uma síntese pública ou continue com o próximo objetivo', {
+                    role: 'command',
+                }),
+            );
+        }
+        return { expectedPendingInput: false, emptyOutputFailure: false };
+    }
+
     reviseRecentTerminalTurnTraceStatus({ timestamp, status: 'failed' });
     recordTerminalActivity('error', 'Turno sem saída pública materializada', {
         detail: `${failureDetail} · sem pergunta humana ou formulário pendente`,
@@ -490,8 +542,13 @@ function recordTerminalExplicitEmptyOutput(input) {
             deltaSlices: input.materialization.diagnostics.deltaSlices,
             deltaChars: input.materialization.diagnostics.deltaChars,
             assistantMessageCount: input.materialization.diagnostics.assistantMessageCount,
+            semanticOutcome,
+            semanticReplySource: input.semanticReplySource ?? null,
+            semanticDiagnostics: input.semanticDiagnostics ?? null,
             pendingQuestionKind: runtimeState.pendingQuestionKind,
             runtimeStatus: runtimeState.status,
+            quiescenceSettledBy: input.quiescence?.settledBy ?? null,
+            quiescenceWaitedMs: input.quiescence?.waitedMs ?? null,
             timestamp,
         }),
     );
@@ -1101,6 +1158,18 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             onReasoning,
             ...(requestHeaders ? { requestHeaders } : {}),
         });
+        const quiescence =
+            turnResult.reply.trim().length === 0 && !hasPendingHumanInputOutcome(readTerminalRuntimeState())
+                ? await waitForTerminalTurnMaterializationQuiescence()
+                : null;
+        if (quiescence && quiescence.waitedMs > 0) {
+            recordTerminalActivity('turn', 'Reconciliação de saída pública concluída', {
+                detail: `${quiescence.settledBy} · ${quiescence.waitedMs}ms`,
+                source: 'dialog',
+                recordHistory: false,
+                updateCurrent: false,
+            });
+        }
         const materializedReply = completeTerminalTurnMaterialization({
             directReply: turnResult.reply,
             directSource: turnResult.replySource,
@@ -1109,6 +1178,14 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             actor,
             byok: byokSummary,
             materialization: materializedReply,
+            ...(turnResult.semanticOutcome !== undefined ? { semanticOutcome: turnResult.semanticOutcome } : {}),
+            ...(turnResult.semanticReplySource !== undefined
+                ? { semanticReplySource: turnResult.semanticReplySource }
+                : {}),
+            ...(turnResult.semanticDiagnostics !== undefined
+                ? { semanticDiagnostics: turnResult.semanticDiagnostics }
+                : {}),
+            quiescence,
         });
         const reply = materializedReply.reply ?? turnResult.reply;
         const effectiveReplySource = materializedReply.source;
@@ -1167,6 +1244,11 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 assistantMessageCount: materializedReply.diagnostics.assistantMessageCount,
                 droppedDeltaSlices: materializedReply.diagnostics.droppedDeltaSlices,
                 droppedDeltaChars: materializedReply.diagnostics.droppedDeltaChars,
+                quiescenceSettledBy: quiescence?.settledBy ?? null,
+                quiescenceWaitedMs: quiescence?.waitedMs ?? null,
+                semanticOutcome: turnResult.semanticOutcome ?? null,
+                semanticReplySource: turnResult.semanticReplySource ?? null,
+                semanticDiagnostics: turnResult.semanticDiagnostics ?? null,
             },
             finalReconciliation: {
                 mode: finalRenderDecision.mode,

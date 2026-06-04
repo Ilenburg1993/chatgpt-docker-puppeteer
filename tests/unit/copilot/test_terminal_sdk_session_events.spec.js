@@ -340,7 +340,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(refreshPromptIfIdle).not.toHaveBeenCalled();
     });
 
-    it('mantém session.model_changed silencioso por default e só narra em modo verbose', async () => {
+    it('narra mudança efetiva de modelo por default e mantém confirmação redundante silenciosa', async () => {
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
@@ -357,10 +357,14 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         });
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Modelo confirmado',
-            expect.objectContaining({ detail: 'de auto para gpt-5.4 · raciocínio high' }),
+            'Modelo alterado',
+            expect.objectContaining({
+                detail: 'de auto para gpt-5.4 · raciocínio high',
+                recordHistory: true,
+                updateCurrent: false,
+            }),
         );
-        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Modelo SDK: auto → gpt-5.4'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('auto → gpt-5.4'));
         expect(mocks.writeSdkSessionConfirmationRecords).toHaveBeenCalledWith([
             expect.objectContaining({
                 previousModel: 'auto',
@@ -372,12 +376,14 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         ]);
 
         mocks.println.mockClear();
-        mocks.getShowSessionActivity.mockReturnValue(true);
-        agent.emit('session.model_changed', { previousModel: 'gpt-5.4', newModel: 'gpt-5.5', reasoningEffort: 'high' });
+        agent.emit('session.model_changed', { previousModel: 'gpt-5.4', newModel: 'gpt-5.4', reasoningEffort: 'high' });
 
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('SDK confirmou gpt-5.4 → gpt-5.5'));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('raciocínio high'));
-        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Modelo SDK:'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('gpt-5.4 → gpt-5.4'));
+
+        mocks.getShowSessionActivity.mockReturnValue(true);
+        agent.emit('session.model_changed', { previousModel: 'gpt-5.4', newModel: 'gpt-5.4', reasoningEffort: 'high' });
+
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('gpt-5.4 → gpt-5.4'));
     });
 
     it('surfa workspace_file_changed e assistant.turn_start/end para a UX local', async () => {

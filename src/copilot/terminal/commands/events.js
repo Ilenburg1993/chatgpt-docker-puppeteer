@@ -260,6 +260,7 @@ function humanEventLabel(event, payload = null) {
         return 'Erro do agente';
     }
     if (event === 'terminal.turn.empty_output') return 'Turno sem saída';
+    if (event === 'terminal.turn.non_text_outcome') return 'Turno sem transcript';
     if (event === 'dialog.empty_after_user_input') return 'Continuação vazia';
     if (event === 'byok.provider.config') return 'Configuração BYOK';
     if (event === 'dialog.ready') return 'Conversa pronta';
@@ -491,7 +492,7 @@ function summarizeEmptyAfterUserInputPayload(payload, opts = {}) {
     return summarizeEmptyAfterUserInputRecovery({
         detail: detail ? compact(detail, 120) : '',
         requestId: requestId ? compactTerminalDiagnosticId(requestId, 14) : '',
-        showIds: opts.showIds,
+        ...(opts.showIds !== undefined ? { showIds: opts.showIds } : {}),
     });
 }
 
@@ -673,8 +674,13 @@ export async function cmdEvents({ println }, arg = '') {
         }
         for (const policy of policies) {
             const policyCount = policy.publicEvents.reduce((sum, event) => sum + (counts.get(event) ?? 0), 0);
-            const events = policy.publicEvents.map(humanEventLabel).join(', ');
-            const title = detailMode ? policy.id : policy.publicEvents.map(humanEventLabel).slice(0, 2).join(' + ');
+            const events = policy.publicEvents.map((event) => humanEventLabel(event)).join(', ');
+            const title = detailMode
+                ? policy.id
+                : policy.publicEvents
+                      .map((event) => humanEventLabel(event))
+                      .slice(0, 2)
+                      .join(' + ');
             println(terminalThemeText('accent', `  ${title || policy.id}`));
             println(terminalThemeRow('Responsável', humanPolicyOwnerSummary(policy), { role: 'muted' }));
             println(

@@ -25,6 +25,11 @@ const MAX_RECENT_TOOL_LIFECYCLE = 48;
  *     turnId: string | null;
  *     target: string | null;
  *     path: string | null;
+ *     commands: string[];
+ *     filters: string[];
+ *     resultCount: number | null;
+ *     resultSummary: string | null;
+ *     primaryTargetKind: string | null;
  *     progress: number | null;
  *     progressMessage: string | null;
  *     success: boolean | null;
@@ -93,6 +98,11 @@ function buildDiagnostic(event, previous) {
         turnId: nonEmptyString(event.turnId) ?? previous?.turnId ?? null,
         target: nonEmptyString(event.target) ?? previous?.target ?? null,
         path: nonEmptyString(event.path) ?? previous?.path ?? null,
+        commands: (event.commands?.length ?? 0) > 0 ? [...(event.commands ?? [])] : (previous?.commands ?? []),
+        filters: (event.filters?.length ?? 0) > 0 ? [...(event.filters ?? [])] : (previous?.filters ?? []),
+        resultCount: typeof event.resultCount === 'number' ? event.resultCount : previous?.resultCount ?? null,
+        resultSummary: nonEmptyString(event.resultSummary) ?? previous?.resultSummary ?? null,
+        primaryTargetKind: nonEmptyString(event.primaryTargetKind) ?? previous?.primaryTargetKind ?? null,
         progress: typeof event.progress === 'number' ? event.progress : previous?.progress ?? null,
         progressMessage: nonEmptyString(event.progressMessage) ?? previous?.progressMessage ?? null,
         success,

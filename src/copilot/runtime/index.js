@@ -63,6 +63,7 @@ export {
     sendRuntimeDialogTurn,
     sendRuntimeDialogTurnForRuntime,
     sendRuntimeDialogTurnOnActiveLoop,
+    sendRuntimeDialogTurnOnActiveLoopDetailed,
     sendRuntimeDialogTurnWithDiagnostics,
     startRuntimeDialogLoop,
     stopRuntimeDialogLoopAuthorized,

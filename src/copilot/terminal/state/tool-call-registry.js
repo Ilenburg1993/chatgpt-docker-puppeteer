@@ -267,6 +267,7 @@ export function createToolCallRegistry() {
      *     canonicalName?: string | null;
      *     rawArgs?: Record<string, unknown>;
      *     presentation?: import('../events/tool-activity-presenter.js').TerminalToolActivityPresentation | null;
+     *     suppressLiveNarration?: boolean;
      * }} [opts]
      * @returns {ToolCallEntry}
      */

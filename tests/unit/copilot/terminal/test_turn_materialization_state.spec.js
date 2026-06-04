@@ -12,6 +12,7 @@ import {
     recordTerminalTurnDelta,
     shouldSuppressTerminalAssistantMessageAsMaterializedTurn,
     shouldSuppressTerminalTaskDeltaAsMaterializedDialog,
+    waitForTerminalTurnMaterializationQuiescence,
 } from '../../../../src/copilot/terminal/state/turn-materialization-state.js';
 
 describe('terminal/state/turn-materialization-state', () => {
@@ -59,6 +60,34 @@ describe('terminal/state/turn-materialization-state', () => {
         expect(materialized.reply).toBe('olá, mundo');
         expect(materialized.source).toBe('stream_delta');
         expect(materialized.diagnostics.deltaSlices).toBe(2);
+    });
+
+    it('reconcilia assistant.message tardia durante quiescência de turno vazio', async () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'late-message' });
+
+        const waiting = waitForTerminalTurnMaterializationQuiescence({ timeoutMs: 100 });
+        queueMicrotask(() => {
+            recordTerminalTurnAssistantMessage({
+                content: 'resposta final tardia',
+                source: 'sdk/assistant.message',
+            });
+        });
+
+        await expect(waiting).resolves.toMatchObject({ settledBy: 'content' });
+        expect(completeTerminalTurnMaterialization({ directReply: '', directSource: 'empty' }).reply).toBe(
+            'resposta final tardia',
+        );
+    });
+
+    it('encerra quiescência de vazio real por timeout limitado', async () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'real-empty' });
+
+        const result = await waitForTerminalTurnMaterializationQuiescence({ timeoutMs: 5 });
+
+        expect(result.settledBy).toBe('timeout');
+        expect(result.waitedMs).toBeGreaterThanOrEqual(0);
     });
 
     it('preserva identidade causal dos deltas no snapshot do turno', () => {

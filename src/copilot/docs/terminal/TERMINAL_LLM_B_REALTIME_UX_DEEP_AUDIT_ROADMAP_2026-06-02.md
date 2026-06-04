@@ -7588,3 +7588,431 @@
     para confirmar que o modo detalhado é rico sem parecer lixo técnico;
   - manter os catálogos longos em comandos explícitos, com títulos humanos, paginação/filtros e
     ações curtas por linha.
+
+## 2026-06-04 — Auditoria Profunda do Contrato de Turno Vazio, Tools e Linha Viva
+
+### 12.62 Escopo e motivação
+
+- [x] Reabrir a investigação a partir do comportamento real observado no terminal:
+  - `Turno vazio · sem resposta pública materializada; nenhuma pergunta humana pendente`;
+  - tools de listagem ou shell que mostram apenas o nome genérico da operação;
+  - linha viva que conhece a tool, mas não necessariamente o alvo operacional que interessa ao
+    operador;
+  - eventos de troca de modelo que existem tecnicamente, mas ainda precisam ser avaliados como uma
+    narrativa operacional única.
+- [x] Expandir a análise para fora do renderer:
+  - `src/copilot/agent/dialog/`;
+  - `src/copilot/channel/client-dialog.js`;
+  - `src/copilot/presentation/`;
+  - `src/copilot/terminal/dialog/`;
+  - `src/copilot/terminal/events/`;
+  - `src/copilot/terminal/state/`;
+  - `src/copilot/core/tool-target-introspection.js`.
+- [x] Reafirmar a decisão arquitetural:
+  - terminal não deve inventar semântica que o runtime já pode conhecer;
+  - `agent` é owner da resolução semântica do turno;
+  - `channel` é owner da entrega e da origem do reply ao consumidor;
+  - terminal é owner da materialização humana, reconciliação visual e diagnóstico;
+  - metadados semânticos de tools devem nascer em um contrato compartilhado, não em strings
+    específicas de um renderer.
+
+### 12.63 Mapa causal atual do turno explícito
+
+- [x] O turno explícito começa em `terminal/dialog/engine.js`:
+  - marca `busy`;
+  - chama `beginTerminalTurnMaterialization()`;
+  - cria callbacks de reasoning e delta;
+  - chama `runTerminalDialogTurnDetailed()`;
+  - imediatamente após o retorno, chama `completeTerminalTurnMaterialization()`;
+  - se nenhuma fonte textual estiver presente, chama `recordTerminalExplicitEmptyOutput()`.
+- [x] O gateway `terminal/frontend/gateways/dialog.js` delega para
+  `llmBridgeClient.dialogTurnDetailed()` quando não há `requestHeaders`.
+- [x] O transporte `channel/client-dialog.js` observa:
+  - retorno direto de `sendRuntimeDialogTurnOnActiveLoop()`;
+  - espelho `dialog.reply`;
+  - deltas `task.delta` e `dialog.delta`;
+  - reasoning `task.reasoning`.
+- [x] O transporte usa uma única passagem por `setImmediate()` quando o retorno direto está vazio e
+  `dialog.reply` ainda não chegou.
+- [x] O runtime do dialog loop em `agent/dialog/executors/turn-executor.js` usa
+  `createDialogTurnOutputCollector()` como owner semântico do reply.
+- [x] O collector observa:
+  - `assistant.message`;
+  - `dialog.delta`;
+  - `task.delta`;
+  - `assistant.turn_end`;
+  - sinais de início/fim de tools;
+  - snapshot de protocolo pendente.
+- [x] O collector deliberadamente considera delta inelegível quando houve sinal de tool depois do
+  último delta:
+  - isso evita tratar texto pré-tool como resposta final;
+  - também significa que um turno tool-only sem mensagem final pode terminar legitimamente sem
+    reply textual.
+- [x] O terminal também observa `assistant.message` em `sdk-session-events.js`:
+  - quando `getBusy()` é verdadeiro, a mensagem é anexada ao materializador do turno;
+  - quando `getBusy()` já é falso, ela é tratada como mensagem fora do turno ativo ou reconciliada
+    contra materialização recente.
+- [x] `dialog.turn_end` em `terminal-agent-wiring.js` é lifecycle e fallback visual, não deveria ser
+  uma segunda fonte semântica independente de transcript.
+
+### 12.64 Situações reais em que “sem resposta pública materializada” pode aparecer
+
+- [x] Caso A — vazio real do modelo:
+  - modelo recebe o prompt;
+  - não emite `REPLY`, `assistant.message` nem delta público elegível;
+  - encerra o turno;
+  - não deixa pergunta humana pendente.
+- [x] Caso B — continuação pós-`ask_user` vazia:
+  - resposta humana é aceita;
+  - o modelo continua;
+  - o turno termina sem fala pública final;
+  - `dialog.empty_after_user_input` registra essa condição.
+- [x] Caso C — turno tool-only:
+  - modelo chama uma ou mais tools;
+  - não emite síntese pública depois da última tool;
+  - deltas anteriores à última tool são inelegíveis por design;
+  - nenhuma pergunta humana permanece pendente.
+- [x] Caso D — mensagem final tardia:
+  - runtime/SDK resolve o caminho principal;
+  - `assistant.message` ou `dialog.reply` chega numa fila assíncrona posterior;
+  - o terminal completa a materialização antes de a mensagem entrar no estado ativo;
+  - o operador vê falso “Turno vazio” seguido de resposta tardia ou mensagem fora do turno.
+- [x] Caso E — divergência entre canais:
+  - retorno direto fica vazio;
+  - espelho `dialog.reply` não chega dentro de um único `setImmediate()`;
+  - `assistant.message` pode existir em outro canal;
+  - o transporte devolve `replySource=empty` cedo demais.
+- [x] Caso F — finalização ou erro de protocolo sem conteúdo:
+  - READY/STOPPED, cancelamento, warning de sessão, falha de provider ou transição de loop altera o
+    estado;
+  - nenhum conteúdo público é produzido;
+  - o terminal precisa distinguir falha, encerramento autorizado, pergunta pendente e vazio real.
+- [x] Caso G — conteúdo suprimido corretamente:
+  - eco de resposta humana é descartado;
+  - mensagem de protocolo READY/STOPPED é descartada;
+  - conteúdo duplicado já materializado é suprimido;
+  - se não houver outra fala pública, o resultado pode parecer vazio, mas o diagnóstico deve
+    explicar que houve conteúdo não público ou duplicado.
+
+### 12.65 Bugs e gaps identificados no contrato de turno
+
+- [x] Gap: `replySource` do transporte descreve apenas `runtime_return`, `transport_mirror` ou
+  `empty`; ele não carrega diagnóstico suficiente para explicar por que o runtime terminou vazio.
+- [x] Gap: o materializador do terminal conhece deltas e mensagens capturados localmente, mas não
+  conhece o snapshot semântico do collector do `agent`.
+- [x] Gap: o terminal decide vazio imediatamente após o retorno do gateway, sem uma política
+  explícita de quiescência para eventos finais assíncronos.
+- [x] Gap: o transporte usa um único `setImmediate()` como drenagem implícita:
+  - é uma heurística de event loop;
+  - não representa uma janela de quiescência;
+  - não produz diagnóstico de quanto tempo ou quais sinais foram aguardados.
+- [x] Gap: `dialog.empty_after_user_input` e `terminal.turn.empty_output` podem representar a mesma
+  falha em camadas diferentes, mas não compartilham uma classificação causal canônica.
+- [x] Gap: o turno vazio é atualmente registrado como falha BYOK sempre que BYOK está pronto:
+  - isso pode ser correto para vazio real do provider;
+  - pode ser incorreto para falso positivo causado por mensagem tardia;
+  - pode ser excessivo para turno tool-only deliberado.
+- [x] Gap: o operador recebe ação de recuperação, mas não recebe uma classificação curta do motivo:
+  - `sem conteúdo do modelo`;
+  - `continuação pós-pergunta vazia`;
+  - `turno tool-only sem síntese`;
+  - `mensagem final tardia`;
+  - `encerramento de protocolo`.
+- [x] Hipótese de propriedade `metrics` duplicada reavaliada:
+  - a releitura numerada de `turn-executor.js` não encontrou duplicidade no estado atual;
+  - o item foi classificado como não reproduzido e não gerou alteração artificial.
+
+### 12.66 Situação ideal para resolução semântica do turno
+
+- [x] Criar um resultado semântico canônico de turno no `agent`, além da string simples.
+- [x] O resultado semântico distingue:
+  - `public_reply`;
+  - `pending_human_input`;
+  - `tool_only`;
+  - `protocol_transition`;
+  - `empty`;
+  - `failed`;
+  - `interrupted`.
+- [ ] O resultado deve carregar diagnóstico seguro:
+  - origem do reply;
+  - presença de `assistant.message`;
+  - quantidade e elegibilidade de deltas;
+  - último sinal de tool;
+  - presença de pergunta humana;
+  - turn id e timestamps;
+  - motivo de finalização.
+- [x] Preservar compatibilidade:
+  - APIs públicas que ainda esperam `Promise<string>` continuam funcionando;
+  - uma API detalhada expõe o resultado semântico;
+  - migração deve ocorrer por barrels e sem duplicar lógica.
+- [x] `channel/client-dialog.js` transporta o resultado detalhado em vez de reconstruir
+  semântica a partir de uma string e um espelho eventual.
+- [x] `terminal/frontend/gateways/dialog.js` expõe os metadados detalhados ao engine.
+- [x] `terminal/dialog/engine.js` materializa e classifica usando o resultado semântico:
+  - não acusar falha quando há pergunta humana pendente;
+  - não acusar falha silenciosamente em tool-only sem síntese;
+  - acusar vazio real com diagnóstico acionável;
+  - registrar falha BYOK apenas quando a classificação atribui o vazio ao caminho de provider.
+- [ ] Uma janela curta e limitada de quiescência pode existir como defesa de borda:
+  - deve aguardar apenas quando o resultado é vazio e há sinais de finalização concorrentes;
+  - deve terminar cedo quando chega mensagem ou delta público;
+  - deve ser configurável, observável e testável;
+  - não pode mascarar stalls nem adicionar latência ao caminho feliz.
+- [ ] Eventos tardios devem ser correlacionados com o turno recém-concluído:
+  - resposta tardia deve reconciliar o diagnóstico anterior;
+  - se um falso vazio já foi exibido, registrar explicitamente a correção;
+  - evitar contar falha BYOK quando a resposta foi materializada dentro da janela de reconciliação.
+
+### 12.67 Contrato atual de metadados de tools
+
+- [x] `core/tool-target-introspection.js` centraliza:
+  - arquivos;
+  - URLs;
+  - termos de busca;
+  - arquivos presentes em patches;
+  - ranges de linha;
+  - alvo primário.
+- [x] `terminal/events/tool-activity-presenter.js` usa esse contrato para construir:
+  - nome humano;
+  - operação;
+  - label;
+  - target;
+  - linha de início;
+  - linha de progresso;
+  - linha de conclusão.
+- [x] `tool-lifecycle-runtime.js` preserva a apresentação no `ToolCallRegistry` e a reutiliza em
+  start, progress, complete, SSE e turn trace.
+- [x] A linha viva usa `activity.toolName`, mas não recebe um campo semântico específico para o alvo
+  operacional atual.
+- [x] `exec_command` tem argumento `command`, porém `command` não faz parte da introspecção
+  canônica:
+  - o `cwd` pode aparecer como arquivo/alvo;
+  - o comando não aparece;
+  - a UX reduz a operação a `Executar comando · executando comando`.
+- [x] `list_tools` tem filtros `category` e `search`, e resultado com `count`, mas não possui nome
+  humano nem resumo semântico dedicado.
+- [x] Tools de listagem de arquivo podem mostrar path ou busca quando esses campos existem, mas
+  contagem e escopo retornados não são apresentados de forma consistente.
+
+### 12.68 Bugs e gaps identificados na narrativa de tools
+
+- [x] Gap: não há campo canônico para comando shell.
+- [x] Gap: não há campo canônico para filtro/categoria de listagem.
+- [x] Gap: não há campo canônico para contagem de resultados.
+- [x] Gap: não há campo canônico para resumo seguro de resultado.
+- [x] Gap: `hasSemanticToolTarget()` considera apenas paths, ranges, URLs, buscas e patches; uma
+  apresentação enriquecida por comando ou contagem pode ser descartada na conclusão.
+- [x] Gap: `tool.lifecycle` não transporta comando seguro, filtro ou contagem.
+- [x] Gap: `recordTerminalTurnToolActivity()` recebe apenas `target`, então a projeção de turno não
+  consegue diferenciar arquivo, comando, filtro e resultado.
+- [x] Gap: a linha viva mostra o nome humano da tool, mas não prioriza `presentation.target` ou um
+  alvo operacional enriquecido.
+- [x] Gap: nomes humanos não cobrem `list_tools`, apesar de a tool ser parte relevante da
+  introspecção da sessão.
+- [x] Risco: mostrar comando bruto pode vazar segredos, tokens, headers ou payloads longos.
+- [x] Risco: mostrar stdout/stderr bruto na linha viva criaria verborragia, quebras e vazamento de
+  dados.
+
+### 12.69 Situação ideal para metadados e UX de tools
+
+- [x] Expandir a introspecção canônica para um contrato de alvos operacionais.
+- [x] O contrato separa:
+  - `fileTargets`;
+  - `urlTargets`;
+  - `searchTerms`;
+  - `patchFiles`;
+  - `lineRange`;
+  - `commands`;
+  - `filters`;
+  - `resultCount`;
+  - `resultSummary`;
+  - `primaryTarget`;
+  - `primaryTargetKind`.
+- [x] Comandos passam por sanitização própria para superfície humana:
+  - compactar whitespace;
+  - truncar agressivamente;
+  - mascarar variáveis e argumentos sensíveis;
+  - evitar imprimir conteúdo multilinha;
+  - preservar o comando bruto apenas em diagnóstico técnico autorizado.
+- [x] Resultados são resumidos, nunca despejados:
+  - `12 arquivos`;
+  - `105 tools`;
+  - `saída 0`;
+  - `3 correspondências`;
+  - `2 páginas`.
+- [x] `tool-activity-presenter` escolhe alvo pela operação:
+  - shell prioriza comando;
+  - leitura/escrita prioriza arquivo;
+  - busca prioriza termo e escopo;
+  - listagem prioriza filtro, path e contagem;
+  - introspecção prioriza recurso e contagem;
+  - pergunta prioriza texto da pergunta;
+  - intent prioriza intenção.
+- [x] `ToolCallRegistry` preserva a apresentação enriquecida do start e permite upgrade no
+  complete quando o resultado adiciona contagem ou resumo.
+- [x] `tool.lifecycle` carrega metadados semânticos seguros para consumidores externos.
+- [ ] Linha viva deve mostrar:
+  - `LLM-B ferramenta · Executar comando · git status · 2s`;
+  - `LLM-B ferramenta · Listar tools · categoria code · 1s`;
+  - `LLM-B ferramenta · Buscar arquivos · "turn-materialization" · 3s`;
+  - sem IDs internos, sem stdout bruto e sem ocupar o input.
+- [ ] Histórico durável deve mostrar começo e conclusão sem repetir frases:
+  - início: ação e alvo;
+  - conclusão: resultado curto, duração e eventual exit code;
+  - progresso: apenas milestones semânticos.
+
+### 12.70 Linha viva como projeção do trabalho atual
+
+- [x] Estado atual:
+  - a linha viva lê `readTerminalActivitySnapshot()`;
+  - tools usam `activity.toolName`;
+  - detalhes existem, mas o caminho especial de tool ignora `activity.detail`;
+  - por isso uma tool enriquecida ainda pode aparecer apenas como nome humano.
+- [x] Decisão:
+  - a linha viva não deve inferir novamente argumentos de tool;
+  - `recordTerminalActivity()` deve receber a apresentação semântica já resolvida;
+  - a linha viva deve escolher uma projeção curta do alvo operacional.
+- [x] Criar prioridade visual:
+  - pergunta humana;
+  - resposta/delta;
+  - tool ativa com alvo;
+  - reasoning;
+  - recuperação/troca de modelo;
+  - turno genérico;
+  - boot/idle.
+- [x] Garantir que a linha viva não ocupe o input:
+  - manter região reservada;
+  - truncar por largura efetiva;
+  - nunca renderizar conteúdo multilinha;
+  - não imprimir heartbeats duráveis concorrentes.
+
+### 12.71 Seleção e troca automática de modelo
+
+- [x] Estado atual identificado:
+  - SDK emite `session.model_changed`;
+  - terminal registra `Modelo confirmado`;
+  - model-gateway grava confirmação de handoff em SQLite;
+  - `auto_mode_switch.requested` e `auto_mode_switch.completed` são observados;
+  - BYOK possui comandos explícitos de automação e troca;
+  - narração de `session.model_changed` é silenciosa por default e visível em modo verbose.
+- [x] Reavaliar se toda troca efetiva deve ser um fato durável no modo default:
+  - troca de modelo muda custo, capacidade, comportamento e interpretação da resposta;
+  - operador precisa saber quando ocorreu, mesmo sem verbose;
+  - evitar narrar apenas mudanças redundantes ou confirmações sem alteração real.
+- [ ] Distinguir visualmente:
+  - rota selecionada pelo model-gateway;
+  - handoff preparado;
+  - sessão SDK reiniciada;
+  - modelo efetivamente confirmado pelo SDK;
+  - retry interno do provider;
+  - auto mode switch solicitado/concluído.
+- [ ] Linha viva deve mostrar transição apenas enquanto ela está acontecendo:
+  - `LLM-B trocando modelo · antigo → novo`;
+  - depois retornar à atividade real;
+  - histórico deve preservar a confirmação efetiva.
+- [ ] SSE e `/events` devem manter IDs e correlação; stdout default deve usar nomes humanos e
+  motivo curto.
+
+### 12.72 Sequência técnica priorizada
+
+- [x] Fase A — fortalecer contrato de resultado de turno no `agent`.
+  - [x] definir tipo detalhado e compatibilidade com retorno string;
+  - [x] expor snapshot do collector;
+  - [x] classificar tool-only, pending-human e vazio real;
+  - [x] reavaliar hipótese de propriedade `metrics` duplicada;
+  - [x] adicionar testes unitários do collector.
+- [x] Fase B — transportar resultado detalhado pelo `channel`.
+  - [x] remover drenagem implícita por `setImmediate()`;
+  - [x] preservar origem e diagnóstico;
+  - [x] testar espelho, vazio real e classificação semântica.
+- [x] Fase C — materializar resultado detalhado no terminal.
+  - [x] reconciliar fontes locais e resultado semântico;
+  - [x] classificar mensagem humana de vazio;
+  - [x] evitar falha BYOK em tool-only;
+  - [x] preservar eventos técnicos.
+- [x] Fase D — expandir metadados canônicos de tools.
+  - [x] comandos;
+  - [x] filtros;
+  - [x] contagens;
+  - [x] resumos;
+  - [x] target kind;
+  - [x] sanitização.
+- [x] Fase E — enriquecer presenter, lifecycle, registry e turn trace.
+  - [x] start;
+  - [x] progress;
+  - [x] complete;
+  - [x] SSE;
+  - [x] `/activity`;
+  - [x] `/tools`;
+  - [x] `/events`.
+- [x] Fase F — projetar alvo operacional na linha viva.
+  - [x] comando shell;
+  - [x] listagem;
+  - [x] busca;
+  - [x] tool desconhecida;
+  - [x] truncamento por largura.
+- [ ] Fase G — consolidar narrativa de troca de modelo.
+  - [ ] evento efetivo;
+  - [ ] linha viva transitória;
+  - [ ] histórico durável;
+  - [ ] correlação model-gateway/SDK.
+- [ ] Fase H — validar em lives reais.
+  - [ ] turno com read;
+  - [ ] turno com `exec_command`;
+  - [ ] turno com `list_tools`;
+  - [ ] turno com busca;
+  - [ ] ask_user com resposta e síntese;
+  - [ ] ask_user com continuação vazia;
+  - [ ] tool-only sem síntese;
+  - [ ] troca automática ou manual de modelo;
+  - [ ] resposta tardia;
+  - [ ] largura estreita no PTY.
+
+### 12.73 Critérios de aceite
+
+- [ ] Nenhum turno com resposta final tardia é acusado como vazio antes da janela de reconciliação.
+- [ ] Vazio real continua visível e acionável.
+- [ ] Continuação pós-pergunta vazia continua distinta de turno vazio comum.
+- [ ] Turno tool-only é diagnosticado sem ser confundido automaticamente com falha de provider.
+- [ ] `exec_command` mostra comando seguro e compacto no start, linha viva e conclusão.
+- [ ] `list_tools` mostra nome humano, filtro e contagem quando disponíveis.
+- [ ] Tools de busca/listagem mostram alvo e resultado curto sem stdout bruto.
+- [ ] Linha viva comunica a ação atual sem IDs internos, sem multiline e sem ocupar o input.
+- [ ] Troca efetiva de modelo é comunicada com precisão e sem confundir seleção preparada com
+  sessão viva.
+- [ ] Testes focados e lives PTY preservam legibilidade, correlação e ausência de regressões.
+
+### 12.74 Implementação estrutural concluída em 2026-06-04
+
+- [x] `createDialogTurnOutputCollector()` agora preserva diagnóstico observável do turno:
+  - contagem de `assistant.message`;
+  - caracteres de delta observados;
+  - elegibilidade do delta;
+  - contagem e sequência de sinais de tool;
+  - tipo de protocolo pendente;
+  - origem da resolução semântica.
+- [x] `executeTurnImpl()` passou a produzir `DialogTurnSemanticResult`.
+- [x] `DialogLoopManager.sendTurnDetailed()` é a capability detalhada canônica.
+- [x] `DialogLoopManager.sendTurn()` continua retornando apenas string para compatibilidade.
+- [x] O resultado detalhado atravessa barrels e façades:
+  - `agent/facades/agent-dialog-runtime.js`;
+  - `presentation/runtime/dialog.js`;
+  - `runtime/index.js`;
+  - `channel/client-dialog.js`;
+  - `terminal/frontend/gateways/dialog.js`.
+- [x] `channel/client-dialog.js` não usa mais um único `setImmediate()` como drenagem implícita.
+- [x] O terminal distingue:
+  - vazio real, que continua sendo erro operacional;
+  - pergunta humana pendente, que é saída válida;
+  - tool-only sem síntese, que é warning acionável e não degrada saúde BYOK;
+  - transição de protocolo sem transcript, que é informativa.
+- [x] `session.model_changed` efetivo virou fato durável no modo default:
+  - mudança real imprime `modelo anterior → modelo novo`;
+  - confirmação redundante permanece silenciosa sem verbose;
+  - a atividade não fica presa na linha viva.
+- [x] A fila strict encontrada em helpers do terminal também foi eliminada:
+  - opções `exactOptionalPropertyTypes`;
+  - rows wrapped;
+  - comandos auxiliares;
+  - registry de tools;
+  - apresentação de recovery.

@@ -49,4 +49,27 @@ describe('core/tool-target-introspection', () => {
         expect(meta.fileTargets).toEqual(['data/live/source.txt', 'data/live/destination.txt']);
         expect(meta.primaryTarget).toBe('data/live/source.txt');
     });
+
+    it('captura comando seguro, filtros e contagem sem vazar segredo', () => {
+        const meta = introspectToolTargets({
+            args: {
+                command: 'curl -H "Authorization: Bearer sk-super-secret-token-value" https://example.test',
+                category: 'code',
+                search: 'terminal',
+            },
+            result: {
+                success: true,
+                count: 12,
+                exitCode: 0,
+            },
+        });
+
+        expect(meta.commands).toHaveLength(1);
+        expect(meta.commands[0]).toContain('Bearer [redacted]');
+        expect(meta.commands[0]).not.toContain('sk-super-secret-token-value');
+        expect(meta.filters).toContain('category: code');
+        expect(meta.searchTerms).toContain('terminal');
+        expect(meta.resultCount).toBe(12);
+        expect(meta.resultSummary).toBe('sucesso · saída 0 · 12 resultados');
+    });
 });

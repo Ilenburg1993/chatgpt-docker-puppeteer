@@ -188,6 +188,7 @@ function printTerminalCommandUsage(println) {
 /**
  * @param {(text: string) => void} println
  * @param {boolean} refresh
+ * @param {string[]} [filterTokens]
  * @returns {void}
  */
 function printTerminalLibsCompact(println, refresh, filterTokens = []) {
@@ -233,6 +234,7 @@ function printTerminalLibsCompact(println, refresh, filterTokens = []) {
 /**
  * @param {(text: string) => void} println
  * @param {boolean} refresh
+ * @param {string[]} [filterTokens]
  * @returns {void}
  */
 function printTerminalLibsDetail(println, refresh, filterTokens = []) {
@@ -302,6 +304,7 @@ function printTerminalLibsDetail(println, refresh, filterTokens = []) {
 /**
  * @param {(text: string) => void} println
  * @param {boolean} refresh
+ * @param {string[]} [filterTokens]
  * @returns {void}
  */
 function printTerminalLibsJson(println, refresh, filterTokens = []) {

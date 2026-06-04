@@ -120,6 +120,7 @@ function renderSdkSessionPresence(value) {
     return typeof value === 'string' && value.trim() ? 'sessão ativa' : 'sem sessão SDK';
 }
 
+/** @type {readonly (readonly [string, string])[]} */
 const SDK_DEFAULT_COMMAND_ROWS = Object.freeze([
     ['Modelos', '/sdk models · /sdk tools [model]'],
     ['Skills', '/sdk skills [--project <path>] [--dir <path>]'],
@@ -1200,7 +1201,7 @@ export async function cmdSdk({ println }, arg = '') {
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
             for (const [label, command] of SDK_DEFAULT_COMMAND_ROWS) {
-                println(terminalThemeWrappedRow(label, command, { role: 'command', maxWidth: 76 }));
+                println(terminalThemeWrappedRow(label, command, { role: 'command', columns: 76 }));
             }
             println('');
         }
@@ -2011,29 +2012,29 @@ export async function cmdWorkspace({ println }, arg = '') {
                 println(terminalThemeRow('Estado', 'nenhum arquivo no workspace SDK virtual', { role: 'muted' }));
                 println(terminalThemeRow('Escopo', 'SDK virtual separado do FS local; use /fs list para o repositório'));
             }
-            println(terminalThemeWrappedRow('Listar', '/workspace list', { role: 'command', maxWidth: 76 }));
+            println(terminalThemeWrappedRow('Listar', '/workspace list', { role: 'command', columns: 76 }));
             println(
                 terminalThemeWrappedRow('SDK', '/workspace read <path> · /workspace write <path> <content>', {
                     role: 'command',
-                    maxWidth: 76,
+                    columns: 76,
                 }),
             );
             println(
                 terminalThemeWrappedRow('Sync', '/workspace sync <sdkPath> --to <localPath> [--overwrite]', {
                     role: 'command',
-                    maxWidth: 76,
+                    columns: 76,
                 }),
             );
             println(
                 terminalThemeWrappedRow('Mirror', '/workspace mirror --to <localDir> [--overwrite]', {
                     role: 'command',
-                    maxWidth: 76,
+                    columns: 76,
                 }),
             );
             println(
                 terminalThemeWrappedRow('Promover', '/workspace promote <localPath> --to <sdkPath> [--overwrite]', {
                     role: 'command',
-                    maxWidth: 76,
+                    columns: 76,
                 }),
             );
             println(terminalThemeWrappedRow('Contrato', 'list/read/write ficam no workspace SDK virtual'));

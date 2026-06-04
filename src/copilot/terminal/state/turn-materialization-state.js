@@ -9,10 +9,13 @@
  * @module copilot/terminal/state/turn-materialization-state
  */
 
+import { EventEmitter } from 'node:events';
+
 const MAX_ASSISTANT_MESSAGES_PER_TURN = 16;
 const MAX_DELTA_SLICES_PER_TURN = 8192;
 const RECENT_COMPLETED_TURNS_MAX = 32;
 const RECENT_COMPLETED_TURN_TTL_MS = 5 * 60_000;
+const DEFAULT_EMPTY_TURN_QUIESCENCE_MS = 160;
 
 /**
  * @typedef {'terminal/explicit-turn' | 'sdk/assistant.turn_start' | 'sdk/assistant.message' | 'dialog/onDelta' | 'public-assistant-stream'} TerminalTurnMaterializationSource
@@ -72,6 +75,10 @@ const RECENT_COMPLETED_TURN_TTL_MS = 5 * 60_000;
 
 /** @type {InternalTerminalTurnMaterialization | null} */
 let _currentTurnMaterialization = null;
+
+/** @type {EventEmitter} */
+const _materializationEmitter = new EventEmitter();
+_materializationEmitter.setMaxListeners(25);
 
 /** @type {{ turnKey: string; turnId: string | null; reply: string; deltaText: string; normalizedReply: string; normalizedDeltaText: string; completedAt: number }[]} */
 const _recentCompletedTurnMaterializations = [];
@@ -159,6 +166,24 @@ function snapshot(state) {
 }
 
 /**
+ * @param {InternalTerminalTurnMaterialization | null} state
+ * @returns {boolean}
+ */
+function hasMaterializedPublicText(state) {
+    return Boolean(
+        state &&
+        (state.assistantMessages.some((entry) => entry.content.trim().length > 0) || state.deltaText.trim().length > 0),
+    );
+}
+
+/**
+ * @returns {void}
+ */
+function emitMaterializationChanged() {
+    _materializationEmitter.emit('changed');
+}
+
+/**
  * @param {{
  *     turnId?: string | number | null;
  *     timestamp?: number;
@@ -207,6 +232,7 @@ export function beginTerminalTurnMaterialization({
         droppedDeltaSlices: 0,
         droppedDeltaChars: 0,
     };
+    emitMaterializationChanged();
     return snapshot(_currentTurnMaterialization);
 }
 
@@ -216,6 +242,7 @@ export function beginTerminalTurnMaterialization({
 export function clearTerminalTurnMaterialization() {
     _currentTurnMaterialization = null;
     _recentCompletedTurnMaterializations.length = 0;
+    emitMaterializationChanged();
 }
 
 /**
@@ -250,6 +277,7 @@ export function recordTerminalTurnAssistantMessage(input) {
         );
     }
     _currentTurnMaterialization.updatedAt = timestamp;
+    emitMaterializationChanged();
     return { ...entry };
 }
 
@@ -295,7 +323,69 @@ export function recordTerminalTurnDelta(input) {
         _currentTurnMaterialization.droppedDeltaChars += dropped?.chunk.length ?? 0;
     }
     _currentTurnMaterialization.updatedAt = timestamp;
+    emitMaterializationChanged();
     return { ...entry };
+}
+
+/**
+ * Aguarda uma janela curta apenas para reconciliar texto público tardio de um turno que aparenta estar vazio.
+ *
+ * Isso não é retry de modelo nem timeout de turno. É uma barreira de quiescência local para eventos finais que podem
+ * chegar em uma fila assíncrona posterior ao retorno do transporte.
+ *
+ * @param {{ timeoutMs?: number }} [input]
+ * @returns {Promise<{
+ *     settledBy: 'content' | 'timeout' | 'no_active_turn';
+ *     waitedMs: number;
+ *     snapshot: TerminalTurnMaterializationSnapshot | null;
+ * }>}
+ */
+export async function waitForTerminalTurnMaterializationQuiescence({
+    timeoutMs = DEFAULT_EMPTY_TURN_QUIESCENCE_MS,
+} = {}) {
+    const startedAt = Date.now();
+    if (!_currentTurnMaterialization) {
+        return { settledBy: 'no_active_turn', waitedMs: 0, snapshot: null };
+    }
+    if (hasMaterializedPublicText(_currentTurnMaterialization)) {
+        return { settledBy: 'content', waitedMs: 0, snapshot: snapshot(_currentTurnMaterialization) };
+    }
+    const safeTimeoutMs = Number.isFinite(timeoutMs)
+        ? Math.max(0, Math.floor(timeoutMs))
+        : DEFAULT_EMPTY_TURN_QUIESCENCE_MS;
+    if (safeTimeoutMs === 0) {
+        return {
+            settledBy: 'timeout',
+            waitedMs: 0,
+            snapshot: _currentTurnMaterialization ? snapshot(_currentTurnMaterialization) : null,
+        };
+    }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        /** @param {'content' | 'timeout' | 'no_active_turn'} settledBy */
+        const finish = (settledBy) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            _materializationEmitter.off('changed', onChanged);
+            resolve({
+                settledBy,
+                waitedMs: Date.now() - startedAt,
+                snapshot: _currentTurnMaterialization ? snapshot(_currentTurnMaterialization) : null,
+            });
+        };
+        const onChanged = () => {
+            if (!_currentTurnMaterialization) {
+                finish('no_active_turn');
+                return;
+            }
+            if (hasMaterializedPublicText(_currentTurnMaterialization)) finish('content');
+        };
+        const timer = setTimeout(() => finish('timeout'), safeTimeoutMs);
+        if (typeof timer.unref === 'function') timer.unref();
+        _materializationEmitter.on('changed', onChanged);
+    });
 }
 
 /**
@@ -358,6 +448,7 @@ export function completeTerminalTurnMaterialization({
     }
     const materializedSnapshot = current ? snapshot(current) : null;
     _currentTurnMaterialization = null;
+    emitMaterializationChanged();
     return {
         reply,
         source,

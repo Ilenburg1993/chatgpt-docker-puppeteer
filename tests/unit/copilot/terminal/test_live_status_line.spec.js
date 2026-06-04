@@ -124,6 +124,27 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(48);
     });
 
+    it('mostra alvo operacional seguro da ferramenta na linha viva', async () => {
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'tool',
+            label: 'Ferramenta em uso',
+            detail: 'executando comando · git status --short',
+            toolName: 'exec_command',
+            toolTarget: 'git status --short',
+        };
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+
+        const line = formatTerminalLiveStatusLine();
+
+        expect(line).toContain('Executar comando');
+        expect(line).toContain('git status --short');
+        expect(line).not.toContain('exec_command');
+        expect(line).not.toContain('executando comando');
+        expect(line.length).toBeLessThan(82);
+    });
+
     it('mantém request_user_input formatável, mas fora do pulso periódico para não disputar o input', async () => {
         mocks.structuredInputs = [
             {

@@ -305,13 +305,14 @@ export function terminalThemeWrappedRow(label, value, options = {}) {
     const columns = Math.max(labelWidth + 18, Math.floor(options.columns ?? 116));
     const valueWidth = Math.max(12, columns - labelWidth - 4);
     return wrapTerminalRowValue(value, valueWidth)
-        .map((line, index) =>
-            terminalThemeRow(index === 0 ? label : '', line, {
+        .map((line, index) => {
+            const rowOptions = {
                 width: labelWidth,
-                role: options.role,
-                truncateLabel: options.truncateLabel,
-            }),
-        )
+                ...(options.role !== undefined ? { role: options.role } : {}),
+                ...(options.truncateLabel !== undefined ? { truncateLabel: options.truncateLabel } : {}),
+            };
+            return terminalThemeRow(index === 0 ? label : '', line, rowOptions);
+        })
         .join('\n');
 }
 

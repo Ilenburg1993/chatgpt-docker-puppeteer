@@ -361,7 +361,7 @@ function trackOperatorVisibleTerminalError(error, options) {
     try {
         defaultErrorTracker?.trackError?.(error, {
             source: options.source,
-            metadata: options.metadata,
+            ...(options.metadata !== undefined ? { metadata: options.metadata } : {}),
         });
     } catch {
         // O tracker de erro nunca pode quebrar a renderização do terminal.

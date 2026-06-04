@@ -68,6 +68,9 @@ export function seedTerminalHistoryFeed(role, content) {
  *     channel: 'dialog' | 'chat';
  *     replySource: 'runtime_return' | 'transport_mirror' | 'direct_chat' | 'empty';
  *     hadReplyEvent?: boolean;
+ *     semanticOutcome?: import('../../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['outcome'];
+ *     semanticReplySource?: import('../../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['replySource'];
+ *     semanticDiagnostics?: import('../../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['diagnostics'];
  * }} TerminalDialogTurnResult
  */
 
@@ -165,6 +168,19 @@ export async function runTerminalDialogTurnDetailed(enrichedMessage, opts) {
                 reply: result.response,
                 channel: 'chat',
                 replySource: result.response.trim().length > 0 ? 'direct_chat' : 'empty',
+                semanticOutcome: result.response.trim().length > 0 ? 'public_reply' : 'empty',
+                semanticReplySource: 'unknown',
+                semanticDiagnostics: {
+                    dispatched: true,
+                    assistantMessageCount: 0,
+                    deltaChars: 0,
+                    deltaEligible: false,
+                    pendingProtocolKind: null,
+                    pendingHumanInput: false,
+                    toolSignalCount: 0,
+                    lastDeltaSeq: 0,
+                    lastToolSignalSeq: 0,
+                },
             };
         } finally {
             if (hadDialogLoop) {
@@ -182,5 +198,8 @@ export async function runTerminalDialogTurnDetailed(enrichedMessage, opts) {
         channel: 'dialog',
         replySource: result.replySource,
         hadReplyEvent: result.hadReplyEvent,
+        semanticOutcome: result.semanticOutcome,
+        semanticReplySource: result.semanticReplySource,
+        semanticDiagnostics: result.semanticDiagnostics,
     };
 }

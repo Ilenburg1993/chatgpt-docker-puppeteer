@@ -20,7 +20,7 @@ import {
 } from '#copilot/events';
 import { log } from '#copilot/observability';
 import {
-    sendRuntimeDialogTurnOnActiveLoop,
+    sendRuntimeDialogTurnOnActiveLoopDetailed,
     startRuntimeDialogLoop,
     stopRuntimeDialogLoopAuthorized,
 } from '#copilot/runtime';
@@ -76,6 +76,9 @@ function resolveDeltaCausalKey(evt) {
  *     reply: string;
  *     replySource: 'runtime_return' | 'transport_mirror' | 'empty';
  *     hadReplyEvent: boolean;
+ *     semanticOutcome: import('#copilot/agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['outcome'];
+ *     semanticReplySource: import('#copilot/agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['replySource'];
+ *     semanticDiagnostics: import('#copilot/agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['diagnostics'];
  * }} DialogTurnTransportResult
  */
 
@@ -418,7 +421,8 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
     if (onReasoningTemp) agent.on(EMITTER_TASK_REASONING, onReasoningTemp);
 
     try {
-        const reply = await sendRuntimeDialogTurnOnActiveLoop(message, { timeout }, agent);
+        const semanticResult = await sendRuntimeDialogTurnOnActiveLoopDetailed(message, { timeout }, agent);
+        const reply = semanticResult.reply;
         if (reply === null && replyFromEvent.trim().length === 0) {
             throw new Error('[LlmBridgeClient] sendDialogTurn retornou null.');
         }
@@ -430,6 +434,9 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
                 reply: directReply,
                 replySource: 'runtime_return',
                 hadReplyEvent,
+                semanticOutcome: semanticResult.outcome,
+                semanticReplySource: semanticResult.replySource,
+                semanticDiagnostics: semanticResult.diagnostics,
             };
             log(
                 'INFO',
@@ -438,9 +445,6 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
             return result;
         }
 
-        if (replyFromEvent.trim().length === 0) {
-            await new Promise((resolve) => setImmediate(resolve));
-        }
         if (replyFromEvent.trim().length > 0) {
             log(
                 'INFO',
@@ -451,6 +455,9 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
                 reply: replyFromEvent,
                 replySource: 'transport_mirror',
                 hadReplyEvent: true,
+                semanticOutcome: semanticResult.outcome,
+                semanticReplySource: semanticResult.replySource,
+                semanticDiagnostics: semanticResult.diagnostics,
             };
             log(
                 'INFO',
@@ -463,6 +470,9 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
             reply: directReply,
             replySource: 'empty',
             hadReplyEvent,
+            semanticOutcome: semanticResult.outcome,
+            semanticReplySource: semanticResult.replySource,
+            semanticDiagnostics: semanticResult.diagnostics,
         };
         log(
             'WARN',

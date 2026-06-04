@@ -34,6 +34,7 @@ import {
     dialogStart,
     dialogStop,
     dispatchAgentDialogTurn,
+    dispatchAgentDialogTurnDetailed,
     execSdkShell,
     getCurrentSdkAgent,
     getModel,
@@ -1111,6 +1112,17 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     sendDialogTurn(message, opts) {
         return dispatchAgentDialogTurn(this.ctx, message, opts);
+    }
+
+    /**
+     * Envia um turno de diálogo preservando o diagnóstico semântico produzido pelo Agent.
+     *
+     * @param {string} message
+     * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [opts]
+     * @returns {Promise<import('./dialog/executors/turn-executor.js').DialogTurnSemanticResult>}
+     */
+    sendDialogTurnDetailed(message, opts) {
+        return dispatchAgentDialogTurnDetailed(this.ctx, message, opts);
     }
 
     /**

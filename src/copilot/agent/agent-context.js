@@ -755,6 +755,10 @@ export class AgentContext {
     sendDialogTurn(message, opts) {
         return this.dialogLoop.sendTurn(message, opts);
     }
+    /** @param {string} message @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [opts] */
+    sendDialogTurnDetailed(message, opts) {
+        return this.dialogLoop.sendTurnDetailed(message, opts);
+    }
     /**
      * @param {{
      *     authorized?: boolean;

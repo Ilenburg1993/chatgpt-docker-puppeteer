@@ -272,7 +272,8 @@ function aggregateTurnTraceFiles(files) {
             continue;
         }
         existing.repeatedRows += 1;
-        existing.updatedAt = Math.max(existing.updatedAt ?? 0, file.updatedAt ?? 0) || existing.updatedAt;
+        const updatedAt = Math.max(existing.updatedAt ?? 0, file.updatedAt ?? 0);
+        if (updatedAt > 0) existing.updatedAt = updatedAt;
         if (existing.source !== file.source) existing.source = 'múltiplas origens';
         const previousCount = existing.count ?? 1;
         existing.count = previousCount > 1 || count > 1 ? Math.max(previousCount, count) : previousCount + count;
@@ -335,10 +336,11 @@ function printTurnTraceSummary(println, title, trace, opts) {
         println(terminalThemeHeadline('assistant', 'Arquivos tocados'));
         for (const file of aggregatedFiles.slice(0, 5)) {
             const source = opts.detail ? ` · ${renderSourceLabel(file.source)}` : '';
+            const count = file.count ?? 1;
             println(
                 terminalThemeRow(
                     'Arquivo',
-                    `${renderOperationLabel(file.operation)} · ${formatTerminalToolPathForOperator(file.path)}${file.count > 1 ? ` ×${file.count}` : ''}${source}`,
+                    `${renderOperationLabel(file.operation)} · ${formatTerminalToolPathForOperator(file.path)}${count > 1 ? ` ×${count}` : ''}${source}`,
                 ),
             );
         }

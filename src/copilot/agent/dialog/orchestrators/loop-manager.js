@@ -32,6 +32,32 @@ import { executeTurnImpl } from '../executors/index.js';
 import { selectDialogResumeStrategy } from '../policies/index.js';
 
 /**
+ * Compatibilidade defensiva para adapters legados que ainda projetam apenas a string do reply.
+ *
+ * @param {import('../executors/turn-executor.js').DialogTurnSemanticResult | string} result
+ * @returns {import('../executors/turn-executor.js').DialogTurnSemanticResult}
+ */
+function normalizeDialogTurnSemanticResult(result) {
+    if (typeof result !== 'string') return result;
+    return {
+        reply: result,
+        outcome: result.trim().length > 0 ? 'public_reply' : 'empty',
+        replySource: 'unknown',
+        diagnostics: {
+            dispatched: true,
+            assistantMessageCount: 0,
+            deltaChars: 0,
+            deltaEligible: false,
+            pendingProtocolKind: null,
+            pendingHumanInput: false,
+            toolSignalCount: 0,
+            lastDeltaSeq: 0,
+            lastToolSignalSeq: 0,
+        },
+    };
+}
+
+/**
  * @typedef {Object} DialogLoopManagerOptions
  * @property {number} [maxQueueSize] - Máximo de turnos na fila (default: 10)
  * @property {number} [bootTimeoutMs] - Timeout para boot do dialog (default: 30s)
@@ -333,6 +359,21 @@ export class DialogLoopManager extends EventEmitter {
      * @returns {Promise<string>}
      */
     sendTurn(message, { timeout = null, signal, traceId } = {}) {
+        return this.sendTurnDetailed(message, {
+            timeout,
+            ...(signal !== undefined ? { signal } : {}),
+            ...(traceId ? { traceId } : {}),
+        }).then((result) => result.reply);
+    }
+
+    /**
+     * Envia um turno expondo o resultado semântico canônico produzido pelo Agent.
+     *
+     * @param {string} message
+     * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [opts]
+     * @returns {Promise<import('../executors/turn-executor.js').DialogTurnSemanticResult>}
+     */
+    sendTurnDetailed(message, { timeout = null, signal, traceId } = {}) {
         if (!this.#state.canSendTurn) {
             return Promise.reject(
                 new SessionError('[DialogLoopManager] Dialog loop não está ativo.', 'DIALOG_NOT_ACTIVE'),
@@ -349,13 +390,15 @@ export class DialogLoopManager extends EventEmitter {
             `[DialogLoopManager] sendTurn enqueued (trace=${traceId ?? 'none'}, timeout=${timeout === null ? 'none(watchdog-only)' : `${timeout}ms`}, queueDepth=${this.#turnQueue.depth})`,
         );
 
-        return this.#turnQueue.enqueue(() =>
-            this.#executeTurn(message, {
-                timeout,
-                ...(signal !== undefined && { signal }),
-                ...(traceId ? { traceId } : {}),
-            }),
-        );
+        return this.#turnQueue
+            .enqueue(() =>
+                this.#executeTurn(message, {
+                    timeout,
+                    ...(signal !== undefined && { signal }),
+                    ...(traceId ? { traceId } : {}),
+                }),
+            )
+            .then(normalizeDialogTurnSemanticResult);
     }
 
     /**
@@ -678,7 +721,7 @@ export class DialogLoopManager extends EventEmitter {
      *
      * @param {string} message
      * @param {{ timeout: number | null; signal?: AbortSignal; traceId?: string }} opts
-     * @returns {Promise<string>}
+     * @returns {Promise<import('../executors/turn-executor.js').DialogTurnSemanticResult>}
      */
     #executeTurn(message, { timeout, signal, traceId }) {
         const host = this.#host;

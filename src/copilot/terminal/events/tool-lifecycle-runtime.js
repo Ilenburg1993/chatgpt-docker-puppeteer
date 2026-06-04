@@ -545,7 +545,11 @@ function hasSemanticToolTarget(presentation) {
         presentation.fileTargets.length > 0 ||
         presentation.urlTargets.length > 0 ||
         presentation.searchTerms.length > 0 ||
-        presentation.patchFiles.length > 0,
+        presentation.patchFiles.length > 0 ||
+        presentation.commands.length > 0 ||
+        presentation.filters.length > 0 ||
+        presentation.resultCount !== null ||
+        presentation.resultSummary,
     );
 }
 
@@ -629,6 +633,7 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
     recordTerminalActivity('tool', 'Ferramenta em uso', {
         detail: presentation.detail,
         toolName: canonicalName,
+        toolTarget: presentation.target,
         source: 'sdk',
     });
     if (shouldPrintToolNarration(entry, toolCallId, registry)) printToolStart(presentation);
@@ -644,8 +649,13 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
             urlTargets: presentation.urlTargets,
             searchTerms: presentation.searchTerms,
             lineRange: presentation.lineRange,
-            patchFiles: presentation.patchFiles,
-        }),
+        patchFiles: presentation.patchFiles,
+        commands: presentation.commands,
+        filters: presentation.filters,
+        resultCount: presentation.resultCount,
+        resultSummary: presentation.resultSummary,
+        primaryTargetKind: presentation.primaryTargetKind,
+    }),
     );
 }
 
@@ -690,6 +700,7 @@ export function handleTerminalNativeToolProgress({ registry, evt }) {
     recordTerminalActivity('tool', persistMilestone ? 'Progresso da ferramenta' : 'Ferramenta em uso', {
         detail: effectiveDetail,
         toolName: name,
+        toolTarget: presentation.target,
         progress,
         source: 'sdk',
         recordHistory: persistMilestone,
@@ -709,6 +720,11 @@ export function handleTerminalNativeToolProgress({ registry, evt }) {
             searchTerms: presentation.searchTerms,
             lineRange: presentation.lineRange,
             patchFiles: presentation.patchFiles,
+            commands: presentation.commands,
+            filters: presentation.filters,
+            resultCount: presentation.resultCount,
+            resultSummary: presentation.resultSummary,
+            primaryTargetKind: presentation.primaryTargetKind,
             progress,
             progressMessage,
         }),
@@ -737,6 +753,7 @@ export function handleTerminalNativeToolPartialResult({ registry, evt }) {
     recordTerminalActivity('tool', 'Resultado parcial de tool', {
         detail: partialOutput,
         toolName: name,
+        toolTarget: presentation.target,
         source: 'sdk',
         recordHistory: false,
     });
@@ -752,6 +769,11 @@ export function handleTerminalNativeToolPartialResult({ registry, evt }) {
             searchTerms: presentation.searchTerms,
             lineRange: presentation.lineRange,
             patchFiles: presentation.patchFiles,
+            commands: presentation.commands,
+            filters: presentation.filters,
+            resultCount: presentation.resultCount,
+            resultSummary: presentation.resultSummary,
+            primaryTargetKind: presentation.primaryTargetKind,
             partialOutput,
         }),
     );
@@ -831,6 +853,7 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
     recordTerminalActivity('tool', activityLabel, {
         detail: presentation.completeLine(success, durationLabel),
         toolName: canonicalName,
+        toolTarget: presentation.target,
         progress: success ? 100 : null,
         severity: success ? 'info' : 'error',
         source: 'sdk',
@@ -851,6 +874,11 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
             searchTerms: presentation.searchTerms,
             lineRange: presentation.lineRange,
             patchFiles: presentation.patchFiles,
+            commands: presentation.commands,
+            filters: presentation.filters,
+            resultCount: presentation.resultCount,
+            resultSummary: presentation.resultSummary,
+            primaryTargetKind: presentation.primaryTargetKind,
             success,
             durationMs: durationMs > 0 ? durationMs : 0,
         }),
@@ -932,6 +960,7 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
     recordTerminalActivity('tool', 'Integração externa solicitada', {
         detail: presentation.detail || `${displayToolName}${renderOptionalToolRequestDetail(requestId)}`,
         toolName: displayToolName,
+        toolTarget: presentation.target,
         source: 'sdk',
     });
     const canPrintExternalStart = shouldPrintToolNarration(null, toolCallId, registry);
@@ -962,6 +991,11 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
             searchTerms: presentation.searchTerms,
             lineRange: presentation.lineRange,
             patchFiles: presentation.patchFiles,
+            commands: presentation.commands,
+            filters: presentation.filters,
+            resultCount: presentation.resultCount,
+            resultSummary: presentation.resultSummary,
+            primaryTargetKind: presentation.primaryTargetKind,
         }),
     );
 }
@@ -1035,6 +1069,7 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
             presentation.completeLine(success, durationLabel) ||
             `${displayToolName}${renderOptionalToolRequestDetail(requestId)}`,
         toolName: displayToolName,
+        toolTarget: presentation.target,
         source: 'sdk',
         severity: success ? 'info' : 'error',
     });
@@ -1068,6 +1103,11 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
             searchTerms: presentation.searchTerms,
             lineRange: presentation.lineRange,
             patchFiles: presentation.patchFiles,
+            commands: presentation.commands,
+            filters: presentation.filters,
+            resultCount: presentation.resultCount,
+            resultSummary: presentation.resultSummary,
+            primaryTargetKind: presentation.primaryTargetKind,
         }),
     );
 }
@@ -1113,6 +1153,7 @@ export function reconcileTerminalPostToolUseResult({ registry, evt }) {
     recordTerminalActivity('tool', 'Integração externa falhou', {
         detail: presentation.completeLine(false, durationLabel),
         toolName: presentation.displayToolName,
+        toolTarget: presentation.target,
         source: 'sdk',
         severity: 'error',
     });
@@ -1130,6 +1171,11 @@ export function reconcileTerminalPostToolUseResult({ registry, evt }) {
             searchTerms: presentation.searchTerms,
             lineRange: presentation.lineRange,
             patchFiles: presentation.patchFiles,
+            commands: presentation.commands,
+            filters: presentation.filters,
+            resultCount: presentation.resultCount,
+            resultSummary: presentation.resultSummary,
+            primaryTargetKind: presentation.primaryTargetKind,
             success: false,
             durationMs,
         }),
@@ -1189,6 +1235,7 @@ export function reconcileTerminalInFlightToolsAtTurnEnd({ registry, reason = 'as
         recordTerminalActivity('tool', 'Tool reconciliada no fim do turno', {
             detail: `${canonicalName} sem completion explícito (${reason}) · ${durationLabel}`,
             toolName: canonicalName,
+            toolTarget: presentation.target,
             severity: 'warn',
             source: 'sdk',
         });
@@ -1214,6 +1261,11 @@ export function reconcileTerminalInFlightToolsAtTurnEnd({ registry, reason = 'as
                 searchTerms: presentation.searchTerms,
                 lineRange: presentation.lineRange,
                 patchFiles: presentation.patchFiles,
+                commands: presentation.commands,
+                filters: presentation.filters,
+                resultCount: presentation.resultCount,
+                resultSummary: presentation.resultSummary,
+                primaryTargetKind: presentation.primaryTargetKind,
                 success: true,
                 durationMs,
             }),

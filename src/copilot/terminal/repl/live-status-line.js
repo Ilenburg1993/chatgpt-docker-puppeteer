@@ -80,6 +80,15 @@ function renderLiveToolName(activity) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {string}
+ */
+function renderLiveToolTarget(activity) {
+    if (!activity.toolTarget) return '';
+    return compactLiveStatusText(activity.toolTarget, 42);
+}
+
+/**
  * @param {string} detail
  * @returns {string | null}
  */
@@ -329,11 +338,13 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const target = renderLiveToolName(activity);
     if (activity.phase === 'tool') {
         const toolLabel = target || label || 'ferramenta';
+        const toolTarget = renderLiveToolTarget(activity);
+        const targetText = toolTarget ? ` · ${toolTarget}` : '';
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, 'ferramenta')}` +
             `${terminalThemeText('tool', ` · ${toolLabel}`)}` +
-            `${terminalThemeText('muted', `${progress} · ${formatLiveDuration(ageMs)}${queue}`)}` +
+            `${terminalThemeText('muted', `${targetText}${progress} · ${formatLiveDuration(ageMs)}${queue}`)}` +
             '\x1b[K'
         );
     }

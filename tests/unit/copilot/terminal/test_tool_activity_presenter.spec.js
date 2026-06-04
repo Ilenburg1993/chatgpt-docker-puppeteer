@@ -130,7 +130,24 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.displayToolName).toBe('Executar comando');
         expect(presentation.operation).toBe('run');
         expect(presentation.detail).toContain('executando comando');
+        expect(presentation.detail).toContain("node -e \"console.log('ok')\"");
+        expect(presentation.target).toBe("node -e \"console.log('ok')\"");
         expect(presentation.detail).not.toContain('operando arquivo');
+    });
+
+    it('mostra list_tools como listagem humana com filtro e contagem materializada', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'list_tools',
+            args: { category: 'code', search: 'terminal' },
+            result: { success: true, count: 18 },
+        });
+
+        expect(presentation.displayToolName).toBe('Listar tools');
+        expect(presentation.operation).toBe('list');
+        expect(presentation.target).toContain('busca: terminal');
+        expect(presentation.target).toContain('category: code');
+        expect(presentation.resultCount).toBe(18);
+        expect(presentation.completeLine(true, '0.1s')).toContain('18 resultados');
     });
 
     it('enriquece leitura com range efetivamente retornado no resultado', () => {

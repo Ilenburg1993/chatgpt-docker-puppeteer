@@ -682,6 +682,54 @@ describe('terminal/dialog/engine.js — contrato', () => {
         });
     });
 
+    it('não degrada saúde BYOK quando o Agent classifica o turno vazio como tool-only', async () => {
+        const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
+        const health = await import('../../../src/copilot/model-gateway/health/provider-health.js');
+        const sse = await import('../../../src/copilot/terminal/dialog/sse.js');
+
+        vi.mocked(health.recordByokProviderModelCallFailure).mockClear();
+        vi.mocked(sse.broadcastSse).mockClear();
+        configMocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: true,
+            ready: true,
+            profile: 'kilo',
+            providerType: 'openai',
+            preset: 'kilo-code',
+            model: 'kilo-auto/free',
+            limits: null,
+            capabilities: null,
+        });
+        vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockResolvedValueOnce({
+            reply: '',
+            channel: 'dialog',
+            replySource: 'empty',
+            semanticOutcome: 'tool_only',
+            semanticReplySource: 'loop.reply',
+            semanticDiagnostics: {
+                dispatched: true,
+                assistantMessageCount: 0,
+                deltaChars: 0,
+                deltaEligible: false,
+                pendingProtocolKind: null,
+                pendingHumanInput: false,
+                toolSignalCount: 2,
+                lastDeltaSeq: 0,
+                lastToolSignalSeq: 2,
+            },
+        });
+
+        await expect(mod.sendTurn('executar tools sem síntese', 'user')).resolves.toBe('');
+
+        expect(vi.mocked(health.recordByokProviderModelCallFailure)).not.toHaveBeenCalled();
+        expect(vi.mocked(sse.broadcastSse)).toHaveBeenCalledWith(
+            'terminal.turn.non_text_outcome',
+            expect.objectContaining({
+                semanticOutcome: 'tool_only',
+                semanticReplySource: 'loop.reply',
+            }),
+        );
+    });
+
     it('pausa o boot do dialog loop quando a policy SDK bloqueia reconnect por auth', async () => {
         const runtime = await import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js');
         const nerv = await import('#copilot/bridges');

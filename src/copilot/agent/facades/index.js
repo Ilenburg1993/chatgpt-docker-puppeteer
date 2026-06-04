@@ -9,12 +9,14 @@
 
 export {
     dispatchAgentDialogTurn,
+    dispatchAgentDialogTurnDetailed,
     isAgentDialogLoopPaused,
     pauseAgentDialogLoop,
     readAgentDialogLastPrInfo,
     readAgentDialogPrMetrics,
     recoverAgentDialogInputChannel,
     sendAgentDialogTurn,
+    sendAgentDialogTurnDetailed,
     startAgentDialogLoop,
     stopAgentDialogLoopAuthorized,
 } from './agent-dialog-runtime.js';

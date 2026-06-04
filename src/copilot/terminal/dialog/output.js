@@ -835,12 +835,13 @@ export function redrawTerminalPrompt(rl, prompt = buildUserPrompt(), options = {
  */
 export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(), options = {}) {
     if (!isTerminalReadlineOpen(rl)) return;
+    const openReadline = /** @type {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} */ (rl);
     if (shouldSuppressPromptRedrawForContinuation(options)) return;
     if (shouldDeferTerminalIdlePromptRedraw(options)) {
-        queueDeferredTerminalIdlePromptRedraw(rl, prompt);
+        queueDeferredTerminalIdlePromptRedraw(openReadline, prompt);
         return;
     }
-    const key = /** @type {object} */ (rl);
+    const key = /** @type {object} */ (openReadline);
     const current = _scheduledPromptRedraws.get(key);
     if (current) {
         current.prompt = prompt;
@@ -852,12 +853,12 @@ export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(
         force: options.force === true,
         immediate: setImmediate(() => {
             _scheduledPromptRedraws.delete(key);
-            if (_terminalRenderLockDepth > 0 || !isTerminalReadlineOpen(rl)) return;
-            const inputLine = /** @type {{ line?: string }} */ (rl).line;
+            if (_terminalRenderLockDepth > 0 || !isTerminalReadlineOpen(openReadline)) return;
+            const inputLine = /** @type {{ line?: string }} */ (openReadline).line;
             if (state.force !== true && typeof inputLine === 'string' && inputLine.length > 0) return;
             const nextPrompt = typeof state.prompt === 'function' ? state.prompt() : state.prompt;
             const prompt = getBusy() && !shouldKeepHumanPromptWithInlineStatus() ? buildWaitingPrompt() : nextPrompt;
-            redrawTerminalPrompt(rl, prompt, { force: state.force });
+            redrawTerminalPrompt(openReadline, prompt, { force: state.force });
         }),
     };
     if (typeof state.immediate.unref === 'function') state.immediate.unref();

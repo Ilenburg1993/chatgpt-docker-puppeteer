@@ -36,6 +36,7 @@ import { spawnSync } from 'node:child_process';
  * @typedef {{
  *     id: string;
  *     label: string;
+ *     commands: readonly string[];
  *     command: string | null;
  *     path: string | null;
  *     available: boolean;

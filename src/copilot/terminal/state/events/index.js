@@ -19,6 +19,7 @@ export {
     shouldSuppressTerminalAssistantMessageAsMaterializedTurn,
     shouldSuppressTerminalTaskDeltaAsMaterializedDialog,
     takeLatestTerminalTurnAssistantMessage,
+    waitForTerminalTurnMaterializationQuiescence,
 } from '../turn-materialization-state.js';
 export {
     appendTerminalIntent,

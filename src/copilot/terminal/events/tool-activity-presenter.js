@@ -51,6 +51,7 @@ const HUMAN_TOOL_NAMES = Object.freeze({
     delete_file: 'Excluir arquivo',
     list_files: 'Listar arquivos',
     search_files: 'Buscar arquivos',
+    list_tools: 'Listar tools',
     get_session_state: 'Estado da sessão',
     hooks_get_pending_tasks: 'Pendências de hooks',
     read_briefing: 'Briefing da sessão',
@@ -105,6 +106,11 @@ const ABSOLUTE_WINDOWS_PATH_PATTERN = /(^|[\s(["'`:=])([A-Za-z]:\\[^\s"'`)]+)/gu
  *     searchTerms: string[];
  *     patchFiles: string[];
  *     lineRange: { start: number | null; end: number | null } | null;
+ *     commands: string[];
+ *     filters: string[];
+ *     resultCount: number | null;
+ *     resultSummary: string | null;
+ *     primaryTargetKind: 'file' | 'url' | 'search' | 'patch' | 'command' | 'filter' | null;
  *     detail: string;
  *     startLine: string;
  *     progressLinePrefix: string;
@@ -314,13 +320,7 @@ function resolveHumanToolName(toolName, canonicalToolName) {
 }
 
 /**
- * @param {{
- *     fileTargets: string[];
- *     urlTargets: string[];
- *     searchTerms: string[];
- *     lineRange: { start: number | null; end: number | null } | null;
- *     primaryTarget: string | null;
- * }} meta
+ * @param {ReturnType<typeof introspectToolTargets>} meta
  * @returns {string | null}
  */
 function buildTargetSummary(meta) {
@@ -345,8 +345,32 @@ function buildTargetSummary(meta) {
         const end = meta.lineRange.end ?? '?';
         chunks.push(`linhas ${start}-${end}`);
     }
+    if (meta.filters.length > 0) {
+        chunks.push(meta.filters.slice(0, 2).map((filter) => compactTerminalToolText(filter, 48)).join(' · '));
+    }
     if (chunks.length === 0) return meta.primaryTarget;
     return chunks.join(' · ');
+}
+
+/**
+ * @param {ReturnType<typeof introspectToolTargets>} meta
+ * @returns {string | null}
+ */
+function buildCommandSummary(meta) {
+    const command = meta.commands[0] ?? null;
+    return command ? compactTerminalToolText(command, 120) : null;
+}
+
+/**
+ * @param {ReturnType<typeof introspectToolTargets>} meta
+ * @returns {string | null}
+ */
+function buildResultSummary(meta) {
+    if (meta.resultSummary) return compactTerminalToolText(meta.resultSummary, 72);
+    if (meta.resultCount !== null) {
+        return `${meta.resultCount} resultado${meta.resultCount === 1 ? '' : 's'}`;
+    }
+    return null;
 }
 
 /**
@@ -409,6 +433,10 @@ function inferOperation(toolName, path, explicitOperation) {
 
     if (/\b(report|telemetry|diagnostic|health|status)\b/i.test(normalized)) {
         return { operation: 'inspect', label: 'inspecionando diagnóstico' };
+    }
+
+    if (/\b(list tools|list available tools)\b/i.test(normalized)) {
+        return { operation: 'list', label: 'listando tools' };
     }
 
     for (const pattern of INSPECTION_TOOL_PATTERNS) {
@@ -598,14 +626,22 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
     const intentPreview = isIntentTool ? inferIntentText({ ...evt, args: toolArgs }) : null;
     const path = isStructuredInputTool ? null : (meta.fileTargets[0] ?? null);
     const { operation, label } = inferOperation(toolName, path, evt['operation']);
+    const commandSummary = operation === 'run' ? buildCommandSummary(meta) : null;
+    const targetSummary = buildTargetSummary(meta);
     const targetCandidate =
-        questionPreview ?? intentPreview ?? buildTargetSummary(meta) ?? stringOrNull(evt['mcpServerName']) ?? null;
+        questionPreview ??
+        intentPreview ??
+        commandSummary ??
+        targetSummary ??
+        stringOrNull(evt['mcpServerName']) ??
+        null;
     const target = isInternalCallIdentifier(targetCandidate) ? null : targetCandidate;
     const targetSuffix = target ? ` · ${target}` : '';
     const effectiveLabel = isStructuredInputTool ? 'aguardando decisão humana' : label;
     const detail = `${effectiveLabel}${targetSuffix}`;
     const startLine = target ? `${effectiveLabel}: ${target}` : effectiveLabel;
     const progressLinePrefix = target ? `${displayToolName} · ${target}` : displayToolName;
+    const resultSummary = buildResultSummary(meta);
 
     return {
         toolName,
@@ -620,6 +656,11 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
         searchTerms: meta.searchTerms,
         patchFiles: meta.patchFiles,
         lineRange: meta.lineRange,
+        commands: meta.commands,
+        filters: meta.filters,
+        resultCount: meta.resultCount,
+        resultSummary,
+        primaryTargetKind: meta.primaryTargetKind,
         detail,
         startLine,
         progressLinePrefix,
@@ -627,7 +668,8 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
             const outcome = success ? 'concluído' : 'falhou';
             const safeDuration =
                 typeof durationLabel === 'string' && durationLabel.trim().length > 0 ? durationLabel.trim() : 'n/d';
-            return `${effectiveLabel} ${outcome}${targetSuffix} (${safeDuration})`;
+            const resultSuffix = resultSummary ? ` · ${resultSummary}` : '';
+            return `${effectiveLabel} ${outcome}${targetSuffix}${resultSuffix} (${safeDuration})`;
         },
     };
 }

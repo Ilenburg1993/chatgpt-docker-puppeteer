@@ -305,7 +305,7 @@ function extractHookToolCalls(input) {
 }
 
 /**
- * @param {ReturnType<typeof createToolCallRegistry>} registry
+ * @param {ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>} registry
  * @param {{ id: string | null; name: string; args: Record<string, unknown> }} call
  * @returns {void}
  */
@@ -1251,6 +1251,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const previousModel = evt?.previousModel ?? 'unknown';
         const newModel = evt?.newModel ?? 'unknown';
         const reasoningEffort = evt?.reasoningEffort ?? null;
+        const changed = previousModel !== newModel;
         observeTerminalModelChangeProjection({ previousModel, newModel, reasoningEffort });
         void recordModelGatewaySdkSessionConfirmation(previousModel, newModel, reasoningEffort).catch((error) => {
             recordTerminalActivity('system', 'Falha ao registrar confirmação SDK no model-gateway', {
@@ -1260,15 +1261,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 recordHistory: false,
             });
         });
-        recordTerminalActivity('system', 'Modelo confirmado', {
+        recordTerminalActivity('system', changed ? 'Modelo alterado' : 'Modelo confirmado', {
             detail: `de ${previousModel} para ${newModel}${reasoningEffort ? ` · raciocínio ${reasoningEffort}` : ''}`,
             source: 'sdk',
+            recordHistory: changed,
+            updateCurrent: false,
         });
-        if (shouldPrintSessionNarration('verbose')) {
+        if (changed || shouldPrintSessionNarration('verbose')) {
             println(
                 terminalThemeRow(
                     'Modelo',
-                    `SDK confirmou ${previousModel} → ${newModel}${reasoningEffort ? ` · raciocínio ${reasoningEffort}` : ''}`,
+                    `${previousModel} → ${newModel}${reasoningEffort ? ` · raciocínio ${reasoningEffort}` : ''}`,
                     { role: 'info' },
                 ),
             );

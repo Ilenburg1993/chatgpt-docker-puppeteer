@@ -11,7 +11,7 @@ import {
     readRuntimeControlState,
     readRuntimeInteractionState,
     recoverAgentDialogInputChannel,
-    sendAgentDialogTurn,
+    sendAgentDialogTurnDetailed,
     startAgentDialogLoop,
     stopAgentDialogLoopAuthorized,
 } from '#copilot/agent/facades';
@@ -35,6 +35,10 @@ export { MAX_EMBED_BYTES };
  *         message: string,
  *         options?: { timeout?: number | null; signal?: AbortSignal; traceId?: string },
  *     ) => Promise<string>;
+ *     sendDialogTurnDetailed?: (
+ *         message: string,
+ *         options?: { timeout?: number | null; signal?: AbortSignal; traceId?: string },
+ *     ) => Promise<import('#copilot/agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult>;
  *     stopDialogLoop: (opts?: {
  *         authorized?: boolean;
  *         reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
@@ -129,17 +133,30 @@ export async function startRuntimeDialogLoop(bootPrompt, runtime, opts = {}) {
  * @returns {Promise<string>}
  */
 export async function sendRuntimeDialogTurnOnActiveLoop(message, options, runtime) {
+    const result = await sendRuntimeDialogTurnOnActiveLoopDetailed(message, options, runtime);
+    return result.reply;
+}
+
+/**
+ * Envia um turno para um dialog loop ativo preservando o resultado semântico canônico do Agent.
+ *
+ * @param {string} message
+ * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [options]
+ * @param {RuntimeDialogTarget | null | undefined} [runtime]
+ * @returns {Promise<import('#copilot/agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult>}
+ */
+export async function sendRuntimeDialogTurnOnActiveLoopDetailed(message, options, runtime) {
     const agent = resolveRuntimeDialogTarget(runtime);
     const startedAt = Date.now();
     const { traceId, timeout } = options ?? {};
     log('INFO', `[runtime-dialog] send turn on active loop (${traceLabel(traceId)}, timeout=${timeout ?? 'default'})`);
     try {
-        const reply = await sendAgentDialogTurn(agent, message, options);
+        const result = await sendAgentDialogTurnDetailed(agent, message, options);
         log(
             'INFO',
-            `[runtime-dialog] turn resolved (${traceLabel(traceId)}, duration=${Date.now() - startedAt}ms, reply=ok)`,
+            `[runtime-dialog] turn resolved (${traceLabel(traceId)}, duration=${Date.now() - startedAt}ms, outcome=${result.outcome}, source=${result.replySource})`,
         );
-        return reply;
+        return result;
     } catch (error) {
         const reason = toError(error).name + ':' + toError(error).message;
         log(
