@@ -5196,3 +5196,32 @@
       typecheck strict de `src/copilot`.
 - [ ] Próxima live: repetir cenário canônico até `ask_user` real para validar linha viva curta,
       timestamps dual e ausência de disputa com input.
+
+### 12.33 Live canônico com tempo dual: bloqueio pós-delta e espera silenciosa
+
+- [x] Live PTY executado após `formatTerminalTimeLabel` dual e resumo de model switch:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-dual-time-model-events-20260604-2244`.
+- [x] Resultado: `Status: BLOCKED`; blocker `live-timeout`; a sessão ficou pronta, executou
+      `report_intent`, `read_file_content` e os 8 deltas públicos, mas o modelo encerrou sem
+      chamar `ask_user`.
+- [x] Evidência positiva: cabeçalho de streaming apareceu como
+      `[2026-06-03T22:44:13-03:00 (há 0s)]`, confirmando ISO até segundos + relativo no fluxo real.
+- [x] Bug UX encontrado: o pulso de espera `10s sem resposta visível` seguia pelo renderer genérico,
+      duplicava `modelo kilo-auto/free · raciocínio high` e quebrava em várias linhas.
+- [x] Correção aplicada: `formatTerminalLiveStatusLine` agora trata espera silenciosa por
+      `sem resposta visível` como linha curta `pensando · 10s sem resposta pública · conversa ativa`,
+      sem modelo/esforço duplicado.
+- [x] Testes escopados: `test_live_status_line.spec.js` cobre `sem delta visível` e
+      `sem resposta visível`.
+- [x] Próxima lacuna do harness/live: quando o cenário canônico volta para `Pronto` após deltas
+      sem `ask_user`, o runner deve classificar rapidamente como `missing-required-ask-user`
+      ou `assistant-ended-before-ask`, em vez de aguardar timeout total.
+- [ ] Próxima lacuna UX: a tela humana deve receber uma linha curta de diagnóstico do cenário live
+      após deltas sem pergunta, por exemplo `Cenário live aguardava ask_user, mas o turno terminou`.
+- [x] Continuação: o runner ganhou detector `assistant-ended-before-ask` para o padrão
+      `DELTA-CANONICAL-8` materializado + pergunta ausente + retorno ao prompt.
+- [x] Continuação: durante a live, esse padrão agenda `/activity 40`, `/events 100 --raw`,
+      `/errors 10`, `/export ...` e `/quit`, reduzindo espera inútil antes do summary.
+- [x] Validação local: o artefato bloqueado
+      `live-canonical-dual-time-model-events-20260604-2244` seria classificado como
+      `assistant-ended-before-ask`.

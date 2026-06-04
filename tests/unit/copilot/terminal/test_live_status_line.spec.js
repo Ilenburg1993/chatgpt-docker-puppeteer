@@ -256,6 +256,29 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(70);
     });
 
+    it('compacta espera sem resposta pública sem duplicar modelo/esforço', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'thinking',
+            label: 'LLM-B trabalhando',
+            detail: '10s sem resposta visível',
+            toolName: null,
+            startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
+        };
+        mocks.stream = { model: 'kilo-auto/free', reasoningEffort: 'high' };
+
+        const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:14.000-03:00') });
+
+        expect(line).toContain('pensando');
+        expect(line).toContain('10s sem resposta pública');
+        expect(line).not.toContain('Aguardando resposta');
+        expect(line).not.toContain('modelo kilo-auto/free');
+        expect(line).not.toContain('raciocínio high');
+        expect(line.length).toBeLessThan(80);
+    });
+
     it('traduz pending messages na linha viva de turno', async () => {
         const { formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');

@@ -87,10 +87,14 @@ function renderLiveToolName(activity) {
  * @param {string} detail
  * @returns {string | null}
  */
-function extractNoDeltaStatus(detail) {
-    const match = detail.match(/(?<elapsed>\d+(?:s|m\d{2}s|h\d{2}m)?)\s+sem delta(?: visível)?/iu);
+function extractQuietWaitStatus(detail) {
+    const match = detail.match(
+        /(?<elapsed>\d+(?:s|m\d{2}s|h\d{2}m)?)\s+sem\s+(?<kind>delta|resposta)(?:\s+visível)?/iu,
+    );
     const elapsed = match?.groups?.['elapsed'] ?? null;
-    return elapsed ? `${elapsed} sem delta` : null;
+    const kind = match?.groups?.['kind'] ?? null;
+    if (!elapsed || !kind) return null;
+    return kind.toLowerCase() === 'resposta' ? `${elapsed} sem resposta pública` : `${elapsed} sem delta`;
 }
 
 /**
@@ -204,12 +208,12 @@ export function formatTerminalLiveStatusLine(input = {}) {
             : (runtime.status ?? '-');
     const severityRole = activity.severity === 'error' ? 'error' : activity.severity === 'warn' ? 'warn' : 'muted';
     const runtimeTail = compactRuntimeStatus(displayStatus, loop);
-    const noDeltaStatus = activity.phase === 'thinking' ? extractNoDeltaStatus(activity.detail ?? '') : null;
-    if (noDeltaStatus) {
+    const quietWaitStatus = activity.phase === 'thinking' ? extractQuietWaitStatus(activity.detail ?? '') : null;
+    if (quietWaitStatus) {
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, 'pensando')}` +
-            `${terminalThemeText('muted', ` · ${noDeltaStatus} · ${runtimeTail}${queue}`)}` +
+            `${terminalThemeText('muted', ` · ${quietWaitStatus} · ${runtimeTail}${queue}`)}` +
             '\x1b[K'
         );
     }

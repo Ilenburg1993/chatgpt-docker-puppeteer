@@ -2624,6 +2624,29 @@ function hasReturnedToReplPrompt(plain, outputOffset) {
     return REPL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
 }
 
+function findAssistantEndedBeforeRequiredAsk(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID], events = []) {
+    const text = String(plain ?? '');
+    if (scenario.askRenderedRe.test(text)) return null;
+    if (!/(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-CANONICAL-8\b/u.test(text)) return null;
+    const promptReturned = /Turno concluído; aguardando próxima mensagem|Aguardando próxima mensagem/iu.test(text);
+    const assistantMessage = Array.isArray(events)
+        ? events.find((evt) => {
+              if (evt?.event !== 'assistant.message' || !isObjectPayload(evt.data)) return false;
+              return /DELTA-CANONICAL-8/u.test(String(evt.data.content ?? ''));
+          })
+        : null;
+    const askEvent = Array.isArray(events)
+        ? events.find((evt) => evt?.event === 'user_input.requested' || evt?.event === 'elicitation.pending')
+        : null;
+    if (askEvent) return null;
+    if (!promptReturned && !assistantMessage) return null;
+    return {
+        eventId: Number(assistantMessage?.id),
+        traceId: typeof assistantMessage?.data?.traceId === 'string' ? assistantMessage.data.traceId : null,
+        turnId: typeof assistantMessage?.data?.turnId === 'string' ? assistantMessage.data.turnId : null,
+    };
+}
+
 function isHardCriterionFailure(criterion) {
     return criterion?.pass !== true && criterion?.severity !== 'warning' && criterion?.required !== false;
 }
@@ -3018,6 +3041,17 @@ function detectLiveBlocker(plain, runtime = {}) {
                 `${emptyOutput?.traceId ? ` · trace=${emptyOutput.traceId}` : ''}` +
                 `${emptyOutput?.turnId ? ` · turn=${emptyOutput.turnId}` : ''}` +
                 `${Number.isFinite(emptyOutput?.eventId) ? ` · sse=#${emptyOutput.eventId}` : ''}`,
+        };
+    }
+    const endedBeforeAsk = findAssistantEndedBeforeRequiredAsk(plain, runtime.liveScenario, runtime.sseEvents);
+    if (endedBeforeAsk) {
+        return {
+            id: 'assistant-ended-before-ask',
+            detail:
+                'assistant produced the required public deltas and returned to idle before calling the required ask_user tool' +
+                `${endedBeforeAsk.traceId ? ` · trace=${endedBeforeAsk.traceId}` : ''}` +
+                `${endedBeforeAsk.turnId ? ` · turn=${endedBeforeAsk.turnId}` : ''}` +
+                `${Number.isFinite(endedBeforeAsk.eventId) ? ` · sse=#${endedBeforeAsk.eventId}` : ''}`,
         };
     }
     if (runtime.timedOut) {
@@ -5431,6 +5465,22 @@ async function main() {
             diagnostics.length * 450 + 1_500,
         ).unref();
     };
+    const scheduleMissingRequiredAskDiagnostics = () => {
+        if (postCommandsSent) return;
+        postCommandsSent = true;
+        const diagnostics = ['/activity 40', '/events 100 --raw', '/errors 10', `/export ${exportArg}`];
+        sendCommandSequence(write, diagnostics, { delayMs: 450 });
+        setTimeout(
+            () => {
+                if (!quitSent) {
+                    quitSent = true;
+                    byokNoPrCanQuit = true;
+                    write('/quit');
+                }
+            },
+            diagnostics.length * 450 + 2_000,
+        ).unref();
+    };
     const invalidChoiceFeedbackRe =
         /Resposta não corresponde às opções da pergunta pendente|Resposta inválida para a pergunta pendente|invalid_choice/iu;
     const sendScenarioAnswerStep = (plain, step) => {
@@ -5567,6 +5617,15 @@ async function main() {
             findByokRealLiveToolProtocolMiss(scenarioTailPlain, liveScenario)
         ) {
             pendingByokLiveProtocolDiagnostics = true;
+        }
+        if (
+            scenarioSent &&
+            !answerSent &&
+            !postCommandsSent &&
+            findAssistantEndedBeforeRequiredAsk(scenarioTailPlain, liveScenario) &&
+            hasReturnedToReplPrompt(plain, scenarioPlainOffset)
+        ) {
+            scheduleMissingRequiredAskDiagnostics();
         }
         if (
             !postCommandsSent &&
