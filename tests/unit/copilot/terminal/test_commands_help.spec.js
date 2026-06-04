@@ -40,7 +40,8 @@ describe('terminal/commands/help', () => {
         expect(ctx.output()).toContain('POST /inject');
         expect(ctx.output()).toContain('Sessão e observação');
         expect(ctx.output()).toContain('Previews e libs auxiliares');
-        expect(ctx.output()).toContain('/terminal libs detail');
+        expect(ctx.output()).toContain('/terminal libs detail [filtro]');
+        expect(ctx.output()).toContain('/terminal libs deferred|fzf|bat|jq');
         expect(ctx.output()).toContain('/fs preview <path> --markdown');
         expect(ctx.output()).toContain('/fs preview <path> --json [--query .x]');
         expect(ctx.output()).toContain('/menu picker --interactive');

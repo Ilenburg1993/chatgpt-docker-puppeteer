@@ -2447,7 +2447,8 @@ function defaultUxCycleCriteria(boot) {
     const helpStart = plain.indexOf('Ajuda rápida');
     const helpFullStart = plain.indexOf('Terminal LLM-B - Ajuda completa');
     const terminalLibsDetailStart = plain.indexOf('Libs auxiliares do terminal', Math.max(0, helpFullStart));
-    const terminalLibsJsonStart = plain.indexOf('/terminal libs json', Math.max(0, terminalLibsDetailStart));
+    const terminalLibsFilteredStart = plain.indexOf('/terminal libs deferred', Math.max(0, terminalLibsDetailStart));
+    const terminalLibsJsonStart = plain.indexOf('/terminal libs json', Math.max(0, terminalLibsFilteredStart));
     const statusStart = plain.indexOf('Status do Terminal LLM-B');
     const nowPanelStart = plain.indexOf('\n  Agora');
     const nowStart = nowPanelStart >= 0 ? nowPanelStart + 1 : plain.indexOf('[agora]');
@@ -2481,6 +2482,7 @@ function defaultUxCycleCriteria(boot) {
         helpStart,
         helpFullStart,
         terminalLibsDetailStart,
+        terminalLibsFilteredStart,
         terminalLibsJsonStart,
         statusStart,
         nowStart,
@@ -2510,6 +2512,7 @@ function defaultUxCycleCriteria(boot) {
     const helpSurface = surfaceAt(helpStart);
     const helpFullSurface = surfaceAt(helpFullStart);
     const terminalLibsDetailSurface = surfaceAt(terminalLibsDetailStart);
+    const terminalLibsFilteredSurface = surfaceAt(terminalLibsFilteredStart);
     const terminalLibsJsonSurface = surfaceAt(terminalLibsJsonStart);
     const terminalLibsJsonBlockStart = terminalLibsJsonSurface.indexOf('{');
     const terminalLibsJsonPromptAfterBlock =
@@ -2547,6 +2550,7 @@ function defaultUxCycleCriteria(boot) {
         helpStart,
         helpFullStart,
         terminalLibsDetailStart,
+        terminalLibsFilteredStart,
         terminalLibsJsonStart,
         statusStart,
         nowStart,
@@ -2608,6 +2612,15 @@ function defaultUxCycleCriteria(boot) {
                 /adiado|adiada/iu.test(terminalLibsDetailSurface) &&
                 !/\bRetorno\b|\{\s*"tools"|\[OK\]|\[ERR\]/u.test(terminalLibsDetailSurface),
             detail: '/terminal libs detail explained policy, examples and deferred tools without raw JSON',
+        },
+        {
+            id: 'ux-cycle-terminal-libs-filtered',
+            pass:
+                /Libs auxiliares do terminal[\s\S]*filtro adiadas[\s\S]*(Atuin|zoxide)/iu.test(
+                    terminalLibsFilteredSurface,
+                ) &&
+                !/\bfzf\b|renderer externo|preview read-only com syntax highlighting/iu.test(terminalLibsFilteredSurface),
+            detail: '/terminal libs deferred rendered a focused filtered surface without accepted-tool noise',
         },
         {
             id: 'ux-cycle-terminal-libs-json-contract',
@@ -2811,6 +2824,7 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
             { line: '/help', waitFor: 'Ajuda rápida', advanceAfterMs: 1_500 },
             { line: '/help full', waitFor: 'Terminal LLM-B - Ajuda completa', advanceAfterMs: 5_000 },
             { line: '/terminal libs detail', waitFor: 'Libs auxiliares do terminal', advanceAfterMs: 2_000 },
+            { line: '/terminal libs deferred', waitFor: 'filtro adiadas', advanceAfterMs: 1_000 },
             { line: '/terminal libs json', waitFor: 'terminal-external-tools-capability-summary', advanceAfterMs: 1_500 },
             { line: '/status', waitFor: 'Status do Terminal LLM-B', advanceAfterMs: 1_500 },
             { line: '/now', waitFor: '\n  Agora', advanceAfterMs: 1_500 },

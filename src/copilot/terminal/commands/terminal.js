@@ -12,6 +12,25 @@ import { terminalThemeHeadline, terminalThemeRow, terminalThemeWrappedRow } from
  * @typedef {object} TerminalCommandContext
  * @property {(text: string) => void} println
  */
+/**
+ * @typedef {{
+ *     query: string;
+ *     label: string;
+ *     active: boolean;
+ *     matched: boolean;
+ *     tools: import('../capabilities/external-tools.js').TerminalExternalToolCapability[];
+ * }} TerminalLibsFilter
+ */
+
+const TERMINAL_LIBS_MODE_TOKENS = new Set([
+    'detail',
+    'details',
+    '--detail',
+    'json',
+    '--json',
+    'refresh',
+    '--refresh',
+]);
 
 /**
  * @param {string} value
@@ -57,6 +76,67 @@ function printRows(println, rows, options = {}) {
 }
 
 /**
+ * @param {string[]} tokens
+ * @param {import('../capabilities/external-tools.js').TerminalExternalToolCapability[]} tools
+ * @returns {TerminalLibsFilter}
+ */
+function resolveTerminalLibsFilter(tokens, tools) {
+    const query =
+        tokens
+            .map((token) => token.trim().toLowerCase())
+            .find((token) => token && !TERMINAL_LIBS_MODE_TOKENS.has(token)) ?? 'all';
+    if (query === 'all' || query === '*') {
+        return { query: 'all', label: 'todos', active: false, matched: true, tools };
+    }
+    if (query === 'available' || query === 'disponiveis' || query === 'disponíveis') {
+        return { query, label: 'disponíveis', active: true, matched: true, tools: tools.filter((tool) => tool.available) };
+    }
+    if (query === 'missing' || query === 'absent' || query === 'ausentes') {
+        return { query, label: 'ausentes', active: true, matched: true, tools: tools.filter((tool) => !tool.available) };
+    }
+    if (query === 'accepted' || query === 'aceitas') {
+        return {
+            query,
+            label: 'aceitas',
+            active: true,
+            matched: true,
+            tools: tools.filter((tool) => tool.decision === 'accepted'),
+        };
+    }
+    if (query === 'guarded' || query === 'guard' || query === 'guardas') {
+        return {
+            query,
+            label: 'com guardas',
+            active: true,
+            matched: true,
+            tools: tools.filter((tool) => tool.decision === 'accepted_guarded'),
+        };
+    }
+    if (query === 'deferred' || query === 'deferidas' || query === 'adiadas') {
+        return {
+            query,
+            label: 'adiadas',
+            active: true,
+            matched: true,
+            tools: tools.filter((tool) => tool.decision === 'deferred'),
+        };
+    }
+    const matchedTools = tools.filter((tool) => {
+        const candidates = [tool.id, tool.label, tool.command, ...(tool.commands ?? [])]
+            .filter((item) => typeof item === 'string')
+            .map((item) => String(item).toLowerCase());
+        return candidates.includes(query);
+    });
+    return {
+        query,
+        label: matchedTools.length > 0 ? query : `sem resultado: ${query}`,
+        active: true,
+        matched: matchedTools.length > 0,
+        tools: matchedTools,
+    };
+}
+
+/**
  * @param {import('../capabilities/external-tools.js').TerminalExternalToolCapability} tool
  * @returns {'success' | 'warn' | 'muted'}
  */
@@ -97,14 +177,11 @@ function renderDefaultState(tool) {
 function printTerminalCommandUsage(println) {
     println('');
     println(terminalThemeHeadline('command', 'Terminal'));
-    printRows(
-        println,
-        [
-            ['Uso', '/terminal libs [detail|json|refresh]'],
-            ['Atalho', '/libs [detail|json|refresh]'],
-            ['Função', 'inspeciona ferramentas auxiliares opcionais e seus fallbacks'],
-        ],
-    );
+    printRows(println, [
+        ['Uso', '/terminal libs [detail|json|refresh] [all|available|missing|accepted|guarded|deferred|tool]'],
+        ['Atalho', '/libs [detail|json|refresh] [filtro]'],
+        ['Função', 'inspeciona ferramentas auxiliares opcionais e seus fallbacks'],
+    ]);
     println('');
 }
 
@@ -113,13 +190,15 @@ function printTerminalCommandUsage(println) {
  * @param {boolean} refresh
  * @returns {void}
  */
-function printTerminalLibsCompact(println, refresh) {
+function printTerminalLibsCompact(println, refresh, filterTokens = []) {
     const summary = readTerminalExternalToolCapabilitySummary({ refresh });
+    const filter = resolveTerminalLibsFilter(filterTokens, summary.tools);
     println('');
     println(
         terminalThemeHeadline('tool', 'Libs auxiliares do terminal', [
             `${summary.available}/${summary.total} disponíveis`,
             'opcionais',
+            filter.active ? `filtro ${filter.label}` : null,
         ]),
     );
     println(terminalThemeRow('Aceitas', `${summary.acceptedAvailable} disponíveis`));
@@ -128,8 +207,11 @@ function printTerminalLibsCompact(println, refresh) {
         ['Adiada', `${summary.deferredAvailable} disponível(is)`],
         ['Fallback', 'terminal JS canônico continua sendo o padrão'],
     ]);
+    if (!filter.matched) {
+        println(terminalThemeRow('Filtro', `${filter.query} não encontrou ferramenta ou grupo`, { role: 'warn' }));
+    }
     println('');
-    for (const tool of summary.tools) {
+    for (const tool of filter.tools) {
         const detail = [
             renderAvailability(tool.available),
             renderDecisionLabel(tool.decision),
@@ -139,8 +221,11 @@ function printTerminalLibsCompact(println, refresh) {
             .join(' · ');
         println(terminalThemeRow(tool.label, detail, { role: renderToolRole(tool), width: 12 }));
     }
+    if (filter.tools.length === 0) {
+        println(terminalThemeRow('Resultado', 'nenhuma ferramenta para este filtro', { role: 'warn' }));
+    }
     println('');
-    println(terminalThemeRow('Detalhes', '/terminal libs detail · /terminal libs json · /terminal libs refresh'));
+    println(terminalThemeRow('Detalhes', '/terminal libs detail [filtro] · /terminal libs json [filtro] · /terminal libs refresh'));
     println(terminalThemeRow('Smoke', 'npm run terminal:aux-libs:smoke · npm --silent run terminal:aux-libs:smoke -- --json'));
     println('');
 }
@@ -150,16 +235,22 @@ function printTerminalLibsCompact(println, refresh) {
  * @param {boolean} refresh
  * @returns {void}
  */
-function printTerminalLibsDetail(println, refresh) {
+function printTerminalLibsDetail(println, refresh, filterTokens = []) {
     const summary = readTerminalExternalToolCapabilitySummary({ refresh });
+    const filter = resolveTerminalLibsFilter(filterTokens, summary.tools);
     println('');
     println(
         terminalThemeHeadline('tool', 'Libs auxiliares do terminal', [
             `${summary.available}/${summary.total} disponíveis`,
             'detail',
+            filter.active ? `filtro ${filter.label}` : null,
         ]),
     );
-    for (const tool of summary.tools) {
+    if (!filter.matched) {
+        println('');
+        println(terminalThemeRow('Filtro', `${filter.query} não encontrou ferramenta ou grupo`, { role: 'warn' }));
+    }
+    for (const tool of filter.tools) {
         println('');
         println(
             terminalThemeRow(tool.label, `${renderAvailability(tool.available)} · ${renderDecisionLabel(tool.decision)}`, {
@@ -191,12 +282,17 @@ function printTerminalLibsDetail(println, refresh) {
             );
         }
     }
+    if (filter.tools.length === 0) {
+        println('');
+        println(terminalThemeRow('Resultado', 'nenhuma ferramenta para este filtro', { role: 'warn' }));
+    }
     println('');
     printRows(
         println,
         [
             ['Smoke', 'npm run terminal:aux-libs:smoke'],
             ['JSON limpo', 'npm --silent run terminal:aux-libs:smoke -- --json'],
+            ['Filtros', 'available · missing · accepted · guarded · deferred · fzf · bat · glow · delta · jq · yq'],
         ],
         { width: 12 },
     );
@@ -208,8 +304,9 @@ function printTerminalLibsDetail(println, refresh) {
  * @param {boolean} refresh
  * @returns {void}
  */
-function printTerminalLibsJson(println, refresh) {
+function printTerminalLibsJson(println, refresh, filterTokens = []) {
     const summary = readTerminalExternalToolCapabilitySummary({ refresh });
+    const filter = resolveTerminalLibsFilter(filterTokens, summary.tools);
     println(
         JSON.stringify(
             {
@@ -221,7 +318,15 @@ function printTerminalLibsJson(println, refresh) {
                     noAutomaticTui: true,
                     canonicalFallbacks: true,
                 },
+                filter: {
+                    query: filter.query,
+                    label: filter.label,
+                    active: filter.active,
+                    matched: filter.matched,
+                    count: filter.tools.length,
+                },
                 ...summary,
+                tools: filter.tools,
             },
             null,
             2,
@@ -246,16 +351,17 @@ export function cmdTerminal(ctx, arg = '') {
         return;
     }
     const flags = new Set(args.slice(1).map((item) => item.toLowerCase()));
+    const filterTokens = args.slice(1);
     const refresh = flags.has('refresh') || flags.has('--refresh');
     if (flags.has('json') || flags.has('--json')) {
-        printTerminalLibsJson(ctx.println, refresh);
+        printTerminalLibsJson(ctx.println, refresh, filterTokens);
         return;
     }
     if (flags.has('detail') || flags.has('details') || flags.has('--detail')) {
-        printTerminalLibsDetail(ctx.println, refresh);
+        printTerminalLibsDetail(ctx.println, refresh, filterTokens);
         return;
     }
-    printTerminalLibsCompact(ctx.println, refresh);
+    printTerminalLibsCompact(ctx.println, refresh, filterTokens);
 }
 
 /**

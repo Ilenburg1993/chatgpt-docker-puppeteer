@@ -290,6 +290,7 @@ Decisão:
 
 - [x] `/terminal libs detail` mostra exemplos por ferramenta.
 - [x] `/terminal libs detail` diferencia `aceita`, `aceita com guardas` e `adiada` em termos de política de execução.
+- [x] `/terminal libs` aceita filtros por disponibilidade, decisão e ferramenta para reduzir rolagem humana.
 - [x] `/help full` tem uma seção rica de libs auxiliares com exemplos e fallbacks.
 - [ ] O picker externo ainda não tem preview seguro integrado; decisão atual é manter sem preview embutido.
 - [x] Há comando de auditoria único que roda bateria local não interativa de previews para demonstrar renderer/fallback.
@@ -319,6 +320,7 @@ Decisão:
 - [x] Fase B.5: adicionar política curta por ferramenta em detail.
 - [x] Fase B.6: adicionar nota explícita de que `defaultEnabled=false` preserva portabilidade.
 - [x] Fase B.7: transformar `/terminal libs json` em envelope versionável com `schema`, timestamp e policy.
+- [x] Fase B.8: adicionar filtros `available`, `missing`, `accepted`, `guarded`, `deferred` e `<tool>`.
 
 ### Faixa C: Help e descoberta
 
@@ -471,10 +473,20 @@ Decisão:
   - `/terminal libs json` agora emite `schema=terminal-external-tools-capability-summary`;
   - `generatedAt` usa ISO 8601 completo com milissegundos e timezone UTC;
   - `policy` explicita que libs são opcionais, sem pager/TUI automático e com fallbacks canônicos.
+- [x] Filtros de UX para reduzir rolagem:
+  - `/terminal libs deferred` mostra apenas ferramentas adiadas;
+  - `/terminal libs detail fzf` mostra uma ferramenta específica;
+  - `/terminal libs json deferred` preserva contadores globais e emite `filter` com `query`, `label`,
+    `matched` e `count`;
+  - filtros sem resultado geram aviso humano e não despejam JSON bruto.
 - [x] Live PTY com contrato JSON de libs:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-json-contract-pass3-20260604 --timeout-ms 180000`;
   - artefato: `artifacts/terminal-live/2026-06-04T17-44-25-689Z/summary.md`;
   - resultado: PASS em 25/25 critérios, incluindo `ux-cycle-terminal-libs-json-contract`.
+- [x] Live PTY com filtros de libs:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-filtered-contract-20260604 --timeout-ms 180000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T17-48-53-899Z/summary.md`;
+  - resultado: PASS em 26/26 critérios, incluindo `ux-cycle-terminal-libs-filtered`.
 
 ## 9. Próxima execução recomendada
 

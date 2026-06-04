@@ -116,6 +116,39 @@ describe('terminal/commands/terminal', () => {
         expect(ctx.output()).toContain('adiado; não ler histórico externo');
         expect(ctx.output()).toContain('planejada, mas sem binário local e sem chamada automática');
         expect(ctx.output()).toContain('JSON limpo');
+        expect(ctx.output()).toContain('Filtros');
+    });
+
+    it('filtra detail por ferramenta para reduzir rolagem humana', () => {
+        const ctx = mockCtx();
+
+        cmdTerminal(ctx, 'libs detail fzf');
+
+        expect(ctx.output()).toContain('filtro fzf');
+        expect(ctx.output()).toContain('/usr/bin/fzf');
+        expect(ctx.output()).not.toContain('/usr/bin/gum');
+        expect(ctx.output()).not.toContain('ConversationHub');
+    });
+
+    it('filtra superfície compacta por decisão adiada', () => {
+        const ctx = mockCtx();
+
+        cmdTerminal(ctx, 'libs deferred');
+
+        expect(ctx.output()).toContain('filtro adiadas');
+        expect(ctx.output()).toContain('Atuin');
+        expect(ctx.output()).not.toContain('Gum');
+        expect(ctx.output()).not.toContain('fzf');
+    });
+
+    it('explica filtro sem resultado sem emitir JSON bruto', () => {
+        const ctx = mockCtx();
+
+        cmdTerminal(ctx, 'libs detail inexistente');
+
+        expect(ctx.output()).toContain('inexistente não encontrou ferramenta ou grupo');
+        expect(ctx.output()).toContain('nenhuma ferramenta para este filtro');
+        expect(ctx.output()).not.toContain('"tools"');
     });
 
     it('emite JSON estruturado para LLMs e scripts', () => {
@@ -134,6 +167,24 @@ describe('terminal/commands/terminal', () => {
         });
         expect(parsed.available).toBe(2);
         expect(parsed.tools[0].id).toBe('fzf');
+    });
+
+    it('emite JSON filtrado preservando contadores globais e filtro explícito', () => {
+        const ctx = mockCtx();
+
+        cmdTerminal(ctx, 'libs json deferred');
+
+        const parsed = JSON.parse(ctx.output());
+        expect(parsed.available).toBe(2);
+        expect(parsed.filter).toMatchObject({
+            query: 'deferred',
+            label: 'adiadas',
+            active: true,
+            matched: true,
+            count: 1,
+        });
+        expect(parsed.tools).toHaveLength(1);
+        expect(parsed.tools[0].id).toBe('atuin');
     });
 
     it('atalho /libs encaminha para /terminal libs', () => {

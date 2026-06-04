@@ -161,7 +161,7 @@ function renderFullHelp({ injectPort, println }) {
         { command: '/who', description: 'atores e canais ativos' },
         { command: '/count', description: 'estatísticas da sessão' },
         { command: '/terminal libs', description: 'libs auxiliares opcionais, decisões de uso e fallbacks' },
-        { command: '/libs [detail|json|refresh]', description: 'atalho para inspecionar capacidades externas' },
+        { command: '/libs [detail|json|refresh] [filtro]', description: 'atalho para inspecionar capacidades externas por grupo ou tool' },
     ]);
     renderHelpSection(println, 'Conversa e controle', [
         { command: '/queue <msg>', description: 'guarda intervenção para a próxima pergunta humana' },
@@ -225,7 +225,8 @@ function renderFullHelp({ injectPort, println }) {
         { command: '/search <termo>', description: 'busca textual rápida no workspace' },
     ]);
     renderHelpSection(println, 'Previews e libs auxiliares', [
-        { command: '/terminal libs detail', description: 'mostra disponibilidade, política, riscos, fallbacks e exemplos' },
+        { command: '/terminal libs detail [filtro]', description: 'mostra disponibilidade, política, riscos, fallbacks e exemplos' },
+        { command: '/terminal libs deferred|fzf|bat|jq', description: 'filtros compactos por decisão, disponibilidade ou ferramenta' },
         { command: '/fs preview <path>', description: 'preview read-only com bat/batcat quando disponível; fallback JS' },
         { command: '/fs preview <path> --plain', description: 'força fallback textual JS, útil para comparar renderers' },
         { command: '/fs preview <path> --markdown', description: 'render Markdown com glow quando disponível; sem pager automático' },
