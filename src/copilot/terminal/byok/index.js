@@ -16,6 +16,10 @@ export {
     renderTerminalSdkProviderBinding,
 } from './session-binding.js';
 export {
+    recordTerminalLiveByokModelSwitchDeferred,
+    requestTerminalLiveByokModelSwitch,
+} from './live-model-switch.js';
+export {
     applyTerminalByokGatewayAutoEffects,
     buildTerminalByokGatewayAutoStatus,
     createTerminalByokGatewayAutoEffectApplicationRecords,

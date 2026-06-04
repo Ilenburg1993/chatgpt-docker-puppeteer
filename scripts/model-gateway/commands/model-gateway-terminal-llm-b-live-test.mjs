@@ -2516,9 +2516,12 @@ function defaultUxCycleCriteria(boot) {
     const waitsStart = plain.lastIndexOf('Esperas humanas');
     const byokStatusStart = plain.indexOf('BYOK status', Math.max(0, waitsStart));
     const byokModelCommandStart = plain.indexOf('/byok model terminal-ux-boundary-fixture', Math.max(0, byokStatusStart));
-    const byokAfterModelStart = byokModelCommandStart >= 0
-        ? plain.indexOf('BYOK status', byokModelCommandStart + 1)
-        : -1;
+    const byokModelStatusStart =
+        byokModelCommandStart >= 0 ? plain.indexOf('BYOK status', byokModelCommandStart + 1) : -1;
+    const byokModelActivityStart =
+        byokModelStatusStart >= 0 ? plain.indexOf('Atividade Atual da LLM-B', byokModelStatusStart + 1) : -1;
+    const byokAfterModelStart =
+        byokModelActivityStart >= 0 ? plain.indexOf('BYOK status', byokModelActivityStart + 1) : -1;
     const sessionSdkAfterByokStart = plain.indexOf('Sessão SDK', Math.max(0, byokAfterModelStart));
     const toolsStart = (() => {
         const populated = plain.indexOf('Ferramentas observadas');
@@ -2551,6 +2554,8 @@ function defaultUxCycleCriteria(boot) {
         waitsStart,
         byokStatusStart,
         byokModelCommandStart,
+        byokModelStatusStart,
+        byokModelActivityStart,
         byokAfterModelStart,
         sessionSdkAfterByokStart,
     ]
@@ -2585,8 +2590,10 @@ function defaultUxCycleCriteria(boot) {
     const usageSurface = surfaceAt(usageStart);
     const byokStatusSurface = surfaceAt(byokStatusStart);
     const byokModelCommandSurface = surfaceAt(byokModelCommandStart);
+    const byokModelStatusSurface = surfaceAt(byokModelStatusStart);
+    const byokModelActivitySurface = surfaceAt(byokModelActivityStart);
     const byokAfterModelSurface = surfaceAt(byokAfterModelStart);
-    const byokModelOutcomeSurface = `${byokModelCommandSurface}\n${byokAfterModelSurface}`;
+    const byokModelOutcomeSurface = `${byokModelCommandSurface}\n${byokModelStatusSurface}\n${byokModelActivitySurface}\n${byokAfterModelSurface}`;
     const sessionSdkAfterByokSurface = surfaceAt(sessionSdkAfterByokStart);
     const healthSurface = surfaceAt(healthStart);
     const toolsSurface = surfaceAt(toolsStart);
@@ -2621,6 +2628,8 @@ function defaultUxCycleCriteria(boot) {
         waitsStart,
         byokStatusStart,
         byokModelCommandStart,
+        byokModelStatusStart,
+        byokModelActivityStart,
         byokAfterModelStart,
         sessionSdkAfterByokStart,
     ];
@@ -2761,10 +2770,10 @@ function defaultUxCycleCriteria(boot) {
             id: 'ux-cycle-byok-boundary-human',
             pass:
                 /BYOK status[\s\S]*Preparada[\s\S]*Sessão viva[\s\S]*Fronteira/iu.test(byokStatusSurface) &&
-                (/(?:Sessão atual usa outro provedor\/perfil[\s\S]*modelo preparado para o próximo boot[\s\S]*sem troca cruzada na conversa viva)|(?:Modelo vivo[\s\S]*solicitado[\s\S]*Confirmar[\s\S]*modelo efetivo)/iu.test(
+                (/(?:Sessão atual usa outro provedor\/perfil[\s\S]*modelo preparado para o próximo boot[\s\S]*sem troca cruzada na conversa viva)|(?:Modelo vivo[\s\S]*solicitado[\s\S]*Confirmação[\s\S]*(?:session\.model_changed|modelo efetivo))/iu.test(
                     byokModelOutcomeSurface,
                 )) &&
-                /BYOK status[\s\S]*(seleção preparada cruza provedor ou perfil da sessão atual|seleção preparada e sessão BYOK atual estão alinhadas|modelo BYOK já confirmado na sessão atual|rota BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação|sem sessão SDK viva)/iu.test(
+                /BYOK status[\s\S]*(seleção preparada cruza provedor ou perfil da sessão atual|seleção preparada e sessão BYOK atual estão alinhadas|modelo preparado confirmado no runtime vivo; vínculo de boot original permanece até nova sessão|rota BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação|sem sessão SDK viva)/iu.test(
                     byokAfterModelSurface,
                 ) &&
                 /BYOK status[\s\S]*Rotina[\s\S]*Trocar[\s\S]*Provar[\s\S]*Avançado/iu.test(byokStatusSurface) &&
@@ -2775,6 +2784,25 @@ function defaultUxCycleCriteria(boot) {
                     `${byokStatusSurface}\n${byokModelOutcomeSurface}`,
                 ),
             detail: '/byok rendered compact routine/switch/probe/advanced guidance and /byok model kept prepared/live boundary human',
+        },
+        {
+            id: 'ux-cycle-byok-model-switch-request-confirmation',
+            pass:
+                /Modelo vivo\s+solicitado\s+[\s\S]{0,120}→\s*terminal-ux-boundary-fixture/iu.test(
+                    byokModelOutcomeSurface,
+                ) &&
+                /Confirmação\s+aguarde\s+session\.model_changed\s+ou próximo uso observado/iu.test(
+                    byokModelOutcomeSurface,
+                ) &&
+                /Atividade Atual da LLM-B[\s\S]*Troca de modelo solicitada/iu.test(byokModelActivitySurface) &&
+                /\[MODEL\?\][\s\S]{0,120}\/activity 10/iu.test(byokModelOutcomeSurface) &&
+                /modelo preparado confirmado no runtime vivo; vínculo de boot original permanece até nova sessão/iu.test(
+                    `${byokAfterModelSurface}\n${sessionSdkAfterByokSurface}`,
+                ) &&
+                !/modelo BYOK já confirmado na sessão atual/iu.test(
+                    `${byokAfterModelSurface}\n${sessionSdkAfterByokSurface}`,
+                ),
+            detail: '/byok model rendered request, model-check prompt, and precise runtime-vs-boot confirmation copy',
         },
         {
             id: 'ux-cycle-session-sdk-boundary-human',
@@ -2919,6 +2947,7 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
                 waitFor: /modelo preparado para o próximo boot|Modelo vivo[\s\S]*solicitado/u,
                 advanceAfterMs: 1_500,
             },
+            { line: '/activity 10', waitFor: 'Atividade Atual da LLM-B', advanceAfterMs: 1_500 },
             { line: '/byok', waitFor: 'BYOK status', advanceAfterMs: 1_500 },
             { line: '/session sdk 6', waitFor: 'Sessão SDK', advanceAfterMs: 1_500 },
             '/quit',

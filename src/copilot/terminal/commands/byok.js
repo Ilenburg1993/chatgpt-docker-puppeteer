@@ -113,7 +113,6 @@ import {
     readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
     readTerminalRuntimeState,
-    setTerminalModelProjection,
 } from '../frontend/index.js';
 import {
     applyTerminalByokGatewayAutoEffects,
@@ -124,6 +123,8 @@ import {
     isSameTerminalByokProviderBoundary,
     parseTerminalByokGatewayAutoArgs,
     persistTerminalByokGatewayAutoEffectApplications,
+    recordTerminalLiveByokModelSwitchDeferred,
+    requestTerminalLiveByokModelSwitch,
     runTerminalByokGatewayPostTurnAutomation,
 } from '../byok/index.js';
 import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeRows } from '../state/theme/index.js';
@@ -370,10 +371,20 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
         inventory = await listTerminalSdkSessionInventory();
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        recordTerminalLiveByokModelSwitchDeferred({
+            model,
+            reason: `sessão viva não inspecionada: ${message}; seleção fica para o próximo boot`,
+            source: 'terminal.byok_model',
+        });
         println(terminalThemeRow('Sessão viva', `não inspecionada · ${message}; seleção fica para o próximo boot`, { role: 'warn' }));
         return;
     }
     if (!inventory.currentSessionId || !isSameTerminalByokProviderBoundary(summary, inventory.persistedByokBinding)) {
+        recordTerminalLiveByokModelSwitchDeferred({
+            model,
+            reason: 'sessão atual usa outro provedor/perfil; seleção preparada para o próximo boot',
+            source: 'terminal.byok_model',
+        });
         println(
             terminalThemeRow(
                 'Troca modelo',
@@ -384,11 +395,32 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
         return;
     }
     try {
-        setTerminalModelProjection(model);
-        println(terminalThemeRow('Modelo vivo', `solicitado ${model}`, { role: 'success' }));
-        println(terminalThemeRow('Confirmar', 'provedor/perfil preservados; confira modelo efetivo no próximo turno/evento', { role: 'muted' }));
+        const request = requestTerminalLiveByokModelSwitch(model, {
+            source: 'terminal.byok_model',
+            reason: 'solicitação manual /byok model',
+        });
+        const transition =
+            request.previousModel && request.previousModel !== request.currentModel
+                ? `${request.previousModel} → ${request.currentModel}`
+                : request.currentModel;
+        println(terminalThemeRow('Modelo vivo', `solicitado ${transition}`, { role: 'success' }));
+        println(
+            terminalThemeRow(
+                'Confirmação',
+                'aguarde session.model_changed ou próximo uso observado para confirmar o modelo efetivo',
+                { role: 'muted' },
+            ),
+        );
+        if (request.reasoningAdjusted) {
+            println(terminalThemeRow('Raciocínio', `ajustado para ${request.currentReasoningEffort ?? 'off'}`, { role: 'warn' }));
+        }
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        recordTerminalLiveByokModelSwitchDeferred({
+            model,
+            reason: `falhou na sessão viva: ${message}; seleção fica para o próximo boot`,
+            source: 'terminal.byok_model',
+        });
         println(
             terminalThemeRow(
                 'Troca modelo',

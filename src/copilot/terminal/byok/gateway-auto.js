@@ -31,8 +31,8 @@ import {
 import {
     listTerminalSdkSessionInventory,
     scheduleTerminalSdkSessionBootSelection,
-    setTerminalModelProjection,
 } from '../frontend/index.js';
+import { requestTerminalLiveByokModelSwitch } from './live-model-switch.js';
 
 /**
  * @param {unknown} value
@@ -303,8 +303,17 @@ export async function applyTerminalByokGatewayAutoEffects(controllerStep) {
             continue;
         }
         if (effect['kind'] === 'set_live_model' && typeof effect['model'] === 'string' && effect['model'].trim()) {
-            setTerminalModelProjection(effect['model']);
-            applied.push({ ...effect, applied: true });
+            const request = requestTerminalLiveByokModelSwitch(effect['model'], {
+                source: 'terminal.byok_auto',
+                reason: 'automação model-gateway',
+            });
+            applied.push({
+                ...effect,
+                applied: true,
+                previousModel: request.previousModel,
+                currentModel: request.currentModel,
+                reasoningAdjusted: request.reasoningAdjusted,
+            });
             continue;
         }
         if (effect['kind'] === 'prepare_new_sdk_session') {

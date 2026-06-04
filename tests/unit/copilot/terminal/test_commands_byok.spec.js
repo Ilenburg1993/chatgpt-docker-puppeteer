@@ -1492,6 +1492,9 @@ const {
     runTerminalByokGatewayPostTurnAutomation,
     runTerminalByokGatewayPreTurnAutomation,
 } = await import('../../../../src/copilot/terminal/byok/gateway-auto.js');
+const { clearTerminalActivityHistory, readTerminalActivityHistory } = await import(
+    '../../../../src/copilot/terminal/state/activity-state.js'
+);
 
 const BASE_PROJECTION = Object.freeze({
     envKeys: Object.freeze(['COPILOT_BYOK_ENABLED', 'COPILOT_BYOK_PROFILE', 'KILO_API_KEY']),
@@ -1899,6 +1902,7 @@ describe('terminal /byok command', () => {
         scheduleTerminalSdkSessionBootSelection.mockReset();
         scheduleTerminalSdkSessionBootSelection.mockResolvedValue({ ok: true });
         setTerminalModelProjection.mockReset();
+        clearTerminalActivityHistory();
         writeFile.mockReset();
         delete process.env['COPILOT_BYOK_ENABLED'];
         delete process.env['COPILOT_BYOK_PROFILE'];
@@ -4406,15 +4410,34 @@ describe('terminal /byok command', () => {
             lastBootDecision: null,
             sessions: [],
         });
+        setTerminalModelProjection.mockReturnValueOnce({
+            previousModel: 'kilo-auto/free',
+            previousReasoningEffort: 'high',
+            currentModel: 'anthropic/claude-sonnet-4.5',
+            currentReasoningEffort: 'high',
+            reasoningAdjusted: false,
+            modelMeta: null,
+            binding: { hubSessionId: null, sdkSessionId: 'sdk-kilo' },
+            runtimeId: 'default',
+        });
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'model anthropic/claude-sonnet-4.5');
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('anthropic/claude-sonnet-4.5');
         expect(ctx.output()).toContain('Modelo vivo');
-        expect(ctx.output()).toContain('solicitado anthropic/claude-sonnet-4.5');
-        expect(ctx.output()).toContain('Confirmar');
-        expect(ctx.output()).toContain('provedor/perfil preservados');
+        expect(ctx.output()).toContain('solicitado kilo-auto/free → anthropic/claude-sonnet-4.5');
+        expect(ctx.output()).toContain('Confirmação');
+        expect(ctx.output()).toContain('session.model_changed');
+        expect(readTerminalActivityHistory(5)).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    label: 'Troca de modelo solicitada',
+                    detail: expect.stringContaining('kilo-auto/free → anthropic/claude-sonnet-4.5'),
+                    source: 'terminal.byok_model',
+                }),
+            ]),
+        );
     });
 
     it('não atravessa provider com setModel quando o binding BYOK vivo diverge', async () => {
@@ -4453,6 +4476,16 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('sessão atual usa outro provedor/perfil');
         expect(ctx.output()).toContain('sem troca cruzada na conversa viva');
         expect(ctx.output()).not.toContain('bound ao mesmo provider');
+        expect(readTerminalActivityHistory(5)).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    label: 'Troca de modelo adiada',
+                    detail: expect.stringContaining('anthropic/claude-sonnet-4.5'),
+                    source: 'terminal.byok_model',
+                    severity: 'warn',
+                }),
+            ]),
+        );
     });
 
     it('lista modelos descobertos automaticamente pelo provider', async () => {

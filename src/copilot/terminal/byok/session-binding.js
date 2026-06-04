@@ -118,8 +118,8 @@ export function classifyTerminalByokSdkBinding(summary, binding, currentSessionI
                     state: 'live-model-confirmed',
                     preparedLabel,
                     liveLabel,
-                    headline: 'modelo BYOK já confirmado na sessão atual',
-                    action: null,
+                    headline: 'modelo preparado confirmado no runtime vivo; vínculo de boot original permanece até nova sessão',
+                    action: '/session sdk next new atualiza o vínculo de boot quando você quiser materializar a seleção preparada',
                     sameProviderBoundary,
                 };
             }

@@ -62,8 +62,12 @@ describe('terminal/byok/session-binding', () => {
 
         expect(result.state).toBe('live-model-confirmed');
         expect(result.sameProviderBoundary).toBe(true);
-        expect(result.headline).toBe('modelo BYOK já confirmado na sessão atual');
-        expect(result.action).toBeNull();
+        expect(result.headline).toBe(
+            'modelo preparado confirmado no runtime vivo; vínculo de boot original permanece até nova sessão',
+        );
+        expect(result.action).toBe(
+            '/session sdk next new atualiza o vínculo de boot quando você quiser materializar a seleção preparada',
+        );
         expect(result.headline).not.toMatch(/\bbinding\b|provider-boundary|precisa de confirmação/u);
     });
 

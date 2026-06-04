@@ -8306,3 +8306,84 @@
   - quando o provider reparte o roundtrip em turnos distintos, a obrigação visual migra para a
     cobertura distribuída em linhas `Ações`/`Arquivos` recentes, sem exigir uma linha artificial
     única que não corresponda ao envelope real do SDK.
+
+### 12.80 Troca de modelo BYOK: intenção, adiamento e confirmação observada — 2026-06-04
+
+- [x] Auditoria do fluxo atual:
+  - `/byok model <id>` alterava a projeção local com `setTerminalModelProjection()` e imprimia
+    `Modelo vivo · solicitado <id>`;
+  - a confirmação real já existia em `session.model_changed`, que atualiza `lastPrInfo`, emite SSE
+    e grava confirmação no SQLite do model-gateway;
+  - o gap era a etapa intermediária: a solicitação/adiamento de troca não tinha unidade canônica,
+    nem registro histórico consistente para `/activity`;
+  - a automação `model-gateway auto` aplicava `set_live_model` por caminho próprio, repetindo a
+    mesma semântica sem reaproveitar a UX do comando manual.
+- [x] Decisão arquitetural:
+  - “solicitação de troca” e “confirmação observada” são eventos diferentes;
+  - a solicitação local não deve ocupar a linha viva permanente quando o modelo está ocioso, porque
+    a linha viva é reservada para trabalho em andamento da LLM-B;
+  - a solicitação deve entrar como histórico operacional (`/activity`) e stdout curto;
+  - a confirmação canônica continua sendo `session.model_changed`/uso observado, não uma promessa
+    feita pelo comando.
+- [x] Correção aplicada:
+  - criado `src/copilot/terminal/byok/live-model-switch.js`;
+  - `requestTerminalLiveByokModelSwitch()` centraliza `setTerminalModelProjection()` e registra
+    `Troca de modelo solicitada` com transição anterior → novo quando disponível;
+  - `recordTerminalLiveByokModelSwitchDeferred()` registra `Troca de modelo adiada` quando a sessão
+    viva não pode ser inspecionada ou cruza provedor/perfil;
+  - `/byok model` passou a usar essa unidade e a imprimir `Confirmação · aguarde
+    session.model_changed ou próximo uso observado`;
+  - `applyTerminalByokGatewayAutoEffects()` passou a usar a mesma unidade para efeitos
+    `set_live_model`.
+- [x] Contrato de UX:
+  - stdout humano mostra transição quando conhecida;
+  - `/activity` registra solicitação/adiamento sem poluir a linha viva;
+  - `session.model_changed` permanece como confirmação final observável em `/events`, SSE e SQLite;
+  - auto-switch e comando manual compartilham o mesmo vocabulário.
+- [x] Ciclo PTY dirigido executado:
+  - artefato:
+    `artifacts/terminal-live/byok-model-switch-ux-20260604-1844/summary.md`;
+  - `/byok model terminal-ux-boundary-fixture` mostrou `Modelo vivo · solicitado kilo-auto/free →
+    terminal-ux-boundary-fixture`;
+  - o prompt exibiu `[MODEL?]` enquanto havia divergência configurado/observado;
+  - após confirmação observada, `/byok` mostrou a transição do modelo e removeu o marcador de
+    divergência no prompt.
+- [x] Achado de precisão pós-ciclo:
+  - `/byok` dizia `modelo BYOK já confirmado na sessão atual`, mas a própria tela ainda mostrava
+    `Sessão viva ... modelo kilo-auto/free`;
+  - tecnicamente o runtime havia confirmado o modelo preparado, enquanto o vínculo SDK de boot
+    permanecia com o modelo original.
+- [x] Correção de linguagem aplicada:
+  - `live-model-confirmed` agora diz:
+    `modelo preparado confirmado no runtime vivo; vínculo de boot original permanece até nova sessão`;
+  - a ação sugerida passa a ser `/session sdk next new` apenas quando o operador quiser materializar
+    a seleção preparada no vínculo de boot.
+- [x] Ciclo PTY pós-correção:
+  - artefato:
+    `artifacts/terminal-live/byok-model-switch-ux-20260604-1846/summary.md`;
+  - status PASS;
+  - novo critério `ux-cycle-byok-model-switch-request-confirmation` passou;
+  - evidência visual:
+    `Modelo vivo · solicitado kilo-auto/free → terminal-ux-boundary-fixture`;
+  - evidência visual:
+    `Confirmação · aguarde session.model_changed ou próximo uso observado`;
+  - evidência visual:
+    `[MODEL?]` apareceu no prompt durante divergência transitória;
+  - evidência visual:
+    `modelo preparado confirmado no runtime vivo; vínculo de boot original permanece até nova sessão`
+    apareceu em `/byok` e `/session sdk`.
+- [x] Ciclo PTY reforçado com `/activity`:
+  - artefato:
+    `artifacts/terminal-live/byok-model-switch-ux-20260604-activity/summary.md`;
+  - status PASS;
+  - o comando `/activity 10` foi executado imediatamente após `/byok model
+    terminal-ux-boundary-fixture`;
+  - `ux-cycle-byok-model-switch-request-confirmation` agora valida:
+    solicitação visual, prompt `[MODEL?]`, timeline `Troca de modelo solicitada`, cópia de
+    confirmação runtime-vs-boot e ausência da frase antiga imprecisa.
+- [ ] Testar o fluxo com `/byok auto apply` em ciclo dirigido do terminal.
+- [x] Adicionar critério live dedicado para troca de modelo:
+  - solicitação aparece sem tomar o prompt;
+  - `/activity` mostra `Troca de modelo solicitada`;
+  - `session.model_changed`, quando emitido pelo SDK, aparece como confirmação;
+  - divergência modelo configurado/efetivo aparece em `/usage`/prompt sem ids técnicos desnecessários.
