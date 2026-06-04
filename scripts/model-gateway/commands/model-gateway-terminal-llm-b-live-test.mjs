@@ -1896,6 +1896,7 @@ async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, t
 }
 
 function diagnosticUxCycleCriteria(boot) {
+    const raw = String(boot?.raw ?? '');
     const plain = String(boot?.plain ?? '');
     const findPromptCommandStart = (command, from = 0) => {
         const promptStart = plain.indexOf(`› ${command}`, Math.max(0, from));
@@ -2058,8 +2059,8 @@ function diagnosticUxCycleCriteria(boot) {
         },
         {
             id: 'diagnostic-ux-no-fs-ansi',
-            pass: !/\\x1b\[|\[(?:LER|MOVER|ARQUIVO|OK|FALHA|TOOL|IO)\]/iu.test(plain),
-            detail: 'diagnostic cycle did not expose old ANSI literals or uppercase FS/tool badges',
+            pass: !/\\x1b\[|\[(?:LER|MOVER|ARQUIVO|OK|FALHA|TOOL|IO)\]/iu.test(plain) && !/\x1B\[;;/u.test(raw),
+            detail: 'diagnostic cycle did not expose old ANSI literals, malformed external-renderer ANSI or uppercase FS/tool badges',
         },
         {
             id: 'diagnostic-ux-no-old-intervention-jargon',
@@ -2098,7 +2099,7 @@ function diagnosticUxCycleCriteria(boot) {
                 /Diagnóstico do Terminal LLM-B[\s\S]*Agente[\s\S]*Atividade[\s\S]*Infraestrutura[\s\S]*Ferramentas por latência/iu.test(
                     healthFullSurface,
                 ) &&
-                !/╔|╚|\bAGENTE\b|\bINFRAESTRUTURA\b|TOOL STATS|TODOs PENDENTES|Status\s+idle|Modo SDK\s+interactive|Permissões\s+approve_all|Runtime alvo\s+default|Mapa runtime\s+[*-][^\n]*:[^\n]*\/|Linha viva\s+.*reserved|streaming on|tools on|Shadow idade|Shadow rest\.|conversation-hub\.store|local-fs-primary|[Ss]essão (?:runtime|SDK|hub)\s+(?:[a-z0-9_-]{8,}|.*…)|Hub storage\s+.*[Ss]essão\s+[a-z0-9_-]{8,}…|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/u.test(
+                !/╔|╚|\bAGENTE\b|\bINFRAESTRUTURA\b|TOOL STATS|TODOs PENDENTES|Status\s+idle|Modo SDK\s+interactive|Permissões\s+approve_all|Runtime alvo\s+default|Mapa runtime\s+[*-][^\n]*:[^\n]*\/|Lifecycle mx|sdk-preflight|Linha viva\s+.*reserved|streaming on|tools on|Shadow idade|Shadow rest\.|conversation-hub\.store|local-fs-primary|[Ss]essão (?:runtime|SDK|hub)\s+(?:[a-z0-9_-]{8,}|.*…)|Hub storage\s+.*[Ss]essão\s+[a-z0-9_-]{8,}…|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/u.test(
                     healthFullSurface,
                 ),
             detail: '/health full rendered themed sections with human status/mode labels instead of the old decorative ANSI box, raw constants, UUIDs or session ids',

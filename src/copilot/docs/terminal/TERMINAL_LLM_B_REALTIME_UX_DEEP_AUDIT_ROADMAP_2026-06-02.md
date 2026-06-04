@@ -4864,3 +4864,41 @@
 - [ ] Próxima lacuna: `/health full` ainda mostra `Lifecycle mx boot sdk-preflight`, e os
       previews Markdown via `glow` ainda podem emitir sequências ANSI estranhas em PTY
       (`ESC[;;1m`). Investigar sanitização/fallback antes de expandir mais o uso de libs.
+
+### 12.22 Health lifecycle e preview Markdown sem ANSI malformado
+
+- [x] Auditoria live: `/health full` ainda mostrava `Lifecycle mx boot sdk-preflight`, misturando
+      abreviação interna (`mx`) e ID de fase (`sdk-preflight`) em uma tela humana.
+- [x] Auditoria live: `/fs preview <arquivo.md> --markdown` com `glow` disponível renderizava o
+      conteúdo certo, mas vazava sequências ANSI malformadas no PTY (`ESC[;;1m`), poluindo a tela
+      como o operador realmente a vê.
+- [x] Decisão UX: comandos `full` continuam podendo ser técnicos, mas seus rótulos devem ser
+      legíveis. Métrica de lifecycle vira `Ciclo vida`; IDs de fase viram nomes humanos.
+- [x] Decisão técnica: renderer externo é enriquecimento opcional e não é confiável para output
+      terminal. O output deve ser sanitizado antes de entrar na superfície humana.
+- [x] Implementação: `cmdDiagnose` ganhou renderização de métrica de lifecycle:
+  - `Lifecycle mx` → `Ciclo vida`;
+  - `sdk-preflight` → `preflight SDK`;
+  - demais IDs técnicos passam por normalização de separadores.
+- [x] Implementação: `markdown-preview.js` sanitiza output de `glow` removendo ANSI/OSC antes de
+      truncar e imprimir.
+- [x] Implementação: o sanitizador foi exportado pelo barrel de capabilities para teste
+      determinístico sem depender de instalação local do `glow`.
+- [x] Harness live reforçado:
+  - `/health full` reprova se `Lifecycle mx` ou `sdk-preflight` voltarem;
+  - ciclo diagnóstico reprova se o raw do PTY voltar a conter `ESC[;;`, preservando ANSI normal do
+        tema.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/diagnose.js`.
+  - `node --check src/copilot/terminal/capabilities/markdown-preview.js`.
+  - `node --check src/copilot/terminal/capabilities/index.js`.
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx eslint src/copilot/terminal/commands/diagnose.js src/copilot/terminal/capabilities/markdown-preview.js src/copilot/terminal/capabilities/index.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_markdown_preview.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_markdown_preview.spec.js --testNamePattern "full|Markdown|ANSI|glow|fallback"`.
+- [x] Live PTY diagnóstica passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-health-glow-clean-20260603-2236`.
+  - Resultado observado: Markdown preview via `glow` ficou limpo; `/health full` exibiu
+        `Ciclo vida   boot preflight SDK · média ...`.
+- [ ] Próxima lacuna: revisar previews com `bat`/`delta` para decidir se ANSI externo deve ser
+      preservado, reduzido ou sanitizado por modo; hoje `bat` ainda colore a linha de preview,
+      o que é aceitável em TTY, mas deve ter política clara por superfície.

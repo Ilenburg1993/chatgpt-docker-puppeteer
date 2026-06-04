@@ -107,6 +107,38 @@ function renderDiagnosePermissionMode(value) {
     return 'seletivas';
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderDiagnoseLifecycleMetricLabel(value) {
+    const id = String(value ?? '').trim();
+    if (!id) return 'n/d';
+    if (id === 'sdk-preflight') return 'preflight SDK';
+    if (id === 'boot') return 'boot';
+    if (id === 'shutdown') return 'shutdown';
+    return id
+        .replace(/^terminal[._-]+/u, '')
+        .replace(/^bootstrap[._-]+/u, '')
+        .replace(/[._-]+/gu, ' ');
+}
+
+/**
+ * @param {{ id?: unknown; avgDurationMs?: unknown } | null} slowestBootPhase
+ * @param {{ name?: unknown; avgDurationMs?: unknown } | null} slowestShutdownHandler
+ * @returns {string}
+ */
+function renderDiagnoseLifecycleMetricsLine(slowestBootPhase, slowestShutdownHandler) {
+    if (!slowestBootPhase && !slowestShutdownHandler) return `${C.grey}n/d${C.reset}`;
+    const bootLine = slowestBootPhase
+        ? `boot ${renderDiagnoseLifecycleMetricLabel(slowestBootPhase.id)} · média ${slowestBootPhase.avgDurationMs ?? '?'}ms`
+        : 'boot n/d';
+    const shutdownLine = slowestShutdownHandler
+        ? `shutdown ${renderDiagnoseLifecycleMetricLabel(slowestShutdownHandler.name)} · média ${slowestShutdownHandler.avgDurationMs ?? '?'}ms`
+        : 'shutdown n/d';
+    return `${bootLine} ${C.grey}·${C.reset} ${shutdownLine}`;
+}
+
 const DISABLED_BYOK_SUMMARY = Object.freeze({
     enabled: false,
     ready: false,
@@ -247,10 +279,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const slowestBootPhase = bootMetrics[0] ?? null;
     const shutdownMetrics = lifecycle.shutdownMetrics ?? [];
     const slowestShutdownHandler = shutdownMetrics[0] ?? null;
-    const lifecycleMetricsLine =
-        slowestBootPhase || slowestShutdownHandler
-            ? `${slowestBootPhase ? `boot ${slowestBootPhase.id} · média ${slowestBootPhase.avgDurationMs}ms` : 'boot n/d'} ${C.grey}·${C.reset} ${slowestShutdownHandler ? `shutdown ${slowestShutdownHandler.name} · média ${slowestShutdownHandler.avgDurationMs}ms` : 'shutdown n/d'}`
-            : `${C.grey}n/d${C.reset}`;
+    const lifecycleMetricsLine = renderDiagnoseLifecycleMetricsLine(slowestBootPhase, slowestShutdownHandler);
     const keepaliveRunning = Boolean(health?.['checks']?.['io']?.['keepaliveRunning']);
     const keepaliveOk = Boolean(health?.['checks']?.['io']?.['ok']);
     const keepaliveLine = keepaliveRunning
@@ -378,7 +407,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     println(terminalThemeRow('Boot report', bootLine));
     println(terminalThemeRow('Shutdown', shutdownLine));
     println(terminalThemeRow('Timers', timerLine));
-    println(terminalThemeRow('Lifecycle mx', lifecycleMetricsLine));
+    println(terminalThemeRow('Ciclo vida', lifecycleMetricsLine));
     println(terminalThemeRow('Uptime', `${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s`));
     println(terminalThemeRow('Memória RSS', `${memMB}MB`, { role: memMB > 400 ? 'warn' : 'muted' }));
     println(terminalThemeRow('Rota SDK/FS', `${renderDiagnoseSdkFsRouteMode(sdkFsRouting.mode)} · ${sdkFsRouting.reason}`, { role: sdkFsRouting.mode === 'local-fs-primary' ? 'success' : sdkFsRouting.mode === 'sdk-workspace-only' ? 'warn' : 'error' }));

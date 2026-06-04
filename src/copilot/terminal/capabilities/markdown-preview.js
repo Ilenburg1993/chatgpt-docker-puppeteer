@@ -23,6 +23,12 @@ import { readTerminalExternalToolCapabilities } from './external-tools.js';
 
 const MAX_MARKDOWN_PREVIEW_BYTES = 192 * 1024;
 const MAX_MARKDOWN_PREVIEW_CHARS = 24_000;
+const ESC = String.fromCharCode(27);
+const BEL = String.fromCharCode(7);
+const ANSI_ESCAPE_PATTERN = new RegExp(
+    `${ESC}(?:\\[[0-?]*[ -/]*[@-~]|\\][^${BEL}]*(?:${BEL}|${ESC}\\\\)|[@-Z\\\\-_])`,
+    'gu',
+);
 
 /**
  * @param {string} text
@@ -35,6 +41,14 @@ function truncateMarkdownPreview(text, max = MAX_MARKDOWN_PREVIEW_CHARS) {
         output: `${text.slice(0, max)}\n... (${text.length - max} caracteres omitidos)`,
         truncated: true,
     };
+}
+
+/**
+ * @param {string} text
+ * @returns {string}
+ */
+export function sanitizeTerminalMarkdownPreviewOutput(text) {
+    return text.replace(ANSI_ESCAPE_PATTERN, '').replace(/\r(?!\n)/gu, '\n');
 }
 
 /**
@@ -83,7 +97,7 @@ export function renderTerminalMarkdownPreview(markdown, options = {}) {
         const reason = result.error?.message || String(result.stderr || '').trim() || 'glow falhou';
         return jsFallback(reason);
     }
-    const rendered = truncateMarkdownPreview(String(result.stdout ?? ''));
+    const rendered = truncateMarkdownPreview(sanitizeTerminalMarkdownPreviewOutput(String(result.stdout ?? '')));
     return {
         output: rendered.output,
         renderer: 'glow',

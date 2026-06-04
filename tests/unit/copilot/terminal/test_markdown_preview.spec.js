@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { renderTerminalMarkdownPreview } from '../../../../src/copilot/terminal/capabilities/index.js';
+import {
+    renderTerminalMarkdownPreview,
+    sanitizeTerminalMarkdownPreviewOutput,
+} from '../../../../src/copilot/terminal/capabilities/index.js';
 
 describe('terminal/capabilities/markdown-preview', () => {
     it('renderiza Markdown em fallback JS quando glow é desativado', () => {
@@ -25,5 +28,12 @@ describe('terminal/capabilities/markdown-preview', () => {
 
         expect(preview.truncated).toBe(true);
         expect(preview.output).toContain('caracteres omitidos');
+    });
+
+    it('remove ANSI malformado de renderer externo', () => {
+        const output = sanitizeTerminalMarkdownPreviewOutput('\x1b[;;1mTítulo\x1b[0m\rcontinua');
+
+        expect(output).toBe('Título\ncontinua');
+        expect(output).not.toContain('\x1b[');
     });
 });

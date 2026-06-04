@@ -334,7 +334,9 @@ describe('commands/diagnose', () => {
             expect(output).toContain('Boot report');
             expect(output).toContain('Shutdown');
             expect(output).toContain('Timers');
-            expect(output).toContain('Lifecycle mx');
+            expect(output).toContain('Ciclo vida');
+            expect(output).not.toContain('Lifecycle mx');
+            expect(output).not.toContain('sdk-preflight');
             expect(output).toContain('Rota SDK/FS');
             expect(output).not.toContain('sdk↔fs route');
             expect(output).not.toContain('local-fs-primary');
