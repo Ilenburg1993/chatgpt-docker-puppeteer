@@ -2594,16 +2594,19 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-sdk-capabilities-human',
             pass:
-                /Capacidades SDK[\s\S]*UI[\s\S]*Tools[\s\S]*Plano[\s\S]*Retorno/iu.test(sdkCapabilitiesSurface) &&
-                !/SDK Capabilities|\[OK\]|\[ERR\]/iu.test(sdkCapabilitiesSurface),
-            detail: '/sdk capabilities rendered a themed human panel instead of the legacy heading',
+                /Capacidades SDK[\s\S]*UI[\s\S]*Tools[\s\S]*Plano[\s\S]*Detalhe\s+\/sdk capabilities detail/iu.test(
+                    sdkCapabilitiesSurface,
+                ) && !/(?:^|\n)\s*SDK Capabilities\b|\[OK\]|\[ERR\]|\bRetorno\b|\{\s*"ui"/u.test(sdkCapabilitiesSurface),
+            detail: '/sdk capabilities rendered a themed human panel without raw JSON in the default surface',
         },
         {
             id: 'ux-cycle-workspace-human',
             pass:
-                /Workspace SDK virtual[\s\S]*(Arquivo|Retorno)[\s\S]*Uso\s+\/workspace list/iu.test(workspaceSurface) &&
-                !/\[OK\]|\[ERR\]|SDK→FS|FS→SDK|\n\s+\/workspace promote <localPath>/iu.test(workspaceSurface),
-            detail: '/workspace list rendered a themed SDK workspace panel',
+                /Workspace SDK virtual[\s\S]*(Arquivo|Estado)[\s\S]*Uso\s+\/workspace list/iu.test(workspaceSurface) &&
+                !/\[OK\]|\[ERR\]|SDK→FS|FS→SDK|\bRetorno\b|\{\s*"files"|\n\s+\/workspace promote <localPath>/iu.test(
+                    workspaceSurface,
+                ),
+            detail: '/workspace list rendered a themed SDK workspace panel without raw JSON in the default surface',
         },
         {
             id: 'ux-cycle-live-compact',

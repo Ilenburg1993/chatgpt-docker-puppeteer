@@ -6875,3 +6875,37 @@
   - Artefato: `artifacts/terminal-live/2026-06-04T08-52-31-421Z/summary.md`.
   - Resultado: PASS em 19/19 critérios; `/status`, `/now`, `/health`, `/sdk` e prompt convergiram
     para `kilo-auto/free`.
+
+### 12.56 SDK capabilities e workspace sem JSON bruto no default
+
+- [x] Achado live:
+  - `/sdk capabilities` mostrava painel humano, mas terminava com `Retorno { "ui": ... }`,
+    poluindo a superfície default com contrato bruto;
+  - `/workspace list`, quando o workspace SDK virtual estava vazio, mostrava `Retorno { "files": [] }`,
+    em vez de explicar o estado vazio para o operador.
+- [x] Decisão UX:
+  - superfícies default devem ser legíveis e operacionais;
+  - contratos JSON continuam disponíveis por opção explícita (`detail`, `--raw`, `--json`), nunca como
+    fallback visual default em telas canônicas;
+  - workspace SDK virtual deve lembrar sua fronteira com o FS local quando estiver vazio.
+- [x] Correção aplicada:
+  - `/sdk capabilities` default remove `Retorno` bruto e mostra `Detalhe /sdk capabilities detail · /sdk doctor · /sdk waits`;
+  - `/sdk capabilities detail` preserva o JSON bruto para auditoria;
+  - `/workspace list` default mostra `Estado nenhum arquivo no workspace SDK virtual` e `Escopo SDK virtual separado do FS local`;
+  - `/workspace list --raw` preserva o retorno bruto.
+- [x] Testes focados:
+  - `test_commands_sdk.spec.js` cobre `/sdk capabilities` default sem `Retorno`/`"ui"` e detail com `Retorno`;
+  - `test_commands_sdk.spec.js` cobre `/workspace list` com arquivos, vazio sem `Retorno` e vazio com `--raw`.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/commands/sdk.js tests/unit/copilot/terminal/test_commands_sdk.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js --hookTimeout=30000`.
+  - `npx eslint src/copilot/terminal/commands/sdk.js tests/unit/copilot/terminal/test_commands_sdk.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Harness live reforçado:
+  - `ux-cycle-sdk-capabilities-human` falha se `/sdk capabilities` default voltar a mostrar
+    `Retorno`, `{ "ui": ... }`, `[OK]`, `[ERR]` ou heading legado;
+  - `ux-cycle-workspace-human` falha se `/workspace list` default voltar a mostrar `Retorno`
+    ou `{ "files": ... }`.
+- [x] Live PTY de confirmação:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-sdk-workspace-no-raw-json-pass-20260604 --timeout-ms 120000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T08-57-38-850Z/summary.md`.
+  - Resultado: PASS em 19/19 critérios; os dois painéis default ficaram sem JSON bruto.

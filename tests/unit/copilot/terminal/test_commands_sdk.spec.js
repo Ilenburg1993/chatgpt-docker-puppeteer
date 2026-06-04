@@ -284,8 +284,16 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('Capacidades SDK');
         expect(ctx.output()).toContain('formulários sim');
         expect(ctx.output()).toContain('workspace sim');
+        expect(ctx.output()).toContain('/sdk capabilities detail');
+        expect(ctx.output()).not.toContain('Retorno');
+        expect(ctx.output()).not.toContain('"ui"');
         expect(ctx.output()).not.toContain('elicitation=true');
         expect(ctx.output()).not.toContain('workspace=true');
+
+        const detail = mockCtx();
+        await cmdSdk({ println: detail.println }, 'capabilities detail');
+        expect(detail.output()).toContain('Retorno');
+        expect(detail.output()).toContain('"ui"');
     });
 
     it('/sdk doctor valida roteamento entre workspace SDK e FS canônico', async () => {
@@ -546,6 +554,19 @@ describe('terminal/commands/sdk', () => {
         await cmdWorkspace({ println: list.println }, 'list');
         expect(list.output()).toContain('Workspace SDK virtual');
         expect(list.output()).toContain('plan.md');
+        expect(list.output()).not.toContain('Retorno');
+
+        runtimeMocks.listTerminalSdkWorkspaceFiles.mockResolvedValueOnce({ files: [] });
+        const emptyList = mockCtx();
+        await cmdWorkspace({ println: emptyList.println }, 'list');
+        expect(emptyList.output()).toContain('nenhum arquivo no workspace SDK virtual');
+        expect(emptyList.output()).not.toContain('Retorno');
+
+        runtimeMocks.listTerminalSdkWorkspaceFiles.mockResolvedValueOnce({ files: [] });
+        const rawList = mockCtx();
+        await cmdWorkspace({ println: rawList.println }, 'list --raw');
+        expect(rawList.output()).toContain('Retorno');
+        expect(rawList.output()).toContain('"files"');
 
         const read = mockCtx();
         await cmdWorkspace({ println: read.println }, 'read plan.md');

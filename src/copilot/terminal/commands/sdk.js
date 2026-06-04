@@ -1049,9 +1049,10 @@ function renderSdkSimulate({ println }, rest) {
 /**
  * @param {CommandContext} ctx
  * @param {string | null | undefined} runtimeId
+ * @param {{ detail?: boolean }} [options]
  * @returns {void}
  */
-function renderSdkCapabilitiesSummary({ println }, runtimeId) {
+function renderSdkCapabilitiesSummary({ println }, runtimeId, options = {}) {
     const capabilities = callWithRuntimeTarget(getTerminalSdkSessionCapabilities, runtimeId);
     const caps = objectOrNull(capabilities) ?? {};
     const ui = objectOrNull(caps['ui']) ?? {};
@@ -1079,7 +1080,11 @@ function renderSdkCapabilitiesSummary({ println }, runtimeId) {
             `leitura ${availableLabel(plan['read'])} · escrita ${availableLabel(plan['write'])} · remoção ${availableLabel(plan['delete'])}`,
         ),
     );
-    println(terminalThemeRow('Retorno', pretty(capabilities, 1200)));
+    if (options.detail) {
+        println(terminalThemeRow('Retorno', pretty(capabilities, 1200)));
+    } else {
+        println(terminalThemeRow('Detalhe', '/sdk capabilities detail · /sdk doctor · /sdk waits', { role: 'command' }));
+    }
     println('');
 }
 
@@ -1139,7 +1144,9 @@ export async function cmdSdk({ println }, arg = '') {
         } else if (sub === 'doctor') {
             await renderSdkDoctor({ println }, runtimeId);
         } else if (sub === 'capabilities' || sub === 'caps') {
-            renderSdkCapabilitiesSummary({ println }, runtimeId);
+            renderSdkCapabilitiesSummary({ println }, runtimeId, {
+                detail: rest.includes('detail') || rest.includes('--detail') || rest.includes('raw') || rest.includes('--raw'),
+            });
         } else if (sub === 'headers') {
             renderSdkRequestHeadersSummary({ println }, rest);
         } else if (sub === 'waits') {
@@ -1795,6 +1802,7 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
 export async function cmdWorkspace({ println }, arg = '') {
     const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
     const [sub = 'list', ...rest] = cleanArg.trim().split(/\s+/).filter(Boolean);
+    const rawOutput = rest.includes('--raw') || rest.includes('raw') || rest.includes('--json') || rest.includes('json');
     try {
         if (sub === 'read') {
             const path = rest.join(' ').trim();
@@ -1989,7 +1997,7 @@ export async function cmdWorkspace({ println }, arg = '') {
             println('');
             println(
                 terminalThemeHeadline('fileRead', 'Workspace SDK virtual', [
-                    files.length ? `${files.length} arquivo(s)` : 'retorno bruto',
+                    files.length ? `${files.length} arquivo(s)` : 'vazio',
                 ]),
             );
             if (files.length > 0) {
@@ -1998,8 +2006,11 @@ export async function cmdWorkspace({ println }, arg = '') {
                     println(terminalThemeRow('Arquivo', String(f['path'] ?? f['name'] ?? file), { role: 'fileRead' }));
                 }
                 if (files.length > 80) println(terminalThemeRow('Omitidos', `${files.length - 80} arquivo(s)`));
-            } else {
+            } else if (rawOutput) {
                 println(terminalThemeRow('Retorno', pretty(result, 1500)));
+            } else {
+                println(terminalThemeRow('Estado', 'nenhum arquivo no workspace SDK virtual', { role: 'muted' }));
+                println(terminalThemeRow('Escopo', 'SDK virtual separado do FS local; use /fs list para o repositório'));
             }
             println(
                 terminalThemeRow('Uso', '/workspace list | read <path> | write <path> <content>', { role: 'command' }),
