@@ -6395,3 +6395,24 @@
 - [ ] Próxima frente UX: auditar `session.js`/`context.js` para `Sync Hub`, `Billing/modelo`,
       `Inject port`, `sessão SDK` e IDs completos no modo padrão, priorizando rotas que aparecem em
       `/status`, `/now`, `/session` e menu.
+
+### 12.48 Status/session/menu sem rótulos de dump
+
+- [x] Auditoria: `/status full` ainda tinha `Inject port`, `Billing/modelo`, `Boot`, `Shutdown`,
+      `handlers`, `Prompt digest`, `n/d` e atividade sem normalização; o menu ainda dizia
+      `Context window`.
+- [x] Decisão UX: `/status full` continua detalhado, mas não deve parecer dump de estrutura interna.
+      Labels humanos podem preservar dados operacionais, enquanto termos de implementação ficam em
+      rotas explicitamente técnicas.
+- [x] Correção aplicada: `session.js` passou a usar `Porta entrada`, `Cobrança/modelo`,
+      `Inicialização`, `Encerramento`, `rotinas`, `Prompt vinculado/sem vínculo`,
+      `sem leitura`/`sem amostra` e atividade humanizada via presenter de tools.
+- [x] Correção aplicada: `Sync Hub` virou `Sincronização` nos painéis de status/timeline; menu
+      passou de `Context window` para `Janela de contexto`.
+- [x] Teste unitário: `test_commands_session.spec.js` bloqueia `Billing/modelo`, `Prompt digest`,
+      `Inject port`, `Shutdown` e `handlers`, usando regex para colunas alinhadas.
+- [x] Validação escopada: `node --check`, `vitest` e `eslint` de `session.js`/`menu.js` e testes
+      associados passaram.
+- [ ] Próxima frente UX: auditar `context.js`, `git.js`, `workspace-index.js` e rotas BYOK longas
+      com ANSI manual, priorizando as que aparecem em lives ou no fluxo inicial antes do operador
+      enviar prompts.

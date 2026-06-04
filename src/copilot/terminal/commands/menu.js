@@ -183,7 +183,7 @@ export function buildTerminalSmartMenuEntries() {
             id: 'compact',
             label: 'Compactar contexto',
             commandLine: '/compact',
-            description: `Context window em ${(ctxUtil * 100).toFixed(0)}%`,
+            description: `Janela de contexto em ${(ctxUtil * 100).toFixed(0)}%`,
             hot: true,
         });
     }

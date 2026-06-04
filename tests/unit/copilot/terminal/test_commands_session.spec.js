@@ -466,17 +466,26 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('pergunta restaurada expirada');
         expect(ctx.output()).toContain('Perfil modelo');
         expect(ctx.output()).toContain('Runtime alvo');
-        expect(ctx.output()).toContain('Runtime alvo principal');
+        expect(ctx.output()).toMatch(/Runtime alvo\s+principal/u);
         expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('ativo principal · gpt-5-mini · ocioso');
         expect(ctx.output()).not.toContain('*default:gpt-5-mini/idle');
-        expect(ctx.output()).toContain('Billing/modelo');
+        expect(ctx.output()).toContain('Cobrança/modelo');
+        expect(ctx.output()).not.toContain('Billing/modelo');
         expect(ctx.output()).toContain('Último PR');
-        expect(ctx.output()).toContain('Prompt digest');
+        expect(ctx.output()).toContain('Prompt');
+        expect(ctx.output()).toContain('vinculado');
+        expect(ctx.output()).not.toContain('Prompt digest');
         expect(ctx.output()).toContain('Prompt frescor');
         expect(ctx.output()).toContain('binding ok');
         expect(ctx.output()).toContain('Ferramentas');
         expect(ctx.output()).not.toContain('tools load');
+        expect(ctx.output()).toContain('Porta entrada');
+        expect(ctx.output()).not.toContain('Inject port');
+        expect(ctx.output()).toContain('Inicialização');
+        expect(ctx.output()).toContain('Encerramento');
+        expect(ctx.output()).not.toContain('Shutdown');
+        expect(ctx.output()).not.toContain('handlers');
         expect(ctx.output()).toContain('Instruções');
         expect(ctx.output()).not.toContain('instr. load');
         expect(ctx.output()).toContain('Rota SDK/FS');
@@ -653,7 +662,7 @@ describe('commands/session — sync commands', () => {
     it('cmdStatus avisa quando o runtime solicitado cai em fallback para o default', () => {
         const ctx = mockCtx();
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime missing full');
-        expect(ctx.output()).toContain('Runtime alvo principal');
+        expect(ctx.output()).toMatch(/Runtime alvo\s+principal/u);
         expect(ctx.output()).toContain('runtime solicitado missing não encontrado');
     });
 

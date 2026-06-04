@@ -47,6 +47,7 @@ import {
     compactTerminalOperatorToolText,
     compactTerminalToolText,
     formatTerminalToolPathForOperator,
+    getTerminalHumanToolName,
     isTerminalInternalCallIdentifier,
 } from '../events/tool-activity-presenter.js';
 import {
@@ -349,6 +350,21 @@ function pluralPt(value, singular, plural) {
 function compactHumanTerminalText(value) {
     const text = typeof value === 'string' ? value : value == null ? '' : String(value);
     return compactTerminalOperatorToolText(text.replace(/\s+/gu, ' ').trim(), 120);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSessionActivityText(value) {
+    return compactHumanTerminalText(value)
+        .replace(/\b[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+\b/giu, (token) => {
+            const label = getTerminalHumanToolName(token);
+            return label === token ? token : label;
+        })
+        .replace(/^Executando tool\b/iu, 'Executando ferramenta')
+        .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
+        .replace(/^Tool falhou\b/iu, 'Ferramenta falhou');
 }
 
 /**
@@ -733,18 +749,18 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             : '';
     const bootLine = lifecycle.boot
         ? `${lifecycle.boot.status} · ${lifecycle.boot.phases} fases · ${lifecycle.boot.durationMs}ms${bootDetail}${lifecycle.boot.failedPhase ? ` · falha ${lifecycle.boot.failedPhase}` : ''}`
-        : 'n/d';
+        : 'sem amostra';
     const shutdownLine = lifecycle.shuttingDown
-        ? `em andamento · ${lifecycle.registeredShutdownHandlers} handlers`
+        ? `em andamento · ${lifecycle.registeredShutdownHandlers} rotinas`
         : lifecycle.shutdown
-          ? `${lifecycle.shutdown.status} · ${lifecycle.shutdown.handlers} handlers · ${lifecycle.shutdown.durationMs}ms${lifecycle.shutdown.failedHandler ? ` · falha ${lifecycle.shutdown.failedHandler}` : ''}`
-          : `parado · ${lifecycle.registeredShutdownHandlers} handlers registrados`;
+          ? `${lifecycle.shutdown.status} · ${lifecycle.shutdown.handlers} rotinas · ${lifecycle.shutdown.durationMs}ms${lifecycle.shutdown.failedHandler ? ` · falha ${lifecycle.shutdown.failedHandler}` : ''}`
+          : `parado · ${lifecycle.registeredShutdownHandlers} rotinas registradas`;
     const modelMeta = configProjection.modelMeta ?? configProjection.observedModelMeta;
     const autoPolicy = configProjection.autoModelPolicy;
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const autoPolicyLine =
         configProjection.currentModel === 'auto'
-            ? `preferido ${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade GitHub Copilot · último ${autoPolicy.observedModel ?? 'n/d'}`
+            ? `preferido ${autoPolicy.preferredModel}/${autoPolicy.preferredReasoningEffort} · autoridade GitHub Copilot · último ${autoPolicy.observedModel ?? 'sem leitura'}`
             : '';
     const byokLine = byok.enabled
         ? `${byok.ready ? 'pronto' : 'incompleto'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · autenticação ${renderTerminalAuthLabel(byok.auth)} · /byok`
@@ -799,7 +815,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
               ? 'recarregamento vivo'
               : promptIsStale === false
                 ? 'ok'
-                : 'n/d';
+                : 'sem leitura';
     const toolLoad = projection.toolLoad;
     const toolContract = toolLoad.toolContract;
     const instructionLoad = projection.instructionLoad;
@@ -829,7 +845,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         ),
     );
     println(terminalThemeRow('Esperas SDK', sdkInterruptions.length > 0 ? sdkInterruptions.join(' · ') : 'nenhuma'));
-    println(terminalThemeRow('UI SDK', `formulários ${uiElicitationFlag == null ? 'n/d' : uiElicitationFlag ? 'disponíveis' : 'indisponíveis'}`));
+    println(terminalThemeRow('UI SDK', `formulários ${uiElicitationFlag == null ? 'sem leitura' : uiElicitationFlag ? 'disponíveis' : 'indisponíveis'}`));
     println(terminalThemeRow('Modelo', `${snap['model']} · raciocínio ${effort}`));
     if (byokLine) println(terminalThemeRow('BYOK provedor', byokLine, { role: byok.ready ? 'success' : 'warn' }));
     println(terminalThemeRow('Modo SDK', renderLiveSdkMode(sdkMode)));
@@ -848,7 +864,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             `${renderTerminalTimelineSourceLabel(projection.timelineSource)} · ${projection.timelineAuthority} · ${renderTerminalTimelineReconciliationLabel(projection.timelineReconciliationStatus)} · ${projection.timelineTurnCount} turnos${timelineSyncLabel}`,
         ),
     );
-    println(terminalThemeRow('Prompt digest', promptBindingDigest ?? 'sem binding'));
+    println(terminalThemeRow('Prompt', promptBindingDigest ? 'vinculado' : 'sem vínculo'));
     println(terminalThemeRow('Prompt frescor', `${promptFreshnessLabel} · ${renderTerminalActionLabel(promptRecommendedAction)}`));
     println(
         terminalThemeRow(
@@ -882,11 +898,11 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             `${projection.turnCount} · persistidos ${projection.persistedTimelineTurnCount} · bridge ${projection.bridgeTurnCount} · live-tail ${projection.liveBridgeTailCount}`,
         ),
     );
-    println(terminalThemeRow('Inject port', String(projection.injectPort)));
-    println(terminalThemeRow('Atividade', `${activity.label}${activityProgress}`));
+    println(terminalThemeRow('Porta entrada', String(projection.injectPort)));
+    println(terminalThemeRow('Atividade', `${renderSessionActivityText(activity.label)}${activityProgress}`));
     println(terminalThemeRow('Origem', `${activity.phase} · ${activity.source}`));
-    println(terminalThemeRow('Boot', bootLine));
-    println(terminalThemeRow('Shutdown', shutdownLine));
+    println(terminalThemeRow('Inicialização', bootLine));
+    println(terminalThemeRow('Encerramento', shutdownLine));
     println(
         terminalThemeRow(
             'Display',
@@ -896,14 +912,14 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     println(terminalThemeRow('Último PR', modelBilling.at ?? 'sem consumo ainda'));
     println(
         terminalThemeRow(
-            'Billing/modelo',
+            'Cobrança/modelo',
             modelBilling.mismatch
                 ? `divergente · configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'}`
                 : `ok · ${modelBilling.displayModel}`,
             { role: modelBilling.mismatch ? 'error' : 'success' },
         ),
     );
-    println(terminalThemeRow('Custo último PR', modelBilling.cost == null ? 'n/d' : modelBilling.cost.toFixed(4)));
+    println(terminalThemeRow('Custo último PR', modelBilling.cost == null ? 'sem leitura' : modelBilling.cost.toFixed(4)));
     println(
         terminalThemeRow(
             'Perfil modelo',
@@ -1056,7 +1072,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     if (projection.timelineSyncStatus === 'scheduled' || projection.timelineSyncStatus === 'inflight') {
         println(
             terminalThemeRow(
-                'Sync Hub',
+                'Sincronização',
                 `${renderTerminalSyncStatusLabel(projection.timelineSyncStatus)} · ${projection.timelineSyncPendingCount} turnos pendentes para materializar no Hub`,
             ),
         );
@@ -1067,7 +1083,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
                 ? ` próxima tentativa ${formatTerminalTimeLabel(projection.timelineSyncNextRetryAt, { mode: 'dual' })}`
                 : '';
         println(
-            terminalThemeRow('Sync Hub', `falhou: ${projection.timelineSyncLastError ?? 'erro desconhecido'}${retryLabel}`, {
+            terminalThemeRow('Sincronização', `falhou: ${projection.timelineSyncLastError ?? 'erro desconhecido'}${retryLabel}`, {
                 role: 'warn',
             }),
         );
@@ -1153,8 +1169,8 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
             );
         }
         if (projection.activity?.label) {
-            const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
-            println(terminalThemeRow('Atividade', `${projection.activity.label}${detail}`));
+            const detail = projection.activity.detail ? ` · ${renderSessionActivityText(projection.activity.detail)}` : '';
+            println(terminalThemeRow('Atividade', `${renderSessionActivityText(projection.activity.label)}${detail}`));
         }
         if (projection.recommendedAction && projection.recommendedAction !== 'none') {
             println(terminalThemeRow('Próximo', renderTerminalActionLabel(projection.recommendedAction), { role: 'command' }));
@@ -1217,8 +1233,8 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         );
     }
     if (projection.activity?.label) {
-        const detail = projection.activity.detail ? ` · ${projection.activity.detail}` : '';
-        println(terminalThemeRow('Atividade', `${projection.activity.phase} · ${projection.activity.label}${detail}`));
+        const detail = projection.activity.detail ? ` · ${renderSessionActivityText(projection.activity.detail)}` : '';
+        println(terminalThemeRow('Atividade', `${projection.activity.phase} · ${renderSessionActivityText(projection.activity.label)}${detail}`));
     }
     if (projection.recommendedAction) {
         println(terminalThemeRow('Próximo', projection.recommendedAction, { role: 'command' }));
@@ -1442,12 +1458,12 @@ export function cmdHistory({ println }, n = 10) {
     if (timeline.sync.status === 'scheduled' || timeline.sync.status === 'inflight') {
         println(
             terminalThemeRow(
-                'Sync Hub',
+                'Sincronização',
                 `${renderTerminalSyncStatusLabel(timeline.sync.status)} · ${timeline.sync.pendingCount} turno(s) aguardando persistência`,
             ),
         );
     } else if (timeline.sync.status === 'failed') {
-        println(terminalThemeRow('Sync Hub', `falhou: ${timeline.sync.lastError ?? 'erro desconhecido'}.`, { role: 'warn' }));
+        println(terminalThemeRow('Sincronização', `falhou: ${timeline.sync.lastError ?? 'erro desconhecido'}.`, { role: 'warn' }));
     }
     println(terminalThemeDivider(64));
 }
