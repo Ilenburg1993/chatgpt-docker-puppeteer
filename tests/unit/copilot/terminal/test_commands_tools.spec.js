@@ -180,7 +180,7 @@ describe('commands/tools', () => {
         expect(diagCtx.output()).not.toContain('read_file_content');
         expect(diagCtx.output()).not.toContain('Nome técnico');
         expect(diagCtx.output()).not.toContain('tool técnico: read_file_content');
-        expect(diagCtx.output()).toContain('Classe');
+        expect(diagCtx.output()).toContain('Tipo');
         expect(diagCtx.output()).toContain('arquivo');
         expect(diagCtx.output()).not.toContain('tipo file');
         expect(diagCtx.output()).not.toContain('tipo: file');
@@ -251,7 +251,7 @@ describe('commands/tools', () => {
         expect(ctx.output()).not.toContain('io-engine.rg.search');
     });
 
-    it('traduz classe e categoria tool para ferramenta no diagnóstico humano', () => {
+    it('omite tipo ferramenta redundante e preserva categoria agregada no diagnóstico humano', () => {
         readTerminalToolStatsProjection.mockReturnValueOnce({
             stats: {
                 report_intent_local: { calls: 1, errors: 0, avgLatencyMs: 7 },
@@ -277,9 +277,11 @@ describe('commands/tools', () => {
 
         cmdTools({ println: ctx.println }, 'diag');
 
-        expect(ctx.output()).toContain('Classe');
+        expect(ctx.output()).not.toContain('Classe');
+        expect(ctx.output()).not.toContain('Tipo');
         expect(ctx.output()).toContain('ferramenta');
         expect(ctx.output()).toContain('Ferramenta');
+        expect(ctx.output()).not.toContain('Tipo          ferramenta');
         expect(ctx.output()).not.toContain('Classe        tool');
         expect(ctx.output()).not.toContain('\ntool');
     });
@@ -369,6 +371,7 @@ describe('commands/tools', () => {
         expect(output).not.toContain('req req-12345678…');
         expect(output).toContain('Intenção capturada');
         expect(output).not.toContain('report_intent_local');
+        expect(output).toMatch(/Alvo\s+src\/copilot\/file\.js/u);
         expect(output).toContain('concluída');
         expect(output).not.toContain('chamada call-1234567…');
         expect(output).not.toContain('requisição req-12345678…');

@@ -8769,3 +8769,25 @@
     terminou PASS, com `ux-no-durable-waiting-spam`, `ux-human-runtime-vocabulary`,
     `scenario-tool-exec_command-lifecycle`, `ask-user-visible`, `post-ask-final-visible`,
     `export-post-ask-final` e `no-terminal-errors`.
+
+### 12.92 `/tools diag` menos repetitivo e mais alinhado — 2026-06-04
+
+- [x] Achado live:
+  - `/tools diag` estava funcional, mas repetia `Classe ferramenta` para quase toda tool;
+  - linhas `Alvo` do lifecycle usavam largura diferente da linha principal, parecendo desalinhadas em
+    PTY;
+  - o diagnóstico humano ficava com ar de dump técnico apesar de já ter bons nomes de tool.
+- [x] Decisão UX:
+  - tipo/classe só aparece quando acrescenta informação;
+  - `tool` não precisa de linha própria em diagnóstico humano porque a própria seção já é de
+    ferramentas;
+  - detalhes de alvo seguem a mesma coluna visual das linhas de lifecycle.
+- [x] Implementação:
+  - `Classe` virou `Tipo`;
+  - `Tipo ferramenta` é omitido no modo `diag`;
+  - `Tipo` continua aparecendo para `file`, `io`, `terminal`, diagnóstico e no modo completo;
+  - `Alvo` em lifecycle usa a mesma largura da linha de tool.
+- [ ] Validação:
+  - [x] teste focado de `/tools`;
+  - [x] `node --check`/lint escopado;
+  - [ ] próxima live deve confirmar `/tools diag` sem `Classe ferramenta` repetido.
