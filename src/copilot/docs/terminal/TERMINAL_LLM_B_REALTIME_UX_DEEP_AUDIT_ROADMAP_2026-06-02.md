@@ -6206,6 +6206,14 @@
   - `artifacts/terminal-live/2026-06-04T05-58-09-623Z/summary.md` bloqueou por
     `assistant-ended-before-ask`; o modelo materializou deltas e encerrou antes de chamar
     `ask_user`, então não exercitou a correção pós-`SIM`.
-- [ ] Próxima frente UX: obter uma live canônica não-flaky após `parkTerminalPromptForContinuation()`
-      em que o modelo materialize `ask_user` e validar que `no-prompt-double-render` passa no trecho
-      pós-resposta humana.
+- [x] Live canônica pós-estacionamento do prompt:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-post-answer-prompt-parked-after-commit-20260605-0322 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T06-03-15-731Z/summary.md`.
+  - Resultado: `Status: PASS`; o terminal materializou `você[kilo-auto…/high][PERG]› SIM`,
+    imprimiu `Resposta enviada para pergunta pendente`, estacionou o prompt normal como
+    `LLM-B pensando` durante a continuação, materializou `POST-ASK-CANONICAL-FINAL: usuário
+    confirmou SIM` e passou `no-prompt-double-render`, `ask-user-input-prompt-visible`,
+    `post-ask-final-visible`, `no-terminal-errors`, export e correlação SSE.
+- [ ] Próxima frente UX: auditar a sincronização entre comandos injetados pelo harness e prompt
+      real, porque o log plain ainda mostra comandos como `/usage now` colados ao prompt em alguns
+      trechos; confirmar se é artefato de `script`/ANSI ou desalinhamento visível no terminal humano.
