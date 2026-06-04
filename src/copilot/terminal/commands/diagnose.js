@@ -379,9 +379,9 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     println(terminalThemeRow('Modo SDK', sdkModeLine));
     println(terminalThemeRow('Permissões', permissionLine));
     println(terminalThemeRow('Plan arquivo', planOpLine));
-    println(terminalThemeRow('Runtime alvo', renderDiagnoseRuntimeTarget(configProjection.runtimeId, detail)));
-    println(terminalThemeRow('Mapa runtime', runtimesLine));
-    println(terminalThemeRow('Sessão runtime', runtimeSessionLabel));
+    println(terminalThemeRow('Ambiente alvo', renderDiagnoseRuntimeTarget(configProjection.runtimeId, detail)));
+    println(terminalThemeRow('Mapa ambiente', runtimesLine));
+    println(terminalThemeRow('Sessão ambiente', runtimeSessionLabel));
     println(terminalThemeRow('Sessão SDK', sdkSessionLabel));
     println(terminalThemeRow('Sessão hub', hubSessionLabel));
     println(terminalThemeRow('Pergunta', askUserLine, { role: askUserLine === 'nenhum' ? 'muted' : 'question' }));
@@ -535,7 +535,7 @@ function renderDiagnoseRuntimeMap(runtimes, detail) {
  */
 function renderDiagnoseInlineStatusMode(value) {
     const mode = String(value ?? '').trim();
-    if (mode === 'reserved') return 'reservada';
+    if (mode === 'reserved') return 'acima do prompt';
     if (mode === 'inline') return 'em linha';
     if (mode === 'overlay') return 'sobreposta';
     if (mode === 'off' || mode === 'disabled') return 'desligada';
@@ -548,7 +548,7 @@ function renderDiagnoseInlineStatusMode(value) {
  */
 function renderDiagnoseInlineStatusSource(value) {
     const source = String(value ?? '').trim();
-    if (!source || source === 'default') return 'runtime principal';
+    if (!source || source === 'default') return 'ambiente principal';
     if (source === 'operator') return 'operador';
     if (source === 'runtime') return 'runtime';
     if (source === 'sdk') return 'SDK';

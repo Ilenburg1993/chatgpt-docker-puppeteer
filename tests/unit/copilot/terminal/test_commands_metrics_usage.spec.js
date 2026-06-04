@@ -351,7 +351,8 @@ describe('commands/metrics + usage', () => {
 
         cmdMetrics({ println: ctx.println }, '--runtime alt');
 
-        expect(ctx.output()).toContain('Runtime alvo');
+        expect(ctx.output()).toContain('Ambiente alvo');
+        expect(ctx.output()).not.toContain('Runtime alvo');
         expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');

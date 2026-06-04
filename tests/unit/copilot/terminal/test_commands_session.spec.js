@@ -465,8 +465,9 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toContain('sdk prompts=');
         expect(ctx.output()).toContain('pergunta restaurada expirada');
         expect(ctx.output()).toContain('Perfil modelo');
-        expect(ctx.output()).toContain('Runtime alvo');
-        expect(ctx.output()).toMatch(/Runtime alvo\s+principal/u);
+        expect(ctx.output()).toContain('Ambiente alvo');
+        expect(ctx.output()).toMatch(/Ambiente alvo\s+principal/u);
+        expect(ctx.output()).not.toContain('Runtime alvo');
         expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('ativo principal · gpt-5-mini · ocioso');
         expect(ctx.output()).not.toContain('*default:gpt-5-mini/idle');
@@ -652,18 +653,20 @@ describe('commands/session — sync commands', () => {
     it('cmdStatus aceita runtimeId explícito na sintaxe do REPL', () => {
         const ctx = mockCtx();
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime alt full');
-        expect(ctx.output()).toContain('Runtime alvo');
+        expect(ctx.output()).toContain('Ambiente alvo');
+        expect(ctx.output()).not.toContain('Runtime alvo');
         expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');
         expect(ctx.output()).toContain('retomar sessão');
     });
 
-    it('cmdStatus avisa quando o runtime solicitado cai em fallback para o default', () => {
+    it('cmdStatus avisa quando o ambiente solicitado cai em fallback para o default', () => {
         const ctx = mockCtx();
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime missing full');
-        expect(ctx.output()).toMatch(/Runtime alvo\s+principal/u);
-        expect(ctx.output()).toContain('runtime solicitado missing não encontrado');
+        expect(ctx.output()).toMatch(/Ambiente alvo\s+principal/u);
+        expect(ctx.output()).toContain('ambiente solicitado missing não encontrado');
+        expect(ctx.output()).not.toContain('runtime solicitado');
     });
 
     it('cmdHistory imprime histórico', () => {

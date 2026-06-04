@@ -297,7 +297,8 @@ describe('commands/diagnose', () => {
             expect(output).not.toContain('inspect_boot_report');
             expect(output).toContain('streaming ativo');
             expect(output).toContain('Linha viva');
-            expect(output).toContain('reservada');
+            expect(output).toContain('acima do prompt');
+            expect(output).not.toContain('reservada');
             expect(output).not.toContain('reserved');
             expect(lowerOutput).toContain('permiss');
             expect(output).toContain('Modo SDK');
@@ -312,16 +313,17 @@ describe('commands/diagnose', () => {
             expect(output).not.toContain('sdk prompts=');
             expect(lowerOutput).toContain('pergunta');
             expect(output).toContain('pergunta restaurada expirando');
-            expect(output).toContain('Runtime alvo');
+            expect(output).toContain('Ambiente alvo');
+            expect(output).not.toContain('Runtime alvo');
             expect(output).not.toContain('runtime id');
-            expect(output).toMatch(/Sessão runtime\s+ativa/u);
+            expect(output).toMatch(/Sessão ambiente\s+ativa/u);
             expect(output).toMatch(/Sessão SDK\s+ativa/u);
             expect(output).toMatch(/Sessão hub\s+ativo/u);
             expect(output).not.toContain('sdk-diagnose-1…');
             expect(output).not.toContain('hub-1');
             expect(output).not.toContain('sdk-diagnose-123456789012345');
             expect(output).not.toContain('hub-diagnose-123456789012345');
-            expect(output).toMatch(/Runtime alvo\s+principal/u);
+            expect(output).toMatch(/Ambiente alvo\s+principal/u);
             expect(output).toContain('principal · gpt-5 · trabalhando');
             expect(output).not.toContain('*default:gpt-5/processing');
             expect(output).not.toContain('default:gpt-5/processing');
@@ -403,7 +405,7 @@ describe('commands/diagnose', () => {
 
         await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, '--runtime alt full');
 
-        expect(ctx.output()).toContain('Runtime alvo');
+        expect(ctx.output()).toContain('Ambiente alvo');
         expect(ctx.output()).not.toContain('runtime id');
         expect(ctx.output()).toContain('alt');
         expect(ctx.output()).toContain('gpt-4.1-mini');
@@ -418,7 +420,7 @@ describe('commands/diagnose', () => {
         expect(ctx.output()).toContain('hub-detail-123456789012345');
     });
 
-    it('explica explicitamente quando o runtime solicitado não existe', async () => {
+    it('explica explicitamente quando o ambiente solicitado não existe', async () => {
         const ctx = mockCtx();
 
         await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, '--runtime missing full');

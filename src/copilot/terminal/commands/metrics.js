@@ -234,7 +234,7 @@ export function cmdMetrics({ println }, arg = '') {
     println(terminalThemeHeadline('command', 'Métricas da sessão'));
     println(terminalThemeDivider(52));
     println(terminalThemeRow('Sessão', sessionId, { role: 'muted' }));
-    println(terminalThemeRow('Runtime alvo', renderMetricRuntimeTarget(projection.runtimeId, detail), { role: 'muted' }));
+    println(terminalThemeRow('Ambiente alvo', renderMetricRuntimeTarget(projection.runtimeId, detail), { role: 'muted' }));
     println(terminalThemeRow('Sessão SDK', renderMetricBinding(binding.sdkSessionId, detail, 'ativa'), { role: 'muted' }));
     println(terminalThemeRow('Sessão hub', renderMetricBinding(binding.hubSessionId, detail, 'ativa'), { role: 'muted' }));
     println(terminalThemeRow('Status', humanMetricStatus(status), { role: 'info' }));

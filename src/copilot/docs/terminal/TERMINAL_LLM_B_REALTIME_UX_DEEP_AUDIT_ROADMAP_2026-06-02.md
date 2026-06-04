@@ -8532,3 +8532,27 @@
     `ux-question-wait-surface-human`, `ux-no-durable-tool-output-inside-question-prompt`,
     `ux-human-tool-names`, `ux-intent-command-default-human`, `ux-intent-command-detail-human-envelope`
     e `no-terminal-errors`.
+
+### 12.83 Vocabulário humano em health/status/diagnose/metrics — 2026-06-04
+
+- [x] Auditoria pós-live:
+  - o terminal já passava os critérios canônicos, mas `/health full` ainda exibiu
+    `Runtime alvo`, `Sessão runtime`, `Mapa runtime` e `Linha viva reservada`;
+  - esses termos eram tecnicamente corretos, mas ruins para o operador humano e desalinhados com a
+    meta de UX fluida.
+- [x] Correção aplicada:
+  - `/status full` passou a usar `Ambiente alvo`, `Sessão ambiente`, `Perfil ambiente` e
+    `Mapa ambiente`;
+  - aviso de fallback passou de `runtime solicitado ... usando runtime principal` para
+    `ambiente solicitado ... usando ambiente principal`;
+  - `/diagnose` passou a usar `Ambiente alvo`, `Sessão ambiente`, `Mapa ambiente`;
+  - modo visual `reserved` passou a renderizar `acima do prompt`;
+  - origem default da linha viva passou a renderizar `ambiente principal`;
+  - `/metrics` passou a usar `Ambiente alvo`;
+  - summary do runner live passou de `TTY inline/reserved status rendered` para
+    `TTY status line rendered above the prompt`.
+- [x] Contratos reforçados:
+  - testes de sessão/diagnóstico/métricas agora exigem `Ambiente alvo`;
+  - testes negam retorno de `Runtime alvo`, `runtime solicitado`, `reservada` e `reserved` nas
+    superfícies humanas;
+  - critério live de `/health full` rejeita `Runtime alvo` e `Linha viva reserved/reservada`.

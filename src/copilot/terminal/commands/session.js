@@ -863,10 +863,10 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     println(terminalThemeRow('Tarefas fundo', String(health?.['backgroundPendingCount'] ?? 0)));
     println(terminalThemeRow('Alertas', String(Array.isArray(health?.['issues']) ? health['issues'].length : 0)));
     println(terminalThemeRow('Próximo passo', renderTerminalActionLabel(projection.recommendedAction), { role: 'command' }));
-    println(terminalThemeRow('Sessão runtime', projection.runtimeSessionId ?? 'sem runtime'));
-    println(terminalThemeRow('Runtime alvo', renderRuntimeTargetLabel(projection.runtimeId)));
-    println(terminalThemeRow('Perfil runtime', projection.agentProfileId ?? 'sem perfil'));
-    println(terminalThemeRow('Mapa runtime', renderTerminalRuntimeTopologyLabel(projection.runtimeTopologyLabel)));
+    println(terminalThemeRow('Sessão ambiente', projection.runtimeSessionId ?? 'sem sessão'));
+    println(terminalThemeRow('Ambiente alvo', renderRuntimeTargetLabel(projection.runtimeId)));
+    println(terminalThemeRow('Perfil ambiente', projection.agentProfileId ?? 'sem perfil'));
+    println(terminalThemeRow('Mapa ambiente', renderTerminalRuntimeTopologyLabel(projection.runtimeTopologyLabel)));
     println(
         terminalThemeRow(
             'Timeline',
@@ -1064,7 +1064,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         println(
             terminalThemeRow(
                 'Nota',
-                `runtime solicitado ${requestedRuntimeLabel} não encontrado; usando runtime principal (${renderRuntimeTargetLabel(projection.runtimeId)}).`,
+                `ambiente solicitado ${requestedRuntimeLabel} não encontrado; usando ambiente principal (${renderRuntimeTargetLabel(projection.runtimeId)}).`,
                 { role: 'warn' },
             ),
         );
