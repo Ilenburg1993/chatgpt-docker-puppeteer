@@ -4736,5 +4736,27 @@
 - [x] Live PTY diagnóstica passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-health-no-session-ids-20260603-2124`.
   - Resultado: PASS em 29/29 critérios; `/health full` mostrou `sessão ativa` sem IDs de sessão.
-- [ ] Próxima lacuna: revisar `Timers`, `Mapa runtime`, `Runtime alvo` e `/session` para remover
-      os últimos resíduos técnicos das telas humanas sem perder diagnóstico nos modos detalhados.
+- [x] Continuação de UX: `Runtime alvo`, `Mapa runtime`, `Display`, `Linha viva`, `Timers`,
+      `MCP bridge` e `Rota SDK/FS` passaram a usar rótulos humanos no modo `full`:
+  - `default` → `principal`;
+  - `*default:model/status` → `principal · modelo · estado`;
+  - `reserved` → `reservada`;
+  - `on/off` → `ativo/inativo`;
+  - `conversation-hub.store.checkpoint:<id>` → `checkpoint do hub`;
+  - `local-fs-primary` → `arquivos locais primeiro`;
+  - `tools` → `ferramentas`.
+- [x] Harness live reforçado novamente: `/health full` agora reprova se voltarem
+      `Runtime alvo default`, mapa cru de runtime, `reserved`, `streaming on`, `tools on`,
+      `Shadow idade`, `Shadow rest.`, `conversation-hub.store` ou `local-fs-primary`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/diagnose.js`.
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx eslint src/copilot/terminal/commands/diagnose.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js`.
+- [x] Live PTY diagnóstica repetida passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-health-human-infra-20260603-2136`.
+  - Resultado: PASS em 29/29 critérios; `/health full` ficou com infraestrutura humana e sem
+        IDs/constantes cruas na superfície principal.
+- [ ] Próxima lacuna: revisar boot/banner inicial, `/live full` e `/session` porque a live ainda
+      mostra `Fluxo local-fs-primary`, `Runtime default` e `Timeline persistent only` fora de
+      `/health full`.

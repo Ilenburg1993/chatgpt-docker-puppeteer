@@ -292,9 +292,10 @@ describe('commands/diagnose', () => {
             expect(output).toContain('Executando tool');
             expect(output).toContain('verificar relatório de inicialização');
             expect(output).not.toContain('inspect_boot_report');
-            expect(output).toContain('streaming on');
+            expect(output).toContain('streaming ativo');
             expect(output).toContain('Linha viva');
-            expect(output).toContain('reserved');
+            expect(output).toContain('reservada');
+            expect(output).not.toContain('reserved');
             expect(lowerOutput).toContain('permiss');
             expect(output).toContain('Modo SDK');
             expect(output).toContain('interativo');
@@ -317,7 +318,10 @@ describe('commands/diagnose', () => {
             expect(output).not.toContain('hub-1');
             expect(output).not.toContain('sdk-diagnose-123456789012345');
             expect(output).not.toContain('hub-diagnose-123456789012345');
-            expect(output).toContain('*default:gpt-5/processing');
+            expect(output).toContain('Runtime alvo principal');
+            expect(output).toContain('principal · gpt-5 · trabalhando');
+            expect(output).not.toContain('*default:gpt-5/processing');
+            expect(output).not.toContain('default:gpt-5/processing');
             expect(output).toContain('Gateway');
             expect(output).toContain('1 provedor');
             expect(output).toContain('3 modelos');
@@ -333,6 +337,8 @@ describe('commands/diagnose', () => {
             expect(output).toContain('Lifecycle mx');
             expect(output).toContain('Rota SDK/FS');
             expect(output).not.toContain('sdk↔fs route');
+            expect(output).not.toContain('local-fs-primary');
+            expect(output).not.toContain('streaming on');
             expect(output).not.toContain('degraded');
             expect(output).toContain('Ler arquivo');
             expect(output).toContain('Intenção capturada');
