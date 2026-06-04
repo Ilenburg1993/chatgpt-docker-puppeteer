@@ -405,7 +405,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             log('WARN', `[TerminalServer] cleanup de listeners falhou: ${toError(e).message}`);
         } finally {
             setRl(null);
-            println('[terminal] readline fechado. Inject server continua ativo.');
+            println(terminalThemeRow('Terminal', 'fechado; HTTP local permanece ativo até o processo encerrar'));
             log('INFO', '[TerminalServer] readline encerrado.');
         }
     });

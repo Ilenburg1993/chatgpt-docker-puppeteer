@@ -106,6 +106,14 @@ function hasCommand(name) {
     return result.status === 0;
 }
 
+const HUMAN_TERMINAL_SHUTDOWN_RE = /Terminal\s+fechado; HTTP local permanece ativo até o processo encerrar/u;
+const LEGACY_TERMINAL_SHUTDOWN_RE = /\[terminal\]\s+(?:readline fechado|Encerrando sessão)/iu;
+
+function hasHumanTerminalShutdownCopy(plain) {
+    const text = String(plain ?? '');
+    return HUMAN_TERMINAL_SHUTDOWN_RE.test(text) && !LEGACY_TERMINAL_SHUTDOWN_RE.test(text);
+}
+
 function canListenOnPort(port, host = '127.0.0.1') {
     return new Promise((resolve) => {
         const server = net.createServer();
@@ -1625,8 +1633,8 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-clean-close',
-            pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
-            detail: 'terminal closed cleanly after structured input cycle',
+            pass: boot.exitCode === 0 && hasHumanTerminalShutdownCopy(plain),
+            detail: 'terminal closed cleanly after structured input cycle with human shutdown copy',
         },
     ];
 }
@@ -1721,8 +1729,8 @@ function menuCycleCriteria(boot) {
         },
         {
             id: 'menu-cycle-clean-close',
-            pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
-            detail: 'terminal closed cleanly after menu cycle',
+            pass: boot.exitCode === 0 && hasHumanTerminalShutdownCopy(plain),
+            detail: 'terminal closed cleanly after menu cycle with human shutdown copy',
         },
     ];
 }
@@ -1805,8 +1813,8 @@ function pickerInteractiveCycleCriteria(boot) {
         },
         {
             id: 'picker-interactive-clean-close',
-            pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
-            detail: 'terminal closed cleanly after interactive picker cycle',
+            pass: boot.exitCode === 0 && hasHumanTerminalShutdownCopy(plain),
+            detail: 'terminal closed cleanly after interactive picker cycle with human shutdown copy',
         },
     ];
 }
@@ -2308,8 +2316,8 @@ function diagnosticUxCycleCriteria(boot) {
         },
         {
             id: 'diagnostic-ux-clean-close',
-            pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
-            detail: 'terminal closed cleanly after diagnostic UX cycle',
+            pass: boot.exitCode === 0 && hasHumanTerminalShutdownCopy(plain),
+            detail: 'terminal closed cleanly after diagnostic UX cycle with human shutdown copy',
         },
     ];
 }
@@ -2611,9 +2619,16 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-sdk-human',
             pass:
-                /SDK do Terminal[\s\S]*Sessão[\s\S]*Modelo[\s\S]*Esperas[\s\S]*Uso\s+\/sdk models/iu.test(sdkSurface) &&
-                !/SDK do Terminal[\s\S]*(reasoning=|restante=|\[OK\]|\[ERR\])/iu.test(sdkSurface),
-            detail: '/sdk default rendered a themed operations panel without raw key-value counters',
+                /SDK do Terminal[\s\S]*Sessão[\s\S]*Modelo[\s\S]*Esperas[\s\S]*Modelos\s+\/sdk models/iu.test(
+                    sdkSurface,
+                ) &&
+                /Skills\s+\/sdk skills[\s\S]*Rotina\s+\/sdk quota[\s\S]*Headers\s+\/sdk headers[\s\S]*Simular\s+\/sdk simulate/iu.test(
+                    sdkSurface,
+                ) &&
+                !/SDK do Terminal[\s\S]*(reasoning=|restante=|\[OK\]|\[ERR\]|\n\s{14,}\/sdk skills|\n\s{14,}\/sdk quota|\n\s{14,}\/sdk headers)/iu.test(
+                    sdkSurface,
+                ),
+            detail: '/sdk default rendered a themed operations panel with named command rows instead of raw counters or anonymous continuations',
         },
         {
             id: 'ux-cycle-sdk-capabilities-human',
@@ -2626,11 +2641,16 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-workspace-human',
             pass:
-                /Workspace SDK virtual[\s\S]*(Arquivo|Estado)[\s\S]*Uso\s+\/workspace list/iu.test(workspaceSurface) &&
-                !/\[OK\]|\[ERR\]|SDK→FS|FS→SDK|\bRetorno\b|\{\s*"files"|\n\s+\/workspace promote <localPath>/iu.test(
+                /Workspace SDK virtual[\s\S]*(Arquivo|Estado)[\s\S]*Listar\s+\/workspace list[\s\S]*Sync\s+\/workspace sync[\s\S]*Mirror\s+\/workspace mirror[\s\S]*Promover\s+\/workspace promote/iu.test(
+                    workspaceSurface,
+                ) &&
+                /Contrato\s+list\/read\/write ficam no workspace SDK virtual[\s\S]*Materializar\s+sync\/mirror copiam SDK para FS local/iu.test(
+                    workspaceSurface,
+                ) &&
+                !/\[OK\]|\[ERR\]|SDK→FS|FS→SDK|\bRetorno\b|\{\s*"files"|\n\s{14,}\[--overwrite\]|\n\s{14,}com auditoria/iu.test(
                     workspaceSurface,
                 ),
-            detail: '/workspace list rendered a themed SDK workspace panel without raw JSON in the default surface',
+            detail: '/workspace list rendered a themed SDK workspace panel with named command rows and no raw JSON or anonymous continuations',
         },
         {
             id: 'ux-cycle-live-compact',
@@ -2673,8 +2693,8 @@ function defaultUxCycleCriteria(boot) {
         },
         {
             id: 'ux-cycle-clean-close',
-            pass: boot.exitCode === 0 && /readline fechado/u.test(plain),
-            detail: 'terminal closed cleanly after default UX cycle',
+            pass: boot.exitCode === 0 && hasHumanTerminalShutdownCopy(plain),
+            detail: 'terminal closed cleanly after default UX cycle with human shutdown copy',
         },
     ];
 }
@@ -4506,8 +4526,8 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'clean-quit',
-            pass: /readline fechado/.test(plain),
-            detail: 'terminal exited through /quit',
+            pass: hasHumanTerminalShutdownCopy(plain),
+            detail: 'terminal exited through /quit with human shutdown copy',
         },
         {
             id: 'export-created',
@@ -4621,8 +4641,8 @@ function evaluateNoPrOutput(plain, sseSummary) {
         },
         {
             id: 'clean-quit',
-            pass: /readline fechado/.test(plain),
-            detail: 'terminal exited through /quit',
+            pass: hasHumanTerminalShutdownCopy(plain),
+            detail: 'terminal exited through /quit with human shutdown copy',
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];
@@ -4716,8 +4736,8 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'clean-quit',
-            pass: /readline fechado/.test(plain),
-            detail: 'terminal exited through /quit',
+            pass: hasHumanTerminalShutdownCopy(plain),
+            detail: 'terminal exited through /quit with human shutdown copy',
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];
@@ -4911,8 +4931,8 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'clean-quit',
-            pass: /readline fechado/.test(plain),
-            detail: 'terminal exited through /quit',
+            pass: hasHumanTerminalShutdownCopy(plain),
+            detail: 'terminal exited through /quit with human shutdown copy',
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];
@@ -4985,8 +5005,8 @@ function evaluateModelProbeOutput(plain, sseSummary) {
         },
         {
             id: 'clean-quit',
-            pass: /readline fechado/.test(plain),
-            detail: 'terminal exited through /quit',
+            pass: hasHumanTerminalShutdownCopy(plain),
+            detail: 'terminal exited through /quit with human shutdown copy',
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];

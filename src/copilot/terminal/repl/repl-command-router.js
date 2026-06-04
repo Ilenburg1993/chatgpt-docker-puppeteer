@@ -587,7 +587,7 @@ const QUIT_SHUTDOWN_TIMEOUT_MS = 8_000;
  */
 async function _cmdQuit(rl, injectServer, cleanup) {
     void injectServer;
-    println('[terminal] Encerrando sessão…');
+    println(terminalThemeRow('Sessão', 'encerrando terminal', { role: 'muted' }));
     cleanup();
     try {
         // Hard timeout: se runShutdown não completar em QUIT_SHUTDOWN_TIMEOUT_MS, sai mesmo assim.

@@ -250,10 +250,16 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).not.toContain('sdk-1');
         expect(ctx.output()).toContain('chat');
         expect(ctx.output()).toContain('0 perguntas');
+        expect(ctx.output()).toContain('Modelos');
         expect(ctx.output()).toContain('/sdk models · /sdk tools');
+        expect(ctx.output()).toContain('Skills');
         expect(ctx.output()).toContain('/sdk skills [--project <path>] [--dir <path>]');
+        expect(ctx.output()).toContain('Rotina');
+        expect(ctx.output()).toContain('Headers');
+        expect(ctx.output()).toContain('Simular');
         expect(ctx.output()).toContain('/sdk simulate request-user-input');
         expect(ctx.output()).not.toContain('/sdk models | /sdk skills');
+        expect(ctx.output()).not.toMatch(/\n\s{14,}\/sdk skills/);
         expect(ctx.output()).not.toContain('pergunta=0');
         expect(ctx.output()).not.toContain('reasoning=');
         expect(ctx.output()).not.toContain('restante=');
@@ -560,6 +566,16 @@ describe('terminal/commands/sdk', () => {
         const emptyList = mockCtx();
         await cmdWorkspace({ println: emptyList.println }, 'list');
         expect(emptyList.output()).toContain('nenhum arquivo no workspace SDK virtual');
+        expect(emptyList.output()).toContain('Listar');
+        expect(emptyList.output()).toContain('/workspace list');
+        expect(emptyList.output()).toContain('Sync');
+        expect(emptyList.output()).toContain('/workspace sync <sdkPath> --to <localPath> [--overwrite]');
+        expect(emptyList.output()).toContain('Mirror');
+        expect(emptyList.output()).toContain('/workspace mirror --to <localDir> [--overwrite]');
+        expect(emptyList.output()).toContain('Contrato');
+        expect(emptyList.output()).toContain('list/read/write ficam no workspace SDK virtual');
+        expect(emptyList.output()).not.toMatch(/\n\s{14,}\[--overwrite\]/);
+        expect(emptyList.output()).not.toMatch(/\n\s{14,}com auditoria/);
         expect(emptyList.output()).not.toContain('Retorno');
 
         runtimeMocks.listTerminalSdkWorkspaceFiles.mockResolvedValueOnce({ files: [] });

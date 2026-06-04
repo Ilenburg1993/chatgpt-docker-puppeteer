@@ -7025,5 +7025,60 @@
   - artefato: `artifacts/terminal-live/2026-06-04T16-23-18-007Z/summary.md`;
   - medição: `awk 'NR>3 && length($0)>120' default-ux-cycle.plain.log` não encontrou linhas internas
     acima de 120 colunas.
+- [x] Encerramento humano padronizado:
+  - achado: `/quit` ainda emitia copy interna (`[terminal] Encerrando sessão...` e
+    `[terminal] readline fechado...`), destoando do restante da UX tematizada;
+  - correção: encerramento agora usa `terminalThemeRow()` com `Sessão encerrando terminal` e
+    `Terminal fechado; HTTP local permanece ativo até o processo encerrar`;
+  - harness live consolidado: todos os critérios `clean-close`/`clean-quit` agora usam um predicado
+    semântico único para a copy humana e rejeitam a copy legada de `[terminal]`;
+  - validação focada:
+    `node --check src/copilot/terminal/repl/repl-command-router.js src/copilot/terminal/repl/repl-lifecycle.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - validação focada:
+    `npx eslint src/copilot/terminal/repl/repl-command-router.js src/copilot/terminal/repl/repl-lifecycle.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - live final:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-human-close-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-27-02-421Z/summary.md`;
+  - resultado: PASS em 21/21 critérios, incluindo `ux-cycle-clean-close` com copy humana.
+- [x] `/sdk` default com comandos nomeados:
+  - achado live: o painel `/sdk` ainda renderizava `Uso` como lista multi-linha com continuações
+    anônimas (`/sdk skills`, `/sdk quota`, `/sdk headers`) penduradas sem label próprio;
+  - decisão UX: painel operacional default deve ser escaneável por categoria, não por bloco de
+    ajuda colado;
+  - correção: `/sdk` default agora mostra `Modelos`, `Skills`, `Rotina`, `Headers` e `Simular`,
+    cada um com linha própria via `terminalThemeWrappedRow()`;
+  - regressão coberta em `tests/unit/copilot/terminal/test_commands_sdk.spec.js`;
+  - harness live reforçado: `ux-cycle-sdk-human` exige linhas nomeadas e rejeita continuações
+    anônimas;
+  - validação focada:
+    `node --check src/copilot/terminal/commands/sdk.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs tests/unit/copilot/terminal/test_commands_sdk.spec.js`;
+  - validação focada:
+    `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js --hookTimeout=30000`;
+  - validação focada:
+    `npx eslint src/copilot/terminal/commands/sdk.js tests/unit/copilot/terminal/test_commands_sdk.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - live final:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-sdk-command-rows-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-33-04-835Z/summary.md`;
+  - resultado: PASS em 21/21 critérios, incluindo `/sdk` com linhas nomeadas.
+- [x] `/workspace list` default sem continuações anônimas:
+  - achado live: `sync/mirror` e `Obs` ainda quebravam em continuações sem label, dificultando a
+    leitura do limite entre workspace SDK virtual e FS local;
+  - correção: `/workspace list` agora mostra `Listar`, `SDK`, `Sync`, `Mirror`, `Promover`,
+    `Contrato` e `Materializar` como linhas nomeadas;
+  - decisão UX: comandos de transferência entre SDK virtual e FS local devem explicitar direção e
+    auditoria sem símbolos técnicos crus;
+  - regressão coberta em `tests/unit/copilot/terminal/test_commands_sdk.spec.js`;
+  - harness live reforçado: `ux-cycle-workspace-human` exige linhas nomeadas e rejeita continuações
+    anônimas de `--overwrite`/`com auditoria`;
+  - validação focada:
+    `node --check src/copilot/terminal/commands/sdk.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs tests/unit/copilot/terminal/test_commands_sdk.spec.js`;
+  - validação focada:
+    `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js --hookTimeout=30000`;
+  - validação focada:
+    `npx eslint src/copilot/terminal/commands/sdk.js tests/unit/copilot/terminal/test_commands_sdk.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - live final:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-sdk-workspace-command-rows-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-35-19-232Z/summary.md`;
+  - resultado: PASS em 21/21 critérios, incluindo workspace com linhas nomeadas.
 - [ ] Próxima lacuna: validar visualmente TUI completa `fzf`/`gum` quando for aceitável tomar o TTY
       real, mantendo o fluxo filtrado como prova automatizada.

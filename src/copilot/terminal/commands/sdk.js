@@ -120,6 +120,14 @@ function renderSdkSessionPresence(value) {
     return typeof value === 'string' && value.trim() ? 'sessão ativa' : 'sem sessão SDK';
 }
 
+const SDK_DEFAULT_COMMAND_ROWS = Object.freeze([
+    ['Modelos', '/sdk models · /sdk tools [model]'],
+    ['Skills', '/sdk skills [--project <path>] [--dir <path>]'],
+    ['Rotina', '/sdk quota · /sdk waits · /sdk prompt · /sdk capabilities'],
+    ['Headers', '/sdk headers [k=v ...|clear]'],
+    ['Simular', '/sdk simulate request-user-input · /sdk doctor · /sdk compact'],
+]);
+
 /**
  * @param {unknown} value
  * @returns {string}
@@ -1191,19 +1199,9 @@ export async function cmdSdk({ println }, arg = '') {
                 ),
             );
             await renderSdkQuota({ println }, runtimeId, { compact: true });
-            println(
-                terminalThemeRows(
-                    'Uso',
-                    [
-                        '/sdk models · /sdk tools [model]',
-                        '/sdk skills [--project <path>] [--dir <path>]',
-                        '/sdk quota · /sdk waits · /sdk prompt · /sdk capabilities',
-                        '/sdk headers [k=v ...|clear]',
-                        '/sdk simulate request-user-input · /sdk doctor · /sdk compact',
-                    ],
-                    { role: 'command' },
-                ),
-            );
+            for (const [label, command] of SDK_DEFAULT_COMMAND_ROWS) {
+                println(terminalThemeWrappedRow(label, command, { role: 'command', maxWidth: 76 }));
+            }
             println('');
         }
     } catch (e) {
@@ -2013,27 +2011,34 @@ export async function cmdWorkspace({ println }, arg = '') {
                 println(terminalThemeRow('Estado', 'nenhum arquivo no workspace SDK virtual', { role: 'muted' }));
                 println(terminalThemeRow('Escopo', 'SDK virtual separado do FS local; use /fs list para o repositório'));
             }
+            println(terminalThemeWrappedRow('Listar', '/workspace list', { role: 'command', maxWidth: 76 }));
             println(
-                terminalThemeRow('Uso', '/workspace list | read <path> | write <path> <content>', { role: 'command' }),
-            );
-            println(
-                terminalThemeWrappedRow(
-                    'Uso',
-                    '/workspace sync <sdkPath> [--to <localPath>] [--overwrite] · /workspace mirror [--to <localDir>] [--overwrite]',
-                    { role: 'command' },
-                ),
-            );
-            println(
-                terminalThemeRow('Uso', '/workspace promote <localPath> [--to <sdkPath>] [--overwrite]', {
+                terminalThemeWrappedRow('SDK', '/workspace read <path> · /workspace write <path> <content>', {
                     role: 'command',
+                    maxWidth: 76,
                 }),
             );
             println(
-                terminalThemeWrappedRow(
-                    'Obs',
-                    'list/read/write operam no SDK virtual; sync/mirror materializam no FS local; promote faz FS para SDK com auditoria',
-                ),
+                terminalThemeWrappedRow('Sync', '/workspace sync <sdkPath> --to <localPath> [--overwrite]', {
+                    role: 'command',
+                    maxWidth: 76,
+                }),
             );
+            println(
+                terminalThemeWrappedRow('Mirror', '/workspace mirror --to <localDir> [--overwrite]', {
+                    role: 'command',
+                    maxWidth: 76,
+                }),
+            );
+            println(
+                terminalThemeWrappedRow('Promover', '/workspace promote <localPath> --to <sdkPath> [--overwrite]', {
+                    role: 'command',
+                    maxWidth: 76,
+                }),
+            );
+            println(terminalThemeWrappedRow('Contrato', 'list/read/write ficam no workspace SDK virtual'));
+            println(terminalThemeWrappedRow('Materializar', 'sync/mirror copiam SDK para FS local com auditoria'));
+            println(terminalThemeWrappedRow('Promover', 'promote copia FS local para SDK virtual com auditoria'));
             println('');
         }
     } catch (e) {
