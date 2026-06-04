@@ -1978,8 +1978,8 @@ function diagnosticUxCycleCriteria(boot) {
     return [
         {
             id: 'diagnostic-ux-ready',
-            pass: /LLM-B pronta/u.test(plain),
-            detail: 'terminal reached ready state before diagnostic UX cycle',
+            pass: /LLM-B pronta/u.test(plain) && !/Fluxo\s+local-fs-primary/u.test(plain),
+            detail: 'terminal reached ready state before diagnostic UX cycle without raw FS routing mode in the first viewport',
         },
         {
             id: 'diagnostic-ux-fs-themed',

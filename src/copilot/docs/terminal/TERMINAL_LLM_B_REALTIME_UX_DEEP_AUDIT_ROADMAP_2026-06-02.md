@@ -4760,3 +4760,26 @@
 - [ ] Próxima lacuna: revisar boot/banner inicial, `/live full` e `/session` porque a live ainda
       mostra `Fluxo local-fs-primary`, `Runtime default` e `Timeline persistent only` fora de
       `/health full`.
+
+### 12.19 Auto-brief pronto sem modo interno de rota
+
+- [x] Auditoria pós-live: o painel inicial da sessão pronta ainda mostrava
+      `Fluxo local-fs-primary`, logo no first viewport, antes de qualquer comando do operador.
+- [x] Decisão UX: o auto-brief deve continuar derivado do contrato canônico
+      `guidance.mode`, mas a tela humana deve traduzir esse modo para linguagem operacional:
+      `arquivos locais primeiro`, `workspace SDK apenas` ou `degradado`.
+- [x] Implementação: `auto-brief.js` ganhou helper de renderização para o modo de rota, usado no
+      brief pronto e também no brief detalhado explícito.
+- [x] Harness live reforçado: `diagnostic-ux-ready` agora reprova se a primeira tela voltar a
+      imprimir `Fluxo local-fs-primary`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/repl/auto-brief.js`.
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx eslint src/copilot/terminal/repl/auto-brief.js tests/unit/copilot/terminal/test_auto_brief.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_auto_brief.spec.js`.
+- [x] Live PTY diagnóstica passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-boot-routing-human-20260603-2140`.
+  - Resultado: PASS em 29/29 critérios; first viewport exibiu
+        `Fluxo     arquivos locais primeiro · próximo /fs list → /activity 5`.
+- [ ] Próxima lacuna: `/live full` ainda mostra `Runtime default` e `Timeline persistent only`;
+      transformar esses rótulos mantendo detalhe técnico em comandos `detail/raw`.

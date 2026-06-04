@@ -135,6 +135,34 @@ describe('terminal/repl/auto-brief', () => {
         expect(text).not.toContain('sem auth');
     });
 
+    it('humaniza o modo de fluxo no briefing pronto', async () => {
+        readTerminalStatusProjection.mockReturnValue(
+            createProjection({
+                dialogLoopActive: true,
+                toolLoad: {
+                    total: 105,
+                    hasCanonicalLocalFsTools: true,
+                    hasCanonicalLocalExecTools: true,
+                    hasSdkWorkspaceTooling: false,
+                    toolContract: {
+                        ok: true,
+                        errorCount: 0,
+                        warningCount: 0,
+                        metadataCoverage: 1,
+                    },
+                },
+                sdkFsRouting: { mode: 'local-fs-primary', reason: 'ready' },
+            }),
+        );
+        const { buildTerminalAutoBrief } = await import('../../../../src/copilot/terminal/repl/auto-brief.js');
+
+        const brief = buildTerminalAutoBrief({ phase: 'ready' });
+        const text = brief.lines.join('\n');
+
+        expect(text).toMatch(/Fluxo\s+arquivos locais primeiro/u);
+        expect(text).not.toContain('local-fs-primary');
+    });
+
     it('preserva modo detalhado por env explícita', async () => {
         readTerminalStatusProjection.mockReturnValue(createProjection());
         vi.stubEnv('COPILOT_TERMINAL_AUTO_BRIEF', 'full');

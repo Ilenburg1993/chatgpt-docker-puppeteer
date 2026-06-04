@@ -52,6 +52,18 @@ function renderAutoBriefAuthLabel(auth) {
 }
 
 /**
+ * @param {unknown} mode
+ * @returns {string}
+ */
+function renderAutoBriefRoutingMode(mode) {
+    const value = String(mode ?? '').trim();
+    if (value === 'local-fs-primary') return 'arquivos locais primeiro';
+    if (value === 'sdk-workspace-only') return 'workspace SDK apenas';
+    if (value === 'degraded') return 'degradado';
+    return value.replace(/[._-]+/gu, ' ') || 'desconhecido';
+}
+
+/**
  * @param {number | null | undefined} value
  * @returns {string}
  */
@@ -207,7 +219,7 @@ export function buildTerminalAutoBrief(input = {}) {
                 ),
             );
         }
-        lines.push(briefLine('Fluxo', `${guidance.mode} · próximo ${guidance.nextCommand ?? '/status'}`));
+        lines.push(briefLine('Fluxo', `${renderAutoBriefRoutingMode(guidance.mode)} · próximo ${guidance.nextCommand ?? '/status'}`));
         if (!ready) lines.push(briefLine('Boot', 'parcial · preparando ferramentas/conversa'));
         if (visibleWarnings.length > 0) lines.push(briefLine('Atenção', visibleWarnings.join(' | ')));
         return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
@@ -240,7 +252,7 @@ export function buildTerminalAutoBrief(input = {}) {
         ),
     );
     lines.push(
-        briefLine('Rota', `${guidance.mode} · ${guidance.summary} · próximo ${guidance.nextCommand ?? '-'}`),
+        briefLine('Rota', `${renderAutoBriefRoutingMode(guidance.mode)} · ${guidance.summary} · próximo ${guidance.nextCommand ?? '-'}`),
     );
     lines.push(
         briefLine(
