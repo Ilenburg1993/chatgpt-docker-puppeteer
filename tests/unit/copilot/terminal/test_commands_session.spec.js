@@ -543,6 +543,26 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toContain('PM:approve_all');
     });
 
+    it('cmdNow traduz tipo de pergunta viva para rótulo humano', () => {
+        defaultRuntime.pendingQuestion = {
+            question: 'Responder default?',
+            kind: 'question',
+            allowFreeform: true,
+            askedAt: 1,
+            protocolControlled: false,
+        };
+        defaultRuntime.pendingQuestionKind = 'question';
+        defaultRuntime.pendingQuestionShadow = null;
+        defaultRuntime.pendingQuestionShadowExpired = false;
+        defaultRuntime.pendingQuestionShadowState = null;
+        const ctx = mockCtx();
+
+        cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println });
+
+        expect(ctx.output()).toContain('pergunta pendente (operador)');
+        expect(ctx.output()).not.toContain('pergunta pendente (question)');
+    });
+
     it('cmdNow full preserva detalhe operacional em painel humano', () => {
         const previousEnv = {
             COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
@@ -633,7 +653,8 @@ describe('commands/session — sync commands', () => {
     it('cmdStatus avisa quando o runtime solicitado cai em fallback para o default', () => {
         const ctx = mockCtx();
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, '--runtime missing full');
-        expect(ctx.output()).toContain('runtime default (default)');
+        expect(ctx.output()).toContain('Runtime alvo principal');
+        expect(ctx.output()).toContain('runtime solicitado missing não encontrado');
     });
 
     it('cmdHistory imprime histórico', () => {

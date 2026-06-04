@@ -2,6 +2,7 @@
 
 export { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../activity-state.js';
 export { readTerminalDisplayState, readTerminalInlineStatusPolicy } from '../display-policy.js';
+export { renderTerminalPendingQuestionKindLabel } from '../pending-question-labels.js';
 export {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,

@@ -32,6 +32,10 @@ export {
 } from './display-policy.js';
 export { shouldConsumeTerminalPendingAnswerInput, tryAnswerTerminalPendingQuestionInput } from './pending-question-answer.js';
 export {
+    renderTerminalPendingQuestionKindLabel,
+    renderTerminalPendingQuestionPromptTag,
+} from './pending-question-labels.js';
+export {
     appendTerminalIntent,
     clearTerminalIntentHistory,
     normalizeTerminalIntentRisk,

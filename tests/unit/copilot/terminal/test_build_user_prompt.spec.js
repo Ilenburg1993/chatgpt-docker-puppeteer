@@ -114,7 +114,8 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const { buildUserPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildUserPrompt();
 
-        expect(prompt).toContain('[PERGUNTA:QUESTION]');
+        expect(prompt).toContain('[PERGUNTA:OPERADOR]');
+        expect(prompt).not.toContain('[PERGUNTA:QUESTION]');
     });
 
     it('não mostra READY como pergunta no prompt normal', async () => {

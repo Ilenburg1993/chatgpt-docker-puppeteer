@@ -5051,3 +5051,33 @@
   - `npx vitest run tests/unit/copilot/terminal/test_build_user_prompt.spec.js`.
 - [ ] Próxima lacuna: reabrir PTY live em cenário canônico para confirmar que o prompt vivo
       mantém largura confortável durante `ask_user`, tools e deltas longos.
+
+### 12.28 Perguntas pendentes com rótulos humanos, não enums do SDK
+
+- [x] Auditoria: o terminal ainda podia mostrar `question`, `confirm` ou `shadow <kind>` em
+      superfícies humanas como prompt detalhado, `/now`, `/status`, `/diagnose` e menu. Esses
+      valores são úteis para contrato interno, mas ruins para operador.
+- [x] Decisão UX: o tipo técnico permanece em SSE/raw/export quando necessário, mas a UX default
+      usa vocabulário estável:
+  - `question` → `operador`;
+  - `confirm` → `confirmação`;
+  - `choice/select` → `escolha`;
+  - `ready` → `pronto`;
+  - ausente → `geral` ou `sem tipo`, dependendo da frase.
+- [x] Implementação: criado `terminal/state/pending-question-labels.js`, exportado pelos barrels
+      de `state`, `dialog`, `repl`, `ui` e `projections`.
+- [x] Implementação: `buildUserPrompt` e `buildWaitingPrompt` renderizam
+      `[PERGUNTA:OPERADOR]` ou `[PERGUNTA]`, nunca `[PERGUNTA:QUESTION]`.
+- [x] Implementação: `/status`, `/now`, `/diagnose`, projeção de canal e menu contextual usam o
+      helper canônico.
+- [x] Testes unitários:
+  - prompt bloqueia `[PERGUNTA:QUESTION]`;
+  - menu mostra `Tipo: confirmação`;
+  - `/now` mostra `pergunta pendente (operador)`.
+- [x] Validação passou:
+  - `node --check` nos módulos alterados;
+  - `npx eslint` nos módulos e testes alterados;
+  - `npx vitest run tests/unit/copilot/terminal/test_build_user_prompt.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`;
+  - `npm run typecheck:strict:src.copilot`.
+- [ ] Próxima lacuna: revisar `/activity detail` e `/metrics` para mapear fases/tipos técnicos
+      em modo default, preservando o valor cru apenas no modo diagnóstico.

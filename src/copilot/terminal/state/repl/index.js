@@ -2,6 +2,10 @@
 
 export { readTerminalActivitySnapshot } from '../activity-state.js';
 export {
+    renderTerminalPendingQuestionKindLabel,
+    renderTerminalPendingQuestionPromptTag,
+} from '../pending-question-labels.js';
+export {
     terminalThemeDivider,
     terminalThemeHeadline,
     terminalThemeJoin,

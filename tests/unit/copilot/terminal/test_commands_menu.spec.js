@@ -119,6 +119,8 @@ describe('terminal/commands/menu', () => {
         expect(ids).toContain('clear-shadow');
         expect(ids).toContain('compact');
         expect(entries.find((entry) => entry.id === 'answer')?.hot).toBe(true);
+        expect(entries.find((entry) => entry.id === 'answer')?.description).toContain('Tipo: confirmação');
+        expect(entries.find((entry) => entry.id === 'answer')?.description).not.toContain('Tipo: confirm ·');
     });
 
     it('inclui atalhos HOT para interrupções SDK pendentes', () => {

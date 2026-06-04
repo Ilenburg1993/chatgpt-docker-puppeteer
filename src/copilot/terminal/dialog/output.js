@@ -25,6 +25,7 @@ import {
     terminalThemeDivider,
     terminalThemeDuration,
     terminalThemeHeadline,
+    renderTerminalPendingQuestionPromptTag,
     terminalThemeText,
 } from '../state/dialog/index.js';
 
@@ -453,7 +454,7 @@ export function buildUserPrompt() {
         pushPromptTag(
             terminalThemeText(
                 'question',
-                compactDetail ? '[PERGUNTA]' : `[PERGUNTA:${state.pendingQuestionKind.toUpperCase()}]`,
+                compactDetail ? '[PERGUNTA]' : `[${renderTerminalPendingQuestionPromptTag(state.pendingQuestionKind)}]`,
             ),
             terminalThemeText('question', '[PERG]'),
         );
@@ -537,7 +538,7 @@ export function buildWaitingPrompt() {
     const tags = [];
     if (promptPolicy.showQueueTag && runtime.queueSize > 0) tags.push(`Q:${runtime.queueSize}`);
     if (runtime.pendingQuestion && runtime.pendingQuestionKind && runtime.pendingQuestionKind !== 'ready') {
-        tags.push(`PERGUNTA:${runtime.pendingQuestionKind.toUpperCase()}`);
+        tags.push(renderTerminalPendingQuestionPromptTag(runtime.pendingQuestionKind));
     } else if (getTerminalPendingStructuredUserInputCount() > 0) {
         tags.push('PERGUNTA');
     }

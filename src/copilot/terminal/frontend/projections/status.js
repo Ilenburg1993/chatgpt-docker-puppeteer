@@ -18,6 +18,7 @@ import {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
+    renderTerminalPendingQuestionKindLabel,
 } from '../../state/projections/index.js';
 import {
     getTerminalPendingStructuredUserInputCount,
@@ -359,7 +360,7 @@ function buildDialogInputChannelProjection(input) {
         }
         return {
             state: 'processing',
-            label: `protocolo ${input.pendingQuestionKind}`,
+            label: `protocolo ${renderTerminalPendingQuestionKindLabel(input.pendingQuestionKind)}`,
             detail: 'mensagem protocolar transitória da conversa está em processamento',
             canAcceptTurn: false,
             recoveryExpected: false,
@@ -368,7 +369,10 @@ function buildDialogInputChannelProjection(input) {
     if (input.pendingQuestionShadow && !input.pendingQuestionShadowExpired) {
         return {
             state: 'shadow',
-            label: `shadow ${input.pendingQuestionShadowKind ?? 'unknown'}`,
+            label: `pergunta restaurada ${renderTerminalPendingQuestionKindLabel(
+                input.pendingQuestionShadowKind,
+                'sem tipo',
+            )}`,
             detail: 'há shadow persistida de ask_user sem pergunta viva; recovery pode reaproveitar ou limpar',
             canAcceptTurn: input.pendingQuestionShadowKind === 'ready',
             recoveryExpected: true,

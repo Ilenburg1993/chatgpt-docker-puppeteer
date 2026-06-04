@@ -51,6 +51,7 @@ import {
     readTerminalSseEventArchiveTail,
     formatTerminalIsoTimestamp,
     formatTerminalTimeLabel,
+    renderTerminalPendingQuestionKindLabel,
     terminalPermissionModeSkipsSdkPrompts,
     terminalThemeDivider,
     terminalThemeHeadline,
@@ -689,11 +690,19 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const branchStr = ws.currentBranch ? ws.currentBranch : 'sem branch';
     const shadowState = projection.pendingQuestionShadowState;
     const askUserStatus = projection.pendingQuestion
-        ? `viva${projection.pendingQuestionKind ? ` (${projection.pendingQuestionKind})` : ''}`
+        ? `viva${
+              projection.pendingQuestionKind
+                  ? ` (${renderTerminalPendingQuestionKindLabel(projection.pendingQuestionKind)})`
+                  : ''
+          }`
         : projection.pendingQuestionShadowExpired
           ? 'pergunta restaurada expirada'
           : projection.pendingQuestionShadow
-            ? `${shadowState === 'expired' ? 'pergunta restaurada expirada' : shadowState === 'expiring_soon' ? 'pergunta restaurada expirando' : shadowState === 'fresh' ? 'pergunta recém-restaurada' : 'pergunta restaurada'}${projection.pendingQuestionShadowKind ? ` (${projection.pendingQuestionShadowKind})` : ''}`
+            ? `${shadowState === 'expired' ? 'pergunta restaurada expirada' : shadowState === 'expiring_soon' ? 'pergunta restaurada expirando' : shadowState === 'fresh' ? 'pergunta recém-restaurada' : 'pergunta restaurada'}${
+                  projection.pendingQuestionShadowKind
+                      ? ` (${renderTerminalPendingQuestionKindLabel(projection.pendingQuestionShadowKind)})`
+                      : ''
+              }`
             : 'nenhuma';
     const pendingPreview = projection.pendingQuestionText
         ? projection.pendingQuestionText.slice(0, 80) + (projection.pendingQuestionText.length > 80 ? '…' : '')
@@ -1114,7 +1123,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
             projection.pendingUserInputs +
             projection.pendingStructuredUserInputs;
         const askLine = projection.pendingQuestion
-            ? `pergunta pendente (${projection.pendingQuestionKind ?? 'geral'})`
+            ? `pergunta pendente (${renderTerminalPendingQuestionKindLabel(projection.pendingQuestionKind)})`
             : projection.pendingQuestionShadowState
               ? `pergunta salva (${projection.pendingQuestionShadowState})`
               : 'sem pergunta pendente';
@@ -1162,7 +1171,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         .filter(Boolean)
         .join(' · ');
     const askLine = projection.pendingQuestion
-        ? `pergunta pendente (${projection.pendingQuestionKind ?? 'geral'})`
+        ? `pergunta pendente (${renderTerminalPendingQuestionKindLabel(projection.pendingQuestionKind)})`
         : projection.pendingQuestionShadowState
           ? `pergunta salva (${projection.pendingQuestionShadowState})`
           : 'sem pergunta pendente';

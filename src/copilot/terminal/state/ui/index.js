@@ -22,6 +22,10 @@ export {
     setTerminalDetailLevel,
 } from '../ui-preferences.js';
 export {
+    renderTerminalPendingQuestionKindLabel,
+    renderTerminalPendingQuestionPromptTag,
+} from '../pending-question-labels.js';
+export {
     getTerminalThemeName,
     isTerminalThemeName,
     listTerminalThemeProfiles,

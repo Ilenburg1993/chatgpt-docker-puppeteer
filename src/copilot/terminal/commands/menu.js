@@ -20,7 +20,11 @@ import {
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
 } from '../state/sdk/index.js';
-import { terminalActionChip, terminalThemeText } from '../state/ui/index.js';
+import {
+    renderTerminalPendingQuestionKindLabel,
+    terminalActionChip,
+    terminalThemeText,
+} from '../state/ui/index.js';
 
 /**
  * @typedef {{
@@ -113,7 +117,9 @@ export function buildTerminalSmartMenuEntries() {
             id: 'answer',
             label: 'Responder pergunta pendente',
             commandLine: '/answer ',
-            description: `Tipo: ${state.pendingQuestionKind} · cole a resposta após /answer`,
+            description: `Tipo: ${renderTerminalPendingQuestionKindLabel(
+                state.pendingQuestionKind,
+            )} · cole a resposta após /answer`,
             hot: true,
         });
     }

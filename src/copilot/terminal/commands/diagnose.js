@@ -21,6 +21,7 @@
 import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
 import {
     formatTerminalIsoTimestamp,
+    renderTerminalPendingQuestionKindLabel,
     terminalPermissionModeSkipsSdkPrompts,
     terminalThemeDivider,
     terminalThemeHeadline,
@@ -220,9 +221,17 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         : `${C.grey}(sem detalhe)${C.reset}`;
     const actionLine = renderCompactActionLine(health?.['recommendedAction']);
     const askUserLine = health?.['pendingQuestion']
-        ? `vivo${health?.['pendingQuestionKind'] ? ` [${health['pendingQuestionKind']}]` : ''}`
+        ? `vivo${
+              health?.['pendingQuestionKind']
+                  ? ` [${renderTerminalPendingQuestionKindLabel(health['pendingQuestionKind'])}]`
+                  : ''
+          }`
         : health?.['pendingQuestionShadow']
-          ? `${health?.['pendingQuestionShadowExpired'] ? 'pergunta restaurada expirada' : health?.['pendingQuestionShadowState'] === 'expiring_soon' ? 'pergunta restaurada expirando' : health?.['pendingQuestionShadowState'] === 'fresh' ? 'pergunta recém-restaurada' : 'pergunta restaurada'}${health?.['pendingQuestionShadowKind'] ? ` [${health['pendingQuestionShadowKind']}]` : ''}`
+          ? `${health?.['pendingQuestionShadowExpired'] ? 'pergunta restaurada expirada' : health?.['pendingQuestionShadowState'] === 'expiring_soon' ? 'pergunta restaurada expirando' : health?.['pendingQuestionShadowState'] === 'fresh' ? 'pergunta recém-restaurada' : 'pergunta restaurada'}${
+                health?.['pendingQuestionShadowKind']
+                    ? ` [${renderTerminalPendingQuestionKindLabel(health['pendingQuestionShadowKind'])}]`
+                    : ''
+            }`
           : 'nenhum';
     const askUserAgeLine =
         typeof health?.['pendingQuestionShadowAgeMs'] === 'number'
