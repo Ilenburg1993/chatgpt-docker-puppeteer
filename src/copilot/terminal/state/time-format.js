@@ -2,7 +2,7 @@
 /**
  * Formatação de tempo para superfícies humanas do terminal.
  *
- * A UX v2 usa um contrato configurável: superfícies operacionais podem mostrar ISO 8601 local até segundos, tempo
+ * A UX v2 usa um contrato configurável: superfícies operacionais podem mostrar ISO 8601 local completo, tempo
  * relativo, ou ambos. A linha viva continua livre para usar duração compacta quando isso evita poluir o input.
  *
  * @module copilot/terminal/time-format
@@ -148,7 +148,7 @@ export function formatTerminalElapsedDuration(value) {
 }
 
 /**
- * Resolve o modo padrão de tempo do terminal. O default deliberado é `dual`: ISO 8601 até segundos para auditabilidade
+ * Resolve o modo padrão de tempo do terminal. O default deliberado é `dual`: ISO 8601 completo para auditabilidade
  * humana e idade relativa para leitura rápida. `elapsed` deve ser usado com parcimônia em superfícies de linha viva.
  *
  * @param {unknown} value
@@ -187,7 +187,9 @@ export function formatTerminalTimeParts(value, options = {}) {
     const timestamp = parseTerminalTimestamp(value, now);
     const valid = Number.isFinite(timestamp);
     const safeTimestamp = valid ? timestamp : now;
-    const iso = valid ? formatTerminalIsoTimestamp(safeTimestamp, { precision: options.isoPrecision ?? 'seconds' }) : 'tempo inválido';
+    const iso = valid
+        ? formatTerminalIsoTimestamp(safeTimestamp, { precision: options.isoPrecision ?? 'milliseconds' })
+        : 'tempo inválido';
     const relative = valid ? formatTerminalRelativeAge(safeTimestamp, now) : 'tempo relativo indisponível';
     const elapsed = valid ? formatTerminalElapsedDuration(Math.max(0, now - safeTimestamp)) : '0s';
     const label =

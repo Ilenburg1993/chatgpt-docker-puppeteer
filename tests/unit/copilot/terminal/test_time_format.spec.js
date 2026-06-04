@@ -22,16 +22,16 @@ describe('terminal/time-format', () => {
         expect(formatTerminalIsoTimestampSeconds(instant)).toBe('2026-06-03T16:30:45-03:00');
     });
 
-    it('combina ISO até segundos e tempo relativo no modo dual', () => {
+    it('combina ISO completo e tempo relativo no modo dual', () => {
         expect(formatTerminalTimeLabel(instant, { now, mode: 'dual' })).toBe(
-            '2026-06-03T16:30:45-03:00 (há 1m)',
+            '2026-06-03T16:30:45.678-03:00 (há 1m)',
         );
-        expect(formatTerminalTimestamp(instant, { now })).toBe('2026-06-03T16:30:45-03:00 (há 1m)');
+        expect(formatTerminalTimestamp(instant, { now })).toBe('2026-06-03T16:30:45.678-03:00 (há 1m)');
     });
 
     it('permite alternar o modo sem refatorar callers', () => {
         expect(formatTerminalTimeLabel(instant, { now, mode: 'relative' })).toBe('há 1m');
-        expect(formatTerminalTimeLabel(instant, { now, mode: 'iso' })).toBe('2026-06-03T16:30:45-03:00');
+        expect(formatTerminalTimeLabel(instant, { now, mode: 'iso' })).toBe('2026-06-03T16:30:45.678-03:00');
         expect(formatTerminalTimeLabel(instant, { now, mode: 'elapsed' })).toBe('1m');
         expect(resolveTerminalTimeDisplayMode('desconhecido')).toBe('dual');
     });
@@ -42,10 +42,10 @@ describe('terminal/time-format', () => {
             timestamp: Date.parse(instant),
             valid: true,
             mode: 'dual',
-            iso: '2026-06-03T16:30:45-03:00',
+            iso: '2026-06-03T16:30:45.678-03:00',
             relative: 'há 1m',
             elapsed: '1m',
-            label: '2026-06-03T16:30:45-03:00 (há 1m)',
+            label: '2026-06-03T16:30:45.678-03:00 (há 1m)',
         });
     });
 
@@ -62,6 +62,12 @@ describe('terminal/time-format', () => {
 
     it('aceita timestamp numérico recebido como string', () => {
         expect(formatTerminalTimeLabel(String(Date.parse(instant)), { now, mode: 'dual' })).toBe(
+            '2026-06-03T16:30:45.678-03:00 (há 1m)',
+        );
+    });
+
+    it('permite optar por ISO até segundos quando a superfície precisa compactar', () => {
+        expect(formatTerminalTimeLabel(instant, { now, mode: 'dual', isoPrecision: 'seconds' })).toBe(
             '2026-06-03T16:30:45-03:00 (há 1m)',
         );
     });

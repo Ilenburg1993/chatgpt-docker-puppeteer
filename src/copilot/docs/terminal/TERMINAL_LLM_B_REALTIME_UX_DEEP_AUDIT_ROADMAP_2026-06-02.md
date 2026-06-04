@@ -6789,3 +6789,22 @@
 - [ ] Próxima inspeção UX: revisar prompt longo enviado pelo harness/live, porque no PTY ele pode
       aparecer sem o prefixo visual completo em logs plain quando `script` e repaint ANSI se
       cruzam; separar artefato de captura de bug real no renderer.
+
+### 12.54 Timestamps completos por contrato central
+
+- [x] Achado UX: embora várias telas já usassem ISO 8601 local com offset, o formatador central
+      `formatTerminalTimeParts()` forçava precisão até segundos. Isso contrariava a decisão de
+      auditabilidade com ISO completo nas superfícies de eventos, activity, pergunta e turn display.
+- [x] Decisão UX: o default humano do terminal passa a ser `dual` com ISO 8601 completo
+      (`YYYY-MM-DDTHH:mm:ss.SSS±HH:mm`) mais idade relativa. Superfícies compactas podem pedir
+      explicitamente `isoPrecision: 'seconds'`.
+- [x] Correção aplicada: `formatTerminalTimeParts()` usa `milliseconds` como precisão padrão.
+- [x] Testes atualizados:
+  - `test_time_format.spec.js` cobre dual/iso completo e a opção explícita por segundos.
+  - `test_commands_events.spec.js` simula `/events` com ISO completo no modo padrão.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/state/time-format.js tests/unit/copilot/terminal/test_time_format.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+  - `npx vitest run tests/unit/copilot/terminal/test_time_format.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+  - `npx eslint src/copilot/terminal/state/time-format.js tests/unit/copilot/terminal/test_time_format.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [ ] Próxima inspeção UX: executar um ciclo curto não-live ou live para confirmar visualmente que
+      os timestamps completos não estouram colunas em `/events` e `/activity` em PTY estreito.
