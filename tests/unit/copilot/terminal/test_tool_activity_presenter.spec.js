@@ -79,6 +79,17 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.completeLine(false, 'n/d')).not.toContain('tool genérica');
     });
 
+    it('usa fallback humano para ferramenta sem classificação conhecida', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'vendor_unknown_action',
+            args: { value: true },
+        });
+
+        expect(presentation.operation).toBe('inspect');
+        expect(presentation.detail).toContain('executando ferramenta não classificada');
+        expect(presentation.detail).not.toContain('tool genérica');
+    });
+
     it('classifica exec_command como execução mesmo quando o cwd aparece como alvo', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'exec_command',

@@ -6278,3 +6278,8 @@
 - [ ] Próxima frente UX: tratar prelude/diagnósticos do harness como fila de comandos com critério
       próprio, sem alterar novamente o repaint canônico do REPL até haver evidência mais clara do
       comportamento humano real.
+- [x] Limpeza lexical adicional: `tool-activity-presenter.js` ainda tinha fallback
+      `executando tool genérica`. A superfície humana agora usa
+      `executando ferramenta não classificada`, preservando detalhe técnico apenas em raw/detail.
+- [x] Teste unitário: `test_tool_activity_presenter.spec.js` cobre ferramenta desconhecida sem
+      regressão para `tool genérica`.

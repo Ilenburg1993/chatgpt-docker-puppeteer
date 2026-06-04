@@ -423,7 +423,7 @@ function inferOperation(toolName, path, explicitOperation) {
         }
     }
     if (path) return { operation: 'inspect', label: 'operando arquivo' };
-    return { operation: 'inspect', label: 'executando tool genérica' };
+    return { operation: 'inspect', label: 'executando ferramenta não classificada' };
 }
 
 /**
