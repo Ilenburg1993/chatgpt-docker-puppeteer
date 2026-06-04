@@ -5440,3 +5440,17 @@
   - `node --check src/copilot/terminal/commands/events.js src/copilot/terminal/commands/session.js`;
   - `npx eslint src/copilot/terminal/commands/events.js src/copilot/terminal/commands/session.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`;
   - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- [x] Live de confirmação pós-humanização:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-humanized-audit-surfaces-20260604-2350`.
+- [x] Resultado: `Status: PASS`; fluxo canônico completo, 181 eventos SSE, zero erros, export
+      relativo, `/events` com `Registro`, `/activity` com `Ler arquivo`/`Intenção capturada`.
+- [x] Lacuna visual encontrada na live: o bloco final pós-pergunta ainda mostrava
+      `Resposta pós-pergunta sdk/assistant.message · Resposta pós-pergunta`, misturando source cru
+      com título humano.
+- [x] Correção aplicada: `assistant-transcript-renderer` agora separa source bruto persistido de
+      source visual; `sdk/assistant.message` vira `LLM-B via SDK` e deltas viram `streaming da
+      LLM-B` na linha humana.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/events/assistant-transcript-renderer.js`;
+  - `npx eslint src/copilot/terminal/events/assistant-transcript-renderer.js tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js`.

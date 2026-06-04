@@ -80,6 +80,21 @@ export function claimTerminalAssistantTranscript(content, options = {}) {
 }
 
 /**
+ * @param {string} source
+ * @returns {string}
+ */
+function formatAssistantTranscriptSourceForOperator(source) {
+    const normalized = source.trim().toLowerCase();
+    if (!normalized) return 'LLM-B';
+    if (normalized === 'sdk/assistant.message' || normalized === 'sdk.assistant.message') return 'LLM-B via SDK';
+    if (normalized.includes('assistant.message_delta')) return 'streaming da LLM-B';
+    if (normalized.startsWith('terminal') || normalized.startsWith('dialog')) return 'terminal';
+    if (normalized === 'sdk' || normalized.startsWith('sdk/')) return 'SDK';
+    if (normalized === 'agent' || normalized.startsWith('agent/')) return 'agente';
+    return source.replace(/[._/-]+/gu, ' ');
+}
+
+/**
  * @param {{
  *     content: string;
  *     title?: string;
@@ -101,11 +116,12 @@ export function renderTerminalAssistantTranscript(input) {
 
     const title = input.title ?? 'Mensagem da LLM-B';
     const source = input.source ?? 'sdk';
+    const displaySource = formatAssistantTranscriptSourceForOperator(source);
     const status = input.status ?? 'message';
     const badgeRole = status === 'error' ? 'error' : status === 'completed' ? 'success' : 'info';
     const detail = input.detail ? ` ${terminalThemeText('muted', `· ${input.detail}`)}` : '';
 
-    const lines = [SEPARATOR, terminalThemeRow(title, `${source}${detail}`, { role: badgeRole }), ''];
+    const lines = [SEPARATOR, terminalThemeRow(title, `${displaySource}${detail}`, { role: badgeRole }), ''];
     for (const line of content.split('\n')) {
         lines.push(`  ${terminalThemeText('assistant', '│')}  ${line}`);
     }
@@ -129,5 +145,6 @@ export function renderTerminalAssistantTranscript(input) {
 
 export const __test__ = {
     clearRecentTranscriptHashes: () => recentTranscriptHashes.clear(),
+    formatAssistantTranscriptSourceForOperator,
     normalizeTranscriptContent,
 };

@@ -9,6 +9,19 @@ import {
 } from '../../../../src/copilot/terminal/events/index.js';
 
 describe('terminal/events/assistant-transcript-renderer', () => {
+    it('humaniza source técnico de assistant.message para a linha visual', () => {
+        expect(
+            terminalAssistantTranscriptRendererTestHarness.formatAssistantTranscriptSourceForOperator(
+                'sdk/assistant.message',
+            ),
+        ).toBe('LLM-B via SDK');
+        expect(
+            terminalAssistantTranscriptRendererTestHarness.formatAssistantTranscriptSourceForOperator(
+                'sdk.assistant.message_delta',
+            ),
+        ).toBe('streaming da LLM-B');
+    });
+
     it('reconhece prefixo truncado como coberto por transcript recente completo', () => {
         terminalAssistantTranscriptRendererTestHarness.clearRecentTranscriptHashes();
 
