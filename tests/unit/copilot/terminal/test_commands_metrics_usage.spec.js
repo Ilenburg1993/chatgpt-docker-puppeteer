@@ -413,7 +413,9 @@ describe('commands/metrics + usage', () => {
             expect(ctx.output()).toContain('continuação da pergunta humana');
             expect(ctx.output()).not.toContain('ask_user_continuation');
             expect(ctx.output()).toContain('Pergunta humana');
+            expect(ctx.output()).toContain('Correlacionar');
             expect(ctx.output()).toContain('/events event=assistant.message');
+            expect(ctx.output()).toContain('/export');
             expect(ctx.output()).not.toContain('\x1b[');
         } finally {
             defaultRuntime.lastLlmUsage = previous;

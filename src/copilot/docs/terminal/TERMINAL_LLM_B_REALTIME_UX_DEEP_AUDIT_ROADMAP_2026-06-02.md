@@ -5471,3 +5471,11 @@
   - `node --check src/copilot/terminal/commands/events.js`;
   - `npx eslint src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`;
   - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [x] Lacuna visual: `/usage now` concentrava quota histórica, BYOK ativo, classe técnica e
+      correlação pós-ask em linhas longas que quebravam no PTY.
+- [x] Correção aplicada: `/usage now` separa `Quota Copilot`, `BYOK ativo`, `Detalhe`,
+      `Pergunta humana` e `Correlacionar` em linhas próprias.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/usage.js`;
+  - `npx eslint src/copilot/terminal/commands/usage.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`.

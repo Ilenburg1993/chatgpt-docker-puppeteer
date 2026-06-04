@@ -96,7 +96,14 @@ export function cmdUsage({ println }, arg) {
                 println(
                     terminalThemeRow(
                         'Quota Copilot',
-                        `${modelLabel} · custo ${cost} · histórica; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}; não é cobrança BYOK`,
+                        `${modelLabel} · custo ${cost} · histórica; não é cobrança BYOK`,
+                    ),
+                );
+                println(
+                    terminalThemeRow(
+                        'BYOK ativo',
+                        `provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
+                        { role: 'success' },
                     ),
                 );
             } else {
@@ -108,10 +115,12 @@ export function cmdUsage({ println }, arg) {
                 );
             }
         } else if (byokActive) {
+            println(terminalThemeRow('Quota Copilot', 'sem snapshot histórico classificado'));
             println(
                 terminalThemeRow(
-                    'Quota Copilot',
-                    `sem snapshot histórico; BYOK ativo usa provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
+                    'BYOK ativo',
+                    `provider ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
+                    { role: 'success' },
                 ),
             );
         } else {
@@ -141,16 +150,24 @@ export function cmdUsage({ println }, arg) {
                       )
                     : terminalThemeRow(
                           'Telemetria LLM',
-                          `modelo ${projection.llmUsageBilling.displayModel} · ${premiumRequest} · tipo ${llmUsageKind} · custo ${llmCost} · /usage now detail para classe técnica`,
+                          `modelo ${projection.llmUsageBilling.displayModel} · ${premiumRequest} · tipo ${llmUsageKind} · custo ${llmCost}`,
                       ),
             );
+            if (!detail) {
+                println(terminalThemeRow('Detalhe', '/usage now detail para classe técnica', { role: 'command' }));
+            }
             if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
                 println(
                     terminalThemeRow(
                         'Pergunta humana',
-                        'telemetria pós-resposta humana separada da fala inicial · use /events event=assistant.message e /export para correlacionar source+trace',
+                        'telemetria pós-resposta humana separada da fala inicial',
                         { role: 'success' },
                     ),
+                );
+                println(
+                    terminalThemeRow('Correlacionar', '/events event=assistant.message · /export', {
+                        role: 'command',
+                    }),
                 );
             }
         }
