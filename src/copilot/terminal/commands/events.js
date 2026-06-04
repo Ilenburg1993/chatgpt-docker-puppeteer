@@ -272,7 +272,7 @@ function humanEventLabel(event, payload = null) {
     if (event === 'permission.mode_changed') return 'Permissões alteradas';
     if (event === 'agent.background.completed') return 'Tarefa em segundo plano concluída';
     if (event === 'agent.background.idle') return 'Tarefa em segundo plano ociosa';
-    if (event === 'question.answered') return 'Resposta do operador';
+    if (event === 'question.answered') return 'Resposta encaminhada';
     if (event === 'assistant.reasoning_complete') return 'Raciocínio concluído';
     if (event === 'dialog.turn_start' || event === 'assistant.turn_start') return 'Turno iniciado';
     if (event === 'dialog.turn_end' || event === 'assistant.turn_end') return 'Turno concluído';
@@ -336,6 +336,7 @@ function humanEventSource(source) {
     if (lower.startsWith('sdk/session.info')) return 'controle da sessão';
     if (lower.startsWith('sdk/user_input')) return 'pergunta ao operador';
     if (lower.startsWith('sdk/assistant')) return 'LLM-B via SDK';
+    if (lower.startsWith('agent/passthrough/question.answered')) return 'ponte da pergunta';
     if (lower.startsWith('agent/background')) return 'tarefa em segundo plano';
     if (lower.startsWith('agent/llm')) return 'telemetria LLM';
     if (lower.startsWith('agent/sdk.lifecycle')) return 'controle da sessão';
@@ -496,7 +497,14 @@ function summarizePayload(payload, opts = {}) {
     const toolName = payload['toolName'] ?? payload['tool'];
     const toolCallId = payload['toolCallId'] ?? payload['callId'];
     const requestId = payload['requestId'] ?? payload['pendingRequestId'];
-    const content = payload['content'] ?? payload['chunk'] ?? payload['question'] ?? payload['message'] ?? null;
+    const content =
+        payload['content'] ??
+        payload['chunk'] ??
+        payload['question'] ??
+        payload['answer'] ??
+        payload['message'] ??
+        payload['description'] ??
+        null;
     const status = payload['status'] ?? null;
     const type = payload['type'] ?? payload['infoType'] ?? null;
     const classification = payload['classification'] ?? null;
@@ -558,6 +566,14 @@ function hasActiveEventFilters(filters) {
             filters['requestId'] ||
             filters['hubSessionId'],
     );
+}
+
+/**
+ * @param {{ payload?: Record<string, unknown> | null }} entry
+ * @returns {boolean}
+ */
+function isInternalDefaultEvent(entry) {
+    return entry.payload?.['internal'] === true;
 }
 
 /**
@@ -670,7 +686,17 @@ export async function cmdEvents({ println }, arg = '') {
     );
     const now = Date.now();
     const shouldAggregateDefaultEvents = !showDiagnosticIds && !hasActiveEventFilters(/** @type {Record<string, unknown>} */ (filters));
-    const eventRows = entries.map((entry) => {
+    const visibleEntries = shouldAggregateDefaultEvents ? entries.filter((entry) => !isInternalDefaultEvent(entry)) : entries;
+    if (visibleEntries.length === 0) {
+        println(
+            terminalThemeRow('Resultado', 'Nenhum evento operacional visível; use /events --raw para auditoria completa.', {
+                role: 'muted',
+            }),
+        );
+        println('');
+        return;
+    }
+    const eventRows = visibleEntries.map((entry) => {
         const time = showDiagnosticIds
             ? formatTerminalIsoTimestamp(entry.timestamp, { precision: 'seconds' })
             : formatTerminalTimeLabel(entry.timestamp, { now, mode: 'dual' });

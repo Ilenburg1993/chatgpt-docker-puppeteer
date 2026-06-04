@@ -94,6 +94,8 @@ const INTERNAL_BACKGROUND_DESCRIPTION_PATTERNS = [
     /^sync resumed session history\b/i,
     /^cleanup stale sdk sessions\b/i,
     /^retry dialog loop recovery\b/i,
+    /^relay question\.answered answers into hook tools resolver$/i,
+    /^clear persisted pendingQuestion$/i,
     /^always_alive$/i,
 ];
 

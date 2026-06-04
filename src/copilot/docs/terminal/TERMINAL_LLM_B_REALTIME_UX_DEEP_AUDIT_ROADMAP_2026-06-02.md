@@ -5823,3 +5823,42 @@
 - [ ] Próxima frente UX: revisar `/activity` timeline para reduzir duplicação de eventos de tarefa
       de segundo plano e tornar `Resposta do operador · agente` mais específica quando o evento
       vem de delivery/ack interno, mantendo autoria humana clara no transcript/export.
+- [x] Auditoria de acks pós-`ask_user`: a live mostrou duas linhas de tarefa quase idênticas
+      (`Resposta humana entregue ao resolvedor da ferramenta` e `Pergunta pendente persistida
+      limpa`) no output ao vivo e na timeline de `/activity`. Essas linhas são úteis para raw/SSE,
+      mas o operador já recebeu `Resposta enviada para pergunta pendente` e não precisa ver os acks
+      internos como eventos principais.
+- [x] Correção aplicada na origem: `Relay question.answered answers into hook tools resolver` e
+      `Clear persisted pendingQuestion` passaram a ser classificados como background interno, sem
+      print, sem update do current e sem histórico padrão; o broadcast SSE permanece com
+      `internal=true`.
+- [x] Correção aplicada em `/events`: o modo default sem filtros oculta eventos com
+      `payload.internal === true`; consultas explícitas e `--raw`/`--json` continuam mostrando o
+      envelope completo.
+- [x] Correção aplicada na semântica de `/events`: `question.answered` agora aparece como
+      `Resposta encaminhada` com origem `ponte da pergunta`, separando o relay auxiliar do evento
+      canônico `user_input.completed`, que continua sendo `Resposta do operador`.
+- [x] Contratos adicionados:
+  - unitário bloqueando evento interno no `/events` default e preservando-o quando há filtro
+        explícito;
+  - unitário de fonte garantindo que os dois acks de pergunta continuam classificados como internos;
+  - live `ux-no-question-ack-task-spam`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/events/agent-runtime-events.js`;
+  - `node --check src/copilot/terminal/commands/events.js`;
+  - `node --check tests/unit/copilot/terminal/test_commands_events.spec.js`;
+  - `node --check tests/unit/copilot/terminal/test_dialog_runtime.spec.js`;
+  - `npx eslint src/copilot/terminal/events/agent-runtime-events.js src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js`.
+- [ ] Próxima live: repetir cenário canônico para confirmar que os acks internos pós-pergunta não
+      aparecem no output ao vivo, em `/activity 40` nem em `/events 60`, mas seguem no `--raw`.
+- [x] Live de confirmação executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-no-question-ack-spam-contract-20260605-0145`.
+  - Resultado: `Status: PASS`; critério `ux-no-question-ack-task-spam` passou no summary.
+- [x] Evidência visual: após `SIM`, o output ao vivo mostrou apenas `Resposta enviada para
+      pergunta pendente`; `/activity 40` não exibiu os acks auxiliares; `/events 60` exibiu
+      `Resposta encaminhada · ponte da pergunta · SIM` e `Resposta do operador · pergunta ao
+      operador · SIM`, separando relay de autoria canônica.
+- [ ] Próxima frente UX: revisar `/events`/`activity` para fontes ainda genéricas como
+      `Atividade · agente`, `Atividade · SDK`, `Uso LLM · diálogo` e `Rotina iniciada · SDK`,
+      avaliando se devem ser agregadas, renomeadas ou movidas para detail/raw.

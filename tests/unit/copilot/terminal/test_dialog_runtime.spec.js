@@ -67,6 +67,8 @@ describe('terminal/dialog/dialog-runtime', () => {
             'utf8',
         );
         expect(agentEvents).toContain("'Pergunta ao operador reconciliada'");
+        expect(agentEvents).toContain('/^relay question\\.answered answers into hook tools resolver$/i');
+        expect(agentEvents).toContain('/^clear persisted pendingQuestion$/i');
         expect(agentEvents).toContain("const SDK_LIFECYCLE_VISIBLE_TYPES = new Set(['session.created', 'session.foreground', 'session.background'])");
         expect(agentEvents).not.toContain("['session.created', 'session.deleted', 'session.foreground', 'session.background']");
         expect(agentEvents).not.toContain("'question.pending reconciliado pelo ask_user SDK'");

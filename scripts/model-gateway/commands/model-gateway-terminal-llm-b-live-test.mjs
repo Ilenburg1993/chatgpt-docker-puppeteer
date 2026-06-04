@@ -4085,6 +4085,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: '/events default kept long event labels from pushing the timestamp column',
         },
         {
+            id: 'ux-no-question-ack-task-spam',
+            pass: !/Resposta humana entregue ao resolvedor da ferramenta|Pergunta pendente persistida limpa|Tarefa\s+conclu[ií]da\s+·\s+(?:Resposta humana entregue|Pergunta pendente persistida)/iu.test(
+                beforeRawDiagnosticsPlain,
+            ),
+            detail: 'internal ask_user delivery/cleanup acknowledgements did not pollute live output, /activity, or default /events',
+        },
+        {
             id: 'ux-single-live-status-source',
             pass: !/[⏳⌛] aguardando .*watchdog\//.test(plain),
             detail: 'dialog watchdog did not render a second live-status line when permanent live status is enabled',

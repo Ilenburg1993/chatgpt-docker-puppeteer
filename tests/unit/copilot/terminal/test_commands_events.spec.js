@@ -260,12 +260,12 @@ describe('terminal/commands/events', () => {
                     timestamp: 1710000001000,
                     eventId: 11,
                     event: 'question.answered',
-                    source: 'agent',
+                    source: 'agent/passthrough/question.answered',
                     eventSource: null,
                     traceId: 'turn:1',
                     turnId: '1',
                     hubSessionId: 'hub-1',
-                    payload: { questionId: 'q-1' },
+                    payload: { questionId: 'q-1', answer: 'SIM' },
                 },
                 {
                     timestamp: 1710000002000,
@@ -296,12 +296,15 @@ describe('terminal/commands/events', () => {
         await cmdEvents({ println: ctx.println }, '20');
 
         expect(ctx.output()).toContain('Raciocínio concluído');
-        expect(ctx.output()).toContain('Resposta do operador');
+        expect(ctx.output()).toContain('Resposta encaminhada');
+        expect(ctx.output()).toContain('ponte da pergunta');
+        expect(ctx.output()).toContain('SIM');
         expect(ctx.output()).toContain('Tarefa em segundo plano concluída');
         expect(ctx.output()).toContain('Tarefa em segundo plano ociosa');
         expect(ctx.output()).toContain('tarefa em segundo plano');
         expect(ctx.output()).not.toContain('assistant reasoning complete');
         expect(ctx.output()).not.toContain('question answered');
+        expect(ctx.output()).not.toContain('Resposta do operador');
         expect(ctx.output()).not.toContain('Tarefa em background concluída');
         expect(ctx.output()).not.toContain('Background ocioso');
         expect(ctx.output()).not.toContain('agente/background');
@@ -560,6 +563,91 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('×3');
         expect((ctx.output().match(/Ferramenta/g) ?? [])).toHaveLength(1);
         expect(ctx.output()).toContain('ferramenta Leitura local');
+    });
+
+    it('oculta eventos internos no resumo default sem esconder consultas explicitas', async () => {
+        const internalAck = {
+            timestamp: 1710000000000,
+            eventId: 81,
+            event: 'agent.background.completed',
+            source: 'agent/background.completed',
+            eventSource: null,
+            traceId: 'turn:1',
+            turnId: '1',
+            hubSessionId: 'hub-1',
+            payload: {
+                description: 'Clear persisted pendingQuestion',
+                status: 'success',
+                internal: true,
+                visible: false,
+            },
+        };
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 2,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                internalAck,
+                {
+                    timestamp: 1710000001000,
+                    eventId: 82,
+                    event: 'user_input.completed',
+                    source: 'sdk/user_input.completed',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: 'hub-1',
+                    payload: { answer: 'SIM' },
+                },
+            ],
+        });
+        const defaultCtx = mockCtx();
+
+        await cmdEvents({ println: defaultCtx.println }, '20');
+
+        expect(defaultCtx.output()).toContain('Resposta do operador');
+        expect(defaultCtx.output()).toContain('SIM');
+        expect(defaultCtx.output()).not.toContain('Tarefa em segundo plano concluída');
+        expect(defaultCtx.output()).not.toContain('Clear persisted pendingQuestion');
+
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 1,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: 'agent.background.completed',
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [internalAck],
+        });
+        const filteredCtx = mockCtx();
+
+        await cmdEvents({ println: filteredCtx.println }, '20 event=agent.background.completed');
+
+        expect(filteredCtx.output()).toContain('Tarefa em segundo plano concluída');
+        expect(filteredCtx.output()).toContain('Clear persisted pendingQuestion');
     });
 
     it('consulta por tool call, request e hub session', async () => {
