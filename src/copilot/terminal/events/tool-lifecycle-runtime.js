@@ -146,7 +146,7 @@ function terminalActivityLabelForPresentation(presentation, stage, success = nul
  * @returns {string}
  */
 function terminalActivityToolNameForPresentation(presentation) {
-    return presentation.canonicalToolName ?? presentation.toolName;
+    return presentation.displayToolName;
 }
 
 /**
@@ -1332,9 +1332,9 @@ export function reconcileTerminalInFlightToolsAtTurnEnd({ registry, reason = 'as
         recordTerminalDiagnosticToolStats(canonicalName, durationMs, true);
         completeTerminalTurnToolCall({ toolCallId: entry.toolCallId, success: true });
         recordToolTurnProjection(presentation, 'completed', entry.toolCallId, true);
-        recordTerminalActivity('tool', 'Tool reconciliada no fim do turno', {
-            detail: `${canonicalName} sem completion explícito (${reason}) · ${durationLabel}`,
-            toolName: canonicalName,
+        recordTerminalActivity('tool', 'Ferramenta reconciliada no fim do turno', {
+            detail: `${presentation.displayToolName} sem conclusão explícita (${reason}) · ${durationLabel}`,
+            toolName: presentation.displayToolName,
             toolTarget: presentation.target,
             severity: 'warn',
             source: 'sdk',
@@ -1343,7 +1343,7 @@ export function reconcileTerminalInFlightToolsAtTurnEnd({ registry, reason = 'as
             println(
                 terminalThemeRow(
                     'Sincronização',
-                    `${terminalThemeText('tool', canonicalName)} · ${terminalThemeText('warn', `conclusão inferida no fim do turno · ${durationLabel}`)}`,
+                    `${terminalThemeText('tool', presentation.displayToolName)} · ${terminalThemeText('warn', `conclusão inferida no fim do turno · ${durationLabel}`)}`,
                     { role: 'warn' },
                 ),
             );

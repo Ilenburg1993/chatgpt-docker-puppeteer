@@ -8630,7 +8630,7 @@
   - tratar retorno nulo da continuação automática como falha explícita em activity/SSE;
   - atualizar `/events` e summary quando necessário para diferenciar `tentando recuperar` de
     `recuperação manual necessária`.
-- [ ] Validação:
+- [x] Validação:
   - [x] teste unitário da política de idempotência;
   - [x] live PTY canônico com preset `default`, exigindo pergunta, resposta humana e ausência de
     duplicação visual;
@@ -8832,9 +8832,9 @@
   - [x] evidência:
     `artifacts/terminal-live/model-probe-20260604-model-transition-ux-rerun/summary.md` terminou
     PASS com `model-change-sse-operator-summary`, `model-human-default-copy` e zero erros.
-- [ ] Lacuna seguinte:
-  - `/events` ainda resume `session.model_changed` como `Modelo alterado` mesmo quando o
-    `operatorSummary` diz `confirmado sem troca`; o resumo humano deve usar a semântica do payload.
+- [x] Lacuna seguinte:
+  - resolvida na seção 12.94: `/events` passou a usar a semântica do `operatorSummary` e distinguir
+    `Modelo confirmado` de `Modelo alterado`.
 
 ### 12.94 `/events` e avisos assíncronos de modelo sem ambiguidade visual — 2026-06-04
 
@@ -8855,10 +8855,57 @@
   - `session.model_changed` e `pr.fallback_model` visíveis são impressos com quebra inicial para não
     grudar no prompt;
   - live runner `--model-probe` ganhou critério `model-events-summary-semantic`.
-- [ ] Validação:
+- [x] Validação:
   - [x] testes unitários focados de `/events`, `/model` e listeners de eventos;
   - [x] live PTY `artifacts/terminal-live/model-probe-20260604-model-events-semantic/summary.md`
     confirmou `Modelo SDK` em linha própria no plain log quando houve troca efetiva;
   - [x] live PTY `artifacts/terminal-live/model-probe-20260604-model-async-line/summary.md`
     confirmou `/events` com `Modelo confirmado` para no-op e critério
     `model-events-summary-semantic` verde.
+
+### 12.95 Fronteira humana/técnica de tools e empty-turn recuperado — 2026-06-04
+
+- [x] Achado:
+  - a superfície default já humanizava `report_intent`, `request_user_input`, ids `chatcmpl-tool-*`
+    e `toolu_*`, mas a atividade canônica ainda gravava `toolName` técnico em alguns eventos
+    `terminal.activity`;
+  - isso mantinha a UX dependente de cada comando lembrar de re-humanizar o payload depois;
+  - a live `long-tool-heartbeat` mostrou que o terminal recuperava corretamente alguns
+    `dialog.turn_end` vazios transitórios, mas o runner ainda classificava o primeiro empty-turn do
+    mesmo `traceId` como bloqueio mesmo quando havia `assistant.message` pública posterior.
+- [x] Decisão UX/contrato:
+  - `tool.lifecycle` continua sendo o contrato técnico: preserva `toolName`, `rawToolName`,
+    ids e correlação para diagnóstico;
+  - `terminal.activity` é superfície operacional humana: `toolName` deve ser o nome que o operador
+    vê, como `Intenção capturada`, `Pergunta ao operador`, `Executar comando` e `Ler arquivo`;
+  - empty-turn vazio só é bloqueador live se permanecer sem recuperação pública posterior no mesmo
+    `traceId` ou `turnId`;
+  - eventos `dialog.turn_end` com `replySuppressed=true` e razão `already_materialized` continuam
+    explicitamente não-bloqueadores.
+- [x] Implementação:
+  - `tool-lifecycle-runtime.js` passou a gravar `presentation.displayToolName` em
+    `terminal.activity` para native tools;
+  - reconciliação de tools pendentes no fim do turno trocou `Tool reconciliada` por
+    `Ferramenta reconciliada` e detalhe humano `sem conclusão explícita`;
+  - testes de lifecycle agora cobrem `ask_user`/`request_user_input` com `Pergunta ao operador` em
+    activity humana e `report_intent` com `Intenção capturada` em activity, mantendo
+    `report_intent_local`/`rawToolName=report_intent` no lifecycle técnico;
+  - runner live passou a usar `findUnrecoveredTerminalEmptyOutputEvent` e
+    `findUnrecoveredEmptyDialogTurnEnd`, ignorando empty-turns seguidos de `assistant.message`
+    pública no mesmo turno/trace.
+- [x] Validação:
+  - [x] `node --check` do runtime de tools, teste e runner live;
+  - [x] teste focado `tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js`;
+  - [x] live PTY `artifacts/terminal-live/ux-tool-name-heartbeat-current-20260604/summary.md`
+    reproduziu o falso bloqueio `assistant-empty-after-user-input` apesar de a resposta final estar
+    em `assistant.message`;
+  - [x] live PTY `artifacts/terminal-live/ux-tool-name-heartbeat-recovery-fixed-20260604/summary.md`
+    terminou PASS com `ux-human-tool-names`, `ux-no-raw-tool-ids-in-default-tool-lines`,
+    `ux-no-durable-waiting-spam`, `ux-question-live-status-does-not-compete-with-input`,
+    `post-ask-final-visible`, `no-terminal-errors` e `sse-critical-events-sourced`.
+- [ ] Lacunas remanescentes:
+  - manter payloads raw visíveis somente em `/events --raw`, `/tools raw` e modos explicitamente
+    detalhados;
+  - continuar procurando surfaces que ainda aceitem nome técnico como rótulo humano primário;
+  - próxima frente de alto retorno: revisar comandos de arquivo/mover/deletar e seleção automática de
+    modelo em live, garantindo que toda transição e toda permissão apareça como evento humano claro.

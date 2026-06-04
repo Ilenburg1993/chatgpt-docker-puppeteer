@@ -3460,7 +3460,9 @@ function detectLiveBlocker(plain, runtime = {}) {
                 ` · deltasBeforeAsk=${askBeforeDeltas.deltaMarkersBeforeAsk}`,
         };
     }
-    const emptyOutput = findTerminalEmptyOutputEvent(runtime.sseEvents) ?? findEmptyDialogTurnEnd(runtime.sseEvents);
+    const emptyOutput =
+        findUnrecoveredTerminalEmptyOutputEvent(runtime.sseEvents) ??
+        findUnrecoveredEmptyDialogTurnEnd(runtime.sseEvents);
     if (/Turno\s+(?:terminou\s+)?sem saída pública/i.test(plain) || emptyOutput) {
         const asked = Boolean(findUserInputRequestedEvent(runtime.sseEvents)) || scenario.askRenderedRe.test(plain);
         const answered =
@@ -3608,7 +3610,28 @@ function isObjectPayload(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function findEmptyDialogTurnEnd(events) {
+function eventPayloadMatchesTurnIdentity(payload, identity) {
+    if (!isObjectPayload(payload)) return false;
+    const traceId = typeof payload.traceId === 'string' ? payload.traceId : null;
+    const turnId = typeof payload.turnId === 'string' ? payload.turnId : null;
+    if (identity.traceId && traceId === identity.traceId) return true;
+    if (identity.turnId && turnId === identity.turnId) return true;
+    return !identity.traceId && !identity.turnId;
+}
+
+function hasPublicAssistantMessageAfterEvent(events, eventIndex, identity) {
+    if (!Array.isArray(events)) return false;
+    for (let index = eventIndex + 1; index < events.length; index += 1) {
+        const evt = events[index];
+        if (evt?.event !== 'assistant.message' || !isObjectPayload(evt.data)) continue;
+        if (!eventPayloadMatchesTurnIdentity(evt.data, identity)) continue;
+        const content = typeof evt.data.content === 'string' ? evt.data.content.trim() : '';
+        if (content.length > 0) return true;
+    }
+    return false;
+}
+
+function findUnrecoveredEmptyDialogTurnEnd(events) {
     if (!Array.isArray(events)) return null;
     for (let index = events.length - 1; index >= 0; index -= 1) {
         const evt = events[index];
@@ -3616,24 +3639,34 @@ function findEmptyDialogTurnEnd(events) {
         if (evt.data.replySuppressed === true) continue;
         const reply = typeof evt.data.reply === 'string' ? evt.data.reply.trim() : '';
         if (reply.length > 0) continue;
-        return {
-            eventId: evt.id,
+        const identity = {
             traceId: typeof evt.data.traceId === 'string' ? evt.data.traceId : null,
             turnId: typeof evt.data.turnId === 'string' ? evt.data.turnId : null,
+        };
+        if (hasPublicAssistantMessageAfterEvent(events, index, identity)) continue;
+        return {
+            eventId: evt.id,
+            traceId: identity.traceId,
+            turnId: identity.turnId,
         };
     }
     return null;
 }
 
-function findTerminalEmptyOutputEvent(events) {
+function findUnrecoveredTerminalEmptyOutputEvent(events) {
     if (!Array.isArray(events)) return null;
     for (let index = events.length - 1; index >= 0; index -= 1) {
         const evt = events[index];
         if (evt?.event !== 'terminal.turn.empty_output' || !isObjectPayload(evt.data)) continue;
-        return {
-            eventId: evt.id,
+        const identity = {
             traceId: typeof evt.data.traceId === 'string' ? evt.data.traceId : null,
             turnId: typeof evt.data.turnId === 'string' ? evt.data.turnId : null,
+        };
+        if (hasPublicAssistantMessageAfterEvent(events, index, identity)) continue;
+        return {
+            eventId: evt.id,
+            traceId: identity.traceId,
+            turnId: identity.turnId,
         };
     }
     return null;

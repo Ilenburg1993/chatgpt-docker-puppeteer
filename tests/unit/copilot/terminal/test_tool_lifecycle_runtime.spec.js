@@ -105,7 +105,7 @@ describe('terminal/tool-lifecycle-runtime', () => {
             expect.objectContaining({
                 detail: expect.stringContaining('aguardando decisão humana falhou'),
                 severity: 'error',
-                toolName: 'request_user_input',
+                toolName: 'Pergunta ao operador',
             }),
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Pergunta ao operador'));
@@ -143,7 +143,7 @@ describe('terminal/tool-lifecycle-runtime', () => {
             'Pergunta ao operador aguardando resposta',
             expect.objectContaining({
                 detail: expect.stringContaining('Como você quer continuar?'),
-                toolName: 'request_user_input',
+                toolName: 'Pergunta ao operador',
                 toolTarget: 'Como você quer continuar?',
             }),
         );
@@ -159,6 +159,70 @@ describe('terminal/tool-lifecycle-runtime', () => {
         );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Tool'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('chatcmpl-tool'));
+    });
+
+    it('registra terminal.activity de report_intent com nome humano sem perder lifecycle técnico', async () => {
+        const { createToolCallRegistry } = await import(
+            '../../../../src/copilot/terminal/state/tool-call-registry.js'
+        );
+        const { handleTerminalNativeToolStart, handleTerminalNativeToolComplete } = await import(
+            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
+        );
+
+        const registry = createToolCallRegistry();
+        const args = { intent: 'auditar UX do terminal' };
+
+        handleTerminalNativeToolStart({
+            registry,
+            evt: {
+                toolCallId: 'chatcmpl-tool-intent',
+                toolName: 'report_intent',
+                args,
+            },
+        });
+        handleTerminalNativeToolComplete({
+            registry,
+            evt: {
+                toolCallId: 'chatcmpl-tool-intent',
+                toolName: 'report_intent',
+                args,
+                success: true,
+                durationMs: 12,
+            },
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'turn',
+            'Intenção capturada',
+            expect.objectContaining({
+                detail: 'registrando intenção · auditar UX do terminal',
+                toolName: 'Intenção capturada',
+                toolTarget: 'auditar UX do terminal',
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'turn',
+            'Intenção registrada',
+            expect.objectContaining({
+                detail: expect.stringContaining('registrando intenção concluído'),
+                toolName: 'Intenção capturada',
+                toolTarget: 'auditar UX do terminal',
+            }),
+        );
+        expect(recordTerminalTurnToolActivity).toHaveBeenCalledWith(
+            expect.objectContaining({
+                toolName: 'report_intent_local',
+                operation: 'intent',
+                target: 'auditar UX do terminal',
+            }),
+        );
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                toolName: 'report_intent_local',
+                rawToolName: 'report_intent',
+            }),
+        );
     });
 
     it('reconcilia postToolUse com exitCode não zero como falha visual da tool', async () => {
