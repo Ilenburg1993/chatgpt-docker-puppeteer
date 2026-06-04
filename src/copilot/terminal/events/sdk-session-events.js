@@ -74,7 +74,7 @@ import {
     setLastSdkPlanOperation,
     setSdkSessionMode,
 } from '../../presentation/state/index.js';
-import { broadcastSse, println, writeInlineStatus } from '../dialog/index.js';
+import { broadcastSse, println } from '../dialog/index.js';
 import {
     answerTerminalPendingQuestion,
     classifyTerminalPermissionDecision,
@@ -1382,12 +1382,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: countLabel,
             source: 'sdk',
             recordHistory: false,
+            updateCurrent: false,
         });
-        if (shouldPrintSessionNarration('verbose')) {
-            const sdkLabel = sdkCount === null ? 'SDK sem contagem' : `SDK dinâmicas ${sdkCount}`;
-            const localLabel = localCount > 0 ? `locais ${localCount} em /tools` : 'sem ferramentas locais';
-            writeInlineStatus(`LLM-B sessão · ferramentas · ${sdkLabel} · ${localLabel}`);
-        }
         broadcastSse(
             'session.tools_updated',
             withSdkSessionSseEnvelope(
@@ -1409,9 +1405,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: `${enabled}/${count} habilitada(s)`,
             source: 'sdk',
             recordHistory: false,
+            updateCurrent: false,
         });
-        if (shouldPrintSessionNarration('verbose'))
-            writeInlineStatus(`LLM-B sessão · skills · ${enabled}/${count} habilitadas`);
         broadcastSse(
             'session.skills_loaded',
             withSdkSessionSseEnvelope({ count, enabled }, 'sdk/session.skills_loaded'),

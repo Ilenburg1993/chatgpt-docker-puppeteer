@@ -16,6 +16,13 @@ import {
     terminalThemeHeadline,
     terminalThemeRow,
 } from '../state/index.js';
+import {
+    compactTerminalIntentText,
+    formatTerminalIntentTechnicalEnvelope,
+    humanTerminalIntentRiskLabel,
+    humanTerminalIntentSource,
+    terminalIntentRiskTheme,
+} from '../events/intent-presenter.js';
 
 /**
  * @typedef {object} IntentCommandContext
@@ -39,51 +46,6 @@ function printBlock(ctx, lines) {
  */
 function formatTime(timestamp) {
     return formatTerminalTimeLabel(timestamp, { mode: 'dual' });
-}
-
-/**
- * @param {string} value
- * @param {number} max
- * @returns {string}
- */
-function compact(value, max) {
-    const text = value.replace(/\s+/g, ' ').trim();
-    if (text.length <= max) return text;
-    return `${text.slice(0, Math.max(0, max - 1))}…`;
-}
-
-/**
- * @param {import('../state/intent-state.js').TerminalIntentRisk} risk
- * @returns {string}
- */
-function humanRiskLabel(risk) {
-    if (risk === 'low') return 'baixo';
-    if (risk === 'medium') return 'médio';
-    if (risk === 'high') return 'alto';
-    return 'não informado';
-}
-
-/**
- * @param {string} source
- * @returns {string}
- */
-function humanIntentSource(source) {
-    const text = source.trim().toLowerCase();
-    if (text.includes('assistant.intent')) return 'SDK';
-    if (text.includes('report_intent')) return 'ferramenta de intenção';
-    if (text.includes('terminal')) return 'terminal';
-    return 'captura';
-}
-
-/**
- * @param {import('../state/intent-state.js').TerminalIntentRisk} risk
- * @returns {'info' | 'warn' | 'error' | 'muted'}
- */
-function riskTheme(risk) {
-    if (risk === 'high') return 'error';
-    if (risk === 'medium') return 'warn';
-    if (risk === 'unknown') return 'muted';
-    return 'info';
 }
 
 /**
@@ -128,21 +90,17 @@ export function cmdIntent(ctx, arg) {
         terminalThemeDivider(58),
     ];
     for (const entry of entries) {
-        const theme = riskTheme(entry.risk);
-        const source = humanIntentSource(entry.source);
-        lines.push(terminalThemeRow('Intenção', compact(entry.intent, 180), { role: theme }));
+        const theme = terminalIntentRiskTheme(entry.risk);
+        const source = humanTerminalIntentSource(entry.source);
+        lines.push(terminalThemeRow('Intenção', compactTerminalIntentText(entry.intent, 180), { role: theme }));
         lines.push(
             terminalThemeRow(
                 'Contexto',
-                `${formatTime(entry.timestamp)} · origem ${source} · risco ${humanRiskLabel(entry.risk)}`,
+                `${formatTime(entry.timestamp)} · origem ${source} · ${humanTerminalIntentRiskLabel(entry.risk)}`,
             ),
         );
         if (detail) {
-            const tool = entry.tool ? ` · ferramenta ${entry.tool}` : '';
-            const call = entry.toolCallId ? ` · chamada ${compact(entry.toolCallId, 18)}` : '';
-            lines.push(
-                terminalThemeRow('Técnico', `origem bruta ${entry.source}${tool}${call} · registro ${entry.id}`),
-            );
+            lines.push(terminalThemeRow('Envelope', formatTerminalIntentTechnicalEnvelope(entry)));
         }
     }
     lines.push(

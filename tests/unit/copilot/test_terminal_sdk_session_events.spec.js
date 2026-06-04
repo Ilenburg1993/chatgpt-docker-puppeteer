@@ -781,7 +781,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Ferramentas dinâmicas do SDK atualizadas'));
     });
 
-    it('mostra narrativa verbose informativa na linha viva quando o toggle session está ativo', async () => {
+    it('mantém inventário verbose de skills/tools fora da linha viva e da atividade atual', async () => {
         mocks.getShowSessionActivity.mockReturnValue(true);
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');
@@ -791,9 +791,17 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         agent.emit('session.skills_loaded', { count: 3, enabled: 2 });
         agent.emit('session.tools_updated', { count: 92 });
 
-        expect(mocks.writeInlineStatus).toHaveBeenCalledWith(expect.stringMatching(/skills · 2\/3 habilitadas/u));
-        expect(mocks.writeInlineStatus).toHaveBeenCalledWith(expect.stringMatching(/ferramentas · SDK dinâmicas 92/u));
-        expect(mocks.writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('sem ferramentas locais'));
+        expect(mocks.writeInlineStatus).not.toHaveBeenCalled();
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Skills SDK carregadas',
+            expect.objectContaining({ updateCurrent: false, recordHistory: false }),
+        );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Ferramentas dinâmicas do SDK atualizadas',
+            expect.objectContaining({ updateCurrent: false, recordHistory: false }),
+        );
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringMatching(/Skills\s+2\/3 habilitadas/u));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringMatching(/Ferramentas\s+SDK dinâmicas 92/u));
     });
@@ -847,9 +855,10 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             'Ferramentas dinâmicas do SDK atualizadas',
             expect.objectContaining({
                 detail: expect.stringContaining('SDK sinalizou atualização sem contagem materializada'),
+                updateCurrent: false,
             }),
         );
-        expect(mocks.writeInlineStatus).toHaveBeenCalledWith(expect.stringMatching(/ferramentas · SDK sem contagem/u));
+        expect(mocks.writeInlineStatus).not.toHaveBeenCalled();
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringMatching(/Ferramentas\s+SDK sem contagem/u));
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'session.tools_updated',
@@ -871,6 +880,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             'Ferramentas dinâmicas do SDK atualizadas',
             expect.objectContaining({
                 detail: expect.stringContaining('0 ferramentas dinâmicas do SDK;'),
+                updateCurrent: false,
             }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
@@ -878,11 +888,10 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             'Ferramentas dinâmicas do SDK atualizadas',
             expect.objectContaining({
                 detail: expect.stringContaining('sem ferramentas locais ativas'),
+                updateCurrent: false,
             }),
         );
-        expect(mocks.writeInlineStatus).toHaveBeenCalledWith(
-            expect.stringMatching(/ferramentas · SDK dinâmicas 0 · sem ferramentas locais/u),
-        );
+        expect(mocks.writeInlineStatus).not.toHaveBeenCalled();
         expect(mocks.println).not.toHaveBeenCalledWith(
             expect.stringMatching(/Ferramentas\s+SDK dinâmicas 0 · sem ferramentas locais/u),
         );

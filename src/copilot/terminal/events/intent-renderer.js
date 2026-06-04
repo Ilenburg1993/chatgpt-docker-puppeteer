@@ -19,6 +19,12 @@ import {
     terminalThemeText,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
+import {
+    compactTerminalIntentText,
+    humanTerminalIntentRiskLabel,
+    humanTerminalIntentSource,
+    terminalIntentRiskTheme,
+} from './intent-presenter.js';
 
 const RECENT_INTENT_TTL_MS = 5 * 60_000;
 const RECENT_INTENT_MAX = 256;
@@ -58,51 +64,6 @@ function hashIntentInput(input) {
 }
 
 /**
- * @param {string} value
- * @param {number} max
- * @returns {string}
- */
-function compact(value, max) {
-    const text = value.replace(/\s+/g, ' ').trim();
-    if (text.length <= max) return text;
-    return `${text.slice(0, Math.max(0, max - 1))}…`;
-}
-
-/**
- * @param {import('../state/intent-state.js').TerminalIntentRisk} risk
- * @returns {'info' | 'warn' | 'error' | 'muted'}
- */
-function riskTheme(risk) {
-    if (risk === 'high') return 'error';
-    if (risk === 'medium') return 'warn';
-    if (risk === 'unknown') return 'muted';
-    return 'info';
-}
-
-/**
- * @param {import('../state/intent-state.js').TerminalIntentRisk} risk
- * @returns {string}
- */
-function humanRiskLabel(risk) {
-    if (risk === 'low') return 'risco baixo';
-    if (risk === 'medium') return 'risco médio';
-    if (risk === 'high') return 'risco alto';
-    return 'risco não informado';
-}
-
-/**
- * @param {string} source
- * @returns {string}
- */
-function humanIntentSource(source) {
-    const text = source.trim().toLowerCase();
-    if (text.includes('assistant.intent')) return 'SDK';
-    if (text.includes('report_intent')) return 'ferramenta de intenção';
-    if (text.includes('terminal')) return 'terminal';
-    return 'captura';
-}
-
-/**
  * @param {{
  *     intent: string;
  *     tool?: string | null;
@@ -131,12 +92,12 @@ export function renderTerminalIntent(input) {
     if (!entry) return null;
 
     const risk = entry.risk;
-    const theme = riskTheme(risk);
-    const renderedRisk = humanRiskLabel(risk);
-    const sourceLabel = ` · origem ${humanIntentSource(entry.source)}`;
+    const theme = terminalIntentRiskTheme(risk);
+    const renderedRisk = humanTerminalIntentRiskLabel(risk);
+    const sourceLabel = ` · origem ${humanTerminalIntentSource(entry.source)}`;
 
     recordTerminalActivity('turn', 'Intenção da LLM-B', {
-        detail: compact(intent, 240),
+        detail: compactTerminalIntentText(intent, 240),
         source: entry.source,
         severity: risk === 'high' ? 'warn' : 'info',
         recordHistory: true,
@@ -152,7 +113,7 @@ export function renderTerminalIntent(input) {
     });
 
     if (input.print !== false) {
-        const lines = [SEPARATOR, terminalThemeRow('Intenção', `${renderedRisk}${sourceLabel}`, { role: theme }), ''];
+        const lines = [SEPARATOR, terminalThemeRow('Intenção capturada', `${renderedRisk}${sourceLabel}`, { role: theme }), ''];
         for (const line of intent.split('\n')) {
             lines.push(`  ${terminalThemeText(theme, '│')}  ${line}`);
         }

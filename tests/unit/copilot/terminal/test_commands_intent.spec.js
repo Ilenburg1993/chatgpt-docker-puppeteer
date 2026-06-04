@@ -53,7 +53,7 @@ describe('terminal/commands/intent', () => {
             tool: 'patch_file',
             risk: 'medium',
             source: 'tool/report_intent_local',
-            toolCallId: 'call-1',
+            toolCallId: 'toolu_bdrk_019v9X862pjamNysAemC1UAW',
             timestamp: 1_700_000_000_000,
         });
         const ctx = mockCtx();
@@ -61,11 +61,16 @@ describe('terminal/commands/intent', () => {
         cmdIntent(ctx, 'detail 5');
 
         expect(ctx.output()).toContain('detalhe técnico');
-        expect(ctx.output()).toContain('origem bruta tool/report_intent_local');
-        expect(ctx.output()).toContain('ferramenta patch_file');
-        expect(ctx.output()).toContain('chamada call-1');
+        expect(ctx.output()).toContain('Envelope');
+        expect(ctx.output()).toContain('origem ferramenta de intenção');
+        expect(ctx.output()).toContain('ferramenta Editar arquivo');
+        expect(ctx.output()).toContain('chamada id interno');
+        expect(ctx.output()).not.toContain('tool/report_intent_local');
+        expect(ctx.output()).not.toContain('report_intent_local');
+        expect(ctx.output()).not.toContain('patch_file');
+        expect(ctx.output()).not.toContain('toolu_bdrk');
         expect(ctx.output()).not.toContain('tool=patch_file');
-        expect(ctx.output()).not.toContain('call=call-1');
+        expect(ctx.output()).not.toContain('call=');
     });
 
     it('limpa histórico em memória', () => {

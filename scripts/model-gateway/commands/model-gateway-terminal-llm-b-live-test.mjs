@@ -4104,6 +4104,18 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const latestActivity40Section =
         activity40Sections
             .at(-1)
+            ?.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/(?:intent|tools|events|usage|errors|health|export|quit)\b/iu)[0] ?? '';
+    const intentDefaultSections = beforeRawDiagnosticsPlain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/intent\s+5\b[^\n\r]*/iu).slice(1);
+    const latestIntentDefaultSection =
+        intentDefaultSections
+            .at(-1)
+            ?.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/(?:intent|tools|events|usage|errors|health|export|quit)\b/iu)[0] ?? '';
+    const intentDetailSections = beforeRawDiagnosticsPlain
+        .split(/\n\s*voc[eê]\[[^\n]*?›\s+\/intent\s+detail\s+5\b[^\n\r]*/iu)
+        .slice(1);
+    const latestIntentDetailSection =
+        intentDetailSections
+            .at(-1)
             ?.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/(?:tools|events|usage|errors|health|export|quit)\b/iu)[0] ?? '';
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const canonicalEvents = [...sseSummary.events, ...archiveRawEvents];
@@ -4530,9 +4542,8 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             pass:
                 !/Info SDK|configuration|Disabled tools|model_retry|Response was interrupted due to a server error/iu.test(
                     beforeRawDiagnosticsPlain,
-                ) &&
-                /Configura[cç][aã]o\s+ferramentas nativas desativadas/iu.test(beforeRawDiagnosticsPlain),
-            detail: 'SDK session info rendered as operator-facing session configuration/retry copy instead of raw SDK labels',
+                ) && !/LLM-B sessão · (?:skills|ferramentas|Configura[cç][aã]o)/iu.test(beforeRawDiagnosticsPlain),
+            detail: 'routine SDK session info stayed out of the live/default surface and raw SDK labels stayed hidden',
         },
         {
             id: 'ux-compact-byok-error-live-status',
@@ -4626,6 +4637,29 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-intent-label-portuguese',
             pass: /Inten[cç][aã]o\s+capturada/u.test(plain) && !/\[INTENT\]/u.test(plain),
             detail: 'intent blocks use the Portuguese operator-facing label',
+        },
+        {
+            id: 'ux-intent-command-default-human',
+            pass:
+                /Inten[cç][oõ]es capturadas/iu.test(latestIntentDefaultSection) &&
+                /origem ferramenta de inten[cç][aã]o/iu.test(latestIntentDefaultSection) &&
+                !/report_intent|tool\/|toolu_|chatcmpl-tool|origem bruta|patch_file|call_/iu.test(
+                    latestIntentDefaultSection,
+                ),
+            detail: '/intent default rendered captured intents without raw source, tool name, or call identifiers',
+        },
+        {
+            id: 'ux-intent-command-detail-human-envelope',
+            pass:
+                /detalhe t[eé]cnico/iu.test(latestIntentDetailSection) &&
+                /Envelope\s+origem ferramenta de inten[cç][aã]o/iu.test(latestIntentDetailSection) &&
+                /ferramenta\s+(?:Inten[cç][aã]o capturada|Editar arquivo|Ler arquivo)/iu.test(
+                    latestIntentDetailSection,
+                ) &&
+                !/origem bruta|tool\/report_intent|report_intent_local|toolu_|chatcmpl-tool|patch_file|call_/iu.test(
+                    latestIntentDetailSection,
+                ),
+            detail: '/intent detail kept the technical envelope humanized and compact',
         },
         {
             id: 'ux-compact-ask-live-status',
@@ -6047,6 +6081,8 @@ async function main() {
                 const diagnostics = [
                     '/usage now',
                     '/activity 40',
+                    '/intent 5',
+                    '/intent detail 5',
                     '/tools diag',
                     '/events 60',
                     '/events 100 --raw',
@@ -6078,6 +6114,8 @@ async function main() {
         postCommandsSent = true;
         const diagnostics = [
             '/activity 40',
+            '/intent 5',
+            '/intent detail 5',
             '/byok providers',
             '/byok health',
             '/byok recommend reasoning safe 8',
@@ -6103,6 +6141,8 @@ async function main() {
         postCommandsSent = true;
         const diagnostics = [
             '/activity 40',
+            '/intent 5',
+            '/intent detail 5',
             '/tools diag',
             '/byok providers',
             '/byok health',
@@ -6133,6 +6173,8 @@ async function main() {
         );
         const diagnostics = [
             '/activity 40',
+            '/intent 5',
+            '/intent detail 5',
             '/tools diag',
             '/events 60',
             '/events 100 --raw',
@@ -6173,6 +6215,8 @@ async function main() {
             );
             const diagnostics = [
                 '/activity 40',
+                '/intent 5',
+                '/intent detail 5',
                 '/tools diag',
                 '/events 60',
                 '/events 100 --raw',

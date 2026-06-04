@@ -24,6 +24,7 @@ describe('terminal/tool-activity-presenter', () => {
         expect(getTerminalHumanToolName('io.search.io-engine.rg.search')).toBe('Busca local');
         expect(getTerminalHumanToolName('tool.fast')).toBe('tool.fast');
         expect(isTerminalInternalCallIdentifier('chatcmpl-tool-80d5a00b25801fef')).toBe(true);
+        expect(isTerminalInternalCallIdentifier('toolu_bdrk_019v9X862pjamNysAemC1UAW')).toBe(true);
         expect(compactTerminalDiagnosticId('chatcmpl-tool-80d5a00b25801fef')).toBe('chatcmpl-too…');
     });
 

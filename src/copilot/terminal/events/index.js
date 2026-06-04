@@ -9,6 +9,13 @@ export {
 } from './assistant-transcript-renderer.js';
 export { renderTerminalIntent, __test__ as terminalIntentRendererTestHarness } from './intent-renderer.js';
 export {
+    compactTerminalIntentText,
+    formatTerminalIntentTechnicalEnvelope,
+    humanTerminalIntentRiskLabel,
+    humanTerminalIntentSource,
+    terminalIntentRiskTheme,
+} from './intent-presenter.js';
+export {
     createTaskTranscriptAccumulator,
     getTaskTranscriptKey,
     isInternalTaskTranscriptKey,

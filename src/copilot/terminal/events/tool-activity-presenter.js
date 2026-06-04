@@ -80,7 +80,7 @@ const HUMAN_TOOL_NAMES = Object.freeze({
 
 const TOOL_ID_PATTERNS = [
     /^chatcmpl-tool-[a-z0-9-]+$/iu,
-    /^toolu_[a-z0-9]+$/iu,
+    /^toolu_[a-z0-9_-]+$/iu,
     /^call_[a-z0-9_-]+$/iu,
     /^ext:[a-z0-9_-]+/iu,
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu,

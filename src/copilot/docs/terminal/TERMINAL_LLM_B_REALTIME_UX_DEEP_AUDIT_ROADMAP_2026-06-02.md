@@ -7301,3 +7301,52 @@
   - revisar `/events` default e `/intent` para garantir que o glossário compartilhado não precise
     de uma segunda camada paralela;
   - só depois retomar a avaliação visual de TUI completa (`gum`, `fzf`, `bat`, `glow`, `delta`).
+
+## 2026-06-04 — Intent e Eventos sem Vocabulário Paralelo
+
+- [x] Auditoria inicial:
+  - `/events` já usa `tool-activity-presenter.js` para nomes de ferramenta, paths e IDs compactos;
+  - `/intent` e `intent-renderer.js` ainda mantêm helpers próprios para origem/risco;
+  - o teste de `/intent detail` ainda aceitava `origem bruta tool/report_intent_local`, `ferramenta
+    patch_file` e `chamada call-1`;
+  - isso cria uma segunda gramática visual e reabre a porta para `report_intent_local`,
+    `chatcmpl-tool-*`, `toolu_*` e nomes técnicos longos em superfícies que deveriam ser humanas.
+- [x] Decisão UX:
+  - `/intent` default deve ler como painel conversacional: intenção, contexto temporal completo,
+    origem humana, risco humano e uso;
+  - `/intent detail` pode mostrar envelope técnico, mas com nomes humanos e IDs compactos;
+  - nomes brutos de ferramenta/source/call ficam reservados para export estruturado, SSE raw ou
+    testes de contrato, não para a superfície visual default;
+  - `assistant.intent`, `report_intent` e `report_intent_local` continuam sendo protocolos
+    canônicos internamente, mas a UI deve apresentá-los como `SDK` ou `ferramenta de intenção`.
+- [ ] Implementação planejada:
+  - [x] criar presenter compartilhado para intent;
+  - [x] migrar `commands/intent.js` e `events/intent-renderer.js`;
+  - [x] atualizar testes para bloquear `report_intent_local`, `toolu_*`, `chatcmpl-tool-*` e `call_*`
+    na superfície humana;
+  - [x] reforçar harness live para validar `/intent` quando houver intenção real capturada.
+- [x] Live canônico de auditoria:
+  - comando:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --label terminal-ux-intent-human-envelope-20260604 --timeout-ms 240000 --transport=pty`;
+  - artefato: `artifacts/terminal-live/2026-06-04T18-22-35-347Z/summary.md`;
+  - resultado parcial: `/intent` default e `/intent detail` passaram com envelope humano;
+  - falha útil: `ux-no-raw-sdk-info-labels` ainda exigia a antiga linha de configuração, embora a
+    decisão atual seja silenciar configuração informativa;
+  - achado visual adicional: `session.skills_loaded` e `session.tools_updated` ainda usavam linha
+    viva em modo full, poluindo a região do prompt com inventário de boot.
+- [x] Correção complementar:
+  - `session.skills_loaded` e `session.tools_updated` agora ficam fora de stdout/linha viva;
+  - ambos preservam SSE/diagnóstico, mas usam `updateCurrent:false` para não sequestrar a atividade
+    atual;
+  - o critério `ux-no-raw-sdk-info-labels` passa a validar silêncio operacional para inventário
+    rotineiro e ausência de rótulos crus.
+- [x] Live canônico final:
+  - comando:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --label terminal-ux-intent-human-envelope-pass2-20260604 --timeout-ms 240000 --transport=pty`;
+  - artefato: `artifacts/terminal-live/2026-06-04T18-27-06-077Z/summary.md`;
+  - resultado: `PASS`;
+  - critérios novos aprovados: `ux-intent-command-default-human`,
+    `ux-intent-command-detail-human-envelope` e `ux-no-raw-sdk-info-labels`;
+  - inspeção manual do `terminal.plain.log`: `/intent` e `/intent detail` renderizam origem humana,
+    ferramenta humana e `chamada id interno`; `report_intent_local`, `toolu_*` e `chatcmpl-tool-*`
+    aparecem apenas após `/events --raw`.
