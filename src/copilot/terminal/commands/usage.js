@@ -91,7 +91,7 @@ export function cmdUsage({ println }, arg) {
             const cost = modelBilling.cost === null ? '?' : modelBilling.cost.toFixed(4);
             const modelLabel = modelBilling.mismatch
                 ? `configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'}`
-                : `modelo ${modelBilling.displayModel}`;
+                : `rota ${modelBilling.displayModel}${modelBilling.observedModel && modelBilling.observedModel !== modelBilling.displayModel ? ` · observado ${modelBilling.observedModel}` : ''}`;
             if (byokActive) {
                 println(
                     terminalThemeRow(

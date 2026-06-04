@@ -4,7 +4,7 @@
  */
 
 import { buildRuntimeFallbackWarning } from '../../../presentation/routing/index.js';
-import { resolveModelSelectionMismatch } from '#copilot/core';
+import { isAutoModelSelector, resolveModelSelectionMismatch } from '#copilot/core';
 import {
     normalizeAgentContextWindowProjection,
     readAgentRuntimeOverviewProjection,
@@ -18,6 +18,7 @@ import { readTerminalSessionBinding } from '../gateways/index.js';
  *     billedModel: string | null;
  *     configuredModel: string | null;
  *     effectiveModel: string | null;
+ *     observedModel: string | null;
  *     mismatch: boolean;
  *     cost: number | null;
  *     at: string | null;
@@ -108,14 +109,19 @@ export function normalizeTerminalModelBillingProjection(lastPrInfo, fallbackMode
         effectiveModel,
         explicitMismatch: Boolean(lastPrInfo?.['modelMismatch']),
     });
+    const displayModel =
+        configuredModel && !isAutoModelSelector(configuredModel)
+            ? configuredModel
+            : fallbackModel ?? configuredModel ?? effectiveModel ?? billedModel ?? '-';
     return {
         billedModel,
         configuredModel,
         effectiveModel,
+        observedModel: effectiveModel ?? billedModel,
         mismatch,
         cost: typeof lastPrInfo?.['cost'] === 'number' ? Number(lastPrInfo['cost']) : null,
         at: typeof lastPrInfo?.['ts'] === 'number' ? new Date(lastPrInfo['ts']).toISOString() : null,
-        displayModel: effectiveModel ?? billedModel ?? configuredModel ?? fallbackModel ?? '-',
+        displayModel,
     };
 }
 

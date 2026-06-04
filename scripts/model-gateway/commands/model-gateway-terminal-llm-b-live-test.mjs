@@ -2475,6 +2475,7 @@ function defaultUxCycleCriteria(boot) {
     const defaultSurface = surfaceStarts.map((index) => surfaceAt(index)).join('\n');
     const helpSurface = surfaceAt(helpStart);
     const helpFullSurface = surfaceAt(helpFullStart);
+    const statusSurface = surfaceAt(statusStart);
     const healthSurface = surfaceAt(healthStart);
     const toolsSurface = surfaceAt(toolsStart);
     const sdkSurface = surfaceAt(sdkStart);
@@ -2483,6 +2484,10 @@ function defaultUxCycleCriteria(boot) {
     const liveSurface = surfaceAt(liveStart);
     const activitySurface = surfaceAt(activityStart);
     const eventsSurface = surfaceAt(eventsStart);
+    const statusModel = extractTerminalUxRowValue(statusSurface, 'Modelo').split('·')[0]?.trim() ?? '';
+    const nowModel = extractTerminalUxRowValue(surfaceAt(nowStart), 'Modelo').split('·')[0]?.trim() ?? '';
+    const healthModel = extractTerminalUxRowValue(healthSurface, 'Modelo').split('·')[0]?.trim() ?? '';
+    const sdkModel = extractTerminalUxRowValue(sdkSurface, 'Modelo').split('·')[0]?.trim() ?? '';
     const orderedSurfaceStarts = [
         helpStart,
         helpFullStart,
@@ -2543,6 +2548,17 @@ function defaultUxCycleCriteria(boot) {
                 /Status do Terminal LLM-B[\s\S]*Conversa[\s\S]*Entrada[\s\S]*Detalhe\s+\/status full/iu.test(plain) &&
                 !/prompt digest|tools load|runtime id|billing\/modelo/iu.test(defaultSurface),
             detail: '/status default rendered a human decision panel instead of the full diagnostic dump',
+        },
+        {
+            id: 'ux-cycle-model-labels-consistent',
+            pass:
+                Boolean(statusModel) &&
+                statusModel === nowModel &&
+                statusModel === healthModel &&
+                statusModel === sdkModel &&
+                [statusModel, nowModel, healthModel, sdkModel].every((model) => model.toLowerCase() !== 'auto') &&
+                !/claude-haiku-4\.5/iu.test([statusModel, nowModel, healthModel, sdkModel].join(' ')),
+            detail: '/status, /now, /health and /sdk agreed on the live BYOK route instead of stale auto/billing labels',
         },
         {
             id: 'ux-cycle-now-human',
@@ -2707,6 +2723,11 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
 
 function hasReturnedToReplPrompt(plain, outputOffset) {
     return REPL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
+}
+
+function extractTerminalUxRowValue(surface, label) {
+    const pattern = new RegExp(`(?:^|\\n)\\s*${escapeRegExp(label)}\\s+([^\\n\\r]+)`, 'u');
+    return String(surface ?? '').match(pattern)?.[1]?.trim() ?? '';
 }
 
 function findAssistantEndedBeforeRequiredAsk(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID], events = []) {

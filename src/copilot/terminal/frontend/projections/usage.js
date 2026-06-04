@@ -30,10 +30,10 @@ export function readTerminalUsageNowProjection(runtimeId) {
         contextWindow: base.contextWindow,
         pr,
         llmUsage,
-        modelBilling: normalizeTerminalModelBillingProjection(pr, String(base.snap['model'] ?? base.model ?? '')),
+        modelBilling: normalizeTerminalModelBillingProjection(pr, String(base.model ?? base.snap['model'] ?? '')),
         llmUsageBilling: normalizeTerminalModelBillingProjection(
             llmUsage,
-            String(base.snap['model'] ?? base.model ?? ''),
+            String(base.model ?? base.snap['model'] ?? ''),
         ),
         requestedRuntimeId: base.requestedRuntimeId,
         runtimeId: base.runtimeId,

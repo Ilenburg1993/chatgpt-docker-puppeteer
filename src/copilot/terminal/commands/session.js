@@ -76,6 +76,18 @@ const DISABLED_BYOK_SUMMARY = Object.freeze({
 });
 
 /**
+ * @param {import('../frontend/projections/shared.js').TerminalModelBillingProjection} modelBilling
+ * @param {string} action
+ * @returns {string}
+ */
+function renderTerminalModelSelectionLine(modelBilling, action) {
+    if (!modelBilling.mismatch) return modelBilling.displayModel;
+    const configured = modelBilling.configuredModel ?? modelBilling.displayModel ?? '-';
+    const observed = modelBilling.effectiveModel ?? modelBilling.billedModel ?? modelBilling.observedModel ?? '-';
+    return `${configured} → ${observed} · ${action}`;
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -662,7 +674,6 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             ? `${byok.ready ? 'pronto' : 'incompleto'} · ${byok.providerType ?? '-'} · ${byok.model ?? '-'}`
             : 'SDK Copilot';
         const modelBilling = projection.modelBilling;
-        const modelLabel = modelBilling.mismatch ? `${modelBilling.displayModel} · ver /status full` : modelBilling.displayModel;
         const gatewayProjection = configProjection.modelGatewayProjection ?? {
             providerCount: 0,
             modelCount: 0,
@@ -670,6 +681,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         };
         const rawAction = projection.recommendedAction === 'none' ? null : projection.recommendedAction;
         const action = rawAction ?? (waitCount > 0 ? '/sdk waits' : '/menu');
+        const modelLabel = renderTerminalModelSelectionLine(modelBilling, 'ver /status full');
 
         println('');
         println(terminalThemeHeadline('assistant', 'Status do Terminal LLM-B'));
@@ -683,7 +695,11 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         );
         println(terminalThemeRow('Saúde', health ? renderHumanTerminalHealth(health['status']) : 'sem leitura', { role: health?.['status'] === 'healthy' ? 'success' : 'warn' }));
         println(terminalThemeRow('Entrada', waitLine, { role: waitCount > 0 ? 'warn' : 'success' }));
-        println(terminalThemeRow('Modelo', `${modelLabel} · raciocínio ${configProjection.currentReasoningEffort}`, { role: modelBilling.mismatch ? 'warn' : 'assistant' }));
+        println(
+            terminalThemeRow('Modelo', `${modelLabel} · raciocínio ${configProjection.currentReasoningEffort}`, {
+                role: modelBilling.mismatch ? 'warn' : 'assistant',
+            }),
+        );
         println(terminalThemeRow('Acesso', byokLabel, { role: byok.enabled && !byok.ready ? 'warn' : 'success' }));
         println(
             terminalThemeRow(
@@ -1146,9 +1162,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
               : 'sem pergunta pendente';
         const waitLine =
             waitCount > 0 ? `${waitCount} pendência(s) humanas · /sdk waits` : 'sem pendências humanas';
-        const modelLine = modelBilling.mismatch
-            ? `${modelBilling.displayModel} · revisar /status full`
-            : modelBilling.displayModel;
+        const modelLine = renderTerminalModelSelectionLine(modelBilling, 'revisar /status full');
         println('');
         println(terminalThemeHeadline('assistant', 'Agora'));
         println(terminalThemeDivider(37));
@@ -1193,8 +1207,8 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
           ? `pergunta salva (${projection.pendingQuestionShadowState})`
           : 'sem pergunta pendente';
     const modelLine = modelBilling.mismatch
-        ? `configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'} · divergente`
-        : modelBilling.displayModel;
+        ? `configurado ${modelBilling.configuredModel ?? '-'} · observado ${modelBilling.observedModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'} · divergente`
+        : `rota ${modelBilling.displayModel}${modelBilling.observedModel && modelBilling.observedModel !== modelBilling.displayModel ? ` · observado ${modelBilling.observedModel}` : ''}`;
     println('');
     println(terminalThemeHeadline('assistant', 'Agora - Detalhe'));
     println(terminalThemeDivider(37));

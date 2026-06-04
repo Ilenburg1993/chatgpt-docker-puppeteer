@@ -6829,7 +6829,49 @@
   - Artefato: `artifacts/terminal-live/2026-06-04T08-44-53-143Z/summary.md`.
   - Resultado: PASS em 18/18 critérios, incluindo `ux-cycle-command-order`,
     `ux-cycle-activity-human` e `ux-cycle-events-complete-iso`.
-- [ ] Próxima lacuna UX/BYOK: a live mostrou `/status` exibindo `claude-haiku-4.5` como
-      modelo enquanto prompt, `/health` e `/now` continuam em `kilo-auto/free`; investigar a
-      origem de cada label e consolidar um contrato único de modelo solicitado, rota BYOK e
-      modelo efetivo do SDK.
+- [x] Lacuna UX/BYOK promovida para seção 12.55: a live mostrou `/status` exibindo
+      `claude-haiku-4.5` como modelo enquanto prompt, `/health` e `/now` continuavam em
+      `kilo-auto/free`.
+
+### 12.55 Contrato único de label de modelo/BYOK no terminal
+
+- [x] Achado live:
+  - prompt e boot mostravam `kilo-auto/free`;
+  - `/health` e `/sdk` mostravam `kilo-auto/free`;
+  - `/status` e `/now` priorizavam `effectiveModel`/`billedModel` do último PR e exibiam
+    `claude-haiku-4.5`;
+  - após uma primeira correção, `/status`/`/now` passaram a mostrar `auto`, que ainda era
+    insuficiente porque `auto` é seletor, não rota operacional final.
+- [x] Decisão UX:
+  - painéis default devem mostrar a rota/modelo vivo que o operador realmente está usando;
+  - `auto` deve ser tratado como seletor e substituído pelo fallback vivo quando ele existe;
+  - telemetria histórica de PR/cobrança deve continuar disponível como `observado`/`cobrado`,
+    especialmente em `/status full`, `/metrics` e `/usage`, mas não pode substituir a rota viva
+    nos painéis default.
+- [x] Correção aplicada:
+  - `normalizeTerminalModelBillingProjection()` ganhou `observedModel` e agora calcula
+    `displayModel` como `configuredModel` apenas quando ele não é `auto`; se `configuredModel`
+    for `auto`, prefere o fallback vivo.
+  - `status.js`, `metrics.js` e `usage.js` passaram a passar `base.model` antes de
+    `base.snap.model`, alinhando projeções com o prompt vivo.
+  - `/status` e `/now` usam helper único para renderizar `rota` ou `configurado → observado`
+    quando existe divergência real.
+  - `/status full`, `/metrics` e `/usage` preservam `observado`/`cobrado` como telemetria
+    histórica explícita.
+- [x] Testes focados:
+  - `test_terminal_runtime_frontend.spec.js` cobre `configuredModel=auto` sem mismatch e o caso
+    `fallback=kilo-auto/free`, garantindo que `displayModel` vira `kilo-auto/free` em vez de
+    `auto` ou `claude-haiku-4.5`.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/frontend/projections/shared.js src/copilot/terminal/frontend/projections/status.js src/copilot/terminal/frontend/projections/metrics.js src/copilot/terminal/frontend/projections/usage.js src/copilot/terminal/commands/session.js src/copilot/terminal/commands/metrics.js src/copilot/terminal/commands/usage.js tests/unit/copilot/test_terminal_runtime_frontend.spec.js`.
+  - `npx vitest run tests/unit/copilot/test_terminal_runtime_frontend.spec.js --hookTimeout=30000`.
+  - `npx eslint src/copilot/terminal/frontend/projections/shared.js src/copilot/terminal/frontend/projections/status.js src/copilot/terminal/frontend/projections/metrics.js src/copilot/terminal/frontend/projections/usage.js src/copilot/terminal/commands/session.js src/copilot/terminal/commands/metrics.js src/copilot/terminal/commands/usage.js tests/unit/copilot/test_terminal_runtime_frontend.spec.js`.
+- [x] Harness live reforçado:
+  - novo critério `ux-cycle-model-labels-consistent` exige que `/status`, `/now`, `/health` e
+    `/sdk` concordem no modelo/rota vivo e não retornem a `auto` ou `claude-haiku-4.5` como
+    label default stale.
+- [x] Live PTY de confirmação:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-model-label-contract-20260604 --timeout-ms 120000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T08-52-31-421Z/summary.md`.
+  - Resultado: PASS em 19/19 critérios; `/status`, `/now`, `/health`, `/sdk` e prompt convergiram
+    para `kilo-auto/free`.

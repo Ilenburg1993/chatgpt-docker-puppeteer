@@ -147,7 +147,7 @@ export function cmdMetrics({ println }, arg = '') {
     // ── Billing ──────────────────────────────────────────────────────
     const lastModel = modelBilling.mismatch
         ? `configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'}`
-        : modelBilling.displayModel;
+        : `rota ${modelBilling.displayModel}${modelBilling.observedModel && modelBilling.observedModel !== modelBilling.displayModel ? ` · observado ${modelBilling.observedModel}` : ''}`;
     const costStr = modelBilling.cost === null ? '-' : `$${modelBilling.cost.toFixed(4)}`;
     const billingStatus = terminalThemeText(modelBilling.mismatch ? 'error' : 'success', modelBilling.mismatch ? 'divergente' : 'ok');
     const billingLine = byokActive

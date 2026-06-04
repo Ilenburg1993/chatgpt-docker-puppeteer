@@ -164,7 +164,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
             typeof base.health?.['recommendedAction'] === 'string' ? base.health['recommendedAction'] : null
         );
     const lifecycle = readRuntimeLifecycleSnapshot();
-    const modelBilling = normalizeTerminalModelBillingProjection(base.lastPrInfo, String(base.snap['model'] ?? ''));
+    const modelBilling = normalizeTerminalModelBillingProjection(base.lastPrInfo, String(base.model ?? base.snap['model'] ?? ''));
     const elicitationSummary = readTerminalElicitationSummary();
     const permissionSummary = readTerminalPermissionSummary();
     const userInputSummary = readTerminalUserInputSummary();

@@ -54,7 +54,7 @@ export function readTerminalMetricsProjection(runtimeId) {
     const base = readTerminalRuntimeBase(runtimeId);
     const timeline = readTerminalTimelineProjection({ limitPairs: 10, runtimeId: runtimeId ?? null });
     const pr = /** @type {Record<string, any> | null} */ (base.lastPrInfo ?? null);
-    const modelBilling = normalizeTerminalModelBillingProjection(pr, String(base.snap['model'] ?? base.model ?? ''));
+    const modelBilling = normalizeTerminalModelBillingProjection(pr, String(base.model ?? base.snap['model'] ?? ''));
     const latestInject = readRuntimeLatestInjectHistoryEntryForRuntime(base.runtimeId);
     const toolStats = readToolStatsProjection().stats;
     let toolCallCount = 0;

@@ -693,6 +693,30 @@ describe('terminal/frontend/index', () => {
                 configuredModel: 'auto',
                 billedModel: 'claude-haiku-4.5',
                 effectiveModel: 'claude-haiku-4.5',
+                observedModel: 'claude-haiku-4.5',
+                displayModel: 'auto',
+                mismatch: false,
+            }),
+        );
+    });
+
+    it('prefere a rota viva quando billing histórico veio de model=auto', async () => {
+        const modelBilling = runtime.normalizeTerminalModelBillingProjection(
+            {
+                model: 'claude-haiku-4.5',
+                configuredModel: 'auto',
+                effectiveModel: 'claude-haiku-4.5',
+                modelMismatch: true,
+                ts: Date.now(),
+            },
+            'kilo-auto/free',
+        );
+
+        expect(modelBilling).toEqual(
+            expect.objectContaining({
+                configuredModel: 'auto',
+                observedModel: 'claude-haiku-4.5',
+                displayModel: 'kilo-auto/free',
                 mismatch: false,
             }),
         );
