@@ -40,4 +40,27 @@ describe('terminal/capabilities/structured-preview', () => {
         expect(preview.queryApplied).toBe(false);
         expect(preview.fallbackReason).toContain('filtro ignorado');
     });
+
+    it('bloqueia filtro iniciado por hífen antes de chamar jq/yq', () => {
+        const preview = renderTerminalStructuredPreview('{"a":1}', {
+            format: 'json',
+            query: '--version',
+        });
+
+        expect(preview.renderer).toBe('js');
+        expect(preview.queryApplied).toBe(false);
+        expect(preview.fallbackReason).toContain('filtro iniciado por hífen bloqueado');
+        expect(preview.fallbackReason).toContain('filtro ignorado');
+    });
+
+    it('bloqueia caracteres de controle no filtro externo', () => {
+        const preview = renderTerminalStructuredPreview('a: 1\n', {
+            format: 'yaml',
+            query: `.a${String.fromCharCode(1)}`,
+        });
+
+        expect(preview.renderer).toBe('js');
+        expect(preview.queryApplied).toBe(false);
+        expect(preview.fallbackReason).toContain('caracteres de controle');
+    });
 });

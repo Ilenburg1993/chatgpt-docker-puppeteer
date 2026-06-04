@@ -89,6 +89,22 @@ function renderJsStructuredPreview(content, format, reason, queryApplied) {
 }
 
 /**
+ * @param {string} query
+ * @returns {string | null}
+ */
+function validateExternalStructuredQuery(query) {
+    if (query.startsWith('-')) return 'filtro iniciado por hífen bloqueado para evitar opção do renderer externo';
+    const hasControl = [...query].some((char) => {
+        const code = char.charCodeAt(0);
+        return (code >= 0 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127;
+    });
+    if (hasControl) {
+        return 'filtro contém caracteres de controle';
+    }
+    return null;
+}
+
+/**
  * @param {string} content
  * @param {{ format: TerminalStructuredPreviewFormat; query?: string; forceJs?: boolean; color?: 'auto' | 'always' | 'never' }} options
  * @returns {TerminalStructuredPreview}
@@ -102,6 +118,8 @@ export function renderTerminalStructuredPreview(content, options) {
         renderJsStructuredPreview(content, format, isDefaultQuery ? reason : `${reason ?? 'renderer externo ausente'}; filtro ignorado`, isDefaultQuery);
 
     if (options.forceJs) return jsFallback('renderer externo desativado');
+    const unsafeQueryReason = validateExternalStructuredQuery(query);
+    if (unsafeQueryReason) return jsFallback(unsafeQueryReason);
 
     const toolId = format === 'json' ? 'jq' : 'yq';
     const tool = readTerminalExternalToolCapabilities().find((item) => item.id === toolId && item.available);

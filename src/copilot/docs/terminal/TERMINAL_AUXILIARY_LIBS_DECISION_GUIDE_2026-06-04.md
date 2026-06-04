@@ -512,6 +512,13 @@ Decisão:
   - renderers reais exercidos no ambiente: `bat`, `glow`, `delta`, `jq`, `yq`;
   - fallback sem PATH continuou passando para arquivo, Markdown, diff, JSON e YAML;
   - envelope JSON permaneceu sem ANSI/OSC/CR solto/controles.
+- [x] Guardrail de option-injection em filtros estruturados:
+  - `jq`/`yq` recebem filtro por argumento tokenizado, mas filtros iniciados por hífen ainda podem
+    ser interpretados pelo parser de opções do binário;
+  - `structured-preview.js` bloqueia filtros externos iniciados por hífen e filtros com caracteres
+    de controle;
+  - nesses casos, o terminal volta ao parser JS canônico e informa que o filtro foi ignorado;
+  - testes cobrem `--version` em JSON e caractere de controle em YAML.
 - [x] Live PTY com contrato JSON de libs:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-json-contract-pass3-20260604 --timeout-ms 180000`;
   - artefato: `artifacts/terminal-live/2026-06-04T17-44-25-689Z/summary.md`;

@@ -7573,6 +7573,12 @@
   - `file-preview.js` agora insere `--` antes do caminho para evitar que arquivos iniciados por
     hífen sejam interpretados como flags do renderer externo;
   - `test_file_preview.spec.js` cobre esse contrato.
+- [x] Sétima correção derivada da reauditoria de libs auxiliares:
+  - `jq`/`yq` também têm parser de opções próprio;
+  - `structured-preview.js` agora bloqueia filtros iniciados por hífen e filtros com caracteres de
+    controle antes de chamar renderer externo;
+  - o fallback JS permanece canônico e declara `filtro ignorado`;
+  - `test_structured_preview.spec.js` cobre JSON/YAML.
 - [ ] Próxima lacuna visual:
   - auditar `/help full`, `/byok gateway commands`, `/byok gateway operator-ready` e `/byok auto`
     para confirmar que o modo detalhado é rico sem parecer lixo técnico;
