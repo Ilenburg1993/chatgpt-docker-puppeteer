@@ -4542,8 +4542,10 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             pass:
                 !/Info SDK|configuration|Disabled tools|model_retry|Response was interrupted due to a server error/iu.test(
                     beforeRawDiagnosticsPlain,
-                ) && !/LLM-B sessão · (?:skills|ferramentas|Configura[cç][aã]o)/iu.test(beforeRawDiagnosticsPlain),
-            detail: 'routine SDK session info stayed out of the live/default surface and raw SDK labels stayed hidden',
+                ) &&
+                !/LLM-B sessão · (?:skills|ferramentas|Configura[cç][aã]o)/iu.test(beforeRawDiagnosticsPlain) &&
+                !/^\s*T[ií]tulo\s{2,}/imu.test(beforeRawDiagnosticsPlain),
+            detail: 'routine SDK session info/title stayed out of the live/default surface and raw SDK labels stayed hidden',
         },
         {
             id: 'ux-compact-byok-error-live-status',

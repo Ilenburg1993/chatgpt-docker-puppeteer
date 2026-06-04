@@ -1293,10 +1293,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: title,
             source: 'sdk',
             recordHistory: false,
+            updateCurrent: false,
         });
-        if (shouldPrintSessionNarration('verbose')) {
-            println(terminalThemeRow('Título', compactSummaryText(compactOneLine(title), 104), { role: 'muted' }));
-        }
         broadcastSse('session.title_changed', withSdkSessionSseEnvelope({ title }, 'sdk/session.title_changed'));
     };
 

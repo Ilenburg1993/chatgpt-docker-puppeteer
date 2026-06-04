@@ -7350,3 +7350,28 @@
   - inspeção manual do `terminal.plain.log`: `/intent` e `/intent detail` renderizam origem humana,
     ferramenta humana e `chamada id interno`; `report_intent_local`, `toolu_*` e `chatcmpl-tool-*`
     aparecem apenas após `/events --raw`.
+- [x] Próximo achado visual:
+  - o mesmo live mostrou `Título` da sessão como linha durável logo após o prompt longo do operador;
+  - decisão: título gerado pelo SDK é metadado de sessão, não progresso da LLM-B;
+  - deve permanecer em SSE/diagnóstico e não roubar a região entre `prompt do usuário` e `LLM-B
+    trabalhando`.
+- [x] Correção aplicada:
+  - `session.title_changed` deixa de imprimir linha durável;
+  - `Título da sessão atualizado` usa `updateCurrent:false` e `recordHistory:false`;
+  - `ux-no-raw-sdk-info-labels` agora também falha se `Título` reaparecer na superfície default do
+    live canônico.
+- [x] Live de verificação:
+  - comando:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --label terminal-ux-silent-session-title-20260604 --timeout-ms 240000 --transport=pty`;
+  - artefato: `artifacts/terminal-live/2026-06-04T18-32-05-756Z/summary.md`;
+  - resultado: `BLOCKED` por `assistant-empty-after-user-input`, mas o critério
+    `ux-no-raw-sdk-info-labels` passou;
+  - inspeção do `terminal.plain.log`: sem `Título`, `LLM-B sessão · skills`,
+    `LLM-B sessão · ferramentas` ou `LLM-B sessão · Configuração` na superfície default.
+- [ ] Próxima lacuna real:
+  - investigar `dialog.empty_after_user_input` recorrente quando a LLM-B recebe a resposta humana e
+    encerra sem texto público;
+  - avaliar se a UX deve oferecer comando de recuperação mais explícito, recuperação assistida no
+    harness, ou uma política de retry controlada pelo operador;
+  - manter a separação: produto não deve fazer retry automático caro/perigoso sem decisão explícita,
+    mas o terminal precisa tornar o próximo passo óbvio.

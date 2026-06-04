@@ -806,7 +806,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringMatching(/Ferramentas\s+SDK dinâmicas 92/u));
     });
 
-    it('compacta config e título de sessão na narrativa verbose', async () => {
+    it('mantém config e título de sessão fora da narrativa visual rotineira', async () => {
         mocks.getShowSessionActivity.mockReturnValue(true);
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');
@@ -829,13 +829,22 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
                 updateCurrent: false,
             }),
         );
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Título da sessão atualizado',
+            expect.objectContaining({
+                detail: expect.stringContaining('Faça um teste integrado'),
+                updateCurrent: false,
+                recordHistory: false,
+            }),
+        );
         expect(mocks.writeInlineStatus).not.toHaveBeenCalledWith(
             expect.stringMatching(/Configuração · ferramentas nativas desativadas/u),
         );
         expect(mocks.println).not.toHaveBeenCalledWith(
             expect.stringMatching(/Configuração\s+ferramentas nativas desativadas/u),
         );
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringMatching(/Título\s+Faça um teste integrado/u));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringMatching(/Título\s+Faça um teste integrado/u));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('SDK info'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Disabled tools:'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Título da sessão:'));
