@@ -604,6 +604,12 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('Sinais');
         expect(ctx.output()).toContain('SSE');
         expect(ctx.output()).toContain('Trace');
+        expect(ctx.output()).toMatch(/Runtime\s+principal/u);
+        expect(ctx.output()).toContain('Contexto');
+        expect(ctx.output()).not.toContain('Runtime     default');
+        expect(ctx.output()).not.toContain('persistent only');
+        expect(ctx.output()).not.toContain('Cache/escopo');
+        expect(ctx.output()).not.toContain('não pausada');
         expect(ctx.output()).not.toContain('streaming=');
         expect(ctx.output()).not.toContain('phase:');
     });

@@ -4757,9 +4757,10 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-health-human-infra-20260603-2136`.
   - Resultado: PASS em 29/29 critérios; `/health full` ficou com infraestrutura humana e sem
         IDs/constantes cruas na superfície principal.
-- [ ] Próxima lacuna: revisar boot/banner inicial, `/live full` e `/session` porque a live ainda
-      mostra `Fluxo local-fs-primary`, `Runtime default` e `Timeline persistent only` fora de
-      `/health full`.
+- [x] Próxima lacuna tratada parcialmente: boot/banner inicial e `/live full` deixaram de expor
+      `Fluxo local-fs-primary`, `Runtime default` e `Timeline persistent only` na superfície humana.
+- [ ] Próxima lacuna: revisar `/session`, `/status full`, `/sdk status` e painéis de sessão porque
+      ainda podem expor nomes internos de rota, runtime, binding, offsets ou títulos técnicos.
 
 ### 12.19 Auto-brief pronto sem modo interno de rota
 
@@ -4781,5 +4782,40 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-boot-routing-human-20260603-2140`.
   - Resultado: PASS em 29/29 critérios; first viewport exibiu
         `Fluxo     arquivos locais primeiro · próximo /fs list → /activity 5`.
-- [ ] Próxima lacuna: `/live full` ainda mostra `Runtime default` e `Timeline persistent only`;
-      transformar esses rótulos mantendo detalhe técnico em comandos `detail/raw`.
+- [x] Próxima lacuna executada: `/live full` foi transformado para rótulos humanos mantendo detalhe
+      técnico em comandos explicitamente detalhados quando necessário.
+
+### 12.20 `/live full` sem rótulos internos de runtime e timeline
+
+- [x] Auditoria pós-live: `/live full` já tinha ficado muito mais útil, mas a própria tela
+      detalhada ainda expunha constantes internas (`Runtime default`, `Timeline persistent only`,
+      `Cache/escopo` e `não pausada`) que quebravam a gramática humana criada para `/health full`
+      e para o auto-brief.
+- [x] Decisão UX: `full` significa diagnóstico humano completo, não despejo cru. O operador deve
+      entender o estado operacional sem conhecer nomes internos de storage, runtime ou cache.
+- [x] Decisão técnica: os nomes brutos continuam válidos como contrato interno e podem aparecer em
+      modos `detail`, `raw`, logs estruturados ou JSON; as superfícies humanas devem traduzir esses
+      nomes no último passo de renderização.
+- [x] Implementação: `Runtime default` virou `Runtime principal`, preservando o estado da conversa
+      como frase curta: `ocioso · conversa ativa · contínua`.
+- [x] Implementação: `persistent_only` virou `histórico persistido` no reconciliador de timeline,
+      removendo a mistura ingles/contrato interno no painel humano.
+- [x] Implementação: a linha `Cache/escopo` virou `Contexto`, reunindo L1, L2, taxa de acerto,
+      índice, escopos ativos e parser com rótulos consistentes (`ativo`, `inativo`, `arquivo(s)`).
+- [x] Harness live reforçado: `diagnostic-ux-live-full-human` agora reprova se `/live full` voltar
+      a exibir `Runtime default`, `persistent only`, `Cache/escopo` ou `não pausada`.
+- [x] Teste unitário reforçado:
+  - `cmdLive full preserva fluxo operacional live consolidado` agora exige `Runtime principal` e
+        `Contexto`, além de bloquear os rótulos crus removidos.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/session.js`.
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx eslint src/copilot/terminal/commands/session.js tests/unit/copilot/terminal/test_commands_session.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js --testNamePattern "cmdLive"`.
+- [x] Live PTY diagnóstica passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-live-full-human-20260603-2145`.
+  - Resultado: PASS em 29/29 critérios; `/live full` mostrou `Runtime principal`,
+        `Timeline hub · histórico persistido`, `Contexto L1 ativo ...`, sem os rótulos crus.
+- [ ] Próxima lacuna: `/session sdk`, `/status full` e `/sdk status` ainda precisam de auditoria
+      visual semelhante, especialmente títulos como `default`, rotas `local-fs-primary`, campos
+      `offset=` e nomes internos de binding BYOK.

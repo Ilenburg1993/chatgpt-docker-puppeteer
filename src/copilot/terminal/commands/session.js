@@ -197,6 +197,7 @@ function renderTerminalTimelineReconciliationLabel(value) {
     if (status === 'reconciled') return 'reconciliada';
     if (status === 'diverged') return 'divergente';
     if (status === 'pending') return 'pendente';
+    if (status === 'persistent_only') return 'histórico persistido';
     return status.replace(/[_-]+/gu, ' ');
 }
 
@@ -466,6 +467,40 @@ function renderLiveSdkMode(mode) {
     if (value === 'plan') return 'plano';
     if (value === 'autopilot') return 'autopiloto';
     return value;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderLiveRuntimeTarget(value) {
+    const runtimeId = String(value ?? '').trim();
+    if (!runtimeId || runtimeId === 'default') return 'principal';
+    return runtimeId.replace(/[._-]+/gu, ' ');
+}
+
+/**
+ * @param {{ cache: { l1: Record<string, unknown>; l2: Record<string, unknown>; aggregate: Record<string, unknown> }; index?: unknown; scopes: { active: number }; parser: { size: number; maxSize: number } }} ioRuntime
+ * @returns {string}
+ */
+function renderLiveContextLine(ioRuntime) {
+    const cacheHitRatio = Number(ioRuntime.cache.aggregate['hitRatio'] || 0);
+    const hitPercent = Number.isFinite(cacheHitRatio) ? `${Math.round(cacheHitRatio * 100)}%` : '-';
+    const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
+    const l1Enabled = Boolean(ioRuntime.cache.l1['enabled']);
+    const l2Enabled = Boolean(ioRuntime.cache.l2['enabled']);
+    const l1Size = ioRuntime.cache.l1['size'] ?? 0;
+    const l2Size = ioRuntime.cache.l2['size'] ?? 0;
+    const indexFiles = Number(ioIndex['files'] ?? 0);
+    const indexLabel = ioIndex['available'] ? `${indexFiles} arquivo(s)` : 'vazio';
+    return [
+        `L1 ${renderLiveToggle(l1Enabled)} (${l1Size})`,
+        `L2 ${renderLiveToggle(l2Enabled)} (${l2Size})`,
+        `acerto ${hitPercent}`,
+        `índice ${indexLabel}`,
+        `escopos ${ioRuntime.scopes.active}`,
+        `parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize}`,
+    ].join(' · ');
 }
 
 /**
@@ -1162,8 +1197,6 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
         `uso ${renderLiveToggle(projection.stream.usage)}`,
     ].join(' · ');
     const ioRuntime = status.ioRuntime;
-    const cacheHitRatio = Number(ioRuntime.cache.aggregate.hitRatio || 0).toFixed(3);
-    const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
 
     if (!detailMode) {
         const streamBits = [
@@ -1213,7 +1246,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     println(
         terminalThemeRow(
             'Runtime',
-            `${status.runtimeId} · ${renderHumanTerminalStatus(status.snap['status'])} · conversa ${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${status.snap['dialogPaused'] ? 'pausada' : 'não pausada'}`,
+            `${renderLiveRuntimeTarget(status.runtimeId)} · ${renderHumanTerminalStatus(status.snap['status'])} · conversa ${status.dialogLoopActive ? 'ativa' : 'inativa'} · ${status.snap['dialogPaused'] ? 'pausada' : 'contínua'}`,
         ),
     );
     println(
@@ -1237,8 +1270,8 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     );
     println(
         terminalThemeRow(
-            'Cache/escopo',
-            `L1 ${renderLiveToggle(Boolean(ioRuntime.cache.l1['enabled']))}:${ioRuntime.cache.l1['size'] ?? 0} · L2 ${renderLiveToggle(Boolean(ioRuntime.cache.l2['enabled']))}:${ioRuntime.cache.l2['size'] ?? 0} · acerto ${cacheHitRatio} · índice ${ioIndex['available'] ? 'ativo' : 'vazio'}:${ioIndex['files'] ?? 0} · escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize}`,
+            'Contexto',
+            renderLiveContextLine(ioRuntime),
         ),
     );
     println(terminalThemeRow('Atividade', renderLiveActivitySummary(current, { includePhase: true })));

@@ -2086,8 +2086,11 @@ function diagnosticUxCycleCriteria(boot) {
                 !hasIsoMilliseconds(liveFullSurface) &&
                 !/\bsearch\b|phase:|approve_all|not_needed|\bempty\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     liveFullSurface,
+                ) &&
+                !/Runtime\s+default|Timeline\s+.*persistent only|Cache\/escopo|não pausada/iu.test(
+                    liveFullSurface,
                 ),
-            detail: '/live full rendered detailed flow with ISO seconds plus relative time and without raw labels, permission constants, empty/not_needed states, or UUIDs',
+            detail: '/live full rendered detailed flow with ISO seconds plus relative time and without raw labels, permission constants, empty/not_needed states, raw runtime/timeline labels, or UUIDs',
         },
         {
             id: 'diagnostic-ux-health-full-themed',
