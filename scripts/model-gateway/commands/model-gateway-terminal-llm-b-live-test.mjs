@@ -3971,6 +3971,17 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: '/events rendered the durable public SSE archive tail',
         },
         {
+            id: 'sse-archive-human-source-labels',
+            pass:
+                /LLM-B via SDK/u.test(beforeRawDiagnosticsPlain) &&
+                /pergunta ao operador/u.test(beforeRawDiagnosticsPlain) &&
+                /telemetria LLM/u.test(beforeRawDiagnosticsPlain) &&
+                /registro export/u.test(beforeRawDiagnosticsPlain) &&
+                !/SDK assistant|pergunta humana SDK|agente\/usage|export envelope/u.test(beforeRawDiagnosticsPlain),
+            detail:
+                '/events default rendered transcript/user/usage/export sources as operator-facing labels before raw diagnostics',
+        },
+        {
             id: 'sse-archive-raw-visible',
             pass: archiveRawEvents.length > 0,
             detail: `/events --raw exposed ${archiveRawEvents.length} archived event(s)`,
@@ -5467,6 +5478,7 @@ async function main() {
             '/byok providers',
             '/byok health',
             '/byok recommend reasoning safe 8',
+            '/events 60',
             '/events 100 --raw',
             '/errors 10',
         ];
@@ -5491,6 +5503,7 @@ async function main() {
             '/byok providers',
             '/byok health',
             '/byok recommend reasoning safe 8',
+            '/events 60',
             '/events 100 --raw',
             '/errors 10',
         ];
@@ -5515,7 +5528,7 @@ async function main() {
             console.warn(
                 '[terminal-live] cenário canônico: deltas públicos concluídos, mas ask_user obrigatório não apareceu; coletando diagnósticos.',
             );
-            const diagnostics = ['/activity 40', '/events 100 --raw', '/errors 10', `/export ${exportArg}`];
+            const diagnostics = ['/activity 40', '/events 60', '/events 100 --raw', '/errors 10', `/export ${exportArg}`];
             sendCommandSequence(write, diagnostics, { delayMs: 450 });
             setTimeout(
                 () => {
@@ -5701,7 +5714,7 @@ async function main() {
                 if (byokReal) {
                     diagnostics.push('/byok providers', '/byok health', '/byok recommend reasoning safe 8');
                 }
-                diagnostics.push('/events 100 --raw', '/errors 10');
+                diagnostics.push('/events 60', '/events 100 --raw', '/errors 10');
                 sendCommandSequence(write, diagnostics, { delayMs: 450 });
                 if (!quitSent) {
                     setTimeout(

@@ -200,7 +200,7 @@ function buildPolicyQueryHints(policy) {
 function humanPolicyOwner(value) {
     const lower = value.toLowerCase();
     if (lower.includes('turn-display')) return 'streaming da resposta';
-    if (lower.includes('sdk') && lower.includes('user')) return 'pergunta humana SDK';
+    if (lower.includes('sdk') && lower.includes('user')) return 'pergunta ao operador';
     if (lower.includes('sdk') && lower.includes('assistant')) return 'mensagens da LLM-B';
     if (lower.includes('agent') && lower.includes('background')) return 'tarefas em segundo plano';
     if (lower.includes('quota')) return 'quota e limites';
@@ -302,10 +302,10 @@ function humanEventSource(source) {
     const lower = text.toLowerCase();
     if (!text) return '-';
     if (lower === 'io' || lower.startsWith('io/')) return 'I/O local';
-    if (lower.startsWith('sdk/user_input')) return 'pergunta humana SDK';
-    if (lower.startsWith('sdk/assistant')) return 'SDK assistant';
+    if (lower.startsWith('sdk/user_input')) return 'pergunta ao operador';
+    if (lower.startsWith('sdk/assistant')) return 'LLM-B via SDK';
     if (lower.startsWith('agent/background')) return 'tarefa em segundo plano';
-    if (lower.startsWith('agent/llm')) return 'agente/usage';
+    if (lower.startsWith('agent/llm')) return 'telemetria LLM';
     if (lower.startsWith('terminal-boot')) return 'terminal';
     if (lower.startsWith('terminal-dialog') || lower.startsWith('terminal-agent-wiring')) return 'diálogo';
     if (lower === 'sdk' || lower.startsWith('sdk/')) return 'SDK';
@@ -373,13 +373,14 @@ function summarizePayload(payload, opts = {}) {
     const renderedStatus = humanStatus(status);
     const renderedType = humanPayloadKind(type);
     const renderedClassification = humanPayloadKind(classification);
+    const classificationLabel = renderedType ? 'classe' : 'tipo';
     return [
         humanToolName ? `ferramenta ${compact(humanToolName, 48)}` : null,
         showIds && toolCallId ? `call ${compactTerminalDiagnosticId(String(toolCallId), 14)}` : null,
         showIds && requestId ? `req ${compactTerminalDiagnosticId(String(requestId), 14)}` : null,
         renderedStatus ? `estado ${compact(renderedStatus)}` : null,
         renderedType ? `tipo ${compact(renderedType)}` : null,
-        renderedClassification ? `classe ${compact(renderedClassification)}` : null,
+        renderedClassification ? `${classificationLabel} ${compact(renderedClassification)}` : null,
         content ? compact(content) : null,
     ]
         .filter(Boolean)
@@ -401,14 +402,14 @@ function buildTranscriptExportHint(entry, opts = {}) {
     /** @type {string | null} */
     let transcript = null;
     if (entry.event === 'assistant.message') transcript = 'LLM-B';
-    if (entry.event === 'user_input.requested') transcript = 'Sistema/pergunta humana';
-    if (entry.event === 'user_input.completed') transcript = 'Operador/pergunta humana';
+    if (entry.event === 'user_input.requested') transcript = 'Sistema/pergunta ao operador';
+    if (entry.event === 'user_input.completed') transcript = 'Operador/resposta';
     if (!transcript) return null;
     const source = entry.eventSource ?? entry.source ?? entry.event;
     const showIds = Boolean(opts.showIds);
     const trace = showIds && entry.traceId ? ` · rastreamento ${compactTerminalDiagnosticId(entry.traceId, 18)}` : '';
     const turn = showIds && entry.turnId ? ` · turno ${compactTerminalDiagnosticId(entry.turnId, 18)}` : '';
-    return `transcript ${transcript} · export envelope ${humanEventSource(source)}${trace}${turn}`;
+    return `transcript ${transcript} · registro export ${humanEventSource(source)}${trace}${turn}`;
 }
 
 /**

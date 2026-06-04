@@ -401,7 +401,7 @@ describe('terminal/commands/events', () => {
         await cmdEvents({ println: ctx.println }, '20');
 
         expect(ctx.output()).toContain('tipo sessão atualizada');
-        expect(ctx.output()).toContain('classe continuação da pergunta humana');
+        expect(ctx.output()).toContain('tipo continuação da pergunta humana');
         expect(ctx.output()).not.toContain('tipo session.updated');
         expect(ctx.output()).not.toContain('ask user continuation');
         expect(ctx.output()).not.toContain('ask_user_continuation');
@@ -580,9 +580,9 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Mensagem da LLM-B');
         expect(ctx.output()).toContain('Pergunta ao operador');
         expect(ctx.output()).toContain('Resposta do operador');
-        expect(ctx.output()).toContain('transcript LLM-B · export envelope SDK assistant');
-        expect(ctx.output()).toContain('transcript Sistema/pergunta humana · export envelope pergunta humana SDK');
-        expect(ctx.output()).toContain('transcript Operador/pergunta humana · export envelope pergunta humana SDK');
+        expect(ctx.output()).toContain('transcript LLM-B · registro export LLM-B via SDK');
+        expect(ctx.output()).toContain('transcript Sistema/pergunta ao operador · registro export pergunta ao operador');
+        expect(ctx.output()).toContain('transcript Operador/resposta · registro export pergunta ao operador');
         expect(ctx.output()).not.toContain('rastreamento turn:1');
         expect(ctx.output()).not.toContain('turno 1');
         expect(ctx.output()).not.toContain('ask_user');

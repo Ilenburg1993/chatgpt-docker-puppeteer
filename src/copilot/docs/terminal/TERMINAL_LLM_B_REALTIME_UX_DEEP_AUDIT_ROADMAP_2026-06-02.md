@@ -5577,9 +5577,54 @@
   - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
 - [ ] Próxima live, quando o provider falhar novamente: confirmar `byok-provider-error-tracked`
       no summary e `/errors 10` preenchido.
-- [ ] Próxima auditoria UX: revisar labels remanescentes como `SDK assistant`, `Sessão SDK` e
+- [x] Auditoria UX de `/events`: labels remanescentes `SDK assistant`, `pergunta humana SDK`,
+      `agente/usage`, `classe continuação...` e `export envelope` ainda pareciam backend
+      vazando na superfície humana.
+- [x] Decisão UX: sources técnicos continuam em `/events --raw`; no modo padrão:
+  - `sdk/assistant.*` vira `LLM-B via SDK`;
+  - `sdk/user_input.*` vira `pergunta ao operador`;
+  - `agent/llm.*` vira `telemetria LLM`;
+  - `export envelope` vira `registro export`;
+  - `classification` sem `type` explícito usa prefixo `tipo`, não `classe`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/events.js`;
+  - `node --check tests/unit/copilot/terminal/test_commands_events.spec.js`;
+  - `npx eslint src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [x] Live de auditoria iniciada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-human-sources-20260605-0025`.
+- [x] Resultado: `Status: BLOCKED` por `blocked-by-assistant-ended-before-ask`; a LLM-B
+      executou tools e deltas públicos, mas encerrou antes da ferramenta obrigatória `ask_user`.
+- [x] Evidência positiva apesar do bloqueio: a linha viva e `/activity` já exibiram o detalhe
+      compacto de uso (`Uso do modelo kilo-auto/free · tokens ... · custo ...` e
+      `Uso BYOK sem Premium Request — modelo ... · tokens ... · custo ...`), sem duplicar
+      `sem Premium Request` no detalhe.
+- [x] Fortificação do harness live: diagnósticos de preflight, erro/protocol miss e ausência de
+      `ask_user` agora coletam `/events 60` antes de `/events 100 --raw`, garantindo auditoria da
+      superfície humana mesmo quando a live bloqueia antes do fluxo canônico completo.
+- [x] Live de confirmação concluída:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-human-sources-20260605-0030`.
+- [x] Resultado: `Status: PASS`; fluxo canônico completo com tools reais, deltas, `ask_user`,
+      resposta `SIM`, final pós-pergunta, export Markdown, SSE conectado e zero erros.
+- [x] Evidência em `/events 60`: `Mensagem da LLM-B · LLM-B via SDK`,
+      `Pergunta ao operador · pergunta ao operador`, `Uso LLM · telemetria LLM · tipo
+      continuação da pergunta humana`, e `transcript ... · registro export ...`.
+- [x] Contrato adicionado ao harness: `sse-archive-human-source-labels` valida que `/events`
+      legível contém `LLM-B via SDK`, `pergunta ao operador`, `telemetria LLM` e
+      `registro export`, e que não regressa para `SDK assistant`, `pergunta humana SDK`,
+      `agente/usage` ou `export envelope` antes do `--raw`.
+- [x] Validação escopada do harness passou:
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Live de contrato concluída:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-human-source-contract-20260605-0035`.
+- [x] Resultado: `Status: PASS`; critério `sse-archive-human-source-labels` passou no summary,
+      além de `sse-archive-query-visible`, `no-terminal-errors` e `clean-quit`.
+- [ ] Próxima auditoria UX: revisar labels remanescentes como `Sessão SDK` e
       `Info SDK · cancellation` para decidir o que é técnico aceitável e o que deve ser
       humanizado no modo padrão.
+- [x] Live pós-critério: repetir cenário canônico após `sse-archive-human-source-labels`
+      confirmou o contrato no summary, não só na evidência visual.
 - [ ] Próxima live de falha controlada: reproduzir ou simular erro BYOK para confirmar que
       `/errors 10` mostra `terminal.byok_provider` com ação/contexto, sem duplicar eventos
       recuperáveis internos.
