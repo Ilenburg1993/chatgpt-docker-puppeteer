@@ -95,15 +95,15 @@ export function cmdUsage({ println }, arg) {
             if (byokActive) {
                 println(
                     terminalThemeRow(
-                        'BYOK ativo',
+                        'BYOK',
                         `provedor ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
                         { role: 'success' },
                     ),
                 );
                 println(
                     terminalThemeRow(
-                        'Histórico Copilot',
-                        `${renderHistoricalCopilotSnapshotLabel(modelBilling)} · custo ${cost} · anterior/lateral; BYOK atual separado`,
+                        'Histórico',
+                        `Copilot ${renderHistoricalCopilotSnapshotLabel(modelBilling)} · custo ${cost} · anterior/lateral; BYOK atual separado`,
                     ),
                 );
             } else {
@@ -117,12 +117,12 @@ export function cmdUsage({ println }, arg) {
         } else if (byokActive) {
             println(
                 terminalThemeRow(
-                    'BYOK ativo',
+                    'BYOK',
                     `provedor ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
                     { role: 'success' },
                 ),
             );
-            println(terminalThemeRow('Histórico Copilot', 'sem snapshot histórico classificado'));
+            println(terminalThemeRow('Histórico', 'Copilot sem snapshot histórico classificado'));
         } else {
             println(terminalThemeRow('Pedido premium', 'sem snapshot histórico classificado'));
         }
@@ -145,14 +145,14 @@ export function cmdUsage({ println }, arg) {
             if (detail) {
                 println(
                     terminalThemeRow(
-                        'Telemetria LLM',
+                        'LLM',
                         `modelo ${projection.llmUsageBilling.displayModel} · ${premiumRequest} · tipo ${llmUsageKind} · classe ${llmClass} · motivo ${llmReason} · custo ${llmCost}`,
                     ),
                 );
             } else {
                 println(
                     terminalThemeRow(
-                        'Telemetria LLM',
+                        'LLM',
                         `modelo ${projection.llmUsageBilling.displayModel} · custo ${llmCost}`,
                     ),
                 );
@@ -163,13 +163,13 @@ export function cmdUsage({ println }, arg) {
             if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
                 println(
                     terminalThemeRow(
-                        'Pergunta humana',
+                        'Pergunta',
                         'telemetria pós-resposta humana separada da fala inicial',
                         { role: 'success' },
                     ),
                 );
                 println(
-                    terminalThemeRow('Correlacionar', '/events event=assistant.message · /export', {
+                    terminalThemeRow('Conferir', '/events event=assistant.message · /export', {
                         role: 'command',
                     }),
                 );

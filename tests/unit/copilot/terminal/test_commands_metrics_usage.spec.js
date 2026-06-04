@@ -373,7 +373,9 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('SDK interativo');
         expect(ctx.output()).not.toContain('interactive');
         expect(ctx.output()).toContain('gpt-5-mini');
-        expect(ctx.output()).toMatch(/Telemetria PR|Histórico Copilot/);
+        expect(ctx.output()).toMatch(/Telemetria PR|Histórico\s+Copilot/);
+        expect(ctx.output()).not.toContain('Histórico Copilot');
+        expect(ctx.output()).not.toContain('BYOK ativo');
         expect(ctx.output()).not.toContain('side-channel');
         expect(ctx.output()).toMatch(/não implica consumo neste boot\/sonda|BYOK atual separado/);
         expect(ctx.output()).not.toContain('Premium Request');
@@ -419,7 +421,8 @@ describe('commands/metrics + usage', () => {
 
             cmdUsage({ println: ctx.println }, 'now');
 
-            expect(ctx.output()).toContain('Telemetria LLM');
+            expect(ctx.output()).toMatch(/LLM\s+modelo \S+ · custo 0\.0000/u);
+            expect(ctx.output()).not.toContain('Telemetria LLM');
             expect(ctx.output()).toContain('Tipo');
             expect(ctx.output()).not.toContain('tipo=');
             expect(ctx.output()).toContain('Pedido');
@@ -431,8 +434,10 @@ describe('commands/metrics + usage', () => {
             expect(ctx.output()).not.toContain(
                 'Telemetria LLM modelo kilo-auto/free · sem Premium Request · tipo continuação da pergunta humana',
             );
-            expect(ctx.output()).toContain('Pergunta humana');
-            expect(ctx.output()).toContain('Correlacionar');
+            expect(ctx.output()).toContain('Pergunta');
+            expect(ctx.output()).toContain('Conferir');
+            expect(ctx.output()).not.toContain('Pergunta humana');
+            expect(ctx.output()).not.toContain('Correlacionar');
             expect(ctx.output()).toContain('/events event=assistant.message');
             expect(ctx.output()).toContain('/export');
             expect(ctx.output()).not.toContain('\x1b[');

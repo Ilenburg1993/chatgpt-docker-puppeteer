@@ -7436,3 +7436,62 @@
   - resultado: `PASS`;
   - o cenário não repetiu o `ask_user` prematuro, mas confirmou que a nova espera por prompt normal
     não afetou o caminho feliz.
+
+## 2026-06-04 — Timeline `/activity` sem Prefixo de Fase Redundante
+
+- [x] Achado live:
+  - em `artifacts/terminal-live/2026-06-04T18-45-44-582Z/terminal.plain.log`, a timeline default de
+    `/activity 40` ainda mostrava linhas como `turno · Intenção da LLM-B` e
+    `sistema · Resposta concluída`;
+  - esses prefixos são tecnicamente corretos, mas visualmente redundantes: o próprio label já
+    explica o evento.
+- [x] Decisão UX:
+  - a timeline default deve ser escaneável por evento humano, não por enum de fase;
+  - fases continuam úteis quando o label é genérico, como `Processando mensagem`;
+  - labels semanticamente fortes (`Intenção`, `Mensagem`, `Resposta`, `Uso BYOK`, `Modelo`) não
+    recebem prefixo de fase.
+- [x] Correção aplicada:
+  - `renderTimelineEntryHeading()` reconhece `Intenção da LLM-B`, `Mensagem...` e
+    `Resposta concluída` como labels autossuficientes;
+  - teste focado cobre ausência de `turno · Intenção da LLM-B` e
+    `sistema · Resposta concluída`.
+- [x] Guardrail live:
+  - `ux-activity-no-redundant-timeline-labels` também falha se `/activity 40` voltar a mostrar
+    `turno · Intenção...` ou `sistema · Resposta...`.
+- [x] Validação focada:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js --hookTimeout=30000`;
+  - `npx eslint src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+
+## 2026-06-04 — `/usage now` com Coluna Visual Compacta
+
+- [x] Achado live:
+  - em `artifacts/terminal-live/2026-06-04T18-45-44-582Z/terminal.plain.log`, `/usage now`
+    comunicava a semântica correta, mas labels longos como `Histórico Copilot`,
+    `Telemetria LLM`, `Pergunta humana` e `Correlacionar` quebravam o alinhamento visual;
+  - isso era especialmente perceptível em PTY estreito, onde a coluna de valor começava em
+    posições diferentes.
+- [x] Decisão UX:
+  - labels default devem ser curtos e escaneáveis;
+  - contexto semântico vai para o valor: `Histórico` pode dizer `Copilot ...`, `LLM` pode dizer
+    `modelo ...`, `Pergunta` pode dizer `pós-resposta humana`;
+  - detalhe técnico continua em `/usage now detail`.
+- [x] Correção aplicada:
+  - `BYOK ativo` virou label `BYOK`;
+  - `Histórico Copilot` virou label `Histórico` com valor começando por `Copilot`;
+  - `Telemetria LLM` virou label `LLM`;
+  - `Pergunta humana` virou label `Pergunta`;
+  - `Correlacionar` virou label `Conferir`.
+- [x] Guardrail live:
+  - `ux-cycle-usage-byok-current-first` agora aceita a forma compacta e reprova os labels longos
+    antigos no default.
+- [x] Live UX:
+  - comando:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-usage-compact-labels-20260604 --timeout-ms 160000 --transport=pty`;
+  - artefato: `artifacts/terminal-live/2026-06-04T18-54-21-268Z/summary.md`;
+  - resultado: `PASS` em 28/28 critérios;
+  - verificação visual: `/usage now` mostrou `BYOK`, `Histórico`, `LLM`, `Pergunta` e
+    `Conferir`, sem `BYOK ativo`, `Histórico Copilot`, `Telemetria LLM` ou `Correlacionar`.
+- [ ] Próxima lacuna visual:
+  - `/help full` e `/byok` default ainda são superfícies muito densas;
+  - avaliar se devem virar cockpit compacto com seções progressivas, deixando catálogos longos em
+    subcomandos explícitos.

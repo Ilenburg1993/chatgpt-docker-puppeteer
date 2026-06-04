@@ -532,6 +532,32 @@ describe('terminal/commands/activity', () => {
                     ts: 2,
                 },
                 {
+                    phase: 'turn',
+                    label: 'Intenção da LLM-B',
+                    detail: 'terminal live canonical deltas tools ask_user usage',
+                    source: 'sdk/assistant.intent',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                    ts: 2,
+                },
+                {
+                    phase: 'system',
+                    label: 'Resposta concluída',
+                    detail: '9.5s',
+                    source: 'terminal',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                    ts: 2,
+                },
+                {
                     phase: 'boot',
                     label: 'Inicializando terminal',
                     detail: 'Preparando aliases',
@@ -561,6 +587,10 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Tarefa em segundo plano concluída');
         expect(ctx.output()).not.toContain('tarefa · Tarefa em segundo plano concluída');
         expect(ctx.output()).not.toContain('turno · Processando mensagem');
+        expect(ctx.output()).toContain('Intenção da LLM-B');
+        expect(ctx.output()).not.toContain('turno · Intenção da LLM-B');
+        expect(ctx.output()).toContain('Resposta concluída');
+        expect(ctx.output()).not.toContain('sistema · Resposta concluída');
         expect(ctx.output()).not.toContain('inicialização · Inicializando terminal');
         expect(ctx.output()).not.toContain('system · Uso BYOK');
         expect(ctx.output()).not.toContain('task · Tarefa');
@@ -605,7 +635,7 @@ describe('terminal/commands/activity', () => {
 
         cmdActivity({ println: ctx.println }, '5');
 
-        expect(ctx.output()).toMatch(/terminal live canonical deltas\s+tools ask_user usage/u);
+        expect(ctx.output()).toMatch(/terminal live canonical deltas\s+tools\s+ask_user usage/u);
         expect(ctx.output()).not.toContain('terminal live canonical deltas tools Pergunta ao operador usage');
     });
 

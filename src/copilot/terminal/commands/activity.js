@@ -224,8 +224,8 @@ function renderTimelineEntryHeading(entry) {
         lowerLabel.startsWith(`${phase} `) ||
         (entry.phase === 'tool' && /^(ferramenta|integra[cç][aã]o|arquivo|i\/o)\b/iu.test(label)) ||
         (entry.phase === 'question' && /^(pergunta|resposta)\b/iu.test(label)) ||
-        (entry.phase === 'turn' && /^turno\b/iu.test(label)) ||
-        (entry.phase === 'system' && /^(uso|configura[cç][aã]o|warning|erro|modelo)\b/iu.test(label));
+        (entry.phase === 'turn' && /^(turno|inten[cç][aã]o|mensagem|resposta)\b/iu.test(label)) ||
+        (entry.phase === 'system' && /^(uso|configura[cç][aã]o|warning|erro|modelo|resposta)\b/iu.test(label));
     return `${labelAlreadyCarriesPhase ? label : `${phase} · ${label}`}${progress}`;
 }
 
