@@ -21,6 +21,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.
 const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_POST_ANSWER_DELAY_MS = 6_000;
 const DEFAULT_POST_ASK_CONTINUATION_WAIT_MS = 45_000;
+const DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS = 2_000;
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 const SECRET_ENV_RE = /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|BEARER)/iu;
 const TURN_SETTLED_AFTER_ASK_RE =
@@ -5319,6 +5320,7 @@ async function main() {
     let promptSynchronizedCommandOutputOffset = 0;
     let waitingForPromptSynchronizedCommand = false;
     let pendingByokLiveProtocolDiagnostics = false;
+    let missingRequiredAskDiagnosticTimer = null;
     const command = canUsePty
         ? {
               cmd: 'script',
@@ -5466,23 +5468,28 @@ async function main() {
         ).unref();
     };
     const scheduleMissingRequiredAskDiagnostics = () => {
-        if (postCommandsSent) return;
-        postCommandsSent = true;
-        console.warn(
-            '[terminal-live] cenário canônico: deltas públicos concluídos, mas ask_user obrigatório não apareceu; coletando diagnósticos.',
-        );
-        const diagnostics = ['/activity 40', '/events 100 --raw', '/errors 10', `/export ${exportArg}`];
-        sendCommandSequence(write, diagnostics, { delayMs: 450 });
-        setTimeout(
-            () => {
-                if (!quitSent) {
-                    quitSent = true;
-                    byokNoPrCanQuit = true;
-                    write('/quit');
-                }
-            },
-            diagnostics.length * 450 + 2_000,
-        ).unref();
+        if (postCommandsSent || missingRequiredAskDiagnosticTimer) return;
+        missingRequiredAskDiagnosticTimer = setTimeout(() => {
+            missingRequiredAskDiagnosticTimer = null;
+            if (postCommandsSent || answerSent || liveScenario.askRenderedRe.test(stripAnsi(raw))) return;
+            postCommandsSent = true;
+            console.warn(
+                '[terminal-live] cenário canônico: deltas públicos concluídos, mas ask_user obrigatório não apareceu; coletando diagnósticos.',
+            );
+            const diagnostics = ['/activity 40', '/events 100 --raw', '/errors 10', `/export ${exportArg}`];
+            sendCommandSequence(write, diagnostics, { delayMs: 450 });
+            setTimeout(
+                () => {
+                    if (!quitSent) {
+                        quitSent = true;
+                        byokNoPrCanQuit = true;
+                        write('/quit');
+                    }
+                },
+                diagnostics.length * 450 + 2_000,
+            ).unref();
+        }, DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS);
+        missingRequiredAskDiagnosticTimer.unref();
     };
     const invalidChoiceFeedbackRe =
         /Resposta não corresponde às opções da pergunta pendente|Resposta inválida para a pergunta pendente|invalid_choice/iu;
@@ -5587,6 +5594,10 @@ async function main() {
             write(buildScenarioPrompt(liveScenario));
         }
         if (!answerSent && answerStepIndex === 0 && liveScenario.askRenderedRe.test(plain)) {
+            if (missingRequiredAskDiagnosticTimer) {
+                clearTimeout(missingRequiredAskDiagnosticTimer);
+                missingRequiredAskDiagnosticTimer = null;
+            }
             sendScenarioAnswerStep(plain, liveScenario.answerSteps[0]);
         }
         if (

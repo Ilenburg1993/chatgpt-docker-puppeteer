@@ -5228,3 +5228,26 @@
 - [x] Validação local: o artefato bloqueado
       `live-canonical-dual-time-model-events-20260604-2244` seria classificado como
       `assistant-ended-before-ask`.
+- [x] Live de verificação rápida:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-missing-ask-fast-diagnostic-20260604-2255`.
+- [x] Resultado: `Status: FAIL`; o modelo chamou `ask_user`, mas o novo detector disparou
+      diagnósticos imediatamente antes da tool aparecer, poluindo o fluxo de pergunta.
+- [x] Correção do race: `assistant-ended-before-ask` agora usa janela de graça antes dos
+      diagnósticos; se `ask_user` aparecer nesse intervalo, o timer é cancelado.
+- [x] Live de confirmação da janela de graça:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-missing-ask-grace-20260604-2300`.
+- [x] Resultado: `Status: PASS`; `ask_user` apareceu, resposta humana `SIM` foi registrada, final
+      pós-pergunta apareceu como `assistant.message`, SSE/export correlacionaram `ask`, `answer` e
+      `postAsk`, e o terminal encerrou sem erros.
+- [x] Critério UX validado: a espera `sem resposta pública` ficou compacta e sem duplicação de
+      modelo/esforço; `ask_user` ficou como superfície própria e persistente.
+- [x] Nova lacuna visual encontrada nessa live: `session.info/model_retry` ainda renderizava a linha
+      viva como `LLM-B erro · Retry de modelo em andamento · Response was interrupted ... · modelo
+      kilo-auto/free · raciocínio high`, quebrando em várias linhas.
+- [x] Correção aplicada: atividades de recuperação/retry de modelo agora usam caminho compacto na
+      linha viva: `LLM-B recuperando · retry do modelo · <idade> · conversa ativa`, mantendo o
+      detalhe técnico apenas no histórico/SSE/diagnóstico.
+- [x] Teste unitário: `test_live_status_line.spec.js` cobre ausência de `Response was interrupted`,
+      `server error`, `modelo kilo-auto/free` e `raciocínio high` na linha viva de retry.
+- [ ] Próxima live estética: repetir cenário canônico ou `model-switch` forçando um retry/troca para
+      confirmar visual real em PTY, sem depender apenas do teste unitário.

@@ -279,6 +279,32 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(80);
     });
 
+    it('compacta retry de modelo sem expor mensagem técnica longa', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'error',
+            label: 'Retry de modelo em andamento',
+            detail: 'Response was interrupted due to a server error. Retrying...',
+            severity: 'warn',
+            toolName: null,
+            startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
+        };
+        mocks.stream = { model: 'kilo-auto/free', reasoningEffort: 'high' };
+
+        const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
+
+        expect(line).toContain('recuperando');
+        expect(line).toContain('retry do modelo');
+        expect(line).toContain('12s');
+        expect(line).not.toContain('Response was interrupted');
+        expect(line).not.toContain('server error');
+        expect(line).not.toContain('modelo kilo-auto/free');
+        expect(line).not.toContain('raciocínio high');
+        expect(line.length).toBeLessThan(76);
+    });
+
     it('traduz pending messages na linha viva de turno', async () => {
         const { formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');

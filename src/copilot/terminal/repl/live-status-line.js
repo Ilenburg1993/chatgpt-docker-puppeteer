@@ -98,6 +98,21 @@ function extractQuietWaitStatus(detail) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {boolean}
+ */
+function isModelRecoveryActivity(activity) {
+    const text = `${activity.phase ?? ''} ${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase();
+    return (
+        text.includes('model_retry') ||
+        text.includes('retry de modelo') ||
+        text.includes('retry do modelo') ||
+        text.includes('response was interrupted') ||
+        text.includes('server error. retrying')
+    );
+}
+
+/**
  * @param {string} status
  * @param {string} loop
  * @returns {string}
@@ -214,6 +229,14 @@ export function formatTerminalLiveStatusLine(input = {}) {
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, 'pensando')}` +
             `${terminalThemeText('muted', ` · ${quietWaitStatus} · ${runtimeTail}${queue}`)}` +
+            '\x1b[K'
+        );
+    }
+    if (isModelRecoveryActivity(activity)) {
+        return (
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+            `${terminalThemeText('warn', 'recuperando')}` +
+            `${terminalThemeText('muted', ` · retry do modelo · ${formatLiveDuration(ageMs)} · ${runtimeTail}${queue}`)}` +
             '\x1b[K'
         );
     }
