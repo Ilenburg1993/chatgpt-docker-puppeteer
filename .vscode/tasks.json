@@ -430,7 +430,7 @@
     {
       "label": "terminal:llm-b",
       "type": "shell",
-      "command": "npm run terminal:llm-b",
+      "command": "npm --silent run terminal:llm-b",
       "group": "none",
       "detail": "Abrir terminal permanente LLM-B (REPL interativo + inject server :3009)",
       "presentation": {

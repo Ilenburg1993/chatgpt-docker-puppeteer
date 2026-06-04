@@ -7080,5 +7080,24 @@
     `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-sdk-workspace-command-rows-20260604 --timeout-ms 140000`;
   - artefato: `artifacts/terminal-live/2026-06-04T16-35-19-232Z/summary.md`;
   - resultado: PASS em 21/21 critérios, incluindo workspace com linhas nomeadas.
+- [x] Boot canônico sem banner `npm run`:
+  - achado live: após a limpeza interna, a única linha acima de 120 colunas no primeiro viewport era
+    o banner externo do `npm run terminal:llm-b`, antes de o terminal assumir a tela;
+  - decisão UX: o operador deve abrir o terminal pelo caminho canônico silencioso, preservando o
+    script `terminal:llm-b` para compatibilidade;
+  - correção: harness live usa `npm --silent run terminal:llm-b` em PTY e stdio;
+  - correção: `make model-gateway-terminal` usa `npm --silent run terminal:llm-b`;
+  - correção: a task VS Code `terminal:llm-b` usa `npm --silent run terminal:llm-b`;
+  - critério operacional: banner do gerenciador de scripts não deve ocupar a primeira tela nem virar
+    linha durável de UX.
+  - validação focada:
+    `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - validação focada:
+    `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - live final:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-silent-boot-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-38-33-340Z/summary.md`;
+  - medição: `awk 'length($0)>120' default-ux-cycle.plain.log` não encontrou linhas acima de
+    120 colunas.
 - [ ] Próxima lacuna: validar visualmente TUI completa `fzf`/`gum` quando for aceitável tomar o TTY
       real, mantendo o fluxo filtrado como prova automatizada.

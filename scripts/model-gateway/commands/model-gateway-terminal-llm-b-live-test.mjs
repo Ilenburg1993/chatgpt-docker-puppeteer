@@ -114,6 +114,16 @@ function hasHumanTerminalShutdownCopy(plain) {
     return HUMAN_TERMINAL_SHUTDOWN_RE.test(text) && !LEGACY_TERMINAL_SHUTDOWN_RE.test(text);
 }
 
+function buildTerminalLlmbCommand(canUsePty) {
+    if (canUsePty) {
+        return {
+            cmd: 'script',
+            args: ['-qfec', 'npm --silent run terminal:llm-b', '/dev/null'],
+        };
+    }
+    return { cmd: 'npm', args: ['--silent', 'run', 'terminal:llm-b'] };
+}
+
 function canListenOnPort(port, host = '127.0.0.1') {
     return new Promise((resolve) => {
         const server = net.createServer();
@@ -1321,12 +1331,7 @@ function sessionCycleBootCriteria(boot, { expectCreated = false, expectResumed =
 async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, requestedTransport, timeoutMs }) {
     const canUsePty = requestedTransport === 'pty' && hasCommand('script');
     const transport = canUsePty ? 'pty:script' : 'stdio:headless';
-    const command = canUsePty
-        ? {
-              cmd: 'script',
-              args: ['-qfec', 'npm run terminal:llm-b', '/dev/null'],
-          }
-        : { cmd: 'npm', args: ['run', 'terminal:llm-b'] };
+    const command = buildTerminalLlmbCommand(canUsePty);
     let raw = '';
     let ready = false;
     let childClosed = false;
@@ -1822,12 +1827,7 @@ function pickerInteractiveCycleCriteria(boot) {
 async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
     const canUsePty = requestedTransport === 'pty' && hasCommand('script');
     const transport = canUsePty ? 'pty:script' : 'stdio:headless';
-    const command = canUsePty
-        ? {
-              cmd: 'script',
-              args: ['-qfec', 'npm run terminal:llm-b', '/dev/null'],
-          }
-        : { cmd: 'npm', args: ['run', 'terminal:llm-b'] };
+    const command = buildTerminalLlmbCommand(canUsePty);
     let raw = '';
     let childClosed = false;
     let pickerSent = false;
@@ -5774,12 +5774,7 @@ async function main() {
     let missingRequiredAskRecoverySent = false;
     let missingRequiredAskRecoveryPlainOffset = 0;
     let forcedKillTimer = null;
-    const command = canUsePty
-        ? {
-              cmd: 'script',
-              args: ['-qfec', 'npm run terminal:llm-b', '/dev/null'],
-          }
-        : { cmd: 'npm', args: ['run', 'terminal:llm-b'] };
+    const command = buildTerminalLlmbCommand(canUsePty);
 
     const child = spawn(command.cmd, command.args, {
         cwd: ROOT,

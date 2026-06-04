@@ -1621,7 +1621,7 @@ model-gateway-refresh-provider:
 
 model-gateway-terminal:
 	@echo "$(CYAN)Abra o cockpit e use: /byok gateway commands$(NC)"
-	@$(NPM) run terminal:llm-b
+	@$(NPM) --silent run terminal:llm-b
 
 terminal-aux-libs-smoke:
 	@$(NPM) run terminal:aux-libs:smoke
