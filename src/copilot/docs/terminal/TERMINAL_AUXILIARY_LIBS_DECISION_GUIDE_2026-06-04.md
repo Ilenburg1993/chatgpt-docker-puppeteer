@@ -485,6 +485,21 @@ Decisão:
   - `/help libs` renderiza uma superfície específica para inspeção, previews, TUI e smoke;
   - `/help` passa a sugerir `/help libs` antes de `/help full`;
   - a superfície evita seções do catálogo completo quando o operador só quer libs auxiliares.
+- [x] Guardrail de pergunta humana pendente para TUI externa:
+  - reauditoria pós-UX confirmou que o plano textual de `/menu picker` já bloqueava TUI quando há
+    pergunta humana pendente;
+  - o caminho explícito `/menu picker --interactive`, porém, passava `pendingQuestion=false` para o
+    planner e dependia apenas da prontidão do TTY;
+  - a regra canônica foi reforçada: mesmo com TTY reportado como pronto, picker externo não pode
+    abrir enquanto `ask_user`, pergunta estruturada ou qualquer input humano pendente estiver ativo;
+  - `cmdMenu()` agora lê `readTerminalRuntimeState()` também no caminho interativo e passa a
+    pendência real para `buildTerminalPickerPlan()`;
+  - teste unitário cobre pergunta humana pendente com TTY pronto e garante que
+    `withExclusiveTty()` não é chamado.
+- [x] Live de regressão do picker interativo após o guardrail:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms 90000 --label terminal-picker-pending-guard-after-menu-fix-20260604`;
+  - artefato: `artifacts/terminal-live/2026-06-04T19-13-40-513Z/summary.md`;
+  - resultado: PASS em 5/5 critérios, com `fzf --filter`, roteamento para `/status` e fechamento limpo.
 - [x] Live PTY com contrato JSON de libs:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-json-contract-pass3-20260604 --timeout-ms 180000`;
   - artefato: `artifacts/terminal-live/2026-06-04T17-44-25-689Z/summary.md`;

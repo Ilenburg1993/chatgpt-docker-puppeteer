@@ -7556,6 +7556,17 @@
   - mesmo em modo completo, tipo TypeScript cru não ajuda o operador;
   - a descrição virou `comandos registrados no SDK`;
   - `test_commands_help.spec.js` bloqueia `CommandDefinition[]` no help humano.
+- [x] Quinta correção derivada da reauditoria de libs auxiliares:
+  - `/menu picker` textual já bloqueava TUI quando havia pergunta humana pendente;
+  - `/menu picker --interactive` ainda enviava `pendingQuestion=false` ao planner;
+  - `cmdMenu()` agora lê a pendência real do runtime também no caminho interativo;
+  - mesmo com TTY reportado como pronto, `ask_user` pendente mantém fallback textual e impede
+    `withExclusiveTty()`;
+  - `test_commands_menu.spec.js` cobre esse cenário.
+  - live de regressão:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms 90000 --label terminal-picker-pending-guard-after-menu-fix-20260604`;
+  - artefato: `artifacts/terminal-live/2026-06-04T19-13-40-513Z/summary.md`;
+  - resultado: `PASS` em 5/5 critérios.
 - [ ] Próxima lacuna visual:
   - auditar `/help full`, `/byok gateway commands`, `/byok gateway operator-ready` e `/byok auto`
     para confirmar que o modo detalhado é rico sem parecer lixo técnico;

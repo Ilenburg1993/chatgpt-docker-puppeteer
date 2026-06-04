@@ -358,10 +358,11 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
             renderTerminalPickerPlan(println, entries, ttyReadiness);
             return;
         }
+        const state = readTerminalRuntimeState();
         const plan = buildTerminalPickerPlan({
             allowInteractive: ttyReadiness?.ready === true,
             blockReasons: ttyReadiness?.ready === false ? ttyReadiness.reasons : [],
-            pendingQuestion: false,
+            pendingQuestion: Boolean(state.pendingQuestion && state.pendingQuestionKind !== 'ready'),
             preferred: 'auto',
         });
         if (plan.mode !== 'external' || !plan.command || !plan.toolId || !deps.withExclusiveTty) {

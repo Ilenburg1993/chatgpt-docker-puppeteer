@@ -225,6 +225,39 @@ describe('terminal/commands/menu', () => {
         expect(ctx.output()).toContain('Picker interativo indisponível');
     });
 
+    it('não abre picker interativo quando há pergunta humana pendente', async () => {
+        const pendingRuntimeState = {
+            runtimeId: 'default',
+            status: 'waiting_for_input',
+            model: 'gpt-5-mini',
+            reasoningEffort: 'high',
+            sessionId: 'sess-1',
+            dialogLoopActive: true,
+            dialogPaused: false,
+            queueSize: 0,
+            pendingQuestion: 'Continuar?',
+            pendingQuestionKind: 'ask_user',
+            pendingQuestionShadowState: null,
+            contextWindow: null,
+            lastPrInfo: null,
+        };
+        runtimeGatewayMocks.readTerminalRuntimeState
+            .mockReturnValueOnce(pendingRuntimeState)
+            .mockReturnValueOnce(pendingRuntimeState)
+            .mockReturnValueOnce(pendingRuntimeState);
+        const ctx = mockCtx();
+        const withExclusiveTty = vi.fn();
+
+        await cmdMenu({ println: ctx.println }, 'picker --interactive', [], {
+            readExclusiveTtyReadiness: () => ({ ready: true, reasons: [] }),
+            withExclusiveTty,
+        });
+
+        expect(withExclusiveTty).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('pergunta humana pendente');
+        expect(ctx.output()).toContain('Picker interativo indisponível');
+    });
+
     it('interpreta flags de picker quando o parser entrega arg agregado', async () => {
         const ctx = mockCtx();
         const withExclusiveTty = vi.fn();
