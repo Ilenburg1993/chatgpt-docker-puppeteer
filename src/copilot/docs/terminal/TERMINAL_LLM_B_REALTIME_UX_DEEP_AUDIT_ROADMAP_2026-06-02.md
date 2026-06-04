@@ -5330,3 +5330,68 @@
   - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
 - [ ] Próxima live: repetir cenário canônico para confirmar summary mais honesto, `LLM-B
       finalizando · <idade>` e painel BYOK curto quando houver falha de provider.
+
+### 12.35 Paths humanos e continuação pós-pergunta vazia
+
+- [x] Live de verificação após painel BYOK curto:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-byok-error-panel-or-recovery-20260604-2325`.
+- [x] Resultado: `Status: BLOCKED` por `assistant-empty-turn`; o provider recuperou da instabilidade
+      BYOK, executou tools reais, materializou os 8 deltas públicos, abriu `ask_user`, recebeu
+      `SIM`, mas a continuação pós-pergunta terminou com `dialog.turn_end.reply=""`.
+- [x] Evidência positiva:
+  - linha viva de finalização apareceu curta (`LLM-B finalizando · 0s/1s/2s`);
+  - `ask_user` apareceu como card próprio;
+  - resposta humana foi registrada como operador, não como LLM-B;
+  - SSE/export preservaram deltas, pergunta e resposta humana.
+- [x] Lacuna operacional encontrada: após resposta humana, o silêncio do provider parecia apenas
+      ausência de output. O terminal não explicava ao operador que a continuação pós-pergunta tinha
+      feito chamada de modelo e encerrado sem resposta pública.
+- [x] Correção aplicada: `terminal-agent-wiring` agora rastreia `user_input.completed` recente e,
+      quando `dialog.turn_end` chega vazio dentro da janela pós-pergunta, emite aviso humano curto:
+      `Continuação pós-pergunta sem resposta pública`, registra activity `warn` e publica
+      `dialog.empty_after_user_input` no SSE.
+- [x] Guardrail: turnos vazios normais de tool-only continuam silenciosos; conteúdo já materializado
+      por delta/assistant.message não dispara aviso.
+- [x] Lacuna visual encontrada: tools e `/activity` ainda vazavam paths absolutos do workspace,
+      como `/workspaces/chatgpt-docker-puppeteer/package.json`, na superfície humana padrão.
+- [x] Decisão UX: payload bruto permanece em SSE/export/`--raw`; stdout padrão e comandos humanos
+      devem mostrar paths relativos ao workspace sempre que possível.
+- [x] Correção aplicada: `tool-activity-presenter` ganhou normalização central
+      `formatTerminalToolPathForOperator()` e `compactTerminalOperatorToolText()`.
+- [x] Correção aplicada: narrativa de tool, `/activity`, `/tools`, `/events` e `/session` usam
+      compactação humana para paths absolutos e detalhes compostos.
+- [x] Testes unitários adicionados:
+  - presenter transforma `${workspace}/package.json` em `package.json` na superfície humana;
+  - `shouldWarnEmptyDialogTurnAfterUserInput()` só sinaliza vazios pós-input humano dentro da janela.
+- [ ] Próxima validação escopada: `node --check`, ESLint e unit tests dos módulos tocados.
+- [x] Live de confirmação:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-paths-empty-ask-warning-20260604-2330`.
+- [x] Resultado: `Status: PASS`; 181 eventos SSE, zero erros, export ok, deltas públicos, tools,
+      `ask_user`, resposta humana, final pós-ask e correlação SSE/export passaram.
+- [x] Evidência positiva: narrativa principal de tool, `/activity` e `/tools diag` passaram a
+      mostrar `package.json`, preservando paths absolutos apenas em `/events --raw`.
+- [x] Lacuna residual encontrada na live: o resumo imediato de turno (`Turno` / `Ações` /
+      `Arquivos`) ainda renderizava paths absolutos, porque vinha de `sdk-session-events` e não dos
+      comandos `/activity`/`/tools`.
+- [x] Correção aplicada: `sdk-session-events.renderTurnTraceSummary()` agora usa a mesma compactação
+      humana para targets e arquivos.
+- [x] Teste unitário reforçado: o contrato de `sdk-session-events` simula trace com path absoluto e
+      exige saída contendo `files/plan.md` sem `process.cwd()`.
+- [x] Validação escopada passou:
+  - `node --check` em `sdk-session-events`, presenter, wiring e comandos humanos tocados;
+  - `npx eslint` nos módulos e testes tocados;
+  - `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/test_terminal_agent_wiring.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
+- [x] Próxima live de confirmação:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-turn-summary-relative-paths-20260604-2340`.
+- [x] Resultado: `Status: PASS`; fluxo canônico completo, 181 eventos SSE, zero erros, export ok.
+- [x] Evidência positiva: resumo imediato de turno agora mostra
+      `Ações ... LER Ler arquivo · package.json` e `Arquivos LER package.json · LER package.json`.
+- [x] Busca no `terminal.plain.log`: ocorrências absolutas restantes aparecem apenas em log de DB,
+      `/events --raw`/payload técnico ou caminho do arquivo exportado; a superfície humana padrão
+      ficou relativa.
+- [ ] Próxima validação escopada adicional, se houver nova edição: repetir `node --check`, ESLint e unit tests incluindo
+      `sdk-session-events`.
+- [ ] Próxima lacuna UX: reduzir a linha viva de pergunta que ainda quebra em duas linhas em PTY
+      estreito (`LLM-B aguardando operador · responda no` / `prompt [PERG] · opções SIM · conversa ativa`).
+- [ ] Próxima lacuna UX: avaliar se `Exportado /workspaces/...` deve virar path relativo no modo
+      humano, mantendo absoluto apenas em detalhes/raw.

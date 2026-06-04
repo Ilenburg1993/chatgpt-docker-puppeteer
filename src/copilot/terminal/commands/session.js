@@ -44,7 +44,9 @@ import {
 } from '../byok/index.js';
 import {
     buildTerminalToolActivityPresentation,
+    compactTerminalOperatorToolText,
     compactTerminalToolText,
+    formatTerminalToolPathForOperator,
     isTerminalInternalCallIdentifier,
 } from '../events/tool-activity-presenter.js';
 import {
@@ -346,7 +348,7 @@ function pluralPt(value, singular, plural) {
  */
 function compactHumanTerminalText(value) {
     const text = typeof value === 'string' ? value : value == null ? '' : String(value);
-    return compactTerminalToolText(text.replace(/\s+/gu, ' ').trim(), 120);
+    return compactTerminalOperatorToolText(text.replace(/\s+/gu, ' ').trim(), 120);
 }
 
 /**
@@ -589,7 +591,7 @@ function renderLiveToolSummary(tool, options) {
     );
     const target =
         targetCandidate && !targetIsInternal
-            ? ` · ${compactTerminalToolText(targetCandidate, 96)}`
+            ? ` · ${compactTerminalOperatorToolText(targetCandidate, 96)}`
             : targetCandidate && options.detail
               ? ` · id ${compactTerminalToolText(targetCandidate, 32)}`
               : '';
@@ -1348,7 +1350,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
             println(
                 terminalThemeRow(
                     'Arquivo',
-                    `${renderLiveOperationLabel(file.operation)} · ${compactHumanTerminalText(file.path)} · ${renderLiveSourceLabel(file.source)}${file.count > 1 ? ` ×${file.count}` : ''}`,
+                    `${renderLiveOperationLabel(file.operation)} · ${formatTerminalToolPathForOperator(file.path)} · ${renderLiveSourceLabel(file.source)}${file.count > 1 ? ` ×${file.count}` : ''}`,
                 ),
             );
         }

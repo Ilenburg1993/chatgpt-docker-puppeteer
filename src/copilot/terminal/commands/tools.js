@@ -10,7 +10,11 @@
  * @see EventBus
  */
 
-import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
+import {
+    compactTerminalDiagnosticId,
+    compactTerminalOperatorToolText,
+    getTerminalHumanToolName,
+} from '../events/tool-activity-presenter.js';
 import { readTerminalToolRegistrySnapshot } from '../frontend/gateways/index.js';
 import { readTerminalStatusProjection, readTerminalToolStatsProjection } from '../frontend/index.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/ui/index.js';
@@ -98,8 +102,7 @@ function renderToolReferenceList(refs) {
  * @returns {string}
  */
 function compactTerminalDiagnosticText(text, max) {
-    const clean = text.replace(/\s+/gu, ' ').trim();
-    return clean.length > max ? `${clean.slice(0, Math.max(0, max - 1))}…` : clean;
+    return compactTerminalOperatorToolText(text, max);
 }
 
 /**

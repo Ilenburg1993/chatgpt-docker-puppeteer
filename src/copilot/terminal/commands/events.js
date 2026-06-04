@@ -6,7 +6,12 @@
  */
 
 import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
-import { compactTerminalDiagnosticId, getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
+import {
+    compactTerminalDiagnosticId,
+    compactTerminalOperatorToolText,
+    formatTerminalToolPathForOperator,
+    getTerminalHumanToolName,
+} from '../events/tool-activity-presenter.js';
 import {
     formatTerminalIsoTimestamp,
     formatTerminalTimeLabel,
@@ -316,7 +321,7 @@ function humanEventSource(source) {
  */
 function normalizeEventSummaryText(value) {
     const text = typeof value === 'string' ? value : value == null ? '' : String(value);
-    return text.replace(/\s+/gu, ' ').trim();
+    return compactTerminalOperatorToolText(text.replace(/\s+/gu, ' ').trim(), 180);
 }
 
 /**
@@ -442,7 +447,7 @@ export async function cmdEvents({ println }, arg = '') {
         println(
             terminalThemeRow(
                 'Janela',
-                `${projection.filters.limit} eventos recentes · arquivo ${projection.state.path ?? '(sem arquivo)'}`,
+                `${projection.filters.limit} eventos recentes · arquivo ${formatTerminalToolPathForOperator(projection.state.path ?? '(sem arquivo)')}`,
                 { role: 'muted' },
             ),
         );
@@ -503,7 +508,7 @@ export async function cmdEvents({ println }, arg = '') {
     println(
         terminalThemeRow(
             'Archive',
-            `${compact(state.path ?? '(sem arquivo)', 88)} · ${state.events} evento(s) · fila ${state.queueDepth}`,
+            `${compactTerminalOperatorToolText(state.path ?? '(sem arquivo)', 88)} · ${state.events} evento(s) · fila ${state.queueDepth}`,
             { role: 'muted' },
         ),
     );

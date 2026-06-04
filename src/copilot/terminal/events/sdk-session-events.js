@@ -111,7 +111,12 @@ import {
 import { drainMailboxToTurnIfIdle } from '../wiring/mailbox/index.js';
 import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
 import { printTerminalHumanQuestionCard } from './human-question-renderer.js';
-import { buildTerminalToolActivityPresentation, compactTerminalDiagnosticId } from './tool-activity-presenter.js';
+import {
+    buildTerminalToolActivityPresentation,
+    compactTerminalDiagnosticId,
+    compactTerminalOperatorToolText,
+    formatTerminalToolPathForOperator,
+} from './tool-activity-presenter.js';
 import {
     handleTerminalExternalToolCompleted,
     handleTerminalExternalToolRequested,
@@ -359,14 +364,15 @@ function renderTurnTraceSummary(trace) {
         const displayName = presentation.displayToolName;
         const operationLabel = renderTurnTraceOperationLabel(tool.operation);
         const label = compactDetail
-            ? `${operationLabel} ${compactSummaryText(target ?? displayName, 28)}`
-            : `${operationLabel} ${displayName}${target ? ` · ${compactSummaryText(target, 46)}` : ''}`;
+            ? `${operationLabel} ${compactTerminalOperatorToolText(target ?? displayName, 28)}`
+            : `${operationLabel} ${displayName}${target ? ` · ${compactTerminalOperatorToolText(target, 46)}` : ''}`;
         return terminalThemeText('tool', label);
     });
     const fileItems = trace.files.slice(0, compactDetail ? 2 : 3).map((file) => {
+        const pathLabel = formatTerminalToolPathForOperator(file.path);
         const label = compactDetail
-            ? compactSummaryText(file.path, 24)
-            : `${renderTurnTraceOperationLabel(file.operation)} ${compactSummaryText(file.path, 42)}`;
+            ? compactTerminalOperatorToolText(pathLabel, 24)
+            : `${renderTurnTraceOperationLabel(file.operation)} ${compactTerminalOperatorToolText(pathLabel, 42)}`;
         return terminalThemeText('info', label);
     });
     const headline = [

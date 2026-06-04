@@ -12,7 +12,8 @@ import {
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
-    compactTerminalToolText,
+    compactTerminalOperatorToolText,
+    formatTerminalToolPathForOperator,
     isTerminalInternalCallIdentifier,
 } from '../events/tool-activity-presenter.js';
 
@@ -161,7 +162,7 @@ function parseActivityArg(arg = '') {
  */
 function compactHumanText(value) {
     const text = typeof value === 'string' ? value : value == null ? '' : String(value);
-    return compactTerminalToolText(text.replace(/\s+/gu, ' ').trim(), 96);
+    return compactTerminalOperatorToolText(text.replace(/\s+/gu, ' ').trim(), 96);
 }
 
 /**
@@ -217,7 +218,7 @@ function renderToolSummary(tool, opts) {
             ? opts.detail
                 ? `id ${compactTerminalDiagnosticId(targetCandidate)}`
                 : null
-            : compactTerminalToolText(targetCandidate, 72)
+            : compactTerminalOperatorToolText(targetCandidate, 72)
         : null;
     return { name: presentation.displayToolName, target };
 }
@@ -247,7 +248,7 @@ function printTurnTraceSummary(println, title, trace, opts) {
             println(
                 terminalThemeRow(
                     'Arquivo',
-                    `${renderOperationLabel(file.operation)} · ${compactHumanText(file.path)}${file.count > 1 ? ` ×${file.count}` : ''}${source}`,
+                    `${renderOperationLabel(file.operation)} · ${formatTerminalToolPathForOperator(file.path)}${file.count > 1 ? ` ×${file.count}` : ''}${source}`,
                 ),
             );
         }

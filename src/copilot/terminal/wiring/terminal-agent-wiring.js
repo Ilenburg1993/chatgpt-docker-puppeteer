@@ -22,6 +22,7 @@ import {
     EMITTER_DIALOG_STOPPED,
     EMITTER_SESSION_FATAL,
     EMITTER_SESSION_USAGE,
+    EMITTER_USER_INPUT_COMPLETED,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { logSwallowed } from '../../core/error-handlers.js';
@@ -57,6 +58,7 @@ const WATCHDOG_RECOVERY_WAIT_MS = Math.max(5_000, Math.min(30_000, Math.round(LL
 const AUTO_RESTART_DIALOG_STOP_REASONS = new Set(['watchdog_restart', 'model_stopped']);
 const EMITTER_DIALOG_TURN_END = 'dialog.turn_end';
 const DIALOG_LOOP_CHANGED_DEDUP_WINDOW_MS = 250;
+const EMPTY_DIALOG_AFTER_USER_INPUT_WINDOW_MS = 30_000;
 
 /**
  * @template {Record<string, unknown>} T
@@ -116,6 +118,33 @@ export function createDialogTurnEndSseEnvelope(evt) {
         'terminal-agent-wiring/dialog.turn_end',
     );
     return { envelope, reply, turnId, replyAlreadyMaterialized };
+}
+
+/**
+ * @param {{
+ *     reply?: string | null;
+ *     replyAlreadyMaterialized?: boolean;
+ *     lastUserInputCompletedAt?: number | null;
+ *     now?: number;
+ *     windowMs?: number;
+ * }} input
+ * @returns {boolean}
+ */
+export function shouldWarnEmptyDialogTurnAfterUserInput(input) {
+    const reply = typeof input.reply === 'string' ? input.reply : '';
+    if (reply.trim().length > 0) return false;
+    if (input.replyAlreadyMaterialized) return false;
+    const lastUserInputCompletedAt =
+        typeof input.lastUserInputCompletedAt === 'number' && Number.isFinite(input.lastUserInputCompletedAt)
+            ? input.lastUserInputCompletedAt
+            : null;
+    if (lastUserInputCompletedAt === null) return false;
+    const now = typeof input.now === 'number' && Number.isFinite(input.now) ? input.now : Date.now();
+    const windowMs =
+        typeof input.windowMs === 'number' && Number.isFinite(input.windowMs)
+            ? Math.max(0, input.windowMs)
+            : EMPTY_DIALOG_AFTER_USER_INPUT_WINDOW_MS;
+    return now >= lastUserInputCompletedAt && now - lastUserInputCompletedAt <= windowMs;
 }
 
 /**
@@ -404,6 +433,27 @@ export function registerAgentEventListeners(printBanner) {
     let lastStreamingReportAt = 0;
     /** @type {{ active: boolean; reason: string; at: number } | null} */
     let lastDialogLoopChangedSse = null;
+    /** @type {{ at: number; answerPreview: string | null; requestId: string | null } | null} */
+    let lastUserInputCompleted = null;
+
+    agentEvents.on(
+        EMITTER_USER_INPUT_COMPLETED,
+        (
+            /** @type {{
+             *     timestamp?: number;
+             *     answer?: unknown;
+             *     requestId?: string | null;
+             * }} */ evt,
+        ) => {
+            const at = typeof evt.timestamp === 'number' && Number.isFinite(evt.timestamp) ? evt.timestamp : Date.now();
+            const answer = typeof evt.answer === 'string' && evt.answer.trim().length > 0 ? evt.answer.trim() : null;
+            lastUserInputCompleted = {
+                at,
+                answerPreview: answer ? answer.slice(0, 80) : null,
+                requestId: typeof evt.requestId === 'string' && evt.requestId.trim().length > 0 ? evt.requestId.trim() : null,
+            };
+        },
+    );
 
     agentEvents.on(EMITTER_DIALOG_REPLY, (/** @type {{ reply: string }} */ evt) => {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
@@ -430,7 +480,44 @@ export function registerAgentEventListeners(printBanner) {
         ) => {
             const { envelope, reply, turnId, replyAlreadyMaterialized } = createDialogTurnEndSseEnvelope(evt);
             broadcastSse('dialog.turn_end', envelope);
-            if (!reply.trim()) return;
+            if (!reply.trim()) {
+                if (
+                    shouldWarnEmptyDialogTurnAfterUserInput({
+                        reply,
+                        replyAlreadyMaterialized,
+                        lastUserInputCompletedAt: lastUserInputCompleted?.at ?? null,
+                        now: Date.now(),
+                    })
+                ) {
+                    const detail = [
+                        'continuação pós-pergunta terminou sem texto público',
+                        turnId ? `turno ${turnId}` : null,
+                        lastUserInputCompleted?.answerPreview ? `resposta ${lastUserInputCompleted.answerPreview}` : null,
+                    ]
+                        .filter(Boolean)
+                        .join(' · ');
+                    println(
+                        `\n  ${terminalThemeBadge('warn', 'AVISO')} ${terminalThemeText('warn', 'Continuação pós-pergunta sem resposta pública')} ${terminalThemeText('muted', '· tente /turn, reenvie a pergunta ou troque modelo com /byok model')}`,
+                    );
+                    recordTerminalActivity('turn', 'Continuação pós-pergunta vazia', {
+                        detail,
+                        severity: 'warn',
+                        source: 'dialog.turn_end',
+                    });
+                    broadcastSse(
+                        'dialog.empty_after_user_input',
+                        withTerminalAgentSseEnvelope(
+                            {
+                                turnId,
+                                detail,
+                                requestId: lastUserInputCompleted?.requestId ?? null,
+                            },
+                            'terminal-agent-wiring/dialog.empty_after_user_input',
+                        ),
+                    );
+                }
+                return;
+            }
             if (replyAlreadyMaterialized) {
                 recordTerminalActivity('turn', 'dialog.turn_end reconciliado sem novo bloco visual', {
                     detail: turnId ? `turn=${turnId} · conteúdo já materializado` : 'conteúdo já materializado',

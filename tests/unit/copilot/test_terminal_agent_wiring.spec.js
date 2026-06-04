@@ -95,4 +95,50 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
         );
         clearTerminalTurnMaterialization();
     });
+
+    it('sinaliza turno vazio apenas quando ocorre logo após input humano', async () => {
+        const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
+
+        expect(
+            mod.shouldWarnEmptyDialogTurnAfterUserInput({
+                reply: '',
+                lastUserInputCompletedAt: 1_000,
+                now: 2_000,
+                windowMs: 5_000,
+            }),
+        ).toBe(true);
+        expect(
+            mod.shouldWarnEmptyDialogTurnAfterUserInput({
+                reply: 'ok',
+                lastUserInputCompletedAt: 1_000,
+                now: 2_000,
+                windowMs: 5_000,
+            }),
+        ).toBe(false);
+        expect(
+            mod.shouldWarnEmptyDialogTurnAfterUserInput({
+                reply: '',
+                replyAlreadyMaterialized: true,
+                lastUserInputCompletedAt: 1_000,
+                now: 2_000,
+                windowMs: 5_000,
+            }),
+        ).toBe(false);
+        expect(
+            mod.shouldWarnEmptyDialogTurnAfterUserInput({
+                reply: '',
+                lastUserInputCompletedAt: 1_000,
+                now: 20_000,
+                windowMs: 5_000,
+            }),
+        ).toBe(false);
+        expect(
+            mod.shouldWarnEmptyDialogTurnAfterUserInput({
+                reply: '',
+                lastUserInputCompletedAt: null,
+                now: 2_000,
+                windowMs: 5_000,
+            }),
+        ).toBe(false);
+    });
 });

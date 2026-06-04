@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
+    compactTerminalOperatorToolText,
+    formatTerminalToolPathForOperator,
     getTerminalHumanToolName,
     isTerminalInternalCallIdentifier,
 } from '../../../../src/copilot/terminal/events/tool-activity-presenter.js';
@@ -76,20 +78,34 @@ describe('terminal/tool-activity-presenter', () => {
     });
 
     it('enriquece leitura com range efetivamente retornado no resultado', () => {
+        const absolutePackagePath = `${process.cwd()}/package.json`;
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'read_file_content',
-            args: { path: 'src/copilot/tools/file/read-tools.js', startLine: 10 },
+            args: { path: absolutePackagePath, startLine: 10 },
             result: {
                 success: true,
-                path: 'src/copilot/tools/file/read-tools.js',
+                path: absolutePackagePath,
                 returnedLines: { start: 10, end: 18 },
             },
         });
 
         expect(presentation.operation).toBe('read');
         expect(presentation.target).toContain('linhas 10-18');
+        expect(presentation.target).toContain('package.json');
+        expect(presentation.target).not.toContain(process.cwd());
         expect(presentation.lineRange).toEqual({ start: 10, end: 18 });
         expect(presentation.completeLine(true, '0.2s')).toContain('linhas 10-18');
+    });
+
+    it('normaliza paths absolutos de workspace apenas na superfície humana', () => {
+        const absolute = `${process.cwd()}/src/copilot/terminal/events/tool-activity-presenter.js`;
+
+        expect(formatTerminalToolPathForOperator(absolute)).toBe(
+            'src/copilot/terminal/events/tool-activity-presenter.js',
+        );
+        expect(compactTerminalOperatorToolText(`arquivo: ${absolute} · linhas 1-3`, 180)).toContain(
+            'arquivo: src/copilot/terminal/events/tool-activity-presenter.js · linhas 1-3',
+        );
     });
 
     it('classifica tools de introspecção sem badge UNKNOWN', () => {

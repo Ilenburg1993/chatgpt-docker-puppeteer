@@ -10,6 +10,7 @@
 
 import { resolveToolName } from '#copilot/config';
 import { introspectToolTargets } from '../../core/tool-target-introspection.js';
+import path from 'node:path';
 
 const FILE_OPERATION_PATTERNS = /** @type {const} */ ([
     { match: /\b(read|view|open|cat|show)\b/i, operation: 'read', label: 'lendo arquivo' },
@@ -60,6 +61,9 @@ const TOOL_ID_PATTERNS = [
     /^ext:[a-z0-9_-]+/iu,
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu,
 ];
+
+const ABSOLUTE_POSIX_PATH_PATTERN = /(^|[\s(["'`:=])((?:\/[^\s"'`)]+){2,})/gu;
+const ABSOLUTE_WINDOWS_PATH_PATTERN = /(^|[\s(["'`:=])([A-Za-z]:\\[^\s"'`)]+)/gu;
 
 /**
  * @typedef {'read' | 'write' | 'edit' | 'copy' | 'move' | 'delete' | 'list' | 'run' | 'inspect' | 'ask' | 'intent' | 'unknown'} TerminalToolOperation
@@ -298,7 +302,7 @@ function buildTargetSummary(meta) {
     /** @type {string[]} */
     const chunks = [];
     if (meta.fileTargets.length > 0) {
-        const preview = meta.fileTargets.slice(0, 2).join(', ');
+        const preview = meta.fileTargets.slice(0, 2).map(formatTerminalToolPathForOperator).join(', ');
         const extra = meta.fileTargets.length > 2 ? ` (+${meta.fileTargets.length - 2})` : '';
         chunks.push(`arquivo${meta.fileTargets.length > 1 ? 's' : ''}: ${preview}${extra}`);
     }
@@ -408,6 +412,52 @@ function inferOperation(toolName, path, explicitOperation) {
 export function compactTerminalToolText(text, max = 140) {
     const compact = text.replace(/\s+/g, ' ').trim();
     return compact.length > max ? `${compact.slice(0, Math.max(0, max - 1))}…` : compact;
+}
+
+/**
+ * Normaliza paths para a superfície humana do terminal. O dado bruto continua em SSE/export/diag; aqui otimizamos a
+ * leitura do operador: paths dentro do workspace viram relativos e paths absolutos externos são encurtados pelo fim.
+ *
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+export function formatTerminalToolPathForOperator(value) {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    if (!raw) return '';
+    if (/^https?:\/\//iu.test(raw) || raw.startsWith('file://')) return raw;
+
+    const workspaceRoot = path.resolve(process.cwd());
+    const normalized = raw.replace(/\\/gu, '/');
+    const absolute = path.isAbsolute(raw) || /^[A-Za-z]:[\\/]/u.test(raw);
+    if (!absolute) return normalized.replace(/^\.\//u, '');
+
+    const resolved = path.resolve(raw);
+    const relative = path.relative(workspaceRoot, resolved).replace(/\\/gu, '/');
+    if (relative && !relative.startsWith('../') && relative !== '..') return relative;
+    if (!relative) return '.';
+
+    const segments = normalized.split('/').filter(Boolean);
+    if (segments.length <= 4) return normalized;
+    return `/…/${segments.slice(-4).join('/')}`;
+}
+
+/**
+ * Compacta texto operacional e troca ocorrências de paths absolutos por paths humanos. Útil para detalhes já
+ * compostos como `arquivo: /workspaces/projeto/package.json · linhas 1-3`.
+ *
+ * @param {string | null | undefined} value
+ * @param {number} [max=140]
+ * @returns {string}
+ */
+export function compactTerminalOperatorToolText(value, max = 140) {
+    const raw = typeof value === 'string' ? value : value == null ? '' : String(value);
+    const withPosixPaths = raw.replace(ABSOLUTE_POSIX_PATH_PATTERN, (_match, prefix, candidate) => {
+        return `${prefix}${formatTerminalToolPathForOperator(candidate)}`;
+    });
+    const withWindowsPaths = withPosixPaths.replace(ABSOLUTE_WINDOWS_PATH_PATTERN, (_match, prefix, candidate) => {
+        return `${prefix}${formatTerminalToolPathForOperator(candidate)}`;
+    });
+    return compactTerminalToolText(withWindowsPaths, max);
 }
 
 /**

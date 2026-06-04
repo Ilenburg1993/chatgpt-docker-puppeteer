@@ -343,6 +343,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
+        const absolutePlanPath = `${process.cwd()}/files/plan.md`;
         mocks.completeTerminalTurnTrace.mockReturnValue({
             traceId: 'turn:turn-1',
             turnId: 'turn-1',
@@ -357,8 +358,8 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
                 {
                     toolName: 'workspace.read_file',
                     operation: 'read',
-                    path: 'files/plan.md',
-                    target: 'files/plan.md',
+                    path: absolutePlanPath,
+                    target: absolutePlanPath,
                     source: 'sdk',
                     status: 'completed',
                     success: true,
@@ -368,7 +369,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             ],
             files: [
                 {
-                    path: 'files/plan.md',
+                    path: absolutePlanPath,
                     operation: 'edit',
                     source: 'sdk',
                     count: 1,
@@ -422,6 +423,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Arquivos'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('files/plan.md'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining(process.cwd()));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Workspace file update: files/plan.md'));
     });
 
