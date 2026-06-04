@@ -5564,6 +5564,17 @@
 - [x] Observação visual: o log PTY ainda pode registrar `SIM` grudado ao frame ANSI da linha viva,
       mas o summary manteve `no-prompt-double-render` e `ux-compact-ask-live-status`; manter sob
       observação em lives futuras.
+- [x] Lacuna visual residual: eventos inline/timeline de uso repetiam `sem Premium Request` no
+      label e no detalhe (`Uso BYOK sem Premium Request — modelo ... · custo ... · sem Premium
+      Request · tokens ...`).
+- [x] Correção aplicada: `formatLlmUsageOperatorDetail()` agora usa detalhe mais escaneável:
+      `modelo ... · tokens entrada→saída · custo ...`; o estado `sem Premium Request` fica no
+      label, e a classe/motivo técnica permanece no payload SSE/`detail`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/events/agent-runtime-events.js`;
+  - `node --check tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
+  - `npx eslint src/copilot/terminal/events/agent-runtime-events.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
+  - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
 - [ ] Próxima live, quando o provider falhar novamente: confirmar `byok-provider-error-tracked`
       no summary e `/errors 10` preenchido.
 - [ ] Próxima auditoria UX: revisar labels remanescentes como `SDK assistant`, `Sessão SDK` e

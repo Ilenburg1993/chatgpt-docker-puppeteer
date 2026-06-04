@@ -1093,13 +1093,15 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'system',
             'Uso BYOK sem Premium Request',
             expect.objectContaining({
-                detail: 'modelo gpt-5.4 · custo 0.0123 · sem Premium Request · tokens 10→4',
+                detail: 'modelo gpt-5.4 · tokens 10→4 · custo 0.0123',
                 source: 'agent',
                 recordHistory: true,
             }),
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Uso do modelo'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('tokens 10→4'));
         expect(println).not.toHaveBeenCalledWith(expect.stringMatching(/Uso do modelo[\s\S]*modelo gpt-5\.4/u));
+        expect(println).not.toHaveBeenCalledWith(expect.stringMatching(/Uso do modelo[\s\S]*sem Premium Request/u));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ask_user_continuation'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('classe='));
         expect(broadcastSse).toHaveBeenCalledWith(

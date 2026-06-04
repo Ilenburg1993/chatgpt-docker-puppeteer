@@ -554,14 +554,13 @@ function formatLlmUsageOperatorDetail(evt, billing) {
     } else if (billing.displayModel) {
         parts.push(`modelo ${billing.displayModel}`);
     }
-    if (billing.cost !== null) {
-        parts.push(`custo ${billing.cost.toFixed(4)}`);
-    }
-    parts.push('sem Premium Request');
     const inputTokens = typeof evt?.['inputTokens'] === 'number' ? evt['inputTokens'] : null;
     const outputTokens = typeof evt?.['outputTokens'] === 'number' ? evt['outputTokens'] : null;
     if (inputTokens !== null || outputTokens !== null) {
         parts.push(`tokens ${inputTokens ?? '?'}→${outputTokens ?? '?'}`);
+    }
+    if (billing.cost !== null) {
+        parts.push(`custo ${billing.cost.toFixed(4)}`);
     }
     return parts.filter(Boolean).join(' · ');
 }
