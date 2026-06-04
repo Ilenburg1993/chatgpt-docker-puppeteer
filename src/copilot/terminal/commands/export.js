@@ -13,6 +13,7 @@ import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretText } from '../../core/security/redaction.js';
+import { formatTerminalToolPathForOperator } from '../events/tool-activity-presenter.js';
 import { readTerminalTimelineProjection } from '../frontend/index.js';
 import { formatTerminalIsoTimestamp, terminalThemeRow } from '../state/index.js';
 
@@ -99,7 +100,7 @@ export async function cmdExport({ println }, arg) {
 
     try {
         await writeFile(filePath, lines.join('\n'), 'utf-8');
-        println(terminalThemeRow('Exportado', filePath, { role: 'success' }));
+        println(terminalThemeRow('Exportado', formatTerminalToolPathForOperator(filePath), { role: 'success' }));
         println(terminalThemeRow('Mensagens', `${projection.turns.length} salvas como Markdown.`));
     } catch (e) {
         println(terminalThemeRow('Erro', `erro ao exportar: ${toError(e).message ?? e}`, { role: 'error' }));

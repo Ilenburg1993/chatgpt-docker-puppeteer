@@ -5409,5 +5409,34 @@
 - [x] Observação de log: `terminal.plain.log` concatena `SIM` ao frame ANSI em uma linha (`... SIMSIM`),
       mas no PTY visual a linha reservada foi limpa ao enviar a resposta; não houve nova quebra de
       linha nem disputa durável com o prompt.
-- [ ] Próxima lacuna UX: avaliar se `Exportado /workspaces/...` deve virar path relativo no modo
-      humano, mantendo absoluto apenas em detalhes/raw.
+- [x] Lacuna UX: `/export` ainda imprimia `Exportado /workspaces/...` no modo humano.
+- [x] Decisão UX: o caminho físico continua absoluto internamente para escrita; a linha humana
+      mostra path relativo ao workspace quando possível, mantendo paths brutos apenas nos artefatos
+      e payloads técnicos.
+- [x] Correção aplicada: `cmdExport()` usa `formatTerminalToolPathForOperator()` para a linha
+      `Exportado`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/export.js`;
+  - `npx eslint src/copilot/terminal/commands/export.js tests/unit/copilot/terminal/test_commands_export.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_export.spec.js`.
+- [x] Lacuna UX: `/activity` ainda podia mostrar nomes crus como `workspace.read_file` no fluxo
+      padrão, exigindo que o operador decodificasse namespace técnico.
+- [x] Correção aplicada: o glossário central de tools agora cobre `workspace.*`, file-tools
+      canônicas/legadas e shell local (`read_bash`, `write_bash`, `stop_bash`), mantendo detalhe/raw
+      como espaço técnico quando necessário.
+- [x] Correção aplicada: o glossário agora privilegia o nome bruto humano específico antes do alias
+      canônico genérico, evitando que `read_bash` vire apenas `Executar comando`.
+- [x] Contrato reforçado: `/activity detail` continua diagnóstico, mas não volta a imprimir paths
+      absolutos do workspace na superfície humana.
+- [x] Validação escopada passou:
+  - `node --check` em presenter, `/activity` e `/export`;
+  - `npx eslint` nos módulos e specs tocados;
+  - `npx vitest run test_tool_activity_presenter.spec.js test_commands_activity.spec.js test_commands_export.spec.js`.
+- [x] Lacuna UX: comandos de auditoria ainda exibiam labels de backend como `Archive`.
+- [x] Correção aplicada: `/events`, `/session sdk events` e `/session sdk waits` usam `Registro`
+      na superfície humana; `/session sdk waits` virou `Interações SDK da sessão` para refletir
+      perguntas, formulários e permissões, não apenas espera passiva.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/events.js src/copilot/terminal/commands/session.js`;
+  - `npx eslint src/copilot/terminal/commands/events.js src/copilot/terminal/commands/session.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`.

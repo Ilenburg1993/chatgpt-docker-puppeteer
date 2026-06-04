@@ -2143,7 +2143,7 @@ async function cmdSessionSdkEvents({ println }, tokens) {
     println(terminalThemeHeadline('assistant', 'Eventos SDK da sessão'));
     println(
         terminalThemeRow(
-            'Archive',
+            'Registro',
             `arquivo ${compactHumanTerminalText(state.path ?? 'sem arquivo')} · janela ${limit} · ciclo de vida ${lifecycle.entries.length} · comandos ${commands.entries.length}`,
         ),
     );
@@ -2205,10 +2205,10 @@ async function cmdSessionSdkWaits({ println }, tokens) {
     const counts = new Map(SDK_SESSION_WAIT_ARCHIVE_EVENTS.map((event) => [event, 0]));
     for (const entry of merged) counts.set(entry.event, (counts.get(entry.event) ?? 0) + 1);
     println('');
-    println(terminalThemeHeadline('assistant', 'Esperas SDK da sessão'));
+    println(terminalThemeHeadline('assistant', 'Interações SDK da sessão'));
     println(
         terminalThemeRow(
-            'Archive',
+            'Registro',
             `arquivo ${compactHumanTerminalText(state?.path ?? 'sem arquivo')} · janela ${limit} · perguntas ${(counts.get('user_input.requested') ?? 0) + (counts.get('user_input.completed') ?? 0)} · formulários ${(counts.get('elicitation.pending') ?? 0) + (counts.get('elicitation.completed') ?? 0)} · permissões ${(counts.get('permission.requested') ?? 0) + (counts.get('permission.completed') ?? 0) + (counts.get('permission.mode_changed') ?? 0)}`,
         ),
     );

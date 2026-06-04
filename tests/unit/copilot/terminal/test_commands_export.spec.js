@@ -90,6 +90,19 @@ describe('terminal/commands/export', () => {
         expect(ctx.output()).toContain('Exportado');
     });
 
+    it('mostra path relativo ao workspace na saída humana quando exporta dentro do repo', async () => {
+        const ctx = mockCtx();
+
+        await cmdExport({ println: ctx.println }, 'artifacts/terminal-live/conversa.md');
+
+        expect(writeFile).toHaveBeenCalledOnce();
+        const [filePath] = writeFile.mock.calls[0];
+        expect(String(filePath)).toContain(`${process.cwd()}/artifacts/terminal-live/conversa.md`);
+        expect(ctx.output()).toContain('Exportado');
+        expect(ctx.output()).toContain('artifacts/terminal-live/conversa.md');
+        expect(ctx.output()).not.toContain(`${process.cwd()}/artifacts/terminal-live/conversa.md`);
+    });
+
     it('usa terminalStreamingDiagnostics como envelope quando não há assistantMessageEnvelope', async () => {
         readTerminalTimelineProjection.mockReturnValueOnce({
             timelineSource: 'hub',

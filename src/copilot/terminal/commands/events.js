@@ -507,7 +507,7 @@ export async function cmdEvents({ println }, arg = '') {
     println(terminalThemeHeadline('accent', `Eventos SSE - últimas ${filters.limit}`));
     println(
         terminalThemeRow(
-            'Archive',
+            'Registro',
             `${compactTerminalOperatorToolText(state.path ?? '(sem arquivo)', 88)} · ${state.events} evento(s) · fila ${state.queueDepth}`,
             { role: 'muted' },
         ),

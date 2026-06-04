@@ -1193,6 +1193,8 @@ describe('commands/session — async commands', () => {
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.lifecycle', limit: 5 });
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.command.executed', limit: 5 });
         expect(ctx.output()).toContain('Eventos SDK da sessão');
+        expect(ctx.output()).toContain('Registro');
+        expect(ctx.output()).not.toContain('Archive');
         expect(ctx.output()).toContain('Ciclo de vida SDK');
         expect(ctx.output()).toContain('sessão atualizada');
         expect(ctx.output()).toContain('×2');
@@ -1326,7 +1328,9 @@ describe('commands/session — async commands', () => {
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'user_input.requested', limit: 6 });
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'elicitation.pending', limit: 6 });
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'permission.requested', limit: 6 });
-        expect(ctx.output()).toContain('Esperas SDK da sessão');
+        expect(ctx.output()).toContain('Interações SDK da sessão');
+        expect(ctx.output()).toContain('Registro');
+        expect(ctx.output()).not.toContain('Archive');
         expect(ctx.output()).toContain('perguntas 2');
         expect(ctx.output()).toContain('formulários 1');
         expect(ctx.output()).toContain('permissões 1');

@@ -172,7 +172,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Resumo do turno atual');
         expect(ctx.output()).toContain('Último turno concluído');
         expect(ctx.output()).toContain('Arquivos tocados');
-        expect(ctx.output()).toContain('workspace.read_file');
+        expect(ctx.output()).toContain('Ler arquivo');
+        expect(ctx.output()).not.toContain('workspace.read_file');
         expect(ctx.output()).toContain('Interações humanas');
         expect(ctx.output()).toContain('Qual ambiente devo usar?');
         expect(ctx.output()).toContain('resposta prod');
@@ -200,7 +201,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('turn:turn-1');
         expect(ctx.output()).toContain('req=ui-1');
         expect(ctx.output()).toContain('Origem');
-        expect(ctx.output()).toContain(
+        expect(ctx.output()).toContain('src/copilot/terminal/commands/activity.js');
+        expect(ctx.output()).not.toContain(
             '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/commands/activity.js',
         );
     });

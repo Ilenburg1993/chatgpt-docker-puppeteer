@@ -133,6 +133,8 @@ describe('terminal/commands/events', () => {
         );
         expect(ctx.output()).toContain('Eventos SSE');
         expect(ctx.output()).toContain('últimas 5');
+        expect(ctx.output()).toContain('Registro');
+        expect(ctx.output()).not.toContain('Archive');
         expect(ctx.output()).toContain('/events --raw');
         expect(ctx.output()).toContain('#42');
         expect(ctx.output()).toContain('Streaming');

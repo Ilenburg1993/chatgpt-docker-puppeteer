@@ -38,11 +38,19 @@ const HUMAN_TOOL_NAMES = Object.freeze({
     report_intent: 'Intenção capturada',
     report_intent_local: 'Intenção capturada',
     read_file_content: 'Ler arquivo',
+    read_file: 'Ler arquivo',
+    view: 'Ler arquivo',
+    glob: 'Listar arquivos',
     create_file: 'Criar arquivo',
+    write_file_content: 'Escrever arquivo',
     write_file: 'Escrever arquivo',
+    edit_file: 'Editar arquivo',
+    patch_file: 'Editar arquivo',
     move_file: 'Mover arquivo',
     copy_file: 'Copiar arquivo',
     delete_file: 'Excluir arquivo',
+    list_files: 'Listar arquivos',
+    search_files: 'Buscar arquivos',
     get_session_state: 'Estado da sessão',
     hooks_get_pending_tasks: 'Pendências de hooks',
     read_briefing: 'Briefing da sessão',
@@ -51,6 +59,19 @@ const HUMAN_TOOL_NAMES = Object.freeze({
     exec_command: 'Executar comando',
     bash: 'Executar comando',
     shell: 'Executar comando',
+    read_bash: 'Ler terminal',
+    write_bash: 'Escrever terminal',
+    stop_bash: 'Parar comando',
+    'workspace.read_file': 'Ler arquivo',
+    'workspace.write_file': 'Escrever arquivo',
+    'workspace.create_file': 'Criar arquivo',
+    'workspace.edit_file': 'Editar arquivo',
+    'workspace.patch_file': 'Editar arquivo',
+    'workspace.move_file': 'Mover arquivo',
+    'workspace.copy_file': 'Copiar arquivo',
+    'workspace.delete_file': 'Excluir arquivo',
+    'workspace.list_files': 'Listar arquivos',
+    'workspace.search_files': 'Buscar arquivos',
     browser_action: 'Ação no navegador',
 });
 
@@ -274,8 +295,9 @@ function isInternalCallIdentifier(value) {
  */
 function resolveHumanToolName(toolName, canonicalToolName) {
     const canonical = canonicalToolName?.trim();
-    if (canonical && HUMAN_TOOL_NAMES[canonical]) return HUMAN_TOOL_NAMES[canonical];
     const raw = toolName.trim();
+    if (HUMAN_TOOL_NAMES[raw]) return HUMAN_TOOL_NAMES[raw];
+    if (canonical && HUMAN_TOOL_NAMES[canonical]) return HUMAN_TOOL_NAMES[canonical];
     if (/^io\.read(?:\.|$)/iu.test(raw)) return 'Leitura local';
     if (/^io\.mkdir(?:\.|$)/iu.test(raw)) return 'Pasta local';
     if (/^io\.(?:write|append)(?:\.|$)/iu.test(raw)) return 'Escrita local';

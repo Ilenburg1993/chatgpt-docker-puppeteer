@@ -15,6 +15,9 @@ describe('terminal/tool-activity-presenter', () => {
     it('expõe helpers canônicos para diagnósticos humanos sem duplicar glossário', () => {
         expect(getTerminalHumanToolName('read_file_content')).toBe('Ler arquivo');
         expect(getTerminalHumanToolName('report_intent_local')).toBe('Intenção capturada');
+        expect(getTerminalHumanToolName('workspace.read_file')).toBe('Ler arquivo');
+        expect(getTerminalHumanToolName('write_file_content')).toBe('Escrever arquivo');
+        expect(getTerminalHumanToolName('read_bash')).toBe('Ler terminal');
         expect(getTerminalHumanToolName('io.mkdir.io-engine.ensure-dir')).toBe('Pasta local');
         expect(getTerminalHumanToolName('io.write.io-engine.atomic-write')).toBe('Escrita local');
         expect(getTerminalHumanToolName('io.search.io-engine.rg.search')).toBe('Busca local');
