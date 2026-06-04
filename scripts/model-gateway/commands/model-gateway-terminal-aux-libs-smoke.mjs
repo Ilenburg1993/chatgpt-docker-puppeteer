@@ -14,6 +14,10 @@ import { join } from 'node:path';
 const args = new Set(process.argv.slice(2));
 const jsonMode = args.has('--json');
 const strictMode = args.has('--strict');
+const ANSI_OR_OSC_RE = new RegExp(
+    '\\u001B(?:\\[[0-?]*[ -/]*[@-~]|\\][^\\u0007]*(?:\\u0007|\\u001B\\\\)|[@-Z\\\\-_])',
+    'u',
+);
 
 /** @type {null | (() => void)} */
 let clearCapabilityCache = null;
@@ -116,6 +120,32 @@ function setPath(pathValue) {
 function summarizeOk(checks) {
     if (checks.some((item) => item.status === 'fail')) return false;
     return strictMode ? checks.every((item) => item.status === 'pass') : true;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function hasUnsafeTerminalText(value) {
+    if (typeof value === 'string') {
+        return ANSI_OR_OSC_RE.test(value) || hasUnsafeControlCode(value) || /\r(?!\n)/u.test(value);
+    }
+    if (Array.isArray(value)) return value.some((item) => hasUnsafeTerminalText(item));
+    if (value && typeof value === 'object') {
+        return Object.values(/** @type {Record<string, unknown>} */ (value)).some((item) => hasUnsafeTerminalText(item));
+    }
+    return false;
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function hasUnsafeControlCode(value) {
+    return [...value].some((char) => {
+        const code = char.charCodeAt(0);
+        return (code >= 0 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127;
+    });
 }
 
 /**
@@ -261,15 +291,27 @@ async function main() {
             externalCheck('real-yaml-preview', 'yaml PATH real', realYaml.renderer, 'yq', hasTool('yq'), realYaml.fallbackReason),
         );
 
+        const availableTools = capabilities
+            .filter((tool) => tool.available)
+            .map((tool) => ({ id: tool.id, command: tool.command, version: tool.version }));
+        checks.push(
+            check(
+                'json-envelope-clean',
+                'envelope JSON sem controle',
+                'js',
+                'js',
+                !hasUnsafeTerminalText({ availableTools, checks }),
+                'versões, detalhes e checks sem ANSI/OSC/CR solto/controles',
+            ),
+        );
+
         const ok = summarizeOk(checks);
         const summary = {
             schema: 'terminal-auxiliary-libs-smoke',
             ok,
             strict: strictMode,
             generatedAt: new Date().toISOString(),
-            availableTools: capabilities
-                .filter((tool) => tool.available)
-                .map((tool) => ({ id: tool.id, command: tool.command, version: tool.version })),
+            availableTools,
             checks,
         };
         if (jsonMode) {

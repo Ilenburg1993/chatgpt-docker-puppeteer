@@ -210,7 +210,23 @@ function printTerminalLibsDetail(println, refresh) {
  */
 function printTerminalLibsJson(println, refresh) {
     const summary = readTerminalExternalToolCapabilitySummary({ refresh });
-    println(JSON.stringify(summary, null, 2));
+    println(
+        JSON.stringify(
+            {
+                schema: 'terminal-external-tools-capability-summary',
+                generatedAt: new Date().toISOString(),
+                policy: {
+                    optionalByDefault: true,
+                    noAutomaticPager: true,
+                    noAutomaticTui: true,
+                    canonicalFallbacks: true,
+                },
+                ...summary,
+            },
+            null,
+            2,
+        ),
+    );
 }
 
 /**

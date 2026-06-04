@@ -185,6 +185,59 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
 /** @type {TerminalExternalToolCapability[] | null} */
 let cachedCapabilities = null;
 
+const ESC = String.fromCharCode(27);
+const BEL = String.fromCharCode(7);
+const ANSI_ESCAPE_PATTERN = new RegExp(
+    `${ESC}(?:\\[[0-?]*[ -/]*[@-~]|\\][^${BEL}]*(?:${BEL}|${ESC}\\\\)|[@-Z\\\\-_])`,
+    'gu',
+);
+const MAX_DIAGNOSTIC_TEXT = 240;
+
+/**
+ * Normaliza saída externa para contratos JSON/log estáveis.
+ *
+ * Renderers visuais podem produzir ANSI para o TTY vivo, mas registry/smoke/diagnósticos nunca devem carregar
+ * sequências de controle vindas de processos externos.
+ *
+ * @param {unknown} value
+ * @param {{ max?: number }} [options]
+ * @returns {string | null}
+ */
+export function sanitizeTerminalExternalToolDiagnostic(value, options = {}) {
+    if (value === null || value === undefined) return null;
+    const max = Math.max(16, Math.min(4_000, Math.trunc(options.max ?? MAX_DIAGNOSTIC_TEXT)));
+    const clean = sanitizeTerminalExternalToolText(value, { max: Math.max(max * 4, max) })
+        .split(/\r?\n/u)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join(' · ')
+        .replace(/\s+/gu, ' ')
+        .trim();
+    if (!clean) return null;
+    return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`;
+}
+
+/**
+ * Remove ANSI e controles sem destruir quebras de linha significativas.
+ *
+ * @param {unknown} value
+ * @param {{ max?: number }} [options]
+ * @returns {string}
+ */
+export function sanitizeTerminalExternalToolText(value, options = {}) {
+    const max = Math.max(16, Math.min(500_000, Math.trunc(options.max ?? 64_000)));
+    const clean = String(value ?? '')
+        .replace(ANSI_ESCAPE_PATTERN, '')
+        .replace(/\r(?!\n)/gu, '\n')
+        .split('')
+        .filter((char) => {
+            const code = char.charCodeAt(0);
+            return !((code >= 0 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127);
+        })
+        .join('');
+    return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`;
+}
+
 /**
  * @param {string} filePath
  * @returns {boolean}
@@ -236,11 +289,7 @@ function readToolVersion(command, env) {
         timeout: 1_500,
         windowsHide: true,
     });
-    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
-        .split(/\r?\n/u)
-        .map((line) => line.trim())
-        .find(Boolean);
-    return output ?? null;
+    return sanitizeTerminalExternalToolDiagnostic(`${result.stdout ?? ''}${result.stderr ?? ''}`);
 }
 
 /**

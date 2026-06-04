@@ -4,6 +4,8 @@ export {
     clearTerminalExternalToolCapabilityCache,
     readTerminalExternalToolCapabilities,
     readTerminalExternalToolCapabilitySummary,
+    sanitizeTerminalExternalToolDiagnostic,
+    sanitizeTerminalExternalToolText,
     TERMINAL_EXTERNAL_TOOL_DEFINITIONS,
 } from './external-tools.js';
 export { renderTerminalDiffPreview } from './diff-preview.js';

@@ -2447,6 +2447,7 @@ function defaultUxCycleCriteria(boot) {
     const helpStart = plain.indexOf('Ajuda rápida');
     const helpFullStart = plain.indexOf('Terminal LLM-B - Ajuda completa');
     const terminalLibsDetailStart = plain.indexOf('Libs auxiliares do terminal', Math.max(0, helpFullStart));
+    const terminalLibsJsonStart = plain.indexOf('/terminal libs json', Math.max(0, terminalLibsDetailStart));
     const statusStart = plain.indexOf('Status do Terminal LLM-B');
     const nowPanelStart = plain.indexOf('\n  Agora');
     const nowStart = nowPanelStart >= 0 ? nowPanelStart + 1 : plain.indexOf('[agora]');
@@ -2480,6 +2481,7 @@ function defaultUxCycleCriteria(boot) {
         helpStart,
         helpFullStart,
         terminalLibsDetailStart,
+        terminalLibsJsonStart,
         statusStart,
         nowStart,
         usageStart,
@@ -2508,6 +2510,20 @@ function defaultUxCycleCriteria(boot) {
     const helpSurface = surfaceAt(helpStart);
     const helpFullSurface = surfaceAt(helpFullStart);
     const terminalLibsDetailSurface = surfaceAt(terminalLibsDetailStart);
+    const terminalLibsJsonSurface = surfaceAt(terminalLibsJsonStart);
+    const terminalLibsJsonBlockStart = terminalLibsJsonSurface.indexOf('{');
+    const terminalLibsJsonPromptAfterBlock =
+        terminalLibsJsonBlockStart >= 0 ? terminalLibsJsonSurface.indexOf('\nvocê', terminalLibsJsonBlockStart) : -1;
+    const terminalLibsJsonBlock =
+        terminalLibsJsonBlockStart >= 0
+            ? terminalLibsJsonSurface.slice(
+                  terminalLibsJsonBlockStart,
+                  terminalLibsJsonPromptAfterBlock > terminalLibsJsonBlockStart
+                      ? terminalLibsJsonPromptAfterBlock
+                      : undefined,
+              )
+            : terminalLibsJsonSurface;
+    const normalizedTerminalLibsJsonBlock = terminalLibsJsonBlock.replace(/\r\n/gu, '\n').trimEnd();
     const statusSurface = surfaceAt(statusStart);
     const usageSurface = surfaceAt(usageStart);
     const byokStatusSurface = surfaceAt(byokStatusStart);
@@ -2531,6 +2547,7 @@ function defaultUxCycleCriteria(boot) {
         helpStart,
         helpFullStart,
         terminalLibsDetailStart,
+        terminalLibsJsonStart,
         statusStart,
         nowStart,
         usageStart,
@@ -2591,6 +2608,19 @@ function defaultUxCycleCriteria(boot) {
                 /adiado|adiada/iu.test(terminalLibsDetailSurface) &&
                 !/\bRetorno\b|\{\s*"tools"|\[OK\]|\[ERR\]/u.test(terminalLibsDetailSurface),
             detail: '/terminal libs detail explained policy, examples and deferred tools without raw JSON',
+        },
+        {
+            id: 'ux-cycle-terminal-libs-json-contract',
+            pass:
+                /"schema":\s*"terminal-external-tools-capability-summary"/u.test(terminalLibsJsonSurface) &&
+                /"generatedAt":\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"/u.test(
+                    terminalLibsJsonSurface,
+                ) &&
+                /"policy":\s*\{[\s\S]*"optionalByDefault":\s*true[\s\S]*"noAutomaticTui":\s*true/u.test(
+                    terminalLibsJsonSurface,
+                ) &&
+                !/\x1b\[|\\u001b|\\u0007|\r/u.test(normalizedTerminalLibsJsonBlock),
+            detail: '/terminal libs json rendered a named machine contract with ISO timestamp, explicit policy and no ANSI/control leakage',
         },
         {
             id: 'ux-cycle-boot-human-copy',
@@ -2781,6 +2811,7 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
             { line: '/help', waitFor: 'Ajuda rápida', advanceAfterMs: 1_500 },
             { line: '/help full', waitFor: 'Terminal LLM-B - Ajuda completa', advanceAfterMs: 5_000 },
             { line: '/terminal libs detail', waitFor: 'Libs auxiliares do terminal', advanceAfterMs: 2_000 },
+            { line: '/terminal libs json', waitFor: 'terminal-external-tools-capability-summary', advanceAfterMs: 1_500 },
             { line: '/status', waitFor: 'Status do Terminal LLM-B', advanceAfterMs: 1_500 },
             { line: '/now', waitFor: '\n  Agora', advanceAfterMs: 1_500 },
             { line: '/usage now', waitFor: 'Janela de contexto', advanceAfterMs: 1_500 },

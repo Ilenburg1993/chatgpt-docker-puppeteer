@@ -124,6 +124,14 @@ describe('terminal/commands/terminal', () => {
         cmdTerminal(ctx, 'libs json');
 
         const parsed = JSON.parse(ctx.output());
+        expect(parsed.schema).toBe('terminal-external-tools-capability-summary');
+        expect(parsed.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u);
+        expect(parsed.policy).toMatchObject({
+            optionalByDefault: true,
+            noAutomaticPager: true,
+            noAutomaticTui: true,
+            canonicalFallbacks: true,
+        });
         expect(parsed.available).toBe(2);
         expect(parsed.tools[0].id).toBe('fzf');
     });

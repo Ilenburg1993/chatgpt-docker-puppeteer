@@ -9,6 +9,8 @@ import {
     clearTerminalExternalToolCapabilityCache,
     readTerminalExternalToolCapabilities,
     readTerminalExternalToolCapabilitySummary,
+    sanitizeTerminalExternalToolDiagnostic,
+    sanitizeTerminalExternalToolText,
 } from '../../../../src/copilot/terminal/capabilities/index.js';
 
 function makeExecutableFixture(command, body = '#!/bin/sh\nprintf "%s\\n" "$0 1.2.3"\n') {
@@ -21,7 +23,7 @@ function makeExecutableFixture(command, body = '#!/bin/sh\nprintf "%s\\n" "$0 1.
 
 describe('terminal/capabilities/external-tools', () => {
     it('detecta binário disponível usando PATH informado sem depender da máquina real', () => {
-        const fixture = makeExecutableFixture('fzf', '#!/bin/sh\nprintf "fzf 0.66.0\\n"\n');
+        const fixture = makeExecutableFixture('fzf', '#!/bin/sh\nprintf "\\033[31mfzf 0.66.0\\033[0m\\r\\n"\n');
 
         const tools = readTerminalExternalToolCapabilities({ env: { PATH: fixture.dir } });
         const fzf = tools.find((tool) => tool.id === 'fzf');
@@ -74,5 +76,19 @@ describe('terminal/capabilities/external-tools', () => {
         const tools = readTerminalExternalToolCapabilities({ env: { PATH: '' } });
         expect(tools.every((tool) => tool.available === false)).toBe(true);
         clearTerminalExternalToolCapabilityCache();
+    });
+
+    it('higieniza diagnósticos externos para JSON/log sem ANSI, CR solto e controles', () => {
+        const value = sanitizeTerminalExternalToolDiagnostic('\x1b[31mtool 1.0\x1b[0m\rparte-b\u0007\n\nok');
+
+        expect(value).toBe('tool 1.0 · parte-b · ok');
+        expect(value).not.toContain('\x1b');
+        expect(value).not.toContain('\u0007');
+    });
+
+    it('higieniza texto externo preservando quebras úteis para previews estruturados', () => {
+        const value = sanitizeTerminalExternalToolText('\x1b[32m{\n  "ok": true\n}\x1b[0m\rtrailer\u0001');
+
+        expect(value).toBe('{\n  "ok": true\n}\ntrailer');
     });
 });

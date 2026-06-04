@@ -280,6 +280,8 @@ Decisão:
 - [x] Default humano deve ser curto.
 - [x] Detail deve explicar path, versão, risco e fallback.
 - [x] JSON deve existir para scripts/LLMs, mas não aparecer por fallback default.
+- [x] JSON e logs de diagnóstico devem remover ANSI, CR solto e controles vindos de binários externos.
+- [x] JSON de `/terminal libs json` deve ter `schema`, `generatedAt` ISO e política operacional explícita.
 - [x] Cada ferramenta aceita deve ter exemplo humano claro de uso.
 - [x] Cada ferramenta adiada deve explicar o motivo em termos operacionais, não apenas "adiada".
 - [x] O terminal deve sugerir comandos canônicos, não flags obscuras.
@@ -291,6 +293,8 @@ Decisão:
 - [x] `/help full` tem uma seção rica de libs auxiliares com exemplos e fallbacks.
 - [ ] O picker externo ainda não tem preview seguro integrado; decisão atual é manter sem preview embutido.
 - [x] Há comando de auditoria único que roda bateria local não interativa de previews para demonstrar renderer/fallback.
+- [x] Versões e diagnósticos de ferramentas externas passam por sanitização antes de JSON/log.
+- [x] Previews estruturados sem cor preservam JSON/YAML, mas removem ANSI e controles de renderers externos.
 - [ ] A TUI visual completa de `fzf`/`gum` ainda depende de validação manual/assistida em terminal real.
 - [x] `atuin` e `zoxide` estão corretamente adiados e o terminal explica que aparecem apenas como
       inventário/planejamento, sem chamada automática.
@@ -314,6 +318,7 @@ Decisão:
 - [x] Fase B.4: adicionar exemplos por ferramenta em detail.
 - [x] Fase B.5: adicionar política curta por ferramenta em detail.
 - [x] Fase B.6: adicionar nota explícita de que `defaultEnabled=false` preserva portabilidade.
+- [x] Fase B.7: transformar `/terminal libs json` em envelope versionável com `schema`, timestamp e policy.
 
 ### Faixa C: Help e descoberta
 
@@ -350,6 +355,15 @@ Decisão:
 - [x] Fase G.3: flags de segurança em `yq`.
 - [x] Fase G.4: exemplos humanos de query em `/terminal libs detail`.
 - [x] Fase G.5: docs de pipe seguro para operador e LLM.
+- [x] Fase G.6: sanitizar saída externa sem cor preservando estrutura JSON/YAML.
+
+### Faixa G2: Higiene de diagnóstico externo
+
+- [x] Fase G2.1: centralizar sanitização de versões e mensagens de ferramentas externas.
+- [x] Fase G2.2: remover ANSI/OSC, CR solto e controles não textuais antes de contratos JSON/log.
+- [x] Fase G2.3: truncar diagnóstico externo para não poluir `/terminal libs json` nem smoke.
+- [x] Fase G2.4: manter sanitização de preview separada da sanitização diagnóstica para não colapsar JSON/YAML.
+- [x] Fase G2.5: ampliar o smoke para verificar explicitamente que o JSON emitido não contém escapes ANSI.
 
 ### Faixa H: Picker e TTY
 
@@ -446,10 +460,25 @@ Decisão:
     largura visual;
   - live final: `artifacts/terminal-live/2026-06-04T16-23-18-007Z/summary.md`;
   - medição final não encontrou linhas internas acima de 120 colunas no `plain.log`.
+- [x] Higiene de saída externa consolidada:
+  - `external-tools.js` agora expõe sanitização diagnóstica e sanitização preservadora de texto;
+  - versões de ferramentas externas não carregam ANSI/OSC, CR solto ou controles para `/terminal libs json`;
+  - `structured-preview.js` usa sanitização preservadora quando a superfície exige saída sem cor;
+  - `terminal:aux-libs:smoke` passa a falhar com `json-envelope-clean` se o envelope JSON carregar
+    ANSI/OSC/CR solto/controles;
+  - testes unitários cobrem ANSI, retorno de carro e controle em versão/diagnóstico e em texto estruturado.
+- [x] Contrato JSON de libs versionado:
+  - `/terminal libs json` agora emite `schema=terminal-external-tools-capability-summary`;
+  - `generatedAt` usa ISO 8601 completo com milissegundos e timezone UTC;
+  - `policy` explicita que libs são opcionais, sem pager/TUI automático e com fallbacks canônicos.
+- [x] Live PTY com contrato JSON de libs:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-json-contract-pass3-20260604 --timeout-ms 180000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T17-44-25-689Z/summary.md`;
+  - resultado: PASS em 25/25 critérios, incluindo `ux-cycle-terminal-libs-json-contract`.
 
 ## 9. Próxima execução recomendada
 
 1. Planejar validação visual assistida de TUI completa (`fzf` e `gum` quando instalado).
-2. Refinar docs de pipe seguro para `jq`/`yq` em comandos específicos, se surgirem novas superfícies.
+2. Rodar live assistida de TUI completa quando houver PTY capaz de responder ao fullscreen real.
 3. Avaliar `/help full --glow` apenas como comando explícito, sem pager automático.
 4. Expandir smoke para cenários de erro/truncamento se a próxima rodada de UX pedir.

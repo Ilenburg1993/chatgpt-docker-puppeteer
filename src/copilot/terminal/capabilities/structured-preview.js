@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 
 import yaml from 'js-yaml';
 
-import { readTerminalExternalToolCapabilities } from './external-tools.js';
+import { readTerminalExternalToolCapabilities, sanitizeTerminalExternalToolText } from './external-tools.js';
 
 /**
  * @typedef {'json' | 'yaml'} TerminalStructuredPreviewFormat
@@ -135,7 +135,11 @@ export function renderTerminalStructuredPreview(content, options) {
         return jsFallback(reason);
     }
 
-    const rendered = truncateStructuredPreview(String(result.stdout ?? ''));
+    const externalOutput =
+        colorMode === 'never'
+            ? sanitizeTerminalExternalToolText(result.stdout, { max: MAX_STRUCTURED_PREVIEW_CHARS })
+            : String(result.stdout ?? '');
+    const rendered = truncateStructuredPreview(externalOutput);
     return {
         output: rendered.output,
         renderer: /** @type {'jq' | 'yq'} */ (toolId),
