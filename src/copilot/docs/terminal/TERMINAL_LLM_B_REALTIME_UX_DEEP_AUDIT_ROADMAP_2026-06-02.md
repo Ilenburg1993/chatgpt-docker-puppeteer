@@ -5081,3 +5081,35 @@
   - `npm run typecheck:strict:src.copilot`.
 - [ ] Próxima lacuna: revisar `/activity detail` e `/metrics` para mapear fases/tipos técnicos
       em modo default, preservando o valor cru apenas no modo diagnóstico.
+
+### 12.29 Live canônico pós-humanização e correção do detector pós-pergunta
+
+- [x] Live PTY canônico executado após humanização do prompt e dos tipos de pergunta:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-humanized-question-prompt-20260603-221211`.
+- [x] Resultado funcional: fluxo real passou pelo usuário, tools reais, deltas públicos,
+      `ask_user`, resposta `SIM`, mensagem pós-pergunta, `/usage`, `/activity`, `/tools diag`,
+      `/events`, `/health full` e `/export`.
+- [x] Falha do harness identificada: `post-ask-final-visible` falhou embora
+      `terminal.plain.log`, SSE e export contivessem `POST-ASK-CANONICAL-FINAL`. O regex antigo
+      de bloco reconhecia `Mensagem sdk/assistant.message`, mas não a narrativa atual
+      `Resposta pós-pergunta sdk/assistant.message`.
+- [x] Implementação: o runner live agora reconhece `Resposta pós-pergunta sdk/assistant.message`
+      como bloco visível de assistant.message para o critério `post-ask-final-visible`.
+- [x] Validação do detector:
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - simulação local sobre `terminal.plain.log` existente retornou `recognized`.
+- [x] Rerun PTY canônico passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-humanized-question-prompt-rerun-20260603-221518`.
+  - Resultado: `Status: PASS`; `post-ask-final-visible: assistant.message=yes`;
+        zero erros no tracker; export criado; SSE monotônico.
+- [x] Observação visual remanescente: a captura plain do PTY ainda pode mostrar prompt e linha
+      viva de pergunta intercalados (`você...[PERG]›` seguido de `LLM-B Pergunta ...`). O
+      detector `no-prompt-double-render` passa, mas a experiência humana ainda precisa de uma
+      política mais elegante para pergunta viva em TTY estreito.
+- [ ] Próxima lacuna: revisar a linha viva quando há `ask_user` pendente para garantir que ela
+      nunca dispute a linha de input; alternativas: compactar para uma única linha ainda mais
+      curta, pausar heartbeat enquanto readline está com prompt `[PERG]`, ou reservar área acima
+      com altura estável específica para pergunta humana.
+- [ ] Próxima lacuna: decidir se `/events --raw` deve permanecer despejo JSON bruto na tela ou se
+      o raw interativo deve sugerir `/export`/arquivo por padrão, mantendo `--json` para pipe.

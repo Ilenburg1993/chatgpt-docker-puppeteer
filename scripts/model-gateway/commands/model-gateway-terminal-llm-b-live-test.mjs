@@ -3709,7 +3709,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     );
     const finalRenderedByAssistantMessage = terminalBlockContains(
         preEventsPlain,
-        /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message)/u,
+        /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message|Resposta pós-pergunta\s+sdk\/assistant\.message)/u,
         postAskFinalRe,
     );
     const taskDeltaActivityDuringDialog =
