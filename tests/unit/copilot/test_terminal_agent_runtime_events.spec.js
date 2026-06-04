@@ -120,6 +120,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         readConfiguredByokSummary.mockReturnValue({ enabled: false });
         reviseRecentTerminalTurnTraceStatus.mockReturnValue(null);
         isTerminalRenderLocked.mockReturnValue(false);
+        delete process.env['COPILOT_TERMINAL_DURABLE_TOOL_HEARTBEAT'];
         printlnBlock.mockImplementation((/** @type {string[]} */ lines) => println(lines.join('\n')));
         readTerminalRuntimeState.mockReturnValue(
             /** @type {any} */ ({
@@ -132,6 +133,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+        delete process.env['COPILOT_TERMINAL_DURABLE_TOOL_HEARTBEAT'];
     });
 
     it('importa sem erros', async () => {
@@ -535,7 +537,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('abrindo arquivo grande'));
     });
 
-    it('mantém heartbeat de tool longa visível no histórico mesmo em modo compact', async () => {
+    it('mantém heartbeat de tool longa visível só na linha viva por padrão', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-05-18T10:00:00.000Z'));
         getTerminalDetailLevel.mockReturnValue('compact');
@@ -563,9 +565,44 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         await vi.advanceTimersByTimeAsync(10_000);
 
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ainda trabalhando · 10s sem novo progresso'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('tool-long-compact'));
+        expect(writeInlineStatus).toHaveBeenCalledWith(
+            expect.stringContaining('ainda trabalhando · 10s sem novo progresso'),
+        );
+
+        cleanup();
+    });
+
+    it('permite heartbeat durável de tool longa apenas por opt-in explícito', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-05-18T10:00:00.000Z'));
+        process.env['COPILOT_TERMINAL_DURABLE_TOOL_HEARTBEAT'] = 'true';
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        const cleanup = setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'tool-long-durable',
+            toolName: 'exec_command',
+        });
+        println.mockClear();
+        writeInlineStatus.mockClear();
+
+        await vi.advanceTimersByTimeAsync(10_000);
+
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Executar comando'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('ainda trabalhando · 10s sem novo progresso'));
-        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('tool-long-compact'));
         expect(writeInlineStatus).toHaveBeenCalledWith(
             expect.stringContaining('ainda trabalhando · 10s sem novo progresso'),
         );
@@ -904,7 +941,10 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 detail: expect.stringContaining('10s ativos'),
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('ainda trabalhando · 10s sem novo progresso'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ainda trabalhando · 10s sem novo progresso'));
+        expect(writeInlineStatus).toHaveBeenCalledWith(
+            expect.stringContaining('ainda trabalhando · 10s sem novo progresso'),
+        );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('bash-long'));
 
         cleanup();
@@ -1562,7 +1602,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             choices: ['A', 'B'],
         });
 
-        expect(println).toHaveBeenCalledTimes(8);
+        const output = println.mock.calls.map(([line]) => String(line)).join('\n');
+        expect((output.match(/Qual arquivo devo revisar agora\?/gu) ?? []).length).toBe(1);
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Pergunta ao operador'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('pergunta restaurada'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Qual arquivo devo revisar agora?'));

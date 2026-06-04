@@ -877,16 +877,42 @@ describe('terminal/dialog/engine.js — contrato', () => {
                 lastToolSignalSeq: 2,
             },
         });
+        vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockResolvedValueOnce({
+            reply: 'síntese recuperada após tools',
+            channel: 'dialog',
+            replySource: 'runtime_return',
+            semanticOutcome: 'public_reply',
+            semanticReplySource: 'loop.reply',
+            semanticDiagnostics: {
+                dispatched: true,
+                assistantMessageCount: 1,
+                deltaChars: 30,
+                deltaEligible: true,
+                pendingProtocolKind: null,
+                pendingHumanInput: false,
+                toolSignalCount: 0,
+                lastDeltaSeq: 1,
+                lastToolSignalSeq: 2,
+            },
+        });
 
-        await expect(mod.sendTurn('executar tools sem síntese', 'user')).resolves.toBe('');
+        await expect(mod.sendTurn('executar tools sem síntese', 'user')).resolves.toBe('síntese recuperada após tools');
 
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed)).toHaveBeenCalledTimes(2);
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mock.calls[1]?.[0]).toContain(
+            'O turno imediatamente anterior executou tools reais',
+        );
         expect(vi.mocked(health.recordByokProviderModelCallFailure)).not.toHaveBeenCalled();
         expect(vi.mocked(sse.broadcastSse)).toHaveBeenCalledWith(
-            'terminal.turn.non_text_outcome',
+            'terminal.turn.empty_recovery',
             expect.objectContaining({
-                semanticOutcome: 'tool_only',
-                semanticReplySource: 'loop.reply',
+                reason: 'post_tool_only_no_public_output',
+                firstOutcome: 'tool_only',
             }),
+        );
+        expect(vi.mocked(sse.broadcastSse)).not.toHaveBeenCalledWith(
+            'terminal.turn.non_text_outcome',
+            expect.objectContaining({ semanticOutcome: 'tool_only' }),
         );
     });
 

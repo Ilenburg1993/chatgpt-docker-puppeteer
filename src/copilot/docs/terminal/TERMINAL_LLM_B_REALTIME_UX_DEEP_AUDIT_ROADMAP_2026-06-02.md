@@ -8708,4 +8708,64 @@
 - [x] Validação:
   - [x] testes unitários focados de auto-brief, sessão, SDK e métricas;
   - [x] `node --check`/lint escopado dos arquivos alterados;
-  - [ ] próxima live PTY canônica deve continuar passando `ux-human-runtime-vocabulary`.
+  - [x] live PTY `long-tool-heartbeat` passou `ux-human-runtime-vocabulary`.
+
+### 12.90 Heartbeat de tool longa como pulso transitório — 2026-06-04
+
+- [x] Achado:
+  - screenshots antigas mostravam linhas repetidas de espera/progresso competindo com o prompt;
+  - a auditoria local encontrou `agent-runtime-events.js` imprimindo heartbeat de tool longa no
+    histórico e também escrevendo inline;
+  - esse heartbeat é útil como pulso vivo, mas ruim como transcript durável porque acumula linhas
+    quase idênticas.
+- [x] Decisão UX:
+  - tool start/progress/complete continuam eventos duráveis quando trazem mudança real;
+  - heartbeat periódico fica transitório por padrão via linha viva;
+  - `/activity` e `/events` continuam preservando o estado operacional;
+  - operadores que queiram log durável de cada batimento podem ativar
+    `COPILOT_TERMINAL_DURABLE_TOOL_HEARTBEAT=true`.
+- [x] Correção:
+  - heartbeat de tool longa passou a chamar `writeInlineStatus()` sempre que tool activity está
+    visível;
+  - `println()` do heartbeat ficou protegido pelo opt-in explícito;
+  - testes agora cobrem default sem spam e opt-in durável.
+- [x] Validação:
+  - [x] testes unitários focados de `agent-runtime-events`;
+  - [x] `node --check`/lint escopado;
+  - [x] live PTY de tool longa confirmou ausência de spam durável.
+
+### 12.91 Recuperação pós-tools sem síntese pública — 2026-06-04
+
+- [x] Evidência live:
+  - live PTY `artifacts/terminal-live/long-tool-ux-20260604-transient-heartbeat/summary.md`
+    terminou `BLOCKED`;
+  - a tool longa real executou e concluiu;
+  - o heartbeat apareceu como linha viva transitória, sem cascata durável de `ainda trabalhando`;
+  - depois das tools, a LLM-B encerrou o turno sem deltas públicos, sem mensagem final e sem
+    `ask_user`;
+  - o runner classificou como `blocked-by-assistant-empty-turn`.
+- [x] Diagnóstico:
+  - o engine já tinha recuperação para turno vazio antes de qualquer tool;
+  - o caso live era semanticamente diferente: `tool_only` com tools reais concluídas, mas sem síntese
+    pública;
+  - a UX apenas avisava `tools executadas; a LLM-B não emitiu síntese pública`, exigindo ação manual.
+- [x] Decisão UX:
+  - `tool_only` sem resposta pública e sem pergunta humana deve tentar continuação segura uma vez;
+  - a continuação não deve repetir tools já concluídas;
+  - sucesso pode ser resposta pública ou pergunta humana real pendente;
+  - se a continuação também falhar, o caminho de diagnóstico manual permanece.
+- [x] Implementação:
+  - adicionada política `shouldAttemptPostToolOnlyRecovery`;
+  - adicionada mensagem de recuperação pós-tools que proíbe simulação textual de tools;
+  - engine emite `terminal.turn.empty_recovery` com razão `post_tool_only_no_public_output`;
+  - BYOK health não é degradado quando a recuperação pós-tools produz saída pública;
+  - teste unitário cobre continuação única após `tool_only`.
+- [x] Validação:
+  - [x] testes unitários focados do dialog engine;
+  - [x] `node --check`/lint escopado;
+  - [x] live PTY `long-tool-heartbeat` avançou para delta, `ask_user`, resposta humana e final
+    pós-pergunta.
+  - [x] evidência: `artifacts/terminal-live/long-tool-ux-20260604-post-tool-recovery/summary.md`
+    terminou PASS, com `ux-no-durable-waiting-spam`, `ux-human-runtime-vocabulary`,
+    `scenario-tool-exec_command-lifecycle`, `ask-user-visible`, `post-ask-final-visible`,
+    `export-post-ask-final` e `no-terminal-errors`.

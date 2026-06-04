@@ -265,6 +265,13 @@ const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
     'falha de provedor BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provedor/modelo via /byok use ou /byok model; sem pedido premium';
 
 /**
+ * @returns {boolean}
+ */
+function shouldPersistToolHeartbeatNarration() {
+    return process.env['COPILOT_TERMINAL_DURABLE_TOOL_HEARTBEAT'] === 'true';
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -647,10 +654,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 if (getShowToolActivity()) {
                     const line =
                         `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(displayName, 32) : displayName)} ${terminalThemeText('muted', `ainda trabalhando · ${elapsed}s sem novo progresso`)}`.trimEnd();
-                    if (compactDetail) {
+                    if (shouldPersistToolHeartbeatNarration()) {
                         println(line);
-                        writeInlineStatus(line);
-                    } else println(line);
+                    }
+                    writeInlineStatus(line);
                 }
             }
         },

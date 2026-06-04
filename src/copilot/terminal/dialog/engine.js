@@ -127,6 +127,15 @@ const EMPTY_TURN_RECOVERY_PROMPT = [
     'Continue exatamente a solicitação anterior do operador. Use apenas tools reais quando necessárias.',
     'Não explique a recuperação; execute o pedido anterior e entregue saída pública normal.',
 ].join('\n');
+const TOOL_ONLY_RECOVERY_PROMPT = [
+    'RECUPERAÇÃO AUTOMÁTICA DO TERMINAL:',
+    'O turno imediatamente anterior executou tools reais, mas encerrou sem texto público e sem pergunta humana pendente.',
+    'Não repita tools que já foram concluídas.',
+    'Continue exatamente a solicitação original a partir do próximo passo pendente.',
+    'Se o próximo passo exigia texto público, emita esse texto agora.',
+    'Se o próximo passo exigia pergunta humana, invoque a tool real de pergunta humana agora.',
+    'Não explique a recuperação e não simule tool em texto, Markdown ou JSON.',
+].join('\n');
 
 /**
  * @param {string | null | undefined} value
@@ -487,6 +496,28 @@ function shouldAttemptPreActionEmptyTurnRecovery(turnResult, context) {
     if (nonNegativeFiniteNumber(diagnostics.assistantMessageCount) > 0) return false;
     if (nonNegativeFiniteNumber(diagnostics.deltaChars) > 0) return false;
     return true;
+}
+
+/**
+ * @param {import('../frontend/gateways/dialog.js').TerminalDialogTurnResult} turnResult
+ * @param {{
+ *     actor: string;
+ *     allowRecovery: boolean;
+ *     runtimeState: ReturnType<typeof readTerminalRuntimeState>;
+ * }} context
+ * @returns {boolean}
+ */
+function shouldAttemptPostToolOnlyRecovery(turnResult, context) {
+    if (!context.allowRecovery || context.actor !== 'user') return false;
+    if (typeof turnResult.reply === 'string' && turnResult.reply.trim().length > 0) return false;
+    if (hasPendingHumanInputOutcome(context.runtimeState)) return false;
+    if (turnResult.semanticOutcome !== 'tool_only') return false;
+    const diagnostics = turnResult.semanticDiagnostics;
+    if (!diagnostics) return true;
+    if (diagnostics.pendingHumanInput === true || diagnostics.pendingProtocolKind !== null) return false;
+    if (nonNegativeFiniteNumber(diagnostics.assistantMessageCount) > 0) return false;
+    if (nonNegativeFiniteNumber(diagnostics.deltaChars) > 0) return false;
+    return nonNegativeFiniteNumber(diagnostics.toolSignalCount) > 0;
 }
 
 /**
@@ -1258,6 +1289,81 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             recordTerminalActivity(
                 emptyTurnRecovery.recovered ? 'turn' : 'error',
                 emptyTurnRecovery.recovered ? 'Turno recuperado após saída vazia' : 'Recuperação de turno sem saída falhou',
+                {
+                    detail:
+                        `${emptyTurnRecovery.durationMs}ms · ` +
+                        `resultado ${turnResult.semanticOutcome ?? 'n/d'} · origem ${turnResult.semanticReplySource ?? turnResult.replySource}`,
+                    source: 'dialog',
+                    severity: emptyTurnRecovery.recovered ? 'info' : 'error',
+                    recordHistory: true,
+                },
+            );
+        }
+        if (
+            shouldAttemptPostToolOnlyRecovery(turnResult, {
+                actor,
+                allowRecovery: !requestHeaders,
+                runtimeState: readTerminalRuntimeState(),
+            })
+        ) {
+            const recoveryStartedAt = Date.now();
+            emptyTurnRecovery = {
+                attempted: true,
+                attempts: EMPTY_TURN_RECOVERY_MAX_ATTEMPTS,
+                firstOutcome: turnResult.semanticOutcome ?? null,
+                firstReplySource: turnResult.semanticReplySource ?? turnResult.replySource ?? null,
+                recovered: false,
+                durationMs: null,
+            };
+            recordTerminalActivity('thinking', 'Recuperando síntese pós-tools', {
+                detail: 'tentativa 1/1 · tools concluídas sem texto público',
+                source: 'dialog',
+                severity: 'warn',
+            });
+            broadcastSse(
+                'terminal.turn.empty_recovery',
+                withTerminalTurnCorrelation({
+                    source: 'terminal-dialog/empty-recovery',
+                    actor,
+                    attempt: 1,
+                    maxAttempts: EMPTY_TURN_RECOVERY_MAX_ATTEMPTS,
+                    reason: 'post_tool_only_no_public_output',
+                    firstOutcome: turnResult.semanticOutcome ?? null,
+                    firstReplySource: turnResult.semanticReplySource ?? turnResult.replySource ?? null,
+                    firstDiagnostics: turnResult.semanticDiagnostics ?? null,
+                    timestamp: recoveryStartedAt,
+                }),
+            );
+            println(
+                terminalThemeRow(
+                    'Recuperação',
+                    'tools concluídas sem síntese; pedindo continuação segura uma vez',
+                    { role: 'warn' },
+                ),
+            );
+            turnResult = await runTerminalDialogTurnDetailed(TOOL_ONLY_RECOVERY_PROMPT, {
+                timeout: timeoutDecision.timeoutMs,
+                onDelta,
+                onDeltaDiagnostic,
+                onReasoning,
+            });
+            const recoveredRuntimeState = readTerminalRuntimeState();
+            emptyTurnRecovery.durationMs = Date.now() - recoveryStartedAt;
+            emptyTurnRecovery.recovered =
+                (typeof turnResult.reply === 'string' && turnResult.reply.trim().length > 0) ||
+                hasPendingHumanInputOutcome(recoveredRuntimeState) ||
+                turnResult.semanticOutcome === 'pending_human_input';
+            recordTerminalActivity(
+                emptyTurnRecovery.recovered
+                    ? hasPendingHumanInputOutcome(recoveredRuntimeState)
+                        ? 'question'
+                        : 'turn'
+                    : 'error',
+                emptyTurnRecovery.recovered
+                    ? hasPendingHumanInputOutcome(recoveredRuntimeState)
+                        ? 'Pergunta humana recuperada após tools'
+                        : 'Síntese recuperada após tools'
+                    : 'Recuperação pós-tools falhou',
                 {
                     detail:
                         `${emptyTurnRecovery.durationMs}ms · ` +
