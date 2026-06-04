@@ -5463,3 +5463,11 @@
   - `node --check src/copilot/terminal/commands/activity.js`;
   - `npx eslint src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js`;
   - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+- [x] Lacuna visual encontrada na live: `/events` ainda mostrava payload enums como
+      `tipo session.updated` e `classe ask user continuation`.
+- [x] Correção aplicada: `humanPayloadKind()` agora traduz lifecycle SDK, continuação pós-ask,
+      retry de modelo e falhas BYOK para labels de operador.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/events.js`;
+  - `npx eslint src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.

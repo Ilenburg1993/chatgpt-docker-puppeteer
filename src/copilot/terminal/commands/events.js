@@ -334,6 +334,15 @@ function humanPayloadKind(value) {
     if (text === 'io' || text === 'io_op') return 'I/O local';
     if (text === 'tool' || text === 'tool_lifecycle') return 'ferramenta';
     if (text === 'background' || text === 'background_task') return 'tarefa em segundo plano';
+    if (text === 'ask_user_continuation') return 'continuação da pergunta humana';
+    if (text === 'session.created') return 'sessão criada';
+    if (text === 'session.deleted') return 'sessão removida';
+    if (text === 'session.updated') return 'sessão atualizada';
+    if (text === 'session.foreground') return 'sessão em primeiro plano';
+    if (text === 'session.background') return 'sessão em segundo plano';
+    if (text === 'session.shutdown') return 'sessão encerrada';
+    if (text === 'model_retry') return 'retry do modelo';
+    if (text === 'byok_provider_failure') return 'falha do provider BYOK';
     return text.replace(/[_-]+/gu, ' ');
 }
 

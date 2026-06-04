@@ -353,6 +353,60 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('io_op');
     });
 
+    it('humaniza tipos e classificações internas em eventos operacionais', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 2,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 51,
+                    event: 'sdk.lifecycle',
+                    source: 'agent/sdk.lifecycle',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { type: 'session.updated' },
+                },
+                {
+                    timestamp: 1710000001000,
+                    eventId: 52,
+                    event: 'llm.usage',
+                    source: 'agent/llm.usage',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { classification: 'ask_user_continuation' },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '20');
+
+        expect(ctx.output()).toContain('tipo sessão atualizada');
+        expect(ctx.output()).toContain('classe continuação da pergunta humana');
+        expect(ctx.output()).not.toContain('tipo session.updated');
+        expect(ctx.output()).not.toContain('ask user continuation');
+        expect(ctx.output()).not.toContain('ask_user_continuation');
+    });
+
     it('agrega eventos default repetidos sem alterar consultas diagnosticas', async () => {
         const repeated = [0, 1, 2].map((offset) => ({
             timestamp: 1710000000000 + offset * 1000,
