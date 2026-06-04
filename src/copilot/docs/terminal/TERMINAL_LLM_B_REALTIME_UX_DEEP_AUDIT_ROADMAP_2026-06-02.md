@@ -7099,5 +7099,30 @@
   - artefato: `artifacts/terminal-live/2026-06-04T16-38-33-340Z/summary.md`;
   - medição: `awk 'length($0)>120' default-ux-cycle.plain.log` não encontrou linhas acima de
     120 colunas.
+- [x] Pergunta humana estruturada com card vertical e prompt restaurado:
+  - achado live: após responder `SIM` em `request_user_input`, o terminal confirmava a resposta,
+    mas não redesenhava o prompt; o próximo comando do harness ficava bloqueado até timeout;
+  - causa: o caminho imediato de resposta pendente estacionava o prompt como se toda resposta fosse
+    `ask_user` de turno real aguardando continuação da LLM;
+  - correção: `repl-lifecycle` agora diferencia `request_user_input` estruturado resolvido de
+    `ask_user` de turno real; pergunta estruturada devolve o prompt imediatamente, enquanto turno
+    real continua podendo manter o handoff para a LLM;
+  - achado visual adicional: o headline do card de pergunta humana juntava estado, origem e
+    timestamp na mesma linha, chegando a 132 colunas;
+  - correção: `human-question-renderer` agora separa `Origem` e `Hora` em linhas próprias,
+    preservando ISO 8601 completo e melhorando escaneabilidade;
+  - harness live ajustado: `structured-input-human-card` valida card humano durável com origem e
+    timestamp ISO, em vez de depender de linha transitória que o plain log não preserva;
+  - validação focada:
+    `node --check src/copilot/terminal/repl/repl-lifecycle.js src/copilot/terminal/events/human-question-renderer.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs tests/unit/copilot/terminal/test_human_question_renderer.spec.js`;
+  - validação focada:
+    `npx vitest run tests/unit/copilot/terminal/test_human_question_renderer.spec.js --hookTimeout=30000`;
+  - validação focada:
+    `npx eslint src/copilot/terminal/repl/repl-lifecycle.js src/copilot/terminal/events/human-question-renderer.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs tests/unit/copilot/terminal/test_human_question_renderer.spec.js`;
+  - live final:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --label terminal-structured-input-card-prompt-pass-20260604 --timeout-ms 90000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-49-03-017Z/summary.md`;
+  - resultado: PASS em 11/11 critérios, incluindo prompt restaurado, zero pendências após resposta,
+    ausência de IDs crus e ausência de spam `request_user_input ainda executando`.
 - [ ] Próxima lacuna: validar visualmente TUI completa `fzf`/`gum` quando for aceitável tomar o TTY
       real, mantendo o fluxo filtrado como prova automatizada.

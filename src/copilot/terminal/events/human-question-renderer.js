@@ -84,13 +84,9 @@ export function buildTerminalHumanQuestionCard(input = {}) {
     if (input.includeDivider !== false) {
         lines.push(terminalThemeDivider(compact ? 37 : 52));
     }
-    lines.push(
-        terminalThemeHeadline('question', input.title ?? 'Pergunta ao operador', [
-            state,
-            renderQuestionSource(input.source),
-            formatTerminalTimeLabel(now, { now, mode: 'dual' }),
-        ]),
-    );
+    lines.push(terminalThemeHeadline('question', input.title ?? 'Pergunta ao operador', [state]));
+    lines.push(terminalThemeRow('Origem', renderQuestionSource(input.source)));
+    lines.push(terminalThemeRow('Hora', formatTerminalTimeLabel(now, { now, mode: 'dual' })));
     lines.push(terminalThemeRow('[PERGUNTA]', questionText, { role: 'question' }));
     if (choicesLine) {
         lines.push(terminalThemeRow('Opções', choicesLine, { role: 'info' }));

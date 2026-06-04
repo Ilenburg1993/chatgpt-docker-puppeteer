@@ -27,7 +27,7 @@ describe('terminal/human-question-renderer', () => {
         expect(output).toContain('Pergunta humana estruturada');
         expect(output).toContain('aguardando resposta');
         expect(output).toContain('SDK');
-        expect(output).toContain('2026-06-03T16:31:50-03:00 (há 0s)');
+        expect(output).toContain('2026-06-03T16:31:50.000-03:00 (há 0s)');
         expect(output).toMatch(/\[PERGUNTA\]\s+ASK-CANONICAL: responda SIM para fechar o teste/u);
         expect(output).toContain('[1] SIM');
         expect(output).toContain('[2] NAO');
@@ -36,6 +36,7 @@ describe('terminal/human-question-renderer', () => {
         expect(output).not.toContain('request_user_input');
         expect(output).not.toContain('ask_user SDK');
         expect(output).not.toMatch(/chatcmpl-tool-[a-z0-9-]+/iu);
+        expect(output.split('\n').every((line) => line.length <= 120)).toBe(true);
     });
 
     it('compacta perguntas longas sem remover o marcador humano canônico', () => {

@@ -126,6 +126,26 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
     /**
      * @param {ReturnType<typeof tryAnswerTerminalPendingQuestionInput>} pendingAnswer
+     * @returns {boolean}
+     */
+    function shouldResumePromptAfterPendingAnswer(pendingAnswer) {
+        return (
+            pendingAnswer.ok === true &&
+            pendingAnswer.pendingQuestionKind === null &&
+            pendingAnswer.pendingQuestionText !== null
+        );
+    }
+
+    /**
+     * @param {ReturnType<typeof tryAnswerTerminalPendingQuestionInput>} pendingAnswer
+     * @returns {boolean}
+     */
+    function shouldParkPromptAfterPendingAnswer(pendingAnswer) {
+        return pendingAnswer.ok === true && !shouldResumePromptAfterPendingAnswer(pendingAnswer);
+    }
+
+    /**
+     * @param {ReturnType<typeof tryAnswerTerminalPendingQuestionInput>} pendingAnswer
      * @returns {void}
      */
     function printPendingAnswerResult(pendingAnswer) {
@@ -141,11 +161,12 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             pendingAnswer.runtimeId && pendingAnswer.runtimeId !== 'default'
                 ? ` · runtime ${pendingAnswer.runtimeId}`
                 : '';
+        const shouldRedrawPrompt = pendingAnswer.ok !== true || shouldResumePromptAfterPendingAnswer(pendingAnswer);
         println(
             pendingAnswer.ok
                 ? `\n${terminalThemeRow('Resposta', `enviada para pergunta pendente${runtimeSuffix}.`, { role: 'success' })}`
                 : `\n${terminalThemeRow('Resposta', `falhou ao responder pergunta pendente${runtimeSuffix}.`, { role: 'error' })}`,
-            { redrawPrompt: pendingAnswer.ok !== true },
+            { redrawPrompt: shouldRedrawPrompt },
         );
     }
 
@@ -326,9 +347,10 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
         const pendingAnswer = tryAnswerTerminalPendingQuestionInput(trimmed);
         if (shouldConsumeTerminalPendingAnswerInput(pendingAnswer)) {
-            if (pendingAnswer.ok) parkTerminalPromptForContinuation();
+            const shouldParkPrompt = shouldParkPromptAfterPendingAnswer(pendingAnswer);
+            if (shouldParkPrompt) parkTerminalPromptForContinuation();
             printPendingAnswerResult(pendingAnswer);
-            if (pendingAnswer.ok) parkPromptForPendingAnswerContinuation();
+            if (shouldParkPrompt) parkPromptForPendingAnswerContinuation();
             else refreshPrompt();
             return;
         }
@@ -370,14 +392,15 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             ? null
             : tryAnswerTerminalPendingQuestionInput(trimmedForEscape);
         if (immediatePendingAnswer && shouldConsumeTerminalPendingAnswerInput(immediatePendingAnswer)) {
-            if (immediatePendingAnswer.ok) parkTerminalPromptForContinuation();
+            const shouldParkPrompt = shouldParkPromptAfterPendingAnswer(immediatePendingAnswer);
+            if (shouldParkPrompt) parkTerminalPromptForContinuation();
             beginTerminalRenderLock();
             try {
                 printPendingAnswerResult(immediatePendingAnswer);
             } finally {
                 endTerminalRenderLock();
             }
-            if (immediatePendingAnswer.ok) parkPromptForPendingAnswerContinuation();
+            if (shouldParkPrompt) parkPromptForPendingAnswerContinuation();
             else refreshPrompt();
             return;
         }

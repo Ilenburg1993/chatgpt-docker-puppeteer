@@ -1605,9 +1605,12 @@ function structuredInputCycleCriteria(boot) {
             detail: 'REPL prompt marked the pending structured input as [PERGUNTA] or compact [PERG]',
         },
         {
-            id: 'structured-input-live-status',
-            pass: /(?:⟲\s+)?LLM-B\s+Pergunta\s+·\s+REQUEST_USER_INPUT-SIM/iu.test(plain),
-            detail: 'permanent live status rendered request_user_input as a human operator question',
+            id: 'structured-input-human-card',
+            pass:
+                /Pergunta humana estruturada\s+·\s+aguardando operador/iu.test(plain) &&
+                /Origem\s+diagnóstico de pergunta estruturada/iu.test(plain) &&
+                /Hora\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/u.test(plain),
+            detail: 'request_user_input rendered as a durable human question card with source and ISO timestamp',
         },
         {
             id: 'structured-input-waits-pending',
