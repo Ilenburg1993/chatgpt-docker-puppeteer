@@ -6063,6 +6063,59 @@
 - [x] Contrato live reforçado: o runner ganhou
       `ux-no-durable-tool-output-inside-question-prompt`, bloqueando tool/file/turn na linha
       `[PERG]›`.
-- [ ] Próxima frente UX: auditar se a linha durável inicial de uma tool pode aparecer colada ao
-      prompt normal `você›` antes de uma pergunta futura; decidir se `printlnBlock`/reserva de
-      prompt deve ser unificada para todo stdout durável, não apenas para pergunta ativa.
+- [x] Contrato live reforçado: o runner ganhou `ux-no-durable-output-inside-default-prompt`,
+      protegendo também o prompt ocioso normal `você›` contra linhas duráveis grudadas.
+- [x] Achado UX: `/activity 40` default ainda podia repetir categoria e label na timeline, como
+      `ferramenta · Ferramenta concluída` ou `pergunta · Pergunta ao operador`, deixando a leitura
+      pesada sem acrescentar informação.
+- [x] Correção aplicada: `renderTimelineEntryHeading()` remove categoria redundante quando a label
+      já carrega a semântica humana (`Ferramenta`, `Integração`, `Arquivo`, `Pergunta`, `Resposta`,
+      `Tarefa`, `Turno`).
+- [x] Teste unitário: `test_commands_activity.spec.js` cobre que `Tarefa em segundo plano concluída`
+      aparece sem prefixo duplicado `tarefa ·`.
+- [x] Contrato live reforçado: o runner ganhou `ux-activity-no-redundant-timeline-labels`, reprovando
+      `ferramenta · Ferramenta`, `pergunta · Pergunta`, `tarefa · Tarefa` e `turno · Turno` no
+      `/activity 40` default pós-turno.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+  - `npx eslint src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Live de auditoria pós-critério executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-activity-labels-20260605-0522 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T05-22-09-678Z/summary.md`.
+  - Resultado: `Status: FAIL`; a live revelou `você[kilo-auto…/high]›   Falhou ... tool genérica`
+    e ausência de materialização/export da pergunta quando o SDK primeiro tentou `ask_user` com
+    schema inválido.
+- [x] Decisão UX: stdout durável não pode depender apenas de carriage-return/ANSI para sair da
+      linha viva; logs plain, VS Code terminal e operador humano precisam ver uma separação física
+      clara entre prompt e eventos permanentes.
+- [x] Correção aplicada: `printlnBlock()` agora abre uma quebra real antes de blocos duráveis quando
+      há readline ativo sem input humano parcial, preservando a limpeza ANSI e impedindo
+      `você› Uso do modelo`/`você› Falhou` no mesmo registro visual.
+- [x] Decisão UX: falhas de `ask_user` devem aparecer como `Pergunta ao operador` falha, nunca como
+      `tool genérica`; sucesso normal de `ask_user` continua sendo responsabilidade exclusiva do
+      card/prompt humano para evitar duplicação.
+- [x] Correção aplicada: `sdk-session-events.js` passa a registrar no `ToolCallRegistry` nome,
+      argumentos e apresentação humana já no `preToolUse`; `tool-lifecycle-runtime.js` só suprime
+      `ask_user` bem-sucedido, deixando falhas semanticamente visíveis.
+- [x] Testes unitários:
+  - `test_tool_activity_presenter.spec.js` cobre `ask_user` como `Pergunta ao operador`.
+  - `test_tool_lifecycle_runtime.spec.js` cobre que falha de `ask_user` grava/imprime pergunta
+    humana e não `tool genérica`.
+- [x] Contrato live reforçado: o runner ganhou `ux-no-generic-tool-failure-copy`, além de
+      `ux-no-durable-output-inside-default-prompt` e
+      `ux-activity-no-redundant-timeline-labels`.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/dialog/output.js src/copilot/terminal/events/sdk-session-events.js src/copilot/terminal/events/tool-lifecycle-runtime.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+  - `npx eslint src/copilot/terminal/dialog/output.js src/copilot/terminal/events/sdk-session-events.js src/copilot/terminal/events/tool-lifecycle-runtime.js src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Live de confirmação executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-prompt-barrier-20260605-0230 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T05-29-40-886Z/summary.md`.
+  - Resultado: `Status: PASS`; passaram `ux-no-durable-output-inside-default-prompt`,
+    `ux-no-generic-tool-failure-copy`, `ux-activity-no-redundant-timeline-labels`,
+    `ask-user-single-source`, `export-ask-user`, `export-ask-user-answer`,
+    `sse-canonical-transcript-events`, `no-prompt-double-render` e `no-terminal-errors`.
+- [ ] Próxima frente UX: reduzir prompts duplicados visuais de boot (`você[auto/high]›` repetido em
+      sequência antes da sessão estabilizar) sem voltar a esconder eventos duráveis; avaliar se o
+      coalescing de prompt deve diferenciar boot, standby e pós-comando.

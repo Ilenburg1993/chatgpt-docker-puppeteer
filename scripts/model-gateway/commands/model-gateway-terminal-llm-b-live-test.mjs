@@ -4064,6 +4064,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: 'durable waiting/tool heartbeat spam, raw ids, and SDK ask_user labels were not printed',
         },
         {
+            id: 'ux-no-generic-tool-failure-copy',
+            pass: !/falhou\s+tool\s+·\s+executando tool gen[ée]rica falhou|Tool falhou[\s\S]{0,120}executando tool gen[ée]rica/iu.test(
+                beforeRawDiagnosticsPlain,
+            ),
+            detail: 'default tool failures kept semantic human names instead of generic SDK fallback copy',
+        },
+        {
             id: 'ux-no-raw-sdk-info-labels',
             pass:
                 !/Info SDK|configuration|Disabled tools|model_retry|Response was interrupted due to a server error/iu.test(
@@ -4097,6 +4104,18 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 latestActivity40Section.length === 0
                     ? '/activity 40 post-turn section was not present in this scenario'
                     : '/activity 40 post-turn default timeline hid boot and routine message-processing rows',
+        },
+        {
+            id: 'ux-activity-no-redundant-timeline-labels',
+            pass:
+                latestActivity40Section.length === 0 ||
+                !/(?:ferramenta\s+·\s+Ferramenta|pergunta\s+·\s+Pergunta|tarefa\s+·\s+Tarefa|turno\s+·\s+Turno)/iu.test(
+                    latestActivity40Section,
+                ),
+            detail:
+                latestActivity40Section.length === 0
+                    ? '/activity 40 post-turn section was not present in this scenario'
+                    : '/activity 40 post-turn timeline avoided repeated category labels',
         },
         {
             id: 'ux-events-stable-long-label-column',
@@ -4164,6 +4183,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 plain,
             ),
             detail: 'durable tool/file/turn rows did not render inside the pending human-question prompt line',
+        },
+        {
+            id: 'ux-no-durable-output-inside-default-prompt',
+            pass: !/voc[eê]\[[^\n\r]*\]›[^\n\r]*(?:Ferramenta|Arquivo|Conclu[ií]do|Falhou|Turno|Evento|Uso do modelo)\b/iu.test(
+                plain,
+            ),
+            detail: 'durable operational rows did not render inside the default idle prompt line',
         },
         {
             id: 'ux-answer-live-status-stays-single-line',

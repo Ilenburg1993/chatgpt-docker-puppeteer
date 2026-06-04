@@ -625,6 +625,23 @@ function redrawPromptIfInteractive() {
 }
 
 /**
+ * Abre uma separação física entre o prompt vivo e um bloco durável.
+ *
+ * A limpeza ANSI deixa a tela real correta, mas logs plain e alguns terminais integrados ainda podem preservar a linha
+ * do prompt antes de aplicar o carriage-return. Uma quebra real evita que eventos duráveis apareçam como se fossem
+ * texto digitado pelo operador, mantendo o input pronto na linha seguinte quando o prompt for redesenhado.
+ *
+ * @returns {void}
+ */
+function breakPromptLineBeforeDurableOutput() {
+    const rl = getRl();
+    if (!process.stdout.isTTY || !rl || _terminalRenderLockDepth > 0) return;
+    const bufferedInput = /** @type {{ line?: unknown }} */ (rl).line;
+    if (typeof bufferedInput === 'string' && bufferedInput.length > 0) return;
+    process.stdout.write('\n');
+}
+
+/**
  * Redesenha o prompt em uma linha limpa imediatamente.
  *
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean } | null | undefined} rl
@@ -861,6 +878,7 @@ export function printlnBlock(lines) {
             _statusRowsReserved = 0;
         }
         clearTerminalLine();
+        breakPromptLineBeforeDurableOutput();
         process.stdout.write(`${text.endsWith('\n') ? text : `${text}\n`}`);
         // Overlay opt-in: re-reserva uma linha em branco acima do prompt para evitar salto visual no próximo pulso.
         if (useOverlay && !hadReservedStatusRows) {

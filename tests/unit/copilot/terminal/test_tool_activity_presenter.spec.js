@@ -65,6 +65,20 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.completeLine(true, '1.0s')).toContain('aguardando decisão humana concluído');
     });
 
+    it('mostra ask_user como pergunta humana mesmo quando vem do hook SDK', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'ask_user',
+            args: { question: 'ASK-CANONICAL: responda SIM para fechar o teste' },
+        });
+
+        expect(presentation.displayToolName).toBe('Pergunta ao operador');
+        expect(presentation.operation).toBe('ask');
+        expect(presentation.detail).toContain('aguardando decisão humana');
+        expect(presentation.detail).toContain('ASK-CANONICAL');
+        expect(presentation.completeLine(false, 'n/d')).toContain('aguardando decisão humana falhou');
+        expect(presentation.completeLine(false, 'n/d')).not.toContain('tool genérica');
+    });
+
     it('classifica exec_command como execução mesmo quando o cwd aparece como alvo', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'exec_command',

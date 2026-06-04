@@ -458,7 +458,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Timeline operacional');
         expect(ctx.output()).toContain('/activity detail mostra timeline completa');
         expect(ctx.output()).not.toContain('sistema · Uso BYOK sem Premium Request');
-        expect(ctx.output()).toContain('tarefa · Tarefa em segundo plano concluída');
+        expect(ctx.output()).toContain('Tarefa em segundo plano concluída');
+        expect(ctx.output()).not.toContain('tarefa · Tarefa em segundo plano concluída');
         expect(ctx.output()).not.toContain('turno · Processando mensagem');
         expect(ctx.output()).not.toContain('inicialização · Inicializando terminal');
         expect(ctx.output()).not.toContain('system · Uso BYOK');

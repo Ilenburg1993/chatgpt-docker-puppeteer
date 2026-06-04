@@ -240,8 +240,27 @@ function isHumanInputToolName(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function normalizeHookToolArgs(value) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return /** @type {Record<string, unknown>} */ (value);
+    }
+    if (typeof value !== 'string' || value.trim().length === 0) return {};
+    try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? /** @type {Record<string, unknown>} */ (parsed)
+            : {};
+    } catch {
+        return {};
+    }
+}
+
+/**
  * @param {Record<string, unknown>} input
- * @returns {{ id: string | null; name: string }[]}
+ * @returns {{ id: string | null; name: string; args: Record<string, unknown> }[]}
  */
 function extractHookToolCalls(input) {
     const toolCalls = Array.isArray(input['toolCalls']) ? input['toolCalls'] : [];
@@ -260,7 +279,39 @@ function extractHookToolCalls(input) {
                 : typeof record['toolName'] === 'string' && record['toolName'].trim()
                   ? record['toolName'].trim()
                   : '';
-        return name ? [{ id, name }] : [];
+        const args = normalizeHookToolArgs(record['args'] ?? record['arguments'] ?? record['input'] ?? record['data']);
+        return name ? [{ id, name, args }] : [];
+    });
+}
+
+/**
+ * @param {ReturnType<typeof createToolCallRegistry>} registry
+ * @param {{ id: string | null; name: string; args: Record<string, unknown> }} call
+ * @returns {void}
+ */
+function registerHookToolCall(registry, call) {
+    if (!call.id) return;
+    const presentation = buildTerminalToolActivityPresentation(
+        {
+            toolName: call.name,
+            name: call.name,
+            args: call.args,
+            toolCallId: call.id,
+        },
+        call.name,
+    );
+    const existing = registry.getEntry(call.id);
+    if (existing) {
+        registry.touch(call.id, {
+            rawArgs: call.args,
+            presentation,
+        });
+        return;
+    }
+    registry.register(call.id, call.name, 'native', {
+        canonicalName: presentation.canonicalToolName ?? call.name,
+        rawArgs: call.args,
+        presentation,
     });
 }
 
@@ -1679,6 +1730,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const hookInvocationId = evt?.hookInvocationId ?? null;
         if (hookType === 'preToolUse' && evt?.input && typeof evt.input === 'object') {
             const calls = extractHookToolCalls(evt.input);
+            for (const call of calls) {
+                registerHookToolCall(_reg, call);
+            }
             const hasHumanInputTool = calls.some((call) => isHumanInputToolName(call.name));
             const suppressed = hasHumanInputTool
                 ? calls.filter((call) => call.id && !isHumanInputToolName(call.name))

@@ -688,7 +688,7 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
         registry.resolveByName(eventName) ??
         (eventName ? null : registry.resolveSingleInFlight('native'));
     const name = entry?.canonicalName ?? entry?.toolName ?? eventName ?? 'tool';
-    if (shouldSuppressTerminalToolNarration(name)) {
+    if (shouldSuppressTerminalToolNarration(name) && success) {
         const suppressedToolCallId = entry?.toolCallId ?? toolCallId;
         if (entry?.toolCallId) registry.complete(entry.toolCallId, success);
         if (suppressedToolCallId) completeTerminalTurnToolCall({ toolCallId: suppressedToolCallId, success });

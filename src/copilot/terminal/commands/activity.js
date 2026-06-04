@@ -215,6 +215,24 @@ function compactActivityLabel(value) {
 }
 
 /**
+ * @param {{ phase: string; label: string; progress?: number | null }} entry
+ * @returns {string}
+ */
+function renderTimelineEntryHeading(entry) {
+    const phase = renderActivityPhaseLabel(entry.phase);
+    const label = compactActivityLabel(entry.label);
+    const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
+    const lowerLabel = label.toLowerCase();
+    const labelAlreadyCarriesPhase =
+        lowerLabel.startsWith(`${phase} `) ||
+        (entry.phase === 'tool' && /^(ferramenta|integra[cç][aã]o|arquivo|i\/o)\b/iu.test(label)) ||
+        (entry.phase === 'question' && /^(pergunta|resposta)\b/iu.test(label)) ||
+        (entry.phase === 'turn' && /^turno\b/iu.test(label)) ||
+        (entry.phase === 'system' && /^(uso|configura[cç][aã]o|warning|erro|modelo)\b/iu.test(label));
+    return `${labelAlreadyCarriesPhase ? label : `${phase} · ${label}`}${progress}`;
+}
+
+/**
  * @param {{ toolName: string; operation: string; path?: string | null; target?: string | null }} tool
  * @param {{ detail: boolean }} opts
  * @returns {{ name: string; target: string | null }}
@@ -555,11 +573,10 @@ export function cmdActivity({ println }, arg) {
     for (const entry of timelineEntries) {
         const ts = renderActivityTime(entry.ts, { detail, now });
         const extra = entry.detail ? ` — ${compactOperatorDetail(entry.detail)}` : '';
-        const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
         println(
             terminalThemeRow(
                 'Evento',
-                `${ts} · ${renderActivityPhaseLabel(entry.phase)} · ${compactActivityLabel(entry.label)}${progress}${extra}`,
+                `${ts} · ${renderTimelineEntryHeading(entry)}${extra}`,
                 { role: renderActivitySeverityRole(entry.severity) },
             ),
         );
