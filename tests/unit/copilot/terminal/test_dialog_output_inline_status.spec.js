@@ -161,6 +161,16 @@ describe('terminal/dialog/output inline status', () => {
         expect(mocks.rl.prompt).not.toHaveBeenCalled();
     });
 
+    it('não repinta linha viva enquanto o operador já digitou resposta parcial', () => {
+        mocks.rl.line = 'SIM';
+
+        writeInlineStatus('LLM-B aguardando você · [PERG] · SIM');
+
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+        expect(mocks.rl.prompt).not.toHaveBeenCalled();
+    });
+
     it('suprime repaint idêntico em sequência curta sem limpar a linha', () => {
         redrawTerminalPrompt(mocks.rl, 'você› ');
         redrawTerminalPrompt(mocks.rl, 'você› ');

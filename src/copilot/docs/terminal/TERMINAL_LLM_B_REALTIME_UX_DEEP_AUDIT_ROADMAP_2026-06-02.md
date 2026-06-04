@@ -5859,6 +5859,68 @@
       pergunta pendente`; `/activity 40` não exibiu os acks auxiliares; `/events 60` exibiu
       `Resposta encaminhada · ponte da pergunta · SIM` e `Resposta do operador · pergunta ao
       operador · SIM`, separando relay de autoria canônica.
-- [ ] Próxima frente UX: revisar `/events`/`activity` para fontes ainda genéricas como
+- [x] Próxima frente UX: revisar `/events`/`activity` para fontes ainda genéricas como
       `Atividade · agente`, `Atividade · SDK`, `Uso LLM · diálogo` e `Rotina iniciada · SDK`,
       avaliando se devem ser agregadas, renomeadas ou movidas para detail/raw.
+- [x] Decisão UX: `/events` default sem filtros é uma tela de triagem operacional. Eventos de
+      manutenção frequentes (`terminal.activity`, `activity.changed`, `busy`, `streaming.progress`,
+      `delta`, `session.usage`, `hook.start`, `hook.end` e `sdk.lifecycle` de `session.updated`)
+      ficam no archive durável, em `/events --raw`, `/events --json` e em consultas explícitas como
+      `/events event=sdk.lifecycle`.
+- [x] Correção aplicada: `commands/events.js` ganhou `isRoutineDefaultEvent()` e filtra essas
+      entradas apenas no modo default sem filtros, preservando a busca explícita por evento, fonte,
+      trace, turno, tool, request e hub.
+- [x] Contrato unitário: `test_commands_events.spec.js` agora prova que o resumo default oculta
+      ruído de atividade/lifecycle/hook/streaming/usage duplicado, mas mantém `Resposta do operador`
+      e preserva `Sessão atualizada · controle da sessão` quando o operador consulta
+      `event=sdk.lifecycle`.
+- [x] Contrato live ajustado: `sse-archive-human-source-labels` deixou de exigir lifecycle/hook no
+      bloco humano, e `sse-archive-default-control-noise-hidden` passa a falhar se `/events` default
+      voltar a renderizar linhas de manutenção com timestamp.
+- [x] Próxima live: repetir cenário canônico para confirmar visualmente que `/events 60` mostra
+      transcript, pergunta/resposta, telemetria LLM e export, mas não repete heartbeat,
+      `session.updated`, hooks de rotina, streaming progress ou `session.usage` duplicado.
+- [x] Live executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-control-noise-hidden-20260605-0210`.
+  - Resultado: `Status: PASS`; novo critério `sse-archive-default-control-noise-hidden` passou.
+- [x] Evidência visual: `/events 60` ficou reduzido a `Mensagem da LLM-B`, `Pergunta ao operador`,
+      `Resposta encaminhada`, `Resposta do operador`, `Uso LLM` de `telemetria LLM` e mensagem final;
+      `session.updated`, `activity.changed`, `terminal.activity`, `hook.start`, `hook.end`,
+      `streaming.progress` e `session.usage` seguiram presentes em `/events --raw`.
+- [x] Novo achado da live: ainda apareceram `Turno concluído ×2 · diálogo`,
+      `Turno concluído ×2 · LLM-B via SDK` e `Turno iniciado · LLM-B via SDK`, que são úteis para
+      auditoria/reconciliação, mas redundantes no resumo default quando `assistant.message`,
+      pergunta/resposta humana e telemetria já estão visíveis.
+- [x] Decisão UX: `dialog.turn_start`, `dialog.turn_end`, `assistant.turn_start` e
+      `assistant.turn_end` também pertencem a filtros explícitos e `--raw` no default; eventos de
+      erro/timeout/turno vazio permanecem em eventos próprios e humanos.
+- [x] Correção aplicada: `isRoutineDefaultEvent()` passou a ocultar turn lifecycle no resumo default,
+      preservando consulta explícita (`/events event=assistant.turn_end`) e o envelope bruto.
+- [x] Próxima live: repetir cenário canônico para confirmar que `/events 60` default fica somente
+      com transcript, ask/answer, relay, uso LLM canônico e mensagem final, sem lifecycle de turno.
+- [x] Live executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-turn-lifecycle-hidden-20260605-0225`.
+  - Resultado: `Status: PASS`; `/events 60` exibiu somente seis linhas operacionais:
+    `Mensagem da LLM-B`, `Pergunta ao operador`, `Resposta encaminhada`,
+    `Resposta do operador`, `Uso LLM` e mensagem final da LLM-B.
+- [x] Achado visual da live: durante a resposta `SIM`, a linha viva ainda podia repintar
+      `LLM-B aguardando você · [PERG] · SIM` enquanto o operador estava digitando, criando sensação
+      de disputa com o input mesmo com `no-prompt-double-render` passando.
+- [x] Decisão UX: quando `readline.line` contém input humano parcial, a prioridade é absoluta do
+      operador; a linha viva não deve pintar nem redesenhar prompt até a linha voltar a ficar vazia.
+- [x] Correção aplicada: `dialog/output.js` ganhou `hasTerminalReadlineBufferedInput()` e
+      `writeInlineStatus()` agora suprime o repaint transitório quando há texto no buffer do
+      readline, limpando apenas a área reservada se já existir.
+- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre que `writeInlineStatus()` não
+      escreve, não chama `setPrompt()` e não chama `prompt()` quando o operador já digitou `SIM`.
+- [x] Próxima live: repetir cenário canônico para verificar que a linha viva não intercala texto no
+      input `[PERG]› SIM` durante a resposta humana.
+- [x] Live executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-input-guard-events-clean-20260605-0240`.
+  - Resultado: `Status: PASS`; `terminal.plain.log` mostra `você[kilo-auto…/high][PERG]› SIM`
+    sem linha `LLM-B aguardando você` intercalada no momento da digitação.
+- [x] Evidência adicional: `/events 60` permaneceu com seis linhas operacionais e o novo critério
+      `sse-archive-default-control-noise-hidden` continuou passando.
+- [ ] Próxima frente UX: auditar `/activity 40`, porque ainda há duplicação visual de arquivo
+      (`Arquivo leitura · package.json ×2` seguido de `Arquivo leitura · package.json`) e a timeline
+      mistura eventos permanentes (`streaming`, `Uso BYOK`, `Processando mensagem`) em volume alto.

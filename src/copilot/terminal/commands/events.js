@@ -577,6 +577,34 @@ function isInternalDefaultEvent(entry) {
 }
 
 /**
+ * O resumo default de `/events` e uma trilha operacional para o operador humano.
+ * Eventos de manutencao continuam no archive, em `--raw`/`--json` e em filtros explicitos.
+ *
+ * @param {{ event: string; payload?: Record<string, unknown> | null }} entry
+ * @returns {boolean}
+ */
+function isRoutineDefaultEvent(entry) {
+    if (entry.event === 'terminal.activity' || entry.event === 'activity.changed') return true;
+    if (entry.event === 'busy') return true;
+    if (entry.event === 'streaming.progress' || entry.event === 'delta') return true;
+    if (entry.event === 'session.usage') return true;
+    if (entry.event === 'hook.start' || entry.event === 'hook.end') return true;
+    if (
+        entry.event === 'dialog.turn_start' ||
+        entry.event === 'dialog.turn_end' ||
+        entry.event === 'assistant.turn_start' ||
+        entry.event === 'assistant.turn_end'
+    ) {
+        return true;
+    }
+    if (entry.event === 'sdk.lifecycle') {
+        const lifecycleType = normalizeEventSummaryText(entry.payload?.['type']).toLowerCase();
+        return lifecycleType === 'session.updated';
+    }
+    return false;
+}
+
+/**
  * @param {EventsContext} ctx
  * @param {string} [arg]
  * @returns {Promise<void>}
@@ -686,7 +714,9 @@ export async function cmdEvents({ println }, arg = '') {
     );
     const now = Date.now();
     const shouldAggregateDefaultEvents = !showDiagnosticIds && !hasActiveEventFilters(/** @type {Record<string, unknown>} */ (filters));
-    const visibleEntries = shouldAggregateDefaultEvents ? entries.filter((entry) => !isInternalDefaultEvent(entry)) : entries;
+    const visibleEntries = shouldAggregateDefaultEvents
+        ? entries.filter((entry) => !isInternalDefaultEvent(entry) && !isRoutineDefaultEvent(entry))
+        : entries;
     if (visibleEntries.length === 0) {
         println(
             terminalThemeRow('Resultado', 'Nenhum evento operacional visível; use /events --raw para auditoria completa.', {

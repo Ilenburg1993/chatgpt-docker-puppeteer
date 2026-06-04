@@ -3979,15 +3979,21 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 /pergunta ao operador/u.test(beforeRawDiagnosticsPlain) &&
                 /telemetria LLM/u.test(beforeRawDiagnosticsPlain) &&
                 /registro export/u.test(beforeRawDiagnosticsPlain) &&
-                /Sessão atualizada/u.test(beforeRawDiagnosticsPlain) &&
-                /controle da sessão/u.test(beforeRawDiagnosticsPlain) &&
-                /Rotina iniciada/u.test(beforeRawDiagnosticsPlain) &&
-                /Rotina concluída/u.test(beforeRawDiagnosticsPlain) &&
                 !/SDK assistant|pergunta humana SDK|agente\/usage|export envelope|Sessão SDK|Hook iniciado|Hook concluído/u.test(
                     beforeRawDiagnosticsPlain,
                 ),
             detail:
-                '/events default rendered transcript/user/usage/session/hook/export sources as operator-facing labels before raw diagnostics',
+                '/events default rendered transcript/user/usage/export sources as operator-facing labels before raw diagnostics',
+        },
+        {
+            id: 'sse-archive-default-control-noise-hidden',
+            pass:
+                !/^\s*(Atividade|Ocupado|Sessão atualizada|Rotina iniciada|Rotina concluída|Streaming|Turno iniciado|Turno concluído)\s{2,}\d{4}-\d{2}-\d{2}T/imu.test(
+                    beforeRawDiagnosticsPlain,
+                ) &&
+                !/^\s*Uso LLM\s{2,}\d{4}-\d{2}-\d{2}T[^\n]*diálogo/imu.test(beforeRawDiagnosticsPlain),
+            detail:
+                '/events default hides routine activity, lifecycle, hook, turn, streaming and duplicate usage rows before raw diagnostics',
         },
         {
             id: 'sse-archive-human-operational-events',

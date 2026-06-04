@@ -575,6 +575,17 @@ function isTerminalReadlineOpen(rl) {
 }
 
 /**
+ * A linha viva nao deve disputar a linha interativa quando o operador ja comecou a digitar.
+ *
+ * @param {unknown} rl
+ * @returns {boolean}
+ */
+function hasTerminalReadlineBufferedInput(rl) {
+    const line = /** @type {{ line?: unknown }} */ (rl ?? {}).line;
+    return typeof line === 'string' && line.length > 0;
+}
+
+/**
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} rl
  * @param {string} prompt
  * @param {{ force?: boolean }} [options]
@@ -880,6 +891,10 @@ export function writeInlineStatus(text) {
     if (!rl) {
         clearTerminalLine();
         process.stdout.write(rows.join('\n'));
+        return;
+    }
+    if (hasTerminalReadlineBufferedInput(rl)) {
+        if (_statusRowsReserved > 0) clearReservedStatusRowsPreservingCursor();
         return;
     }
     reserveInlineStatusRows(rl, rows.length);

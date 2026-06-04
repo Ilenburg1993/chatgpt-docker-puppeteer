@@ -356,7 +356,7 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('io_op');
     });
 
-    it('humaniza tipos e classificações internas em eventos operacionais', async () => {
+    it('preserva tipos e classificações internas em consultas explícitas', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
@@ -369,7 +369,7 @@ describe('terminal/commands/events', () => {
                 event: null,
                 traceId: null,
                 turnId: null,
-                source: null,
+                source: 'agent/sdk.lifecycle',
                 toolCallId: null,
                 requestId: null,
                 hubSessionId: null,
@@ -401,7 +401,7 @@ describe('terminal/commands/events', () => {
         });
         const ctx = mockCtx();
 
-        await cmdEvents({ println: ctx.println }, '20');
+        await cmdEvents({ println: ctx.println }, '20 source=agent/sdk.lifecycle');
 
         expect(ctx.output()).toContain('Sessão atualizada');
         expect(ctx.output()).toContain('controle da sessão');
@@ -411,6 +411,182 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('tipo session.updated');
         expect(ctx.output()).not.toContain('ask user continuation');
         expect(ctx.output()).not.toContain('ask_user_continuation');
+    });
+
+    it('move eventos rotineiros para filtros explícitos e raw no resumo default', async () => {
+        const routineEntries = [
+            {
+                timestamp: 1710000000000,
+                eventId: 91,
+                event: 'terminal.activity',
+                source: 'terminal/activity',
+                eventSource: null,
+                traceId: null,
+                turnId: null,
+                hubSessionId: null,
+                payload: { message: 'heartbeat de atividade' },
+            },
+            {
+                timestamp: 1710000001000,
+                eventId: 92,
+                event: 'busy',
+                source: 'terminal-dialog/busy',
+                eventSource: null,
+                traceId: null,
+                turnId: null,
+                hubSessionId: null,
+                payload: { status: 'active' },
+            },
+            {
+                timestamp: 1710000002000,
+                eventId: 93,
+                event: 'sdk.lifecycle',
+                source: 'agent/sdk.lifecycle',
+                eventSource: null,
+                traceId: null,
+                turnId: null,
+                hubSessionId: null,
+                payload: { type: 'session.updated' },
+            },
+            {
+                timestamp: 1710000003000,
+                eventId: 94,
+                event: 'hook.start',
+                source: 'sdk/hooks',
+                eventSource: null,
+                traceId: null,
+                turnId: null,
+                hubSessionId: null,
+                payload: { hookType: 'beforeToolUse' },
+            },
+            {
+                timestamp: 1710000004000,
+                eventId: 95,
+                event: 'session.usage',
+                source: 'terminal-dialog/usage',
+                eventSource: null,
+                traceId: null,
+                turnId: null,
+                hubSessionId: null,
+                payload: { classification: 'non_user_initiated' },
+            },
+            {
+                timestamp: 1710000005000,
+                eventId: 96,
+                event: 'streaming.progress',
+                source: 'terminal-dialog/streaming',
+                eventSource: null,
+                traceId: null,
+                turnId: null,
+                hubSessionId: null,
+                payload: { status: 'active' },
+            },
+            {
+                timestamp: 1710000006000,
+                eventId: 97,
+                event: 'assistant.turn_end',
+                source: 'sdk/assistant.turn_end',
+                eventSource: null,
+                traceId: null,
+                turnId: 'turn-1',
+                hubSessionId: null,
+                payload: { turnId: 'turn-1' },
+            },
+            {
+                timestamp: 1710000007000,
+                eventId: 98,
+                event: 'user_input.completed',
+                source: 'sdk/user_input.completed',
+                eventSource: null,
+                traceId: null,
+                turnId: null,
+                hubSessionId: null,
+                payload: { answer: 'SIM' },
+            },
+        ];
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: routineEntries.length,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: routineEntries,
+        });
+        const defaultCtx = mockCtx();
+
+        await cmdEvents({ println: defaultCtx.println }, '20');
+
+        expect(defaultCtx.output()).toContain('Resposta do operador');
+        expect(defaultCtx.output()).toContain('SIM');
+        expect(defaultCtx.output()).not.toContain('Atividade');
+        expect(defaultCtx.output()).not.toContain('Ocupado');
+        expect(defaultCtx.output()).not.toContain('Sessão atualizada');
+        expect(defaultCtx.output()).not.toContain('Rotina iniciada');
+        expect(defaultCtx.output()).not.toContain('Uso LLM');
+        expect(defaultCtx.output()).not.toContain('Streaming');
+        expect(defaultCtx.output()).not.toContain('Turno concluído');
+
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 1,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: 'sdk.lifecycle',
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [routineEntries[2]],
+        });
+        const filteredCtx = mockCtx();
+
+        await cmdEvents({ println: filteredCtx.println }, '20 event=sdk.lifecycle');
+
+        expect(filteredCtx.output()).toContain('Sessão atualizada');
+        expect(filteredCtx.output()).toContain('controle da sessão');
+
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 1,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: 'assistant.turn_end',
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [routineEntries[6]],
+        });
+        const turnCtx = mockCtx();
+
+        await cmdEvents({ println: turnCtx.println }, '20 event=assistant.turn_end');
+
+        expect(turnCtx.output()).toContain('Turno concluído');
     });
 
     it('humaniza erros BYOK, cancelamentos e turnos vazios no resumo default', async () => {
