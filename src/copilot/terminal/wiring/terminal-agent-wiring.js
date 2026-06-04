@@ -29,6 +29,7 @@ import { logSwallowed } from '../../core/error-handlers.js';
 import { getHubSessionId } from '../../presentation/state/index.js';
 import { broadcastSse, ensureDialogLoop, println } from '../dialog/index.js';
 import {
+    buildEmptyAfterUserInputRecoveryRows,
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
     isTerminalAssistantTranscriptCovered,
@@ -46,7 +47,7 @@ import {
     writeTerminalHubSystemTurn,
 } from '../frontend/gateways/index.js';
 import { markTerminalActivityIdle, recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
-import { terminalThemeBadge } from '../state/events/index.js';
+import { terminalThemeBadge, terminalThemeRow } from '../state/events/index.js';
 import { shouldSuppressTerminalAssistantMessageAsMaterializedTurn, withTerminalTurnCorrelation } from '../state/events/index.js';
 import { drainMailboxToTurnIfIdle } from './mailbox-drain.js';
 
@@ -496,8 +497,20 @@ export function registerAgentEventListeners(printBanner) {
                     ]
                         .filter(Boolean)
                         .join(' · ');
+                    const recoveryRows = buildEmptyAfterUserInputRecoveryRows({
+                        detail,
+                        turnId,
+                        answerPreview: lastUserInputCompleted?.answerPreview ?? null,
+                        includeModelSwitch: true,
+                    });
                     println(
-                        `\n  ${terminalThemeBadge('warn', 'AVISO')} ${terminalThemeText('warn', 'Continuação pós-pergunta sem resposta pública')} ${terminalThemeText('muted', '· tente /turn, reenvie a pergunta ou troque modelo com /byok model')}`,
+                        [
+                            '',
+                            `  ${terminalThemeBadge('warn', 'RECUPERAR')} ${terminalThemeText('warn', 'Continuação pós-pergunta sem resposta pública')}`,
+                            ...recoveryRows.map((row) =>
+                                terminalThemeRow(row.label, row.value, { role: row.role, width: 11 }),
+                            ),
+                        ].join('\n'),
                     );
                     recordTerminalActivity('turn', 'Continuação pós-pergunta vazia', {
                         detail,

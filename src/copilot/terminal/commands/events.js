@@ -5,7 +5,7 @@
  * @module copilot/terminal/commands/events
  */
 
-import { listTerminalPublicStreamSourcePolicies } from '../events/index.js';
+import { listTerminalPublicStreamSourcePolicies, summarizeEmptyAfterUserInputRecovery } from '../events/index.js';
 import {
     compactTerminalDiagnosticId,
     compactTerminalOperatorToolText,
@@ -488,13 +488,11 @@ function summarizeEmptyTurnPayload(payload) {
 function summarizeEmptyAfterUserInputPayload(payload, opts = {}) {
     const detail = typeof payload['detail'] === 'string' ? humanEventMessage(payload['detail']) : '';
     const requestId = typeof payload['requestId'] === 'string' ? payload['requestId'] : '';
-    return [
-        detail ? compact(detail, 120) : 'continuação pós-pergunta terminou sem texto público',
-        opts.showIds && requestId ? `req ${compactTerminalDiagnosticId(requestId, 14)}` : null,
-        'ação /activity 40 · /events 60 · reenviar ou trocar modelo',
-    ]
-        .filter(Boolean)
-        .join(' · ');
+    return summarizeEmptyAfterUserInputRecovery({
+        detail: detail ? compact(detail, 120) : '',
+        requestId: requestId ? compactTerminalDiagnosticId(requestId, 14) : '',
+        showIds: opts.showIds,
+    });
 }
 
 /**

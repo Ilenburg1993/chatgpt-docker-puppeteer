@@ -7375,3 +7375,64 @@
     harness, ou uma política de retry controlada pelo operador;
   - manter a separação: produto não deve fazer retry automático caro/perigoso sem decisão explícita,
     mas o terminal precisa tornar o próximo passo óbvio.
+
+## 2026-06-04 — Recuperação Humana para Continuação Pós-Pergunta Vazia
+
+- [x] Auditoria da falha live:
+  - artefato: `artifacts/terminal-live/2026-06-04T18-32-05-756Z/summary.md`;
+  - o fluxo canônico chegou ao `ask_user`, registrou `SIM`, emitiu `llm.usage` classificado como
+    continuação de pergunta humana e encerrou `turn:2` com `dialog.turn_end.reply=""`;
+  - não houve vazamento de `Título`, `Skills`, `Ferramentas` ou `Configuração`, portanto o bloqueio
+    restante não era regressão estética de boot;
+  - a cópia anterior dizia apenas para tentar `/turn`, reenviar ou trocar modelo, sem confirmar ao
+    operador que a resposta humana tinha sido aceita.
+- [x] Decisão UX:
+  - não implementar retry automático de produto nesta etapa, porque ele pode consumir chamada de
+    modelo, repetir intenção sensível ou esconder uma falha real de protocolo;
+  - tornar a recuperação explícita, humana e acionável: estado, resposta aceita, turno, detalhe,
+    comando de retomada, comandos de diagnóstico e alternativa de troca de modelo;
+  - manter `requestId` e envelopes técnicos fora da superfície default; eles continuam disponíveis
+    em `/events --raw`, SSE e export técnico.
+- [ ] Implementação planejada:
+  - [x] criar presenter compartilhado para recuperação de `dialog.empty_after_user_input`;
+  - [x] trocar a linha genérica de warning por um cartão de recuperação com `Retomar`,
+    `Diagnóstico` e `Alternativa`;
+  - [x] alinhar `/events` default para mostrar a mesma ação de retomada em vez de uma frase
+    genérica;
+  - [x] adicionar critério live opcional garantindo que uma execução bloqueada por
+    `assistant-empty-after-user-input` mostre o comando de recuperação;
+  - [x] repetir live canônico para observar o cartão em uma falha real ou confirmar PASS quando a
+    LLM-B materializar o pós-ask.
+  - [x] live de confirmação:
+    - comando:
+      `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --label terminal-ux-question-safe-diagnostics-20260604 --timeout-ms 240000 --transport=pty`;
+    - artefato: `artifacts/terminal-live/2026-06-04T18-45-44-582Z/summary.md`;
+    - resultado: `PASS`;
+    - validou tools reais, deltas públicos, `ask_user`, prompt `[PERG]`, resposta `SIM`,
+      pós-pergunta via `assistant.message`, export e correlação SSE;
+    - não houve comando diagnóstico injetado em prompt `[PERG]`.
+
+## 2026-06-04 — Harness Não Deve Injetar Diagnóstico Dentro de `[PERG]`
+
+- [x] Achado live:
+  - artefato: `artifacts/terminal-live/2026-06-04T18-42-31-896Z/summary.md`;
+  - a LLM-B chamou `ask_user` antes dos deltas públicos obrigatórios;
+  - o harness detectou corretamente `assistant-asked-before-required-deltas`, mas começou a enviar
+    `/activity`, `/intent`, `/events` e `/export` enquanto o terminal ainda estava em
+    `você[…][PERG]›`;
+  - isso fazia os comandos parecerem respostas humanas e poluía a visão real do operador.
+- [x] Decisão UX/teste:
+  - diagnóstico automatizado nunca deve disputar um prompt de pergunta humana;
+  - se o modelo abre `ask_user` prematuramente, o harness deve responder com a resposta do cenário,
+    aguardar retorno ao prompt normal e só então emitir comandos diagnósticos;
+  - o bloqueio continua sendo protocolar, mas a evidência visual deixa de criar uma segunda falha
+    artificial.
+- [x] Correção aplicada:
+  - criado detector de prompt normal que exclui `[PERG]`;
+  - `scheduleAskBeforeDeltasDiagnostics()` agora libera a pergunta pendente antes dos diagnósticos;
+  - os diagnósticos só disparam depois de `você[…]›` normal, preservando a região de input humano.
+- [x] Live posterior:
+  - artefato: `artifacts/terminal-live/2026-06-04T18-45-44-582Z/summary.md`;
+  - resultado: `PASS`;
+  - o cenário não repetiu o `ask_user` prematuro, mas confirmou que a nova espera por prompt normal
+    não afetou o caminho feliz.

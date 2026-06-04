@@ -710,7 +710,10 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('deltas 0/0 caracteres');
         expect(ctx.output()).toContain('Continuação vazia');
         expect(ctx.output()).toContain('continuação pós-pergunta terminou sem texto público · resposta SIM');
-        expect(ctx.output()).toContain('ação /activity 40 · /events 60 · reenviar ou trocar modelo');
+        expect(ctx.output()).toContain(
+            'retomar /turn Continue a partir da ultima resposta humana e entregue a resposta final em texto publico.',
+        );
+        expect(ctx.output()).toContain('diagnóstico /activity 40 · /events 60 · /byok health');
         expect(ctx.output()).not.toContain('ask-request-1234567890');
         expect(ctx.output()).toContain('tipo iniciado pelo agente');
         expect(ctx.output()).not.toContain('agent error');

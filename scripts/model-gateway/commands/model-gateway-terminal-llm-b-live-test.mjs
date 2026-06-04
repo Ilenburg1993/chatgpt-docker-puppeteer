@@ -27,6 +27,7 @@ const SECRET_ENV_RE = /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|BEARER)/iu;
 const TURN_SETTLED_AFTER_ASK_RE =
     /(?:Resposta concluída|Turno concluído; aguardando próxima mensagem|Turno do assistente concluído)/iu;
 const REPL_PROMPT_TAIL_RE = /(?:^|\n)voc[eê]\[[^\n]*?›\s*$/iu;
+const REPL_NORMAL_PROMPT_TAIL_RE = /(?:^|\n)voc[eê]\[[^\n\]]+\](?!\[PERG(?:UNTA)?\])›\s*$/iu;
 const LIVE_PROTOCOL_PROBE_KINDS = Object.freeze(['live_tool_protocol', 'live_ask_user']);
 const LIVE_TURN_PROBE_KIND = 'live_turn';
 const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([...LIVE_PROTOCOL_PROBE_KINDS, LIVE_TURN_PROBE_KIND]);
@@ -2931,6 +2932,10 @@ function hasReturnedToReplPrompt(plain, outputOffset) {
     return REPL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
 }
 
+function hasReturnedToNormalReplPrompt(plain, outputOffset) {
+    return REPL_NORMAL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
+}
+
 function extractTerminalUxRowValue(surface, label) {
     const pattern = new RegExp(`(?:^|\\n)\\s*${escapeRegExp(label)}\\s+([^\\n\\r]+)`, 'u');
     return String(surface ?? '').match(pattern)?.[1]?.trim() ?? '';
@@ -3565,6 +3570,23 @@ function shouldEvaluateScenarioDespiteBlocker(blocker) {
     return ['assistant-empty-after-user-input', 'assistant-empty-after-ask', 'assistant-ended-before-ask'].includes(
         blocker?.id,
     );
+}
+
+function evaluateEmptyAfterUserInputRecoveryVisible(plain) {
+    const text = String(plain ?? '');
+    const hasTitle =
+        /RECUPERAR[\s\S]{0,260}Continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica/iu.test(text) ||
+        /Continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica[\s\S]{0,260}RECUPERAR/iu.test(text);
+    const hasResume =
+        /Retomar\s+\/turn Continue a partir da ultima resposta humana e entregue a resposta final em texto publico\./iu.test(
+            text,
+        );
+    const hasDiagnostics = /Diagn[oó]stico\s+\/activity 40\s+·\s+\/events 60\s+·\s+\/byok health/iu.test(text);
+    return {
+        id: 'ux-empty-after-user-input-recovery-card',
+        pass: hasTitle && hasResume && hasDiagnostics,
+        detail: `recovery title=${hasTitle ? 'yes' : 'no'} resume=${hasResume ? 'yes' : 'no'} diagnostics=${hasDiagnostics ? 'yes' : 'no'}`,
+    };
 }
 
 function summarizeSseEvents(events) {
@@ -6005,6 +6027,8 @@ async function main() {
     let waitingForPromptSynchronizedCommand = false;
     let pendingByokLiveProtocolDiagnostics = false;
     let askBeforeDeltasDiagnosticsSent = false;
+    let askBeforeDeltasDiagnosticsPendingAfterAnswer = false;
+    let askBeforeDeltasAnswerPlainOffset = 0;
     let missingRequiredAskDiagnosticTimer = null;
     let missingRequiredAskRecoverySent = false;
     let missingRequiredAskRecoveryPlainOffset = 0;
@@ -6166,13 +6190,7 @@ async function main() {
         ).unref();
         if (timedOut) scheduleForcedKill(diagnostics.length * 450 + 6_500);
     };
-    const scheduleAskBeforeDeltasDiagnostics = () => {
-        if (postCommandsSent || askBeforeDeltasDiagnosticsSent) return;
-        postCommandsSent = true;
-        askBeforeDeltasDiagnosticsSent = true;
-        console.warn(
-            '[terminal-live] cenário canônico: ask_user apareceu antes dos deltas públicos obrigatórios; coletando diagnósticos.',
-        );
+    const sendAskBeforeDeltasDiagnostics = () => {
         const diagnostics = [
             '/activity 40',
             '/intent 5',
@@ -6196,6 +6214,27 @@ async function main() {
             diagnostics.length * 550 + 2_000,
         ).unref();
         if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
+    };
+    const scheduleAskBeforeDeltasDiagnostics = () => {
+        if (postCommandsSent || askBeforeDeltasDiagnosticsSent) return;
+        postCommandsSent = true;
+        askBeforeDeltasDiagnosticsSent = true;
+        console.warn(
+            '[terminal-live] cenário canônico: ask_user apareceu antes dos deltas públicos obrigatórios; respondendo a pergunta pendente antes dos diagnósticos.',
+        );
+        if (!answerSent && liveScenario.answerSteps[0]) {
+            answerSequenceStarted = true;
+            answerStepIndex = Math.max(answerStepIndex, 1);
+            answerSent = true;
+            answerPlainOffset = stripAnsi(raw).length;
+            lastAnswerStepPlainOffset = answerPlainOffset;
+            askBeforeDeltasDiagnosticsPendingAfterAnswer = true;
+            askBeforeDeltasAnswerPlainOffset = answerPlainOffset;
+            write(liveScenario.answerSteps[0].answer);
+            return;
+        }
+        console.warn('[terminal-live] cenário canônico: coletando diagnósticos após ask_user prematuro.');
+        sendAskBeforeDeltasDiagnostics();
     };
     const scheduleMissingRequiredAskDiagnostics = ({ delayMs = DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS } = {}) => {
         if (postCommandsSent || missingRequiredAskDiagnosticTimer) return;
@@ -6293,6 +6332,14 @@ async function main() {
         ) {
             pendingByokLiveProtocolDiagnostics = false;
             scheduleByokLiveProtocolDiagnostics();
+        }
+        if (
+            askBeforeDeltasDiagnosticsPendingAfterAnswer &&
+            hasReturnedToNormalReplPrompt(plain, askBeforeDeltasAnswerPlainOffset)
+        ) {
+            askBeforeDeltasDiagnosticsPendingAfterAnswer = false;
+            console.warn('[terminal-live] cenário canônico: coletando diagnósticos após liberar prompt de pergunta.');
+            sendAskBeforeDeltasDiagnostics();
         }
         if (/Modo headless detectado/.test(plain) && !canUsePty && !readySent) {
             console.warn(
@@ -6530,6 +6577,9 @@ async function main() {
         ? evaluateScenarioWithBlocker
             ? [
                   ...evaluateOutput(plain, sseSummary, exportSummary, liveScenario),
+                  ...(blocker.id === 'assistant-empty-after-user-input'
+                      ? [evaluateEmptyAfterUserInputRecoveryVisible(plain)]
+                      : []),
                   {
                       id: `blocked-by-${blocker.id}`,
                       pass: false,
