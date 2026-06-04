@@ -7541,6 +7541,21 @@
   - inspeção adicional: o plain log não contém `provedor BYOK`, `provider/modelo BYOK`,
     `/byok gateway catalog refresh|diff|integrity|sqlite|search` nem o bloco antigo
     `/byok auto [on|policy|doctor...]` na UX default.
+- [x] Terceira correção derivada da live:
+  - `/session sdk 6` ainda repetia seis linhas `Resumo` com 137 colunas;
+  - o preview default de resumo de sessão foi reduzido de 120 para 84 caracteres úteis;
+  - `test_commands_session.spec.js` passou a bloquear linhas `Resumo` maiores que 112 caracteres
+    na superfície default;
+  - live posterior:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-session-summary-compact-20260604 --timeout-ms 170000 --transport=pty`;
+  - artefato: `artifacts/terminal-live/2026-06-04T19-06-07-106Z/summary.md`;
+  - resultado: `PASS` em 28/28 critérios; `awk length>135` não encontrou linhas longas, e os
+    resumos de sessão ficaram em 101 colunas no plain log.
+- [x] Quarta correção derivada da auditoria do plain log:
+  - `/help full` ainda dizia `/session sdk commands  CommandDefinition[] registrados no SDK`;
+  - mesmo em modo completo, tipo TypeScript cru não ajuda o operador;
+  - a descrição virou `comandos registrados no SDK`;
+  - `test_commands_help.spec.js` bloqueia `CommandDefinition[]` no help humano.
 - [ ] Próxima lacuna visual:
   - auditar `/help full`, `/byok gateway commands`, `/byok gateway operator-ready` e `/byok auto`
     para confirmar que o modo detalhado é rico sem parecer lixo técnico;

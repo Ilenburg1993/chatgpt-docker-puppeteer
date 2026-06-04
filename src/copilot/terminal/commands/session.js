@@ -1762,7 +1762,7 @@ function renderSdkSessionSummaryPreview(summary) {
     if (typeof summary !== 'string') return '';
     const compact = summary.replace(/\s+/gu, ' ').trim();
     if (!compact) return '';
-    return compact.length > 120 ? `${compact.slice(0, 117)}...` : compact;
+    return compact.length > 84 ? `${compact.slice(0, 81)}...` : compact;
 }
 
 /**

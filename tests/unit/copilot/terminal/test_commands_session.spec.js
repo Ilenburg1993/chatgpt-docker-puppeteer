@@ -927,6 +927,8 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).not.toContain('/session sdk controla sessão SDK;');
         expect(ctx.output()).not.toContain('/session sdk next new |');
         expect(ctx.output()).toContain('...');
+        const summaryLine = ctx.output().split('\n').find((line) => line.includes('Resumo'));
+        expect(summaryLine?.length ?? 0).toBeLessThanOrEqual(112);
         expect(ctx.output()).not.toContain('2026-05-21T');
         expect(ctx.output()).not.toContain('last');
         expect(ctx.output()).not.toContain('foreground');

@@ -215,7 +215,7 @@ function renderFullHelp({ injectPort, println }) {
     ]);
     renderHelpSection(println, 'Sessão SDK persistente', [
         { command: '/session [sdk [n]]', description: 'cockpit da sessão SDK persistente' },
-        { command: '/session sdk commands', description: 'CommandDefinition[] registrados no SDK' },
+        { command: '/session sdk commands', description: 'comandos registrados no SDK' },
         { command: '/session sdk events [n]', description: 'lifecycle e comandos SDK pelo archive SSE canônico' },
         {
             command: '/session sdk waits [n]',
