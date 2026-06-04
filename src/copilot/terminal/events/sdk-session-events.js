@@ -112,6 +112,10 @@ import { drainMailboxToTurnIfIdle } from '../wiring/mailbox/index.js';
 import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
 import { printTerminalHumanQuestionCard } from './human-question-renderer.js';
 import {
+    buildTerminalModelTransitionPresentation,
+    renderTerminalModelTransitionRow,
+} from './model-transition-presenter.js';
+import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
     compactTerminalOperatorToolText,
@@ -1267,6 +1271,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const newModel = evt?.newModel ?? 'unknown';
         const reasoningEffort = evt?.reasoningEffort ?? null;
         const changed = previousModel !== newModel;
+        const presentation = buildTerminalModelTransitionPresentation({
+            from: previousModel,
+            to: newModel,
+            kind: changed ? 'confirmed' : 'unchanged',
+            reasoningEffort,
+            source: 'SDK',
+        });
         observeTerminalModelChangeProjection({ previousModel, newModel, reasoningEffort });
         void recordModelGatewaySdkSessionConfirmation(previousModel, newModel, reasoningEffort).catch((error) => {
             recordTerminalActivity('system', 'Falha ao registrar confirmação SDK no model-gateway', {
@@ -1276,19 +1287,22 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 recordHistory: false,
             });
         });
-        recordTerminalActivity('system', changed ? 'Modelo alterado' : 'Modelo confirmado', {
-            detail: `de ${previousModel} para ${newModel}${reasoningEffort ? ` · raciocínio ${reasoningEffort}` : ''}`,
+        recordTerminalActivity('system', changed ? 'Modelo SDK confirmado' : 'Modelo SDK reconfirmado', {
+            detail: presentation.detail,
             source: 'sdk',
             recordHistory: changed,
             updateCurrent: false,
         });
         if (changed || shouldPrintSessionNarration('verbose')) {
             println(
-                terminalThemeRow(
-                    'Modelo',
-                    `${previousModel} → ${newModel}${reasoningEffort ? ` · raciocínio ${reasoningEffort}` : ''}`,
-                    { role: 'info' },
-                ),
+                `\n${renderTerminalModelTransitionRow({
+                    from: previousModel,
+                    to: newModel,
+                    kind: changed ? 'confirmed' : 'unchanged',
+                    reasoningEffort,
+                    source: 'SDK',
+                    role: changed ? 'info' : 'muted',
+                })}`,
             );
         }
         broadcastSse(
@@ -1298,6 +1312,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                     previousModel,
                     newModel,
                     reasoningEffort,
+                    operatorSummary: presentation.detail,
                 },
                 'sdk/session.model_changed',
             ),

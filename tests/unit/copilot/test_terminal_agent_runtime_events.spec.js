@@ -1268,15 +1268,20 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'system',
             'Fallback de modelo aplicado',
             expect.objectContaining({
-                detail: 'gpt-5 → gpt-5-mini',
+                detail: expect.stringContaining('fallback aplicado: gpt-5 → gpt-5-mini · origem agente · 20'),
                 severity: 'warn',
                 source: 'agent',
             }),
         );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Fallback modelo'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('fallback aplicado: gpt-5 → gpt-5-mini'));
         expect(broadcastSse).toHaveBeenCalledWith(
             'pr.fallback_model',
-            expect.objectContaining({ from: 'gpt-5', to: 'gpt-5-mini' }),
+            expect.objectContaining({
+                from: 'gpt-5',
+                to: 'gpt-5-mini',
+                operatorSummary: expect.stringContaining('fallback aplicado: gpt-5 → gpt-5-mini'),
+            }),
         );
     });
 

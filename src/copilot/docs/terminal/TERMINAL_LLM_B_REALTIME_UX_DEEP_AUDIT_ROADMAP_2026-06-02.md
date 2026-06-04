@@ -8791,3 +8791,74 @@
   - [x] teste focado de `/tools`;
   - [x] `node --check`/lint escopado;
   - [ ] próxima live deve confirmar `/tools diag` sem `Classe ferramenta` repetido.
+
+### 12.93 Transições de modelo como narrativa operacional própria — 2026-06-04
+
+- [x] Achado:
+  - `session.model_changed` aparecia como linha genérica `Modelo`, sem distinguir confirmação do SDK,
+    troca real, reconfirmação redundante ou origem;
+  - `pr.fallback_model` dizia apenas `fallback aplicado: A -> B`, sem timestamp ISO completo nem
+    resumo operacional no SSE;
+  - `/byok model` e automação BYOK já falavam em solicitação/aguardo de confirmação, mas a confirmação
+    posterior do SDK usava outra linguagem.
+  - live control probe de `/model` mostrou outro ruído: `/model <id>` dizia `Modelo configurado`
+    mesmo antes da confirmação do SDK, enquanto o prompt já mostrava `[MODEL?]`.
+- [x] Decisão UX:
+  - transição de modelo é um evento de estado de alto valor e deve ter vocabulário canônico:
+    `confirmado`, `confirmado sem troca` e `fallback aplicado`;
+  - tela, `/activity` e SSE devem compartilhar o mesmo resumo curto;
+  - todo evento visível de transição deve carregar timestamp ISO 8601 completo;
+  - `session.model_changed` continua sendo confirmação observada, não promessa de que a solicitação
+    original foi aplicada com sucesso sem checar handoff/uso posterior.
+- [x] Implementação:
+  - criado `terminal/events/model-transition-presenter.js`;
+  - `session.model_changed` passou a renderizar `Modelo SDK` com resumo canônico e
+    `operatorSummary` no SSE;
+  - reconfirmação sem troca continua silenciosa por padrão e aparece apenas com sessão verbose;
+  - `pr.fallback_model` passou a renderizar `Fallback modelo` com origem, razão opcional e
+    `operatorSummary` no SSE;
+  - `/model <id>` passou a renderizar `Modelo solicitado`, usar seta única `→`, registrar a
+    solicitação em `/activity` e manter a confirmação como etapa separada;
+  - o live runner `--model-probe` passou a validar `Modelo solicitado` e `operatorSummary` canônico
+    em `session.model_changed`;
+  - contratos unitários foram atualizados para a linguagem humana atual de ferramenta aguardando
+    operador (`Ferramenta aguarda operador`, operação `write`).
+- [x] Validação:
+  - [x] `node --check` dos listeners e presenter;
+  - [x] testes focados de `sdk-session-events`, `agent-runtime-events` e `/model`;
+  - [x] lint escopado dos arquivos tocados e runner live;
+  - [x] live PTY control probe `--model-probe` confirmou `/model` como `Modelo solicitado`,
+    `/activity` com solicitações auditáveis e SSE raw com `operatorSummary` ISO completo;
+  - [x] evidência:
+    `artifacts/terminal-live/model-probe-20260604-model-transition-ux-rerun/summary.md` terminou
+    PASS com `model-change-sse-operator-summary`, `model-human-default-copy` e zero erros.
+- [ ] Lacuna seguinte:
+  - `/events` ainda resume `session.model_changed` como `Modelo alterado` mesmo quando o
+    `operatorSummary` diz `confirmado sem troca`; o resumo humano deve usar a semântica do payload.
+
+### 12.94 `/events` e avisos assíncronos de modelo sem ambiguidade visual — 2026-06-04
+
+- [x] Achado live:
+  - após `/model auto`, o SDK pode emitir `session.model_changed` com `auto -> auto`;
+  - `/events` resumia esse caso como `Modelo alterado`, apesar do SSE já carregar
+    `operatorSummary: confirmado sem troca`;
+  - em PTY real, uma confirmação `Modelo SDK` podia aparecer colada no prompt quando chegava no mesmo
+    instante em que o operador/runner digitava o próximo comando.
+- [x] Decisão UX:
+  - reconfirmação sem troca deve ser `Modelo confirmado`, não `Modelo alterado`;
+  - quando `operatorSummary` existir, ele é a fonte humana preferida do detalhe;
+  - avisos assíncronos de transição de modelo devem abrir sua própria linha antes do texto, para não
+    ocupar a entrada viva.
+- [x] Implementação:
+  - `/events` passa a usar `operatorSummary` em `session.model_changed`;
+  - `/events` escolhe `Modelo confirmado` quando o resumo diz `confirmado sem troca`;
+  - `session.model_changed` e `pr.fallback_model` visíveis são impressos com quebra inicial para não
+    grudar no prompt;
+  - live runner `--model-probe` ganhou critério `model-events-summary-semantic`.
+- [ ] Validação:
+  - [x] testes unitários focados de `/events`, `/model` e listeners de eventos;
+  - [x] live PTY `artifacts/terminal-live/model-probe-20260604-model-events-semantic/summary.md`
+    confirmou `Modelo SDK` em linha própria no plain log quando houve troca efetiva;
+  - [x] live PTY `artifacts/terminal-live/model-probe-20260604-model-async-line/summary.md`
+    confirmou `/events` com `Modelo confirmado` para no-op e critério
+    `model-events-summary-semantic` verde.

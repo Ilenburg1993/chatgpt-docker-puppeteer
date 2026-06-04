@@ -20,6 +20,8 @@ import {
     setTerminalModelProjection,
     setTerminalReasoningProjection,
 } from '../frontend/index.js';
+import { buildTerminalModelTransitionPresentation } from '../events/model-transition-presenter.js';
+import { recordTerminalActivity } from '../state/activity-state.js';
 import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -225,9 +227,22 @@ export async function cmdModel({ println }, arg) {
     } = callWithRuntimeTarget(setTerminalModelProjection, runtimeId, trimmed);
     const runtimeState = callWithRuntimeTarget(readTerminalRuntimeState, runtimeId);
     const observed = resolveObservedModelState(runtimeState);
+    const requestPresentation = buildTerminalModelTransitionPresentation({
+        from: previous,
+        to: trimmed,
+        kind: 'requested',
+        source: 'terminal',
+        reason: 'aguardando confirmação SDK ou próximo uso observado',
+    });
+    recordTerminalActivity('system', 'Modelo solicitado', {
+        detail: requestPresentation.detail,
+        source: 'terminal.model',
+        recordHistory: true,
+        updateCurrent: false,
+    });
 
     println('');
-    println(terminalThemeHeadline('assistant', 'Modelo configurado', [`${previous} -> ${trimmed}`]));
+    println(terminalThemeHeadline('assistant', 'Modelo solicitado', [requestPresentation.transition]));
     if (trimmed === 'auto') {
         println(
             terminalThemeRow('Auto', 'roteamento nativo do Copilot; gpt-5.4/high é preferência local observável, não parâmetro oficial forçado.'),
@@ -239,7 +254,7 @@ export async function cmdModel({ println }, arg) {
     }
     if (reasoningAdjusted) {
         println(
-            terminalThemeRow('Raciocínio', `${previousReasoningEffort} -> ${currentReasoningEffort} (modelo sem suporte explícito a controle de raciocínio).`, { role: 'warn' }),
+            terminalThemeRow('Raciocínio', `${previousReasoningEffort} → ${currentReasoningEffort} (modelo sem suporte explícito a controle de raciocínio).`, { role: 'warn' }),
         );
     }
     if (observed.observedModel && observed.observedModel !== trimmed) {

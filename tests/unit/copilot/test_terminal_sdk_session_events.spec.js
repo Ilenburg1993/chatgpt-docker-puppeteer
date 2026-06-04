@@ -357,14 +357,15 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         });
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Modelo alterado',
+            'Modelo SDK confirmado',
             expect.objectContaining({
-                detail: 'de auto para gpt-5.4 · raciocínio high',
+                detail: expect.stringContaining('confirmado: auto → gpt-5.4 · raciocínio high · origem SDK · 20'),
                 recordHistory: true,
                 updateCurrent: false,
             }),
         );
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('auto → gpt-5.4'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Modelo SDK'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('confirmado: auto → gpt-5.4'));
         expect(mocks.writeSdkSessionConfirmationRecords).toHaveBeenCalledWith([
             expect.objectContaining({
                 previousModel: 'auto',
@@ -383,7 +384,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         mocks.getShowSessionActivity.mockReturnValue(true);
         agent.emit('session.model_changed', { previousModel: 'gpt-5.4', newModel: 'gpt-5.4', reasoningEffort: 'high' });
 
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('gpt-5.4 → gpt-5.4'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('confirmado sem troca: gpt-5.4 (sem troca)'));
     });
 
     it('surfa workspace_file_changed e assistant.turn_start/end para a UX local', async () => {
@@ -553,13 +554,18 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'tool',
-            'Tool solicitou ação do usuário',
-            expect.objectContaining({ toolName: 'workspace.write', severity: 'warn' }),
+            'Ferramenta aguarda operador',
+            expect.objectContaining({
+                detail: 'escrevendo arquivo',
+                toolName: 'workspace.write',
+                severity: 'warn',
+                source: 'sdk',
+            }),
         );
         expect(mocks.recordTerminalTurnToolActivity).toHaveBeenCalledWith(
             expect.objectContaining({
                 toolName: 'workspace.write',
-                operation: 'run',
+                operation: 'write',
                 status: 'user_requested',
             }),
         );

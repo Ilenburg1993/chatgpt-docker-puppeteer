@@ -72,6 +72,10 @@ import { formatTerminalTimeLabel } from '../state/ui/index.js';
 import { printTerminalHumanQuestionCard } from './human-question-renderer.js';
 import { renderTerminalIntent } from './intent-renderer.js';
 import {
+    buildTerminalModelTransitionPresentation,
+    renderTerminalModelTransitionRow,
+} from './model-transition-presenter.js';
+import {
     compactTerminalDiagnosticId,
     compactTerminalToolText,
     getTerminalHumanToolName,
@@ -1192,14 +1196,33 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     const onPrFallbackModel = (/** @type {Record<string, unknown>} */ evt) => {
         const from = typeof evt?.['from'] === 'string' ? evt['from'] : '?';
         const to = typeof evt?.['to'] === 'string' ? evt['to'] : '?';
-        const detail = `${from} → ${to}`;
+        const reason = typeof evt?.['reason'] === 'string' ? evt['reason'] : null;
+        const presentation = buildTerminalModelTransitionPresentation({
+            from,
+            to,
+            kind: 'fallback',
+            reason,
+            source: 'agent',
+        });
         recordTerminalActivity('system', 'Fallback de modelo aplicado', {
-            detail,
+            detail: presentation.detail,
             source: 'agent',
             severity: 'warn',
         });
-        println(terminalThemeRow('Modelo', `fallback aplicado: ${detail}`, { role: 'warn' }));
-        broadcastSse(AGENT_PR_FALLBACK_MODEL_EVENT, withAgentSseEnvelope(evt, 'agent/pr.fallback_model'));
+        println(
+            `\n${renderTerminalModelTransitionRow({
+                from,
+                to,
+                kind: 'fallback',
+                reason,
+                source: 'agent',
+                role: 'warn',
+            })}`,
+        );
+        broadcastSse(
+            AGENT_PR_FALLBACK_MODEL_EVENT,
+            withAgentSseEnvelope({ ...evt, operatorSummary: presentation.detail }, 'agent/pr.fallback_model'),
+        );
     };
 
     const onDialogBootRecovery = (/** @type {Record<string, unknown>} */ evt) => {

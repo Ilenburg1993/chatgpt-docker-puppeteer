@@ -5448,22 +5448,38 @@ function evaluateModelProbeOutput(plain, sseSummary) {
         },
         {
             id: 'model-current-visible',
-            pass: /Modelo ativo:\s+auto/u.test(plain) && /autoridade GitHub Copilot/u.test(plain),
+            pass: /Modelo ativo\s+·\s+auto/u.test(plain) && /autoridade GitHub Copilot/u.test(plain),
             detail: '/model rendered the current native auto model policy in human language',
         },
         {
             id: 'model-auto-visible',
             pass:
-                /Modelo configurado:[\s\S]{0,220}auto/u.test(plain) &&
-                /Auto usa roteamento nativo do Copilot/u.test(plain),
+                /Modelo solicitado\s+·\s+auto \(sem troca\)/u.test(plain) &&
+                /Auto\s+roteamento nativo do Copilot/u.test(plain),
             detail: '/model auto rendered native routing guidance without BYOK/provider jargon',
         },
         {
             id: 'model-explicit-visible',
             pass:
-                /Modelo configurado:[\s\S]{0,260}gpt-4\.1-mini/u.test(plain) &&
-                /Raciocínio ajustado|raciocínio/u.test(plain),
+                /Modelo solicitado\s+·\s+auto → gpt-4\.1-mini/u.test(plain) &&
+                /Raciocínio\s+high → off/u.test(plain),
             detail: '/model <id> rendered a local model change and reasoning guidance',
+        },
+        {
+            id: 'model-change-sse-operator-summary',
+            pass:
+                /"event":"session\.model_changed"/u.test(plain) &&
+                /"operatorSummary":"confirmado sem troca: auto \(sem troca\) · origem SDK · \d{4}-\d{2}-\d{2}T/u.test(
+                    plain,
+                ),
+            detail: 'session.model_changed raw SSE carries the canonical operator summary with ISO timestamp',
+        },
+        {
+            id: 'model-events-summary-semantic',
+            pass:
+                /Modelo confirmado[\s\S]{0,220}confirmado sem troca: auto \(sem troca\)/u.test(plain) &&
+                !/Modelo alterado[\s\S]{0,220}modelo auto → auto/u.test(plain),
+            detail: '/events summarizes no-op model confirmations without calling them model changes',
         },
         {
             id: 'model-no-byok-blocker',

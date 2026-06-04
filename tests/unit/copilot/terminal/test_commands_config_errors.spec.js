@@ -200,8 +200,9 @@ describe('terminal commands config/errors com frontend canônico', () => {
         await cmdModel({ println: ctx.println }, 'gpt-4.1');
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('gpt-4.1');
+        expect(ctx.output()).toContain('Modelo solicitado');
         expect(ctx.output()).toContain('Raciocínio');
-        expect(ctx.output()).toContain('high -> off');
+        expect(ctx.output()).toContain('high → off');
         expect(ctx.output()).not.toContain('Reasoning ajustado');
         expect(ctx.output()).toContain('raciocínio não');
         expect(ctx.output()).toContain('Efetivo');

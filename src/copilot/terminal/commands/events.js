@@ -245,7 +245,11 @@ function humanEventLabel(event, payload = null) {
     if (event === 'terminal.started') return 'Terminal iniciado';
     if (event === 'dialog.loop.changed') return 'Conversa alterada';
     if (event === 'quota.warning') return 'Aviso de quota';
-    if (event === 'session.model_changed') return 'Modelo alterado';
+    if (event === 'session.model_changed') {
+        const summary = typeof payload?.['operatorSummary'] === 'string' ? payload['operatorSummary'] : '';
+        if (/confirmado sem troca/iu.test(summary)) return 'Modelo confirmado';
+        return 'Modelo alterado';
+    }
     if (event === 'session.skills_loaded') return 'Skills carregadas';
     if (event === 'session.info') {
         const infoType = typeof payload?.['infoType'] === 'string' ? payload['infoType'].trim().toLowerCase() : '';
@@ -567,6 +571,9 @@ function summarizePayload(payload, opts = {}) {
     const previousModel = payload['previousModel'];
     const newModel = payload['newModel'];
     if (typeof newModel === 'string' && newModel.trim().length > 0) {
+        if (typeof payload['operatorSummary'] === 'string' && payload['operatorSummary'].trim().length > 0) {
+            return compact(payload['operatorSummary'], 140);
+        }
         const previous = typeof previousModel === 'string' && previousModel.trim().length > 0 ? previousModel.trim() : 'modelo anterior n/d';
         const effort = typeof payload['reasoningEffort'] === 'string' && payload['reasoningEffort'].trim().length > 0
             ? ` · raciocínio ${payload['reasoningEffort'].trim()}`

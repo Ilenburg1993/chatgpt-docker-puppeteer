@@ -228,6 +228,52 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('session model changed');
     });
 
+    it('usa operatorSummary para reconfirmação de modelo sem chamar de alteração', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 1,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 5,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000003000,
+                    eventId: 4,
+                    event: 'session.model_changed',
+                    source: 'sdk/session.model_changed',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: {
+                        previousModel: 'auto',
+                        newModel: 'auto',
+                        operatorSummary: 'confirmado sem troca: auto (sem troca) · origem SDK · 2026-06-04T23:29:37.513Z',
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '5');
+
+        expect(ctx.output()).toContain('Modelo confirmado');
+        expect(ctx.output()).toContain('confirmado sem troca: auto (sem troca) · origem SDK · 2026-06-04T23:29:37.513Z');
+        expect(ctx.output()).not.toContain('Modelo alterado');
+        expect(ctx.output()).not.toContain('modelo auto → auto');
+    });
+
     it('humaniza perguntas, raciocínio e tarefas em segundo plano no resumo default', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: {
