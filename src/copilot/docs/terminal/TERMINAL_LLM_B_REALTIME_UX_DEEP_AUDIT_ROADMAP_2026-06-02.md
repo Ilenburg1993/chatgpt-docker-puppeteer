@@ -5391,7 +5391,23 @@
       ficou relativa.
 - [ ] Próxima validação escopada adicional, se houver nova edição: repetir `node --check`, ESLint e unit tests incluindo
       `sdk-session-events`.
-- [ ] Próxima lacuna UX: reduzir a linha viva de pergunta que ainda quebra em duas linhas em PTY
-      estreito (`LLM-B aguardando operador · responda no` / `prompt [PERG] · opções SIM · conversa ativa`).
+- [x] Lacuna UX seguinte tratada: a linha viva de pergunta quebrava em PTY estreito como
+      `LLM-B aguardando operador · responda no` / `prompt [PERG] · opções SIM · conversa ativa`.
+- [x] Decisão UX: o card da pergunta já explica a ação; a linha viva deve ser só um estado curto.
+- [x] Correção aplicada: pergunta pendente agora renderiza `LLM-B aguardando você · [PERG] · SIM`;
+      input estruturado genérico renderiza `LLM-B aguardando você · formulário · ...`, sem
+      `request_user_input`, sem `responda no prompt` e sem `conversa ativa`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/repl/live-status-line.js`;
+  - `npx eslint src/copilot/terminal/repl/live-status-line.js tests/unit/copilot/terminal/test_live_status_line.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js`.
+- [x] Live de confirmação:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-short-ask-live-line-20260604-2345`.
+- [x] Resultado: `Status: PASS`; fluxo canônico completo, 182 eventos SSE, zero erros, export ok.
+- [x] Evidência positiva: a linha viva de pergunta apareceu como uma linha única:
+      `LLM-B aguardando você · [PERG] · SIM`.
+- [x] Observação de log: `terminal.plain.log` concatena `SIM` ao frame ANSI em uma linha (`... SIMSIM`),
+      mas no PTY visual a linha reservada foi limpa ao enviar a resposta; não houve nova quebra de
+      linha nem disputa durável com o prompt.
 - [ ] Próxima lacuna UX: avaliar se `Exportado /workspaces/...` deve virar path relativo no modo
       humano, mantendo absoluto apenas em detalhes/raw.

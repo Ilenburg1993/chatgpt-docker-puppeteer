@@ -139,14 +139,16 @@ describe('terminal/live-status-line', () => {
         const line = formatTerminalLiveStatusLine();
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
-        expect(line).toContain('aguardando operador');
-        expect(line).toContain('request_user_input pendente');
-        expect(line).toContain('opções seguir|pausar');
+        expect(line).toContain('aguardando você');
+        expect(line).toContain('formulário');
+        expect(line).toContain('seguir|pausar');
         expect(line).not.toContain('Escolha como continuar');
+        expect(line).not.toContain('request_user_input');
         expect(line).not.toContain('opções=');
         expect(line).not.toContain('noloop');
         expect(line).not.toContain('loop');
         expect(line).not.toContain('read_file_content');
+        expect(line.length).toBeLessThan(58);
     });
 
     it('renderiza continuamente enquanto há operação ativa', async () => {
@@ -417,13 +419,15 @@ describe('terminal/live-status-line', () => {
 
         expect(shouldRenderTerminalLiveStatusLine()).toBe(true);
         const line = formatTerminalLiveStatusLine();
-        expect(line).toContain('aguardando operador');
-        expect(line).toContain('responda no prompt [PERG]');
-        expect(line).toContain('opções azul|verde');
+        expect(line).toContain('aguardando você');
+        expect(line).toContain('[PERG]');
+        expect(line).toContain('azul|verde');
         expect(line).not.toContain('Qual cor devo usar');
+        expect(line).not.toContain('responda no prompt');
+        expect(line).not.toContain('conversa ativa');
         expect(line).not.toContain('opções=');
         expect(line).not.toContain('modelo auto');
         expect(line).not.toContain('LLM-B trabalhando');
-        expect(line.length).toBeLessThan(100);
+        expect(line.length).toBeLessThan(55);
     });
 });

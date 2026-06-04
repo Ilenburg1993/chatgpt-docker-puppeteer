@@ -205,12 +205,12 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const modelEffort = renderLiveModelEffort(model, effort);
     if (hasHumanPendingQuestion(runtime)) {
         const choices = Array.isArray(runtime.pendingQuestion.choices) ? runtime.pendingQuestion.choices : [];
-        const choiceText = choices.length > 0 ? ` · opções ${compactLiveStatusText(choices.join('|'), 24)}` : '';
+        const choiceText = choices.length > 0 ? ` · ${compactLiveStatusText(choices.join('|'), 20)}` : '';
         const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila ${runtime.queueSize}` : '';
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText('question', 'aguardando operador')}` +
-            `${terminalThemeText('muted', ` · responda no prompt [PERG]${choiceText} · ${runtime.dialogLoopActive ? 'conversa ativa' : 'standby'}${queue}`)}` +
+            `${terminalThemeText('question', 'aguardando você')}` +
+            `${terminalThemeText('muted', ` · [PERG]${choiceText}${queue}`)}` +
             '\x1b[K'
         );
     }
@@ -218,12 +218,12 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const structuredInput = structuredInputs.at(0) ?? null;
     if (structuredInput) {
         const choices = Array.isArray(structuredInput.choices) ? structuredInput.choices : [];
-        const choiceText = choices.length > 0 ? ` · opções ${compactLiveStatusText(choices.join('|'), 24)}` : '';
+        const choiceText = choices.length > 0 ? ` · ${compactLiveStatusText(choices.join('|'), 20)}` : '';
         const queue = structuredInputs.length > 1 ? ` · fila ${structuredInputs.length}` : '';
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText('question', 'aguardando operador')}` +
-            `${terminalThemeText('muted', ` · request_user_input pendente${choiceText}${queue}`)}` +
+            `${terminalThemeText('question', 'aguardando você')}` +
+            `${terminalThemeText('muted', ` · formulário${choiceText}${queue}`)}` +
             '\x1b[K'
         );
     }
