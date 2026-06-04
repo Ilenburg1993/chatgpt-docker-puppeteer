@@ -35,11 +35,18 @@ function command(value) {
  * @returns {void}
  */
 function renderHelpSection(println, title, rows) {
+    const commandWidth = 48;
+    const descriptionIndent = '  ' + ' '.repeat(commandWidth);
     println('');
     println(terminalThemeHeadline('assistant', title, [`${rows.length} comando(s)`]));
     for (const row of rows) {
+        if (row.command.length > commandWidth) {
+            println(`  ${terminalThemeText('command', row.command)}`);
+            println(`${descriptionIndent} ${terminalThemeText('muted', row.description)}`);
+            continue;
+        }
         println(
-            `  ${terminalThemeText('command', row.command.padEnd(48))} ${terminalThemeText('muted', row.description)}`,
+            `  ${terminalThemeText('command', row.command.padEnd(commandWidth))} ${terminalThemeText('muted', row.description)}`,
         );
     }
 }
@@ -187,6 +194,19 @@ function renderFullHelp({ injectPort, println }) {
             description: 'índice local FTS, símbolos, imports e poda',
         },
         { command: '/search <termo>', description: 'busca textual rápida no workspace' },
+    ]);
+    renderHelpSection(println, 'Previews e libs auxiliares', [
+        { command: '/terminal libs detail', description: 'mostra disponibilidade, política, riscos, fallbacks e exemplos' },
+        { command: '/fs preview <path>', description: 'preview read-only com bat/batcat quando disponível; fallback JS' },
+        { command: '/fs preview <path> --plain', description: 'força fallback textual JS, útil para comparar renderers' },
+        { command: '/fs preview <path> --markdown', description: 'render Markdown com glow quando disponível; sem pager automático' },
+        { command: '/fs preview <path> --json [--query .x]', description: 'pretty/query JSON com jq quando disponível; parser JS é canônico' },
+        { command: '/fs preview <path> --yaml [--query .x]', description: 'pretty/query YAML com yq seguro quando disponível; fallback js-yaml' },
+        { command: '/git diff [--staged] [--plain]', description: 'diff com delta quando disponível; diff bruto continua canônico' },
+        { command: '/gh pr diff <n> [--plain]', description: 'preview de patch de PR com o mesmo contrato de diff' },
+        { command: '/menu picker', description: 'mostra plano seguro; não abre TUI sem ação explícita' },
+        { command: '/menu picker --interactive', description: 'abre fzf/gum somente com TTY exclusivo e sem pergunta pendente' },
+        { command: 'atuin/zoxide', description: 'detectados apenas; adiados por histórico/cwd pessoal e estado fora do produto' },
     ]);
     renderHelpSection(println, 'Interações humanas e SDK', [
         {

@@ -6909,3 +6909,46 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-sdk-workspace-no-raw-json-pass-20260604 --timeout-ms 120000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T08-57-38-850Z/summary.md`.
   - Resultado: PASS em 19/19 critérios; os dois painéis default ficaram sem JSON bruto.
+
+### 12.57 Guia de decisão das libs auxiliares e próxima UX de inspeção
+
+- [x] Retomada após commits/push anteriores:
+  - worktree revisado; apenas `.codex/config.toml` permanece modificado fora do escopo desta tarefa;
+  - `src/copilot/terminal/capabilities` já contém registry, previews, structured preview, picker plan e picker runner;
+  - `/terminal libs`, `/libs`, `/fs preview`, `/git diff`, `/gh pr diff` e `/menu picker` já exercem a arquitetura opcional.
+- [x] Investigação oficial refeita em 2026-06-04 antes de novas integrações:
+  - `gum`: docs oficiais confirmam comandos interativos (`choose`, `confirm`, `file`, `filter`, `input`, `write`, `pager`) e comandos de formatação; decisão segue `accepted_guarded`;
+  - `fzf`: docs/manpage confirmam seleção por stdout e preview por comando shell; decisão segue aceitar seleção e bloquear `fzf --preview` até adapter tokenizado;
+  - `bat`: docs oficiais confirmam `--paging=never`, `batcat` como realidade de distro e uso típico de preview; decisão segue preview read-only;
+  - `glow`: docs oficiais confirmam CLI/stdin, largura e pager; decisão segue Markdown explícito sem pager automático;
+  - `delta`: docs oficiais confirmam diff por stdin/pager Git; decisão segue diff explícito sem substituir diff bruto canônico;
+  - `jq`/`yq`: docs oficiais confirmam filtros por stdin e risco de quoting/ops avançadas; decisão segue diagnóstico/preview, não fonte canônica;
+  - `atuin`: docs oficiais atuais incluem hooks para agentes e AI própria; decisão segue adiar integração ativa para evitar paralelismo de histórico/permissões;
+  - `zoxide`: docs oficiais confirmam shell hooks, ranking pessoal e `zi` com `fzf`; decisão segue adiar para preservar cwd/escopo canônico.
+- [x] Novo guia criado:
+  - `src/copilot/docs/terminal/TERMINAL_AUXILIARY_LIBS_DECISION_GUIDE_2026-06-04.md`.
+- [x] Decisão consolidada:
+  - nenhuma lib vira dependência obrigatória;
+  - nenhuma lib é instalada ou chamada automaticamente;
+  - TUI externa exige ação explícita, TTY exclusivo, ausência de pergunta humana pendente, ausência de input digitado e restauração limpa de prompt;
+  - `atuin` e `zoxide` seguem detectáveis, mas adiados;
+  - `fzf --preview` segue bloqueado até existir preview tokenizado sem shell livre.
+- [x] Transformação aplicada: `/terminal libs detail` passou a renderizar `Política` e `Exemplo n`
+      a partir do registry central de capabilities, sem criar segunda fonte no comando.
+- [x] Transformação aplicada: `/help full` ganhou seção `Previews e libs auxiliares` com comandos
+      canônicos para `bat`/`batcat`, `glow`, `delta`, `jq`, `yq`, picker e a decisão adiada de
+      `atuin/zoxide`.
+- [x] Validação focada inicial:
+  - `node --check src/copilot/terminal/capabilities/external-tools.js && node --check src/copilot/terminal/commands/terminal.js && node --check tests/unit/copilot/terminal/test_commands_terminal.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_terminal.spec.js tests/unit/copilot/terminal/test_external_tool_capabilities.spec.js --hookTimeout=30000`.
+- [x] Validação focada final:
+  - `node --check src/copilot/terminal/commands/help.js && node --check tests/unit/copilot/terminal/test_commands_help.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_help.spec.js --hookTimeout=30000`;
+  - `npx eslint src/copilot/terminal/commands/help.js tests/unit/copilot/terminal/test_commands_help.spec.js`;
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Live UX curta:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-help-detail-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T15-52-52-818Z/summary.md`;
+  - resultado: PASS em 20/20 critérios, incluindo `ux-cycle-terminal-libs-detail`.
+- [ ] Próxima lacuna: avaliar docs de pipe seguro para `jq`/`yq` e smoke não interativo de previews com `PATH` vazio/real.

@@ -27,6 +27,8 @@ import { spawnSync } from 'node:child_process';
  *     fallback: string;
  *     risk: string;
  *     officialDocs: string;
+ *     executionPolicy: string;
+ *     exampleCommands: readonly string[];
  * }} TerminalExternalToolDefinition
  */
 
@@ -45,6 +47,8 @@ import { spawnSync } from 'node:child_process';
  *     fallback: string;
  *     risk: string;
  *     officialDocs: string;
+ *     executionPolicy: string;
+ *     exampleCommands: readonly string[];
  * }} TerminalExternalToolCapability
  */
 
@@ -61,6 +65,8 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         fallback: 'menus textuais e chips atuais do terminal',
         risk: 'pode tomar o TTY e competir com prompt vivo se usado automaticamente',
         officialDocs: 'https://github.com/charmbracelet/gum',
+        executionPolicy: 'somente com comando explícito, TTY exclusivo e fallback textual',
+        exampleCommands: Object.freeze(['/menu picker --interactive']),
     }),
     Object.freeze({
         id: 'fzf',
@@ -73,6 +79,8 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         fallback: 'listas numeradas e comandos atuais',
         risk: 'TUI interativa deve ser bloqueada durante streaming ou pergunta humana pendente',
         officialDocs: 'https://junegunn.github.io/fzf/',
+        executionPolicy: 'seleção explícita; preview embutido bloqueado até adapter sem shell livre',
+        exampleCommands: Object.freeze(['/menu picker --interactive']),
     }),
     Object.freeze({
         id: 'bat',
@@ -85,6 +93,8 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         fallback: 'preview textual JS com truncamento seguro',
         risk: 'arquivos grandes/binários precisam de limite e detecção antes de renderizar',
         officialDocs: 'https://github.com/sharkdp/bat',
+        executionPolicy: 'preview read-only explícito; nunca pager automático',
+        exampleCommands: Object.freeze(['/fs preview src/copilot/terminal/commands/terminal.js', '/fs read README.md --preview --plain']),
     }),
     Object.freeze({
         id: 'glow',
@@ -97,6 +107,8 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         fallback: 'Markdown em texto plano com seções compactas',
         risk: 'modo TUI/pager deve ser opt-in para não ocupar o prompt vivo',
         officialDocs: 'https://github.com/charmbracelet/glow',
+        executionPolicy: 'Markdown explícito por stdin; sem pager/TUI automática',
+        exampleCommands: Object.freeze(['/fs preview README.md --markdown', '/fs read src/copilot/docs/terminal/TERMINAL_AUXILIARY_LIBS_DECISION_GUIDE_2026-06-04.md --preview --markdown --plain']),
     }),
     Object.freeze({
         id: 'delta',
@@ -109,6 +121,8 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         fallback: 'diff bruto atual e resumo humano',
         risk: 'ANSI e paginação devem ficar fora de logs default',
         officialDocs: 'https://dandavison.github.io/delta/',
+        executionPolicy: 'diff explícito por stdin; diff bruto permanece canônico',
+        exampleCommands: Object.freeze(['/git diff --plain', '/gh pr diff 123 --plain']),
     }),
     Object.freeze({
         id: 'atuin',
@@ -121,6 +135,8 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         fallback: 'histórico próprio do terminal e ConversationHub',
         risk: 'altera histórico de shell, pode envolver sync e estado sensível do operador',
         officialDocs: 'https://docs.atuin.sh/',
+        executionPolicy: 'adiado; não ler histórico externo, não instalar hooks e não sincronizar',
+        exampleCommands: Object.freeze(['/terminal libs detail']),
     }),
     Object.freeze({
         id: 'zoxide',
@@ -133,6 +149,8 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         fallback: 'workspace fixo e comandos explícitos do terminal',
         risk: 'depende de hooks de shell e pode conflitar com escopo/cwd controlado',
         officialDocs: 'https://github.com/ajeetdsouza/zoxide',
+        executionPolicy: 'adiado; não alterar cwd canônico nem consultar ranking pessoal por default',
+        exampleCommands: Object.freeze(['/terminal libs detail']),
     }),
     Object.freeze({
         id: 'jq',
@@ -145,6 +163,8 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         fallback: 'JSON.stringify e parsers JS canônicos',
         risk: 'não deve virar fonte canônica paralela aos contratos JS',
         officialDocs: 'https://jqlang.org/',
+        executionPolicy: 'diagnóstico por stdin; parser JS continua fonte canônica',
+        exampleCommands: Object.freeze(['/fs preview package.json --json', "/fs preview package.json --json --query '.scripts'"]),
     }),
     Object.freeze({
         id: 'yq',
@@ -157,6 +177,8 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         fallback: 'parsers JS/Node canônicos por formato',
         risk: 'edição mutável exige preview e confirmação explícitos',
         officialDocs: 'https://github.com/mikefarah/yq',
+        executionPolicy: 'preview/query por stdin com env/file ops bloqueadas; sem edição in-place automática',
+        exampleCommands: Object.freeze(['/fs preview .github/workflows/ci.yml --yaml', "/fs preview .github/workflows/ci.yml --yaml --query '.jobs'"]),
     }),
 ]);
 

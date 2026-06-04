@@ -24,6 +24,8 @@ const capabilityMocks = vi.hoisted(() => ({
                 fallback: 'listas numeradas',
                 risk: 'TUI interativa',
                 officialDocs: 'https://junegunn.github.io/fzf/',
+                executionPolicy: 'seleção explícita',
+                exampleCommands: ['/menu picker --interactive'],
             },
             {
                 id: 'gum',
@@ -39,6 +41,8 @@ const capabilityMocks = vi.hoisted(() => ({
                 fallback: 'menus textuais',
                 risk: 'pode tomar o TTY',
                 officialDocs: 'https://github.com/charmbracelet/gum',
+                executionPolicy: 'somente com TTY exclusivo',
+                exampleCommands: ['/menu picker --interactive'],
             },
             {
                 id: 'atuin',
@@ -54,6 +58,8 @@ const capabilityMocks = vi.hoisted(() => ({
                 fallback: 'ConversationHub',
                 risk: 'histórico sensível',
                 officialDocs: 'https://docs.atuin.sh/',
+                executionPolicy: 'adiado; não ler histórico externo',
+                exampleCommands: ['/terminal libs detail'],
             },
         ],
     })),
@@ -96,7 +102,12 @@ describe('terminal/commands/terminal', () => {
         expect(ctx.output()).toContain('/usr/bin/fzf');
         expect(ctx.output()).toContain('https://junegunn.github.io/fzf/');
         expect(ctx.output()).toContain('TUI interativa');
+        expect(ctx.output()).toContain('Política');
+        expect(ctx.output()).toContain('seleção explícita');
+        expect(ctx.output()).toContain('Exemplo 1');
+        expect(ctx.output()).toContain('/menu picker --interactive');
         expect(ctx.output()).toContain('ConversationHub');
+        expect(ctx.output()).toContain('adiado; não ler histórico externo');
     });
 
     it('emite JSON estruturado para LLMs e scripts', () => {

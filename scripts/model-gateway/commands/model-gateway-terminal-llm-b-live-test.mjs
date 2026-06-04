@@ -2435,6 +2435,7 @@ function defaultUxCycleCriteria(boot) {
     const plain = String(boot?.plain ?? '');
     const helpStart = plain.indexOf('Ajuda rápida');
     const helpFullStart = plain.indexOf('Terminal LLM-B - Ajuda completa');
+    const terminalLibsDetailStart = plain.indexOf('Libs auxiliares do terminal', Math.max(0, helpFullStart));
     const statusStart = plain.indexOf('Status do Terminal LLM-B');
     const nowPanelStart = plain.indexOf('\n  Agora');
     const nowStart = nowPanelStart >= 0 ? nowPanelStart + 1 : plain.indexOf('[agora]');
@@ -2453,6 +2454,7 @@ function defaultUxCycleCriteria(boot) {
     const surfaceStarts = [
         helpStart,
         helpFullStart,
+        terminalLibsDetailStart,
         statusStart,
         nowStart,
         healthStart,
@@ -2475,6 +2477,7 @@ function defaultUxCycleCriteria(boot) {
     const defaultSurface = surfaceStarts.map((index) => surfaceAt(index)).join('\n');
     const helpSurface = surfaceAt(helpStart);
     const helpFullSurface = surfaceAt(helpFullStart);
+    const terminalLibsDetailSurface = surfaceAt(terminalLibsDetailStart);
     const statusSurface = surfaceAt(statusStart);
     const healthSurface = surfaceAt(healthStart);
     const toolsSurface = surfaceAt(toolsStart);
@@ -2491,6 +2494,7 @@ function defaultUxCycleCriteria(boot) {
     const orderedSurfaceStarts = [
         helpStart,
         helpFullStart,
+        terminalLibsDetailStart,
         statusStart,
         nowStart,
         healthStart,
@@ -2527,10 +2531,25 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-help-full-structured',
             pass:
-                /Terminal LLM-B - Ajuda completa[\s\S]*Sessão e observação[\s\S]*Interações humanas e SDK[\s\S]*HTTP local/iu.test(
+                /Terminal LLM-B - Ajuda completa[\s\S]*Sessão e observação[\s\S]*Previews e libs auxiliares[\s\S]*Interações humanas e SDK[\s\S]*HTTP local/iu.test(
                     helpFullSurface,
-                ) && !/╔|╚|\x1b\[/u.test(helpFullSurface),
+                ) &&
+                /\/fs preview <path> --markdown[\s\S]*\/menu picker --interactive[\s\S]*atuin\/zoxide/iu.test(
+                    helpFullSurface,
+                ) &&
+                !/╔|╚|\x1b\[/u.test(helpFullSurface),
             detail: '/help full rendered a structured catalog without the legacy ANSI box',
+        },
+        {
+            id: 'ux-cycle-terminal-libs-detail',
+            pass:
+                /Libs auxiliares do terminal[\s\S]*detail[\s\S]*Política[\s\S]*Exemplo 1/iu.test(
+                    terminalLibsDetailSurface,
+                ) &&
+                /atuin|zoxide/iu.test(terminalLibsDetailSurface) &&
+                /adiado|adiada/iu.test(terminalLibsDetailSurface) &&
+                !/\bRetorno\b|\{\s*"tools"|\[OK\]|\[ERR\]/u.test(terminalLibsDetailSurface),
+            detail: '/terminal libs detail explained policy, examples and deferred tools without raw JSON',
         },
         {
             id: 'ux-cycle-boot-human-copy',
@@ -2663,6 +2682,7 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
         commands: [
             { line: '/help', waitFor: 'Ajuda rápida', advanceAfterMs: 1_500 },
             { line: '/help full', waitFor: 'Terminal LLM-B - Ajuda completa', advanceAfterMs: 5_000 },
+            { line: '/terminal libs detail', waitFor: 'Libs auxiliares do terminal', advanceAfterMs: 2_000 },
             { line: '/status', waitFor: 'Status do Terminal LLM-B', advanceAfterMs: 1_500 },
             { line: '/now', waitFor: '\n  Agora', advanceAfterMs: 1_500 },
             { line: '/health', waitFor: 'Saúde do Terminal LLM-B', advanceAfterMs: 1_500 },

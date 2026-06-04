@@ -146,6 +146,7 @@ function printTerminalLibsDetail(println, refresh) {
             println,
             [
                 ['Uso', tool.recommendedFor],
+                ['Política', tool.executionPolicy],
                 ['Fallback', tool.fallback],
                 ['Risco', tool.risk],
                 ['Comando', tool.command ?? 'não encontrado'],
@@ -155,6 +156,13 @@ function printTerminalLibsDetail(println, refresh) {
             ],
             { width: 12 },
         );
+        if (tool.exampleCommands.length > 0) {
+            printRows(
+                println,
+                tool.exampleCommands.map((command, index) => [`Exemplo ${index + 1}`, command]),
+                { width: 12 },
+            );
+        }
     }
     println('');
 }

@@ -39,6 +39,12 @@ describe('terminal/commands/help', () => {
         expect(ctx.output()).toContain('/session sdk commands');
         expect(ctx.output()).toContain('POST /inject');
         expect(ctx.output()).toContain('Sessão e observação');
+        expect(ctx.output()).toContain('Previews e libs auxiliares');
+        expect(ctx.output()).toContain('/terminal libs detail');
+        expect(ctx.output()).toContain('/fs preview <path> --markdown');
+        expect(ctx.output()).toContain('/fs preview <path> --json [--query .x]');
+        expect(ctx.output()).toContain('/menu picker --interactive');
+        expect(ctx.output()).toContain('atuin/zoxide');
         expect(ctx.output()).not.toContain('╚');
         expect(ctx.output()).not.toContain('\x1b[33m/status');
     });
