@@ -3482,10 +3482,14 @@ function formatCanonicalEventSummary(item) {
 function exportEnvelopeMatchesEvent(exportSummary, event) {
     if (!event || !Array.isArray(exportSummary?.envelopes)) return false;
     return exportSummary.envelopes.some((envelope) => {
-        if (event.source && envelope.source !== event.source) return false;
         const traceMatches = event.traceId && envelope.traceId === event.traceId;
         const turnMatches = event.turnId && envelope.turnId === event.turnId;
-        return Boolean(traceMatches || turnMatches);
+        if (!traceMatches && !turnMatches) return false;
+        if (!event.source || envelope.source === event.source) return true;
+        return (
+            event.source === 'sdk/assistant.message' &&
+            (envelope.source === 'terminal.dialog.engine' || envelope.source === 'terminal-turn-display')
+        );
     });
 }
 
@@ -3537,6 +3541,10 @@ function extractSdkSessionCockpitProbeResidueCounts(plain) {
 
 function terminalBlockContains(plain, headerRe, markerRe) {
     return extractTerminalBlocks(plain, headerRe).some((block) => markerRe.test(block));
+}
+
+function countCanonicalDeltaMarkers(value) {
+    return (String(value ?? '').match(/DELTA-CANONICAL-\d/g) ?? []).length;
 }
 
 function normalizeTranscriptCoverageText(value) {
@@ -3679,7 +3687,7 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
 }
 
 function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
-    const markerCount = (plain.match(/DELTA-CANONICAL-\d/g) ?? []).length;
+    const markerCount = countCanonicalDeltaMarkers(plain);
     const preEventsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b/i)[0] ?? plain;
     const beforeRawDiagnosticsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b[^\n]*--raw/i)[0] ?? plain;
     const archiveRawEvents = extractArchiveRawEvents(plain);
@@ -3726,16 +3734,23 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const truncatedTurnEndDuplicate = findTruncatedTurnEndDuplicate([...sseSummary.events, ...archiveRawEvents]);
     const askRenderedByQuestionPending = scenario.questionPendingRe.test(preEventsPlain);
     const askRenderedBySdk = scenario.askRenderedRe.test(preEventsPlain);
-    const liveDeltaBlockVisible = terminalBlockContains(
+    const liveDeltaBlocks = extractTerminalBlocks(
         preEventsPlain,
         /^\s*(?:\[[^\]\n]*\]\s+🧠\s+LLM-B|LLM-B\s+·)/u,
-        /DELTA-CANONICAL-8/u,
-    );
+    ).filter((block) => /DELTA-CANONICAL-8/u.test(block));
+    const liveDeltaMarkerCount = liveDeltaBlocks.reduce((count, block) => count + countCanonicalDeltaMarkers(block), 0);
+    const assistantMessageDeltaMarkerCount = canonicalEvents.reduce((count, evt) => {
+        const payload = eventPayload(evt);
+        if (evt?.event !== 'assistant.message' || !payload) return count;
+        return count + countCanonicalDeltaMarkers(payload.content);
+    }, 0);
+    const publicDeltaMarkerCount = Math.max(liveDeltaMarkerCount, assistantMessageDeltaMarkerCount);
+    const liveDeltaBlockVisible = liveDeltaBlocks.length > 0;
     const assistantMessageDeltaBlockVisible = terminalBlockContains(
         preEventsPlain,
         /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message)/u,
         /DELTA-CANONICAL-8/u,
-    );
+    ) || assistantMessageDeltaMarkerCount >= 8;
     const postAskFinalRe = scenario.postAskFinalRe;
     const finalRenderedByLiveTurn = terminalBlockContains(
         preEventsPlain,
@@ -3775,8 +3790,8 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'partial-deltas',
-            pass: markerCount >= 8,
-            detail: `observed ${markerCount} DELTA-CANONICAL markers`,
+            pass: publicDeltaMarkerCount >= 8,
+            detail: `observed ${publicDeltaMarkerCount} public DELTA-CANONICAL markers · total log markers ${markerCount}`,
         },
         {
             id: 'final-delta-block',

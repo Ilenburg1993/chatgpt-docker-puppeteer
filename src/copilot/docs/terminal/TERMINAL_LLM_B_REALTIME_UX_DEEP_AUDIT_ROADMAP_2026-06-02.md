@@ -5302,6 +5302,16 @@
       `LLM-B finalizando · <idade>`.
 - [x] Teste unitário: `test_live_status_line.spec.js` cobre a ausência de `Turno do assistente`,
       `concluí` e `conversa ativa` no pulso de finalização.
-- [ ] Próxima investigação: separar falha real do modelo versus lacuna do harness no critério
-      `final-delta-block`; o live deve exigir materialização pública de deltas sem contar marcadores
-      presentes apenas no prompt inicial.
+- [x] Investigação do runner: `partial-deltas` contava `DELTA-CANONICAL-*` no log inteiro, incluindo
+      o prompt inicial do cenário; isso tornava o summary confuso quando os deltas não eram
+      materializados publicamente.
+- [x] Correção do harness: `partial-deltas` agora conta apenas marcadores públicos em bloco visível
+      da LLM-B ou `assistant.message`; o detalhe mostra `public ... · total log markers ...`.
+- [x] Correção de correlação export/SSE: `exportEnvelopeMatchesEvent` aceita mesmo trace/turn para
+      `sdk/assistant.message` materializado no export via `terminal.dialog.engine` ou
+      `terminal-turn-display`, preservando o contrato sem exigir duplicação de source visual.
+- [x] Validação escopada do runner passou:
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [ ] Próxima live: repetir cenário canônico para confirmar summary mais honesto e a linha
+      `LLM-B finalizando · <idade>` no PTY.
