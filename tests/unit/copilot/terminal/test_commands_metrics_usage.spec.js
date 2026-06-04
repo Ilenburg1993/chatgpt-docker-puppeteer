@@ -373,9 +373,9 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('SDK interativo');
         expect(ctx.output()).not.toContain('interactive');
         expect(ctx.output()).toContain('gpt-5-mini');
-        expect(ctx.output()).toMatch(/Telemetria PR|Quota Copilot/);
+        expect(ctx.output()).toMatch(/Telemetria PR|Histórico Copilot/);
         expect(ctx.output()).not.toContain('side-channel');
-        expect(ctx.output()).toMatch(/não implica consumo neste boot\/sonda|não é cobrança BYOK/);
+        expect(ctx.output()).toMatch(/não implica consumo neste boot\/sonda|BYOK atual separado/);
         expect(ctx.output()).not.toContain('Premium Request');
         expect(ctx.output()).not.toContain('\x1b[');
     });

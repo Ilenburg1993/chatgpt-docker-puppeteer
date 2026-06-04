@@ -95,15 +95,15 @@ export function cmdUsage({ println }, arg) {
             if (byokActive) {
                 println(
                     terminalThemeRow(
-                        'Quota Copilot',
-                        `${modelLabel} · custo ${cost} · histórica; não é cobrança BYOK`,
+                        'BYOK ativo',
+                        `provedor ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
+                        { role: 'success' },
                     ),
                 );
                 println(
                     terminalThemeRow(
-                        'BYOK ativo',
-                        `provedor ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
-                        { role: 'success' },
+                        'Histórico Copilot',
+                        `${renderHistoricalCopilotSnapshotLabel(modelBilling)} · custo ${cost} · anterior/lateral; BYOK atual separado`,
                     ),
                 );
             } else {
@@ -115,7 +115,6 @@ export function cmdUsage({ println }, arg) {
                 );
             }
         } else if (byokActive) {
-            println(terminalThemeRow('Quota Copilot', 'sem snapshot histórico classificado'));
             println(
                 terminalThemeRow(
                     'BYOK ativo',
@@ -123,6 +122,7 @@ export function cmdUsage({ println }, arg) {
                     { role: 'success' },
                 ),
             );
+            println(terminalThemeRow('Histórico Copilot', 'sem snapshot histórico classificado'));
         } else {
             println(terminalThemeRow('Pedido premium', 'sem snapshot histórico classificado'));
         }
@@ -209,6 +209,29 @@ export function cmdUsage({ println }, arg) {
     println(terminalThemeRow('Telemetria', `pós-turno ${status}`, { role: next ? 'success' : 'error' }));
     println(terminalThemeRows('Uso', ['/usage [on|off|now] [detail]'], { role: 'command' }));
     println('');
+}
+
+/**
+ * @param {{
+ *     mismatch?: boolean;
+ *     configuredModel?: string | null;
+ *     observedModel?: string | null;
+ *     billedModel?: string | null;
+ *     displayModel?: string | null;
+ * }} modelBilling
+ * @returns {string}
+ */
+function renderHistoricalCopilotSnapshotLabel(modelBilling) {
+    if (modelBilling.mismatch) {
+        return [
+            `configurado ${modelBilling.configuredModel ?? '-'}`,
+            modelBilling.observedModel ? `observado ${modelBilling.observedModel}` : null,
+            `cobrado ${modelBilling.billedModel ?? modelBilling.observedModel ?? '-'}`,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+    }
+    return `último snapshot ${modelBilling.observedModel ?? modelBilling.displayModel ?? '-'}`;
 }
 
 /**

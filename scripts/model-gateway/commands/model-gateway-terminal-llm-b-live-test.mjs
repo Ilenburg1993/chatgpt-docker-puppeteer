@@ -371,8 +371,8 @@ function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]
 function buildMissingRequiredAskRecoveryPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     return [
         'Continue o teste canônico exatamente de onde parou.',
-        'Você já produziu as linhas DELTA-CANONICAL públicas, mas ainda não chamou a ferramenta real ask_user obrigatória.',
-        'Não repita report_intent, read_file_content, exec_command nem as linhas DELTA-CANONICAL.',
+        'Você já produziu as oito linhas públicas de delta, mas ainda não chamou a ferramenta real ask_user obrigatória.',
+        'Não repita report_intent, read_file_content, exec_command nem as linhas de delta.',
         scenario.askToolInstruction,
         scenario.finalInstruction,
         `Antes da resposta humana final, não escreva, cite nem antecipe o marcador ${scenario.finalMarker}.`,
@@ -2450,6 +2450,14 @@ function defaultUxCycleCriteria(boot) {
     const statusStart = plain.indexOf('Status do Terminal LLM-B');
     const nowPanelStart = plain.indexOf('\n  Agora');
     const nowStart = nowPanelStart >= 0 ? nowPanelStart + 1 : plain.indexOf('[agora]');
+    const usageStart = [
+        plain.indexOf('Janela de contexto', Math.max(0, nowStart)),
+        plain.indexOf('Atenção       dados da janela de contexto', Math.max(0, nowStart)),
+        plain.indexOf('BYOK ativo', Math.max(0, nowStart)),
+        plain.indexOf('Pedido premium', Math.max(0, nowStart)),
+    ]
+        .filter((index) => index >= 0)
+        .sort((a, b) => a - b)[0] ?? -1;
     const healthStart = plain.indexOf('Saúde do Terminal LLM-B');
     const toolsStart = (() => {
         const populated = plain.indexOf('Ferramentas observadas');
@@ -2468,6 +2476,7 @@ function defaultUxCycleCriteria(boot) {
         terminalLibsDetailStart,
         statusStart,
         nowStart,
+        usageStart,
         healthStart,
         toolsStart,
         sdkStart,
@@ -2490,6 +2499,7 @@ function defaultUxCycleCriteria(boot) {
     const helpFullSurface = surfaceAt(helpFullStart);
     const terminalLibsDetailSurface = surfaceAt(terminalLibsDetailStart);
     const statusSurface = surfaceAt(statusStart);
+    const usageSurface = surfaceAt(usageStart);
     const healthSurface = surfaceAt(healthStart);
     const toolsSurface = surfaceAt(toolsStart);
     const sdkSurface = surfaceAt(sdkStart);
@@ -2508,6 +2518,7 @@ function defaultUxCycleCriteria(boot) {
         terminalLibsDetailStart,
         statusStart,
         nowStart,
+        usageStart,
         healthStart,
         toolsStart,
         sdkStart,
@@ -2602,6 +2613,19 @@ function defaultUxCycleCriteria(boot) {
                     surfaceAt(nowStart),
                 ) && !/\[agora\]|\[now\]\s+runtime=|entrada=|catálogo=|atividade=|próximo=|sse=/iu.test(defaultSurface),
             detail: '/now default rendered human labels instead of runtime key-value telemetry',
+        },
+        {
+            id: 'ux-cycle-usage-byok-current-first',
+            pass:
+                (/BYOK ativo/iu.test(usageSurface)
+                    ? /(?:Janela de contexto|Atenção\s+dados da janela de contexto)[\s\S]*BYOK ativo[\s\S]*Histórico Copilot|BYOK ativo[\s\S]*Histórico Copilot/iu.test(
+                          usageSurface,
+                      )
+                    : /(?:Janela de contexto|Atenção\s+dados da janela de contexto)[\s\S]*(?:Telemetria PR|Pedido premium)|Pedido premium/iu.test(
+                          usageSurface,
+                      )) &&
+                !/Quota Copilot|side-channel|não é cobrança BYOK/iu.test(usageSurface),
+            detail: '/usage now rendered BYOK as current state and Copilot telemetry as historical side-channel',
         },
         {
             id: 'ux-cycle-health-compact',
@@ -2713,6 +2737,7 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
             { line: '/terminal libs detail', waitFor: 'Libs auxiliares do terminal', advanceAfterMs: 2_000 },
             { line: '/status', waitFor: 'Status do Terminal LLM-B', advanceAfterMs: 1_500 },
             { line: '/now', waitFor: '\n  Agora', advanceAfterMs: 1_500 },
+            { line: '/usage now', waitFor: 'Janela de contexto', advanceAfterMs: 1_500 },
             { line: '/health', waitFor: 'Saúde do Terminal LLM-B', advanceAfterMs: 1_500 },
             { line: '/tools', waitFor: /Ferramentas observadas|Nenhuma ferramenta observada/u, advanceAfterMs: 1_500 },
             { line: '/tools diag', waitFor: /Ferramentas observadas|Nenhuma ferramenta observada/u, advanceAfterMs: 1_500 },
@@ -2784,12 +2809,12 @@ function extractTerminalUxRowValue(surface, label) {
 function findAssistantEndedBeforeRequiredAsk(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID], events = []) {
     const text = String(plain ?? '');
     if (scenario.askRenderedRe.test(text)) return null;
-    if (!/(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-CANONICAL-8\b/u.test(text)) return null;
+    if (!hasRenderedRequiredDeltaTail(text)) return null;
     const promptReturned = /Turno concluído; aguardando próxima mensagem|Aguardando próxima mensagem/iu.test(text);
     const assistantMessage = Array.isArray(events)
         ? events.find((evt) => {
               if (evt?.event !== 'assistant.message' || !isObjectPayload(evt.data)) return false;
-              return /DELTA-CANONICAL-8/u.test(String(evt.data.content ?? ''));
+              return hasRequiredDeltaTail(String(evt.data.content ?? ''));
           })
         : null;
     const askEvent = Array.isArray(events)
@@ -3268,7 +3293,7 @@ function findAskBeforeRequiredPublicDeltas(events, scenario = LIVE_SCENARIOS[DEF
                 : typeof payload?.chunk === 'string'
                   ? payload.chunk
                   : '';
-        deltaMarkersBeforeAsk += countCanonicalDeltaMarkers(content);
+        deltaMarkersBeforeAsk += countRequiredDeltaMarkers(content);
     }
     if (deltaMarkersBeforeAsk >= 8) return null;
     const askEvent = events[askIndex];
@@ -3346,7 +3371,7 @@ function findByokRealLiveToolProtocolMiss(plain, scenario = LIVE_SCENARIOS[DEFAU
     if (markers.length > 0 && !renderedReadFileToolOk(plain)) {
         return { markers };
     }
-    if (!/(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-CANONICAL-8\b/u.test(plain)) return null;
+    if (!hasRenderedRequiredDeltaTail(plain)) return null;
     const hasTextifiedAsk =
         markers.includes('ask_user') || markers.includes('ask_user_text') || markers.includes('ask_user_question_json');
     return hasTextifiedAsk || markers.length >= 2 ? { markers } : null;
@@ -3669,7 +3694,7 @@ function summarizeCanonicalTranscriptEvents(events, scenario = LIVE_SCENARIOS[DE
         if (!payload) continue;
         if (evt?.event === 'assistant.message') {
             const content = typeof payload.content === 'string' ? payload.content : '';
-            if (!summary.deltaAssistant && /DELTA-CANONICAL-8/u.test(content)) {
+            if (!summary.deltaAssistant && hasRequiredDeltaTail(content)) {
                 summary.deltaAssistant = canonicalEventSummaryItem(evt, payload);
             }
             if (!summary.postAskAssistant && scenario.postAskFinalRe.test(content)) {
@@ -3782,8 +3807,23 @@ function terminalBlockContains(plain, headerRe, markerRe) {
     return extractTerminalBlocks(plain, headerRe).some((block) => markerRe.test(block));
 }
 
+const REQUIRED_DELTA_TAIL_RE = /DELTA-(?:CANONICAL-)?8\b/u;
+const RENDERED_REQUIRED_DELTA_TAIL_RE = /(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-(?:CANONICAL-)?8\b/u;
+
 function countCanonicalDeltaMarkers(value) {
     return (String(value ?? '').match(/DELTA-CANONICAL-\d/g) ?? []).length;
+}
+
+function countRequiredDeltaMarkers(value) {
+    return (String(value ?? '').match(/DELTA-(?:CANONICAL-)?\d/g) ?? []).length;
+}
+
+function hasRequiredDeltaTail(value) {
+    return REQUIRED_DELTA_TAIL_RE.test(String(value ?? ''));
+}
+
+function hasRenderedRequiredDeltaTail(value) {
+    return RENDERED_REQUIRED_DELTA_TAIL_RE.test(String(value ?? ''));
 }
 
 function normalizeTranscriptCoverageText(value) {
@@ -3982,14 +4022,27 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const liveDeltaBlocks = extractTerminalBlocks(
         preEventsPlain,
         /^\s*(?:\[[^\]\n]*\]\s+🧠\s+LLM-B|LLM-B\s+·)/u,
-    ).filter((block) => /DELTA-CANONICAL-8/u.test(block));
-    const liveDeltaMarkerCount = liveDeltaBlocks.reduce((count, block) => count + countCanonicalDeltaMarkers(block), 0);
+    ).filter((block) => hasRequiredDeltaTail(block));
+    const liveDeltaMarkerCount = liveDeltaBlocks.reduce((count, block) => count + countRequiredDeltaMarkers(block), 0);
+    const liveCanonicalDeltaMarkerCount = liveDeltaBlocks.reduce(
+        (count, block) => count + countCanonicalDeltaMarkers(block),
+        0,
+    );
     const assistantMessageDeltaMarkerCount = canonicalEvents.reduce((count, evt) => {
+        const payload = eventPayload(evt);
+        if (evt?.event !== 'assistant.message' || !payload) return count;
+        return count + countRequiredDeltaMarkers(payload.content);
+    }, 0);
+    const assistantMessageCanonicalDeltaMarkerCount = canonicalEvents.reduce((count, evt) => {
         const payload = eventPayload(evt);
         if (evt?.event !== 'assistant.message' || !payload) return count;
         return count + countCanonicalDeltaMarkers(payload.content);
     }, 0);
     const publicDeltaMarkerCount = Math.max(liveDeltaMarkerCount, assistantMessageDeltaMarkerCount);
+    const canonicalPublicDeltaMarkerCount = Math.max(
+        liveCanonicalDeltaMarkerCount,
+        assistantMessageCanonicalDeltaMarkerCount,
+    );
     const liveDeltaBlockVisible = liveDeltaBlocks.length > 0;
     const assistantMessageTranscriptHeadingRe =
         /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message|Mensagem da LLM-B\s+(?:LLM-B via SDK|SDK assistant))/u;
@@ -3998,7 +4051,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const assistantMessageDeltaBlockVisible = terminalBlockContains(
         preEventsPlain,
         assistantMessageTranscriptHeadingRe,
-        /DELTA-CANONICAL-8/u,
+        REQUIRED_DELTA_TAIL_RE,
     ) || assistantMessageDeltaMarkerCount >= 8;
     const postAskFinalRe = scenario.postAskFinalRe;
     const finalRenderedByLiveTurn = terminalBlockContains(
@@ -4042,7 +4095,20 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'partial-deltas',
             pass: publicDeltaMarkerCount >= 8,
-            detail: `observed ${publicDeltaMarkerCount} public DELTA-CANONICAL markers · total log markers ${markerCount}`,
+            detail:
+                `observed ${publicDeltaMarkerCount} public delta markers` +
+                ` · canonical=${canonicalPublicDeltaMarkerCount}` +
+                ` · total log canonical markers ${markerCount}`,
+        },
+        {
+            id: 'canonical-delta-labels',
+            pass: canonicalPublicDeltaMarkerCount >= 8,
+            detail:
+                canonicalPublicDeltaMarkerCount >= 8
+                    ? 'assistant used the exact DELTA-CANONICAL labels requested by the scenario'
+                    : `assistant used noncanonical public delta labels · canonical=${canonicalPublicDeltaMarkerCount} · public=${publicDeltaMarkerCount}`,
+            severity: 'warning',
+            required: false,
         },
         {
             id: 'final-delta-block',
@@ -5332,7 +5398,7 @@ async function inspectExportedMarkdown(exportPath, scenario = LIVE_SCENARIOS[DEF
         return {
             ok: true,
             detail: `${content.length} chars`,
-            hasTranscript: /DELTA-CANONICAL-8/.test(content) || scenario.askQuestionRe.test(content),
+            hasTranscript: hasRequiredDeltaTail(content) || scenario.askQuestionRe.test(content),
             hasStreamingDiagnostics: /streaming=/.test(content),
             hasEnvelope: /envelope=/.test(content),
             hasAskUser: /ask_user solicitou resposta humana:/iu.test(content) && scenario.askQuestionRe.test(content),

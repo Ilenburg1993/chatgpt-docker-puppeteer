@@ -7124,5 +7124,47 @@
   - artefato: `artifacts/terminal-live/2026-06-04T16-49-03-017Z/summary.md`;
   - resultado: PASS em 11/11 critérios, incluindo prompt restaurado, zero pendências após resposta,
     ausência de IDs crus e ausência de spam `request_user_input ainda executando`.
+- [x] Diagnóstico rápido quando a LLM-B produz deltas mas omite `ask_user`:
+  - achado live real:
+    `artifacts/terminal-live/2026-06-04T16-50-21-066Z/summary.md`;
+  - status observado: BLOCKED por timeout, embora a LLM-B tenha executado `report_intent`,
+    `read_file_content` e escrito oito deltas públicos;
+  - causa funcional: o modelo escreveu `DELTA-1`..`DELTA-8` em vez de
+    `DELTA-CANONICAL-1`..`DELTA-CANONICAL-8`; o detector de recuperacao aceitava apenas
+    `DELTA-CANONICAL-8`, portanto nao percebeu que a proxima acao obrigatoria era `ask_user`;
+  - decisao UX/protocolo: "oito deltas publicos vistos" e "rotulo textual exatamente canonico"
+    sao evidencias diferentes; a primeira deve dirigir a maquina de estados do runner, enquanto a
+    segunda fica como criterio informativo de aderencia do modelo;
+  - correcao: o harness agora reconhece `DELTA-8` e `DELTA-CANONICAL-8` para acionar
+    recuperacao/diagnostico de `ask_user` ausente;
+  - correcao: a continuacao controlada nao mente mais dizendo que as linhas foram necessariamente
+    `DELTA-CANONICAL`; ela diz apenas que os oito deltas publicos ja apareceram;
+  - correcao: os criterios live agora separam `partial-deltas` de `canonical-delta-labels`; o
+    primeiro permanece requisito de fluxo, o segundo vira warning quando a LLM-B usa rotulos
+    nao canonicos;
+  - objetivo operacional: uma falha de protocolo do modelo deve virar recuperacao ou diagnostico
+    em segundos, com `/activity`, `/tools diag`, `/events`, `/errors`, `/health` e `/export`, nao
+    uma espera muda ate o timeout.
+- [x] `/usage now` com BYOK ativo sem falsa hierarquia de quota:
+  - achado live:
+    `artifacts/terminal-live/2026-06-04T16-59-30-059Z/terminal.plain.log`;
+  - problema visual: logo apos boot BYOK, `/usage now` mostrava primeiro
+    `Quota Copilot rota kilo-auto/free · observado claude-haiku-4.5`, o que parecia indicar modelo
+    atual divergente, apesar de ser apenas snapshot historico/lateral;
+  - decisao UX: o estado atual deve vir primeiro (`BYOK ativo`), e telemetria Copilot/PR anterior
+    deve ser rotulada como `Histórico Copilot`;
+  - correcao: quando BYOK esta ativo, `/usage now` renderiza `BYOK ativo` antes do historico e usa
+    `Histórico Copilot ... anterior/lateral; BYOK atual separado`;
+  - preservacao: em caso de mismatch real, a linha historica ainda mostra `configurado`,
+    `observado` quando existir e `cobrado`, para nao perder valor diagnostico;
+  - teste focado:
+    `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js --hookTimeout=30000`;
+  - resultado: PASS em 8/8 testes;
+  - harness live reforcado: `--ux-cycle` agora inclui `/usage now` e valida que BYOK aparece como
+    estado atual antes do historico Copilot;
+  - live final:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-usage-byok-history-guardrail-pass-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T17-07-17-596Z/summary.md`;
+  - resultado: PASS em 22/22 criterios, sem linhas acima de 132 colunas no plain log filtrado.
 - [ ] Próxima lacuna: validar visualmente TUI completa `fzf`/`gum` quando for aceitável tomar o TTY
       real, mantendo o fluxo filtrado como prova automatizada.
