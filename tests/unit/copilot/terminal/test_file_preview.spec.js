@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { renderTerminalFilePreview } from '../../../../src/copilot/terminal/capabilities/index.js';
+import { __test__ } from '../../../../src/copilot/terminal/capabilities/file-preview.js';
 
 describe('terminal/capabilities/file-preview', () => {
     it('renderiza fallback JS com linhas numeradas quando preview externo é desativado', () => {
@@ -36,5 +37,13 @@ describe('terminal/capabilities/file-preview', () => {
 
         expect(preview.fallbackReason).toContain('caracteres de controle');
         expect(preview.output).not.toContain(String.fromCharCode(1));
+    });
+
+    it('passa caminho do bat após separador de opções', () => {
+        const args = __test__.buildBatPreviewArgs('never', 20, '--looks-like-option.js');
+
+        expect(args).toContain('--paging=never');
+        expect(args).toContain('--line-range');
+        expect(args.slice(-2)).toEqual(['--', '--looks-like-option.js']);
     });
 });

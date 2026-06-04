@@ -83,6 +83,25 @@ function renderUnsafePreview(reason) {
 }
 
 /**
+ * @param {'auto' | 'always' | 'never'} colorMode
+ * @param {number} lineLimit
+ * @param {string} filePath
+ * @returns {string[]}
+ */
+function buildBatPreviewArgs(colorMode, lineLimit, filePath) {
+    return [
+        '--paging=never',
+        `--color=${colorMode}`,
+        '--style=numbers,changes',
+        '--wrap=never',
+        '--line-range',
+        `:${lineLimit}`,
+        '--',
+        filePath,
+    ];
+}
+
+/**
  * @param {string | null | undefined} path
  * @param {string} content
  * @param {{ lineLimit?: number; forceJs?: boolean; color?: 'auto' | 'always' | 'never' }} [options]
@@ -112,15 +131,7 @@ export function renderTerminalFilePreview(path, content, options = {}) {
     const colorMode = options.color ?? (process.stdout.isTTY ? 'always' : 'never');
     const result = spawnSync(
         bat.command,
-        [
-            '--paging=never',
-            `--color=${colorMode}`,
-            '--style=numbers,changes',
-            '--wrap=never',
-            '--line-range',
-            `: ${lineLimit}`.replace(/\s+/gu, ''),
-            filePath,
-        ],
+        buildBatPreviewArgs(colorMode, lineLimit, filePath),
         {
             encoding: 'utf8',
             maxBuffer: MAX_PREVIEW_BYTES,
@@ -141,3 +152,7 @@ export function renderTerminalFilePreview(path, content, options = {}) {
         truncated: rendered.truncated,
     };
 }
+
+export const __test__ = {
+    buildBatPreviewArgs,
+};

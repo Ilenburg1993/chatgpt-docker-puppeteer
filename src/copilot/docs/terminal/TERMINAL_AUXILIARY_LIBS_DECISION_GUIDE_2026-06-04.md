@@ -500,6 +500,18 @@ Decisão:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms 90000 --label terminal-picker-pending-guard-after-menu-fix-20260604`;
   - artefato: `artifacts/terminal-live/2026-06-04T19-13-40-513Z/summary.md`;
   - resultado: PASS em 5/5 critérios, com `fzf --filter`, roteamento para `/status` e fechamento limpo.
+- [x] Guardrail de option-injection em preview com `bat`:
+  - reauditoria de `file-preview.js` confirmou que o caminho era tokenizado, mas ainda entrava sem
+    separador de opções;
+  - arquivos com nome iniciado por hífen poderiam ser interpretados como flags pelo `bat`;
+  - `buildBatPreviewArgs()` agora sempre insere `--` antes do caminho;
+  - teste unitário cobre path `--looks-like-option.js`.
+- [x] Smoke pós-guardrail:
+  - `npm --silent run terminal:aux-libs:smoke -- --json`;
+  - resultado: `ok=true`;
+  - renderers reais exercidos no ambiente: `bat`, `glow`, `delta`, `jq`, `yq`;
+  - fallback sem PATH continuou passando para arquivo, Markdown, diff, JSON e YAML;
+  - envelope JSON permaneceu sem ANSI/OSC/CR solto/controles.
 - [x] Live PTY com contrato JSON de libs:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-json-contract-pass3-20260604 --timeout-ms 180000`;
   - artefato: `artifacts/terminal-live/2026-06-04T17-44-25-689Z/summary.md`;

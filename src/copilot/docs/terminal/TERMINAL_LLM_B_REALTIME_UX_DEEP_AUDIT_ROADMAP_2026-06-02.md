@@ -7567,6 +7567,12 @@
     `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms 90000 --label terminal-picker-pending-guard-after-menu-fix-20260604`;
   - artefato: `artifacts/terminal-live/2026-06-04T19-13-40-513Z/summary.md`;
   - resultado: `PASS` em 5/5 critérios.
+- [x] Sexta correção derivada da reauditoria de libs auxiliares:
+  - `bat` já recebia argumentos tokenizados e sem shell livre, mas o path ainda era passado sem
+    `--`;
+  - `file-preview.js` agora insere `--` antes do caminho para evitar que arquivos iniciados por
+    hífen sejam interpretados como flags do renderer externo;
+  - `test_file_preview.spec.js` cobre esse contrato.
 - [ ] Próxima lacuna visual:
   - auditar `/help full`, `/byok gateway commands`, `/byok gateway operator-ready` e `/byok auto`
     para confirmar que o modo detalhado é rico sem parecer lixo técnico;
