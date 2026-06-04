@@ -5313,5 +5313,20 @@
 - [x] Validação escopada do runner passou:
   - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
   - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
-- [ ] Próxima live: repetir cenário canônico para confirmar summary mais honesto e a linha
-      `LLM-B finalizando · <idade>` no PTY.
+- [x] Live seguinte:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-public-delta-finalizing-20260604-2320`.
+- [x] Resultado: `Status: BLOCKED` por `byok-provider-turn-failed`; o provider BYOK falhou antes de
+      tools/deltas e o terminal conteve o erro sem fallback para Copilot auto.
+- [x] Nova lacuna UX encontrada: a falha BYOK era renderizada como uma linha `Modelo` enorme:
+      mensagem do SDK + política de fallback + ação + provider/perfil/modelo.
+- [x] Correção aplicada: erro recuperável de `model_call` BYOK agora renderiza painel curto:
+      `Provider BYOK`, `Ação`, `Fallback`, `Contexto`. O detalhe completo continua em
+      `recordTerminalActivity` e SSE.
+- [x] Teste unitário: `test_terminal_agent_runtime_events.spec.js` garante que o painel contém
+      `/byok use`, `/byok model` e contexto provider/perfil/modelo, sem a frase longa de retry.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/events/agent-runtime-events.js`;
+  - `npx eslint src/copilot/terminal/events/agent-runtime-events.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
+  - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
+- [ ] Próxima live: repetir cenário canônico para confirmar summary mais honesto, `LLM-B
+      finalizando · <idade>` e painel BYOK curto quando houver falha de provider.

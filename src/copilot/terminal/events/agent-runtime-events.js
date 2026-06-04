@@ -261,6 +261,29 @@ const RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL =
 const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
     'erro de provider BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provider/modelo via /byok use ou /byok model; sem Premium Request';
 
+/**
+ * @param {Record<string, unknown>} evt
+ * @param {string} message
+ * @returns {string}
+ */
+function renderRecoverableByokModelCallErrorForOperator(evt, message) {
+    const provider =
+        typeof evt['byokProviderType'] === 'string'
+            ? evt['byokProviderType']
+            : typeof evt['byokPreset'] === 'string'
+              ? evt['byokPreset']
+              : '-';
+    const profile = typeof evt['byokProfile'] === 'string' ? evt['byokProfile'] : '-';
+    const model = typeof evt['byokModel'] === 'string' ? evt['byokModel'] : '-';
+    return [
+        '',
+        terminalThemeRow('Provider BYOK', message, { role: 'warn' }),
+        terminalThemeRow('Ação', 'troque provider/modelo com /byok use ou /byok model', { role: 'command' }),
+        terminalThemeRow('Fallback', 'Copilot auto bloqueado por contrato · sem Premium Request', { role: 'muted' }),
+        terminalThemeRow('Contexto', `provider ${provider} · perfil ${profile} · modelo ${model}`, { role: 'muted' }),
+    ].join('\n');
+}
+
 /** @type {Readonly<Record<string, string>>} */
 const SDK_LIFECYCLE_LABELS = Object.freeze({
     'session.created': 'Sessão SDK criada',
@@ -809,11 +832,12 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             updateCurrent: true,
         });
         if (shouldPrint && !isTerminalRenderLocked()) {
-            println(
-                `\n${terminalThemeRow(isRecoverableModelCall ? 'Modelo' : 'Erro do agente', detail, {
-                    role: severity,
-                })}`,
-            );
+            const rendered = isByokModelCall
+                ? renderRecoverableByokModelCallErrorForOperator(evt, msg)
+                : `\n${terminalThemeRow(isRecoverableModelCall ? 'Modelo' : 'Erro do agente', detail, {
+                      role: severity,
+                  })}`;
+            println(rendered);
         }
         broadcastSse(
             'agent.error',

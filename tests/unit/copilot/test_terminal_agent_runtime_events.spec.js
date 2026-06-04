@@ -1307,6 +1307,15 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 detail: expect.not.stringContaining('provider='),
             }),
         );
+        const rendered = println.mock.calls.map(([line]) => String(line)).join('\n');
+        expect(rendered).toContain('Provider BYOK');
+        expect(rendered).toContain('Ação');
+        expect(rendered).toContain('/byok use');
+        expect(rendered).toContain('/byok model');
+        expect(rendered).toContain('Fallback');
+        expect(rendered).toContain('provider gemini · perfil gemini-free · modelo gemini-2.5-flash');
+        expect(rendered).not.toContain('Modelo       Provider returned 403 · erro de provider BYOK');
+        expect(rendered).not.toContain('retry automático bloqueado para não prender o terminal; troque provider/modelo');
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.error',
             expect.objectContaining({
