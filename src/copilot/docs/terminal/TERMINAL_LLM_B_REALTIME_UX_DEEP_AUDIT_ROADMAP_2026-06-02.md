@@ -5921,6 +5921,83 @@
     sem linha `LLM-B aguardando você` intercalada no momento da digitação.
 - [x] Evidência adicional: `/events 60` permaneceu com seis linhas operacionais e o novo critério
       `sse-archive-default-control-noise-hidden` continuou passando.
-- [ ] Próxima frente UX: auditar `/activity 40`, porque ainda há duplicação visual de arquivo
+- [x] Próxima frente UX: auditar `/activity 40`, porque ainda há duplicação visual de arquivo
       (`Arquivo leitura · package.json ×2` seguido de `Arquivo leitura · package.json`) e a timeline
       mistura eventos permanentes (`streaming`, `Uso BYOK`, `Processando mensagem`) em volume alto.
+- [x] Decisão UX: `/activity` default deve responder “o que está acontecendo e o que acabou de
+      acontecer”, não despejar toda a linha do tempo. A timeline completa pertence a
+      `/activity detail`, junto com origem, trace, engine e streaming.
+- [x] Correção aplicada: `commands/activity.js` agora colapsa arquivos repetidos por
+      operação/caminho, escolhendo contagem máxima quando a projeção já trouxe linha agregada, para
+      evitar inflar `×2` para `×3`.
+- [x] Correção aplicada: a timeline default virou `Timeline operacional`, filtra ruído de idle,
+      streaming e `Uso BYOK sem Premium Request`, limita a 12 linhas e mostra hint para
+      `/activity detail` quando houver histórico omitido. O modo detail mostra `Timeline completa`.
+- [x] Teste unitário: `test_commands_activity.spec.js` cobre arquivo repetido colapsado em uma linha,
+      timeline operacional/default, timeline completa/detail e filtro de uso BYOK rotineiro.
+- [x] Próxima live: repetir ciclo canônico/diagnóstico para confirmar visualmente que `/activity 40`
+      não duplica `package.json`, não despeja streaming/uso rotineiro na timeline default e mantém
+      detail como rota completa.
+- [x] Live executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-activity-operational-timeline-20260605-0255`.
+  - Resultado: `BLOCKED` por `blocked-by-assistant-empty-turn`; a LLM-B não emitiu a mensagem final
+    pós-`SIM`, mas a live revelou bugs reais de UX.
+- [x] Achado: `/activity 40` ainda mostrou `Arquivo leitura · package.json ×2` seguido de outra
+      linha `Arquivo leitura · package.json`, porque a projeção recebia o mesmo alvo como caminho
+      absoluto e relativo.
+- [x] Correção aplicada: `aggregateTurnTraceFiles()` agora usa a forma exibida do caminho como chave
+      de agregação, colapsando `/workspaces/.../package.json` e `package.json` na mesma linha.
+- [x] Achado: após `SIM`, a linha viva podia renderizar um bloco de quatro linhas com
+      `LLM-B aguardando operador · Resposta do operador · escolha estruturada · ...`, pesado demais
+      para um estado transitório pós-resposta humana.
+- [x] Correção aplicada: `live-status-line.js` agora compacta `phase=question` sem pergunta pendente
+      como `LLM-B resposta recebida · aguardando LLM-B · Ns`, sem repetir detalhe, modelo ou
+      `conversa ativa`.
+- [x] Testes focados passaram:
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`.
+- [x] Live executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-activity-path-live-status-20260605-0310`.
+  - Resultado: `Status: PASS`; `/activity 40` mostrou uma única linha `Arquivo leitura ·
+    package.json ×2`, sem duplicata absoluto/relativo, e `/events 60` permaneceu com eventos
+    operacionais limpos.
+- [x] Achado crítico apesar do PASS: o log PTY ainda mostrou
+      `você...[PERG]› LLM-B aguardando você · [PERG] · SIMSIM`, ou seja, a linha viva de pergunta
+      pendente ainda podia repintar no mesmo trecho visual do input antes da resposta automática.
+- [x] Decisão UX revisada: enquanto uma pergunta humana ou input estruturado está pendente, o
+      card/prompt são a fonte exclusiva do estado de decisão; a linha viva periódica deve ficar
+      silenciosa até a resposta ser enviada. Depois da resposta, ela pode voltar como
+      `LLM-B resposta recebida · aguardando LLM-B · Ns`.
+- [x] Correção aplicada: `shouldRenderTerminalLiveStatusLine()` agora retorna falso para
+      `pendingQuestion` e `request_user_input` pendentes, mantendo `formatTerminalLiveStatusLine()`
+      formatável para diagnóstico/teste direto, mas impedindo o repaint periódico que compete com
+      o cursor humano.
+- [x] Contrato live reforçado: o runner ganhou critério
+      `ux-question-live-status-does-not-compete-with-input`, bloqueando `SIMSIM` e status de
+      pergunta pendente colado ao prompt.
+- [x] Live executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-question-live-status-suppressed-20260605-0350`.
+  - Resultado: `Status: PASS`; o novo critério `ux-question-live-status-does-not-compete-with-input`
+    passou, o prompt mostrou `você...[PERG]› SIM` sem `SIMSIM`, e `/events 60` manteve apenas
+    transcript, pergunta, resposta, uso LLM e final pós-pergunta.
+- [x] Evidência positiva adicional: `/activity 40` mostrou somente `Arquivo leitura · package.json
+      ×2` no resumo consolidado, sem duplicata absoluto/relativo.
+- [x] Achado visual remanescente: o bloco durável de resumo do turno ainda exibiu `Arquivos LER
+      package.json · LER package.json`, porque `renderTurnTraceSummary()` usava os arquivos crus do
+      trace e não a chave visual humana.
+- [x] Correção aplicada: `sdk-session-events.js` ganhou `selectTerminalTurnTraceSummaryFiles()`,
+      deduplicando o resumo visual por operação + caminho humano sem apagar o trace bruto.
+- [x] Teste unitário: `test_sdk_session_events_turn_summary.spec.js` cobre que
+      `package.json` relativo e `/workspaces/.../package.json` viram uma única linha no resumo.
+- [x] Contrato live reforçado: o runner ganhou `ux-turn-file-summary-deduped`, reprovando a linha
+      `Arquivos LER package.json · LER package.json` no default antes dos diagnósticos crus.
+- [x] Live executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-turn-file-summary-deduped-20260605-0410`.
+  - Resultado: `Status: PASS`; `ux-question-live-status-does-not-compete-with-input` e
+    `ux-turn-file-summary-deduped` passaram.
+- [x] Evidência visual: o bloco durável do turno mostrou `Turno 2 ações · 1 arquivo` e
+      `Arquivos LER package.json`, sem repetição; o prompt de pergunta mostrou `SIM` isolado, sem
+      `SIMSIM` e sem `LLM-B aguardando você` colado ao input.
+- [ ] Próxima frente UX: revisar a timeline operacional de `/activity`, porque ela ainda inclui
+      `Processando mensagem` e eventos de inicialização quando há eventos operacionais suficientes;
+      avaliar se boot/processamento devem ficar em `/activity detail` por default após a primeira
+      resposta.

@@ -4136,6 +4136,18 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: 'ask live status stayed compact and did not include the old verbose label',
         },
         {
+            id: 'ux-question-live-status-does-not-compete-with-input',
+            pass:
+                !/SIMSIM/u.test(plain) &&
+                !/voc[eê]\[[^\n\r]*\[PERG\][^\n\r]*›[^\n\r]*(?:LLM-B aguardando voc[eê]|SIMSIM)/iu.test(plain),
+            detail: 'pending-question live status did not repaint inside the human input line',
+        },
+        {
+            id: 'ux-turn-file-summary-deduped',
+            pass: !/Arquivos\s+LER\s+package\.json\s+·\s+LER\s+package\.json/iu.test(beforeRawDiagnosticsPlain),
+            detail: 'turn summary did not repeat the same human file path in one row',
+        },
+        {
             id: 'ux-no-raw-hourglass-waiting-prompt',
             pass: !/⏳\s+\[[^\]]+\]/u.test(plain),
             detail: 'waiting prompt avoided the old raw hourglass model/effort tag',

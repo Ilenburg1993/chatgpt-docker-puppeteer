@@ -275,6 +275,27 @@ function pluralPt(value, singular, plural) {
 }
 
 /**
+ * @param {import('../state/turn-trace-state.js').TerminalTurnTraceFileEntry[]} files
+ * @param {number} limit
+ * @returns {import('../state/turn-trace-state.js').TerminalTurnTraceFileEntry[]}
+ */
+export function selectTerminalTurnTraceSummaryFiles(files, limit) {
+    const max = Math.max(0, Math.floor(limit));
+    if (max <= 0) return [];
+    /** @type {Map<string, import('../state/turn-trace-state.js').TerminalTurnTraceFileEntry>} */
+    const selected = new Map();
+    for (const file of files) {
+        const displayPath = formatTerminalToolPathForOperator(file.path);
+        const key = `${file.operation}:${displayPath}`;
+        if (!selected.has(key)) {
+            selected.set(key, { ...file, path: displayPath });
+        }
+        if (selected.size >= max) break;
+    }
+    return [...selected.values()];
+}
+
+/**
  * @param {string | null | undefined} requestId
  * @returns {string}
  */
@@ -350,6 +371,7 @@ function renderTurnTraceSummary(trace) {
         return;
     }
     const compactDetail = getTerminalDetailLevel() === 'compact';
+    const summaryFiles = selectTerminalTurnTraceSummaryFiles(trace.files, compactDetail ? 2 : 3);
     const toolItems = trace.tools.slice(0, compactDetail ? 2 : 3).map((tool) => {
         const targetCandidate = tool.path ?? tool.target ?? null;
         const target = isLikelyInternalId(targetCandidate) ? null : targetCandidate;
@@ -368,8 +390,8 @@ function renderTurnTraceSummary(trace) {
             : `${operationLabel} ${displayName}${target ? ` · ${compactTerminalOperatorToolText(target, 46)}` : ''}`;
         return terminalThemeText('tool', label);
     });
-    const fileItems = trace.files.slice(0, compactDetail ? 2 : 3).map((file) => {
-        const pathLabel = formatTerminalToolPathForOperator(file.path);
+    const fileItems = summaryFiles.map((file) => {
+        const pathLabel = file.path;
         const label = compactDetail
             ? compactTerminalOperatorToolText(pathLabel, 24)
             : `${renderTurnTraceOperationLabel(file.operation)} ${compactTerminalOperatorToolText(pathLabel, 42)}`;
@@ -377,7 +399,7 @@ function renderTurnTraceSummary(trace) {
     });
     const headline = [
         trace.tools.length > 0 ? pluralPt(trace.tools.length, 'ação', 'ações') : null,
-        trace.files.length > 0 ? pluralPt(trace.files.length, 'arquivo', 'arquivos') : null,
+        summaryFiles.length > 0 ? pluralPt(summaryFiles.length, 'arquivo', 'arquivos') : null,
     ]
         .filter(Boolean)
         .join(' · ');

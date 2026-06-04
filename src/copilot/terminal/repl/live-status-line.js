@@ -305,6 +305,15 @@ export function formatTerminalLiveStatusLine(input = {}) {
         );
     }
     const label = compactLiveStatusText(activity.label, LIVE_LABEL_MAX_CHARS);
+    if (activity.phase === 'question') {
+        const answered = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase().includes('resposta');
+        return (
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+            `${terminalThemeText(severityRole, answered ? 'resposta recebida' : 'pergunta')}` +
+            `${terminalThemeText('muted', ` · aguardando LLM-B · ${formatLiveDuration(ageMs)}${queue}`)}` +
+            '\x1b[K'
+        );
+    }
     if (activity.phase === 'turn') {
         if (isTurnFinalizationActivity(activity)) {
             return (
@@ -345,8 +354,8 @@ export function shouldRenderTerminalLiveStatusLine(input = {}) {
     const activity = input.activity ?? readTerminalActivitySnapshot();
     const runtime = input.runtime ?? readTerminalRuntimeState();
     const busy = input.busy ?? getBusy();
-    if (hasHumanPendingQuestion(runtime)) return true;
-    if (listTerminalPendingStructuredUserInputs().length > 0) return true;
+    if (hasHumanPendingQuestion(runtime)) return false;
+    if (listTerminalPendingStructuredUserInputs().length > 0) return false;
     const queueActive = Number(runtime.queueSize ?? 0) > 0;
     const runtimeActive =
         busy ||

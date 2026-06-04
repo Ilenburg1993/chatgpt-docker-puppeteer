@@ -231,6 +231,55 @@ function renderToolSummary(tool, opts) {
 }
 
 /**
+ * @param {Array<{ path: string; operation: string; source?: string | null; count?: number; updatedAt?: number }>} files
+ * @returns {Array<{ path: string; operation: string; source?: string | null; count?: number; updatedAt?: number }>}
+ */
+function aggregateTurnTraceFiles(files) {
+    /** @type {Map<string, { path: string; operation: string; source?: string | null; count?: number; updatedAt?: number; repeatedRows: number }>} */
+    const groups = new Map();
+    for (const file of files) {
+        const displayPath = formatTerminalToolPathForOperator(file.path);
+        const key = `${file.operation}\u0000${displayPath}`;
+        const existing = groups.get(key);
+        const count = typeof file.count === 'number' && Number.isFinite(file.count) ? Math.max(1, file.count) : 1;
+        if (!existing) {
+            groups.set(key, { ...file, path: displayPath, count, repeatedRows: 1 });
+            continue;
+        }
+        existing.repeatedRows += 1;
+        existing.updatedAt = Math.max(existing.updatedAt ?? 0, file.updatedAt ?? 0) || existing.updatedAt;
+        if (existing.source !== file.source) existing.source = 'múltiplas origens';
+        const previousCount = existing.count ?? 1;
+        existing.count = previousCount > 1 || count > 1 ? Math.max(previousCount, count) : previousCount + count;
+    }
+    return [...groups.values()].map(({ repeatedRows: _repeatedRows, ...file }) => file);
+}
+
+/**
+ * @param {{ phase?: string; label?: string; severity?: string }} entry
+ * @returns {boolean}
+ */
+function isRoutineDefaultTimelineEntry(entry) {
+    const label = compactHumanText(entry.label ?? '').toLowerCase();
+    if (entry.severity === 'error' || entry.severity === 'warn') return false;
+    if (entry.phase === 'idle') return true;
+    if (entry.phase === 'streaming') return true;
+    if (entry.phase === 'system' && label.includes('uso byok sem premium request')) return true;
+    return false;
+}
+
+/**
+ * @param {any[]} history
+ * @param {number} limit
+ * @returns {any[]}
+ */
+function selectDefaultTimelineEntries(history, limit) {
+    const maxRows = Math.min(limit, 12);
+    const operational = history.filter((entry) => !isRoutineDefaultTimelineEntry(entry));
+    return (operational.length > 0 ? operational : history).slice(0, maxRows);
+}
+
+/**
  * @param {ActivityContext['println']} println
  * @param {string} title
  * @param {any} trace
@@ -250,7 +299,7 @@ function printTurnTraceSummary(println, title, trace, opts) {
 
     if (trace.files.length > 0) {
         println(terminalThemeHeadline('assistant', 'Arquivos tocados'));
-        for (const file of trace.files.slice(0, 5)) {
+        for (const file of aggregateTurnTraceFiles(trace.files).slice(0, 5)) {
             const source = opts.detail ? ` · ${renderSourceLabel(file.source)}` : '';
             println(
                 terminalThemeRow(
@@ -482,8 +531,9 @@ export function cmdActivity({ println }, arg) {
         return;
     }
 
-    println(terminalThemeHeadline('assistant', 'Timeline recente'));
-    for (const entry of projection.history) {
+    const timelineEntries = detail ? projection.history : selectDefaultTimelineEntries(projection.history, limit);
+    println(terminalThemeHeadline('assistant', detail ? 'Timeline completa' : 'Timeline operacional'));
+    for (const entry of timelineEntries) {
         const ts = renderActivityTime(entry.ts, { detail, now });
         const extra = entry.detail ? ` — ${compactOperatorDetail(entry.detail)}` : '';
         const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
@@ -494,6 +544,9 @@ export function cmdActivity({ println }, arg) {
                 { role: renderActivitySeverityRole(entry.severity) },
             ),
         );
+    }
+    if (!detail && projection.history.length > timelineEntries.length) {
+        println(terminalThemeRow('Completo', '/activity detail mostra timeline completa.', { role: 'command' }));
     }
     println('');
 }

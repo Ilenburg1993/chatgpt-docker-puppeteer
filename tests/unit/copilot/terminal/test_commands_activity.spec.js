@@ -66,6 +66,13 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
                         count: 2,
                         updatedAt: 2,
                     },
+                    {
+                        path: '/workspaces/chatgpt-docker-puppeteer/src/copilot/terminal/repl/repl.js',
+                        operation: 'read',
+                        source: 'sdk',
+                        count: 1,
+                        updatedAt: 2,
+                    },
                 ],
                 userInputs: [
                     {
@@ -167,12 +174,13 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Estado');
         expect(ctx.output()).toContain('Evento');
         expect(ctx.output()).toContain('Ferramentas');
-        expect(ctx.output()).toContain('Timeline recente');
+        expect(ctx.output()).toContain('Timeline operacional');
         expect(ctx.output()).toContain('Operador');
         expect(ctx.output()).not.toContain('\x1b[36mTimeline recente');
         expect(ctx.output()).toContain('Resumo do turno atual');
         expect(ctx.output()).toContain('Último turno concluído');
         expect(ctx.output()).toContain('Arquivos tocados');
+        expect((ctx.output().match(/Arquivo\s+leitura · src\/copilot\/terminal\/repl\/repl\.js ×2/gu) ?? [])).toHaveLength(1);
         expect(ctx.output()).toContain('Ler arquivo');
         expect(ctx.output()).not.toContain('workspace.read_file');
         expect(ctx.output()).toContain('Interações humanas');
@@ -200,6 +208,7 @@ describe('terminal/commands/activity', () => {
 
         cmdActivity({ println: ctx.println }, '5 detail');
 
+        expect(ctx.output()).toContain('Timeline completa');
         expect(ctx.output()).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} \(há \d+[smhda]\)\]/u);
         expect(ctx.output()).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/u);
         expect(ctx.output()).toContain('io-engine.fs.readFile.text');
@@ -431,7 +440,9 @@ describe('terminal/commands/activity', () => {
         cmdActivity({ println: ctx.println }, '5');
 
         expect(ctx.output()).toMatch(/Estado\s+sistema/u);
-        expect(ctx.output()).toContain('sistema · Uso BYOK sem Premium Request');
+        expect(ctx.output()).toContain('Timeline operacional');
+        expect(ctx.output()).toContain('/activity detail mostra timeline completa');
+        expect(ctx.output()).not.toContain('sistema · Uso BYOK sem Premium Request');
         expect(ctx.output()).toContain('tarefa · Tarefa em segundo plano concluída');
         expect(ctx.output()).toContain('inicialização · Inicializando terminal');
         expect(ctx.output()).not.toContain('system · Uso BYOK');
