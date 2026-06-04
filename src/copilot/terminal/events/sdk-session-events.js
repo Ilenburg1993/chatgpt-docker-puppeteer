@@ -416,14 +416,26 @@ function renderSdkSessionInfoForOperator(infoType, message) {
         const disabledTools = text.match(/Disabled tools:\s*(?<tools>.+)$/iu)?.groups?.['tools']?.trim();
         if (disabledTools) {
             return {
-                label: 'Config SDK',
-                detail: `tools nativas desativadas · ${compactSummaryText(disabledTools, 92)}`,
+                label: 'Configuração',
+                detail: `ferramentas nativas desativadas · ${compactSummaryText(disabledTools, 92)}`,
             };
         }
-        return { label: 'Config SDK', detail: compactSummaryText(text || 'configuração atualizada', 112) };
+        return { label: 'Configuração', detail: compactSummaryText(text || 'configuração atualizada', 112) };
     }
-    if (type === 'model') return { label: 'Modelo SDK', detail: compactSummaryText(text || 'modelo atualizado', 112) };
-    return { label: 'Info SDK', detail: `${type} · ${compactSummaryText(text || '(sem mensagem)', 104)}` };
+    if (type === 'model_retry') {
+        const interrupted = /Response was interrupted due to a server error\.?\s*Retrying\.?/iu.test(text);
+        return {
+            label: 'Retry modelo',
+            detail: interrupted
+                ? 'resposta interrompida por erro do servidor; tentando novamente'
+                : compactSummaryText(text || 'tentando novamente', 112),
+        };
+    }
+    if (type === 'model') return { label: 'Modelo', detail: compactSummaryText(text || 'modelo atualizado', 112) };
+    return {
+        label: 'Evento',
+        detail: `${type.replace(/[._-]+/gu, ' ')} · ${compactSummaryText(text || '(sem mensagem)', 104)}`,
+    };
 }
 
 /**
@@ -743,18 +755,18 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const infoType = evt?.infoType ?? 'info';
         const message = evt?.message ?? '(sem mensagem)';
         const modelRetry = infoType === 'model_retry';
+        const renderedInfo = renderSdkSessionInfoForOperator(infoType, message);
         recordTerminalActivity(
-            modelRetry ? 'error' : 'system',
-            modelRetry ? 'Retry de modelo em andamento' : `Info SDK · ${infoType}`,
+            'system',
+            renderedInfo.label,
             {
-                detail: message,
+                detail: renderedInfo.detail,
                 source: 'sdk',
                 severity: modelRetry ? 'warn' : 'info',
                 recordHistory: modelRetry,
             },
         );
         if (shouldPrintSessionNarration('verbose')) {
-            const renderedInfo = renderSdkSessionInfoForOperator(infoType, message);
             println(terminalThemeRow(renderedInfo.label, renderedInfo.detail));
             if (evt?.url) println(terminalThemeRow('URL', String(evt.url), { role: 'command' }));
         }

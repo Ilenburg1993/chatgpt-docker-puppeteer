@@ -5642,8 +5642,23 @@
       passou no summary.
 - [x] Decisão de escopo: `Sessão SDK` permanece aceitável em `/events --raw` e em telas
       explicitamente diagnósticas como `/health full` até nova auditoria dessas superfícies.
-- [ ] Próxima auditoria UX: revisar labels remanescentes como `Info SDK · cancellation` para
-      decidir o que é técnico aceitável e o que deve ser humanizado no modo padrão.
+- [x] Auditoria UX de `session.info`: lives antigas mostravam `Info SDK · configuration`,
+      `Disabled tools: ...`, `Info SDK · model_retry` e mensagens em inglês na linha viva/activity,
+      apesar de a impressão verbose já ter um renderizador mais amigável.
+- [x] Correção aplicada: `session.info` agora usa `renderSdkSessionInfoForOperator()` como fonte
+      única também para activity/linha viva; `configuration` vira `Configuração · ferramentas
+      nativas desativadas`, `model_retry` vira `Retry modelo · resposta interrompida por erro do
+      servidor; tentando novamente`, e outros tipos viram `Evento` com detalhe saneado.
+- [x] Contrato live adicionado: `ux-no-raw-sdk-info-labels` bloqueia `Info SDK`,
+      `configuration`, `Disabled tools`, `model_retry` e o texto inglês de retry antes do `--raw`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/events/sdk-session-events.js`;
+  - `npx eslint src/copilot/terminal/events/sdk-session-events.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_dialog_runtime.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [x] Live canônica confirmou `ux-no-raw-sdk-info-labels`: `artifacts/terminal-live/live-canonical-sdk-info-short-copy-contract-20260605-0050/summary.md`
+      ficou `Status: PASS`, com `/events` limpo, `no-terminal-errors`, `clean-quit`, e primeiro
+      viewport pós-boot exibindo `Configuração ferramentas nativas desativadas...` sem `Info SDK`,
+      `Disabled tools`, `model_retry` ou texto inglês de retry antes do bloco `--raw`.
 - [x] Live pós-critério: repetir cenário canônico após `sse-archive-human-source-labels`
       confirmou o contrato no summary, não só na evidência visual.
 - [ ] Próxima live de falha controlada: reproduzir ou simular erro BYOK para confirmar que

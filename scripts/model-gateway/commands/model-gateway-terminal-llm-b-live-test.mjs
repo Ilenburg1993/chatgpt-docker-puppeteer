@@ -4040,6 +4040,15 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: 'durable waiting/tool heartbeat spam, raw ids, and SDK ask_user labels were not printed',
         },
         {
+            id: 'ux-no-raw-sdk-info-labels',
+            pass:
+                !/Info SDK|configuration|Disabled tools|model_retry|Response was interrupted due to a server error/iu.test(
+                    beforeRawDiagnosticsPlain,
+                ) &&
+                /Configura[cç][aã]o\s+ferramentas nativas desativadas/iu.test(beforeRawDiagnosticsPlain),
+            detail: 'SDK session info rendered as operator-facing session configuration/retry copy instead of raw SDK labels',
+        },
+        {
             id: 'ux-single-live-status-source',
             pass: !/[⏳⌛] aguardando .*watchdog\//.test(plain),
             detail: 'dialog watchdog did not render a second live-status line when permanent live status is enabled',
