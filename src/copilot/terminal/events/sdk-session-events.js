@@ -74,7 +74,7 @@ import {
     setLastSdkPlanOperation,
     setSdkSessionMode,
 } from '../../presentation/state/index.js';
-import { broadcastSse, println } from '../dialog/index.js';
+import { broadcastSse, println, writeInlineStatus } from '../dialog/index.js';
 import {
     answerTerminalPendingQuestion,
     classifyTerminalPermissionDecision,
@@ -882,6 +882,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const infoType = evt?.infoType ?? 'info';
         const message = evt?.message ?? '(sem mensagem)';
         const modelRetry = infoType === 'model_retry';
+        const configurationInfo = infoType === 'configuration';
         const renderedInfo = renderSdkSessionInfoForOperator(infoType, message);
         recordTerminalActivity(
             'system',
@@ -891,9 +892,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 source: 'sdk',
                 severity: modelRetry ? 'warn' : 'info',
                 recordHistory: modelRetry,
+                updateCurrent: !configurationInfo,
             },
         );
-        if (shouldPrintSessionNarration('verbose')) {
+        if (shouldPrintSessionNarration('verbose') && !configurationInfo) {
             println(terminalThemeRow(renderedInfo.label, renderedInfo.detail));
             if (evt?.url) println(terminalThemeRow('URL', String(evt.url), { role: 'command' }));
         }
@@ -1384,7 +1386,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (shouldPrintSessionNarration('verbose')) {
             const sdkLabel = sdkCount === null ? 'SDK sem contagem' : `SDK dinâmicas ${sdkCount}`;
             const localLabel = localCount > 0 ? `locais ${localCount} em /tools` : 'sem ferramentas locais';
-            println(terminalThemeRow('Ferramentas', `${sdkLabel} · ${localLabel}`, { role: 'muted' }));
+            writeInlineStatus(`LLM-B sessão · ferramentas · ${sdkLabel} · ${localLabel}`);
         }
         broadcastSse(
             'session.tools_updated',
@@ -1409,7 +1411,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose'))
-            println(terminalThemeRow('Skills', `${enabled}/${count} habilitadas`, { role: 'muted' }));
+            writeInlineStatus(`LLM-B sessão · skills · ${enabled}/${count} habilitadas`);
         broadcastSse(
             'session.skills_loaded',
             withSdkSessionSseEnvelope({ count, enabled }, 'sdk/session.skills_loaded'),

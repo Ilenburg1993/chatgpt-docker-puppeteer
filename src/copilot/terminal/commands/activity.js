@@ -15,7 +15,7 @@ import {
     compactTerminalDiagnosticId,
     compactTerminalOperatorToolText,
     formatTerminalToolPathForOperator,
-    getTerminalHumanToolName,
+    humanizeTerminalToolSurfaceText,
     isTerminalInternalCallIdentifier,
 } from '../events/tool-activity-presenter.js';
 
@@ -189,7 +189,7 @@ function compactHumanText(value) {
  * @returns {string}
  */
 function compactOperatorDetail(value) {
-    return humanizeKnownToolIdentifiers(compactHumanText(value), { preserveProtocolNames: true })
+    return humanizeTerminalToolSurfaceText(compactHumanText(value), { preserveProtocolNames: true })
         .replace(/\bmodelo=/giu, 'modelo ')
         .replace(/\bcusto=/giu, 'custo ')
         .replace(/\bstatus=success\b/giu, 'concluída')
@@ -208,36 +208,7 @@ function compactOperatorDetail(value) {
  * @returns {string}
  */
 function compactActivityLabel(value) {
-    return humanizeKnownToolIdentifiers(compactHumanText(value))
-        .replace(/^Executando tool\b/iu, 'Executando ferramenta')
-        .replace(/^Tool em andamento\b/iu, 'Ferramenta em andamento')
-        .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
-        .replace(/^Tool falhou\b/iu, 'Ferramenta falhou')
-        .replace(/^I\/O read concluído\b/iu, 'I/O leitura concluída')
-        .replace(/^I\/O write concluído\b/iu, 'I/O escrita concluída')
-        .replace(/^ask_user SDK solicitado\b/iu, 'Pergunta ao operador solicitada');
-}
-
-/**
- * @param {string} text
- * @param {{ preserveProtocolNames?: boolean }} [opts]
- * @returns {string}
- */
-function humanizeKnownToolIdentifiers(text, opts = {}) {
-    return text.replace(/\b[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+\b/giu, (token) => {
-        const normalized = token.toLowerCase();
-        if (
-            opts.preserveProtocolNames &&
-            (normalized === 'ask_user' ||
-                normalized === 'request_user_input' ||
-                normalized.endsWith('.ask_user') ||
-                normalized.endsWith('.request_user_input'))
-        ) {
-            return token;
-        }
-        const label = getTerminalHumanToolName(token);
-        return label === token ? token : label;
-    });
+    return humanizeTerminalToolSurfaceText(compactHumanText(value));
 }
 
 /**

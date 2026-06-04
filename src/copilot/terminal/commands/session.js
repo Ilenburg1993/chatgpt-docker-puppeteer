@@ -47,7 +47,7 @@ import {
     compactTerminalOperatorToolText,
     compactTerminalToolText,
     formatTerminalToolPathForOperator,
-    getTerminalHumanToolName,
+    humanizeTerminalToolSurfaceText,
     isTerminalInternalCallIdentifier,
 } from '../events/tool-activity-presenter.js';
 import {
@@ -369,14 +369,7 @@ function compactHumanTerminalText(value) {
  * @returns {string}
  */
 function renderSessionActivityText(value) {
-    return compactHumanTerminalText(value)
-        .replace(/\b[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+\b/giu, (token) => {
-            const label = getTerminalHumanToolName(token);
-            return label === token ? token : label;
-        })
-        .replace(/^Executando tool\b/iu, 'Executando ferramenta')
-        .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
-        .replace(/^Tool falhou\b/iu, 'Ferramenta falhou');
+    return humanizeTerminalToolSurfaceText(compactHumanTerminalText(value));
 }
 
 /**

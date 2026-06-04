@@ -8,6 +8,7 @@ import {
     compactTerminalOperatorToolText,
     formatTerminalToolPathForOperator,
     getTerminalHumanToolName,
+    humanizeTerminalToolSurfaceText,
     isTerminalInternalCallIdentifier,
 } from '../../../../src/copilot/terminal/events/tool-activity-presenter.js';
 
@@ -24,6 +25,32 @@ describe('terminal/tool-activity-presenter', () => {
         expect(getTerminalHumanToolName('tool.fast')).toBe('tool.fast');
         expect(isTerminalInternalCallIdentifier('chatcmpl-tool-80d5a00b25801fef')).toBe(true);
         expect(compactTerminalDiagnosticId('chatcmpl-tool-80d5a00b25801fef')).toBe('chatcmpl-too…');
+    });
+
+    it('humaniza superfícies default sem vazar nomes internos ou ids de chamada', () => {
+        const text = humanizeTerminalToolSurfaceText(
+            'LLM-B tool/Executando tool · request_user_input ainda executando · report_intent_local · read_file_content · chatcmpl-tool-80d5a00b25801fef · toolu_bdrk_123',
+        );
+
+        expect(text).toContain('LLM-B ferramenta');
+        expect(text).toContain('Pergunta ao operador aguardando resposta');
+        expect(text).toContain('Intenção capturada');
+        expect(text).toContain('Ler arquivo');
+        expect(text).not.toContain('request_user_input');
+        expect(text).not.toContain('report_intent');
+        expect(text).not.toContain('read_file_content');
+        expect(text).not.toContain('chatcmpl-tool');
+        expect(text).not.toContain('toolu_bdrk');
+    });
+
+    it('preserva nomes de protocolo quando eles fazem parte de conteúdo livre', () => {
+        const text = humanizeTerminalToolSurfaceText('intenção: testar ask_user e request_user_input no prompt', {
+            preserveProtocolNames: true,
+        });
+
+        expect(text).toContain('ask_user');
+        expect(text).toContain('request_user_input');
+        expect(text).not.toContain('Pergunta ao operador');
     });
 
     it('usa nome humano para alias legado e mantém operação canônica inferida', () => {

@@ -31,6 +31,7 @@ import {
 import {
     compactTerminalToolText,
     getTerminalHumanToolName,
+    humanizeTerminalToolSurfaceText,
 } from '../events/tool-activity-presenter.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
@@ -62,14 +63,7 @@ function renderCommandList(commands) {
  * @returns {string}
  */
 function humanizeDiagnoseToolIdentifiers(text) {
-    return text
-        .replace(/\b[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+\b/giu, (token) => {
-            const label = getTerminalHumanToolName(token);
-            return label === token ? token : label;
-        })
-        .replace(/^Executando tool\b/iu, 'Executando ferramenta')
-        .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
-        .replace(/^Tool falhou\b/iu, 'Ferramenta falhou');
+    return humanizeTerminalToolSurfaceText(text);
 }
 
 /**

@@ -12,6 +12,7 @@ import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { resolveModelSelectionMismatch } from '#copilot/core';
 import readline from 'node:readline';
 import { getBusy, getRl, getSdkSessionMode } from '../../presentation/state/index.js';
+import { humanizeTerminalToolSurfaceText } from '../events/tool-activity-presenter.js';
 import {
     getTerminalPendingStructuredUserInputCount,
     readTerminalDialogStreamMeta,
@@ -289,19 +290,7 @@ function fitInlineStatusRows(text) {
  * @returns {string}
  */
 function normalizeInlineStatusText(text) {
-    return String(text)
-        .replace(/\bLLM-B\s+tool\/Executando tool\b/giu, 'LLM-B ferramenta · Ferramenta em uso')
-        .replace(/\btool\/Executando tool\b/giu, 'ferramenta · Ferramenta em uso')
-        .replace(/\btool\/([^·\n]+)/giu, 'ferramenta · $1')
-        .replace(/\bturn\/([^·\n]+)/giu, 'turno · $1')
-        .replace(/\bthinking\/([^·\n]+)/giu, 'pensando · $1')
-        .replace(/\bstreaming\/([^·\n]+)/giu, 'respondendo · $1')
-        .replace(/\brequest_user_input ainda executando\b[^\n]*/giu, 'Pergunta ao operador aguardando resposta')
-        .replace(/\bchatcmpl-tool-[a-z0-9-]+\b/giu, 'id interno')
-        .replace(/\b(?:toolu|call)_[a-z0-9_-]+\b/giu, 'id interno')
-        .replace(/\bexec_command\b/giu, 'Executar comando')
-        .replace(/\bread_file_content\b/giu, 'Ler arquivo')
-        .replace(/\breport_intent(?:_local)?\b/giu, 'Intenção capturada');
+    return humanizeTerminalToolSurfaceText(text);
 }
 
 /**

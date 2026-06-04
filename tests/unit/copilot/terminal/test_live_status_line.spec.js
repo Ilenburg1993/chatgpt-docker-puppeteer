@@ -155,6 +155,25 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(58);
     });
 
+    it('humaniza detalhes crus de tool antes de montar a linha viva', async () => {
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'thinking',
+            label: 'LLM-B trabalhando',
+            detail: 'request_user_input ainda executando · report_intent_local · chatcmpl-tool-80d5a00b25801fef',
+            toolName: null,
+        };
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+
+        const line = formatTerminalLiveStatusLine();
+
+        expect(line).toContain('Aguardando resposta');
+        expect(line).not.toContain('request_user_input');
+        expect(line).not.toContain('report_intent');
+        expect(line).not.toContain('chatcmpl-tool');
+    });
+
     it('renderiza continuamente enquanto há operação ativa', async () => {
         const { setupTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');

@@ -486,6 +486,53 @@ export function compactTerminalOperatorToolText(value, max = 140) {
 }
 
 /**
+ * Humaniza texto operacional de superfícies default do terminal sem destruir o envelope técnico preservado em
+ * `/events --raw`, `/tools raw`, export estruturado e diagnósticos detalhados.
+ *
+ * @param {unknown} value
+ * @param {{ preserveProtocolNames?: boolean }} [opts]
+ * @returns {string}
+ */
+export function humanizeTerminalToolSurfaceText(value, opts = {}) {
+    const preserveProtocolNames = opts.preserveProtocolNames === true;
+    return String(value ?? '')
+        .replace(/\brequest_user_input ainda executando\b[^·\n]*/giu, 'Pergunta ao operador aguardando resposta')
+        .replace(/\bLLM-B\s+tool\/Executando tool\b/giu, 'LLM-B ferramenta · Ferramenta em uso')
+        .replace(/\btool\/Executando tool\b/giu, 'ferramenta · Ferramenta em uso')
+        .replace(/\btool\/([^·\n]+)/giu, 'ferramenta · $1')
+        .replace(/\bturn\/([^·\n]+)/giu, 'turno · $1')
+        .replace(/\bthinking\/([^·\n]+)/giu, 'pensando · $1')
+        .replace(/\bstreaming\/([^·\n]+)/giu, 'respondendo · $1')
+        .replace(/\bchatcmpl-tool-[a-z0-9-]+\b/giu, 'id interno')
+        .replace(/\b(?:toolu|call)_[a-z0-9_-]+\b/giu, 'id interno')
+        .replace(/\b[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+\b/giu, (token) => {
+            const normalized = token.toLowerCase();
+            if (
+                preserveProtocolNames &&
+                (normalized === 'ask_user' ||
+                    normalized === 'request_user_input' ||
+                    normalized.endsWith('.ask_user') ||
+                    normalized.endsWith('.request_user_input'))
+            ) {
+                return token;
+            }
+            const label = getTerminalHumanToolName(token);
+            return label === token ? token : label;
+        })
+        .replace(/^Executando tool\b/iu, 'Executando ferramenta')
+        .replace(/^Tool em andamento\b/iu, 'Ferramenta em andamento')
+        .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
+        .replace(/^Tool falhou\b/iu, 'Ferramenta falhou')
+        .replace(/^I\/O read concluído\b/iu, 'I/O leitura concluída')
+        .replace(/^I\/O write concluído\b/iu, 'I/O escrita concluída')
+        .replace(/^ask_user SDK solicitado\b/iu, 'Pergunta ao operador solicitada')
+        .replace(/^request_user_input\b/iu, 'Pergunta ao operador')
+        .replace(/^Pending messages alteradas$/iu, 'Contexto atualizado')
+        .replace(/^LLM-B trabalhando$/iu, 'Aguardando resposta')
+        .trim();
+}
+
+/**
  * @param {string | null | undefined} value
  * @param {number} [size=12]
  * @returns {string | null}

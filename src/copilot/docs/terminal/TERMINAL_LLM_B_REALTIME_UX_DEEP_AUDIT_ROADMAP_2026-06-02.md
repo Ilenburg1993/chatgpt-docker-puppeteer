@@ -7221,3 +7221,70 @@
     `ux-cycle-session-sdk-boundary-human`.
 - [ ] Próxima lacuna: validar visualmente TUI completa `fzf`/`gum` quando for aceitável tomar o TTY
       real, mantendo o fluxo filtrado como prova automatizada.
+
+## 2026-06-04 — Consolidação do Glossário Humano das Superfícies Default
+
+- [x] Auditoria de retomada:
+  - a UX terminal já tinha várias correções para `report_intent`, `request_user_input`, ids
+    `chatcmpl-tool-*` e aliases técnicos;
+  - ainda havia duplicação de regras em `dialog/output.js`, `live-status-line.js`,
+    `commands/activity.js`, `commands/diagnose.js` e `commands/session.js`;
+  - essa duplicação criava risco de regressão estética: uma superfície podia ficar bonita enquanto
+    outra voltava a mostrar `Tool concluída`, `request_user_input ainda executando` ou ids crus.
+- [x] Decisão arquitetural:
+  - `tool-activity-presenter.js` passa a ser também a fonte canônica de humanização textual para
+    superfícies default;
+  - `/events --raw`, `/tools raw`, exports estruturados e diagnósticos detalhados continuam
+    preservando envelopes técnicos;
+  - textos livres do operador/modelo podem preservar nomes de protocolo quando isso é conteúdo
+    semântico, usando `preserveProtocolNames`.
+- [x] Correção aplicada:
+  - criado `humanizeTerminalToolSurfaceText()`;
+  - migrados `live-status-line.js`, `dialog/output.js`, `/activity`, `/diagnose` e `/session`
+    para usar o mesmo filtro humano;
+  - ids `chatcmpl-tool-*`, `toolu_*` e `call_*` viram `id interno` nas superfícies default;
+  - `request_user_input ainda executando` vira `Pergunta ao operador aguardando resposta` sem
+    engolir o restante da linha;
+  - `report_intent(_local)`, `read_file_content`, `exec_command` e agregados conhecidos continuam
+    passando pelo glossário humano compartilhado.
+- [x] Contratos unitários adicionados:
+  - presenter canônico bloqueia vazamento de nomes internos e ids;
+  - presenter preserva `ask_user`/`request_user_input` quando solicitado para conteúdo livre;
+  - linha viva reservada normaliza ids e tools internas antes de tomar a região do prompt;
+  - linha viva calculada humaniza detalhes crus antes de renderizar.
+- [x] Live PTY de confirmação inicial:
+  - comando:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-shared-human-glossary-20260604 --timeout-ms 180000 --transport=pty`;
+  - artefato: `artifacts/terminal-live/2026-06-04T18-00-46-885Z/summary.md`;
+  - resultado: `Status: PASS` em 27/27 critérios;
+  - achado visual apesar do PASS: eventos informativos `Skills SDK carregadas` e depois
+    `Configuração` podiam ser impressos entre prompt e comando injetado, poluindo a região de
+    input embora não quebrassem o ciclo formal.
+- [x] Correção de eventos SDK informativos:
+  - `session.skills_loaded` e `session.tools_updated` deixam de imprimir linhas duráveis em modo
+    verbose; quando o operador liga narração de sessão, eles usam linha viva curta;
+  - `session.info` de tipo `configuration` deixa de pintar stdout e também não atualiza a atividade
+    atual, ficando disponível em SSE/eventos e diagnósticos;
+  - eventos relevantes como `model_retry`, título de sessão, warning e permissões continuam
+    visíveis porque pedem atenção operacional real.
+- [x] Live PTY intermediária:
+  - comando:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-inline-informative-sdk-events-20260604 --timeout-ms 180000 --transport=pty`;
+  - artefato: `artifacts/terminal-live/2026-06-04T18-04-58-891Z/summary.md`;
+  - resultado: `Status: PASS`; `Skills` deixou de vazar, mas `Configuração` ainda aparecia antes de
+    `/quit`, validando a necessidade de tratar `session.info configuration` separadamente.
+- [x] Live PTY final:
+  - comando:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-silent-configuration-info-20260604 --timeout-ms 180000 --transport=pty`;
+  - artefato: `artifacts/terminal-live/2026-06-04T18-08-33-540Z/summary.md`;
+  - resultado: `Status: PASS` em 27/27 critérios;
+  - verificação manual do `plain.log`: as únicas ocorrências finais são
+    `você[terminal-…/high]› /session sdk 6` e `você[terminal-…/high]› /quit`, sem `Skills`,
+    `Configuração`, `chatcmpl-tool`, `request_user_input`, `report_intent` ou `toolu_` na
+    superfície default.
+- [ ] Próxima frente:
+  - revisar `/events` default e `/intent` para garantir que o glossário compartilhado não precise
+    de uma segunda camada paralela;
+  - reforçar o harness para falhar quando linhas informativas de sessão aparecem entre prompt e
+    comando no plain log;
+  - só depois retomar a avaliação visual de TUI completa (`gum`, `fzf`, `bat`, `glow`, `delta`).

@@ -12,7 +12,7 @@ import { TERMINAL_LIVE_STATUS_ENABLED, TERMINAL_LIVE_STATUS_INTERVAL_MS } from '
 import { cancelTimer, registerInterval } from '#copilot/core';
 import { getBusy } from '../../presentation/state/index.js';
 import { clearInlineStatus, writeInlineStatus } from '../dialog/index.js';
-import { getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
+import { getTerminalHumanToolName, humanizeTerminalToolSurfaceText } from '../events/tool-activity-presenter.js';
 import {
     listTerminalPendingStructuredUserInputs,
     readTerminalDialogStreamMeta,
@@ -62,20 +62,8 @@ function hasHumanPendingQuestion(runtime) {
  * @returns {string}
  */
 function compactLiveStatusText(value, max) {
-    const text = String(value ?? '')
-        .replace(/\b[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+\b/giu, (token) => {
-            const label = getTerminalHumanToolName(token);
-            return label === token ? token : label;
-        })
-        .replace(/^Executando tool\b/iu, 'Executando ferramenta')
-        .replace(/^Tool em andamento\b/iu, 'Ferramenta em andamento')
-        .replace(/^Tool concluída\b/iu, 'Ferramenta concluída')
-        .replace(/^Tool falhou\b/iu, 'Ferramenta falhou')
-        .replace(/\b(?:chatcmpl-tool|toolu|call)_[a-z0-9_-]+\b/giu, 'id interno')
-        .replace(/\bchatcmpl-tool-[a-z0-9-]+\b/giu, 'id interno')
+    const text = humanizeTerminalToolSurfaceText(value)
         .replace(/\bturnId=\d+\b/giu, 'turno concluído')
-        .replace(/^Pending messages alteradas$/iu, 'Contexto atualizado')
-        .replace(/^LLM-B trabalhando$/iu, 'Aguardando resposta')
         .replace(/\s+/g, ' ')
         .trim();
     return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`;

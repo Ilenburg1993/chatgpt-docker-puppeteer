@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     broadcastSse: vi.fn(),
     println: vi.fn(),
     printlnBlock: vi.fn(),
+    writeInlineStatus: vi.fn(),
     setLastSdkPlanOperation: vi.fn(),
     setSdkSessionMode: vi.fn(),
     getBusy: vi.fn(() => false),
@@ -56,6 +57,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     broadcastSse: mocks.broadcastSse,
     println: mocks.println,
     printlnBlock: mocks.printlnBlock,
+    writeInlineStatus: mocks.writeInlineStatus,
 }));
 
 vi.mock('../../../src/copilot/presentation/state/index.js', async (importOriginal) => {
@@ -779,7 +781,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Ferramentas dinâmicas do SDK atualizadas'));
     });
 
-    it('mostra narrativa verbose de sessão quando o toggle session está ativo', async () => {
+    it('mostra narrativa verbose informativa na linha viva quando o toggle session está ativo', async () => {
         mocks.getShowSessionActivity.mockReturnValue(true);
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');
@@ -789,9 +791,11 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         agent.emit('session.skills_loaded', { count: 3, enabled: 2 });
         agent.emit('session.tools_updated', { count: 92 });
 
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringMatching(/Skills\s+2\/3 habilitadas/u));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringMatching(/Ferramentas\s+SDK dinâmicas 92/u));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('sem ferramentas locais'));
+        expect(mocks.writeInlineStatus).toHaveBeenCalledWith(expect.stringMatching(/skills · 2\/3 habilitadas/u));
+        expect(mocks.writeInlineStatus).toHaveBeenCalledWith(expect.stringMatching(/ferramentas · SDK dinâmicas 92/u));
+        expect(mocks.writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('sem ferramentas locais'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringMatching(/Skills\s+2\/3 habilitadas/u));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringMatching(/Ferramentas\s+SDK dinâmicas 92/u));
     });
 
     it('compacta config e título de sessão na narrativa verbose', async () => {
@@ -809,7 +813,20 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             title: 'Faça um teste integrado canônico do terminal com prompt muito longo que não deve ocupar a tela inteira do operador humano',
         });
 
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringMatching(/Configuração\s+ferramentas nativas desativadas/u));
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'system',
+            'Configuração',
+            expect.objectContaining({
+                detail: expect.stringContaining('ferramentas nativas desativadas'),
+                updateCurrent: false,
+            }),
+        );
+        expect(mocks.writeInlineStatus).not.toHaveBeenCalledWith(
+            expect.stringMatching(/Configuração · ferramentas nativas desativadas/u),
+        );
+        expect(mocks.println).not.toHaveBeenCalledWith(
+            expect.stringMatching(/Configuração\s+ferramentas nativas desativadas/u),
+        );
         expect(mocks.println).toHaveBeenCalledWith(expect.stringMatching(/Título\s+Faça um teste integrado/u));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('SDK info'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Disabled tools:'));
@@ -832,9 +849,8 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
                 detail: expect.stringContaining('SDK sinalizou atualização sem contagem materializada'),
             }),
         );
-        expect(mocks.println).toHaveBeenCalledWith(
-            expect.stringMatching(/Ferramentas\s+SDK sem contagem/u),
-        );
+        expect(mocks.writeInlineStatus).toHaveBeenCalledWith(expect.stringMatching(/ferramentas · SDK sem contagem/u));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringMatching(/Ferramentas\s+SDK sem contagem/u));
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'session.tools_updated',
             expect.objectContaining({ sdkCount: null, localToolsActive: false }),
@@ -864,7 +880,10 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
                 detail: expect.stringContaining('sem ferramentas locais ativas'),
             }),
         );
-        expect(mocks.println).toHaveBeenCalledWith(
+        expect(mocks.writeInlineStatus).toHaveBeenCalledWith(
+            expect.stringMatching(/ferramentas · SDK dinâmicas 0 · sem ferramentas locais/u),
+        );
+        expect(mocks.println).not.toHaveBeenCalledWith(
             expect.stringMatching(/Ferramentas\s+SDK dinâmicas 0 · sem ferramentas locais/u),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(

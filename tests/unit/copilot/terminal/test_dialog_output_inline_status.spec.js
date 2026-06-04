@@ -159,6 +159,19 @@ describe('terminal/dialog/output inline status', () => {
         expect(mocks.rl.prompt).toHaveBeenCalled();
     });
 
+    it('normaliza ids e tools internas antes de reservar a linha viva', () => {
+        writeInlineStatus(
+            'request_user_input ainda executando · report_intent_local · chatcmpl-tool-80d5a00b25801fef',
+        );
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('Pergunta ao operador aguardando resposta');
+        expect(output).toContain('Intenção capturada');
+        expect(output).not.toContain('request_user_input');
+        expect(output).not.toContain('report_intent');
+        expect(output).not.toContain('chatcmpl-tool');
+    });
+
     it('permite desligar a linha viva por env', () => {
         process.env['COPILOT_TERMINAL_INLINE_STATUS'] = 'off';
 
