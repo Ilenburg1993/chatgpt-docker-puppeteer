@@ -40,6 +40,7 @@ export {
     terminalThemeRows,
     terminalThemeStatus,
     terminalThemeText,
+    terminalThemeWrappedRow,
 } from '../ui-theme.js';
 export {
     TERMINAL_TIME_DISPLAY_MODES,

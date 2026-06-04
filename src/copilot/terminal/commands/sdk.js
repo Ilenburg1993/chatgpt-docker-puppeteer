@@ -78,6 +78,7 @@ import {
     terminalThemeRow,
     terminalThemeRows,
     terminalThemeText,
+    terminalThemeWrappedRow,
 } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, renderRuntimeTargetLabel } from './runtime-target.js';
 
@@ -2016,7 +2017,7 @@ export async function cmdWorkspace({ println }, arg = '') {
                 terminalThemeRow('Uso', '/workspace list | read <path> | write <path> <content>', { role: 'command' }),
             );
             println(
-                terminalThemeRow(
+                terminalThemeWrappedRow(
                     'Uso',
                     '/workspace sync <sdkPath> [--to <localPath>] [--overwrite] · /workspace mirror [--to <localDir>] [--overwrite]',
                     { role: 'command' },
@@ -2028,7 +2029,7 @@ export async function cmdWorkspace({ println }, arg = '') {
                 }),
             );
             println(
-                terminalThemeRow(
+                terminalThemeWrappedRow(
                     'Obs',
                     'list/read/write operam no SDK virtual; sync/mirror materializam no FS local; promote faz FS para SDK com auditoria',
                 ),

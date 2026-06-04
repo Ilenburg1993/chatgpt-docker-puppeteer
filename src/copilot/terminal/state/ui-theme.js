@@ -265,6 +265,57 @@ export function terminalThemeRows(label, values, options = {}) {
 }
 
 /**
+ * @param {string} value
+ * @param {number} width
+ * @returns {string[]}
+ */
+function wrapTerminalRowValue(value, width) {
+    const maxWidth = Math.max(12, Math.floor(width));
+    /** @type {string[]} */
+    const lines = [];
+    let current = '';
+    for (const rawWord of String(value).split(/\s+/u).filter(Boolean)) {
+        /** @type {string[]} */
+        const chunks = [];
+        for (let index = 0; index < rawWord.length; index += maxWidth) {
+            chunks.push(rawWord.slice(index, index + maxWidth));
+        }
+        for (const word of chunks) {
+            const next = current ? `${current} ${word}` : word;
+            if (next.length <= maxWidth) {
+                current = next;
+                continue;
+            }
+            if (current) lines.push(current);
+            current = word;
+        }
+    }
+    if (current) lines.push(current);
+    return lines.length > 0 ? lines : [''];
+}
+
+/**
+ * @param {string} label
+ * @param {string} value
+ * @param {{ width?: number; role?: TerminalThemeRole; columns?: number; truncateLabel?: boolean }} [options]
+ * @returns {string}
+ */
+export function terminalThemeWrappedRow(label, value, options = {}) {
+    const labelWidth = Math.max(4, Math.floor(options.width ?? 12));
+    const columns = Math.max(labelWidth + 18, Math.floor(options.columns ?? 116));
+    const valueWidth = Math.max(12, columns - labelWidth - 4);
+    return wrapTerminalRowValue(value, valueWidth)
+        .map((line, index) =>
+            terminalThemeRow(index === 0 ? label : '', line, {
+                width: labelWidth,
+                role: options.role,
+                truncateLabel: options.truncateLabel,
+            }),
+        )
+        .join('\n');
+}
+
+/**
  * @param {boolean} success
  * @returns {string}
  */

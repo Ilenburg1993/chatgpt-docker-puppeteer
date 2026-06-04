@@ -29,6 +29,28 @@ function command(value) {
  */
 
 /**
+ * @param {string} text
+ * @param {number} width
+ * @returns {string[]}
+ */
+function wrapHelpText(text, width) {
+    /** @type {string[]} */
+    const lines = [];
+    let current = '';
+    for (const word of text.split(/\s+/u).filter(Boolean)) {
+        const next = current ? `${current} ${word}` : word;
+        if (next.length <= width) {
+            current = next;
+            continue;
+        }
+        if (current) lines.push(current);
+        current = word;
+    }
+    if (current) lines.push(current);
+    return lines.length > 0 ? lines : [''];
+}
+
+/**
  * @param {(text: string) => void} println
  * @param {string} title
  * @param {HelpCommand[]} rows
@@ -36,18 +58,25 @@ function command(value) {
  */
 function renderHelpSection(println, title, rows) {
     const commandWidth = 48;
+    const descriptionWidth = 66;
     const descriptionIndent = '  ' + ' '.repeat(commandWidth);
     println('');
     println(terminalThemeHeadline('assistant', title, [`${rows.length} comando(s)`]));
     for (const row of rows) {
+        const descriptionLines = wrapHelpText(row.description, descriptionWidth);
         if (row.command.length > commandWidth) {
             println(`  ${terminalThemeText('command', row.command)}`);
-            println(`${descriptionIndent} ${terminalThemeText('muted', row.description)}`);
+            for (const line of descriptionLines) {
+                println(`${descriptionIndent} ${terminalThemeText('muted', line)}`);
+            }
             continue;
         }
         println(
-            `  ${terminalThemeText('command', row.command.padEnd(commandWidth))} ${terminalThemeText('muted', row.description)}`,
+            `  ${terminalThemeText('command', row.command.padEnd(commandWidth))} ${terminalThemeText('muted', descriptionLines[0] ?? '')}`,
         );
+        for (const line of descriptionLines.slice(1)) {
+            println(`${descriptionIndent} ${terminalThemeText('muted', line)}`);
+        }
     }
 }
 

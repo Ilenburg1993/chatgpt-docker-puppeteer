@@ -6,7 +6,7 @@
  */
 
 import { readTerminalExternalToolCapabilitySummary } from '../capabilities/external-tools.js';
-import { terminalThemeHeadline, terminalThemeRow } from '../state/ui-theme.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeWrappedRow } from '../state/ui-theme.js';
 
 /**
  * @typedef {object} TerminalCommandContext
@@ -52,7 +52,7 @@ function renderAvailability(value) {
 function printRows(println, rows, options = {}) {
     for (const [label, value] of rows) {
         const rowOptions = options.width === undefined ? {} : { width: options.width };
-        println(terminalThemeRow(label, value, rowOptions));
+        println(terminalThemeWrappedRow(label, value, rowOptions));
     }
 }
 

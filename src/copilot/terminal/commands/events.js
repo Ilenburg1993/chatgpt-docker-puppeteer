@@ -19,6 +19,7 @@ import {
     terminalThemeHeadline,
     terminalThemeRow,
     terminalThemeText,
+    terminalThemeWrappedRow,
 } from '../state/index.js';
 
 /**
@@ -724,7 +725,7 @@ export async function cmdEvents({ println }, arg = '') {
     println('');
     println(terminalThemeHeadline('accent', `Eventos SSE - últimas ${filters.limit}`));
     println(
-        terminalThemeRow(
+        terminalThemeWrappedRow(
             'Registro',
             `${compactTerminalOperatorToolText(state.path ?? '(sem arquivo)', 88)} · ${state.events} evento(s) · fila ${state.queueDepth}`,
             { role: 'muted' },

@@ -56,6 +56,9 @@ vi.mock('../../../../src/copilot/terminal/state/index.js', () => ({
     terminalThemeRow: vi.fn(
         (/** @type {string} */ label, /** @type {string} */ value) => `  ${label.padEnd(12)} ${value}`,
     ),
+    terminalThemeWrappedRow: vi.fn(
+        (/** @type {string} */ label, /** @type {string} */ value) => `  ${label.padEnd(12)} ${value}`,
+    ),
     terminalThemeText: vi.fn((/** @type {string} */ _role, /** @type {string} */ text) => text),
 }));
 

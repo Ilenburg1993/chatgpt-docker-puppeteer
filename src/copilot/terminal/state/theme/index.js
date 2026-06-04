@@ -15,4 +15,5 @@ export {
     terminalThemeRows,
     terminalThemeStatus,
     terminalThemeText,
+    terminalThemeWrappedRow,
 } from '../ui-theme.js';

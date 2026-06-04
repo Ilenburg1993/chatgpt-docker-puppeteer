@@ -8,6 +8,7 @@ import {
     terminalThemeDivider,
     terminalThemeHeadline,
     terminalThemeRow,
+    terminalThemeWrappedRow,
 } from '../state/ui/index.js';
 import {
     buildTerminalToolActivityPresentation,
@@ -594,7 +595,7 @@ export function cmdActivity({ println }, arg) {
             const engine = entry.engine ? ` · ${entry.engine}` : '';
             const engineDetail = detail ? engine : '';
             println(
-                terminalThemeRow(
+                terminalThemeWrappedRow(
                     'Operação',
                     `${ts} · ${renderIoOperationLabel(entry.operation)} · ${compactHumanText(entry.target)}${bytes}${duration}${engineDetail}`,
                     { role: entry.success ? 'muted' : 'error' },
@@ -620,11 +621,9 @@ export function cmdActivity({ println }, arg) {
         const ts = renderActivityTime(entry.ts, { detail, now });
         const extra = entry.detail ? ` — ${compactOperatorDetail(entry.detail)}` : '';
         println(
-            terminalThemeRow(
-                'Evento',
-                `${ts} · ${renderTimelineEntryHeading(entry)}${extra}`,
-                { role: renderActivitySeverityRole(entry.severity) },
-            ),
+            terminalThemeWrappedRow('Evento', `${ts} · ${renderTimelineEntryHeading(entry)}${extra}`, {
+                role: renderActivitySeverityRole(entry.severity),
+            }),
         );
     }
     if (!detail && projection.history.length > timelineEntries.length) {

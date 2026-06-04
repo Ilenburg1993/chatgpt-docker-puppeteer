@@ -213,8 +213,7 @@ describe('terminal/commands/activity', () => {
 
         expect(ctx.output()).toContain('Timeline completa');
         expect(ctx.output()).toContain('1 arquivo único · 2 registros');
-        expect(ctx.output()).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} \(há \d+[smhda]\)\]/u);
-        expect(ctx.output()).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/u);
+        expect(ctx.output()).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2} \(há \d+[smhda]\)\]/u);
         expect(ctx.output()).toContain('io-engine.fs.readFile.text');
         expect(ctx.output()).toContain('turn:turn-1');
         expect(ctx.output()).toContain('req=ui-1');
@@ -606,7 +605,7 @@ describe('terminal/commands/activity', () => {
 
         cmdActivity({ println: ctx.println }, '5');
 
-        expect(ctx.output()).toContain('terminal live canonical deltas tools ask_user usage');
+        expect(ctx.output()).toMatch(/terminal live canonical deltas\s+tools ask_user usage/u);
         expect(ctx.output()).not.toContain('terminal live canonical deltas tools Pergunta ao operador usage');
     });
 

@@ -7011,5 +7011,19 @@
   - artefato: `artifacts/terminal-live/2026-06-04T16-13-42-410Z/summary.md`;
   - resultado: PASS em 21/21 critérios, incluindo copy operacional de libs e ausência de ruído DB
     no console humano.
+- [x] Wrapping visual padronizado:
+  - achado: `/workspace list`, `/activity`, `/events` e uma linha de `/help full` ainda podiam
+    ultrapassar 120 colunas em PTY real;
+  - correção: `terminalThemeWrappedRow()` centraliza quebra de linhas mantendo coluna de label
+    estável;
+  - superfícies ajustadas: `/terminal libs detail`, `/workspace list`, `/activity`, `/events` e
+    descrições longas de `/help full`;
+  - validação focada: `test_ui_theme`, `test_commands_sdk`, `test_commands_activity`,
+    `test_commands_terminal`, `test_commands_help` e `test_commands_events`;
+  - live final:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-wrapped-help-events-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-23-18-007Z/summary.md`;
+  - medição: `awk 'NR>3 && length($0)>120' default-ux-cycle.plain.log` não encontrou linhas internas
+    acima de 120 colunas.
 - [ ] Próxima lacuna: validar visualmente TUI completa `fzf`/`gum` quando for aceitável tomar o TTY
       real, mantendo o fluxo filtrado como prova automatizada.

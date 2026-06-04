@@ -441,6 +441,11 @@ Decisão:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-no-db-criterion-20260604 --timeout-ms 140000`;
   - artefato: `artifacts/terminal-live/2026-06-04T16-13-42-410Z/summary.md`;
   - resultado: PASS em 21/21 critérios, incluindo `ux-cycle-no-db-console-noise`.
+- [x] Wrapping visual da superfície de libs:
+  - `terminalThemeWrappedRow()` evita que exemplos longos em `/terminal libs detail` estourem a
+    largura visual;
+  - live final: `artifacts/terminal-live/2026-06-04T16-23-18-007Z/summary.md`;
+  - medição final não encontrou linhas internas acima de 120 colunas no `plain.log`.
 
 ## 9. Próxima execução recomendada
 
