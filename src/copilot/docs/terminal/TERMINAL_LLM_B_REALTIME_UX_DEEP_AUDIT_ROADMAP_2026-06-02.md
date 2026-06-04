@@ -5286,5 +5286,22 @@
       `/activity`, `/events` e estado pronto.
 - [x] Teste unitário reforçado: `test_live_status_line.spec.js` agora exige ausência de `conversa
       ativa/parada` nos pulsos curtos e limites de comprimento mais agressivos.
-- [ ] Próxima live estética: confirmar em PTY que boot, turno inicial e finalização não quebram em
-      múltiplas linhas após o corte do tail de runtime.
+- [x] Live estética após corte do tail:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-short-transient-status-20260604-2310`.
+- [x] Evidência positiva: boot e `Contexto atualizado` passaram para uma linha reservada única em
+      PTY; prompt temporário permaneceu `LLM-B pensando` sem modelo/esforço.
+- [x] Resultado de cenário: `Status: FAIL`, mas por contrato de transcript (`final-delta-block`,
+      `sse-canonical-transcript-events`, `export-sse-correlation`), não por erro de terminal. A
+      LLM-B chegou ao `ask_user` e ao pós-ask, mas o bloco público inicial `DELTA-CANONICAL-*` não
+      foi materializado como transcript público antes da pergunta.
+- [x] Nova lacuna visual encontrada: a finalização de turno ainda aparecia como
+      `LLM-B turno · Turno do assistente concluí… · <idade>`, quebrando em duas linhas no PTY
+      estreito.
+- [x] Correção aplicada: atividades de finalização de turno (`Turno do assistente concluído`,
+      `Reply do turno explícito resolvido`) renderizam a linha viva curta
+      `LLM-B finalizando · <idade>`.
+- [x] Teste unitário: `test_live_status_line.spec.js` cobre a ausência de `Turno do assistente`,
+      `concluí` e `conversa ativa` no pulso de finalização.
+- [ ] Próxima investigação: separar falha real do modelo versus lacuna do harness no critério
+      `final-delta-block`; o live deve exigir materialização pública de deltas sem contar marcadores
+      presentes apenas no prompt inicial.

@@ -172,6 +172,21 @@ function isCompletedLiveStatusActivity(label) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {boolean}
+ */
+function isTurnFinalizationActivity(activity) {
+    const text = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase();
+    return (
+        activity.phase === 'turn' &&
+        (text.includes('turno do assistente conclu') ||
+            text.includes('reply do turno') ||
+            text.includes('turno explícito resolvido') ||
+            text.includes('turno explicito resolvido'))
+    );
+}
+
+/**
  * @param {{
  *     activity?: ReturnType<typeof readTerminalActivitySnapshot>;
  *     runtime?: ReturnType<typeof readTerminalRuntimeState>;
@@ -251,6 +266,14 @@ export function formatTerminalLiveStatusLine(input = {}) {
     }
     const label = compactLiveStatusText(activity.label, LIVE_LABEL_MAX_CHARS);
     if (activity.phase === 'turn') {
+        if (isTurnFinalizationActivity(activity)) {
+            return (
+                `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+                `${terminalThemeText(severityRole, 'finalizando')}` +
+                `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)}${queue}`)}` +
+                '\x1b[K'
+            );
+        }
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, `turno · ${label}`)}` +

@@ -369,6 +369,28 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(72);
     });
 
+    it('compacta finalização de turno sem rótulo truncado longo', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'turn',
+            label: 'Turno do assistente concluído',
+            detail: 'turno 2',
+            toolName: null,
+            startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
+        };
+
+        const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:02.000-03:00') });
+
+        expect(line).toContain('finalizando');
+        expect(line).toContain('2s');
+        expect(line).not.toContain('Turno do assistente');
+        expect(line).not.toContain('concluí');
+        expect(line).not.toContain('conversa ativa');
+        expect(line.length).toBeLessThan(42);
+    });
+
     it('prioriza ask_user humano sobre atividade antiga na linha viva', async () => {
         const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');
