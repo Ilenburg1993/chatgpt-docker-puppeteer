@@ -3692,6 +3692,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const markerCount = countCanonicalDeltaMarkers(plain);
     const preEventsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b/i)[0] ?? plain;
     const beforeRawDiagnosticsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b[^\n]*--raw/i)[0] ?? plain;
+    const beforeReadyPlain = plain.split(/LLM-B pronta/iu)[0] ?? plain;
     const activity40Sections = beforeRawDiagnosticsPlain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/activity\s+40\b[^\n\r]*/iu).slice(1);
     const latestActivity40Section =
         activity40Sections
@@ -4040,6 +4041,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-no-standalone-boot-box',
             pass: !/┌─ Terminal Permanente LLM-B/u.test(plain),
             detail: 'standalone boot surface avoided the old second box',
+        },
+        {
+            id: 'ux-no-boot-prompt-double-paint',
+            pass: !/voc[eê]\[([^\]\n]+)\]›[^\n]*\n\s*voc[eê]\[\1\]›/iu.test(beforeReadyPlain),
+            detail: 'boot did not paint the same idle prompt twice before ready',
         },
         {
             id: 'ux-human-tool-names',

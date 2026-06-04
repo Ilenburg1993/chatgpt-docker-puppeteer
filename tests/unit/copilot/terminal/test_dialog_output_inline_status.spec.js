@@ -32,6 +32,18 @@ const mocks = vi.hoisted(() => ({
         pendingQuestionShadowRemainingMs: null,
         lastPrInfo: null,
     },
+    activitySnapshot: {
+        phase: 'tool',
+        label: 'Executando tool',
+        detail: 'lendo arquivo',
+        source: 'sdk',
+        severity: 'info',
+        progress: null,
+        toolName: 'read_file_content',
+        startedAt: 1,
+        updatedAt: 2,
+        ageMs: 1000,
+    },
 }));
 
 vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
@@ -58,18 +70,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', (
 }));
 
 vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
-    readTerminalActivitySnapshot: vi.fn(() => ({
-        phase: 'tool',
-        label: 'Executando tool',
-        detail: 'lendo arquivo',
-        source: 'sdk',
-        severity: 'info',
-        progress: null,
-        toolName: 'read_file_content',
-        startedAt: 1,
-        updatedAt: 2,
-        ageMs: 1000,
-    })),
+    readTerminalActivitySnapshot: vi.fn(() => mocks.activitySnapshot),
 }));
 
 vi.mock('../../../../src/copilot/terminal/state/ui-preferences.js', () => ({
@@ -119,6 +120,18 @@ describe('terminal/dialog/output inline status', () => {
         mocks.busy = false;
         mocks.rl.closed = false;
         mocks.rl.line = '';
+        mocks.activitySnapshot = {
+            phase: 'tool',
+            label: 'Executando tool',
+            detail: 'lendo arquivo',
+            source: 'sdk',
+            severity: 'info',
+            progress: null,
+            toolName: 'read_file_content',
+            startedAt: 1,
+            updatedAt: 2,
+            ageMs: 1000,
+        };
     });
 
     afterEach(() => {
@@ -189,6 +202,29 @@ describe('terminal/dialog/output inline status', () => {
 
         const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
         expect(output).toContain('linha permanente durante streaming');
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+        expect(mocks.rl.prompt).not.toHaveBeenCalled();
+    });
+
+    it('não redesenha prompt automaticamente para printlnBlock durante boot', async () => {
+        mocks.activitySnapshot = {
+            phase: 'boot',
+            label: 'Iniciando agente',
+            detail: 'Inicializando ambiente da conversa',
+            source: 'dialog',
+            severity: 'info',
+            progress: null,
+            toolName: null,
+            startedAt: 1,
+            updatedAt: 2,
+            ageMs: 1000,
+        };
+
+        printlnBlock(['  Preparando agente...']);
+        await new Promise((resolve) => setImmediate(resolve));
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('Preparando agente');
         expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
         expect(mocks.rl.prompt).not.toHaveBeenCalled();
     });

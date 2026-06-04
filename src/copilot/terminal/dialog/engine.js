@@ -744,6 +744,8 @@ async function _tryStartDialogLoop() {
     });
     if (resumeSessionAttach) {
         markTerminalActivityIdle('Sessão retomada; aguardando próxima mensagem');
+        const rl = getRl();
+        if (rl) scheduleTerminalPromptRedraw(rl, buildUserPrompt());
     }
 }
 

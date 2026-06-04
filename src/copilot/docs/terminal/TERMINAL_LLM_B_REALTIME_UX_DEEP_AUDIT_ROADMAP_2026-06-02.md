@@ -6116,6 +6116,34 @@
     `ux-no-generic-tool-failure-copy`, `ux-activity-no-redundant-timeline-labels`,
     `ask-user-single-source`, `export-ask-user`, `export-ask-user-answer`,
     `sse-canonical-transcript-events`, `no-prompt-double-render` e `no-terminal-errors`.
-- [ ] Próxima frente UX: reduzir prompts duplicados visuais de boot (`você[auto/high]›` repetido em
-      sequência antes da sessão estabilizar) sem voltar a esconder eventos duráveis; avaliar se o
-      coalescing de prompt deve diferenciar boot, standby e pós-comando.
+- [x] Achado UX: o boot ainda podia renderizar dois prompts idênticos antes de `LLM-B pronta`, como
+      `você[auto/high]›` em uma linha e, logo em seguida, outro `você[auto/high]›` com a linha viva
+      de `Iniciando agente`.
+- [x] Decisão UX: durante `phase=boot`, blocos duráveis (`printlnBlock`) não devem redesenhar prompt
+      automaticamente. A linha viva pode reservar sua área e pintar o prompt uma vez; o prompt final
+      pós-boot deve ser agendado explicitamente quando a atividade marca `Pronto`.
+- [x] Correção aplicada: `redrawPromptIfInteractive()` agora ignora atividade `boot`; `_tryStartDialogLoop()`
+      agenda `buildUserPrompt()` depois de `markTerminalActivityIdle('Sessão retomada...')`.
+- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre que `printlnBlock('Preparando
+      agente...')` escreve a linha permanente, mas não chama `setPrompt()`/`prompt()` durante boot.
+- [x] Contrato live reforçado: o runner ganhou `ux-no-boot-prompt-double-paint`, bloqueando dois
+      prompts idênticos antes de `LLM-B pronta`.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/dialog/output.js src/copilot/terminal/dialog/engine.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
+  - `npx eslint src/copilot/terminal/dialog/output.js src/copilot/terminal/dialog/engine.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Live no-PR de inspeção:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --no-pr --label live-no-pr-boot-prompt-20260605-0235 --timeout-ms 90000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T05-35-25-772Z/summary.md`.
+  - Resultado geral: `Status: FAIL` por timeout/diagnósticos incompletos do próprio ciclo no-PR, mas
+    a inspeção do `terminal.plain.log` confirmou que a duplicação de prompt de boot sumiu.
+- [x] Live canônica de contrato:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-boot-prompt-dedupe-20260605-0237 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T05-37-25-546Z/summary.md`.
+  - Resultado geral: `Status: FAIL` porque o modelo pulou os oito `DELTA-CANONICAL-*` antes do
+    `ask_user`; porém `ux-no-boot-prompt-double-paint`,
+    `ux-no-durable-output-inside-default-prompt`, `ux-no-generic-tool-failure-copy`,
+    `ux-activity-no-redundant-timeline-labels` e `no-terminal-errors` passaram.
+- [ ] Próxima frente UX: investigar por que respostas automáticas muito rápidas podem aparecer como
+      `SIM` sem o prefixo visual `você...[PERG]›` no plain/live, mesmo quando o evento
+      `user_input.requested` existe e o card da pergunta foi renderizado.

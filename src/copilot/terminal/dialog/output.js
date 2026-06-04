@@ -575,6 +575,22 @@ function isTerminalReadlineOpen(rl) {
 }
 
 /**
+ * @returns {boolean}
+ */
+function isTerminalBootActivityActive() {
+    const snapshot = readTerminalActivitySnapshot();
+    const current =
+        snapshot && typeof snapshot === 'object' && 'current' in snapshot
+            ? /** @type {{ current?: unknown }} */ (snapshot).current
+            : snapshot;
+    const phase =
+        current && typeof current === 'object' && typeof /** @type {{ phase?: unknown }} */ (current).phase === 'string'
+            ? /** @type {{ phase: string }} */ (current).phase
+            : '';
+    return phase === 'boot';
+}
+
+/**
  * A linha viva nao deve disputar a linha interativa quando o operador ja comecou a digitar.
  *
  * @param {unknown} rl
@@ -621,6 +637,7 @@ function shouldSkipDuplicatePromptPaint(rl, prompt, now = Date.now()) {
 function redrawPromptIfInteractive() {
     const rl = getRl();
     if (!rl || getBusy() || _terminalRenderLockDepth > 0) return;
+    if (isTerminalBootActivityActive()) return;
     scheduleTerminalPromptRedraw(rl, () => buildUserPrompt());
 }
 
