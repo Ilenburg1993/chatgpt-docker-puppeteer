@@ -5486,3 +5486,52 @@
   - `node --check src/copilot/terminal/commands/metrics.js`;
   - `npx eslint src/copilot/terminal/commands/metrics.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
   - `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`.
+
+### 12.36 Contratos live humanizados e erros BYOK visíveis
+
+- [x] Live pós-humanização de source/labels:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-post-live-ux-fixes-20260605-0005`.
+- [x] Resultado inicial: `Status: FAIL` apenas no critério `post-ask-final-visible`.
+- [x] Diagnóstico: a tela real continha `Resposta pós-pergunta LLM-B via SDK` e o SSE/export
+      continham `POST-ASK-CANONICAL-FINAL`, mas o verificador ainda procurava o formato antigo
+      `Resposta pós-pergunta sdk/assistant.message`.
+- [x] Correção aplicada: o runner live aceita headings antigos e novos, incluindo
+      `LLM-B via SDK`, sem regredir compatibilidade com logs históricos.
+- [x] Lacuna visual: quando título e detalhe eram iguais, o transcript renderizava
+      `Resposta pós-pergunta LLM-B via SDK · Resposta pós-pergunta`.
+- [x] Correção aplicada: `renderTerminalAssistantTranscript()` suprime detalhe duplicado quando
+      `detail === title`, preservando detalhe útil quando ele acrescenta contexto.
+- [x] Lacuna visual: `/activity` usava dois rótulos `Detalhe` no topo; o segundo era só orientação
+      técnica para `/activity detail`.
+- [x] Correção aplicada: a linha de orientação passou a usar `Técnico`, reduzindo repetição visual.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/events/assistant-transcript-renderer.js`;
+  - `node --check src/copilot/terminal/commands/activity.js`;
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint src/copilot/terminal/events/assistant-transcript-renderer.js src/copilot/terminal/commands/activity.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+- [x] Live seguinte:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-post-live-ux-fixes-20260605-0010`.
+- [x] Resultado: `Status: BLOCKED` por `byok-provider-turn-failed`; o provider BYOK falhou após
+      tools reais e antes de deltas/ask_user, com fallback para Copilot auto bloqueado por contrato.
+- [x] Lacuna operacional encontrada: o terminal exibiu o painel `Provider BYOK`, mas `/errors 10`
+      informou `0 total · 0 no buffer`, criando contradição para o operador.
+- [x] Decisão UX: erros recuperáveis genéricos de `model_call` continuam fora de `/errors`, mas
+      falhas BYOK visíveis e contidas que encerram turno são diagnóstico operador-facing e devem
+      aparecer no ErrorTracker.
+- [x] Correção aplicada: `agent-runtime-events` registra em `defaultErrorTracker` falhas
+      `terminal.byok_provider`, `terminal.byok_session`, `terminal.agent` e `terminal.session`
+      apenas quando chegaram à superfície do operador; o tracker nunca pode quebrar renderização.
+- [x] Contrato atualizado: linha viva compacta de tool exige `Ler arquivo`, não
+      `workspace.read_file`, mantendo IDs técnicos fora da superfície humana padrão.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/events/agent-runtime-events.js`;
+  - `node --check tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
+  - `npx eslint src/copilot/terminal/events/agent-runtime-events.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
+  - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
+- [ ] Próxima live: repetir o cenário canônico quando o provider BYOK estiver estável para
+      confirmar `post-ask-final-visible` com o verificador humanizado.
+- [ ] Próxima live de falha controlada: reproduzir ou simular erro BYOK para confirmar que
+      `/errors 10` mostra `terminal.byok_provider` com ação/contexto, sem duplicar eventos
+      recuperáveis internos.

@@ -119,7 +119,9 @@ export function renderTerminalAssistantTranscript(input) {
     const displaySource = formatAssistantTranscriptSourceForOperator(source);
     const status = input.status ?? 'message';
     const badgeRole = status === 'error' ? 'error' : status === 'completed' ? 'success' : 'info';
-    const detail = input.detail ? ` ${terminalThemeText('muted', `· ${input.detail}`)}` : '';
+    const rawDetail = typeof input.detail === 'string' ? input.detail.trim() : '';
+    const uniqueDetail = rawDetail && rawDetail !== String(title).trim() ? rawDetail : '';
+    const detail = uniqueDetail ? ` ${terminalThemeText('muted', `· ${uniqueDetail}`)}` : '';
 
     const lines = [SEPARATOR, terminalThemeRow(title, `${displaySource}${detail}`, { role: badgeRole }), ''];
     for (const line of content.split('\n')) {

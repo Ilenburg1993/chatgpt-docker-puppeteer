@@ -45,6 +45,7 @@ import {
     recordByokProviderModelCallFailure,
     recordByokProviderModelCallSuccess,
 } from '#copilot/model-gateway';
+import { defaultErrorTracker } from '#copilot/observability';
 import { getShowSessionActivity, getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
 import {
     broadcastSse,
@@ -322,6 +323,26 @@ function resolveRecoverableModelCallOperatorDetail(evt) {
         model ? `modelo ${model}` : null,
     ].filter(Boolean);
     return bits.join(' · ');
+}
+
+/**
+ * Registra em `/errors` apenas falhas que realmente chegaram à superfície do operador. Eventos recuperáveis do SDK
+ * continuam fora do tracker por padrão; quando o BYOK bloqueia fallback/retry e encerra o turno, o operador precisa
+ * encontrá-lo em `/errors` com a mesma orientação exibida em tela.
+ *
+ * @param {Error} error
+ * @param {{ source: string; metadata?: Record<string, unknown> }} options
+ * @returns {void}
+ */
+function trackOperatorVisibleTerminalError(error, options) {
+    try {
+        defaultErrorTracker?.trackError?.(error, {
+            source: options.source,
+            metadata: options.metadata,
+        });
+    } catch {
+        // O tracker de erro nunca pode quebrar a renderização do terminal.
+    }
 }
 
 /**
@@ -752,6 +773,17 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             severity: 'error',
             source: 'agent',
         });
+        trackOperatorVisibleTerminalError(new Error(detail), {
+            source: byokError.enabled ? 'terminal.byok_session' : 'terminal.session',
+            metadata: {
+                errorType,
+                byokProvider: byokError.enabled,
+                byokProfile: byokError.profile,
+                byokProviderType: byokError.provider,
+                byokModel: byokError.model,
+                operatorMeaning: byokError.operatorDetail,
+            },
+        });
         println(`\n${terminalThemeRow(byokError.enabled ? 'Erro BYOK' : 'Erro de sessão', detail, { role: 'error' })}`);
         broadcastSse(
             'session.error',
@@ -838,6 +870,22 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                       role: severity,
                   })}`;
             println(rendered);
+        }
+        if (shouldPrint && (!isRecoverableModelCall || isByokModelCall)) {
+            trackOperatorVisibleTerminalError(new Error(detail), {
+                source: isByokModelCall ? 'terminal.byok_provider' : 'terminal.agent',
+                metadata: {
+                    hookType,
+                    errorContext,
+                    recoverable,
+                    byokEnabled: evt?.['byokEnabled'] === true,
+                    byokProviderType:
+                        typeof evt?.['byokProviderType'] === 'string' ? evt['byokProviderType'] : null,
+                    byokProfile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
+                    byokModel: typeof evt?.['byokModel'] === 'string' ? evt['byokModel'] : null,
+                    operatorMeaning: operatorDetail,
+                },
+            });
         }
         broadcastSse(
             'agent.error',

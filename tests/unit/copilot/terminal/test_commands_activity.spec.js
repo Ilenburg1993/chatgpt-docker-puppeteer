@@ -184,6 +184,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).not.toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u);
         expect(ctx.output()).not.toMatch(/\[\d{2}:\d{2}:\d{2}\]/u);
         expect(ctx.output()).toContain('Detalhes técnicos ficam em /activity detail');
+        expect(ctx.output()).toContain('Técnico');
+        expect(ctx.output()).not.toContain('Detalhe      Detalhes técnicos');
         expect(ctx.output()).not.toContain('source');
         expect(ctx.output()).not.toContain('Streaming público');
         expect(ctx.output()).not.toContain('deltas');

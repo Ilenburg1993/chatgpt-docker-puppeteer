@@ -46,6 +46,9 @@ const reviseRecentTerminalTurnTraceStatus = vi.fn(() => null);
 const readTerminalTurnTraceProjection = vi.fn(() => ({ current: null, recent: [] }));
 const getTerminalDetailLevel = vi.fn(() => 'detailed');
 const recordToolCall = vi.fn();
+const defaultErrorTracker = {
+    trackError: vi.fn(),
+};
 const readConfiguredByokSummary = vi.fn(() => ({ enabled: false }));
 
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
@@ -92,6 +95,7 @@ vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
 
 vi.mock('../../../src/copilot/observability/index.js', () => ({
     recordToolCall,
+    defaultErrorTracker,
 }));
 
 vi.mock('#copilot/config', async (importOriginal) => {
@@ -474,7 +478,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('LLM-B perguntou'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('abrindo arquivo grande'));
-        expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
+        expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('Ler arquivo'));
+        expect(writeInlineStatus).not.toHaveBeenCalledWith(expect.stringContaining('workspace.read_file'));
         expect(writeInlineStatus).toHaveBeenCalledWith(expect.stringContaining('abrindo arquivo grande'));
     });
 
@@ -1575,5 +1580,46 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(println).toHaveBeenCalledWith(expect.stringContaining('[1] sim   [2] não'));
         expect(rl.pause).toHaveBeenCalled();
         expect(rl.resume).toHaveBeenCalled();
+    });
+
+    it('registra falha BYOK visível no ErrorTracker para /errors', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('error')?.[0]?.({
+            hookType: 'errorOccurred',
+            errorContext: 'model_call',
+            recoverable: true,
+            errorMessage: 'Erro do SDK sem mensagem estruturada.',
+            byokEnabled: true,
+            byokProviderType: 'openai',
+            byokProfile: 'kilo',
+            byokModel: 'kilo-auto/free',
+        });
+
+        expect(defaultErrorTracker.trackError).toHaveBeenCalledWith(
+            expect.any(Error),
+            expect.objectContaining({
+                source: 'terminal.byok_provider',
+                metadata: expect.objectContaining({
+                    errorContext: 'model_call',
+                    byokProviderType: 'openai',
+                    byokProfile: 'kilo',
+                    byokModel: 'kilo-auto/free',
+                }),
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Provider BYOK'));
     });
 });

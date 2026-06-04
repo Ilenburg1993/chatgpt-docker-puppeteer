@@ -429,7 +429,7 @@ export function cmdActivity({ println }, arg) {
         println(terminalThemeRow('Origem', current.source));
     }
     if (!detail) {
-        println(terminalThemeRow('Detalhe', 'Detalhes técnicos ficam em /activity detail.', { role: 'command' }));
+        println(terminalThemeRow('Técnico', 'Detalhes técnicos ficam em /activity detail.', { role: 'command' }));
     }
 
     if (activeTurnTrace) {

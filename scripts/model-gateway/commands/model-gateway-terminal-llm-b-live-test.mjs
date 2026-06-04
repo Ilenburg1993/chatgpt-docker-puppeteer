@@ -3746,9 +3746,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     }, 0);
     const publicDeltaMarkerCount = Math.max(liveDeltaMarkerCount, assistantMessageDeltaMarkerCount);
     const liveDeltaBlockVisible = liveDeltaBlocks.length > 0;
+    const assistantMessageTranscriptHeadingRe =
+        /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message|Mensagem da LLM-B\s+(?:LLM-B via SDK|SDK assistant))/u;
+    const postAskAssistantTranscriptHeadingRe =
+        /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message|Resposta pós-pergunta\s+(?:sdk\/assistant\.message|LLM-B via SDK))/u;
     const assistantMessageDeltaBlockVisible = terminalBlockContains(
         preEventsPlain,
-        /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message)/u,
+        assistantMessageTranscriptHeadingRe,
         /DELTA-CANONICAL-8/u,
     ) || assistantMessageDeltaMarkerCount >= 8;
     const postAskFinalRe = scenario.postAskFinalRe;
@@ -3759,7 +3763,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     );
     const finalRenderedByAssistantMessage = terminalBlockContains(
         preEventsPlain,
-        /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message|Resposta pós-pergunta\s+sdk\/assistant\.message)/u,
+        postAskAssistantTranscriptHeadingRe,
         postAskFinalRe,
     );
     const taskDeltaActivityDuringDialog =
