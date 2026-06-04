@@ -337,15 +337,20 @@ function printByokSdkSessionBoundaryHint(println, options = {}) {
     println(
         terminalThemeRow(
             'Próximo',
-            `${prefix} Para entrar/sair de BYOK ou trocar provedor/perfil, agende /session sdk next new e reinicie a tarefa do terminal; /restart reinicia só a conversa.`,
+            `${prefix} Troca de provedor/perfil entra no próximo boot: /session sdk next new.`,
         ),
     );
     println(
         terminalThemeRow(
-            'Modelo vivo',
-            '/byok model <id> tenta trocar o modelo na sessão viva apenas quando ela já nasceu com o mesmo provedor BYOK.',
+            'Conversa',
+            '/restart reinicia só a conversa; não troca o provedor da sessão viva.',
             { role: 'command' },
         ),
+    );
+    println(
+        terminalThemeRow('Modelo vivo', '/byok model <id> só atua na sessão viva se o provedor/perfil já coincidem.', {
+            role: 'command',
+        }),
     );
 }
 
@@ -365,29 +370,31 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
         inventory = await listTerminalSdkSessionInventory();
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        println(
-            `  \x1b[33mSessão viva não inspecionada para troca BYOK: ${message}. A seleção do processo continua pronta para o próximo boot.\x1b[0m`,
-        );
+        println(terminalThemeRow('Sessão viva', `não inspecionada · ${message}; seleção fica para o próximo boot`, { role: 'warn' }));
         return;
     }
     if (!inventory.currentSessionId || !isSameTerminalByokProviderBoundary(summary, inventory.persistedByokBinding)) {
         println(
-            '  \x1b[33mSessão atual usa outro provedor/perfil; modelo preparado para o próximo boot, sem troca cruzada na conversa viva.\x1b[0m',
+            terminalThemeRow(
+                'Troca modelo',
+                'sessão atual usa outro provedor/perfil; modelo preparado para o próximo boot, sem troca cruzada na conversa viva',
+                { role: 'warn' },
+            ),
         );
         return;
     }
     try {
         setTerminalModelProjection(model);
-        println(
-            `  \x1b[32mModelo BYOK solicitado na sessão viva: ${model}.\x1b[0m`,
-        );
-        println(
-            '  \x1b[90mProvedor/perfil foram preservados; confirme o modelo efetivo no próximo turno por uso registrado ou evento de modelo confirmado.\x1b[0m',
-        );
+        println(terminalThemeRow('Modelo vivo', `solicitado ${model}`, { role: 'success' }));
+        println(terminalThemeRow('Confirmar', 'provedor/perfil preservados; confira modelo efetivo no próximo turno/evento', { role: 'muted' }));
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         println(
-            `  \x1b[33mNão foi possível pedir troca de modelo BYOK no runtime vivo: ${message}. A seleção do processo continua pronta para o próximo boot.\x1b[0m`,
+            terminalThemeRow(
+                'Troca modelo',
+                `falhou na sessão viva · ${message}; seleção fica pronta para o próximo boot`,
+                { role: 'warn' },
+            ),
         );
     }
 }
@@ -2184,23 +2191,10 @@ async function renderStatus(projection, println) {
         ),
     );
     printByokSdkSessionBoundaryHint(println);
-    println(
-        terminalThemeRows(
-            'Comandos',
-            [
-                '/byok reload · /byok providers · /byok profiles · /byok env',
-                '/byok gateway operator-ready [profile:<id>]',
-                '/byok gateway catalog refresh|diff|integrity|sqlite|search <query>',
-                '/byok gateway selection audit [effective|runtime-proof|write-trace]',
-                '/byok models [all-providers|grouped|refresh|free|reasoning|safe]',
-                '/byok recommend [all-providers] [grouped] [filtros] [n]',
-                '/byok probe [chat|agent|streaming|json|vision] [profile:<nome>] [model:<id>]',
-                '/byok use <perfil|sdk> · /byok model <id> · /byok provider <preset> [model]',
-                '/byok auto [on|policy|doctor|standby|proof-plan|switch|history|off]',
-            ],
-            { role: 'command', width: 12 },
-        ),
-    );
+    println(terminalThemeRow('Rotina', '/byok providers · /byok profiles · /byok models · /byok recommend', { role: 'command' }));
+    println(terminalThemeRow('Trocar', '/byok use <perfil|sdk> · /byok model <id> · /byok provider <preset>', { role: 'command' }));
+    println(terminalThemeRow('Provar', '/byok probe chat · /byok probe agent · /byok probe shortlist', { role: 'command' }));
+    println(terminalThemeRow('Avançado', '/byok gateway commands · /byok auto policy · /byok env', { role: 'command' }));
     println(terminalThemeDivider(66));
     println('');
 }

@@ -43,7 +43,7 @@ describe('terminal/byok/session-binding', () => {
         expect(result.state).toBe('live-model-drift');
         expect(result.sameProviderBoundary).toBe(true);
         expect(result.headline).toBe(
-            'provedor BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação',
+            'rota BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação',
         );
         expect(result.action).toBe(
             '/byok model <id> pede a troca na sessão atual; confirme pelo próximo uso registrado ou por evento de modelo confirmado',

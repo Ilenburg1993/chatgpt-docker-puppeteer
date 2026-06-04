@@ -7491,7 +7491,58 @@
   - resultado: `PASS` em 28/28 critérios;
   - verificação visual: `/usage now` mostrou `BYOK`, `Histórico`, `LLM`, `Pergunta` e
     `Conferir`, sem `BYOK ativo`, `Histórico Copilot`, `Telemetria LLM` ou `Correlacionar`.
+- [x] Próxima lacuna visual promovida:
+  - `/byok` default ainda era superfície muito densa;
+  - `/help full` continua denso por escolha explícita do operador e será tratado em rodada separada.
+
+## 2026-06-04 — `/byok` Default como Cockpit Compacto
+
+- [x] Achado live:
+  - no artefato `artifacts/terminal-live/2026-06-04T18-54-21-268Z/terminal.plain.log`, `/byok`
+    e `/byok model terminal-ux-boundary-fixture` renderizavam o estado correto, mas terminavam com
+    um bloco `Comandos` de nove linhas;
+  - esse bloco incluía catálogo de gateway, seleção, importers, probes, recomendações e automação,
+    ocupando o primeiro viewport como se o operador tivesse pedido documentação completa;
+  - a tela de status perdia o papel de cockpit e voltava a parecer dump de manual.
+- [x] Decisão UX:
+  - `/byok` padrão deve responder quatro perguntas rápidas: qual é o estado, qual é a sessão viva,
+    como trocar, como provar;
+  - catálogo completo e comandos avançados continuam disponíveis, mas apenas por intenção explícita
+    em `/byok gateway commands`, `/byok auto policy` e `/byok env`;
+  - linhas de fronteira entre seleção preparada e sessão viva devem usar o mesmo tema visual do
+    terminal, sem ANSI manual nem frases fora do alinhamento comum.
+- [x] Correção aplicada:
+  - `printByokSdkSessionBoundaryHint()` reduziu `Próximo`, separou `Conversa` de `Modelo vivo` e
+    deixou claro que `/restart` não troca provedor;
+  - `tryApplyLiveByokModelSwitch()` trocou mensagens ANSI manuais por rows temáticas `Sessão viva`,
+    `Troca modelo`, `Modelo vivo` e `Confirmar`;
+  - `/byok` default substituiu o bloco `Comandos` por quatro linhas compactas:
+    `Rotina`, `Trocar`, `Provar` e `Avançado`.
+- [x] Guardrails:
+  - `test_commands_byok.spec.js` exige `Rotina`, `Trocar`, `Provar` e `Avançado`;
+  - o teste bloqueia o retorno de `/byok gateway catalog refresh|diff|integrity|sqlite|search`
+    e do bloco `/byok auto [on|policy|doctor|standby|proof-plan|switch|history|off]` no status
+    default;
+  - o runner live `--ux-cycle` exige cockpit compacto e também bloqueia catálogo avançado dentro
+    da superfície `/byok` default.
+- [x] Segunda correção derivada da live:
+  - `/session sdk` ainda mostrava `Metadados modelo ... · provedor BYOK · limite mudança de
+    provider/modelo BYOK`;
+  - o vocabulário foi normalizado para `rota BYOK` e `mudança de rota/modelo BYOK`;
+  - `classifyTerminalByokSdkBinding()` também passou a dizer `rota BYOK da sessão atual coincide`
+    no caso de mesma rota com modelo ainda pendente;
+  - o runner live agora reprova `provedor BYOK` e `provider/modelo BYOK` dentro da superfície
+    default de `/session sdk`.
+- [x] Live UX:
+  - comando:
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-byok-session-route-copy-20260604 --timeout-ms 170000 --transport=pty`;
+  - artefato: `artifacts/terminal-live/2026-06-04T19-03-09-938Z/summary.md`;
+  - resultado: `PASS` em 28/28 critérios;
+  - inspeção adicional: o plain log não contém `provedor BYOK`, `provider/modelo BYOK`,
+    `/byok gateway catalog refresh|diff|integrity|sqlite|search` nem o bloco antigo
+    `/byok auto [on|policy|doctor...]` na UX default.
 - [ ] Próxima lacuna visual:
-  - `/help full` e `/byok` default ainda são superfícies muito densas;
-  - avaliar se devem virar cockpit compacto com seções progressivas, deixando catálogos longos em
-    subcomandos explícitos.
+  - auditar `/help full`, `/byok gateway commands`, `/byok gateway operator-ready` e `/byok auto`
+    para confirmar que o modo detalhado é rico sem parecer lixo técnico;
+  - manter os catálogos longos em comandos explícitos, com títulos humanos, paginação/filtros e
+    ações curtas por linha.

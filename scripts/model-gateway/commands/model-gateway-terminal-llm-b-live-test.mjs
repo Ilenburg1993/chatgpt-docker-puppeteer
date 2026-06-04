@@ -2725,16 +2725,20 @@ function defaultUxCycleCriteria(boot) {
             id: 'ux-cycle-byok-boundary-human',
             pass:
                 /BYOK status[\s\S]*Preparada[\s\S]*Sessão viva[\s\S]*Fronteira/iu.test(byokStatusSurface) &&
-                (/(?:Sessão atual usa outro provedor\/perfil[\s\S]*modelo preparado para o próximo boot[\s\S]*sem troca cruzada na conversa viva)|(?:Modelo BYOK solicitado na sessão viva[\s\S]*confirme o modelo efetivo)/iu.test(
+                (/(?:Sessão atual usa outro provedor\/perfil[\s\S]*modelo preparado para o próximo boot[\s\S]*sem troca cruzada na conversa viva)|(?:Modelo vivo[\s\S]*solicitado[\s\S]*Confirmar[\s\S]*modelo efetivo)/iu.test(
                     byokModelOutcomeSurface,
                 )) &&
-                /BYOK status[\s\S]*(seleção preparada cruza provedor ou perfil da sessão atual|seleção preparada e sessão BYOK atual estão alinhadas|modelo BYOK já confirmado na sessão atual|provedor BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação|sem sessão SDK viva)/iu.test(
+                /BYOK status[\s\S]*(seleção preparada cruza provedor ou perfil da sessão atual|seleção preparada e sessão BYOK atual estão alinhadas|modelo BYOK já confirmado na sessão atual|rota BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação|sem sessão SDK viva)/iu.test(
                     byokAfterModelSurface,
+                ) &&
+                /BYOK status[\s\S]*Rotina[\s\S]*Trocar[\s\S]*Provar[\s\S]*Avançado/iu.test(byokStatusSurface) &&
+                !/\/byok gateway catalog refresh\|diff\|integrity\|sqlite\|search|\/byok gateway selection audit|\/byok auto \[on\|policy\|doctor/iu.test(
+                    byokStatusSurface,
                 ) &&
                 !/\bbinding\b|provider-boundary|provider BYOK vivo|binding de nascimento|binding da sessão viva|cruzam provider\/perfil/iu.test(
                     `${byokStatusSurface}\n${byokModelOutcomeSurface}`,
                 ),
-            detail: '/byok and /byok model rendered prepared/live boundary with human next-boot language and no raw binding/provider-boundary terms',
+            detail: '/byok rendered compact routine/switch/probe/advanced guidance and /byok model kept prepared/live boundary human',
         },
         {
             id: 'ux-cycle-session-sdk-boundary-human',
@@ -2744,7 +2748,8 @@ function defaultUxCycleCriteria(boot) {
                 ) &&
                 !/\bbinding\b|provider-boundary|provider\/perfil|Foreground|operator-next-boot|sdk-resume-fallback/iu.test(
                     sessionSdkAfterByokSurface,
-                ),
+                ) &&
+                !/provedor BYOK|provider\/modelo BYOK/iu.test(sessionSdkAfterByokSurface),
             detail: '/session sdk rendered BYOK selection boundary without raw binding/provider-boundary vocabulary',
         },
         {
@@ -2875,7 +2880,7 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
             { line: '/byok', waitFor: 'BYOK status', advanceAfterMs: 1_500 },
             {
                 line: '/byok model terminal-ux-boundary-fixture',
-                waitFor: /modelo preparado para o próximo boot|Modelo BYOK solicitado na sessão viva/u,
+                waitFor: /modelo preparado para o próximo boot|Modelo vivo[\s\S]*solicitado/u,
                 advanceAfterMs: 1_500,
             },
             { line: '/byok', waitFor: 'BYOK status', advanceAfterMs: 1_500 },

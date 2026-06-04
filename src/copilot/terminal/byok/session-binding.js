@@ -127,7 +127,7 @@ export function classifyTerminalByokSdkBinding(summary, binding, currentSessionI
                 state: 'live-model-drift',
                 preparedLabel,
                 liveLabel,
-                headline: 'provedor BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação',
+                headline: 'rota BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação',
                 action: '/byok model <id> pede a troca na sessão atual; confirme pelo próximo uso registrado ou por evento de modelo confirmado',
                 sameProviderBoundary,
             };

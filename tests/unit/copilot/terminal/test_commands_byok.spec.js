@@ -1932,9 +1932,16 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('.env.local');
         expect(ctx.output()).toContain('Autenticação');
         expect(ctx.output()).toContain('token bearer');
-        expect(ctx.output()).toContain('Comandos');
-        expect(ctx.output()).toContain('/byok gateway catalog refresh|diff|integrity|sqlite|search <query>');
-        expect(ctx.output()).toContain('/byok auto [on|policy|doctor|standby|proof-plan|switch|history|off]');
+        expect(ctx.output()).toContain('Rotina');
+        expect(ctx.output()).toContain('/byok providers · /byok profiles · /byok models · /byok recommend');
+        expect(ctx.output()).toContain('Trocar');
+        expect(ctx.output()).toContain('/byok use <perfil|sdk> · /byok model <id> · /byok provider <preset>');
+        expect(ctx.output()).toContain('Provar');
+        expect(ctx.output()).toContain('/byok probe chat · /byok probe agent · /byok probe shortlist');
+        expect(ctx.output()).toContain('Avançado');
+        expect(ctx.output()).toContain('/byok gateway commands · /byok auto policy · /byok env');
+        expect(ctx.output()).not.toContain('/byok gateway catalog refresh|diff|integrity|sqlite|search <query>');
+        expect(ctx.output()).not.toContain('/byok auto [on|policy|doctor|standby|proof-plan|switch|history|off]');
         expect(ctx.output()).not.toContain('apiKey');
         expect(ctx.output()).not.toContain('bearer=');
         expect(ctx.output()).not.toContain('\x1b[36mBYOK status');
@@ -4404,8 +4411,10 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'model anthropic/claude-sonnet-4.5');
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('anthropic/claude-sonnet-4.5');
-        expect(ctx.output()).toContain('Modelo BYOK solicitado na sessão viva');
-        expect(ctx.output()).toContain('Provedor/perfil foram preservados');
+        expect(ctx.output()).toContain('Modelo vivo');
+        expect(ctx.output()).toContain('solicitado anthropic/claude-sonnet-4.5');
+        expect(ctx.output()).toContain('Confirmar');
+        expect(ctx.output()).toContain('provedor/perfil preservados');
     });
 
     it('não atravessa provider com setModel quando o binding BYOK vivo diverge', async () => {
@@ -4440,7 +4449,8 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'model anthropic/claude-sonnet-4.5');
 
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('Sessão atual usa outro provedor/perfil');
+        expect(ctx.output()).toContain('Troca modelo');
+        expect(ctx.output()).toContain('sessão atual usa outro provedor/perfil');
         expect(ctx.output()).toContain('sem troca cruzada na conversa viva');
         expect(ctx.output()).not.toContain('bound ao mesmo provider');
     });

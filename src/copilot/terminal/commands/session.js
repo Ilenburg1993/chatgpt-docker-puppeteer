@@ -1849,14 +1849,22 @@ function renderSdkSessionLocalMetadata(metadata) {
     const reason = typeof boundary?.['reason'] === 'string' ? boundary['reason'] : null;
     const parts = [
         model ? `modelo ${model}` : null,
-        providerKind
-            ? `provedor ${renderSdkSessionProviderKindLabel(providerKind)}${
-                  providerModel && providerModel !== model ? `:${providerModel}` : ''
-              }`
-            : null,
+        providerKind ? renderSdkSessionMetadataProvider(providerKind, providerModel, model) : null,
         reason ? `limite ${renderSdkSessionReasonLabel(reason)}` : null,
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
+ * @param {string} providerKind
+ * @param {string | null} providerModel
+ * @param {string | null} model
+ * @returns {string}
+ */
+function renderSdkSessionMetadataProvider(providerKind, providerModel, model) {
+    const renderedProvider = renderSdkSessionProviderKindLabel(providerKind);
+    const modelSuffix = providerModel && providerModel !== model ? `:${providerModel}` : '';
+    return providerKind === 'byok' ? `rota BYOK${modelSuffix}` : `provedor ${renderedProvider}${modelSuffix}`;
 }
 
 /**
@@ -1883,7 +1891,7 @@ function renderSdkSessionReasonLabel(value) {
         return 'retomada automática criou sessão nova quando a anterior não pôde ser retomada';
     }
     if (reason.includes('auto-resume-persisted-session')) return 'retomada automática da sessão persistida';
-    if (reason.includes('provider-boundary')) return 'mudança de provider/modelo BYOK';
+    if (reason.includes('provider-boundary')) return 'mudança de rota/modelo BYOK';
     if (reason.includes('byok')) return reason.replace(/[._-]+/gu, ' ');
     return compactSdkSessionEventValue(reason.replace(/\bsdk[-_]/giu, '').replace(/[._-]+/gu, ' '), 96);
 }

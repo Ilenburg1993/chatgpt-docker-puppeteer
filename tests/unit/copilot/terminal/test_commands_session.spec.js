@@ -987,7 +987,8 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('workspace:.copilot/sdk-session-fs');
         expect(ctx.output()).toContain('Metadados');
         expect(ctx.output()).toContain('modelo kilo-auto/free');
-        expect(ctx.output()).toContain('limite mudança de provider/modelo BYOK');
+        expect(ctx.output()).toContain('rota BYOK');
+        expect(ctx.output()).toContain('limite mudança de rota/modelo BYOK');
         expect(ctx.output()).not.toContain('provider-boundary');
         expect(ctx.output()).not.toContain('sdk-first');
     });
@@ -1093,7 +1094,7 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('BYOK pronto');
         expect(ctx.output()).toContain('Limite BYOK');
         expect(ctx.output()).toContain('Último boot');
-        expect(ctx.output()).toContain('mudança de provider/modelo BYOK');
+        expect(ctx.output()).toContain('mudança de rota/modelo BYOK');
         expect(ctx.output()).not.toContain('provider-boundary');
     });
 
