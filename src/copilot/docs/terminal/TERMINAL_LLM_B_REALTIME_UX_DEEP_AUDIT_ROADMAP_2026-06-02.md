@@ -6972,5 +6972,44 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-smoke-command-20260604 --timeout-ms 140000`;
   - artefato: `artifacts/terminal-live/2026-06-04T16-00-21-072Z/summary.md`;
   - resultado: PASS em 20/20 critérios.
+- [x] Live PTY filtrada do picker repetida após smoke:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms 90000 --label terminal-picker-filtered-after-smoke-20260604`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-02-16-650Z/summary.md`;
+  - resultado: PASS em 5/5 critérios;
+  - escopo real da prova: `fzf --filter`, handoff exclusivo, seleção, roteamento por `/status`
+    e restauração de prompt;
+  - limite conhecido: não é prova visual completa de TUI fullscreen, porque o harness PTY não
+    emula todas as respostas de terminal necessárias para esse modo.
+- [x] Reconciliação documental:
+  - `TERMINAL_AUXILIARY_LIBS_DECISION_GUIDE_2026-06-04.md` foi alinhado com o progresso real:
+    exemplos, políticas, `/help full` rico e smoke local deixaram de aparecer como gaps pendentes.
+- [x] Copy operacional fortalecida:
+  - `/terminal libs detail` passou a renderizar `Estado` e `Default` por ferramenta;
+  - ferramentas aceitas dizem explicitamente se sao acionáveis por comando explícito ou por opt-in
+    com TTY exclusivo;
+  - ferramentas adiadas como `atuin` e `zoxide` ficam descritas como inventário/planejamento, sem
+    chamada automática.
+- [x] Bug de poluição visual corrigido:
+  - achado: renderizar `/terminal libs detail` por import direto emitia `[db][INFO] SQLite copilot ready`
+    antes da tela humana;
+  - causa: import via barrel amplo acionava módulos laterais desnecessários para uma tela read-only;
+  - correção: `/terminal libs` importa `external-tools.js` diretamente e `diff-preview.js` importa
+    `ui-theme.js` diretamente;
+  - regressão coberta por processo filho em
+    `tests/unit/copilot/terminal/test_terminal_command_import_side_effects.spec.js`.
+- [x] Boot humano mais limpo:
+  - achado live: a sessão ainda começava com `[db][INFO] [CopilotDB] SQLite copilot ready` antes
+    do cabeçalho visual;
+  - decisão UX: INFO de infraestrutura fica no logger central/arquivo, não na primeira linha do
+    terminal humano;
+  - correção: logger default de `src/copilot/db/sqlite.js` agora só imprime WARN/ERROR/FATAL antes
+    da injeção de observabilidade;
+  - regressão coberta por `tests/unit/copilot/test_copilot_db_default_logger.spec.js`;
+  - harness live `--ux-cycle` agora possui o critério `ux-cycle-no-db-console-noise`.
+- [x] Live PTY final:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-no-db-criterion-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-13-42-410Z/summary.md`;
+  - resultado: PASS em 21/21 critérios, incluindo copy operacional de libs e ausência de ruído DB
+    no console humano.
 - [ ] Próxima lacuna: validar visualmente TUI completa `fzf`/`gum` quando for aceitável tomar o TTY
       real, mantendo o fluxo filtrado como prova automatizada.

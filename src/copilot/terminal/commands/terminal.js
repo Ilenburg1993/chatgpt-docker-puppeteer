@@ -5,7 +5,7 @@
  * @module copilot/terminal/commands/terminal
  */
 
-import { readTerminalExternalToolCapabilitySummary } from '../capabilities/index.js';
+import { readTerminalExternalToolCapabilitySummary } from '../capabilities/external-tools.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/ui-theme.js';
 
 /**
@@ -64,6 +64,30 @@ function renderToolRole(tool) {
     if (!tool.available) return 'muted';
     if (tool.decision === 'deferred') return 'warn';
     return 'success';
+}
+
+/**
+ * @param {import('../capabilities/external-tools.js').TerminalExternalToolCapability} tool
+ * @returns {string}
+ */
+function renderOperationalState(tool) {
+    if (tool.decision === 'deferred') {
+        return tool.available
+            ? 'inventariada apenas; nenhuma chamada automática'
+            : 'planejada, mas sem binário local e sem chamada automática';
+    }
+    if (!tool.available) return 'fallback canônico ativo';
+    if (tool.decision === 'accepted_guarded') return 'acionável por opt-in com TTY exclusivo';
+    return 'acionável por comando explícito';
+}
+
+/**
+ * @param {import('../capabilities/external-tools.js').TerminalExternalToolCapability} tool
+ * @returns {string}
+ */
+function renderDefaultState(tool) {
+    if (tool.defaultEnabled) return 'habilitada por default';
+    return 'desabilitada por default para preservar portabilidade';
 }
 
 /**
@@ -147,6 +171,8 @@ function printTerminalLibsDetail(println, refresh) {
             println,
             [
                 ['Uso', tool.recommendedFor],
+                ['Estado', renderOperationalState(tool)],
+                ['Default', renderDefaultState(tool)],
                 ['Política', tool.executionPolicy],
                 ['Fallback', tool.fallback],
                 ['Risco', tool.risk],

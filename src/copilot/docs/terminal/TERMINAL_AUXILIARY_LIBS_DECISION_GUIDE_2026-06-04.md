@@ -258,7 +258,7 @@ Decisão:
 - [x] Camada 3: comandos humanos que explicam renderer/fallback.
 - [x] Camada 4: lives PTY para provar que o terminal continua usável.
 - [ ] Camada 5: validação visual literal da TUI completa em terminal real.
-- [ ] Camada 6: exemplos guiados em `/terminal libs detail` e `/help full`.
+- [x] Camada 6: exemplos guiados em `/terminal libs detail` e `/help full`.
 
 ### 4.2 Regras para adapters
 
@@ -286,13 +286,14 @@ Decisão:
 
 ## 5. Gaps atuais
 
-- [ ] `/terminal libs detail` ainda não mostra exemplos por ferramenta.
-- [ ] `/terminal libs detail` ainda não diferencia claramente `aceita`, `aceita com guardas` e `adiada` em termos de política de execução.
-- [ ] `/help full` ainda não tem uma seção rica de libs auxiliares com exemplos e fallbacks.
+- [x] `/terminal libs detail` mostra exemplos por ferramenta.
+- [x] `/terminal libs detail` diferencia `aceita`, `aceita com guardas` e `adiada` em termos de política de execução.
+- [x] `/help full` tem uma seção rica de libs auxiliares com exemplos e fallbacks.
 - [ ] O picker externo ainda não tem preview seguro integrado; decisão atual é manter sem preview embutido.
-- [ ] Não há comando de auditoria único que rode uma bateria local não interativa de previews para demonstrar renderer/fallback.
+- [x] Há comando de auditoria único que roda bateria local não interativa de previews para demonstrar renderer/fallback.
 - [ ] A TUI visual completa de `fzf`/`gum` ainda depende de validação manual/assistida em terminal real.
-- [ ] `atuin` e `zoxide` estão corretamente adiados, mas o terminal poderia explicar melhor por que eles aparecem no registry.
+- [x] `atuin` e `zoxide` estão corretamente adiados e o terminal explica que aparecem apenas como
+      inventário/planejamento, sem chamada automática.
 
 ## 6. Roadmap
 
@@ -364,7 +365,7 @@ Decisão:
 
 - [x] Fase I.1: detectar sem ativar.
 - [x] Fase I.2: documentar risco de estado pessoal.
-- [ ] Fase I.3: melhorar copy em `/terminal libs detail`.
+- [x] Fase I.3: melhorar copy em `/terminal libs detail` sobre libs detectadas mas não acionáveis.
 - [ ] Fase I.4: rejeitar qualquer chamada automática em teste.
 - [ ] Fase I.5: avaliar futuro comando opt-in de diagnóstico sem leitura de histórico.
 
@@ -409,6 +410,37 @@ Decisão:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-smoke-command-20260604 --timeout-ms 140000`;
   - artefato: `artifacts/terminal-live/2026-06-04T16-00-21-072Z/summary.md`;
   - resultado: PASS em 20/20 critérios.
+- [x] Picker interativo filtrado validado após a camada de smoke:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms 90000 --label terminal-picker-filtered-after-smoke-20260604`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-02-16-650Z/summary.md`;
+  - resultado: PASS em 5/5 critérios;
+  - escopo real da prova: `fzf --filter`, handoff exclusivo, seleção, roteamento por `/status` e
+    restauração de prompt;
+  - limite conhecido: não é prova visual completa de TUI fullscreen, porque o harness PTY não
+    emula todas as respostas de terminal necessárias para esse modo.
+- [x] Reconciliação documental pós-commit:
+  - checklist de gaps ajustada para refletir que exemplos por ferramenta, política por ferramenta,
+    seção rica de `/help full` e smoke local já foram implementados e validados;
+  - lacuna remanescente focada: copy operacional de libs adiadas e prova visual literal de TUI
+    fullscreen.
+- [x] Copy operacional de libs auxiliares fortalecida:
+  - `/terminal libs detail` passa a renderizar `Estado` e `Default`;
+  - libs aceitas ficam como `acionável por comando explícito`;
+  - libs aceitas com guardas ficam como `acionável por opt-in com TTY exclusivo`;
+  - libs adiadas ficam como inventário/planejamento, sem chamada automática.
+- [x] Bug de poluição visual corrigido:
+  - importar e executar `/terminal libs detail` isoladamente não inicializa mais log lateral de DB;
+  - `terminal/commands/terminal.js` usa o registry específico de external tools em vez do barrel amplo;
+  - `diff-preview.js` usa o módulo específico de tema visual em vez do barrel amplo de state;
+  - teste de processo filho garante ausência de `[db]` e `SQLite copilot ready` no output do comando.
+- [x] Boot humano protegido contra INFO precoce do DB:
+  - o logger default do SQLite só imprime WARN/ERROR/FATAL antes da observabilidade central;
+  - INFO de prontidão do DB deixa de ocupar a primeira linha do terminal;
+  - teste de processo filho cobre abertura/fechamento do DB sem stdout/stderr.
+- [x] Live PTY final com guardrail de ruído DB:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-no-db-criterion-20260604 --timeout-ms 140000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T16-13-42-410Z/summary.md`;
+  - resultado: PASS em 21/21 critérios, incluindo `ux-cycle-no-db-console-noise`.
 
 ## 9. Próxima execução recomendada
 

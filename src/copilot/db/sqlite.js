@@ -36,7 +36,8 @@ import { COPILOT_MIGRATIONS } from './migrations.js';
 
 /** @type {DbLogFn} */
 let log = (level, msg) => {
-    const fn = level === 'WARN' || level === 'ERROR' ? console.warn : console.log;
+    if (level !== 'WARN' && level !== 'ERROR' && level !== 'FATAL') return;
+    const fn = level === 'WARN' ? console.warn : console.error;
     fn(`[db][${level}] ${msg}`);
 };
 

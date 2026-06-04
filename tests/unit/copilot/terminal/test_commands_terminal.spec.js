@@ -65,7 +65,7 @@ const capabilityMocks = vi.hoisted(() => ({
     })),
 }));
 
-vi.mock('../../../../src/copilot/terminal/capabilities/index.js', () => ({
+vi.mock('../../../../src/copilot/terminal/capabilities/external-tools.js', () => ({
     readTerminalExternalToolCapabilitySummary: capabilityMocks.readTerminalExternalToolCapabilitySummary,
 }));
 
@@ -104,11 +104,17 @@ describe('terminal/commands/terminal', () => {
         expect(ctx.output()).toContain('https://junegunn.github.io/fzf/');
         expect(ctx.output()).toContain('TUI interativa');
         expect(ctx.output()).toContain('Política');
+        expect(ctx.output()).toContain('Estado');
+        expect(ctx.output()).toContain('Default');
         expect(ctx.output()).toContain('seleção explícita');
+        expect(ctx.output()).toContain('acionável por comando explícito');
+        expect(ctx.output()).toContain('acionável por opt-in com TTY exclusivo');
+        expect(ctx.output()).toContain('desabilitada por default para preservar portabilidade');
         expect(ctx.output()).toContain('Exemplo 1');
         expect(ctx.output()).toContain('/menu picker --interactive');
         expect(ctx.output()).toContain('ConversationHub');
         expect(ctx.output()).toContain('adiado; não ler histórico externo');
+        expect(ctx.output()).toContain('planejada, mas sem binário local e sem chamada automática');
         expect(ctx.output()).toContain('JSON limpo');
     });
 

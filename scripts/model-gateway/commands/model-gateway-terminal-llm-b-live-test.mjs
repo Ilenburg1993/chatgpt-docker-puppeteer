@@ -2543,7 +2543,7 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-terminal-libs-detail',
             pass:
-                /Libs auxiliares do terminal[\s\S]*detail[\s\S]*Política[\s\S]*Exemplo 1/iu.test(
+                /Libs auxiliares do terminal[\s\S]*detail[\s\S]*Estado[\s\S]*Default[\s\S]*Política[\s\S]*Exemplo 1/iu.test(
                     terminalLibsDetailSurface,
                 ) &&
                 /atuin|zoxide/iu.test(terminalLibsDetailSurface) &&
@@ -2560,6 +2560,11 @@ function defaultUxCycleCriteria(boot) {
                     plain,
                 ),
             detail: 'default boot copy avoided raw server/runtime/tools labels and raw loop tails',
+        },
+        {
+            id: 'ux-cycle-no-db-console-noise',
+            pass: !/\[db\]\[(?:DEBUG|INFO|WARN|ERROR|FATAL)\]|SQLite copilot ready/iu.test(defaultSurface),
+            detail: 'default terminal UX did not expose infrastructure DB logs in the human console',
         },
         {
             id: 'ux-cycle-status-compact',
