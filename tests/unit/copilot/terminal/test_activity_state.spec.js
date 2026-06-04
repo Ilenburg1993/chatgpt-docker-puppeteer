@@ -78,6 +78,62 @@ describe('terminal/activity-state', () => {
         expect(snap.toolName).toBe('bash');
     });
 
+    it('mantém foco em tool ativa quando watchdog de thinking chega em background', () => {
+        clearTerminalActivityHistory();
+        recordTerminalActivity('tool', 'Executando tool', {
+            detail: 'executando comando',
+            toolName: 'exec_command',
+            toolTarget: 'npm test',
+            source: 'sdk',
+        });
+        recordTerminalActivity('thinking', 'LLM-B trabalhando', {
+            detail: '10s sem resposta visível',
+            source: 'dialog',
+            recordHistory: false,
+            focusMode: 'background',
+        });
+
+        const snap = readTerminalActivitySnapshot();
+
+        expect(snap.phase).toBe('tool');
+        expect(snap.toolName).toBe('exec_command');
+        expect(snap.toolTarget).toBe('npm test');
+    });
+
+    it('permite que watchdog de thinking em background refine um turno genérico', () => {
+        clearTerminalActivityHistory();
+        recordTerminalActivity('turn', 'Processando mensagem', {
+            detail: 'prompt do operador',
+            source: 'dialog',
+        });
+        recordTerminalActivity('thinking', 'LLM-B trabalhando', {
+            detail: '10s sem resposta visível',
+            source: 'dialog',
+            recordHistory: false,
+            focusMode: 'background',
+        });
+
+        expect(readTerminalActivitySnapshot().phase).toBe('thinking');
+    });
+
+    it('não libera foco de tool por conclusão de tarefa não relacionada', () => {
+        clearTerminalActivityHistory();
+        recordTerminalActivity('tool', 'Executando tool', {
+            detail: 'executando comando',
+            toolName: 'exec_command',
+            source: 'sdk',
+        });
+        recordTerminalActivity('task', 'Tarefa interna concluída', {
+            detail: 'tarefa auxiliar',
+            source: 'agent',
+        });
+
+        const snap = readTerminalActivitySnapshot();
+
+        expect(snap.phase).toBe('tool');
+        expect(snap.toolName).toBe('exec_command');
+    });
+
     it('libera foco de tool ao receber conclusão da mesma tool', () => {
         clearTerminalActivityHistory();
         recordTerminalActivity('tool', 'Executando tool', {

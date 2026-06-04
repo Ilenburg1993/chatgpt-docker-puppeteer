@@ -102,6 +102,7 @@ const ABSOLUTE_WINDOWS_PATH_PATTERN = /(^|[\s(["'`:=])([A-Za-z]:\\[^\s"'`)]+)/gu
  *     path: string | null;
  *     target: string | null;
  *     fileTargets: string[];
+ *     directoryTargets: string[];
  *     urlTargets: string[];
  *     searchTerms: string[];
  *     patchFiles: string[];
@@ -110,7 +111,7 @@ const ABSOLUTE_WINDOWS_PATH_PATTERN = /(^|[\s(["'`:=])([A-Za-z]:\\[^\s"'`)]+)/gu
  *     filters: string[];
  *     resultCount: number | null;
  *     resultSummary: string | null;
- *     primaryTargetKind: 'file' | 'url' | 'search' | 'patch' | 'command' | 'filter' | null;
+ *     primaryTargetKind: 'file' | 'directory' | 'url' | 'search' | 'patch' | 'command' | 'filter' | null;
  *     detail: string;
  *     startLine: string;
  *     progressLinePrefix: string;
@@ -347,6 +348,9 @@ function buildTargetSummary(meta) {
     }
     if (meta.filters.length > 0) {
         chunks.push(meta.filters.slice(0, 2).map((filter) => compactTerminalToolText(filter, 48)).join(' · '));
+    }
+    if (chunks.length === 0 && meta.directoryTargets.length > 0) {
+        chunks.push(`diretório: ${formatTerminalToolPathForOperator(meta.directoryTargets[0] ?? '')}`);
     }
     if (chunks.length === 0) return meta.primaryTarget;
     return chunks.join(' · ');
@@ -652,6 +656,7 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
         path,
         target,
         fileTargets: meta.fileTargets,
+        directoryTargets: meta.directoryTargets,
         urlTargets: meta.urlTargets,
         searchTerms: meta.searchTerms,
         patchFiles: meta.patchFiles,

@@ -31,10 +31,11 @@ const FILE_KEYS = new Set([
     'destinationPath',
     'dest',
     'src',
-    'cwd',
     'includePattern',
     'excludePattern',
 ]);
+
+const DIRECTORY_KEYS = new Set(['cwd', 'directory', 'dir', 'root', 'workspaceRoot', 'baseDir', 'basePath']);
 
 const URL_KEYS = new Set(['url', 'uri', 'href', 'link', 'page', 'webpage', 'endpoint']);
 
@@ -69,6 +70,7 @@ const RESULT_LINE_RANGE_KEYS = new Set(['returnedLines', 'lineRange']);
 /**
  * @typedef {{
  *     fileTargets: string[];
+ *     directoryTargets: string[];
  *     urlTargets: string[];
  *     searchTerms: string[];
  *     patchFiles: string[];
@@ -78,7 +80,7 @@ const RESULT_LINE_RANGE_KEYS = new Set(['returnedLines', 'lineRange']);
  *     resultCount: number | null;
  *     resultSummary: string | null;
  *     primaryTarget: string | null;
- *     primaryTargetKind: 'file' | 'url' | 'search' | 'patch' | 'command' | 'filter' | null;
+ *     primaryTargetKind: 'file' | 'directory' | 'url' | 'search' | 'patch' | 'command' | 'filter' | null;
  * }} ToolTargetIntrospection
  */
 
@@ -186,6 +188,7 @@ function extractStructuredLineRange(value) {
  * @param {unknown} raw
  * @param {{
  *     fileTargets: Set<string>;
+ *     directoryTargets: Set<string>;
  *     urlTargets: Set<string>;
  *     searchTerms: Set<string>;
  *     patchFiles: Set<string>;
@@ -243,6 +246,10 @@ function processStructuredEntry(keyName, raw, state) {
         else addIfPresent(state.fileTargets, text);
     }
 
+    if (DIRECTORY_KEYS.has(keyName)) {
+        addIfPresent(state.directoryTargets, text);
+    }
+
     if (URL_KEYS.has(keyName) && isLikelyUrl(text)) {
         addIfPresent(state.urlTargets, text);
     }
@@ -264,6 +271,7 @@ function processStructuredEntry(keyName, raw, state) {
  * @param {unknown} value
  * @param {{
  *     fileTargets: Set<string>;
+ *     directoryTargets: Set<string>;
  *     urlTargets: Set<string>;
  *     searchTerms: Set<string>;
  *     patchFiles: Set<string>;
@@ -352,6 +360,8 @@ export function introspectToolTargets({ args, result }) {
     /** @type {Set<string>} */
     const fileTargets = new Set();
     /** @type {Set<string>} */
+    const directoryTargets = new Set();
+    /** @type {Set<string>} */
     const urlTargets = new Set();
     /** @type {Set<string>} */
     const searchTerms = new Set();
@@ -367,6 +377,7 @@ export function introspectToolTargets({ args, result }) {
 
     const state = {
         fileTargets,
+        directoryTargets,
         urlTargets,
         searchTerms,
         patchFiles,
@@ -407,6 +418,7 @@ export function introspectToolTargets({ args, result }) {
     }
 
     const normalizedFiles = Array.from(fileTargets).slice(0, MAX_DISCOVERED_VALUES);
+    const normalizedDirectories = Array.from(directoryTargets).slice(0, MAX_DISCOVERED_VALUES);
     const normalizedUrls = Array.from(urlTargets).slice(0, MAX_DISCOVERED_VALUES);
     const normalizedQueries = Array.from(searchTerms).slice(0, MAX_DISCOVERED_VALUES);
     const normalizedPatchFiles = Array.from(patchFiles).slice(0, MAX_DISCOVERED_VALUES);
@@ -420,6 +432,7 @@ export function introspectToolTargets({ args, result }) {
         normalizedPatchFiles[0] ??
         normalizedCommands[0] ??
         normalizedFilters[0] ??
+        normalizedDirectories[0] ??
         null;
     const primaryTargetKind =
         normalizedFiles.length > 0
@@ -434,7 +447,9 @@ export function introspectToolTargets({ args, result }) {
                     ? 'command'
                     : normalizedFilters.length > 0
                       ? 'filter'
-                      : null;
+                      : normalizedDirectories.length > 0
+                        ? 'directory'
+                        : null;
 
     const hasRange = lineRange.start !== null || lineRange.end !== null;
     const resultSummary = [
@@ -447,6 +462,7 @@ export function introspectToolTargets({ args, result }) {
 
     return {
         fileTargets: normalizedFiles,
+        directoryTargets: normalizedDirectories,
         urlTargets: normalizedUrls,
         searchTerms: normalizedQueries,
         patchFiles: normalizedPatchFiles,

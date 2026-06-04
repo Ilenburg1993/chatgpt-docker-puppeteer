@@ -132,6 +132,10 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.detail).toContain('executando comando');
         expect(presentation.detail).toContain("node -e \"console.log('ok')\"");
         expect(presentation.target).toBe("node -e \"console.log('ok')\"");
+        expect(presentation.path).toBeNull();
+        expect(presentation.fileTargets).toEqual([]);
+        expect(presentation.directoryTargets).toEqual(['/workspaces/chatgpt-docker-puppeteer']);
+        expect(presentation.primaryTargetKind).toBe('command');
         expect(presentation.detail).not.toContain('operando arquivo');
     });
 

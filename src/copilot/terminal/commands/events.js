@@ -259,6 +259,7 @@ function humanEventLabel(event, payload = null) {
         if (payload?.['byokEnabled'] === true || typeof payload?.['byokProviderType'] === 'string') return 'Erro BYOK';
         return 'Erro do agente';
     }
+    if (event === 'terminal.turn.empty_recovery') return 'Recuperação de turno';
     if (event === 'terminal.turn.empty_output') return 'Turno sem saída';
     if (event === 'terminal.turn.non_text_outcome') return 'Turno sem transcript';
     if (event === 'dialog.empty_after_user_input') return 'Continuação vazia';
@@ -317,6 +318,7 @@ function humanStatus(value) {
     if (text === 'erroroccurred' || text === 'error_occurred') return 'erro capturado';
     if (text === 'cancellation') return 'cancelamento';
     if (text === 'empty') return 'sem saída';
+    if (text === 'pre_action_empty_output') return 'turno vazio antes de ação';
     if (text === 'agent') return 'agente';
     if (text === 'session.created') return 'sessão criada';
     if (text === 'session.deleted') return 'sessão removida';
@@ -404,6 +406,7 @@ function humanPayloadKind(value) {
     if (text === 'erroroccurred' || text === 'error_occurred') return 'erro capturado';
     if (text === 'cancellation') return 'cancelamento';
     if (text === 'empty') return 'sem saída';
+    if (text === 'pre_action_empty_output') return 'turno vazio antes de ação';
     if (text === 'agent') return 'agente';
     return text.replace(/[_-]+/gu, ' ');
 }
@@ -483,6 +486,27 @@ function summarizeEmptyTurnPayload(payload) {
 
 /**
  * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeEmptyTurnRecoveryPayload(payload) {
+    const attempt = typeof payload['attempt'] === 'number' ? payload['attempt'] : null;
+    const maxAttempts = typeof payload['maxAttempts'] === 'number' ? payload['maxAttempts'] : null;
+    const reason = humanPayloadKind(payload['reason']);
+    const firstOutcome = humanPayloadKind(payload['firstOutcome']);
+    const firstReplySource = humanPayloadKind(payload['firstReplySource']);
+    return [
+        attempt != null && maxAttempts != null ? `tentativa ${attempt}/${maxAttempts}` : null,
+        reason ? `motivo ${reason}` : null,
+        firstOutcome ? `resultado inicial ${firstOutcome}` : null,
+        firstReplySource ? `origem inicial ${firstReplySource}` : null,
+        'sem tool, delta ou pergunta pendente; continuação reenviada uma vez',
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
  * @param {{ showIds?: boolean }} [opts]
  * @returns {string}
  */
@@ -502,6 +526,9 @@ function summarizeEmptyAfterUserInputPayload(payload, opts = {}) {
  * @returns {string}
  */
 function summarizePayload(payload, opts = {}) {
+    if (opts.event === 'terminal.turn.empty_recovery') {
+        return summarizeEmptyTurnRecoveryPayload(payload);
+    }
     if (opts.event === 'dialog.empty_after_user_input') {
         return summarizeEmptyAfterUserInputPayload(payload, opts);
     }

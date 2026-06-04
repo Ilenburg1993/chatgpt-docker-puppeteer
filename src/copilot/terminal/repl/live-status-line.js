@@ -25,6 +25,76 @@ const MIN_LIVE_STATUS_HEARTBEAT_MS = 1_000;
 const DEFAULT_LIVE_STATUS_HEARTBEAT_MS = 5_000;
 const LIVE_LABEL_MAX_CHARS = 28;
 const LIVE_DETAIL_MAX_CHARS = 48;
+const LIVE_STATUS_FALLBACK_COLUMNS = 120;
+const LIVE_STATUS_MIN_COLUMNS = 48;
+const ANSI_CLEAR_TO_END_OF_LINE = '\x1b[K';
+const ANSI_RESET = '\x1b[0m';
+const ANSI_ESCAPE = String.fromCharCode(27);
+const ANSI_ESCAPE_PATTERN = new RegExp(`${ANSI_ESCAPE}\\[[0-?]*[ -/]*[@-~]`, 'gu');
+const ANSI_ESCAPE_PREFIX_PATTERN = new RegExp(`^${ANSI_ESCAPE}\\[[0-?]*[ -/]*[@-~]`, 'u');
+
+/**
+ * @param {number | null | undefined} columns
+ * @returns {number}
+ */
+function resolveLiveStatusBudget(columns) {
+    const candidate = Number(columns ?? process.stdout.columns ?? LIVE_STATUS_FALLBACK_COLUMNS);
+    if (!Number.isFinite(candidate)) return LIVE_STATUS_FALLBACK_COLUMNS - 1;
+    return Math.max(LIVE_STATUS_MIN_COLUMNS, Math.floor(candidate) - 1);
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function stripLiveStatusAnsi(value) {
+    return value.replace(ANSI_ESCAPE_PATTERN, '');
+}
+
+/**
+ * @param {string} value
+ * @returns {number}
+ */
+function liveStatusVisibleLength(value) {
+    return Array.from(stripLiveStatusAnsi(value)).length;
+}
+
+/**
+ * Mantém a linha viva fisicamente em uma única linha sem quebrar sequências ANSI.
+ *
+ * @param {string} value
+ * @param {number | null | undefined} columns
+ * @returns {string}
+ */
+function fitLiveStatusToSingleLine(value, columns) {
+    const budget = resolveLiveStatusBudget(columns);
+    const sanitized = String(value)
+        .replaceAll(ANSI_CLEAR_TO_END_OF_LINE, '')
+        .replace(/[\r\n]+/gu, ' ')
+        .replace(/\s+/gu, ' ')
+        .trimEnd();
+    if (liveStatusVisibleLength(sanitized) <= budget) return `${sanitized}${ANSI_CLEAR_TO_END_OF_LINE}`;
+
+    const targetVisibleChars = Math.max(1, budget - 1);
+    let visibleChars = 0;
+    let result = '';
+    for (let index = 0; index < sanitized.length && visibleChars < targetVisibleChars; ) {
+        if (sanitized[index] === ANSI_ESCAPE) {
+            const match = sanitized.slice(index).match(ANSI_ESCAPE_PREFIX_PATTERN);
+            if (match) {
+                result += match[0];
+                index += match[0].length;
+                continue;
+            }
+        }
+        const codePoint = sanitized.codePointAt(index);
+        if (codePoint === undefined) break;
+        result += String.fromCodePoint(codePoint);
+        index += codePoint > 0xffff ? 2 : 1;
+        visibleChars += 1;
+    }
+    return `${result}…${ANSI_RESET}${ANSI_CLEAR_TO_END_OF_LINE}`;
+}
 
 /**
  * @param {string} phase
@@ -81,11 +151,13 @@ function renderLiveToolName(activity) {
 
 /**
  * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @param {number} [max=42] Default is `42`
  * @returns {string}
  */
-function renderLiveToolTarget(activity) {
+function renderLiveToolTarget(activity, max = 42) {
     if (!activity.toolTarget) return '';
-    return compactLiveStatusText(activity.toolTarget, 42);
+    if (max < 8) return '';
+    return compactLiveStatusText(activity.toolTarget, max);
 }
 
 /**
@@ -221,10 +293,11 @@ function isByokProviderErrorActivity(activity) {
  *     runtime?: ReturnType<typeof readTerminalRuntimeState>;
  *     stream?: ReturnType<typeof readTerminalDialogStreamMeta>;
  *     now?: number;
+ *     columns?: number;
  * }} [input]
  * @returns {string}
  */
-export function formatTerminalLiveStatusLine(input = {}) {
+function buildTerminalLiveStatusLine(input = {}) {
     const now = input.now ?? Date.now();
     const activity = input.activity ?? readTerminalActivitySnapshot();
     const runtime = input.runtime ?? readTerminalRuntimeState();
@@ -338,13 +411,19 @@ export function formatTerminalLiveStatusLine(input = {}) {
     const target = renderLiveToolName(activity);
     if (activity.phase === 'tool') {
         const toolLabel = target || label || 'ferramenta';
-        const toolTarget = renderLiveToolTarget(activity);
+        const duration = formatLiveDuration(ageMs);
+        const liveBudget = resolveLiveStatusBudget(input.columns);
+        const useCompactToolPhase = Boolean(activity.toolTarget) && liveBudget < 72;
+        const phaseText = useCompactToolPhase ? '' : ' ferramenta';
+        const fixedVisibleText = `  LLM-B${phaseText} · ${toolLabel}${progress} · ${duration}${queue}`;
+        const targetBudget = Math.min(42, liveBudget - Array.from(fixedVisibleText).length - 3);
+        const toolTarget = renderLiveToolTarget(activity, targetBudget);
         const targetText = toolTarget ? ` · ${toolTarget}` : '';
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText(severityRole, 'ferramenta')}` +
+            `${useCompactToolPhase ? '' : terminalThemeText(severityRole, 'ferramenta')}` +
             `${terminalThemeText('tool', ` · ${toolLabel}`)}` +
-            `${terminalThemeText('muted', `${targetText}${progress} · ${formatLiveDuration(ageMs)}${queue}`)}` +
+            `${terminalThemeText('muted', `${targetText}${progress} · ${duration}${queue}`)}` +
             '\x1b[K'
         );
     }
@@ -354,9 +433,25 @@ export function formatTerminalLiveStatusLine(input = {}) {
         `  ${terminalThemeText('assistant', 'LLM-B')} ` +
         `${terminalThemeText(severityRole, `${renderLivePhaseLabel(activity.phase)} · ${label}`)}` +
         `${terminalThemeText('tool', targetText)}` +
-        `${terminalThemeText('muted', `${detailText}${progress} · ${formatLiveDuration(ageMs)}${modelEffort ? ` · ${modelEffort}` : ''} · ${runtimeTail}${queue}`)}` +
+        `${terminalThemeText('muted', `${detailText}${progress} · ${formatLiveDuration(ageMs)} · ${runtimeTail}${queue}${modelEffort ? ` · ${modelEffort}` : ''}`)}` +
         '\x1b[K'
     );
+}
+
+/**
+ * Formata a projeção transitória da atividade atual dentro de uma única linha física.
+ *
+ * @param {{
+ *     activity?: ReturnType<typeof readTerminalActivitySnapshot>;
+ *     runtime?: ReturnType<typeof readTerminalRuntimeState>;
+ *     stream?: ReturnType<typeof readTerminalDialogStreamMeta>;
+ *     now?: number;
+ *     columns?: number;
+ * }} [input]
+ * @returns {string}
+ */
+export function formatTerminalLiveStatusLine(input = {}) {
+    return fitLiveStatusToSingleLine(buildTerminalLiveStatusLine(input), input.columns);
 }
 
 /**

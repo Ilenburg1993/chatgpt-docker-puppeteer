@@ -120,6 +120,13 @@ export { drainPendingNotifications, getPersistenceFailureCount };
  */
 
 const MAX_TURN_QUEUE_SIZE = 10;
+const EMPTY_TURN_RECOVERY_MAX_ATTEMPTS = 1;
+const EMPTY_TURN_RECOVERY_PROMPT = [
+    'RECUPERAÇÃO AUTOMÁTICA DO TERMINAL:',
+    'O turno imediatamente anterior encerrou sem texto público, sem tool executada e sem pergunta humana pendente.',
+    'Continue exatamente a solicitação anterior do operador. Use apenas tools reais quando necessárias.',
+    'Não explique a recuperação; execute o pedido anterior e entregue saída pública normal.',
+].join('\n');
 
 /**
  * @param {string | null | undefined} value
@@ -444,6 +451,42 @@ function hasPendingHumanInputOutcome(runtimeState) {
         runtimeState.pendingQuestion !== null &&
         runtimeState.pendingQuestionKind !== 'ready'
     );
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number}
+ */
+function nonNegativeFiniteNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/**
+ * Um turno vazio antes de qualquer tool/pergunta é recuperável: não houve efeito colateral observável e a causa mais
+ * provável é o modelo/adapter ter encerrado a chamada sem materializar protocolo público. Depois de tools, perguntas
+ * ou transições de protocolo, retry automático deixa de ser seguro porque poderia duplicar ação ou atropelar o
+ * contrato do SDK.
+ *
+ * @param {import('../frontend/gateways/dialog.js').TerminalDialogTurnResult} turnResult
+ * @param {{
+ *     actor: string;
+ *     allowRecovery: boolean;
+ *     runtimeState: ReturnType<typeof readTerminalRuntimeState>;
+ * }} context
+ * @returns {boolean}
+ */
+function shouldAttemptPreActionEmptyTurnRecovery(turnResult, context) {
+    if (!context.allowRecovery || context.actor !== 'user') return false;
+    if (typeof turnResult.reply === 'string' && turnResult.reply.trim().length > 0) return false;
+    if (hasPendingHumanInputOutcome(context.runtimeState)) return false;
+    if (turnResult.semanticOutcome && turnResult.semanticOutcome !== 'empty') return false;
+    const diagnostics = turnResult.semanticDiagnostics;
+    if (!diagnostics) return true;
+    if (diagnostics.pendingHumanInput === true || diagnostics.pendingProtocolKind !== null) return false;
+    if (nonNegativeFiniteNumber(diagnostics.toolSignalCount) > 0) return false;
+    if (nonNegativeFiniteNumber(diagnostics.assistantMessageCount) > 0) return false;
+    if (nonNegativeFiniteNumber(diagnostics.deltaChars) > 0) return false;
+    return true;
 }
 
 /**
@@ -1007,6 +1050,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 detail: `${elapsedSeconds}s sem resposta visível`,
                 source: 'dialog',
                 recordHistory: false,
+                focusMode: 'background',
             });
             if (process.env['COPILOT_TERMINAL_DURABLE_WAITING_NARRATION'] === 'true') {
                 println(terminalThemeRow('LLM-B', `pensando · ${elapsedSeconds}s sem resposta visível`, { role: 'muted' }));
@@ -1151,13 +1195,79 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             });
         };
 
-        const turnResult = await runTerminalDialogTurnDetailed(enrichedMessage, {
+        /** @type {import('../frontend/gateways/dialog.js').TerminalDialogTurnResult} */
+        let turnResult = await runTerminalDialogTurnDetailed(enrichedMessage, {
             timeout: timeoutDecision.timeoutMs,
             onDelta,
             onDeltaDiagnostic,
             onReasoning,
             ...(requestHeaders ? { requestHeaders } : {}),
         });
+        /** @type {{ attempted: boolean; attempts: number; firstOutcome: string | null; firstReplySource: string | null; recovered: boolean; durationMs: number | null } | null} */
+        let emptyTurnRecovery = null;
+        if (
+            shouldAttemptPreActionEmptyTurnRecovery(turnResult, {
+                actor,
+                allowRecovery: !requestHeaders,
+                runtimeState: readTerminalRuntimeState(),
+            })
+        ) {
+            const recoveryStartedAt = Date.now();
+            emptyTurnRecovery = {
+                attempted: true,
+                attempts: EMPTY_TURN_RECOVERY_MAX_ATTEMPTS,
+                firstOutcome: turnResult.semanticOutcome ?? null,
+                firstReplySource: turnResult.semanticReplySource ?? turnResult.replySource ?? null,
+                recovered: false,
+                durationMs: null,
+            };
+            recordTerminalActivity('thinking', 'Recuperando turno sem saída', {
+                detail: 'tentativa 1/1 · sem tool, sem delta e sem pergunta pendente',
+                source: 'dialog',
+                severity: 'warn',
+            });
+            broadcastSse(
+                'terminal.turn.empty_recovery',
+                withTerminalTurnCorrelation({
+                    source: 'terminal-dialog/empty-recovery',
+                    actor,
+                    attempt: 1,
+                    maxAttempts: EMPTY_TURN_RECOVERY_MAX_ATTEMPTS,
+                    reason: 'pre_action_empty_output',
+                    firstOutcome: turnResult.semanticOutcome ?? null,
+                    firstReplySource: turnResult.semanticReplySource ?? turnResult.replySource ?? null,
+                    firstDiagnostics: turnResult.semanticDiagnostics ?? null,
+                    timestamp: recoveryStartedAt,
+                }),
+            );
+            println(
+                terminalThemeRow(
+                    'Recuperação',
+                    'turno sem saída antes de qualquer tool; reenviando continuação segura uma vez',
+                    { role: 'warn' },
+                ),
+            );
+            turnResult = await runTerminalDialogTurnDetailed(EMPTY_TURN_RECOVERY_PROMPT, {
+                timeout: timeoutDecision.timeoutMs,
+                onDelta,
+                onDeltaDiagnostic,
+                onReasoning,
+            });
+            emptyTurnRecovery.durationMs = Date.now() - recoveryStartedAt;
+            emptyTurnRecovery.recovered = typeof turnResult.reply === 'string' && turnResult.reply.trim().length > 0;
+            recordTerminalActivity(
+                emptyTurnRecovery.recovered ? 'turn' : 'error',
+                emptyTurnRecovery.recovered ? 'Turno recuperado após saída vazia' : 'Recuperação de turno sem saída falhou',
+                {
+                    detail:
+                        `${emptyTurnRecovery.durationMs}ms · ` +
+                        `resultado ${turnResult.semanticOutcome ?? 'n/d'} · origem ${turnResult.semanticReplySource ?? turnResult.replySource}`,
+                    source: 'dialog',
+                    severity: emptyTurnRecovery.recovered ? 'info' : 'error',
+                    recordHistory: true,
+                },
+            );
+        }
         const quiescence =
             turnResult.reply.trim().length === 0 && !hasPendingHumanInputOutcome(readTerminalRuntimeState())
                 ? await waitForTerminalTurnMaterializationQuiescence()
@@ -1249,6 +1359,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 semanticOutcome: turnResult.semanticOutcome ?? null,
                 semanticReplySource: turnResult.semanticReplySource ?? null,
                 semanticDiagnostics: turnResult.semanticDiagnostics ?? null,
+                emptyTurnRecovery,
             },
             finalReconciliation: {
                 mode: finalRenderDecision.mode,

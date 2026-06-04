@@ -145,6 +145,71 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(82);
     });
 
+    it('mantém alvo de ferramenta em uma única linha física na largura efetiva do terminal', async () => {
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'tool',
+            label: 'Ferramenta em uso',
+            detail: 'executando comando longo',
+            toolName: 'exec_command',
+            toolTarget:
+                'node -e "setTimeout(() => console.log(\'LONG-TOOL-HEARTBEAT-DONE\'), 4000)"',
+        };
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+
+        const line = formatTerminalLiveStatusLine({ columns: 72 });
+        const visible = line.replace(/\x1b\[[0-?]*[ -/]*[@-~]/gu, '');
+
+        expect(visible).toContain('LLM-B');
+        expect(visible).toContain('Executar comando');
+        expect(visible).toContain('node');
+        expect(visible).not.toContain('\n');
+        expect(visible).not.toContain('\r');
+        expect(Array.from(visible).length).toBeLessThanOrEqual(71);
+    });
+
+    it('prioriza ação e alvo sobre o rótulo de fase em PTY muito estreito', async () => {
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'tool',
+            label: 'Ferramenta em uso',
+            detail: 'executando comando longo',
+            toolName: 'exec_command',
+            toolTarget: 'node -e "console.log(123)"',
+        };
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+
+        const line = formatTerminalLiveStatusLine({ columns: 48 });
+        const visible = line.replace(/\x1b\[[0-?]*[ -/]*[@-~]/gu, '');
+
+        expect(visible).toContain('LLM-B');
+        expect(visible).toContain('Executar comando');
+        expect(visible).toContain('node');
+        expect(visible).not.toContain('ferramenta');
+        expect(Array.from(visible).length).toBeLessThanOrEqual(48);
+    });
+
+    it('impõe barreira de uma linha também para detalhes inesperadamente longos', async () => {
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'thinking',
+            label: 'Analisando contexto profundamente',
+            detail: `detalhe inesperado ${'muito longo '.repeat(30)}`,
+            toolName: null,
+        };
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+
+        const line = formatTerminalLiveStatusLine({ columns: 60 });
+        const visible = line.replace(/\x1b\[[0-?]*[ -/]*[@-~]/gu, '');
+
+        expect(visible).not.toContain('\n');
+        expect(visible).not.toContain('\r');
+        expect(Array.from(visible).length).toBeLessThanOrEqual(59);
+    });
+
     it('mantém request_user_input formatável, mas fora do pulso periódico para não disputar o input', async () => {
         mocks.structuredInputs = [
             {

@@ -25,6 +25,7 @@ const MAX_RECENT_TOOL_LIFECYCLE = 48;
  *     turnId: string | null;
  *     target: string | null;
  *     path: string | null;
+ *     directoryTargets: string[];
  *     commands: string[];
  *     filters: string[];
  *     resultCount: number | null;
@@ -98,6 +99,10 @@ function buildDiagnostic(event, previous) {
         turnId: nonEmptyString(event.turnId) ?? previous?.turnId ?? null,
         target: nonEmptyString(event.target) ?? previous?.target ?? null,
         path: nonEmptyString(event.path) ?? previous?.path ?? null,
+        directoryTargets:
+            (event.directoryTargets?.length ?? 0) > 0
+                ? [...(event.directoryTargets ?? [])]
+                : (previous?.directoryTargets ?? []),
         commands: (event.commands?.length ?? 0) > 0 ? [...(event.commands ?? [])] : (previous?.commands ?? []),
         filters: (event.filters?.length ?? 0) > 0 ? [...(event.filters ?? [])] : (previous?.filters ?? []),
         resultCount: typeof event.resultCount === 'number' ? event.resultCount : previous?.resultCount ?? null,

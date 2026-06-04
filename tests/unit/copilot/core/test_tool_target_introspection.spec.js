@@ -72,4 +72,23 @@ describe('core/tool-target-introspection', () => {
         expect(meta.resultCount).toBe(12);
         expect(meta.resultSummary).toBe('sucesso · saída 0 · 12 resultados');
     });
+
+    it('separa cwd contextual de arquivos afetados e mantém comando como alvo primário', () => {
+        const meta = introspectToolTargets({
+            args: {
+                command: 'git status --short',
+                cwd: '/workspaces/chatgpt-docker-puppeteer',
+            },
+            result: {
+                success: true,
+                exitCode: 0,
+            },
+        });
+
+        expect(meta.fileTargets).toEqual([]);
+        expect(meta.directoryTargets).toEqual(['/workspaces/chatgpt-docker-puppeteer']);
+        expect(meta.commands).toEqual(['git status --short']);
+        expect(meta.primaryTarget).toBe('git status --short');
+        expect(meta.primaryTargetKind).toBe('command');
+    });
 });

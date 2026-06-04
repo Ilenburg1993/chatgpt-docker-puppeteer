@@ -647,6 +647,24 @@ describe('terminal/commands/events', () => {
                 {
                     timestamp: 1710000002000,
                     eventId: 63,
+                    event: 'terminal.turn.empty_recovery',
+                    source: 'terminal-dialog/empty-recovery',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        actor: 'user',
+                        attempt: 1,
+                        maxAttempts: 1,
+                        reason: 'pre_action_empty_output',
+                        firstOutcome: 'empty',
+                        firstReplySource: 'direct_dispatch',
+                    },
+                },
+                {
+                    timestamp: 1710000002500,
+                    eventId: 66,
                     event: 'terminal.turn.empty_output',
                     source: 'terminal-dialog/empty-output',
                     eventSource: null,
@@ -704,6 +722,10 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Cancelamento');
         expect(ctx.output()).toContain('controle da sessão');
         expect(ctx.output()).toContain('operação cancelada pelo operador');
+        expect(ctx.output()).toContain('Recuperação de turno');
+        expect(ctx.output()).toContain('tentativa 1/1');
+        expect(ctx.output()).toContain('motivo turno vazio antes de ação');
+        expect(ctx.output()).toContain('sem tool, delta ou pergunta pendente');
         expect(ctx.output()).toContain('Turno sem saída');
         expect(ctx.output()).toContain('autor agente');
         expect(ctx.output()).toContain('origem sem saída');

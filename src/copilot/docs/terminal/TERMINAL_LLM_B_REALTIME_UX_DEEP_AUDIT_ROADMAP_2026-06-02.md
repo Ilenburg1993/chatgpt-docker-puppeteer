@@ -7851,7 +7851,7 @@
 - [x] `ToolCallRegistry` preserva a apresentação enriquecida do start e permite upgrade no
   complete quando o resultado adiciona contagem ou resumo.
 - [x] `tool.lifecycle` carrega metadados semânticos seguros para consumidores externos.
-- [ ] Linha viva deve mostrar:
+- [x] Linha viva deve mostrar:
   - `LLM-B ferramenta · Executar comando · git status · 2s`;
   - `LLM-B ferramenta · Listar tools · categoria code · 1s`;
   - `LLM-B ferramenta · Buscar arquivos · "turn-materialization" · 3s`;
@@ -7974,10 +7974,10 @@
 - [ ] Vazio real continua visível e acionável.
 - [ ] Continuação pós-pergunta vazia continua distinta de turno vazio comum.
 - [ ] Turno tool-only é diagnosticado sem ser confundido automaticamente com falha de provider.
-- [ ] `exec_command` mostra comando seguro e compacto no start, linha viva e conclusão.
+- [x] `exec_command` mostra comando seguro e compacto no start, linha viva e conclusão.
 - [ ] `list_tools` mostra nome humano, filtro e contagem quando disponíveis.
 - [ ] Tools de busca/listagem mostram alvo e resultado curto sem stdout bruto.
-- [ ] Linha viva comunica a ação atual sem IDs internos, sem multiline e sem ocupar o input.
+- [x] Linha viva comunica a ação atual sem IDs internos, sem multiline e sem ocupar o input.
 - [ ] Troca efetiva de modelo é comunicada com precisão e sem confundir seleção preparada com
   sessão viva.
 - [ ] Testes focados e lives PTY preservam legibilidade, correlação e ausência de regressões.
@@ -8016,3 +8016,178 @@
   - comandos auxiliares;
   - registry de tools;
   - apresentação de recovery.
+
+### 12.75 Primeiro live PTY da projeção semântica de tools — 2026-06-04
+
+- [x] Cenário executado:
+  - `long-tool-heartbeat`;
+  - transporte PTY real;
+  - BYOK real;
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T20-05-46-656Z/summary.md`.
+- [x] O live confirmou que `exec_command` agora preserva e apresenta o comando seguro:
+  - start durável com `Executar comando`;
+  - `/activity` com alvo operacional;
+  - `/tools diag` com linha `Alvo`;
+  - `tool.lifecycle` SSE com `commands` e `primaryTargetKind=command`;
+  - conclusão estruturada com sucesso e `exitCode=0`.
+- [x] O live revelou um bug visual real:
+  - o comando longo fez a linha viva ocupar duas linhas físicas;
+  - a região reservada cresceu para duas linhas;
+  - o input continuou tecnicamente preservado, mas a UX deixou de cumprir o contrato de pulso
+    compacto e previsível.
+- [x] Decisão arquitetural consolidada:
+  - blocos transitórios genéricos podem usar a área reservada elástica;
+  - a linha viva canônica deve ser estritamente uma linha física;
+  - a projeção semântica deve calcular o orçamento restante antes de incluir o alvo;
+  - uma barreira ANSI-aware deve impedir multiline e overflow mesmo quando um produtor futuro
+    fornecer texto inesperadamente longo.
+- [x] Implementação:
+  - `formatTerminalLiveStatusLine()` aceita largura explícita para testes determinísticos;
+  - largura real de `process.stdout.columns` é usada em produção;
+  - o alvo de tool é compactado conforme o orçamento restante;
+  - toda linha viva passa por truncamento ANSI-aware com reset e clear-to-end preservados.
+- [x] O live também revelou falso negativo no runner:
+  - lifecycle estruturado de `exec_command` estava correto;
+  - o critério ainda reconhecia apenas badges legados como `[EXEC]` e `✅ [OK]`;
+  - o runner passou a aceitar também as linhas humanas `Ferramenta` e `Concluído`.
+- [x] Reexecutar `long-tool-heartbeat` e confirmar:
+  - linha viva fisicamente única no PTY;
+  - lifecycle sem falso negativo;
+  - input permanentemente disponível;
+  - nenhuma regressão no ask_user posterior.
+
+### 12.76 Metadado contextual de shell e segunda rodada live — 2026-06-04
+
+- [x] A primeira reexecução após o truncamento width-aware passou:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T20-12-10-531Z/summary.md`;
+  - lifecycle humano de `exec_command` foi reconhecido pelo runner;
+  - linha viva permaneceu em uma linha física;
+  - ask_user posterior continuou dedicado e sem disputa com input.
+- [x] A inspeção humana desse live revelou um bug de metadado:
+  - `cwd` era classificado como `fileTarget`;
+  - o diretório do workspace virava `path` da tool;
+  - a formatação humana reduzia o workspace para `.`;
+  - resumo do turno mostrava `Arquivos EXEC .`;
+  - `/activity` mostrava arquivo de execução `.`;
+  - `/tools diag` substituía o comando pelo alvo `.`.
+- [x] Decisão arquitetural:
+  - diretório de trabalho é contexto operacional, não arquivo afetado;
+  - `cwd`, `directory`, `root` e equivalentes devem viver em `directoryTargets`;
+  - apenas arquivos realmente afetados entram em `fileTargets`, `path`, contagem de arquivos e
+    resumo de arquivos tocados;
+  - para shell, o comando continua sendo o alvo primário e `primaryTargetKind=command`.
+- [x] Implementação:
+  - `introspectToolTargets()` separa `directoryTargets`;
+  - `TerminalToolActivityPresentation` preserva diretórios contextuais;
+  - `tool.lifecycle` publica `directoryTargets` sem poluir `fileTargets`;
+  - projeção diagnóstica mantém o novo campo;
+  - linha viva estreita remove o rótulo redundante de fase antes de omitir o alvo.
+- [x] Terceira execução PTY confirmou o comportamento real:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T20-19-17-919Z/summary.md`;
+  - linha viva:
+    `LLM-B · Executar comando · node -e "setT… · 0s`;
+  - resumo do turno:
+    `Turno 1 ação`, sem arquivo fictício;
+  - `/activity`: `Arquivos 0`;
+  - `/tools diag`: alvo é o comando;
+  - SSE: `path=null`, `fileTargets=[]`, `directoryTargets=[workspace]`,
+    `primaryTargetKind=command`.
+- [x] O terceiro live encontrou novo falso negativo do runner:
+  - regex ampla alcançava JSON técnico contendo `LLM-B` e `modelo`;
+  - o critério passou a inspecionar frames físicos delimitados por `\r`;
+  - um frame de tool só é válido quando contém duração no mesmo frame e não carrega tail de
+    modelo/runtime.
+- [x] Reexecutar `long-tool-heartbeat` após o critério por frame e registrar PASS final:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T20-22-39-510Z/summary.md`;
+  - status PASS;
+  - `ux-tool-live-status-stays-single-line` passou;
+  - `ux-command-cwd-not-file-target` passou.
+
+### 12.77 Precedência de foco entre tool e watchdog de silêncio — 2026-06-04
+
+- [x] O live PASS ainda revelou uma discrepância humana não coberta pelo runner:
+  - `exec_command` estava em voo;
+  - a linha viva começou corretamente com o comando;
+  - antes do complete, o ticker do diálogo publicou `thinking/LLM-B trabalhando`;
+  - a linha viva passou a mostrar `pensando · 11s sem resposta pública`;
+  - o operador deixou de ver a atividade concreta ainda em execução.
+- [x] Diagnóstico:
+  - `recordTerminalActivity()` possui um foco operacional separado de `_currentActivity`;
+  - eventos `system` já não substituem o foco de tool;
+  - `thinking` é fase focalizável e substituía a tool;
+  - o watchdog de silêncio é um sinal genérico de background, não uma atividade concreta;
+  - qualquer conclusão sem `toolName` também podia limpar foco de tool por engano.
+- [x] Decisão:
+  - produtores devem declarar quando uma atividade é de foco `background`;
+  - background pode refinar `boot`, `turn` ou `thinking` genéricos;
+  - background não pode desalojar tool, streaming, pergunta, tarefa, compaction, subagente ou erro;
+  - completions só limpam foco por identidade de tool, mesma fase, fluxo de turno compatível ou idle.
+- [x] Implementação:
+  - `recordTerminalActivity()` aceita `focusMode`;
+  - ticker de silêncio do diálogo usa `focusMode=background`;
+  - conclusão de tarefa não relacionada não limpa mais tool ativa;
+  - testes cobrem preservação de tool, refinamento de turno genérico e completion não relacionada.
+- [x] Runner live ganhou critério estruturado:
+  - coleta IDs de start e completion por tool;
+  - falha se um `terminal.activity` de `thinking` surgir entre esses eventos;
+  - evita depender apenas da aparência final do stdout.
+- [x] Reexecutar `long-tool-heartbeat` e confirmar que `exec_command` permanece foreground até o complete:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T20-28-19-696Z/summary.md`;
+  - status PASS;
+  - `scenario-tool-exec_command-focus-preserved` passou;
+  - a linha viva permaneceu no comando durante os quatro segundos de execução;
+  - `thinking` só assumiu o foco depois do complete, durante a espera legítima por resposta pública.
+
+### 12.78 Recuperação canônica de turno vazio pré-ação — 2026-06-04
+
+- [x] Live real `recoverable-tool-error` encontrou uma falha anterior ao cenário de erro:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T20-30-57-924Z/summary.md`;
+  - status `BLOCKED`;
+  - blocker `assistant-empty-turn`;
+  - o provider/SDK consumiu tokens e emitiu `assistant.turn_end`;
+  - não houve `assistant.message`, delta público, tool, pergunta humana ou protocolo pendente;
+  - o terminal registrou corretamente `terminal.turn.empty_output`, mas encerrou o fluxo antes de
+    testar a recuperação de tool.
+- [x] Diagnóstico:
+  - este é o Caso A da taxonomia de vazio real;
+  - não é falso positivo de materialização tardia, pois a quiescência não encontrou mensagem
+    posterior;
+  - também não é tool-only, pois `toolSignalCount=0`;
+  - como nenhuma tool/pergunta/transição ocorreu, uma única continuação automática é segura;
+  - depois de qualquer tool ou pergunta, retry automático deixa de ser seguro por risco de duplicar
+    efeitos ou atropelar o contrato do SDK.
+- [x] Decisão arquitetural:
+  - o terminal deve tratar vazio pré-ação como recuperável uma vez;
+  - a recuperação pertence ao mesmo turno humano na camada visual/materialização;
+  - o prompt de recuperação é curto, explícito e instrui a continuar a solicitação anterior sem
+    narrar a recuperação;
+  - o terminal emite `terminal.turn.empty_recovery` antes da segunda tentativa;
+  - somente a segunda falha vazia degrada saúde BYOK e imprime `Turno vazio`.
+- [x] Implementação:
+  - `shouldAttemptPreActionEmptyTurnRecovery()` valida ator, ausência de requestHeaders, ausência
+    de input humano, ausência de protocolo, zero tools, zero assistant messages e zero deltas;
+  - `_executeTurn()` faz uma segunda chamada com `RECUPERAÇÃO AUTOMÁTICA DO TERMINAL`;
+  - a materialização do terminal permanece aberta até a segunda chamada resolver;
+  - `/events` ganhou label humano `Recuperação de turno` e resumo de tentativa/motivo;
+  - os diagnósticos exportáveis incluem `emptyTurnRecovery`.
+- [x] Testes de contrato adicionados/ajustados:
+  - vazio pré-ação recuperado não degrada saúde BYOK;
+  - vazio BYOK só vira falha operacional quando continua vazio após a recuperação;
+  - `/events` renderiza a recuperação sem envelope cru.
+- [x] Reexecutar `recoverable-tool-error` e confirmar que o cenário avança para tools reais, erro
+      recuperável, segunda leitura, deltas públicos, `ask_user` e final pós-resposta:
+  - artefato:
+    `artifacts/terminal-live/2026-06-04T20-48-30-966Z/summary.md`;
+  - status PASS;
+  - `scenario-tool-exec_command-lifecycle` passou com `expected=failure`;
+  - `scenario-tool-exec_command-focus-preserved` passou;
+  - `scenario-recoverable-tool-error-observed` passou;
+  - `ask_user`, resposta humana, export, SSE e `/health full` permaneceram coerentes;
+  - neste run específico não houve vazio pré-ação, portanto `terminal.turn.empty_recovery` não foi
+    necessário; o contrato permanece coberto por teste unitário e pelo blocker anterior.

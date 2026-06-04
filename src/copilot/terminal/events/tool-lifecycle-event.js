@@ -57,6 +57,7 @@
  * @property {string | null} path - Caminho principal afetado
  * @property {string | null} target - Alvo principal da operação
  * @property {string[]} fileTargets - Todos os arquivos afetados
+ * @property {string[]} directoryTargets - Diretórios contextuais da operação
  * @property {string[]} urlTargets - URLs acessadas
  * @property {string[]} searchTerms - Termos de busca (se aplicável)
  * @property {{ start: number | null; end: number | null } | null} lineRange - Range de linhas
@@ -94,6 +95,7 @@
  * @property {string | null} [path]
  * @property {string | null} [target]
  * @property {string[]} [fileTargets]
+ * @property {string[]} [directoryTargets]
  * @property {string[]} [urlTargets]
  * @property {string[]} [searchTerms]
  * @property {{ start: number | null; end: number | null } | null} [lineRange]
@@ -146,6 +148,7 @@ export function buildToolLifecycleEvent(type, source, fields) {
         path: fields.path ?? null,
         target: fields.target ?? null,
         fileTargets: fields.fileTargets ?? [],
+        directoryTargets: fields.directoryTargets ?? [],
         urlTargets: fields.urlTargets ?? [],
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
@@ -187,6 +190,7 @@ export function buildToolLifecycleEvent(type, source, fields) {
  *     path?: string | null;
  *     target?: string | null;
  *     fileTargets?: string[];
+ *     directoryTargets?: string[];
  *     urlTargets?: string[];
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
@@ -208,6 +212,7 @@ export function buildToolLifecycleStart(fields) {
         path: fields.path ?? null,
         target: fields.target ?? null,
         fileTargets: fields.fileTargets ?? [],
+        directoryTargets: fields.directoryTargets ?? [],
         urlTargets: fields.urlTargets ?? [],
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
@@ -230,6 +235,7 @@ export function buildToolLifecycleStart(fields) {
  *     path?: string | null;
  *     target?: string | null;
  *     fileTargets?: string[];
+ *     directoryTargets?: string[];
  *     urlTargets?: string[];
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
@@ -252,6 +258,7 @@ export function buildToolLifecycleProgress(fields) {
         path: fields.path ?? null,
         target: fields.target ?? null,
         fileTargets: fields.fileTargets ?? [],
+        directoryTargets: fields.directoryTargets ?? [],
         urlTargets: fields.urlTargets ?? [],
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
@@ -276,6 +283,7 @@ export function buildToolLifecycleProgress(fields) {
  *     path?: string | null;
  *     target?: string | null;
  *     fileTargets?: string[];
+ *     directoryTargets?: string[];
  *     urlTargets?: string[];
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
@@ -297,6 +305,7 @@ export function buildToolLifecyclePartialResult(fields) {
         path: fields.path ?? null,
         target: fields.target ?? null,
         fileTargets: fields.fileTargets ?? [],
+        directoryTargets: fields.directoryTargets ?? [],
         urlTargets: fields.urlTargets ?? [],
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
@@ -321,6 +330,7 @@ export function buildToolLifecyclePartialResult(fields) {
  *     path?: string | null;
  *     target?: string | null;
  *     fileTargets?: string[];
+ *     directoryTargets?: string[];
  *     urlTargets?: string[];
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
@@ -344,6 +354,7 @@ export function buildToolLifecycleComplete(fields) {
         path: fields.path ?? null,
         target: fields.target ?? null,
         fileTargets: fields.fileTargets ?? [],
+        directoryTargets: fields.directoryTargets ?? [],
         urlTargets: fields.urlTargets ?? [],
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
@@ -369,6 +380,7 @@ export function buildToolLifecycleComplete(fields) {
  *     path?: string | null;
  *     target?: string | null;
  *     fileTargets?: string[];
+ *     directoryTargets?: string[];
  *     urlTargets?: string[];
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
@@ -390,6 +402,7 @@ export function buildToolLifecycleExternalRequested(fields) {
         path: fields.path ?? null,
         target: fields.target ?? null,
         fileTargets: fields.fileTargets ?? [],
+        directoryTargets: fields.directoryTargets ?? [],
         urlTargets: fields.urlTargets ?? [],
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,
@@ -414,6 +427,7 @@ export function buildToolLifecycleExternalRequested(fields) {
  *     path?: string | null;
  *     target?: string | null;
  *     fileTargets?: string[];
+ *     directoryTargets?: string[];
  *     urlTargets?: string[];
  *     searchTerms?: string[];
  *     lineRange?: { start: number | null; end: number | null } | null;
@@ -436,6 +450,7 @@ export function buildToolLifecycleExternalCompleted(fields) {
         path: fields.path ?? null,
         target: fields.target ?? null,
         fileTargets: fields.fileTargets ?? [],
+        directoryTargets: fields.directoryTargets ?? [],
         urlTargets: fields.urlTargets ?? [],
         searchTerms: fields.searchTerms ?? [],
         lineRange: fields.lineRange ?? null,

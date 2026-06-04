@@ -31,6 +31,10 @@ const FOCUSED_ACTIVITY_MAX_AGE_MS = 10 * 60_000;
  */
 
 /**
+ * @typedef {'foreground' | 'background'} TerminalActivityFocusMode
+ */
+
+/**
  * @typedef {Object} TerminalActivitySnapshot
  * @property {TerminalActivityPhase} phase
  * @property {string} label
@@ -144,16 +148,32 @@ function isFocusableTerminalActivityPhase(phase) {
 
 /**
  * @param {TerminalActivitySnapshot} activity
+ * @param {TerminalActivityFocusMode} focusMode
  * @returns {void}
  */
-function updateFocusedActivity(activity) {
+function updateFocusedActivity(activity, focusMode = 'foreground') {
     if (isTerminalActivityCompletion(activity.phase, activity.label)) {
-        if (!activity.toolName || _focusedActivity?.toolName === activity.toolName) {
+        const focused = _focusedActivity;
+        const clearsByToolIdentity = Boolean(activity.toolName) && focused?.toolName === activity.toolName;
+        const clearsSamePhase = focused?.phase === activity.phase;
+        const clearsTurnFlow =
+            activity.phase === 'turn' &&
+            (focused?.phase === 'turn' || focused?.phase === 'thinking' || focused?.phase === 'streaming');
+        if (activity.phase === 'idle' || clearsByToolIdentity || clearsSamePhase || clearsTurnFlow) {
             _focusedActivity = null;
         }
         return;
     }
     if (isFocusableTerminalActivityPhase(activity.phase)) {
+        if (
+            focusMode === 'background' &&
+            _focusedActivity &&
+            _focusedActivity.phase !== 'boot' &&
+            _focusedActivity.phase !== 'turn' &&
+            _focusedActivity.phase !== 'thinking'
+        ) {
+            return;
+        }
         _focusedActivity = activity;
     }
 }
@@ -182,6 +202,7 @@ function readFocusedActivity() {
  *     toolTarget?: string | null;
  *     recordHistory?: boolean;
  *     updateCurrent?: boolean;
+ *     focusMode?: TerminalActivityFocusMode;
  *     timestamp?: number;
  * }} [opts]
  * @returns {TerminalActivitySnapshot}
@@ -196,6 +217,7 @@ export function recordTerminalActivity(phase, label, opts = {}) {
     const toolTarget = opts.toolTarget ?? null;
     const recordHistory = opts.recordHistory !== false;
     const updateCurrent = opts.updateCurrent !== false;
+    const focusMode = opts.focusMode ?? 'foreground';
     const keepStart =
         _currentActivity.phase === phase &&
         _currentActivity.label === label &&
@@ -213,7 +235,7 @@ export function recordTerminalActivity(phase, label, opts = {}) {
             updatedAt: timestamp,
             ageMs: 0,
         });
-        updateFocusedActivity(_currentActivity);
+        updateFocusedActivity(_currentActivity, focusMode);
         return _currentActivity;
     }
 
@@ -239,7 +261,7 @@ export function recordTerminalActivity(phase, label, opts = {}) {
     }
     const prev = _currentActivity;
     _currentActivity = next;
-    updateFocusedActivity(next);
+    updateFocusedActivity(next, focusMode);
     if (recordHistory) {
         pushHistory(next);
     }

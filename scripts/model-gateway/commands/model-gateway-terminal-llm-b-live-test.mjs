@@ -3749,6 +3749,8 @@ function summarizeNamedToolLifecycle(events, expectedName) {
         resultTypes: [],
         exitCodes: [],
         matchedEventIds: [],
+        startEventIds: [],
+        completionEventIds: [],
     };
     for (const evt of events) {
         const payload = eventPayload(evt);
@@ -3768,15 +3770,26 @@ function summarizeNamedToolLifecycle(events, expectedName) {
         const type = typeof payload.type === 'string' ? payload.type : '';
         const success = payload.success !== false;
         const eventId = eventPublicId(evt);
-        if (isLifecycleStartType(type)) summary.start = true;
-        if (isLifecycleCompletionType(type) && success) summary.done = true;
-        if (isLifecycleCompletionType(type) && !success) summary.failed = true;
+        if (isLifecycleStartType(type)) {
+            summary.start = true;
+            if (Number.isFinite(eventId)) summary.startEventIds.push(eventId);
+        }
+        if (isLifecycleCompletionType(type) && success) {
+            summary.done = true;
+            if (Number.isFinite(eventId)) summary.completionEventIds.push(eventId);
+        }
+        if (isLifecycleCompletionType(type) && !success) {
+            summary.failed = true;
+            if (Number.isFinite(eventId)) summary.completionEventIds.push(eventId);
+        }
         if (type === 'io_op' && success) summary.io = true;
         if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
     }
     summary.resultTypes = [...new Set(summary.resultTypes)].sort();
     summary.exitCodes = [...new Set(summary.exitCodes)].sort((a, b) => a - b);
     summary.matchedEventIds = [...new Set(summary.matchedEventIds)].sort((a, b) => a - b);
+    summary.startEventIds = [...new Set(summary.startEventIds)].sort((a, b) => a - b);
+    summary.completionEventIds = [...new Set(summary.completionEventIds)].sort((a, b) => a - b);
     return summary;
 }
 
@@ -4148,12 +4161,42 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const canonicalEvents = [...sseSummary.events, ...archiveRawEvents];
     const canonicalToolLifecycle = summarizeCanonicalToolLifecycle(canonicalEvents);
-    const scenarioToolLifecycle = scenario.expectedLifecycleTools.map((tool) => ({
-        ...tool,
-        lifecycle: summarizeNamedToolLifecycle(canonicalEvents, tool.name),
-        renderedRe: new RegExp(`\\[[^\\]]+\\].*${escapeRegExp(tool.renderedName ?? tool.name)}`, 's'),
-        doneRe: new RegExp(`✅ \\[OK\\].*${escapeRegExp(tool.renderedName ?? tool.name)}`, 's'),
-    }));
+    const scenarioToolLifecycle = scenario.expectedLifecycleTools.map((tool) => {
+        const renderedName = escapeRegExp(tool.renderedName ?? tool.name);
+        const lifecycle = summarizeNamedToolLifecycle(canonicalEvents, tool.name);
+        const firstStartId = lifecycle.startEventIds.at(0) ?? null;
+        const lastCompletionId = lifecycle.completionEventIds.at(-1) ?? null;
+        const thinkingOverrideEventIds =
+            firstStartId === null || lastCompletionId === null
+                ? []
+                : canonicalEvents
+                      .filter((evt) => {
+                          const eventId = eventPublicId(evt);
+                          const payload = eventPayload(evt);
+                          return (
+                              Number.isFinite(eventId) &&
+                              eventId > firstStartId &&
+                              eventId < lastCompletionId &&
+                              evt?.event === 'terminal.activity' &&
+                              payload?.phase === 'thinking'
+                          );
+                      })
+                      .map((evt) => eventPublicId(evt))
+                      .filter((eventId) => Number.isFinite(eventId));
+        return {
+            ...tool,
+            lifecycle,
+            thinkingOverrideEventIds,
+            renderedRe: new RegExp(
+                `(?:\\[[^\\]]+\\][^\\n]*${renderedName}|Ferramenta\\s+[^\\n]*${renderedName})`,
+                'iu',
+            ),
+            doneRe: new RegExp(
+                `(?:✅\\s+\\[OK\\][^\\n]*${renderedName}|Conclu[ií]do\\s+[^\\n]*${renderedName})`,
+                'iu',
+            ),
+        };
+    });
     const scenarioOutputMarkers = scenario.expectedOutputMarkers.map((marker) => ({
         marker,
         observedInToolResult: scenarioMarkerObservedInToolResults(canonicalEvents, marker),
@@ -4251,6 +4294,18 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         /Permiss[aã]o solicitada/iu.test(plain) ||
         /permission request/iu.test(plain);
     const scenarioUsesPermissionedTool = scenario.expectedLifecycleTools.length > 0;
+    const scenarioUsesExecCommand = scenario.expectedLifecycleTools.some((tool) => tool.name === 'exec_command');
+    const expectedLiveToolLabels = scenario.expectedLifecycleTools
+        .map((tool) => String(tool.renderedName ?? tool.name).trim())
+        .filter(Boolean);
+    const toolLiveStatusFrames = String(plain)
+        .split('\r')
+        .map((frame) => frame.trim())
+        .filter(
+            (frame) =>
+                /^LLM-B\b/u.test(frame) &&
+                (/\bferramenta\b/iu.test(frame) || expectedLiveToolLabels.some((label) => frame.includes(label))),
+        );
     return [
         {
             id: 'ready',
@@ -4321,6 +4376,14 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                     `rendered=${rendered ? 'yes' : 'no'} events=${tool.lifecycle.matchedEventIds.slice(0, 8).join(',') || '-'}`,
             };
         }),
+        ...scenarioToolLifecycle.map((tool) => ({
+            id: `scenario-tool-${tool.name}-focus-preserved`,
+            pass: tool.thinkingOverrideEventIds.length === 0,
+            detail:
+                tool.thinkingOverrideEventIds.length === 0
+                    ? `${tool.name} remained the foreground activity until completion`
+                    : `${tool.name} was overwritten by thinking activity event(s) ${tool.thinkingOverrideEventIds.join(', ')}`,
+        })),
         ...scenarioOutputMarkers.map(({ marker, observedInToolResult }) => ({
             id: `scenario-marker-${marker.toLowerCase().replace(/[^a-z0-9]+/gu, '-')}`,
             pass: observedInToolResult,
@@ -4653,8 +4716,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'ux-tool-live-status-stays-single-line',
-            pass: !/LLM-B\s+ferramenta[^\n]*(?:\n\s*(?:arquivo|·)|modelo\s+|racioc[ií]nio|conversa ativa)/iu.test(
-                plain,
+            pass: toolLiveStatusFrames.every(
+                (frame) =>
+                    !frame.includes('\n') &&
+                    /·\s+\d+(?:s|m\d{2}s|h\d{2}m)\s*$/u.test(frame) &&
+                    !/\b(?:modelo|racioc[ií]nio|conversa ativa)\b/iu.test(frame),
             ),
             detail: 'tool live status stayed one compact operator line without model/runtime tail',
         },
@@ -4726,6 +4792,16 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-turn-file-summary-deduped',
             pass: !/Arquivos\s+LER\s+package\.json\s+·\s+LER\s+package\.json/iu.test(beforeRawDiagnosticsPlain),
             detail: 'turn summary did not repeat the same human file path in one row',
+        },
+        {
+            id: 'ux-command-cwd-not-file-target',
+            pass:
+                !scenarioUsesExecCommand ||
+                (!/Arquivos\s+EXEC\s+\./iu.test(beforeRawDiagnosticsPlain) &&
+                    !/Arquivo\s+execu[cç][aã]o\s+·\s+\./iu.test(beforeRawDiagnosticsPlain) &&
+                    !/Executar comando\s+·\s+execu[cç][aã]o\s+·\s+\./iu.test(beforeRawDiagnosticsPlain) &&
+                    !/Executar comando[\s\S]{0,120}Alvo\s+\./iu.test(beforeRawDiagnosticsPlain)),
+            detail: 'exec_command cwd stayed contextual instead of becoming a touched file or replacing the command target',
         },
         {
             id: 'ux-no-raw-hourglass-waiting-prompt',
