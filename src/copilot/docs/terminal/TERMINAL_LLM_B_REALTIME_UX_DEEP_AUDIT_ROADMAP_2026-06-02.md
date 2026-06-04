@@ -5661,6 +5661,91 @@
       `Disabled tools`, `model_retry` ou texto inglês de retry antes do bloco `--raw`.
 - [x] Live pós-critério: repetir cenário canônico após `sse-archive-human-source-labels`
       confirmou o contrato no summary, não só na evidência visual.
+- [x] Auditoria UX de `/tools diag`: a live canônica ainda mostrava `Técnico`,
+      `SDK report_intent` e `Refs call chatcmpl-too... · req ...` dentro da superfície
+      diagnóstica intermediária. Isso preservava auditoria, mas quebrava a leitura humana e
+      reintroduzia IDs estranhos no fluxo que o operador mais usa para entender tools.
+- [x] Decisão UX: `/tools diag` agora é diagnóstico humano de triagem; `/tools all` é drill-down
+      técnico; `/tools raw` e `/events --raw` continuam sendo o envelope bruto. Portanto, o modo
+      `diag` pode mostrar classe, latência, categorias, contrato e lifecycle recente com nomes
+      humanos, mas não deve mostrar `chatcmpl`, `requestId`, `traceId`, `report_intent_local` ou
+      nomes SDK como linha primária.
+- [x] Correção aplicada: `/tools diag` oculta refs e nomes internos de lifecycle; `/tools all`
+      preserva `Nome interno` e `Rastreio`; o espaçamento global de `terminalThemeRow` ganhou
+      duas colunas entre label e valor para evitar linhas visualmente coladas como
+      `Configuração ferramentas...`.
+- [x] Contrato unitário atualizado: `diag` exige diagnóstico humano sem nomes internos/refs, e
+      `all` preserva rastreio técnico.
+- [x] Contrato live atualizado: `diagnostic-ux-tools-diag-hierarchy` agora bloqueia `Nome interno`,
+      `Técnico`, `Refs`, `Rastreio call/req/trace`, `chatcmpl-tool` e labels antigos na superfície
+      `/tools diag`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/state/ui-theme.js`;
+  - `node --check src/copilot/terminal/commands/tools.js`;
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint src/copilot/terminal/state/ui-theme.js src/copilot/terminal/commands/tools.js tests/unit/copilot/terminal/test_commands_tools.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js`.
+- [x] Live canônica/diagnóstica passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-tools-diag-human-contract-20260605-0055`.
+  - Resultado: `Status: PASS`; `/tools diag` mostrou `diagnóstico humano`, nomes humanos,
+        lifecycle recente sem `chatcmpl`, refs ou nomes internos, `/events 60` permaneceu humano,
+        `/errors 10` ficou zerado e `/health full` preservou painel temático.
+- [x] Achado visual da live: `Classe tool` e categoria `tool` ainda apareciam em inglês no painel
+      humano. Correção aplicada: classe/categoria `tool` viram `ferramenta`/`Ferramenta`, e o
+      critério live agora bloqueia `Classe tool` e linha de categoria `tool`.
+- [x] Validação adicional pós-tradução passou:
+  - `node --check src/copilot/terminal/commands/tools.js`;
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint src/copilot/terminal/commands/tools.js tests/unit/copilot/terminal/test_commands_tools.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js`.
+- [ ] Próxima live: repetir ciclo canônico/diagnóstico para confirmar a tradução final
+      `ferramenta` em PTY real e verificar `/tools all` como rota de auditoria profunda.
+- [x] Live de confirmação pós-tradução executada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-tools-diag-ferramenta-contract-20260605-0100`.
+  - Resultado: `Status: BLOCKED` por `blocked-by-assistant-empty-turn`; a LLM-B respondeu a
+        pergunta, mas encerrou a continuação sem texto público antes do marcador final canônico.
+- [x] Evidência positiva da live bloqueada: `/tools diag` exibiu `Classe ferramenta` e categoria
+      `Ferramenta`, sem refs/IDs crus, confirmando a tradução final no PTY real.
+- [x] Bug UX descoberto pela live: após `dialog.empty_after_user_input`, o aviso
+      `Continuação pós-pergunta vazia` era registrado como atividade atual `phase=turn`; com runtime
+      ocioso, a linha viva continuava pulsando por mais de 40s e quebrava em duas linhas físicas,
+      ocupando a área do input.
+- [x] Correção aplicada: o aviso de continuação vazia agora entra no histórico sem assumir o estado
+      atual (`updateCurrent: false`), e a linha viva ganhou guarda explícita para não renderizar
+      `Continuação pós-pergunta vazia` quando o runtime está ocioso.
+- [x] Validação escopada pós-empty-turn passou:
+  - `node --check src/copilot/terminal/wiring/terminal-agent-wiring.js`;
+  - `node --check src/copilot/terminal/repl/live-status-line.js`;
+  - `node --check src/copilot/terminal/commands/tools.js`;
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint src/copilot/terminal/wiring/terminal-agent-wiring.js src/copilot/terminal/repl/live-status-line.js src/copilot/terminal/commands/tools.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js`.
+- [ ] Próxima live: repetir o cenário canônico para confirmar que uma continuação vazia não deixa
+      linha viva presa e que o prompt permanece limpo.
+- [x] Live seguinte capturou falha BYOK real:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-empty-turn-status-clear-contract-20260605-0105`.
+  - Resultado: `Status: BLOCKED` por `blocked-by-byok-provider-turn-failed`; `/errors 10`
+        registrou `terminal.byok_provider` com ação/contexto, e o terminal retornou a `Pronto`,
+        confirmando que o empty-turn anterior não deixou a linha presa.
+- [x] Bug UX descoberto nessa live: a linha viva de erro BYOK renderizava uma frase gigante com
+      `Erro do SDK sem mensagem estruturada`, `/byok model`, modelo, raciocínio e `conversa ativa`,
+      quebrando em quatro linhas físicas. O bloco durável e `/errors` já carregam ação/contexto;
+      a linha viva deve ser apenas estado curto.
+- [x] Correção aplicada: `phase=error` em provider BYOK agora renderiza
+      `LLM-B erro · provider BYOK · <idade>`, sem detalhe longo, modelo, raciocínio ou runtime.
+- [x] Contrato live adicionado: `ux-compact-byok-error-live-status` bloqueia vazamento de
+      `Erro do SDK`, `/byok model`, modelo/raciocínio e `conversa ativa` na linha viva de erro.
+- [x] Validação escopada pós-erro BYOK passou:
+  - `node --check src/copilot/terminal/repl/live-status-line.js`;
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint src/copilot/terminal/repl/live-status-line.js tests/unit/copilot/terminal/test_live_status_line.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js`.
+- [x] Live canônica final do pacote passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-byok-error-compact-status-contract-20260605-0110`.
+  - Resultado: `Status: PASS`; fluxo canônico completo com tools reais, deltas, pergunta,
+        resposta, final pós-pergunta, export, `/tools diag` com `Classe ferramenta`/`Ferramenta`,
+        `/events 60` humano, `/errors 10` zerado e critério
+        `ux-compact-byok-error-live-status` verde.
 - [ ] Próxima live de falha controlada: reproduzir ou simular erro BYOK para confirmar que
       `/errors 10` mostra `terminal.byok_provider` com ação/contexto, sem duplicar eventos
       recuperáveis internos.

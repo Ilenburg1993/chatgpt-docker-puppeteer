@@ -233,7 +233,7 @@ export function terminalThemeHeadline(role, title, details = []) {
 export function terminalThemeRow(label, value, options = {}) {
     const width = Math.max(4, Math.floor(options.width ?? 12));
     const role = options.role ?? 'muted';
-    return `  ${terminalThemeText('muted', label.padEnd(width))} ${terminalThemeText(role, value)}`;
+    return `  ${terminalThemeText('muted', label.padEnd(width))}  ${terminalThemeText(role, value)}`;
 }
 
 /**

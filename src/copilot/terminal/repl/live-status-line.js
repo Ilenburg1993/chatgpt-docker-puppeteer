@@ -187,6 +187,30 @@ function isTurnFinalizationActivity(activity) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {boolean}
+ */
+function isEmptyAfterUserInputActivity(activity) {
+    const text = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase();
+    return (
+        activity.phase === 'turn' &&
+        (text.includes('continuação pós-pergunta vazia') ||
+            text.includes('continuacao pos-pergunta vazia') ||
+            text.includes('continuação pós-pergunta terminou sem texto público') ||
+            text.includes('continuacao pos-pergunta terminou sem texto publico'))
+    );
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {boolean}
+ */
+function isByokProviderErrorActivity(activity) {
+    const text = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase();
+    return activity.phase === 'error' && text.includes('provider byok');
+}
+
+/**
  * @param {{
  *     activity?: ReturnType<typeof readTerminalActivitySnapshot>;
  *     runtime?: ReturnType<typeof readTerminalRuntimeState>;
@@ -264,6 +288,22 @@ export function formatTerminalLiveStatusLine(input = {}) {
             '\x1b[K'
         );
     }
+    if (isByokProviderErrorActivity(activity)) {
+        return (
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+            `${terminalThemeText('warn', 'erro')}` +
+            `${terminalThemeText('muted', ` · provider BYOK · ${formatLiveDuration(ageMs)}`)}` +
+            '\x1b[K'
+        );
+    }
+    if (activity.phase === 'error') {
+        return (
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+            `${terminalThemeText('error', 'erro')}` +
+            `${terminalThemeText('muted', ` · ${compactLiveStatusText(activity.label, 24)} · ${formatLiveDuration(ageMs)}`)}` +
+            '\x1b[K'
+        );
+    }
     const label = compactLiveStatusText(activity.label, LIVE_LABEL_MAX_CHARS);
     if (activity.phase === 'turn') {
         if (isTurnFinalizationActivity(activity)) {
@@ -312,6 +352,7 @@ export function shouldRenderTerminalLiveStatusLine(input = {}) {
         busy ||
         queueActive ||
         (activity.phase !== 'idle' && (runtime.status === 'starting' || runtime.status === 'processing'));
+    if (isEmptyAfterUserInputActivity(activity) && !runtimeActive) return false;
     if (isCompletedLiveStatusActivity(activity.label) && !runtimeActive) return false;
     if (activity.phase !== 'idle') return true;
     return runtimeActive;

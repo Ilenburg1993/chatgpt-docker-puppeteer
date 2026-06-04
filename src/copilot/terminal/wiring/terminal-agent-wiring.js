@@ -503,6 +503,7 @@ export function registerAgentEventListeners(printBanner) {
                         detail,
                         severity: 'warn',
                         source: 'dialog.turn_end',
+                        updateCurrent: false,
                     });
                     broadcastSse(
                         'dialog.empty_after_user_input',

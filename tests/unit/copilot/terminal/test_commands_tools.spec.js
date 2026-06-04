@@ -117,7 +117,7 @@ describe('commands/tools', () => {
         expect(ctx.output()).toContain('Nenhuma ferramenta observada');
     });
 
-    it('usa nomes humanos no modo default e preserva nomes técnicos em diag', () => {
+    it('usa nomes humanos no modo default, diag humano e nomes técnicos apenas no all/raw', () => {
         readTerminalToolStatsProjection.mockReturnValueOnce({
             stats: {
                 read_file_content: { calls: 2, errors: 0, avgLatencyMs: 18 },
@@ -175,14 +175,42 @@ describe('commands/tools', () => {
         cmdTools({ println: diagCtx.println }, 'diag');
 
         expect(diagCtx.output()).toContain('Ler arquivo');
-        expect(diagCtx.output()).toContain('Técnico');
-        expect(diagCtx.output()).toContain('read_file_content');
+        expect(diagCtx.output()).toContain('diagnóstico humano');
+        expect(diagCtx.output()).not.toContain('Nome interno');
+        expect(diagCtx.output()).not.toContain('read_file_content');
         expect(diagCtx.output()).not.toContain('Nome técnico');
         expect(diagCtx.output()).not.toContain('tool técnico: read_file_content');
         expect(diagCtx.output()).toContain('Classe');
         expect(diagCtx.output()).toContain('arquivo');
         expect(diagCtx.output()).not.toContain('tipo file');
         expect(diagCtx.output()).not.toContain('tipo: file');
+
+        readTerminalToolStatsProjection.mockReturnValueOnce({
+            stats: {
+                read_file_content: { calls: 2, errors: 0, avgLatencyMs: 18 },
+            },
+            canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
+                ['read_file_content', { calls: 2, errors: 0, avgLatencyMs: 18, kind: 'file' }],
+            ]),
+            entries: /** @type {[string, Record<string, any>][]} */ ([
+                ['read_file_content', { calls: 2, errors: 0, avgLatencyMs: 18, kind: 'file' }],
+            ]),
+            tools: [],
+            byCategory: {},
+            toolCount: 1,
+            lifecycle: {
+                active: [],
+                recent: [],
+                summary: { active: 0, recent: 0, waitingUser: 0, failedRecent: 0 },
+            },
+        });
+        const allCtx = mockCtx();
+
+        cmdTools({ println: allCtx.println }, 'all');
+
+        expect(allCtx.output()).toContain('diagnóstico completo');
+        expect(allCtx.output()).toContain('Nome interno');
+        expect(allCtx.output()).toContain('read_file_content');
     });
 
     it('humaniza agregados de I/O no modo default', () => {
@@ -221,6 +249,39 @@ describe('commands/tools', () => {
         expect(ctx.output()).not.toContain('io-engine.fs.readFile.text');
         expect(ctx.output()).not.toContain('io-engine.ensure-dir');
         expect(ctx.output()).not.toContain('io-engine.rg.search');
+    });
+
+    it('traduz classe e categoria tool para ferramenta no diagnóstico humano', () => {
+        readTerminalToolStatsProjection.mockReturnValueOnce({
+            stats: {
+                report_intent_local: { calls: 1, errors: 0, avgLatencyMs: 7 },
+            },
+            canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
+                ['report_intent_local', { calls: 1, errors: 0, avgLatencyMs: 7, kind: 'tool' }],
+            ]),
+            entries: /** @type {[string, Record<string, any>][]} */ ([
+                ['report_intent_local', { calls: 1, errors: 0, avgLatencyMs: 7, kind: 'tool' }],
+            ]),
+            tools: [],
+            byCategory: {
+                tool: { totalCalls: 1, totalErrors: 0, totalBlocked: 0, avgLatencyMs: 7 },
+            },
+            toolCount: 1,
+            lifecycle: {
+                active: [],
+                recent: [],
+                summary: { active: 0, recent: 0, waitingUser: 0, failedRecent: 0 },
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdTools({ println: ctx.println }, 'diag');
+
+        expect(ctx.output()).toContain('Classe');
+        expect(ctx.output()).toContain('ferramenta');
+        expect(ctx.output()).toContain('Ferramenta');
+        expect(ctx.output()).not.toContain('Classe        tool');
+        expect(ctx.output()).not.toContain('\ntool');
     });
 
     it('renderiza lifecycle compacto em modo diag', () => {
@@ -301,18 +362,100 @@ describe('commands/tools', () => {
         expect(output).toContain('Ler arquivo');
         expect(output).toContain('Em voo');
         expect(output).toContain('1 ferramenta');
-        expect(output).toContain('Técnico');
-        expect(output).toContain('read_file_content');
-        expect(output).toContain('Refs');
-        expect(output).toContain('call call-1234567…');
-        expect(output).toContain('req req-12345678…');
+        expect(output).not.toContain('Nome interno');
+        expect(output).not.toContain('read_file_content');
+        expect(output).not.toContain('Rastreio');
+        expect(output).not.toContain('call call-1234567…');
+        expect(output).not.toContain('req req-12345678…');
         expect(output).toContain('Intenção capturada');
-        expect(output).toContain('report_intent_local');
+        expect(output).not.toContain('report_intent_local');
         expect(output).toContain('concluída');
         expect(output).not.toContain('chamada call-1234567…');
         expect(output).not.toContain('requisição req-12345678…');
         expect(output).not.toContain('active=');
         expect(output).not.toContain('tool=report_intent_local');
         expect(output).not.toContain('call=call-1234567');
+    });
+
+    it('preserva rastreio técnico de lifecycle no modo all', () => {
+        readTerminalToolStatsProjection.mockReturnValueOnce({
+            stats: {
+                read_file_content: { calls: 1, errors: 0, avgLatencyMs: 25 },
+            },
+            canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
+                ['read_file_content', { calls: 1, errors: 0, avgLatencyMs: 25, kind: 'file' }],
+            ]),
+            entries: /** @type {[string, Record<string, any>][]} */ ([
+                ['read_file_content', { calls: 1, errors: 0, avgLatencyMs: 25, kind: 'file' }],
+            ]),
+            tools: [],
+            byCategory: {
+                file: { totalCalls: 1, totalErrors: 0, totalBlocked: 0, avgLatencyMs: 25 },
+            },
+            toolCount: 1,
+            lifecycle: {
+                active: [
+                    {
+                        key: 'call-123456789012345',
+                        type: 'start',
+                        status: 'active',
+                        source: 'sdk',
+                        toolName: 'read_file_content',
+                        rawToolName: null,
+                        operation: 'read',
+                        toolCallId: 'call-123456789012345',
+                        requestId: 'req-123456789012345',
+                        traceId: 'turn:123456789012345',
+                        turnId: '1',
+                        target: 'src/copilot/file.js',
+                        path: 'src/copilot/file.js',
+                        progress: 50,
+                        progressMessage: 'metade',
+                        success: null,
+                        durationMs: null,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        completedAt: null,
+                    },
+                ],
+                recent: [
+                    {
+                        key: 'call-done',
+                        type: 'complete',
+                        status: 'completed',
+                        source: 'sdk',
+                        toolName: 'report_intent_local',
+                        rawToolName: 'report_intent',
+                        operation: 'inspect',
+                        toolCallId: 'call-done',
+                        requestId: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        target: null,
+                        path: null,
+                        progress: null,
+                        progressMessage: null,
+                        success: true,
+                        durationMs: 31,
+                        startedAt: 1,
+                        updatedAt: 3,
+                        completedAt: 3,
+                    },
+                ],
+                summary: { active: 1, recent: 1, waitingUser: 0, failedRecent: 0 },
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdTools({ println: ctx.println }, 'all');
+
+        const output = ctx.output();
+        expect(output).toContain('diagnóstico completo');
+        expect(output).toContain('Nome interno');
+        expect(output).toContain('read_file_content');
+        expect(output).toContain('SDK report_intent');
+        expect(output).toContain('Rastreio');
+        expect(output).toContain('call call-1234567…');
+        expect(output).toContain('req req-12345678…');
     });
 });

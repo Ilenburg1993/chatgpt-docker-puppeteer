@@ -393,6 +393,61 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(42);
     });
 
+    it('não mantém linha viva para continuação pós-pergunta vazia já encerrada', async () => {
+        const { shouldRenderTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'turn',
+            label: 'Continuação pós-pergunta vazia',
+            detail: 'continuação pós-pergunta terminou sem texto público · resposta SIM',
+            source: 'dialog.turn_end',
+            severity: 'warn',
+            toolName: null,
+            startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
+        };
+        mocks.runtime = {
+            ...mocks.runtime,
+            status: 'idle',
+            dialogLoopActive: true,
+            queueSize: 0,
+        };
+
+        expect(shouldRenderTerminalLiveStatusLine()).toBe(false);
+    });
+
+    it('mantém erro BYOK compacto na linha viva', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'error',
+            label: 'Erro de provider BYOK',
+            detail: 'Erro do SDK sem mensagem estruturada. · erro de provider BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provider/modelo via /byok use ou /byok model; sem Premium Request · provider openai · perfil kilo · modelo kilo-auto/free',
+            source: 'agent',
+            severity: 'warn',
+            toolName: null,
+            startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
+        };
+        mocks.runtime = {
+            ...mocks.runtime,
+            status: 'processing',
+            dialogLoopActive: true,
+        };
+
+        const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:03.000-03:00') });
+
+        expect(line).toContain('erro');
+        expect(line).toContain('provider BYOK');
+        expect(line).toContain('3s');
+        expect(line).not.toContain('Erro do SDK sem mensagem estruturada');
+        expect(line).not.toContain('/byok model');
+        expect(line).not.toContain('modelo kilo-auto/free');
+        expect(line).not.toContain('raciocínio xhigh');
+        expect(line).not.toContain('conversa ativa');
+        expect(line.length).toBeLessThan(42);
+    });
+
     it('prioriza ask_user humano sobre atividade antiga na linha viva', async () => {
         const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');

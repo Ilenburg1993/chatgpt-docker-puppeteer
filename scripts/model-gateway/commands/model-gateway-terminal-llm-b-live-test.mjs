@@ -2121,11 +2121,13 @@ function diagnosticUxCycleCriteria(boot) {
         {
             id: 'diagnostic-ux-tools-diag-hierarchy',
             pass:
-                /Ferramentas[\s\S]*Técnico[\s\S]*Classe[\s\S]*Superfícies operacionais[\s\S]*Contrato das ferramentas[\s\S]*Lifecycle recente/iu.test(
+                /Ferramentas[\s\S]*diagnóstico humano[\s\S]*Classe[\s\S]*Superfícies operacionais[\s\S]*Contrato das ferramentas[\s\S]*Lifecycle recente/iu.test(
                     toolsDiagSurface,
                 ) &&
-                !/Nome técnico|tipo file|chamada |requisição |tool\(s\)|Superfícies de tools/iu.test(toolsDiagSurface),
-            detail: '/tools diag separated human summary, technical metadata and references without old implementation-first labels',
+                !/Nome técnico|Nome interno|Técnico|Refs|Rastreio\s+(?:call|req|trace)|chatcmpl-tool|call chatcmpl|Classe\s+tool|(?:^|\n)\s*tool\s+uso|tipo file|chamada |requisição |tool\(s\)|Superfícies de tools/iu.test(
+                    toolsDiagSurface,
+                ),
+            detail: '/tools diag separated human summary from raw technical names/references, leaving trace ids to /tools all/raw',
         },
         {
             id: 'diagnostic-ux-events-human',
@@ -4047,6 +4049,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 ) &&
                 /Configura[cç][aã]o\s+ferramentas nativas desativadas/iu.test(beforeRawDiagnosticsPlain),
             detail: 'SDK session info rendered as operator-facing session configuration/retry copy instead of raw SDK labels',
+        },
+        {
+            id: 'ux-compact-byok-error-live-status',
+            pass: !/LLM-B\s+erro[\s\S]{0,180}(Erro do SDK|\/byok model|modelo kilo-auto|racioc[ií]nio high|conversa ativa)/iu.test(
+                beforeRawDiagnosticsPlain,
+            ),
+            detail: 'BYOK provider errors stayed compact in the live status line; full action/context remains in durable diagnostics',
         },
         {
             id: 'ux-single-live-status-source',

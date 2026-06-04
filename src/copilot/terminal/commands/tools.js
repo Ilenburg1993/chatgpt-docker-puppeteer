@@ -26,9 +26,11 @@ import { terminalThemeHeadline, terminalThemeRow } from '../state/ui/index.js';
 
 /**
  * @param {import('../state/tool-lifecycle-state.js').TerminalToolLifecycleDiagnostic} entry
+ * @param {{ includeRawDetails?: boolean }} [options]
  * @returns {string}
  */
-function renderLifecycleDiagnosticLine(entry) {
+function renderLifecycleDiagnosticLine(entry, options = {}) {
+    const includeRawDetails = options.includeRawDetails === true;
     const refs = renderToolReferenceList([
         ['call', entry.toolCallId, 12],
         ['req', entry.requestId, 12],
@@ -53,11 +55,16 @@ function renderLifecycleDiagnosticLine(entry) {
     if (target) {
         lines.push(terminalThemeRow('Alvo', compactTerminalDiagnosticText(target, 96), { role: 'fileRead' }));
     }
-    if (technicalName || rawName) {
-        lines.push(terminalThemeRow('Técnico', [technicalName, rawName].filter(Boolean).join(' · '), { role: 'muted' }));
+    if (includeRawDetails && (technicalName || rawName)) {
+        lines.push(
+            terminalThemeRow('Nome interno', [technicalName, rawName].filter(Boolean).join(' · '), {
+                role: 'muted',
+                width: 13,
+            }),
+        );
     }
-    if (refs) {
-        lines.push(terminalThemeRow('Refs', refs, { role: 'muted' }));
+    if (includeRawDetails && refs) {
+        lines.push(terminalThemeRow('Rastreio', refs, { role: 'muted', width: 13 }));
     }
     return lines.join('\n');
 }
@@ -186,6 +193,7 @@ function renderTechnicalToolName(name) {
  * @returns {string}
  */
 function renderToolKindLabel(kind) {
+    if (kind === 'tool') return 'ferramenta';
     if (kind === 'file') return 'arquivo';
     if (kind === 'io') return 'I/O local';
     if (kind === 'shell' || kind === 'exec') return 'terminal';
@@ -198,6 +206,7 @@ function renderToolKindLabel(kind) {
  * @returns {string}
  */
 function renderCategoryLabel(value) {
+    if (value === 'tool') return 'Ferramenta';
     if (value === 'file') return 'Arquivo';
     if (value === 'io') return 'I/O local';
     if (value === 'shell' || value === 'exec') return 'Terminal';
@@ -285,7 +294,8 @@ export function cmdTools({ println }, arg = '') {
         .trim()
         .toLowerCase();
     const wantsRaw = mode === 'raw';
-    const wantsDiag = mode === 'diag' || mode === 'all';
+    const wantsDeepDiag = mode === 'all';
+    const wantsDiag = mode === 'diag' || wantsDeepDiag;
     const projection = readTerminalToolStatsProjection();
     const status = readTerminalStatusProjection();
     const entries = wantsRaw ? projection.entries : projection.canonicalEntries;
@@ -303,7 +313,7 @@ export function cmdTools({ println }, arg = '') {
         println(
             terminalThemeHeadline('tool', 'Ferramentas', [
                 `${entries.length} ${entries.length === 1 ? 'ferramenta' : 'ferramentas'}`,
-                wantsRaw ? 'nomes crus' : 'agregadas',
+                wantsRaw ? 'nomes crus' : wantsDeepDiag ? 'diagnóstico completo' : 'diagnóstico humano',
             ]),
         );
         println('');
@@ -332,10 +342,10 @@ export function cmdTools({ println }, arg = '') {
         const visualName = wantsRaw ? name : renderToolDiagnosticName(name);
         println(renderToolStatsRow(wantsRaw, wantsDiag, visualName, calls, blocked, errors, latency));
         const technicalName = renderToolTechnicalDetail(visualName, name);
-        if (!wantsRaw && wantsDiag && technicalName) {
-            println(terminalThemeRow('Técnico', technicalName, { role: 'muted' }));
+        if (!wantsRaw && wantsDeepDiag && technicalName) {
+            println(terminalThemeRow('Nome interno', technicalName, { role: 'muted', width: 13 }));
         }
-        if (!wantsRaw && wantsDiag && Array.isArray(d.aliases) && d.aliases.length > 1) {
+        if (!wantsRaw && wantsDeepDiag && Array.isArray(d.aliases) && d.aliases.length > 1) {
             println(terminalThemeRow('Aliases', d.aliases.join(', '), { role: 'muted' }));
         }
         if (wantsDiag && typeof d.kind === 'string' && d.kind.length > 0) {
@@ -448,19 +458,29 @@ export function cmdTools({ println }, arg = '') {
             const active = lifecycle.active.slice(0, 8);
             if (active.length > 0) {
                 println(terminalThemeRow('Em voo', `${active.length} ${active.length === 1 ? 'ferramenta' : 'ferramentas'}`));
-                for (const entry of active) println(renderLifecycleDiagnosticLine(entry));
+                for (const entry of active) {
+                    println(renderLifecycleDiagnosticLine(entry, { includeRawDetails: wantsDeepDiag }));
+                }
             }
             if (lifecycle.recent.length > 0) {
                 const recentCount = Math.min(8, lifecycle.recent.length);
                 println(terminalThemeRow('Recentes', `${recentCount} ${recentCount === 1 ? 'evento' : 'eventos'}`));
-                for (const entry of lifecycle.recent.slice(0, 8)) println(renderLifecycleDiagnosticLine(entry));
+                for (const entry of lifecycle.recent.slice(0, 8)) {
+                    println(renderLifecycleDiagnosticLine(entry, { includeRawDetails: wantsDeepDiag }));
+                }
             }
         }
     }
 
     println(
         wantsRaw || wantsDiag
-            ? terminalThemeRow('Comandos', '/tools diag · /tools all · /tools raw', { role: 'command' })
+            ? terminalThemeRow(
+                  'Comandos',
+                  wantsDeepDiag
+                      ? '/tools diag · nomes crus: /tools raw'
+                      : '/tools all · rastreio bruto: /tools raw · /events --raw',
+                  { role: 'command' },
+              )
             : terminalThemeRow('Detalhes', '/tools diag · nomes crus: /tools raw', { role: 'command' }),
     );
     println('');
