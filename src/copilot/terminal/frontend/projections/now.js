@@ -61,10 +61,11 @@ import { readTerminalTimelineProjection } from './timeline.js';
  * }}
  */
 export function readTerminalActivityProjection(limit = 10) {
+    const turnTraceLimit = Math.max(8, Math.min(Number.isFinite(limit) ? Math.floor(limit) : 10, 24));
     return {
         current: readTerminalActivitySnapshot(),
         history: readTerminalActivityHistory(limit),
-        turnTrace: readTerminalTurnTraceProjection(3),
+        turnTrace: readTerminalTurnTraceProjection(turnTraceLimit),
         streamDiagnostics: readTerminalStreamDiagnosticsProjection(limit),
     };
 }

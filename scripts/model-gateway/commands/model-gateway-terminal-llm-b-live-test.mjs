@@ -265,9 +265,9 @@ const LIVE_SCENARIOS = Object.freeze({
         finalMarker: 'POST-ASK-RECOVERABLE-FINAL: erro de tool foi recuperado e usuário confirmou SIM',
         answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
         beforeDeltaInstructions: [
-            'Ainda no primeiro lote de tool calls, junto com report_intent e read_file_content e antes de qualquer texto público, invoque também a ferramenta real exec_command com command exatamente "node -e \\"console.error(\'RECOVERABLE-TOOL-ERROR\'); process.exit(7)\\"" e timeoutSeconds=10. Esta tool deve falhar de forma controlada.',
-            'Depois desse erro recuperável de exec_command, invoque read_file_content novamente para ler as primeiras 3 linhas de package.json e continue normalmente.',
-            'Não trate o erro recuperável como falha do teste; ele deve ser contido e seguido por recuperação explícita.',
+            'Não encerre o turno depois de report_intent. Depois do primeiro read_file_content, e ainda antes de qualquer texto público, invoque a ferramenta real exec_command com command exatamente "node -e \\"console.error(\'RECOVERABLE-TOOL-ERROR\'); process.exit(7)\\"" e timeoutSeconds=10.',
+            'A falha controlada de exec_command é esperada. Mesmo que exec_command retorne success=false ou exitCode=7, continue o turno e invoque read_file_content novamente para ler as primeiras 3 linhas de package.json.',
+            'Somente depois dessa recuperação explícita escreva as oito linhas DELTA-CANONICAL. Não trate o erro recuperável como falha fatal do teste.',
         ],
         askToolInstruction:
             'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-RECOVERABLE: responda SIM depois da recuperação". Use a opção SIM se o schema da tool expuser choices.',
@@ -347,6 +347,19 @@ function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]
         `A pergunta ${scenario.askQuestion.split(':')[0]} deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.`,
         'Nunca escreva um objeto tool_calls, uma chave function/args, nem diga que ações foram executadas sem a tool real aparecer no terminal.',
         `Não use outras tools além de ${scenario.allowedTools.join(', ')}.`,
+    ].join(' ');
+}
+
+function buildMissingRequiredAskRecoveryPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+    return [
+        'Continue o teste canônico exatamente de onde parou.',
+        'Você já produziu as linhas DELTA-CANONICAL públicas, mas ainda não chamou a ferramenta real ask_user obrigatória.',
+        'Não repita report_intent, read_file_content, exec_command nem as linhas DELTA-CANONICAL.',
+        scenario.askToolInstruction,
+        scenario.finalInstruction,
+        `Antes da resposta humana final, não escreva, cite nem antecipe o marcador ${scenario.finalMarker}.`,
+        `A pergunta ${scenario.askQuestion.split(':')[0]} deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.`,
+        'Neste turno de recuperação, use somente a tool real ask_user antes da resposta humana.',
     ].join(' ');
 }
 
@@ -898,7 +911,7 @@ function renderedReadFileToolOk(plain) {
         (/\[LER\].*(?:read_file_content|Ler arquivo)/s.test(plain) ||
             /Ferramenta\s+Ler arquivo\s+·\s+lendo arquivo/s.test(plain)) &&
         (/✅ \[OK\].*(?:read_file_content|Ler arquivo)/s.test(plain) ||
-            /Conclu[ií]do\s+ok\s+Ler arquivo\s+·\s+lendo arquivo conclu[ií]do/s.test(plain))
+            /Conclu[ií]do\s+(?:ok\s+)?Ler arquivo\s+·\s+lendo arquivo conclu[ií]do/s.test(plain))
     );
 }
 
@@ -2654,6 +2667,14 @@ function findAssistantEndedBeforeRequiredAsk(plain, scenario = LIVE_SCENARIOS[DE
     };
 }
 
+function findAssistantEndedAfterAskRecoveryWithoutAsk(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+    const text = String(plain ?? '');
+    if (scenario.askRenderedRe.test(text)) return null;
+    if (!/Turno conclu[ií]do; aguardando próxima mensagem|Aguardando próxima mensagem/iu.test(text)) return null;
+    if (!/Continue o teste can[oô]nico exatamente de onde parou/iu.test(text)) return null;
+    return { traceId: null, turnId: null, eventId: null };
+}
+
 function isHardCriterionFailure(criterion) {
     return criterion?.pass !== true && criterion?.severity !== 'warning' && criterion?.required !== false;
 }
@@ -3040,8 +3061,18 @@ function detectLiveBlocker(plain, runtime = {}) {
         };
     }
     const scenario = runtime.liveScenario ?? LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID];
+    const askBeforeDeltas = findAskBeforeRequiredPublicDeltas(runtime.sseEvents, scenario);
+    if (askBeforeDeltas) {
+        return {
+            id: 'assistant-asked-before-required-deltas',
+            detail:
+                'assistant called the required ask_user tool before materializing the required public DELTA-CANONICAL lines' +
+                `${askBeforeDeltas.askEventId ? ` · askSse=#${askBeforeDeltas.askEventId}` : ''}` +
+                ` · deltasBeforeAsk=${askBeforeDeltas.deltaMarkersBeforeAsk}`,
+        };
+    }
     const emptyOutput = findTerminalEmptyOutputEvent(runtime.sseEvents) ?? findEmptyDialogTurnEnd(runtime.sseEvents);
-    if (/Turno terminou sem saída pública/i.test(plain) || emptyOutput) {
+    if (/Turno\s+(?:terminou\s+)?sem saída pública/i.test(plain) || emptyOutput) {
         const asked = Boolean(findUserInputRequestedEvent(runtime.sseEvents)) || scenario.askRenderedRe.test(plain);
         const answered =
             Boolean(findUserInputCompletedEvent(runtime.sseEvents)) ||
@@ -3085,6 +3116,33 @@ function detectLiveBlocker(plain, runtime = {}) {
         };
     }
     return null;
+}
+
+function findAskBeforeRequiredPublicDeltas(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+    if (!Array.isArray(events) || !scenario?.askQuestion) return null;
+    const askIndex = events.findIndex((evt) => evt?.event === 'user_input.requested' || evt?.event === 'elicitation.pending');
+    if (askIndex < 0) return null;
+    let deltaMarkersBeforeAsk = 0;
+    for (const evt of events.slice(0, askIndex)) {
+        const payload = eventPayload(evt);
+        const content =
+            typeof payload?.content === 'string'
+                ? payload.content
+                : typeof payload?.chunk === 'string'
+                  ? payload.chunk
+                  : '';
+        deltaMarkersBeforeAsk += countCanonicalDeltaMarkers(content);
+    }
+    if (deltaMarkersBeforeAsk >= 8) return null;
+    const askEvent = events[askIndex];
+    return {
+        askEventId: Number.isFinite(askEvent?.id)
+            ? Number(askEvent.id)
+            : Number.isFinite(askEvent?.eventId)
+              ? Number(askEvent.eventId)
+              : null,
+        deltaMarkersBeforeAsk,
+    };
 }
 
 function findUnexpectedScenarioTool(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
@@ -3763,8 +3821,8 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             badge,
             forbiddenBadge,
             expectedRe: new RegExp(
-                `\\[${escapeRegExp(badge)}\\]\\s+${escapeRegExp(String(item.renderedName ?? toolName))}\\b`,
-                'u',
+                `(?:\\[${escapeRegExp(badge)}\\]\\s+${escapeRegExp(String(item.renderedName ?? toolName))}\\b|(?:Ferramenta|Conclu[ií]do|Falhou)\\s+[^\\n]*${escapeRegExp(String(item.renderedName ?? toolName))}\\b)`,
+                'iu',
             ),
             forbiddenRe: forbiddenBadge
                 ? new RegExp(
@@ -3919,8 +3977,10 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                   },
                   {
                       id: 'health-full-permission-policy-visible',
-                      pass: /permission\s+approve_all[\s\S]{0,120}sdk prompts=skip/iu.test(plain),
-                      detail: '/health full rendered approve_all with sdk prompts=skip for permissioned live scenario',
+                      pass:
+                          /permission\s+approve_all[\s\S]{0,120}sdk prompts=skip/iu.test(plain) ||
+                          /Permiss(?:ões|oes)\s+automáticas\s+·\s+prompts SDK ignorados/iu.test(plain),
+                      detail: '/health full rendered automatic permissions with SDK prompts skipped for permissioned live scenario',
                   },
               ]
             : []),
@@ -4108,7 +4168,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             pass:
                 /Inten[cç][aã]o\s+capturada/u.test(plain) &&
                 /Ferramenta\s+Ler arquivo\s+·\s+lendo arquivo/u.test(plain) &&
-                /Conclu[ií]do\s+ok\s+Ler arquivo\s+·\s+lendo arquivo conclu[ií]do/u.test(plain),
+                /Conclu[ií]do\s+(?:ok\s+)?Ler arquivo\s+·\s+lendo arquivo conclu[ií]do/u.test(plain),
             detail: 'default tool narration uses human tool names',
         },
         {
@@ -4219,7 +4279,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'ux-tool-live-status-stays-single-line',
-            pass: !/LLM-B\s+ferramenta[^\n]*(?:[\r\n]\s*(?:arquivo|·)|modelo\s+|racioc[ií]nio|conversa ativa)/iu.test(
+            pass: !/LLM-B\s+ferramenta[^\n]*(?:\n\s*(?:arquivo|·)|modelo\s+|racioc[ií]nio|conversa ativa)/iu.test(
                 plain,
             ),
             detail: 'tool live status stayed one compact operator line without model/runtime tail',
@@ -5575,7 +5635,11 @@ async function main() {
     let promptSynchronizedCommandOutputOffset = 0;
     let waitingForPromptSynchronizedCommand = false;
     let pendingByokLiveProtocolDiagnostics = false;
+    let askBeforeDeltasDiagnosticsSent = false;
     let missingRequiredAskDiagnosticTimer = null;
+    let missingRequiredAskRecoverySent = false;
+    let missingRequiredAskRecoveryPlainOffset = 0;
+    let forcedKillTimer = null;
     const command = canUsePty
         ? {
               cmd: 'script',
@@ -5638,6 +5702,11 @@ async function main() {
         waitingForPromptSynchronizedCommand = false;
         sendNextPromptSynchronizedCommand();
     };
+    const scheduleForcedKill = (delayMs = 2_000) => {
+        if (forcedKillTimer) return;
+        forcedKillTimer = setTimeout(() => child.kill('SIGTERM'), Math.max(0, delayMs));
+        forcedKillTimer.unref();
+    };
     const schedulePostAnswerDiagnostics = (delayMs = postAnswerDelayMs) => {
         if (postCommandsSent) return;
         postCommandsSent = true;
@@ -5671,6 +5740,7 @@ async function main() {
                     },
                     diagnostics.length * 350 + 2_000,
                 ).unref();
+                if (timedOut) scheduleForcedKill(diagnostics.length * 350 + 7_000);
             },
             Math.max(0, delayMs),
         ).unref();
@@ -5698,6 +5768,7 @@ async function main() {
             },
             diagnostics.length * 450 + 1_500,
         ).unref();
+        if (timedOut) scheduleForcedKill(diagnostics.length * 450 + 6_500);
     };
     const scheduleByokLiveProtocolDiagnostics = () => {
         if (postCommandsSent) return;
@@ -5723,15 +5794,54 @@ async function main() {
             },
             diagnostics.length * 450 + 1_500,
         ).unref();
+        if (timedOut) scheduleForcedKill(diagnostics.length * 450 + 6_500);
     };
-    const scheduleMissingRequiredAskDiagnostics = () => {
+    const scheduleAskBeforeDeltasDiagnostics = () => {
+        if (postCommandsSent || askBeforeDeltasDiagnosticsSent) return;
+        postCommandsSent = true;
+        askBeforeDeltasDiagnosticsSent = true;
+        console.warn(
+            '[terminal-live] cenário canônico: ask_user apareceu antes dos deltas públicos obrigatórios; coletando diagnósticos.',
+        );
+        const diagnostics = [
+            '/activity 40',
+            '/tools diag',
+            '/events 60',
+            '/events 100 --raw',
+            '/errors 10',
+            '/health full',
+            `/export ${exportArg}`,
+        ];
+        sendCommandSequence(write, diagnostics, { delayMs: 550 });
+        setTimeout(
+            () => {
+                if (!quitSent) {
+                    quitSent = true;
+                    byokNoPrCanQuit = true;
+                    write('/quit');
+                }
+            },
+            diagnostics.length * 550 + 2_000,
+        ).unref();
+        if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
+    };
+    const scheduleMissingRequiredAskDiagnostics = ({ delayMs = DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS } = {}) => {
         if (postCommandsSent || missingRequiredAskDiagnosticTimer) return;
         missingRequiredAskDiagnosticTimer = setTimeout(() => {
             missingRequiredAskDiagnosticTimer = null;
             if (postCommandsSent || answerSent || liveScenario.askRenderedRe.test(stripAnsi(raw))) return;
+            if (!missingRequiredAskRecoverySent) {
+                missingRequiredAskRecoverySent = true;
+                missingRequiredAskRecoveryPlainOffset = stripAnsi(raw).length;
+                console.warn(
+                    '[terminal-live] cenário canônico: deltas públicos concluídos sem ask_user; enviando continuação controlada.',
+                );
+                write(buildMissingRequiredAskRecoveryPrompt(liveScenario));
+                return;
+            }
             postCommandsSent = true;
             console.warn(
-                '[terminal-live] cenário canônico: deltas públicos concluídos, mas ask_user obrigatório não apareceu; coletando diagnósticos.',
+                '[terminal-live] cenário canônico: ask_user obrigatório continuou ausente após recuperação; coletando diagnósticos.',
             );
             const diagnostics = [
                 '/activity 40',
@@ -5753,11 +5863,12 @@ async function main() {
                 },
                 diagnostics.length * 550 + 2_000,
             ).unref();
-        }, DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS);
+            if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
+        }, Math.max(0, delayMs));
         missingRequiredAskDiagnosticTimer.unref();
     };
     const invalidChoiceFeedbackRe =
-        /Resposta não corresponde às opções da pergunta pendente|Resposta inválida para a pergunta pendente|invalid_choice/iu;
+        /Resposta\s+não corresponde às opções da pergunta pendente|Resposta\s+inválida para a pergunta pendente|invalid_choice/iu;
     const sendScenarioAnswerStep = (plain, step) => {
         if (!step) return;
         answerSequenceStarted = true;
@@ -5774,8 +5885,18 @@ async function main() {
         () => {
             timedOut = true;
             byokNoPrCanQuit = true;
+            const scenarioTailPlain = scenarioSent ? stripAnsi(raw).slice(scenarioPlainOffset) : '';
+            const endedBeforeAsk =
+                scenarioSent &&
+                !answerSent &&
+                !postCommandsSent &&
+                findAssistantEndedBeforeRequiredAsk(scenarioTailPlain, liveScenario, sseCollector?.events ?? []);
+            if (endedBeforeAsk) {
+                scheduleMissingRequiredAskDiagnostics({ delayMs: 0 });
+                return;
+            }
             write('/quit');
-            setTimeout(() => child.kill('SIGTERM'), 2_000).unref();
+            scheduleForcedKill(2_000);
         },
         Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS,
     );
@@ -5865,6 +5986,10 @@ async function main() {
             liveScenario.askRenderedRe.test(plain) &&
             hasHumanQuestionInputPrompt(plain)
         ) {
+            if (findAskBeforeRequiredPublicDeltas(sseCollector?.events ?? [], liveScenario)) {
+                scheduleAskBeforeDeltasDiagnostics();
+                return;
+            }
             if (missingRequiredAskDiagnosticTimer) {
                 clearTimeout(missingRequiredAskDiagnosticTimer);
                 missingRequiredAskDiagnosticTimer = null;
@@ -5918,7 +6043,12 @@ async function main() {
             scenarioSent &&
             !answerSent &&
             !postCommandsSent &&
-            findAssistantEndedBeforeRequiredAsk(scenarioTailPlain, liveScenario)
+            (!missingRequiredAskRecoverySent
+                ? findAssistantEndedBeforeRequiredAsk(scenarioTailPlain, liveScenario, sseCollector?.events ?? [])
+                : findAssistantEndedAfterAskRecoveryWithoutAsk(
+                      plain.slice(missingRequiredAskRecoveryPlainOffset),
+                      liveScenario,
+                  ))
         ) {
             scheduleMissingRequiredAskDiagnostics();
         }
@@ -5927,7 +6057,7 @@ async function main() {
             (/Erro de sessão \[(?:query|rate_limit)\]|You've hit your rate limit|session\.error|CAPIError|Failed to get response from the AI model/i.test(
                 scenarioTailPlain,
             ) ||
-                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user|Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked|Turno terminou sem saída pública/i.test(
+                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user|Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked|Turno\s+(?:terminou\s+)?sem saída pública/i.test(
                     scenarioTailPlain,
                 )) &&
             !(byokReal && noPr) &&
@@ -5939,11 +6069,11 @@ async function main() {
                 postAnswerCommandTimer = null;
             }
             setTimeout(() => {
-                const diagnostics = ['/activity 40'];
+                const diagnostics = ['/activity 40', '/tools diag', '/health full'];
                 if (byokReal) {
                     diagnostics.push('/byok providers', '/byok health', '/byok recommend reasoning safe 8');
                 }
-                diagnostics.push('/events 60', '/events 100 --raw', '/errors 10');
+                diagnostics.push('/events 60', '/events 100 --raw', '/errors 10', `/export ${exportArg}`);
                 sendCommandSequence(write, diagnostics, { delayMs: 450 });
                 if (!quitSent) {
                     setTimeout(
@@ -5988,6 +6118,7 @@ async function main() {
         });
     });
     clearTimeout(timeout);
+    if (forcedKillTimer) clearTimeout(forcedKillTimer);
     sseCollector?.close();
     await byokFixtureProvider?.close();
 

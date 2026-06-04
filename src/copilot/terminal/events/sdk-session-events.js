@@ -122,6 +122,7 @@ import {
     handleTerminalExternalToolRequested,
     handleTerminalToolUserRequested,
     reconcileTerminalInFlightToolsAtTurnEnd,
+    reconcileTerminalPostToolUseResult,
 } from './tool-lifecycle-runtime.js';
 
 /**
@@ -1768,6 +1769,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                     updateCurrent: false,
                 });
             }
+        }
+        if (hookType === 'postToolUse' && evt?.input && typeof evt.input === 'object') {
+            reconcileTerminalPostToolUseResult({
+                registry: _reg,
+                evt: /** @type {Record<string, unknown>} */ (evt.input),
+            });
         }
         recordTerminalActivity('system', 'Hook SDK iniciado', {
             detail: `${hookType}${hookInvocationId ? ` · ${hookInvocationId}` : ''}`,

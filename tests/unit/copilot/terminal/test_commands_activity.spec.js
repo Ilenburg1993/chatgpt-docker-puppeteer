@@ -379,6 +379,105 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).not.toContain('resposta=');
     });
 
+    it('prioriza falhas operacionais recentes em vez de reads triviais posteriores', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'idle',
+                label: 'Pronto',
+                detail: 'Turno concluído',
+                source: 'terminal',
+                severity: 'info',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 0,
+            },
+            history: [],
+            turnTrace: {
+                current: null,
+                recent: [
+                    {
+                        traceId: 'turn:empty-after-answer',
+                        turnId: 'empty-after-answer',
+                        source: 'assistant',
+                        status: 'failed',
+                        startedAt: 40,
+                        updatedAt: 45,
+                        finishedAt: 45,
+                        toolCount: 0,
+                        fileCount: 0,
+                        userInputCount: 0,
+                        tools: [],
+                        files: [],
+                        userInputs: [],
+                    },
+                    {
+                        traceId: 'turn:read-after',
+                        turnId: 'read-after',
+                        source: 'assistant',
+                        status: 'completed',
+                        startedAt: 30,
+                        updatedAt: 35,
+                        finishedAt: 35,
+                        toolCount: 1,
+                        fileCount: 1,
+                        userInputCount: 0,
+                        tools: [
+                            {
+                                toolName: 'read_file_content',
+                                operation: 'read',
+                                path: 'package.json',
+                                target: 'package.json',
+                                source: 'sdk',
+                                status: 'completed',
+                                success: true,
+                                count: 1,
+                                updatedAt: 35,
+                            },
+                        ],
+                        files: [{ path: 'package.json', operation: 'read', source: 'sdk', count: 1, updatedAt: 35 }],
+                        userInputs: [],
+                    },
+                    {
+                        traceId: 'turn:exec-failed',
+                        turnId: 'exec-failed',
+                        source: 'assistant',
+                        status: 'completed',
+                        startedAt: 20,
+                        updatedAt: 25,
+                        finishedAt: 25,
+                        toolCount: 1,
+                        fileCount: 0,
+                        userInputCount: 0,
+                        tools: [
+                            {
+                                toolName: 'exec_command',
+                                operation: 'run',
+                                path: null,
+                                target: 'node -e "process.exit(7)"',
+                                source: 'sdk',
+                                status: 'failed',
+                                success: false,
+                                count: 1,
+                                updatedAt: 25,
+                            },
+                        ],
+                        files: [],
+                        userInputs: [],
+                    },
+                ],
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '40');
+
+        expect(ctx.output()).toContain('Último turno concluído');
+        expect(ctx.output()).toContain('Executar comando');
+        expect(ctx.output()).toContain('execução · node -e "process.exit(7)" · falhou');
+    });
+
     it('humaniza fases internas na timeline padrão', () => {
         vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
             current: {
@@ -467,6 +566,48 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).not.toContain('system · Uso BYOK');
         expect(ctx.output()).not.toContain('task · Tarefa');
         expect(ctx.output()).not.toContain('boot · Inicializando');
+    });
+
+    it('preserva nomes de protocolo em detalhes livres da intenção', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'idle',
+                label: 'Pronto',
+                detail: 'Turno concluído',
+                source: 'terminal',
+                severity: 'info',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 0,
+            },
+            history: [
+                {
+                    phase: 'turn',
+                    label: 'Intenção da LLM-B',
+                    detail: 'terminal live canonical deltas tools ask_user usage',
+                    source: 'tool/report_intent_local',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                    ts: 2,
+                },
+            ],
+            turnTrace: {
+                current: null,
+                recent: [],
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '5');
+
+        expect(ctx.output()).toContain('terminal live canonical deltas tools ask_user usage');
+        expect(ctx.output()).not.toContain('terminal live canonical deltas tools Pergunta ao operador usage');
     });
 
     it('mantém eventos de boot no default quando ainda não existe evento operacional melhor', () => {

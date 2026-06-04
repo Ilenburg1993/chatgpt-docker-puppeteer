@@ -184,6 +184,37 @@ describe('F161 — wrapWithStats não altera retorno da tool', () => {
         expect(entry.calls).toBe(1);
         expect(entry.errors).toBe(0);
     });
+
+    it('registra falha quando handler retorna success:false sem lançar exceção', async () => {
+        const tool = {
+            name: 'test.structured_failure',
+            description: 'test structured failure',
+            handler: vi.fn().mockResolvedValue({ success: false, error: 'não encontrado' }),
+        };
+        const wrapped = wrapWithStats(/** @type {any} */ (tool));
+        const result = await wrapped.handler({}, /** @type {any} */ ({}));
+        const stats = getToolStats();
+        const entry = entryOf(stats, 'test.structured_failure');
+        expect(result).toMatchObject({ success: false });
+        expect(entry.calls).toBe(1);
+        expect(entry.errors).toBe(1);
+        expect(entry.lastOk).toBe(false);
+    });
+
+    it('registra falha quando handler retorna exitCode não zero', async () => {
+        const tool = {
+            name: 'test.exit_code_failure',
+            description: 'test exit code failure',
+            handler: vi.fn().mockResolvedValue({ success: false, exitCode: 7 }),
+        };
+        const wrapped = wrapWithStats(/** @type {any} */ (tool));
+        await wrapped.handler({}, /** @type {any} */ ({}));
+        const stats = getToolStats();
+        const entry = entryOf(stats, 'test.exit_code_failure');
+        expect(entry.calls).toBe(1);
+        expect(entry.errors).toBe(1);
+        expect(entry.lastOk).toBe(false);
+    });
 });
 
 // ─── F162: wrapWithStats captura erros sem suprimir ────────────────────────

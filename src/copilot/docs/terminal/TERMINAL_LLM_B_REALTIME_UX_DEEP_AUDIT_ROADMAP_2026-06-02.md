@@ -6564,6 +6564,190 @@
   - Confirmação: `ux-tool-live-status-stays-single-line`, `ux-compact-tool-live-status`,
     `ux-live-status-not-input-prompt`, `no-prompt-double-render`, `ask-user-input-prompt-visible`,
     `llm-usage-visible`, export/SSE e `clean-quit` passaram.
-- [ ] Próxima frente UX: repetir `invalid-choice` e um cenário de falha BYOK/tool recuperável para
-      validar a mesma limpeza em caminhos não felizes, especialmente cancelamento, retry e falhas de
-      provider.
+- [x] Live `invalid-choice` pós-humanização e pós-linha-viva compacta:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=invalid-choice --label live-terminal-ux-invalid-choice-feedback-spacing-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T07-46-09-370Z/summary.md`.
+  - Resultado geral: `Status: PASS`.
+  - Confirmação: `TALVEZ` foi rejeitado localmente, o prompt `[PERG]` permaneceu pronto,
+    `SIM` foi aceito, a resposta pós-pergunta saiu por `assistant.message`, `/activity`,
+    `/events`, `/errors`, `/health`, export/SSE e `clean-quit` passaram.
+- [x] Correção de harness descoberta antes do PASS:
+  - quando a LLM-B concluía os deltas mas não chamava `ask_user`, o timeout encerrava com `/quit`
+    antes de coletar `/activity`, `/events`, `/errors`, `/health` e `/export`;
+  - o runner agora detecta `assistant-ended-before-ask` também com apoio dos eventos SSE vivos e,
+    no timeout, executa diagnósticos/export antes de encerrar ou matar o processo.
+- [x] Correção de harness para choice inválido:
+  - o feedback real usa layout tabular (`Resposta      não corresponde...`), então o detector de
+    `invalid-choice` passou a aceitar espaçamento visual da UI, não apenas logs com espaço único.
+- [x] Achado UX: a humanização de detalhes em `/activity` estava traduzindo `ask_user` dentro de
+      texto livre da intenção (`terminal live canonical deltas tools Pergunta ao operador usage`).
+- [x] Decisão UX: nomes de protocolo em conteúdo livre (`ask_user`, `request_user_input`) devem ser
+      preservados; a tradução para `Pergunta ao operador` pertence a labels, headings e eventos
+      semânticos, não ao payload textual do operador/modelo.
+- [x] Correção aplicada: `activity.js` preserva nomes de protocolo em detalhes livres, mantendo
+      humanização de labels e de ferramentas reais.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+  - `npx eslint src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [ ] Próxima frente UX: repetir um cenário de falha BYOK/tool recuperável para validar a mesma
+      limpeza em caminhos não felizes, especialmente cancelamento, retry e falhas de provedor.
+
+### 12.51 Falhas recuperáveis não podem parecer sucesso
+
+- [x] Live `recoverable-tool-error` pós-humanização:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=recoverable-tool-error --label live-terminal-ux-recoverable-tool-exitcode-failure-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T07-55-04-622Z/summary.md`.
+  - Resultado geral: `Status: BLOCKED` por `assistant-empty-after-user-input`; a LLM-B chamou
+    `ask_user`, o operador respondeu `SIM`, mas a continuação retornou sem saída pública.
+  - Sinais positivos: `exec_command` real retornou `success:false`, `exitCode=7`,
+    `RECOVERABLE-TOOL-ERROR`; o runner coletou `/activity`, `/events`, `/tools diag`,
+    `/health full`, `/errors` e export mesmo em bloqueio; perguntas, respostas, SSE e export
+    permaneceram correlacionados.
+  - Achado UX crítico: o terminal imprimia `Concluído ... Executar comando` a partir de
+    `external_completed success=true` e logo depois `Falhou ... Executar comando` a partir do
+    `postToolUse` estruturado. A timeline ficava contraditória, e `/tools`/`/health` ainda diziam
+    `sem falhas` porque a telemetria agregada tratava handler retornado como sucesso mesmo quando
+    o payload era `{ success:false }`.
+- [x] Decisão arquitetural: para operações de terminal (`operation=run`), `external_completed`
+      sem resultado estruturado é sinal provisório, não conclusão visual. A verdade operacional
+      vem do `postToolUse` ou do reconciliador de fim de turno.
+- [x] Correção aplicada: `handleTerminalExternalToolCompleted()` deixa de imprimir, arquivar em
+      `/activity`, fechar registry ou emitir `external_completed` visual para execução local
+      provisória. A entrada fica ativa para o `postToolUse` correlacionar corretamente.
+- [x] Correção aplicada: `reconcileTerminalPostToolUseResult()` fecha a tool ativa como falha,
+      preserva `toolCallId`, imprime uma única linha `Falhou Executar comando ... saída 7` e emite
+      `tool.lifecycle complete success=false`.
+- [x] Correção aplicada: `printToolComplete()` removeu a duplicação textual `Falhou falhou` /
+      `Concluído ok`; o label da coluna já comunica o estado, e o detalhe foca nome humano e ação.
+- [x] Correção de base: `observability/tool-stats.js` passou a interpretar retorno estruturado de
+      handler (`success:false`, `ok:false`, `resultType=error`, `exitCode!=0`) como falha real,
+      mesmo sem exceção. Isso corrige `/tools`, `/health` e métricas agregadas na fonte.
+- [x] Contrato live atualizado: `scenario-render-*` aceita o novo render humano
+      `Ferramenta`/`Concluído`/`Falhou` com nome legível, além do badge legado; `health-full`
+      aceita a cópia humana `Permissões automáticas · prompts SDK ignorados`.
+- [x] Testes unitários:
+  - `test_tool_lifecycle_runtime.spec.js` cobre reconciliação tardia de `exitCode=7` e bloqueia
+    sucesso provisório visual em `external_completed` de `exec_command`.
+  - `test_sdk_tool_stats_f32.spec.js` cobre falhas estruturadas retornadas por handlers.
+- [x] Validação focada:
+  - `node --check src/copilot/observability/tool-stats.js src/copilot/terminal/events/tool-lifecycle-runtime.js tests/unit/copilot/sdk/test_sdk_tool_stats_f32.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/sdk/test_sdk_tool_stats_f32.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+  - `npx eslint src/copilot/observability/tool-stats.js src/copilot/terminal/events/tool-lifecycle-runtime.js src/copilot/terminal/events/sdk-session-events.js tests/unit/copilot/sdk/test_sdk_tool_stats_f32.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [ ] Próxima live obrigatória: repetir `recoverable-tool-error` para confirmar que a tela real não
+      mostra sucesso provisório, que `/tools diag` e `/health full` contam a falha agregada, e para
+      separar o problema remanescente de `assistant-empty-after-user-input` de qualquer falha de UX.
+- [x] Tentativa live pós-correção de sucesso provisório:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=recoverable-tool-error --label live-terminal-ux-recoverable-tool-no-provisional-success-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T08-03-39-347Z/summary.md`.
+  - Resultado: `Status: BLOCKED` por `assistant-empty-turn`; a LLM-B chamou apenas
+    `report_intent`, encerrou o turno sem saída pública e não chegou a `read_file_content`,
+    `exec_command`, deltas ou `ask_user`.
+  - Diagnóstico: a tentativa não exercitou a correção de `exec_command`; o bloqueio é aderência do
+    modelo/turno, não regressão da UX de lifecycle.
+- [x] Bug de harness descoberto nessa live: a cópia nova da tela é `Turno sem saída pública`, mas
+      o detector de diagnóstico automático ainda esperava apenas `Turno terminou sem saída
+      pública`. Por isso o runner aguardou timeout e terminou com `conversation-export.md` n/a.
+- [x] Correção aplicada no runner: detectores de turno vazio agora aceitam
+      `Turno sem saída pública` e `Turno terminou sem saída pública`; o pacote automático desse
+      bloqueio coleta `/activity 40`, `/tools diag`, `/health full`, `/events`, `/errors` e
+      `/export`.
+- [x] Validação focada:
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [ ] Próxima tentativa: executar `recoverable-tool-error` com rota/modelo mais aderente ou criar
+      ciclo diagnóstico controlado de lifecycle para provar a superfície visual enquanto o live
+      real continua sujeito à aderência do provider.
+- [x] Prompt do cenário `recoverable-tool-error` foi reescrito para ordem sequencial explícita:
+      não encerrar após `report_intent`, chamar `read_file_content`, depois `exec_command`, continuar
+      mesmo com `success=false/exitCode=7`, ler o arquivo novamente, só então emitir deltas e
+      perguntar ao operador.
+- [x] Live `recoverable-tool-error` com prompt sequencial:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=recoverable-tool-error --label live-terminal-ux-recoverable-tool-sequential-prompt-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T08-11-04-159Z/summary.md`.
+  - Resultado formal: `Status: FAIL` apenas por critérios do harness ainda presos ao formato antigo
+    `Concluído ok Ler arquivo`.
+  - Resultado material de UX: caminho real validado de ponta a ponta. A LLM-B chamou
+    `report_intent`, `read_file_content`, `exec_command` com `exitCode=7`, `read_file_content`
+    novamente, emitiu os 8 deltas, chamou `ask_user`, recebeu `SIM` e materializou
+    `POST-ASK-RECOVERABLE-FINAL`.
+  - Confirmação visual: a tela exibiu somente `Falhou Executar comando · executando comando falhou
+    (81ms · saída 7)`; não houve `Concluído Executar comando`, não houve `Falhou falhou`, e o
+    prompt humano permaneceu limpo.
+  - Confirmação diagnóstica: `/tools diag` mostrou `Executar comando uso 1 · sem bloqueios · 1
+    falha(s)`, lifecycle com `falhas recentes 1`, e `/health full` mostrou `Executar comando 0%
+    média 105ms (1 uso)`.
+  - Export/SSE: export gerado com 4091 chars, ask/answer/postAsk correlacionados, `no-terminal-errors`
+    e `clean-quit` passaram.
+- [x] Critérios live corrigidos após a live: `renderedReadFileToolOk()` e `ux-human-tool-names`
+      aceitam a nova linha `Concluído Ler arquivo ...` sem exigir o marcador textual `ok` removido
+      da UX.
+- [x] Validação focada:
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [ ] Próxima live curta: repetir `recoverable-tool-error` uma vez com o harness corrigido para
+      obter `Status: PASS` formal e congelar esse cenário como regressão canônica.
+
+### 12.52 Continuação controlada quando a LLM-B esquece `ask_user`
+
+- [x] Live `recoverable-tool-error` após correção dos critérios:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=recoverable-tool-error --label live-terminal-ux-recoverable-tool-pass-after-criteria-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T08-13-38-809Z/summary.md`.
+  - Resultado formal: `Status: FAIL` apenas por falso negativo em
+    `ux-tool-live-status-stays-single-line`.
+  - Diagnóstico: a linha viva real era `LLM-B ferramenta · Ler arquivo · 0s`; o harness tratava
+    `\r` de repintura TTY como quebra visual real e confundia a próxima linha durável com wrap.
+- [x] Correção aplicada: o critério `ux-tool-live-status-stays-single-line` agora considera quebra
+      visual por `\n`, preservando `\r` como repintura de TTY/ANSI. O teste continua bloqueando
+      cauda de modelo/runtime (`modelo`, `raciocínio`, `conversa ativa`) na linha viva.
+- [x] Live `recoverable-tool-error` com critério corrigido:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=recoverable-tool-error --label live-terminal-ux-recoverable-tool-formal-pass-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T08-17-12-174Z/summary.md`.
+  - Resultado: `Status: BLOCKED` por `assistant-ended-before-ask`. A LLM-B executou
+    `report_intent`, `read_file_content`, `exec_command` com `exitCode=7`, novo
+    `read_file_content`, emitiu os deltas, mas encerrou sem chamar `ask_user`.
+  - Sinal positivo de UX: a falha de `exec_command` permaneceu uma única linha humana
+    `Falhou Executar comando ... saída 7`; `/tools diag` e `/health full` registraram
+    `1 falha(s)` e `0%`.
+  - Gap de diagnóstico: `/activity 40` escolheu a leitura posterior como “Último turno concluído”
+    e escondia o `exec_command` falho como contexto principal, embora a timeline ainda mostrasse a
+    falha.
+- [x] Decisão de harness: “deltas canônicos produzidos, mas `ask_user` obrigatório ausente” deve
+      primeiro gerar continuação controlada curta, não timeout ou pós-mortem imediato. Se a
+      continuação também encerrar sem `ask_user`, o runner coleta diagnóstico e bloqueia.
+- [x] Correção aplicada: o runner cria um turno de recuperação com instrução exclusiva para chamar
+      a tool real `ask_user`, sem repetir tools/deltas. A segunda avaliação olha apenas o trecho
+      posterior à continuação, evitando diagnosticar cedo demais olhando para o primeiro turno.
+- [x] Correção aplicada em `/activity`: `readTerminalActivityProjection()` amplia a janela de
+      turn traces conforme o limite do operador (`8..24`), e a escolha de “último turno útil”
+      prioriza falhas operacionais recentes antes de reads triviais posteriores.
+- [x] Teste unitário adicionado: `/activity 40` passa a priorizar `Executar comando · falhou` em
+      vez de uma leitura posterior bem-sucedida quando ambos estão nos traces recentes.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/frontend/projections/now.js src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+  - `npx eslint src/copilot/terminal/frontend/projections/now.js src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Live `recoverable-tool-error` após recuperação controlada:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=recoverable-tool-error --label live-terminal-ux-recoverable-tool-controlled-recovery-20260604 --timeout-ms 260000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T08-23-23-791Z/summary.md`.
+  - Resultado: `Status: BLOCKED`. A LLM-B executou `report_intent`, `read_file_content`,
+    `exec_command` falho e novo `read_file_content`, mas chamou `ask_user` antes dos deltas
+    públicos obrigatórios; depois do `SIM`, a continuação pós-pergunta ficou vazia.
+  - Confirmação UX: a falha real de comando permaneceu coerente em tela, `/tools diag` e
+    `/health full`; o problema remanescente é aderência/ordem do modelo ao contrato do cenário.
+  - Achado de diagnóstico: o blocker final `assistant-empty-after-user-input` escondia a causa
+    anterior mais útil para o operador, que era `ask_user` cedo demais.
+- [x] Correção aplicada no runner: se `user_input.requested` aparece antes de um
+      `assistant.message`/delta com os 8 `DELTA-CANONICAL`, o runner não responde `SIM`; ele
+      coleta `/activity 40`, `/tools diag`, `/events`, `/errors`, `/health full` e export, e
+      classifica a causa como `assistant-asked-before-required-deltas`.
+- [x] Correção refinada em `/activity`: falhas vazias sem ferramentas, arquivos ou operador não
+      devem ocultar uma falha operacional recente com ferramenta real; o teste unitário cobre esse
+      caso com um turno vazio falho antes de um read e de um `exec_command` falho.
+- [x] Validação focada adicional:
+  - `node --check src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
+  - `npx eslint src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [ ] Próxima live obrigatória: repetir `recoverable-tool-error`; aceitar `Status: PASS` direto
+      ou `Status: PASS` via continuação controlada, desde que ask/answer/postAsk, SSE/export,
+      `/activity`, `/tools diag` e `/health full` permaneçam coerentes.

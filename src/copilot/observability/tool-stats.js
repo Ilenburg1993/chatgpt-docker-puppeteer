@@ -13,6 +13,36 @@ import { normalizeObservedToolName } from '../config/tool-aliases.js';
 import { createHistogram } from './metrics-histogram.js';
 
 /**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Interpreta o resultado semântico de handlers que retornam falhas estruturadas em vez de lançar exceção.
+ *
+ * Muitas tools locais preservam o contrato `{ success:false, error }` para que a LLM consiga se recuperar. A execução
+ * do handler, portanto, pode terminar "normalmente" enquanto a operação real falhou. Métricas e UX devem contar o
+ * resultado operacional, não apenas o fato de o callback ter retornado.
+ *
+ * @param {unknown} result
+ * @returns {boolean}
+ */
+function inferToolHandlerSuccess(result) {
+    if (!isRecord(result)) return true;
+    if (result['success'] === false || result['ok'] === false) return false;
+    if (result['resultType'] === 'error') return false;
+    if (typeof result['exitCode'] === 'number' && Number.isFinite(result['exitCode']) && result['exitCode'] !== 0) {
+        return false;
+    }
+    const nested = result['result'];
+    if (isRecord(nested)) return inferToolHandlerSuccess(nested);
+    return true;
+}
+
+/**
  * Estatísticas acumuladas de uma operação observada no plano canônico de telemetria.
  *
  * @typedef {object} ToolCallStats
@@ -265,7 +295,7 @@ export function createToolTelemetryStore() {
                 const t0 = Date.now();
                 try {
                     const result = await original(params, invocation);
-                    recordToolCall(tool.name, Date.now() - t0, true);
+                    recordToolCall(tool.name, Date.now() - t0, inferToolHandlerSuccess(result));
                     return result;
                 } catch (error) {
                     recordToolCall(tool.name, Date.now() - t0, false);

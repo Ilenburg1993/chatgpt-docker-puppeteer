@@ -27,7 +27,6 @@ import {
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
     terminalThemeRow,
-    terminalThemeStatus,
     terminalThemeText,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
@@ -195,6 +194,89 @@ function readFirstString(record, keys) {
         if (typeof value === 'string' && value.trim()) return value.trim();
     }
     return null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function numberOrNull(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @returns {{ envelope: Record<string, unknown>; parsed: Record<string, unknown> | null } | null}
+ */
+function extractToolResultEnvelope(evt) {
+    const envelope =
+        objectOrParsedJson(evt['toolResult']) ??
+        objectOrParsedJson(evt['result']) ??
+        objectOrParsedJson(evt['output']) ??
+        objectOrParsedJson(objectOrParsedJson(evt['input'])?.['toolResult']) ??
+        null;
+    if (!envelope) return null;
+    const parsed =
+        objectOrParsedJson(envelope['textResultForLlm']) ??
+        objectOrParsedJson(envelope['result']) ??
+        objectOrParsedJson(envelope['output']) ??
+        null;
+    return { envelope, parsed };
+}
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @param {boolean} fallback
+ * @returns {{ success: boolean; exitCode: number | null; durationMs: number | null; hasStructuredResult: boolean }}
+ */
+function inferToolResultSuccess(evt, fallback) {
+    const result = extractToolResultEnvelope(evt);
+    const explicitSuccess = typeof evt['success'] === 'boolean' ? evt['success'] : null;
+    const envelopeSuccess =
+        result?.envelope && typeof result.envelope['success'] === 'boolean'
+            ? /** @type {boolean} */ (result.envelope['success'])
+            : null;
+    const parsedSuccess =
+        result?.parsed && typeof result.parsed['success'] === 'boolean'
+            ? /** @type {boolean} */ (result.parsed['success'])
+            : null;
+    const resultType = typeof result?.envelope?.['resultType'] === 'string' ? result.envelope['resultType'] : null;
+    const exitCode =
+        numberOrNull(result?.parsed?.['exitCode']) ??
+        numberOrNull(result?.envelope?.['exitCode']) ??
+        numberOrNull(evt['exitCode']);
+    const durationMs =
+        numberOrNull(result?.parsed?.['durationMs']) ??
+        numberOrNull(result?.envelope?.['durationMs']) ??
+        numberOrNull(evt['durationMs']);
+    const failed =
+        explicitSuccess === false ||
+        envelopeSuccess === false ||
+        parsedSuccess === false ||
+        resultType === 'error' ||
+        (exitCode !== null && exitCode !== 0);
+    const succeeded =
+        explicitSuccess === true ||
+        envelopeSuccess === true ||
+        parsedSuccess === true ||
+        resultType === 'success' ||
+        exitCode === 0;
+    return {
+        success: failed ? false : succeeded ? true : fallback,
+        exitCode,
+        durationMs,
+        hasStructuredResult: Boolean(result),
+    };
+}
+
+/**
+ * @param {string} durationLabel
+ * @param {number | null} exitCode
+ * @returns {string}
+ */
+function appendExitCodeToDurationLabel(durationLabel, exitCode) {
+    if (exitCode === null) return durationLabel;
+    return `${durationLabel} · saída ${exitCode}`;
 }
 
 /**
@@ -419,7 +501,6 @@ function printToolProgress(presentation, progress, progressMessage, options = {}
 function printToolComplete(presentation, success, durationLabel, fallbackToolCallId = null) {
     if (!getShowToolActivity()) return;
     const compactDetail = getTerminalDetailLevel() === 'compact';
-    const statusText = terminalThemeStatus(success);
     const operationRole = mapTerminalToolOperationRole(presentation.operation);
     if (compactDetail) clearInlineStatus();
     const hasOnlyCallIdTarget =
@@ -442,12 +523,12 @@ function printToolComplete(presentation, success, durationLabel, fallbackToolCal
         compactDetail
             ? terminalThemeRow(
                   success ? 'Concluído' : 'Falhou',
-                  `${statusText} ${terminalThemeText('tool', compactTerminalToolText(renderedName, 28))} · ${terminalThemeText(operationRole, compactTerminalToolText(completionDetail, 88))}`,
+                  `${terminalThemeText('tool', compactTerminalToolText(renderedName, 28))} · ${terminalThemeText(operationRole, compactTerminalToolText(completionDetail, 88))}`,
                   { role: success ? 'success' : 'error' },
               )
             : terminalThemeRow(
                   success ? 'Concluído' : 'Falhou',
-                  `${statusText} ${terminalThemeText('tool', renderedName)} · ${terminalThemeText(operationRole, completionDetail)}`,
+                  `${terminalThemeText('tool', renderedName)} · ${terminalThemeText(operationRole, completionDetail)}`,
                   { role: success ? 'success' : 'error' },
               ),
     );
@@ -474,6 +555,16 @@ function hasSemanticToolTarget(presentation) {
 function isTerminalWaitingForHumanQuestion() {
     const runtime = readTerminalRuntimeState();
     return runtime.status === 'waiting_for_input' && runtime.pendingQuestionKind === 'question';
+}
+
+/**
+ * @param {import('./tool-activity-presenter.js').TerminalToolActivityPresentation} presentation
+ * @param {{ success: boolean; hasStructuredResult: boolean }} result
+ * @returns {boolean}
+ */
+function shouldDeferExternalCompletionUntilPostToolUse(presentation, result) {
+    if (!result.success || result.hasStructuredResult) return false;
+    return presentation.operation === 'run';
 }
 
 /**
@@ -896,7 +987,8 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
         originalToolName,
     );
     const requestId = evt?.requestId ?? null;
-    const success = evt?.success !== false;
+    const inferredResult = inferToolResultSuccess(/** @type {Record<string, unknown>} */ (evt ?? {}), evt?.success !== false);
+    const success = inferredResult.success;
     const evtToolCallId = evt?.toolCallId ?? null;
     /** @type {string | null} */
     let resolvedToolCallId = evtToolCallId;
@@ -911,11 +1003,8 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
         source: `sdk/external/${toolName}`,
         toolCallId: resolvedToolCallId,
     });
-    /** @type {import('../state/tool-call-registry.js').ToolCallEntry | null} */
-    let completedEntry = null;
     if (resolvedEntry) {
         resolvedToolCallId = resolvedEntry.toolCallId;
-        completedEntry = registry.complete(resolvedEntry.toolCallId, success);
     }
     const completionPresentation = buildTerminalToolActivityPresentation(evt ?? {}, toolName);
     const presentation = hasSemanticToolTarget(completionPresentation)
@@ -923,9 +1012,23 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
         : (resolvedEntry?.presentation ?? completionPresentation);
     const statsToolName = presentation.canonicalToolName ?? toolName;
     const displayToolName = presentation.displayToolName;
-    const durationMs = completedEntry ? Date.now() - completedEntry.t0 : 0;
+    if (shouldDeferExternalCompletionUntilPostToolUse(presentation, inferredResult)) {
+        if (resolvedToolCallId) {
+            registry.touch(resolvedToolCallId, { presentation, lastSignalAt: Date.now() });
+        }
+        return;
+    }
+    const completedEntry = resolvedEntry ? registry.complete(resolvedEntry.toolCallId, success) : null;
+    const durationMs = completedEntry
+        ? Date.now() - completedEntry.t0
+        : typeof inferredResult.durationMs === 'number'
+          ? inferredResult.durationMs
+          : 0;
     recordTerminalDiagnosticToolStats(statsToolName, durationMs, success);
-    const durationLabel = buildToolCompletionDurationLabel(completedEntry ?? resolvedEntry, durationMs);
+    const durationLabel = appendExitCodeToDurationLabel(
+        buildToolCompletionDurationLabel(completedEntry ?? resolvedEntry, durationMs),
+        inferredResult.exitCode,
+    );
     recordToolTurnProjection(presentation, success ? 'completed' : 'failed', resolvedToolCallId, success);
     recordTerminalActivity('tool', success ? 'Integração externa concluída' : 'Integração externa falhou', {
         detail:
@@ -965,6 +1068,70 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
             searchTerms: presentation.searchTerms,
             lineRange: presentation.lineRange,
             patchFiles: presentation.patchFiles,
+        }),
+    );
+}
+
+/**
+ * Reconciliacao tardia do hook `postToolUse`.
+ *
+ * Alguns eventos SDK marcam `external_completed` antes de o hook `postToolUse` expor o resultado real. Para tools de
+ * shell/comando, isso pode significar `external_completed success=true` seguido por `textResultForLlm` com
+ * `{ success:false, exitCode:7 }`. A tela humana deve refletir o resultado real da tool.
+ *
+ * @param {{
+ *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
+ *     evt: Record<string, unknown>;
+ * }} input
+ * @returns {void}
+ */
+export function reconcileTerminalPostToolUseResult({ registry, evt }) {
+    const result = inferToolResultSuccess(evt, true);
+    if (!result.hasStructuredResult || result.success) return;
+    const toolName = typeof evt['toolName'] === 'string' && evt['toolName'].trim() ? evt['toolName'].trim() : 'tool';
+    const args = objectArgsOrEmpty(evt['toolArgs'] ?? evt['args'] ?? evt['arguments'] ?? evt['input'] ?? null);
+    const presentation = buildTerminalToolActivityPresentation(
+        {
+            toolName,
+            args,
+            result: extractToolResultEnvelope(evt)?.parsed ?? evt['toolResult'] ?? null,
+        },
+        toolName,
+    );
+    const canonicalName = presentation.canonicalToolName ?? presentation.toolName;
+    const resolvedEntry = registry.resolveByName(toolName);
+    const toolCallId = resolvedEntry?.toolCallId ?? '';
+    const completedEntry = toolCallId ? registry.complete(toolCallId, false) : null;
+    const durationMs = result.durationMs ?? 0;
+    const durationLabel = appendExitCodeToDurationLabel(
+        buildToolCompletionDurationLabel(completedEntry ?? resolvedEntry, durationMs),
+        result.exitCode,
+    );
+    recordTerminalDiagnosticToolStats(canonicalName, durationMs, false);
+    recordToolTurnProjection(presentation, 'failed', toolCallId || null, false);
+    if (toolCallId) completeTerminalTurnToolCall({ toolCallId, success: false });
+    recordTerminalActivity('tool', 'Integração externa falhou', {
+        detail: presentation.completeLine(false, durationLabel),
+        toolName: presentation.displayToolName,
+        source: 'sdk',
+        severity: 'error',
+    });
+    printToolComplete(presentation, false, durationLabel, toolCallId || null);
+    broadcastToolLifecycle(
+        buildToolLifecycleComplete({
+            toolCallId,
+            toolName,
+            canonicalName,
+            operation: presentation.operation,
+            path: presentation.path,
+            target: presentation.target,
+            fileTargets: presentation.fileTargets,
+            urlTargets: presentation.urlTargets,
+            searchTerms: presentation.searchTerms,
+            lineRange: presentation.lineRange,
+            patchFiles: presentation.patchFiles,
+            success: false,
+            durationMs,
         }),
     );
 }

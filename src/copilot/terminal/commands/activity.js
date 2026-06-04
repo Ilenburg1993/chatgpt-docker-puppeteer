@@ -188,7 +188,7 @@ function compactHumanText(value) {
  * @returns {string}
  */
 function compactOperatorDetail(value) {
-    return humanizeKnownToolIdentifiers(compactHumanText(value))
+    return humanizeKnownToolIdentifiers(compactHumanText(value), { preserveProtocolNames: true })
         .replace(/\bmodelo=/giu, 'modelo ')
         .replace(/\bcusto=/giu, 'custo ')
         .replace(/\bstatus=success\b/giu, 'concluída')
@@ -219,10 +219,21 @@ function compactActivityLabel(value) {
 
 /**
  * @param {string} text
+ * @param {{ preserveProtocolNames?: boolean }} [opts]
  * @returns {string}
  */
-function humanizeKnownToolIdentifiers(text) {
+function humanizeKnownToolIdentifiers(text, opts = {}) {
     return text.replace(/\b[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+\b/giu, (token) => {
+        const normalized = token.toLowerCase();
+        if (
+            opts.preserveProtocolNames &&
+            (normalized === 'ask_user' ||
+                normalized === 'request_user_input' ||
+                normalized.endsWith('.ask_user') ||
+                normalized.endsWith('.request_user_input'))
+        ) {
+            return token;
+        }
         const label = getTerminalHumanToolName(token);
         return label === token ? token : label;
     });
@@ -404,7 +415,28 @@ function printTurnTraceSummary(println, title, trace, opts) {
  * @returns {any | null}
  */
 function pickMostUsefulRecentTurnTrace(recent) {
-    return pickRecentOperationalTurnTrace(recent) ?? pickRecentHumanTurnTrace(recent) ?? recent[0] ?? null;
+    return pickRecentFailedTurnTrace(recent) ?? pickRecentOperationalTurnTrace(recent) ?? pickRecentHumanTurnTrace(recent) ?? recent[0] ?? null;
+}
+
+/**
+ * @param {any[]} recent
+ * @returns {any | null}
+ */
+function pickRecentFailedTurnTrace(recent) {
+    return (
+        recent.find(
+            (entry) =>
+                (Array.isArray(entry.tools) &&
+                    entry.tools.some(
+                        /** @param {{ status?: string; success?: boolean | null }} tool */ (tool) =>
+                            tool.status === 'failed' || tool.success === false,
+                    )) ||
+                (entry.status === 'failed' &&
+                    (Number(entry.toolCount ?? 0) > 0 ||
+                        Number(entry.fileCount ?? 0) > 0 ||
+                        Number(entry.userInputCount ?? 0) > 0)),
+        ) ?? null
+    );
 }
 
 /**

@@ -114,4 +114,131 @@ describe('terminal/tool-lifecycle-runtime', () => {
             success: false,
         });
     });
+
+    it('reconcilia postToolUse com exitCode não zero como falha visual da tool', async () => {
+        const { createToolCallRegistry } = await import(
+            '../../../../src/copilot/terminal/state/tool-call-registry.js'
+        );
+        const { buildTerminalToolActivityPresentation } = await import(
+            '../../../../src/copilot/terminal/events/tool-activity-presenter.js'
+        );
+        const { reconcileTerminalPostToolUseResult } = await import(
+            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
+        );
+
+        const registry = createToolCallRegistry();
+        const args = {
+            command: "node -e \"console.error('RECOVERABLE-TOOL-ERROR'); process.exit(7)\"",
+            timeoutSeconds: 10,
+        };
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'exec_command',
+            args,
+            toolCallId: 'chatcmpl-tool-exec',
+        });
+        registry.register('chatcmpl-tool-exec', 'exec_command', 'native', {
+            canonicalName: presentation.canonicalToolName ?? 'exec_command',
+            rawArgs: args,
+            presentation,
+        });
+
+        reconcileTerminalPostToolUseResult({
+            registry,
+            evt: {
+                toolName: 'exec_command',
+                toolArgs: args,
+                toolResult: {
+                    resultType: 'success',
+                    textResultForLlm: JSON.stringify({
+                        success: false,
+                        exitCode: 7,
+                        stderr: 'RECOVERABLE-TOOL-ERROR\n',
+                        durationMs: 264,
+                    }),
+                },
+            },
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'tool',
+            'Integração externa falhou',
+            expect.objectContaining({
+                detail: expect.stringContaining('executando comando falhou'),
+                severity: 'error',
+                toolName: 'Executar comando',
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'tool',
+            'Integração externa falhou',
+            expect.objectContaining({
+                detail: expect.stringContaining('saída 7'),
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Falhou'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Falhou falhou'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Concluído'));
+        expect(completeTerminalTurnToolCall).toHaveBeenCalledWith({
+            toolCallId: 'chatcmpl-tool-exec',
+            success: false,
+        });
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                success: false,
+                toolName: 'exec_command',
+            }),
+        );
+    });
+
+    it('não imprime sucesso provisório de external_completed para exec_command sem resultado estruturado', async () => {
+        const { createToolCallRegistry } = await import(
+            '../../../../src/copilot/terminal/state/tool-call-registry.js'
+        );
+        const { buildTerminalToolActivityPresentation } = await import(
+            '../../../../src/copilot/terminal/events/tool-activity-presenter.js'
+        );
+        const { handleTerminalExternalToolCompleted } = await import(
+            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
+        );
+
+        const registry = createToolCallRegistry();
+        const args = { command: 'node -e "process.exit(7)"', timeoutSeconds: 10 };
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'exec_command',
+            args,
+            toolCallId: 'chatcmpl-tool-exec',
+        });
+        registry.register('chatcmpl-tool-exec', 'exec_command', 'native', {
+            canonicalName: presentation.canonicalToolName ?? 'exec_command',
+            rawArgs: args,
+            presentation,
+        });
+
+        handleTerminalExternalToolCompleted({
+            registry,
+            evt: {
+                toolName: 'external_tool',
+                requestId: 'req-exec',
+                toolCallId: 'chatcmpl-tool-exec',
+                success: true,
+                data: { toolName: 'exec_command' },
+            },
+        });
+
+        expect(registry.getEntry('chatcmpl-tool-exec')).not.toBeNull();
+        expect(recordTerminalActivity).not.toHaveBeenCalledWith(
+            'tool',
+            'Integração externa concluída',
+            expect.anything(),
+        );
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Concluído'));
+        expect(broadcastSse).not.toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                type: 'external_completed',
+                success: true,
+            }),
+        );
+    });
 });
