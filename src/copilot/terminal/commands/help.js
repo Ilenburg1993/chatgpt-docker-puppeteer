@@ -101,6 +101,10 @@ export function cmdHelp({ injectPort, println }, arg = '') {
         renderFullHelp({ injectPort, println });
         return;
     }
+    if (mode === 'libs' || mode === 'lib' || mode === 'preview' || mode === 'previews') {
+        renderAuxiliaryLibsHelp(println);
+        return;
+    }
 
     println('');
     println(terminalThemeHeadline('assistant', 'Ajuda rápida - Terminal LLM-B'));
@@ -135,9 +139,41 @@ export function cmdHelp({ injectPort, println }, arg = '') {
         }),
     );
     println(terminalThemeRow('Terminal', commandChain(['/terminal libs', '/libs detail']), { role: 'muted' }));
-    println(terminalThemeRow('Completo', command('/help full'), { role: 'muted' }));
+    println(terminalThemeRow('Ajuda', commandChain(['/help libs', '/help full']), { role: 'muted' }));
     println(terminalThemeRow('HTTP local', `porta ${injectPort}: /inject · /events · /sessions`));
     println(terminalThemeDivider(58));
+    println('');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @returns {void}
+ */
+function renderAuxiliaryLibsHelp(println) {
+    println('');
+    println(terminalThemeHeadline('assistant', 'Ajuda de libs auxiliares'));
+    println(terminalThemeDivider(66));
+    renderHelpSection(println, 'Inspeção', [
+        { command: '/terminal libs', description: 'visão compacta de ferramentas externas opcionais e fallbacks' },
+        { command: '/terminal libs detail [filtro]', description: 'detalhes com política, riscos, path, versão e exemplos' },
+        { command: '/terminal libs json [filtro]', description: 'contrato JSON com schema, timestamp, policy e tools filtradas' },
+        { command: '/terminal libs refresh [filtro]', description: 'redetecta PATH antes de renderizar a superfície solicitada' },
+        { command: '/libs deferred|available|missing|fzf', description: 'filtros rápidos por decisão, disponibilidade ou ferramenta' },
+    ]);
+    renderHelpSection(println, 'Previews', [
+        { command: '/fs preview <path>', description: 'preview read-only com bat/batcat quando disponível; fallback JS' },
+        { command: '/fs preview <path> --markdown', description: 'Markdown via glow por stdin; sem pager automático' },
+        { command: '/fs preview <path> --json --query .x', description: 'JSON via jq quando disponível; parser JS continua canônico' },
+        { command: '/fs preview <path> --yaml --query .x', description: 'YAML via yq com env/file ops bloqueadas; fallback js-yaml' },
+        { command: '/git diff [--plain]', description: 'delta apenas quando a superfície aceita cor; diff bruto permanece canônico' },
+    ]);
+    renderHelpSection(println, 'TUI e smoke', [
+        { command: '/menu picker', description: 'mostra plano seguro e guardas antes de qualquer TUI externa' },
+        { command: '/menu picker --interactive', description: 'usa fzf/gum somente com TTY exclusivo e sem pergunta pendente' },
+        { command: 'npm run terminal:aux-libs:smoke', description: 'prova fallbacks, renderers reais e envelope JSON limpo' },
+        { command: 'atuin/zoxide', description: 'inventariados, mas adiados por histórico/cwd pessoal e estado fora do produto' },
+    ]);
+    println(terminalThemeDivider(66));
     println('');
 }
 

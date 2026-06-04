@@ -23,11 +23,27 @@ describe('terminal/commands/help', () => {
         expect(ctx.output()).toContain('/help full');
         expect(ctx.output()).toContain('Esperas');
         expect(ctx.output()).toContain('/sdk waits');
+        expect(ctx.output()).toContain('/help libs');
         expect(ctx.output()).not.toContain('╔');
         expect(ctx.output()).not.toContain('binding/frescor');
         expect(ctx.output()).not.toContain('CommandDefinition');
         expect(ctx.output()).not.toContain('\x1b[36mAjuda rápida');
         expect(ctx.output()).not.toContain('\x1b[33m/status');
+    });
+
+    it('renderiza ajuda temática de libs sem abrir catálogo completo', () => {
+        const ctx = mockCtx();
+
+        cmdHelp(ctx, 'libs');
+
+        expect(ctx.output()).toContain('Ajuda de libs auxiliares');
+        expect(ctx.output()).toContain('/terminal libs detail [filtro]');
+        expect(ctx.output()).toContain('/terminal libs json [filtro]');
+        expect(ctx.output()).toContain('/libs deferred|available|missing|fzf');
+        expect(ctx.output()).toContain('npm run terminal:aux-libs:smoke');
+        expect(ctx.output()).toContain('atuin/zoxide');
+        expect(ctx.output()).not.toContain('Sessão SDK persistente');
+        expect(ctx.output()).not.toContain('HTTP local');
     });
 
     it('preserva catálogo completo quando solicitado explicitamente', () => {

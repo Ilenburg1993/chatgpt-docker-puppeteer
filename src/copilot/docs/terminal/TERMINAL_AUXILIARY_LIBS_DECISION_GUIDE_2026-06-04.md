@@ -291,6 +291,7 @@ Decisão:
 - [x] `/terminal libs detail` mostra exemplos por ferramenta.
 - [x] `/terminal libs detail` diferencia `aceita`, `aceita com guardas` e `adiada` em termos de política de execução.
 - [x] `/terminal libs` aceita filtros por disponibilidade, decisão e ferramenta para reduzir rolagem humana.
+- [x] `/help libs` oferece descoberta temática sem abrir o catálogo completo.
 - [x] `/help full` tem uma seção rica de libs auxiliares com exemplos e fallbacks.
 - [ ] O picker externo ainda não tem preview seguro integrado; decisão atual é manter sem preview embutido.
 - [x] Há comando de auditoria único que roda bateria local não interativa de previews para demonstrar renderer/fallback.
@@ -328,6 +329,7 @@ Decisão:
 - [x] Fase C.2: `/help full` deve listar comandos de preview com `--plain`, `--markdown`, `--json`, `--yaml`, `/git diff`, `/gh pr diff`.
 - [x] Fase C.3: `/help full` deve listar que `atuin` e `zoxide` são detectados, mas não usados.
 - [x] Fase C.4: `/help full` deve apontar `/terminal libs detail` como diagnóstico.
+- [x] Fase C.5: `/help libs` deve oferecer ajuda temática curta para filtros, previews, TUI e smoke.
 
 ### Faixa D: Preview read-only
 
@@ -479,6 +481,10 @@ Decisão:
   - `/terminal libs json deferred` preserva contadores globais e emite `filter` com `query`, `label`,
     `matched` e `count`;
   - filtros sem resultado geram aviso humano e não despejam JSON bruto.
+- [x] Ajuda temática de libs:
+  - `/help libs` renderiza uma superfície específica para inspeção, previews, TUI e smoke;
+  - `/help` passa a sugerir `/help libs` antes de `/help full`;
+  - a superfície evita seções do catálogo completo quando o operador só quer libs auxiliares.
 - [x] Live PTY com contrato JSON de libs:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-json-contract-pass3-20260604 --timeout-ms 180000`;
   - artefato: `artifacts/terminal-live/2026-06-04T17-44-25-689Z/summary.md`;
@@ -487,6 +493,10 @@ Decisão:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-aux-libs-filtered-contract-20260604 --timeout-ms 180000`;
   - artefato: `artifacts/terminal-live/2026-06-04T17-48-53-899Z/summary.md`;
   - resultado: PASS em 26/26 critérios, incluindo `ux-cycle-terminal-libs-filtered`.
+- [x] Live PTY com ajuda temática de libs:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-help-libs-topic-20260604 --timeout-ms 180000`;
+  - artefato: `artifacts/terminal-live/2026-06-04T17-52-07-505Z/summary.md`;
+  - resultado: PASS em 27/27 critérios, incluindo `ux-cycle-help-libs-topic`.
 
 ## 9. Próxima execução recomendada
 

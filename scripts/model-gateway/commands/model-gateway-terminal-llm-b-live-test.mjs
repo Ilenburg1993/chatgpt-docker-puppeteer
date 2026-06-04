@@ -2445,7 +2445,8 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
 function defaultUxCycleCriteria(boot) {
     const plain = String(boot?.plain ?? '');
     const helpStart = plain.indexOf('Ajuda rápida');
-    const helpFullStart = plain.indexOf('Terminal LLM-B - Ajuda completa');
+    const helpLibsStart = plain.indexOf('Ajuda de libs auxiliares', Math.max(0, helpStart));
+    const helpFullStart = plain.indexOf('Terminal LLM-B - Ajuda completa', Math.max(0, helpLibsStart));
     const terminalLibsDetailStart = plain.indexOf('Libs auxiliares do terminal', Math.max(0, helpFullStart));
     const terminalLibsFilteredStart = plain.indexOf('/terminal libs deferred', Math.max(0, terminalLibsDetailStart));
     const terminalLibsJsonStart = plain.indexOf('/terminal libs json', Math.max(0, terminalLibsFilteredStart));
@@ -2480,6 +2481,7 @@ function defaultUxCycleCriteria(boot) {
     const eventsStart = plain.indexOf('Eventos SSE');
     const surfaceStarts = [
         helpStart,
+        helpLibsStart,
         helpFullStart,
         terminalLibsDetailStart,
         terminalLibsFilteredStart,
@@ -2510,6 +2512,7 @@ function defaultUxCycleCriteria(boot) {
     };
     const defaultSurface = surfaceStarts.map((index) => surfaceAt(index)).join('\n');
     const helpSurface = surfaceAt(helpStart);
+    const helpLibsSurface = surfaceAt(helpLibsStart);
     const helpFullSurface = surfaceAt(helpFullStart);
     const terminalLibsDetailSurface = surfaceAt(terminalLibsDetailStart);
     const terminalLibsFilteredSurface = surfaceAt(terminalLibsFilteredStart);
@@ -2548,6 +2551,7 @@ function defaultUxCycleCriteria(boot) {
     const sdkModel = extractTerminalUxRowValue(sdkSurface, 'Modelo').split('·')[0]?.trim() ?? '';
     const orderedSurfaceStarts = [
         helpStart,
+        helpLibsStart,
         helpFullStart,
         terminalLibsDetailStart,
         terminalLibsFilteredStart,
@@ -2586,9 +2590,17 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-help-compact',
             pass:
-                /Ajuda rápida[\s\S]*Situação[\s\S]*Completo\s+\/help full/iu.test(helpSurface) &&
+                /Ajuda rápida[\s\S]*Situação[\s\S]*Ajuda\s+\/help libs[\s\S]*\/help full/iu.test(helpSurface) &&
                 !/╔|╚|binding\/frescor|CommandDefinition/iu.test(helpSurface),
             detail: '/help default rendered the compact human guide and kept the old catalog behind /help full',
+        },
+        {
+            id: 'ux-cycle-help-libs-topic',
+            pass:
+                /Ajuda de libs auxiliares[\s\S]*Inspeção[\s\S]*\/terminal libs json \[filtro\][\s\S]*Previews[\s\S]*\/fs preview <path> --markdown[\s\S]*TUI e smoke[\s\S]*terminal:aux-libs:smoke/iu.test(
+                    helpLibsSurface,
+                ) && !/Sessão SDK persistente|HTTP local|Memória, GitHub e Git/iu.test(helpLibsSurface),
+            detail: '/help libs rendered a focused topical guide without opening the full command catalog',
         },
         {
             id: 'ux-cycle-help-full-structured',
@@ -2822,6 +2834,7 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
         outDir,
         commands: [
             { line: '/help', waitFor: 'Ajuda rápida', advanceAfterMs: 1_500 },
+            { line: '/help libs', waitFor: 'Ajuda de libs auxiliares', advanceAfterMs: 1_500 },
             { line: '/help full', waitFor: 'Terminal LLM-B - Ajuda completa', advanceAfterMs: 5_000 },
             { line: '/terminal libs detail', waitFor: 'Libs auxiliares do terminal', advanceAfterMs: 2_000 },
             { line: '/terminal libs deferred', waitFor: 'filtro adiadas', advanceAfterMs: 1_000 },
