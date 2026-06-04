@@ -496,13 +496,13 @@ function recordTerminalExplicitEmptyOutput(input) {
         }),
     );
     println(
-        terminalThemeRow('Turno', 'sem saída pública, sem delta e sem pergunta humana pendente', {
+        terminalThemeRow('Turno vazio', 'sem resposta pública materializada; nenhuma pergunta humana pendente', {
             role: 'error',
         }),
     );
     println(
-        terminalThemeRow('Diagnóstico', 'use /activity, /live e /byok health para separar provedor, SDK e transcript', {
-            role: 'muted',
+        terminalThemeRow('Próximo passo', '/activity 40 · /events 60 · /byok health · reenvie ou troque modelo', {
+            role: 'command',
         }),
     );
 

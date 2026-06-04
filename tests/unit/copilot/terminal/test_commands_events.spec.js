@@ -655,12 +655,29 @@ describe('terminal/commands/events', () => {
                         actor: 'agent',
                         sourceDetail: 'empty',
                         assistantMessageCount: 0,
+                        deltaSlices: 0,
+                        deltaChars: 0,
                         pendingQuestionKind: null,
                     },
                 },
                 {
                     timestamp: 1710000003000,
                     eventId: 64,
+                    event: 'dialog.empty_after_user_input',
+                    source: 'terminal-agent-wiring/dialog.empty_after_user_input',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        turnId: 'turn:ask',
+                        detail: 'continuação pós-pergunta terminou sem texto público · resposta SIM',
+                        requestId: 'ask-request-1234567890',
+                    },
+                },
+                {
+                    timestamp: 1710000004000,
+                    eventId: 65,
                     event: 'llm.usage',
                     source: 'agent/llm.usage',
                     eventSource: null,
@@ -688,6 +705,11 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Turno sem saída');
         expect(ctx.output()).toContain('autor agente');
         expect(ctx.output()).toContain('origem sem saída');
+        expect(ctx.output()).toContain('deltas 0/0 caracteres');
+        expect(ctx.output()).toContain('Continuação vazia');
+        expect(ctx.output()).toContain('continuação pós-pergunta terminou sem texto público · resposta SIM');
+        expect(ctx.output()).toContain('ação /activity 40 · /events 60 · reenviar ou trocar modelo');
+        expect(ctx.output()).not.toContain('ask-request-1234567890');
         expect(ctx.output()).toContain('tipo iniciado pelo agente');
         expect(ctx.output()).not.toContain('agent error');
         expect(ctx.output()).not.toContain('Info da sessão');

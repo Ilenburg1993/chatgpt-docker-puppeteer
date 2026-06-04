@@ -513,7 +513,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
         );
         expect(vi.mocked(activity.recordTerminalActivity)).toHaveBeenCalledWith(
             'error',
-            'Falha de provider BYOK no turno',
+            'Falha de provedor BYOK no turno',
             expect.objectContaining({ source: 'dialog' }),
         );
         expect(vi.mocked(activity.recordTerminalActivity)).not.toHaveBeenCalledWith(

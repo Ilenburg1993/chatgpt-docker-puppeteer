@@ -6751,3 +6751,41 @@
 - [ ] Próxima live obrigatória: repetir `recoverable-tool-error`; aceitar `Status: PASS` direto
       ou `Status: PASS` via continuação controlada, desde que ask/answer/postAsk, SSE/export,
       `/activity`, `/tools diag` e `/health full` permaneçam coerentes.
+
+### 12.53 Turno vazio e eventos precisam orientar, não repetir
+
+- [x] Achado UX no live bloqueado:
+  - a tela imprimia uma linha específica de pós-pergunta vazia e, em seguida, uma linha genérica
+    muito parecida (`Turno sem saída pública...`), aumentando ruído no momento em que o operador
+    precisa de ação clara.
+  - `/events` resumia `terminal.turn.empty_output`, mas não mostrava `deltaSlices/deltaChars`,
+    porque o renderer procurava `deltaCount`.
+- [x] Decisão UX: duas camadas podem continuar emitindo sinais distintos, mas a cópia deve ser
+      complementar. A linha específica explica “continuação pós-pergunta”; a linha genérica deve
+      ser curta, operacional e acionável.
+- [x] Correção aplicada: `recordTerminalExplicitEmptyOutput()` agora imprime:
+  - `Turno vazio · sem resposta pública materializada; nenhuma pergunta humana pendente`;
+  - `Próximo passo · /activity 40 · /events 60 · /byok health · reenvie ou troque modelo`.
+- [x] Correção aplicada: `/events` passa a resumir `deltaSlices/deltaChars` como
+      `deltas 0/0 caracteres`, preservando evidência útil para diagnosticar turno vazio.
+- [x] Correção de contrato textual: teste de engine atualizado para `Falha de provedor BYOK no
+      turno`, alinhado ao vocabulário em português já usado pela UX.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js src/copilot/terminal/dialog/engine.js`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
+  - `npx vitest run tests/unit/copilot/test_terminal_dialog_engine.spec.js --hookTimeout=30000`.
+  - `npx eslint src/copilot/terminal/dialog/engine.js src/copilot/terminal/commands/events.js tests/unit/copilot/test_terminal_dialog_engine.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [x] Correção aplicada: `dialog.empty_after_user_input` recebeu resumo próprio em `/events`,
+      incluindo `continuação pós-pergunta terminou sem texto público`, resposta humana quando
+      disponível e ação sugerida (`/activity 40 · /events 60 · reenviar ou trocar modelo`).
+- [x] Decisão UX: `requestId` continua oculto no `/events` padrão; aparece apenas nos modos com
+      IDs diagnósticos, preservando legibilidade para o operador humano.
+- [x] Teste unitário adicionado: `/events` renderiza `Continuação vazia` com resposta e ação, sem
+      expor `requestId` bruto por padrão.
+- [x] Validação focada:
+  - `node --check src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
+  - `npx eslint src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [ ] Próxima inspeção UX: revisar prompt longo enviado pelo harness/live, porque no PTY ele pode
+      aparecer sem o prefixo visual completo em logs plain quando `script` e repaint ANSI se
+      cruzam; separar artefato de captura de bug real no renderer.

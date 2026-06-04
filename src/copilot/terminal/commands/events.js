@@ -456,7 +456,13 @@ function summarizeEmptyTurnPayload(payload) {
     const actor = humanPayloadKind(payload['actor']);
     const sourceDetail = humanPayloadKind(payload['sourceDetail']);
     const assistantMessages = typeof payload['assistantMessageCount'] === 'number' ? payload['assistantMessageCount'] : null;
-    const deltaCount = typeof payload['deltaCount'] === 'number' ? payload['deltaCount'] : null;
+    const deltaCount =
+        typeof payload['deltaCount'] === 'number'
+            ? payload['deltaCount']
+            : typeof payload['deltaSlices'] === 'number'
+              ? payload['deltaSlices']
+              : null;
+    const deltaChars = typeof payload['deltaChars'] === 'number' ? payload['deltaChars'] : null;
     const pendingQuestion = payload['pendingQuestionKind']
         ? `pergunta pendente ${compact(humanPayloadKind(payload['pendingQuestionKind']), 40)}`
         : 'sem pergunta humana pendente';
@@ -464,7 +470,9 @@ function summarizeEmptyTurnPayload(payload) {
         actor ? `autor ${actor}` : null,
         sourceDetail ? `origem ${sourceDetail}` : null,
         assistantMessages != null ? `mensagens LLM-B ${assistantMessages}` : null,
-        deltaCount != null ? `deltas ${deltaCount}` : null,
+        deltaCount != null
+            ? `deltas ${deltaCount}${deltaChars != null ? `/${deltaChars} caracteres` : ''}`
+            : null,
         pendingQuestion,
     ]
         .filter(Boolean)
@@ -476,7 +484,27 @@ function summarizeEmptyTurnPayload(payload) {
  * @param {{ showIds?: boolean }} [opts]
  * @returns {string}
  */
+function summarizeEmptyAfterUserInputPayload(payload, opts = {}) {
+    const detail = typeof payload['detail'] === 'string' ? humanEventMessage(payload['detail']) : '';
+    const requestId = typeof payload['requestId'] === 'string' ? payload['requestId'] : '';
+    return [
+        detail ? compact(detail, 120) : 'continuação pós-pergunta terminou sem texto público',
+        opts.showIds && requestId ? `req ${compactTerminalDiagnosticId(requestId, 14)}` : null,
+        'ação /activity 40 · /events 60 · reenviar ou trocar modelo',
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {{ showIds?: boolean; event?: string }} [opts]
+ * @returns {string}
+ */
 function summarizePayload(payload, opts = {}) {
+    if (opts.event === 'dialog.empty_after_user_input') {
+        return summarizeEmptyAfterUserInputPayload(payload, opts);
+    }
     if (payload['byokEnabled'] === true || payload['handledAs'] || payload['errorContext']) {
         const agentErrorSummary = summarizeAgentErrorPayload(payload);
         if (agentErrorSummary) return agentErrorSummary;
@@ -749,6 +777,7 @@ export async function cmdEvents({ println }, arg = '') {
         const label = humanEventLabel(entry.event, entry.payload ?? {});
         const rawSummary = summarizePayload(entry.payload ?? {}, {
             showIds: showDiagnosticIds,
+            event: entry.event,
         });
         const summary = isRedundantEventSummary(label, rawSummary) ? '' : rawSummary;
         const transcriptHint = buildTranscriptExportHint(entry, { showIds: showDiagnosticIds });
