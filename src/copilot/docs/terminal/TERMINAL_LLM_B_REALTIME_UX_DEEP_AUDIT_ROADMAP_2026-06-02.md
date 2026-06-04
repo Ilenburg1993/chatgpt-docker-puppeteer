@@ -5028,3 +5028,26 @@
   - `npm run typecheck:strict:src.copilot`.
 - [ ] Próxima lacuna: avaliar se a agregação deve virar mais inteligente para pares
       `tool.lifecycle` + `terminal.activity` correlacionados, evitando sumir com informação útil.
+
+### 12.27 Prompt vivo de espera sem bracket técnico de modelo
+
+- [x] Auditoria visual: screenshots e PTY mostravam o prompt vivo com formato
+      `LLM-B pensando [kilo-auto/free/high]`, que é curto, mas parece metadado cru colado no
+      input humano e compete com o espaço de digitação.
+- [x] Decisão UX: o prompt vivo de espera é uma superfície humana, não um envelope técnico. O
+      modelo e o esforço continuam visíveis, mas como sufixo textual: `modelo ... · raciocínio
+      ...`. Tags operacionais como `[PERGUNTA]` continuam existindo porque indicam estado de
+      interação e não apenas diagnóstico interno.
+- [x] Implementação: `buildWaitingPrompt` substitui `[modelo/effort]` por
+      `· modelo <id> · raciocínio <effort>`, com truncamento explícito para preservar largura.
+- [x] Implementação: a fase interna do activity no prompt de espera passou por rótulo humano:
+      `turn` → `turno`, `streaming` → `respondendo`, `question` → `aguardando operador`,
+      `tool` → `ferramenta` etc.
+- [x] Testes unitários: `test_build_user_prompt.spec.js` bloqueia regressão para
+      `[gpt-5-mini/high]`, exige `modelo gpt-5-mini`, `raciocínio high` e `turno`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/dialog/output.js`.
+  - `npx eslint src/copilot/terminal/dialog/output.js tests/unit/copilot/terminal/test_build_user_prompt.spec.js`.
+  - `npx vitest run tests/unit/copilot/terminal/test_build_user_prompt.spec.js`.
+- [ ] Próxima lacuna: reabrir PTY live em cenário canônico para confirmar que o prompt vivo
+      mantém largura confortável durante `ask_user`, tools e deltas longos.

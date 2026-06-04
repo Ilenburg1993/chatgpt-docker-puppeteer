@@ -500,6 +500,25 @@ export function buildUserPrompt() {
 }
 
 /**
+ * @param {string} phase
+ * @returns {string}
+ */
+function renderWaitingPromptPhaseLabel(phase) {
+    if (phase === 'idle') return 'pronta';
+    if (phase === 'boot') return 'iniciando';
+    if (phase === 'turn') return 'turno';
+    if (phase === 'thinking') return 'pensando';
+    if (phase === 'streaming') return 'respondendo';
+    if (phase === 'tool') return 'ferramenta';
+    if (phase === 'task') return 'tarefa';
+    if (phase === 'compaction') return 'compactando';
+    if (phase === 'question') return 'aguardando operador';
+    if (phase === 'subagent') return 'subagente';
+    if (phase === 'error') return 'erro';
+    return phase || 'atividade';
+}
+
+/**
  * Constrói o prompt exibido enquanto o terminal está aguardando a resposta da LLM-B.
  *
  * @returns {string}
@@ -511,7 +530,7 @@ export function buildWaitingPrompt() {
     const activity = readTerminalActivitySnapshot();
     const runtime = readTerminalRuntimeState();
     const compactDetail = detailLevel === 'compact' || shouldUseCompactPromptLayout();
-    const phase = shortenPromptToken(activity.phase.toUpperCase(), 10);
+    const phase = shortenPromptToken(renderWaitingPromptPhaseLabel(activity.phase), 20);
     const label = shortenPromptToken(activity.label, 16);
     const sevRole = activity.severity === 'error' ? 'error' : activity.severity === 'warn' ? 'warn' : 'muted';
     /** @type {string[]} */
@@ -527,11 +546,14 @@ export function buildWaitingPrompt() {
     }
     if (runtime.pendingQuestionShadowState === 'expired') tags.push('SHDW:EXP');
     const tagsStr = tags.length > 0 ? ` ${terminalThemeText('muted', `[${tags.join('|')}]`)}` : '';
-    const modelEffort = `${terminalThemeText('muted', '[')}${terminalThemeText('assistant', model)}${terminalThemeText('muted', '/')}${terminalThemeText('thinking', reasoningEffort)}${terminalThemeText('muted', ']')}`;
+    const modelEffort = terminalThemeText(
+        'muted',
+        ` · modelo ${shortenPromptToken(model, 24)} · raciocínio ${shortenPromptToken(reasoningEffort, 12)}`,
+    );
     if (!promptPolicy.showWaitingActivity || compactDetail) {
-        return `${terminalThemeText('thinking', 'LLM-B pensando')}${tagsStr} ${modelEffort} `;
+        return `${terminalThemeText('thinking', 'LLM-B pensando')}${tagsStr}${modelEffort} `;
     }
-    return `${terminalThemeText(sevRole, `LLM-B pensando · ${phase.toLowerCase()} · ${label}`)}${tagsStr} ${modelEffort} `;
+    return `${terminalThemeText(sevRole, `LLM-B pensando · ${phase} · ${label}`)}${tagsStr}${modelEffort} `;
 }
 
 /** Separador visual entre turnos — 72 colunas. */

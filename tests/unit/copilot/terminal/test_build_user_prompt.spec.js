@@ -245,10 +245,14 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         const prompt = buildWaitingPrompt();
 
         expect(prompt).toContain('LLM-B pensando');
-        expect(prompt).toContain('TURN');
+        expect(prompt).toContain('turno');
+        expect(prompt).not.toContain('TURN');
         expect(prompt).toContain('Processando');
         expect(prompt).toContain('gpt-5-mini');
         expect(prompt).toContain('high');
+        expect(prompt).toContain('modelo gpt-5-mini');
+        expect(prompt).toContain('raciocínio high');
+        expect(prompt).not.toContain('[gpt-5-mini/high]');
         expect(prompt).not.toContain('⏳');
     });
 
@@ -264,6 +268,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).toContain('LLM-B pensando');
         expect(prompt).toContain('gpt-5-mini');
         expect(prompt).toContain('high');
+        expect(prompt).not.toContain('[gpt-5-mini/high]');
         expect(prompt).not.toContain('TURN');
         expect(prompt).not.toContain('Processando');
         expect(prompt).not.toContain('⏳');
@@ -311,6 +316,7 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).toContain('LLM-B pensando');
         expect(prompt).toContain('gpt-5-mini');
         expect(prompt).toContain('high');
+        expect(prompt).not.toContain('[gpt-5-mini/high]');
         expect(prompt).not.toContain('TURN');
         expect(prompt).not.toContain('Processando');
         expect(prompt).not.toContain('⏳');
