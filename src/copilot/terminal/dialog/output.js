@@ -95,6 +95,12 @@ const PROMPT_REDRAW_DEDUPE_MS = 250;
 const PROMPT_PARK_DEFAULT_MS = 8_000;
 
 /**
+ * @typedef {{
+ *     redrawPrompt?: boolean;
+ * }} TerminalPrintOptions
+ */
+
+/**
  * Quantidade de linhas reservadas para status acima do prompt (layout: [status...][prompt]).
  *
  * A UX antiga assumia exatamente 1 linha. Isso fazia textos longos sumirem, quebrarem o prompt ou ficarem
@@ -105,6 +111,7 @@ const PROMPT_PARK_DEFAULT_MS = 8_000;
  */
 let _statusRowsReserved = 0;
 let _terminalPromptParkedUntil = 0;
+let _terminalPromptRedrawSuppressedUntil = 0;
 
 /**
  * @param {string} value
@@ -178,6 +185,15 @@ function shouldUseInlineStatusOverlay() {
  */
 function shouldUseInlineStatus() {
     return resolveInlineStatusMode() !== INLINE_STATUS_MODE_OFF;
+}
+
+/**
+ * Quando a linha viva esta ativa, o estado da LLM-B deve viver na area reservada acima do prompt, nao no input.
+ *
+ * @returns {boolean}
+ */
+function shouldKeepHumanPromptWithInlineStatus() {
+    return process.stdout.isTTY === true && shouldUseInlineStatus();
 }
 
 /**
@@ -349,7 +365,7 @@ function reserveInlineStatusRows(rl, rows) {
     const missingRows = rows - _statusRowsReserved;
     clearTerminalLine();
     process.stdout.write('\n'.repeat(missingRows));
-    paintTerminalPrompt(rl, getBusy() ? buildWaitingPrompt() : buildUserPrompt());
+    paintTerminalPrompt(rl, buildUserPrompt());
     _statusRowsReserved = rows;
 }
 
@@ -617,13 +633,16 @@ function hasTerminalReadlineBufferedInput(rl) {
  * @returns {void}
  */
 export function parkTerminalPromptForContinuation(durationMs = PROMPT_PARK_DEFAULT_MS) {
-    _terminalPromptParkedUntil = Math.max(_terminalPromptParkedUntil, Date.now() + Math.max(0, durationMs));
+    const until = Date.now() + Math.max(0, durationMs);
+    _terminalPromptParkedUntil = Math.max(_terminalPromptParkedUntil, until);
+    _terminalPromptRedrawSuppressedUntil = Math.max(_terminalPromptRedrawSuppressedUntil, until);
 }
 
 /**
  * @returns {boolean}
  */
 function shouldUseParkedTerminalPrompt() {
+    if (shouldKeepHumanPromptWithInlineStatus()) return false;
     if (_terminalPromptParkedUntil <= 0) return false;
     if (Date.now() > _terminalPromptParkedUntil) {
         _terminalPromptParkedUntil = 0;
@@ -645,6 +664,21 @@ function shouldUseParkedTerminalPrompt() {
  */
 function resolvePromptForPaint(prompt) {
     return shouldUseParkedTerminalPrompt() ? buildWaitingPrompt() : prompt;
+}
+
+/**
+ * @param {TerminalPromptRedrawOptions} [options]
+ * @returns {boolean}
+ */
+function shouldSuppressPromptRedrawForContinuation(options = {}) {
+    if (options.force === true) return false;
+    if (!shouldKeepHumanPromptWithInlineStatus()) return false;
+    if (_terminalPromptRedrawSuppressedUntil <= 0) return false;
+    if (Date.now() > _terminalPromptRedrawSuppressedUntil) {
+        _terminalPromptRedrawSuppressedUntil = 0;
+        return false;
+    }
+    return !hasActiveHumanInputPromptState();
 }
 
 /**
@@ -812,6 +846,7 @@ export function redrawTerminalPrompt(rl, prompt = buildUserPrompt(), options = {
  */
 export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(), options = {}) {
     if (!isTerminalReadlineOpen(rl)) return;
+    if (shouldSuppressPromptRedrawForContinuation(options)) return;
     if (shouldDeferTerminalIdlePromptRedraw(options)) {
         queueDeferredTerminalIdlePromptRedraw(rl, prompt);
         return;
@@ -832,7 +867,8 @@ export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(
             const inputLine = /** @type {{ line?: string }} */ (rl).line;
             if (state.force !== true && typeof inputLine === 'string' && inputLine.length > 0) return;
             const nextPrompt = typeof state.prompt === 'function' ? state.prompt() : state.prompt;
-            redrawTerminalPrompt(rl, getBusy() ? buildWaitingPrompt() : nextPrompt, { force: state.force });
+            const prompt = getBusy() && !shouldKeepHumanPromptWithInlineStatus() ? buildWaitingPrompt() : nextPrompt;
+            redrawTerminalPrompt(rl, prompt, { force: state.force });
         }),
     };
     if (typeof state.immediate.unref === 'function') state.immediate.unref();
@@ -1002,10 +1038,11 @@ export const BOOT_PROMPT = LLM_B_BOOT_PROMPT ?? DEFAULT_BOOT_PROMPT;
  * Escreve linha no stdout preservando o estado do prompt.
  *
  * @param {string} text - Texto a exibir
+ * @param {TerminalPrintOptions} [options]
  * @returns {void}
  */
-export function println(text) {
-    printlnBlock([text]);
+export function println(text, options = {}) {
+    printlnBlock([text], options);
 }
 
 /**
@@ -1015,9 +1052,10 @@ export function println(text) {
  * redesenhado entre cada linha, reduz writes ANSI e deixa o histórico visual muito mais limpo.
  *
  * @param {string | string[]} lines
+ * @param {TerminalPrintOptions} [options]
  * @returns {void}
  */
-export function printlnBlock(lines) {
+export function printlnBlock(lines, options = {}) {
     const text = Array.isArray(lines) ? lines.join('\n') : lines;
     if (getRl()) {
         const useOverlay = shouldUseInlineStatusOverlay();
@@ -1034,7 +1072,9 @@ export function printlnBlock(lines) {
             process.stdout.write('\n');
         }
         _statusRowsReserved = useOverlay ? 1 : 0;
-        redrawPromptIfInteractive();
+        if (options.redrawPrompt !== false) {
+            redrawPromptIfInteractive();
+        }
         return;
     }
     process.stdout.write(`\r${text}\n`);
@@ -1144,6 +1184,7 @@ export function clearInlineStatus() {
 export function resetStatusRowState() {
     _statusRowsReserved = 0;
     _terminalPromptParkedUntil = 0;
+    _terminalPromptRedrawSuppressedUntil = 0;
     _terminalIdlePromptDeferredUntil = 0;
     _terminalIdlePromptDeferredRequest = null;
     if (_terminalIdlePromptDeferredTimer) {

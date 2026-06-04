@@ -6416,3 +6416,102 @@
 - [ ] Próxima frente UX: auditar `context.js`, `git.js`, `workspace-index.js` e rotas BYOK longas
       com ANSI manual, priorizando as que aparecem em lives ou no fluxo inicial antes do operador
       enviar prompts.
+
+### 12.49 Linha viva não é prompt de input
+
+- [x] Live canônica pós-humanização:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-terminal-ux-humanized-copy-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T06-54-46-066Z/summary.md`.
+  - Resultado geral: `Status: FAIL` apenas em `llm-usage-visible`; o SSE continha três eventos
+    `llm.usage` e a tela mostrou `Uso BYOK sem pedido premium`, portanto a falha era critério live
+    preso ao texto antigo `Premium Request`.
+  - Achado visual real: depois de `você[...] [PERG]› SIM`, o plain log mostrou linhas soltas
+    `LLM-B pensando` antes/depois de `Uso do modelo`, indicando que o prompt de input estava sendo
+    usado como superfície de status.
+- [x] Decisão UX: em TTY com linha viva ativa, busy/thinking/finalizing pertence à região reservada
+      acima do prompt. O prompt de input deve continuar humano (`você[...]›` ou `[PERG]›`) e nunca
+      virar uma linha independente `LLM-B pensando`. O fallback de prompt de espera permanece válido
+      apenas quando a linha viva está desligada ou indisponível.
+- [x] Correção aplicada: `dialog/output.js` ganhou a regra central
+      `shouldKeepHumanPromptWithInlineStatus()`. `reserveInlineStatusRows()` agora repinta prompt
+      humano ao reservar área de status, e `scheduleTerminalPromptRedraw()` só usa
+      `buildWaitingPrompt()` durante busy quando não há linha viva TTY ativa.
+- [x] Correção aplicada: `parkTerminalPromptForContinuation()` continua existindo para fallback sem
+      linha viva, mas não converte mais o prompt em `LLM-B pensando` quando a linha viva reservada
+      consegue mostrar o estado acima do input.
+- [x] Contrato live atualizado: `llm-usage-visible` aceita a cópia humanizada
+      `Uso BYOK sem pedido premium`/`Telemetria LLM sem pedido premium`; novo critério
+      `ux-live-status-not-input-prompt` bloqueia linhas standalone `LLM-B pensando`.
+- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` agora cobre os dois modos:
+      linha viva ativa preserva prompt humano; linha viva desligada preserva prompt de espera
+      estacionado como fallback.
+- [x] Validação escopada:
+  - `node --check src/copilot/terminal/dialog/output.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
+  - `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
+  - `node scripts/model-gateway/run.mjs llmBLiveTest --dry-run --live-scenario=canonical --out-dir=artifacts/terminal-live-dry/canonical-inline-human-prompt-20260604`.
+  - `npx eslint src/copilot/terminal/dialog/output.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
+- [x] Live canônica pós-linha-viva-humana:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-terminal-ux-inline-human-prompt-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T07-01-30-974Z/summary.md`.
+  - Resultado geral: `Status: FAIL` apenas em `no-prompt-double-render`.
+  - Sinais positivos: `llm-usage-visible`, `ux-live-status-not-input-prompt`,
+    `ask-user-input-prompt-visible`, export/SSE, `no-terminal-errors` e `clean-quit` passaram.
+  - Achado residual: após `Resposta enviada para pergunta pendente.`, o ACK durável repintava prompt
+    humano e, logo depois, a linha viva da continuação reservava status e repintava outro prompt
+    humano. O problema deixou de ser `LLM-B pensando` no input e virou competição entre dois
+    produtores legítimos de prompt.
+- [x] Correção aplicada: `println()`/`printlnBlock()` ganharam opção `{ redrawPrompt: false }`.
+      O ACK positivo de resposta humana usa essa opção, preservando a linha durável, mas deixando a
+      continuação da LLM-B repintar a superfície uma única vez pela linha viva.
+- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre bloco durável sem redraw de
+      prompt para handoff pós-resposta humana.
+- [x] Validação escopada:
+  - `node --check src/copilot/terminal/dialog/output.js src/copilot/terminal/repl/repl-lifecycle.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
+  - `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
+  - `npx eslint src/copilot/terminal/dialog/output.js src/copilot/terminal/repl/repl-lifecycle.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Tentativa bloqueada adicional:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-terminal-ux-no-prompt-double-after-answer-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T07-05-13-054Z/summary.md`.
+  - Resultado geral: `Status: BLOCKED` por `assistant-ended-before-ask`; o modelo materializou
+    deltas e voltou a idle sem chamar `ask_user`. Mesmo sem exercitar o pós-`SIM`, confirmou
+    `no-prompt-double-render` e `ux-live-status-not-input-prompt`.
+- [x] Tentativa bloqueada com silêncio prolongado:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-terminal-ux-no-prompt-double-after-answer-retry-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T07-06-25-402Z/summary.md`.
+  - Resultado geral: `Status: BLOCKED` por `assistant-ended-before-ask`, mas o runner ficou
+    silencioso até o timeout e não coletou export/diagnósticos completos.
+  - Achado de harness/UX: o diagnóstico de “deltas concluídos, ask obrigatório ausente” dependia
+    de detectar prompt final por regex; em alguns PTYs a linha de prompt não fica no formato exato
+    do regex, então o scheduler nunca arma.
+- [x] Correção aplicada no runner: `scheduleMissingRequiredAskDiagnostics()` passa a ser acionado
+      pelo próprio fim semântico do turno (`DELTA-CANONICAL-8` + retorno/assistant.message), sem
+      exigir `hasReturnedToReplPrompt()`. O pacote de diagnóstico ganhou `/tools diag` e
+      `/health full`, além de `/activity`, `/events`, `/errors` e `/export`.
+- [x] Validação escopada:
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Tentativa de cenário `invalid-choice` para exercitar handoff pós-resposta:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=invalid-choice --label live-terminal-ux-invalid-choice-no-prompt-double-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T07-12-41-882Z/summary.md`.
+  - Resultado geral: interrompido após detectar bug do harness; quando a primeira resposta
+    intermediária era aceita pelo SDK como freeform e o modelo reabria a pergunta, o runner não
+    enviava o segundo passo porque esperava apenas texto local de `invalid_choice`.
+- [x] Correção aplicada no runner: cenários multi-step agora guardam o offset de cada resposta
+      enviada. Se a mesma pergunta reaparece depois de uma resposta intermediária e o prompt
+      `[PERG]›` está visível, o runner envia o próximo passo. O critério
+      `ask-user-invalid-choice-feedback` também aceita reabertura da pergunta depois da resposta
+      inválida como evidência de recuperação quando a rejeição local não ocorre.
+- [x] Validação escopada:
+  - `node --check src/copilot/terminal/dialog/output.js src/copilot/terminal/repl/repl-lifecycle.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
+  - `npx eslint src/copilot/terminal/dialog/output.js src/copilot/terminal/repl/repl-lifecycle.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Tentativa `invalid-choice` pós-runner multi-step:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=invalid-choice --label live-terminal-ux-invalid-choice-no-prompt-double-retry-20260604 --timeout-ms 240000`.
+  - Artefato: `artifacts/terminal-live/2026-06-04T07-16-42-720Z/summary.md`.
+  - Resultado geral: `Status: BLOCKED` por `assistant-empty-turn`; o provider BYOK cancelou o
+    turno antes de materializar `ask_user`/final. O bloqueio impediu validação do handoff
+    pós-resposta, mas o terminal exibiu erro BYOK compacto, sem janela de permissão e sem spam de
+    espera.
+- [ ] Próxima live obrigatória: repetir cenário canônico com PTY para confirmar que
+      `ux-live-status-not-input-prompt`, `llm-usage-visible`, `no-prompt-double-render`,
+      `ask-user-input-prompt-visible`, export/SSE e `clean-quit` passam juntos.

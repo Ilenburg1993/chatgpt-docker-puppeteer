@@ -145,6 +145,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
             pendingAnswer.ok
                 ? `\n${terminalThemeRow('Resposta', `enviada para pergunta pendente${runtimeSuffix}.`, { role: 'success' })}`
                 : `\n${terminalThemeRow('Resposta', `falhou ao responder pergunta pendente${runtimeSuffix}.`, { role: 'error' })}`,
+            { redrawPrompt: pendingAnswer.ok !== true },
         );
     }
 

@@ -3967,8 +3967,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                       pass:
                           /Resposta não corresponde às opções da pergunta pendente/i.test(plain) ||
                           /Resposta inválida para a pergunta pendente/i.test(plain) ||
-                          /invalid_choice/i.test(plain),
-                      detail: 'choice-only scenario rejected invalid answer before accepting the valid choice',
+                          /invalid_choice/i.test(plain) ||
+                          new RegExp(
+                              `${escapeRegExp(scenario.answerSteps[0]?.answer ?? '')}[\\s\\S]{0,2400}${escapeRegExp(scenario.askQuestion)}`,
+                              'iu',
+                          ).test(plain),
+                      detail:
+                          'choice-only scenario rejected the invalid answer locally or re-opened the question before accepting the valid choice',
                   },
               ]
             : []),
@@ -4017,7 +4022,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'llm-usage-visible',
             pass:
                 /Uso BYOK sem Premium Request/.test(plain) ||
+                /Uso BYOK sem pedido premium/.test(plain) ||
                 /Telemetria LLM sem Premium Request/.test(plain) ||
+                /Telemetria LLM sem pedido premium/.test(plain) ||
                 /Última telemetria LLM/.test(plain) ||
                 /Premium Request classificada/.test(plain),
             detail: 'llm.usage telemetry surfaced separately from PR',
@@ -4260,6 +4267,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-no-raw-hourglass-waiting-prompt',
             pass: !/⏳\s+\[[^\]]+\]/u.test(plain),
             detail: 'waiting prompt avoided the old raw hourglass model/effort tag',
+        },
+        {
+            id: 'ux-live-status-not-input-prompt',
+            pass: !/^\s*LLM-B pensando\s*$/imu.test(plain),
+            detail: 'live status stayed above the input instead of becoming a standalone prompt line',
         },
         {
             id: 'ux-health-human-tool-stats',
@@ -5546,6 +5558,7 @@ async function main() {
     let sseCollector = null;
     let postAskContinuationObserved = false;
     let answerPlainOffset = 0;
+    let lastAnswerStepPlainOffset = 0;
     let postAnswerCommandTimer = null;
     let timedOut = false;
     /** @type {string[]} */
@@ -5713,8 +5726,16 @@ async function main() {
             console.warn(
                 '[terminal-live] cenário canônico: deltas públicos concluídos, mas ask_user obrigatório não apareceu; coletando diagnósticos.',
             );
-            const diagnostics = ['/activity 40', '/events 60', '/events 100 --raw', '/errors 10', `/export ${exportArg}`];
-            sendCommandSequence(write, diagnostics, { delayMs: 450 });
+            const diagnostics = [
+                '/activity 40',
+                '/tools diag',
+                '/events 60',
+                '/events 100 --raw',
+                '/errors 10',
+                '/health full',
+                `/export ${exportArg}`,
+            ];
+            sendCommandSequence(write, diagnostics, { delayMs: 550 });
             setTimeout(
                 () => {
                     if (!quitSent) {
@@ -5723,7 +5744,7 @@ async function main() {
                         write('/quit');
                     }
                 },
-                diagnostics.length * 450 + 2_000,
+                diagnostics.length * 550 + 2_000,
             ).unref();
         }, DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS);
         missingRequiredAskDiagnosticTimer.unref();
@@ -5734,6 +5755,7 @@ async function main() {
         if (!step) return;
         answerSequenceStarted = true;
         answerStepIndex += 1;
+        lastAnswerStepPlainOffset = plain.length;
         const isFinalAnswer = answerStepIndex >= liveScenario.answerSteps.length;
         if (isFinalAnswer) {
             answerSent = true;
@@ -5850,6 +5872,17 @@ async function main() {
         ) {
             sendScenarioAnswerStep(plain, liveScenario.answerSteps[answerStepIndex]);
         }
+        const afterLastAnswerStepPlain = lastAnswerStepPlainOffset > 0 ? plain.slice(lastAnswerStepPlainOffset) : '';
+        if (
+            answerSequenceStarted &&
+            !answerSent &&
+            answerStepIndex > 0 &&
+            answerStepIndex < liveScenario.answerSteps.length &&
+            liveScenario.askRenderedRe.test(afterLastAnswerStepPlain) &&
+            hasHumanQuestionInputPrompt(afterLastAnswerStepPlain)
+        ) {
+            sendScenarioAnswerStep(plain, liveScenario.answerSteps[answerStepIndex]);
+        }
         const afterAnswerPlain = answerSent ? plain.slice(answerPlainOffset) : '';
         if (answerSent && !postAskContinuationObserved && liveScenario.postAskFinalRe.test(afterAnswerPlain)) {
             postAskContinuationObserved = true;
@@ -5878,8 +5911,7 @@ async function main() {
             scenarioSent &&
             !answerSent &&
             !postCommandsSent &&
-            findAssistantEndedBeforeRequiredAsk(scenarioTailPlain, liveScenario) &&
-            hasReturnedToReplPrompt(plain, scenarioPlainOffset)
+            findAssistantEndedBeforeRequiredAsk(scenarioTailPlain, liveScenario)
         ) {
             scheduleMissingRequiredAskDiagnostics();
         }

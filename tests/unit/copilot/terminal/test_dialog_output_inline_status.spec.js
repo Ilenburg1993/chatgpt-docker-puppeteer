@@ -255,8 +255,31 @@ describe('terminal/dialog/output inline status', () => {
 
         writeInlineStatus('LLM-B finalizando · 1s');
 
+        expect(mocks.rl.setPrompt).toHaveBeenCalledWith(expect.stringContaining('você'));
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalledWith(expect.stringContaining('LLM-B pensando'));
+    });
+
+    it('suprime redraw normal durante handoff pós-resposta quando linha viva esta ativa', async () => {
+        parkTerminalPromptForContinuation(1_000);
+
+        scheduleTerminalPromptRedraw(mocks.rl, 'você› ');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+
+        writeInlineStatus('LLM-B finalizando · 1s');
+
+        expect(mocks.rl.setPrompt).toHaveBeenCalledTimes(1);
+        expect(mocks.rl.setPrompt).toHaveBeenCalledWith(expect.stringContaining('você'));
+    });
+
+    it('usa prompt de espera estacionado apenas quando linha viva esta desligada', () => {
+        process.env['COPILOT_TERMINAL_INLINE_STATUS'] = 'off';
+        parkTerminalPromptForContinuation(1_000);
+
+        redrawTerminalPrompt(mocks.rl, 'você› ');
+
         expect(mocks.rl.setPrompt).toHaveBeenCalledWith(expect.stringContaining('LLM-B pensando'));
-        expect(mocks.rl.setPrompt).not.toHaveBeenCalledWith('você› ');
     });
 
     it('não repinta prompt em printlnBlock enquanto render lock está ativo', () => {
@@ -269,6 +292,15 @@ describe('terminal/dialog/output inline status', () => {
 
         const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
         expect(output).toContain('linha permanente durante streaming');
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+        expect(mocks.rl.prompt).not.toHaveBeenCalled();
+    });
+
+    it('permite bloco durável sem redraw de prompt para handoff pós-resposta humana', () => {
+        printlnBlock(['Resposta enviada para pergunta pendente.'], { redrawPrompt: false });
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('Resposta enviada para pergunta pendente.');
         expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
         expect(mocks.rl.prompt).not.toHaveBeenCalled();
     });
