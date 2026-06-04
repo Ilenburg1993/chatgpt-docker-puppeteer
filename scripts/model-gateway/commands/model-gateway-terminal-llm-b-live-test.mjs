@@ -2161,26 +2161,27 @@ function diagnosticUxCycleCriteria(boot) {
             pass:
                 /Sessão SDK[\s\S]*(Sessões SDK listadas|nenhuma sessão SDK listada)/iu.test(sdkInventorySurface) &&
                 /Última usada|Primeiro plano/iu.test(sdkInventorySurface) &&
+                /Vínculo SDK/iu.test(sdkInventorySurface) &&
                 /Comandos[\s\S]*\/session sdk controla sessões SDK[\s\S]*\/restart reinicia só a conversa[\s\S]*Próximo boot[\s\S]*\/session sdk next new[\s\S]*Filtros[\s\S]*offset=<n>/iu.test(
                     sdkInventorySurface,
                 ) &&
                 (!/Tempo/iu.test(sdkInventorySurface) || (hasIsoSeconds(sdkInventorySurface) && hasRelativeAge(sdkInventorySurface))) &&
-                !/\/session sdk controla sessão SDK;|\/session sdk next new \||Foreground|probe-residue|\blast\b|\bforeground\b|operator-next-boot|sdk-resume-fallback|provider-boundary|\bsdk-(?:current|old|probe|new|last|second)\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
+                !/Vínculo BYOK\s+BYOK|\/session sdk controla sessão SDK;|\/session sdk next new \||Foreground|probe-residue|\blast\b|\bforeground\b|operator-next-boot|sdk-resume-fallback|provider-boundary|\bsdk-(?:current|old|probe|new|last|second)\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     sdkInventorySurface,
                 ),
-            detail: '/session sdk default rendered inventory and command help as compact multiline human blocks without raw ids or English flags',
+            detail: '/session sdk default rendered inventory, BYOK binding and command help as compact multiline human blocks without duplicate BYOK labels, raw ids or English flags',
         },
         {
             id: 'diagnostic-ux-sdk-status-human',
             pass:
-                /SDK do Terminal[\s\S]*Sessão\s+sessão ativa/iu.test(sdkStatusSurface) &&
+                /SDK do Terminal\s+·\s+principal[\s\S]*Sessão\s+sessão ativa/iu.test(sdkStatusSurface) &&
                 /Uso[\s\S]*\/sdk models · \/sdk tools[\s\S]*\/sdk skills[\s\S]*\/sdk quota · \/sdk waits[\s\S]*\/sdk headers[\s\S]*\/sdk simulate request-user-input/iu.test(
                     sdkStatusSurface,
                 ) &&
-                !/\d{4}-\d{2}-\d{2}T|\bsdk-[a-z0-9_-]+\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|reasoning=|restante=|\/sdk models \| \/sdk skills/iu.test(
+                !/SDK do Terminal\s+·\s+default|\d{4}-\d{2}-\d{2}T|\bsdk-[a-z0-9_-]+\b|copilot_sdk_entitlement|premium_interactions|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|reasoning=|restante=|\/sdk models \| \/sdk skills/iu.test(
                     sdkStatusSurface,
                 ),
-            detail: '/sdk status rendered session presence, quota/status and compact multiline command help without raw ids or key=value diagnostics',
+            detail: '/sdk status rendered principal runtime, session presence, quota/status and compact multiline command help without raw ids, raw quota scopes or key=value diagnostics',
         },
         {
             id: 'diagnostic-ux-permission-human',

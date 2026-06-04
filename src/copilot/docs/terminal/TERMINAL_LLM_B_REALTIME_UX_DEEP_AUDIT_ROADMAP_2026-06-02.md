@@ -4819,3 +4819,48 @@
 - [ ] Próxima lacuna: `/session sdk`, `/status full` e `/sdk status` ainda precisam de auditoria
       visual semelhante, especialmente títulos como `default`, rotas `local-fs-primary`, campos
       `offset=` e nomes internos de binding BYOK.
+
+### 12.21 Sessão SDK, status detalhado e quota sem nomes crus
+
+- [x] Auditoria live: `/session sdk 6` melhorou em relação aos primeiros screenshots, mas ainda
+      mostrava `Vínculo BYOK BYOK`, duplicando o domínio no rótulo e no valor.
+- [x] Auditoria live: `/sdk status` ainda abria com `SDK do Terminal · default`, mostrava
+      `escopo copilot_sdk_entitlement` e expunha `premium_interactions` como nome de quota.
+- [x] Auditoria de código: `/status full` ainda renderizava `Runtime alvo default`,
+      `Mapa runtime *default:model/status`, `Rota SDK/FS local-fs-primary · ready`,
+      `L2 off` e `índice ativo:<n>` em uma superfície humana.
+- [x] Decisão UX: `default`, `local-fs-primary`, `copilot_sdk_entitlement`,
+      `premium_interactions`, separadores técnicos e flags compactas continuam válidos como
+      contrato interno, mas devem ser traduzidos nas telas de operador.
+- [x] Implementação: `runtime-target.js` ganhou `renderRuntimeTargetLabel`, tornando `default` →
+      `principal` uma regra central para comandos do terminal.
+- [x] Implementação: `/status full` passou a humanizar runtime alvo, mapa runtime, rota SDK/FS e
+      contexto I/O:
+  - `*default:gpt-5-mini/idle` → `ativo principal · gpt-5-mini · ocioso`;
+  - `local-fs-primary · ready` → `arquivos locais primeiro · FS local canônico disponível...`;
+  - `off` → `inativo`;
+  - `índice ativo:<n>` → `índice <n> arquivo(s)`.
+- [x] Implementação: `/session sdk` trocou o rótulo `Vínculo BYOK` por `Vínculo SDK`, removendo
+      a duplicação visual quando o valor começa com `BYOK`.
+- [x] Implementação: `/sdk status` agora usa `principal` no título e traduz escopo/quotas:
+  - `copilot_sdk_entitlement` → `entitlement do SDK`;
+  - `premium_interactions` → `Premium Requests`.
+- [x] Harness live reforçado:
+  - `diagnostic-ux-session-sdk-inventory-human` exige `Vínculo SDK` e bloqueia
+        `Vínculo BYOK BYOK`;
+  - `diagnostic-ux-sdk-status-human` exige `SDK do Terminal · principal` e bloqueia `default`,
+        `copilot_sdk_entitlement` e `premium_interactions`.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/session.js`.
+  - `node --check src/copilot/terminal/commands/sdk.js`.
+  - `node --check src/copilot/terminal/commands/runtime-target.js`.
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx eslint src/copilot/terminal/commands/session.js src/copilot/terminal/commands/sdk.js src/copilot/terminal/commands/runtime-target.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js --testNamePattern "cmdStatus full|cmdSessionSdk expõe|/sdk status|/sdk quota"`.
+- [x] Live PTY diagnóstica passou:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-sdk-quota-labels-20260603-2230`.
+  - Resultado observado: `/session sdk 6` exibiu `Vínculo SDK`; `/sdk status` exibiu
+        `SDK do Terminal · principal` e `Premium Requests · ... · escopo entitlement do SDK`.
+- [ ] Próxima lacuna: `/health full` ainda mostra `Lifecycle mx boot sdk-preflight`, e os
+      previews Markdown via `glow` ainda podem emitir sequências ANSI estranhas em PTY
+      (`ESC[;;1m`). Investigar sanitização/fallback antes de expandir mais o uso de libs.

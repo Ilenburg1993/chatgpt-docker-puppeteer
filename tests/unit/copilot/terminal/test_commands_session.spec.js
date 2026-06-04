@@ -466,8 +466,10 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('pergunta restaurada expirada');
         expect(ctx.output()).toContain('Perfil modelo');
         expect(ctx.output()).toContain('Runtime alvo');
+        expect(ctx.output()).toContain('Runtime alvo principal');
         expect(ctx.output()).not.toContain('runtime id');
-        expect(ctx.output()).toContain('*default:gpt-5-mini/idle');
+        expect(ctx.output()).toContain('ativo principal · gpt-5-mini · ocioso');
+        expect(ctx.output()).not.toContain('*default:gpt-5-mini/idle');
         expect(ctx.output()).toContain('Billing/modelo');
         expect(ctx.output()).toContain('Último PR');
         expect(ctx.output()).toContain('Prompt digest');
@@ -478,6 +480,10 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('Instruções');
         expect(ctx.output()).not.toContain('instr. load');
         expect(ctx.output()).toContain('Rota SDK/FS');
+        expect(ctx.output()).toContain('rota degradada');
+        expect(ctx.output()).not.toContain('local-fs-primary');
+        expect(ctx.output()).not.toContain('off · entradas');
+        expect(ctx.output()).not.toContain('índice ativo:');
         expect(ctx.output()).not.toContain('sdk↔fs route');
         expect(ctx.output()).toContain('Coleta ctx');
         expect(ctx.output()).toContain('/sdk doctor');
@@ -1051,7 +1057,8 @@ describe('commands/session — async commands', () => {
         });
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '');
-        expect(ctx.output()).toContain('Vínculo BYOK');
+        expect(ctx.output()).toContain('Vínculo SDK');
+        expect(ctx.output()).not.toContain('Vínculo BYOK BYOK');
         expect(ctx.output()).toContain('BYOK · perfil groq-free');
         expect(ctx.output()).toContain('BYOK pronto');
         expect(ctx.output()).toContain('Limite BYOK');

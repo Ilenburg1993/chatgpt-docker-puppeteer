@@ -37,7 +37,7 @@ import {
     shouldConsumeTerminalPendingAnswerInput,
     tryAnswerTerminalPendingQuestionInput,
 } from '../state/repl-runtime/index.js';
-import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
+import { callWithRuntimeTarget, extractRuntimeTarget, renderRuntimeTargetLabel, withRuntimeTarget } from './runtime-target.js';
 import {
     classifyTerminalByokSdkBinding,
     renderTerminalSdkProviderBinding,
@@ -199,6 +199,64 @@ function renderTerminalTimelineReconciliationLabel(value) {
     if (status === 'pending') return 'pendente';
     if (status === 'persistent_only') return 'histórico persistido';
     return status.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTerminalRuntimeTopologyLabel(value) {
+    return String(value ?? '')
+        .split(/\s+•\s+|\s*\|\s*/u)
+        .filter(Boolean)
+        .map((entry) => {
+            const marker = entry.startsWith('*') ? 'ativo ' : '';
+            const clean = entry.replace(/^\*/u, '');
+            const match = clean.match(/^([^:]+):([^/]+)\/(.+)$/u);
+            if (!match) return `${marker}${renderRuntimeTargetLabel(clean)}`.trim();
+            const [, runtime, model, status] = match;
+            return `${marker}${renderRuntimeTargetLabel(runtime)} · ${model} · ${renderHumanTerminalStatus(status)}`.trim();
+        })
+        .join(' · ');
+}
+
+/**
+ * @param {{ mode: unknown; reason?: unknown }} routing
+ * @returns {string}
+ */
+function renderTerminalSdkFsRoutingLine(routing) {
+    const mode = String(routing.mode ?? '').trim();
+    const reason = String(routing.reason ?? '').trim();
+    const modeLabel =
+        mode === 'local-fs-primary'
+            ? 'arquivos locais primeiro'
+            : mode === 'sdk-workspace-only'
+              ? 'workspace SDK temporário'
+              : mode === 'degraded'
+                ? 'rota degradada'
+                : mode.replace(/[._-]+/gu, ' ') || 'n/d';
+    const reasonLabel =
+        reason === 'ready'
+            ? 'FS local canônico disponível; workspace SDK fica como superfície auxiliar'
+            : reason.replace(/[._-]+/gu, ' ') || 'sem motivo registrado';
+    return `${modeLabel} · ${reasonLabel}`;
+}
+
+/**
+ * @param {{ cache: { l1: Record<string, unknown>; l2: Record<string, unknown>; aggregate: Record<string, unknown> }; index?: unknown; scopes: { active: number }; parser: { size: number; maxSize: number } }} ioRuntime
+ * @returns {{ cache: string; scope: string }}
+ */
+function renderTerminalIoStatusLines(ioRuntime) {
+    const ioHitRatio = Number(ioRuntime.cache.aggregate['hitRatio'] || 0);
+    const hitPercent = Number.isFinite(ioHitRatio) ? `${Math.round(ioHitRatio * 100)}%` : '-';
+    const ioL1 = ioRuntime.cache.l1;
+    const ioL2 = ioRuntime.cache.l2;
+    const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
+    const indexFiles = Number(ioIndex['files'] ?? 0);
+    return {
+        cache: `L1 ${ioL1['enabled'] ? 'ativo' : 'inativo'} · entradas ${ioL1['size'] ?? 0} · bytes ${ioL1['bytesStored'] ?? 0} · L2 ${ioL2['enabled'] ? 'ativo' : 'inativo'} · entradas ${ioL2['size'] ?? 0} · acerto ${hitPercent}`,
+        scope: `escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize} · índice ${ioIndex['available'] ? `${indexFiles} arquivo(s)` : 'vazio'}`,
+    };
 }
 
 /**
@@ -474,9 +532,7 @@ function renderLiveSdkMode(mode) {
  * @returns {string}
  */
 function renderLiveRuntimeTarget(value) {
-    const runtimeId = String(value ?? '').trim();
-    if (!runtimeId || runtimeId === 'default') return 'principal';
-    return runtimeId.replace(/[._-]+/gu, ' ');
+    return renderRuntimeTargetLabel(value);
 }
 
 /**
@@ -744,12 +800,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         instructionLoad,
     });
     const ioRuntime = projection.ioRuntime;
-    const ioHitRatio = Number(ioRuntime.cache.aggregate.hitRatio || 0).toFixed(3);
-    const ioL1 = ioRuntime.cache.l1;
-    const ioL2 = ioRuntime.cache.l2;
-    const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
-    const ioCacheLine = `L1 ${ioL1['enabled'] ? 'ativo' : 'off'} · entradas ${ioL1['size'] ?? 0} · bytes ${ioL1['bytesStored'] ?? 0} · L2 ${ioL2['enabled'] ? 'ativo' : 'off'} · entradas ${ioL2['size'] ?? 0} · acerto ${ioHitRatio}`;
-    const ioScopeLine = `escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize} · índice ${ioIndex['available'] ? 'ativo' : 'vazio'}:${ioIndex['files'] ?? 0}`;
+    const ioLines = renderTerminalIoStatusLines(ioRuntime);
     const agentSelection = getEffectiveSdkAgentSelection();
     const customAgentsLine = agentSelection.enabled.length
         ? `${agentSelection.enabled.join(', ')}${agentSelection.disabled.length ? ` · desativados ${agentSelection.disabled.join(', ')}` : ''}`
@@ -778,9 +829,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     println(terminalThemeRow('Alertas', String(Array.isArray(health?.['issues']) ? health['issues'].length : 0)));
     println(terminalThemeRow('Próximo passo', renderTerminalActionLabel(projection.recommendedAction), { role: 'command' }));
     println(terminalThemeRow('Sessão runtime', projection.runtimeSessionId ?? 'sem runtime'));
-    println(terminalThemeRow('Runtime alvo', projection.runtimeId));
+    println(terminalThemeRow('Runtime alvo', renderRuntimeTargetLabel(projection.runtimeId)));
     println(terminalThemeRow('Perfil runtime', projection.agentProfileId ?? 'sem perfil'));
-    println(terminalThemeRow('Mapa runtime', projection.runtimeTopologyLabel));
+    println(terminalThemeRow('Mapa runtime', renderTerminalRuntimeTopologyLabel(projection.runtimeTopologyLabel)));
     println(
         terminalThemeRow(
             'Timeline',
@@ -809,10 +860,10 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             `${instructionLoad.liveReloadMechanism} · seções ${instructionLoad.sectionCount} · seções ausentes ${instructionLoad.sectionsMissingFileCount} · anexos ausentes ${instructionLoad.appendFileMissingCount} · fontes RPC ${instructionLoad.sdkSupportsInstructionSourcesRpc ? 'sim' : 'não'}`,
         ),
     );
-    println(terminalThemeRow('Rota SDK/FS', `${sdkFsRouting.mode} · ${sdkFsRouting.reason}`));
+    println(terminalThemeRow('Rota SDK/FS', renderTerminalSdkFsRoutingLine(sdkFsRouting)));
     println(terminalThemeRow('Agentes extras', `perfil ${COPILOT_OPERATIONAL_PROFILE} · ${customAgentsLine}`));
-    println(terminalThemeRow('I/O cache', ioCacheLine));
-    println(terminalThemeRow('I/O scope', ioScopeLine));
+    println(terminalThemeRow('I/O cache', ioLines.cache));
+    println(terminalThemeRow('I/O scope', ioLines.scope));
     println(terminalThemeRow('Sessão SDK', renderTerminalSdkSessionPresence(projection.sdkSessionId)));
     println(terminalThemeRow('Sessão hub', projection.hubSessionId ?? 'sem hub'));
     println(
@@ -973,10 +1024,12 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         );
     }
     if (projection.usedDefaultRuntimeFallback) {
+        const requestedRuntimeLabel =
+            projection.requestedRuntimeId == null ? 'desconhecido' : renderRuntimeTargetLabel(projection.requestedRuntimeId);
         println(
             terminalThemeRow(
                 'Nota',
-                `runtime solicitado ${projection.requestedRuntimeId ?? 'desconhecido'} não encontrado; usando runtime default (${projection.runtimeId}).`,
+                `runtime solicitado ${requestedRuntimeLabel} não encontrado; usando runtime principal (${renderRuntimeTargetLabel(projection.runtimeId)}).`,
                 { role: 'warn' },
             ),
         );
@@ -2356,7 +2409,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
         inventory.persistedByokBinding,
         inventory.currentSessionId,
     );
-    println(terminalThemeRow('Vínculo BYOK', renderTerminalSdkProviderBinding(inventory.persistedByokBinding)));
+    println(terminalThemeRow('Vínculo SDK', renderTerminalSdkProviderBinding(inventory.persistedByokBinding)));
     println(terminalThemeRow('BYOK pronto', byokBinding.preparedLabel));
     println(terminalThemeRow('Limite BYOK', byokBinding.headline));
     if (byokBinding.action) {

@@ -79,7 +79,7 @@ import {
     terminalThemeRows,
     terminalThemeText,
 } from '../state/ui/index.js';
-import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
+import { callWithRuntimeTarget, extractRuntimeTarget, renderRuntimeTargetLabel } from './runtime-target.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} CommandContext
@@ -184,6 +184,30 @@ function renderSdkQuotaResetLabel(value) {
     const now = Date.now();
     const relative = formatTerminalRelativeAge(parsed, now);
     return parsed >= now ? `em ${relative.replace(/^há\s+/u, '')}` : relative;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkQuotaScopeLabel(value) {
+    const scope = String(value ?? '').trim();
+    if (scope === 'copilot_sdk_entitlement') return 'entitlement do SDK';
+    if (scope === 'copilot_chat') return 'chat Copilot';
+    if (scope === 'premium_interactions') return 'Premium Requests';
+    return scope.replace(/[._-]+/gu, ' ') || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkQuotaIdLabel(value) {
+    const quotaId = String(value ?? '').trim();
+    if (quotaId === 'premium_interactions') return 'Premium Requests';
+    if (quotaId === 'completions') return 'completions';
+    if (quotaId === 'chat') return 'chat';
+    return quotaId.replace(/[._-]+/gu, ' ') || 'quota';
 }
 
 /**
@@ -1141,7 +1165,7 @@ export async function cmdSdk({ println }, arg = '') {
             const userInputSummary = readTerminalUserInputSummary({ runtimeId: state.runtimeId });
             const structuredInputPending = getTerminalPendingStructuredUserInputCount();
             println('');
-            println(terminalThemeHeadline('accent', 'SDK do Terminal', [state.runtimeId]));
+            println(terminalThemeHeadline('accent', 'SDK do Terminal', [renderRuntimeTargetLabel(state.runtimeId)]));
             println(terminalThemeDivider(58));
             println(terminalThemeRow('Sessão', renderSdkSessionPresence(state.sessionId)));
             println(
@@ -1655,10 +1679,11 @@ async function renderSdkQuota({ println }, runtimeId, opts = {}) {
     }
     for (const row of quotaSummary.rows) {
         const pct = row.remainingPercentage === null ? '?' : `${row.remainingPercentage.toFixed(1)}%`;
+        const quotaLabel = renderSdkQuotaIdLabel(row.quotaId);
         println(
             terminalThemeRow(
-                opts.compact ? 'Quota' : row.quotaId,
-                `${opts.compact ? `${row.quotaId} · ` : ''}${pct} restante · reset ${renderSdkQuotaResetLabel(row.resetAt)} · escopo ${row.scope}`,
+                opts.compact ? 'Quota' : quotaLabel,
+                `${opts.compact ? `${quotaLabel} · ` : ''}${pct} restante · reset ${renderSdkQuotaResetLabel(row.resetAt)} · escopo ${renderSdkQuotaScopeLabel(row.scope)}`,
                 { role },
             ),
         );

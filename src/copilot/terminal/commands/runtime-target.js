@@ -60,6 +60,19 @@ export function hasRuntimeTarget(runtimeId) {
 }
 
 /**
+ * Rótulo humano para superfícies de operador. O contrato interno continua usando
+ * `default`; a tela humana chama esse runtime de `principal`.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function renderRuntimeTargetLabel(value) {
+    const runtimeId = String(value ?? '').trim();
+    if (!runtimeId || runtimeId === 'default') return 'principal';
+    return runtimeId.replace(/[._-]+/gu, ' ');
+}
+
+/**
  * Invoca uma função runtime-aware sem vazar `null` como segundo argumento opcional.
  *
  * @template {(...args: any[]) => any} T

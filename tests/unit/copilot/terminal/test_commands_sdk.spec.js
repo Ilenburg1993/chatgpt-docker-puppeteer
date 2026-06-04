@@ -244,6 +244,8 @@ describe('terminal/commands/sdk', () => {
         const ctx = mockCtx();
         await cmdSdk({ println: ctx.println }, 'status');
         expect(ctx.output()).toContain('SDK do Terminal');
+        expect(ctx.output()).toContain('principal');
+        expect(ctx.output()).not.toContain('SDK do Terminal  ·  default');
         expect(ctx.output()).toContain('sessão ativa');
         expect(ctx.output()).not.toContain('sdk-1');
         expect(ctx.output()).toContain('chat');
@@ -255,6 +257,8 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).not.toContain('pergunta=0');
         expect(ctx.output()).not.toContain('reasoning=');
         expect(ctx.output()).not.toContain('restante=');
+        expect(ctx.output()).not.toContain('copilot_sdk_entitlement');
+        expect(ctx.output()).not.toContain('premium_interactions');
         expect(ctx.output()).not.toContain('2026-05-01');
     });
 
@@ -265,9 +269,11 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('91.0%');
         expect(ctx.output()).toContain('restante · reset');
         expect(ctx.output()).toContain('escopo');
+        expect(ctx.output()).toContain('entitlement do SDK');
         expect(ctx.output()).not.toContain('restante=');
         expect(ctx.output()).not.toContain('reset=');
         expect(ctx.output()).not.toContain('escopo=');
+        expect(ctx.output()).not.toContain('copilot_sdk_entitlement');
         expect(ctx.output()).not.toContain('2026-05-01');
     });
 
