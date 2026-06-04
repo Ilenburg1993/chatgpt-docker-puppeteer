@@ -288,6 +288,21 @@ function renderByokTokenLabel(value) {
         'admission-blocked': 'bloqueado na admissão',
         ready: 'pronto',
         deferred: 'adiado',
+        applied: 'aplicado',
+        manual_intervention: 'intervenção manual',
+        effect_not_authorized: 'aguardando autorização',
+        new_session_not_allowed: 'nova sessão não autorizada',
+        boot_scheduled: 'novo boot agendado',
+        model_mismatch: 'modelo divergente',
+        apply_live_model: 'aplicar modelo vivo',
+        prepare_new_session: 'preparar nova sessão',
+        prepare_new_sdk_session: 'preparar novo boot SDK',
+        set_live_model: 'trocar modelo vivo',
+        replan_after_turn_failure: 'replanejar pós-falha',
+        wait_for_provider_reset: 'aguardar reset do provedor',
+        policy_denied: 'política não autorizou',
+        keep_current: 'manter atual',
+        wait_for_reset: 'aguardar reset',
     });
     return labels[normalized] ?? normalized.replace(/[_-]+/gu, ' ');
 }
@@ -3811,7 +3826,15 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
     }
     if (controllerStep.effects.length > 0) {
         println(
-            `    efeitos:       \x1b[90m${controllerStep.effects.map((effect) => `${effect['kind']} · ${effect['execute'] === true ? 'executar' : optionalScalarString(effect['authorization']) ?? 'simular'}${effect['blockedReason'] ? ` · bloqueio ${effect['blockedReason']}` : ''}`).join(', ')}\x1b[0m`,
+            `    efeitos:       \x1b[90m${controllerStep.effects.map((effect) => {
+                const kind = renderByokTokenLabel(optionalScalarString(effect['kind']));
+                const mode =
+                    effect['execute'] === true
+                        ? 'executar'
+                        : renderByokTokenLabel(optionalScalarString(effect['authorization']) ?? 'simular');
+                const blockedReason = optionalScalarString(effect['blockedReason']);
+                return `${kind} · ${mode}${blockedReason ? ` · bloqueio ${renderByokTokenLabel(blockedReason)}` : ''}`;
+            }).join(', ')}\x1b[0m`,
         );
     }
     println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
@@ -4032,7 +4055,9 @@ async function renderByokGatewayAutoHistory(println, rest) {
         const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
         const profile = optionalScalarString(row['routeProfile']) ?? '-';
         const ok = row['ok'] === true ? 'ok' : row['ok'] === false ? 'blocked' : optionalScalarString(row['status']) ?? '-';
-        println(`    ${index + 1}. \x1b[33m${action}\x1b[0m  \x1b[90mrota ${route} · perfil ${profile} · estado ${ok} · decidido ${decidedAt}\x1b[0m`);
+        println(
+            `    ${index + 1}. \x1b[33m${renderByokTokenLabel(action)}\x1b[0m  \x1b[90mrota ${route} · perfil ${profile} · estado ${renderByokTokenLabel(ok)} · decidido ${decidedAt}\x1b[0m`,
+        );
     });
     println('');
 }
@@ -4055,7 +4080,9 @@ async function renderByokGatewayAutoHandoffs(println, rest) {
         const model = optionalScalarString(row['targetModel']) ?? optionalScalarString(row['model']) ?? '-';
         const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
         const requestedAt = optionalScalarString(row['requestedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
-        println(`    ${index + 1}. \x1b[33m${status}\x1b[0m  \x1b[90mmodelo ${model} · rota ${route} · solicitado ${requestedAt}\x1b[0m`);
+        println(
+            `    ${index + 1}. \x1b[33m${renderByokTokenLabel(status)}\x1b[0m  \x1b[90mmodelo ${model} · rota ${route} · solicitado ${requestedAt}\x1b[0m`,
+        );
     });
     println('');
 }
@@ -4079,7 +4106,7 @@ async function renderByokGatewayAutoConfirmations(println, rest) {
         const confirmedModel = optionalScalarString(row['confirmedModel']) ?? optionalScalarString(row['newModel']) ?? '-';
         const observedAt = optionalScalarString(row['observedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
         println(
-            `    ${index + 1}. \x1b[33m${status}\x1b[0m  \x1b[90m${previousModel} -> ${confirmedModel} · observado ${observedAt}\x1b[0m`,
+            `    ${index + 1}. \x1b[33m${renderByokTokenLabel(status)}\x1b[0m  \x1b[90m${previousModel} -> ${confirmedModel} · observado ${observedAt}\x1b[0m`,
         );
     });
     println('');
@@ -4105,7 +4132,7 @@ async function renderByokGatewayAutoRecoveries(println, rest) {
         const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
         const observedAt = optionalScalarString(row['observedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
         println(
-            `    ${index + 1}. \x1b[33m${status}\x1b[0m  \x1b[90mescopo ${scope} · falha ${failureKind} · rota ${route} · observado ${observedAt}\x1b[0m`,
+            `    ${index + 1}. \x1b[33m${renderByokTokenLabel(status)}\x1b[0m  \x1b[90mescopo ${renderByokTokenLabel(scope)} · falha ${renderByokTokenLabel(failureKind)} · rota ${route} · observado ${observedAt}\x1b[0m`,
         );
     });
     println('');
@@ -4361,22 +4388,49 @@ async function renderByokGatewayAutoOff(println) {
  */
 async function applyByokGatewayAutoEffects(println, controllerStep) {
     const application = await applyTerminalByokGatewayAutoEffects(controllerStep);
+    if (application.applied.length === 0 && application.skipped.length === 0) {
+        println(
+            terminalThemeRow(
+                'Auto apply',
+                'nenhum efeito terminal derivado para aplicar; revise bloqueios e próxima ação acima',
+                { role: 'warn' },
+            ),
+        );
+        println('');
+        return application;
+    }
     if (application.applied.length === 0 && application.skipped.length > 0) {
         const reasons = application.skipped
             .map((effect) => describeTerminalByokGatewayAutoEffect(effect))
             .slice(0, 4)
             .join('; ');
+        println(terminalThemeRow('Auto apply', `nenhum efeito aplicado · ${reasons || 'revise bloqueios e próxima ação acima'}`, { role: 'warn' }));
         println(
-            `  \x1b[33mNenhum efeito auto foi aplicado. ${reasons || 'Use /byok auto status para revisar blockers e flags'}.\x1b[0m\n`,
+            terminalThemeRow(
+                'Próximo',
+                'use /byok auto status para revisar bloqueios, política e seleção atual',
+                { role: 'muted' },
+            ),
         );
+        println('');
         return application;
     }
     for (const effect of application.applied) {
-        println(`  \x1b[32mAuto apply: ${describeTerminalByokGatewayAutoEffect(effect)}.\x1b[0m`);
+        const description = describeTerminalByokGatewayAutoEffect(effect);
+        println(terminalThemeRow('Auto apply', description, { role: 'success' }));
+        if (effect['kind'] === 'set_live_model') {
+            println(
+                terminalThemeRow(
+                    'Confirmação',
+                    'aguarde session.model_changed ou próximo uso observado para confirmar o modelo efetivo',
+                    { role: 'muted' },
+                ),
+            );
+        }
     }
     for (const effect of application.skipped) {
         if (effect['skippedReason'] === 'effect_not_authorized') continue;
-        println(`  \x1b[33mAuto apply: ${describeTerminalByokGatewayAutoEffect(effect)}.\x1b[0m`);
+        println(terminalThemeRow('Auto apply', describeTerminalByokGatewayAutoEffect(effect), { role: 'warn' }));
     }
     println('');
     return application;

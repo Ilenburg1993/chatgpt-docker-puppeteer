@@ -3274,9 +3274,10 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK model-gateway auto');
         expect(ctx.output()).toContain('troca viva nao');
         expect(ctx.output()).not.toContain('live setModel');
-        expect(ctx.output()).toContain('prepare_new_sdk_session · simular');
+        expect(ctx.output()).toContain('preparar novo boot SDK');
         expect(ctx.output()).not.toContain('prepare_new_sdk_session:dry');
-        expect(ctx.output()).toContain('ação prepare new session');
+        expect(ctx.output()).not.toContain('prepare_new_sdk_session');
+        expect(ctx.output()).toContain('ação preparar nova sessão');
         expect(ctx.output()).toContain('/session sdk next new');
     });
 
@@ -3480,12 +3481,31 @@ describe('terminal /byok command', () => {
             nextCommands: ['/byok model openai/gpt-oss-120b'],
             operatorSummary: 'Mesmo provider BYOK; o modelo pode ser aplicado na sessao viva.',
         });
+        setTerminalModelProjection.mockReturnValueOnce({
+            previousModel: 'old-model',
+            currentModel: 'openai/gpt-oss-120b',
+            currentReasoningEffort: 'high',
+            reasoningAdjusted: false,
+            runtimeId: 'runtime-auto-apply',
+        });
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'auto apply profile:repo_agent allow-live-set-model');
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('openai/gpt-oss-120b');
-        expect(ctx.output()).toContain('Auto apply: modelo vivo atualizado para openai/gpt-oss-120b');
+        expect(ctx.output()).toContain('Auto apply');
+        expect(ctx.output()).toContain('modelo vivo solicitado old-model → openai/gpt-oss-120b');
+        expect(ctx.output()).toContain('Confirmação');
+        expect(ctx.output()).toContain('session.model_changed');
+        expect(readTerminalActivityHistory()).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    label: 'Troca de modelo solicitada',
+                    source: 'terminal.byok_auto',
+                    detail: expect.stringContaining('automação model-gateway'),
+                }),
+            ]),
+        );
     });
 
     it('persiste auto on sem aplicar efeitos na sessao viva', async () => {
@@ -3581,7 +3601,7 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'auto history 5');
 
         expect(ctx.output()).toContain('BYOK model-gateway auto history');
-        expect(ctx.output()).toContain('prepare_new_session');
+        expect(ctx.output()).toContain('preparar nova sessão');
         expect(ctx.output()).toContain('zai:glm-4.5-flash');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
@@ -3599,9 +3619,10 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: recoveriesCtx.println }, 'auto recoveries 5');
 
         expect(handoffsCtx.output()).toContain('BYOK model-gateway auto handoffs');
-        expect(handoffsCtx.output()).toContain('boot_scheduled');
+        expect(handoffsCtx.output()).toContain('novo boot agendado');
+        expect(handoffsCtx.output()).not.toContain('effect_not_authorized');
         expect(confirmationsCtx.output()).toContain('BYOK model-gateway auto confirmations');
-        expect(confirmationsCtx.output()).toContain('matched_handoff');
+        expect(confirmationsCtx.output()).toContain('matched handoff');
         expect(fixtureCtx.output()).toContain('BYOK model-gateway auto recovery fixture');
         expect(fixtureCtx.output()).toContain('sem chamada a provedor');
         expect(fixtureCtx.output()).toContain('saúde sintética sim');
@@ -3609,7 +3630,7 @@ describe('terminal /byok command', () => {
         expect(fixtureCtx.output()).not.toContain('applied=');
         expect(fixtureCtx.output()).not.toContain('recorded=');
         expect(recoveriesCtx.output()).toContain('BYOK model-gateway auto recoveries');
-        expect(recoveriesCtx.output()).toContain('rate-limit');
+        expect(recoveriesCtx.output()).toContain('limite de taxa');
         expect(recoveriesCtx.output()).toContain('escopo');
         expect(recoveriesCtx.output()).not.toContain('scope=');
         expect(recoveriesCtx.output()).not.toContain('failure=');
@@ -3684,7 +3705,7 @@ describe('terminal /byok command', () => {
         expect(result.applied).toHaveLength(2);
         expect(result.applied.map(describeTerminalByokGatewayAutoEffect)).toEqual(
             expect.arrayContaining([
-                'modelo vivo atualizado para anthropic/claude-sonnet-4.5',
+                'modelo vivo solicitado anthropic/claude-sonnet-4.5',
                 'novo boot SDK preparado para anthropic/claude-sonnet-4.5',
             ]),
         );

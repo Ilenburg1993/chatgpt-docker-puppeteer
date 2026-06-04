@@ -120,9 +120,14 @@ function resolvePostTurnHealthFailure(status, turnFailure) {
 export function describeTerminalByokGatewayAutoEffect(effect) {
     const kind = optionalScalarString(effect['kind']) ?? 'unknown_effect';
     const model = optionalScalarString(effect['model']);
+    const previousModel = optionalScalarString(effect['previousModel']);
+    const currentModel = optionalScalarString(effect['currentModel']) ?? model;
     const skippedReason = optionalScalarString(effect['skippedReason']);
     if (effect['applied'] === true && kind === 'set_live_model') {
-        return model ? `modelo vivo atualizado para ${model}` : 'modelo vivo atualizado';
+        if (previousModel && currentModel && previousModel !== currentModel) {
+            return `modelo vivo solicitado ${previousModel} → ${currentModel}`;
+        }
+        return currentModel ? `modelo vivo solicitado ${currentModel}` : 'modelo vivo solicitado';
     }
     if (effect['applied'] === true && kind === 'prepare_new_sdk_session') {
         return model ? `novo boot SDK preparado para ${model}` : 'novo boot SDK preparado';

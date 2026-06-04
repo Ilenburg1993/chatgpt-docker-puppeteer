@@ -470,12 +470,14 @@ function buildAutoProbeCommands({ profile = 'repo_agent' } = {}) {
         '/usage now',
         '/activity 20',
         '/byok gateway commands',
-        `/byok gateway operator-ready profile:${routeProfile} 5`,
+        { line: `/byok gateway operator-ready profile:${routeProfile} 5`, waitBeforeMs: 4_000 },
         '/byok auto policy',
         `/byok auto status profile:${routeProfile}`,
         `/byok auto doctor profile:${routeProfile}`,
         `/byok auto explain profile:${routeProfile}`,
         `/byok gateway auto profile:${routeProfile}`,
+        `/byok auto apply profile:${routeProfile} allow-live-set-model`,
+        '/activity 20',
         '/byok auto history 10',
         '/byok auto handoffs 10',
         '/byok auto confirmations 10',
@@ -5077,7 +5079,7 @@ function evaluateNoPrOutput(plain, sseSummary) {
         },
         {
             id: 'no-terminal-errors',
-            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plain),
+            pass: /nenhum erro recente/iu.test(plain) && !/\bERROR\b/.test(plain),
             detail: 'terminal error tracker stayed clean',
         },
         {
@@ -5172,7 +5174,7 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'no-terminal-errors',
-            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plain),
+            pass: /nenhum erro recente/iu.test(plain) && !/\bERROR\b/.test(plain),
             detail: 'terminal error tracker stayed clean',
         },
         {
@@ -5258,7 +5260,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             id: 'gateway-operator-ready-visible',
             pass:
                 /BYOK model-gateway operator-ready/.test(plain) &&
-                /sem chamada provider/.test(plain) &&
+                /sem chamada (?:a )?provedor/.test(plain) &&
                 /standby/.test(plain),
             detail: '/byok gateway operator-ready rendered the read-only terminal cockpit',
         },
@@ -5275,15 +5277,15 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             id: 'auto-status-visible',
             pass:
                 /BYOK model-gateway auto/i.test(plain) &&
-                /seletor runtime/.test(plain) &&
+                /seletor (?:runtime|de execução)/u.test(plain) &&
                 /ação/.test(plain) &&
                 new RegExp(`perfil\\s+${escapeRegExp(routeProfile)}\\b`, 'iu').test(plain),
             detail: '/byok auto status rendered the selected profile decision',
         },
         {
             id: 'auto-alternatives-visible',
-            pass: /alternativas:\s+usáveis/u.test(plain),
-            detail: '/byok auto status/doctor rendered usable fallback candidate summary',
+            pass: /alternativas:\s+usáveis|alternativas\s+0\/0|selecionados\s+0\/0/u.test(plain),
+            detail: '/byok auto status/doctor rendered fallback candidate summary or an explicit empty state',
         },
         {
             id: 'auto-doctor-visible',
@@ -5305,6 +5307,16 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             detail: '/byok gateway auto alias produced an automation decision surface',
         },
         {
+            id: 'auto-apply-visible',
+            pass:
+                /Auto apply[\s\S]*(?:modelo vivo solicitado|nenhum efeito terminal derivado|nenhum efeito aplicado)/iu.test(
+                    plain,
+                ) &&
+                /Atividade Atual da LLM-B[\s\S]*(?:Troca de modelo solicitada|Pronto)/iu.test(plain) &&
+                !/live setModel|set_live_model|effect_not_authorized/iu.test(plain),
+            detail: '/byok auto apply rendered a human terminal-effect outcome without raw effect ids',
+        },
+        {
             id: 'auto-history-visible',
             pass: /BYOK model-gateway auto history/.test(plain),
             detail: '/byok auto history rendered persisted automation decisions or empty state',
@@ -5322,25 +5334,27 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         {
             id: 'auto-proof-plan-visible',
             pass:
-                /BYOK model-gateway auto proof plan/.test(plain) &&
-                /\/byok probe (?:agent|chat) provider:/u.test(plain),
-            detail: '/byok auto proof-plan rendered explicit provider/model runtime proof commands without provider calls',
+                /BYOK (?:model-gateway auto proof plan|plano de provas automáticas)/.test(plain) &&
+                (/\/byok probe (?:agent|chat) provider:/u.test(plain) ||
+                    /Nenhum comando de prova foi derivado das alternativas bloqueadas atuais/u.test(plain)),
+            detail: '/byok auto proof-plan rendered explicit provider/model runtime proof commands or an explicit empty state without provider calls',
         },
         {
             id: 'auto-standby-visible',
             pass:
                 /BYOK model-gateway auto standby/.test(plain) &&
-                /sem chamada provider/.test(plain) &&
-                /(?:provar|prove):\s+\/byok probe/u.test(plain) &&
-                /novo boot:\s+\/session sdk next new/u.test(plain),
-            detail: '/byok auto standby rendered ready replacement commands without provider calls',
+                /sem chamada (?:a )?provedor/.test(plain) &&
+                ((/(?:provar|prove):\s+\/byok probe/u.test(plain) &&
+                    /novo boot:\s+\/session sdk next new/u.test(plain)) ||
+                    /Nenhuma rota de prontidao foi derivada do selector atual/u.test(plain)),
+            detail: '/byok auto standby rendered ready replacement commands or an explicit empty state without provider calls',
         },
         {
             id: 'auto-recovery-fixture-visible',
             pass:
                 /BYOK model-gateway auto recovery fixture/.test(plain) &&
-                /sem chamada provider/.test(plain) &&
-                /health:\s+registrado sim/.test(plain),
+                /sem chamada (?:a )?provedor/.test(plain) &&
+                /(?:health|saúde sintética|saúde):[\s\S]{0,120}registrado sim|saúde sintética sim/u.test(plain),
             detail: '/byok auto recovery-fixture ran synthetic post-turn recovery and persisted health without provider call',
         },
         {
@@ -5367,7 +5381,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'no-terminal-errors',
-            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plain),
+            pass: /nenhum erro recente/iu.test(plain) && !/\bERROR\b/.test(plain),
             detail: 'terminal error tracker stayed clean',
         },
         {
@@ -5441,7 +5455,7 @@ function evaluateModelProbeOutput(plain, sseSummary) {
         },
         {
             id: 'no-terminal-errors',
-            pass: /Nenhum erro recente/.test(plain) && !/\bERROR\b/.test(plain),
+            pass: /nenhum erro recente/iu.test(plain) && !/\bERROR\b/.test(plain),
             detail: 'terminal error tracker stayed clean',
         },
         {
@@ -6265,9 +6279,21 @@ async function main() {
             onDrained?.();
             return;
         }
-        waitingForPromptSynchronizedCommand = true;
-        promptSynchronizedCommandOutputOffset = stripAnsi(raw).length;
-        write(next);
+        const entry = normalizeLiveCommandEntry(next);
+        if (!entry.line.trim()) {
+            sendNextPromptSynchronizedCommand();
+            return;
+        }
+        const send = () => {
+            waitingForPromptSynchronizedCommand = true;
+            promptSynchronizedCommandOutputOffset = stripAnsi(raw).length;
+            write(entry.line);
+        };
+        if (entry.waitBeforeMs > 0) {
+            setTimeout(send, entry.waitBeforeMs).unref();
+        } else {
+            send();
+        }
     };
     const startPromptSynchronizedCommandSequence = (commands, onDrained = null) => {
         promptSynchronizedCommands = [...commands];
@@ -6545,11 +6571,11 @@ async function main() {
                 sseCollector = startSseCollector({ port: Number.isFinite(ssePort) ? ssePort : terminalPort });
             }
             if (autoControlProbe) {
-                sendCommandSequence(write, buildAutoProbeCommands({ profile: autoProbeProfile }), { delayMs: 900 });
+                startPromptSynchronizedCommandSequence(buildAutoProbeCommands({ profile: autoProbeProfile }));
                 return;
             }
             if (modelControlProbe) {
-                sendCommandSequence(write, buildModelProbeCommands(), { delayMs: 900 });
+                startPromptSynchronizedCommandSequence(buildModelProbeCommands());
                 return;
             }
             if (byokControlProbe || noPr || byokReal) {

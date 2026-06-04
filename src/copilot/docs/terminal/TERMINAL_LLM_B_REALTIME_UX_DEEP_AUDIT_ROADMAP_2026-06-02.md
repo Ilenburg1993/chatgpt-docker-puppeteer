@@ -8381,9 +8381,60 @@
   - `ux-cycle-byok-model-switch-request-confirmation` agora valida:
     solicitação visual, prompt `[MODEL?]`, timeline `Troca de modelo solicitada`, cópia de
     confirmação runtime-vs-boot e ausência da frase antiga imprecisa.
-- [ ] Testar o fluxo com `/byok auto apply` em ciclo dirigido do terminal.
+- [x] Testar o fluxo com `/byok auto apply` em ciclo dirigido do terminal.
 - [x] Adicionar critério live dedicado para troca de modelo:
   - solicitação aparece sem tomar o prompt;
   - `/activity` mostra `Troca de modelo solicitada`;
   - `session.model_changed`, quando emitido pelo SDK, aparece como confirmação;
   - divergência modelo configurado/efetivo aparece em `/usage`/prompt sem ids técnicos desnecessários.
+
+### 12.81 Auto-probe BYOK: `apply`, ledgers humanos e sincronização do harness — 2026-06-04
+
+- [x] Auditoria live do fluxo `/byok auto`:
+  - execução observacional inicial:
+    `artifacts/terminal-live/byok-auto-probe-ux-20260604-observe/summary.md`;
+  - falhou porque o runner antigo disparava comandos por relógio e porque critérios exigiam
+    alternativas mesmo quando o seletor real retornava 0/0;
+  - a tela real mostrou empty states legítimos para perfil `kilo`, sem provider call.
+- [x] Correção do runner:
+  - `auto-probe` e `model-probe` migraram para sequência sincronizada por prompt;
+  - entradas sincronizadas agora aceitam `waitBeforeMs`;
+  - o auto-probe aguarda após o catálogo canônico longo antes de abrir o cockpit
+    `operator-ready`, reduzindo eco de comandos colado na superfície anterior.
+- [x] Correção de UX de `/byok auto apply`:
+  - quando não há efeitos derivados, o terminal mostra:
+    `Auto apply · nenhum efeito terminal derivado para aplicar`;
+  - quando há efeitos pulados, o terminal usa linhas temáticas e próxima ação humana, sem frase
+    solta `Auto apply: ...`;
+  - quando há `set_live_model`, o mesmo vocabulário da troca manual é usado:
+    solicitação, transição e confirmação por `session.model_changed`/próximo uso observado.
+- [x] Correção dos ledgers automáticos:
+  - ações e status técnicos passaram por `renderByokTokenLabel()`;
+  - `manual_intervention` virou `intervenção manual`;
+  - `effect_not_authorized` virou `aguardando autorização`;
+  - `new_session_not_allowed` virou `nova sessão não autorizada`;
+  - `model_mismatch` virou `modelo divergente`;
+  - `rate-limit` virou `limite de taxa`;
+  - registros persistidos continuam técnicos no SQLite, mas a superfície default do operador é
+    humana.
+- [x] Critérios live atualizados:
+  - `auto-apply-visible` cobre efeito aplicado ou empty state claro;
+  - `auto-proof-plan-visible` e `auto-standby-visible` aceitam comandos reais ou empty state 0/0;
+  - `auto-recovery-fixture-visible` aceita a cópia atual em português e a linha de health;
+  - `no-terminal-errors` passou a aceitar caixa baixa em `nenhum erro recente`.
+- [x] Prova PTY aprovada:
+  - artefato:
+    `artifacts/terminal-live/byok-auto-probe-ux-20260604-human-ledgers/summary.md`;
+  - status PASS;
+  - 31 critérios passaram, incluindo `auto-apply-visible`, `auto-human-default-copy`,
+    ledgers, SSE archive, ausência de erros e fechamento limpo.
+- [x] Prova PTY pós-ajuste de espaçamento:
+  - artefato:
+    `artifacts/terminal-live/byok-auto-probe-ux-20260604-wait-before/summary.md`;
+  - status PASS;
+  - o cockpit `operator-ready` deixou de colar no eco do catálogo canônico longo.
+- [ ] Próxima auditoria:
+  - segmentar critérios de auto-probe por superfície em vez de procurar alguns termos no log
+    inteiro;
+  - criar fixture controlado para provar também o caminho `set_live_model` aplicado por
+    `/byok auto apply`, sem depender de seleção real do catálogo atual.
