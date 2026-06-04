@@ -142,18 +142,22 @@ export function cmdUsage({ println }, arg) {
                     ? 'Premium Request nesta telemetria'
                     : 'sem Premium Request';
             const llmUsageKind = humanLlmUsageKind(llmClass, llmReason);
-            println(
-                detail
-                    ? terminalThemeRow(
-                          'Telemetria LLM',
-                          `modelo ${projection.llmUsageBilling.displayModel} · ${premiumRequest} · tipo ${llmUsageKind} · classe ${llmClass} · motivo ${llmReason} · custo ${llmCost}`,
-                      )
-                    : terminalThemeRow(
-                          'Telemetria LLM',
-                          `modelo ${projection.llmUsageBilling.displayModel} · ${premiumRequest} · tipo ${llmUsageKind} · custo ${llmCost}`,
-                      ),
-            );
-            if (!detail) {
+            if (detail) {
+                println(
+                    terminalThemeRow(
+                        'Telemetria LLM',
+                        `modelo ${projection.llmUsageBilling.displayModel} · ${premiumRequest} · tipo ${llmUsageKind} · classe ${llmClass} · motivo ${llmReason} · custo ${llmCost}`,
+                    ),
+                );
+            } else {
+                println(
+                    terminalThemeRow(
+                        'Telemetria LLM',
+                        `modelo ${projection.llmUsageBilling.displayModel} · custo ${llmCost}`,
+                    ),
+                );
+                println(terminalThemeRow('Request', premiumRequest));
+                println(terminalThemeRow('Tipo', llmUsageKind));
                 println(terminalThemeRow('Detalhe', '/usage now detail para classe técnica', { role: 'command' }));
             }
             if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {

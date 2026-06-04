@@ -4855,6 +4855,7 @@ function evaluateByokRealOutput(
 }
 
 function evaluateBlockedOutput(plain, sseSummary, blocker) {
+    const blockedByByokProvider = blocker?.id === 'byok-provider-turn-failed';
     return [
         {
             id: 'ready',
@@ -4876,6 +4877,25 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
             pass: sseSummary.connected,
             detail: `SSE collector ${sseSummary.connected ? 'connected' : 'did not connect'} before blocker`,
         },
+        ...(blockedByByokProvider
+            ? [
+                  {
+                      id: 'byok-provider-panel-visible',
+                      pass:
+                          /Provider BYOK/.test(plain) &&
+                          /troque provider\/modelo com \/byok use ou \/byok model/.test(plain),
+                      detail: 'BYOK provider failure rendered an actionable operator panel',
+                  },
+                  {
+                      id: 'byok-provider-error-tracked',
+                      pass:
+                          /Erros rastreados[\s\S]{0,800}(?:terminal\.byok_provider|Erro de provider BYOK|Provider BYOK)/u.test(
+                              plain,
+                          ) && !/Erros rastreados\s+·\s+0 total\s+·\s+0 no buffer/u.test(plain),
+                      detail: '/errors surfaced the operator-visible BYOK provider failure',
+                  },
+              ]
+            : []),
         {
             id: 'root-cause-not-ux-duplication',
             pass: true,

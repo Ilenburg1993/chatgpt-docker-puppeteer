@@ -5530,8 +5530,45 @@
   - `node --check tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
   - `npx eslint src/copilot/terminal/events/agent-runtime-events.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
   - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
-- [ ] Próxima live: repetir o cenário canônico quando o provider BYOK estiver estável para
-      confirmar `post-ask-final-visible` com o verificador humanizado.
+- [x] Correção aplicada no live-runner: quando `BLOCKED` por `byok-provider-turn-failed`, o
+      summary agora também verifica `byok-provider-panel-visible` e
+      `byok-provider-error-tracked`, para transformar falhas instáveis do provider em evidência
+      objetiva de UX/diagnóstico.
+- [x] Validação escopada do runner passou:
+  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Live de confirmação com provider estável:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-byok-errors-tracked-or-pass-20260605-0015`.
+- [x] Resultado: `Status: PASS`; fluxo canônico completo, 178 eventos SSE, zero erros, export ok.
+- [x] Evidência positiva: `post-ask-final-visible` passou com `assistant.message=yes`; tela mostrou
+      `Resposta pós-pergunta LLM-B via SDK` sem `· Resposta pós-pergunta`.
+- [x] Lacuna visual residual da live: `/usage now` ainda mostrava `Telemetria LLM modelo ... ·
+      sem Premium Request · tipo ... · custo ...` numa linha longa.
+- [x] Correção aplicada: `/usage now` divide telemetria recente em `Telemetria LLM`, `Request`,
+      `Tipo` e `Detalhe`, preservando o modo `detail` para classe/motivo técnico.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/usage.js`;
+  - `node --check tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
+  - `npx eslint src/copilot/terminal/commands/usage.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`.
+- [x] Live de confirmação com `/usage now` atualizado:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-usage-split-20260605-0020`.
+- [x] Resultado: `Status: PASS`; fluxo completo, 228 eventos SSE, zero erros, export ok.
+- [x] Evidência positiva: `/usage now` mostrou:
+  - `Telemetria LLM modelo kilo-auto/free · custo 0.0000`;
+  - `Request sem Premium Request`;
+  - `Tipo continuação da pergunta humana`.
+- [x] Observação operacional: a LLM-B separou `report_intent` e `read_file_content` em etapas/turnos
+      diferentes, mas o runner aceitou corretamente o fluxo canônico porque as tools reais, deltas,
+      ask_user, resposta humana e final pós-ask foram materializados.
+- [x] Observação visual: o log PTY ainda pode registrar `SIM` grudado ao frame ANSI da linha viva,
+      mas o summary manteve `no-prompt-double-render` e `ux-compact-ask-live-status`; manter sob
+      observação em lives futuras.
+- [ ] Próxima live, quando o provider falhar novamente: confirmar `byok-provider-error-tracked`
+      no summary e `/errors 10` preenchido.
+- [ ] Próxima auditoria UX: revisar labels remanescentes como `SDK assistant`, `Sessão SDK` e
+      `Info SDK · cancellation` para decidir o que é técnico aceitável e o que deve ser
+      humanizado no modo padrão.
 - [ ] Próxima live de falha controlada: reproduzir ou simular erro BYOK para confirmar que
       `/errors 10` mostra `terminal.byok_provider` com ação/contexto, sem duplicar eventos
       recuperáveis internos.

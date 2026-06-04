@@ -409,10 +409,15 @@ describe('commands/metrics + usage', () => {
             cmdUsage({ println: ctx.println }, 'now');
 
             expect(ctx.output()).toContain('Telemetria LLM');
-            expect(ctx.output()).toContain('tipo');
+            expect(ctx.output()).toContain('Tipo');
             expect(ctx.output()).not.toContain('tipo=');
+            expect(ctx.output()).toContain('Request');
+            expect(ctx.output()).toContain('sem Premium Request');
             expect(ctx.output()).toContain('continuação da pergunta humana');
             expect(ctx.output()).not.toContain('ask_user_continuation');
+            expect(ctx.output()).not.toContain(
+                'Telemetria LLM modelo kilo-auto/free · sem Premium Request · tipo continuação da pergunta humana',
+            );
             expect(ctx.output()).toContain('Pergunta humana');
             expect(ctx.output()).toContain('Correlacionar');
             expect(ctx.output()).toContain('/events event=assistant.message');
