@@ -217,7 +217,7 @@ export function cmdMetrics({ println }, arg = '') {
     println(terminalThemeRow('Cumulativo', `normalizados ${streamDiagnostics.counters.deltaCumulativeNormalized} · suprimidos ${streamDiagnostics.counters.deltaCumulativeSuppressed} · overlap ${streamDiagnostics.counters.deltaOverlapNormalized} · sufixo dup ${streamDiagnostics.counters.deltaDuplicateSuppressed}`, { role: 'muted' }));
     println(terminalThemeRow('Final', `ok ${streamDiagnostics.counters.finalAlreadyStreamed} · sufixo ${streamDiagnostics.counters.finalSuffix} · divergências ${streamDiagnostics.counters.finalMismatch} · sem delta ${streamDiagnostics.counters.finalNoVisibleStream} · vazio ${streamDiagnostics.counters.finalEmpty}`, { role: 'info' }));
 
-    println(terminalThemeHeadline('info', 'Archive SSE'));
+    println(terminalThemeHeadline('info', 'Registro SSE'));
     println(terminalThemeRow('Eventos', `${sseEventArchive.events} (último id ${sseEventArchive.lastEventId ?? '-'})`, { role: 'info' }));
     println(terminalThemeRow('Fila', `${sseEventArchive.queueDepth} (flush ${sseEventArchive.flushInFlight ? 'em andamento' : sseEventArchive.flushScheduled ? 'agendado' : 'ocioso'} · falhas ${sseEventArchive.failedEvents} · descartados ${sseEventArchive.droppedEvents})`, { role: 'muted' }));
     println(terminalThemeRow('Arquivo', sseEventArchive.enabled ? sseEventArchive.path ?? '(aguardando primeiro evento)' : 'desabilitado', { role: 'muted' }));

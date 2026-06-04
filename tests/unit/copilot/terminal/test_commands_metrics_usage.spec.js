@@ -331,7 +331,8 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('bridge/live 0');
         expect(ctx.output()).toContain('Atividade');
         expect(ctx.output()).toContain('Inject');
-        expect(ctx.output()).toContain('Archive SSE');
+        expect(ctx.output()).toContain('Registro SSE');
+        expect(ctx.output()).not.toContain('Archive SSE');
         expect(ctx.output()).toContain('binding ok');
         expect(ctx.output()).toContain('Processando mensagem');
     });

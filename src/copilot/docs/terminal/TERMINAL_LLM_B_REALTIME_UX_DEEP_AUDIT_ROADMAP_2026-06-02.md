@@ -5479,3 +5479,10 @@
   - `node --check src/copilot/terminal/commands/usage.js`;
   - `npx eslint src/copilot/terminal/commands/usage.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
   - `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`.
+- [x] Lacuna visual: `/metrics` ainda usava o título técnico `Archive SSE`.
+- [x] Correção aplicada: título humanizado para `Registro SSE`, mantendo contadores, fila e arquivo
+      do archive.
+- [x] Validação escopada passou:
+  - `node --check src/copilot/terminal/commands/metrics.js`;
+  - `npx eslint src/copilot/terminal/commands/metrics.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`.
