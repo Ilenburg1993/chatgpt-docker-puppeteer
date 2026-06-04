@@ -891,7 +891,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             expect.objectContaining({ detail: 'npm run lint:copilot · saída 0', source: 'agent' }),
         );
         expect(println).toHaveBeenCalledWith(
-            expect.stringContaining('Tarefa em segundo plano concluída: investigar sessão SDK'),
+            expect.stringMatching(/Tarefa\s+conclu[ií]da · investigar sessão SDK/u),
         );
         expect(println).toHaveBeenCalledWith(
             expect.stringContaining('Shell concluído: npm run lint:copilot · saída 0'),
@@ -1094,6 +1094,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             }),
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Uso do modelo'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringMatching(/Uso do modelo[\s\S]*modelo gpt-5\.4/u));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ask_user_continuation'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('classe='));
         expect(broadcastSse).toHaveBeenCalledWith(
@@ -1446,7 +1447,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: /** @type {any} */ (rl) });
 
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('decisão pendente'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Pergunta ao operador'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('pergunta restaurada'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Qual arquivo devo revisar agora?'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Opções'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('[1] A   [2] B'));
@@ -1492,8 +1494,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             choices: ['A', 'B'],
         });
 
-        expect(println).toHaveBeenCalledTimes(5);
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('decisão pendente'));
+        expect(println).toHaveBeenCalledTimes(8);
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Pergunta ao operador'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('pergunta restaurada'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Qual arquivo devo revisar agora?'));
     });
 
@@ -1556,7 +1559,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: /** @type {any} */ (rl) });
 
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('decisão pendente'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Pergunta ao operador'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('pergunta restaurada'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Você confirma aplicar o patch mínimo?'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Opções'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('[1] sim   [2] não'));

@@ -378,6 +378,19 @@ function renderTurnTraceSummary(trace) {
 }
 
 /**
+ * @param {string | null | undefined} kind
+ * @returns {string}
+ */
+function renderAssistantMessageProtocolKindLabel(kind) {
+    const normalized = String(kind ?? '').trim();
+    if (normalized === 'question') return 'Resposta pós-pergunta';
+    if (normalized === 'reply') return 'Resposta';
+    if (normalized === 'delta') return 'Trecho de resposta';
+    if (normalized === 'reasoning') return 'Raciocínio';
+    return normalized.replace(/[._-]+/gu, ' ') || 'Mensagem';
+}
+
+/**
  * @param {{
  *     agent: AgentEventHost;
  *     refreshPromptIfIdle: () => void;
@@ -671,17 +684,18 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             if (rendered) refreshPromptIfIdle();
             return;
         }
+        const assistantMessageKindLabel = renderAssistantMessageProtocolKindLabel(normalized.kind);
         recordTerminalActivity('turn', 'Mensagem da LLM-B recebida', {
-            detail: `${normalized.kind}${normalized.content ? ` · ${normalized.content.slice(0, 160)}` : ''}`,
+            detail: `${assistantMessageKindLabel}${normalized.content ? ` · ${normalized.content.slice(0, 160)}` : ''}`,
             source: 'sdk',
             recordHistory: false,
         });
         const rendered = renderTerminalAssistantTranscript({
             content: normalized.content,
-            title: normalized.kind === 'reply' ? 'Resposta fora do turno ativo' : 'Mensagem',
+            title: normalized.kind === 'reply' ? 'Resposta fora do turno ativo' : assistantMessageKindLabel,
             source: 'sdk/assistant.message',
             status: 'message',
-            detail: normalized.kind,
+            detail: assistantMessageKindLabel,
             metadata: {
                 assistantMessageEnvelope,
             },

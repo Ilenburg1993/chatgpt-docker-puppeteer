@@ -210,7 +210,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'turn',
             'Mensagem da LLM-B recebida',
-            expect.objectContaining({ detail: expect.stringContaining('reply'), source: 'sdk' }),
+            expect.objectContaining({ detail: expect.stringContaining('Resposta'), source: 'sdk' }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'assistant.message',
@@ -220,7 +220,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             expect.objectContaining({
                 content: 'resposta visível',
                 source: 'sdk/assistant.message',
-                detail: 'reply',
+                detail: 'Resposta',
             }),
         );
         expect(refreshPromptIfIdle).toHaveBeenCalled();
@@ -688,8 +688,12 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         });
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
-            'Mailbox zero-PR não aplicado (requeued)',
-            expect.objectContaining({ severity: 'warn', source: 'sdk' }),
+            'Fila de intervenção aguardando próxima oportunidade',
+            expect.objectContaining({
+                detail: 'pergunta humana ainda não aceita resposta; intervenção preservada',
+                severity: 'warn',
+                source: 'sdk',
+            }),
         );
     });
 

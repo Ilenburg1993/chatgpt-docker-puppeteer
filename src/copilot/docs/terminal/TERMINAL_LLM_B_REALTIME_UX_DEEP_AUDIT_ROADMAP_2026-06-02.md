@@ -4902,3 +4902,73 @@
 - [ ] Próxima lacuna: revisar previews com `bat`/`delta` para decidir se ANSI externo deve ser
       preservado, reduzido ou sanitizado por modo; hoje `bat` ainda colore a linha de preview,
       o que é aceitável em TTY, mas deve ter política clara por superfície.
+
+### 12.23 Live canônico de `ask_user`, métricas humanas e pós-pergunta
+
+- [x] Live PTY canônico executado com fluxo real de operador:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-ask-user-canonical-audit-20260603-2241`.
+  - O cenário executou prompt real, `report_intent`, `read_file_content`, deltas públicos,
+        pergunta `ask_user`, resposta humana `SIM`, final pós-pergunta, `/usage now`,
+        `/activity`, `/tools diag`, `/events`, `/events --raw`, `/errors`, `/health full` e
+        `/export`.
+- [x] Resultado funcional observado:
+  - deltas públicos e final pós-pergunta materializados sem duplicação visual;
+  - `ask_user` apareceu como `Pergunta ao operador`, com prompt `[PERG]`, linha viva dedicada e
+        resposta humana aceita;
+  - não houve spam antigo de `request_user_input ainda executando`, `LLM-B ainda trabalhando`,
+        IDs `chatcmpl-tool-*` ou timeout por falta de resposta;
+  - `/errors 10` mostrou zero erros;
+  - export Markdown e SSE mantiveram envelopes técnicos para auditoria.
+- [x] Falha identificada no harness, não no fluxo real: `ux-health-human-tool-stats` ainda
+      procurava a seção legada `TOOL STATS`, embora `/health full` já use
+      `Ferramentas por latência`.
+- [x] Implementação: o extrator do runner live agora reconhece tanto o nome legado quanto
+      `Ferramentas por latência`, mantendo o bloqueio contra `read_file_content` e
+      `report_intent_local` na superfície default.
+- [x] Auditoria visual adicional do live:
+  - a linha `Uso do modelo` ainda repetia `modelo kilo-auto/free`;
+  - a atividade pós-pergunta ainda podia mostrar o tipo cru `question` em
+        `Mensagem da LLM-B recebida`.
+- [x] Implementação: a linha impressa de uso remove o prefixo redundante quando o próprio label
+      já é `Uso do modelo`, preservando `modelo ...` em timelines e telemetria onde a frase é
+      independente.
+- [x] Implementação: `assistant.message` fora de turno ativo ganhou rótulos humanos de protocolo:
+  - `question` → `Resposta pós-pergunta`;
+  - `reply` → `Resposta`;
+  - `delta` → `Trecho de resposta`;
+  - `reasoning` → `Raciocínio`.
+- [x] Testes unitários atualizados:
+  - o teste de usage bloqueia `Uso do modelo ... modelo ...`;
+  - o teste de `assistant.message` espera `Resposta` no lugar de `reply` na superfície humana.
+- [ ] Próxima validação obrigatória: repetir o live canônico após estes ajustes e exigir PASS em
+      `ux-health-human-tool-stats`.
+- [ ] Próxima lacuna UX: revisar a seção `/events` default para reduzir repetições de
+      `Sessão SDK` quando há muitos `session.updated`, talvez por agregação temporal; raw/json
+      continuam preservando todos os eventos.
+- [ ] Próxima lacuna UX: investigar se `SDK info configuration` e a linha inicial de tools
+      desabilitadas devem virar bloco compacto único em boot, especialmente em tela pequena.
+
+### 12.24 Live canônico bloqueado por tool fora do cenário
+
+- [x] Repetição do live canônico após o ajuste de `ux-health-human-tool-stats`:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-ask-user-canonical-health-stats-fix-20260603-2246`.
+- [x] Resultado observado: o terminal iniciou corretamente, executou `report_intent` e
+      `read_file_content`, mas a LLM-B invocou `exec_command` fora da allowlist do cenário
+      canônico e depois terminou sem saída pública, sem `ask_user`.
+- [x] Diagnóstico: o cenário tinha allowlist textual (`report_intent`, `read_file_content`,
+      `ask_user`), mas a sessão real ainda expunha `exec_command` ao modelo. A allowlist global
+      existente em `sdk/tools/state` governa hooks/policy, mas não é uma remoção dinâmica
+      isolada de visibilidade por cenário live.
+- [x] Decisão técnica imediata: o runner live deve preservar a causa raiz. `assistant-empty-turn`
+      é sintoma final; quando há `tool.lifecycle` de uma tool não permitida pelo cenário, o
+      blocker correto passa a ser `unexpected-scenario-tool`.
+- [x] Implementação: `detectLiveBlocker` ganhou `findUnexpectedScenarioTool`, usando SSE
+      `tool.lifecycle`, aliases já normalizados por `isLifecycleTool`, e ignorando I/O interno
+      (`io.*`). O summary futuro deve mostrar `tool=<nome>`, `allowed=<lista>` e `sse=#<id>`.
+- [ ] Próxima lacuna arquitetural: decidir se lives de cenário devem:
+  - aplicar allowlist temporária de sessão sem tocar no `tools-config.json` canônico do operador;
+  - aplicar hook bloqueante que interrompa claramente tool fora de cenário;
+  - ou manter todas as tools visíveis e tratar desvio como dado de confiabilidade do modelo.
+- [ ] Próxima lacuna UX: quando uma tool fora de cenário é detectada em live/harness, a tela
+      humana deveria explicar em português: `Cenário live interrompido: tool fora do contrato`,
+      com lista curta de permitidas e comando de retentativa.

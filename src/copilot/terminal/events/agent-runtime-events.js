@@ -523,6 +523,14 @@ function formatLlmUsageOperatorDetail(evt, billing) {
 }
 
 /**
+ * @param {string} detail
+ * @returns {string}
+ */
+function renderLlmUsageModelRowDetail(detail) {
+    return String(detail ?? '').replace(/^modelo\s+/iu, '').trim();
+}
+
+/**
  * @param {{
  *     agent: AgentEventHost;
  *     rl?: import('node:readline').Interface | null;
@@ -1068,8 +1076,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             recordHistory: shouldPersist,
         });
         if ((showUsage || billing.mismatch) && !isTerminalRenderLocked()) {
+            const rowDetail = billing.mismatch ? technicalDetail : renderLlmUsageModelRowDetail(operatorDetail);
             println(
-                terminalThemeRow('Uso do modelo', billing.mismatch ? technicalDetail : operatorDetail, {
+                terminalThemeRow('Uso do modelo', rowDetail || operatorDetail, {
                     role: billing.mismatch ? 'warn' : 'muted',
                 }),
             );

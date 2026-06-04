@@ -910,7 +910,9 @@ function hasRawInternalIdInDefaultToolNarration(plain) {
 }
 
 function extractHealthToolStatsSection(plain) {
-    const match = String(plain ?? '').match(/TOOL STATS[^\n]*\n(?<body>[\s\S]*?)(?:╚|você\[|$)/u);
+    const match = String(plain ?? '').match(
+        /(?:TOOL STATS|Ferramentas por lat[eê]ncia)[^\n]*\n(?<body>[\s\S]*?)(?:\n\s*[─╚]|você\[|$)/iu,
+    );
     return match?.groups?.body?.trim() ?? '';
 }
 
@@ -2984,6 +2986,17 @@ function detectLiveBlocker(plain, runtime = {}) {
                 `${byokLiveToolProtocolMiss.markers.length > 0 ? ` · text=${byokLiveToolProtocolMiss.markers.join('+')}` : ''}`,
         };
     }
+    const unexpectedScenarioTool = findUnexpectedScenarioTool(runtime.sseEvents, runtime.liveScenario);
+    if (unexpectedScenarioTool) {
+        return {
+            id: 'unexpected-scenario-tool',
+            detail:
+                `LLM-B used a tool outside the live scenario allowlist before completing the canonical ask/final` +
+                ` · tool=${unexpectedScenarioTool.toolName}` +
+                `${unexpectedScenarioTool.allowedTools.length > 0 ? ` · allowed=${unexpectedScenarioTool.allowedTools.join(',')}` : ''}` +
+                `${Number.isFinite(unexpectedScenarioTool.eventId) ? ` · sse=#${unexpectedScenarioTool.eventId}` : ''}`,
+        };
+    }
     if (
         /erro de provider BYOK/i.test(plain) ||
         /Erro de sessão BYOK/i.test(plain) ||
@@ -3015,6 +3028,27 @@ function detectLiveBlocker(plain, runtime = {}) {
                 ` · ask=${runtime.answerSent ? 'answered' : 'not-answered'}` +
                 ` · postAsk=${runtime.postAskContinuationObserved ? 'observed' : 'missing'}` +
                 ` · diagnostics=${runtime.postCommandsSent ? 'started' : 'not-started'}`,
+        };
+    }
+    return null;
+}
+
+function findUnexpectedScenarioTool(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+    const allowedTools = Array.isArray(scenario?.allowedTools) ? [...scenario.allowedTools] : [];
+    if (allowedTools.length === 0 || !Array.isArray(events)) return null;
+    for (const evt of events) {
+        if (evt?.event !== 'tool.lifecycle') continue;
+        const payload = evt.data && typeof evt.data === 'object' ? evt.data : {};
+        const type = String(payload.type ?? '');
+        if (!isLifecycleStartType(type)) continue;
+        const toolName = normalizeLifecycleToolName(payload);
+        if (!toolName || toolName.startsWith('io.')) continue;
+        const allowed = allowedTools.some((expectedName) => isLifecycleTool(payload, expectedName));
+        if (allowed) continue;
+        return {
+            toolName,
+            allowedTools,
+            eventId: typeof evt.id === 'number' ? evt.id : typeof evt.eventId === 'number' ? evt.eventId : null,
         };
     }
     return null;
