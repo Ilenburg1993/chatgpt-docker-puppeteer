@@ -5273,5 +5273,18 @@
   - `node --check src/copilot/terminal/repl/live-status-line.js`;
   - `npx eslint src/copilot/terminal/dialog/output.js src/copilot/terminal/repl/live-status-line.js tests/unit/copilot/terminal/test_build_user_prompt.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`;
   - `npx vitest run tests/unit/copilot/terminal/test_build_user_prompt.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`.
-- [ ] Próxima live estética: confirmar em PTY que boot + turno inicial não quebram em múltiplas
-      linhas e que o input fica visualmente previsível enquanto a LLM-B trabalha.
+- [x] Live estética:
+  - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-compact-waiting-prompt-20260604-2305`.
+- [x] Resultado: `Status: BLOCKED` por `assistant-ended-before-ask`; o modelo emitiu os deltas
+      canônicos e encerrou sem chamar `ask_user`. O bloqueio foi rápido e sem timeout.
+- [x] Evidência positiva: o prompt temporário passou a aparecer como `LLM-B pensando`, sem
+      `modelo ... · raciocínio ...`.
+- [x] Nova lacuna visual encontrada: mesmo com prompt curto, a linha viva em PTY estreito ainda
+      quebrava em duas linhas por causa de `conversa ativa/parada` em `boot`, `turn` e retry/espera.
+- [x] Correção aplicada: pulsos transitórios de `boot`, `turn`, `retry de modelo` e espera
+      silenciosa removem o tail redundante de runtime; o runtime detalhado permanece em
+      `/activity`, `/events` e estado pronto.
+- [x] Teste unitário reforçado: `test_live_status_line.spec.js` agora exige ausência de `conversa
+      ativa/parada` nos pulsos curtos e limites de comprimento mais agressivos.
+- [ ] Próxima live estética: confirmar em PTY que boot, turno inicial e finalização não quebram em
+      múltiplas linhas após o corte do tail de runtime.

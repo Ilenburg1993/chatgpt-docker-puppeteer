@@ -228,7 +228,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, 'pensando')}` +
-            `${terminalThemeText('muted', ` · ${quietWaitStatus} · ${runtimeTail}${queue}`)}` +
+            `${terminalThemeText('muted', ` · ${quietWaitStatus}${queue}`)}` +
             '\x1b[K'
         );
     }
@@ -237,7 +237,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, `iniciando · ${bootLabel}`)}` +
-            `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)} · ${runtimeTail}${queue}`)}` +
+            `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)}${queue}`)}` +
             '\x1b[K'
         );
     }
@@ -245,7 +245,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText('warn', 'recuperando')}` +
-            `${terminalThemeText('muted', ` · retry do modelo · ${formatLiveDuration(ageMs)} · ${runtimeTail}${queue}`)}` +
+            `${terminalThemeText('muted', ` · retry do modelo · ${formatLiveDuration(ageMs)}${queue}`)}` +
             '\x1b[K'
         );
     }
@@ -254,7 +254,7 @@ export function formatTerminalLiveStatusLine(input = {}) {
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, `turno · ${label}`)}` +
-            `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)} · ${runtimeTail}${queue}`)}` +
+            `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)}${queue}`)}` +
             '\x1b[K'
         );
     }

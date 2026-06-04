@@ -251,6 +251,7 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('20s sem delta');
         expect(line).not.toContain('modelo auto');
         expect(line).not.toContain('raciocínio high');
+        expect(line).not.toContain('conversa ativa');
         expect(line).not.toContain('thinking');
         expect(line).not.toContain('LLM-B trabalhando');
         expect(line.length).toBeLessThan(70);
@@ -276,6 +277,7 @@ describe('terminal/live-status-line', () => {
         expect(line).not.toContain('Aguardando resposta');
         expect(line).not.toContain('modelo kilo-auto/free');
         expect(line).not.toContain('raciocínio high');
+        expect(line).not.toContain('conversa ativa');
         expect(line.length).toBeLessThan(80);
     });
 
@@ -302,7 +304,8 @@ describe('terminal/live-status-line', () => {
         expect(line).not.toContain('server error');
         expect(line).not.toContain('modelo kilo-auto/free');
         expect(line).not.toContain('raciocínio high');
-        expect(line.length).toBeLessThan(76);
+        expect(line).not.toContain('conversa ativa');
+        expect(line.length).toBeLessThan(58);
     });
 
     it('traduz pending messages na linha viva de turno', async () => {
@@ -341,7 +344,8 @@ describe('terminal/live-status-line', () => {
         expect(line).not.toContain('stopped:noloop');
         expect(line).not.toContain('modelo claude-sonnet-4.6');
         expect(line).not.toContain('raciocínio xhigh');
-        expect(line.length).toBeLessThan(82);
+        expect(line).not.toContain('conversa parada');
+        expect(line.length).toBeLessThan(62);
     });
 
     it('compacta estado turn sem repetir detalhe longo', async () => {
@@ -361,7 +365,8 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('turno · Intenção da LLM-B');
         expect(line).toContain('12s');
         expect(line).not.toContain('terminal live canonical');
-        expect(line.length).toBeLessThan(88);
+        expect(line).not.toContain('conversa ativa');
+        expect(line.length).toBeLessThan(72);
     });
 
     it('prioriza ask_user humano sobre atividade antiga na linha viva', async () => {
