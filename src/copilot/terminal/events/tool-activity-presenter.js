@@ -449,6 +449,23 @@ function uniqueNonEmptyStrings(values) {
 }
 
 /**
+ * @param {string[]} values
+ * @returns {string[]}
+ */
+function uniqueOperatorPaths(values) {
+    const seen = new Set();
+    /** @type {string[]} */
+    const result = [];
+    for (const value of values) {
+        const displayPath = formatTerminalToolPathForOperator(value);
+        if (!displayPath || seen.has(displayPath)) continue;
+        seen.add(displayPath);
+        result.push(displayPath);
+    }
+    return result;
+}
+
+/**
  * @param {string} toolName
  * @param {string | null} canonicalToolName
  * @returns {string}
@@ -835,11 +852,11 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
     const toolResult = extractTerminalToolResultPayload(evt);
     const presentationHint = extractToolPresentationHint(toolResult);
     const meta = introspectToolTargets({ args: toolArgs, result: toolResult });
-    const fileTargets = uniqueNonEmptyStrings(meta.fileTargets);
+    const fileTargets = uniqueOperatorPaths(meta.fileTargets);
     const directoryTargets = uniqueNonEmptyStrings(meta.directoryTargets);
     const urlTargets = uniqueNonEmptyStrings(meta.urlTargets);
     const searchTerms = uniqueNonEmptyStrings(meta.searchTerms);
-    const patchFiles = uniqueNonEmptyStrings(meta.patchFiles);
+    const patchFiles = uniqueOperatorPaths(meta.patchFiles);
     const commands = uniqueNonEmptyStrings(meta.commands);
     const filters = uniqueNonEmptyStrings(meta.filters);
     const normalizedMeta = {

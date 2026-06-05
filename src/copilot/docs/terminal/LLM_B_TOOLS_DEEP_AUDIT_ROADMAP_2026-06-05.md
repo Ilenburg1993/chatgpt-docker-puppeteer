@@ -280,6 +280,7 @@ operador vê e salvar summary com critérios objetivos.
 - [x] F6. Adiar sucesso provisório de `external_completed` até `postToolUse` estruturado em operações com resultado tardio.
 - [x] F7. Estacionar redraw de prompt idle durante narração de tools para evitar prompt pronto em turno ativo.
 - [x] F8. Deduplicar alvos de arquivos vindos simultaneamente de args/result/presentation.
+- [x] F9. Deduplicar paths equivalentes absoluto/relativo na superfície humana sem afetar `cwd` de comandos.
 
 ### Faixa G — Auditoria de claims
 
@@ -368,4 +369,6 @@ operador vê e salvar summary com critérios objetivos.
 - [x] 2026-06-05: validações focadas verdes: lifecycle runtime, inline status/prompt e export (`40` testes).
 - [x] 2026-06-05: rerun live `file-patch-roundtrip` PASS em `artifacts/terminal-live/llm-b-tools-ux-file-patch-rerun-20260605`, incluindo deltas, ask_user real, resposta humana, final pós-pergunta, SSE/export e ausência de prompt idle durante turno ativo.
 - [x] 2026-06-05: presenter deduplica `fileTargets` para evitar detalhes como `arquivos: X, X`; teste focado adicionado.
-- [ ] Próximo passo: `recoverable-tool-error`, `file-write-roundtrip`, e revisão visual de detalhes remanescentes.
+- [x] 2026-06-05: live `recoverable-tool-error` BLOCKED em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-20260605` por `assistant-asked-before-required-deltas`; UX de falha ficou correta (`Falhou` sem falso `Concluído`).
+- [x] 2026-06-05: dedupe de paths agora considera equivalência absoluto/relativo para arquivos e patches, preservando diretórios/cwd técnicos de comandos.
+- [ ] Próximo passo: ajustar prompt/harness do cenário recoverable se necessário, rodar `file-write-roundtrip`, e revisar detalhes visuais remanescentes.

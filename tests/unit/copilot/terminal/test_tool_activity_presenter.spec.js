@@ -230,9 +230,9 @@ describe('terminal/tool-activity-presenter', () => {
             args: { path },
             result: {
                 success: true,
-                path,
+                path: `${process.cwd()}/${path}`,
                 presentation: {
-                    path,
+                    path: `${process.cwd()}/${path}`,
                     summary: 'Patch aplicado: 1/1 ocorrencias',
                 },
             },
