@@ -65,7 +65,7 @@ export function isTerminalAssistantTranscriptCovered(content, options = {}) {
 
 /**
  * @param {string} content
- * @param {{ suppressIfCoveredByRecent?: boolean }} [options]
+ * @param {{ suppressIfCoveredByRecent?: boolean; coverageMinChars?: number }} [options]
  * @returns {boolean}
  */
 export function claimTerminalAssistantTranscript(content, options = {}) {
@@ -74,7 +74,12 @@ export function claimTerminalAssistantTranscript(content, options = {}) {
     pruneRecentTranscriptHashes();
     const hash = createHash('sha256').update(normalized).digest('hex');
     if (recentTranscriptHashes.has(hash)) return false;
-    if (options.suppressIfCoveredByRecent && isTerminalAssistantTranscriptCovered(normalized)) return false;
+    if (
+        options.suppressIfCoveredByRecent &&
+        isTerminalAssistantTranscriptCovered(normalized, { minChars: options.coverageMinChars })
+    ) {
+        return false;
+    }
     recentTranscriptHashes.set(hash, { ts: Date.now(), normalized });
     return true;
 }
@@ -103,13 +108,16 @@ function formatAssistantTranscriptSourceForOperator(source) {
  *     detail?: string | null;
  *     truncated?: boolean;
  *     suppressIfCoveredByRecent?: boolean;
+ *     coverageMinChars?: number;
  *     metadata?: Record<string, unknown> | null;
  * }} input
  * @returns {boolean}
  */
 export function renderTerminalAssistantTranscript(input) {
     const content = input.content.trim();
-    const claimOptions = input.suppressIfCoveredByRecent ? { suppressIfCoveredByRecent: true } : {};
+    const claimOptions = input.suppressIfCoveredByRecent
+        ? { suppressIfCoveredByRecent: true, coverageMinChars: input.coverageMinChars }
+        : {};
     if (!content || !claimTerminalAssistantTranscript(content, claimOptions)) {
         return false;
     }

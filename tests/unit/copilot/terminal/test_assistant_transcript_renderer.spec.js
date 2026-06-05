@@ -66,4 +66,37 @@ describe('terminal/events/assistant-transcript-renderer', () => {
             }),
         ).toBe(false);
     });
+
+    it('suprime sufixo tardio quando o transcript completo recente já cobriu o conteúdo', () => {
+        terminalAssistantTranscriptRendererTestHarness.clearRecentTranscriptHashes();
+        const writes = [];
+        const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+            writes.push(String(chunk));
+            return true;
+        });
+        try {
+            expect(
+                renderTerminalAssistantTranscript({
+                    title: 'Continuação da LLM-B',
+                    source: 'dialog.turn_end',
+                    content: 'POST-ASK-CANONICAL-FINAL: usuário confirmou SIM',
+                }),
+            ).toBe(true);
+            expect(
+                renderTerminalAssistantTranscript({
+                    title: 'Complemento da LLM-B',
+                    source: 'sdk/assistant.message',
+                    content: 'SIM',
+                    suppressIfCoveredByRecent: true,
+                    coverageMinChars: 1,
+                }),
+            ).toBe(false);
+        } finally {
+            writeSpy.mockRestore();
+        }
+
+        const output = writes.join('');
+        expect(output).toContain('POST-ASK-CANONICAL-FINAL: usuário confirmou SIM');
+        expect(output).not.toContain('Complemento da LLM-B');
+    });
 });

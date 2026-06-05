@@ -2886,7 +2886,7 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-activity-human',
             pass:
-                /Atividade Atual da LLM-B[\s\S]*Estado[\s\S]*Evento[\s\S]*Drill-down\s+\/activity detail mostra origem, trace, engine e streaming/iu.test(
+                /Atividade Atual da LLM-B[\s\S]*Estado[\s\S]*Evento[\s\S]*Detalhes\s+\/activity detail mostra origem, trace, engine e streaming/iu.test(
                     activitySurface,
                 ) &&
                 !/\bsource\b|\btools\b|\btraceId\b|Streaming público|\bdeltas\b|cumulativo|Sessão SDK removida|session\.deleted/iu.test(
@@ -5152,12 +5152,12 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: 'BYOK provider errors stayed compact in the live status line; full action/context remains in durable diagnostics',
         },
         {
-            id: 'ux-activity-drilldown-label',
+            id: 'ux-activity-detail-route-label',
             pass:
-                /Drill-down\s+\/activity detail mostra origem, trace, engine e streaming/iu.test(
+                /Detalhes\s+\/activity detail mostra origem, trace, engine e streaming/iu.test(
                     beforeRawDiagnosticsPlain,
                 ) && !/^\s*T[eé]cnico\s+Detalhes t[eé]cnicos ficam em \/activity detail/imu.test(beforeRawDiagnosticsPlain),
-            detail: '/activity default exposed a calm drill-down route instead of the old technical label',
+            detail: '/activity default exposed a calm detail route instead of the old technical label',
         },
         {
             id: 'ux-activity-post-turn-timeline-operational',

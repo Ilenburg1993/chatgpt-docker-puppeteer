@@ -9505,3 +9505,57 @@
     `/display`, `/thinking` e previews para avaliar se precisam de presenters temáticos próprios;
   - manter libs externas (`gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`, `zoxide`, `jq`, `yq`) como
     fase posterior, com documento de decisão antes de dependência nova.
+
+### 12.109 Live canônico com tools, deltas, ask_user e reconciliação de suffix — 2026-06-04
+
+- [x] Achado:
+  - o live canônico em PTY confirmou a UX principal sob pressão real: tools com nomes humanos,
+    deltas públicos, card de pergunta, prompt `[PERG]`, resposta humana e final pós-ask;
+  - o primeiro run completou o handshake, mas falhou porque o harness ainda esperava a cópia antiga
+    `Drill-down` em `/activity`;
+  - o segundo run validou o harness novo, mas foi bloqueado pelo próprio modelo: `ask_user` foi
+    chamado antes dos deltas obrigatórios, portanto o cenário foi corretamente classificado como
+    BLOCKED e não como falha de terminal;
+  - esse run bloqueado revelou uma borda visual real: quando o stream mostrava prefixo parcial e
+    `assistant.message`/`dialog.turn_end` materializavam o final completo, um suffix curto como
+    `SIM` podia aparecer como `Complemento da LLM-B` redundante.
+- [x] Decisão UX/arquitetura:
+  - o harness deve validar a cópia atual (`Detalhes`) e não perpetuar termos antigos;
+  - bloqueio por modelo que viola ordem de cenário deve permanecer explícito, porque é sinal útil
+    de seleção/runtime e não regressão estética;
+  - suffix de `assistant.message` pode usar supressão por transcript recente com limite menor quando
+    o chamador sabe que o conteúdo é só complemento de stream;
+  - o padrão global continua conservador: cobertura curta não deve ser usada em todo renderer, só no
+    caminho de suffix.
+- [x] Implementação:
+  - critérios live `ux-cycle-activity-human` e `ux-activity-detail-route-label` passaram a procurar
+    `Detalhes /activity detail...`;
+  - o critério deixou de se chamar `drilldown`, evitando ressuscitar a nomenclatura antiga;
+  - `renderTerminalAssistantTranscript()` ganhou `coverageMinChars` opcional para supressão
+    contextual de conteúdo curto;
+  - o handler de `assistant.message` usa `suppressIfCoveredByRecent: true` e `coverageMinChars: 1`
+    apenas no caminho `render_suffix`;
+  - teste unitário cobre o caso live: bloco completo recente `POST-ASK... SIM` suprime suffix tardio
+    `SIM` e não renderiza `Complemento da LLM-B`.
+- [x] Validação:
+  - [x] live completo com handshake funcional, mas critério stale:
+    `artifacts/terminal-live/canonical-turn-ux-after-copy-pass-20260604/summary.md`;
+  - [x] live rerun BLOCKED por ordem do modelo, com artefatos preservados:
+    `artifacts/terminal-live/canonical-turn-ux-after-copy-rerun-pass-20260604/summary.md`;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js tests/unit/copilot/terminal/test_turn_materialization_state.spec.js tests/unit/copilot/terminal/test_turn_reconciliation.spec.js tests/unit/copilot/terminal/test_sdk_session_events_turn_summary.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`
+    com 50 testes verdes;
+  - [x] `npx eslint` focado em harness, renderer, eventos SDK e teste novo;
+  - [x] `git diff --check`.
+- [x] Resultado observado:
+  - fluxo real de pergunta humana está visualmente forte: card dedicado, prompt pronto, resposta
+    separada da fala da LLM-B, SSE/export correlacionados;
+  - quando o modelo obedece a ordem, o terminal completa deltas + ask_user + pós-ask sem erro;
+  - quando o modelo viola a ordem, o harness classifica como bloqueio de protocolo, preservando
+    artefatos para análise;
+  - a reconciliação de suffix ficou mais robusta contra complementos redundantes curtos.
+- [ ] Próximas verificações:
+  - rodar outro live canônico em janela posterior para obter PASS com harness novo quando o modelo
+    seguir a ordem de deltas;
+  - investigar se o prompt do cenário deve ser reforçado para reduzir `ask_user` antes dos deltas;
+  - auditar `/health full`, que no live ainda mostra `Issues` e alguns termos que podem ser
+    humanizados na próxima faixa.

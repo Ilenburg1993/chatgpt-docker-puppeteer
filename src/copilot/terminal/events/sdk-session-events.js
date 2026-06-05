@@ -878,6 +878,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 title: 'Complemento da LLM-B',
                 source: 'sdk/assistant.message',
                 status: 'completed',
+                suppressIfCoveredByRecent: true,
+                coverageMinChars: 1,
                 detail: materializationDecision.reason,
                 metadata: {
                     assistantMessageEnvelope,
