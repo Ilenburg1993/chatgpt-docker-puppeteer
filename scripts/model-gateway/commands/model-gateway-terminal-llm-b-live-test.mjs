@@ -1710,7 +1710,7 @@ function structuredInputCycleCriteria(boot) {
                 /Pergunta humana estruturada/iu.test(plain) &&
                 /diagnóstico de pergunta estruturada/iu.test(plain) &&
                 /REQUEST_USER_INPUT-SIM:\s+responda para fechar o teste/iu.test(plain),
-            detail: '/sdk simulate request-user-input rendered a human-facing diagnostic request',
+            detail: '/sdk simulate pergunta rendered a human-facing diagnostic request',
         },
         {
             id: 'structured-input-calm-boot-copy',
@@ -1771,7 +1771,7 @@ async function runStructuredInputCycleLiveTest({ outDir, requestedTransport, tim
         label: 'structured request_user_input',
         outDir,
         commands: [
-            '/sdk simulate request-user-input --choices SIM|NAO --required REQUEST_USER_INPUT-SIM: responda para fechar o teste',
+            '/sdk simulate pergunta --choices SIM|NAO --required REQUEST_USER_INPUT-SIM: responda para fechar o teste',
             { line: '/sdk waits', waitBeforeMs: 1_500, advanceAfterMs: 1_500 },
             'SIM',
             { line: '/sdk waits', advanceAfterMs: 1_500 },
@@ -2280,10 +2280,12 @@ function diagnosticUxCycleCriteria(boot) {
         {
             id: 'diagnostic-ux-live-full-human',
             pass:
-                /Fluxo detalhado da conversa[\s\S]*I\/O real recente[\s\S]*Eventos recentes/iu.test(liveFullSurface) &&
+                /Fluxo operacional detalhado[\s\S]*Atividade operacional observada[\s\S]*I\/O real recente[\s\S]*Eventos recentes/iu.test(
+                    liveFullSurface,
+                ) &&
                 hasIsoSeconds(liveFullSurface) &&
                 hasRelativeAge(liveFullSurface) &&
-                !/\bsearch\b|phase:|approve_all|not_needed|\bempty\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
+                !/\bsearch\b|phase:|approve_all|not_needed|\bempty\b|Turno observado|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     liveFullSurface,
                 ) &&
                 !/Runtime\s+default|Timeline\s+.*persistent only|Cache\/escopo|não pausada/iu.test(
@@ -2376,10 +2378,10 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-sdk-status-human',
             pass:
                 /SDK do Terminal\s+·\s+principal[\s\S]*Sessão\s+sessão ativa/iu.test(sdkStatusSurface) &&
-                /Modelos\s+\/sdk models · \/sdk tools[\s\S]*Skills\s+\/sdk skills[\s\S]*Rotina\s+\/sdk quota · \/sdk waits[\s\S]*Headers\s+\/sdk headers[\s\S]*Simular\s+\/sdk simulate request-user-input/iu.test(
+                /Modelos\s+\/sdk models · \/sdk tools[\s\S]*Skills\s+\/sdk skills[\s\S]*Rotina\s+\/sdk quota · \/sdk waits[\s\S]*Headers\s+\/sdk headers[\s\S]*Simular\s+\/sdk simulate pergunta/iu.test(
                     sdkStatusSurface,
                 ) &&
-                !/SDK do Terminal\s+·\s+default|\d{4}-\d{2}-\d{2}T|\bsdk-[a-z0-9_-]+\b|copilot_sdk_entitlement|premium_interactions|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|reasoning=|restante=|\/sdk models \| \/sdk skills/iu.test(
+                !/SDK do Terminal\s+·\s+default|\d{4}-\d{2}-\d{2}T|\bsdk-[a-z0-9_-]+\b|copilot_sdk_entitlement|premium_interactions|request-user-input|request_user_input|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|reasoning=|restante=|\/sdk models \| \/sdk skills/iu.test(
                     sdkStatusSurface,
                 ),
             detail: '/sdk status rendered principal runtime, session presence, quota/status and compact multiline command help without raw ids, raw quota scopes or key=value diagnostics',
@@ -2517,7 +2519,7 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
                 { line: '/menu picker', waitFor: 'Picker do menu', advanceAfterMs: 1_000 },
                 { line: '/git diff --plain src/copilot/terminal/README.md', waitFor: 'Git diff', advanceAfterMs: 1_000 },
                 { line: '/activity 8', waitFor: 'Atividade Atual da LLM-B', advanceAfterMs: 1_000 },
-                { line: '/live full', waitFor: 'Fluxo detalhado da conversa', advanceAfterMs: 1_000 },
+                { line: '/live full', waitFor: 'Fluxo operacional detalhado', advanceAfterMs: 1_000 },
                 { line: '/health full', waitFor: 'Diagnóstico do Terminal LLM-B', advanceAfterMs: 1_000 },
                 { line: '/tools', waitFor: 'Ferramentas observadas', advanceAfterMs: 1_000 },
                 { line: '/tools diag', waitFor: 'diagnóstico humano', advanceAfterMs: 1_000 },
@@ -2915,13 +2917,15 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-session-sdk-boundary-human',
             pass:
-                /Sessão SDK[\s\S]*Vínculo SDK[\s\S]*BYOK pronto[\s\S]*Limite BYOK/iu.test(
+                /Sessão SDK[\s\S]*Vínculo SDK[\s\S]*Preparado[\s\S]*Limite BYOK/iu.test(
                     sessionSdkAfterByokSurface,
                 ) &&
                 !/\bbinding\b|provider-boundary|provider\/perfil|Foreground|operator-next-boot|sdk-resume-fallback/iu.test(
                     sessionSdkAfterByokSurface,
                 ) &&
-                !/provedor BYOK|provider\/modelo BYOK/iu.test(sessionSdkAfterByokSurface),
+                !/BYOK\s+pronto\s+BYOK|BYOK\s+BYOK|provedor BYOK|provider\/modelo BYOK/iu.test(
+                    sessionSdkAfterByokSurface,
+                ),
             detail: '/session sdk rendered BYOK selection boundary without raw binding/provider-boundary vocabulary',
         },
         {
@@ -6233,7 +6237,7 @@ function evaluateByokRealOutput(
         },
         {
             id: 'byok-real-binding-cockpit',
-            pass: /vínculo BYOK:/u.test(plain) && /BYOK pronto:/u.test(plain) && /limite BYOK:/u.test(plain),
+            pass: /vínculo BYOK:/u.test(plain) && /preparado:/u.test(plain) && /limite BYOK:/u.test(plain),
             detail: 'BYOK and SDK session cockpits separated prepared selection from live provider binding',
         },
         {

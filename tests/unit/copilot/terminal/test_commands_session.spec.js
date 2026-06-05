@@ -654,7 +654,8 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('Estado');
         expect(ctx.output()).toContain('Sinais');
         expect(ctx.output()).toContain('SSE');
-        expect(ctx.output()).toContain('Trace');
+        expect(ctx.output()).toContain('Turno');
+        expect(ctx.output()).not.toContain('Trace');
         expect(ctx.output()).toMatch(/Ambiente\s+principal/u);
         expect(ctx.output()).toContain('Contexto');
         expect(ctx.output()).not.toContain('Runtime     default');
@@ -1114,7 +1115,8 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('Vínculo SDK');
         expect(ctx.output()).not.toContain('Vínculo BYOK BYOK');
         expect(ctx.output()).toContain('BYOK · perfil groq-free');
-        expect(ctx.output()).toContain('BYOK pronto');
+        expect(ctx.output()).toContain('Preparado');
+        expect(ctx.output()).not.toContain('BYOK pronto  BYOK');
         expect(ctx.output()).toContain('Limite BYOK');
         expect(ctx.output()).toContain('Último boot');
         expect(ctx.output()).toContain('mudança de rota/modelo BYOK');

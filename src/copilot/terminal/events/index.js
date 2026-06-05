@@ -52,4 +52,9 @@ export {
     setupTerminalIoActivityEvents,
     __test__ as terminalIoActivityEventsTestHarness,
 } from './io-activity-events.js';
+export {
+    isTerminalImplicitOperationalTrace,
+    renderTerminalTraceFlowSummary,
+    renderTerminalTraceSummaryTitle,
+} from './turn-trace-presentation.js';
 export { setupTerminalTaskStreamListeners } from './task-stream-events.js';

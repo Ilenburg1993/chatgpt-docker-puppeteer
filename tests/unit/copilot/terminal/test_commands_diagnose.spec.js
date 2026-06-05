@@ -148,7 +148,10 @@ vi.mock('#copilot/agent', () => ({
         selectionAuthority: 'github-copilot',
         canForcePreference: false,
     }),
-    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
+    readAgentRuntimeTodoSummaries: vi.fn(async () => [
+        { id: 'a1', title: 'Primeira task' },
+        { id: 'a2', title: 'Segunda task' },
+    ]),
     readSdkModelMetadata: () => null,
 }));
 
@@ -182,7 +185,10 @@ vi.mock('#copilot/agent/facades', () => ({
         selectionAuthority: 'github-copilot',
         canForcePreference: false,
     }),
-    readAgentRuntimeTodoSummaries: vi.fn(async () => []),
+    readAgentRuntimeTodoSummaries: vi.fn(async () => [
+        { id: 'a1', title: 'Primeira task' },
+        { id: 'a2', title: 'Segunda task' },
+    ]),
     readSdkModelMetadata: () => null,
 }));
 
@@ -362,6 +368,14 @@ describe('commands/diagnose', () => {
             expect(output).not.toContain('local-fs-primary');
             expect(output).not.toContain('streaming on');
             expect(output).not.toContain('degraded');
+            expect(output).toContain('Pendências');
+            expect(output).toContain('Pendente 1');
+            expect(output).toContain('Primeira task');
+            expect(output).not.toContain('[a1]');
+            expect(output).not.toContain('[a2]');
+            expect(output).toContain('Ferramentas por latência');
+            expect(output).toContain('1. Ler arquivo');
+            expect(output).toContain('75% · média 120ms · 4 usos');
             expect(output).toContain('Ler arquivo');
             expect(output).toContain('Intenção capturada');
             expect(output).not.toContain('read_file_content');

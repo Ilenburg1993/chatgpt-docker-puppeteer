@@ -130,7 +130,7 @@ const SDK_DEFAULT_COMMAND_ROWS = Object.freeze([
     ['Skills', '/sdk skills [--project <path>] [--dir <path>]'],
     ['Rotina', '/sdk quota · /sdk waits · /sdk prompt · /sdk capabilities'],
     ['Headers', '/sdk headers [k=v ...|clear]'],
-    ['Simular', '/sdk simulate request-user-input · /sdk doctor · /sdk compact'],
+    ['Simular', '/sdk simulate pergunta · /sdk doctor · /sdk compact'],
 ]);
 
 /**
@@ -1135,13 +1135,14 @@ function parseSdkSimulateRequestUserInputArgs(rest) {
  */
 function renderSdkSimulate({ println }, rest) {
     const [kind = '', ...tail] = rest;
-    if (kind !== 'request-user-input' && kind !== 'request_user_input') {
+    if (kind !== 'pergunta' && kind !== 'question' && kind !== 'request-user-input' && kind !== 'request_user_input') {
         println('');
         println(
-            terminalThemeRow('Uso', '/sdk simulate request-user-input [--choices "sim|nao"] [--required] [pergunta]', {
+            terminalThemeRow('Uso', '/sdk simulate pergunta [--choices "sim|nao"] [--required] [texto]', {
                 role: 'command',
             }),
         );
+        println(terminalThemeRow('Compatível', '/sdk simulate request-user-input continua aceito para automações legadas', { role: 'muted' }));
         println('');
         return;
     }
@@ -1150,7 +1151,7 @@ function renderSdkSimulate({ println }, rest) {
         question: parsed.question,
         choices: parsed.choices,
         allowFreeform: parsed.allowFreeform,
-        data: { command: '/sdk simulate request-user-input' },
+        data: { command: '/sdk simulate pergunta' },
     });
     println('');
     printTerminalHumanQuestionCard(println, {

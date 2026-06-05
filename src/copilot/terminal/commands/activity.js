@@ -1,6 +1,6 @@
 // @ts-check
 
-import { readTerminalIoActivityProjection } from '../events/index.js';
+import { readTerminalIoActivityProjection, renderTerminalTraceSummaryTitle } from '../events/index.js';
 import { readTerminalActivityProjection } from '../frontend/index.js';
 import {
     formatTerminalElapsedDuration,
@@ -561,11 +561,21 @@ export function cmdActivity({ println }, arg) {
     }
 
     if (activeTurnTrace) {
-        printTurnTraceSummary(println, 'Resumo do turno atual', activeTurnTrace, { detail });
+        printTurnTraceSummary(
+            println,
+            renderTerminalTraceSummaryTitle('Resumo do turno atual', 'Atividade operacional atual', activeTurnTrace),
+            activeTurnTrace,
+            { detail },
+        );
     }
 
     if (latestCompletedTurnTrace && latestCompletedTurnTrace.traceId !== activeTurnTrace?.traceId) {
-        printTurnTraceSummary(println, 'Último turno concluído', latestCompletedTurnTrace, { detail });
+        printTurnTraceSummary(
+            println,
+            renderTerminalTraceSummaryTitle('Último turno concluído', 'Atividade operacional recente', latestCompletedTurnTrace),
+            latestCompletedTurnTrace,
+            { detail },
+        );
     }
 
     if (

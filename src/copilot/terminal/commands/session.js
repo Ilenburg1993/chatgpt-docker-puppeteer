@@ -43,6 +43,11 @@ import {
     renderTerminalSdkProviderBinding,
 } from '../byok/index.js';
 import {
+    isTerminalImplicitOperationalTrace,
+    renderTerminalTraceFlowSummary,
+    renderTerminalTraceSummaryTitle,
+} from '../events/index.js';
+import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
     compactTerminalOperatorToolText,
@@ -447,6 +452,18 @@ function renderLiveFlowStateLabel(value) {
     if (state === 'offline') return 'fora do ar';
     if (state === 'recovering') return 'recuperando';
     return state || 'indefinido';
+}
+
+/**
+ * @param {unknown} value
+ * @param {unknown} trace
+ * @returns {string}
+ */
+function renderLiveFlowStateLabelForTrace(value, trace) {
+    if (String(value ?? '') === 'active-turn' && isTerminalImplicitOperationalTrace(trace)) {
+        return 'atividade operacional';
+    }
+    return renderLiveFlowStateLabel(value);
 }
 
 /**
@@ -1364,13 +1381,14 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
             projection.counters.fileCount > 0 ? countLabel(projection.counters.fileCount, 'arquivo', 'arquivos') : null,
             projection.counters.recentIoCount > 0 ? `${projection.counters.recentIoCount} I/O recente` : null,
         ].filter(Boolean);
-        const stateLabel = renderLiveFlowStateLabel(projection.state);
+        const stateLabel = renderLiveFlowStateLabelForTrace(projection.state, activeTrace);
+        const flowSummary = renderTerminalTraceFlowSummary(projection.summary, activeTrace);
         const activityLine = renderLiveActivitySummary(current);
         println('');
-        println(terminalThemeHeadline('assistant', 'Fluxo da conversa'));
+        println(terminalThemeHeadline('assistant', renderTerminalTraceSummaryTitle('Fluxo da conversa', 'Fluxo operacional', activeTrace)));
         println(terminalThemeDivider(37));
         println(
-            terminalThemeRow('Estado', `${stateLabel} · ${projection.summary}`, {
+            terminalThemeRow('Estado', `${stateLabel} · ${flowSummary}`, {
                 role: renderLiveFlowStateRole(projection.state),
             }),
         );
@@ -1382,7 +1400,12 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
         );
         println(terminalThemeRow('Sinais', streamBits.join(' · ') || 'sinais reduzidos'));
         println(terminalThemeRow('Atividade', activityLine));
-        println(terminalThemeRow('Turno', traceSummary.join(' · ') || 'sem ações recentes'));
+        println(
+            terminalThemeRow(
+                isTerminalImplicitOperationalTrace(activeTrace) ? 'Ações' : 'Turno',
+                traceSummary.join(' · ') || 'sem ações recentes',
+            ),
+        );
         println(
             terminalThemeRow(
                 'Conexões',
@@ -1395,10 +1418,17 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     }
 
     println('');
-    println(terminalThemeHeadline('assistant', 'Fluxo detalhado da conversa'));
-    println(terminalThemeDivider(37));
     println(
-        terminalThemeRow('Estado', `${renderLiveFlowStateLabel(projection.state)} · ${projection.summary}`, {
+        terminalThemeHeadline(
+            'assistant',
+            renderTerminalTraceSummaryTitle('Fluxo detalhado da conversa', 'Fluxo operacional detalhado', activeTrace),
+        ),
+    );
+    println(terminalThemeDivider(37));
+    const detailStateLabel = renderLiveFlowStateLabelForTrace(projection.state, activeTrace);
+    const detailFlowSummary = renderTerminalTraceFlowSummary(projection.summary, activeTrace);
+    println(
+        terminalThemeRow('Estado', `${detailStateLabel} · ${detailFlowSummary}`, {
             role: renderLiveFlowStateRole(projection.state),
         }),
     );
@@ -1440,14 +1470,19 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     println(terminalThemeRow('Atividade', renderLiveActivitySummary(current, { includePhase: true })));
     println(
         terminalThemeRow(
-            'Trace',
+            isTerminalImplicitOperationalTrace(activeTrace) ? 'Ações' : 'Turno',
             `${countLabel(projection.counters.toolCount, 'ferramenta', 'ferramentas')} · ${countLabel(projection.counters.fileCount, 'arquivo', 'arquivos')} · ${projection.counters.recentIoCount} I/O recente`,
         ),
     );
     println(terminalThemeDivider(37));
 
     if (activeTrace && (activeTrace.tools.length > 0 || activeTrace.files.length > 0)) {
-        println(terminalThemeHeadline('assistant', 'Turno observado'));
+        println(
+            terminalThemeHeadline(
+                'assistant',
+                renderTerminalTraceSummaryTitle('Turno observado', 'Atividade operacional observada', activeTrace),
+            ),
+        );
         for (const tool of activeTrace.tools.slice(0, 5)) {
             println(terminalThemeRow('Ferramenta', renderLiveToolSummary(tool, { detail: true })));
         }
@@ -2013,7 +2048,7 @@ function findSdkSessionHandle(sessionId, sessions, offset = 0) {
 function renderSdkSessionTopReference(sessionId, sessions, offset = 0) {
     if (!sessionId) return 'ausente';
     const handle = findSdkSessionHandle(sessionId, sessions, offset);
-    return handle ? `sessão ${handle}` : 'sessão não listada nesta página';
+    return handle ? `sessão ${handle}` : 'ativa fora desta página';
 }
 
 /**
@@ -2537,7 +2572,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
         callWithRuntimeTarget(readTerminalConfigProjection, runtimeId).currentModel,
     );
     println(terminalThemeRow('Vínculo SDK', renderTerminalSdkProviderBinding(inventory.persistedByokBinding)));
-    println(terminalThemeRow('BYOK pronto', byokBinding.preparedLabel));
+    println(terminalThemeRow('Preparado', byokBinding.preparedLabel));
     println(terminalThemeRow('Limite BYOK', byokBinding.headline));
     if (byokBinding.action) {
         println(terminalThemeRow('Ação BYOK', byokBinding.action));

@@ -35,6 +35,8 @@ import {
 } from '../events/tool-activity-presenter.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
+/** @typedef {import('../state/ui-theme.js').TerminalThemeRole} TerminalThemeRole */
+
 /**
  * @typedef {object} DiagnoseContext
  * @property {string | null} [hubSessionId]
@@ -208,23 +210,30 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
               : hubSummary.includes('erro')
                 ? diagnoseText('error', `falha · ${hubSummary}`)
                 : diagnoseText('success', `ok · ${hubSummary}`);
-    const todoLines =
+    const todoRows =
         todos.length === 0
-            ? diagnoseText('success', 'nenhum pendente')
-            : todos.map((task) => `  ${diagnoseText('muted', '•')} [${task.id.slice(0, 6)}] ${task.title}`).join('\n');
-    const statsLines =
+            ? [{ label: 'Estado', value: 'nenhum pendente', role: /** @type {TerminalThemeRole} */ ('success') }]
+            : todos.map((task, index) => ({
+                  label: `Pendente ${index + 1}`,
+                  value: `${compactTerminalToolText(String(task.title ?? 'tarefa sem título'), 72)}${detail ? ` · id ${String(task.id ?? '').slice(0, 10) || 'n/d'}` : ''}`,
+                  role: /** @type {TerminalThemeRole} */ ('muted'),
+              }));
+    const statRows =
         topToolStats.length === 0
-            ? diagnoseText('muted', 'nenhum dado registrado')
+            ? [{ label: 'Estado', value: 'nenhum dado registrado', role: /** @type {TerminalThemeRole} */ ('muted') }]
             : topToolStats
-                  .map(([name, stat]) => {
+                  .map(([name, stat], index) => {
                       const calls = Number(stat['calls'] ?? 0);
                       const errors = Number(stat['errors'] ?? 0);
                       const rate = calls > 0 ? Math.round(((calls - errors) / calls) * 100) : 0;
-                      const role = rate >= 90 ? 'success' : rate >= 70 ? 'warn' : 'error';
-                      const visualName = compactTerminalToolText(getTerminalHumanToolName(name), 28).padEnd(28);
-                      return `  ${diagnoseText('muted', '•')} ${visualName} ${diagnoseText(role, `${rate}%`)} média ${stat['avgLatencyMs'] ?? 0}ms (${pluralPt(calls, 'uso', 'usos')})`;
-                  })
-                  .join('\n');
+                      const role = /** @type {TerminalThemeRole} */ (rate >= 90 ? 'success' : rate >= 70 ? 'warn' : 'error');
+                      const visualName = compactTerminalToolText(getTerminalHumanToolName(name), 42);
+                      return {
+                          label: `${index + 1}. ${visualName}`,
+                          value: `${rate}% · média ${stat['avgLatencyMs'] ?? 0}ms · ${pluralPt(calls, 'uso', 'usos')}`,
+                          role,
+                      };
+                  });
     const activityDetail = activity.detail
         ? diagnoseText('muted', humanizeDiagnoseToolIdentifiers(activity.detail))
         : diagnoseText('muted', '(sem detalhe)');
@@ -435,11 +444,11 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
 
     println('');
     println(terminalThemeHeadline('warn', 'Pendências', ['top-5']));
-    for (const line of todoLines.split('\n')) println(line);
+    for (const row of todoRows) println(terminalThemeRow(row.label, row.value, { role: row.role }));
 
     println('');
     println(terminalThemeHeadline('tool', 'Ferramentas por latência', ['top-5']));
-    for (const line of statsLines.split('\n')) println(line);
+    for (const row of statRows) println(terminalThemeRow(row.label, row.value, { role: row.role }));
     println(terminalThemeDivider(62));
     println('');
 

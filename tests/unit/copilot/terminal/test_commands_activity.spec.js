@@ -335,6 +335,65 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Confirmar deploy?');
     });
 
+    it('chama trace implícito local de atividade operacional, não turno de conversa', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'tool',
+                label: 'Arquivo: busca concluída',
+                detail: 'busca · data/copilot-terminal/live-scratch',
+                source: 'io',
+                severity: 'info',
+                progress: 100,
+                toolName: 'io.search',
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 0,
+            },
+            history: [],
+            turnTrace: {
+                current: {
+                    traceId: 'implicit:123',
+                    turnId: null,
+                    source: 'implicit',
+                    status: 'active',
+                    startedAt: 1,
+                    updatedAt: 2,
+                    finishedAt: null,
+                    toolCount: 0,
+                    fileCount: 1,
+                    userInputCount: 0,
+                    tools: [],
+                    files: [
+                        {
+                            path: 'data/copilot-terminal/live-scratch/example.txt',
+                            operation: 'read',
+                            source: 'io',
+                            count: 1,
+                            updatedAt: 2,
+                        },
+                    ],
+                    userInputs: [],
+                },
+                recent: [],
+            },
+            streamDiagnostics: {
+                active: false,
+                pendingDeltas: 0,
+                pendingReasoning: 0,
+                pendingToolEvents: 0,
+                lastFlushAt: null,
+                lastDeltaAt: null,
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '5');
+
+        expect(ctx.output()).toContain('Atividade operacional atual');
+        expect(ctx.output()).not.toContain('Resumo do turno atual');
+        expect(ctx.output()).toContain('data/copilot-terminal/live-scratch/example.txt');
+    });
+
     it('preserva trace operacional recente quando o SDK separa tools e ask_user em turnos distintos', () => {
         vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
             current: {

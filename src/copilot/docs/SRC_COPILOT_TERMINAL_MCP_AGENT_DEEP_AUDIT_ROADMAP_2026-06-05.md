@@ -395,6 +395,11 @@
 - [x] Gap 68: live de model switch mostrou timer atrasado da linha viva colando `LLM-B modelo solicitado` no comando `/activity 10`; `suppressInlineStatusForSubmit` agora bloqueia pulsos durante a borda do submit do readline.
 - [x] Gap 69: o fluxo canônico ainda conduzia o operador ao nome interno `/mailbox`; `/queue status|consume|clear` agora é o cockpit recomendado, com `/mailbox` preservado só como alias legado.
 - [x] Gap 70: `/tools diag` imprimia cada entrada lifecycle multi-linha em um único `println`, deixando linhas secundárias como `Alvo` fora do pipeline durável do TTY; agora cada row lifecycle é impressa separadamente.
+- [x] Gap 71: `/sdk status` ainda ensinava `request-user-input` como comando principal, mantendo nome interno na superfície humana; agora promove `/sdk simulate pergunta`, preserva o alias legado e endurece o live diagnostic para reprovar o termo cru no status.
+- [x] Gap 72: `/health full` ainda despejava pendências e estatísticas como texto solto com IDs curtos; agora usa rows temáticas alinhadas, oculta IDs por padrão e mantém IDs apenas no modo detalhado.
+- [x] Gap 73: `/activity` chamava trace local `implicit:*` de `Resumo do turno atual`, confundindo I/O local com conversa da LLM-B; agora traces implícitos/fonte I/O aparecem como `Atividade operacional atual` ou `Atividade operacional recente`.
+- [x] Gap 74: `/session sdk` podia mostrar `Atual sessão não listada nesta página` e `BYOK pronto BYOK · ...`, soando como paginação interna e duplicando a sigla; agora usa `ativa fora desta página` e label `Preparado`.
+- [x] Gap 75: `/live full` ainda chamava trace local `implicit:*` de `Turno observado`/`turno ativo`, divergindo de `/activity`; agora ambos usam presenter compartilhado para distinguir atividade operacional de turno conversacional.
 
 ## 08. Criterio de Marco
 
@@ -502,3 +507,9 @@
 - [x] 2026-06-05: `operator-ux-cycle` primeiro falhou em `artifacts/terminal-live/2026-06-05T11-39-49-569Z/summary.md` por overlay de modelo colado em `/activity 10`; após cooldown pós-submit, live PASS em `artifacts/terminal-live/2026-06-05T11-43-44-400Z/summary.md`.
 - [x] 2026-06-05: `/queue` ganhou subcomandos `status|consume|clear`, banner/help/live deixaram de recomendar `/mailbox`; `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T11-48-47-241Z/summary.md` confirmou a fila humana e o estado vazio de `/history`.
 - [x] 2026-06-05: `/tools diag` passou a imprimir rows lifecycle uma a uma, evitando que `Alvo`/`Comando` fiquem visualmente fora do fluxo durável do terminal; live PASS em `artifacts/terminal-live/2026-06-05T11-51-53-605Z/summary.md`.
+- [x] 2026-06-05: `/sdk simulate pergunta` passou a ser o comando humano canônico para pergunta estruturada diagnóstica; `request-user-input` continua aceito apenas como alias legado/automação, com teste unitário cobrindo ambos.
+- [x] 2026-06-05: `/health full` passou a renderizar `Pendências` e `Ferramentas por latência` com `terminalThemeRow`, removendo bullets soltos e IDs curtos da superfície padrão; `test_commands_diagnose` cobre pendências, stats e ausência de `[a1]`/`[a2]`.
+- [x] 2026-06-05: `/activity` passou a titular traces `implicit:*`/I/O como atividade operacional, preservando `Resumo do turno atual` apenas para turnos conversacionais; `test_commands_activity` cobre o caso visto no live diagnostic.
+- [x] 2026-06-05: `/session sdk` passou a renderizar sessão viva fora da janela como `ativa fora desta página` e a seleção BYOK preparada como row `Preparado`, removendo duplicação visual `BYOK pronto BYOK`; `test_commands_session` e critérios live foram atualizados.
+- [x] 2026-06-05: criado `turn-trace-presentation.js` para classificar traces implícitos operacionais; `/live` agora usa `Fluxo operacional`, `atividade operacional`, `Ações` e `Atividade operacional observada` quando não há turno real da LLM-B.
+- [x] 2026-06-05: live `diagnostic-ux-cycle` primeiro falhou em `artifacts/terminal-live/2026-06-05T12-09-58-254Z/summary.md` por critério antigo; após alinhar o harness, PASS em `artifacts/terminal-live/2026-06-05T12-11-49-995Z/summary.md`.

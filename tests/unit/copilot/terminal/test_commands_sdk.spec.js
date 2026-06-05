@@ -257,7 +257,8 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('Rotina');
         expect(ctx.output()).toContain('Headers');
         expect(ctx.output()).toContain('Simular');
-        expect(ctx.output()).toContain('/sdk simulate request-user-input');
+        expect(ctx.output()).toContain('/sdk simulate pergunta');
+        expect(ctx.output()).not.toContain('/sdk simulate request-user-input');
         expect(ctx.output()).not.toContain('/sdk models | /sdk skills');
         expect(ctx.output()).not.toMatch(/\n\s{14,}\/sdk skills/);
         expect(ctx.output()).not.toContain('pergunta=0');
@@ -439,9 +440,9 @@ describe('terminal/commands/sdk', () => {
         expect(detail.output()).toContain('request-user-input-test-1');
     });
 
-    it('/sdk simulate request-user-input cria pendência estruturada diagnóstica', async () => {
+    it('/sdk simulate pergunta cria pendência estruturada diagnóstica', async () => {
         const ctx = mockCtx();
-        await cmdSdk({ println: ctx.println }, 'simulate request-user-input --choices sim|nao --required Continuar teste visual?');
+        await cmdSdk({ println: ctx.println }, 'simulate pergunta --choices sim|nao --required Continuar teste visual?');
 
         expect(runtimeMocks.createTerminalPendingStructuredUserInput).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -455,6 +456,22 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('aguardando operador');
         expect(ctx.output()).toContain('Continuar teste visual?');
         expect(ctx.output()).toContain('/sdk waits detail');
+        expect(ctx.output()).not.toContain('request-user-input-sim-1');
+    });
+
+    it('/sdk simulate request-user-input continua como alias legado sem vazar ID', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'simulate request-user-input --choices sim|nao --required Alias legado funciona?');
+
+        expect(runtimeMocks.createTerminalPendingStructuredUserInput).toHaveBeenCalledWith(
+            expect.objectContaining({
+                question: 'Alias legado funciona?',
+                choices: ['sim', 'nao'],
+                allowFreeform: false,
+            }),
+        );
+        expect(ctx.output()).toContain('Pergunta humana estruturada');
+        expect(ctx.output()).toContain('Alias legado funciona?');
         expect(ctx.output()).not.toContain('request-user-input-sim-1');
     });
 
