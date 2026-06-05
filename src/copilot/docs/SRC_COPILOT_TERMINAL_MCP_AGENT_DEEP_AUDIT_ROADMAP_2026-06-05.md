@@ -390,6 +390,7 @@
 - [x] Gap 63: `/fs preview --json|--yaml --lines` ignorava o limite em previews estruturados e podia despejar centenas de linhas; agora o renderer estruturado limita linhas e reporta `truncado`.
 - [x] Gap 64: `/export` removia HTML e redigia segredos, mas podia preservar ANSI/OSC/control codes vindos de renderers externos; agora sanitiza texto terminal antes da redação e do Markdown.
 - [x] Gap 65: live diagnóstica mostrou que o harness podia injetar comando durante saída longa antes do prompt redesenhar; `runSessionCycleBoot` agora espera conteúdo esperado e prompt retornado, com limite de segurança.
+- [x] Gap 66: `diagnostic-ux-cycle` ainda avançava grande parte do roteiro por tempo fixo e podia ocultar regressões de ordem visual; agora cada comando do ciclo principal espera marcador semântico da própria superfície antes do próximo input.
 
 ## 08. Criterio de Marco
 
@@ -492,3 +493,4 @@
 - [x] 2026-06-05: `/export` passou a usar `sanitizeTerminalExternalToolText` antes de `redactSecretText`, removendo ANSI/OSC/controles de conteúdo e envelopes preservados no Markdown.
 - [x] 2026-06-05: live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T11-26-53-139Z/summary.md`, cobrindo `/terminal libs`, previews read-only, `--lines`, `/git diff`, `/menu picker`, export/log sanitizado e critérios humanos do terminal.
 - [x] 2026-06-05: `runSessionCycleBoot` recebeu backpressure por prompt estável; live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T11-29-43-334Z/summary.md` confirmou `/session sdk 6` seguido de `/sdk status` com prompt redesenhado.
+- [x] 2026-06-05: `diagnostic-ux-cycle` passou a esperar evidências semânticas por comando (`FS local criado`, `Preview`, `Eventos SSE`, `SDK do Terminal`, etc.); live PASS em `artifacts/terminal-live/2026-06-05T11-32-07-998Z/summary.md` confirmou sequência sem colagem de comandos.
