@@ -736,6 +736,8 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
                     upstreamProvider: null,
                     score: 91,
                     hasRuntimeProof: true,
+                    needsProbe: false,
+                    standbyClass: 'new_provider',
                     runtimeEnvStatus: 'ready',
                     reasons: ['runtime_selector_alternativa:alternate1'],
                     commands: {
@@ -3272,18 +3274,30 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('BYOK model-gateway operator-ready');
         expect(ctx.output()).toMatch(/sem\s+chamada\s+a\s+provedor/u);
-        expect(ctx.output()).toContain('runtime selector');
+        expect(ctx.output()).toContain('preset manual do operador');
+        expect(ctx.output()).toContain('seletor de execução');
+        expect(ctx.output()).toContain('decisão automática');
+        expect(ctx.output()).toContain('rotas standby');
+        expect(ctx.output()).toContain('fronteira do terminal');
         expect(ctx.output()).toContain('Standby 1');
         expect(ctx.output()).toContain('Banco standby');
         expect(ctx.output()).toContain('Banco live');
         expect(ctx.output()).toContain('Provar');
         expect(ctx.output()).toContain('Novo boot');
+        expect(ctx.output()).toContain('alternativa candidata');
+        expect(ctx.output()).toContain('novo provedor');
         expect(ctx.output()).toContain('/byok health clear provider:');
         expect(ctx.output()).toContain('artifacts/terminal-live/unit/summary.md');
         expect(ctx.output()).toContain('kilo-code:kilo-auto/free');
         expect(ctx.output()).toContain('--write-sqlite');
         expect(ctx.output()).toMatch(/\/byok auto standby\s+profile:repo_agent 5/u);
         expect(ctx.output()).not.toContain('\x1b[');
+        expect(ctx.output()).not.toContain('candidate alternative');
+        expect(ctx.output()).not.toContain('new provider');
+        expect(ctx.output()).not.toMatch(/Check\s+.*automation decision/iu);
+        expect(ctx.output()).not.toMatch(/Check\s+.*standby routes/iu);
+        expect(ctx.output()).not.toMatch(/Check\s+.*terminal boundary/iu);
+        expect(ctx.output()).not.toMatch(/Política\s+.*preset operator_manual/iu);
     });
 
     it('renderiza standby persistido sem recalcular selector no terminal', async () => {
@@ -3345,6 +3359,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('prepare_new_sdk_session:dry');
         expect(ctx.output()).not.toContain('prepare_new_sdk_session');
         expect(ctx.output()).toContain('ação preparar nova sessão');
+        expect(ctx.output()).not.toContain('new session policy');
         expect(ctx.output()).toContain('/session sdk next new');
     });
 
@@ -3534,10 +3549,14 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('BYOK model-gateway auto standby');
         expect(ctx.output()).toMatch(/sem chamada\s+a\s+provedor/u);
+        expect(ctx.output()).toContain('alternativa candidata');
+        expect(ctx.output()).toContain('novo provedor');
         expect(ctx.output()).toContain('/byok probe agent provider:kilo-code model:kilo-auto/free timeout:20000');
         expect(ctx.output()).toContain('/byok model kilo-auto/free');
         expect(ctx.output()).toContain('/session sdk next new && /byok provider kilo-code kilo-auto/free');
         expect(ctx.output()).toContain('/byok persist provider kilo-code kilo-auto/free');
+        expect(ctx.output()).not.toContain('candidate alternative');
+        expect(ctx.output()).not.toContain('new provider');
     });
 
     it('aplica efeito auto live apenas quando a policy autoriza', async () => {
@@ -3721,6 +3740,8 @@ describe('terminal /byok command', () => {
         expect(fixtureCtx.output()).not.toContain('action=');
         expect(fixtureCtx.output()).not.toContain('applied=');
         expect(fixtureCtx.output()).not.toContain('recorded=');
+        expect(fixtureCtx.output()).not.toContain('prepare_new_sdk_session');
+        expect(fixtureCtx.output()).not.toContain('new_session_not_allowed');
         expect(recoveriesCtx.output()).toContain('Recuperações BYOK');
         expect(recoveriesCtx.output()).toContain('limite de taxa');
         expect(recoveriesCtx.output()).toContain('escopo');
@@ -3808,6 +3829,18 @@ describe('terminal /byok command', () => {
                 expect.objectContaining({ kind: 'set_live_model', skippedReason: 'live_set_model_not_allowed' }),
             ]),
         );
+        expect(result.skipped.map(describeTerminalByokGatewayAutoEffect)).toEqual(
+            expect.arrayContaining([
+                'trocar modelo vivo aguardando autorização da policy',
+                'trocar modelo vivo não aplicado (troca viva não autorizada)',
+            ]),
+        );
+        expect(
+            describeTerminalByokGatewayAutoEffect({
+                kind: 'prepare_new_sdk_session',
+                skippedReason: 'new_session_not_allowed',
+            }),
+        ).toBe('preparar novo boot SDK não aplicado (nova sessão não autorizada)');
         const records = createTerminalByokGatewayAutoEffectApplicationRecords(
             {
                 args: { profileId: 'repo_agent' },

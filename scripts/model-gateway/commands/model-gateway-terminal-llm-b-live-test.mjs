@@ -6090,9 +6090,13 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'auto-human-default-copy',
-            pass: !/\b(?:providerCall=nao|liveSetModel=|runtimeSelector=|action=|ledgers:|from=|reason=|live setModel|Modelo SDK:)\b/iu.test(
-                plain,
-            ),
+            pass:
+                !/\b(?:providerCall=nao|liveSetModel=|runtimeSelector=|action=|ledgers:|from=|reason=|live setModel|Modelo SDK:|prepare_new_sdk_session|new_session_not_allowed|manual_intervention|candidate alternative|selected route|new provider)\b/iu.test(
+                    plain,
+                ) &&
+                !/(?:Check|Classe|Sem ação|Bloqueios|Política)\s+.*(?:new session policy|new session requires explicit policy|automation decision|standby routes|terminal boundary|preset operator_manual)/iu.test(
+                    plain,
+                ),
             detail: 'auto/BYOK control surfaces avoided raw key-value and setModel jargon in default copy',
         },
         {

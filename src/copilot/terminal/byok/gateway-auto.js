@@ -84,6 +84,39 @@ function defaultRetryAfterSeconds(failureKind) {
 }
 
 /**
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+function renderAutomationTokenLabel(value) {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) return '-';
+    const key = normalized.toLowerCase().replace(/[\s-]+/gu, '_');
+    const labels = /** @type {Record<string, string>} */ ({
+        set_live_model: 'trocar modelo vivo',
+        prepare_new_sdk_session: 'preparar novo boot SDK',
+        replan_after_turn_failure: 'replanejamento pós-falha',
+        effect_not_authorized: 'aguardando autorização',
+        live_set_model_not_allowed: 'troca viva não autorizada',
+        new_session_not_allowed: 'nova sessão não autorizada',
+        policy_denied: 'política não autorizou',
+        policy_disabled: 'política desativada',
+        rate_limit: 'limite de taxa',
+        rate_limited: 'limitado por taxa',
+        unknown_failure: 'falha desconhecida',
+        unknown_effect: 'efeito desconhecido',
+    });
+    if (labels[normalized]) return labels[normalized];
+    if (labels[key]) return labels[key];
+    if (normalized.includes(':')) {
+        return normalized
+            .split(':')
+            .map((part) => renderAutomationTokenLabel(part))
+            .join(' · ');
+    }
+    return normalized.replace(/[_-]+/gu, ' ');
+}
+
+/**
  * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
  * @param {Record<string, unknown>} turnFailure
  * @returns {{ routeProfile: string; providerId: string | null; providerModel: string | null; failureKind: string; message: string | null; errorContext: string | null; failureStatusCode: number | null; retryAfterSeconds: number | null; resetAt: string | null }}
@@ -119,6 +152,7 @@ function resolvePostTurnHealthFailure(status, turnFailure) {
  */
 export function describeTerminalByokGatewayAutoEffect(effect) {
     const kind = optionalScalarString(effect['kind']) ?? 'unknown_effect';
+    const label = renderAutomationTokenLabel(kind);
     const model = optionalScalarString(effect['model']);
     const previousModel = optionalScalarString(effect['previousModel']);
     const currentModel = optionalScalarString(effect['currentModel']) ?? model;
@@ -134,15 +168,15 @@ export function describeTerminalByokGatewayAutoEffect(effect) {
     }
     if (effect['applied'] === true && kind === 'replan_after_turn_failure') {
         const scope = optionalScalarString(effect['recoveryScope']) === 'account' ? 'conta/key' : 'modelo/rota';
-        return `replanejamento pós-falha registrado (${optionalScalarString(effect['failureKind']) ?? 'unknown_failure'}, escopo ${scope})`;
+        return `replanejamento pós-falha registrado (${renderAutomationTokenLabel(optionalScalarString(effect['failureKind']) ?? 'unknown_failure')}, escopo ${scope})`;
     }
     if (skippedReason === 'effect_not_authorized') {
-        return `efeito ${kind} aguardando autorizacao da policy`;
+        return `${label} aguardando autorização da policy`;
     }
     if (skippedReason) {
-        return `efeito ${kind} nao aplicado (${skippedReason})`;
+        return `${label} não aplicado (${renderAutomationTokenLabel(skippedReason)})`;
     }
-    return `efeito ${kind}`;
+    return label;
 }
 
 /**

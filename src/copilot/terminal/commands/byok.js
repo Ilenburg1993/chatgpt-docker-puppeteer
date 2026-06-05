@@ -246,6 +246,14 @@ function joinTerminalSummary(parts) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeByokLabelKey(value) {
+    return value.toLowerCase().replace(/[\s-]+/gu, '_');
+}
+
+/**
  * @param {string | null | undefined} value
  * @returns {string}
  */
@@ -267,9 +275,15 @@ function renderByokSourceLabel(value) {
         'model-gateway': 'model-gateway',
         env_compat: 'env compatível',
         runtime: 'execução observada',
+        selected: 'selecionada',
+        selected_route: 'rota selecionada',
+        candidate_alternative: 'alternativa candidata',
+        candidate: 'candidata',
+        alternative: 'alternativa',
+        new_provider: 'novo provedor',
         unavailable: 'indisponível',
     });
-    return labels[normalized] ?? normalized.replace(/[_-]+/gu, ' ');
+    return labels[normalized] ?? labels[normalizeByokLabelKey(normalized)] ?? normalized.replace(/[_-]+/gu, ' ');
 }
 
 /**
@@ -341,6 +355,18 @@ function renderByokTokenLabel(value) {
         strict_access_only: 'somente acesso confirmado',
         terminal: 'terminal',
         runtime_health: 'saúde runtime',
+        runtime_selector: 'seletor de execução',
+        runtime_selector_alternativa: 'alternativa do seletor',
+        catalog_snapshot: 'snapshot do catálogo',
+        automation_decision: 'decisão automática',
+        standby_routes: 'rotas standby',
+        terminal_boundary: 'fronteira do terminal',
+        agent_probe_missing: 'agent probe ausente',
+        agent_probe_not_verified: 'agent probe não verificada',
+        agent_probe_failed: 'agent probe falhou',
+        chat_health_missing: 'saúde de chat ausente',
+        chat_health_failed: 'saúde de chat falhou',
+        health_unknown: 'saúde desconhecida',
         authenticated_account_api: 'API autenticada da conta',
         authenticated_catalog: 'catálogo autenticado',
         authenticated_models: 'modelos autenticados',
@@ -359,6 +385,12 @@ function renderByokTokenLabel(value) {
         temporary: 'temporário',
         not_blocking: 'sem bloqueio',
         explicit_reset_at: 'reset explícito',
+        selected: 'selecionada',
+        selected_route: 'rota selecionada',
+        candidate_alternative: 'alternativa candidata',
+        new_provider: 'novo provedor',
+        same_provider: 'mesmo provedor',
+        no_selected_route: 'nenhuma rota selecionada',
         key_account_and_public_models: 'conta da key e modelos públicos',
         key_credit_balance: 'saldo de crédito da key',
         headers_or_runtime_failure: 'headers ou falha runtime',
@@ -383,13 +415,19 @@ function renderByokTokenLabel(value) {
         failed: 'falhou',
         pass: 'ok',
         blocked: 'bloqueado',
+        blocked_no_selected_route: 'bloqueado: nenhuma rota selecionada',
         'admission-blocked': 'bloqueado na admissão',
         ready: 'pronto',
         deferred: 'adiado',
         applied: 'aplicado',
+        dry_run: 'simulação',
         manual_intervention: 'intervenção manual',
         effect_not_authorized: 'aguardando autorização',
+        effects_not_enabled: 'efeitos desativados',
         new_session_not_allowed: 'nova sessão não autorizada',
+        new_session_policy: 'política de nova sessão',
+        new_session_policy_required: 'política exige nova sessão explícita',
+        new_session_requires_explicit_policy: 'nova sessão exige política explícita',
         boot_scheduled: 'novo boot agendado',
         model_mismatch: 'modelo divergente',
         apply_live_model: 'aplicar modelo vivo',
@@ -408,13 +446,24 @@ function renderByokTokenLabel(value) {
         runtime_selector_route_missing: 'seletor não encontrou rota',
         selected_route_missing: 'rota selecionada ausente',
         rate_limit_resettable: 'limite de taxa com reset',
+        rate_limit: 'limite de taxa',
         provider_health_cooldown: 'cooldown de saúde do provedor',
         route_wait_for_reset: 'rota aguardando reset',
         'blocked:provider_health_cooldown:rate-limit': 'bloqueada por cooldown de limite de taxa',
+        blocked_provider_health_cooldown_rate_limit: 'bloqueada por cooldown de limite de taxa',
         keep_current: 'manter atual',
         wait_for_reset: 'aguardar reset',
     });
-    return labels[normalized] ?? normalized.replace(/[_-]+/gu, ' ');
+    const key = normalizeByokLabelKey(normalized);
+    if (labels[normalized]) return labels[normalized];
+    if (labels[key]) return labels[key];
+    if (normalized.includes(':')) {
+        return normalized
+            .split(':')
+            .map((part) => renderByokTokenLabel(part))
+            .join(' · ');
+    }
+    return normalized.replace(/[_-]+/gu, ' ');
 }
 
 /**
@@ -3016,7 +3065,7 @@ async function renderByokGatewayOperatorReady(println, rest) {
         {
             id: 'automation_decision',
             pass: status.decision.ok === true || status.decision.action === 'keep_current',
-            detail: `ação ${status.decision.action} · bloqueios ${status.decision.blockers.length}`,
+            detail: `ação ${renderByokTokenLabel(status.decision.action)} · bloqueios ${status.decision.blockers.length}`,
         },
         {
             id: 'standby_routes',
@@ -3050,7 +3099,7 @@ async function renderByokGatewayOperatorReady(println, rest) {
     println(
         terminalThemeWrappedRow(
             'Política',
-            `ativa ${yesNo(policy.enabled)} · preset ${policy.preset} · modo ${renderByokTokenLabel(policy.policy)} · modelo vivo ${yesNo(policy.allowLiveSetModel)} · nova sessão ${yesNo(policy.allowNewSession)} · local privado ${yesNo(policy.allowLocalPrivate)}`,
+            `ativa ${yesNo(policy.enabled)} · preset ${renderByokAutoPresetLabel(optionalScalarString(policy.preset) ?? 'operator_manual')} · modo ${renderByokTokenLabel(policy.policy)} · modelo vivo ${yesNo(policy.allowLiveSetModel)} · nova sessão ${yesNo(policy.allowNewSession)} · local privado ${yesNo(policy.allowLocalPrivate)}`,
             { role: policy.enabled ? 'success' : 'warn', columns: 112 },
         ),
     );
@@ -4454,11 +4503,10 @@ async function renderByokGatewayAutoStandby(println, rest) {
         return;
     }
     for (const [index, row] of visibleRows.entries()) {
-        const source = row.source === 'selected' ? 'selecionada' : 'alternativa';
         println(
             terminalThemeWrappedRow(
                 `${index + 1}. Rota`,
-                `${row.providerId}:${row.providerModel} · ${source} · classe ${renderByokTokenLabel(row.standbyClass)} · precisa sonda ${yesNo(row.needsProbe)} · perfil ${row.profileId} · prova ${yesNo(row.hasRuntimeProof)} · env ${renderByokTokenLabel(row.runtimeEnvStatus)} · pontuação ${row.score ?? '-'}`,
+                `${row.providerId}:${row.providerModel} · ${renderByokSourceLabel(row.source)} · classe ${renderByokTokenLabel(row.standbyClass)} · precisa sonda ${yesNo(row.needsProbe)} · perfil ${row.profileId} · prova ${yesNo(row.hasRuntimeProof)} · env ${renderByokTokenLabel(row.runtimeEnvStatus)} · pontuação ${row.score ?? '-'}`,
                 { role: row.needsProbe ? 'warn' : 'success', columns: 112 },
             ),
         );
@@ -4860,7 +4908,7 @@ async function renderByokGatewayAutoPolicy(println) {
     println(
         terminalThemeWrappedRow(
             'Política',
-            `${renderByokAutoPresetLabel(effectivePolicy.preset)} · fonte ${policySources['preset']?.source ?? '-'} · preset ${effectivePolicy.preset}`,
+            `${renderByokAutoPresetLabel(effectivePolicy.preset)} · fonte ${renderByokTokenLabel(policySources['preset']?.source)}`,
             { role: 'warn', columns: 112 },
         ),
     );
@@ -4884,7 +4932,7 @@ async function renderByokGatewayAutoPolicy(println) {
         println(
             terminalThemeWrappedRow(
                 'Preset',
-                `${renderByokAutoPresetLabel(String(preset['preset']))} (${preset['preset']}) · regra ${renderByokTokenLabel(optionalScalarString(preset['policy']))} · troca viva ${yesNo(preset['allowLiveSetModel'] === true)} · nova sessão ${yesNo(preset['allowNewSession'] === true)} · local privado ${yesNo(preset['allowLocalPrivate'] === true)}`,
+                `${renderByokAutoPresetLabel(String(preset['preset']))} · código ${preset['preset']} · regra ${renderByokTokenLabel(optionalScalarString(preset['policy']))} · troca viva ${yesNo(preset['allowLiveSetModel'] === true)} · nova sessão ${yesNo(preset['allowNewSession'] === true)} · local privado ${yesNo(preset['allowLocalPrivate'] === true)}`,
                 { role: 'muted', columns: 112 },
             ),
         );
