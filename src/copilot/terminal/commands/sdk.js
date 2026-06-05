@@ -80,6 +80,10 @@ import {
     terminalThemeText,
     terminalThemeWrappedRow,
 } from '../state/ui/index.js';
+import {
+    compactTerminalDiagnosticId,
+    formatTerminalToolPathForOperator,
+} from '../events/tool-activity-presenter.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, renderRuntimeTargetLabel } from './runtime-target.js';
 
 /**
@@ -453,6 +457,23 @@ function ioSummary(result) {
     const engine = typeof io['engine'] === 'string' ? io['engine'] : null;
     if (!operation && !engine) return '';
     return `I/O ${operation ?? '-'} · motor ${engine ?? '-'}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderOperatorPath(value) {
+    const text = typeof value === 'string' ? value : value == null ? '' : String(value);
+    return formatTerminalToolPathForOperator(text) || text || '-';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderAuditTrace(value) {
+    return compactTerminalDiagnosticId(typeof value === 'string' ? value : value == null ? '' : String(value), 12) ?? 'sem id';
 }
 
 /**
@@ -1482,8 +1503,8 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
                 role: enabled ? 'command' : 'muted',
             }),
         );
-        if (projectPath) println(terminalThemeRow('Projeto', projectPath));
-        if (path && path !== projectPath) println(terminalThemeRow('Caminho', path));
+        if (projectPath) println(terminalThemeRow('Projeto', renderOperatorPath(projectPath)));
+        if (path && path !== projectPath) println(terminalThemeRow('Caminho', renderOperatorPath(path)));
     }
     if (skills.length > 40) println(terminalThemeRow('Omitidas', pluralPt(skills.length - 40, 'skill', 'skills')));
     println(
@@ -1905,7 +1926,7 @@ export async function cmdWorkspace({ println }, arg = '') {
             }
             const result = await callWithRuntimeTarget(readTerminalSdkWorkspaceFile, runtimeId, path);
             println('');
-            println(terminalThemeHeadline('fileRead', 'Workspace SDK virtual', [path]));
+            println(terminalThemeHeadline('fileRead', 'Workspace SDK virtual', [renderOperatorPath(path)]));
             println(terminalThemeRow('Escopo', 'SDK virtual; não é FS local'));
             println(terminalThemeRow('Retorno', pretty(result, 4000)));
             println('');
@@ -1919,7 +1940,7 @@ export async function cmdWorkspace({ println }, arg = '') {
             const result = await callWithRuntimeTarget(createTerminalSdkWorkspaceFile, runtimeId, path, content);
             println('');
             println(terminalThemeRow('Workspace', 'arquivo escrito no SDK virtual', { role: 'success' }));
-            println(terminalThemeRow('Arquivo', path, { role: 'fileWrite' }));
+            println(terminalThemeRow('Arquivo', renderOperatorPath(path), { role: 'fileWrite' }));
             println(terminalThemeRow('Retorno', pretty(result, 500)));
             println('');
         } else if (sub === 'sync' || sub === 'materialize') {
@@ -1978,8 +1999,8 @@ export async function cmdWorkspace({ println }, arg = '') {
 
             println('');
             println(terminalThemeRow('Materialização', 'SDK para FS concluída', { role: 'success' }));
-            println(terminalThemeRow('Origem', sourcePath, { role: 'fileRead' }));
-            println(terminalThemeRow('Destino', destinationPath, { role: 'fileWrite' }));
+            println(terminalThemeRow('Origem', renderOperatorPath(sourcePath), { role: 'fileRead' }));
+            println(terminalThemeRow('Destino', renderOperatorPath(destinationPath), { role: 'fileWrite' }));
             const io = ioSummary(writeResult);
             if (io) println(terminalThemeRow('I/O', io));
             println(terminalThemeRow('Bytes', String(writeResult['bytesWritten'] ?? content.length)));
@@ -2006,7 +2027,7 @@ export async function cmdWorkspace({ println }, arg = '') {
                 const content = workspaceReadContent(readResult);
                 if (content === null) {
                     fail += 1;
-                    println(terminalThemeRow('Ignorado', `${sourcePath} · conteúdo não textual`, { role: 'warn' }));
+                    println(terminalThemeRow('Ignorado', `${renderOperatorPath(sourcePath)} · conteúdo não textual`, { role: 'warn' }));
                     continue;
                 }
                 const destinationPath = `${targetRoot.replace(/\/$/u, '')}/${sourcePath}`;
@@ -2016,20 +2037,30 @@ export async function cmdWorkspace({ println }, arg = '') {
                 );
                 if (writeResult['success'] === true) {
                     ok += 1;
-                    println(terminalThemeRow('Mirror', `${sourcePath} → ${destinationPath}`, { role: 'success' }));
+                    println(
+                        terminalThemeRow(
+                            'Mirror',
+                            `${renderOperatorPath(sourcePath)} → ${renderOperatorPath(destinationPath)}`,
+                            { role: 'success' },
+                        ),
+                    );
                 } else {
                     fail += 1;
                     println(
-                        terminalThemeRow('Mirror', `${sourcePath} · ${String(writeResult['error'] ?? 'erro')}`, {
-                            role: 'error',
-                        }),
+                        terminalThemeRow(
+                            'Mirror',
+                            `${renderOperatorPath(sourcePath)} · ${String(writeResult['error'] ?? 'erro')}`,
+                            {
+                                role: 'error',
+                            },
+                        ),
                     );
                 }
             }
 
             println('');
             println(
-                terminalThemeRow('Mirror SDK', `concluído · ok=${ok} · fail=${fail} · root=${targetRoot}`, {
+                terminalThemeRow('Mirror SDK', `concluído · ok ${ok} · falhas ${fail} · destino ${renderOperatorPath(targetRoot)}`, {
                     role: fail > 0 ? 'warn' : 'success',
                 }),
             );
@@ -2067,7 +2098,7 @@ export async function cmdWorkspace({ println }, arg = '') {
                         ),
                     );
                 }
-                println(terminalThemeRow('Trace', result.traceId));
+                println(terminalThemeRow('Auditoria', `trace ${renderAuditTrace(result.traceId)}`));
                 println('');
                 await renderCommandFailureGuidance(println, runtimeId);
                 return;
@@ -2075,12 +2106,12 @@ export async function cmdWorkspace({ println }, arg = '') {
 
             println('');
             println(terminalThemeRow('Promoção', 'FS para SDK concluída', { role: 'success' }));
-            println(terminalThemeRow('Origem', sourcePath, { role: 'fileRead' }));
-            println(terminalThemeRow('Destino', destinationPath, { role: 'fileWrite' }));
+            println(terminalThemeRow('Origem', renderOperatorPath(sourcePath), { role: 'fileRead' }));
+            println(terminalThemeRow('Destino', renderOperatorPath(destinationPath), { role: 'fileWrite' }));
             println(
                 terminalThemeRow(
                     'Política',
-                    `${flags.overwrite ? 'overwrite' : 'fail-if-exists'} · ação ${result.action} · bytes ${result.bytes} · traceId ${result.traceId}`,
+                    `${flags.overwrite ? 'overwrite' : 'fail-if-exists'} · ação ${result.action} · bytes ${result.bytes} · auditoria ${renderAuditTrace(result.traceId)}`,
                 ),
             );
             println('');
@@ -2096,7 +2127,7 @@ export async function cmdWorkspace({ println }, arg = '') {
             if (files.length > 0) {
                 for (const file of files.slice(0, 80)) {
                     const f = objectOrNull(file) ?? {};
-                    println(terminalThemeRow('Arquivo', String(f['path'] ?? f['name'] ?? file), { role: 'fileRead' }));
+                    println(terminalThemeRow('Arquivo', renderOperatorPath(f['path'] ?? f['name'] ?? file), { role: 'fileRead' }));
                 }
                 if (files.length > 80)
                     println(

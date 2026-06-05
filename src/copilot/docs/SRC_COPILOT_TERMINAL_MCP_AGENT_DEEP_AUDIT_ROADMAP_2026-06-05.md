@@ -360,6 +360,9 @@
 - [x] Gap 33: `operator-ux-cycle` avançava após palavras genéricas do status BYOK (`Sessão viva`/`Modelo vivo`) e podia intercalar `/activity` antes de `Modelo vivo solicitado`; agora espera o marcador específico de pedido/adiamento/falha.
 - [x] Gap 34: `/session save` imprimia caminho absoluto do workspace na superfície default; agora usa path relativo humano, preservando o caminho completo nas camadas de persistência.
 - [x] Gap 35: `/metrics` imprimia o arquivo do archive SSE como caminho absoluto do workspace; agora a superfície default usa caminho relativo humano e mantém o caminho completo apenas em estado interno/export técnico.
+- [x] Gap 36: `/session list` e `/session restore` ainda usavam ANSI literal, IDs/status crus e sufixos como `[ready]`; agora usam tema central, rótulos humanos, IDs compactos e instruções consistentes.
+- [x] Gap 37: `/sdk skills` expunha paths absolutos de skills em projetos externos; agora paths passam pelo formatador de operador e ficam compactos.
+- [x] Gap 38: `/workspace mirror|promote|sync` ainda usava `ok=`, `fail=`, `root=` e `traceId` na superfície principal; agora usa contadores humanos, paths compactos e rótulo de auditoria.
 
 ## 08. Criterio de Marco
 
@@ -429,3 +432,5 @@
 - [x] 2026-06-05: live `operator-ux-cycle` pass7 revelou avanço prematuro do harness em `/byok model`; o `waitFor` agora exige `Modelo vivo solicitado` ou saída específica de adiamento/falha, evitando comandos colados no bloco visual anterior.
 - [x] 2026-06-05: `cmdSessionSave` passou a renderizar o arquivo salvo via `formatTerminalToolPathForOperator`, removendo `/workspaces/...` do fluxo visual padrão.
 - [x] 2026-06-05: `/metrics` passou a renderizar o caminho do archive SSE via `formatTerminalToolPathForOperator`, com teste garantindo `data/copilot-terminal/sse-events` sem `process.cwd()`.
+- [x] 2026-06-05: `/session list` e `/session restore` foram migrados para `terminalThemeHeadline/Row`, com perguntas restauradas humanizadas (`pronto`, `operador`, etc.) e sem ANSI hardcoded nos testes.
+- [x] 2026-06-05: `/sdk skills` e `/workspace` agora reutilizam `formatTerminalToolPathForOperator`/`compactTerminalDiagnosticId` para skills, workspace virtual, mirror e promoção FS↔SDK.

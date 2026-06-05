@@ -44,6 +44,7 @@ import {
 } from '../byok/index.js';
 import {
     buildTerminalToolActivityPresentation,
+    compactTerminalDiagnosticId,
     compactTerminalOperatorToolText,
     compactTerminalToolText,
     formatTerminalToolPathForOperator,
@@ -334,6 +335,27 @@ function renderTerminalPermissionModeLabel(value) {
  */
 function renderTerminalSdkSessionPresence(value) {
     return typeof value === 'string' && value.trim().length > 0 ? 'sessão ativa' : 'sem sessão SDK';
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} [fallback]
+ * @returns {string}
+ */
+function renderTerminalSnapshotReference(value, fallback = '(sem id)') {
+    const text = typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim();
+    if (!text) return fallback;
+    return compactTerminalDiagnosticId(text, 28) ?? fallback;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTerminalSnapshotSessionReference(value) {
+    const text = typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim();
+    if (!text) return '(nenhuma)';
+    return compactTerminalDiagnosticId(text, 32) ?? '(nenhuma)';
 }
 
 /**
@@ -2632,20 +2654,23 @@ export async function cmdSessionSave({ println }, reason) {
 export async function cmdSessionList({ println }) {
     const snaps = await listTerminalSnapshotsProjection();
     if (snaps.length === 0) {
-        println('\x1b[90m  Nenhum snapshot encontrado.\x1b[0m');
+        println(terminalThemeRow('Snapshots', 'nenhum snapshot encontrado', { role: 'warn' }));
         return;
     }
-    println(`\x1b[36m  Snapshots disponíveis (${snaps.length}):\x1b[0m`);
-    for (const s of snaps) {
+    println(terminalThemeHeadline('assistant', 'Snapshots da sessão', [`${snaps.length} disponíveis`]));
+    snaps.forEach((s, index) => {
         const createdAt = s['createdAt'];
         const date =
             typeof createdAt === 'number' || typeof createdAt === 'string'
                 ? formatTerminalTimeLabel(createdAt, { mode: 'dual' })
                 : 'data inválida';
+        const snapshotId = renderTerminalSnapshotReference(s['snapshotId']);
+        const model = compactHumanTerminalText(s['model'] || 'modelo desconhecido');
+        const reason = compactHumanTerminalText(s['reason'] || 'sem motivo');
         println(
-            `    ${String(s['snapshotId'] ?? '')}  ${date}  modelo ${String(s['model'] ?? '')}  ${String(s['reason'] ?? '')}`,
+            terminalThemeRow(`#${index + 1}`, `${snapshotId} · ${date} · ${model} · ${reason}`, { role: 'info' }),
         );
-    }
+    });
 }
 
 /**
@@ -2657,50 +2682,72 @@ export async function cmdSessionList({ println }) {
  */
 export async function cmdSessionRestore({ println }, snapshotId) {
     if (!snapshotId) {
-        println('\x1b[33m  Uso: /session restore <snapshotId>\x1b[0m');
-        println('\x1b[90m  Use /session list para ver snapshots disponíveis.\x1b[0m');
+        println(terminalThemeRow('Uso', '/session restore <snapshotId>', { role: 'command' }));
+        println(terminalThemeRow('Ação', 'use /session list para ver snapshots disponíveis', { role: 'muted' }));
         return;
     }
 
     const snap = await loadTerminalSnapshotProjection(snapshotId);
     if (!snap) {
-        println(`\x1b[31m  Snapshot não encontrado: ${snapshotId}\x1b[0m`);
+        println(terminalThemeRow('Snapshot', `não encontrado · ${renderTerminalSnapshotReference(snapshotId)}`, { role: 'error' }));
+        println(terminalThemeRow('Ação', 'use /session list para conferir ids disponíveis', { role: 'command' }));
         return;
     }
 
-    println(`\x1b[36m  Snapshot: ${String(snap['snapshotId'] ?? '(sem id)')}\x1b[0m`);
+    println(terminalThemeHeadline('assistant', 'Snapshot da sessão', [renderTerminalSnapshotReference(snap['snapshotId'])]));
     const createdAt = snap['createdAt'];
     const createdAtIso =
         typeof createdAt === 'number' || typeof createdAt === 'string'
             ? formatTerminalTimeLabel(createdAt, { mode: 'dual' })
             : 'data inválida';
-    println(`    Criado: ${createdAtIso}`);
-    println(`    Sessão: ${String(snap['sessionId'] ?? '(nenhuma)')}`);
-    println(`    Modelo: ${String(snap['model'] ?? 'desconhecido')}  Status: ${String(snap['status'] ?? 'desconhecido')}`);
-    println(`    Envios: ${Number(snap['sendCount'] ?? 0)}`);
+    println(terminalThemeRow('Criado', createdAtIso));
+    println(terminalThemeRow('Sessão', renderTerminalSnapshotSessionReference(snap['sessionId'])));
     println(
-        `    Conversa: ${snap['dialogLoopActive'] ? 'ativa' : 'inativa'}${snap['dialogPaused'] ? ' (pausada)' : ''}`,
+        terminalThemeRow(
+            'Modelo',
+            `${compactHumanTerminalText(snap['model'] || 'desconhecido')} · ${renderHumanTerminalStatus(snap['status'])}`,
+            { role: 'assistant' },
+        ),
+    );
+    println(terminalThemeRow('Envios', String(Number(snap['sendCount'] ?? 0))));
+    println(
+        terminalThemeRow(
+            'Conversa',
+            `${snap['dialogLoopActive'] ? 'ativa' : 'inativa'}${snap['dialogPaused'] ? ' · pausada' : ''}`,
+        ),
     );
     if (snap['pendingQuestion']) {
         const pendingMeta =
             snap['pendingQuestionMeta'] && typeof snap['pendingQuestionMeta'] === 'object'
                 ? /** @type {{ kind?: string }} */ (snap['pendingQuestionMeta'])
                 : null;
-        const pendingKind = pendingMeta?.kind ? ` [${pendingMeta.kind}]` : '';
-        println(`    Pergunta pendente${pendingKind}: ${String(snap['pendingQuestion'])}`);
+        const pendingKind = renderTerminalPendingQuestionKindLabel(pendingMeta?.kind, 'operador');
+        println(
+            terminalThemeRow(
+                'Pergunta pendente',
+                `${pendingKind} · ${compactHumanTerminalText(snap['pendingQuestion'])}`,
+                { role: 'question' },
+            ),
+        );
     }
     if (snap['pendingQuestionShadow'] && typeof snap['pendingQuestionShadow'] === 'object') {
         const shadow =
             /** @type {{ question?: unknown; meta?: { kind?: unknown }; restoredAt?: unknown; expiresAt?: unknown }} */ (
                 snap['pendingQuestionShadow']
             );
-        const shadowKind = typeof shadow.meta?.kind === 'string' ? ` [${shadow.meta.kind}]` : '';
-        println(`    Pergunta restaurada${shadowKind}: ${String(shadow.question ?? '(sem texto)')}`);
+        const shadowKind = renderTerminalPendingQuestionKindLabel(shadow.meta?.kind, 'operador');
+        println(
+            terminalThemeRow(
+                'Pergunta restaurada',
+                `${shadowKind} · ${compactHumanTerminalText(shadow.question ?? '(sem texto)')}`,
+                { role: 'question' },
+            ),
+        );
         if (typeof shadow.restoredAt === 'number') {
-            println(`    Restaurada em: ${formatTerminalTimeLabel(shadow.restoredAt, { mode: 'dual' })}`);
+            println(terminalThemeRow('Restaurada em', formatTerminalTimeLabel(shadow.restoredAt, { mode: 'dual' })));
         }
         if (typeof shadow.expiresAt === 'number') {
-            println(`    Expira em: ${formatTerminalTimeLabel(shadow.expiresAt, { mode: 'dual' })}`);
+            println(terminalThemeRow('Expira em', formatTerminalTimeLabel(shadow.expiresAt, { mode: 'dual' })));
         }
     }
     if (snap['prMetrics']) {
@@ -2708,8 +2755,11 @@ export async function cmdSessionRestore({ println }, snapshotId) {
             snap['prMetrics']
         );
         println(
-            `    PR metrics: boots=${Number(prMetrics.boots ?? 0)} resumePR=${Number(prMetrics.resumesWithPR ?? 0)} zeroPR=${Number(prMetrics.resumesZeroPR ?? 0)}`,
+            terminalThemeRow(
+                'Premium Requests',
+                `boots ${Number(prMetrics.boots ?? 0)} · retomadas com PR ${Number(prMetrics.resumesWithPR ?? 0)} · retomadas zero PR ${Number(prMetrics.resumesZeroPR ?? 0)}`,
+            ),
         );
     }
-    println('\x1b[90m    (Restore automático ocorre no boot via PM2 — use /session save antes de reiniciar)\x1b[0m');
+    println(terminalThemeRow('Nota', 'restore automático ocorre no boot via PM2; use /session save antes de reiniciar'));
 }

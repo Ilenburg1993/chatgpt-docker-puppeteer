@@ -509,6 +509,8 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('slash');
         expect(ctx.output()).toContain('projeto /repo');
         expect(ctx.output()).toContain('diretório /extra-skills');
+        expect(ctx.output()).toContain('/…/.github/skills/pdf/SKILL.md');
+        expect(ctx.output()).not.toContain('/repo/.github/skills/pdf/SKILL.md');
         expect(ctx.output()).toContain('custom agent = definição');
         expect(ctx.output()).not.toContain('enabled=1');
     });
@@ -679,7 +681,9 @@ describe('terminal/commands/sdk', () => {
             expect.objectContaining({ path: 'tmp/sdk-mirror/dir/b.md', content: 'B', encoding: 'utf8' }),
         );
         expect(ctx.output()).toContain('Mirror SDK');
-        expect(ctx.output()).toContain('ok=2');
+        expect(ctx.output()).toContain('ok 2');
+        expect(ctx.output()).toContain('falhas 0');
+        expect(ctx.output()).not.toContain('ok=2');
     });
 
     it('/workspace promote promove arquivo local para workspace SDK com conflito auditável', async () => {
@@ -699,7 +703,8 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('Promoção');
         expect(ctx.output()).toContain('concluída');
         expect(ctx.output()).toContain('fail-if-exists');
-        expect(ctx.output()).toContain('traceId');
+        expect(ctx.output()).toContain('auditoria');
+        expect(ctx.output()).not.toContain('traceId');
 
         runtimeMocks.readTerminalSdkWorkspaceFile.mockResolvedValueOnce({
             path: 'notes/from-local.md',
@@ -710,6 +715,8 @@ describe('terminal/commands/sdk', () => {
 
         expect(conflict.output()).toContain('conflict');
         expect(conflict.output()).toContain('--overwrite');
+        expect(conflict.output()).toContain('Auditoria');
+        expect(conflict.output()).not.toContain('Trace');
     });
 
     it('/workspace promote permite overwrite explícito no workspace SDK', async () => {

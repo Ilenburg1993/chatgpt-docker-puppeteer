@@ -1393,26 +1393,38 @@ describe('commands/session — async commands', () => {
     it('cmdSessionList lista snapshots', async () => {
         const ctx = mockCtx();
         await cmdSessionList({ println: ctx.println });
+        expect(ctx.output()).toContain('Snapshots da sessão');
         expect(ctx.output()).toContain('snap-001');
+        expect(ctx.output()).not.toContain('Snapshots disponíveis');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('cmdSessionRestore sem id mostra uso', async () => {
         const ctx = mockCtx();
         await cmdSessionRestore({ println: ctx.println }, '');
         expect(ctx.output()).toContain('/session restore');
+        expect(ctx.output()).toContain('/session list');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('cmdSessionRestore com id válido mostra detalhes', async () => {
         const ctx = mockCtx();
         await cmdSessionRestore({ println: ctx.println }, 'snap-001');
+        expect(ctx.output()).toContain('Snapshot da sessão');
         expect(ctx.output()).toContain('snap-001');
         expect(ctx.output()).toContain('gpt-5-mini');
         expect(ctx.output()).toContain('Pergunta restaurada');
+        expect(ctx.output()).toContain('pronto · READY: aguardando próxima mensagem');
+        expect(ctx.output()).not.toContain('[ready]');
+        expect(ctx.output()).not.toContain('PR metrics');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('cmdSessionRestore com id inválido mostra erro', async () => {
         const ctx = mockCtx();
         await cmdSessionRestore({ println: ctx.println }, 'nonexistent');
         expect(ctx.output()).toContain('não encontrado');
+        expect(ctx.output()).toContain('/session list');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 });
