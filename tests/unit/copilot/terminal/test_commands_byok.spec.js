@@ -3123,6 +3123,26 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('canonical_commands_are_published');
     });
 
+    it('lista overlays de conta do model-gateway com superfície humana e segredos redigidos', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway overlays openrouter');
+
+        expect(ctx.output()).toContain('BYOK overlays de conta');
+        expect(ctx.output()).toContain('data/copilot/model-gateway/catalog.json');
+        expect(ctx.output()).toContain('segredos protegidos sim');
+        expect(ctx.output()).toContain('Provedor');
+        expect(ctx.output()).toContain('openrouter');
+        expect(ctx.output()).toContain('escopo padrão');
+        expect(ctx.output()).toContain('segredo OPENROUTER_API_KEY');
+        expect(ctx.output()).toContain('redigido -');
+        expect(ctx.output()).toContain('não executa modelo nem revela valores de segredo');
+        expect(ctx.output()).not.toContain('\x1b[');
+        expect(ctx.output()).not.toContain('BYOK model-gateway account overlays');
+        expect(ctx.output()).not.toContain('/workspaces/chatgpt-docker-puppeteer/data/copilot/model-gateway/catalog.json');
+    });
+
     it('mostra contas e limites account/key do model-gateway sem executar runtime', async () => {
         mockProjection();
         const ctx = mockCtx();

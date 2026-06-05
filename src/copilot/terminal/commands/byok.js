@@ -374,6 +374,8 @@ function renderByokTokenLabel(value) {
         sdk_entitlement_separate: 'limite SDK separado',
         not_applicable: 'não aplicável',
         unknown: 'desconhecido',
+        sanitized: 'sanitizado',
+        redacted: 'redigido',
         wait_for_rate_limit_reset_or_choose_another_route: 'aguardar reset do limite ou escolher outra rota',
         refresh_overlay_or_retry_pre_runtime_selection: 'atualizar overlay ou tentar seleção pré-runtime novamente',
         'provider.timeout': 'timeout do provedor',
@@ -4785,23 +4787,55 @@ async function renderByokGatewayOverlays(println, rest) {
     const overlays = snapshot.accountOverlays.filter((overlay) =>
         matchesGatewayCatalogRecordSelector(overlay, args.selector),
     );
-    println(`\n  \x1b[36mBYOK model-gateway account overlays\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('accent', 'BYOK overlays de conta'));
     println(
-        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${overlays.length}/${snapshot.accountOverlays.length} · segredos protegidos sim\x1b[0m\n`,
+        terminalThemeRow(
+            'Catálogo',
+            `${formatTerminalToolPathForOperator(store.filePath)} · filtro ${args.selector ?? '-'} · overlays ${overlays.length}/${snapshot.accountOverlays.length} · segredos protegidos sim`,
+            { role: 'muted' },
+        ),
     );
     if (overlays.length === 0) {
-        println('    \x1b[33mNenhum account overlay encontrado para o filtro informado.\x1b[0m\n');
+        println(terminalThemeRow('Resultado', 'nenhum overlay de conta encontrado para o filtro informado.', { role: 'warn' }));
+        println('');
         return;
     }
     for (const overlay of overlays.slice(0, args.limit)) {
         const enabled = Array.isArray(overlay['enabledModels']) ? overlay['enabledModels'].length : 0;
         const blocked = Array.isArray(overlay['blockedModels']) ? overlay['blockedModels'].length : 0;
+        const providerId = optionalScalarString(overlay['providerId']) ?? '-';
         println(
-            `    \x1b[33m${optionalScalarString(overlay['providerId']) ?? '-'}\x1b[0m  \x1b[90mescopo ${optionalScalarString(overlay['accountScope']) ?? 'default'} · segredo ${optionalScalarString(overlay['secretRef']) ?? '-'} · fonte ${optionalScalarString(overlay['sourceId']) ?? '-'} · confiança ${optionalScalarString(overlay['confidence']) ?? '-'}\x1b[0m`,
+            terminalThemeRow('Provedor', providerId, {
+                role: blocked > 0 ? 'warn' : 'accent',
+            }),
         );
-        println(`      \x1b[90mhabilitados ${enabled} · bloqueados ${blocked} · redigido ${optionalScalarString(overlay['redactionStatus']) ?? '-'}\x1b[0m`);
+        println(
+            terminalThemeRow(
+                'Conta',
+                `escopo ${renderByokTokenLabel(optionalScalarString(overlay['accountScope']) ?? 'default')} · segredo ${optionalScalarString(overlay['secretRef']) ?? '-'}`,
+                { role: 'muted' },
+            ),
+        );
+        println(
+            terminalThemeRow(
+                'Fonte',
+                `${renderByokSourceIdLabel(optionalScalarString(overlay['sourceId']))} · confiança ${renderByokTokenLabel(optionalScalarString(overlay['confidence']))}`,
+                { role: 'muted' },
+            ),
+        );
+        println(
+            terminalThemeRow(
+                'Modelos',
+                `habilitados ${enabled} · bloqueados ${blocked} · redigido ${renderByokTokenLabel(optionalScalarString(overlay['redactionStatus']))}`,
+                { role: blocked > 0 ? 'warn' : 'muted' },
+            ),
+        );
     }
-    if (overlays.length > args.limit) println(`\n  \x1b[90mexibindo ${args.limit}/${overlays.length}; use filtro ou limite numerico.\x1b[0m`);
+    if (overlays.length > args.limit) {
+        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${overlays.length}; use filtro ou limite numerico.`, { role: 'muted' }));
+    }
+    println(terminalThemeRow('Nota', 'overlays complementam o catálogo; a tela não executa modelo nem revela valores de segredo.', { role: 'muted' }));
     println('');
 }
 
