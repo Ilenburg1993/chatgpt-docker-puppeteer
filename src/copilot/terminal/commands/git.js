@@ -18,7 +18,7 @@ import {
     gitStatus,
 } from '#copilot/bridges';
 import { renderTerminalDiffPreview } from '../capabilities/index.js';
-import { terminalThemeHeadline, terminalThemeRow, terminalThemeRows, terminalThemeWrappedRow } from '../state/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeWrappedRow } from '../state/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -247,19 +247,16 @@ export async function cmdGit({ println }, args) {
     // help / fallback
     println('');
     println(terminalThemeHeadline('tool', '/git', ['Git operacional']));
-    println(
-        terminalThemeRows(
-            'Comandos',
-            [
-                '/git status',
-                '/git log [n] [--oneline]',
-                '/git diff [--staged] [--plain] [file]',
-                '/git branch',
-                '/git pull',
-                '/git stash [list|pop|drop]',
-            ],
-            { role: 'command' },
-        ),
-    );
+    const rows = [
+        ['Status', '/git status'],
+        ['Log', '/git log [n] [--oneline]'],
+        ['Diff', '/git diff [--staged] [--plain] [file]'],
+        ['Branches', '/git branch'],
+        ['Atualizar', '/git pull'],
+        ['Stash', '/git stash [list|pop|drop]'],
+    ];
+    for (const [label, command] of rows) {
+        println(terminalThemeRow(label, command, { role: 'command' }));
+    }
     println('');
 }

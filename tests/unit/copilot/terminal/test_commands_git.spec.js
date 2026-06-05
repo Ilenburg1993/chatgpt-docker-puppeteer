@@ -108,4 +108,17 @@ describe('terminal/commands/git', () => {
         expect(ctx.output()).toContain('upstream origin/main');
         expect(ctx.output()).toContain('atual');
     });
+
+    it('renderiza help do git como linhas de ações, sem lista multiline em uma só row', async () => {
+        const ctx = mockCtx();
+
+        await cmdGit({ println: ctx.println }, ['help']);
+
+        expect(ctx.output()).toContain('Git operacional');
+        expect(ctx.output()).toContain('Status');
+        expect(ctx.output()).toContain('/git status');
+        expect(ctx.output()).toContain('Diff');
+        expect(ctx.output()).toContain('/git diff [--staged] [--plain] [file]');
+        expect(ctx.output()).not.toContain('Comandos      /git status\n');
+    });
 });

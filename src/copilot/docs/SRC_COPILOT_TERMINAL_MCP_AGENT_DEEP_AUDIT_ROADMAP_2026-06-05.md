@@ -367,6 +367,8 @@
 - [x] Gap 40: `/model list` misturava modelo, `ativo` e badges `[raciocínio]`/`[visão]` sem separadores claros; agora usa uma row compacta por modelo com `· ativo · raciocínio · visão`.
 - [x] Gap 41: live pass11 mostrou `LLM-B modelo confirmado .../sdk models` colado ao input; agora confirmação/reconfirmação de modelo é status concluído e não mantém overlay quando o runtime está idle.
 - [x] Gap 42: `/sdk models` ainda imprimia `reasoning low,medium,high`; agora usa `raciocínio low, medium, high` com espaçamento humano.
+- [x] Gap 43: `/git help` empilhava todos os comandos em uma única row multiline; agora renderiza ações nomeadas, uma por linha.
+- [x] Gap 44: live pass13 falhou por critério antigo que exigia `Comandos` em `/git help`; harness agora valida as novas ações nomeadas e reprova a row multiline antiga.
 
 ## 08. Criterio de Marco
 
@@ -444,3 +446,6 @@
 - [x] 2026-06-05: live `operator-ux-cycle` pass11 FAIL revelou disputa entre overlay de modelo confirmado e input; `shouldRenderTerminalLiveStatusLine` agora suprime confirmações concluídas quando a sessão está ociosa.
 - [x] 2026-06-05: live `operator-ux-cycle` pass12 PASS confirmou `/model list` compacto, `/byok status` limpo e ausência de colisão entre confirmação de modelo e `/sdk models`.
 - [x] 2026-06-05: `/sdk models` passou a humanizar esforços suportados como `raciocínio high`, evitando inglês cru e listas sem espaço.
+- [x] 2026-06-05: `/git help` passou a usar linhas `Status`, `Log`, `Diff`, `Branches`, `Atualizar` e `Stash`, sem bloco multiline em uma única row.
+- [x] 2026-06-05: live `operator-ux-cycle` pass13 mostrou UX correta, mas critério desatualizado; runner agora espera `Status/Diff/Stash` e rejeita `Comandos /git status` multiline.
+- [x] 2026-06-05: live `operator-ux-cycle` pass14 PASS confirmou Git help em ações nomeadas, BYOK/model list compactos, `/sdk models` humanizado e ausência de colisão de overlay.

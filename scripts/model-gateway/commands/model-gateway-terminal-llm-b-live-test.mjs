@@ -3311,9 +3311,11 @@ function operatorUxCycleCriteria(boot) {
         {
             id: 'operator-ux-git-human-shell',
             pass:
-                /\/git help[\s\S]*Git operacional[\s\S]*Comandos/iu.test(surfaceAt(gitHelpStart)) &&
+                /\/git help[\s\S]*Git operacional[\s\S]*Status\s+\/git status[\s\S]*Diff\s+\/git diff[\s\S]*Stash\s+\/git stash/iu.test(
+                    surfaceAt(gitHelpStart),
+                ) &&
                 /Git status/iu.test(surfaceAt(gitStatusStart)) &&
-                !/Git CLI|Verificando status git|Buscando log|Executando git pull|✗|✓/iu.test(
+                !/Git CLI|Verificando status git|Buscando log|Executando git pull|Comandos\s+\/git status\s*\n|✗|✓/iu.test(
                     `${surfaceAt(gitHelpStart)}\n${surfaceAt(gitStatusStart)}`,
                 ),
             detail: '/git help/status used themed command shell instead of old local ANSI banners',
