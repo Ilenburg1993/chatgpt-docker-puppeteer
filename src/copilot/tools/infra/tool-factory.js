@@ -213,6 +213,7 @@ function logToolFactory(level, message) {
  *
  *   - Schema Zod (v3 ou v4, inclusive tipagem SDK) ou JSON Schema manual dos parâmetros
  *
+ * @property {string} [instructions] - Orientação operacional explícita para o modelo usar a tool com segurança.
  * @property {import('#copilot/sdk/types').ToolHandler<TArgs>} handler - Callback executor da ferramenta
  * @property {boolean} [requiresApproval] - Se `true` (default), skipPermission=false
  * @property {boolean} [overridesBuiltInTool] - Se sobrescreve ferramenta nativa do SDK
@@ -295,6 +296,9 @@ function validateToolDefinitionContractLocal(tool) {
     ) {
         return { ok: false, reason: 'parameters deve ser object quando definido.' };
     }
+    if (candidate['instructions'] !== undefined && typeof candidate['instructions'] !== 'string') {
+        return { ok: false, reason: 'instructions deve ser string quando definido.' };
+    }
     return { ok: true };
 }
 
@@ -317,6 +321,7 @@ export function buildTool({
     name,
     description,
     parameters,
+    instructions,
     handler,
     requiresApproval = true,
     overridesBuiltInTool = false,
@@ -326,16 +331,19 @@ export function buildTool({
         parameters: jsonSchemaParams,
     });
 
+    const tool = createTool({
+        name,
+        description,
+        ...(jsonSchemaParams !== undefined ? { parameters: jsonSchemaParams } : {}),
+        handler: /** @type {Parameters<typeof sdkCreateTool>[0]['handler']} */ (failureAwareHandler),
+        // Semântica explícita: requiresApproval=true => skipPermission=false; false => skipPermission=true.
+        skipPermission: !requiresApproval,
+        ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
+    });
     return /** @type {import('#copilot/sdk/types').Tool<TArgs>} */ (
-        createTool({
-            name,
-            description,
-            ...(jsonSchemaParams !== undefined ? { parameters: jsonSchemaParams } : {}),
-            handler: /** @type {Parameters<typeof sdkCreateTool>[0]['handler']} */ (failureAwareHandler),
-            // Semântica explícita: requiresApproval=true => skipPermission=false; false => skipPermission=true.
-            skipPermission: !requiresApproval,
-            ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
-        })
+        typeof instructions === 'string' && instructions.trim().length > 0
+            ? { ...tool, instructions: instructions.trim() }
+            : tool
     );
 }
 

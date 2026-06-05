@@ -65,7 +65,7 @@ Common options:
   --byok-real-require-vision-probe
   --auto-probe
   --model-probe
-  --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip>
+  --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip|file-patch-roundtrip>
   --structured-input-cycle
   --menu-cycle
   --picker-interactive-cycle
@@ -333,6 +333,39 @@ const LIVE_SCENARIOS = Object.freeze({
         expectedOutputMarkers: ['TERMINAL-PERMISSION-ROUNDTRIP'],
         expectedTerminalRender: [
             { toolName: 'move_file', renderedName: 'Mover arquivo', badge: 'MOVER', forbiddenBadge: 'VER' },
+        ],
+    }),
+    'file-patch-roundtrip': createLiveScenario({
+        id: 'file-patch-roundtrip',
+        description: 'create_file, read_file_content com hash, patch_file dry-run/aplicado e delete_file reais',
+        askQuestion: 'ASK-FILEPATCH: responda SIM depois do roundtrip de patch',
+        finalMarker: 'POST-ASK-FILEPATCH-FINAL: patch simulado, aplicado, limpo e usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        beforeDeltaInstructions: [
+            'Os caminhos relativos abaixo são deliberados, seguros, relativos ao workspace atual e já autorizados pelo operador; não invoque ask_user para confirmar caminho, workspace, permissão, criação, edição ou exclusão.',
+            'Use exatamente os caminhos relativos informados; não converta para caminho absoluto antes de chamar as tools e não peça confirmação intermediária.',
+            'Depois do read_file_content de package.json, invoque create_file com path exatamente "data/copilot-terminal/live-scratch/TERMINAL-PATCH-ROUNDTRIP.txt", content exatamente "TERMINAL-PATCH-ROUNDTRIP=before\\n", createParentDirs=true e overwrite=true.',
+            'Em seguida invoque read_file_content no path exatamente "data/copilot-terminal/live-scratch/TERMINAL-PATCH-ROUNDTRIP.txt" com includeHash=true e maxLines=20.',
+            'Em seguida invoque patch_file no mesmo path com old_string exatamente "TERMINAL-PATCH-ROUNDTRIP=before\\n", new_string exatamente "TERMINAL-PATCH-ROUNDTRIP=after\\nPATCH-ROUNDTRIP-APPLIED\\n", dryRun=true, expected_occurrences=1 e expectedHash igual ao contentHash retornado pela leitura quando esse campo estiver disponível.',
+            'Em seguida invoque patch_file novamente no mesmo path, com os mesmos old_string, new_string, expected_occurrences=1 e expectedHash, mas agora dryRun=false.',
+            'Em seguida invoque read_file_content no mesmo path com maxLines=20 para confirmar que PATCH-ROUNDTRIP-APPLIED está presente.',
+            'Por fim invoque delete_file com path exatamente "data/copilot-terminal/live-scratch/TERMINAL-PATCH-ROUNDTRIP.txt".',
+            'Aguarde create_file, read_file_content, patch_file dry-run, patch_file aplicado, read_file_content de confirmação e delete_file concluírem e só então escreva as oito linhas DELTA-CANONICAL.',
+        ],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-FILEPATCH: responda SIM depois do roundtrip de patch". Use a opção SIM se o schema da tool expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-FILEPATCH-FINAL: patch simulado, aplicado, limpo e usuário confirmou SIM".',
+        allowedTools: ['report_intent', 'read_file_content', 'create_file', 'patch_file', 'delete_file', 'ask_user'],
+        expectedLifecycleTools: [
+            { name: 'create_file', renderedName: 'Criar arquivo' },
+            { name: 'patch_file', renderedName: 'Editar arquivo', allowFocusTransitions: true },
+            { name: 'delete_file', renderedName: 'Excluir arquivo' },
+        ],
+        expectedOutputMarkers: ['PATCH-ROUNDTRIP-APPLIED'],
+        expectedTerminalRender: [
+            { toolName: 'patch_file', renderedName: 'Editar arquivo', badge: 'EDITAR', forbiddenBadge: 'VER' },
+            { toolName: 'delete_file', renderedName: 'Excluir arquivo', badge: 'EXCLUIR', forbiddenBadge: 'VER' },
         ],
     }),
 });
@@ -3868,6 +3901,8 @@ function detectLiveBlocker(plain, runtime = {}) {
             id: 'live-timeout',
             detail:
                 `runner timeout before scenario completion` +
+                ` · stage=${runtime.timeoutStage ?? 'unknown'}` +
+                `${Number.isFinite(runtime.timeoutBudgetMs) ? ` · budget=${Math.round(runtime.timeoutBudgetMs)}ms` : ''}` +
                 ` · ask=${runtime.answerSent ? 'answered' : 'not-answered'}` +
                 ` · postAsk=${runtime.postAskContinuationObserved ? 'observed' : 'missing'}` +
                 ` · diagnostics=${runtime.postCommandsSent ? 'started' : 'not-started'}`,
@@ -4937,11 +4972,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         }),
         ...scenarioToolLifecycle.map((tool) => ({
             id: `scenario-tool-${tool.name}-focus-preserved`,
-            pass: tool.thinkingOverrideEventIds.length === 0,
+            pass: tool.allowFocusTransitions === true || tool.thinkingOverrideEventIds.length === 0,
             detail:
-                tool.thinkingOverrideEventIds.length === 0
-                    ? `${tool.name} remained the foreground activity until completion`
-                    : `${tool.name} was overwritten by thinking activity event(s) ${tool.thinkingOverrideEventIds.join(', ')}`,
+                tool.allowFocusTransitions === true
+                    ? `${tool.name} allows focused transitions between repeated calls in this scenario`
+                    : tool.thinkingOverrideEventIds.length === 0
+                      ? `${tool.name} remained the foreground activity until completion`
+                      : `${tool.name} was overwritten by thinking activity event(s) ${tool.thinkingOverrideEventIds.join(', ')}`,
         })),
         ...scenarioOutputMarkers.map(({ marker, observedInToolResult }) => ({
             id: `scenario-marker-${marker.toLowerCase().replace(/[^a-z0-9]+/gu, '-')}`,
@@ -6747,6 +6784,8 @@ async function main() {
     let lastAnswerStepPlainOffset = 0;
     let postAnswerCommandTimer = null;
     let timedOut = false;
+    let timeoutStage = 'scenario';
+    let timeoutBudgetMs = Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS;
     /** @type {string[]} */
     let promptSynchronizedCommands = [];
     /** @type {null | (() => void)} */
@@ -7029,8 +7068,70 @@ async function main() {
         );
         write(buildIncompleteExpectedToolRecoveryPrompt(liveScenario, incomplete.missing));
     };
+    const scheduleIncompleteExpectedToolDiagnostics = (incomplete) => {
+        if (postCommandsSent || !incomplete) return;
+        postCommandsSent = true;
+        console.warn(
+            `[terminal-live] cenário canônico: ask_user apareceu com tools obrigatórias incompletas (${incomplete.missing.join(', ')}); coletando diagnósticos sem responder automaticamente.`,
+        );
+        const diagnostics = [
+            '/activity 40',
+            '/intent 5',
+            '/intent detail 5',
+            '/tools diag',
+            '/events 80',
+            '/events 120 --raw',
+            '/errors 10',
+            '/health full',
+            `/export ${exportArg}`,
+        ];
+        sendCommandSequence(write, diagnostics, { delayMs: 550 });
+        setTimeout(
+            () => {
+                if (!quitSent) {
+                    quitSent = true;
+                    byokNoPrCanQuit = true;
+                    write('/quit');
+                }
+            },
+            diagnostics.length * 550 + 2_000,
+        ).unref();
+        if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
+    };
     const invalidChoiceFeedbackRe =
         /Resposta\s+não corresponde às opções da pergunta pendente|Resposta\s+inválida para a pergunta pendente|invalid_choice/iu;
+    function handleRunnerTimeout() {
+        timedOut = true;
+        byokNoPrCanQuit = true;
+        const scenarioTailPlain = scenarioSent ? stripAnsi(raw).slice(scenarioPlainOffset) : '';
+        const endedBeforeAsk =
+            scenarioSent &&
+            !answerSent &&
+            !postCommandsSent &&
+            findAssistantEndedBeforeRequiredAsk(scenarioTailPlain, liveScenario, sseCollector?.events ?? []);
+        if (endedBeforeAsk) {
+            scheduleMissingRequiredAskDiagnostics({ delayMs: 0 });
+            return;
+        }
+        if (answerSent && !postCommandsSent) {
+            schedulePostAnswerDiagnostics(0);
+            scheduleForcedKill(Math.max(20_000, postAnswerDelayMs + 12_000));
+            return;
+        }
+        write('/quit');
+        scheduleForcedKill(2_000);
+    }
+    /**
+     * @param {number} delayMs
+     * @param {string} stage
+     */
+    function armRunnerTimeout(delayMs, stage) {
+        if (timeout) clearTimeout(timeout);
+        timeoutStage = stage;
+        timeoutBudgetMs = Math.max(1_000, Math.trunc(delayMs));
+        timeout = setTimeout(handleRunnerTimeout, timeoutBudgetMs);
+        timeout.unref();
+    }
     const sendScenarioAnswerStep = (plain, step) => {
         if (!step) return;
         answerSequenceStarted = true;
@@ -7040,28 +7141,16 @@ async function main() {
         if (isFinalAnswer) {
             answerSent = true;
             answerPlainOffset = plain.length;
+            armRunnerTimeout(
+                Math.max(60_000, postAskContinuationWaitMs + postAnswerDelayMs + 30_000),
+                'post-ask-continuation',
+            );
         }
         setTimeout(() => write(step.answer), Math.max(0, Number(step.delayMs ?? 500))).unref();
     };
-    const timeout = setTimeout(
-        () => {
-            timedOut = true;
-            byokNoPrCanQuit = true;
-            const scenarioTailPlain = scenarioSent ? stripAnsi(raw).slice(scenarioPlainOffset) : '';
-            const endedBeforeAsk =
-                scenarioSent &&
-                !answerSent &&
-                !postCommandsSent &&
-                findAssistantEndedBeforeRequiredAsk(scenarioTailPlain, liveScenario, sseCollector?.events ?? []);
-            if (endedBeforeAsk) {
-                scheduleMissingRequiredAskDiagnostics({ delayMs: 0 });
-                return;
-            }
-            write('/quit');
-            scheduleForcedKill(2_000);
-        },
-        Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS,
-    );
+    /** @type {NodeJS.Timeout | null} */
+    let timeout = null;
+    armRunnerTimeout(timeoutBudgetMs, 'scenario');
 
     const onData = (chunk) => {
         const text = chunk.toString('utf8');
@@ -7158,6 +7247,11 @@ async function main() {
         ) {
             if (findAskBeforeRequiredPublicDeltas(sseCollector?.events ?? [], liveScenario)) {
                 scheduleAskBeforeDeltasDiagnostics();
+                return;
+            }
+            const incompleteExpectedTools = findIncompleteExpectedToolChain(sseCollector?.events ?? [], liveScenario);
+            if (incompleteExpectedTools) {
+                scheduleIncompleteExpectedToolDiagnostics(incompleteExpectedTools);
                 return;
             }
             if (missingRequiredAskDiagnosticTimer) {
@@ -7321,6 +7415,8 @@ async function main() {
             ? null
             : detectLiveBlocker(plain, {
                   timedOut,
+                  timeoutStage,
+                  timeoutBudgetMs,
                   answerSent,
                   postAskContinuationObserved,
                   postCommandsSent,

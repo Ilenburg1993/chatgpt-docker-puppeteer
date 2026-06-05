@@ -18,6 +18,8 @@ describe('terminal/tool-activity-presenter', () => {
         expect(getTerminalHumanToolName('report_intent_local')).toBe('Intenção capturada');
         expect(getTerminalHumanToolName('workspace.read_file')).toBe('Ler arquivo');
         expect(getTerminalHumanToolName('write_file_content')).toBe('Escrever arquivo');
+        expect(getTerminalHumanToolName('repo_apply_patch')).toBe('Aplicar patch');
+        expect(getTerminalHumanToolName('repo_apply_file_batch')).toBe('Aplicar lote de arquivos');
         expect(getTerminalHumanToolName('read_bash')).toBe('Ler terminal');
         expect(getTerminalHumanToolName('io.mkdir.io-engine.ensure-dir')).toBe('Pasta local');
         expect(getTerminalHumanToolName('io.write.io-engine.atomic-write')).toBe('Escrita local');
@@ -200,6 +202,28 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.completeLine(true, '0.1s')).toContain('sucesso · 1 resultado');
     });
 
+    it('resume read_file_content com bytes e truncamento sem poluir a superfície com conteúdo bruto', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'read_file_content',
+            args: { path: `${process.cwd()}/src/copilot/terminal/events/tool-activity-presenter.js` },
+            result: {
+                success: true,
+                path: `${process.cwd()}/src/copilot/terminal/events/tool-activity-presenter.js`,
+                returnedLines: { start: 1, end: 40 },
+                bytesReturned: 4096,
+                truncated: true,
+                content: 'x'.repeat(10_000),
+            },
+        });
+
+        expect(presentation.operation).toBe('read');
+        expect(presentation.target).toContain('src/copilot/terminal/events/tool-activity-presenter.js');
+        expect(presentation.target).toContain('linhas 1-40');
+        expect(presentation.resultSummary).toBe('sucesso · 4.0 KB · truncado');
+        expect(presentation.completeLine(true, '0.2s')).toContain('sucesso · 4.0 KB · truncado');
+        expect(presentation.detail).not.toContain('x'.repeat(80));
+    });
+
     it('mostra list_tools como listagem humana com filtro e contagem materializada', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'list_tools',
@@ -352,5 +376,76 @@ describe('terminal/tool-activity-presenter', () => {
         expect(move.target).toContain('src/b.txt');
         expect(move.target).not.toContain('call-move');
         expect(move.completeLine(true, '0.1s')).toContain('movendo arquivo concluído');
+    });
+
+    it('resume patch_file local com substituições e dry-run sem renderizar diffPreview no default', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'patch_file',
+            args: {
+                path: 'src/copilot/terminal/events/tool-activity-presenter.js',
+                old_string: 'alpha',
+                new_string: 'beta',
+            },
+            result: {
+                success: true,
+                dryRun: true,
+                replacedOccurrences: 1,
+                diffPreview: '-alpha\n+beta',
+                diffPreviewLines: 2,
+            },
+        });
+
+        expect(presentation.displayToolName).toBe('Editar arquivo');
+        expect(presentation.operation).toBe('edit');
+        expect(presentation.target).toContain('src/copilot/terminal/events/tool-activity-presenter.js');
+        expect(presentation.resultSummary).toBe('sucesso · simulação · 1 substituição');
+        expect(presentation.completeLine(true, '0.1s')).toContain('sucesso · simulação · 1 substituição');
+        expect(presentation.detail).not.toContain('-alpha');
+        expect(presentation.detail).not.toContain('+beta');
+    });
+
+    it('humaniza nomes repo_* observados no runtime sem vazar identificadores técnicos', () => {
+        const patch = buildTerminalToolActivityPresentation({
+            toolName: 'repo_apply_patch',
+            args: {
+                path: 'src/copilot/terminal/events/tool-activity-presenter.js',
+                old_string: 'alpha',
+                new_string: 'beta',
+            },
+            result: {
+                success: true,
+                replacedOccurrences: 1,
+                returnedLines: { start: 10, end: 12 },
+            },
+        });
+        const batch = buildTerminalToolActivityPresentation({
+            toolName: 'repo_apply_file_batch',
+            args: {
+                operations: [
+                    { type: 'create_file', path: 'src/copilot/.ai/jobs/a.txt', content: 'a' },
+                    {
+                        type: 'move_file',
+                        source: 'src/copilot/.ai/jobs/a.txt',
+                        destination: 'src/copilot/.ai/jobs/b.txt',
+                    },
+                ],
+            },
+            result: { success: true, operationCount: 2 },
+        });
+
+        expect(patch.displayToolName).toBe('Aplicar patch');
+        expect(patch.operation).toBe('edit');
+        expect(patch.detail).toContain('editando arquivo');
+        expect(patch.target).toContain('src/copilot/terminal/events/tool-activity-presenter.js');
+        expect(patch.detail).not.toContain('repo_apply_patch');
+        expect(batch.displayToolName).toBe('Aplicar lote de arquivos');
+        expect(batch.operation).toBe('write');
+        expect(batch.detail).toContain('aplicando lote de arquivos');
+        expect(batch.target).toContain('2 operações');
+        expect(batch.target).toContain('src/copilot/.ai/jobs/a.txt');
+        expect(batch.target).toContain('src/copilot/.ai/jobs/b.txt');
+        expect(batch.resultSummary).toBe('sucesso · 2 operações');
+        expect(batch.completeLine(true, '0.2s')).toContain('sucesso · 2 operações');
+        expect(batch.detail).not.toContain('repo_apply_file_batch');
     });
 });

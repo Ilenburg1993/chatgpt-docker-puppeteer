@@ -47,6 +47,11 @@ export const readFileContentTool = buildTool({
     description:
         'Lê o conteúdo de um arquivo no workspace. Arquivos de texto são retornados como string. ' +
         'Arquivos binários retornam conteúdo em base64 quando essa codificação é solicitada.',
+    instructions:
+        'Use read_file_content before editing files and when the model needs exact current text. ' +
+        'Prefer startLine/endLine, maxLines or cursor for large files; request includeHash=true before follow-up writes ' +
+        'that need optimistic safety. Use readStrategy=stream for large line windows and encoding=base64 only for binary ' +
+        'files. Summarize returned ranges, truncation and nextCursor instead of pasting huge content back to the user.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto dentro de /workspaces/)'),
         startLine: z

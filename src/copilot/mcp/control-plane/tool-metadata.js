@@ -13,6 +13,94 @@ import { securitySchemesForMcpTool } from './auth.js';
  */
 
 const NOAUTH = /** @type {const} */ ({ type: 'noauth' });
+const MAX_TOOL_INVOCATION_STATUS_LENGTH = 64;
+
+const TOOL_INVOCATION_LABELS = new Map([
+    ['repo_status', 'Status do repo'],
+    ['repo_tree', 'Arvore do repo'],
+    ['repo_root_tree', 'Raiz do repo'],
+    ['repo_read_file', 'Lendo arquivo'],
+    ['repo_read_file_chunks', 'Lendo arquivo em blocos'],
+    ['repo_search_text', 'Buscando texto'],
+    ['repo_diff_files', 'Comparando arquivos'],
+    ['repo_file_stats', 'Inspecionando arquivo'],
+    ['repo_file_outline', 'Mapeando arquivo'],
+    ['repo_symbol_search', 'Buscando simbolo'],
+    ['repo_find_symbol_usages', 'Buscando usos'],
+    ['repo_find_imports', 'Buscando imports'],
+    ['repo_write_file', 'Escrevendo arquivo'],
+    ['repo_create_file', 'Criando arquivo'],
+    ['repo_create_file_plan', 'Planejando criacao'],
+    ['repo_apply_patch', 'Aplicando patch'],
+    ['repo_patch_plan', 'Planejando patch'],
+    ['repo_move_file', 'Movendo arquivo'],
+    ['repo_move_file_plan', 'Planejando movimento'],
+    ['repo_quarantine_file', 'Quarentenando arquivo'],
+    ['repo_quarantine_file_plan', 'Planejando quarentena'],
+    ['repo_restore_quarantined_file', 'Restaurando arquivo'],
+    ['repo_remove_file', 'Removendo arquivo'],
+    ['repo_apply_file_batch', 'Aplicando lote de arquivos'],
+    ['repo_apply_file_batch_plan', 'Planejando lote de arquivos'],
+    ['git_status', 'Lendo Git status'],
+    ['git_diff', 'Lendo diff Git'],
+    ['git_log', 'Lendo historico Git'],
+    ['git_branch_info', 'Lendo branch Git'],
+    ['run_lint_copilot', 'Rodando lint copilot'],
+    ['run_typecheck_copilot', 'Rodando typecheck copilot'],
+    ['run_unit_copilot', 'Rodando testes copilot'],
+    ['run_copilot_validator', 'Rodando validador copilot'],
+]);
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function sanitizeInvocationStatusText(value) {
+    return String(value)
+        .replace(/[\r\n\t]+/gu, ' ')
+        .replace(/\s+/gu, ' ')
+        .replace(/[^\p{L}\p{N}\p{P}\p{Zs}]/gu, '')
+        .trim();
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function humanizeToolName(value) {
+    const normalized = value.replace(/^mcp_/u, '').replace(/^repo_/u, '').replace(/_/gu, ' ').trim();
+    return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Tool';
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function trimInvocationStatus(value) {
+    if (value.length <= MAX_TOOL_INVOCATION_STATUS_LENGTH) return value;
+    return `${value.slice(0, MAX_TOOL_INVOCATION_STATUS_LENGTH - 1).trimEnd()}…`;
+}
+
+/**
+ * @param {import('../registry.js').McpToolDefinition} tool
+ * @returns {string}
+ */
+export function buildHumanMcpToolInvocationLabel(tool) {
+    const explicit = TOOL_INVOCATION_LABELS.get(tool.name);
+    if (explicit) return explicit;
+    const title = typeof tool.title === 'string' && tool.title.trim() ? tool.title : humanizeToolName(tool.name);
+    return sanitizeInvocationStatusText(title) || 'Tool';
+}
+
+/**
+ * @param {import('../registry.js').McpToolDefinition} tool
+ * @param {'invoking' | 'invoked'} phase
+ * @returns {string}
+ */
+export function buildHumanMcpToolInvocationStatus(tool, phase) {
+    const label = buildHumanMcpToolInvocationLabel(tool);
+    return trimInvocationStatus(phase === 'invoking' ? `${label}...` : `${label} concluido`);
+}
 
 /**
  * Minimal schema used until each tool gets a fully specific output schema.
@@ -49,8 +137,10 @@ export function buildToolMeta(tool) {
     return {
         ...(tool._meta ?? {}),
         securitySchemes: tool.securitySchemes ?? defaultSecuritySchemesForTool(tool),
-        'openai/toolInvocation/invoking': tool._meta?.['openai/toolInvocation/invoking'] ?? `Running ${tool.name}`,
-        'openai/toolInvocation/invoked': tool._meta?.['openai/toolInvocation/invoked'] ?? `Finished ${tool.name}`,
+        'openai/toolInvocation/invoking':
+            tool._meta?.['openai/toolInvocation/invoking'] ?? buildHumanMcpToolInvocationStatus(tool, 'invoking'),
+        'openai/toolInvocation/invoked':
+            tool._meta?.['openai/toolInvocation/invoked'] ?? buildHumanMcpToolInvocationStatus(tool, 'invoked'),
     };
 }
 

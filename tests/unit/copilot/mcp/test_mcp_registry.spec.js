@@ -142,6 +142,23 @@ describe('copilot MCP registry', () => {
         }
     });
 
+    it('uses human invocation status metadata instead of raw technical fallbacks', () => {
+        const tools = getCanonicalMcpTools();
+
+        for (const tool of tools) {
+            const invoking = String(tool._meta?.['openai/toolInvocation/invoking'] ?? '');
+            const invoked = String(tool._meta?.['openai/toolInvocation/invoked'] ?? '');
+            assert.ok(invoking.length > 0 && invoking.length <= 64, `bad invoking status: ${tool.name}`);
+            assert.ok(invoked.length > 0 && invoked.length <= 64, `bad invoked status: ${tool.name}`);
+            assert.equal(invoking.startsWith('Running '), false, tool.name);
+            assert.equal(invoked.startsWith('Finished '), false, tool.name);
+        }
+
+        const patch = tools.find((tool) => tool.name === 'repo_apply_patch');
+        assert.equal(patch?._meta?.['openai/toolInvocation/invoking'], 'Aplicando patch...');
+        assert.equal(patch?._meta?.['openai/toolInvocation/invoked'], 'Aplicando patch concluido');
+    });
+
     it('does not expose duplicate tool names', () => {
         const tools = getCanonicalMcpTools();
         const names = tools.map((tool) => tool.name);

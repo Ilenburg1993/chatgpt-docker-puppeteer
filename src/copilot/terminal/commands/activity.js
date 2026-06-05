@@ -118,9 +118,17 @@ function renderSourceLabel(source) {
 
 /**
  * @param {string} operation
+ * @param {{ dryRun?: boolean }} [options]
  * @returns {string}
  */
-function renderIoOperationLabel(operation) {
+function renderIoOperationLabel(operation, options = {}) {
+    if (options.dryRun === true) {
+        if (operation === 'patch') return 'simulação de edição';
+        if (operation === 'write') return 'simulação de escrita';
+        if (operation === 'delete') return 'simulação de remoção';
+        if (operation === 'move') return 'simulação de movimento';
+        if (operation === 'copy') return 'simulação de cópia';
+    }
     if (operation === 'read') return 'leitura';
     if (operation === 'write') return 'escrita';
     if (operation === 'mkdir') return 'criação de pasta';
@@ -571,15 +579,15 @@ export function cmdActivity({ println }, arg) {
                 typeof entry.bytesRead === 'number'
                     ? ` · ${renderBytes(entry.bytesRead)} lidos`
                     : typeof entry.bytesWritten === 'number'
-                      ? ` · ${renderBytes(entry.bytesWritten)} escritos`
-                      : '';
+                    ? ` · ${renderBytes(entry.bytesWritten)} escritos`
+                    : '';
             const duration = typeof entry.durationMs === 'number' ? ` · ${entry.durationMs}ms` : '';
             const engine = entry.engine ? ` · ${entry.engine}` : '';
             const engineDetail = detail ? engine : '';
             println(
                 terminalThemeWrappedRow(
                     'Operação',
-                    `${ts} · ${renderIoOperationLabel(entry.operation)} · ${compactHumanText(entry.target)}${bytes}${duration}${engineDetail}`,
+                    `${ts} · ${renderIoOperationLabel(entry.operation, { dryRun: entry.dryRun })} · ${compactHumanText(entry.target)}${bytes}${duration}${engineDetail}`,
                     { role: entry.success ? 'muted' : 'error' },
                 ),
             );

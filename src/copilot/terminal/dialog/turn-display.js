@@ -83,7 +83,7 @@ export function stripTerminalInvisibleText(text) {
  * @returns {string}
  */
 export function sanitizeTerminalRenderText(text) {
-    return stripTerminalInvisibleText(text);
+    return stripTerminalInvisibleText(text).replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
 }
 
 /**

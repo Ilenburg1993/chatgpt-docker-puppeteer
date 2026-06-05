@@ -37,9 +37,10 @@ const _ioDedupWindow = new Map();
  * @param {string} operation
  * @param {string | string[]} targets
  * @param {string} [fallbackTarget]
+ * @param {string} [variant]
  * @returns {boolean} true se deve suprimir (é duplicata dentro da janela)
  */
-function isDuplicateIoOperation(operation, targets, fallbackTarget) {
+function isDuplicateIoOperation(operation, targets, fallbackTarget, variant = '') {
     const normalizedTargets = Array.isArray(targets)
         ? targets
         : typeof targets === 'string' && targets
@@ -47,7 +48,7 @@ function isDuplicateIoOperation(operation, targets, fallbackTarget) {
           : [];
     const normalizedFallback = fallbackTarget ?? (typeof targets === 'string' ? targets : 'unknown');
     const keyTarget = normalizedTargets.length > 0 ? normalizedTargets.join(' -> ') : normalizedFallback;
-    const key = `${operation}::${keyTarget}`;
+    const key = `${operation}${variant ? `:${variant}` : ''}::${keyTarget}`;
     const now = Date.now();
     const lastTs = _ioDedupWindow.get(key);
     if (lastTs !== undefined && now - lastTs <= IO_DEDUP_WINDOW_MS) {
@@ -86,6 +87,7 @@ function isDuplicateIoOperation(operation, targets, fallbackTarget) {
  *     bytesRead: number | null;
  *     bytesWritten: number | null;
  *     riskClass: string | null;
+ *     dryRun: boolean;
  *     error: { name?: string; message?: string } | null;
  * }} TerminalIoActivityEntry
  */
@@ -150,11 +152,35 @@ const IO_OPERATION_LABELS = new Map([
 const IO_MASCULINE_OPERATION_LABELS = new Set(['append', 'move']);
 
 /**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isPlainObject(value) {
+    return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+/**
+ * @param {import('../../core/io-contracts.js').IoMeta} io
+ * @returns {boolean}
+ */
+function isDryRunIoOperation(io) {
+    return isPlainObject(io.advisoryLimits) && io.advisoryLimits['dryRun'] === true;
+}
+
+/**
  * @param {string} operation
+ * @param {{ dryRun?: boolean }} [options]
  * @returns {string}
  */
-function renderIoOperationLabel(operation) {
-    return IO_OPERATION_LABELS.get(operation) ?? operation;
+function renderIoOperationLabel(operation, options = {}) {
+    const base = IO_OPERATION_LABELS.get(operation) ?? operation;
+    if (options.dryRun !== true) return base;
+    if (operation === 'patch') return 'simulação de edição';
+    if (operation === 'write') return 'simulação de escrita';
+    if (operation === 'delete') return 'simulação de remoção';
+    if (operation === 'move') return 'simulação de movimento';
+    if (operation === 'copy') return 'simulação de cópia';
+    return `simulação de ${base}`;
 }
 
 /**
@@ -246,14 +272,15 @@ function handleIoOperation(message, registry = null) {
     const touchedTargets = extractTouchedTargets(io);
     const primaryTarget =
         touchedTargets[0] ?? (typeof io.target === 'string' ? compactTargetPath(io.target) : 'unknown');
+    const dryRun = isDryRunIoOperation(io);
     // F1.2: absorver triple-firing de camadas de cache de I/O
-    if (isDuplicateIoOperation(io.operation, touchedTargets, primaryTarget)) {
+    if (isDuplicateIoOperation(io.operation, touchedTargets, primaryTarget, dryRun ? 'dry-run' : '')) {
         return;
     }
     const byteLabel = formatBytes(io.bytesRead ?? io.bytesWritten);
     const durationLabel = typeof io.durationMs === 'number' ? `${Math.max(0, Math.round(io.durationMs))}ms` : null;
     const humanExtra = [byteLabel, durationLabel].filter(Boolean).join(' · ');
-    const operationLabel = renderIoOperationLabel(io.operation);
+    const operationLabel = renderIoOperationLabel(io.operation, { dryRun });
     const detail = `${operationLabel} · ${primaryTarget}${humanExtra ? ` · ${humanExtra}` : ''}`;
     const completionLabel = renderIoCompletionLabel(io.operation);
     const label = success ? `Arquivo: ${operationLabel} ${completionLabel}` : `Arquivo: ${operationLabel} falhou`;
@@ -269,6 +296,7 @@ function handleIoOperation(message, registry = null) {
         bytesRead: io.bytesRead ?? null,
         bytesWritten: io.bytesWritten ?? null,
         riskClass: io.riskClass ?? null,
+        dryRun,
         error: message.error ?? null,
     };
 
@@ -299,7 +327,7 @@ function handleIoOperation(message, registry = null) {
         println(
             terminalThemeRow(
                 'Arquivo',
-                `${renderIoOperationLabel(io.operation)} · ${terminalThemeText(role, compactText(primaryTarget, 92))} · ${status}${humanExtra ? ` · ${humanExtra}` : ''}`,
+                `${renderIoOperationLabel(io.operation, { dryRun })} · ${terminalThemeText(role, compactText(primaryTarget, 92))} · ${status}${humanExtra ? ` · ${humanExtra}` : ''}`,
                 { role },
             ),
         );

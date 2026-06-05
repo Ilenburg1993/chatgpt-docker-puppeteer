@@ -47,6 +47,10 @@ const writeFileContentTool = buildTool({
     description:
         'Escreve conteúdo em um arquivo existente no workspace. ' +
         'Sobrescreve o conteúdo completo; use create_file para arquivos novos e expectedHash para precondição otimista.',
+    instructions:
+        'Use write_file_content only when replacing the whole existing file is intentional. Prefer patch_file for ' +
+        'surgical edits. Read the current file first and pass expectedHash from read_file_content when available so ' +
+        'concurrent changes fail safely instead of being overwritten.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo (deve existir)'),
         content: z.string().describe('Novo conteúdo completo do arquivo'),
@@ -171,6 +175,10 @@ const createFileTool = buildTool({
     description:
         'Cria um novo arquivo no workspace com conteúdo opcional. ' +
         'Por padrão falha se o arquivo já existe; use overwrite=true somente quando quiser substituir.',
+    instructions:
+        'Use create_file for new files or deliberate file replacement. Use createParentDirs=true for approved ' +
+        'workspace-relative scratch paths. Do not ask for a separate permission prompt when the operator already gave ' +
+        'a concrete path and the terminal permission mode is automatic; report the created path and byte count instead.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo a criar'),
         content: z.string().optional().default('').describe('Conteúdo inicial do arquivo'),
@@ -272,6 +280,10 @@ const deleteFileTool = buildTool({
     name: 'delete_file',
     description:
         'Deleta um arquivo do workspace. Não opera sobre diretórios e retorna snapshot de rollback quando possível.',
+    instructions:
+        'Use delete_file only for explicit file cleanup or removal requested by the operator/scenario. Do not use it ' +
+        'for directories. When deleting temporary live-test artifacts, prefer precise workspace-relative paths and ' +
+        'avoid extra confirmation prompts if the cleanup was already part of the requested flow.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo a deletar'),
     }),
@@ -359,6 +371,9 @@ const copyFileTool = buildTool({
     name: 'copy_file',
     description:
         'Copia um arquivo para outro caminho no workspace, com overwrite explícito e rollback do destino quando possível.',
+    instructions:
+        'Use copy_file for file-to-file copies with explicit source and destination. Keep paths workspace-relative ' +
+        'when the operator gave relative paths. Set overwrite=true only when replacing the destination is intended.',
     parameters: z.object({
         source: z.string().describe('Caminho do arquivo de origem'),
         destination: z.string().describe('Caminho de destino'),
@@ -485,6 +500,10 @@ const copyFileTool = buildTool({
 const moveFileTool = buildTool({
     name: 'move_file',
     description: 'Move ou renomeia um arquivo no workspace, com overwrite explícito e metadados de rollback.',
+    instructions:
+        'Use move_file for renames or moves after the source and destination are known. Keep the operation atomic and ' +
+        'avoid additional permission questions when the operator already supplied the exact move in an automatic ' +
+        'permission flow.',
     parameters: z.object({
         source: z.string().describe('Caminho do arquivo de origem'),
         destination: z.string().describe('Caminho de destino'),

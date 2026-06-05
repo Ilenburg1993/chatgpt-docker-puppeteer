@@ -90,6 +90,40 @@ describe('terminal/commands/export', () => {
         expect(ctx.output()).toContain('Exportado');
     });
 
+    it('escapa HTML bruto da LLM-B ao exportar Markdown', async () => {
+        readTerminalTimelineProjection.mockReturnValueOnce({
+            timelineSource: 'hub',
+            reconciliationStatus: 'aligned',
+            sync: { status: 'not_needed' },
+            turns: [
+                {
+                    role: 'assistant',
+                    rawRole: 'llm_b',
+                    origin: 'hub',
+                    persisted: true,
+                    content: '<a href="https://x.example"><img src=x>oie</a>',
+                    timestamp: 1710000001000,
+                    metadata: {
+                        assistantMessageEnvelope: {
+                            source: 'sdk/assistant.message',
+                            traceId: 'trace-html',
+                            turnId: 'turn-html',
+                            eventId: 'evt-html',
+                        },
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+
+        const [, content] = writeFile.mock.calls[0];
+        const markdown = String(content);
+        expect(markdown).toContain('&lt;a href="https://x.example"&gt;&lt;img src=x&gt;oie&lt;/a&gt;');
+        expect(markdown).not.toContain('<img src=x>');
+    });
+
     it('mostra path relativo ao workspace na saída humana quando exporta dentro do repo', async () => {
         const ctx = mockCtx();
 

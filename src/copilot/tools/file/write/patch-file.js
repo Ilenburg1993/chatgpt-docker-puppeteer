@@ -33,6 +33,12 @@ export const patchFileTool = buildTool({
         'Aplica uma substituição cirúrgica num arquivo: substitui `old_string` por `new_string`. ' +
         '`old_string` deve ser literal e, por padrão, ocorrer exatamente uma vez. ' +
         'Para matches repetidos, use occurrence_index para uma ocorrência específica ou replace_all com expected_occurrences.',
+    instructions:
+        'Use patch_file for surgical exact-string edits after reading the current file. Prefer expectedHash from ' +
+        'read_file_content when available. Use dryRun=true for risky edits, repeated matches or operator-visible ' +
+        'planning, then apply the same patch when validated. Provide enough context in old_string for uniqueness; use ' +
+        'occurrence_index or replace_all with expected_occurrences for repeated text. Do not use patch_file for ' +
+        'full-file rewrites; use write_file_content only when replacing the whole file is truly intended.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto)'),
         old_string: z.string().min(1).describe('Texto exato a substituir. Deve ocorrer exatamente 1 vez no arquivo.'),

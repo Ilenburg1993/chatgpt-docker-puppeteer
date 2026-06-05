@@ -54,7 +54,13 @@ const RESULT_COUNT_KEYS = new Set([
     'matchCount',
     'matchesCount',
     'returnedCount',
+    'returnedMatchCount',
 ]);
+
+const RESULT_OPERATION_COUNT_KEYS = new Set(['operationCount', 'operationsCount', 'appliedCount']);
+const RESULT_REPLACEMENT_COUNT_KEYS = new Set(['replacedOccurrences', 'replacementCount', 'replacementsCount']);
+const RESULT_BYTE_KEYS = new Set(['bytesReturned', 'bytesWritten', 'rawReturnedBytes', 'projectedBytes']);
+const OPERATION_ARRAY_KEYS = new Set(['operations', 'ops', 'changes', 'actions', 'steps']);
 
 const START_LINE_KEYS = new Set(['startLine', 'start', 'fromLine']);
 const END_LINE_KEYS = new Set(['endLine', 'end', 'toLine']);
@@ -78,6 +84,7 @@ const RESULT_LINE_RANGE_KEYS = new Set(['returnedLines', 'lineRange']);
  *     commands: string[];
  *     filters: string[];
  *     resultCount: number | null;
+ *     operationCount: number | null;
  *     resultSummary: string | null;
  *     primaryTarget: string | null;
  *     primaryTargetKind: 'file' | 'directory' | 'url' | 'search' | 'patch' | 'command' | 'filter' | null;
@@ -201,6 +208,12 @@ function extractStructuredLineRange(value) {
  *     allowFilterKeys: boolean;
  *     allowResultMetadata: boolean;
  *     resultCount: number | null;
+ *     resultOperationCount: number | null;
+ *     operationCount: number | null;
+ *     resultReplacementCount: number | null;
+ *     resultBytes: number | null;
+ *     resultTruncated: boolean | null;
+ *     resultDryRun: boolean | null;
  *     resultSuccess: boolean | null;
  *     resultExitCode: number | null;
  * }} state
@@ -223,6 +236,29 @@ function processStructuredEntry(keyName, raw, state) {
     if (state.allowResultMetadata && RESULT_COUNT_KEYS.has(keyName)) {
         const count = asFiniteNumber(raw);
         if (count !== null && count >= 0) state.resultCount = count;
+    }
+    if (state.allowResultMetadata && RESULT_OPERATION_COUNT_KEYS.has(keyName)) {
+        const count = asFiniteNumber(raw);
+        if (count !== null && count >= 0) state.resultOperationCount = count;
+    }
+    if (OPERATION_ARRAY_KEYS.has(keyName) && Array.isArray(raw) && raw.length > 0) {
+        state.operationCount = Math.max(state.operationCount ?? 0, raw.length);
+    }
+    if (state.allowResultMetadata && RESULT_REPLACEMENT_COUNT_KEYS.has(keyName)) {
+        const count = asFiniteNumber(raw);
+        if (count !== null && count >= 0) state.resultReplacementCount = count;
+    }
+    if (state.allowResultMetadata && RESULT_BYTE_KEYS.has(keyName)) {
+        const bytes = asFiniteNumber(raw);
+        if (bytes !== null && bytes >= 0 && (state.resultBytes === null || bytes > state.resultBytes)) {
+            state.resultBytes = bytes;
+        }
+    }
+    if (state.allowResultMetadata && keyName === 'truncated' && typeof raw === 'boolean') {
+        state.resultTruncated = raw;
+    }
+    if (state.allowResultMetadata && keyName === 'dryRun' && typeof raw === 'boolean') {
+        state.resultDryRun = raw;
     }
     if (state.allowResultMetadata && keyName === 'success' && typeof raw === 'boolean') {
         state.resultSuccess = raw;
@@ -284,6 +320,11 @@ function processStructuredEntry(keyName, raw, state) {
  *     allowFilterKeys: boolean;
  *     allowResultMetadata: boolean;
  *     resultCount: number | null;
+ *     resultOperationCount: number | null;
+ *     resultReplacementCount: number | null;
+ *     resultBytes: number | null;
+ *     resultTruncated: boolean | null;
+ *     resultDryRun: boolean | null;
  *     resultSuccess: boolean | null;
  *     resultExitCode: number | null;
  * }} state
@@ -390,6 +431,12 @@ export function introspectToolTargets({ args, result }) {
         allowFilterKeys: true,
         allowResultMetadata: false,
         resultCount: null,
+        resultOperationCount: null,
+        operationCount: null,
+        resultReplacementCount: null,
+        resultBytes: null,
+        resultTruncated: null,
+        resultDryRun: null,
         resultSuccess: null,
         resultExitCode: null,
     };
@@ -454,8 +501,17 @@ export function introspectToolTargets({ args, result }) {
     const hasRange = lineRange.start !== null || lineRange.end !== null;
     const resultSummary = [
         state.resultSuccess === null ? null : state.resultSuccess ? 'sucesso' : 'falha',
+        state.resultDryRun === true ? 'simulação' : null,
         state.resultExitCode === null ? null : `saída ${state.resultExitCode}`,
+        state.resultOperationCount === null
+            ? null
+            : `${state.resultOperationCount} ${state.resultOperationCount === 1 ? 'operação' : 'operações'}`,
+        state.resultReplacementCount === null
+            ? null
+            : `${state.resultReplacementCount} substituição${state.resultReplacementCount === 1 ? '' : 'ões'}`,
         state.resultCount === null ? null : `${state.resultCount} resultado${state.resultCount === 1 ? '' : 's'}`,
+        state.resultBytes === null ? null : formatResultBytes(state.resultBytes),
+        state.resultTruncated === true ? 'truncado' : null,
     ]
         .filter(Boolean)
         .join(' · ');
@@ -470,8 +526,19 @@ export function introspectToolTargets({ args, result }) {
         commands: normalizedCommands,
         filters: normalizedFilters,
         resultCount: state.resultCount,
+        operationCount: state.operationCount,
         resultSummary: resultSummary || null,
         primaryTarget,
         primaryTargetKind,
     };
+}
+
+/**
+ * @param {number} bytes
+ * @returns {string}
+ */
+function formatResultBytes(bytes) {
+    if (bytes < 1024) return `${Math.round(bytes)} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

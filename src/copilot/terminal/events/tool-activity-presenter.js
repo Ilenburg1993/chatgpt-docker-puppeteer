@@ -77,6 +77,31 @@ const HUMAN_TOOL_NAMES = Object.freeze({
     'workspace.delete_file': 'Excluir arquivo',
     'workspace.list_files': 'Listar arquivos',
     'workspace.search_files': 'Buscar arquivos',
+    repo_status: 'Status do repo',
+    repo_tree: 'Listar repo',
+    repo_root_tree: 'Listar raiz do repo',
+    repo_read_file: 'Ler arquivo',
+    repo_read_file_chunks: 'Ler arquivo em blocos',
+    repo_search_text: 'Buscar texto',
+    repo_diff_files: 'Comparar arquivos',
+    repo_file_stats: 'Inspecionar arquivo',
+    repo_file_outline: 'Mapear arquivo',
+    repo_symbol_search: 'Buscar símbolo',
+    repo_find_symbol_usages: 'Buscar usos',
+    repo_find_imports: 'Buscar imports',
+    repo_write_file: 'Escrever arquivo',
+    repo_create_file: 'Criar arquivo',
+    repo_create_file_plan: 'Planejar criação',
+    repo_apply_patch: 'Aplicar patch',
+    repo_patch_plan: 'Planejar patch',
+    repo_move_file: 'Mover arquivo',
+    repo_move_file_plan: 'Planejar movimento',
+    repo_quarantine_file: 'Quarentenar arquivo',
+    repo_quarantine_file_plan: 'Planejar quarentena',
+    repo_restore_quarantined_file: 'Restaurar arquivo',
+    repo_remove_file: 'Excluir arquivo',
+    repo_apply_file_batch: 'Aplicar lote de arquivos',
+    repo_apply_file_batch_plan: 'Planejar lote de arquivos',
     browser_action: 'Ação no navegador',
 });
 
@@ -487,6 +512,27 @@ function buildResultSummary(meta) {
 }
 
 /**
+ * @param {string} toolName
+ * @param {string | null} canonicalToolName
+ * @returns {boolean}
+ */
+function isBatchFileTool(toolName, canonicalToolName) {
+    const normalized = `${toolName} ${canonicalToolName ?? ''}`.toLowerCase();
+    return normalized.includes('repo_apply_file_batch');
+}
+
+/**
+ * @param {ReturnType<typeof introspectToolTargets>} meta
+ * @returns {string | null}
+ */
+function buildOperationCountSummary(meta) {
+    if (typeof meta.operationCount !== 'number' || !Number.isFinite(meta.operationCount) || meta.operationCount <= 0) {
+        return null;
+    }
+    return `${meta.operationCount} ${meta.operationCount === 1 ? 'operação' : 'operações'}`;
+}
+
+/**
  * @param {unknown} value
  * @returns {{ operation: TerminalToolOperation; label: string } | null}
  */
@@ -527,6 +573,28 @@ function inferOperation(toolName, path, explicitOperation) {
 
     const canonical = resolveToolName(toolName) ?? toolName;
     const normalized = `${toolName} ${canonical}`.replace(/[_:-]+/g, ' ');
+    const normalizedTechnicalName = `${toolName} ${canonical}`.toLowerCase();
+
+    if (normalizedTechnicalName.includes('repo_apply_file_batch_plan')) {
+        return { operation: 'inspect', label: 'planejando lote de arquivos' };
+    }
+    if (normalizedTechnicalName.includes('repo_apply_file_batch')) {
+        return { operation: 'write', label: 'aplicando lote de arquivos' };
+    }
+    if (
+        normalizedTechnicalName.includes('repo_patch_plan') ||
+        normalizedTechnicalName.includes('repo_create_file_plan') ||
+        normalizedTechnicalName.includes('repo_move_file_plan') ||
+        normalizedTechnicalName.includes('repo_quarantine_file_plan')
+    ) {
+        return { operation: 'inspect', label: 'planejando operação de arquivo' };
+    }
+    if (normalizedTechnicalName.includes('repo_restore_quarantined_file')) {
+        return { operation: 'move', label: 'restaurando arquivo' };
+    }
+    if (normalizedTechnicalName.includes('repo_quarantine_file')) {
+        return { operation: 'move', label: 'quarentenando arquivo' };
+    }
 
     if (/\bexternal\s*tool\b/i.test(normalized)) {
         return { operation: 'run', label: 'executando integração externa' };
@@ -742,10 +810,15 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
     const { operation, label } = inferOperation(toolName, path, evt['operation']);
     const commandSummary = operation === 'run' ? buildCommandSummary(meta) : null;
     const targetSummary = buildTargetSummary(meta);
+    const operationCountSummary = isBatchFileTool(toolName, canonicalToolName)
+        ? buildOperationCountSummary(meta)
+        : null;
+    const batchTargetSummary = [operationCountSummary, targetSummary].filter(Boolean).join(' · ') || null;
     const targetCandidate =
         questionPreview ??
         intentPreview ??
         commandSummary ??
+        batchTargetSummary ??
         targetSummary ??
         stringOrNull(evt['mcpServerName']) ??
         null;

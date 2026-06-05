@@ -254,6 +254,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         const interventionPolicy = getTerminalInterventionPolicy();
         const isModelIdle = !getBusy() && getTurnQueueDepth() === 0;
         if (isModelIdle && interventionPolicy.allowQueueFallback) {
+            parkTerminalPromptForContinuation();
             println(terminalThemeRow('Intervenção', 'modelo ocioso; encaminhada como novo turno', { role: 'info' }), {
                 redrawPrompt: false,
             });

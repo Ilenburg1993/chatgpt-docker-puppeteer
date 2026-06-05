@@ -143,6 +143,33 @@ describe('fileTools — exportações do módulo', () => {
             assert.ok(t.description && t.description.length > 0, `${t.name}: description não deve ser vazia`);
         }
     });
+
+    it('file-tools críticas declaram instructions explícitas para uso seguro pela LLM-B', () => {
+        const read = /** @type {any} */ (findTool(fileReadTools, 'read_file_content'));
+        const write = /** @type {any} */ (findTool(fileWriteTools, 'write_file_content'));
+        const create = /** @type {any} */ (findTool(fileWriteTools, 'create_file'));
+        const remove = /** @type {any} */ (findTool(fileWriteTools, 'delete_file'));
+        const copy = /** @type {any} */ (findTool(fileWriteTools, 'copy_file'));
+        const move = /** @type {any} */ (findTool(fileWriteTools, 'move_file'));
+        const patch = /** @type {any} */ (findTool(fileWriteTools, 'patch_file'));
+
+        assert.match(read.instructions, /before editing files/);
+        assert.match(read.instructions, /includeHash=true/);
+        assert.match(read.instructions, /nextCursor/);
+        assert.match(write.instructions, /replacing the whole existing file/);
+        assert.match(write.instructions, /expectedHash/);
+        assert.match(create.instructions, /new files/);
+        assert.match(create.instructions, /permission mode is automatic/);
+        assert.match(remove.instructions, /explicit file cleanup/);
+        assert.match(remove.instructions, /temporary live-test artifacts/);
+        assert.match(copy.instructions, /file-to-file copies/);
+        assert.match(move.instructions, /renames or moves/);
+        assert.match(move.instructions, /automatic permission flow/);
+        assert.match(patch.instructions, /surgical exact-string edits/);
+        assert.match(patch.instructions, /expectedHash/);
+        assert.match(patch.instructions, /dryRun=true/);
+        assert.match(patch.instructions, /Do not use patch_file for full-file rewrites/);
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

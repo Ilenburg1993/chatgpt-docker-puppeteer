@@ -194,6 +194,62 @@ describe('terminal/io-activity-events', () => {
         );
     });
 
+    it('expõe dry-run de patch como simulação, sem confundir com edição aplicada', async () => {
+        const { clearTerminalIoActivityProjection, readTerminalIoActivityProjection, setupTerminalIoActivityEvents } =
+            await import('../../../../src/copilot/terminal/events/io-activity-events.js');
+        clearTerminalIoActivityProjection();
+        const cleanup = setupTerminalIoActivityEvents();
+        const target = join(process.cwd(), 'data/copilot-terminal/live-scratch/dry-run.txt');
+
+        try {
+            channel('copilot.io.operation').publish({
+                ts: 654,
+                success: true,
+                io: {
+                    operation: 'patch',
+                    target,
+                    targetKind: 'file',
+                    bytesWritten: 0,
+                    durationMs: 4,
+                    engine: 'io-engine.fs.patchTextLocked',
+                    riskClass: 'low',
+                    traceId: 'trace-io-patch-dry-run',
+                    advisoryLimits: {
+                        dryRun: true,
+                    },
+                },
+            });
+        } finally {
+            cleanup();
+        }
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'tool',
+            'Arquivo: simulação de edição concluída',
+            expect.objectContaining({
+                detail: expect.stringContaining('simulação de edição · data/copilot-terminal/live-scratch/dry-run.txt'),
+                toolName: 'io.patch',
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('simulação de edição'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                type: 'io_op',
+                operation: 'patch',
+                ioDryRun: true,
+                target: 'data/copilot-terminal/live-scratch/dry-run.txt',
+            }),
+        );
+        expect(readTerminalIoActivityProjection(1)).toEqual([
+            expect.objectContaining({
+                operation: 'patch',
+                dryRun: true,
+                target: 'data/copilot-terminal/live-scratch/dry-run.txt',
+            }),
+        ]);
+    });
+
     it('não imprime I/O vivo quando a tool correlacionada ficou silenciosa por pergunta humana', async () => {
         const { createToolCallRegistry } = await import(
             '../../../../src/copilot/terminal/state/tool-call-registry.js'

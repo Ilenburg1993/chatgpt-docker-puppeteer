@@ -172,6 +172,15 @@ describe('terminal/dialog/output inline status', () => {
         expect(output).not.toContain('chatcmpl-tool');
     });
 
+    it('deduplica pulso visual idêntico em sequência curta', () => {
+        writeInlineStatus('LLM-B pensando · 10s sem resposta pública');
+        const writesAfterFirstPulse = writeSpy.mock.calls.length;
+
+        writeInlineStatus('LLM-B pensando · 10s sem resposta pública');
+
+        expect(writeSpy.mock.calls.length).toBe(writesAfterFirstPulse);
+    });
+
     it('permite desligar a linha viva por env', () => {
         process.env['COPILOT_TERMINAL_INLINE_STATUS'] = 'off';
 
@@ -263,13 +272,15 @@ describe('terminal/dialog/output inline status', () => {
         expect(rl.prompt).toHaveBeenCalledTimes(1);
     });
 
-    it('estaciona prompt normal durante continuação pós-resposta humana', () => {
+    it('estaciona prompt normal durante continuação sem repintar prompt extra', () => {
         parkTerminalPromptForContinuation(1_000);
 
         writeInlineStatus('LLM-B finalizando · 1s');
 
-        expect(mocks.rl.setPrompt).toHaveBeenCalledWith(expect.stringContaining('você'));
-        expect(mocks.rl.setPrompt).not.toHaveBeenCalledWith(expect.stringContaining('LLM-B pensando'));
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('LLM-B finalizando');
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+        expect(mocks.rl.prompt).not.toHaveBeenCalled();
     });
 
     it('suprime redraw normal durante handoff pós-resposta quando linha viva esta ativa', async () => {
@@ -282,8 +293,8 @@ describe('terminal/dialog/output inline status', () => {
 
         writeInlineStatus('LLM-B finalizando · 1s');
 
-        expect(mocks.rl.setPrompt).toHaveBeenCalledTimes(1);
-        expect(mocks.rl.setPrompt).toHaveBeenCalledWith(expect.stringContaining('você'));
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+        expect(mocks.rl.prompt).not.toHaveBeenCalled();
     });
 
     it('usa prompt de espera estacionado apenas quando linha viva esta desligada', () => {

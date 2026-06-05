@@ -64,6 +64,12 @@ describe('terminal/dialog/turn-display', () => {
         );
     });
 
+    it('neutraliza HTML bruto em deltas públicos antes de escrever no terminal', () => {
+        expect(sanitizeTerminalRenderText('<a href="https://x.example"><img src=x>oie</a>')).toBe(
+            '&lt;a href="https://x.example"&gt;&lt;img src=x&gt;oie&lt;/a&gt;',
+        );
+    });
+
     it('não abre streaming visual apenas com chunks vazios/brancos; deixa fallback textual decidir', () => {
         const state = createDisplayState({
             model: 'gpt-5-mini',
@@ -102,7 +108,9 @@ describe('terminal/dialog/turn-display', () => {
         expect(state.streamingChars).toBe(3);
         expect(state.streamingContent).toBe('abc');
         const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
-        expect(output).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} \(há \d+s\)\]/u);
+        expect(output).toMatch(
+            /\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?[+-]\d{2}:\d{2} \(há \d+s\)\]/u,
+        );
         expect(output).not.toMatch(/\[\d{2}:\d{2}:\d{2}\]/u);
         expect(isTerminalRenderLocked()).toBe(false);
     });

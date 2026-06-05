@@ -112,7 +112,7 @@ export async function cmdExport({ println }, arg) {
  * @returns {string}
  */
 function sanitizeExportInline(value) {
-    return redactSecretText(value).replace(/[\r\n]+/gu, ' ').trim();
+    return escapeMarkdownHtml(redactSecretText(value).replace(/[\r\n]+/gu, ' ').trim());
 }
 
 /**
@@ -120,7 +120,15 @@ function sanitizeExportInline(value) {
  * @returns {string}
  */
 function sanitizeExportBlock(value) {
-    return redactSecretText(value);
+    return escapeMarkdownHtml(redactSecretText(value));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function escapeMarkdownHtml(value) {
+    return String(value ?? '').replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
 }
 
 /**

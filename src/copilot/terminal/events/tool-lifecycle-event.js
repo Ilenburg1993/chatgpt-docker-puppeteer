@@ -77,6 +77,7 @@
  * @property {number | null} ioBytesRead - Bytes lidos
  * @property {number | null} ioBytesWritten - Bytes escritos
  * @property {string | null} ioRiskClass - Classe de risco da operação
+ * @property {boolean} ioDryRun - True quando a operação observada é simulação sem mutação persistente
  * @property {string[]} ioTargets - Alvo(s) de I/O
  * @property {{ name?: string; message?: string } | null} ioError - Erro de I/O
  * @property {string | null} correlatedToolCallId - ID da tool correlacionada (F3.2)
@@ -115,6 +116,7 @@
  * @property {number | null} [ioBytesRead]
  * @property {number | null} [ioBytesWritten]
  * @property {string | null} [ioRiskClass]
+ * @property {boolean} [ioDryRun]
  * @property {string[]} [ioTargets]
  * @property {{ name?: string; message?: string } | null} [ioError]
  * @property {string | null} [correlatedToolCallId]
@@ -171,6 +173,7 @@ export function buildToolLifecycleEvent(type, source, fields) {
         ioBytesRead: fields.ioBytesRead ?? null,
         ioBytesWritten: fields.ioBytesWritten ?? null,
         ioRiskClass: fields.ioRiskClass ?? null,
+        ioDryRun: fields.ioDryRun === true,
         ioTargets: fields.ioTargets ?? [],
         ioError: fields.ioError ?? null,
 
@@ -491,6 +494,7 @@ export function buildToolLifecycleUserRequested(fields) {
  *     bytesRead: number | null;
  *     bytesWritten: number | null;
  *     riskClass: string | null;
+ *     dryRun: boolean;
  *     success: boolean;
  *     error: { name?: string; message?: string } | null;
  * }} ioEntry
@@ -509,6 +513,7 @@ export function buildToolLifecycleIoOp(ioEntry, correlation) {
         ioBytesRead: ioEntry.bytesRead,
         ioBytesWritten: ioEntry.bytesWritten,
         ioRiskClass: ioEntry.riskClass,
+        ioDryRun: ioEntry.dryRun === true,
         ioTargets: ioEntry.targets,
         ioError: ioEntry.error,
         success: ioEntry.success,

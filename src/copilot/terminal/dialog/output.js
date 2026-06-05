@@ -94,6 +94,7 @@ const INLINE_STATUS_MODE_OVERLAY = 'overlay';
 const INLINE_STATUS_MODE_RESERVED = 'reserved';
 const PROMPT_REDRAW_DEDUPE_MS = 250;
 const PROMPT_PARK_DEFAULT_MS = 8_000;
+const INLINE_STATUS_VISUAL_DEDUPE_MS = 1_500;
 
 /**
  * @typedef {{
@@ -113,6 +114,8 @@ const PROMPT_PARK_DEFAULT_MS = 8_000;
 let _statusRowsReserved = 0;
 let _terminalPromptParkedUntil = 0;
 let _terminalPromptRedrawSuppressedUntil = 0;
+let _lastInlineStatusVisualText = '';
+let _lastInlineStatusVisualAt = 0;
 
 /**
  * @param {string} value
@@ -128,6 +131,33 @@ export function stripAnsiEscapes(value) {
  */
 function visibleTextLength(value) {
     return Array.from(stripAnsiEscapes(value)).length;
+}
+
+/**
+ * @param {string} text
+ * @returns {boolean}
+ */
+function shouldSuppressDuplicateInlineStatus(text) {
+    const visualText = stripAnsiEscapes(String(text ?? ''))
+        .replace(/\x1b\[K/gu, '')
+        .replace(/\s+/gu, ' ')
+        .trim();
+    const now = Date.now();
+    if (
+        visualText &&
+        visualText === _lastInlineStatusVisualText &&
+        now - _lastInlineStatusVisualAt < INLINE_STATUS_VISUAL_DEDUPE_MS
+    ) {
+        return true;
+    }
+    _lastInlineStatusVisualText = visualText;
+    _lastInlineStatusVisualAt = now;
+    return false;
+}
+
+function resetInlineStatusVisualDedupe() {
+    _lastInlineStatusVisualText = '';
+    _lastInlineStatusVisualAt = 0;
 }
 
 /**
@@ -354,7 +384,9 @@ function reserveInlineStatusRows(rl, rows) {
     const missingRows = rows - _statusRowsReserved;
     clearTerminalLine();
     process.stdout.write('\n'.repeat(missingRows));
-    paintTerminalPrompt(rl, buildUserPrompt());
+    if (!shouldSuppressPromptRedrawForContinuation()) {
+        paintTerminalPrompt(rl, buildUserPrompt());
+    }
     _statusRowsReserved = rows;
 }
 
@@ -1101,6 +1133,7 @@ export function writeInlineStatus(text) {
     if (isTerminalRenderLocked()) return;
     if (!process.stdout.isTTY) return;
     if (!shouldUseInlineStatus()) return;
+    if (shouldSuppressDuplicateInlineStatus(text)) return;
     const rows = fitInlineStatusRows(text);
     const rl = getRl();
     if (!rl) {
@@ -1167,6 +1200,7 @@ export function writeTerminalPrefixedChunk(linePrefix, chunk, options = {}) {
  */
 export function clearInlineStatus() {
     if (isTerminalRenderLocked()) return;
+    resetInlineStatusVisualDedupe();
     if (!shouldUseInlineStatus()) {
         _statusRowsReserved = 0;
         return;
@@ -1191,6 +1225,7 @@ export function clearInlineStatus() {
  */
 export function resetStatusRowState() {
     _statusRowsReserved = 0;
+    resetInlineStatusVisualDedupe();
     _terminalPromptParkedUntil = 0;
     _terminalPromptRedrawSuppressedUntil = 0;
     _terminalIdlePromptDeferredUntil = 0;
