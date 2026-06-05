@@ -28,7 +28,11 @@ import {
     viewPr,
     viewRun,
 } from '#copilot/bridges';
-import { renderTerminalDiffPreview } from '../capabilities/index.js';
+import {
+    renderTerminalDiffPreview,
+    renderTerminalPreviewSummary,
+    terminalPreviewSummaryRole,
+} from '../capabilities/index.js';
 import {
     terminalThemeDivider,
     terminalThemeHeadline,
@@ -245,8 +249,8 @@ async function handlePr(println, args) {
         printGhRow(
             println,
             'Preview',
-            `${rendered.renderer}${rendered.fallbackReason ? ` · fallback: ${rendered.fallbackReason}` : ''}${rendered.truncated ? ' · truncado' : ''}`,
-            rendered.renderer === 'delta' ? 'success' : 'muted',
+            renderTerminalPreviewSummary(rendered),
+            terminalPreviewSummaryRole(rendered),
         );
         println(rendered.output);
         return;

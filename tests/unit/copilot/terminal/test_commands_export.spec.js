@@ -124,6 +124,47 @@ describe('terminal/commands/export', () => {
         expect(markdown).not.toContain('<img src=x>');
     });
 
+    it('remove ANSI/OSC e controles antes de exportar Markdown', async () => {
+        const esc = String.fromCharCode(27);
+        const bel = String.fromCharCode(7);
+        readTerminalTimelineProjection.mockReturnValueOnce({
+            timelineSource: 'hub',
+            reconciliationStatus: 'aligned',
+            sync: { status: 'not_needed' },
+            turns: [
+                {
+                    role: 'assistant',
+                    rawRole: 'llm_b',
+                    origin: 'hub',
+                    persisted: true,
+                    content: `${esc}[31mvermelho${esc}[0m\n${esc}]8;;https://example.com${bel}link${esc}]8;;${bel}\u0001fim`,
+                    timestamp: 1710000001000,
+                    metadata: {
+                        assistantMessageEnvelope: {
+                            source: `${esc}[32msdk/assistant.message${esc}[0m`,
+                            traceId: 'trace-ansi',
+                            turnId: 'turn-ansi',
+                            eventId: 'evt-ansi',
+                        },
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
+
+        const [, content] = writeFile.mock.calls[0];
+        const markdown = String(content);
+        expect(markdown).toContain('vermelho');
+        expect(markdown).toContain('link');
+        expect(markdown).toContain('fim');
+        expect(markdown).toContain('envelope=sdk/assistant.message');
+        expect(markdown).not.toContain(esc);
+        expect(markdown).not.toContain(bel);
+        expect(markdown).not.toContain('\u0001');
+    });
+
     it('mostra path relativo ao workspace na saída humana quando exporta dentro do repo', async () => {
         const ctx = mockCtx();
 

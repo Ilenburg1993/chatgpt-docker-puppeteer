@@ -264,16 +264,16 @@
 ## Faixa K - Auxiliar UX Libs
 
 - [x] K.1 Existem docs anteriores de libs auxiliares em `src/copilot/docs/terminal`.
-- [ ] K.2 Investigar `gum` em documentacao oficial: menus, inputs, confirms, estilos, fallback.
-- [ ] K.3 Investigar `fzf`: selecao de arquivos/contexto, preview, portabilidade.
-- [ ] K.4 Investigar `bat`: preview de arquivos, temas, fallback para `sed`.
-- [ ] K.5 Investigar `glow`: markdown legivel, pager e fallback.
-- [ ] K.6 Investigar `delta`: diffs legiveis, integracao com git e patch previews.
-- [ ] K.7 Investigar `atuin`: historico e riscos de privacidade.
-- [ ] K.8 Investigar `zoxide`: navegacao e custo de adocao.
-- [ ] K.9 Investigar `jq/yq`: contratos estruturados com LLM, validacao e fallback.
-- [ ] K.10 Decidir aceitar/rejeitar cada lib com criterios de valor, dependencia, portabilidade, manutencao e fallback.
-- [ ] K.11 Nao implementar lib antes de completar o documento de decisao especifico.
+- [x] K.2 Investigar `gum` em documentacao oficial: menus, inputs, confirms, estilos, fallback.
+- [x] K.3 Investigar `fzf`: selecao de arquivos/contexto, preview, portabilidade.
+- [x] K.4 Investigar `bat`: preview de arquivos, temas, fallback para `sed`.
+- [x] K.5 Investigar `glow`: markdown legivel, pager e fallback.
+- [x] K.6 Investigar `delta`: diffs legiveis, integracao com git e patch previews.
+- [x] K.7 Investigar `atuin`: historico e riscos de privacidade.
+- [x] K.8 Investigar `zoxide`: navegacao e custo de adocao.
+- [x] K.9 Investigar `jq/yq`: contratos estruturados com LLM, validacao e fallback.
+- [x] K.10 Decidir aceitar/rejeitar cada lib com criterios de valor, dependencia, portabilidade, manutencao e fallback.
+- [x] K.11 Nao implementar lib antes de completar o documento de decisao especifico.
 
 ## Faixa L - Live Tests e Evidencia Visual
 
@@ -385,6 +385,10 @@
 - [x] Gap 58: live canônico pass3 mostrou que tools em grupos separados podiam redesenhar prompt entre resumo de tool e transcript final; `printlnBlock` agora não repinta prompt enquanto a atividade operacional está em fase de turno/tool/streaming/thinking.
 - [x] Gap 59: recovery pós-ask dominou `/events` default e expôs labels crus `task started`, `task queued`, `pending messages modified` e `session tools updated`; agora estes eventos possuem rótulos humanos em português.
 - [x] Gap 60: recovery automático pós-ask tinha ação automática, mas não exibia retomada manual; agora o card mostra `Retomar /turn ...` e o runner distingue falha vazia recuperada de bloqueio real.
+- [x] Gap 61: libs auxiliares precisavam de decisão arquitetural antes de novas integrações; criado `TERMINAL_AUX_LIBS_UX_ARCHITECTURE_DECISION_2026-06-05.md` com inventário, decisões e roadmap AUX.
+- [x] Gap 62: rodapés de preview divergiam entre `/fs`, `/git` e `/gh`; agora `renderTerminalPreviewSummary` padroniza renderer externo, fallback canônico, motivo, filtro aplicado e truncamento.
+- [x] Gap 63: `/fs preview --json|--yaml --lines` ignorava o limite em previews estruturados e podia despejar centenas de linhas; agora o renderer estruturado limita linhas e reporta `truncado`.
+- [x] Gap 64: `/export` removia HTML e redigia segredos, mas podia preservar ANSI/OSC/control codes vindos de renderers externos; agora sanitiza texto terminal antes da redação e do Markdown.
 
 ## 08. Criterio de Marco
 
@@ -481,3 +485,7 @@
 - [x] 2026-06-05: `/events` default passou a humanizar `task.started`, `task.queued`, `pending_messages.modified` e `session.tools_updated`, removendo inglês cru da trilha de recuperação pós-ask.
 - [x] 2026-06-05: card de recuperação automática pós-ask passou a incluir retomada manual explícita; harness live deixa de marcar `BLOCKED` quando a recuperação entrega o final canônico.
 - [x] 2026-06-05: live `terminal-ux-live-ask-user-canonical` pass04 PASS confirmou `Conexão sessão conectada`, ausência de prompt pronto entre tool summary/status/transcript, ask_user real, resposta humana, pós-ask e `/events` default humanizado.
+- [x] 2026-06-05: criada decisão arquitetural de libs auxiliares do terminal; `gum/fzf` ficam bloqueados até TTY exclusivo, `bat/glow/delta/jq/yq` seguem como previews explícitos e `atuin/zoxide` permanecem adiados.
+- [x] 2026-06-05: `/terminal libs` ganhou resumo por categoria e link para o guia AUX; `/fs preview`, `/git diff` e `/gh pr diff` agora compartilham rodapé canônico `renderer externo`/`fallback canônico`, com testes focados cobrindo os fallbacks.
+- [x] 2026-06-05: observado em execução real que `/fs preview package.json --json --query .scripts --lines 5` despejava centenas de linhas; `structured-preview` agora aplica `lineLimit` pós-render e o smoke AUX protege `structured-preview-line-limit`.
+- [x] 2026-06-05: `/export` passou a usar `sanitizeTerminalExternalToolText` antes de `redactSecretText`, removendo ANSI/OSC/controles de conteúdo e envelopes preservados no Markdown.

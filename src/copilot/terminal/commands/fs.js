@@ -12,7 +12,9 @@ import { toError } from '../../core/error-handlers.js';
 import {
     renderTerminalFilePreview,
     renderTerminalMarkdownPreview,
+    renderTerminalPreviewSummary,
     renderTerminalStructuredPreview,
+    terminalPreviewSummaryRole,
 } from '../capabilities/index.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { requireTerminalFileTool } from '../frontend/gateways/index.js';
@@ -292,6 +294,7 @@ async function runRead(ctx, parts, previewDefault = false) {
                   format: flags.structured,
                   query: flags.query,
                   forceJs: flags.forceJs,
+                  lineLimit: flags.lineLimit,
               })
             : flags.markdown
               ? renderTerminalMarkdownPreview(content, { forceJs: flags.forceJs, width: 100 })
@@ -302,16 +305,11 @@ async function runRead(ctx, parts, previewDefault = false) {
         ctx.println(
             terminalThemeRow(
                 'Preview',
-                `${rendered.renderer}${'queryApplied' in rendered && rendered.queryApplied ? ` · filtro ${flags.query}` : ''}${rendered.fallbackReason ? ` · fallback: ${rendered.fallbackReason}` : ''}${rendered.truncated ? ' · truncado' : ''}`,
-                {
-                    role:
-                        rendered.renderer === 'bat' ||
-                        rendered.renderer === 'glow' ||
-                        rendered.renderer === 'jq' ||
-                        rendered.renderer === 'yq'
-                            ? 'success'
-                            : 'muted',
-                },
+                renderTerminalPreviewSummary(rendered, {
+                    query: flags.query,
+                    queryApplied: 'queryApplied' in rendered ? rendered.queryApplied : false,
+                }),
+                { role: terminalPreviewSummaryRole(rendered) },
             ),
         );
         ctx.println(rendered.output);

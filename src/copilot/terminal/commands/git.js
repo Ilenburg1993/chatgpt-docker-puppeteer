@@ -17,7 +17,11 @@ import {
     gitStashList,
     gitStatus,
 } from '#copilot/bridges';
-import { renderTerminalDiffPreview } from '../capabilities/index.js';
+import {
+    renderTerminalDiffPreview,
+    renderTerminalPreviewSummary,
+    terminalPreviewSummaryRole,
+} from '../capabilities/index.js';
 import { terminalThemeHeadline, terminalThemeRow, terminalThemeWrappedRow } from '../state/index.js';
 
 /**
@@ -200,8 +204,8 @@ export async function cmdGit({ println }, args) {
         println(
             terminalThemeRow(
                 'Preview',
-                `${rendered.renderer}${rendered.fallbackReason ? ` · fallback: ${rendered.fallbackReason}` : ''}${rendered.truncated ? ' · truncado' : ''}`,
-                { role: rendered.renderer === 'delta' ? 'success' : 'muted' },
+                renderTerminalPreviewSummary(rendered),
+                { role: terminalPreviewSummaryRole(rendered) },
             ),
         );
         println(rendered.output);

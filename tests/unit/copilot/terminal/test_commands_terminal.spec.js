@@ -90,7 +90,14 @@ describe('terminal/commands/terminal', () => {
         expect(ctx.output()).toContain('aceita como opcional');
         expect(ctx.output()).toContain('Gum');
         expect(ctx.output()).toContain('aceita com guardas');
+        expect(ctx.output()).toContain('Preview');
+        expect(ctx.output()).toContain('0 renderers disponíveis · uso explícito · fallback JS');
+        expect(ctx.output()).toContain('TUI');
+        expect(ctx.output()).toContain('2 pickers detectados · bloqueados até TTY exclusivo');
+        expect(ctx.output()).toContain('Hist/nav');
+        expect(ctx.output()).toContain('1 integração adiada · sem histórico/cwd pessoal por default');
         expect(ctx.output()).toContain('/terminal libs detail');
+        expect(ctx.output()).toContain('TERMINAL_AUX_LIBS_UX_ARCHITECTURE_DECISION_2026-06-05.md');
         expect(ctx.output()).toContain('terminal:aux-libs:smoke');
         expect(ctx.output()).not.toContain('disponível(is)');
     });
@@ -116,6 +123,7 @@ describe('terminal/commands/terminal', () => {
         expect(ctx.output()).toContain('ConversationHub');
         expect(ctx.output()).toContain('adiado; não ler histórico externo');
         expect(ctx.output()).toContain('planejada, mas sem binário local e sem chamada automática');
+        expect(ctx.output()).toContain('TERMINAL_AUX_LIBS_UX_ARCHITECTURE_DECISION_2026-06-05.md');
         expect(ctx.output()).toContain('JSON limpo');
         expect(ctx.output()).toContain('Filtros');
     });

@@ -29,6 +29,7 @@ import { readTerminalExternalToolCapabilities, sanitizeTerminalExternalToolText 
 
 const MAX_STRUCTURED_PREVIEW_BYTES = 384 * 1024;
 const MAX_STRUCTURED_PREVIEW_CHARS = 48_000;
+const DEFAULT_STRUCTURED_LINE_LIMIT = 220;
 
 /**
  * @param {string} text
@@ -39,6 +40,34 @@ function truncateStructuredPreview(text) {
     return {
         output: `${text.slice(0, MAX_STRUCTURED_PREVIEW_CHARS)}\n... (${text.length - MAX_STRUCTURED_PREVIEW_CHARS} caracteres omitidos)`,
         truncated: true,
+    };
+}
+
+/**
+ * @param {string} text
+ * @param {number} lineLimit
+ * @returns {{ output: string; truncated: boolean }}
+ */
+function limitStructuredPreviewLines(text, lineLimit) {
+    const lines = text.split(/\r?\n/u);
+    if (lines.length <= lineLimit) return { output: text, truncated: false };
+    return {
+        output: `${lines.slice(0, lineLimit).join('\n')}\n... (${lines.length - lineLimit} linhas omitidas)`,
+        truncated: true,
+    };
+}
+
+/**
+ * @param {string} text
+ * @param {number} lineLimit
+ * @returns {{ output: string; truncated: boolean }}
+ */
+function truncateAndLimitStructuredPreview(text, lineLimit) {
+    const charLimited = truncateStructuredPreview(text);
+    const lineLimited = limitStructuredPreviewLines(charLimited.output, lineLimit);
+    return {
+        output: lineLimited.output,
+        truncated: charLimited.truncated || lineLimited.truncated,
     };
 }
 
@@ -63,12 +92,16 @@ function stringifyYaml(value) {
  * @param {TerminalStructuredPreviewFormat} format
  * @param {string | null} reason
  * @param {boolean} queryApplied
+ * @param {number} lineLimit
  * @returns {TerminalStructuredPreview}
  */
-function renderJsStructuredPreview(content, format, reason, queryApplied) {
+function renderJsStructuredPreview(content, format, reason, queryApplied, lineLimit = DEFAULT_STRUCTURED_LINE_LIMIT) {
     try {
         const parsed = format === 'json' ? JSON.parse(content) : yaml.load(content);
-        const rendered = truncateStructuredPreview(format === 'json' ? stringifyJson(parsed) : stringifyYaml(parsed));
+        const rendered = truncateAndLimitStructuredPreview(
+            format === 'json' ? stringifyJson(parsed) : stringifyYaml(parsed),
+            lineLimit,
+        );
         return {
             output: rendered.output,
             renderer: 'js',
@@ -106,7 +139,7 @@ function validateExternalStructuredQuery(query) {
 
 /**
  * @param {string} content
- * @param {{ format: TerminalStructuredPreviewFormat; query?: string; forceJs?: boolean; color?: 'auto' | 'always' | 'never' }} options
+ * @param {{ format: TerminalStructuredPreviewFormat; query?: string; forceJs?: boolean; color?: 'auto' | 'always' | 'never'; lineLimit?: number }} options
  * @returns {TerminalStructuredPreview}
  */
 export function renderTerminalStructuredPreview(content, options) {
@@ -114,8 +147,15 @@ export function renderTerminalStructuredPreview(content, options) {
     const query = options.query?.trim() || '.';
     const isDefaultQuery = query === '.';
     const colorMode = options.color ?? (process.stdout.isTTY ? 'always' : 'never');
+    const lineLimit = Math.max(1, Math.min(3_000, Math.trunc(options.lineLimit ?? DEFAULT_STRUCTURED_LINE_LIMIT)));
     const jsFallback = (/** @type {string | null} */ reason) =>
-        renderJsStructuredPreview(content, format, isDefaultQuery ? reason : `${reason ?? 'renderer externo ausente'}; filtro ignorado`, isDefaultQuery);
+        renderJsStructuredPreview(
+            content,
+            format,
+            isDefaultQuery ? reason : `${reason ?? 'renderer externo ausente'}; filtro ignorado`,
+            isDefaultQuery,
+            lineLimit,
+        );
 
     if (options.forceJs) return jsFallback('renderer externo desativado');
     const unsafeQueryReason = validateExternalStructuredQuery(query);
@@ -157,7 +197,7 @@ export function renderTerminalStructuredPreview(content, options) {
         colorMode === 'never'
             ? sanitizeTerminalExternalToolText(result.stdout, { max: MAX_STRUCTURED_PREVIEW_CHARS })
             : String(result.stdout ?? '');
-    const rendered = truncateStructuredPreview(externalOutput);
+    const rendered = truncateAndLimitStructuredPreview(externalOutput, lineLimit);
     return {
         output: rendered.output,
         renderer: /** @type {'jq' | 'yq'} */ (toolId),
@@ -169,5 +209,7 @@ export function renderTerminalStructuredPreview(content, options) {
 
 export const __test__ = {
     renderJsStructuredPreview,
+    limitStructuredPreviewLines,
+    truncateAndLimitStructuredPreview,
     truncateStructuredPreview,
 };

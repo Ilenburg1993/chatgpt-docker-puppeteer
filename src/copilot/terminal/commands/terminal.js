@@ -31,6 +31,8 @@ const TERMINAL_LIBS_MODE_TOKENS = new Set([
     'refresh',
     '--refresh',
 ]);
+const TERMINAL_AUX_LIBS_GUIDE =
+    'src/copilot/docs/terminal/TERMINAL_AUX_LIBS_UX_ARCHITECTURE_DECISION_2026-06-05.md';
 
 /**
  * @param {string} value
@@ -70,6 +72,37 @@ function renderAvailability(value) {
  */
 function countLabel(count, singular, plural) {
     return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
+ * @param {import('../capabilities/external-tools.js').TerminalExternalToolCapability[]} tools
+ * @param {import('../capabilities/external-tools.js').TerminalExternalToolUse} use
+ * @returns {number}
+ */
+function countAvailableByUse(tools, use) {
+    return tools.filter((tool) => tool.available && tool.uses.includes(use)).length;
+}
+
+/**
+ * @param {import('../capabilities/external-tools.js').TerminalExternalToolCapability[]} tools
+ * @returns {Array<[string, string]>}
+ */
+function buildTerminalLibsCategoryRows(tools) {
+    const previewCount =
+        countAvailableByUse(tools, 'preview') +
+        countAvailableByUse(tools, 'markdown') +
+        countAvailableByUse(tools, 'diff') +
+        countAvailableByUse(tools, 'structured');
+    const pickerCount = countAvailableByUse(tools, 'picker');
+    const deferredCount = tools.filter((tool) => tool.decision === 'deferred').length;
+    return [
+        ['Preview', `${countLabel(previewCount, 'renderer disponível', 'renderers disponíveis')} · uso explícito · fallback JS`],
+        [
+            'TUI',
+            `${countLabel(pickerCount, 'picker detectado', 'pickers detectados')} · ${pickerCount === 1 ? 'bloqueado' : 'bloqueados'} até TTY exclusivo`,
+        ],
+        ['Hist/nav', `${countLabel(deferredCount, 'integração adiada', 'integrações adiadas')} · sem histórico/cwd pessoal por default`],
+    ];
 }
 
 /**
@@ -218,6 +251,7 @@ function printTerminalLibsCompact(println, refresh, filterTokens = []) {
         ['Adiada', countLabel(summary.deferredAvailable, 'disponível', 'disponíveis')],
         ['Fallback', 'terminal JS canônico continua sendo o padrão'],
     ]);
+    printRows(println, buildTerminalLibsCategoryRows(summary.tools));
     if (!filter.matched) {
         println(terminalThemeRow('Filtro', `${filter.query} não encontrou ferramenta ou grupo`, { role: 'warn' }));
     }
@@ -238,6 +272,7 @@ function printTerminalLibsCompact(println, refresh, filterTokens = []) {
     println('');
     println(terminalThemeRow('Detalhes', '/terminal libs detail [filtro] · /terminal libs json [filtro] · /terminal libs refresh'));
     println(terminalThemeRow('Smoke', 'npm run terminal:aux-libs:smoke · npm --silent run terminal:aux-libs:smoke -- --json'));
+    println(terminalThemeRow('Guia', TERMINAL_AUX_LIBS_GUIDE));
     println('');
 }
 
@@ -302,6 +337,7 @@ function printTerminalLibsDetail(println, refresh, filterTokens = []) {
     printRows(
         println,
         [
+            ['Guia', TERMINAL_AUX_LIBS_GUIDE],
             ['Smoke', 'npm run terminal:aux-libs:smoke'],
             ['JSON limpo', 'npm --silent run terminal:aux-libs:smoke -- --json'],
             ['Filtros', 'available · missing · accepted · guarded · deferred · fzf · bat · glow · delta · jq · yq'],

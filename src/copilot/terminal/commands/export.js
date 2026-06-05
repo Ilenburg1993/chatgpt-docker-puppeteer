@@ -13,6 +13,7 @@ import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretText } from '../../core/security/redaction.js';
+import { sanitizeTerminalExternalToolText } from '../capabilities/index.js';
 import { formatTerminalToolPathForOperator } from '../events/tool-activity-presenter.js';
 import { readTerminalTimelineProjection } from '../frontend/index.js';
 import { formatTerminalIsoTimestamp, terminalThemeRow } from '../state/index.js';
@@ -112,7 +113,7 @@ export async function cmdExport({ println }, arg) {
  * @returns {string}
  */
 function sanitizeExportInline(value) {
-    return escapeMarkdownHtml(redactSecretText(value).replace(/[\r\n]+/gu, ' ').trim());
+    return escapeMarkdownHtml(redactSecretText(sanitizeTerminalExternalToolText(value)).replace(/[\r\n]+/gu, ' ').trim());
 }
 
 /**
@@ -120,7 +121,7 @@ function sanitizeExportInline(value) {
  * @returns {string}
  */
 function sanitizeExportBlock(value) {
-    return escapeMarkdownHtml(redactSecretText(value));
+    return escapeMarkdownHtml(redactSecretText(sanitizeTerminalExternalToolText(value)));
 }
 
 /**

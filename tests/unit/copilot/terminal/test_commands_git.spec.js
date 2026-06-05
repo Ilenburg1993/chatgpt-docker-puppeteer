@@ -50,7 +50,7 @@ describe('terminal/commands/git', () => {
         expect(bridgeMocks.gitDiff).toHaveBeenCalledWith({ staged: false, file: undefined });
         expect(ctx.output()).toContain('Git diff');
         expect(ctx.output()).toContain('Preview');
-        expect(ctx.output()).toContain('js · fallback: diff externo desativado');
+        expect(ctx.output()).toContain('js · fallback canônico · motivo diff externo desativado');
         expect(ctx.output()).toContain('-old');
         expect(ctx.output()).toContain('+new');
         expect(ctx.output()).not.toContain('Gerando diff…');

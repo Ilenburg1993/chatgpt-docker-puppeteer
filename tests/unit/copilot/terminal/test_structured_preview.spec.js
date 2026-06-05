@@ -63,4 +63,16 @@ describe('terminal/capabilities/structured-preview', () => {
         expect(preview.queryApplied).toBe(false);
         expect(preview.fallbackReason).toContain('caracteres de controle');
     });
+
+    it('respeita limite de linhas também em previews estruturados', () => {
+        const preview = renderTerminalStructuredPreview('{"items":[1,2,3,4,5,6]}', {
+            format: 'json',
+            forceJs: true,
+            lineLimit: 4,
+        });
+
+        expect(preview.truncated).toBe(true);
+        expect(preview.output.split('\n').length).toBeLessThanOrEqual(5);
+        expect(preview.output).toContain('linhas omitidas');
+    });
 });

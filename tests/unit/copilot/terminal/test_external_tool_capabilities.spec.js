@@ -9,8 +9,10 @@ import {
     clearTerminalExternalToolCapabilityCache,
     readTerminalExternalToolCapabilities,
     readTerminalExternalToolCapabilitySummary,
+    renderTerminalPreviewSummary,
     sanitizeTerminalExternalToolDiagnostic,
     sanitizeTerminalExternalToolText,
+    terminalPreviewSummaryRole,
 } from '../../../../src/copilot/terminal/capabilities/index.js';
 
 function makeExecutableFixture(command, body = '#!/bin/sh\nprintf "%s\\n" "$0 1.2.3"\n') {
@@ -90,5 +92,25 @@ describe('terminal/capabilities/external-tools', () => {
         const value = sanitizeTerminalExternalToolText('\x1b[32m{\n  "ok": true\n}\x1b[0m\rtrailer\u0001');
 
         expect(value).toBe('{\n  "ok": true\n}\ntrailer');
+    });
+
+    it('sumariza previews externos e fallback JS com vocabulário único', () => {
+        expect(renderTerminalPreviewSummary({ renderer: 'delta', truncated: true })).toBe(
+            'delta · renderer externo · truncado',
+        );
+        expect(
+            renderTerminalPreviewSummary(
+                { renderer: 'js', fallbackReason: 'jq ausente', queryApplied: false },
+                { query: '.scripts' },
+            ),
+        ).toBe('js · fallback canônico · motivo jq ausente');
+        expect(
+            renderTerminalPreviewSummary(
+                { renderer: 'jq', queryApplied: true, fallbackReason: null },
+                { query: '.scripts' },
+            ),
+        ).toBe('jq · renderer externo · filtro .scripts');
+        expect(terminalPreviewSummaryRole({ renderer: 'bat' })).toBe('success');
+        expect(terminalPreviewSummaryRole({ renderer: 'js' })).toBe('muted');
     });
 });

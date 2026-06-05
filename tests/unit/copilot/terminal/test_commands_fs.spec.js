@@ -121,7 +121,7 @@ describe('terminal/commands/fs', () => {
         await cmdFs(preview, `preview ${fileRel} --plain --lines 3`);
 
         expect(preview.output()).toContain('Preview');
-        expect(preview.output()).toContain('js · fallback: preview externo desativado');
+        expect(preview.output()).toContain('js · fallback canônico · motivo preview externo desativado');
         expect(preview.output()).toContain('1 │ const value = 42;');
         expect(preview.output()).toContain('Arquivo');
         expectNoAnsi(preview.output());
@@ -150,7 +150,7 @@ describe('terminal/commands/fs', () => {
         await cmdFs(preview, `preview ${fileRel} --markdown --plain`);
 
         expect(preview.output()).toContain('Preview');
-        expect(preview.output()).toContain('js · fallback: markdown externo desativado');
+        expect(preview.output()).toContain('js · fallback canônico · motivo markdown externo desativado');
         expect(preview.output()).toContain('# Titulo');
         expectNoAnsi(preview.output());
     });
@@ -165,7 +165,7 @@ describe('terminal/commands/fs', () => {
         await cmdFs(preview, `preview ${fileRel} --json --plain`);
 
         expect(preview.output()).toContain('Preview');
-        expect(preview.output()).toContain('js · filtro . · fallback: renderer externo desativado');
+        expect(preview.output()).toContain('js · fallback canônico · motivo renderer externo desativado');
         expect(preview.output()).toContain('"b": 2');
         expect(preview.output()).toContain('"a": {');
         expectNoAnsi(preview.output());
@@ -181,7 +181,7 @@ describe('terminal/commands/fs', () => {
         await cmdFs(preview, `preview ${fileRel} --yaml --plain`);
 
         expect(preview.output()).toContain('Preview');
-        expect(preview.output()).toContain('js · filtro . · fallback: renderer externo desativado');
+        expect(preview.output()).toContain('js · fallback canônico · motivo renderer externo desativado');
         expect(preview.output()).toContain('b: 2');
         expect(preview.output()).toContain('a:');
         expectNoAnsi(preview.output());

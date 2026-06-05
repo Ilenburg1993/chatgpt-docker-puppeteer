@@ -167,6 +167,7 @@ async function main() {
         renderTerminalDiffPreview,
         renderTerminalFilePreview,
         renderTerminalMarkdownPreview,
+        renderTerminalPreviewSummary,
         renderTerminalStructuredPreview,
     } = api;
     clearCapabilityCache = clearTerminalExternalToolCapabilityCache;
@@ -281,6 +282,27 @@ async function main() {
         });
         checks.push(
             externalCheck('real-json-preview', 'json PATH real', realJson.renderer, 'jq', hasTool('jq'), realJson.fallbackReason),
+        );
+        const limitedJson = renderTerminalStructuredPreview(
+            JSON.stringify({ scripts: Object.fromEntries(Array.from({ length: 40 }, (_, index) => [`script:${index}`, `node task-${index}.mjs`])) }),
+            {
+                format: 'json',
+                query: '.scripts',
+                color: 'never',
+                lineLimit: 5,
+            },
+        );
+        checks.push(
+            check(
+                'structured-preview-line-limit',
+                'json respeita --lines',
+                limitedJson.renderer,
+                hasTool('jq') ? 'jq' : 'js',
+                limitedJson.truncated &&
+                    limitedJson.output.split('\n').length <= 6 &&
+                    renderTerminalPreviewSummary(limitedJson, { query: '.scripts' }).includes('truncado'),
+                renderTerminalPreviewSummary(limitedJson, { query: '.scripts' }),
+            ),
         );
         const realYaml = renderTerminalStructuredPreview('jobs:\n  test:\n    runs-on: ubuntu-latest\n', {
             format: 'yaml',

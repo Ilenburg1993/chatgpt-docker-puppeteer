@@ -82,7 +82,7 @@ describe('terminal/commands/gh', () => {
         expect(bridgeMocks.diffPr).toHaveBeenCalledWith(42);
         expect(ctx.output()).toContain('PR #42 diff');
         expect(ctx.output()).toContain('Preview');
-        expect(ctx.output()).toContain('js · fallback: diff externo desativado');
+        expect(ctx.output()).toContain('js · fallback canônico · motivo diff externo desativado');
         expect(ctx.output()).toContain('-old');
         expect(ctx.output()).toContain('+new');
         expect(ctx.output()).not.toContain('truncado em 120 linhas');
