@@ -905,7 +905,7 @@ export function cmdTools({ println }, arg = '') {
                       : '/tools all · FS: /tools fs · falhas: /tools failures · contrato: /tools contract · rastreio bruto: /tools raw · /events --raw',
                   { role: 'command' },
               )
-            : terminalThemeRow('Detalhes', '/tools fs · /tools failures · /tools diag · contrato: /tools contract · nomes crus: /tools raw', { role: 'command' }),
+            : terminalThemeRow('Detalhes', '/tools diag · /tools fs · /tools failures · contrato: /tools contract · nomes crus: /tools raw', { role: 'command' }),
     );
     println('');
 }
