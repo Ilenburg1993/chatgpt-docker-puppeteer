@@ -455,6 +455,7 @@ operador vê e salvar summary com critérios objetivos.
 - [x] 2026-06-05: bootstrap/lifecycle do REPL removeram ANSI manual da continuação multiline e de erro de boot; erro público agora é row `Boot`, mantendo log técnico separado.
 - [x] 2026-06-05: live `diagnostic-ux-cycle` em `artifacts/terminal-live/terminal-ux-themed-repl-20260605-1739` falhou apenas em `/tools` default; a linha `Detalhes` priorizava `/tools fs` antes do diagnóstico.
 - [x] 2026-06-05: `/tools` default agora prioriza `/tools diag` como próximo comando primário; rerun live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/terminal-ux-themed-repl-rerun-20260605-1742` com 30/30 critérios.
+- [x] 2026-06-05: `/elicitation confirm|select|input|capabilities` removeu rótulos públicos ingleses (`Confirm`, `Select`, `Input`, `Elicitation`) e corrigiu capability check para respeitar resposta síncrona ou futura Promise do runtime.
 - [ ] Próximo gap UX: completar traduções de `/byok gateway commands full` e dos filtros menos usados; decidir se todos os comandos canônicos devem ganhar `terminalSummary` próprio no domínio, em vez de mapa local no terminal.
 - [ ] Próximo gap UX: auditar `byok.js` por rótulos ingleses sem ANSI (`high`, `agentic capability`, `remote=1`, `providerId`, aliases raros) e mover mais glossário para domínio canônico quando fizer sentido.
 - [ ] Próximo passo: auditar `dialog/output.js` e eventos de sessão por mensagens manuais de espera/erro, especialmente prompt preservado, `sdk-session-events.js`, `agent-runtime-events.js` e `task-stream-events.js`.

@@ -789,18 +789,27 @@ describe('terminal/commands/sdk', () => {
         const confirm = mockCtx();
         await cmdElicitation({ println: confirm.println }, 'confirm Confirma deploy?');
         expect(runtimeMocks.confirmTerminalSdkSessionUi).toHaveBeenCalledWith('Confirma deploy?');
+        expect(confirm.output()).toContain('Confirmação');
         expect(confirm.output()).toContain('session.ui.confirm');
 
         const select = mockCtx();
         await cmdElicitation({ println: select.println }, 'select Escolha ambiente -- dev|prod');
         expect(runtimeMocks.selectTerminalSdkSessionUi).toHaveBeenCalledWith('Escolha ambiente', ['dev', 'prod']);
+        expect(select.output()).toContain('Seleção');
         expect(select.output()).toContain('session.ui.select');
 
         const input = mockCtx();
         await cmdElicitation({ println: input.println }, 'input Nome do projeto -- {"title":"Nome"}');
         expect(runtimeMocks.inputTerminalSdkSessionUi).toHaveBeenCalledWith('Nome do projeto', { title: 'Nome' });
+        expect(input.output()).toContain('Entrada');
         expect(input.output()).toContain('Nome do projeto:typed');
         expect(input.output()).not.toContain('[object Promise]');
+
+        runtimeMocks.isTerminalSdkSessionUiElicitationAvailable.mockReturnValueOnce(false);
+        const unavailable = mockCtx();
+        await cmdElicitation({ println: unavailable.println }, 'capabilities');
+        expect(unavailable.output()).toContain('Session UI');
+        expect(unavailable.output()).toContain('indisponível');
     });
 
     it('/elicitation valida content contra schema SDK antes de responder', async () => {

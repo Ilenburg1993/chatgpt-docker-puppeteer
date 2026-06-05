@@ -2197,7 +2197,7 @@ export async function cmdElicitation({ println }, arg = '') {
             const result = await callWithRuntimeTarget(confirmTerminalSdkSessionUi, runtimeId, message);
             println('');
             println(
-                terminalThemeRow('Confirm', `session.ui.confirm concluído · ${String(result)}`, { role: 'success' }),
+                terminalThemeRow('Confirmação', `session.ui.confirm concluído · ${String(result)}`, { role: 'success' }),
             );
             println('');
         } else if (sub === 'select') {
@@ -2218,7 +2218,7 @@ export async function cmdElicitation({ println }, arg = '') {
             }
             const result = await callWithRuntimeTarget(selectTerminalSdkSessionUi, runtimeId, message, options);
             println('');
-            println(terminalThemeRow('Select', `session.ui.select concluído · ${String(result)}`, { role: 'success' }));
+            println(terminalThemeRow('Seleção', `session.ui.select concluído · ${String(result)}`, { role: 'success' }));
             println('');
         } else if (sub === 'input') {
             const { left, right } = splitAtDoubleDash(rest);
@@ -2237,16 +2237,18 @@ export async function cmdElicitation({ println }, arg = '') {
                 ),
             );
             println('');
-            println(terminalThemeRow('Input', `session.ui.input concluído · ${String(result)}`, { role: 'success' }));
+            println(terminalThemeRow('Entrada', `session.ui.input concluído · ${String(result)}`, { role: 'success' }));
             println('');
         } else if (sub === 'capabilities') {
-            const available = callWithRuntimeTarget(isTerminalSdkSessionUiElicitationAvailable, runtimeId);
+            const available = await Promise.resolve(
+                callWithRuntimeTarget(isTerminalSdkSessionUiElicitationAvailable, runtimeId),
+            );
             const ok = available;
             println('');
             println(terminalThemeHeadline('question', 'Session UI'));
             println(terminalThemeDivider(37));
             println(
-                terminalThemeRow('Elicitation', ok ? 'disponível' : 'indisponível', { role: ok ? 'success' : 'warn' }),
+                terminalThemeRow('Session UI', ok ? 'disponível' : 'indisponível', { role: ok ? 'success' : 'warn' }),
             );
             println(terminalThemeDivider(37));
             println('');
