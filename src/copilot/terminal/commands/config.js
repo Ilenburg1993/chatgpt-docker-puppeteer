@@ -306,7 +306,7 @@ export async function cmdModel({ println }, arg) {
     println(terminalThemeHeadline('assistant', 'Modelo solicitado', [requestPresentation.transition]));
     if (trimmed === 'auto') {
         println(
-            terminalThemeRow('Auto', 'roteamento nativo do Copilot; gpt-5.4/high é preferência local observável, não parâmetro oficial forçado.'),
+            terminalThemeRow('Modo automático', 'roteamento nativo do Copilot; gpt-5.4/high é preferência local observável, não parâmetro oficial forçado.'),
         );
     }
     if (modelMeta) {

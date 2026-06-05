@@ -252,7 +252,7 @@ describe('terminal commands config/errors com frontend canônico', () => {
         await cmdModel({ println: ctx.println }, 'auto');
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('auto');
-        expect(ctx.output()).toContain('Auto');
+        expect(ctx.output()).toContain('Modo automático');
         expect(ctx.output()).toContain('roteamento nativo do Copilot');
         expect(ctx.output()).toContain('gpt-5.4/high');
     });

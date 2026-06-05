@@ -2025,7 +2025,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         if (shouldPrintSessionNarration('important')) {
             println(
-                terminalThemeRow('Auto mode', `SDK solicitou troca automática${errorCode ? ` · ${errorCode}` : ''}`, {
+                terminalThemeRow('Modo automático', `SDK solicitou troca automática${errorCode ? ` · ${errorCode}` : ''}`, {
                     role: 'warn',
                 }),
             );
