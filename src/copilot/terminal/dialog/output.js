@@ -36,7 +36,7 @@ import {
 /** Timeout para aguardar resposta da LLM-B por turno (ms). */
 export const TURN_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
 
-export const PROMPT_USER = '\x1b[32mvocê\x1b[0m\x1b[90m›\x1b[0m ';
+export const PROMPT_USER = `${terminalThemeText('user', 'você')}${terminalThemeText('muted', '›')} `;
 export const PROMPT_WAITING = '     ';
 
 /** @type {number} */
@@ -1368,9 +1368,9 @@ export function printExchange(actor, message, reply, durationMs) {
     for (const line of visibleReplyLines) {
         if (line.trimStart().startsWith('```')) {
             inCodeBlock = !inCodeBlock;
-            lines.push(`  ${terminalThemeText('assistant', '│')}  \x1b[2m${line}\x1b[0m`);
+            lines.push(`  ${terminalThemeText('assistant', '│')}  ${terminalThemeText('muted', line)}`);
         } else if (inCodeBlock) {
-            lines.push(`  ${terminalThemeText('assistant', '│')}  \x1b[48;5;236m${terminalThemeText('info', line)}`);
+            lines.push(`  ${terminalThemeText('assistant', '│')}  ${terminalThemeText('info', line)}`);
         } else if (reply.trim().length === 0) {
             lines.push(`  ${terminalThemeText('warn', '│')}  ${terminalThemeText('warn', line)}`);
         } else {

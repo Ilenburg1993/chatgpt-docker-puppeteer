@@ -25,6 +25,7 @@ import { log } from '#copilot/observability';
 import { ensureDialogLoop, println } from '../dialog/index.js';
 import { setupTerminalHeadlessEventAdapters } from '../events/index.js';
 import { recordTerminalActivity } from '../state/repl-runtime/index.js';
+import { terminalThemeRow } from '../state/repl/index.js';
 import { renderTerminalAutoBrief } from './auto-brief.js';
 import { runReplLifecycle } from './repl-lifecycle.js';
 export { setupAgentListeners } from './repl-listeners.js';
@@ -75,7 +76,7 @@ export function launchTerminalDialogLoopBootstrap(deps = {}) {
                 source: 'terminal',
                 severity: 'error',
             });
-            printlnFn(`\x1b[31m  [erro de boot] ${error.message}\x1b[0m`);
+            printlnFn(terminalThemeRow('Boot', `falha ao iniciar conversa · ${error.message}`, { role: 'error' }));
             logFn('ERROR', `[TerminalServer] Dialog loop bootstrap error: ${error.message}`);
         });
 }

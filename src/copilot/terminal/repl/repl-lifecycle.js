@@ -131,7 +131,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
     // aqui; redesenhar de novo nesta fase duplica `você› você›` quando o cursor já está na linha interativa.
     rl.setPrompt(buildUserPrompt());
 
-    const PROMPT_CONTINUATION = '\x1b[90m  ...\x1b[0m ';
+    const PROMPT_CONTINUATION = `${terminalThemeText('muted', '  ...')} `;
     const multilineInput = createTerminalMultilineInputState();
     /** @type {Promise<void>} */
     let lineQueue = Promise.resolve();

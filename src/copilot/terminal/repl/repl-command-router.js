@@ -103,7 +103,7 @@ import {
     stopTerminalDialogMode,
 } from '../frontend/gateways/index.js';
 import { clearRateLimiters } from '../state/repl-runtime/index.js';
-import { terminalThemeRow, terminalThemeRows } from '../state/repl/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeRows } from '../state/repl/index.js';
 import { deliverEntryAsTurnIfIdle } from '../wiring/mailbox/index.js';
 import { parseTerminalReplCommand, parseTerminalSubcommand } from './repl-command-parser.js';
 
@@ -191,15 +191,15 @@ export function isReadlineOpen(rl) {
 
 /** F16.2 — Limpa rate limiters e reinicia a conversa (útil após throttling acidental). */
 async function _cmdEmergencyReset() {
-    println('\x1b[33m  [emergency-reset] Limpando rate limiters…\x1b[0m');
+    println(terminalThemeRow('Reset de emergência', 'limpando limitadores locais', { role: 'warn' }));
     clearRateLimiters();
-    println('\x1b[33m  [emergency-reset] Reiniciando conversa…\x1b[0m');
+    println(terminalThemeRow('Reset de emergência', 'reiniciando conversa', { role: 'warn' }));
     await _cmdRestart();
-    println('\x1b[32m  [emergency-reset] OK — limitadores limpos e conversa reiniciada.\x1b[0m');
+    println(terminalThemeRow('Reset de emergência', 'limitadores limpos e conversa reiniciada', { role: 'success' }));
 }
 
 async function _cmdRestart() {
-    println('\x1b[90m  Reiniciando conversa…\x1b[0m');
+    println(terminalThemeRow('Conversa', 'reiniciando', { role: 'muted' }));
     try {
         // Registrar 'dialog.ready' ANTES de stopDialogMode() para evitar race condition.
         const { promise: readyPromise, resolve: resolveReady, reject: rejectReady } = Promise.withResolvers();
@@ -234,27 +234,27 @@ async function _cmdRestart() {
             cleanupReadyWait();
         }
     } catch (e) {
-        println(`\x1b[31m  Falha no restart: ${toError(e).message}\x1b[0m`);
+        println(terminalThemeRow('Conversa', `falha ao reiniciar · ${toError(e).message}`, { role: 'error' }));
         await ensureDialogLoop().catch((e) => logSwallowed(e, 'terminal.repl.ensureDialogLoop'));
     }
-    println('\x1b[32m  Conversa reiniciada.\x1b[0m');
+    println(terminalThemeRow('Conversa', 'reiniciada', { role: 'success' }));
 }
 
 async function _cmdPauseDialogLoop() {
     try {
         await pauseTerminalDialogLoop();
-        println('\x1b[33m  Conversa pausada. Use /dialog-resume para retomar sem consumir PR.\x1b[0m');
+        println(terminalThemeRow('Conversa', 'pausada · use /dialog-resume para retomar sem consumir PR', { role: 'warn' }));
     } catch (e) {
-        println(`\x1b[31m  Erro ao pausar: ${toError(e).message}\x1b[0m`);
+        println(terminalThemeRow('Conversa', `erro ao pausar · ${toError(e).message}`, { role: 'error' }));
     }
 }
 
 async function _cmdDialogResume() {
     try {
         await resumeTerminalDialogLoop();
-        println('\x1b[32m  Conversa retomada.\x1b[0m');
+        println(terminalThemeRow('Conversa', 'retomada', { role: 'success' }));
     } catch (e) {
-        println(`\x1b[31m  Erro ao retomar: ${toError(e).message}\x1b[0m`);
+        println(terminalThemeRow('Conversa', `erro ao retomar · ${toError(e).message}`, { role: 'error' }));
     }
 }
 
@@ -264,10 +264,10 @@ async function _cmdDialogResume() {
 async function _cmdAbortCurrentTurn() {
     try {
         await abortTerminalCurrentMessage();
-        println('\x1b[33m  [abort] Turno SDK ativo abortado. A próxima mensagem da fila poderá prosseguir.\x1b[0m');
+        println(terminalThemeRow('Abortar turno', 'turno SDK ativo abortado; a próxima mensagem da fila pode prosseguir', { role: 'warn' }));
         return true;
     } catch (e) {
-        println(`\x1b[31m  [abort] Falha ao abortar turno ativo: ${toError(e).message}\x1b[0m`);
+        println(terminalThemeRow('Abortar turno', `falha ao abortar turno ativo · ${toError(e).message}`, { role: 'error' }));
         return false;
     }
 }
@@ -588,18 +588,22 @@ function _cmdQueueMailbox(message) {
 function _cmdHandoff() {
     const history = readTerminalHandoffHistory();
     if (!history) {
-        println('\x1b[31m  HandoffManager não disponível.\x1b[0m');
+        println(terminalThemeRow('Handoff', 'gerenciador não disponível', { role: 'error' }));
         return;
     }
     if (history.length === 0) {
-        println('\x1b[33m  Nenhum handoff registrado nesta sessão.\x1b[0m');
+        println(terminalThemeRow('Handoff', 'nenhuma troca registrada nesta sessão', { role: 'muted' }));
         return;
     }
-    println('\x1b[36m  ── Handoff History ──\x1b[0m');
+    println(terminalThemeHeadline('info', 'Histórico de handoff', [`${history.length} registros`]));
     for (const h of history) {
         const ts = new Date(Number(h.receivedAt)).toISOString();
         println(
-            `  \x1b[90m${ts}\x1b[0m  ${h.fromAgent}→\x1b[33m${h.toAgent}\x1b[0m  motivo \x1b[90m${h.reason ?? '-'}\x1b[0m  status \x1b[36m${h.status}\x1b[0m`,
+            terminalThemeRow(
+                `${h.fromAgent} → ${h.toAgent}`,
+                `${ts} · motivo ${h.reason ?? 'n/d'} · status ${h.status}`,
+                { role: 'info' },
+            ),
         );
     }
 }

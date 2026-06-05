@@ -22,7 +22,11 @@ describe('terminal/repl dialog bootstrap', () => {
             }),
         ).resolves.toBeUndefined();
 
-        expect(printlnFn).toHaveBeenCalledWith(expect.stringContaining('READY lento'));
+        const output = printlnFn.mock.calls.map((call) => String(call[0] ?? '')).join('\n');
+        expect(output).toContain('READY lento');
+        expect(output).toContain('Boot');
+        expect(output).not.toContain('[erro de boot]');
+        expect(output).not.toContain('\\x1b[');
         expect(logFn).toHaveBeenCalledWith('ERROR', expect.stringContaining('READY lento'));
     });
 
