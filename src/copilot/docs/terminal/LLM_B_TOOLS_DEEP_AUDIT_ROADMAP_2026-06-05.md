@@ -325,8 +325,9 @@ operador vê e salvar summary com critérios objetivos.
 - [x] K7. Executar live PTY `--no-pr` para validar boot/UX/artefatos sem abrir turno de LLM.
 - [x] K8. Reexecutar `file-patch-roundtrip` após correções de lifecycle/prompt/export.
 - [ ] K9. Rodar cenário `recoverable-tool-error` para confirmar falhas sem "Concluído" falso.
-- [ ] K10. Rodar cenário `file-write-roundtrip` para criação/move/delete e claims.
+- [x] K10. Rodar cenário `file-write-roundtrip` para criação/move/delete e claims.
 - [ ] K11. Consolidar relatório visual comparando screenshots antigas versus saída live atual.
+- [x] K12. Sincronizar comandos diagnósticos live por retorno ao prompt antes de `/quit`.
 
 ### Faixa L — Agente e outras superfícies src/copilot
 
@@ -371,4 +372,7 @@ operador vê e salvar summary com critérios objetivos.
 - [x] 2026-06-05: presenter deduplica `fileTargets` para evitar detalhes como `arquivos: X, X`; teste focado adicionado.
 - [x] 2026-06-05: live `recoverable-tool-error` BLOCKED em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-20260605` por `assistant-asked-before-required-deltas`; UX de falha ficou correta (`Falhou` sem falso `Concluído`).
 - [x] 2026-06-05: dedupe de paths agora considera equivalência absoluto/relativo para arquivos e patches, preservando diretórios/cwd técnicos de comandos.
-- [ ] Próximo passo: ajustar prompt/harness do cenário recoverable se necessário, rodar `file-write-roundtrip`, e revisar detalhes visuais remanescentes.
+- [x] 2026-06-05: live `file-write-roundtrip` em `artifacts/terminal-live/llm-b-tools-ux-file-write-20260605` falhou corretamente por `delete_file` ausente; create/move renderizaram sem prompt de permissão, e artefato residual foi limpo.
+- [x] 2026-06-05: harness live agora usa sequência prompt-synchronized para diagnósticos com `/export` e `/quit`, evitando embolar comandos longos durante `[PERG]`.
+- [x] 2026-06-05: rerun live `file-write-roundtrip` PASS em `artifacts/terminal-live/llm-b-tools-ux-file-write-rerun-20260605`, cobrindo `create_file`, `move_file`, `delete_file`, ausência de prompt de permissão, `/activity`, `/intent`, `/tools diag`, `/events`, `/health full`, `/export` e cleanup real.
+- [ ] Próximo passo: ajustar prompt/harness do cenário `recoverable-tool-error` para recuperar tool obrigatória faltante, revisar detalhes visuais remanescentes e consolidar relatório comparando screenshots antigas contra saída live atual.

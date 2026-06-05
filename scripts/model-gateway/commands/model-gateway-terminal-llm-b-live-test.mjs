@@ -22,7 +22,6 @@ const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_POST_ANSWER_DELAY_MS = 6_000;
 const DEFAULT_POST_ASK_CONTINUATION_WAIT_MS = 45_000;
 const DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS = 2_000;
-const DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS = 5_000;
 const SESSION_CYCLE_PROMPT_STABLE_MAX_WAIT_MS = 15_000;
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 const SECRET_ENV_RE = /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|BEARER)/iu;
@@ -7064,6 +7063,16 @@ async function main() {
         forcedKillTimer = setTimeout(() => child.kill('SIGTERM'), Math.max(0, delayMs));
         forcedKillTimer.unref();
     };
+    const startDiagnosticCommandSequenceThenQuit = (diagnostics, { forceKillDelayMs = 10_000 } = {}) => {
+        startPromptSynchronizedCommandSequence(diagnostics, () => {
+            if (!quitSent) {
+                quitSent = true;
+                byokNoPrCanQuit = true;
+                write('/quit');
+            }
+        });
+        if (timedOut) scheduleForcedKill(forceKillDelayMs);
+    };
     const schedulePostAnswerDiagnostics = (delayMs = postAnswerDelayMs) => {
         if (postCommandsSent) return;
         postCommandsSent = true;
@@ -7088,18 +7097,7 @@ async function main() {
                     diagnostics.push('/byok providers', '/byok health', '/byok recommend reasoning safe 8');
                 }
                 diagnostics.push(`/export ${exportArg}`);
-                sendCommandSequence(write, diagnostics, { delayMs: 350 });
-                setTimeout(
-                    () => {
-                        if (!quitSent) {
-                            quitSent = true;
-                            byokNoPrCanQuit = true;
-                            write('/quit');
-                        }
-                    },
-                    diagnostics.length * 350 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
-                ).unref();
-                if (timedOut) scheduleForcedKill(diagnostics.length * 350 + 7_000);
+                startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: diagnostics.length * 2_000 });
             },
             Math.max(0, delayMs),
         ).unref();
@@ -7171,18 +7169,7 @@ async function main() {
             '/health full',
             `/export ${exportArg}`,
         ];
-        sendCommandSequence(write, diagnostics, { delayMs: 550 });
-        setTimeout(
-            () => {
-                if (!quitSent) {
-                    quitSent = true;
-                    byokNoPrCanQuit = true;
-                    write('/quit');
-                }
-            },
-            diagnostics.length * 550 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
-        ).unref();
-        if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
+        startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: diagnostics.length * 2_000 });
     };
     const scheduleAskBeforeDeltasDiagnostics = () => {
         if (postCommandsSent || askBeforeDeltasDiagnosticsSent) return;
@@ -7234,18 +7221,7 @@ async function main() {
                 '/health full',
                 `/export ${exportArg}`,
             ];
-            sendCommandSequence(write, diagnostics, { delayMs: 550 });
-            setTimeout(
-                () => {
-                    if (!quitSent) {
-                        quitSent = true;
-                        byokNoPrCanQuit = true;
-                        write('/quit');
-                    }
-                },
-                diagnostics.length * 550 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
-            ).unref();
-            if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
+            startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: diagnostics.length * 2_000 });
         }, Math.max(0, delayMs));
         missingRequiredAskDiagnosticTimer.unref();
     };
@@ -7274,18 +7250,7 @@ async function main() {
             '/health full',
             `/export ${exportArg}`,
         ];
-        sendCommandSequence(write, diagnostics, { delayMs: 550 });
-        setTimeout(
-            () => {
-                if (!quitSent) {
-                    quitSent = true;
-                    byokNoPrCanQuit = true;
-                    write('/quit');
-                }
-            },
-            diagnostics.length * 550 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
-        ).unref();
-        if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
+        startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: diagnostics.length * 2_000 });
     };
     const scheduleDivergentAskDiagnostics = (divergentAsk) => {
         if (postCommandsSent || !divergentAsk) return;
@@ -7303,18 +7268,7 @@ async function main() {
             '/health full',
             `/export ${exportArg}`,
         ];
-        sendCommandSequence(write, diagnostics, { delayMs: 550 });
-        setTimeout(
-            () => {
-                if (!quitSent) {
-                    quitSent = true;
-                    byokNoPrCanQuit = true;
-                    write('/quit');
-                }
-            },
-            diagnostics.length * 550 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
-        ).unref();
-        if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
+        startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: diagnostics.length * 2_000 });
     };
     const invalidChoiceFeedbackRe =
         /Resposta\s+não corresponde às opções da pergunta pendente|Resposta\s+inválida para a pergunta pendente|invalid_choice/iu;
@@ -7578,19 +7532,7 @@ async function main() {
                     diagnostics.push('/byok providers', '/byok health', '/byok recommend reasoning safe 8');
                 }
                 diagnostics.push('/events 60', '/events 100 --raw', '/errors 10', `/export ${exportArg}`);
-                sendCommandSequence(write, diagnostics, { delayMs: 450 });
-                if (!quitSent) {
-                    setTimeout(
-                        () => {
-                            if (!quitSent) {
-                                quitSent = true;
-                                byokNoPrCanQuit = true;
-                                write('/quit');
-                            }
-                        },
-                        diagnostics.length * 450 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
-                    ).unref();
-                }
+                startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: diagnostics.length * 2_000 });
             }, 1_000).unref();
         }
         if (!quitSent && /(?:^|\n)\s*Exportado\s+/u.test(plain)) {
