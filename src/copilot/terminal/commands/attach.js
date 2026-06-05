@@ -30,6 +30,15 @@ function countLabel(count, singular, plural) {
 }
 
 /**
+ * @param {number} count
+ * @returns {string}
+ */
+function attachmentQueueNextTurnLabel(count) {
+    const action = count === 1 ? 'será embutido' : 'serão embutidos';
+    return `${countLabel(count, 'item', 'itens')} na fila · ${action} no próximo turno`;
+}
+
+/**
  * @param {string | Record<string, unknown>} entry
  * @returns {string}
  */
@@ -128,7 +137,7 @@ export async function cmdAttach({ println }, arg) {
                 role: 'success',
             }),
         );
-        println(terminalThemeText('muted', `  Fila: ${countLabel(queue.length, 'item', 'itens')} - serão embutidos no próximo turno.`));
+        println(terminalThemeRow('Fila', attachmentQueueNextTurnLabel(queue.length), { role: 'muted' }));
         return;
     }
 
@@ -151,7 +160,7 @@ export async function cmdAttach({ println }, arg) {
         println(
             terminalThemeRow('Adicionado', `${filePath} (${(info.size / 1024).toFixed(1)} KB)`, { role: 'success' }),
         );
-        println(terminalThemeText('muted', `  Fila: ${countLabel(queue.length, 'item', 'itens')} - serão embutidos no próximo turno.`));
+        println(terminalThemeRow('Fila', attachmentQueueNextTurnLabel(queue.length), { role: 'muted' }));
     } catch {
         println(terminalThemeRow('Erro', `arquivo não encontrado ou sem permissão: ${filePath}`, { role: 'error' }));
     }

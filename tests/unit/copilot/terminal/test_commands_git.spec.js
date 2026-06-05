@@ -65,4 +65,47 @@ describe('terminal/commands/git', () => {
         expect(ctx.output()).toContain('sem diferenças');
         expect(ctx.output()).not.toContain('Sem diferenças.');
     });
+
+    it('renderiza status com presenter do terminal, sem formatStatus ANSI do bridge', async () => {
+        bridgeMocks.gitStatus.mockResolvedValueOnce([
+            { xy: ' M', path: '.codex/config.toml', label: 'unstaged:modificado', color: '\x1b[33m' },
+            { xy: '??', path: 'tmp/new-file.txt', label: 'unstaged:não rastreado', color: '\x1b[90m' },
+        ]);
+        const ctx = mockCtx();
+
+        await cmdGit({ println: ctx.println }, ['status']);
+
+        expect(bridgeMocks.formatStatus).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('Git status');
+        expect(ctx.output()).toContain('.codex/config.toml');
+        expect(ctx.output()).toContain('worktree modificado');
+        expect(ctx.output()).toContain('não rastreado');
+        expect(ctx.output()).not.toContain('unstaged:');
+    });
+
+    it('renderiza log e branches sem formatadores ANSI compartilhados', async () => {
+        bridgeMocks.gitLog.mockResolvedValueOnce([
+            {
+                abbrevHash: 'abc1234',
+                subject: 'Improve terminal UX',
+                authorName: 'Codex',
+                authorDate: 'há 1 minuto',
+                refNames: 'HEAD -> main',
+            },
+        ]);
+        bridgeMocks.gitBranch.mockResolvedValueOnce([
+            { name: 'main', current: true, upstream: 'origin/main', lastCommit: 'abc1234' },
+        ]);
+        const ctx = mockCtx();
+
+        await cmdGit({ println: ctx.println }, ['log', '1']);
+        await cmdGit({ println: ctx.println }, ['branch']);
+
+        expect(bridgeMocks.formatLog).not.toHaveBeenCalled();
+        expect(bridgeMocks.formatBranch).not.toHaveBeenCalled();
+        expect(ctx.output()).toContain('Improve terminal UX');
+        expect(ctx.output()).toContain('HEAD -> main');
+        expect(ctx.output()).toContain('upstream origin/main');
+        expect(ctx.output()).toContain('atual');
+    });
 });

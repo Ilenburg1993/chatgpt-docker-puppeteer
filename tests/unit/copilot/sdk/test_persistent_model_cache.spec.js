@@ -16,15 +16,31 @@ import {
 } from '../../../../src/copilot/sdk/models/persistent-cache.js';
 
 describe('persistent-model-cache', () => {
-    beforeEach(() => {
+    /** @type {string | undefined} */
+    let originalPersistentCacheFile;
+
+    beforeEach(async () => {
+        vi.restoreAllMocks();
+        originalPersistentCacheFile = process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'];
+        process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'] =
+            `data/copilot/test/persistent-model-cache-${process.pid}-${Date.now()}-${Math.random()
+                .toString(16)
+                .slice(2)}.json`;
+        await clearPersistentModelCache();
         vi.clearAllMocks();
     });
 
     afterEach(async () => {
+        vi.restoreAllMocks();
         try {
             await clearPersistentModelCache();
         } catch {
             // Ignore cleanup errors
+        }
+        if (originalPersistentCacheFile === undefined) {
+            delete process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'];
+        } else {
+            process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'] = originalPersistentCacheFile;
         }
     });
 
@@ -125,6 +141,7 @@ describe('persistent-model-cache', () => {
             if (!call) {
                 throw new Error('writeFile deveria ter sido chamado ao persistir models válidos');
             }
+            expect(String(call[0])).toContain('data/copilot/test/persistent-model-cache-');
             const payload = call[1];
             const written = JSON.parse(/** @type {string} */ (payload));
             expect(written.version).toBe(2);

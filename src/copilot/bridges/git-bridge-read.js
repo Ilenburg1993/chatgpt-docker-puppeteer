@@ -70,7 +70,7 @@ async function runGit(args, opts = {}) {
         span?.setAttribute('status_code', 0);
         span?.setStatus({ code: 1 });
         recordGitMetricBestEffort(method, elapsed, true);
-        return stdout.trim();
+        return stdout.trimEnd();
     } catch (err) {
         const elapsed = Date.now() - t0;
         span?.setAttribute('duration_ms', elapsed);

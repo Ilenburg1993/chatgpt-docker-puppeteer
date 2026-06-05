@@ -3007,7 +3007,7 @@ function auditUxCycleCriteria(boot) {
     const plain = stripAnsi(boot.plain);
     const commandStart = (command, from = 0) => {
         const pattern = new RegExp(
-            `(?:^|\\n)\\s*voc[eê]\\[[^\\n]*?›\\s+${escapeRegExp(command)}(?:\\s*\\r?\\n|\\r|$)`,
+            `(?:^|\\n)(?:\\s*voc[eê]\\[[^\\n]*?›\\s+|\\s*)${escapeRegExp(command)}(?:\\s*\\r?\\n|\\r|$)`,
             'iu',
         );
         const match = pattern.exec(plain.slice(from));
@@ -3304,7 +3304,7 @@ async function runOperatorUxCycleLiveTest({ outDir, requestedTransport, timeoutM
             },
             { line: '/mailbox clear', waitFor: 'Fila de intervenção', advanceAfterMs: 1_500 },
             { line: '/model list', waitFor: /Modelos disponíveis|Nenhum modelo retornado pelo SDK/u, advanceAfterMs: 1_500 },
-            { line: '/sdk models', waitFor: 'Modelos SDK', advanceAfterMs: 1_500 },
+            { line: '/sdk models', waitFor: 'Modelos SDK', advanceAfterMs: 2_500 },
             { line: '/workspace list', waitFor: 'Workspace SDK virtual', advanceAfterMs: 1_500 },
             { line: '/live', waitFor: 'Fluxo da conversa', advanceAfterMs: 1_500 },
             '/quit',

@@ -2137,8 +2137,8 @@ export async function cmdWorkspace({ println }, arg = '') {
                 }),
             );
             println(terminalThemeWrappedRow('Contrato', 'list/read/write ficam no workspace SDK virtual'));
-            println(terminalThemeWrappedRow('Materializar', 'sync/mirror copiam SDK para FS local com auditoria'));
-            println(terminalThemeWrappedRow('Promover', 'promote copia FS local para SDK virtual com auditoria'));
+            println(terminalThemeWrappedRow('SDK → FS', 'sync/mirror materializam SDK no filesystem local com auditoria'));
+            println(terminalThemeWrappedRow('FS → SDK', 'promote importa arquivo local para SDK virtual com auditoria'));
             println('');
         }
     } catch (e) {

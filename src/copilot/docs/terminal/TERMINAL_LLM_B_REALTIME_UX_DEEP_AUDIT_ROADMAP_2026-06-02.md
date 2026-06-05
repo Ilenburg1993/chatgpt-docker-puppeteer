@@ -9316,3 +9316,66 @@
   - separar presenters de terminal para `formatStatus`, `formatLog` e `formatBranch`, que ainda vêm
     do bridge git com ANSI próprio;
   - revisar `/byok` profundo e `/sdk workspace` com a mesma fronteira default/detail.
+
+### 12.106 Presenter git, cache SDK fora da raiz e polimento live de anexos/workspace — 2026-06-04
+
+- [x] Achado:
+  - após a humanização da casca de `/git`, `status/log/branch` ainda dependiam dos formatadores
+    ANSI do bridge, o que deixava a fronteira default/detail incompleta;
+  - `git status --porcelain` tinha a primeira linha alterada por `stdout.trim()`: quando o primeiro
+    arquivo era `.codex/config.toml`, o espaço de status era removido e o path virava
+    `codex/config.toml`;
+  - a live PTY expôs que `/model list`/SDK models podiam criar `modellist-cache.json` na raiz do
+    repositório, misturando cache runtime com arquivos de trabalho;
+  - o cache persistente era escrito em modo fire-and-forget sem promise observável: um `clear`
+    podia apagar e uma escrita atrasada recriar o cache depois;
+  - a live também mostrou dois ruídos pequenos mas visíveis: `/attach` imprimia
+    `Fila: 1 item - serão embutidos...` e `/workspace list` repetia o rótulo `Promover`.
+- [x] Decisão UX/arquitetura:
+  - bridge git continua fornecendo dados brutos e formatadores legados para consumidores técnicos,
+    mas o terminal default deve ter presenter próprio sem ANSI local;
+  - parsing de porcelain não pode perder whitespace significativo;
+  - cache persistente de modelos deve viver em `data/copilot/sdk/models/modellist-cache.json`,
+    fora da raiz e dentro do espaço runtime ignorado;
+  - leitura deve aceitar o cache legado da raiz como fallback de migração, mas escrita nova deve ir
+    apenas para `data/`;
+  - limpeza deve aguardar escrita pendente antes de remover arquivos;
+  - textos default precisam falar como interface operacional, não como dump de estado interno.
+- [x] Implementação:
+  - `/git status` passou a renderizar rows temáticos por arquivo, com labels como
+    `worktree modificado`, `stage modificado`, `não rastreado`, `conflito` e papéis visuais
+    coerentes;
+  - `/git log` e `/git branch` passaram a usar presenters do terminal e deixaram de chamar
+    `formatLog`/`formatBranch`;
+  - `git-bridge-read` trocou `trim()` por `trimEnd()`, preservando o espaço inicial do porcelain;
+  - `persistent-cache.js` ganhou caminho primário sob `data/copilot/sdk/models`, override por
+    `COPILOT_MODEL_PERSISTENT_CACHE_FILE`, fallback de leitura legado e criação de diretório;
+  - a escrita persistente agora mantém `_pendingPersistentModelCacheWrite` e `clearPersistentModelCache`
+    aguarda essa promise antes de apagar o cache;
+  - testes SDK desabilitam cache persistente quando querem medir L1/client mockado, e testes de
+    persistência usam arquivo isolado via env override;
+  - o runner `--operator-ux-cycle` aceita eco de comando em linha própria quando o prompt do PTY é
+    redesenhado tarde, e dá mais respiro após `/sdk models`;
+  - `/attach` passou a mostrar `Fila          1 item na fila · será embutido no próximo turno`;
+  - `/workspace list` substituiu a duplicação `Promover` por `SDK → FS` e `FS → SDK`.
+- [x] Validação:
+  - [x] `node --check` em `persistent-cache.js`, `git.js`, `git-bridge-read.js`, `attach.js`,
+    `sdk.js`, testes alterados e runner live;
+  - [x] `npx eslint` focado nos arquivos alterados;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_attach.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_git.spec.js tests/unit/copilot/bridges/test_git_bridge.spec.js tests/unit/copilot/sdk/test_persistent_model_cache.spec.js tests/unit/copilot/sdk/test_sdk_models.spec.js`
+    com 106 testes verdes;
+  - [x] live PASS antes do polimento de anexos/workspace:
+    `artifacts/terminal-live/operator-ux-cycle-git-cache-pass-20260604/summary.md`;
+  - [x] live PASS final:
+    `artifacts/terminal-live/operator-ux-cycle-polished-pass-20260604/summary.md`.
+- [x] Resultado observado:
+  - `/git status` mostra `.codex/config.toml` corretamente e sem `unstaged:` cru;
+  - `/model list` não cria `modellist-cache.json` na raiz do repo;
+  - cache runtime fica no espaço `data/copilot/...`, com limpeza determinística;
+  - `/attach` e `/workspace list` ficaram mais escaneáveis na tela real;
+  - o ciclo live fecha com `operator-ux-no-stale-copy` verde.
+- [ ] Próximas verificações:
+  - auditar `/byok` e subcomandos longos de SDK para eliminar frases herdadas e separar default/detail;
+  - criar live de turno real com deltas, tools, thinking e troca de modelo no mesmo fluxo;
+  - investigar o uso de `gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`, `zoxide`, `jq` e `yq` após
+    estabilizar terminal/BYOK, com documento técnico próprio antes de qualquer dependência nova.

@@ -72,6 +72,8 @@ describe('terminal/commands/attach', () => {
         expect(ctx.output()).toContain('Adicionado');
         expect(ctx.output()).toContain('memo.txt');
         expect(ctx.output()).toContain('text/plain');
+        expect(ctx.output()).toContain('1 item na fila · será embutido no próximo turno');
+        expect(ctx.output()).not.toContain('Fila:');
     });
 
     it('/attach lista fila com entries tipadas', async () => {
@@ -94,5 +96,6 @@ describe('terminal/commands/attach', () => {
         expect(ctx.output()).toContain('2 itens');
         expect(ctx.output()).toContain('/tmp/a.js');
         expect(ctx.output()).toContain('screenshot.png [blob:image/png]');
+        expect(ctx.output()).toContain('Serão embutidos no próximo turno');
     });
 });

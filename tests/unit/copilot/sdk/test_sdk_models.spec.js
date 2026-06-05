@@ -1,5 +1,5 @@
 // @ts-check
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Hoisted mocks ────────────────────────────────────────────────────────
 
@@ -113,14 +113,27 @@ function makeReasoningModel() {
 describe('F76 - listModels / getModelById', () => {
     /** @type {any} */
     let mockClient;
+    /** @type {string | undefined} */
+    let originalPersistentCacheEnabled;
 
     beforeEach(async () => {
+        originalPersistentCacheEnabled = process.env['COPILOT_MODEL_PERSISTENT_CACHE_ENABLED'];
+        process.env['COPILOT_MODEL_PERSISTENT_CACHE_ENABLED'] = 'false';
         await clearModelsCacheAsync();
         setModelListClientProvider(mockGetClient);
         mockClient = {
             listModels: vi.fn().mockResolvedValue([makeModel(), makeReasoningModel()]),
         };
         mockGetClient.mockResolvedValue(mockClient);
+    });
+
+    afterEach(async () => {
+        await clearModelsCacheAsync();
+        if (originalPersistentCacheEnabled === undefined) {
+            delete process.env['COPILOT_MODEL_PERSISTENT_CACHE_ENABLED'];
+        } else {
+            process.env['COPILOT_MODEL_PERSISTENT_CACHE_ENABLED'] = originalPersistentCacheEnabled;
+        }
     });
 
     it('listModels retorna array de modelos via client', async () => {

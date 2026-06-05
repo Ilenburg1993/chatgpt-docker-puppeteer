@@ -11,7 +11,9 @@
  */
 
 import { toError } from '#copilot/core/error-handlers';
+import { resolveBootWorkspaceRoot } from '#copilot/boot';
 import { promises as fs } from 'node:fs';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -32,7 +34,90 @@ import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
 const CACHE_SCHEMA_VERSION = 2;
 const CACHE_FILE_NAME = 'modellist-cache.json';
+const CACHE_DEFAULT_RELATIVE_PATH = `data/copilot/sdk/models/${CACHE_FILE_NAME}`;
 const CACHE_STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24h
+
+/** @type {Promise<void> | null} */
+let _pendingPersistentModelCacheWrite = null;
+
+/**
+ * @returns {string}
+ */
+function resolvePersistentModelCacheFile() {
+    const override = String(process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'] ?? '').trim();
+    const workspaceRoot = resolveBootWorkspaceRoot();
+    if (override) return isAbsolute(override) ? override : resolve(workspaceRoot, override);
+    return resolve(workspaceRoot, CACHE_DEFAULT_RELATIVE_PATH);
+}
+
+/**
+ * @returns {string[]}
+ */
+function resolvePersistentModelCacheReadPaths() {
+    const primary = resolvePersistentModelCacheFile();
+    const legacy = resolvePersistentConfigFile(CACHE_FILE_NAME);
+    return primary === legacy ? [primary] : [primary, legacy];
+}
+
+/**
+ * @param {unknown} data
+ * @returns {PersistentModelListCache | null}
+ */
+function parsePersistentModelCachePayload(data) {
+    if (typeof data !== 'object' || data === null) {
+        log('WARN', '[model-cache] Cache não é object');
+        return null;
+    }
+
+    if (data.version !== CACHE_SCHEMA_VERSION) {
+        log('WARN', `[model-cache] Schema version mismatch: ${data.version} !== ${CACHE_SCHEMA_VERSION}`);
+        return null;
+    }
+
+    if (!Array.isArray(data.models)) {
+        log('WARN', '[model-cache] Cache models não é array');
+        return null;
+    }
+
+    if (typeof data.fetchedAt !== 'number' || !Number.isFinite(data.fetchedAt)) {
+        log('WARN', '[model-cache] Cache fetchedAt inválido');
+        return null;
+    }
+
+    if (typeof data.schema !== 'string' || data.schema !== 'ModelInfo[]') {
+        log('WARN', '[model-cache] Cache schema inválido');
+        return null;
+    }
+
+    return /** @type {PersistentModelListCache} */ (data);
+}
+
+/**
+ * @param {string} cachePath
+ * @returns {Promise<PersistentModelListCache | null | undefined>} `undefined` means cache miss.
+ */
+async function readPersistentModelCachePath(cachePath) {
+    try {
+        const content = await fs.readFile(cachePath, 'utf8');
+        let data;
+        try {
+            data = JSON.parse(content);
+        } catch {
+            log('WARN', `[model-cache] Cache JSON invalido em ${cachePath}`);
+            return null;
+        }
+        const parsed = parsePersistentModelCachePayload(data);
+        if (parsed) log('DEBUG', `[model-cache] Cache lido: ${parsed.models.length} modelos`);
+        return parsed;
+    } catch (error) {
+        const err = /** @type {NodeJS.ErrnoException} */ (error);
+        if (err && typeof err === 'object' && err.code === 'ENOENT') return undefined;
+
+        const errMsg = toError(error);
+        log('DEBUG', `[model-cache] Leitura falhou: ${errMsg.message}`);
+        return null;
+    }
+}
 
 /**
  * Ler cache persistente do disk de forma segura.
@@ -49,59 +134,11 @@ const CACHE_STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24h
  * @returns {Promise<PersistentModelListCache | null>}
  */
 export async function readPersistentModelCache() {
-    try {
-        const cachePath = resolvePersistentConfigFile(CACHE_FILE_NAME);
-        const content = await fs.readFile(cachePath, 'utf8');
-
-        // Parse defensivo
-        let data;
-        try {
-            data = JSON.parse(content);
-        } catch {
-            log('WARN', `[model-cache] Cache JSON invalido em ${CACHE_FILE_NAME}`);
-            return null;
-        }
-
-        // Validar estructura
-        if (typeof data !== 'object' || data === null) {
-            log('WARN', '[model-cache] Cache não é object');
-            return null;
-        }
-
-        if (data.version !== CACHE_SCHEMA_VERSION) {
-            log('WARN', `[model-cache] Schema version mismatch: ${data.version} !== ${CACHE_SCHEMA_VERSION}`);
-            return null;
-        }
-
-        if (!Array.isArray(data.models)) {
-            log('WARN', '[model-cache] Cache models não é array');
-            return null;
-        }
-
-        if (typeof data.fetchedAt !== 'number' || !Number.isFinite(data.fetchedAt)) {
-            log('WARN', '[model-cache] Cache fetchedAt inválido');
-            return null;
-        }
-
-        if (typeof data.schema !== 'string' || data.schema !== 'ModelInfo[]') {
-            log('WARN', '[model-cache] Cache schema inválido');
-            return null;
-        }
-
-        log('DEBUG', `[model-cache] Cache lido: ${data.models.length} modelos`);
-        return /** @type {PersistentModelListCache} */ (data);
-    } catch (error) {
-        // ENOENT (file not found) é normal, não logar
-        const err = /** @type {NodeJS.ErrnoException} */ (error);
-        if (err && typeof err === 'object' && err.code === 'ENOENT') {
-            return null;
-        }
-
-        // Outras erros (permission, I/O) logar como debug
-        const errMsg = toError(error);
-        log('DEBUG', `[model-cache] Leitura falhou: ${errMsg.message}`);
-        return null;
+    for (const cachePath of resolvePersistentModelCacheReadPaths()) {
+        const result = await readPersistentModelCachePath(cachePath);
+        if (result !== undefined) return result;
     }
+    return null;
 }
 
 /**
@@ -125,9 +162,9 @@ export function writePersistentModelCacheAsync(models) {
 
     // Fire-and-forget: não await, não bloqueia
     // Use void para indicar Promise ignorada intencionalmente
-    void (async () => {
+    const writePromise = Promise.resolve().then(async () => {
         try {
-            const cachePath = resolvePersistentConfigFile(CACHE_FILE_NAME);
+            const cachePath = resolvePersistentModelCacheFile();
             const now = Date.now();
 
             const data = /** @type {PersistentModelListCache} */ ({
@@ -138,14 +175,21 @@ export function writePersistentModelCacheAsync(models) {
             });
 
             const json = JSON.stringify(data, null, 2);
+            await fs.mkdir(dirname(cachePath), { recursive: true });
             await fs.writeFile(cachePath, json, 'utf8');
             log('DEBUG', `[model-cache] Cache persistido: ${models.length} modelos`);
         } catch (error) {
             // Não re-lançar — graceful degrade para L1-only cache
             const err = toError(error);
             log('WARN', `[model-cache] Persistência falhou: ${err.message}`);
+        } finally {
+            if (_pendingPersistentModelCacheWrite === writePromise) {
+                _pendingPersistentModelCacheWrite = null;
+            }
         }
-    })();
+    });
+    _pendingPersistentModelCacheWrite = writePromise;
+    void writePromise;
 }
 
 /**
@@ -159,16 +203,17 @@ export function writePersistentModelCacheAsync(models) {
  * @returns {Promise<void>}
  */
 export async function clearPersistentModelCache() {
-    try {
-        const cachePath = resolvePersistentConfigFile(CACHE_FILE_NAME);
-        await fs.unlink(cachePath);
-        log('DEBUG', '[model-cache] Cache persistido deletado');
-    } catch (error) {
-        // ENOENT = file already gone, ok
-        const err = /** @type {NodeJS.ErrnoException} */ (error);
-        if (!(err && typeof err === 'object' && err.code === 'ENOENT')) {
-            const errMsg = toError(error);
-            log('DEBUG', `[model-cache] Clear persistência: ${errMsg.message}`);
+    await _pendingPersistentModelCacheWrite;
+    for (const cachePath of resolvePersistentModelCacheReadPaths()) {
+        try {
+            await fs.unlink(cachePath);
+            log('DEBUG', '[model-cache] Cache persistido deletado');
+        } catch (error) {
+            const err = /** @type {NodeJS.ErrnoException} */ (error);
+            if (!(err && typeof err === 'object' && err.code === 'ENOENT')) {
+                const errMsg = toError(error);
+                log('DEBUG', `[model-cache] Clear persistência: ${errMsg.message}`);
+            }
         }
     }
 }
@@ -198,7 +243,7 @@ export function evaluatePersistentCache(cache) {
  */
 export async function getPersistentCacheDiagnostics() {
     try {
-        const cachePath = resolvePersistentConfigFile(CACHE_FILE_NAME);
+        const cachePath = resolvePersistentModelCacheFile();
         const stat = await fs.stat(cachePath);
         const ageMs = Date.now() - stat.mtime.getTime();
         const ageHours = Math.floor(ageMs / (60 * 60 * 1000));

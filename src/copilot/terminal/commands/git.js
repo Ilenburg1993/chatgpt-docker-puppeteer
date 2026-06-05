@@ -9,9 +9,6 @@
  */
 
 import {
-    formatBranch,
-    formatLog,
-    formatStatus,
     gitBranch,
     gitDiff,
     gitLog,
@@ -21,12 +18,136 @@ import {
     gitStatus,
 } from '#copilot/bridges';
 import { renderTerminalDiffPreview } from '../capabilities/index.js';
-import { terminalThemeHeadline, terminalThemeRow, terminalThemeRows } from '../state/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeRows, terminalThemeWrappedRow } from '../state/index.js';
 
 /**
  * @typedef {object} SessionContext
  * @property {(text: string) => void} println
  */
+
+/** @type {Record<string, string>} */
+const GIT_STATUS_LABELS = Object.freeze({
+    M: 'modificado',
+    A: 'adicionado',
+    D: 'deletado',
+    R: 'renomeado',
+    C: 'copiado',
+    U: 'conflito',
+    '?': 'não rastreado',
+    '!': 'ignorado',
+});
+
+/**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
+ * @param {unknown} code
+ * @returns {string}
+ */
+function gitStatusCodeLabel(code) {
+    const normalized = typeof code === 'string' ? code.trim() : '';
+    return GIT_STATUS_LABELS[normalized] ?? normalized;
+}
+
+/**
+ * @param {{ xy?: string; label?: string }} entry
+ * @returns {string}
+ */
+function renderGitStatusLabel(entry) {
+    const xy = typeof entry.xy === 'string' ? entry.xy.padEnd(2, ' ') : '  ';
+    const staged = xy[0] ?? ' ';
+    const unstaged = xy[1] ?? ' ';
+    if (staged === '?' && unstaged === '?') return 'não rastreado';
+    if (staged === '!' && unstaged === '!') return 'ignorado';
+    const parts = [];
+    if (staged.trim()) parts.push(`stage ${gitStatusCodeLabel(staged)}`);
+    if (unstaged.trim()) parts.push(`worktree ${gitStatusCodeLabel(unstaged)}`);
+    if (parts.length > 0) return parts.join(' · ');
+    return typeof entry.label === 'string' && entry.label ? entry.label.replace(':', ' ') : 'alterado';
+}
+
+/**
+ * @param {{ xy?: string }} entry
+ * @returns {'fileRead' | 'fileWrite' | 'fileEdit' | 'fileDelete' | 'warn'}
+ */
+function gitStatusRole(entry) {
+    const xy = typeof entry.xy === 'string' ? entry.xy : '';
+    if (xy.includes('D')) return 'fileDelete';
+    if (xy.includes('A') || xy.includes('?')) return 'fileWrite';
+    if (xy.includes('U')) return 'warn';
+    return 'fileEdit';
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} fallback
+ * @returns {string}
+ */
+function stringField(value, fallback = '-') {
+    const text = typeof value === 'string' ? value.trim() : '';
+    return text || fallback;
+}
+
+/**
+ * @param {Array<{ xy?: string; path?: string; label?: string }>} entries
+ * @returns {string[]}
+ */
+function renderGitStatusEntries(entries) {
+    if (entries.length === 0) return [terminalThemeRow('Working tree', 'limpo', { role: 'success' })];
+    return entries.map((entry) =>
+        terminalThemeWrappedRow('Arquivo', `${stringField(entry.path)} · ${renderGitStatusLabel(entry)}`, {
+            role: gitStatusRole(entry),
+            columns: 116,
+        }),
+    );
+}
+
+/**
+ * @param {Array<{ abbrevHash?: string; subject?: string; authorName?: string; authorDate?: string; refNames?: string }>} entries
+ * @returns {string[]}
+ */
+function renderGitLogEntries(entries) {
+    if (entries.length === 0) return [terminalThemeRow('Git log', 'sem commits', { role: 'muted' })];
+    return entries.map((entry) => {
+        const refs = stringField(entry.refNames, '');
+        return terminalThemeWrappedRow(
+            stringField(entry.abbrevHash, 'commit'),
+            [stringField(entry.subject, 'sem assunto'), stringField(entry.authorName, ''), stringField(entry.authorDate, ''), refs]
+                .filter(Boolean)
+                .join(' · '),
+            { role: 'command', columns: 116, width: 12 },
+        );
+    });
+}
+
+/**
+ * @param {Array<{ name?: string; current?: boolean; upstream?: string; lastCommit?: string }>} branches
+ * @returns {string[]}
+ */
+function renderGitBranches(branches) {
+    if (branches.length === 0) return [terminalThemeRow('Branches', 'nenhuma branch', { role: 'muted' })];
+    return branches.map((branch) =>
+        terminalThemeWrappedRow(
+            'Branch',
+            [
+                stringField(branch.name),
+                branch.current ? 'atual' : null,
+                branch.upstream ? `upstream ${branch.upstream}` : null,
+                branch.lastCommit ? `último ${branch.lastCommit}` : null,
+            ]
+                .filter(Boolean)
+                .join(' · '),
+            { role: branch.current ? 'success' : 'command', columns: 116 },
+        ),
+    );
+}
 
 /**
  * Handler do comando /git <subcomando> [args…].
@@ -44,8 +165,8 @@ export async function cmdGit({ println }, args) {
         println(terminalThemeRow('Git', 'verificando status', { role: 'muted' }));
         const entries = await gitStatus().catch(() => []);
         println('');
-        println(terminalThemeHeadline('tool', 'Git status', [`${entries.length} ${entries.length === 1 ? 'arquivo' : 'arquivos'}`]));
-        println(formatStatus(entries));
+        println(terminalThemeHeadline('tool', 'Git status', [countLabel(entries.length, 'arquivo', 'arquivos')]));
+        for (const line of renderGitStatusEntries(entries)) println(line);
         println('');
         return;
     }
@@ -58,7 +179,7 @@ export async function cmdGit({ println }, args) {
         const entries = await gitLog({ n, oneline }).catch(() => []);
         println('');
         println(terminalThemeHeadline('tool', 'Git log', [`últimos ${entries.length} commits`]));
-        println(formatLog(entries, oneline));
+        for (const line of renderGitLogEntries(entries)) println(line);
         println('');
         return;
     }
@@ -91,8 +212,8 @@ export async function cmdGit({ println }, args) {
         println(terminalThemeRow('Git', 'buscando branches', { role: 'muted' }));
         const branches = await gitBranch().catch(() => []);
         println('');
-        println(terminalThemeHeadline('tool', 'Git branches', [`${branches.length}`]));
-        println(formatBranch(branches));
+        println(terminalThemeHeadline('tool', 'Git branches', [countLabel(branches.length, 'branch', 'branches')]));
+        for (const line of renderGitBranches(branches)) println(line);
         println('');
         return;
     }
