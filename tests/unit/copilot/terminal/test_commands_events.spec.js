@@ -84,11 +84,13 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('5 eventos recentes');
         expect(ctx.output()).toContain('Streaming');
         expect(ctx.output()).toContain('1 recentes');
-        expect(ctx.output()).toContain('/events delta 50');
-        expect(ctx.output()).toContain('/events source terminal/dialog/turn-display.createDeltaCallback 50');
+        expect(ctx.output()).toContain('ver Streaming: /events 50');
+        expect(ctx.output()).toContain('detalhe técnico: /events sources detail');
         expect(ctx.output()).toContain('Pergunta ao operador');
         expect(ctx.output()).toContain('Configuração BYOK');
         expect(ctx.output()).toContain('/events sources detail');
+        expect(ctx.output()).not.toContain('/events source terminal/dialog/turn-display.createDeltaCallback 50');
+        expect(ctx.output()).not.toContain('user_input.requested');
         expect(ctx.output()).not.toContain('task.delta only when dialog loop is inactive');
         expect(ctx.output()).not.toContain('COPILOT_BYOK_* resolved into SDK provider');
     });
@@ -100,6 +102,7 @@ describe('terminal/commands/events', () => {
 
         expect(ctx.output()).toContain('Fontes do Terminal - Detalhe');
         expect(ctx.output()).toContain('assistant.text.delta');
+        expect(ctx.output()).toContain('/events source terminal/dialog/turn-display.createDeltaCallback 50');
         expect(ctx.output()).toContain('task.delta only when dialog loop is inactive');
         expect(ctx.output()).toContain('COPILOT_BYOK_* resolved into SDK provider');
         expect(ctx.output()).toContain('/byok env · /byok profiles · /byok models refresh · /status');
@@ -217,7 +220,7 @@ describe('terminal/commands/events', () => {
 
         expect(ctx.output()).toContain('Conversa alterada');
         expect(ctx.output()).toContain('há 5s');
-        expect(ctx.output()).toContain('Runtime pronto');
+        expect(ctx.output()).toContain('Sessão pronta');
         expect(ctx.output()).toContain('Aviso de quota');
         expect(ctx.output()).toContain('Modelo alterado');
         expect(ctx.output()).toContain('modelo auto → gpt-4.1-mini · raciocínio high');

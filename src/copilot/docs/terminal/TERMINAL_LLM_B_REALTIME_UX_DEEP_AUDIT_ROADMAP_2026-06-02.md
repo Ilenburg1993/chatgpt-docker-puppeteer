@@ -9187,3 +9187,59 @@
   - criar uma live de turno real com deltas parciais para comparar fala da LLM-B, thinking e tools no
     mesmo fluxo;
   - medir truncamento/alinhamento em viewport menor e ajustar larguras responsivas do terminal.
+
+### 12.104 `/audit` e `/events sources` com fronteira default/detail protegida por live — 2026-06-04
+
+- [x] Achado live:
+  - o novo ciclo `--audit-ux-cycle` expôs `/health`, `/diagnose`, `/errors`, `/intent`, `/audit` e
+    `/events sources` lado a lado em PTY real;
+  - primeira execução falhou porque `/events sources` default ainda imprimia comandos técnicos como
+    `/events user_input.requested 50` e paths de emissor `terminal/events/...`;
+  - `/events sources` também duplicava rótulos humanos quando eventos diferentes tinham o mesmo
+    nome público (`Uso LLM + Uso LLM`, `Atividade, Atividade`);
+  - `/audit 10` renderizava `tool.execution · sem horário · tool.execution`, apesar de o arquivo
+    de auditoria carregar `ts` ISO e toolName;
+  - `shell.exec_command` aparecia cru como ferramenta.
+- [x] Decisão UX:
+  - `/events sources` default deve explicar famílias humanas de eventos e apontar para `/events 50`
+    e `/events sources detail`;
+  - nomes de evento, source, policy id, emitter e classes ficam em `detail`;
+  - labels humanos duplicados devem ser deduplicados antes de montar título/lista;
+  - `/audit` default é relatório operacional, não dump JSONL: tipo, horário, ferramenta, sucesso e
+    duração devem ser legíveis;
+  - `runtime` não deve aparecer como rótulo humano default quando `sessão` comunica melhor o estado.
+- [x] Implementação:
+  - runner live ganhou `--audit-ux-cycle`, summary e critérios para default/detail de auditoria;
+  - o recorte de superfícies do novo ciclo procura prompt real do REPL, não ocorrência textual em
+    links de ajuda;
+  - `/events sources` default passou a usar `ver <família>: /events 50 · detalhe técnico: /events
+    sources detail`;
+  - `/events sources detail` preserva `/events <evento>`, `/events source <emissor>`, ID, classe,
+    dono técnico, emissor, aceita/suprime/fallback;
+  - `humanEventLabel()` trocou `Runtime pronto/falhou` por `Sessão pronta/falhou`;
+  - `/audit` agora parseia `ts` ISO, traduz `tool.execution` para `Execução de ferramenta`, resume
+    ferramenta/sucesso/duração e agrupa o resumo por tipo humano;
+  - `getTerminalHumanToolName()` passou a mapear `shell.exec_command` para `Executar comando`.
+- [x] Validação:
+  - [x] `node --check` em `events.js`, `audit.js`, `tool-activity-presenter.js`, runner e testes;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_audit.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js`
+    com 39 testes verdes;
+  - [x] live inicial FAIL:
+    `artifacts/terminal-live/audit-ux-surfaces-first-20260604/summary.md`;
+  - [x] live intermediária mostrou `/audit` e `/events sources` humanizados mas revelou critério de
+    recorte stale:
+    `artifacts/terminal-live/audit-ux-surfaces-humanized-20260604/summary.md`;
+  - [x] live final PASS:
+    `artifacts/terminal-live/audit-ux-surfaces-pass-20260604/summary.md`.
+- [x] Resultado observado:
+  - `/audit 10` mostra `Execução de ferramenta · ISO completo (há X) · Executar comando ·
+    concluída/falhou · Nms`;
+  - `/events sources` default não mostra `user_input.requested`, `terminal/events/...`, `ID`,
+    `Classe`, `Dono técnico` ou `Emissor`;
+  - `/events sources detail` continua com os dados técnicos para auditoria profunda.
+- [ ] Próximas verificações:
+  - auditar `/byok` default e subcomandos longos ainda com ANSI manual;
+  - auditar `/git`, `/workspace-index`, `/context` e `/sources` relacionados a paths, diffs e
+    contexto;
+  - criar ciclo live de viewport estreito para detectar linhas longas em `/events sources`,
+    `/session sdk` e `/byok`.

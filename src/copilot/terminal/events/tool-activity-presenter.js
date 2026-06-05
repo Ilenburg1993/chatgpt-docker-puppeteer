@@ -61,6 +61,7 @@ const HUMAN_TOOL_NAMES = Object.freeze({
     web_search: 'Buscar na web',
     fetch_url: 'Abrir URL',
     exec_command: 'Executar comando',
+    'shell.exec_command': 'Executar comando',
     bash: 'Executar comando',
     shell: 'Executar comando',
     read_bash: 'Ler terminal',

@@ -71,6 +71,7 @@ Common options:
   --picker-interactive-cycle
   --ux-cycle
   --diagnostic-ux-cycle
+  --audit-ux-cycle
   --reuse-sdk-session
   --timeout-ms=<ms>
   --transport=<pty|stdio>
@@ -3001,6 +3002,174 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
     return summary;
 }
 
+function auditUxCycleCriteria(boot) {
+    const plain = stripAnsi(boot.plain);
+    const commandStart = (command, from = 0) => {
+        const pattern = new RegExp(
+            `(?:^|\\n)\\s*voc[eê]\\[[^\\n]*?›\\s+${escapeRegExp(command)}(?:\\s*\\r?\\n|\\r|$)`,
+            'iu',
+        );
+        const match = pattern.exec(plain.slice(from));
+        return match ? from + match.index : -1;
+    };
+    const healthStart = commandStart('/health');
+    const diagnoseStart = commandStart('/diagnose');
+    const errorsStart = commandStart('/errors 10');
+    const intentStart = commandStart('/intent 10');
+    const intentDetailStart = commandStart('/intent detail 10');
+    const auditStart = commandStart('/audit 10');
+    const eventsSourcesStart = commandStart('/events sources');
+    const eventsSourcesDetailStart = commandStart('/events sources detail', Math.max(0, eventsSourcesStart + 1));
+    const quitStart = commandStart('/quit');
+    const surfaceStarts = [
+        healthStart,
+        diagnoseStart,
+        errorsStart,
+        intentStart,
+        intentDetailStart,
+        auditStart,
+        eventsSourcesStart,
+        eventsSourcesDetailStart,
+        quitStart,
+    ].filter((index) => index >= 0);
+    const surfaceAt = (start) => {
+        if (start < 0) return '';
+        const position = surfaceStarts.indexOf(start);
+        return plain.slice(start, surfaceStarts[position + 1] ?? plain.length);
+    };
+    const healthSurface = surfaceAt(healthStart);
+    const diagnoseSurface = surfaceAt(diagnoseStart);
+    const errorsSurface = surfaceAt(errorsStart);
+    const intentSurface = surfaceAt(intentStart);
+    const intentDetailSurface = surfaceAt(intentDetailStart);
+    const auditSurface = surfaceAt(auditStart);
+    const eventsSourcesSurface = surfaceAt(eventsSourcesStart);
+    const eventsSourcesDetailSurface = surfaceAt(eventsSourcesDetailStart);
+    const auditDefaultSurface = [
+        healthSurface,
+        diagnoseSurface,
+        errorsSurface,
+        intentSurface,
+        auditSurface,
+        eventsSourcesSurface,
+    ].join('\n');
+    const rawIdPattern = /chatcmpl-tool-|toolu_|request_user_input|report_intent(?:_local)?|\\x1b\[|scope\.js::/iu;
+    const staleCopyPattern = /Drill-down|Label|Atividade info|phase:|tipo I\/O local|disponível\(is\)|runtime ainda/iu;
+    return [
+        {
+            id: 'audit-ux-ready',
+            pass: /LLM-B pronta/iu.test(plain) && boot.exitCode === 0,
+            detail: 'terminal reached ready state and closed cleanly during audit UX cycle',
+        },
+        {
+            id: 'audit-ux-surfaces-rendered',
+            pass:
+                /Saúde do Terminal LLM-B/iu.test(healthSurface) &&
+                /Diagnóstico do Terminal LLM-B/iu.test(diagnoseSurface) &&
+                /Erros rastreados/iu.test(errorsSurface) &&
+                /Intenções/iu.test(intentSurface) &&
+                /Auditoria/iu.test(auditSurface) &&
+                /Fontes do Terminal/iu.test(eventsSourcesSurface),
+            detail: 'health, diagnose, errors, intent, audit and event-source surfaces rendered in one PTY session',
+        },
+        {
+            id: 'audit-ux-default-no-raw-ids',
+            pass: !rawIdPattern.test(auditDefaultSurface),
+            detail: 'default audit surfaces avoided raw tool IDs, SDK prompt names and parser export syntax',
+        },
+        {
+            id: 'audit-ux-default-no-stale-copy',
+            pass: !staleCopyPattern.test(auditDefaultSurface),
+            detail: 'default audit surfaces avoided stale English/schema copy and old visual placeholders',
+        },
+        {
+            id: 'audit-ux-intent-detail-contained',
+            pass:
+                /detalhe técnico|Nenhuma intenção capturada ainda/iu.test(intentDetailSurface) &&
+                !/toolu_|chatcmpl-tool-|call=/iu.test(intentDetailSurface),
+            detail: '/intent detail stayed technical but did not leak provider/tool-call IDs',
+        },
+        {
+            id: 'audit-ux-events-sources-default-human',
+            pass:
+                /Responsável/iu.test(eventsSourcesSurface) &&
+                /Investigar/iu.test(eventsSourcesSurface) &&
+                !/\bID\b|Classe|Dono técnico|Emissor|Aceita|Suprime/iu.test(eventsSourcesSurface),
+            detail: '/events sources default stayed human while detail fields remained opt-in',
+        },
+        {
+            id: 'audit-ux-events-sources-detail-not-duplicated',
+            pass:
+                /Fontes do Terminal - Detalhe/iu.test(eventsSourcesDetailSurface) &&
+                !/(Fallback\s+[^\n]+\n\s*Fallback\s+)/iu.test(eventsSourcesDetailSurface),
+            detail: '/events sources detail rendered technical fields without duplicate fallback rows',
+        },
+    ];
+}
+
+async function runAuditUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+    const boot = await runSessionCycleBoot({
+        id: 'audit-ux-cycle',
+        label: 'audit and diagnostic UX surfaces',
+        outDir,
+        commands: [
+            { line: '/health', waitFor: 'Saúde do Terminal LLM-B', advanceAfterMs: 1_500 },
+            { line: '/diagnose', waitFor: 'Diagnóstico do Terminal LLM-B', advanceAfterMs: 1_500 },
+            { line: '/errors 10', waitFor: 'Erros rastreados', advanceAfterMs: 1_500 },
+            { line: '/intent 10', waitFor: 'Intenções', advanceAfterMs: 1_500 },
+            { line: '/intent detail 10', waitFor: /Intenções|Nenhuma intenção/u, advanceAfterMs: 1_500 },
+            { line: '/audit 10', waitFor: 'Auditoria', advanceAfterMs: 1_500 },
+            { line: '/events sources', waitFor: 'Fontes do Terminal', advanceAfterMs: 1_500 },
+            { line: '/events sources detail', waitFor: 'Fontes do Terminal - Detalhe', advanceAfterMs: 1_500 },
+            '/quit',
+        ],
+        terminalPort,
+        requestedTransport,
+        timeoutMs,
+    });
+    const criteria = auditUxCycleCriteria(boot);
+    const durationMs = Date.now() - Date.parse(startedAt);
+    const ok = criteria.every((criterion) => criterion.pass);
+    const summary = {
+        ok,
+        startedAt,
+        durationMs,
+        terminalPort,
+        boot: {
+            id: boot.id,
+            label: boot.label,
+            exitCode: boot.exitCode,
+            sessionId: boot.sessionId || null,
+            transport: boot.transport,
+        },
+        criteria,
+    };
+    await writeFile(path.join(outDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await writeFile(
+        path.join(outDir, 'summary.md'),
+        [
+            '# Terminal LLM-B Audit UX Live Test',
+            '',
+            `Started: ${startedAt}`,
+            `Duration: ${durationMs}ms`,
+            `Status: ${ok ? 'PASS' : 'FAIL'}`,
+            `Terminal port: ${terminalPort}`,
+            '',
+            '## Criteria',
+            '',
+            ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+            '',
+            '## Logs',
+            '',
+            `- raw: ${path.relative(ROOT, path.join(outDir, 'audit-ux-cycle.raw.log'))}`,
+            `- plain: ${path.relative(ROOT, path.join(outDir, 'audit-ux-cycle.plain.log'))}`,
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+    return summary;
+}
+
 function hasReturnedToReplPrompt(plain, outputOffset) {
     return REPL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
 }
@@ -3156,6 +3325,7 @@ function liveScenarioKind({
     pickerInteractiveCycle,
     uxCycle,
     diagnosticUxCycle,
+    auditUxCycle,
     modelControlProbe,
     liveScenario,
 }) {
@@ -3165,6 +3335,7 @@ function liveScenarioKind({
     if (pickerInteractiveCycle) return 'picker_interactive_cycle';
     if (uxCycle) return 'default_ux_cycle';
     if (diagnosticUxCycle) return 'diagnostic_ux_cycle';
+    if (auditUxCycle) return 'audit_ux_cycle';
     if (modelControlProbe) return 'model_probe';
     if (autoControlProbe) return 'auto_probe';
     if (byokFixture) return 'byok_fixture_no_pr';
@@ -6004,6 +6175,7 @@ async function main() {
     const pickerInteractiveCycle = hasFlag('--picker-interactive-cycle');
     const uxCycle = hasFlag('--ux-cycle');
     const diagnosticUxCycle = hasFlag('--diagnostic-ux-cycle');
+    const auditUxCycle = hasFlag('--audit-ux-cycle');
     const reuseSdkSession = hasFlag('--reuse-sdk-session');
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
@@ -6028,6 +6200,7 @@ async function main() {
         pickerInteractiveCycle,
         uxCycle,
         diagnosticUxCycle,
+        auditUxCycle,
         liveScenario,
     });
     const byokRealProfile = readArg('--byok-real-profile', '');
@@ -6212,6 +6385,20 @@ async function main() {
             startedAt,
         });
         console.log(`[terminal-live] diagnostic ux summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
+        if (!summary.ok) process.exitCode = 1;
+        await byokFixtureProvider?.close();
+        return;
+    }
+
+    if (auditUxCycle) {
+        const summary = await runAuditUxCycleLiveTest({
+            outDir,
+            requestedTransport,
+            timeoutMs,
+            terminalPort,
+            startedAt,
+        });
+        console.log(`[terminal-live] audit ux summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
         if (!summary.ok) process.exitCode = 1;
         await byokFixtureProvider?.close();
         return;

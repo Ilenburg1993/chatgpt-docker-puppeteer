@@ -195,6 +195,24 @@ function buildPolicyQueryHints(policy) {
 }
 
 /**
+ * @param {{ id: string; publicEvents: string[] }} policy
+ * @returns {string}
+ */
+function buildHumanPolicyQueryHint(policy) {
+    const labels = uniqueHumanEventLabels(policy.publicEvents);
+    const subject = labels.length > 0 ? labels.join(' + ') : humanPolicyId(policy.id);
+    return `ver ${subject}: /events 50 · detalhe técnico: /events sources detail`;
+}
+
+/**
+ * @param {string} id
+ * @returns {string}
+ */
+function humanPolicyId(id) {
+    return id.replace(/[._-]+/gu, ' ');
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -222,6 +240,14 @@ function humanPolicyOwnerSummary(policy) {
 }
 
 /**
+ * @param {string[]} events
+ * @returns {string[]}
+ */
+function uniqueHumanEventLabels(events) {
+    return [...new Set(events.map((event) => humanEventLabel(event)).filter(Boolean))];
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -241,7 +267,7 @@ function humanEventLabel(event, payload = null) {
     if (event === 'user_input.completed') return 'Resposta do operador';
     if (event === 'tool.lifecycle') return 'Ferramenta';
     if (event === 'terminal.activity' || event === 'activity.changed') return 'Atividade';
-    if (event === 'terminal.runtime.wired') return 'Runtime pronto';
+    if (event === 'terminal.runtime.wired') return 'Sessão pronta';
     if (event === 'terminal.started') return 'Terminal iniciado';
     if (event === 'dialog.loop.changed') return 'Conversa alterada';
     if (event === 'quota.warning') return 'Aviso de quota';
@@ -272,7 +298,7 @@ function humanEventLabel(event, payload = null) {
     if (event === 'byok.provider.config') return 'Configuração BYOK';
     if (event === 'dialog.ready') return 'Conversa pronta';
     if (event === 'dialog.stopped') return 'Conversa parada';
-    if (event === 'terminal.runtime.wire_failed') return 'Runtime falhou';
+    if (event === 'terminal.runtime.wire_failed') return 'Sessão falhou';
     if (event === 'skills.reloaded') return 'Skills recarregadas';
     if (event === 'elicitation.pending') return 'Formulário pendente';
     if (event === 'elicitation.completed') return 'Formulário concluído';
@@ -735,13 +761,11 @@ export async function cmdEvents({ println }, arg = '') {
         }
         for (const policy of policies) {
             const policyCount = policy.publicEvents.reduce((sum, event) => sum + (counts.get(event) ?? 0), 0);
-            const events = policy.publicEvents.map((event) => humanEventLabel(event)).join(', ');
+            const humanEvents = uniqueHumanEventLabels(policy.publicEvents);
+            const events = humanEvents.join(', ');
             const title = detailMode
                 ? policy.id
-                : policy.publicEvents
-                      .map((event) => humanEventLabel(event))
-                      .slice(0, 2)
-                      .join(' + ');
+                : humanEvents.slice(0, 2).join(' + ');
             println(terminalThemeText('accent', `  ${title || policy.id}`));
             println(terminalThemeRow('Responsável', humanPolicyOwnerSummary(policy), { role: 'muted' }));
             println(
@@ -749,7 +773,11 @@ export async function cmdEvents({ println }, arg = '') {
                     role: policyCount > 0 ? 'info' : 'muted',
                 }),
             );
-            println(terminalThemeRow('Investigar', buildPolicyQueryHints(policy) || '/events 50', { role: 'command' }));
+            println(
+                terminalThemeRow('Investigar', detailMode ? buildPolicyQueryHints(policy) || '/events 50' : buildHumanPolicyQueryHint(policy), {
+                    role: 'command',
+                }),
+            );
             if (detailMode) {
                 println(terminalThemeRow('ID', policy.id, { role: 'muted' }));
                 println(terminalThemeRow('Classe', policy.class, { role: 'muted' }));
