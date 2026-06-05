@@ -521,6 +521,74 @@ function shouldAttemptPostToolOnlyRecovery(turnResult, context) {
 }
 
 /**
+ * @param {number | null | undefined} value
+ * @returns {number}
+ */
+function safeCounter(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/**
+ * @param {{
+ *     semanticOutcome?: import('../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['outcome'];
+ *     semanticReplySource?: import('../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['replySource'];
+ *     semanticDiagnostics?: import('../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['diagnostics'];
+ *     materialization: ReturnType<typeof completeTerminalTurnMaterialization>;
+ *     quiescence?: Awaited<ReturnType<typeof waitForTerminalTurnMaterializationQuiescence>> | null;
+ * }} input
+ * @returns {{
+ *     cause: string;
+ *     evidence: string;
+ *     action: string;
+ *     operatorSummary: string;
+ * }}
+ */
+function buildTerminalEmptyOutputDiagnosis(input) {
+    const diagnostics = input.semanticDiagnostics;
+    const assistantMessages = safeCounter(
+        diagnostics?.assistantMessageCount ?? input.materialization.diagnostics.assistantMessageCount,
+    );
+    const toolSignals = safeCounter(diagnostics?.toolSignalCount);
+    const deltaChars = safeCounter(diagnostics?.deltaChars ?? input.materialization.diagnostics.deltaChars);
+    const deltaSlices = safeCounter(input.materialization.diagnostics.deltaSlices);
+    const pendingProtocol = diagnostics?.pendingProtocolKind ?? null;
+    const outcome = input.semanticOutcome ?? 'empty';
+    const source = input.semanticReplySource ?? 'n/d';
+    let cause = 'modelo encerrou o turno sem texto público nem protocolo de continuidade';
+    let action = 'reenvie, peça síntese curta ou troque rota/modelo se repetir';
+
+    if (pendingProtocol) {
+        cause = `protocolo avançou para ${pendingProtocol}, mas sem resposta pública renderizável`;
+        action = '/activity 40 · /events 60 para confirmar o estado protocolar';
+    } else if (toolSignals > 0) {
+        cause = 'tools foram observadas, mas nenhuma síntese pública chegou ao terminal';
+        action = 'peça uma síntese pública antes de repetir ações com efeito colateral';
+    } else if (assistantMessages > 0) {
+        cause = 'o SDK sinalizou mensagem final, mas ela não virou transcript visível';
+        action = '/events event=assistant.message · /export para comparar materialização';
+    } else if (deltaChars > 0 || deltaSlices > 0) {
+        cause = 'deltas foram observados, mas não formaram resposta pública final';
+        action = '/activity detail · /events event=assistant.message_delta para comparar streaming';
+    }
+
+    const evidenceParts = [
+        `resultado ${outcome}`,
+        `origem ${source}`,
+        `tools ${toolSignals}`,
+        `deltas ${deltaSlices}/${deltaChars} caracteres`,
+        `mensagens ${assistantMessages}`,
+        input.quiescence ? `quiescência ${input.quiescence.settledBy}/${input.quiescence.waitedMs}ms` : null,
+    ].filter(Boolean);
+    const evidence = evidenceParts.join(' · ');
+    return {
+        cause,
+        evidence,
+        action,
+        operatorSummary: `${cause} · ${evidence}`,
+    };
+}
+
+/**
  * @param {{
  *     actor: string;
  *     byok: ReturnType<typeof readConfiguredByokSummary>;
@@ -602,8 +670,15 @@ function recordTerminalExplicitEmptyOutput(input) {
     }
 
     reviseRecentTerminalTurnTraceStatus({ timestamp, status: 'failed' });
+    const diagnosis = buildTerminalEmptyOutputDiagnosis({
+        semanticOutcome,
+        semanticReplySource: input.semanticReplySource,
+        semanticDiagnostics: input.semanticDiagnostics,
+        materialization: input.materialization,
+        quiescence: input.quiescence,
+    });
     recordTerminalActivity('error', 'Turno sem saída pública materializada', {
-        detail: `${failureDetail} · sem pergunta humana ou formulário pendente`,
+        detail: `${diagnosis.operatorSummary} · ${failureDetail} · sem pergunta humana ou formulário pendente`,
         source: 'dialog',
         severity: 'error',
     });
@@ -619,6 +694,10 @@ function recordTerminalExplicitEmptyOutput(input) {
             semanticOutcome,
             semanticReplySource: input.semanticReplySource ?? null,
             semanticDiagnostics: input.semanticDiagnostics ?? null,
+            cause: diagnosis.cause,
+            evidence: diagnosis.evidence,
+            operatorSummary: diagnosis.operatorSummary,
+            operatorAction: diagnosis.action,
             pendingQuestionKind: runtimeState.pendingQuestionKind,
             runtimeStatus: runtimeState.status,
             quiescenceSettledBy: input.quiescence?.settledBy ?? null,
@@ -627,12 +706,14 @@ function recordTerminalExplicitEmptyOutput(input) {
         }),
     );
     println(
-        terminalThemeRow('Turno vazio', 'sem resposta pública materializada; nenhuma pergunta humana pendente', {
+        terminalThemeRow('Turno vazio', 'LLM-B encerrou sem resposta pública e sem pergunta humana pendente', {
             role: 'error',
         }),
     );
+    println(terminalThemeRow('Causa', diagnosis.cause, { role: 'warn' }));
+    println(terminalThemeRow('Evidências', diagnosis.evidence, { role: 'muted' }));
     println(
-        terminalThemeRow('Próximo passo', '/activity 40 · /events 60 · /byok health · reenvie ou troque modelo', {
+        terminalThemeRow('Próximo passo', `${diagnosis.action} · /activity 40 · /events 60 · /byok health`, {
             role: 'command',
         }),
     );

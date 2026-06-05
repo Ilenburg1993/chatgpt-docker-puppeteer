@@ -538,7 +538,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
         );
         expect(vi.mocked(activity.recordTerminalActivity)).toHaveBeenCalledWith(
             'error',
-            'Falha de provedor BYOK no turno',
+            'Falha da rota BYOK no turno',
             expect.objectContaining({ source: 'dialog' }),
         );
         expect(vi.mocked(activity.recordTerminalActivity)).not.toHaveBeenCalledWith(
@@ -639,8 +639,16 @@ describe('terminal/dialog/engine.js — contrato', () => {
                 actor: 'user',
                 source: 'terminal-dialog/empty-output',
                 assistantMessageCount: 0,
+                cause: 'modelo encerrou o turno sem texto público nem protocolo de continuidade',
+                evidence: expect.stringContaining('tools 0'),
+                operatorSummary: expect.stringContaining('modelo encerrou o turno'),
+                operatorAction: expect.stringContaining('troque rota/modelo'),
             }),
         );
+        const renderedOutput = stdoutWriteSpy?.mock.calls.map((call) => String(call[0])).join('') ?? '';
+        expect(renderedOutput).toContain('LLM-B encerrou sem resposta pública');
+        expect(renderedOutput).toContain('Causa');
+        expect(renderedOutput).toContain('Evidências');
 
         configMocks.readConfiguredByokSummary.mockReturnValue({
             enabled: false,
