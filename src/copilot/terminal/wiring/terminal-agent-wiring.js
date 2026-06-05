@@ -305,7 +305,12 @@ export function registerAgentEventListeners(printBanner) {
             );
             if (!success || prConsumed) {
                 const label = success ? 'conversa recuperada com restart' : 'falha no recovery da conversa';
-                println(`\n\x1b[33m  [conversa] ${label}: ${strategy} · ${reason} · ${duration}\x1b[0m`);
+                println('');
+                println(
+                    terminalThemeRow('Recovery', `${label} · estratégia ${strategy} · motivo ${reason} · ${duration}`, {
+                        role: success ? 'warn' : 'error',
+                    }),
+                );
             }
             broadcastSse(
                 'dialog.recovery',
@@ -788,7 +793,8 @@ export function registerAgentEventListeners(printBanner) {
                 detail: 'Parado por autorização explícita do usuário',
                 source: 'dialog',
             });
-            println(`\n\x1b[33m  [conversa] Encerrada por autorização explícita do usuário.\x1b[0m`);
+            println('');
+            println(terminalThemeRow('Conversa', 'encerrada por autorização explícita do operador', { role: 'warn' }));
             log('INFO', '[TerminalServer] Conversa encerrada com autorização do usuário.');
             broadcastSse(
                 'dialog.stopped',
@@ -803,7 +809,8 @@ export function registerAgentEventListeners(printBanner) {
                 detail: `Encerrado enquanto pausado (${reason})`,
                 source: 'dialog',
             });
-            println(`\n\x1b[33m  [conversa] Encerrada enquanto pausada pelo usuário — não reiniciando.\x1b[0m`);
+            println('');
+            println(terminalThemeRow('Conversa', 'encerrada enquanto pausada pelo operador; não reiniciando', { role: 'warn' }));
             log('INFO', '[TerminalServer] Conversa encerrada com dialogPaused=true. Não reiniciando.');
             broadcastSse(
                 'dialog.stopped',
@@ -819,7 +826,8 @@ export function registerAgentEventListeners(printBanner) {
                 severity: 'warn',
                 source: 'dialog',
             });
-            println(`\n\x1b[33m  [dialog] ${stopPolicy.terminalMessage}\x1b[0m`);
+            println('');
+            println(terminalThemeRow('Política', stopPolicy.terminalMessage, { role: 'warn' }));
             log(
                 'WARN',
                 `[TerminalServer] Conversa encerrada (${stopPolicy.label}). Restart automático bloqueado por política.`,
@@ -837,7 +845,8 @@ export function registerAgentEventListeners(printBanner) {
             severity: 'warn',
             source: 'dialog',
         });
-        println(`\n\x1b[33m  [conversa] Encerrada (${label}) — reiniciando automaticamente…\x1b[0m`);
+        println('');
+        println(terminalThemeRow('Conversa', `encerrada (${label}); reiniciando automaticamente`, { role: 'warn' }));
         log('WARN', `[TerminalServer] Conversa encerrada (${label}). Reiniciando.`);
         broadcastSse(
             'dialog.stopped',

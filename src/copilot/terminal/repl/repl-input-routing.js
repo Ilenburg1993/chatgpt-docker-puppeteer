@@ -8,6 +8,8 @@
  * @module copilot/terminal/repl-input-routing
  */
 
+import { terminalThemeRow } from '../state/dialog/index.js';
+
 const TERMINAL_ESCAPE_COMMANDS = new Set(['quit', 'exit', 'restart', 'emergency-reset', 'ereset']);
 
 const TERMINAL_IMMEDIATE_COMMANDS = new Set([
@@ -50,5 +52,5 @@ export function isTerminalImmediateCommand(command) {
  */
 export function formatTerminalQueuedTurnNotice({ queueDepth }) {
     const position = Math.max(1, queueDepth);
-    return `\x1b[90m  [fila] Mensagem recebida e enfileirada para a LLM-B (posição ${position}).\x1b[0m`;
+    return terminalThemeRow('Fila', `mensagem enviada para a LLM-B · posição ${position}`, { role: 'muted' });
 }

@@ -14,6 +14,7 @@ const printlnBlock = vi.fn((/** @type {string[]} */ lines) => println(lines.join
 const buildUserPrompt = vi.fn(() => 'prompt> ');
 const broadcastSse = vi.fn();
 const isTerminalRenderLocked = vi.fn(() => false);
+const parkTerminalPromptForContinuation = vi.fn();
 const scheduleTerminalPromptRedraw = vi.fn((/** @type {any} */ rl, /** @type {string} */ prompt) => {
     rl?.setPrompt?.(prompt);
     rl?.prompt?.();
@@ -58,6 +59,7 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     buildUserPrompt,
     broadcastSse,
     isTerminalRenderLocked,
+    parkTerminalPromptForContinuation,
     scheduleTerminalPromptRedraw,
     writeInlineStatus,
 }));
@@ -120,6 +122,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         readConfiguredByokSummary.mockReturnValue({ enabled: false });
         reviseRecentTerminalTurnTraceStatus.mockReturnValue(null);
         isTerminalRenderLocked.mockReturnValue(false);
+        parkTerminalPromptForContinuation.mockClear();
         delete process.env['COPILOT_TERMINAL_DURABLE_TOOL_HEARTBEAT'];
         printlnBlock.mockImplementation((/** @type {string[]} */ lines) => println(lines.join('\n')));
         readTerminalRuntimeState.mockReturnValue(
@@ -991,7 +994,10 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             expect.stringMatching(/Tarefa\s+conclu[ií]da · investigar sessão SDK/u),
         );
         expect(println).toHaveBeenCalledWith(
-            expect.stringContaining('Shell concluído: npm run lint:copilot · saída 0'),
+            expect.stringContaining('Shell'),
+        );
+        expect(println).toHaveBeenCalledWith(
+            expect.stringContaining('concluído · npm run lint:copilot · saída 0'),
         );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('exit='));
         expect(broadcastSse).toHaveBeenCalledWith(

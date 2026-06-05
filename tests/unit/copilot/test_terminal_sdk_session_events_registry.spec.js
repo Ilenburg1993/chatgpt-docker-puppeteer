@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
     enqueueRuntimeInterventionMailbox: vi.fn(),
     readRuntimeInterventionMailboxSummary: vi.fn(() => ({ queueSize: 0, dropped: 0, runtimeId: 'default' })),
     answerTerminalPendingQuestion: vi.fn(() => true),
+    readTerminalRuntimeState: vi.fn(() => ({ status: 'idle', pendingQuestionKind: null })),
     beginTerminalTurnTrace: vi.fn(),
     completeTerminalTurnTrace: vi.fn(() => null),
     completeTerminalTurnToolCall: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     SEPARATOR: '---',
     broadcastSse: mocks.broadcastSse,
+    parkTerminalPromptForContinuation: vi.fn(),
     println: mocks.println,
     printlnBlock: mocks.printlnBlock,
 }));
@@ -72,6 +74,7 @@ vi.mock('../../../src/copilot/presentation/state/index.js', async (importOrigina
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     answerTerminalPendingQuestion: mocks.answerTerminalPendingQuestion,
     drainMailboxToTurnIfIdle: vi.fn(),
+    readTerminalRuntimeState: mocks.readTerminalRuntimeState,
 }));
 vi.mock('../../../src/copilot/terminal/frontend/projections/index.js', () => ({
     observeTerminalModelChangeProjection: mocks.observeTerminalModelChangeProjection,
@@ -89,7 +92,13 @@ vi.mock('../../../src/copilot/terminal/state/ui-preferences.js', () => ({
     getTerminalDetailLevel: mocks.getTerminalDetailLevel,
 }));
 vi.mock('../../../src/copilot/terminal/state/ui-theme.js', () => ({
+    terminalActionChip: vi.fn((label) => `<${label}>`),
     terminalThemeBadge: vi.fn((_, label) => `[${label}]`),
+    terminalThemeDivider: vi.fn((width = 52) => '-'.repeat(width)),
+    terminalThemeHeadline: vi.fn((_, title, details = []) =>
+        details.length > 0 ? `${title} · ${details.join(' · ')}` : title,
+    ),
+    terminalThemeRow: vi.fn((label, value) => `  ${label}  ${value}`),
     terminalThemeStatus: vi.fn((success) => (success ? 'ok' : 'falhou')),
     terminalThemeText: vi.fn((_, text) => text),
 }));
@@ -218,7 +227,7 @@ describe('sdk-session-events.js — integração com ToolCallRegistry', () => {
         expect(sseCall?.[1]?.toolName).toBe('github_api');
     });
 
-    it('promove external_tool.completed pobre para completion rico quando há tool nativa em voo', async () => {
+    it('preserva completion pobre em voo quando a tool nativa ainda aguarda resultado semântico', async () => {
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const { handleTerminalNativeToolStart } =
@@ -243,8 +252,10 @@ describe('sdk-session-events.js — integração com ToolCallRegistry', () => {
             success: true,
         });
 
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('package.json'));
-        expect(registry.isNameInFlight('read_file_content')).toBe(false);
+        expect(registry.isNameInFlight('read_file_content')).toBe(true);
+        const entry = registry.resolveByName('read_file_content');
+        expect(entry?.toolCallId).toBe('native-read-1');
+        expect(entry?.presentation?.path).toBe('package.json');
     });
 
     it('renderiza request_user_input como pergunta humana, não como tool genérica', async () => {
@@ -292,7 +303,9 @@ describe('sdk-session-events.js — integração com ToolCallRegistry', () => {
 
         expect(registry.isNameInFlight('report_intent')).toBe(false);
         expect(registry.wasRecentlyCompleted('native-intent-orphan')).toBe(true);
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('[SYNC]'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Sincronização'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('conclusão inferida no fim do turno'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('[SYNC]'));
     });
 
     it('onSessionShutdown chama registry.clear()', async () => {

@@ -1368,7 +1368,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
         });
         if (shouldPrintSessionNarration('verbose'))
-            println(`  \x1b[90m📁 Contexto SDK: ${cwd}${branch}${repository}\x1b[0m`);
+            println(terminalThemeRow('Contexto SDK', `${cwd}${branch}${repository}`, { role: 'muted' }));
         broadcastSse(
             'session.context_changed',
             withSdkSessionSseEnvelope(
@@ -1393,7 +1393,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
         });
         if (shouldPrintSessionNarration('verbose')) {
-            println(`  \x1b[35m🧭 Modo SDK: ${previousMode} → ${newMode ?? 'unknown'}\x1b[0m`);
+            println(terminalThemeRow('Modo SDK', `${previousMode} → ${newMode ?? 'unknown'}`, { role: 'thinking' }));
         }
         broadcastSse(
             'session.mode_changed',
@@ -1409,7 +1409,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             detail: operation ? `plan ${operation}` : 'plan modificado',
             source: 'sdk',
         });
-        if (shouldPrintSessionNarration('verbose')) println(`  \x1b[33m📝 Plan SDK: ${operation ?? 'alterado'}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose'))
+            println(terminalThemeRow('Plano SDK', operation ?? 'alterado', { role: 'warn' }));
         broadcastSse('session.plan_changed', withSdkSessionSseEnvelope({ operation }, 'sdk/session.plan_changed'));
         refreshPromptIfIdle();
     };
@@ -1542,7 +1543,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
         });
         println(
-            `  \x1b[33m✂️  Truncation SDK: ${messageTruncatedCount} msgs · ${tokensTruncated.toLocaleString('pt-BR')} tokens · ${reason}\x1b[0m`,
+            terminalThemeRow(
+                'Truncamento',
+                `${messageTruncatedCount} msgs · ${tokensTruncated.toLocaleString('pt-BR')} tokens · ${reason}`,
+                { role: 'warn' },
+            ),
         );
         broadcastSse(
             'session.truncation',
@@ -1565,7 +1570,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             severity: 'warn',
             source: 'sdk',
         });
-        println(`  \x1b[33m⏪ Snapshot rewind: ${snapshotId} · ${reason}\x1b[0m`);
+        println(terminalThemeRow('Snapshot', `rebobinado · ${snapshotId} · ${reason}`, { role: 'warn' }));
         broadcastSse(
             'session.snapshot_rewind',
             withSdkSessionSseEnvelope({ snapshotId, reason }, 'sdk/session.snapshot_rewind'),
@@ -1580,7 +1585,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             severity: 'warn',
             source: 'sdk',
         });
-        println(`  \x1b[33m🛑 Shutdown SDK: ${shutdownType}${reason ? ` · ${reason}` : ''}\x1b[0m`);
+        println(terminalThemeRow('Shutdown SDK', `${shutdownType}${reason ? ` · ${reason}` : ''}`, { role: 'warn' }));
         broadcastSse('session.shutdown', withSdkSessionSseEnvelope({ shutdownType, reason }, 'sdk/session.shutdown'));
         // Limpeza defensiva em shutdown para não carregar estado órfão em sessões subsequentes.
         suppressedProtocolRequestIds.clear();
@@ -1598,7 +1603,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
         });
         if (shouldPrintSessionNarration('important')) {
-            println(`  \x1b[36m🔁 Handoff SDK: ${fromAgent} → ${toAgent}${reason ? ` · ${reason}` : ''}\x1b[0m`);
+            println(terminalThemeRow('Handoff SDK', `${fromAgent} → ${toAgent}${reason ? ` · ${reason}` : ''}`, { role: 'info' }));
         }
         broadcastSse(
             'session.handoff',
@@ -1630,7 +1635,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose'))
-            println(`  \x1b[90m🗂️  Workspace file ${operation}: ${path}\x1b[0m`);
+            println(terminalThemeRow('Workspace', `${operation} · ${path}`, { role: 'muted' }));
         broadcastSse(
             'session.workspace_file_changed',
             withSdkSessionSseEnvelope({ path, operation }, 'sdk/session.workspace_file_changed'),

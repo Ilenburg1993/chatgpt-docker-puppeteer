@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
 import {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
@@ -21,6 +22,18 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
     it('exporta registerAgentEventListeners', async () => {
         const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
         expect(typeof mod.registerAgentEventListeners).toBe('function');
+    });
+
+    it('não usa ANSI manual nem tags cruas em mensagens públicas de conversa', async () => {
+        const src = await readFile(
+            new URL('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js', import.meta.url),
+            'utf8',
+        );
+
+        expect(src).not.toContain('\\x1b[');
+        expect(src).not.toContain('[conversa]');
+        expect(src).toContain("terminalThemeRow('Conversa'");
+        expect(src).toContain("terminalThemeRow('Recovery'");
     });
 
     it('descreve reconnect_restart como prompt preservado sem reenvio automático', async () => {

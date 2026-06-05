@@ -1098,9 +1098,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             source: 'agent',
         });
         printlnWhenRenderUnlocked(
-            failed
-                ? `  \x1b[31m💻 Shell concluído com erro: ${description}${exitLabel}\x1b[0m`
-                : `  \x1b[32m💻 Shell concluído: ${description}${exitLabel}\x1b[0m`,
+            terminalThemeRow('Shell', `${failed ? 'concluído com erro' : 'concluído'} · ${description}${exitLabel}`, {
+                role: failed ? 'error' : 'success',
+            }),
         );
         broadcastSse(AGENT_SHELL_COMPLETED_EVENT, withAgentSseEnvelope({ ...evt }, 'agent/shell.completed'));
     };
@@ -1111,7 +1111,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: description,
             source: 'agent',
         });
-        printlnWhenRenderUnlocked(`  \x1b[32m💻 Shell destacada concluída: ${description}\x1b[0m`);
+        printlnWhenRenderUnlocked(terminalThemeRow('Shell', `destacada concluída · ${description}`, { role: 'success' }));
         broadcastSse(
             AGENT_SHELL_DETACHED_COMPLETED_EVENT,
             withAgentSseEnvelope({ ...evt }, 'agent/shell.detached_completed'),

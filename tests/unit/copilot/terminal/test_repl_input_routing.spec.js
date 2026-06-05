@@ -27,5 +27,8 @@ describe('terminal/repl/repl-input-routing.js', () => {
     it('formata aviso de fila com posicao humana minima', () => {
         expect(formatTerminalQueuedTurnNotice({ queueDepth: 0 })).toContain('posição 1');
         expect(formatTerminalQueuedTurnNotice({ queueDepth: 3 })).toContain('posição 3');
+        expect(formatTerminalQueuedTurnNotice({ queueDepth: 3 })).toContain('Fila');
+        expect(formatTerminalQueuedTurnNotice({ queueDepth: 3 })).not.toContain('[fila]');
+        expect(formatTerminalQueuedTurnNotice({ queueDepth: 3 })).not.toContain('\\x1b[');
     });
 });

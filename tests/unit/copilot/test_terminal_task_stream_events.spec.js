@@ -158,7 +158,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
             }),
         );
         expect(mocks.println).toHaveBeenCalledWith(
-            expect.stringContaining('prompt preservado sem reenvio automático'),
+            expect.stringContaining('preservado sem reenvio automático'),
         );
     });
 
@@ -179,7 +179,8 @@ describe('terminal/task-stream-events.js — contrato', () => {
         expect(mocks.appendThinkingHistoryChunk).toHaveBeenCalledWith(
             expect.objectContaining({ id: 'task-task-1', source: 'task', chunk: 'pensando...' }),
         );
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('raciocínio da tarefa capturado'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Raciocínio'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('capturado · task-1'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('/thinking show'));
         expect(stdoutSpy).not.toHaveBeenCalled();
         stdoutSpy.mockRestore();
@@ -423,7 +424,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
             expect.objectContaining({ id: 'task-internal-1', source: 'task', taskId: null }),
         );
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('/thinking show task-internal-1'));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('raciocínio da tarefa #task-internal-1 concluído'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('tarefa #task-internal-1 concluído'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('__anonymous__'));
     });
 
@@ -452,6 +453,6 @@ describe('terminal/task-stream-events.js — contrato', () => {
             'task-task-1',
             expect.objectContaining({ status: 'completed' }),
         );
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('raciocínio da tarefa #task-task-1 concluído'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('tarefa #task-task-1 concluído'));
     });
 });
