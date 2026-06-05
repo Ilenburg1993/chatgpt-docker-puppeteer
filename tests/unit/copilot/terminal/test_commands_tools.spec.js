@@ -141,6 +141,8 @@ describe('commands/tools', () => {
         expect(output).toContain('Superfícies operacionais');
         expect(output).toContain('Contrato das ferramentas');
         expect(output).toContain('/tools contract');
+        expect(output).not.toContain('Ferramentas observadas');
+        expect(output).not.toContain('0 grupos de ação');
     });
 
     it('renderiza decisões de autonomia no contrato sem tratá-las como aviso operacional', () => {

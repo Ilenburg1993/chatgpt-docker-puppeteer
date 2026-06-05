@@ -751,16 +751,17 @@ export function cmdTools({ println }, arg = '') {
         return;
     }
 
-    const shouldPrintDiagnosticHeadline = (wantsRaw || wantsDiag) && entries.length > 0;
-    if (shouldPrintDiagnosticHeadline) {
+    if (wantsRaw || wantsDiag) {
         println('');
-        println(
-            terminalThemeHeadline('tool', 'Ferramentas', [
-                `${entries.length} ${entries.length === 1 ? 'ferramenta' : 'ferramentas'}`,
-                wantsRaw ? 'nomes crus' : wantsDeepDiag ? 'diagnóstico completo' : 'diagnóstico humano',
-            ]),
-        );
-        println('');
+        if (entries.length > 0) {
+            println(
+                terminalThemeHeadline('tool', 'Ferramentas', [
+                    `${entries.length} ${entries.length === 1 ? 'ferramenta' : 'ferramentas'}`,
+                    wantsRaw ? 'nomes crus' : wantsDeepDiag ? 'diagnóstico completo' : 'diagnóstico humano',
+                ]),
+            );
+            println('');
+        }
     } else {
         println('');
         println(terminalThemeHeadline('tool', 'Ferramentas observadas'));
