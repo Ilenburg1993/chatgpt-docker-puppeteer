@@ -187,6 +187,98 @@ function renderPermissionDecisionLabel(value) {
  * @param {unknown} value
  * @returns {string}
  */
+function renderElicitationResultActionLabel(value) {
+    const action = String(value ?? '').trim();
+    if (action === 'accept') return 'aceito';
+    if (action === 'decline') return 'recusado';
+    if (action === 'cancel' || action === 'cancelled' || action === 'canceled') return 'cancelado';
+    return action.replace(/[._-]+/gu, ' ') || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderElicitationModeLabel(value) {
+    const mode = String(value ?? '').trim();
+    if (mode === 'form') return 'formulário estruturado';
+    if (mode === 'url') return 'link externo';
+    if (mode === 'confirm') return 'confirmação';
+    if (mode === 'select') return 'seleção';
+    if (mode === 'input') return 'entrada curta';
+    return mode.replace(/[._-]+/gu, ' ') || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkInteractionStatusLabel(value) {
+    const status = String(value ?? '').trim();
+    if (status === 'pending') return 'aguardando operador';
+    if (status === 'completed') return 'concluído';
+    return status.replace(/[._-]+/gu, ' ') || 'n/d';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkInteractionSourceLabel(value) {
+    const source = String(value ?? '').trim();
+    if (!source) return 'n/d';
+    if (source === 'permissions.listPending') return 'permissões pendentes via SDK';
+    if (source === 'session.ui.elicitation') return 'formulário SDK';
+    if (source === 'session.ui.input') return 'entrada SDK';
+    if (source === 'session.ui.confirm') return 'confirmação SDK';
+    if (source === 'session.ui.select') return 'seleção SDK';
+    return source.replace(/[._-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSdkHandle(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return 'n/d';
+    if (text.length <= 18) return text;
+    return `${text.slice(0, 10)}…${text.slice(-6)}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isSdkDiagnosticDetailToken(value) {
+    const token = String(value ?? '').trim().toLowerCase();
+    return (
+        token === 'detail' ||
+        token === 'details' ||
+        token === 'raw' ||
+        token === 'debug' ||
+        token === 'full' ||
+        token === '--detail' ||
+        token === '--raw' ||
+        token === '--debug' ||
+        token === '--full'
+    );
+}
+
+/**
+ * @param {string[]} rest
+ * @returns {{ id: string; detail: boolean }}
+ */
+function parseSdkShowArgs(rest) {
+    const detail = rest.some((token) => isSdkDiagnosticDetailToken(token));
+    const id = rest.find((token) => !isSdkDiagnosticDetailToken(token)) ?? 'latest';
+    return { id, detail };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 function renderSdkQuotaResetLabel(value) {
     if (value == null || value === '') return '-';
     const parsed = value instanceof Date ? value.getTime() : typeof value === 'number' ? value : Date.parse(String(value));
@@ -2118,7 +2210,12 @@ export async function cmdElicitation({ println }, arg = '') {
             println(terminalThemeDivider(37));
             println('');
         } else if (sub === 'show') {
-            renderElicitationEntry({ println }, getTerminalElicitation(rest[0] || 'latest', { runtimeId }));
+            const showArgs = parseSdkShowArgs(rest);
+            renderElicitationEntry(
+                { println },
+                getTerminalElicitation(showArgs.id, { runtimeId }),
+                { detail: showArgs.detail },
+            );
         } else if (sub === 'clear') {
             const ok = clearTerminalElicitation(rest[0] || 'latest');
             println(
@@ -2277,7 +2374,12 @@ export async function cmdPermission({ println }, arg = '') {
         return;
     }
     if (sub === 'show') {
-        renderPermissionEntry({ println }, getTerminalPermission(rest[0] || 'latest', { runtimeId }));
+        const showArgs = parseSdkShowArgs(rest);
+        renderPermissionEntry(
+            { println },
+            getTerminalPermission(showArgs.id, { runtimeId }),
+            { detail: showArgs.detail },
+        );
         return;
     }
     if (sub === 'respond' || sub === 'resolve') {
@@ -2452,55 +2554,86 @@ export async function cmdPermission({ println }, arg = '') {
 /**
  * @param {CommandContext} ctx
  * @param {ReturnType<typeof getTerminalElicitation>} entry
+ * @param {{ detail?: boolean }} [options]
  * @returns {void}
  */
-function renderElicitationEntry({ println }, entry) {
+function renderElicitationEntry({ println }, entry, options = {}) {
     if (!entry) {
         println(terminalThemeRow('Formulário', 'não encontrado', { role: 'warn' }));
         return;
     }
+    const detail = options.detail === true;
     println('');
-    println(terminalThemeHeadline('question', 'Formulário SDK', [entry.id]));
+    println(
+        terminalThemeHeadline('question', 'Formulário SDK', [
+            renderSdkInteractionStatusLabel(entry.status),
+            detail ? `id ${entry.id}` : null,
+        ]),
+    );
     println(terminalThemeDivider(37));
-    println(terminalThemeRow('Estado', entry.status, { role: entry.status === 'pending' ? 'question' : 'muted' }));
-    println(terminalThemeRow('Modo', entry.mode));
+    println(
+        terminalThemeRow('Estado', renderSdkInteractionStatusLabel(entry.status), {
+            role: entry.status === 'pending' ? 'question' : 'muted',
+        }),
+    );
+    println(terminalThemeRow('Modo', renderElicitationModeLabel(entry.mode)));
     println(terminalThemeRow('Mensagem', entry.message, { role: 'question' }));
     if (entry.url) println(terminalThemeRow('URL', entry.url, { role: 'command' }));
-    if (entry.source) println(terminalThemeRow('Origem', entry.source));
-    if (entry.toolCallId) println(terminalThemeRow('Tool', entry.toolCallId));
-    if (entry.actionable) println(terminalThemeRow('Ação', 'respondível pelo runtime', { role: 'success' }));
-    if (entry.resultAction) println(terminalThemeRow('Resultado', entry.resultAction, { role: 'warn' }));
+    if (entry.source) println(terminalThemeRow('Origem', renderSdkInteractionSourceLabel(entry.source)));
+    if (detail && entry.toolCallId) println(terminalThemeRow('Tool call', renderSdkHandle(entry.toolCallId)));
+    if (detail && entry.requestId) println(terminalThemeRow('Alça', renderSdkHandle(entry.requestId)));
+    if (entry.actionable) println(terminalThemeRow('Ação', 'respondível pela sessão', { role: 'success' }));
+    if (entry.resultAction)
+        println(terminalThemeRow('Resultado', renderElicitationResultActionLabel(entry.resultAction), { role: 'warn' }));
+    println(terminalThemeRow('Criado', formatTerminalRelativeAge(entry.createdAt)));
+    if (entry.completedAt) println(terminalThemeRow('Concluído', formatTerminalRelativeAge(entry.completedAt)));
     println(terminalThemeDivider(37));
-    if (entry.resultContent) println(`\n  conteúdo da resposta:\n${pretty(entry.resultContent, 2500)}`);
-    if (entry.requestedSchema) println(`\n  schema:\n${pretty(entry.requestedSchema, 2500)}`);
     if (entry.actionable) {
         const shorthand = describeElicitationShorthand(entry.requestedSchema);
         println(
-            terminalThemeRow('Responder', '/elicitation respond <id> <accept|decline|cancel> [json]', {
+            terminalThemeRow('Responder', '/elicitation respond latest <accept|decline|cancel> [json]', {
                 role: 'command',
             }),
         );
         if (shorthand) println(terminalThemeRow('Atalho', shorthand, { role: 'command' }));
-        println('');
     }
+    if (detail) {
+        if (entry.resultContent) println(`\n  conteúdo da resposta:\n${pretty(entry.resultContent, 2500)}`);
+        if (entry.requestedSchema) println(`\n  schema:\n${pretty(entry.requestedSchema, 2500)}`);
+        if (entry.data) println(`\n  data:\n${pretty(entry.data, 2500)}`);
+    } else {
+        println(terminalThemeRow('Detalhes', '/elicitation show latest detail', { role: 'command' }));
+    }
+    println('');
 }
 
 /**
  * @param {CommandContext} ctx
  * @param {ReturnType<typeof getTerminalPermission>} entry
+ * @param {{ detail?: boolean }} [options]
  * @returns {void}
  */
-function renderPermissionEntry({ println }, entry) {
+function renderPermissionEntry({ println }, entry, options = {}) {
     if (!entry) {
         println(terminalThemeRow('Permissão', 'não encontrada', { role: 'warn' }));
         return;
     }
+    const detail = options.detail === true;
     println('');
-    println(terminalThemeHeadline('question', 'Permissão SDK', [entry.id]));
+    println(
+        terminalThemeHeadline('question', 'Permissão SDK', [
+            renderSdkInteractionStatusLabel(entry.status),
+            detail ? `id ${entry.id}` : null,
+        ]),
+    );
     println(terminalThemeDivider(37));
-    println(terminalThemeRow('Estado', entry.status, { role: entry.status === 'pending' ? 'question' : 'muted' }));
+    println(
+        terminalThemeRow('Estado', renderSdkInteractionStatusLabel(entry.status), {
+            role: entry.status === 'pending' ? 'question' : 'muted',
+        }),
+    );
     println(terminalThemeRow('Tipo', renderPermissionTypeLabel(entry.permissionType), { role: 'warn' }));
-    if (entry.requestId) println(terminalThemeRow('Alça', entry.requestId));
+    if (detail && entry.requestId) println(terminalThemeRow('Alça', renderSdkHandle(entry.requestId)));
     if (entry.granted !== null)
         println(terminalThemeRow('Aprovação', entry.granted ? 'aprovada' : 'não aprovada', { role: entry.granted ? 'success' : 'warn' }));
     if (entry.result) println(terminalThemeRow('Resultado', renderPermissionDecisionLabel(entry.result), { role: 'warn' }));
@@ -2510,13 +2643,18 @@ function renderPermissionEntry({ println }, entry) {
         println(
             terminalThemeRow(
                 'Ação',
-                '/permission respond <id> <approve-once|approve-for-session|approve-for-location|reject|user-not-available>',
+                '/permission respond latest <approve-once|approve-for-session|approve-for-location|reject|user-not-available>',
                 { role: 'command' },
             ),
         );
     }
     println(terminalThemeDivider(37));
-    println(`\n  data:\n${pretty(entry.data, 2500)}\n`);
+    if (detail) {
+        println(`\n  data:\n${pretty(entry.data, 2500)}\n`);
+    } else {
+        println(terminalThemeRow('Detalhes', '/permission show latest detail', { role: 'command' }));
+        println('');
+    }
 }
 
 /**

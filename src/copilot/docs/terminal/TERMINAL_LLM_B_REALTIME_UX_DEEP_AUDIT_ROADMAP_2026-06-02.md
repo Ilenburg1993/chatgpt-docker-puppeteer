@@ -9060,3 +9060,38 @@
 - [x] Validação:
   - [x] teste focado de `/events`;
   - [x] lint/sintaxe escopados.
+
+### 12.101 `/permission show` e `/elicitation show` como cards humanos, não dumps — 2026-06-04
+
+- [x] Achado:
+  - `show` de permissões e formulários misturava operação humana com auditoria interna;
+  - o título trazia IDs crus (`perm-*`, `el-*`, `chatcmpl-tool-*`) mesmo quando o operador só queria
+    entender o estado atual;
+  - `/permission show` sempre imprimia `data:` com payload completo, recriando a poluição visual que
+    as lives recentes mostraram;
+  - `Formulário SDK` ainda dizia `respondível pelo runtime`, termo técnico inadequado para a camada
+    de UX.
+- [x] Decisão UX:
+  - `show` default deve ser card operacional: estado, tipo/modo, mensagem, idade, resultado humano e
+    ação recomendada;
+  - handles, request IDs, tool call IDs, schemas e payload bruto ficam atrás de `detail/raw/full`;
+  - `latest` é o atalho humano preferido nos comandos sugeridos, para evitar cópia de IDs;
+  - `all` continua sendo visão de auditoria/listagem histórica onde IDs podem aparecer para escolha
+    explícita;
+  - o termo “runtime” sai da superfície default, substituído por “sessão”.
+- [x] Implementação:
+  - `parseSdkShowArgs()` aceita `detail`, `raw`, `debug`, `full` e variantes `--*`;
+  - `renderPermissionEntry()` passa a esconder `data:` e `requestId` por padrão;
+  - `renderElicitationEntry()` passa a esconder schema/payload/handles por padrão;
+  - estados, modos, fontes e resultados ganharam rótulos humanos em português;
+  - comandos sugeridos usam `/permission respond latest ...` e `/elicitation respond latest ...`;
+  - testes de `/permission` e `/elicitation` agora fixam a separação entre card limpo e detalhe bruto.
+- [x] Validação:
+  - [x] `node --check src/copilot/terminal/commands/sdk.js`;
+  - [x] `node --check tests/unit/copilot/terminal/test_commands_sdk.spec.js`;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js` com 40 testes verdes.
+- [ ] Próximas verificações:
+  - rodar live com pergunta/permissão/formulário real e conferir o plain log;
+  - revisar `/sdk waits`, `/status`, `/activity` e linha viva para garantir que nenhum comando
+    semelhante ainda trate payload interno como UI primária;
+  - manter raw/detail auditável sem regressão para operador humano.

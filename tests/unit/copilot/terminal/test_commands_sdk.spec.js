@@ -942,8 +942,15 @@ describe('terminal/commands/sdk', () => {
 
         const show = mockCtx();
         await cmdPermission({ println: show.println }, 'show perm-1');
-        expect(show.output()).toContain('perm-1');
         expect(show.output()).toContain('escrita de arquivo');
+        expect(show.output()).toContain('concluído');
+        expect(show.output()).toContain('/permission show latest detail');
+        expect(show.output()).not.toContain('data:');
+
+        const detail = mockCtx();
+        await cmdPermission({ println: detail.println }, 'show perm-1 detail');
+        expect(detail.output()).toContain('perm-1');
+        expect(detail.output()).toContain('data:');
 
         const clear = mockCtx();
         await cmdPermission({ println: clear.println }, 'clear perm-1');
@@ -1007,9 +1014,9 @@ describe('terminal/commands/sdk', () => {
 
         const show = mockCtx();
         await cmdPermission({ println: show.println }, 'show perm-e2e-1');
-        expect(show.output()).toContain('perm-e2e-1');
         expect(show.output()).toContain('aprovada uma vez');
         expect(show.output()).not.toContain('approve-once');
+        expect(show.output()).not.toContain('perm-e2e-1');
     });
 
     it('/permission respond valida decisões persistentes que exigem approval', async () => {
@@ -1089,7 +1096,12 @@ describe('terminal/commands/sdk', () => {
 
         const showAudit = mockCtx();
         await cmdPermission({ println: showAudit.println }, 'show latest --runtime audit');
-        expect(showAudit.output()).toContain('perm-audit-1');
+        expect(showAudit.output()).toContain('escrita de arquivo');
+        expect(showAudit.output()).not.toContain('execução no terminal');
+
+        const showAuditDetail = mockCtx();
+        await cmdPermission({ println: showAuditDetail.println }, 'show latest detail --runtime audit');
+        expect(showAuditDetail.output()).toContain('perm-audit-1');
 
         const respondAudit = mockCtx();
         await cmdPermission({ println: respondAudit.println }, 'respond latest approve-once --runtime audit');
@@ -1119,7 +1131,14 @@ describe('terminal/commands/sdk', () => {
         const showAudit = mockCtx();
         await cmdElicitation({ println: showAudit.println }, 'show latest --runtime audit');
         expect(showAudit.output()).toContain('Formulário SDK');
-        expect(showAudit.output()).toContain('el-audit-1');
+        expect(showAudit.output()).toContain('Audit');
+        expect(showAudit.output()).not.toContain('el-audit-1');
+        expect(showAudit.output()).toContain('/elicitation show latest detail');
+
+        const showAuditDetail = mockCtx();
+        await cmdElicitation({ println: showAuditDetail.println }, 'show latest detail --runtime audit');
+        expect(showAuditDetail.output()).toContain('el-audit-1');
+        expect(showAuditDetail.output()).toContain('schema:');
 
         const respondAudit = mockCtx();
         await cmdElicitation(
