@@ -418,8 +418,16 @@ function renderByokTokenLabel(value) {
         blocked_no_selected_route: 'bloqueado: nenhuma rota selecionada',
         'admission-blocked': 'bloqueado na admissão',
         ready: 'pronto',
+        missing: 'ausente',
+        partial: 'parcial',
         deferred: 'adiado',
         applied: 'aplicado',
+        gateway_auto: 'gateway auto',
+        provider_model: 'modelo do provedor',
+        public_gateway_api: 'API pública do gateway',
+        public_docs: 'docs públicos',
+        authenticated_api: 'API autenticada',
+        runtime_rate_limited: 'runtime limitado por taxa',
         dry_run: 'simulação',
         manual_intervention: 'intervenção manual',
         effect_not_authorized: 'aguardando autorização',
@@ -447,6 +455,13 @@ function renderByokTokenLabel(value) {
         selected_route_missing: 'rota selecionada ausente',
         rate_limit_resettable: 'limite de taxa com reset',
         rate_limit: 'limite de taxa',
+        capabilities_changed: 'capacidades alteradas',
+        pricing_changed: 'preço alterado',
+        disposition_changed: 'disposição alterada',
+        access_changed: 'acesso alterado',
+        policy_changed: 'política alterada',
+        runtime_health_changed: 'saúde runtime alterada',
+        request_local_provider_explicitly: 'pedir provider local explicitamente',
         provider_health_cooldown: 'cooldown de saúde do provedor',
         route_wait_for_reset: 'rota aguardando reset',
         'blocked:provider_health_cooldown:rate-limit': 'bloqueada por cooldown de limite de taxa',
@@ -2635,28 +2650,43 @@ function renderByokProviderEndpointInventory(println, rest) {
         ? [resolveProviderEndpointInventory(selector)].filter((item) => item !== null)
         : listProviderEndpointInventory();
 
-    println(`\n  \x1b[36mBYOK endpoints de provedores\x1b[0m (${inventories.length})`);
-    println('  \x1b[90mInventário estático de coleta; não prova acesso nem capacidade. Use sondas para promover confiança de execução.\x1b[0m\n');
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK endpoints de provedores', [countLabel(inventories.length, 'provedor', 'provedores')]));
+    println(
+        terminalThemeWrappedRow(
+            'Escopo',
+            'inventário estático de coleta · não prova acesso nem execução · sondas promovem confiança depois',
+            { role: 'muted', columns: 112 },
+        ),
+    );
 
     if (inventories.length === 0) {
-        println(`    \x1b[33mProvedor não encontrado no inventário: ${selector ?? '-'}.\x1b[0m\n`);
+        println(terminalThemeWrappedRow('Estado', `provedor não encontrado no inventário: ${selector ?? '-'}`, { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
 
     for (const inventory of inventories) {
-        println(`    \x1b[33m${inventory.providerId}\x1b[0m  \x1b[90mtipo ${renderByokTokenLabel(inventory.providerKind)} · adaptador ${inventory.adapterId}\x1b[0m`);
-        println(`      \x1b[90mbases ${inventory.baseUrls.slice(0, 3).join(' · ')}${inventory.baseUrls.length > 3 ? ' · ...' : ''}\x1b[0m`);
+        println(
+            terminalThemeWrappedRow(
+                'Provider',
+                `${inventory.providerId} · tipo ${renderByokTokenLabel(inventory.providerKind)} · adaptador ${inventory.adapterId}`,
+                { role: 'warn', columns: 112 },
+            ),
+        );
+        println(terminalThemeWrappedRow('Bases', `${inventory.baseUrls.slice(0, 3).join(' · ')}${inventory.baseUrls.length > 3 ? ' · ...' : ''}`, { role: 'muted', columns: 112 }));
         const sources = inventory.modelCatalogSources
             .slice(0, 3)
-            .map((source) => `${source.method} ${source.url} (${source.richness})`);
-        println(`      \x1b[90mcatálogo ${sources.join(' · ')}${inventory.modelCatalogSources.length > 3 ? ' · ...' : ''}\x1b[0m`);
+            .map((source) => `${source.method} ${source.url} (${renderByokTokenLabel(source.richness)})`);
+        println(terminalThemeWrappedRow('Catálogo', `${sources.join(' · ')}${inventory.modelCatalogSources.length > 3 ? ' · ...' : ''}`, { role: 'muted', columns: 112 }));
         const runtime = inventory.runtimeEndpoints
             .slice(0, 4)
             .map((endpoint) => `${endpoint.method} ${endpoint.path}`);
-        println(`      \x1b[90mexecução ${runtime.join(' · ')}${inventory.runtimeEndpoints.length > 4 ? ' · ...' : ''}\x1b[0m`);
-        println(`      \x1b[90mseletores ${inventory.routeSelectors.join(',')}\x1b[0m`);
+        println(terminalThemeWrappedRow('Execução', `${runtime.join(' · ')}${inventory.runtimeEndpoints.length > 4 ? ' · ...' : ''}`, { role: 'muted', columns: 112 }));
+        println(terminalThemeWrappedRow('Seletores', renderByokTokenList(inventory.routeSelectors.map(String)), { role: 'muted', columns: 112 }));
     }
-    println('\n  \x1b[90mPróximo passo: importadores de catálogo usam este mapa como fonte inicial antes de sondas e seleção de execução.\x1b[0m\n');
+    println(terminalThemeWrappedRow('Próximo', 'importadores de catálogo usam este mapa antes de elegibilidade, sondas e seleção de execução', { role: 'command', columns: 112 }));
+    println('');
 }
 
 /**
@@ -2688,44 +2718,59 @@ function renderByokGatewayImporterAudit(println, rest) {
     const coveredSourceCount = coverageRows.reduce((total, row) => total + row.coveredCatalogSourceCount, 0);
     const totalSourceCount = coverageRows.reduce((total, row) => total + row.catalogSourceCount, 0);
 
-    println(`\n  \x1b[36mBYOK auditoria de importadores\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK auditoria de importadores'));
     println(
-        `  \x1b[90mFiltro: ${selector ?? '-'} · importadores ${audit.importerCount}/${allImporters.length} · provedores ${audit.providerCount} · públicos ${audit.publicImporterCount} · autenticados ${audit.authenticatedImporterCount}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `filtro ${selector ?? '-'} · importadores ${audit.importerCount}/${allImporters.length} · provedores ${audit.providerCount} · públicos ${audit.publicImporterCount} · autenticados ${audit.authenticatedImporterCount}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
-        `  \x1b[90mEvidências de provedor ${audit.providerEvidenceImporterCount} · rotas ${audit.routeOptionImporterCount} · overlays de conta ${audit.accountOverlayImporterCount} · cobertura de endpoints ${coveredSourceCount}/${totalSourceCount}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Cobertura',
+            `evidências de provedor ${audit.providerEvidenceImporterCount} · rotas ${audit.routeOptionImporterCount} · overlays de conta ${audit.accountOverlayImporterCount} · endpoints ${coveredSourceCount}/${totalSourceCount}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
-    println('  \x1b[90mAuditoria local e pré-execução; não chama fetchRaw, não usa rede, não executa provedor/modelo e não imprime segredos.\x1b[0m\n');
+    println(terminalThemeWrappedRow('Escopo', 'auditoria local e pré-execução · sem rede · sem runtime · sem segredos', { role: 'muted', columns: 112 }));
 
     if (selector && inventories.length === 0) {
-        println(`    \x1b[33mProvedor não encontrado no inventário: ${selector}.\x1b[0m\n`);
+        println(terminalThemeWrappedRow('Estado', `provedor não encontrado no inventário: ${selector}`, { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
 
     if (audit.descriptors.length === 0) {
-        println(`    \x1b[33mNenhum importer configurado para ${selector ?? 'o ambiente atual'}.\x1b[0m\n`);
+        println(terminalThemeWrappedRow('Estado', `nenhum importer configurado para ${selector ?? 'o ambiente atual'}`, { role: 'warn', columns: 112 }));
     } else {
         for (const descriptor of audit.descriptors.slice(0, 32)) {
             const hookTags = Object.entries(descriptor.hooks)
                 .filter(([, enabled]) => enabled)
-                .map(([hook]) => hook)
+                .map(([hook]) => renderByokTokenLabel(hook))
                 .join(',');
             const envRequirements = descriptor.envRequirements.length > 0 ? descriptor.envRequirements.join(',') : '-';
             println(
-                `    \x1b[33m${descriptor.id}\x1b[0m  \x1b[90mprovedor ${descriptor.providerId} · fonte ${descriptor.sourceKind} · autenticação ${descriptor.requiresAuth ? 'sim' : 'nao'} · TTL ${formatTerminalDurationSeconds(descriptor.ttlSeconds)}\x1b[0m`,
+                terminalThemeWrappedRow(
+                    'Importer',
+                    `${descriptor.id} · provedor ${descriptor.providerId} · fonte ${renderByokTokenLabel(descriptor.sourceKind)} · autenticação ${yesNo(descriptor.requiresAuth)} · TTL ${formatTerminalDurationSeconds(descriptor.ttlSeconds)}`,
+                    { role: 'warn', columns: 112 },
+                ),
             );
-            println(`      \x1b[90metapas ${hookTags || '-'} · env ${envRequirements}\x1b[0m`);
+            println(terminalThemeWrappedRow('Etapas', `${hookTags || '-'} · env ${envRequirements}`, { role: 'muted', columns: 112 }));
         }
-        if (audit.descriptors.length > 32) println(`\n  \x1b[90mexibindo 32/${audit.descriptors.length}; filtre com provider id.\x1b[0m`);
+        if (audit.descriptors.length > 32) println(terminalThemeWrappedRow('Omitidos', `exibindo 32/${audit.descriptors.length}; filtre com provider id`, { role: 'muted', columns: 112 }));
     }
 
     const uncovered = audit.uncoveredCatalogSourceIds.slice(0, 12).join(', ');
     const missingHooks = audit.missingRequiredHooks.slice(0, 12).join(', ');
     const providersWithoutImporters = audit.providersWithoutImporters.slice(0, 12).join(', ');
-    println(`\n  \x1b[90mFontes de catálogo sem cobertura: ${uncovered || '-'}\x1b[0m`);
-    println(`  \x1b[90mProvedores sem importador: ${providersWithoutImporters || '-'}\x1b[0m`);
-    println(`  \x1b[90mEtapas obrigatórias ausentes: ${missingHooks || '-'}\x1b[0m`);
-    println('  \x1b[90mUse isto antes de atualizar catálogo para decidir quais importadores, docs e overlays de conta devem ser aprofundados.\x1b[0m\n');
+    println(terminalThemeWrappedRow('Sem cobertura', uncovered || '-', { role: uncovered ? 'warn' : 'success', columns: 112 }));
+    println(terminalThemeWrappedRow('Sem importador', providersWithoutImporters || '-', { role: providersWithoutImporters ? 'warn' : 'success', columns: 112 }));
+    println(terminalThemeWrappedRow('Etapas ausentes', missingHooks || '-', { role: missingHooks ? 'warn' : 'success', columns: 112 }));
+    println(terminalThemeWrappedRow('Próximo', 'use antes de atualizar catálogo para priorizar importers, docs e overlays de conta', { role: 'command', columns: 112 }));
+    println('');
 }
 
 /**
@@ -2739,11 +2784,19 @@ function renderByokProviderGatewayTraits(println, rest) {
         ? [resolveProviderGatewayTraits(selector)].filter((item) => item !== null)
         : listProviderGatewayTraits();
 
-    println(`\n  \x1b[36mBYOK características de provedores\x1b[0m (${traits.length})`);
-    println('  \x1b[90mMetadados pré-execução derivados de specs/endpoints; não provam acesso, saúde ou execução do modelo.\x1b[0m\n');
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK características de provedores', [countLabel(traits.length, 'provedor', 'provedores')]));
+    println(
+        terminalThemeWrappedRow(
+            'Escopo',
+            'metadados pré-execução derivados de specs/endpoints · não provam acesso, saúde ou execução',
+            { role: 'muted', columns: 112 },
+        ),
+    );
 
     if (traits.length === 0) {
-        println(`    \x1b[33mProvedor não encontrado para características: ${selector ?? '-'}.\x1b[0m\n`);
+        println(terminalThemeWrappedRow('Estado', `provedor não encontrado para características: ${selector ?? '-'}`, { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
 
@@ -2751,27 +2804,44 @@ function renderByokProviderGatewayTraits(println, rest) {
         const capabilities = asRecord(item['capabilities']);
         const routing = asRecord(item['routing']);
         const metadata = asRecord(item['metadata']);
-        const routeSelectors = Array.isArray(item['routeSelectors']) ? item['routeSelectors'].slice(0, 6).join(',') : '-';
-        const richnessTags = Array.isArray(item['richnessTags']) ? item['richnessTags'].slice(0, 8).join(',') : '-';
-        const richnessCategories = Array.isArray(item['richnessCategories']) ? item['richnessCategories'].slice(0, 8).join(',') : '-';
+        const routeSelectors = Array.isArray(item['routeSelectors']) ? renderByokTokenList(item['routeSelectors'].slice(0, 6).map(String)) : '-';
+        const richnessTags = Array.isArray(item['richnessTags']) ? renderByokTokenList(item['richnessTags'].slice(0, 8).map(String)) : '-';
+        const richnessCategories = Array.isArray(item['richnessCategories']) ? renderByokTokenList(item['richnessCategories'].slice(0, 8).map(String)) : '-';
         println(
-            `    \x1b[33m${optionalScalarString(item['providerId']) ?? '-'}\x1b[0m  \x1b[90mtopologia ${renderByokTokenLabel(optionalScalarString(item['topology']))} · tipo ${renderByokTokenLabel(optionalScalarString(item['providerKind']))} · compatível com OpenAI ${item['openAICompatible'] === true ? 'sim' : 'nao'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Provider',
+                `${optionalScalarString(item['providerId']) ?? '-'} · topologia ${renderByokTokenLabel(optionalScalarString(item['topology']))} · tipo ${renderByokTokenLabel(optionalScalarString(item['providerKind']))} · compatível com OpenAI ${yesNo(item['openAICompatible'] === true)}`,
+                { role: 'warn', columns: 112 },
+            ),
         );
         println(
-            `      \x1b[90mfontes de catálogo ${item['catalogSourceCount'] ?? 0} · endpoints runtime ${item['runtimeEndpointCount'] ?? 0} · públicos ${item['publicCatalogSourceCount'] ?? 0} · autenticados ${item['authenticatedCatalogSourceCount'] ?? 0} · parametrizados ${item['parameterizedCatalogSourceCount'] ?? 0}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Catálogo',
+                `fontes ${item['catalogSourceCount'] ?? 0} · endpoints runtime ${item['runtimeEndpointCount'] ?? 0} · públicos ${item['publicCatalogSourceCount'] ?? 0} · autenticados ${item['authenticatedCatalogSourceCount'] ?? 0} · parametrizados ${item['parameterizedCatalogSourceCount'] ?? 0}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
         println(
-            `      \x1b[90mtipos de execução ${Array.isArray(item['runtimeKinds']) ? renderByokTokenList(item['runtimeKinds'].map(String)) || '-' : '-'} · seletores ${routeSelectors}\x1b[0m`,
+            terminalThemeWrappedRow('Execução', `tipos ${Array.isArray(item['runtimeKinds']) ? renderByokTokenList(item['runtimeKinds'].map(String)) || '-' : '-'} · seletores ${routeSelectors}`, { role: 'muted', columns: 112 }),
         );
         println(
-            `      \x1b[90mcapacidades chat:${capabilities['chatCompletions'] === true ? 'sim' : 'nao'}, responses:${capabilities['responses'] === true ? 'sim' : 'nao'}, FIM:${capabilities['fim'] === true ? 'sim' : 'nao'}, embeddings:${capabilities['embeddings'] === true ? 'sim' : 'nao'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Capacidades',
+                `chat ${yesNo(capabilities['chatCompletions'] === true)} · responses ${yesNo(capabilities['responses'] === true)} · FIM ${yesNo(capabilities['fim'] === true)} · embeddings ${yesNo(capabilities['embeddings'] === true)}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
         println(
-            `      \x1b[90mroteamento auto:${routing['supportsAutoSelection'] === true ? 'sim' : 'nao'}, fallback:${routing['supportsFallback'] === true ? 'sim' : 'nao'}, ordem de providers:${routing['supportsProviderOrder'] === true ? 'sim' : 'nao'}, BYOK:${routing['supportsGatewayByok'] === true ? 'sim' : 'nao'} · metadados preço:${metadata['hasPricingMetadata'] === true ? 'sim' : 'nao'}, contexto:${metadata['hasContextMetadata'] === true ? 'sim' : 'nao'}, provider:${metadata['hasProviderMetadata'] === true ? 'sim' : 'nao'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Roteamento',
+                `auto ${yesNo(routing['supportsAutoSelection'] === true)} · fallback ${yesNo(routing['supportsFallback'] === true)} · ordem de providers ${yesNo(routing['supportsProviderOrder'] === true)} · BYOK ${yesNo(routing['supportsGatewayByok'] === true)} · preço ${yesNo(metadata['hasPricingMetadata'] === true)} · contexto ${yesNo(metadata['hasContextMetadata'] === true)} · provider ${yesNo(metadata['hasProviderMetadata'] === true)}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
-        println(`      \x1b[90mriqueza ${richnessTags} · categorias ${richnessCategories}\x1b[0m`);
+        println(terminalThemeWrappedRow('Riqueza', `${richnessTags} · categorias ${richnessCategories}`, { role: 'muted', columns: 112 }));
     }
-    println('\n  \x1b[90mUse estas características como filtro inicial; elegibilidade e sondas continuam em fases separadas.\x1b[0m\n');
+    println(terminalThemeWrappedRow('Próximo', 'usar como filtro inicial; elegibilidade e sondas continuam em fases separadas', { role: 'command', columns: 112 }));
+    println('');
 }
 
 /**
@@ -2779,15 +2849,17 @@ function renderByokProviderGatewayTraits(println, rest) {
  * @returns {void}
  */
 function renderByokGatewayLocalGuidance(println) {
-    println(`\n  \x1b[36mBYOK model-gateway local/Ollama\x1b[0m`);
-    println('  \x1b[90mPadrão: excluído · daemon não iniciado · sem runtime · opt-in obrigatório\x1b[0m\n');
-    println(`    \x1b[90mMotivo: ${MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON}\x1b[0m`);
-    println('    \x1b[90mPolítica: excluir providers locais por padrão\x1b[0m');
-    println('    \x1b[90mOpt-in por provider: /byok gateway selection audit provider:ollama\x1b[0m');
-    println('    \x1b[90mOpt-in por perfil:   /byok gateway selection audit local_private\x1b[0m');
-    println('    \x1b[90mmodelo ativo:   /byok provider ollama-local <modelo> http://127.0.0.1:11434/v1\x1b[0m');
-    println('    \x1b[90mchecagem:       /byok gateway selection audit strict local_private_strict\x1b[0m\n');
-    println('  \x1b[90mEste comando nao inicia Ollama, nao faz probe e nao altera env. Ele apenas mostra o caminho explicito.\x1b[0m\n');
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway local/Ollama'));
+    println(terminalThemeWrappedRow('Padrão', 'excluído · daemon não iniciado · sem runtime · opt-in obrigatório', { role: 'warn', columns: 112 }));
+    println(terminalThemeWrappedRow('Motivo', renderByokTokenLabel(MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON), { role: 'muted', columns: 112 }));
+    println(terminalThemeWrappedRow('Política', 'excluir providers locais por padrão', { role: 'muted', columns: 112 }));
+    println(terminalThemeWrappedRow('Opt-in provider', '/byok gateway selection audit provider:ollama', { role: 'command', columns: 112 }));
+    println(terminalThemeWrappedRow('Opt-in perfil', '/byok gateway selection audit local_private', { role: 'command', columns: 112 }));
+    println(terminalThemeWrappedRow('Modelo ativo', '/byok provider ollama-local <modelo> http://127.0.0.1:11434/v1', { role: 'command', columns: 112 }));
+    println(terminalThemeWrappedRow('Checagem', '/byok gateway selection audit strict local_private_strict', { role: 'command', columns: 112 }));
+    println(terminalThemeWrappedRow('Garantia', 'não inicia Ollama, não faz probe e não altera env; apenas mostra o caminho explícito', { role: 'muted', columns: 112 }));
+    println('');
 }
 
 /**
@@ -2800,33 +2872,44 @@ function renderByokGatewayProbeMatrix(println, rest) {
     const rows = listProviderWireProbeMatrix({ providerId: selector ?? undefined });
     const summary = summarizeProviderWireProbeMatrix(rows);
 
-    println(`\n  \x1b[36mBYOK matriz de sondas por protocolo\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK matriz de sondas por protocolo'));
     println(
-        `  \x1b[90mProvedores ${summary.providerCount} · linhas ${summary.rowCount} · filtro ${selector ?? '-'} · fase: planejamento pré-execução\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `provedores ${summary.providerCount} · linhas ${summary.rowCount} · filtro ${selector ?? '-'} · fase planejamento pré-execução`,
+            { role: 'muted', columns: 112 },
+        ),
     );
 
     if (rows.length === 0) {
-        println(`    \x1b[33mNenhuma linha de matriz encontrada para ${selector ?? 'inventário atual'}.\x1b[0m\n`);
+        println(terminalThemeWrappedRow('Estado', `nenhuma linha de matriz encontrada para ${selector ?? 'inventário atual'}`, { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
 
     for (const row of rows.slice(0, 24)) {
         const implemented = Array.isArray(row['implementedProbeKinds']) ? renderByokTokenList(row['implementedProbeKinds'].map(String)) : '-';
         const pending = Array.isArray(row['pendingProbeKinds']) ? renderByokTokenList(row['pendingProbeKinds'].map(String)) : '-';
-        const notes = Array.isArray(row['notes']) ? row['notes'].join(',') : '-';
+        const notes = Array.isArray(row['notes']) ? row['notes'].map((note) => renderByokTokenLabel(String(note))).join(',') : '-';
         println(
-            `    \x1b[33m${optionalScalarString(row['providerId']) ?? '-'}\x1b[0m  \x1b[90mprotocolo ${renderByokWireLabel(optionalScalarString(row['wireApi']))} · execução ${renderByokTokenLabel(optionalScalarString(row['runtimeKind']))} · topologia ${renderByokTokenLabel(optionalScalarString(row['topology']))}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Provider',
+                `${optionalScalarString(row['providerId']) ?? '-'} · protocolo ${renderByokWireLabel(optionalScalarString(row['wireApi']))} · execução ${renderByokTokenLabel(optionalScalarString(row['runtimeKind']))} · topologia ${renderByokTokenLabel(optionalScalarString(row['topology']))}`,
+                { role: 'warn', columns: 112 },
+            ),
         );
-        println(`      \x1b[90mimplementados ${implemented || '-'} · pendentes ${pending || '-'} · notas ${notes || '-'}\x1b[0m`);
+        println(terminalThemeWrappedRow('Sondas', `implementados ${implemented || '-'} · pendentes ${pending || '-'} · notas ${notes || '-'}`, { role: 'muted', columns: 112 }));
     }
-    if (rows.length > 24) println(`\n  \x1b[90mexibindo 24/${rows.length}; filtre com provider id.\x1b[0m`);
+    if (rows.length > 24) println(terminalThemeWrappedRow('Omitidos', `exibindo 24/${rows.length}; filtre com provider id`, { role: 'muted', columns: 112 }));
 
     const pendingKinds = Object.entries(summary.pendingProbeKindCounts)
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([kind, count]) => `${renderByokTokenLabel(kind)}:${count}`)
         .join(', ');
-    println(`\n  \x1b[90mTipos de sonda pendentes: ${pendingKinds || '-'}\x1b[0m`);
-    println('  \x1b[90mMatriz não executa provedor/modelo; ela só orienta sondas futuras e seleção por política.\x1b[0m\n');
+    println(terminalThemeWrappedRow('Sondas pendentes', pendingKinds || '-', { role: pendingKinds ? 'warn' : 'success', columns: 112 }));
+    println(terminalThemeWrappedRow('Escopo', 'não executa provedor/modelo; orienta sondas futuras e seleção por política', { role: 'muted', columns: 112 }));
+    println('');
 }
 
 /**
@@ -2851,29 +2934,42 @@ async function renderByokGatewayProbeBackoff(println, rest) {
     });
     const reasonCounts = Object.entries(plan.summary.reasonCounts)
         .sort(([left], [right]) => left.localeCompare(right))
-        .map(([reason, count]) => `${reason}:${count}`)
+        .map(([reason, count]) => `${renderByokTokenLabel(reason)}:${count}`)
         .join(',');
-    println(`\n  \x1b[36mBYOK planejador de pausa para sondas\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK planejador de pausa para sondas'));
     println(
-        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · recomendações ${filteredRecommendations.length}/${recommendations.length} · prontas ${plan.summary.ready} · adiadas ${plan.summary.deferred} · motivos ${reasonCounts || '-'}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · filtro ${args.selector ?? '-'} · recomendações ${filteredRecommendations.length}/${recommendations.length} · prontas ${plan.summary.ready} · adiadas ${plan.summary.deferred} · motivos ${reasonCounts || '-'}`,
+            { role: plan.summary.deferred > 0 ? 'warn' : 'success', columns: 112 },
+        ),
     );
     if (filteredRecommendations.length === 0) {
-        println('    \x1b[33mNenhuma recomendação de probe disponível no último diff persistido.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Estado', 'nenhuma recomendação de probe disponível no último diff persistido', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
     for (const item of plan.deferred.slice(0, args.limit)) {
         const retry = item.resetAt ? `reset ${item.resetAt}` : item.retryAfterSeconds ? `retentar em ${item.retryAfterSeconds}s` : 'reset -';
-        const probe = item.probeKind ? ` · probe ${item.probeKind}` : '';
+        const probe = item.probeKind ? ` · sonda ${renderByokTokenLabel(item.probeKind)}` : '';
         println(
-            `    \x1b[33mADIAR\x1b[0m ${item.key}  \x1b[90mmotivo ${renderByokTokenLabel(item.reason)}${probe} · ${retry} · provedor ${item.providerId}\x1b[0m`,
+            terminalThemeWrappedRow('Adiar', `${item.key} · motivo ${renderByokTokenLabel(item.reason)}${probe} · ${retry} · provedor ${item.providerId}`, {
+                role: 'warn',
+                columns: 112,
+            }),
         );
     }
     for (const item of plan.ready.slice(0, Math.max(0, args.limit - plan.deferred.length))) {
         println(
-            `    \x1b[32mPRONTO\x1b[0m ${item.key}  \x1b[90msondas ${renderByokTokenList(item.probeKinds) || '-'} · motivos ${renderByokTokenList(item.reasons.slice(0, 3)) || '-'}\x1b[0m`,
+            terminalThemeWrappedRow('Pronto', `${item.key} · sondas ${renderByokTokenList(item.probeKinds) || '-'} · motivos ${renderByokTokenList(item.reasons.slice(0, 3)) || '-'}`, {
+                role: 'success',
+                columns: 112,
+            }),
         );
     }
-    println('  \x1b[90mPlanner não executa provedor/modelo; ele só evita sondas durante janelas dinâmicas conhecidas.\x1b[0m\n');
+    println(terminalThemeWrappedRow('Escopo', 'não executa provedor/modelo; evita sondas durante janelas dinâmicas conhecidas', { role: 'muted', columns: 112 }));
+    println('');
 }
 
 /**
@@ -2886,13 +2982,19 @@ function renderByokGatewayEnvRequirements(println, rest) {
     const rows = evaluateModelGatewayProviderEnvRequirements({ env: process.env, providerId: selector ?? undefined });
     const summary = summarizeModelGatewayProviderEnvRequirements(rows);
 
-    println(`\n  \x1b[36mBYOK provider env requirements\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK provider env requirements'));
     println(
-        `  \x1b[90mProviders ${summary.providerCount} · prontos ${summary.readyCount} · parciais ${summary.partialCount} · ausentes ${summary.missingCount} · filtro ${selector ?? '-'}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `providers ${summary.providerCount} · prontos ${summary.readyCount} · parciais ${summary.partialCount} · ausentes ${summary.missingCount} · filtro ${selector ?? '-'}`,
+            { role: summary.missingCount > 0 ? 'warn' : 'success', columns: 112 },
+        ),
     );
 
     if (rows.length === 0) {
-        println(`    \x1b[33mNenhum provedor encontrado para requisitos: ${selector ?? '-'}.\x1b[0m\n`);
+        println(terminalThemeWrappedRow('Estado', `nenhum provedor encontrado para requisitos: ${selector ?? '-'}`, { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
 
@@ -2902,12 +3004,17 @@ function renderByokGatewayEnvRequirements(println, rest) {
         const recommended = row.missingRecommendedKeys.length > 0 ? row.missingRecommendedKeys.join(',') : '-';
         const aliases = Array.isArray(row.providerAliases) && row.providerAliases.length > 0 ? ` · aliases ${row.providerAliases.join(',')}` : '';
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mestado ${row.status} · obrigatórias ${row.satisfiedRequiredGroupCount}/${row.requiredGroupCount} · recomendadas ${row.satisfiedRecommendedGroupCount}/${row.recommendedGroupCount}${aliases}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Provider',
+                `${row.providerId} · estado ${renderByokTokenLabel(row.status)} · obrigatórias ${row.satisfiedRequiredGroupCount}/${row.requiredGroupCount} · recomendadas ${row.satisfiedRecommendedGroupCount}/${row.recommendedGroupCount}${aliases}`,
+                { role: row.status === 'ready' ? 'success' : 'warn', columns: 112 },
+            ),
         );
-        println(`      \x1b[90mconfiguradas ${configured} · obrigatórias ausentes ${missing} · recomendadas ausentes ${recommended}\x1b[0m`);
+        println(terminalThemeWrappedRow('Variáveis', `configuradas ${configured} · obrigatórias ausentes ${missing} · recomendadas ausentes ${recommended}`, { role: 'muted', columns: 112 }));
     }
-    if (rows.length > 24) println(`\n  \x1b[90mexibindo 24/${rows.length}; filtre com provider id.\x1b[0m`);
-    println('\n  \x1b[90mA saída lista apenas nomes de variáveis; nenhum valor de segredo é impresso.\x1b[0m\n');
+    if (rows.length > 24) println(terminalThemeWrappedRow('Omitidos', `exibindo 24/${rows.length}; filtre com provider id`, { role: 'muted', columns: 112 }));
+    println(terminalThemeWrappedRow('Segurança', 'lista apenas nomes de variáveis; nenhum valor de segredo é impresso', { role: 'muted', columns: 112 }));
+    println('');
 }
 
 /**
@@ -3602,24 +3709,50 @@ async function renderByokGatewayEligibilityRuns(println, rest) {
     const runs = [...allRuns]
         .sort((left, right) => String(right['completedAt'] ?? '').localeCompare(String(left['completedAt'] ?? '')))
         .slice(0, limit);
-    println(`\n  \x1b[36mBYOK model-gateway eligibility runs\x1b[0m`);
-    println(`  \x1b[90mCatálogo: ${store.filePath} · runs persistidos ${allRuns.length} · sem runtime\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway eligibility runs'));
+    println(
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · runs persistidos ${allRuns.length} · exibindo ${runs.length}/${allRuns.length} · sem runtime`,
+            { role: 'muted', columns: 112 },
+        ),
+    );
     if (runs.length === 0) {
-        println('    \x1b[33mNenhum run de eligibility persistido. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
+        println(
+            terminalThemeWrappedRow('Estado', 'nenhum run de eligibility persistido; rode /byok gateway catalog refresh primeiro', {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
+        println('');
         return;
     }
-    for (const run of runs) {
-        const summary = run['diffSummary'] ? summarizeModelGatewayEligibilityDiff(normalizeEligibilityDiffForDisplay(run['diff'])) : null;
+    for (const [index, run] of runs.entries()) {
+        const summary = summarizeModelGatewayEligibilityDiff(normalizeEligibilityDiffForDisplay(run['diff']));
         println(
-            `    \x1b[33m${run['runId'] ?? '-'}\x1b[0m  \x1b[90mpolítica ${run['policyProfile'] ?? '-'} · tarefa ${run['taskProfile'] ?? '-'} · conta ${run['accountScope'] ?? '-'} · estado ${run['status'] ?? '-'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                `${index + 1}. Run`,
+                `${run['runId'] ?? '-'} · política ${renderByokTokenLabel(optionalScalarString(run['policyProfile']))} · tarefa ${renderByokTokenLabel(optionalScalarString(run['taskProfile']))} · conta ${renderByokTokenLabel(optionalScalarString(run['accountScope']))} · estado ${renderByokTokenLabel(optionalScalarString(run['status']))}`,
+                { role: run['status'] === 'completed' ? 'success' : 'warn', columns: 112 },
+            ),
         );
         println(
-            `      \x1b[90mconcluído ${run['completedAt'] ?? '-'} · modelos ${run['modelCount'] ?? 0} · elegíveis ${run['eligibleCount'] ?? 0} · desconhecidos ${run['unknownCount'] ?? 0} · excluídos ${run['excludedCount'] ?? 0}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Contagem',
+                `concluído ${run['completedAt'] ?? '-'} · modelos ${run['modelCount'] ?? 0} · elegíveis ${run['eligibleCount'] ?? 0} · desconhecidos ${run['unknownCount'] ?? 0} · excluídos ${run['excludedCount'] ?? 0}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
-        if (summary) {
-            println(
-                `      \x1b[90mdiferença: novas ${summary.addedCount} · removidas ${summary.removedCount} · alteradas ${summary.changedCount} · ficaram elegíveis ${summary.becameEligibleCount} · ficaram excluídas ${summary.becameExcludedCount}\x1b[0m`,
-            );
+        println(
+            terminalThemeWrappedRow(
+                'Diferença',
+                `novas ${summary.addedCount} · removidas ${summary.removedCount} · alteradas ${summary.changedCount} · ficaram elegíveis ${summary.becameEligibleCount} · ficaram excluídas ${summary.becameExcludedCount}`,
+                { role: summary.addedCount > 0 || summary.removedCount > 0 || summary.changedCount > 0 ? 'warn' : 'muted', columns: 112 },
+            ),
+        );
+        if (summary.changedKinds.length > 0) {
+            println(terminalThemeWrappedRow('Tipos de mudança', renderByokTokenList(summary.changedKinds), { role: 'muted', columns: 112 }));
         }
     }
     println('');
@@ -3633,23 +3766,36 @@ async function renderByokGatewayEligibilityDiff(println) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
     const run = findLatestEligibilityRun(snapshot);
-    println(`\n  \x1b[36mBYOK model-gateway eligibility diff\x1b[0m`);
-    println(`  \x1b[90mCatálogo: ${store.filePath} · fonte: último run de elegibilidade persistido · sem runtime\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway eligibility diff'));
+    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · fonte último run de elegibilidade persistido · sem runtime`, { role: 'muted', columns: 112 }));
     if (!run) {
-        println('    \x1b[33mNenhum diff de eligibility persistido. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
+        println(
+            terminalThemeWrappedRow('Estado', 'nenhum diff de eligibility persistido; rode /byok gateway catalog refresh primeiro', {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
+        println('');
         return;
     }
     const diff = normalizeEligibilityDiffForDisplay(run['diff']);
     const summary = summarizeModelGatewayEligibilityDiff(diff);
     println(
-        `    \x1b[90mRun ${run['runId'] ?? '-'} · novas ${summary.addedCount} · removidas ${summary.removedCount} · alteradas ${summary.changedCount} · ficaram elegíveis ${summary.becameEligibleCount} · ficaram excluídas ${summary.becameExcludedCount}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Run',
+            `${run['runId'] ?? '-'} · novas ${summary.addedCount} · removidas ${summary.removedCount} · alteradas ${summary.changedCount} · ficaram elegíveis ${summary.becameEligibleCount} · ficaram excluídas ${summary.becameExcludedCount}`,
+            { role: summary.addedCount > 0 || summary.removedCount > 0 || summary.changedCount > 0 ? 'warn' : 'success', columns: 112 },
+        ),
     );
-    if (summary.changedKinds.length > 0) println(`    \x1b[90mTipos de mudança: ${summary.changedKinds.join(',')}\x1b[0m`);
-    for (const id of diff.added.slice(0, 8)) println(`      \x1b[32m+\x1b[0m ${id}`);
-    for (const id of diff.removed.slice(0, 8)) println(`      \x1b[31m-\x1b[0m ${id}`);
+    if (summary.changedKinds.length > 0) {
+        println(terminalThemeWrappedRow('Tipos de mudança', renderByokTokenList(summary.changedKinds), { role: 'muted', columns: 112 }));
+    }
+    for (const id of diff.added.slice(0, 8)) println(terminalThemeWrappedRow('Novo elegível', id, { role: 'success', columns: 112 }));
+    for (const id of diff.removed.slice(0, 8)) println(terminalThemeWrappedRow('Removido', id, { role: 'error', columns: 112 }));
     for (const item of diff.changed.slice(0, 8)) {
-        const kinds = item.changedKinds.length > 0 ? ` · ${item.changedKinds.join(',')}` : '';
-        println(`      \x1b[33m~\x1b[0m ${item.key}${kinds}`);
+        const kinds = item.changedKinds.length > 0 ? ` · ${renderByokTokenList(item.changedKinds)}` : '';
+        println(terminalThemeWrappedRow('Alterado', `${item.key}${kinds}`, { role: 'warn', columns: 112 }));
     }
     println('');
 }
@@ -3805,7 +3951,7 @@ function parseByokGatewaySelectionAuditArgs(rest) {
 function formatCountMap(counts) {
     const text = Object.entries(counts)
         .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, count]) => `${key}:${count}`)
+        .map(([key, count]) => `${renderByokTokenLabel(key)}:${count}`)
         .join(',');
     return text || '-';
 }
@@ -3895,35 +4041,73 @@ async function renderByokGatewaySelectionAudit(println, rest) {
               )
             : null;
     const persistedStatus = tracePersistence?.written === true ? 'sim' : args.writeTrace ? 'falha' : 'nao';
-    println(`\n  \x1b[36mBYOK model-gateway selection audit\x1b[0m`);
+    const modeLabel = `${renderByokTokenLabel(selection.mode)}${args.effective ? ' + efetivo' : ''}${args.requireRuntimeProof ? ' + prova obrigatória' : ''}`;
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway selection audit'));
     println(
-            `  \x1b[90mcatálogo ${store.filePath} · integridade ${integrity.ok ? 'ok' : 'falha'} · modo ${renderByokTokenLabel(selection.mode)}${args.effective ? '+efetivo' : ''}${args.requireRuntimeProof ? '+prova obrigatória' : ''} · sem execução · persistido ${persistedStatus} · perfis ${selection.summary.selectedProfileCount}/${selection.summary.profileCount}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · integridade ${integrity.ok ? 'ok' : 'falha'} · modo ${modeLabel} · sem execução · persistido ${persistedStatus} · perfis ${selection.summary.selectedProfileCount}/${selection.summary.profileCount}`,
+            { role: integrity.ok ? 'success' : 'error', columns: 112 },
+        ),
     );
     println(
-            `  \x1b[90mprojeções ${selection.snapshotContext['projectionCount']} · rotas ${selection.snapshotContext['routeOptionCount']} · overlays ${selection.snapshotContext['accountOverlayCount']} · elegibilidade ${selection.snapshotContext['eligibilityDecisionCount']} · candidatos ${selection.snapshotContext['candidateCount']}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Snapshot',
+            `projeções ${selection.snapshotContext['projectionCount']} · rotas ${selection.snapshotContext['routeOptionCount']} · overlays ${selection.snapshotContext['accountOverlayCount']} · elegibilidade ${selection.snapshotContext['eligibilityDecisionCount']} · candidatos ${selection.snapshotContext['candidateCount']}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     if (args.effective) {
         println(
-            `  \x1b[90msaúde observada ${healthRecords.length} · overlays de execução ${runtimeOverlays.length} · ativos ${runtimeOverlaySummary?.activeCount ?? 0} · expirados ${runtimeOverlaySummary?.expiredCount ?? 0} · falhas ${formatCountMap(runtimeOverlaySummary?.byFailureKind ?? {})} · provedores ${formatCountMap(runtimeOverlaySummary?.byProvider ?? {})} · elegibilidade efetiva ${effectiveEligibility?.decisions.length ?? 0}\x1b[0m\n`,
+            terminalThemeWrappedRow(
+                'Saúde observada',
+                `registros ${healthRecords.length} · overlays de execução ${runtimeOverlays.length} · ativos ${runtimeOverlaySummary?.activeCount ?? 0} · expirados ${runtimeOverlaySummary?.expiredCount ?? 0} · falhas ${formatCountMap(runtimeOverlaySummary?.byFailureKind ?? {})} · provedores ${formatCountMap(runtimeOverlaySummary?.byProvider ?? {})} · elegibilidade efetiva ${effectiveEligibility?.decisions.length ?? 0}`,
+                { role: (runtimeOverlaySummary?.activeCount ?? 0) > 0 ? 'warn' : 'muted', columns: 112 },
+            ),
         );
         println(
-            `  \x1b[90mpós-execução perfis ${postRuntimeSelection?.summary.selectedProfileCount ?? 0}/${postRuntimeSelection?.summary.profileCount ?? 0} · saúde casada ${postRuntimeSelection?.summary.healthRecordCount ?? 0} · provas de saúde ${postRuntimeSelection?.summary.runtimeHealthProofCount ?? 0} · provas agente ${postRuntimeSelection?.summary.runtimeAgentProbeProofCount ?? 0} · provas de sonda ${postRuntimeSelection?.summary.runtimeProbeProofCount ?? 0} · provedores ${formatCountMap(postRuntimeSelection?.summary.selectedProviders ?? {})}\x1b[0m\n`,
+            terminalThemeWrappedRow(
+                'Pós-execução',
+                `perfis ${postRuntimeSelection?.summary.selectedProfileCount ?? 0}/${postRuntimeSelection?.summary.profileCount ?? 0} · saúde casada ${postRuntimeSelection?.summary.healthRecordCount ?? 0} · provas de saúde ${postRuntimeSelection?.summary.runtimeHealthProofCount ?? 0} · provas agente ${postRuntimeSelection?.summary.runtimeAgentProbeProofCount ?? 0} · provas de sonda ${postRuntimeSelection?.summary.runtimeProbeProofCount ?? 0} · provedores ${formatCountMap(postRuntimeSelection?.summary.selectedProviders ?? {})}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
         println(
-            `  \x1b[90mcomparação mudou ${selectionComparison?.summary.changedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0} · prova pós-runtime selecionada ${selectionComparison?.summary.postRuntimeProofSelectedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0}\x1b[0m\n`,
+            terminalThemeWrappedRow(
+                'Comparação',
+                `mudou ${selectionComparison?.summary.changedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0} · prova pós-runtime selecionada ${selectionComparison?.summary.postRuntimeProofSelectedCount ?? 0}/${selectionComparison?.summary.profileCount ?? 0}`,
+                { role: (selectionComparison?.summary.changedCount ?? 0) > 0 ? 'warn' : 'success', columns: 112 },
+            ),
         );
         println(
-            `  \x1b[90mrazões da comparação ${formatCountMap(selectionComparisonExplanation?.summary.reasonCounts ?? {})} · próximos ${selectionComparisonExplanation?.summary.nextActions.slice(0, 4).join(',') || '-'}\x1b[0m\n`,
+            terminalThemeWrappedRow(
+                'Razões',
+                `${formatCountMap(selectionComparisonExplanation?.summary.reasonCounts ?? {})} · próximos ${renderByokTokenList(selectionComparisonExplanation?.summary.nextActions.slice(0, 4).map(String) ?? []) || '-'}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
         println(
-            `  \x1b[90mpolítica ${renderByokTokenLabel(policyResolution?.mode ?? args.selectionPolicy)} · selecionados finais ${policyResolution?.summary.selectedCount ?? 0}/${policyResolution?.summary.profileCount ?? 0} · vencedores pós-execução ${policyResolution?.summary.postRuntimeWinnerCount ?? 0} · mudou do pré-runtime ${policyResolution?.summary.changedFromPreRuntimeCount ?? 0}\x1b[0m\n`,
+            terminalThemeWrappedRow(
+                'Política',
+                `${renderByokTokenLabel(policyResolution?.mode ?? args.selectionPolicy)} · selecionados finais ${policyResolution?.summary.selectedCount ?? 0}/${policyResolution?.summary.profileCount ?? 0} · vencedores pós-execução ${policyResolution?.summary.postRuntimeWinnerCount ?? 0} · mudou do pré-runtime ${policyResolution?.summary.changedFromPreRuntimeCount ?? 0}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
         println(
-            `  \x1b[90mseletor de execução ${runtimeSelectorPlan?.ready ? 'pronto' : 'bloqueado'} · selecionados ${runtimeSelectorPlan?.summary.selectedProfileCount ?? 0}/${runtimeSelectorPlan?.summary.profileCount ?? 0} · bloqueados ${runtimeSelectorPlan?.summary.blockedProfileCount ?? 0} · env pronto ${runtimeSelectorPlan?.summary.runtimeEnvReadyCount ?? 0} · env bloqueado ${runtimeSelectorPlan?.summary.runtimeEnvBlockedCount ?? 0} · prova selecionada ${runtimeSelectorPlan?.summary.runtimeProofSelectedCount ?? 0}\x1b[0m\n`,
+            terminalThemeWrappedRow(
+                'Seletor de execução',
+                `${runtimeSelectorPlan?.ready ? 'pronto' : 'bloqueado'} · selecionados ${runtimeSelectorPlan?.summary.selectedProfileCount ?? 0}/${runtimeSelectorPlan?.summary.profileCount ?? 0} · bloqueados ${runtimeSelectorPlan?.summary.blockedProfileCount ?? 0} · env pronto ${runtimeSelectorPlan?.summary.runtimeEnvReadyCount ?? 0} · env bloqueado ${runtimeSelectorPlan?.summary.runtimeEnvBlockedCount ?? 0} · prova selecionada ${runtimeSelectorPlan?.summary.runtimeProofSelectedCount ?? 0}`,
+                { role: runtimeSelectorPlan?.ready ? 'success' : 'warn', columns: 112 },
+            ),
         );
         if (args.writeTrace) {
             println(
-                `  \x1b[90mtrace persistido ${tracePersistence?.written ? 'sim' : 'nao'} · arquivo ${tracePersistence?.filePath ?? '-'} · mais recente ${tracePersistence?.latestPath ?? '-'} · erro ${tracePersistence?.error ?? '-'}\x1b[0m\n`,
+                terminalThemeWrappedRow(
+                    'Trace',
+                    `persistido ${tracePersistence?.written ? 'sim' : 'nao'} · arquivo ${tracePersistence?.filePath ?? '-'} · mais recente ${tracePersistence?.latestPath ?? '-'} · erro ${tracePersistence?.error ?? '-'}`,
+                    { role: tracePersistence?.written ? 'success' : 'warn', columns: 112 },
+                ),
             );
         }
     }
@@ -3940,17 +4124,25 @@ async function renderByokGatewaySelectionAudit(println, rest) {
                 : '';
         if (selected) {
             println(
-                `    \x1b[32m${profile.profileId}\x1b[0m  \x1b[90m${selected['providerId']}:${selected['providerModel']} · seletor ${renderByokTokenLabel(optionalScalarString(selected['selectorKind']))} · pontuação ${selected['score'] ?? '-'} · candidatos ${profile.candidateCount} · rejeitados ${profile.rejectedCount}\x1b[0m`,
+                terminalThemeWrappedRow(
+                    'Perfil',
+                    `${profile.profileId} · ${selected['providerId']}:${selected['providerModel']} · seletor ${renderByokTokenLabel(optionalScalarString(selected['selectorKind']))} · pontuação ${selected['score'] ?? '-'} · candidatos ${profile.candidateCount} · rejeitados ${profile.rejectedCount}`,
+                    { role: 'success', columns: 112 },
+                ),
             );
         } else {
             println(
-                `    \x1b[31m${profile.profileId}\x1b[0m  \x1b[90msem selecionado · candidatos ${profile.candidateCount} · rejeitados ${profile.rejectedCount} · próxima ação ${profile.nextActions.slice(0, 3).join(',') || '-'}\x1b[0m`,
+                terminalThemeWrappedRow(
+                    'Perfil',
+                    `${profile.profileId} · sem selecionado · candidatos ${profile.candidateCount} · rejeitados ${profile.rejectedCount} · próxima ação ${renderByokTokenList(profile.nextActions.slice(0, 3).map(String)) || '-'}`,
+                    { role: 'error', columns: 112 },
+                ),
             );
             if (profile.topRejectedReasons.length > 0) {
-                println(`      \x1b[90mmotivos de rejeição ${profile.topRejectedReasons.slice(0, 5).join(',')}\x1b[0m`);
+                println(terminalThemeWrappedRow('Rejeições', renderByokTokenList(profile.topRejectedReasons.slice(0, 5).map(String)), { role: 'warn', columns: 112 }));
             }
         }
-        if (supplyLine) println(`      \x1b[90msupply ${supplyLine}\x1b[0m`);
+        if (supplyLine) println(terminalThemeWrappedRow('Supply', supplyLine, { role: 'muted', columns: 112 }));
         const comparisonRow = selectionComparison?.rows.find((row) => row.profileId === profile.profileId);
         const comparisonExplanation = selectionComparisonExplanation?.rows.find((row) => row.profileId === profile.profileId);
         if (comparisonRow?.changed || (args.effective && comparisonRow?.postSelected)) {
@@ -3959,25 +4151,38 @@ async function renderByokGatewaySelectionAudit(println, rest) {
                 ? `${postSelected['providerId']}:${postSelected['providerModel']} · seletor ${renderByokTokenLabel(optionalScalarString(postSelected['selectorKind']))} · pontuação ${postSelected['score'] ?? '-'}`
                 : 'sem selecionado';
             println(
-                `      \x1b[90mpós-execução ${comparisonRow.changed ? 'mudou' : 'igual'} -> ${postLabel} · prova runtime ${comparisonRow.postSelectedHasRuntimeProof ? 'sim' : 'nao'}\x1b[0m`,
+                terminalThemeWrappedRow(
+                    'Pós-execução',
+                    `${comparisonRow.changed ? 'mudou' : 'igual'} -> ${postLabel} · prova runtime ${yesNo(comparisonRow.postSelectedHasRuntimeProof)}`,
+                    { role: comparisonRow.changed ? 'warn' : 'muted', columns: 112 },
+                ),
             );
         }
         if (args.effective && comparisonExplanation) {
             println(
-                `      \x1b[90mcomparação ${comparisonExplanation.reason} · próxima ação ${comparisonExplanation.nextActions.slice(0, 3).join(',')}\x1b[0m`,
+                terminalThemeWrappedRow(
+                    'Comparação',
+                    `${renderByokTokenLabel(comparisonExplanation.reason)} · próxima ação ${renderByokTokenList(comparisonExplanation.nextActions.slice(0, 3).map(String))}`,
+                    { role: 'muted', columns: 112 },
+                ),
             );
         }
         if (Array.isArray(profile.supplyWarnings) && profile.supplyWarnings.length > 0) {
-            println(`      \x1b[33mavisos ${profile.supplyWarnings.slice(0, 6).join(',')}\x1b[0m`);
+            println(terminalThemeWrappedRow('Avisos', renderByokTokenList(profile.supplyWarnings.slice(0, 6).map(String)), { role: 'warn', columns: 112 }));
         }
     }
     const localProviderBlocks = summarizeModelGatewayLocalProviderOptInBlocks(selection);
     if (localProviderBlocks.hasBlocks) {
-        println(`\n  \x1b[33m${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderBlocks.blockedProfileIds })}\x1b[0m`);
+        println(terminalThemeWrappedRow('Local/Ollama', renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderBlocks.blockedProfileIds }), { role: 'warn', columns: 112 }));
     }
     println(
-        `\n  \x1b[90mEsta auditoria encerra a etapa ${args.effective ? 'efetiva sem novas sondas' : 'pré-runtime'}: ela rankeia por metadados/overlays/política${args.effective ? ' e saúde já observada' : ''}; sondas live ficam para a fase seguinte.\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Fronteira',
+            `etapa ${args.effective ? 'efetiva sem novas sondas' : 'pré-runtime'} · ranking por metadados/overlays/política${args.effective ? ' e saúde já observada' : ''} · sondas live ficam para a fase seguinte`,
+            { role: 'muted', columns: 112 },
+        ),
     );
+    println('');
 }
 
 /**

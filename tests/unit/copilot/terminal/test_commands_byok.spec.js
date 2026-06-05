@@ -2980,8 +2980,10 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('tipo gateway');
         expect(ctx.output()).toContain('https://api.kilo.ai/api/gateway/models');
         expect(ctx.output()).toContain('POST /chat/completions');
-        expect(ctx.output()).toContain('seletores exact_model,gateway_auto,provider_model');
+        expect(ctx.output()).toContain('Seletores');
+        expect(ctx.output()).toContain('modelo exato, gateway auto, modelo do provedor');
         expect(ctx.output()).not.toContain('kind=gateway');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra traits provider/gateway normalizados sem chamar runtime', async () => {
@@ -2995,9 +2997,10 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK características de provedores');
         expect(ctx.output()).toContain('topologia gateway');
         expect(ctx.output()).toContain('compatível com OpenAI sim');
-        expect(ctx.output()).toContain('tipos de execução chat completions');
-        expect(ctx.output()).toContain('metadados preço:sim');
+        expect(ctx.output()).toContain('tipos chat completions');
+        expect(ctx.output()).toContain('preço sim');
         expect(ctx.output()).not.toContain('topology=gateway');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra matriz provider/wire API de probes sem chamar runtime', async () => {
@@ -3011,10 +3014,13 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK matriz de sondas por protocolo');
         expect(ctx.output()).toContain('protocolo chat completions');
         expect(ctx.output()).toContain('implementados chat, streaming, JSON, agente');
-        expect(ctx.output()).toContain('pendentes reasoning, forced tool choice, parallel tool calls');
-        expect(ctx.output()).toContain('Tipos de sonda pendentes: forced tool choice:1, parallel tool calls:1, reasoning:1');
+        expect(ctx.output()).toContain('pendentes reasoning, forced tool choice, parallel');
+        expect(ctx.output()).toContain('tool calls');
+        expect(ctx.output()).toContain('Sondas pendentes');
+        expect(ctx.output()).toContain('forced tool choice:1, parallel tool calls:1, reasoning:1');
         expect(ctx.output()).not.toContain('wire=openai_chat_completions');
         expect(ctx.output()).not.toContain('pendingKinds=');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra orientação explícita para habilitar Ollama/local sem iniciar daemon', async () => {
@@ -3024,10 +3030,12 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'gateway local');
 
         expect(ctx.output()).toContain('BYOK model-gateway local/Ollama');
-        expect(ctx.output()).toContain('Política: excluir providers locais por padrão');
-        expect(ctx.output()).toContain('local_provider_requires_explicit_request');
-        expect(ctx.output()).toContain('nao inicia Ollama');
+        expect(ctx.output()).toContain('Política');
+        expect(ctx.output()).toContain('excluir providers locais por padrão');
+        expect(ctx.output()).toContain('provedor local exige pedido explícito');
+        expect(ctx.output()).toContain('não inicia Ollama');
         expect(ctx.output()).not.toContain('default=excluido');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra planejamento de backoff de probes sem chamar runtime', async () => {
@@ -3047,10 +3055,11 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK planejador de pausa para sondas');
         expect(ctx.output()).toContain('prontas 1');
         expect(ctx.output()).toContain('adiadas 1');
-        expect(ctx.output()).toContain('runtime_rate_limited');
-        expect(ctx.output()).toContain('PRONTO');
-        expect(ctx.output()).toContain('ADIAR');
+        expect(ctx.output()).toContain('runtime limitado por taxa');
+        expect(ctx.output()).toContain('Pronto');
+        expect(ctx.output()).toContain('Adiar');
         expect(ctx.output()).not.toContain('ready=1');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra requisitos de env por provider sem expor valores de segredo', async () => {
@@ -3062,9 +3071,10 @@ describe('terminal /byok command', () => {
         expect(evaluateModelGatewayProviderEnvRequirements).toHaveBeenCalledWith({ env: process.env, providerId: 'kilo' });
         expect(summarizeModelGatewayProviderEnvRequirements).toHaveBeenCalled();
         expect(ctx.output()).toContain('BYOK provider env requirements');
-        expect(ctx.output()).toContain('estado missing');
+        expect(ctx.output()).toContain('estado ausente');
         expect(ctx.output()).toContain('obrigatórias ausentes KILO_API_KEY,KILO_CODE_API_KEY');
         expect(ctx.output()).not.toContain('kilo-secret');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('audita importers configurados e cobertura de endpoints sem chamar rede', async () => {
@@ -3088,14 +3098,17 @@ describe('terminal /byok command', () => {
             { inventories: [expect.objectContaining({ providerId: 'kilo' })] },
         );
         expect(ctx.output()).toContain('BYOK auditoria de importadores');
-        expect(ctx.output()).toContain('Filtro: kilo');
+        expect(ctx.output()).toContain('filtro kilo');
         expect(ctx.output()).toContain('importadores 2/3');
-        expect(ctx.output()).toContain('Evidências de provedor 1');
+        expect(ctx.output()).toContain('evidências de provedor 1');
         expect(ctx.output()).toContain('overlays de conta 1');
         expect(ctx.output()).toContain('kilo-gateway-models');
-        expect(ctx.output()).toContain('etapas fetchRaw,parseRows,toEvidenceFacts,toRouteOptions');
-        expect(ctx.output()).toContain('Fontes de catálogo sem cobertura: kilo:catalog:public_docs:get:https-api-kilo-ai-docs');
+        expect(ctx.output()).toContain('Etapas');
+        expect(ctx.output()).toContain('fetchRaw,parseRows,toEvidenceFacts,toRouteOptions');
+        expect(ctx.output()).toContain('Sem cobertura');
+        expect(ctx.output()).toContain('kilo:catalog:public_docs:get:https-api-kilo-ai-docs');
         expect(ctx.output()).not.toContain('secret');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra gate pré-K do model-gateway com checks booleanos', async () => {
@@ -4011,8 +4024,10 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'gateway selection audit cheap_chat');
 
-        expect(ctx.output()).toContain('local_provider_requires_explicit_request');
+        expect(ctx.output()).toContain('provedor local exige pedido explícito');
+        expect(ctx.output()).not.toContain('local_provider_requires_explicit_request');
         expect(ctx.output()).toContain('Ollama/local foi bloqueado por padrão nos perfis cheap_chat');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra seleção efetiva com saúde observada sem persistir nem executar probes', async () => {
@@ -4068,28 +4083,36 @@ describe('terminal /byok command', () => {
             source: 'terminal-byok-selection-audit',
             requireRuntimeProof: false,
         });
-        expect(ctx.output()).toContain('modo permitir sonda quando acesso é desconhecido+efetivo');
+        expect(ctx.output()).toContain('modo permitir sonda quando');
+        expect(ctx.output()).toContain('acesso é desconhecido + efetivo');
         expect(ctx.output()).toContain('persistido nao');
-        expect(ctx.output()).toContain('saúde observada');
-        expect(ctx.output()).toContain('pós-execução perfis 1/1');
-        expect(ctx.output()).toContain('comparação mudou 1/1');
-        expect(ctx.output()).toContain('razões da comparação post_runtime_proved_better_route:1');
-        expect(ctx.output()).toContain('comparação post_runtime_proved_better_route');
+        expect(ctx.output()).toContain('Saúde observada');
+        expect(ctx.output()).toContain('Pós-execução');
+        expect(ctx.output()).toContain('perfis 1/1');
+        expect(ctx.output()).toContain('Comparação');
+        expect(ctx.output()).toContain('mudou 1/1');
+        expect(ctx.output()).toContain('rota provada em runtime venceu:1');
+        expect(ctx.output()).toContain('Comparação');
+        expect(ctx.output()).toContain('rota provada em runtime venceu');
         expect(ctx.output()).not.toContain('compare=post_runtime_proved_better_route');
-        expect(ctx.output()).toContain('política metadados primeiro');
+        expect(ctx.output()).not.toContain('post_runtime_proved_better_route');
+        expect(ctx.output()).toContain('Política');
+        expect(ctx.output()).toContain('metadados primeiro');
         expect(ctx.output()).toContain('selecionados finais 1/1');
-        expect(ctx.output()).toContain('seletor de execução pronto');
+        expect(ctx.output()).toContain('Seletor de execução');
+        expect(ctx.output()).toContain('pronto · selecionados 1/1');
         expect(ctx.output()).toContain('bloqueados 0');
         expect(ctx.output()).toContain('env pronto 1');
         expect(ctx.output()).toContain('env bloqueado 0');
-        expect(ctx.output()).toContain('pós-execução mudou -> groq:openai/gpt-oss-120b');
+        expect(ctx.output()).toContain('mudou -> groq:openai/gpt-oss-120b');
         expect(ctx.output()).toContain('provas de saúde 1');
         expect(ctx.output()).toContain('provas de sonda 1');
         expect(ctx.output()).toContain('overlays de execução 1');
         expect(ctx.output()).toContain('ativos 1');
         expect(ctx.output()).toContain('expirados 0');
-        expect(ctx.output()).toContain('falhas rate-limit:1');
+        expect(ctx.output()).toContain('falhas limite de taxa:1');
         expect(ctx.output()).toContain('provedores groq:1');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('permite exigir prova runtime na auditoria efetiva do terminal', async () => {
@@ -4114,8 +4137,11 @@ describe('terminal /byok command', () => {
             source: 'terminal-byok-selection-audit',
             requireRuntimeProof: true,
         });
-        expect(ctx.output()).toContain('modo permitir sonda quando acesso é desconhecido+efetivo+prova obrigatória');
-        expect(ctx.output()).toContain('política exigir prova runtime');
+        expect(ctx.output()).toContain('modo permitir sonda quando');
+        expect(ctx.output()).toContain('acesso é desconhecido + efetivo + prova obrigatória');
+        expect(ctx.output()).toContain('Política');
+        expect(ctx.output()).toContain('exigir prova runtime');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('grava trace de decisão da auditoria efetiva do terminal sem mutar catálogo', async () => {
@@ -4148,9 +4174,11 @@ describe('terminal /byok command', () => {
             }),
             { directory: DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR },
         );
-        expect(ctx.output()).toContain('trace persistido sim');
-        expect(ctx.output()).toContain('mais recente /tmp/latest-model-gateway-selection-trace.json');
+        expect(ctx.output()).toContain('Trace');
+        expect(ctx.output()).toContain('persistido sim');
+        expect(ctx.output()).toContain('/tmp/latest-model-gateway-selection-trace.json');
         expect(ctx.output()).not.toContain('latest /tmp/latest-model-gateway-selection-trace.json');
+        expect(ctx.output()).not.toContain('\x1b[');
         expect(ctx.output()).toContain('persistido sim');
         expect(ctx.output()).toContain('/tmp/model-gateway-selection-trace.json');
     });
@@ -4297,10 +4325,15 @@ describe('terminal /byok command', () => {
         expect(summarizeModelGatewayEligibilityDiff).toHaveBeenCalled();
         expect(runsCtx.output()).toContain('BYOK model-gateway eligibility runs');
         expect(runsCtx.output()).toContain('eligibility-run-1');
-        expect(runsCtx.output()).toContain('diferença: novas 1');
+        expect(runsCtx.output()).toMatch(/Diferença\s+novas 1/u);
+        expect(runsCtx.output()).toContain('disposição alterada');
+        expect(runsCtx.output()).not.toContain('disposition_changed');
+        expect(runsCtx.output()).not.toContain('\x1b[');
         expect(diffCtx.output()).toContain('BYOK model-gateway eligibility diff');
         expect(diffCtx.output()).toContain('ficaram elegíveis 0');
-        expect(diffCtx.output()).toContain('disposition_changed');
+        expect(diffCtx.output()).toContain('disposição alterada');
+        expect(diffCtx.output()).not.toContain('disposition_changed');
+        expect(diffCtx.output()).not.toContain('\x1b[');
     });
 
     it('encaminha /models catalog refresh com filtro de provider/importer', async () => {
