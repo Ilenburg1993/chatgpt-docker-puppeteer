@@ -1,11 +1,20 @@
 // @ts-check
 
+import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getIoIndex } from '../../../../src/copilot/infra/io-index-registry.js';
+const mocks = vi.hoisted(() => ({
+    getCopilotDb: vi.fn(),
+}));
+
+vi.mock('#copilot/db', () => ({
+    getCopilotDb: mocks.getCopilotDb,
+}));
+
+import { resetIoIndexForTest } from '../../../../src/copilot/infra/io-index-registry.js';
 import { cmdIndex } from '../../../../src/copilot/terminal/commands/workspace-index.js';
 
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
@@ -14,6 +23,8 @@ const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
 let tmpDir = null;
 /** @type {string | null} */
 let tmpRel = null;
+/** @type {import('better-sqlite3').Database | null} */
+let testDb = null;
 
 function mockCtx() {
     /** @type {string[]} */
@@ -25,7 +36,9 @@ function mockCtx() {
 }
 
 beforeEach(async () => {
-    getIoIndex()?.clearAll();
+    resetIoIndexForTest();
+    testDb = new Database(':memory:');
+    mocks.getCopilotDb.mockReturnValue(testDb);
     tmpDir = mkdtempSync(join(WORKSPACE, 'tmp', '.terminal-index-'));
     tmpRel = relative(WORKSPACE, tmpDir).replace(/\\/gu, '/');
     await mkdir(join(tmpDir, 'nested'), { recursive: true });
@@ -34,7 +47,10 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-    getIoIndex()?.clearAll();
+    resetIoIndexForTest();
+    if (testDb?.open) testDb.close();
+    testDb = null;
+    mocks.getCopilotDb.mockReset();
     if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = null;
     tmpRel = null;
@@ -48,6 +64,8 @@ describe('terminal/commands/index', () => {
         await cmdIndex(ctx, `build ${tmpRel} --ext js --ext md --concurrency 2`);
         expect(ctx.output()).toContain('/index build');
         expect(ctx.output()).toContain('gitignore on');
+        expect(ctx.output()).toContain('Progresso');
+        expect(ctx.output()).toContain('Varredura');
         expect(ctx.output()).toContain('Resultado');
         expect(ctx.output()).toContain('indexados 2');
         expect(ctx.output()).toContain('Workspace');
@@ -69,6 +87,8 @@ describe('terminal/commands/index', () => {
         expect(ctx.output()).toContain('resultados');
         expect(ctx.output()).toContain('beta.md');
         expect(ctx.output()).toContain('Arquivo');
+        expect(ctx.output()).not.toContain('[terminal]');
+        expect(ctx.output()).not.toContain('**terminal**');
 
         await cmdIndex(ctx, 'symbol alphaHelper');
         expect(ctx.output()).toContain('/index symbol');

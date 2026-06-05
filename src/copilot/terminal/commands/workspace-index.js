@@ -9,6 +9,7 @@
  * @module copilot/terminal/commands/workspace-index
  */
 
+import { channel } from 'node:diagnostics_channel';
 import { relative } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import {
@@ -23,6 +24,7 @@ import {
     terminalThemeHeadline,
     terminalThemeJoin,
     terminalThemeRow,
+    terminalThemeText,
     terminalThemeWrappedRow,
 } from '../state/ui/index.js';
 
@@ -41,6 +43,9 @@ import {
  *     rest: string[];
  * }} ParsedIndexArgs
  */
+
+const ioIndexChannel = channel('copilot.io.index');
+const ioScanChannel = channel('copilot.io.scan');
 
 /**
  * @param {string} target
@@ -98,6 +103,129 @@ function compactText(value, limit = 180) {
     const text = String(value ?? '').replace(/\s+/gu, ' ').trim();
     if (text.length <= limit) return text;
     return `${text.slice(0, Math.max(1, limit - 1)).trimEnd()}…`;
+}
+
+/**
+ * FTS5 usa marcadores textuais nos snippets (`[match]`). Isso é bom para a saída estruturada/Markdown das tools, mas
+ * no terminal humano parece caminho adulterado (`src/copilot/[terminal]`) e dificulta copiar o texto. A superfície
+ * visual converte esses marcadores em destaque ANSI, mantendo o texto real sem colchetes artificiais.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTerminalIndexSnippet(value) {
+    return compactText(value).replace(/\[([^\]\n]{1,120})\]/gu, (_match, highlighted) =>
+        terminalThemeText('index', String(highlighted ?? '')),
+    );
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function objectOrNull(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function finiteNumberOrNull(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+}
+
+/**
+ * @param {IndexCommandContext} ctx
+ * @param {string} rootPath
+ * @returns {() => void}
+ */
+function subscribeIndexBuildProgress(ctx, rootPath) {
+    const normalizedRoot = compactPath(rootPath);
+    let lastPrintedAt = 0;
+    let activeTraceId = /** @type {string | null} */ (null);
+
+    /**
+     * @param {string} label
+     * @param {string} detail
+     * @param {{ force?: boolean }} [options]
+     */
+    function printProgress(label, detail, options = {}) {
+        const now = Date.now();
+        if (!options.force && now - lastPrintedAt < 900) return;
+        lastPrintedAt = now;
+        ctx.println(terminalThemeRow(label, detail, { role: 'info' }));
+    }
+
+    /**
+     * @param {unknown} message
+     */
+    function onIndex(message) {
+        const event = objectOrNull(message);
+        if (!event) return;
+        const phase = String(event['phase'] ?? '');
+        const eventRoot = compactPath(String(event['rootPath'] ?? rootPath));
+        if (eventRoot !== normalizedRoot) return;
+        const traceId = typeof event['traceId'] === 'string' ? event['traceId'] : null;
+        if (phase === 'build.start') {
+            activeTraceId = traceId;
+            printProgress(
+                'Progresso',
+                terminalThemeJoin([
+                    'varrendo arquivos',
+                    `raiz ${normalizedRoot}`,
+                    `limite ${numberLabel(event['effectiveMaxFiles'])}`,
+                    `concorrência ${numberLabel(event['concurrency'])}`,
+                ]),
+                { force: true },
+            );
+            return;
+        }
+        if (activeTraceId && traceId && traceId !== activeTraceId) return;
+        if (phase !== 'build.progress') return;
+        const indexed = finiteNumberOrNull(event['indexed']) ?? 0;
+        const total = finiteNumberOrNull(event['total']);
+        const pct = finiteNumberOrNull(event['pct']);
+        const current = typeof event['currentFile'] === 'string' ? compactPath(event['currentFile']) : null;
+        printProgress(
+            'Indexando',
+            terminalThemeJoin([
+                total ? `${indexed}/${total}` : `${indexed} arquivos`,
+                pct !== null ? `${pct}%` : null,
+                current,
+            ]),
+        );
+    }
+
+    /**
+     * @param {unknown} message
+     */
+    function onScan(message) {
+        const event = objectOrNull(message);
+        if (!event) return;
+        const phase = String(event['phase'] ?? '');
+        const eventRoot = compactPath(String(event['rootPath'] ?? rootPath));
+        if (eventRoot !== normalizedRoot) return;
+        const scanned = finiteNumberOrNull(event['scannedEntries']);
+        if (phase === 'progress') {
+            const current = typeof event['currentPath'] === 'string' ? compactPath(event['currentPath']) : null;
+            printProgress('Varrendo', terminalThemeJoin([scanned !== null ? `${scanned} entradas` : null, current]));
+        } else if (phase === 'complete') {
+            printProgress('Varredura', terminalThemeJoin([scanned !== null ? `${scanned} entradas` : null, 'selecionando candidatos']), {
+                force: true,
+            });
+        }
+    }
+
+    ioIndexChannel.subscribe(onIndex);
+    ioScanChannel.subscribe(onScan);
+    return () => {
+        ioIndexChannel.unsubscribe(onIndex);
+        ioScanChannel.unsubscribe(onScan);
+    };
 }
 
 /**
@@ -291,7 +419,13 @@ async function runBuild(ctx, parts) {
             `prune ${parsed.pruneMissing === false ? 'off' : 'auto'}`,
         ]),
     );
-    const result = /** @type {Record<string, unknown>} */ (await buildIoIndexForDirectory(directory, options));
+    const unsubscribeProgress = subscribeIndexBuildProgress(ctx, directory);
+    let result;
+    try {
+        result = /** @type {Record<string, unknown>} */ (await buildIoIndexForDirectory(directory, options));
+    } finally {
+        unsubscribeProgress();
+    }
     if (result['available'] === false) {
         ctx.println(terminalThemeRow('Índice L2', `falhou · ${stringLabel(result['reason'] ?? 'index-unavailable')}`, { role: 'error' }));
         ctx.println('');
@@ -342,7 +476,7 @@ function runSearch(ctx, parts) {
     ctx.println(terminalThemeHeadline('index', '/index search', [`"${query}"`, `resultados ${results.length}`]));
     for (const item of results) {
         ctx.println(
-            terminalThemeWrappedRow('Arquivo', `${item.relativePath} · ${compactText(item.snippet)}`, {
+            terminalThemeWrappedRow('Arquivo', `${item.relativePath} · ${renderTerminalIndexSnippet(item.snippet)}`, {
                 role: 'fileRead',
                 columns: 110,
             }),

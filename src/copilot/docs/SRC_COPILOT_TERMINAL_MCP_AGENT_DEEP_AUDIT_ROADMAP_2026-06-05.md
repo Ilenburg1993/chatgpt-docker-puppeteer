@@ -354,6 +354,10 @@
 - [x] Gap 27: `/events` default ainda mostrava limpeza interna de sessões SDK (`session.deleted`); agora lifecycle rotineiro fica em filtros explícitos/raw/json.
 - [x] Gap 28: continuação pós-`ask_user` usava estado genérico de resposta humana e recuperação automática mínima; agora há presenter compartilhado para aguardando continuação, auto-retomada e diagnóstico.
 - [x] Gap 29: superfícies humanas de troca de modelo ainda citavam `session.model_changed`; agora falam em confirmação do SDK/uso observado, mantendo o nome cru apenas em SSE, adapters e inspeção técnica.
+- [x] Gap 30: `/index search` mostrava marcadores FTS5 como `[terminal]`, parecendo caminho adulterado; agora o comando humano converte highlights para ANSI e preserva texto copiável sem colchetes artificiais.
+- [x] Gap 31: teste unitário de `/index` apagava o índice real em `copilot.sqlite`; agora usa SQLite em memória via mock de `#copilot/db`, mantendo o estado operacional do terminal intacto.
+- [x] Gap 32: `/index build` ficava silencioso durante varredura/indexação longa; agora consome `copilot.io.scan`/`copilot.io.index` temporariamente e imprime progresso humano por marcos.
+- [x] Gap 33: `operator-ux-cycle` avançava após palavras genéricas do status BYOK (`Sessão viva`/`Modelo vivo`) e podia intercalar `/activity` antes de `Modelo vivo solicitado`; agora espera o marcador específico de pedido/adiamento/falha.
 
 ## 08. Criterio de Marco
 
@@ -417,3 +421,7 @@
 - [x] 2026-06-05: validado com `test_dialog_recovery_presenter`, `test_terminal_sdk_session_events`, `test_live_status_line`, `test_terminal_agent_wiring` e `test_commands_events`.
 - [x] 2026-06-05: revisada a trilha BYOK sem mensagem estruturada; a cobertura existente já humaniza `agent.error`/`session.error`, mantém linha viva compacta e evita fallback Copilot automático, ficando pendente apenas cenário live adversarial dedicado.
 - [x] 2026-06-05: `/byok model`, auto-apply do model-gateway e o runner live passaram a usar `confirmação do SDK ou próximo uso observado`; `session.model_changed` permanece como contrato técnico de SSE/event adapter, não como texto padrão ao operador.
+- [x] 2026-06-05: live `operator-ux-cycle` pass5 PASS confirmou a troca para `confirmação do SDK`; no mesmo PTY foi identificado e corrigido o destaque FTS5 textual de `/index search` que criava `[terminal]` em previews.
+- [x] 2026-06-05: `test_commands_index` foi isolado com `better-sqlite3(':memory:')` e `resetIoIndexForTest()`, impedindo que validações destruam o índice L2 persistente visto por `/index status` no terminal real.
+- [x] 2026-06-05: `/index build` passou a renderizar `Progresso`, `Varrendo`, `Varredura` e `Indexando` a partir dos canais canônicos de observabilidade, sem criar um segundo contador no comando.
+- [x] 2026-06-05: live `operator-ux-cycle` pass7 revelou avanço prematuro do harness em `/byok model`; o `waitFor` agora exige `Modelo vivo solicitado` ou saída específica de adiamento/falha, evitando comandos colados no bloco visual anterior.

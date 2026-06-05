@@ -3383,7 +3383,8 @@ async function runOperatorUxCycleLiveTest({ outDir, requestedTransport, timeoutM
             { line: '/model list', waitFor: /Modelos disponíveis|Nenhum modelo retornado pelo SDK/u, advanceAfterMs: 1_500 },
             {
                 line: '/byok model terminal-ux-boundary-fixture',
-                waitFor: /Modelo vivo|Troca modelo|Sessão viva/u,
+                waitFor:
+                    /Modelo vivo\s+solicitado|Troca modelo\s+(?:sessão atual|falhou)|Sessão viva\s+não inspecionada/u,
                 advanceAfterMs: 1_500,
             },
             { line: '/activity 10', waitFor: 'Atividade Atual da LLM-B', advanceAfterMs: 1_500 },
