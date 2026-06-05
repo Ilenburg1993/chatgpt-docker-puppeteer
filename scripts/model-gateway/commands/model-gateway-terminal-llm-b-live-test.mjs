@@ -5736,9 +5736,9 @@ function evaluateNoPrOutput(plain, sseSummary) {
         {
             id: 'usage-visible',
             pass:
-                /Premium Request:|Última (?:Premium Request|telemetria PR) classificada:|GitHub Copilot quota\/PR side-channel:/.test(
+                /Premium Request:|Última (?:Premium Request|telemetria PR) classificada:|GitHub Copilot quota\/PR side-channel:|Histórico\s+Copilot último snapshot|Cobrança\s+GitHub PR/.test(
                     plain,
-                ) && /Modo: sdk=/.test(plain),
+                ) && /Modo\s+SDK|Modo:\s*sdk=/.test(plain),
             detail: '/usage now rendered context, PR and SDK mode telemetry',
         },
         {
@@ -5753,17 +5753,20 @@ function evaluateNoPrOutput(plain, sseSummary) {
         },
         {
             id: 'sdk-session-events-cockpit-visible',
-            pass: /Eventos SDK da sessão/.test(plain) && /fonte=archive SSE canônico/.test(plain),
+            pass: /Eventos SDK da sessão/.test(plain) && /Registro\s+arquivo|archive SSE canônico/.test(plain),
             detail: '/session sdk events rendered lifecycle/command diagnostics from the canonical archive',
         },
         {
             id: 'sdk-session-waits-cockpit-visible',
-            pass: /Waits SDK da sessão/.test(plain) && /perguntas=\d+/.test(plain) && /elicitation=\d+/.test(plain),
+            pass:
+                /(?:Waits|Esperas) SDK da sessão/.test(plain) &&
+                /perguntas\s+\d+|perguntas=\d+/.test(plain) &&
+                /(?:formulários|elicitation)\s+\d+|elicitation=\d+/.test(plain),
             detail: '/session sdk waits rendered ask_user/elicitation/permission diagnostics from the canonical archive',
         },
         {
             id: 'metrics-visible',
-            pass: /Métricas da Sessão/.test(plain) && /Streaming público/.test(plain),
+            pass: /Métricas da sessão|Métricas da Sessão/.test(plain) && /Streaming público/.test(plain),
             detail: '/metrics rendered session and public streaming counters',
         },
         {

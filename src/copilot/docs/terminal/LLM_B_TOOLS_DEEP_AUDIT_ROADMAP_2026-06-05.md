@@ -315,6 +315,8 @@ operador vê e salvar summary com critérios objetivos.
 - [ ] K3. Conferir terminal como operador humano.
 - [ ] K4. Corrigir discrepâncias de layout, nomes e timing.
 - [ ] K5. Repetir com falhas intencionais e recuperação.
+- [x] K6. Confirmar runner canônico: `node scripts/model-gateway/run.mjs llmBLiveTest`; wrapper antigo `scripts/copilot/run-terminal-llm-b-live-test.mjs` não existe mais.
+- [x] K7. Executar live PTY `--no-pr` para validar boot/UX/artefatos sem abrir turno de LLM.
 
 ### Faixa L — Agente e outras superfícies src/copilot
 
@@ -348,4 +350,6 @@ operador vê e salvar summary com critérios objetivos.
 - [x] 2026-06-05: disabled/sessionExcluded agora têm registros ricos com source, reason e ISO timestamp, preservando `getDisabledTools()`.
 - [x] 2026-06-05: `/tools` padrão ganhou resumo compacto por categoria; `/tools all` mostra timestamp ISO no lifecycle.
 - [x] 2026-06-05: validações focadas verdes: typecheck strict `src/copilot`, lint `src/copilot`, e 145 testes unitários focados de terminal/tools/read/write.
+- [x] 2026-06-05: após push `1d58e746`, retomada análise de linha viva e runner live; caminho canônico de live test confirmado.
+- [x] 2026-06-05: live PTY `--no-pr` PASS em `artifacts/terminal-live/llm-b-tools-ux-no-pr-rerun-20260605`; harness atualizado para critérios da UX atual.
 - [ ] Próximo passo: roteiro live read/patch, labels da linha viva e auditoria de claims.
