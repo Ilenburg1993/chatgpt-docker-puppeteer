@@ -447,7 +447,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'Ferramenta em uso',
             expect.objectContaining({
                 detail: 'lendo arquivo · arquivo: src/copilot/terminal/repl/repl.js',
-                toolName: 'workspace.read_file',
+                toolName: 'Ler arquivo',
             }),
         );
         expect(recordTerminalTurnToolActivity).toHaveBeenCalledWith(
@@ -712,7 +712,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'tool',
             'Ferramenta em uso',
             expect.objectContaining({
-                toolName: 'patch_file',
+                toolName: 'Editar arquivo',
                 detail: expect.stringContaining('editando arquivo'),
             }),
         );
@@ -1682,7 +1682,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(rl.resume).toHaveBeenCalled();
     });
 
-    it('registra falha BYOK visível no ErrorTracker para /errors', async () => {
+    it('mantém falha BYOK recuperável fora do ErrorTracker e preserva painel/SSE', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         /** @type {Map<string, Function[]>} */
@@ -1708,18 +1708,18 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             byokModel: 'kilo-auto/free',
         });
 
-        expect(defaultErrorTracker.trackError).toHaveBeenCalledWith(
-            expect.any(Error),
+        expect(defaultErrorTracker.trackError).not.toHaveBeenCalled();
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('falha do provedor'));
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'agent.error',
             expect.objectContaining({
-                source: 'terminal.byok_provider',
-                metadata: expect.objectContaining({
-                    errorContext: 'model_call',
-                    byokProviderType: 'openai',
-                    byokProfile: 'kilo',
-                    byokModel: 'kilo-auto/free',
-                }),
+                errorContext: 'model_call',
+                recoverable: true,
+                byokProviderType: 'openai',
+                byokProfile: 'kilo',
+                byokModel: 'kilo-auto/free',
+                handledAs: 'recoverable_model_call',
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('falha do provedor'));
     });
 });

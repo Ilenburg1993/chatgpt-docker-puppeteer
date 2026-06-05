@@ -8909,3 +8909,116 @@
   - continuar procurando surfaces que ainda aceitem nome técnico como rótulo humano primário;
   - próxima frente de alto retorno: revisar comandos de arquivo/mover/deletar e seleção automática de
     modelo em live, garantindo que toda transição e toda permissão apareça como evento humano claro.
+
+### 12.96 Permissões autoaprovadas fora da superfície humana — 2026-06-04
+
+- [x] Achado live:
+  - no cenário de criação/move/delete de arquivo, o SDK emitia `permission.requested` e
+    `permission.completed` mesmo quando o modo efetivo era `approve_all`;
+  - a política aprovava corretamente, mas o terminal ainda renderizava linhas duráveis
+    `Permissão ...` e `Acompanhar /permission list ...`;
+  - para o operador, isso parecia uma segunda pergunta ou uma janela textual, contrariando o default
+    canônico de máxima autonomia;
+  - a auditoria/SSE precisava continuar preservada, porque permissões são eventos importantes para
+    diagnóstico posterior.
+- [x] Decisão UX:
+  - em `approve_all` e `audit_only`, permissões SDK aprovadas automaticamente ficam fora da superfície
+    visual default;
+  - nesses modos, `permission.requested` e `permission.completed` continuam no SSE e no estado de
+    permissões para `/permission`, `/events --raw`, auditoria e testes;
+  - em `selective`, permissões continuam visíveis como pergunta operacional, com ajuda de comandos;
+  - negações, políticas automáticas restritivas e resultados inseguros continuam podendo aparecer como
+    alerta humano, mesmo fora de `selective`;
+  - a linha viva não deve ser atualizada por permissão autoaprovada silenciosa, para não competir com
+    o input.
+- [x] Implementação:
+  - `sdk-session-events.js` passou a consultar `readTerminalRuntimePermissionMode()` e
+    `terminalPermissionModeSkipsSdkPrompts()`;
+  - `onPermissionRequested` registra/broadcasta sempre, mas só grava atividade visual, imprime ajuda e
+    refresca prompt quando o modo exige superfície seletiva;
+  - `onPermissionCompleted` preserva SSE com `decision`, mas omite linha durável e activity de
+    aprovação automática nos modos silenciosos;
+  - teste unitário cobre o contrato `approve_all`: nenhum `println` com `Permissão`, nenhuma activity
+    `Permissão SDK solicitada/aprovada`, nenhum refresh do prompt, mas SSE completo preservado;
+  - teste existente de narrativa seletiva agora fixa `selective` explicitamente, protegendo os dois
+    modos.
+- [x] Validação:
+  - [x] `node --check` nos arquivos alterados;
+  - [x] `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js`;
+  - [x] lint escopado de `sdk-session-events.js` e do teste;
+  - [x] `git diff --check`.
+- [x] Live:
+  - repetir `file-write-roundtrip` em PTY;
+  - confirmar que permissões autoaprovadas não poluem o log visual;
+  - se ainda houver bloqueio por tool inesperada (`grep`, `search_in_files`) ou intenção stale, tratar
+    como lacuna separada de roteamento/harness, não como falha de permissão.
+  - evidência PASS:
+    `artifacts/terminal-live/ux-file-roundtrip-question-tag-fixed-20260604/summary.md`.
+
+### 12.97 `/errors` como falha ativa, não incidente BYOK recuperado — 2026-06-04
+
+- [x] Achado live:
+  - `file-write-roundtrip` concluiu create/move/delete reais, deltas públicos, `ask_user` real e final
+    pós-resposta;
+  - o critério `no-sdk-permission-prompt-in-approve-all` passou, confirmando que permissões
+    autoaprovadas saíram da superfície visual;
+  - o run ainda terminou FAIL porque `/errors 10` mostrava uma falha BYOK recuperável ocorrida antes
+    das tools;
+  - essa falha foi seguida por recuperação segura e resposta pública, portanto não representava
+    terminal sujo ou falha ativa.
+- [x] Decisão UX/observabilidade:
+  - `/errors` deve representar falhas finais/fatais ou incidentes que ainda pedem ação direta;
+  - erro recuperável de `model_call`, inclusive BYOK, continua em `agent.error`, activity, health e
+    eventos brutos;
+  - quando o dialog engine recupera o turno, o operador não deve ver “erro recente” como estado
+    terminal;
+  - falhas fatais de sessão e falhas não recuperáveis continuam indo ao error tracker.
+- [x] Implementação:
+  - `agent-runtime-events.js` deixou de chamar `trackOperatorVisibleTerminalError` para
+    `model_call` recuperável;
+  - o comentário do helper passou a documentar a diferença entre incidente recuperável e erro final;
+  - testes unitários agora exigem que falha BYOK recuperável preserve painel/SSE sem sujar
+    `defaultErrorTracker`;
+  - expectativas antigas de activity humana foram atualizadas para nomes humanos (`Ler arquivo`,
+    `Editar arquivo`) em vez de nomes técnicos.
+- [x] Validação:
+  - [x] `node --check` dos arquivos alterados;
+  - [x] `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js`;
+  - [x] lint escopado dos listeners e testes.
+- [x] Live:
+  - repetir `file-write-roundtrip` para confirmar PASS completo;
+  - se o provider não produzir incidente recuperável nessa execução, manter a evidência anterior como
+    reprodução e validar a limpeza por teste unitário;
+  - se produzir, confirmar `/errors` com `nenhum erro recente` e `agent.error` ainda presente no SSE.
+  - evidência PASS:
+    `artifacts/terminal-live/ux-file-roundtrip-question-tag-fixed-20260604/summary.md`, com
+    `no-terminal-errors` verde e `/errors 10` exibindo `0 total · 0 no buffer`.
+
+### 12.98 Runner live alinhado ao prompt humano `[Q:n][PERG]` — 2026-06-04
+
+- [x] Achado live:
+  - a pergunta `ASK-FILEWRITE` apareceu corretamente como card humano e prompt dedicado;
+  - o prompt real era `você[modelo/high][Q:1][PERG]›`;
+  - o live runner só reconhecia `você[modelo/high][PERG]›`;
+  - por isso, em turno de recuperação, o runner não respondeu `SIM` e o teste terminou
+    `blocked-by-live-timeout`;
+  - a falha era do harness, não da UX terminal, porque `user_input.requested` também apareceu no SSE.
+- [x] Decisão:
+  - tags intermediárias de estado, como `[Q:1]`, são parte válida da UX;
+  - todo helper de reconhecimento de prompt humano deve aceitar uma sequência de tags antes de
+    `[PERG]`;
+  - o runner deve validar a UX real que o operador vê, não uma gramática antiga.
+- [x] Implementação:
+  - `hasHumanQuestionInputPrompt()` passou a aceitar `você[...][...][PERG]›`;
+  - o critério `structured-input-prompt-tag` foi atualizado com a mesma gramática.
+- [x] Validação:
+  - [x] `node --check` do runner live;
+  - [x] `git diff --check`.
+- [x] Live:
+  - repetir `file-write-roundtrip` e confirmar auto-answer em prompt `[Q:1][PERG]`;
+  - se a LLM-B ordenar create/move/delete incorretamente, registrar como gap de aderência do modelo ao
+    cenário, mas manter a UX mostrando falha/sucesso com clareza.
+  - evidência PASS:
+    `artifacts/terminal-live/ux-file-roundtrip-question-tag-fixed-20260604/summary.md`, com
+    `ask-user-answer`, `post-ask-final-visible`, `no-sdk-permission-prompt-in-approve-all` e
+    `clean-quit` verdes.

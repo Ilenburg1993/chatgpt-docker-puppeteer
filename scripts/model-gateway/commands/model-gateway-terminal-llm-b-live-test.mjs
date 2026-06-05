@@ -168,7 +168,9 @@ function buildAskRenderedRegex(question) {
 }
 
 function hasHumanQuestionInputPrompt(plain) {
-    return /voc[eê]\[[^\]\n]+(?:\/[^\]\n]+)?\]\[PERG(?:UNTA)?\]›/iu.test(String(plain ?? ''));
+    return /voc[eê]\[[^\]\n]+(?:\/[^\]\n]+)?\](?:\[[^\]\n]+\])*\[PERG(?:UNTA)?\]›/iu.test(
+        String(plain ?? ''),
+    );
 }
 
 function buildQuestionPendingRegex(question) {
@@ -1640,7 +1642,7 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-prompt-tag',
-            pass: /você\[[^\]\n]+\/[^\]\n]+\]\[PERG(?:UNTA)?\]›/iu.test(plain),
+            pass: /você\[[^\]\n]+\/[^\]\n]+\](?:\[[^\]\n]+\])*\[PERG(?:UNTA)?\]›/iu.test(plain),
             detail: 'REPL prompt marked the pending structured input as [PERGUNTA] or compact [PERG]',
         },
         {

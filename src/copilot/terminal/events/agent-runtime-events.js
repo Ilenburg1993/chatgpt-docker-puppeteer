@@ -360,9 +360,11 @@ function resolveRecoverableModelCallOperatorDetail(evt) {
 }
 
 /**
- * Registra em `/errors` apenas falhas que realmente chegaram à superfície do operador. Eventos recuperáveis do SDK
- * continuam fora do tracker por padrão; quando o BYOK bloqueia fallback/retry e encerra o turno, o operador precisa
- * encontrá-lo em `/errors` com a mesma orientação exibida em tela.
+ * Registra em `/errors` apenas falhas finais/fatais que realmente chegaram à superfície do operador.
+ *
+ * Eventos recuperáveis de `model_call`, inclusive BYOK, continuam em activity/SSE/health porque são relevantes para
+ * diagnóstico, mas não devem sujar `/errors`: o dialog engine pode recuperar o turno com continuação segura e o
+ * operador precisa distinguir "incidente recuperado" de "terminal em erro".
  *
  * @param {Error} error
  * @param {{ source: string; metadata?: Record<string, unknown> }} options
@@ -907,7 +909,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                   })}`;
             println(rendered);
         }
-        if (shouldPrint && (!isRecoverableModelCall || isByokModelCall)) {
+        if (shouldPrint && !isRecoverableModelCall) {
             trackOperatorVisibleTerminalError(new Error(detail), {
                 source: isByokModelCall ? 'terminal.byok_provider' : 'terminal.agent',
                 metadata: {

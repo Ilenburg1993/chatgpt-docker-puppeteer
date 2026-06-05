@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => ({
     renderTerminalAssistantTranscript: vi.fn(() => true),
     readSdkSessionHandoffRecords: vi.fn(() => Promise.resolve([])),
     writeSdkSessionConfirmationRecords: vi.fn(() => Promise.resolve({ sdkSessionConfirmations: 1 })),
+    runtimePermissionMode: 'approve_all',
 }));
 
 vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
@@ -76,6 +77,11 @@ vi.mock('../../../src/copilot/presentation/state/index.js', async (importOrigina
 
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     answerTerminalPendingQuestion: mocks.answerTerminalPendingQuestion,
+    readTerminalRuntimePermissionMode: vi.fn(() => mocks.runtimePermissionMode),
+    setTerminalRuntimePermissionMode: vi.fn((mode) => {
+        mocks.runtimePermissionMode = mode;
+        return mocks.runtimePermissionMode;
+    }),
 }));
 
 vi.mock('../../../src/copilot/terminal/frontend/projections/index.js', () => ({
@@ -144,8 +150,13 @@ function createAgentHost() {
 }
 
 describe('terminal/events/sdk-session-events.js — contrato', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
+        mocks.runtimePermissionMode = 'approve_all';
+        const { setTerminalRuntimePermissionMode } = await import(
+            '../../../src/copilot/terminal/frontend/gateways/index.js'
+        );
+        setTerminalRuntimePermissionMode('approve_all');
         mocks.printlnBlock.mockImplementation((/** @type {string[]} */ lines) => mocks.println(lines.join('\n')));
         mocks.getBusy.mockReturnValue(false);
         mocks.getShowSessionActivity.mockReturnValue(false);
@@ -477,11 +488,15 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
     });
 
     it('surfa elicitation, permission e sidechannel SDK como narrativa operacional', async () => {
+        const { setTerminalRuntimePermissionMode } = await import(
+            '../../../src/copilot/terminal/frontend/gateways/index.js'
+        );
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
         const refreshPromptIfIdle = vi.fn();
 
+        setTerminalRuntimePermissionMode('selective');
         setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle });
         agent.emit('elicitation.pending', {
             requestId: 'el-1',
@@ -610,6 +625,53 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             }),
         );
         expect(refreshPromptIfIdle).toHaveBeenCalled();
+    });
+
+    it('mantém permissões autoaprovadas fora da superfície visual em approve_all', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+        const refreshPromptIfIdle = vi.fn();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle });
+        agent.emit('permission.requested', {
+            requestId: 'perm-auto-1',
+            permissionType: 'file_write',
+        });
+        agent.emit('permission.completed', {
+            requestId: 'perm-auto-1',
+            permissionType: 'file_write',
+            granted: true,
+        });
+
+        expect(mocks.recordTerminalActivity).not.toHaveBeenCalledWith(
+            'question',
+            'Permissão SDK solicitada',
+            expect.anything(),
+        );
+        expect(mocks.recordTerminalActivity).not.toHaveBeenCalledWith(
+            'system',
+            'Permissão SDK aprovada',
+            expect.anything(),
+        );
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Permissão'));
+        expect(refreshPromptIfIdle).not.toHaveBeenCalled();
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'permission.requested',
+            expect.objectContaining({
+                id: 'perm-auto-1',
+                permissionType: 'file_write',
+                source: 'sdk/permission.requested',
+            }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'permission.completed',
+            expect.objectContaining({
+                requestId: 'perm-auto-1',
+                source: 'sdk/permission.completed',
+                decision: 'approved',
+            }),
+        );
     });
 
     it('propaga traceId e turnId em user_input.requested/completed durante turno ativo', async () => {

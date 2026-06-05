@@ -79,9 +79,11 @@ import {
     answerTerminalPendingQuestion,
     classifyTerminalPermissionDecision,
     loginTerminalSdkMcpOauth,
+    readTerminalRuntimePermissionMode,
     readTerminalToolRegistrySnapshot,
 } from '../frontend/gateways/index.js';
 import { observeTerminalModelChangeProjection } from '../frontend/projections/index.js';
+import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
 import {
     appendTerminalTranscriptTurn,
     beginTerminalTurnMaterialization,
@@ -460,6 +462,13 @@ function renderPermissionDecisionLabel(result, granted) {
     if (result === 'denied-by-content-exclusion-policy') return 'negada por exclusão de conteúdo';
     if (granted === false) return 'não aprovada';
     return result ?? 'concluída';
+}
+
+/**
+ * @returns {boolean}
+ */
+function shouldRenderSdkPermissionPromptSurface() {
+    return !terminalPermissionModeSkipsSdkPrompts(readTerminalRuntimePermissionMode());
 }
 
 /**
@@ -974,25 +983,28 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onPermissionRequested = (/** @type {Record<string, unknown>} */ evt) => {
         const entry = recordTerminalPermissionRequested(evt);
-        recordTerminalActivity('question', 'Permissão SDK solicitada', {
-            detail: `${entry.permissionType}${renderSdkOptionalRequestDetail(entry.requestId)}`,
-            source: 'sdk',
-            severity: 'warn',
-        });
-        println('');
-        println(
-            terminalThemeRow(
-                'Permissão',
-                `${entry.permissionType}${entry.requestId ? ` · ${renderSdkRequestLabel(entry.requestId)}` : ''}`,
-                { role: 'question' },
-            ),
-        );
-        if (!permissionHelpPrinted) {
-            println(terminalThemeRow('Acompanhar', '/permission list · /status · /activity', { role: 'command' }));
-            permissionHelpPrinted = true;
+        const renderPromptSurface = shouldRenderSdkPermissionPromptSurface();
+        if (renderPromptSurface) {
+            recordTerminalActivity('question', 'Permissão SDK solicitada', {
+                detail: `${entry.permissionType}${renderSdkOptionalRequestDetail(entry.requestId)}`,
+                source: 'sdk',
+                severity: 'warn',
+            });
+            println('');
+            println(
+                terminalThemeRow(
+                    'Permissão',
+                    `${entry.permissionType}${entry.requestId ? ` · ${renderSdkRequestLabel(entry.requestId)}` : ''}`,
+                    { role: 'question' },
+                ),
+            );
+            if (!permissionHelpPrinted) {
+                println(terminalThemeRow('Acompanhar', '/permission list · /status · /activity', { role: 'command' }));
+                permissionHelpPrinted = true;
+            }
         }
         broadcastSse('permission.requested', withSdkSessionSseEnvelope({ ...entry }, 'sdk/permission.requested'));
-        refreshPromptIfIdle();
+        if (renderPromptSurface) refreshPromptIfIdle();
     };
 
     const onPermissionCompleted = (/** @type {Record<string, unknown>} */ evt) => {
@@ -1018,18 +1030,21 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
               : 'Permissão SDK concluída';
         const ambiguousEcho =
             entry?.permissionType === 'permission.requested' && granted == null && !entry?.result && !entry?.requestId;
+        const renderPromptSurface = shouldRenderSdkPermissionPromptSurface();
 
-        recordTerminalActivity('system', label, {
-            detail: entry
-                ? `${entry.permissionType} · ${renderPermissionDecisionLabel(entry.result ?? null, typeof granted === 'boolean' ? granted : null)}${wasDeniedByPolicy ? ' · política automática' : ''}`
-                : 'pedido local não encontrado',
-            source: 'sdk',
-            severity: ok || granted == null ? 'info' : 'warn',
-            recordHistory: !ambiguousEcho,
-            updateCurrent: false,
-        });
+        if (renderPromptSurface || wasDeniedByPolicy || granted === false) {
+            recordTerminalActivity('system', label, {
+                detail: entry
+                    ? `${entry.permissionType} · ${renderPermissionDecisionLabel(entry.result ?? null, typeof granted === 'boolean' ? granted : null)}${wasDeniedByPolicy ? ' · política automática' : ''}`
+                    : 'pedido local não encontrado',
+                source: 'sdk',
+                severity: ok || granted == null ? 'info' : 'warn',
+                recordHistory: !ambiguousEcho,
+                updateCurrent: false,
+            });
+        }
 
-        if (!ambiguousEcho) {
+        if (renderPromptSurface && !ambiguousEcho) {
             println(
                 terminalThemeRow(
                     'Permissão',
@@ -1042,7 +1057,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             'permission.completed',
             withSdkSessionSseEnvelope({ ...data, decision, wasDeniedByPolicy }, 'sdk/permission.completed'),
         );
-        refreshPromptIfIdle();
+        if (renderPromptSurface) refreshPromptIfIdle();
     };
 
     const onPermissionModeChanged = (/** @type {{ mode?: string }} */ evt) => {
