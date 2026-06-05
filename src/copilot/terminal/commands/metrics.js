@@ -9,6 +9,10 @@
  */
 
 import { readTerminalConfigProjection, readTerminalMetricsProjection } from '../frontend/index.js';
+import {
+    compactTerminalOperatorToolText,
+    humanizeTerminalToolSurfaceText,
+} from '../events/tool-activity-presenter.js';
 import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -40,6 +44,14 @@ function humanMetricStatus(value) {
     if (status === 'stopped') return 'parado';
     if (status === 'error' || status === 'failed') return 'falhou';
     if (status === 'pending') return 'pendente';
+    if (status === 'tool') return 'ferramenta';
+    if (status === 'turn') return 'turno';
+    if (status === 'thinking') return 'pensando';
+    if (status === 'streaming') return 'respondendo';
+    if (status === 'question') return 'pergunta';
+    if (status === 'task') return 'tarefa';
+    if (status === 'boot') return 'inicialização';
+    if (status === 'system') return 'sistema';
     return status || 'sem leitura';
 }
 
@@ -65,6 +77,28 @@ function humanMetricPromptState(value) {
     if (state === 'live-reload') return 'recarregando';
     if (state === 'ok') return 'ok';
     return state.replace(/[._-]+/gu, ' ') || 'sem leitura';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanMetricActivityText(value) {
+    const text =
+        typeof value === 'string'
+            ? value
+            : value == null
+              ? ''
+              : String(value);
+    return humanizeTerminalToolSurfaceText(compactTerminalOperatorToolText(text.replace(/\s+/gu, ' ').trim(), 120))
+        .replace(/\bmodelo=/giu, 'modelo ')
+        .replace(/\bcusto=/giu, 'custo ')
+        .replace(/\bstatus=success\b/giu, 'concluída')
+        .replace(/\bstatus=completed\b/giu, 'concluída')
+        .replace(/\bstatus=failed\b/giu, 'falhou')
+        .replace(/\bchoices=/giu, 'opções ')
+        .replace(/\bdisplay=/giu, 'tela ')
+        .replace(/\breasoning=/giu, 'raciocínio ');
 }
 
 /**
@@ -268,8 +302,18 @@ export function cmdMetrics({ println }, arg = '') {
 
     println(terminalThemeHeadline('thinking', 'Atividade'));
     println(terminalThemeRow('Fase', humanMetricStatus(activity.phase), { role: 'thinking' }));
-    println(terminalThemeRow('Label', `${activity.label}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}`, { role: 'thinking' }));
-    println(terminalThemeRow('Detalhe', activity.detail ?? '(nenhum)', { role: activity.detail ? 'muted' : 'muted' }));
+    println(
+        terminalThemeRow(
+            'Evento',
+            `${humanMetricActivityText(activity.label)}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}`,
+            { role: 'thinking' },
+        ),
+    );
+    println(
+        terminalThemeRow('Detalhe', activity.detail ? humanMetricActivityText(activity.detail) : '(nenhum)', {
+            role: activity.detail ? 'muted' : 'muted',
+        }),
+    );
 
     println(terminalThemeHeadline('info', 'Streaming público'));
     println(terminalThemeRow('Deltas', `aceitos ${streamDiagnostics.counters.deltaAccepted} · normalizados ${streamDiagnostics.counters.deltaNormalized} · suprimidos ${streamDiagnostics.counters.deltaSuppressed}`, { role: 'info' }));

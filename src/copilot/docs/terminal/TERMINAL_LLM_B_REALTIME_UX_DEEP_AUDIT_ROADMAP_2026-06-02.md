@@ -9095,3 +9095,37 @@
   - revisar `/sdk waits`, `/status`, `/activity` e linha viva para garantir que nenhum comando
     semelhante ainda trate payload interno como UI primária;
   - manter raw/detail auditável sem regressão para operador humano.
+
+### 12.102 `/activity`, `/status full` e `/metrics` sem jargão inglês ou `phase:label` cru — 2026-06-04
+
+- [x] Achado:
+  - `/activity` default ainda chamava o caminho profundo de `Drill-down`, destoando do restante da UX
+    em português;
+  - `/status full` imprimia `Origem` como `${phase} · ${source}`, expondo `turn`, `tool`, `agent`,
+    `terminal` e similares como linguagem primária;
+  - `Atividade info` e `Atividade rec.` ainda deixavam detalhes livres e histórico recente com
+    formato técnico (`phase:label`).
+  - `/metrics` usava o rótulo `Label`, que descreve o schema interno e não a experiência do operador.
+- [x] Decisão UX:
+  - default e full continuam diferentes, mas ambos devem falar primeiro com o operador humano;
+  - fases e fontes devem ser traduzidas para `pensando`, `respondendo`, `ferramenta`, `agente`,
+    `diálogo`, `SDK`, `I/O real`;
+  - a palavra `Detalhes` substitui `Drill-down` para manter uma gramática única;
+  - histórico recente em `/status full` deve ser uma frase compacta, não uma tupla de estado.
+- [x] Implementação:
+  - `/activity` passou a usar `Detalhes` nos links para modo profundo;
+  - `/activity detail` humaniza a origem com `renderSourceLabel()`;
+  - `/status full` substituiu `Origem` por `Fluxo`, usando `renderLivePhaseLabel()` e
+    `renderLiveSourceLabel()`;
+  - `Atividade info` virou `Detalhe atividade`, com compactação/humanização;
+  - `Atividade rec.` passou de `phase:label` para `fase · rótulo`.
+  - `/metrics` trocou `Label` por `Evento`, traduziu fases `tool/turn/streaming/question` e humanizou
+    detalhes de atividade como `display=full`, `status=success`, `choices=`.
+- [x] Validação:
+  - [x] `node --check` de `activity.js`, `session.js`, `metrics.js` e testes focados;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`
+    com 63 testes verdes.
+- [ ] Próximas verificações:
+  - confirmar em live que `/activity 10` não exibe `Drill-down`, tool IDs ou fontes cruas;
+  - revisar `/diagnose` para a mesma fronteira default/detail;
+  - fazer uma live curta de boot/status/activity após o próximo bloco de limpeza.

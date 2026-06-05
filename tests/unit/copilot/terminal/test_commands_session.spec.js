@@ -483,6 +483,10 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toContain('tools load');
         expect(ctx.output()).toContain('Porta entrada');
         expect(ctx.output()).not.toContain('Inject port');
+        expect(ctx.output()).toContain('Fluxo');
+        expect(ctx.output()).not.toContain('Atividade info');
+        expect(ctx.output()).toContain('Detalhe atividade');
+        expect(ctx.output()).not.toContain('activity detail');
         expect(ctx.output()).toContain('Inicialização');
         expect(ctx.output()).toContain('Encerramento');
         expect(ctx.output()).not.toContain('Shutdown');

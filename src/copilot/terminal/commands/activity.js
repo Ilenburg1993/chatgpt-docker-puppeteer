@@ -536,10 +536,10 @@ export function cmdActivity({ println }, arg) {
     println(terminalThemeRow('Idade', formatTerminalElapsedDuration(current.ageMs)));
     println(terminalThemeDivider(37));
     if (detail) {
-        println(terminalThemeRow('Origem', current.source));
+        println(terminalThemeRow('Origem', renderSourceLabel(current.source)));
     }
     if (!detail) {
-        println(terminalThemeRow('Drill-down', '/activity detail mostra origem, trace, engine e streaming.', { role: 'command' }));
+        println(terminalThemeRow('Detalhes', '/activity detail mostra origem, trace, engine e streaming.', { role: 'command' }));
     }
 
     if (activeTurnTrace) {
@@ -604,7 +604,7 @@ export function cmdActivity({ println }, arg) {
         );
     }
     if (!detail && projection.history.length > timelineEntries.length) {
-        println(terminalThemeRow('Completo', '/activity detail mostra timeline completa.', { role: 'command' }));
+        println(terminalThemeRow('Detalhes', '/activity detail mostra timeline completa.', { role: 'command' }));
     }
     println('');
 }

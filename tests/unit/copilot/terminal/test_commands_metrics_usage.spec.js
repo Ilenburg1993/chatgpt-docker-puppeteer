@@ -334,6 +334,8 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toMatch(/Timeline\s+0/u);
         expect(ctx.output()).not.toContain('bridge/live');
         expect(ctx.output()).toContain('Atividade');
+        expect(ctx.output()).toContain('Evento');
+        expect(ctx.output()).not.toContain('Label');
         expect(ctx.output()).toContain('Injeção');
         expect(ctx.output()).not.toContain('Inject');
         expect(ctx.output()).toContain('Registro SSE');

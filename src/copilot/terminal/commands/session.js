@@ -909,7 +909,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     );
     println(terminalThemeRow('Porta entrada', String(projection.injectPort)));
     println(terminalThemeRow('Atividade', `${renderSessionActivityText(activity.label)}${activityProgress}`));
-    println(terminalThemeRow('Origem', `${activity.phase} · ${activity.source}`));
+    println(terminalThemeRow('Fluxo', `${renderLivePhaseLabel(activity.phase)} · ${renderLiveSourceLabel(activity.source)}`));
     println(terminalThemeRow('Inicialização', bootLine));
     println(terminalThemeRow('Encerramento', shutdownLine));
     println(
@@ -956,7 +956,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         println(terminalThemeRow('Tempo restante', shadowRemainingLabel));
     }
     if (activity.detail) {
-        println(terminalThemeRow('Atividade info', activity.detail));
+        println(terminalThemeRow('Detalhe atividade', compactLiveDetail(activity.detail)));
     }
     if (inputChannel.detail) {
         println(terminalThemeRow('Canal detalhe', renderHumanInputChannelText(inputChannel.detail)));
@@ -977,7 +977,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
                 activityProjection.history
                     .map((entry) => {
                         const progress = typeof entry.progress === 'number' ? ` ${entry.progress}%` : '';
-                        return `${entry.phase}:${entry.label}${progress}`;
+                        return `${renderLivePhaseLabel(entry.phase)} · ${compactLiveLabel(entry.label)}${progress}`;
                     })
                     .join('  •  '),
             ),

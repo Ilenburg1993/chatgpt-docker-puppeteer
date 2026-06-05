@@ -195,7 +195,7 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).not.toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u);
         expect(ctx.output()).not.toMatch(/\[\d{2}:\d{2}:\d{2}\]/u);
         expect(ctx.output()).toContain('/activity detail mostra origem, trace, engine e streaming');
-        expect(ctx.output()).toContain('Drill-down');
+        expect(ctx.output()).toContain('Detalhes');
         expect(ctx.output()).not.toContain('Detalhes técnicos ficam em /activity detail');
         expect(ctx.output()).not.toContain('Técnico');
         expect(ctx.output()).not.toContain('Detalhe      Detalhes técnicos');
@@ -583,6 +583,7 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toMatch(/Estado\s+sistema/u);
         expect(ctx.output()).toContain('Timeline operacional');
         expect(ctx.output()).toContain('/activity detail mostra timeline completa');
+        expect(ctx.output()).toContain('Detalhes');
         expect(ctx.output()).not.toContain('sistema · Uso BYOK sem Premium Request');
         expect(ctx.output()).toContain('Tarefa em segundo plano concluída');
         expect(ctx.output()).not.toContain('tarefa · Tarefa em segundo plano concluída');
