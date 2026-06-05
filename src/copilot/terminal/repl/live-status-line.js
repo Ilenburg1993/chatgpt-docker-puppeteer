@@ -128,6 +128,25 @@ function hasHumanPendingQuestion(runtime) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {boolean}
+ */
+function isHumanQuestionToolActivity(activity) {
+    const toolName = String(activity.toolName ?? '').toLowerCase();
+    const text = `${activity.phase ?? ''} ${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase();
+    return (
+        toolName === 'request_user_input' ||
+        toolName.endsWith('.request_user_input') ||
+        toolName === 'ask_user' ||
+        toolName.endsWith('.ask_user') ||
+        text.includes('request_user_input') ||
+        text.includes('pergunta ao operador') ||
+        text.includes('aguardando decisão humana') ||
+        text.includes('aguardando decisao humana')
+    );
+}
+
+/**
  * @param {string | null | undefined} value
  * @param {number} max
  * @returns {string}
@@ -352,6 +371,15 @@ function buildTerminalLiveStatusLine(input = {}) {
             '\x1b[K'
         );
     }
+    if (isHumanQuestionToolActivity(activity)) {
+        const queue = Number(runtime.queueSize ?? 0) > 0 ? ` · fila ${runtime.queueSize}` : '';
+        return (
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+            `${terminalThemeText('question', 'aguardando você')}` +
+            `${terminalThemeText('muted', ` · [PERG]${queue}`)}` +
+            '\x1b[K'
+        );
+    }
     const ageMs = Math.max(0, now - activity.startedAt);
     const detail = compactLiveStatusText(activity.detail ?? activity.toolName ?? '', LIVE_DETAIL_MAX_CHARS);
     const progress = activity.progress !== null ? ` · ${activity.progress}%` : '';
@@ -501,6 +529,7 @@ export function shouldRenderTerminalLiveStatusLine(input = {}) {
     const busy = input.busy ?? getBusy();
     if (hasHumanPendingQuestion(runtime)) return false;
     if (listTerminalPendingStructuredUserInputs().length > 0) return false;
+    if (isHumanQuestionToolActivity(activity)) return false;
     const queueActive = Number(runtime.queueSize ?? 0) > 0;
     const runtimeActive =
         busy ||

@@ -241,7 +241,29 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(58);
     });
 
-    it('humaniza detalhes crus de tool antes de montar a linha viva', async () => {
+    it('trata request_user_input cru como pergunta humana antes da pendência estruturada aparecer', async () => {
+        mocks.structuredInputs = [];
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'tool',
+            label: 'LLM-B tool/Executando tool',
+            detail: 'request_user_input ainda executando · 44s · chatcmpl-tool-80d5a00b25801fef',
+            toolName: 'request_user_input',
+        };
+        const { formatTerminalLiveStatusLine, shouldRenderTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+
+        const line = formatTerminalLiveStatusLine();
+
+        expect(shouldRenderTerminalLiveStatusLine()).toBe(false);
+        expect(line).toContain('aguardando você');
+        expect(line).toContain('[PERG]');
+        expect(line).not.toContain('request_user_input');
+        expect(line).not.toContain('chatcmpl-tool');
+        expect(line).not.toContain('Executando tool');
+    });
+
+    it('classifica detalhes crus de request_user_input como pergunta humana, não como tool comum', async () => {
         mocks.activity = {
             ...mocks.activity,
             phase: 'thinking',
@@ -249,12 +271,14 @@ describe('terminal/live-status-line', () => {
             detail: 'request_user_input ainda executando · report_intent_local · chatcmpl-tool-80d5a00b25801fef',
             toolName: null,
         };
-        const { formatTerminalLiveStatusLine } =
+        const { formatTerminalLiveStatusLine, shouldRenderTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');
 
         const line = formatTerminalLiveStatusLine();
 
-        expect(line).toContain('Aguardando resposta');
+        expect(shouldRenderTerminalLiveStatusLine()).toBe(false);
+        expect(line).toContain('aguardando você');
+        expect(line).toContain('[PERG]');
         expect(line).not.toContain('request_user_input');
         expect(line).not.toContain('report_intent');
         expect(line).not.toContain('chatcmpl-tool');
