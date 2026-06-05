@@ -2122,8 +2122,8 @@ function diagnosticUxCycleCriteria(boot) {
     const permissionModeStart = plain.indexOf('/permission mode', Math.max(0, sdkStatusStart));
     const permissionCockpitStart = plain.indexOf('/permission cockpit', Math.max(0, permissionModeStart));
     const queueStart = plain.indexOf('/queue intervenção visual sem turno novo', Math.max(0, permissionCockpitStart));
-    const mailboxStatusStart = plain.indexOf('/mailbox status', Math.max(0, queueStart));
-    const mailboxClearStart = plain.indexOf('/mailbox clear', Math.max(0, mailboxStatusStart));
+    const mailboxStatusStart = plain.indexOf('/queue status', Math.max(0, queueStart));
+    const mailboxClearStart = plain.indexOf('/queue clear', Math.max(0, mailboxStatusStart));
     const historyStart = plain.indexOf('/history 6', Math.max(0, mailboxClearStart));
     const dbHistoryStart = plain.indexOf('/db-history 6', Math.max(0, historyStart));
     const dbSessionsStart = plain.indexOf('/db-sessions 6', Math.max(0, dbHistoryStart));
@@ -2402,13 +2402,13 @@ function diagnosticUxCycleCriteria(boot) {
                 !/mailbox zero-PR|runtime default|runtime [a-z0-9_-]+|\[mailbox|modeHint|entryId|\\x1b\[/iu.test(
                     mailboxSurface,
                 ),
-            detail: '/queue and /mailbox status/clear rendered human intervention queue copy without mailbox-zero-PR jargon, runtime ids, entry ids, modeHint, or ANSI',
+            detail: '/queue status/clear rendered human intervention queue copy without mailbox-zero-PR jargon, runtime ids, entry ids, modeHint, or ANSI',
         },
         {
             id: 'diagnostic-ux-history-human',
             pass:
                 /Histórico/iu.test(historySurface) &&
-                (/Histórico\s+sem mensagens visíveis nesta janela/iu.test(historySurface) ||
+                (/Histórico\s+(?:sem mensagens visíveis nesta janela|vazio)/iu.test(historySurface) ||
                     (!/(LLM-B|Você|Sistema)/iu.test(historySurface) ||
                         (hasIsoSeconds(historySurface) && hasRelativeAge(historySurface)))) &&
                 !/reconciled|\bmixed\b|\[live\]|(?:Você|LLM-B|Sistema)\s+\d{4}-\d{2}-\d{2}T[^\n]*·\s*(?:\n|$)/iu.test(
@@ -2529,8 +2529,8 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
                 { line: '/permission mode', waitFor: 'Modo de permissões', advanceAfterMs: 1_000 },
                 { line: '/permission cockpit', waitFor: 'Permissões SDK', advanceAfterMs: 1_000 },
                 { line: '/queue intervenção visual sem turno novo', waitFor: 'intervenção guardada', advanceAfterMs: 1_000 },
-                { line: '/mailbox status', waitFor: 'Fila de intervenção', advanceAfterMs: 1_000 },
-                { line: '/mailbox clear', waitFor: 'limpa', advanceAfterMs: 1_000 },
+                { line: '/queue status', waitFor: 'Fila de intervenção', advanceAfterMs: 1_000 },
+                { line: '/queue clear', waitFor: 'limpa', advanceAfterMs: 1_000 },
                 { line: '/history 6', waitFor: 'Histórico', advanceAfterMs: 1_000 },
                 { line: '/db-history 6', waitFor: '/db-history', advanceAfterMs: 1_000 },
                 { line: '/db-sessions 6', waitFor: 'Últimas 6 sessões persistidas', advanceAfterMs: 1_000 },
@@ -3293,7 +3293,7 @@ function operatorUxCycleCriteria(boot) {
     const sessionSaveStart = commandStart('/session save terminal-ux-live');
     const attachEmptyStart = commandStart('/attach');
     const attachAddStart = commandStart('/attach src/copilot/terminal/commands/workspace-index.js', Math.max(0, attachEmptyStart + 1));
-    const mailboxStart = commandStart('/mailbox clear');
+    const mailboxStart = commandStart('/queue clear');
     const modelListStart = commandStart('/model list');
     const byokModelStart = commandStart('/byok model terminal-ux-boundary-fixture');
     const activityAfterByokModelStart = commandStart('/activity 10', Math.max(0, byokModelStart + 1));
@@ -3434,7 +3434,7 @@ async function runOperatorUxCycleLiveTest({ outDir, requestedTransport, timeoutM
                 waitFor: 'Adicionado',
                 advanceAfterMs: 1_500,
             },
-            { line: '/mailbox clear', waitFor: 'Fila de intervenção', advanceAfterMs: 1_500 },
+            { line: '/queue clear', waitFor: 'Fila de intervenção', advanceAfterMs: 1_500 },
             { line: '/model list', waitFor: /Modelos disponíveis|Nenhum modelo retornado pelo SDK/u, advanceAfterMs: 1_500 },
             {
                 line: '/byok model terminal-ux-boundary-fixture',

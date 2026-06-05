@@ -63,7 +63,7 @@ ${bannerGroup('Essenciais', ['/status', '/health', '/now', '/live [n]', '/activi
 ${bannerGroup('Sessão', ['/history [n]', '/db-history [n] [offset]', '/db-sessions [n]', '/who', '/restart'])}
 ${bannerGroup('Modelo', ['/model [list|id]', '/reasoning [low|medium|high|xhigh|off]', '/count'])}
 ${bannerGroup('Contexto', ['/attach [path|blob|clear]', '/context', '/compact', '/plan [on|off|autopilot|read|clear]', '/resume [id]'])}
-${bannerGroup('Fluxo', ['/pause', '/dialog-resume [bootPrompt]', '/handoff', '/queue <msg>', '/turn <msg>', '/mailbox [status|consume|clear]'])}
+${bannerGroup('Fluxo', ['/pause', '/dialog-resume [bootPrompt]', '/handoff', '/queue <msg>', '/queue [status|consume|clear]', '/turn <msg>'])}
 ${bannerGroup('Observação', ['/thinking [on|off]', '/intent [n]', '/usage [on|off|now]', '/tools', '/errors [n]', '/events [n|sources]', '/audit [n]'])}
 ${bannerGroup('SDK/FS', ['/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]', '/workspace [list|read|write|sync|mirror|promote]', '/fs [list|read|search|create|write]'])}
 ${bannerGroup('Índice', ['/scope [list|declare|find]', '/index [status|build|search|symbol]', '/elicitation', '/permission [mode|respond]'])}

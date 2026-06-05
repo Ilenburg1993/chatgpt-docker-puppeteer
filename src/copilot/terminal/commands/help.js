@@ -211,12 +211,12 @@ function renderFullHelp({ injectPort, println }) {
     ]);
     renderHelpSection(println, 'Conversa e controle', [
         { command: '/queue <msg>', description: 'guarda intervenção para a próxima pergunta humana' },
+        { command: '/queue [status|consume|clear]', description: 'inspeciona, consome ou limpa a fila de intervenção' },
         { command: '/turn <msg>', description: 'abre novo turno explicitamente, podendo consumir PR' },
         { command: '/steer <msg>', description: 'envio SDK immediate explícito, bloqueado por padrão' },
         { command: '/interrupt <msg>', description: 'aborta turno ativo e guarda substituição para a próxima pergunta' },
         { command: '/answer <texto>', description: 'responde pergunta humana pendente' },
         { command: '/abort', description: 'aborta apenas o turno SDK ativo' },
-        { command: '/mailbox [status|consume|clear]', description: 'inspeciona, consome ou limpa a fila de intervenção' },
         { command: '/clear', description: 'limpa histórico em memória' },
         { command: '/clear-shadow', description: 'limpa pergunta humana restaurada do disco' },
         { command: '/restart', description: 'reinicia a conversa' },

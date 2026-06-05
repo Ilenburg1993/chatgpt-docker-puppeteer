@@ -501,7 +501,7 @@ function _cmdMailbox(arg) {
             ),
         );
     }
-    println(terminalThemeRow('Comandos', '/mailbox status · /mailbox consume · /mailbox clear', { role: 'command' }));
+    println(terminalThemeRow('Comandos', '/queue status · /queue consume · /queue clear', { role: 'command' }));
 }
 
 /**
@@ -553,8 +553,13 @@ async function _cmdTurn(message) {
  */
 function _cmdQueueMailbox(message) {
     const prompt = message.trim();
+    if (/^(status|clear|consume|pop)$/iu.test(prompt)) {
+        _cmdMailbox(prompt);
+        return;
+    }
     if (!prompt) {
-        println(terminalThemeRow('/queue', 'Uso: /queue <mensagem>', { role: 'command' }));
+        _cmdMailbox('status');
+        println(terminalThemeRow('Uso', '/queue <mensagem> · /queue status · /queue consume · /queue clear', { role: 'command' }));
         return;
     }
     if (tryApplyImmediateTerminalZeroPr(prompt)) {
