@@ -284,7 +284,7 @@ describe('commands/diagnose', () => {
             expect(output).toContain('Agente  ·  ambiente · modelo · entrada');
             expect(output).not.toContain('Agente  ·  runtime · modelo · entrada');
             expect(output).toContain('atenção');
-            expect(lowerOutput).toContain('tarefas');
+            expect(lowerOutput).toContain('segundo plano');
             expect(lowerOutput).toContain('pulso');
             expect(lowerOutput).toContain('quota');
             expect(output).not.toContain('bg tasks');
@@ -303,12 +303,14 @@ describe('commands/diagnose', () => {
             expect(output).not.toContain('reservada');
             expect(output).not.toContain('reserved');
             expect(lowerOutput).toContain('permiss');
-            expect(output).toContain('Modo SDK');
+            expect(output).toContain('SDK');
             expect(output).toContain('interativo');
             expect(output).toContain('automáticas');
             expect(output).toContain('prompts SDK ignorados');
+            expect(output).toContain('Plano arquivo');
             expect(output).not.toContain('Status       idle');
             expect(output).not.toContain('Modo SDK     interactive');
+            expect(output).not.toContain('Plan arquivo');
             expect(output).not.toContain('Permissões   approve_all');
             expect(output).not.toContain('permission');
             expect(output).not.toContain('prompts SDK skip');
@@ -318,7 +320,8 @@ describe('commands/diagnose', () => {
             expect(output).toContain('Ambiente alvo');
             expect(output).not.toContain('Runtime alvo');
             expect(output).not.toContain('runtime id');
-            expect(output).toMatch(/Sessão ambiente\s+ativa/u);
+            expect(output).toMatch(/Sessão local\s+ativa/u);
+            expect(output).not.toContain('Sessão ambiente');
             expect(output).toMatch(/Sessão SDK\s+ativa/u);
             expect(output).toMatch(/Sessão hub\s+ativo/u);
             expect(output).not.toContain('sdk-diagnose-1…');
@@ -338,7 +341,8 @@ describe('commands/diagnose', () => {
             expect(output).not.toContain('providers=');
             expect(output).not.toContain('active=');
             expect(output).not.toContain('test-diagnose-byok-key-that-must-not-render');
-            expect(output).toContain('MCP remoto');
+            expect(output).toContain('MCP');
+            expect(output).not.toContain('MCP remoto');
             expect(output).toContain('Histórico');
             expect(output).toContain('Inicialização');
             expect(output).toContain('Encerramento');

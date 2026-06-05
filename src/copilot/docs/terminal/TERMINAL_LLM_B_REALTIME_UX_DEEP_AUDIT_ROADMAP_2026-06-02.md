@@ -9559,3 +9559,41 @@
   - investigar se o prompt do cenário deve ser reforçado para reduzir `ask_user` antes dos deltas;
   - auditar `/health full`, que no live ainda mostra `Issues` e alguns termos que podem ser
     humanizados na próxima faixa.
+
+### 12.110 `/health full` como painel humano, não dump técnico — 2026-06-04
+
+- [x] Achado:
+  - o live canônico mostrou `/health full` funcional, mas com rótulos desalinhados com a nova UX:
+    `Issues`, `Display`, `Tarefas`, `Quota`, `Plan arquivo`, `Modo SDK`, `Sessão ambiente` e
+    `MCP remoto`;
+  - havia risco de `Ação` duplicada na seção `Agente`, já corrigido no estado atual do arquivo.
+- [x] Decisão UX:
+  - `/health full` pode continuar sendo profundo, mas os rótulos precisam ser de operador;
+  - termos técnicos podem aparecer no valor quando são conceitos reais, mas a coluna esquerda deve
+    orientar leitura humana;
+  - `Sessão ambiente` é ambíguo; `Sessão local` comunica melhor a sessão do terminal/ambiente
+    principal.
+- [x] Implementação:
+  - `Modo SDK` virou `SDK`;
+  - `Plan arquivo` virou `Plano arquivo`;
+  - `Sessão ambiente` virou `Sessão local`;
+  - `Tarefas` virou `Segundo plano`;
+  - `Quota` virou `Quota SDK`;
+  - `Issues` virou `Alertas`;
+  - `Display` virou `Tela`;
+  - `MCP remoto` virou `MCP`.
+- [x] Validação:
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`
+    com 13 testes verdes;
+  - [x] `npx eslint src/copilot/terminal/commands/diagnose.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`;
+  - [x] `git diff --check`.
+- [x] Resultado observado:
+  - `/health full` fica consistente com a nomenclatura de ambiente/local/SDK adotada no restante
+    do terminal;
+  - os testes impedem retorno de `Plan arquivo`, `Sessão ambiente`, `MCP remoto` e `Modo SDK`
+    em posições antigas.
+- [ ] Próximas verificações:
+  - auditar `/usage now`, pois o live ainda mostra `BYOK provedor ...` e pode seguir a mesma
+    transição para `rota BYOK`;
+  - avaliar se `/health full` deve ter `full` traduzido no headline ou se o termo deve permanecer
+    por ser comando literal.

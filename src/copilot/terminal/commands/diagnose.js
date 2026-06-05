@@ -308,7 +308,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         : keepaliveOk
           ? diagnoseText('success', 'standby da conversa')
           : diagnoseText('warn', 'parado');
-    const runtimeSessionLabel = renderDiagnoseSessionId(runtimeSessionId, detail, 'sem runtime', 'ativa');
+    const runtimeSessionLabel = renderDiagnoseSessionId(runtimeSessionId, detail, 'sem ambiente', 'ativa');
     const sdkSessionLabel = renderDiagnoseSessionId(binding.sdkSessionId, detail, 'sem SDK', 'ativa');
     const hubSessionLabel = renderDiagnoseSessionId(hub.activeHubSessionId, detail, 'sem hub', 'ativo');
 
@@ -376,12 +376,12 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     println(terminalThemeRow('Modelo', `${snap['model']} · raciocínio ${configProjection.currentReasoningEffort}`, { role: 'assistant' }));
     println(terminalThemeRow('BYOK', byokLine, { role: byok.ready ? 'success' : byok.enabled ? 'warn' : 'muted' }));
     println(terminalThemeRow('Gateway', gatewayLine));
-    println(terminalThemeRow('Modo SDK', sdkModeLine));
+    println(terminalThemeRow('SDK', sdkModeLine));
     println(terminalThemeRow('Permissões', permissionLine));
-    println(terminalThemeRow('Plan arquivo', planOpLine));
+    println(terminalThemeRow('Plano arquivo', planOpLine));
     println(terminalThemeRow('Ambiente alvo', renderDiagnoseRuntimeTarget(configProjection.runtimeId, detail)));
     println(terminalThemeRow('Mapa ambiente', runtimesLine));
-    println(terminalThemeRow('Sessão ambiente', runtimeSessionLabel));
+    println(terminalThemeRow('Sessão local', runtimeSessionLabel));
     println(terminalThemeRow('Sessão SDK', sdkSessionLabel));
     println(terminalThemeRow('Sessão hub', hubSessionLabel));
     println(terminalThemeRow('Pergunta', askUserLine, { role: askUserLine === 'nenhum' ? 'muted' : 'question' }));
@@ -390,15 +390,15 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     println(terminalThemeRow('Ação', actionLine, { role: 'command' }));
 
     println('');
-    println(terminalThemeHeadline('thinking', 'Atividade', ['pulso', 'display']));
+    println(terminalThemeHeadline('thinking', 'Atividade', ['pulso', 'tela']));
     println(terminalThemeRow('Atual', `${humanizeDiagnoseToolIdentifiers(activity.label)}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}`, { role: renderActivityRole(activity.severity) }));
     println(terminalThemeRow('Detalhe', activityDetail));
-    println(terminalThemeRow('Tarefas', String(health?.['backgroundPendingCount'] ?? 0)));
+    println(terminalThemeRow('Segundo plano', String(health?.['backgroundPendingCount'] ?? 0)));
     println(terminalThemeRow('Pulso', keepaliveLine));
-    println(terminalThemeRow('Quota', health?.['checks']?.['quota']?.['running'] ? 'rodando' : 'parada', { role: health?.['checks']?.['quota']?.['running'] ? 'success' : 'warn' }));
+    println(terminalThemeRow('Quota SDK', health?.['checks']?.['quota']?.['running'] ? 'rodando' : 'parada', { role: health?.['checks']?.['quota']?.['running'] ? 'success' : 'warn' }));
     println(
         terminalThemeRow(
-            'Issues',
+            'Alertas',
             health
                 ? Array.isArray(health['issues']) && health['issues'].length === 0
                     ? 'nenhuma'
@@ -409,7 +409,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     );
     println(
         terminalThemeRow(
-            'Display',
+            'Tela',
             `raciocínio ${renderDiagnoseBooleanFlag(display.thinking)} · streaming ${renderDiagnoseBooleanFlag(display.streaming)} · uso ${renderDiagnoseBooleanFlag(display.usage)} · ferramentas ${renderDiagnoseBooleanFlag(display.tools)} · intenção ${renderDiagnoseBooleanFlag(display.intent)}`,
         ),
     );
@@ -423,7 +423,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
 
     println('');
     println(terminalThemeHeadline('system', 'Infraestrutura', ['MCP', 'hub', 'timers']));
-    println(terminalThemeRow('MCP remoto', mcpLine));
+    println(terminalThemeRow('MCP', mcpLine));
     println(terminalThemeRow('Histórico', hubLine));
     println(terminalThemeRow('Inicialização', bootLine));
     println(terminalThemeRow('Encerramento', shutdownLine));
