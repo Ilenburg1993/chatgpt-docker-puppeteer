@@ -4188,11 +4188,12 @@ describe('terminal /byok command', () => {
         });
         expect(ctx.output()).toContain('BYOK model-gateway refresh log');
         expect(ctx.output()).toContain('eventos 6');
-        expect(ctx.output()).toContain('Refresh completo sim');
+        expect(ctx.output()).toMatch(/Refresh completo\s+sim/u);
         expect(ctx.output()).toContain('projeções 42');
         expect(ctx.output()).toContain('openrouter-models');
         expect(ctx.output()).toContain('falhas 0');
         expect(ctx.output()).not.toContain('events=6');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('planeja refresh do catálogo model-gateway sem rede e sem escrita', async () => {
@@ -4239,7 +4240,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('sem rede');
         expect(ctx.output()).toContain('novos 1');
         expect(ctx.output()).toContain('capabilities_changed');
-        expect(ctx.output()).toContain('Sugestões de prova runtime: 1');
+        expect(ctx.output()).toMatch(/Sugestões de prova runtime\s+1/u);
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('exibe runs e diff persistidos de eligibility sem executar runtime', async () => {

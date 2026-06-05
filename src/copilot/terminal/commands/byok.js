@@ -3289,10 +3289,18 @@ async function renderByokGatewayCatalogRefreshPlan(println, selector = null) {
               [importer.id, importer.providerId].some((value) => String(value ?? '').toLowerCase().includes(normalizedSelector)),
           )
         : allImporters;
-    println(`\n  \x1b[36mBYOK model-gateway catalog refresh plan\x1b[0m`);
-    println(`  \x1b[90mCatálogo: ${store.filePath} · Filtro: ${normalizedSelector ?? '-'} · Prévia local, sem rede e sem escrita\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway catalog refresh plan'));
+    println(
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · filtro ${normalizedSelector ?? '-'} · prévia local, sem rede e sem escrita`,
+            { role: 'muted', columns: 112 },
+        ),
+    );
     if (importers.length === 0) {
-        println('    \x1b[33mNenhum importer habilitado para este seletor.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Estado', 'nenhum importer habilitado para este seletor', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
     const snapshot = await store.readSnapshot();
@@ -3359,30 +3367,62 @@ async function findLatestModelGatewayRefreshLogPath() {
  * @returns {Promise<void>}
  */
 async function renderByokGatewayCatalogRefreshLog(println) {
-    println(`\n  \x1b[36mBYOK model-gateway refresh log\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway refresh log'));
     const logPath = await findLatestModelGatewayRefreshLogPath();
     if (!logPath) {
-        println('    \x1b[33mNenhum log JSONL de refresh encontrado. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
+        println(
+            terminalThemeWrappedRow(
+                'Estado',
+                'nenhum log JSONL de refresh encontrado; rode /byok gateway catalog refresh primeiro',
+                { role: 'warn', columns: 112 },
+            ),
+        );
+        println('');
         return;
     }
     const text = await fs.readFile(logPath, 'utf8');
     const summary = summarizeModelGatewayRefreshLogText(text, { logPath });
-    println(`  \x1b[90mLog: ${logPath} · eventos ${summary.eventCount} · linhas inválidas ${summary.invalidLineCount}\x1b[0m\n`);
     println(
-        `    \x1b[90mRefresh completo ${yesNoPlain(summary.completed)} · commit ${yesNoPlain(summary.committed)} · duração ${summary.elapsedMs ?? '-'}ms\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Log',
+            `${logPath} · eventos ${summary.eventCount} · linhas inválidas ${summary.invalidLineCount}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
-        `    \x1b[90mTotais: projeções ${summary.totals.projections ?? '-'} · modelos OpenAI ${summary.totals.openai ?? '-'} · overlays ${summary.totals.overlays ?? '-'} · novos ${summary.totals.added ?? '-'} · removidos ${summary.totals.removed ?? '-'} · alterados ${summary.totals.changed ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Refresh completo',
+            `${yesNoPlain(summary.completed)} · commit ${yesNoPlain(summary.committed)} · duração ${summary.elapsedMs ?? '-'}ms`,
+            { role: summary.completed ? 'success' : 'warn', columns: 112 },
+        ),
+    );
+    println(
+        terminalThemeWrappedRow(
+            'Totais',
+            `projeções ${summary.totals.projections ?? '-'} · modelos OpenAI ${summary.totals.openai ?? '-'} · overlays ${summary.totals.overlays ?? '-'} · novos ${summary.totals.added ?? '-'} · removidos ${summary.totals.removed ?? '-'} · alterados ${summary.totals.changed ?? '-'}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     const importerEntries = Object.entries(summary.importers);
-    println(`    \x1b[90mImporters com eventos ${importerEntries.length} · falhas ${summary.failures.length}\x1b[0m`);
+    println(terminalThemeWrappedRow('Importers', `com eventos ${importerEntries.length} · falhas ${summary.failures.length}`, { role: summary.failures.length === 0 ? 'success' : 'warn', columns: 112 }));
     for (const [importerId, importer] of importerEntries.slice(0, 12)) {
         println(
-            `      \x1b[90m${importerId}: iniciados ${importer.started} · concluídos ${importer.completed} · falhas ${importer.failed} · linhas ${importer.rowCount} · evidências ${importer.evidenceCount}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Importer',
+                `${importerId} · iniciados ${importer.started} · concluídos ${importer.completed} · falhas ${importer.failed} · linhas ${importer.rowCount} · evidências ${importer.evidenceCount}`,
+                { role: importer.failed === 0 ? 'muted' : 'warn', columns: 112 },
+            ),
         );
     }
     for (const failure of summary.failures.slice(0, 8)) {
-        println(`      \x1b[31mfalha\x1b[0m \x1b[90m${failure.phase} · importer ${failure.importerId ?? '-'} · ${failure.errors.join('; ')}\x1b[0m`);
+        println(
+            terminalThemeWrappedRow(
+                'Falha',
+                `${failure.phase} · importer ${failure.importerId ?? '-'} · ${failure.errors.join('; ')}`,
+                { role: 'error', columns: 112 },
+            ),
+        );
     }
     println('');
 }
@@ -3535,34 +3575,46 @@ async function renderByokGatewayEligibilityDiff(println) {
  */
 async function renderByokGatewayCatalogDiff(println) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-    println(`\n  \x1b[36mBYOK model-gateway catalog diff\x1b[0m`);
-    println(`  \x1b[90mCatálogo: ${store.filePath} · fonte: último refresh persistido · sem rede\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway catalog diff'));
+    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · fonte último refresh persistido · sem rede`, { role: 'muted', columns: 112 }));
     const snapshot = await store.readSnapshot();
     const latestRun = findLatestCatalogRefreshRun(snapshot);
     if (!latestRun) {
-        println('    \x1b[33mNenhum diff persistido encontrado. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Estado', 'nenhum diff persistido encontrado; rode /byok gateway catalog refresh primeiro', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
     const diff = normalizeCatalogDiffForDisplay(latestRun['diff']);
     const summary = summarizeCanonicalModelProjectionDiff(diff);
     const recommendations = recommendCatalogDiffProbes(buildByokProbeRecommendationInput(snapshot, diff, 8));
     println(
-        `    \x1b[90mRun ${latestRun['runId'] ?? '-'} · novos ${summary.addedCount} · removidos ${summary.removedCount} · alterados ${summary.changedCount} · conflitos ${snapshot.conflicts.length}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Run',
+            `${latestRun['runId'] ?? '-'} · novos ${summary.addedCount} · removidos ${summary.removedCount} · alterados ${summary.changedCount} · conflitos ${snapshot.conflicts.length}`,
+            { role: summary.changedCount > 0 || summary.addedCount > 0 || summary.removedCount > 0 ? 'warn' : 'success', columns: 112 },
+        ),
     );
     if (summary.changedKinds.length > 0) {
-        println(`    \x1b[90mTipos de mudança: ${summary.changedKinds.join(',')}\x1b[0m`);
+        println(terminalThemeWrappedRow('Tipos de mudança', summary.changedKinds.join(','), { role: 'muted', columns: 112 }));
     }
-    for (const id of diff.added.slice(0, 8)) println(`      \x1b[32m+\x1b[0m ${id}`);
-    for (const id of diff.removed.slice(0, 8)) println(`      \x1b[31m-\x1b[0m ${id}`);
+    for (const id of diff.added.slice(0, 8)) println(terminalThemeWrappedRow('Novo', id, { role: 'success', columns: 112 }));
+    for (const id of diff.removed.slice(0, 8)) println(terminalThemeWrappedRow('Removido', id, { role: 'error', columns: 112 }));
     for (const item of diff.changed.slice(0, 8)) {
         const kinds = item.changedKinds.length > 0 ? ` · ${item.changedKinds.join(',')}` : '';
-        println(`      \x1b[33m~\x1b[0m ${item.key} (${item.changedFields.join(',')}${kinds})`);
+        println(terminalThemeWrappedRow('Alterado', `${item.key} (${item.changedFields.join(',')}${kinds})`, { role: 'warn', columns: 112 }));
     }
     if (recommendations.length > 0) {
-        println(`\n    \x1b[90mSugestões de prova runtime: ${recommendations.length}\x1b[0m`);
+        println(terminalThemeWrappedRow('Sugestões de prova runtime', String(recommendations.length), { role: 'warn', columns: 112 }));
         for (const recommendation of recommendations.slice(0, 5)) {
-            println(`      \x1b[90m? ${recommendation.key}: ${recommendation.probeKinds.join(',')} · ${recommendation.reasons.slice(0, 4).join(',')}\x1b[0m`);
-            println(`        \x1b[90m${recommendation.commands[0]}\x1b[0m`);
+            println(
+                terminalThemeWrappedRow(
+                    'Provar',
+                    `${recommendation.key} · ${recommendation.probeKinds.join(',')} · ${recommendation.reasons.slice(0, 4).join(',')}`,
+                    { role: 'warn', columns: 112 },
+                ),
+            );
+            println(terminalThemeWrappedRow('Comando', recommendation.commands[0], { role: 'command', columns: 112 }));
         }
     }
     println('');
@@ -3576,18 +3628,32 @@ async function renderByokGatewayCatalogIntegrity(println) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
     const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
-    println(`\n  \x1b[36mBYOK model-gateway catalog integrity\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway catalog integrity'));
     println(
-        `  \x1b[90mCatálogo: ${store.filePath} · integridade ${integrity.ok ? 'ok' : 'falha'} · identidades redigidas ${integrity.redactedIdentityCount} · sem rede\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · integridade ${integrity.ok ? 'ok' : 'falha'} · identidades redigidas ${integrity.redactedIdentityCount} · sem rede`,
+            { role: integrity.ok ? 'success' : 'error', columns: 112 },
+        ),
     );
     for (const [field, check] of Object.entries(integrity.duplicateChecks)) {
-        const color = check.duplicateExtraRowCount === 0 ? '\x1b[32m' : '\x1b[31m';
         println(
-            `    ${color}${field}\x1b[0m \x1b[90mlinhas ${check.rowCount} · únicas ${check.uniqueKeyCount} · chaves duplicadas ${check.duplicateKeyCount} · excedentes ${check.duplicateExtraRowCount}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Duplicidade',
+                `${renderByokTokenLabel(field)} · linhas ${check.rowCount} · únicas ${check.uniqueKeyCount} · chaves duplicadas ${check.duplicateKeyCount} · excedentes ${check.duplicateExtraRowCount}`,
+                { role: check.duplicateExtraRowCount === 0 ? 'success' : 'error', columns: 112 },
+            ),
         );
     }
     for (const sample of integrity.redactedIdentitySamples.slice(0, 8)) {
-        println(`      \x1b[31mredacted\x1b[0m \x1b[90m${sample.field}: ${sample.id ?? sample.providerModel ?? sample.providerId ?? '-'}\x1b[0m`);
+        println(
+            terminalThemeWrappedRow(
+                'Redigido',
+                `${renderByokTokenLabel(sample.field)} · ${sample.id ?? sample.providerModel ?? sample.providerId ?? '-'}`,
+                { role: 'error', columns: 112 },
+            ),
+        );
     }
     println('');
 }
