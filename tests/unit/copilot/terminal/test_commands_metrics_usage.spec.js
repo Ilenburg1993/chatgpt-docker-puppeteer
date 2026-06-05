@@ -376,15 +376,17 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toContain('gpt-4.1-mini');
     });
 
-    it('cmdUsage now exibe contexto e binding runtime/sdk/hub', () => {
+    it('cmdUsage now exibe contexto e conexão de sessão sem IDs técnicos', () => {
         const ctx = mockCtx();
 
         cmdUsage({ println: ctx.println }, 'now');
 
         expect(ctx.output()).toContain('Janela de contexto');
         expect(ctx.output()).not.toContain('Context window');
-        expect(ctx.output()).toContain('Vínculo');
-        expect(ctx.output()).toContain('ambiente, SDK e hub conectados');
+        expect(ctx.output()).toContain('Conexão');
+        expect(ctx.output()).toContain('sessão conectada');
+        expect(ctx.output()).not.toContain('Vínculo');
+        expect(ctx.output()).not.toContain('ambiente, SDK e hub conectados');
         expect(ctx.output()).not.toContain('runtime, SDK e hub conectados');
         expect(ctx.output()).not.toContain('runtime-456789…');
         expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
@@ -409,8 +411,9 @@ describe('commands/metrics + usage', () => {
 
         cmdUsage({ println: ctx.println }, 'now --runtime alt');
 
-        expect(ctx.output()).toContain('Vínculo');
-        expect(ctx.output()).toContain('ambiente, SDK e hub conectados');
+        expect(ctx.output()).toContain('Conexão');
+        expect(ctx.output()).toContain('sessão conectada');
+        expect(ctx.output()).not.toContain('ambiente, SDK e hub conectados');
         expect(ctx.output()).not.toContain('runtime, SDK e hub conectados');
         expect(ctx.output()).toContain('SDK interativo');
         expect(ctx.output()).toContain('gpt-4.1-mini');
@@ -422,6 +425,7 @@ describe('commands/metrics + usage', () => {
 
         cmdUsage({ println: ctx.println }, 'now detail');
 
+        expect(ctx.output()).toContain('Vínculo');
         expect(ctx.output()).toContain('runtime-4567890123456789012345');
         expect(ctx.output()).toContain('sdk-4567890123456789012345');
         expect(ctx.output()).toContain('hub-4567890123456789012345');

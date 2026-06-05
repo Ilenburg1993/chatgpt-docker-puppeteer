@@ -184,7 +184,7 @@ export function cmdUsage({ println }, arg) {
             println(
                 detail
                     ? terminalThemeRow('Vínculo', `ambiente ${runtimeLabel} · SDK ${sdkLabel} · hub ${hubLabel}`)
-                    : terminalThemeRow('Vínculo', `${renderUsageBindingSummary({
+                    : terminalThemeRow('Conexão', `${renderUsageBindingSummary({
                           runtimeSessionId: projection.runtimeSessionId,
                           sdkSessionId: projection.binding.sdkSessionId,
                           hubSessionId: projection.binding.hubSessionId,
@@ -256,9 +256,9 @@ function renderUsageBindingSummary(binding) {
         binding.sdkSessionId ? 'SDK' : null,
         binding.hubSessionId ? 'hub' : null,
     ].filter(Boolean);
-    if (present.length === 3) return 'ambiente, SDK e hub conectados';
-    if (present.length > 0) return `vínculo parcial: ${present.join(', ')}`;
-    return 'sem vínculo registrado';
+    if (present.length === 3) return 'sessão conectada';
+    if (present.length > 0) return `sessão parcial: ${present.join(', ')}`;
+    return 'sem sessão registrada';
 }
 
 /**

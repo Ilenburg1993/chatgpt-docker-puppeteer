@@ -115,6 +115,22 @@ describe('terminal/dialog/turn-display', () => {
         expect(isTerminalRenderLocked()).toBe(false);
     });
 
+    it('limpa a linha interativa antes de abrir o transcript do primeiro delta visível', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: true,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('Olá operador.');
+
+        expect(writeSpy).toHaveBeenCalled();
+        expect(writeSpy.mock.calls[0]?.[0]).toBe('');
+    });
+
     it('sanitiza deltas antes de escrever no terminal, preservando o conteúdo textual', () => {
         const state = createDisplayState({
             model: 'gpt-5-mini',

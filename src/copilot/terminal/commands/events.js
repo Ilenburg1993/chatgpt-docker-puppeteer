@@ -323,6 +323,10 @@ function humanEventLabel(event, payload = null) {
     if (event === 'permission.mode_changed') return 'Permissões alteradas';
     if (event === 'agent.background.completed') return 'Tarefa em segundo plano concluída';
     if (event === 'agent.background.idle') return 'Tarefa em segundo plano ociosa';
+    if (event === 'task.started') return 'Tarefa iniciada';
+    if (event === 'task.queued') return 'Tarefa enfileirada';
+    if (event === 'pending_messages.modified') return 'Fila de mensagens alterada';
+    if (event === 'session.tools_updated') return 'Ferramentas da sessão atualizadas';
     if (event === 'question.answered') return 'Resposta encaminhada';
     if (event === 'assistant.reasoning_complete') return 'Raciocínio concluído';
     if (event === 'dialog.turn_start' || event === 'assistant.turn_start') return 'Turno iniciado';

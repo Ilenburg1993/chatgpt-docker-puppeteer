@@ -379,6 +379,12 @@
 - [x] Gap 52: pass20 revelou que a nova função de limpeza reservada não estava no barrel `terminal/dialog`; agora `clearReservedInlineStatus` é exportada pelo barrel canônico.
 - [x] Gap 53: `/model list` despejava 40 modelos por padrão e dominava a tela; agora mostra 20 por padrão, aceita limite explícito (`/model list 50`/`limit=50`) e mantém `full` para catálogo completo.
 - [x] Gap 54: pass22 mostrou clear reservado colando no prompt antes do próximo comando porque a reserva continuava marcada após submit; agora `clearReservedInlineStatus()` libera a reserva depois de limpar.
+- [x] Gap 55: live canônico de pergunta real mostrou critério antigo esperando `trace, engine e streaming`; harness atualizado para a cópia humana atual de `/activity detail`.
+- [x] Gap 56: live canônico mostrou `você[...]›` antes do transcript final da LLM-B; o primeiro delta visível agora limpa explicitamente a linha interativa antes de abrir o bloco durável.
+- [x] Gap 57: `/usage now` padrão ainda dizia `ambiente, SDK e hub conectados`; agora a superfície normal fala `Conexão · sessão conectada`, deixando IDs e SDK/hub para `detail`.
+- [x] Gap 58: live canônico pass3 mostrou que tools em grupos separados podiam redesenhar prompt entre resumo de tool e transcript final; `printlnBlock` agora não repinta prompt enquanto a atividade operacional está em fase de turno/tool/streaming/thinking.
+- [x] Gap 59: recovery pós-ask dominou `/events` default e expôs labels crus `task started`, `task queued`, `pending messages modified` e `session tools updated`; agora estes eventos possuem rótulos humanos em português.
+- [x] Gap 60: recovery automático pós-ask tinha ação automática, mas não exibia retomada manual; agora o card mostra `Retomar /turn ...` e o runner distingue falha vazia recuperada de bloqueio real.
 
 ## 08. Criterio de Marco
 
@@ -468,3 +474,10 @@
 - [x] 2026-06-05: live pass20 falhou no boot por export ausente; `terminal/dialog/index.js` agora reexporta `clearReservedInlineStatus`.
 - [x] 2026-06-05: `/model list` passou para janela default de 20 modelos com expansão explícita por número ou `full`.
 - [x] 2026-06-05: pass22 revelou resíduo de reserva no prompt; a limpeza reserved-only agora zera a reserva depois do submit.
+- [x] 2026-06-05: live `terminal-ux-live-ask-user-canonical` pass1 confirmou pergunta humana sem spam, mas expôs prompt pronto antes do transcript final; `turn-display` passou a limpar a linha interativa no primeiro delta visível.
+- [x] 2026-06-05: critérios live de `/activity` foram alinhados à linguagem atual `auditoria técnica e streaming`, evitando falso negativo herdado da cópia anterior.
+- [x] 2026-06-05: `/usage now` trocou `Vínculo ambiente, SDK e hub conectados` por `Conexão sessão conectada`, mantendo os identificadores técnicos apenas em `/usage now detail`.
+- [x] 2026-06-05: live pass3 expôs prompt pronto entre tool summary e transcript quando o SDK dividiu tools em duas fases; `redrawPromptIfInteractive` passou a respeitar fase operacional ativa, não apenas busy/materialização.
+- [x] 2026-06-05: `/events` default passou a humanizar `task.started`, `task.queued`, `pending_messages.modified` e `session.tools_updated`, removendo inglês cru da trilha de recuperação pós-ask.
+- [x] 2026-06-05: card de recuperação automática pós-ask passou a incluir retomada manual explícita; harness live deixa de marcar `BLOCKED` quando a recuperação entrega o final canônico.
+- [x] 2026-06-05: live `terminal-ux-live-ask-user-canonical` pass04 PASS confirmou `Conexão sessão conectada`, ausência de prompt pronto entre tool summary/status/transcript, ask_user real, resposta humana, pós-ask e `/events` default humanizado.

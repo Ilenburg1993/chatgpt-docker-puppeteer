@@ -785,6 +785,50 @@ describe('terminal/commands/events', () => {
                     hubSessionId: 'hub-1',
                     payload: { classification: 'non_user_initiated' },
                 },
+                {
+                    timestamp: 1710000004100,
+                    eventId: 68,
+                    event: 'task.started',
+                    source: 'agent',
+                    eventSource: null,
+                    traceId: 'turn:3',
+                    turnId: '3',
+                    hubSessionId: 'hub-1',
+                    payload: { description: 'Continue a partir da ultima resposta humana.' },
+                },
+                {
+                    timestamp: 1710000004200,
+                    eventId: 69,
+                    event: 'task.queued',
+                    source: 'agent',
+                    eventSource: null,
+                    traceId: 'turn:3',
+                    turnId: '3',
+                    hubSessionId: 'hub-1',
+                    payload: { description: 'Continue a partir da ultima resposta humana.' },
+                },
+                {
+                    timestamp: 1710000004300,
+                    eventId: 70,
+                    event: 'pending_messages.modified',
+                    source: 'sdk/pending_messages.modified',
+                    eventSource: null,
+                    traceId: 'turn:3',
+                    turnId: '3',
+                    hubSessionId: 'hub-1',
+                    payload: { count: 2 },
+                },
+                {
+                    timestamp: 1710000004400,
+                    eventId: 71,
+                    event: 'session.tools_updated',
+                    source: 'sdk/session.tools_updated',
+                    eventSource: null,
+                    traceId: 'turn:3',
+                    turnId: '3',
+                    hubSessionId: 'hub-1',
+                    payload: { count: 105 },
+                },
             ],
         });
         const ctx = mockCtx();
@@ -821,6 +865,14 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Retomada automática');
         expect(ctx.output()).toContain('retomada automática enviada uma vez');
         expect(ctx.output()).toContain('sem repetir a pergunta humana');
+        expect(ctx.output()).toContain('Tarefa iniciada');
+        expect(ctx.output()).toContain('Tarefa enfileirada');
+        expect(ctx.output()).toContain('Fila de mensagens alterada');
+        expect(ctx.output()).toContain('Ferramentas da sessão atualizadas');
+        expect(ctx.output()).not.toContain('task started');
+        expect(ctx.output()).not.toContain('task queued');
+        expect(ctx.output()).not.toContain('pending messages modified');
+        expect(ctx.output()).not.toContain('session tools updated');
         expect(ctx.output()).not.toContain('ask-request-1234567890');
         expect(ctx.output()).not.toContain('request:ask-request');
         expect(ctx.output()).toContain('tipo iniciado pelo agente');

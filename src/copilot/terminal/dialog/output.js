@@ -622,9 +622,9 @@ function isTerminalReadlineOpen(rl) {
 }
 
 /**
- * @returns {boolean}
+ * @returns {string}
  */
-function isTerminalBootActivityActive() {
+function readCurrentTerminalActivityPhase() {
     const snapshot = readTerminalActivitySnapshot();
     const current =
         snapshot && typeof snapshot === 'object' && 'current' in snapshot
@@ -634,7 +634,7 @@ function isTerminalBootActivityActive() {
         current && typeof current === 'object' && typeof /** @type {{ phase?: unknown }} */ (current).phase === 'string'
             ? /** @type {{ phase: string }} */ (current).phase
             : '';
-    return phase === 'boot';
+    return phase;
 }
 
 /**
@@ -733,6 +733,24 @@ function isTerminalTurnPresentationActive() {
 }
 
 /**
+ * @returns {boolean}
+ */
+function isTerminalOperationalActivityActiveForPromptRedraw() {
+    const phase = readCurrentTerminalActivityPhase();
+    return (
+        phase === 'boot' ||
+        phase === 'turn' ||
+        phase === 'thinking' ||
+        phase === 'streaming' ||
+        phase === 'tool' ||
+        phase === 'task' ||
+        phase === 'compaction' ||
+        phase === 'subagent' ||
+        phase === 'model'
+    );
+}
+
+/**
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} rl
  * @param {string} prompt
  * @param {{ force?: boolean }} [options]
@@ -772,7 +790,7 @@ function shouldSkipDuplicatePromptPaint(rl, prompt, now = Date.now()) {
 function redrawPromptIfInteractive() {
     const rl = getRl();
     if (!rl || isTerminalTurnPresentationActive() || _terminalRenderLockDepth > 0) return;
-    if (isTerminalBootActivityActive()) return;
+    if (isTerminalOperationalActivityActiveForPromptRedraw()) return;
     scheduleTerminalPromptRedraw(rl, () => buildUserPrompt());
 }
 

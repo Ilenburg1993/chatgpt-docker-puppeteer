@@ -2936,7 +2936,7 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-activity-human',
             pass:
-                /Atividade Atual da LLM-B[\s\S]*Estado[\s\S]*Evento[\s\S]*Detalhes\s+\/activity detail mostra origem, trace, engine e streaming/iu.test(
+                /Atividade Atual da LLM-B[\s\S]*Estado[\s\S]*Evento[\s\S]*Detalhes\s+\/activity detail mostra origem, auditoria técnica e streaming/iu.test(
                     activitySurface,
                 ) &&
                 !/\bsource\b|\btools\b|\btraceId\b|Streaming público|\bdeltas\b|cumulativo|Sessão SDK removida|session\.deleted/iu.test(
@@ -3932,6 +3932,11 @@ function detectLiveBlocker(plain, runtime = {}) {
                     'iu',
                 ).test(plain));
         const id = answered ? 'assistant-empty-after-user-input' : asked ? 'assistant-empty-after-ask' : 'assistant-empty-turn';
+        const recoveredAfterUserInput =
+            id === 'assistant-empty-after-user-input' &&
+            scenario.postAskFinalRe.test(plain) &&
+            /Retomada automática|RECUPERANDO|dialog\.empty_after_user_input\.auto_recovery/iu.test(plain);
+        if (recoveredAfterUserInput) return null;
         const phaseDetail = answered
             ? 'after the operator answered the required ask_user prompt'
             : asked
@@ -4212,7 +4217,9 @@ function evaluateEmptyAfterUserInputRecoveryVisible(plain) {
     const text = String(plain ?? '');
     const hasTitle =
         /RECUPERAR[\s\S]{0,260}Continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica/iu.test(text) ||
-        /Continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica[\s\S]{0,260}RECUPERAR/iu.test(text);
+        /Continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica[\s\S]{0,260}RECUPERAR/iu.test(text) ||
+        /RECUPERANDO[\s\S]{0,260}Continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica/iu.test(text) ||
+        /Continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica[\s\S]{0,260}RECUPERANDO/iu.test(text);
     const hasResume =
         /Retomar\s+\/turn Continue a partir da ultima resposta humana e entregue a resposta final em texto publico\./iu.test(
             text,
@@ -5315,7 +5322,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'ux-activity-detail-route-label',
             pass:
-                /Detalhes\s+\/activity detail mostra origem, trace, engine e streaming/iu.test(
+                /Detalhes\s+\/activity detail mostra origem, auditoria técnica e streaming/iu.test(
                     beforeRawDiagnosticsPlain,
                 ) && !/^\s*T[eé]cnico\s+Detalhes t[eé]cnicos ficam em \/activity detail/imu.test(beforeRawDiagnosticsPlain),
             detail: '/activity default exposed a calm detail route instead of the old technical label',
@@ -5509,7 +5516,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         },
         {
             id: 'ux-human-runtime-vocabulary',
-            pass: !/runtime, SDK e hub conectados|Agente\s+·\s+runtime\s+·\s+modelo\s+·\s+entrada/iu.test(
+            pass: !/(?:runtime|ambiente), SDK e hub conectados|Agente\s+·\s+runtime\s+·\s+modelo\s+·\s+entrada/iu.test(
                 beforeRawDiagnosticsPlain,
             ),
             detail: 'operator-facing usage/health surfaces used ambiente vocabulary instead of runtime vocabulary',

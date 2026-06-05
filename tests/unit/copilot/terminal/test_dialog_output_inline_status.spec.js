@@ -186,6 +186,27 @@ describe('terminal/dialog/output inline status', () => {
         expect(output).toBe('');
     });
 
+    it('não redesenha prompt depois de bloco durável enquanto atividade operacional está ativa', () => {
+        mocks.activitySnapshot = {
+            phase: 'tool',
+            label: 'Integração externa concluída',
+            detail: 'lendo arquivo concluído',
+            source: 'sdk',
+            severity: 'info',
+            progress: 100,
+            toolName: 'read_file_content',
+            startedAt: 1,
+            updatedAt: 2,
+            ageMs: 1000,
+        };
+
+        printlnBlock(['  Ferramenta    Ler arquivo', '  Concluído     Ler arquivo · package.json']);
+
+        expect(writeSpy).toHaveBeenCalled();
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+        expect(mocks.rl.prompt).not.toHaveBeenCalled();
+    });
+
     it('limpa apenas a linha viva reservada no submit do readline', () => {
         writeInlineStatus('LLM-B pensando · carregando contexto');
         writeSpy.mockClear();

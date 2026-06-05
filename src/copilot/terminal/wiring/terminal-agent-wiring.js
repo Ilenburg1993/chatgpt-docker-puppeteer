@@ -565,7 +565,7 @@ export function registerAgentEventListeners(printBanner) {
                         println(
                             [
                                 '',
-                                `  ${terminalThemeBadge('warn', 'RECUPERANDO')} ${terminalThemeText('warn', 'Continuação pós-pergunta vazia; tentando retomar automaticamente uma vez')}`,
+                                `  ${terminalThemeBadge('warn', 'RECUPERANDO')} ${terminalThemeText('warn', 'Continuação pós-pergunta sem resposta pública; retomada automática enviada')}`,
                                 ...buildEmptyAfterUserInputAutoRecoveryRows({
                                     detail,
                                     turnId,

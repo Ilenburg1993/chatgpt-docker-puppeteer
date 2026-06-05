@@ -75,6 +75,7 @@ describe('terminal/events/dialog-recovery-presenter', () => {
 
         expect(text).toContain('Estado: resposta humana registrada; a continuação voltou sem texto público');
         expect(text).toContain('Ação: retomada automática enviada uma vez');
+        expect(text).toContain(`Retomar: ${EMPTY_AFTER_USER_INPUT_RESUME_COMMAND}`);
         expect(text).toContain('Resposta: SIM');
         expect(text).toContain('Turno: turno 3');
         expect(text).toContain(`Diagnóstico: ${EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS}`);

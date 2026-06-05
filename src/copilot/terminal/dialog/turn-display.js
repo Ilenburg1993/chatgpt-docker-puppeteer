@@ -378,6 +378,7 @@ export function createDeltaCallback(state) {
             } else {
                 clearInlineStatus();
             }
+            writeTerminalRaw('', { clearPromptLine: true });
             const tsNow = formatTerminalTimeLabel(now, { mode: 'dual' });
             println(SEPARATOR);
             println(
