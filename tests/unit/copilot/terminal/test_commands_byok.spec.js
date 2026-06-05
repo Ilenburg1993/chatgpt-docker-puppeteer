@@ -5148,12 +5148,15 @@ describe('terminal /byok command', () => {
             expect.objectContaining({ routeProfile: 'kilo-free', excludeFailed: true, requireAgentProbeOk: false }),
         );
         expect(ctx.output()).toContain('BYOK model route');
-        expect(ctx.output()).toContain('Decisão route-test');
+        expect(ctx.output()).toContain('Decisão');
+        expect(ctx.output()).toContain('route-test');
         expect(ctx.output()).toContain('modo pré-sonda');
-        expect(ctx.output()).toContain('selecionado');
+        expect(ctx.output()).toContain('Selecionado');
         expect(ctx.output()).toContain('kilo-auto/free');
-        expect(ctx.output()).toContain('cadeia de alternativas');
-        expect(ctx.output()).toContain('missing_capability:tools');
+        expect(ctx.output()).toContain('Cadeia de alternativas');
+        expect(ctx.output()).toContain('capacidade ausente: tools');
+        expect(ctx.output()).not.toContain('missing_capability:tools');
+        expect(ctx.output()).not.toContain('\x1b[');
         expect(buildRouteDecisionEvent).toHaveBeenCalledWith(
             expect.objectContaining({
                 taskProfile: 'repo_agent',
@@ -5231,7 +5234,9 @@ describe('terminal /byok command', () => {
         );
         expect(ctx.output()).toContain('Ollama/local foi bloqueado por padrão');
         expect(ctx.output()).toMatch(/\/byok\s+models\s+route\s+repo_agent\s+provider:ollama/u);
-        expect(ctx.output()).toContain('local_provider_requires_explicit_request');
+        expect(ctx.output()).toContain('provedor local exige pedido explícito');
+        expect(ctx.output()).not.toContain('local_provider_requires_explicit_request');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('roteia modelos descobertos pelo provider ativo usando o preset operacional em vez de owned_by', async () => {
@@ -5305,7 +5310,7 @@ describe('terminal /byok command', () => {
             'code',
             expect.objectContaining({ allowProviders: ['nvidia-nim'] }),
         );
-        expect(ctx.output()).toContain('selecionado');
+        expect(ctx.output()).toContain('Selecionado');
         expect(ctx.output()).toContain('provedor nvidia-nim');
         expect(ctx.output()).not.toContain('Nenhum candidato encontrado para roteamento');
     });
@@ -5385,7 +5390,7 @@ describe('terminal /byok command', () => {
             'code',
             expect.objectContaining({ allowProviders: ['zai'] }),
         );
-        expect(ctx.output()).toContain('selecionado');
+        expect(ctx.output()).toContain('Selecionado');
         expect(ctx.output()).toContain('glm-4.5-flash');
     });
 
@@ -5459,7 +5464,7 @@ describe('terminal /byok command', () => {
             expect.objectContaining({ allowProviders: ['ollama'] }),
         );
         expect(ctx.output()).toContain('fonte model gateway static=1');
-        expect(ctx.output()).toContain('selecionado');
+        expect(ctx.output()).toContain('Selecionado');
         expect(ctx.output()).toContain('ollama-local');
     });
 
@@ -5528,7 +5533,7 @@ describe('terminal /byok command', () => {
             'repo_agent',
             expect.objectContaining({ allowLocalProviders: true }),
         );
-        expect(ctx.output()).toContain('selecionado');
+        expect(ctx.output()).toContain('Selecionado');
         expect(ctx.output()).toContain('ollama-local');
     });
 

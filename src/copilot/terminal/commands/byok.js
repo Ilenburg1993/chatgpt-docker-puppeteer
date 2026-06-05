@@ -411,6 +411,13 @@ function renderByokTokenLabel(value) {
         candidate_can_be_ranked: 'candidato pode ser ranqueado',
         account_model_visible: 'modelo visível na conta',
         no_extra_action: 'sem ação extra',
+        'preferred:large_context': 'preferido por contexto amplo',
+        preferred_large_context: 'preferido por contexto amplo',
+        'confidence:catalog': 'confiança do catálogo',
+        confidence_catalog: 'confiança do catálogo',
+        'missing_capability:tools': 'capacidade ausente: tools',
+        missing_capability_tools: 'capacidade ausente: tools',
+        context_too_small: 'contexto pequeno demais',
         sanitized: 'sanitizado',
         redacted: 'redigido',
         wait_for_rate_limit_reset_or_choose_another_route: 'aguardar reset do limite ou escolher outra rota',
@@ -1574,16 +1581,22 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     const candidates = enrichGatewayRouteCandidatesWithRouteOptions(modelList.map(toGatewayRouteCandidate), catalogSnapshot);
     const filterLabel = renderByokFilterLabel(filters);
 
-    println(`\n  \x1b[36mBYOK model route\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model route'));
     println(
-        `  \x1b[90mperfil ${profileId} · modo ${strict ? 'estrito/sonda verificada' : 'pré-sonda'} · fonte ${renderByokSourceLabel(discovered.sourceLabel)}${discovered.profileCount > 1 ? ` · perfis ${discovered.profileCount}` : ''}${discovered.endpoint ? ` · endpoint ${discovered.endpoint}` : ''} · filtros ${filterLabel || '-'}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `perfil ${profileId} · modo ${strict ? 'estrito/sonda verificada' : 'pré-sonda'} · fonte ${renderByokSourceLabel(discovered.sourceLabel)}${discovered.profileCount > 1 ? ` · perfis ${discovered.profileCount}` : ''}${discovered.endpoint ? ` · endpoint ${discovered.endpoint}` : ''} · filtros ${filterLabel || '-'}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     for (const error of discovered.errors.slice(0, 6)) {
-        println(`  \x1b[33m  aviso: descoberta remota indisponível (${error}); usando catálogo disponível.\x1b[0m`);
+        println(terminalThemeWrappedRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, { role: 'warn', columns: 112 }));
     }
     renderByokCatalogWarnings(println, discovered.warnings);
     if (candidates.length === 0) {
-        println('    \x1b[33mNenhum candidato encontrado para roteamento. Remova filtros, use active/current ou rode /byok models refresh.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Resultado', 'nenhum candidato encontrado para roteamento; remova filtros, use active/current ou rode /byok models refresh', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
 
@@ -1605,8 +1618,15 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        println(`    \x1b[31mPerfil de rota inválido: ${message}\x1b[0m`);
-        println('    \x1b[90mPerfis conhecidos: cheap_chat, code, repo_agent, tool_agent, json_extraction, vision, deep_reasoning, local_private, local_private_strict.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Erro', `perfil de rota inválido: ${message}`, { role: 'error', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Perfis conhecidos',
+                'cheap_chat, code, repo_agent, tool_agent, json_extraction, vision, deep_reasoning, local_private, local_private_strict',
+                { role: 'muted', columns: 112 },
+            ),
+        );
+        println('');
         return;
     }
     const decisionEvent = buildRouteDecisionEvent({
@@ -1625,22 +1645,40 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     eventBus?.emit?.(decisionEvent);
 
     println(
-        `  \x1b[90mDecisão ${decisionEvent.decisionId} · admitidos ${route.candidates.length}/${candidates.length} · rejeitados ${route.rejected.length} · alternativas ${route.fallbackChain.length}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Decisão',
+            `${decisionEvent.decisionId} · admitidos ${route.candidates.length}/${candidates.length} · rejeitados ${route.rejected.length} · alternativas ${route.fallbackChain.length}`,
+            { role: route.selected ? 'success' : 'warn', columns: 112 },
+        ),
     );
     if (!route.selected) {
         println(
-            `    \x1b[33mNenhum modelo passou na política ${strict ? 'estrita' : 'pré-sonda'}. Use /byok models route ${profileId} --show-rejected para ver causas.\x1b[0m\n`,
+            terminalThemeWrappedRow(
+                'Resultado',
+                `nenhum modelo passou na política ${strict ? 'estrita' : 'pré-sonda'}; use /byok models route ${profileId} --show-rejected para ver causas`,
+                { role: 'warn', columns: 112 },
+            ),
         );
     } else {
         const model = route.selected.model;
-        const reasons = route.selected.reasons.slice(0, 5).join(' · ') || 'sem motivo adicional';
+        const reasons = renderByokTokenList(route.selected.reasons.slice(0, 5).map(String)) || 'sem motivo adicional';
         const health = route.selected.health
             ? `${renderByokHealthTag(route.selected.health)} · ${renderByokAgentProbeHealthTag(route.selected.health)}`
             : 'saúde sem registro';
-        println(`    \x1b[32mselecionado\x1b[0m ${model['providerModel'] ?? model['id']}  \x1b[90mprovedor ${model['providerId']} · pontuação ${route.selected.score}\x1b[0m`);
-        println(`      \x1b[90m${reasons} · ${health}\x1b[0m`);
         println(
-            `      \x1b[90mpróximo passo: /byok probe agent provider:${model['providerId']} model:${model['providerModel'] ?? model['id']} e então /byok use <perfil> + /byok model <id>.\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Selecionado',
+                `${model['providerModel'] ?? model['id']} · provedor ${model['providerId']} · pontuação ${route.selected.score}`,
+                { role: 'success', columns: 112 },
+            ),
+        );
+        println(terminalThemeWrappedRow('Motivos', `${reasons} · ${health}`, { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Próximo',
+                `/byok probe agent provider:${model['providerId']} model:${model['providerModel'] ?? model['id']} && /byok use <perfil> && /byok model <id>`,
+                { role: 'command', columns: 112 },
+            ),
         );
     }
 
@@ -1649,14 +1687,17 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     }
 
     if (route.fallbackChain.length > 0) {
-        println(`\n  \x1b[90mcadeia de alternativas: ${route.fallbackChain.slice(0, 8).join(' -> ')}${route.fallbackChain.length > 8 ? ' -> ...' : ''}\x1b[0m`);
+        println(terminalThemeWrappedRow('Cadeia de alternativas', `${route.fallbackChain.slice(0, 8).join(' -> ')}${route.fallbackChain.length > 8 ? ' -> ...' : ''}`, { role: 'muted', columns: 112 }));
     }
     if (showRejected && route.rejected.length > 0) {
-        println('\n  \x1b[90mRejeitados principais:\x1b[0m');
         for (const rejected of route.rejected.slice(0, 8)) {
             const model = rejected.model;
             println(
-                `    \x1b[90m- ${model['providerModel'] ?? model['id']} (${model['providerId']}): ${rejected.rejectedReasons.join(', ') || 'sem causa'}\x1b[0m`,
+                terminalThemeWrappedRow(
+                    'Rejeitado',
+                    `${model['providerModel'] ?? model['id']} (${model['providerId']}): ${renderByokTokenList(rejected.rejectedReasons.map(String)) || 'sem causa'}`,
+                    { role: 'warn', columns: 112 },
+                ),
             );
         }
     }
@@ -7055,7 +7096,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             let passed = 0;
             let attempted = 0;
             for (const [index, model] of candidates.entries()) {
-                println(`    ${index + 1}. \x1b[33m${model.id}\x1b[0m  \x1b[90m${renderModelTags(model)}\x1b[0m`);
+                println(terminalThemeWrappedRow(`${index + 1}. Modelo`, `${model.id} · ${renderModelTags(model)}`, { role: 'warn', columns: 112 }));
                 const result = await runByokProbe('agent', buildByokModelProbeSelection(model, timeoutMs), eventBus);
                 renderByokProbeResult(println, 'agent', result.probe, {
                     indent: '       ',
