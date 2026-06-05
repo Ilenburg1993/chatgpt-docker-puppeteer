@@ -2867,15 +2867,32 @@ function renderByokGatewayEnvRequirements(println, rest) {
  */
 function renderByokGatewayPreKGate(println) {
     const report = buildModelGatewayPreKCompatibilityReport();
-    println(`\n  \x1b[36mBYOK model-gateway pre-K gate\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway pre-K gate'));
     println(
-        `  \x1b[90mEtapa ${report.stage} · pronto ${report.ready ? 'sim' : 'nao'} · checks ${report.passed}/${report.total} · falhas ${report.failed}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `etapa ${report.stage} · pronto ${yesNo(report.ready)} · checks ${report.passed}/${report.total} · falhas ${report.failed}`,
+            { role: report.ready ? 'success' : 'warn', columns: 112 },
+        ),
     );
     for (const check of report.checks) {
-        const mark = check.passed ? '\x1b[32m[x]\x1b[0m' : '\x1b[31m[ ]\x1b[0m';
-        println(`    ${mark} \x1b[33m${check.id}\x1b[0m  \x1b[90mfaixa=${check.track} · ${check.summary}\x1b[0m`);
+        println(
+            terminalThemeWrappedRow(
+                'Check',
+                `${check.passed ? 'ok' : 'pendente'} · ${renderByokTokenLabel(check.id)} · faixa ${check.track} · ${check.summary}`,
+                { role: check.passed ? 'success' : 'warn', columns: 112 },
+            ),
+        );
     }
-    println('\n  \x1b[90mEste gate fecha a camada A-J; catálogo universal, SQLite e importers profundos continuam nas Faixas K+.\x1b[0m\n');
+    println(
+        terminalThemeWrappedRow(
+            'Escopo',
+            'este gate fecha a camada A-J; catálogo universal, SQLite e importers profundos continuam nas Faixas K+',
+            { role: 'muted', columns: 112 },
+        ),
+    );
+    println('');
 }
 
 /**
@@ -2884,17 +2901,32 @@ function renderByokGatewayPreKGate(println) {
  */
 function renderByokGatewayPreBuildReadiness(println) {
     const report = buildModelGatewayPreBuildReadinessReport();
-    println(`\n  \x1b[36mBYOK model-gateway pre-build readiness\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway pre-build readiness'));
     println(
-        `  \x1b[90mEtapa ${report.stage} · pronto ${report.ready ? 'sim' : 'nao'} · checks ${report.passed}/${report.total} · falhas ${report.failed}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `etapa ${report.stage} · pronto ${yesNo(report.ready)} · checks ${report.passed}/${report.total} · falhas ${report.failed}`,
+            { role: report.ready ? 'success' : 'warn', columns: 112 },
+        ),
     );
     for (const check of report.checks) {
-        const mark = check.passed ? '\x1b[32m[x]\x1b[0m' : '\x1b[31m[ ]\x1b[0m';
-        println(`    ${mark} \x1b[33m${check.id}\x1b[0m  \x1b[90mfaixa=${check.track} · ${check.summary}\x1b[0m`);
+        println(
+            terminalThemeWrappedRow(
+                'Check',
+                `${check.passed ? 'ok' : 'pendente'} · ${renderByokTokenLabel(check.id)} · faixa ${check.track} · ${check.summary}`,
+                { role: check.passed ? 'success' : 'warn', columns: 112 },
+            ),
+        );
     }
     println(
-        '\n  \x1b[90mEste readiness prepara o build do banco de metadados; ele não substitui probes runtime nem executa modelos.\x1b[0m\n',
+        terminalThemeWrappedRow(
+            'Escopo',
+            'este readiness prepara o build do banco de metadados; ele não substitui probes runtime nem executa modelos',
+            { role: 'muted', columns: 112 },
+        ),
     );
+    println('');
 }
 
 /**
@@ -2906,18 +2938,28 @@ function renderByokGatewayCanonicalCommands(println, rest) {
     const surface = rest.find((item) => /^(package|make|terminal)$/iu.test(item))?.toLowerCase();
     const phase = rest.find((item) => /^(orientation|metadata|pre-runtime|selection|validate|prebuild|live-readiness)$/iu.test(item))?.toLowerCase();
     const commands = listModelGatewayCanonicalCommands({ surface, phase });
-    println(`\n  \x1b[36mBYOK model-gateway canonical commands\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway canonical commands'));
     println(
-        `  \x1b[90mFaixa Y · escopo package + make + terminal · build em preparação · superfície ${surface ?? '-'} · fase ${phase ?? '-'} · comandos ${commands.length}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `Faixa Y · escopo package + make + terminal · build em preparação · superfície ${surface ?? '-'} · fase ${phase ?? '-'} · comandos ${commands.length}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     for (const line of renderModelGatewayCanonicalCommandLines({ surface, phase })) {
         const [head, summary] = line.split(' :: ');
-        println(`    \x1b[33m${head}\x1b[0m`);
-        if (summary) println(`      \x1b[90m${summary}\x1b[0m`);
+        println(terminalThemeWrappedRow('Comando', head, { role: 'command', columns: 112 }));
+        if (summary) println(terminalThemeWrappedRow('Descrição', summary, { role: 'muted', columns: 112 }));
     }
     println(
-        '\n  \x1b[90mBuild do banco de metadados deve partir de npm run model-gateway:build ou make model-gateway-build.\x1b[0m\n',
+        terminalThemeWrappedRow(
+            'Build',
+            'banco de metadados deve partir de npm run model-gateway:build ou make model-gateway-build',
+            { role: 'command', columns: 112 },
+        ),
     );
+    println('');
 }
 
 /**

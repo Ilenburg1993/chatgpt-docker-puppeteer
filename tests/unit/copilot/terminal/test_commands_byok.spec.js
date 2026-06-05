@@ -3105,8 +3105,9 @@ describe('terminal /byok command', () => {
         expect(buildModelGatewayPreKCompatibilityReport).toHaveBeenCalled();
         expect(ctx.output()).toContain('BYOK model-gateway pre-K gate');
         expect(ctx.output()).toContain('checks 2/2');
-        expect(ctx.output()).toContain('sdk_provider_config_boundary');
-        expect(ctx.output()).toContain('route_trace_attributes_are_stable');
+        expect(ctx.output()).toContain('sdk provider config boundary');
+        expect(ctx.output()).toContain('route trace attributes are stable');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra readiness pré-build K+ do model-gateway com checks booleanos', async () => {
@@ -3118,9 +3119,10 @@ describe('terminal /byok command', () => {
         expect(buildModelGatewayPreBuildReadinessReport).toHaveBeenCalled();
         expect(ctx.output()).toContain('BYOK model-gateway pre-build readiness');
         expect(ctx.output()).toContain('checks 3/3');
-        expect(ctx.output()).toContain('universal_catalog_contracts_are_exported');
-        expect(ctx.output()).toContain('provider_gateway_traits_are_metadata');
-        expect(ctx.output()).toContain('canonical_commands_are_published');
+        expect(ctx.output()).toContain('universal catalog contracts are exported');
+        expect(ctx.output()).toContain('provider gateway traits are metadata');
+        expect(ctx.output()).toContain('canonical commands are published');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('lista overlays de conta do model-gateway com superfície humana e segredos redigidos', async () => {
@@ -3249,6 +3251,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('make model-gateway-prebuild');
         expect(ctx.output()).toContain('/byok gateway commands');
         expect(ctx.output()).toContain('/byok gateway operator-ready profile:repo_agent');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('filtra comandos canônicos do model-gateway pela fase live-readiness', async () => {
