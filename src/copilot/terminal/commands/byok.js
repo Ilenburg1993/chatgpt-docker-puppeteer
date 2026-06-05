@@ -2989,22 +2989,25 @@ function renderByokGatewayCanonicalCommands(println, rest) {
     const full = rest.some((item) => /^(full|all|completo|todos|--full|--all)$/iu.test(item));
     const commands = listModelGatewayCanonicalCommands({ surface, phase });
     const renderedLines = renderModelGatewayCanonicalCommandLines({ surface, phase });
-    const visibleLines = full || surface || phase ? renderedLines : renderedLines.slice(0, 48);
+    const visibleCommands = full || surface || phase ? commands : commands.slice(0, 48);
     println('');
     println(terminalThemeHeadline('tool', 'BYOK model-gateway canonical commands'));
     println(
         terminalThemeWrappedRow(
             'Resumo',
-            `Faixa Y · escopo package + make + terminal · build em preparação · superfície ${surface ?? '-'} · fase ${phase ?? '-'} · comandos ${commands.length} · exibindo ${visibleLines.length}/${renderedLines.length}`,
+            `Faixa Y · escopo package + make + terminal · build em preparação · superfície ${surface ?? '-'} · fase ${phase ? renderModelGatewayCommandPhaseLabel(phase) : '-'} · comandos ${commands.length} · exibindo ${visibleCommands.length}/${renderedLines.length}`,
             { role: 'muted', columns: 112 },
         ),
     );
-    for (const line of visibleLines) {
-        const [head, summary] = line.split(' :: ');
-        println(terminalThemeWrappedRow('Comando', head, { role: 'command', columns: 112 }));
-        if (summary) println(terminalThemeWrappedRow('Descrição', summary, { role: 'muted', columns: 112 }));
+    for (const [index, command] of visibleCommands.entries()) {
+        const fallbackSummary = renderedLines[index]?.split(' :: ')[1];
+        const commandText = optionalScalarString(command['command']) ?? renderedLines[index]?.split(' :: ')[0] ?? '-';
+        const commandSurface = optionalScalarString(command['surface']) ?? '-';
+        const commandPhase = renderModelGatewayCommandPhaseLabel(optionalScalarString(command['phase']));
+        println(terminalThemeWrappedRow('Comando', `${commandSurface} · ${commandPhase} · ${commandText}`, { role: 'command', columns: 112 }));
+        println(terminalThemeWrappedRow('Descrição', renderTerminalModelGatewayCommandSummary(command, fallbackSummary), { role: 'muted', columns: 112 }));
     }
-    if (visibleLines.length < renderedLines.length) {
+    if (visibleCommands.length < renderedLines.length) {
         println(
             terminalThemeWrappedRow(
                 'Mais',
@@ -3021,6 +3024,27 @@ function renderByokGatewayCanonicalCommands(println, rest) {
         ),
     );
     println('');
+}
+
+/**
+ * @param {(text: string) => void} println
+ * @param {string[]} rest
+ * @returns {void}
+ */
+function renderByokGatewayAutoExplainIntro(println, rest) {
+    const profile =
+        rest
+            .map((item) => item.match(/^profile[:=](.+)$/iu)?.[1]?.trim())
+            .find((value) => value) ?? 'repo_agent';
+    println('');
+    println(terminalThemeHeadline('accent', 'Explicação BYOK auto', ['model-gateway']));
+    println(
+        terminalThemeWrappedRow(
+            'Escopo',
+            `perfil ${profile} · decisão atual + diagnóstico operacional · sem chamada a provedor`,
+            { role: 'muted', columns: 112 },
+        ),
+    );
 }
 
 /**
@@ -4883,6 +4907,99 @@ function renderByokAutoPresetLabel(preset) {
 }
 
 /**
+ * @param {string | null | undefined} phase
+ * @returns {string}
+ */
+function renderModelGatewayCommandPhaseLabel(phase) {
+    const labels = /** @type {Record<string, string>} */ ({
+        orientation: 'orientação',
+        metadata: 'metadados',
+        'pre-runtime': 'pré-runtime',
+        selection: 'seleção',
+        automation: 'automação',
+        'runtime-probes': 'provas runtime',
+        'live-readiness': 'pronto para live',
+        validate: 'validação',
+        prebuild: 'pré-build',
+    });
+    const normalized = String(phase ?? '').trim();
+    return labels[normalized] ?? renderByokTokenLabel(normalized);
+}
+
+const TERMINAL_MODEL_GATEWAY_COMMAND_SUMMARIES = /** @type {Readonly<Record<string, string>>} */ (Object.freeze({
+    'commands.text': 'Lista os comandos canônicos para operador humano e LLM.',
+    'commands.json': 'Emite o inventário canônico como JSON estruturado.',
+    'scripts.manifest': 'Mostra o manifesto dos runners e barrels do model-gateway.',
+    'ops.status': 'Abre cockpit operacional read-only de banco, readiness, automação e comandos.',
+    'operator.ready': 'Mostra readiness do operador com checks, rotas standby e próximos comandos seguros.',
+    'lint.scoped': 'Roda ESLint no model-gateway, comando BYOK terminal e testes focados.',
+    'typecheck.strict': 'Roda typecheck strict do escopo src/copilot.',
+    'test.contracts': 'Roda a suíte unitária de contratos do model-gateway.',
+    'test.terminal': 'Roda a suíte unitária do comando terminal BYOK.',
+    'validate.prebuild': 'Roda validações canônicas escopadas antes do build do banco.',
+    'refresh.incremental': 'Atualiza metadados incrementalmente com log JSONL vivo.',
+    'refresh.provider': 'Atualiza apenas um provedor/família sem rebuild completo.',
+    'refresh.preview': 'Simula refresh de provedor e grava log sem commitar snapshot.',
+    'refresh.log': 'Resume o último log JSONL de refresh sem tocar no catálogo.',
+    'refresh.log-sqlite': 'Espelha eventos operacionais de refresh no SQLite sem mutar metadados.',
+    'refresh.plan': 'Planeja fontes selecionadas/puladas antes de buscar provedores.',
+    'sqlite.diagnostics': 'Inspeciona tabelas SQLite e camadas operacionais sem buscar rede.',
+    'runtime-health.mirror': 'Espelha saúde BYOK já observada para tabelas runtime no SQLite.',
+    'sqlite.retention': 'Pré-visualiza retenção de quota, rate limit, gasto, rotas, refresh e saúde.',
+    'sqlite.retention-apply': 'Aplica retenção operacional SQLite para histórico volátil.',
+    'prebuild.all': 'Mostra inventário e roda validadores escopados de pré-build.',
+    'prebuild.first-build': 'Roda pré-build e materializa o banco de metadados.',
+    'metadata-build.plan': 'Planeja o build completo sem buscar provedores nem gravar stores.',
+    'metadata-build.preview': 'Executa preview do build completo sem commitar JSON/SQLite.',
+    'metadata-build.commit': 'Materializa catálogo, espelha SQLite e aplica retenção operacional.',
+    'catalog.integrity': 'Audita duplicidades e identidades redigidas do catálogo persistido.',
+    'redaction.audit': 'Audita JSON/SQLite contra vazamento de strings com aparência de segredo.',
+    'selection.audit': 'Audita seleção metadata-first sem executar probes runtime.',
+    'selection.audit.local-strict': 'Bloqueia remoto no perfil local/private estrito sem runtime.',
+    'selection.effective': 'Avalia seleção efetiva usando overlays de conta e saúde já observada.',
+    'selection.effective.supply-gate': 'Falha quando perfil local/private não tem oferta local suficiente.',
+    'selection.effective.runtime-proof': 'Inspeciona seleção exigindo prova runtime já observada.',
+    'selection.effective.trace': 'Persiste trace não-mutante de decisão para auditoria e handoff.',
+    'selection.trace-diff': 'Compara os dois traces de seleção mais recentes.',
+    'selection.trace-retention': 'Pré-visualiza retenção de traces de seleção sem apagar por padrão.',
+    'runtime.selector': 'Monta plano final do seletor runtime sem chamar provider.',
+    'automation.status': 'Calcula decisão pura de automação sem mutar terminal.',
+    'automation.plan': 'Inspeciona a próxima ação automática por perfil de rota.',
+    'automation.ready': 'Roda gate read-only antes de usar auto mode ao vivo.',
+    'automation.doctor': 'Explica política auto, bloqueios, ledgers e próximos passos.',
+    'automation.explain': 'Combina status e doctor em uma explicação read-only.',
+    'automation.handoffs': 'Lê handoffs SDK persistidos pela automação.',
+    'automation.confirmations': 'Lê confirmações de modelo correlacionadas à automação.',
+    'automation.recoveries': 'Lê tentativas de recuperação pós-turno persistidas.',
+    'automation.proof-plan': 'Cria fila read-only de comandos explícitos de prova runtime.',
+    'automation.standby': 'Lista rotas standby com comandos seguros para o operador.',
+    'automation.standby-write-sqlite': 'Persiste plano standby no SQLite sem chamar providers.',
+    'automation.standby-read-sqlite': 'Lê planos standby persistidos sem recalcular selector.',
+    'automation.scenarios': 'Monta roteiro canônico read-only para auto mode e live tests.',
+    'runtime-health.diff': 'Snapshot/diff de saúde runtime já observada sem chamadas externas.',
+    'runtime-health.clear': 'Limpa saúde operacional escopada após reset ou contaminação de fixture.',
+    'live.readiness': 'Checa integridade, paridade SQLite e seleção antes de live tests.',
+    'live.plan': 'Materializa plano de live test sem runtime adicional.',
+    'live.plan.local-strict': 'Materializa plano live com pré-requisito local/private explícito.',
+    'live.terminal.control-no-pr': 'Roda controle LLM-B sem abrir turno de modelo.',
+    'live.terminal.byok-fixture': 'Roda controle BYOK contra fixture OpenAI-compatible local.',
+    'live.terminal.auto-probe': 'Roda probe do cockpit auto sem turno de modelo nem providers.',
+    'live.runs': 'Lê summaries de live persistidos no SQLite.',
+}));
+
+/**
+ * @param {Record<string, unknown>} command
+ * @param {string | undefined} fallbackSummary
+ * @returns {string}
+ */
+function renderTerminalModelGatewayCommandSummary(command, fallbackSummary) {
+    const id = optionalScalarString(command['id']);
+    if (id && TERMINAL_MODEL_GATEWAY_COMMAND_SUMMARIES[id]) return TERMINAL_MODEL_GATEWAY_COMMAND_SUMMARIES[id];
+    const summary = optionalScalarString(command['summary']) ?? fallbackSummary;
+    return summary ?? 'comando operacional canônico do model-gateway';
+}
+
+/**
  * @param {(text: string) => void} println
  * @returns {Promise<void>}
  */
@@ -6243,6 +6360,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             return;
         }
         if (rest.some((item) => /^(explain|explicar|why|porque|por-que)$/iu.test(item))) {
+            renderByokGatewayAutoExplainIntro(println, rest);
             await renderByokGatewayAutoStatus(println, rest);
             await renderByokGatewayAutoDoctor(println, rest);
             return;
@@ -6306,6 +6424,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 return;
             }
             if (autoRest.some((item) => /^(explain|explicar|why|porque|por-que)$/iu.test(item))) {
+                renderByokGatewayAutoExplainIntro(println, autoRest);
                 await renderByokGatewayAutoStatus(println, autoRest);
                 await renderByokGatewayAutoDoctor(println, autoRest);
                 return;

@@ -1000,10 +1000,10 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
         }),
         listByokProviderModelHealth: vi.fn(() => []),
         listModelGatewayCanonicalCommands: vi.fn(() => [
-            { surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
-            { surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
-            { surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
-            { surface: 'terminal', phase: 'orientation', command: '/byok gateway operator-ready profile:repo_agent' },
+            { id: 'prebuild.all', surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
+            { id: 'prebuild.first-build', surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
+            { id: 'commands.text', surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
+            { id: 'operator.ready', surface: 'terminal', phase: 'orientation', command: '/byok gateway operator-ready profile:repo_agent' },
         ]),
         listProviderEndpointInventory: vi.fn(() => [
             {
@@ -1605,10 +1605,10 @@ describe('terminal /byok command', () => {
         listByokProviderModelHealth.mockReturnValue([]);
         listModelGatewayCanonicalCommands.mockReset();
         listModelGatewayCanonicalCommands.mockReturnValue([
-            { surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
-            { surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
-            { surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
-            { surface: 'terminal', phase: 'orientation', command: '/byok gateway operator-ready profile:repo_agent' },
+            { id: 'prebuild.all', surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
+            { id: 'prebuild.first-build', surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
+            { id: 'commands.text', surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
+            { id: 'operator.ready', surface: 'terminal', phase: 'orientation', command: '/byok gateway operator-ready profile:repo_agent' },
         ]);
         listProviderEndpointInventory.mockReset();
         listProviderEndpointInventory.mockReturnValue([
@@ -3253,6 +3253,12 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('make model-gateway-prebuild');
         expect(ctx.output()).toContain('/byok gateway commands');
         expect(ctx.output()).toContain('/byok gateway operator-ready profile:repo_agent');
+        expect(ctx.output()).toContain('pré-build');
+        expect(ctx.output()).toContain('orientação');
+        expect(ctx.output()).toContain('Lista os comandos canônicos');
+        expect(ctx.output()).toContain('Mostra readiness');
+        expect(ctx.output()).not.toContain('Show commands');
+        expect(ctx.output()).not.toContain('Run pre-build validators');
         expect(ctx.output()).not.toContain('\x1b[');
     });
 
@@ -3798,6 +3804,8 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: explainCtx.println }, 'auto explain profile:repo_agent');
         await cmdByok({ println: switchCtx.println }, 'auto switch profile:repo_agent');
 
+        expect(explainCtx.output()).toContain('Explicação BYOK auto');
+        expect(explainCtx.output()).toContain('decisão atual + diagnóstico operacional');
         expect(explainCtx.output()).toContain('BYOK model-gateway auto');
         expect(explainCtx.output()).toContain('BYOK model-gateway auto doctor');
         expect(switchCtx.output()).toContain('BYOK model-gateway auto');

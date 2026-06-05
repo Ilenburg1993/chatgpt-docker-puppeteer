@@ -6024,7 +6024,10 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'auto-explain-visible',
-            pass: /BYOK model-gateway auto explain|automation decision|operatorSummary|resumo:/i.test(plain),
+            pass:
+                /Explicação BYOK auto/u.test(plain) &&
+                /decisão atual \+ diagnóstico operacional/u.test(plain) &&
+                /BYOK model-gateway auto doctor/u.test(plain),
             detail: '/byok auto explain rendered the automation explanation',
         },
         {
