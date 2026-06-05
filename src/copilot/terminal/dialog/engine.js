@@ -59,6 +59,7 @@ import {
     recordTerminalStreamDeltaDiagnostic,
     recordTerminalTurnDelta,
     readTerminalTurnCorrelation,
+    readTerminalTurnTraceProjection,
     reviseRecentTerminalTurnTraceStatus,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     waitForTerminalTurnMaterializationQuiescence,
@@ -92,6 +93,10 @@ import {
     writeInlineStatus,
 } from './output.js';
 import { broadcastSse } from './sse.js';
+import {
+    auditAssistantToolClaims,
+    renderAssistantToolClaimAuditFindings,
+} from './assistant-tool-claim-audit.js';
 import {
     createDeltaCallback,
     createDisplayState,
@@ -136,6 +141,53 @@ const TOOL_ONLY_RECOVERY_PROMPT = [
     'Se o próximo passo exigia pergunta humana, invoque a tool real de pergunta humana agora.',
     'Não explique a recuperação e não simule tool em texto, Markdown ou JSON.',
 ].join('\n');
+
+/**
+ * @param {string} message
+ * @returns {string | null}
+ */
+function extractOriginalToolAllowlist(message) {
+    const match = message.match(/Não use outras tools além de (?<tools>[^.]+)\./iu);
+    const tools = match?.groups?.['tools']?.trim() ?? '';
+    return tools.length > 0 ? tools : null;
+}
+
+/**
+ * @param {string} message
+ * @returns {string | null}
+ */
+function extractOriginalExactAskQuestion(message) {
+    const match = message.match(/ask_user perguntando exatamente "(?<question>[^"]+)"/iu);
+    const question = match?.groups?.['question']?.trim() ?? '';
+    return question.length > 0 ? question : null;
+}
+
+/**
+ * Recovery pós-tools deve preservar o contrato do turno original. Sem isso, um modelo pode "recuperar" uma falha
+ * chamando ferramenta fora da allowlist ou inventando uma pergunta diferente, o que piora a UX e quebra lives canônicos.
+ *
+ * @param {string} originalMessage
+ * @returns {string}
+ */
+export function buildToolOnlyRecoveryPrompt(originalMessage) {
+    const allowlist = extractOriginalToolAllowlist(originalMessage);
+    const exactAskQuestion = extractOriginalExactAskQuestion(originalMessage);
+    return [
+        TOOL_ONLY_RECOVERY_PROMPT,
+        '',
+        'Contrato invariável do turno original:',
+        'Preserve todas as restrições explícitas do pedido original.',
+        allowlist
+            ? `Allowlist original de tools: ${allowlist}. Não use nenhuma tool fora dessa allowlist.`
+            : 'Não introduza ferramentas alternativas se o pedido original restringia ferramentas ou fluxo.',
+        exactAskQuestion
+            ? `Se a continuação exigir pergunta ao operador, use exatamente esta pergunta: "${exactAskQuestion}". Não altere texto, opções nem intenção.`
+            : 'Se precisar perguntar ao operador, preserve a pergunta/forma solicitada no pedido original.',
+        'Se uma tool falhou, não substitua por shell, comando, pseudo-tool ou plano textual fora do contrato; continue com a próxima tool permitida ou materialize uma falha clara.',
+    ]
+        .filter((line) => typeof line === 'string' && line.length > 0)
+        .join('\n');
+}
 
 /**
  * @param {string | null | undefined} value
@@ -1424,7 +1476,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                     { role: 'warn' },
                 ),
             );
-            turnResult = await runTerminalDialogTurnDetailed(TOOL_ONLY_RECOVERY_PROMPT, {
+            turnResult = await runTerminalDialogTurnDetailed(buildToolOnlyRecoveryPrompt(enrichedMessage), {
                 timeout: timeoutDecision.timeoutMs,
                 onDelta,
                 onDeltaDiagnostic,
@@ -1511,7 +1563,28 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             log('WARN', '[TerminalServer] Turno explícito concluído sem reply textual materializado no transporte.');
         }
 
+        const toolClaimAuditFindings = auditAssistantToolClaims({
+            reply: typeof reply === 'string' ? reply : null,
+            projection: readTerminalTurnTraceProjection(20),
+        });
+
         renderStreamingFooter(displayState, durationMs);
+        if (renderAssistantToolClaimAuditFindings(toolClaimAuditFindings)) {
+            recordTerminalActivity('system', 'Verificação de tools encontrou divergência', {
+                detail: `${toolClaimAuditFindings.length} alegação sem lifecycle comprovado`,
+                source: 'dialog/tool-claim-audit',
+                severity: 'warn',
+                recordHistory: true,
+            });
+            broadcastSse(
+                'assistant.tool_claim_audit',
+                withTerminalTurnCorrelation({
+                    findings: toolClaimAuditFindings,
+                    timestamp: Date.now(),
+                    source: 'terminal.dialog.engine/tool-claim-audit',
+                }),
+            );
+        }
         const finalRenderDecision = decideFinalTranscriptRender({
             reply: typeof reply === 'string' ? reply : null,
             streamedContent: displayState.streamingContent,

@@ -158,17 +158,24 @@ describe('fileTools — exportações do módulo', () => {
         assert.match(read.instructions, /nextCursor/);
         assert.match(write.instructions, /replacing the whole existing file/);
         assert.match(write.instructions, /expectedHash/);
+        assert.match(write.instructions, /returns success/);
         assert.match(create.instructions, /new files/);
         assert.match(create.instructions, /permission mode is automatic/);
+        assert.match(create.instructions, /after this tool returns success/);
         assert.match(remove.instructions, /explicit file cleanup/);
         assert.match(remove.instructions, /temporary live-test artifacts/);
+        assert.match(remove.instructions, /claim deletion/);
+        assert.match(remove.instructions, /invoke this tool/);
         assert.match(copy.instructions, /file-to-file copies/);
+        assert.match(copy.instructions, /copy happened until this tool returns success/);
         assert.match(move.instructions, /renames or moves/);
         assert.match(move.instructions, /automatic permission flow/);
+        assert.match(move.instructions, /move happened until this tool returns success/);
         assert.match(patch.instructions, /surgical exact-string edits/);
         assert.match(patch.instructions, /expectedHash/);
         assert.match(patch.instructions, /dryRun=true/);
         assert.match(patch.instructions, /Do not use patch_file for full-file rewrites/);
+        assert.match(patch.instructions, /dryRun=false returns success/);
     });
 });
 
@@ -380,6 +387,8 @@ describe('delete_file', () => {
         const result = await callTool(tool, { path: tmpFile });
         assert.equal(result.success, true);
         assert.equal(result.deleted, true);
+        assert.equal(result.io?.operation, 'delete');
+        assert.equal(result.io?.targetKind, 'file');
         assert.ok(!fs.existsSync(tmpFile));
     });
 

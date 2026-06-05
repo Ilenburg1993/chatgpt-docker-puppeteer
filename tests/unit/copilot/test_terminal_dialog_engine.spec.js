@@ -904,11 +904,26 @@ describe('terminal/dialog/engine.js — contrato', () => {
             },
         });
 
-        await expect(mod.sendTurn('executar tools sem síntese', 'user')).resolves.toBe('síntese recuperada após tools');
+        await expect(
+            mod.sendTurn(
+                [
+                    'executar tools sem síntese',
+                    'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-TEST: responda SIM".',
+                    'Não use outras tools além de report_intent, read_file_content, ask_user.',
+                ].join(' '),
+                'user',
+            ),
+        ).resolves.toBe('síntese recuperada após tools');
 
         expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed)).toHaveBeenCalledTimes(2);
         expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mock.calls[1]?.[0]).toContain(
             'O turno imediatamente anterior executou tools reais',
+        );
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mock.calls[1]?.[0]).toContain(
+            'Allowlist original de tools: report_intent, read_file_content, ask_user',
+        );
+        expect(vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mock.calls[1]?.[0]).toContain(
+            'use exatamente esta pergunta: "ASK-TEST: responda SIM"',
         );
         expect(vi.mocked(health.recordByokProviderModelCallFailure)).not.toHaveBeenCalled();
         expect(vi.mocked(sse.broadcastSse)).toHaveBeenCalledWith(

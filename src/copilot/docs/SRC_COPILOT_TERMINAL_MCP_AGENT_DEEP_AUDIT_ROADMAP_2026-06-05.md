@@ -173,6 +173,9 @@
 - [x] D.10 Garantir que batch MCP mostre operacoes agregadas sem esconder risco.
 - [x] D.11 Criar testes unitarios de presenter para read/list/search/diff/patch/exec/batch.
 - [ ] D.12 Criar live real com read, list, patch, exec e batch.
+- [x] D.13 Instrucoes de mutacao local agora proíbem narrar create/write/patch/copy/move/delete antes de retorno `success` da tool real.
+- [x] D.14 Auditar claims publicos da LLM-B contra `turn-trace`: quando texto afirma tool concluida sem lifecycle recente, terminal alerta o operador.
+- [x] D.15 Recovery pós-tools preserva allowlist e pergunta exata do turno original para evitar ferramenta alternativa ou ask_user improvisado.
 
 ## Faixa E - MCP e Apps SDK Compliance
 
@@ -304,7 +307,7 @@
 - [x] O.2 Implementar auditoria MCP descriptor/status labels humanos.
 - [x] O.3 Fortalecer presenters para local/MCP tools com action/target/result comuns.
 - [x] O.4 Cobrir read/list/patch/exec nos testes de presenter e linha viva.
-- [ ] O.5 Rodar live curta de read/list/patch/exec, incluindo `file-patch-roundtrip`.
+- [x] O.5 Rodar live curta de read/list/patch/exec, incluindo `file-patch-roundtrip`.
 - [ ] O.6 Corrigir discrepancias visuais observadas.
 - [ ] O.7 Auditar model switch end-to-end.
 - [ ] O.8 Criar live de model switch.
@@ -327,6 +330,9 @@
 - [x] Gap 12: `patch_file dryRun=true` aparecia como `Arquivo edição ok`; agora projection, SSE e linha viva preservam semantica de simulacao.
 - [x] Gap 13: fala publica da LLM-B podia exibir/exportar HTML bruto; renderer de turno e `/export` agora escapam markup em texto nao confiavel.
 - [x] Gap 14: live pass3 mostrou alucinacao operacional (`delete_file` descrito no texto sem tool real); runner agora nao responde automaticamente ao `ask_user` se tools obrigatorias estiverem incompletas.
+- [x] Gap 15: prompt live permitia deltas com markup; agora exige texto puro nas linhas `DELTA-CANONICAL` e o runner tem criterio contra HTML bruto na superficie publica.
+- [x] Gap 16: terminal confiava visualmente em claims publicos de tool; agora `assistant-tool-claim-audit` compara resposta publica com o ledger recente e emite warning/SSE quando falta lifecycle comprovado.
+- [x] Gap 17: recuperação automática pós-tools podia sair da allowlist do pedido original (`exec_command` em live de file tools); prompt de recovery agora injeta allowlist/pergunta exata e runner detecta `ask_user` divergente.
 
 ## 08. Criterio de Marco
 
@@ -337,7 +343,7 @@
 - [ ] Marco Agent-1: resultado semantico de turno e consumido sem reinterpretacao paralela desnecessaria.
 - [ ] Marco BYOK-1: provider/modelo/quota/rate-limit aparecem separados entre catalogo, pre-runtime e runtime.
 - [ ] Marco Ops-1: package, Makefile e terminal possuem comandos canonicos consistentes.
-- [ ] Marco Live-1: todos os cenarios principais tem artefatos live e passam sem discrepancia visual relevante.
+- [x] Marco Live-1: `file-patch-roundtrip` possui artefato live PASS com tool lifecycle, ask_user, export e SSE canônicos.
 
 ## 09. Diario Tecnico do Turno Atual
 
@@ -357,5 +363,11 @@
 - [x] 2026-06-05: reexecutada live `file-patch-roundtrip` pass3; dry-run apareceu como `simulação de edição`, prompt duplicado continuou ausente e resposta pos-ask materializou rapidamente.
 - [x] 2026-06-05: a live pass3 falhou corretamente porque a LLM-B escreveu que removeu o arquivo sem chamar `delete_file`; scratch remanescente foi removido e o runner foi fortalecido para nao auto-responder protocolo incompleto.
 - [x] 2026-06-05: identificado HTML bruto em delta publico (`<a><img>`); `sanitizeTerminalRenderText` e `/export` agora escapam markup, com testes unitarios dedicados.
-- [ ] 2026-06-05: reexecutar `file-patch-roundtrip` ate PASS completo apos bloqueio de ask prematuro por tools incompletas.
+- [x] 2026-06-05: prompt live e instructions das file tools reforçados para texto puro e para nunca afirmar mutação antes do retorno `success` da tool real.
+- [x] 2026-06-05: pass4 confirmou o caso adversarial: a LLM-B voltou a afirmar `delete_file` sem lifecycle; o runner bloqueou auto-resposta ao `ask_user` e coletou diagnosticos.
+- [x] 2026-06-05: criado `assistant-tool-claim-audit`, integrado ao engine, com warning visual e SSE quando resposta publica afirma tool concluida sem evidencia no `turn-trace`.
+- [x] 2026-06-05: `delete_file` local agora retorna `withIoMeta(..., deleted.io)` como as demais mutacoes, preservando `io.operation=delete` para projection/lifecycle.
+- [x] 2026-06-05: pass6 bloqueou corretamente por `unexpected-scenario-tool`: recuperação pós-tools chamou `exec_command` fora da allowlist após falha BYOK/hash mismatch.
+- [x] 2026-06-05: `buildToolOnlyRecoveryPrompt()` agora preserva allowlist original de tools e pergunta exata de `ask_user`; runner live também bloqueia pergunta divergente com diagnóstico próprio.
+- [x] 2026-06-05: reexecutado live `file-patch-roundtrip` pass7 em PTY; status PASS, scratch limpo, `delete_file` real renderizado como `EXCLUIR`, `ask_user` exato, resposta pós-SIM materializada e export/SSE correlacionados.
 - [ ] 2026-06-05: melhorar estado visual/diagnostico para continuacao pos-`ask_user` lenta ou falha BYOK sem mensagem estruturada.

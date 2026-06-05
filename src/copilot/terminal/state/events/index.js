@@ -66,6 +66,7 @@ export {
     beginTerminalTurnTrace,
     completeTerminalTurnToolCall,
     completeTerminalTurnTrace,
+    readTerminalTurnTraceProjection,
     recordTerminalTurnFileActivity,
     recordTerminalTurnToolActivity,
     recordTerminalTurnUserInputActivity,

@@ -175,6 +175,21 @@ function hasHumanQuestionInputPrompt(plain) {
     );
 }
 
+function findDivergentScenarioAsk(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+    const text = String(plain ?? '');
+    if (scenario.askRenderedRe.test(text)) return null;
+    const prefix = scenario.askQuestion.split(':')[0];
+    if (!prefix) return null;
+    const match = text.match(new RegExp(`\\[(?:PERGUNTA|ASK)\\]\\s+(?<question>${escapeRegExp(prefix)}[^\\n\\r]*)`, 'iu'));
+    const question = match?.groups?.['question']?.trim() ?? '';
+    if (!question || question === scenario.askQuestion) return null;
+    return {
+        expected: scenario.askQuestion,
+        observed: question,
+        prefix,
+    };
+}
+
 function buildQuestionPendingRegex(question) {
     return new RegExp(`\\[(?:QUESTION|ASK:[^\\]]+)\\]\\s+LLM-B perguntou:\\s*"${escapeRegExp(question)}"`, 'u');
 }
@@ -398,12 +413,14 @@ function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]
         'Depois invoque a ferramenta real read_file_content para ler as primeiras 3 linhas de package.json.',
         ...scenario.beforeDeltaInstructions,
         'Em seguida escreva obrigatoriamente uma resposta pública antes de qualquer ask_user, com exatamente 8 linhas separadas: DELTA-CANONICAL-1, DELTA-CANONICAL-2, DELTA-CANONICAL-3, DELTA-CANONICAL-4, DELTA-CANONICAL-5, DELTA-CANONICAL-6, DELTA-CANONICAL-7 e DELTA-CANONICAL-8.',
+        'Essas oito linhas DELTA-CANONICAL devem ser texto puro: não use Markdown, HTML, links, imagens, tabelas, listas ou blocos de código nelas.',
         'Não invoque ask_user antes dessas 8 linhas públicas aparecerem no transcript.',
         scenario.askToolInstruction,
         scenario.finalInstruction,
         `Antes da resposta humana final, não escreva, cite nem antecipe o marcador ${scenario.finalMarker}.`,
         `A pergunta ${scenario.askQuestion.split(':')[0]} deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.`,
         'Nunca escreva um objeto tool_calls, uma chave function/args, nem diga que ações foram executadas sem a tool real aparecer no terminal.',
+        'Nunca afirme que criou, editou, moveu, copiou ou excluiu arquivo antes de ver a respectiva tool real retornar sucesso.',
         `Não use outras tools além de ${scenario.allowedTools.join(', ')}.`,
     ].join(' ');
 }
@@ -3855,6 +3872,16 @@ function detectLiveBlocker(plain, runtime = {}) {
                 ` · deltasBeforeAsk=${askBeforeDeltas.deltaMarkersBeforeAsk}`,
         };
     }
+    const divergentAsk = findDivergentScenarioAsk(plain, scenario);
+    if (divergentAsk) {
+        return {
+            id: 'assistant-ask-question-diverged',
+            detail:
+                'assistant called ask_user with a question that does not match the live scenario contract' +
+                ` · expected="${divergentAsk.expected}"` +
+                ` · observed="${divergentAsk.observed}"`,
+        };
+    }
     const emptyOutput =
         findUnrecoveredTerminalEmptyOutputEvent(runtime.sseEvents) ??
         findUnrecoveredEmptyDialogTurnEnd(runtime.sseEvents);
@@ -5216,6 +5243,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 beforeRawDiagnosticsPlain,
             ),
             detail: 'durable waiting/tool heartbeat spam, raw ids, and SDK ask_user labels were not printed',
+        },
+        {
+            id: 'ux-no-raw-html-in-public-output',
+            pass: !/<\s*(?:a|img|script|iframe|object|embed)\b/iu.test(beforeRawDiagnosticsPlain),
+            detail: 'public terminal/export surface escaped raw HTML-like markup from assistant text',
         },
         {
             id: 'ux-no-generic-tool-failure-copy',
@@ -7098,6 +7130,35 @@ async function main() {
         ).unref();
         if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
     };
+    const scheduleDivergentAskDiagnostics = (divergentAsk) => {
+        if (postCommandsSent || !divergentAsk) return;
+        postCommandsSent = true;
+        console.warn(
+            `[terminal-live] cenário canônico: ask_user divergiu da pergunta esperada; esperado="${divergentAsk.expected}" observado="${divergentAsk.observed}".`,
+        );
+        const diagnostics = [
+            '/activity 40',
+            '/intent 5',
+            '/tools diag',
+            '/events 80',
+            '/events 120 --raw',
+            '/errors 10',
+            '/health full',
+            `/export ${exportArg}`,
+        ];
+        sendCommandSequence(write, diagnostics, { delayMs: 550 });
+        setTimeout(
+            () => {
+                if (!quitSent) {
+                    quitSent = true;
+                    byokNoPrCanQuit = true;
+                    write('/quit');
+                }
+            },
+            diagnostics.length * 550 + 2_000,
+        ).unref();
+        if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
+    };
     const invalidChoiceFeedbackRe =
         /Resposta\s+não corresponde às opções da pergunta pendente|Resposta\s+inválida para a pergunta pendente|invalid_choice/iu;
     function handleRunnerTimeout() {
@@ -7238,6 +7299,18 @@ async function main() {
                 scenarioSent = true;
                 write(buildScenarioPrompt(liveScenario));
             });
+        }
+        if (
+            !answerSent &&
+            answerStepIndex === 0 &&
+            !liveScenario.askRenderedRe.test(plain) &&
+            hasHumanQuestionInputPrompt(plain)
+        ) {
+            const divergentAsk = findDivergentScenarioAsk(plain, liveScenario);
+            if (divergentAsk) {
+                scheduleDivergentAskDiagnostics(divergentAsk);
+                return;
+            }
         }
         if (
             !answerSent &&

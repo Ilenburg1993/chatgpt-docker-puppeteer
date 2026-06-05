@@ -50,7 +50,8 @@ const writeFileContentTool = buildTool({
     instructions:
         'Use write_file_content only when replacing the whole existing file is intentional. Prefer patch_file for ' +
         'surgical edits. Read the current file first and pass expectedHash from read_file_content when available so ' +
-        'concurrent changes fail safely instead of being overwritten.',
+        'concurrent changes fail safely instead of being overwritten. Do not claim the file was written until this ' +
+        'tool returns success.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo (deve existir)'),
         content: z.string().describe('Novo conteúdo completo do arquivo'),
@@ -178,7 +179,8 @@ const createFileTool = buildTool({
     instructions:
         'Use create_file for new files or deliberate file replacement. Use createParentDirs=true for approved ' +
         'workspace-relative scratch paths. Do not ask for a separate permission prompt when the operator already gave ' +
-        'a concrete path and the terminal permission mode is automatic; report the created path and byte count instead.',
+        'a concrete path and the terminal permission mode is automatic; report the created path and byte count only ' +
+        'after this tool returns success.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo a criar'),
         content: z.string().optional().default('').describe('Conteúdo inicial do arquivo'),
@@ -283,7 +285,9 @@ const deleteFileTool = buildTool({
     instructions:
         'Use delete_file only for explicit file cleanup or removal requested by the operator/scenario. Do not use it ' +
         'for directories. When deleting temporary live-test artifacts, prefer precise workspace-relative paths and ' +
-        'avoid extra confirmation prompts if the cleanup was already part of the requested flow.',
+        'avoid extra confirmation prompts if the cleanup was already part of the requested flow. Do not claim deletion ' +
+        'or cleanup until this tool returns success. If a requested workflow names delete_file as the final cleanup ' +
+        'step, invoke this tool; do not replace it with a textual claim that cleanup happened.',
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo a deletar'),
     }),
@@ -303,37 +307,40 @@ const deleteFileTool = buildTool({
 
         try {
             const deleted = await deleteFileLocked(resolved);
-            return {
-                success: true,
-                ...deleted,
-                operation: await completeAndAuditMutation(
-                    operation,
-                    {
-                        traceId: deleted.io?.traceId ?? null,
-                        evidence: {
-                            deleted: true,
-                            previousHash: deleted.previousHash,
-                            previousBytes: deleted.previousBytes,
+            return withIoMeta(
+                {
+                    success: true,
+                    ...deleted,
+                    operation: await completeAndAuditMutation(
+                        operation,
+                        {
+                            traceId: deleted.io?.traceId ?? null,
+                            evidence: {
+                                deleted: true,
+                                previousHash: deleted.previousHash,
+                                previousBytes: deleted.previousBytes,
+                            },
                         },
-                    },
-                    { tool: 'delete_file', io: deleted.io, result: { path: resolved } },
-                ),
-                changeSet: buildMutationChangeSet({
-                    capability: IO_CAPABILITY.fileDelete,
-                    riskClass: IO_RISK.high,
-                    traceId: deleted.io?.traceId ?? null,
-                    action: 'delete',
-                    targets: [resolved],
-                    rollback: {
-                        action: 'write',
-                        target: resolved,
-                        previousHash: deleted.previousHash,
-                        bytes: deleted.previousBytes,
-                        snapshotBase64: deleted.previousSnapshotBase64,
-                    },
-                    evidence: { tool: 'delete_file' },
-                }),
-            };
+                        { tool: 'delete_file', io: deleted.io, result: { path: resolved } },
+                    ),
+                    changeSet: buildMutationChangeSet({
+                        capability: IO_CAPABILITY.fileDelete,
+                        riskClass: IO_RISK.high,
+                        traceId: deleted.io?.traceId ?? null,
+                        action: 'delete',
+                        targets: [resolved],
+                        rollback: {
+                            action: 'write',
+                            target: resolved,
+                            previousHash: deleted.previousHash,
+                            bytes: deleted.previousBytes,
+                            snapshotBase64: deleted.previousSnapshotBase64,
+                        },
+                        evidence: { tool: 'delete_file' },
+                    }),
+                },
+                deleted.io,
+            );
         } catch (err) {
             const e = /** @type {{ code?: unknown }} */ (err);
             if (e.code === 'EISDIR' || e.code === 'EPERM') {
@@ -373,7 +380,8 @@ const copyFileTool = buildTool({
         'Copia um arquivo para outro caminho no workspace, com overwrite explícito e rollback do destino quando possível.',
     instructions:
         'Use copy_file for file-to-file copies with explicit source and destination. Keep paths workspace-relative ' +
-        'when the operator gave relative paths. Set overwrite=true only when replacing the destination is intended.',
+        'when the operator gave relative paths. Set overwrite=true only when replacing the destination is intended. ' +
+        'Do not claim the copy happened until this tool returns success.',
     parameters: z.object({
         source: z.string().describe('Caminho do arquivo de origem'),
         destination: z.string().describe('Caminho de destino'),
@@ -503,7 +511,7 @@ const moveFileTool = buildTool({
     instructions:
         'Use move_file for renames or moves after the source and destination are known. Keep the operation atomic and ' +
         'avoid additional permission questions when the operator already supplied the exact move in an automatic ' +
-        'permission flow.',
+        'permission flow. Do not claim the move happened until this tool returns success.',
     parameters: z.object({
         source: z.string().describe('Caminho do arquivo de origem'),
         destination: z.string().describe('Caminho de destino'),
