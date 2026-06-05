@@ -17,7 +17,7 @@
 
 import { recordToolCall } from '#copilot/observability';
 import { getShowToolActivity } from '../../presentation/state/index.js';
-import { broadcastSse, clearInlineStatus, println, writeInlineStatus } from '../dialog/index.js';
+import { broadcastSse, clearInlineStatus, parkTerminalPromptForContinuation, println, writeInlineStatus } from '../dialog/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     completeTerminalTurnToolCall,
@@ -54,6 +54,17 @@ import {
 
 const DURABLE_TOOL_PROGRESS_INTERVAL_MS = 4_000;
 const DURABLE_TOOL_PROGRESS_PERCENT_STEP = 25;
+const TOOL_TURN_PROMPT_PARK_MS = 12_000;
+const POST_TOOL_USE_RESULT_OPERATIONS = new Set([
+    'create',
+    'delete',
+    'edit',
+    'move',
+    'read',
+    'run',
+    'search',
+    'write',
+]);
 
 /**
  * @param {string} toolName
@@ -504,6 +515,7 @@ function printToolStart(presentation) {
         });
         return;
     }
+    parkTerminalPromptForContinuation(TOOL_TURN_PROMPT_PARK_MS);
     const operationRole = mapTerminalToolOperationRole(presentation.operation);
     println(
         compactDetail
@@ -553,6 +565,7 @@ function shouldPersistToolProgressMilestone(entry, progress, progressMessage) {
  */
 function printToolProgress(presentation, progress, progressMessage, options = {}) {
     if (!getShowToolActivity()) return;
+    parkTerminalPromptForContinuation(TOOL_TURN_PROMPT_PARK_MS);
     const compactDetail = getTerminalDetailLevel() === 'compact';
     const suffix = progressMessage ?? (progress !== null ? `${progress}%` : '');
     const progressLine =
@@ -574,6 +587,7 @@ function printToolProgress(presentation, progress, progressMessage, options = {}
  */
 function printToolComplete(presentation, success, durationLabel, fallbackToolCallId = null) {
     if (!getShowToolActivity()) return;
+    parkTerminalPromptForContinuation(TOOL_TURN_PROMPT_PARK_MS);
     const compactDetail = getTerminalDetailLevel() === 'compact';
     const operationRole = mapTerminalToolOperationRole(presentation.operation);
     if (compactDetail) clearInlineStatus();
@@ -642,7 +656,7 @@ function isTerminalWaitingForHumanQuestion() {
  */
 function shouldDeferExternalCompletionUntilPostToolUse(presentation, result) {
     if (!result.success || result.hasStructuredResult) return false;
-    return presentation.operation === 'run';
+    return POST_TOOL_USE_RESULT_OPERATIONS.has(presentation.operation);
 }
 
 /**
@@ -1245,7 +1259,7 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
  */
 export function reconcileTerminalPostToolUseResult({ registry, evt }) {
     const result = inferToolResultSuccess(evt, true);
-    if (!result.hasStructuredResult || result.success) return;
+    if (!result.hasStructuredResult) return;
     const toolName = typeof evt['toolName'] === 'string' && evt['toolName'].trim() ? evt['toolName'].trim() : 'tool';
     const args = extractTerminalToolArgsPayload(evt);
     const presentation = buildTerminalToolActivityPresentation(
@@ -1261,25 +1275,31 @@ export function reconcileTerminalPostToolUseResult({ registry, evt }) {
         toolName,
     );
     const canonicalName = presentation.canonicalToolName ?? presentation.toolName;
-    const resolvedEntry = registry.resolveByName(toolName);
+    const eventToolCallId = typeof evt['toolCallId'] === 'string' && evt['toolCallId'].trim() ? evt['toolCallId'] : null;
+    const requestId = typeof evt['requestId'] === 'string' && evt['requestId'].trim() ? evt['requestId'] : null;
+    const resolvedEntry =
+        (eventToolCallId ? registry.getEntry(eventToolCallId) : null) ??
+        registry.resolveByRequestId(requestId) ??
+        registry.resolveByName(toolName);
+    if (result.success && !resolvedEntry) return;
     const toolCallId = resolvedEntry?.toolCallId ?? '';
-    const completedEntry = toolCallId ? registry.complete(toolCallId, false) : null;
+    const completedEntry = toolCallId ? registry.complete(toolCallId, result.success) : null;
     const durationMs = result.durationMs ?? 0;
     const durationLabel = appendExitCodeToDurationLabel(
         buildToolCompletionDurationLabel(completedEntry ?? resolvedEntry, durationMs),
         result.exitCode,
     );
-    recordTerminalDiagnosticToolStats(canonicalName, durationMs, false);
-    recordToolTurnProjection(presentation, 'failed', toolCallId || null, false);
-    if (toolCallId) completeTerminalTurnToolCall({ toolCallId, success: false });
-    recordTerminalActivity('tool', 'Integração externa falhou', {
-        detail: presentation.completeLine(false, durationLabel),
+    recordTerminalDiagnosticToolStats(canonicalName, durationMs, result.success);
+    recordToolTurnProjection(presentation, result.success ? 'completed' : 'failed', toolCallId || null, result.success);
+    if (toolCallId) completeTerminalTurnToolCall({ toolCallId, success: result.success });
+    recordTerminalActivity('tool', result.success ? 'Integração externa concluída' : 'Integração externa falhou', {
+        detail: presentation.completeLine(result.success, durationLabel),
         toolName: presentation.displayToolName,
         toolTarget: presentation.target,
         source: 'sdk',
-        severity: 'error',
+        severity: result.success ? 'info' : 'error',
     });
-    printToolComplete(presentation, false, durationLabel, toolCallId || null);
+    printToolComplete(presentation, result.success, durationLabel, toolCallId || null);
     broadcastToolLifecycle(
         buildToolLifecycleComplete({
             toolCallId,
@@ -1299,7 +1319,7 @@ export function reconcileTerminalPostToolUseResult({ registry, evt }) {
             resultCount: presentation.resultCount,
             resultSummary: presentation.resultSummary,
             primaryTargetKind: presentation.primaryTargetKind,
-            success: false,
+            success: result.success,
             durationMs,
         }),
     );

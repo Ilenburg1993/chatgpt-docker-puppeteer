@@ -276,7 +276,10 @@ operador vê e salvar summary com critérios objetivos.
 - [ ] F2. Reduzir exposição de IDs no modo normal.
 - [ ] F3. Melhorar labels de read/patch em linha viva.
 - [ ] F4. Mostrar ISO 8601 completo em views persistentes.
-- [ ] F5. Consolidar fallback heurístico para tools externas/legadas.
+- [x] F5. Consolidar fallback heurístico para tools externas/legadas.
+- [x] F6. Adiar sucesso provisório de `external_completed` até `postToolUse` estruturado em operações com resultado tardio.
+- [x] F7. Estacionar redraw de prompt idle durante narração de tools para evitar prompt pronto em turno ativo.
+- [x] F8. Deduplicar alvos de arquivos vindos simultaneamente de args/result/presentation.
 
 ### Faixa G — Auditoria de claims
 
@@ -302,21 +305,27 @@ operador vê e salvar summary com critérios objetivos.
 
 ### Faixa J — Testes unitários focados
 
-- [ ] J1. Testar metadata canônica.
-- [ ] J2. Testar verifier contextual.
-- [ ] J3. Testar `list_tools` detalhado.
-- [ ] J4. Testar summaries de read/patch.
-- [ ] J5. Testar presenter com hints estruturados.
+- [x] J1. Testar metadata canônica.
+- [x] J2. Testar verifier contextual.
+- [x] J3. Testar `list_tools` detalhado.
+- [x] J4. Testar summaries de read/patch.
+- [x] J5. Testar presenter com hints estruturados.
+- [x] J6. Testar lifecycle tardio `external_completed` -> `postToolUse` para falha e sucesso.
+- [x] J7. Testar `/export` criando diretórios de destino antes da escrita.
 
 ### Faixa K — Testes live LLM-B
 
-- [ ] K1. Criar roteiro live read/patch em workspace temporário.
-- [ ] K2. Salvar transcript e summary em artifacts.
-- [ ] K3. Conferir terminal como operador humano.
-- [ ] K4. Corrigir discrepâncias de layout, nomes e timing.
+- [x] K1. Criar roteiro live read/patch em workspace temporário.
+- [x] K2. Salvar transcript e summary em artifacts.
+- [x] K3. Conferir terminal como operador humano.
+- [x] K4. Corrigir discrepâncias de layout, nomes e timing.
 - [ ] K5. Repetir com falhas intencionais e recuperação.
 - [x] K6. Confirmar runner canônico: `node scripts/model-gateway/run.mjs llmBLiveTest`; wrapper antigo `scripts/copilot/run-terminal-llm-b-live-test.mjs` não existe mais.
 - [x] K7. Executar live PTY `--no-pr` para validar boot/UX/artefatos sem abrir turno de LLM.
+- [x] K8. Reexecutar `file-patch-roundtrip` após correções de lifecycle/prompt/export.
+- [ ] K9. Rodar cenário `recoverable-tool-error` para confirmar falhas sem "Concluído" falso.
+- [ ] K10. Rodar cenário `file-write-roundtrip` para criação/move/delete e claims.
+- [ ] K11. Consolidar relatório visual comparando screenshots antigas versus saída live atual.
 
 ### Faixa L — Agente e outras superfícies src/copilot
 
@@ -352,4 +361,11 @@ operador vê e salvar summary com critérios objetivos.
 - [x] 2026-06-05: validações focadas verdes: typecheck strict `src/copilot`, lint `src/copilot`, e 145 testes unitários focados de terminal/tools/read/write.
 - [x] 2026-06-05: após push `1d58e746`, retomada análise de linha viva e runner live; caminho canônico de live test confirmado.
 - [x] 2026-06-05: live PTY `--no-pr` PASS em `artifacts/terminal-live/llm-b-tools-ux-no-pr-rerun-20260605`; harness atualizado para critérios da UX atual.
-- [ ] Próximo passo: roteiro live read/patch, labels da linha viva e auditoria de claims.
+- [x] 2026-06-05: live real `file-patch-roundtrip` executado em `artifacts/terminal-live/llm-b-tools-ux-file-patch-20260605`; achou claim de `delete_file` sem lifecycle, sucesso provisório antes de falha real, prompt pronto durante turno ativo e export prematuro.
+- [x] 2026-06-05: `tool-lifecycle-runtime` agora adia sucesso provisório de operações read/write/create/edit/delete/move/run/search até `postToolUse` estruturado quando aplicável.
+- [x] 2026-06-05: narração de tools estaciona redraw de prompt idle por janela curta para manter linha viva como fonte de estado durante turno ativo.
+- [x] 2026-06-05: `/export` cria diretório destino recursivamente; harness live reconhece a linha `Exportado` atual e espera mais antes de `/quit`.
+- [x] 2026-06-05: validações focadas verdes: lifecycle runtime, inline status/prompt e export (`40` testes).
+- [x] 2026-06-05: rerun live `file-patch-roundtrip` PASS em `artifacts/terminal-live/llm-b-tools-ux-file-patch-rerun-20260605`, incluindo deltas, ask_user real, resposta humana, final pós-pergunta, SSE/export e ausência de prompt idle durante turno ativo.
+- [x] 2026-06-05: presenter deduplica `fileTargets` para evitar detalhes como `arquivos: X, X`; teste focado adicionado.
+- [ ] Próximo passo: `recoverable-tool-error`, `file-write-roundtrip`, e revisão visual de detalhes remanescentes.

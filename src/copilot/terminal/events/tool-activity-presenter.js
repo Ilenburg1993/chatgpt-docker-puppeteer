@@ -432,6 +432,23 @@ function isInternalCallIdentifier(value) {
 }
 
 /**
+ * @param {string[]} values
+ * @returns {string[]}
+ */
+function uniqueNonEmptyStrings(values) {
+    const seen = new Set();
+    /** @type {string[]} */
+    const result = [];
+    for (const value of values) {
+        const normalized = typeof value === 'string' ? value.trim() : '';
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        result.push(normalized);
+    }
+    return result;
+}
+
+/**
  * @param {string} toolName
  * @param {string | null} canonicalToolName
  * @returns {string}
@@ -818,18 +835,36 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
     const toolResult = extractTerminalToolResultPayload(evt);
     const presentationHint = extractToolPresentationHint(toolResult);
     const meta = introspectToolTargets({ args: toolArgs, result: toolResult });
+    const fileTargets = uniqueNonEmptyStrings(meta.fileTargets);
+    const directoryTargets = uniqueNonEmptyStrings(meta.directoryTargets);
+    const urlTargets = uniqueNonEmptyStrings(meta.urlTargets);
+    const searchTerms = uniqueNonEmptyStrings(meta.searchTerms);
+    const patchFiles = uniqueNonEmptyStrings(meta.patchFiles);
+    const commands = uniqueNonEmptyStrings(meta.commands);
+    const filters = uniqueNonEmptyStrings(meta.filters);
+    const normalizedMeta = {
+        ...meta,
+        fileTargets,
+        directoryTargets,
+        urlTargets,
+        searchTerms,
+        patchFiles,
+        commands,
+        filters,
+        primaryTarget: fileTargets[0] ?? meta.primaryTarget,
+    };
     const isStructuredInputTool = (canonicalToolName ?? toolName) === 'request_user_input';
     const isIntentTool = (canonicalToolName ?? toolName) === 'report_intent_local' || toolName === 'report_intent';
     const questionPreview = isStructuredInputTool ? inferQuestion(toolArgs) : null;
     const questionChoices = isStructuredInputTool ? inferQuestionChoices(toolArgs) : [];
     const allowFreeformQuestion = isStructuredInputTool ? inferQuestionAllowFreeform(toolArgs) : null;
     const intentPreview = isIntentTool ? inferIntentText({ ...evt, args: toolArgs }) : null;
-    const path = isStructuredInputTool ? null : (presentationHint?.path ?? meta.fileTargets[0] ?? null);
+    const path = isStructuredInputTool ? null : (presentationHint?.path ?? fileTargets[0] ?? null);
     const { operation, label } = inferOperation(toolName, path, evt['operation'] ?? presentationHint?.operation);
-    const commandSummary = operation === 'run' ? buildCommandSummary(meta) : null;
-    const targetSummary = buildTargetSummary(meta);
+    const commandSummary = operation === 'run' ? buildCommandSummary(normalizedMeta) : null;
+    const targetSummary = buildTargetSummary(normalizedMeta);
     const operationCountSummary = isBatchFileTool(toolName, canonicalToolName)
-        ? buildOperationCountSummary(meta)
+        ? buildOperationCountSummary(normalizedMeta)
         : null;
     const batchTargetSummary = [operationCountSummary, targetSummary].filter(Boolean).join(' · ') || null;
     const targetCandidate =
@@ -858,14 +893,14 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
         label,
         path,
         target,
-        fileTargets: meta.fileTargets,
-        directoryTargets: meta.directoryTargets,
-        urlTargets: meta.urlTargets,
-        searchTerms: meta.searchTerms,
-        patchFiles: meta.patchFiles,
+        fileTargets,
+        directoryTargets,
+        urlTargets,
+        searchTerms,
+        patchFiles,
         lineRange: meta.lineRange,
-        commands: meta.commands,
-        filters: meta.filters,
+        commands,
+        filters,
         questionChoices,
         allowFreeformQuestion,
         resultCount: meta.resultCount,

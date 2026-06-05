@@ -223,6 +223,26 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.completeLine(true, '0.1s')).toContain('Patch aplicado: 1/1 ocorrencias');
     });
 
+    it('deduplica arquivos vindos simultaneamente de args e result', () => {
+        const path = 'data/copilot-terminal/live-scratch/TERMINAL-PATCH-ROUNDTRIP.txt';
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'patch_file',
+            args: { path },
+            result: {
+                success: true,
+                path,
+                presentation: {
+                    path,
+                    summary: 'Patch aplicado: 1/1 ocorrencias',
+                },
+            },
+        });
+
+        expect(presentation.fileTargets).toEqual([path]);
+        expect(presentation.completeLine(true, '0.1s')).toContain(`arquivo: ${path}`);
+        expect(presentation.completeLine(true, '0.1s')).not.toContain(`${path}, ${path}`);
+    });
+
     it('resume read_file_content com bytes e truncamento sem poluir a superfície com conteúdo bruto', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'read_file_content',

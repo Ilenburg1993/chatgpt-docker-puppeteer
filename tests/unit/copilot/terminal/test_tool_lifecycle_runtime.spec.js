@@ -6,6 +6,7 @@ const recordToolCall = vi.fn();
 const getShowToolActivity = vi.fn(() => true);
 const broadcastSse = vi.fn();
 const clearInlineStatus = vi.fn();
+const parkTerminalPromptForContinuation = vi.fn();
 const println = vi.fn();
 const writeInlineStatus = vi.fn();
 const readTerminalRuntimeState = vi.fn(() => ({ status: 'idle', pendingQuestionKind: null }));
@@ -27,6 +28,7 @@ vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
 vi.mock('../../../../src/copilot/terminal/dialog/index.js', () => ({
     broadcastSse,
     clearInlineStatus,
+    parkTerminalPromptForContinuation,
     println,
     writeInlineStatus,
 }));
@@ -340,6 +342,7 @@ describe('terminal/tool-lifecycle-runtime', () => {
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Falhou'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Falhou falhou'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Concluído'));
+        expect(parkTerminalPromptForContinuation).toHaveBeenCalled();
         expect(completeTerminalTurnToolCall).toHaveBeenCalledWith({
             toolCallId: 'chatcmpl-tool-exec',
             success: false,
@@ -394,12 +397,103 @@ describe('terminal/tool-lifecycle-runtime', () => {
             'Integração externa concluída',
             expect.anything(),
         );
+        expect(parkTerminalPromptForContinuation).not.toHaveBeenCalled();
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Concluído'));
         expect(broadcastSse).not.toHaveBeenCalledWith(
             'tool.lifecycle',
             expect.objectContaining({
                 type: 'external_completed',
                 success: true,
+            }),
+        );
+    });
+
+    it('adia sucesso provisório de patch_file até postToolUse estruturado', async () => {
+        const { createToolCallRegistry } = await import(
+            '../../../../src/copilot/terminal/state/tool-call-registry.js'
+        );
+        const { buildTerminalToolActivityPresentation } = await import(
+            '../../../../src/copilot/terminal/events/tool-activity-presenter.js'
+        );
+        const { handleTerminalExternalToolCompleted, reconcileTerminalPostToolUseResult } = await import(
+            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
+        );
+
+        const registry = createToolCallRegistry();
+        const args = {
+            path: 'data/copilot-terminal/live-scratch/TERMINAL-PATCH-ROUNDTRIP.txt',
+            old_string: 'before\n',
+            new_string: 'after\n',
+            dryRun: false,
+        };
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'patch_file',
+            args,
+            toolCallId: 'chatcmpl-tool-patch',
+        });
+        registry.register('chatcmpl-tool-patch', 'patch_file', 'external', {
+            canonicalName: presentation.canonicalToolName ?? 'patch_file',
+            rawArgs: args,
+            presentation,
+        });
+
+        handleTerminalExternalToolCompleted({
+            registry,
+            evt: {
+                toolName: 'external_tool',
+                requestId: 'req-patch',
+                toolCallId: 'chatcmpl-tool-patch',
+                success: true,
+                data: { toolName: 'patch_file' },
+            },
+        });
+
+        expect(registry.getEntry('chatcmpl-tool-patch')).not.toBeNull();
+        expect(recordTerminalActivity).not.toHaveBeenCalledWith(
+            'tool',
+            'Integração externa concluída',
+            expect.anything(),
+        );
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Concluído'));
+
+        reconcileTerminalPostToolUseResult({
+            registry,
+            evt: {
+                toolName: 'patch_file',
+                toolCallId: 'chatcmpl-tool-patch',
+                toolArgs: args,
+                toolResult: {
+                    resultType: 'success',
+                    textResultForLlm: JSON.stringify({
+                        success: true,
+                        durationMs: 18,
+                        bytesWritten: 55,
+                    }),
+                },
+            },
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'tool',
+            'Integração externa concluída',
+            expect.objectContaining({
+                detail: expect.stringContaining('editando arquivo concluído'),
+                severity: 'info',
+                toolName: 'Editar arquivo',
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Concluído'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Falhou'));
+        expect(parkTerminalPromptForContinuation).toHaveBeenCalled();
+        expect(completeTerminalTurnToolCall).toHaveBeenCalledWith({
+            toolCallId: 'chatcmpl-tool-patch',
+            success: true,
+        });
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                success: true,
+                toolName: 'patch_file',
             }),
         );
     });

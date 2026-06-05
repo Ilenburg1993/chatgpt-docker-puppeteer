@@ -52,6 +52,7 @@ const readTerminalTimelineProjection = vi.fn(() => ({
     ],
 }));
 
+const mkdir = vi.fn(async () => undefined);
 const writeFile = vi.fn(async () => undefined);
 
 vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
@@ -59,6 +60,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 }));
 
 vi.mock('node:fs/promises', () => ({
+    mkdir,
     writeFile,
 }));
 
@@ -83,6 +85,7 @@ describe('terminal/commands/export', () => {
 
         expect(readTerminalTimelineProjection).toHaveBeenCalled();
         expect(writeFile).toHaveBeenCalledOnce();
+        expect(mkdir).toHaveBeenCalledWith('/tmp', { recursive: true });
         const [, content] = writeFile.mock.calls[0];
         expect(String(content)).toContain('envelope=sdk/assistant.message');
         expect(String(content)).toContain('trace=trace-export-1');
@@ -171,6 +174,7 @@ describe('terminal/commands/export', () => {
         await cmdExport({ println: ctx.println }, 'artifacts/terminal-live/conversa.md');
 
         expect(writeFile).toHaveBeenCalledOnce();
+        expect(mkdir).toHaveBeenCalledWith(expect.stringContaining('artifacts/terminal-live'), { recursive: true });
         const [filePath] = writeFile.mock.calls[0];
         expect(String(filePath)).toContain(`${process.cwd()}/artifacts/terminal-live/conversa.md`);
         expect(ctx.output()).toContain('Exportado');

@@ -22,6 +22,7 @@ const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_POST_ANSWER_DELAY_MS = 6_000;
 const DEFAULT_POST_ASK_CONTINUATION_WAIT_MS = 45_000;
 const DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS = 2_000;
+const DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS = 5_000;
 const SESSION_CYCLE_PROMPT_STABLE_MAX_WAIT_MS = 15_000;
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 const SECRET_ENV_RE = /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|BEARER)/iu;
@@ -7096,7 +7097,7 @@ async function main() {
                             write('/quit');
                         }
                     },
-                    diagnostics.length * 350 + 2_000,
+                    diagnostics.length * 350 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
                 ).unref();
                 if (timedOut) scheduleForcedKill(diagnostics.length * 350 + 7_000);
             },
@@ -7179,7 +7180,7 @@ async function main() {
                     write('/quit');
                 }
             },
-            diagnostics.length * 550 + 2_000,
+            diagnostics.length * 550 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
         ).unref();
         if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
     };
@@ -7242,7 +7243,7 @@ async function main() {
                         write('/quit');
                     }
                 },
-                diagnostics.length * 550 + 2_000,
+                diagnostics.length * 550 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
             ).unref();
             if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
         }, Math.max(0, delayMs));
@@ -7282,7 +7283,7 @@ async function main() {
                     write('/quit');
                 }
             },
-            diagnostics.length * 550 + 2_000,
+            diagnostics.length * 550 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
         ).unref();
         if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
     };
@@ -7311,7 +7312,7 @@ async function main() {
                     write('/quit');
                 }
             },
-            diagnostics.length * 550 + 2_000,
+            diagnostics.length * 550 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
         ).unref();
         if (timedOut) scheduleForcedKill(diagnostics.length * 550 + 7_000);
     };
@@ -7587,12 +7588,12 @@ async function main() {
                                 write('/quit');
                             }
                         },
-                        diagnostics.length * 450 + 1_500,
+                        diagnostics.length * 450 + DEFAULT_DIAGNOSTIC_EXPORT_QUIT_GRACE_MS,
                     ).unref();
                 }
             }, 1_000).unref();
         }
-        if (!quitSent && /Exportado:/.test(plain)) {
+        if (!quitSent && /(?:^|\n)\s*Exportado\s+/u.test(plain)) {
             quitSent = true;
             byokNoPrCanQuit = true;
             setTimeout(() => write('/quit'), 500).unref();
