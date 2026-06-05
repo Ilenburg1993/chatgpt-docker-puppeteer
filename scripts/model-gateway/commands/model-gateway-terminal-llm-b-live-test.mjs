@@ -2181,8 +2181,10 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-fs-json-preview',
             pass:
                 /Arquivo[\s\S]*TERMINAL_DIAGNOSTIC_UX_\d+\.json[\s\S]*\(FS local\)/iu.test(fsJsonSurface) &&
-                /Preview\s+js\s+·\s+filtro\s+\.\s+·\s+fallback:\s+renderer externo desativado/iu.test(fsJsonSurface) &&
+                /Preview\s+js\s+·\s+fallback canônico\s+·\s+motivo renderer externo desativado/iu.test(fsJsonSurface) &&
+                /Preview[\s\S]*truncado/iu.test(fsJsonSurface) &&
                 /"marker":\s*"TERMINAL_DIAGNOSTIC_UX_/iu.test(fsJsonSurface) &&
+                /linhas omitidas/iu.test(fsJsonSurface) &&
                 !/\[copilot\/read_file_content\]|chatcmpl-tool-|toolu_|\\x1b\[/iu.test(fsJsonSurface),
             detail: '/fs preview --json rendered explicit structured preview without raw file-tool logs, tool ids or ANSI literals',
         },
@@ -2190,7 +2192,7 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-fs-yaml-preview',
             pass:
                 /Arquivo[\s\S]*TERMINAL_DIAGNOSTIC_UX_\d+\.yaml[\s\S]*\(FS local\)/iu.test(fsYamlSurface) &&
-                /Preview\s+js\s+·\s+filtro\s+\.\s+·\s+fallback:\s+renderer externo desativado/iu.test(fsYamlSurface) &&
+                /Preview\s+js\s+·\s+fallback canônico\s+·\s+motivo renderer externo desativado/iu.test(fsYamlSurface) &&
                 /marker:\s+TERMINAL_DIAGNOSTIC_UX_/iu.test(fsYamlSurface) &&
                 !/\[copilot\/read_file_content\]|chatcmpl-tool-|toolu_|\\x1b\[/iu.test(fsYamlSurface),
             detail: '/fs preview --yaml rendered explicit structured preview without raw file-tool logs, tool ids or ANSI literals',
@@ -2199,6 +2201,9 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-terminal-libs',
             pass:
                 /Libs auxiliares do terminal[\s\S]*(?:disponíveis|disponível)[\s\S]*Fallback[\s\S]*terminal JS canônico/iu.test(
+                    terminalLibsSurface,
+                ) &&
+                /Preview[\s\S]*renderers disponíveis[\s\S]*TUI[\s\S]*TTY exclusivo[\s\S]*Guia[\s\S]*TERMINAL_AUX_LIBS_UX_ARCHITECTURE_DECISION_2026-06-05\.md/iu.test(
                     terminalLibsSurface,
                 ) &&
                 /fzf[\s\S]*(?:disponível|ausente)[\s\S]*bat[\s\S]*(?:disponível|ausente)[\s\S]*jq[\s\S]*(?:disponível|ausente)/iu.test(
@@ -2222,7 +2227,7 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-git-diff-preview',
             pass:
                 /Git diff/iu.test(gitDiffSurface) &&
-                /Preview\s+js\s+·\s+fallback:\s+diff externo desativado/iu.test(gitDiffSurface) &&
+                /Preview\s+js\s+·\s+fallback canônico\s+·\s+motivo diff externo desativado/iu.test(gitDiffSurface) &&
                 /src\/copilot\/terminal\/README\.md|TERMINAL_DIAGNOSTIC_UX_/iu.test(gitDiffSurface) &&
                 !/chatcmpl-tool-|toolu_|\\x1b\[/iu.test(gitDiffSurface),
             detail: '/git diff --plain rendered canonical diff preview without old manual ANSI or raw tool ids',
@@ -2368,7 +2373,7 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-intervention-queue-human',
             pass:
                 /Fila[\s\S]*intervenção guardada para a próxima pergunta humana/iu.test(mailboxSurface) &&
-                /Fila de intervenção[\s\S]*1 na fila[\s\S]*limpa/iu.test(mailboxSurface) &&
+                /Fila de intervenção[\s\S]*1 item na fila[\s\S]*limpa/iu.test(mailboxSurface) &&
                 !/mailbox zero-PR|runtime default|runtime [a-z0-9_-]+|\[mailbox|modeHint|entryId|\\x1b\[/iu.test(
                     mailboxSurface,
                 ),
@@ -2455,13 +2460,16 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             commands: [
                 { line: `/fs create ${scratchPath} ${marker}`, advanceAfterMs: 1_000 },
                 { line: `/fs create ${markdownPath} # Terminal UX Markdown - Item de diagnóstico`, advanceAfterMs: 1_000 },
-                { line: `/fs create ${jsonPath} {"marker":"${marker}","count":2}`, advanceAfterMs: 1_000 },
+                {
+                    line: `/fs create ${jsonPath} {"marker":"${marker}","items":[1,2,3,4,5,6,7,8],"nested":{"alpha":1,"beta":2}}`,
+                    advanceAfterMs: 1_000,
+                },
                 { line: `/fs create ${yamlPath} marker: ${marker}`, advanceAfterMs: 1_000 },
                 { line: `/fs read ${scratchPath}`, advanceAfterMs: 1_000 },
                 { line: `/fs preview ${scratchPath} --lines 20`, advanceAfterMs: 1_000 },
                 { line: `/fs preview ${markdownPath} --markdown`, advanceAfterMs: 1_000 },
-                { line: `/fs preview ${jsonPath} --json --plain`, advanceAfterMs: 1_000 },
-                { line: `/fs preview ${yamlPath} --yaml --plain`, advanceAfterMs: 1_000 },
+                { line: `/fs preview ${jsonPath} --json --plain --lines 5`, advanceAfterMs: 1_000 },
+                { line: `/fs preview ${yamlPath} --yaml --plain --lines 5`, advanceAfterMs: 1_000 },
                 { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, advanceAfterMs: 1_000 },
                 { line: '/terminal libs', advanceAfterMs: 1_000 },
                 { line: '/menu picker', advanceAfterMs: 1_000 },

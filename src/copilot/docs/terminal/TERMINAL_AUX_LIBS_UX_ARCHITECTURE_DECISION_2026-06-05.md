@@ -168,7 +168,7 @@
 - [x] AUX-B.5: padronizar footer de renderer/fallback/truncamento entre todos os previews.
 - [x] AUX-B.6: fazer previews estruturados respeitarem `--lines`, inclusive quando `jq`/`yq` renderizam saída externa.
 - [x] AUX-B.7: impedir que output externo ANSI apareça em logs/export default.
-- [ ] AUX-B.8: live dedicada de `/fs preview` cobrindo JS, Markdown, JSON, YAML e diff.
+- [x] AUX-B.8: live dedicada de `/fs preview` cobrindo JS, Markdown, JSON, YAML e diff.
 
 ### Faixa AUX-C - TTY Exclusivo
 
@@ -198,7 +198,7 @@
 
 - [x] AUX-F.1: smoke sem `PATH` cobre fallbacks JS.
 - [x] AUX-F.2: smoke com `PATH` cobre renderers reais disponíveis.
-- [ ] AUX-F.3: live UX dedicada para `/terminal libs`, `/fs preview`, `/git diff`, `/menu picker`.
+- [x] AUX-F.3: live UX dedicada para `/terminal libs`, `/fs preview`, `/git diff`, `/menu picker`.
 - [ ] AUX-F.4: critérios live devem rejeitar `chatcmpl-tool`, `request_user_input`, ANSI literal, IDs crus e shell livre.
 - [ ] AUX-F.5: relatório final por artefato com screenshots/log plain quando PTY expuser discrepância.
 
@@ -207,5 +207,5 @@
 - [x] Primeiro: melhorar `/terminal libs` para ser a superfície canônica de decisão e disponibilidade.
 - [x] Segundo: padronizar footer de preview nos comandos que usam `bat`, `glow`, `delta`, `jq` e `yq`.
 - [x] Terceiro: ampliar `terminal:aux-libs:smoke` para verificar ausência de ANSI em JSON/log, presença de fallback reasons humanos e respeito a `--lines` em preview estruturado.
-- [ ] Quarto: rodar live de libs auxiliares antes de qualquer TUI real.
+- [x] Quarto: rodar live de libs auxiliares antes de qualquer TUI real.
 - [ ] Quinto: só depois desenhar `withTerminalExclusiveTty` para `fzf`/`gum`.
