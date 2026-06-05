@@ -127,6 +127,25 @@ const RESTART_WAIT_TIMEOUT_MS = resolveBoundedTimeoutMs(LLM_B_BOOT_TIMEOUT_MS, 6
 let _terminalInterventionQueue = Promise.resolve();
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
+ * @param {{ queueSize: number; dropped?: number }} summary
+ * @returns {string}
+ */
+function renderInterventionQueueTail(summary) {
+    const dropped = Number(summary.dropped ?? 0);
+    return `${countLabel(Number(summary.queueSize ?? 0), 'item', 'itens')} na fila${dropped > 0 ? ` · ${countLabel(dropped, 'descartada', 'descartadas')}` : ''}`;
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -320,7 +339,7 @@ async function _cmdSteer(message) {
         println(
             terminalThemeRow(
                 'Intervenção',
-                `guardada para a próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
+                `guardada para a próxima pergunta humana (${renderInterventionQueueTail(queued)})`,
                 { role: 'success' },
             ),
         );
@@ -397,7 +416,7 @@ async function _cmdInterrupt(message) {
             println(
                 terminalThemeRow(
                     'Intervenção',
-                    `substituição guardada para a próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
+                    `substituição guardada para a próxima pergunta humana (${renderInterventionQueueTail(queued)})`,
                     { role: 'success' },
                 ),
             );
@@ -444,7 +463,7 @@ function _cmdMailbox(arg) {
         println(
             terminalThemeRow(
                 'Fila de intervenção',
-                `limpa · ${removed} ${removed === 1 ? 'item removido' : 'itens removidos'}`,
+                `limpa · ${countLabel(removed, 'item removido', 'itens removidos')}`,
                 { role: 'success' },
             ),
         );
@@ -471,7 +490,7 @@ function _cmdMailbox(arg) {
     println(
         terminalThemeRow(
             'Fila de intervenção',
-            `${summary.queueSize} na fila · ${summary.dropped} descartada(s)`,
+            `${countLabel(summary.queueSize, 'item', 'itens')} na fila · ${countLabel(summary.dropped, 'descartada', 'descartadas')}`,
         ),
     );
     if (latest) {
@@ -555,7 +574,7 @@ function _cmdQueueMailbox(message) {
     println(
         terminalThemeRow(
             'Fila',
-            `intervenção guardada para a próxima pergunta humana (${queued.queueSize} na fila${queued.dropped > 0 ? ` · ${queued.dropped} descartada(s)` : ''})`,
+                `intervenção guardada para a próxima pergunta humana (${renderInterventionQueueTail(queued)})`,
             { role: 'success' },
         ),
     );

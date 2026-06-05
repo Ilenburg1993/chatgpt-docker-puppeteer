@@ -66,7 +66,7 @@ describe('terminal/activity-state', () => {
             source: 'sdk',
         });
         recordTerminalActivity('system', 'Background tasks SDK alteradas', {
-            detail: '0 pendente(s)',
+            detail: '0 pendentes',
             source: 'sdk',
             recordHistory: false,
         });

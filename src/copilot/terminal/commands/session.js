@@ -672,7 +672,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             projection.pendingPermissions +
             projection.pendingUserInputs +
             projection.pendingStructuredUserInputs;
-        const waitLine = waitCount > 0 ? `${waitCount} pendência(s) · /sdk waits` : 'nenhuma pendência';
+        const waitLine = waitCount > 0 ? `${countLabel(waitCount, 'pendência', 'pendências')} · /sdk waits` : 'nenhuma pendência';
         const queue = Number(snap['queueSize'] ?? 0);
         const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
         const byokLabel = byok.enabled
@@ -791,16 +791,16 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const activityProgress = typeof activity.progress === 'number' ? ` (${activity.progress}%)` : '';
     const sdkInterruptions = [
         projection.pendingElicitations > 0
-            ? `${projection.pendingElicitations} formulário(s)${projection.latestElicitationMode ? ` (${projection.latestElicitationMode})` : ''}`
+            ? `${countLabel(projection.pendingElicitations, 'formulário', 'formulários')}${projection.latestElicitationMode ? ` (${projection.latestElicitationMode})` : ''}`
             : null,
         projection.pendingPermissions > 0
-            ? `${projection.pendingPermissions} permissão(ões)${projection.latestPermissionType ? ` (${projection.latestPermissionType})` : ''}`
+            ? `${countLabel(projection.pendingPermissions, 'permissão', 'permissões')}${projection.latestPermissionType ? ` (${projection.latestPermissionType})` : ''}`
             : null,
         projection.pendingUserInputs > 0
-            ? `${projection.pendingUserInputs} pergunta(s)${projection.latestUserInputKind ? ` (${projection.latestUserInputKind})` : ''}`
+            ? `${countLabel(projection.pendingUserInputs, 'pergunta', 'perguntas')}${projection.latestUserInputKind ? ` (${projection.latestUserInputKind})` : ''}`
             : null,
         projection.pendingStructuredUserInputs > 0
-            ? `${projection.pendingStructuredUserInputs} input(s) estruturado(s)`
+            ? countLabel(projection.pendingStructuredUserInputs, 'input estruturado', 'inputs estruturados')
             : null,
     ].filter(Boolean);
     const sdkCapabilitiesUi =
@@ -1166,7 +1166,7 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
               ? `pergunta salva (${projection.pendingQuestionShadowState})`
               : 'sem pergunta pendente';
         const waitLine =
-            waitCount > 0 ? `${waitCount} pendência(s) humanas · /sdk waits` : 'sem pendências humanas';
+            waitCount > 0 ? `${countLabel(waitCount, 'pendência humana', 'pendências humanas')} · /sdk waits` : 'sem pendências humanas';
         const modelLine = renderTerminalModelSelectionLine(modelBilling, 'revisar /status full');
         println('');
         println(terminalThemeHeadline('assistant', 'Agora'));
@@ -2321,7 +2321,7 @@ function cmdSessionSdkCommands({ println }) {
     const specs = listTerminalSdkCommandSpecs();
     println('');
     println(terminalThemeHeadline('assistant', 'Comandos SDK expostos ao Copilot'));
-    println(terminalThemeRow('Fonte', `agent/session/commands · ${specs.length} comando(s) · safelist observável; execução local continua no REPL`));
+    println(terminalThemeRow('Fonte', `agent/session/commands · ${countLabel(specs.length, 'comando', 'comandos')} · safelist observável; execução local continua no REPL`));
     for (const spec of specs) {
         println(terminalThemeRow(spec.name, `${spec.localCommand}${spec.safe ? ' · seguro' : ''}`));
         println(terminalThemeRow('Descrição', spec.description));

@@ -34,6 +34,16 @@ import { log } from '../observability/logger.js';
 const _COPILOT_SRC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @typedef {'notify' | 'auto'} DevWatchMode
  *
  * @typedef {{
@@ -192,7 +202,7 @@ function _recordChanges(files, watchPath) {
 
     log(
         'INFO',
-        `[dev-watch] ${files.length} mudança(s) detectada(s) em "${watchPath}": ${files.slice(0, 5).join(', ')}` +
+        `[dev-watch] ${countLabel(files.length, 'mudança detectada', 'mudanças detectadas')} em "${watchPath}": ${files.slice(0, 5).join(', ')}` +
             (files.length > 5 ? ` (+${files.length - 5} mais)` : '') +
             `. Total desde boot: ${_status.changeCount}. Use reload_agent_process para aplicar.`,
     );

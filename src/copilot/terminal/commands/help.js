@@ -17,6 +17,16 @@ import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminal
  */
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -61,7 +71,7 @@ function renderHelpSection(println, title, rows) {
     const descriptionWidth = 66;
     const descriptionIndent = '  ' + ' '.repeat(commandWidth);
     println('');
-    println(terminalThemeHeadline('assistant', title, [`${rows.length} comando(s)`]));
+    println(terminalThemeHeadline('assistant', title, [countLabel(rows.length, 'comando', 'comandos')]));
     for (const row of rows) {
         const descriptionLines = wrapHelpText(row.description, descriptionWidth);
         if (row.command.length > commandWidth) {

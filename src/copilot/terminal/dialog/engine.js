@@ -993,7 +993,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 }),
             );
             println(
-                terminalThemeRow('Bloqueado', 'turno não enviado ao provedor BYOK; estimativa excede o limite declarado antes do streaming', {
+                terminalThemeRow('Bloqueado', 'turno não enviado à rota BYOK; estimativa excede o limite declarado antes do streaming', {
                     role: 'error',
                 }),
             );
@@ -1620,7 +1620,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             if (!revisedTrace) {
                 completeTerminalTurnTrace({ timestamp: now, status: 'failed' });
             }
-            recordTerminalActivity('error', 'Falha de provedor BYOK no turno', {
+            recordTerminalActivity('error', 'Falha da rota BYOK no turno', {
                 detail:
                     `${byokFailure.errorContext} · perfil ${byokFailure.profile ?? '-'} · ` +
                     `provedor ${byokFailure.provider ?? '-'} · modelo ${byokFailure.model ?? '-'} · ` +

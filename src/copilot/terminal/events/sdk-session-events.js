@@ -1168,7 +1168,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 const mailboxSummary = readRuntimeInterventionMailboxSummary(runtimeId);
                 const sourceLabel = renderInterventionSourceLabel(mailboxEntry.source);
                 const modeLabel = renderInterventionModeLabel(mailboxEntry.modeHint);
-                const mergedLabel = mailboxEntry.mergedCount > 0 ? ` · ${mailboxEntry.mergedCount} mescla(s)` : '';
+                const mergedLabel = mailboxEntry.mergedCount > 0 ? ` · ${pluralPt(mailboxEntry.mergedCount, 'mescla', 'mesclas')}` : '';
                 recordTerminalActivity('question', 'Fila de intervenção aplicada em pergunta humana', {
                     detail: `origem ${sourceLabel} · ${modeLabel}${mergedLabel}`,
                     source: 'sdk',
@@ -1178,7 +1178,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 println(
                     terminalThemeRow(
                         'Fila de intervenção',
-                        `aplicada automaticamente · origem ${sourceLabel} · ${modeLabel} · ${mailboxSummary.queueSize} restante(s) na fila`,
+                        `aplicada automaticamente · origem ${sourceLabel} · ${modeLabel} · ${pluralPt(mailboxSummary.queueSize, 'restante', 'restantes')} na fila`,
                         { role: 'info' },
                     ),
                 );
@@ -1448,7 +1448,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const count = Number(evt?.count ?? 0);
         const enabled = Number(evt?.enabled ?? count);
         recordTerminalActivity('system', 'Skills SDK carregadas', {
-            detail: `${enabled}/${count} habilitada(s)`,
+            detail: `${enabled}/${count} ${enabled === 1 ? 'habilitada' : 'habilitadas'}`,
             source: 'sdk',
             recordHistory: false,
             updateCurrent: false,
@@ -1462,7 +1462,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onSessionExtensionsLoaded = (/** @type {{ count?: number }} */ evt) => {
         const count = Number(evt?.count ?? 0);
         recordTerminalActivity('system', 'Extensões SDK carregadas', {
-            detail: `${count} extensão(ões)`,
+            detail: pluralPt(count, 'extensão', 'extensões'),
             source: 'sdk',
             recordHistory: false,
         });
@@ -1475,7 +1475,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onSessionMcpServersLoaded = (/** @type {{ count?: number }} */ evt) => {
         const count = Number(evt?.count ?? 0);
         recordTerminalActivity('system', 'MCP servers carregados', {
-            detail: `${count} server(s)`,
+            detail: pluralPt(count, 'server', 'servers'),
             source: 'sdk',
             recordHistory: false,
         });
@@ -1489,7 +1489,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onSessionBackgroundTasksChanged = (/** @type {{ count?: number }} */ evt) => {
         const count = Number(evt?.count ?? 0);
         recordTerminalActivity('system', 'Background tasks SDK alteradas', {
-            detail: `${count} pendente(s)`,
+            detail: pluralPt(count, 'pendente', 'pendentes'),
             source: 'sdk',
             severity: count > 0 ? 'warn' : 'info',
             recordHistory: count > 0,
@@ -1776,7 +1776,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onPendingMessagesModified = (/** @type {{ count?: number }} */ evt) => {
         const count = Number(evt?.count ?? 0);
         recordTerminalActivity('turn', 'Pending messages alteradas', {
-            detail: `${count} mensagem(ns) pendente(s)`,
+            detail: `${pluralPt(count, 'mensagem pendente', 'mensagens pendentes')}`,
             source: 'sdk',
             recordHistory: false,
         });
@@ -1806,7 +1806,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             if (suppressed.length > 0) {
                 const names = [...new Set(suppressed.map((call) => call.name))].slice(0, 3).join(', ');
                 recordTerminalActivity('question', 'Tools secundárias silenciosas durante pergunta', {
-                    detail: `${suppressed.length} tool(s) preservada(s) em /activity e /events${names ? ` · ${names}` : ''}`,
+                    detail: `${pluralPt(suppressed.length, 'ferramenta preservada', 'ferramentas preservadas')} em /activity e /events${names ? ` · ${names}` : ''}`,
                     source: 'sdk',
                     recordHistory: false,
                     updateCurrent: false,
@@ -1942,12 +1942,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             .map((command) => command?.name ?? 'unknown')
             .join(', ');
         recordTerminalActivity('system', 'Comandos SDK atualizados', {
-            detail: `${count} comando(s)${preview ? ` · ${preview}` : ''}`,
+            detail: `${pluralPt(count, 'comando', 'comandos')}${preview ? ` · ${preview}` : ''}`,
             source: 'sdk',
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose')) {
-            println(terminalThemeRow('Comandos SDK', `${count} comando(s)${preview ? ` · ${preview}` : ''}`));
+            println(terminalThemeRow('Comandos SDK', `${pluralPt(count, 'comando', 'comandos')}${preview ? ` · ${preview}` : ''}`));
         }
         broadcastSse('commands.changed', withSdkSessionSseEnvelope({ count, commands }, 'sdk/commands.changed'));
         refreshPromptIfIdle();

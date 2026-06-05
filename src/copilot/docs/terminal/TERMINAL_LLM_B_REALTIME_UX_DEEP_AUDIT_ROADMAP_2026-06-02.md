@@ -9450,3 +9450,58 @@
     validar linha viva, timeline, ask_user e finalização no mesmo fluxo;
   - desenhar o documento de investigação de libs (`gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`,
     `zoxide`, `jq`, `yq`) apenas depois de fechar o bloco terminal/BYOK atual.
+
+### 12.108 Gramática natural em `/tools`, SDK, status, linha viva e eventos — 2026-06-04
+
+- [x] Achado:
+  - a auditoria pós-12.107 reduziu a dívida de copy a poucos arquivos muito expostos: `/tools`,
+    `/sdk waits`, `/sdk skills`, `/sdk tools`, `/status`, `/now`, `/fs`, `/skills`, `/help`,
+    `/events`, linha viva, auto-brief, watcher e eventos SDK;
+  - os resíduos eram pequenos (`tool(s)`, `pendente(s)`, `mensagem(ns)`, `arquivo(s)`,
+    `grupo(s)`, `skill(s)`, `agent(s)`, `comando(s)`, `descartada(s)`), mas passavam a sensação
+    de dump técnico, exatamente o problema visual reportado nas screenshots;
+  - a linha viva ainda dizia `provedor BYOK` em erro, embora a arquitetura consolidada fale em
+    rota/modelo/profile/provider como uma unidade operacional.
+- [x] Decisão UX/arquitetura:
+  - cada superfície pode ter helper local de plural enquanto não houver uma camada compartilhada
+    canônica de copy; isso evita acoplamento prematuro e mantém o patch rastreável;
+  - `agent`, `skill`, `server` podem continuar como termos SDK quando forem nomes de conceitos,
+    mas contadores devem ser naturais (`1 skill`, `2 skills`, `1 ferramenta nativa`);
+  - erros BYOK do terminal devem dizer `rota BYOK`, não `provedor BYOK`, porque o bloqueio pode
+    envolver profile, quota, modelo, endpoint, token ou provider;
+  - filas de intervenção devem usar a mesma gramática em `/steer`, `/interrupt`, `/queue`,
+    `/mailbox` e entrada livre.
+- [x] Implementação:
+  - `/tools` usa plural natural em resumo, bloqueios, falhas, achados, omitidos e lifecycle;
+  - `/fs list`, `/skills list` e `/help` usam contadores naturais;
+  - `/sdk waits`, `/sdk skills`, `/sdk agents` e `/sdk tools` foram limpos de `pendência(s)`,
+    `skill(s)`, `agent(s)` e `tool(s) nativa(s)`;
+  - `/status`, `/now` e `/session sdk commands` foram alinhados para `pendência`, `formulário`,
+    `permissão`, `pergunta`, `input estruturado` e `comando` naturais;
+  - eventos SDK passaram a registrar `mensagens pendentes`, `ferramentas preservadas`,
+    `comandos`, `servers`, `extensões`, `restantes na fila`, `mesclas` e `habilitadas`;
+  - REPL de intervenção ganhou helper único para fila e descartes, cobrindo `/steer`,
+    `/interrupt`, `/queue`, `/mailbox` e lifecycle de entrada livre;
+  - linha viva e eventos de erro BYOK migraram de `provedor BYOK` para `rota BYOK`;
+  - preview de arquivo, hot reload de skills/instruções, dev-watch e auto-brief perderam seus
+    plurais mecânicos.
+- [x] Validação:
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js tests/unit/copilot/terminal/test_commands_skills.spec.js tests/unit/copilot/terminal/test_commands_help.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_activity_state.spec.js tests/unit/copilot/terminal/test_file_preview.spec.js`
+    com 163 testes verdes;
+  - [x] `npx eslint` focado em comandos, eventos, REPL, engine, preview e testes alterados;
+  - [x] `git diff --check`;
+  - [x] `rg` não encontrou plurais mecânicos nas superfícies alteradas, exceto asserção negativa
+    deliberada e comentário JSDoc.
+- [x] Resultado observado:
+  - o vocabulário default do terminal ficou mais coeso entre comandos, eventos e linha viva;
+  - `/tools` e `/sdk` agora parecem painéis do mesmo produto, não misturas de SDK cru e PT-BR;
+  - erro BYOK comunica a camada correta (`rota`) sem esconder provider/modelo nos detalhes;
+  - filas de intervenção explicam quantos itens estão pendentes e quantos foram descartados sem
+    sintaxe artificial.
+- [ ] Próximas verificações:
+  - rodar live de turno real com deltas, tools e ask_user para confirmar que esses textos aparecem
+    corretamente sob pressão de terminal real;
+  - auditar outputs ainda com `terminalThemeText` manual em `/sdk tools`, `/help`, `/search`,
+    `/display`, `/thinking` e previews para avaliar se precisam de presenters temáticos próprios;
+  - manter libs externas (`gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`, `zoxide`, `jq`, `yq`) como
+    fase posterior, com documento de decisão antes de dependência nova.

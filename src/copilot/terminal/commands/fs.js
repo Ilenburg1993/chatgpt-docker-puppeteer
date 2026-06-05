@@ -25,6 +25,16 @@ import { terminalThemeRow } from '../state/ui/index.js';
  */
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @param {import('../frontend/gateways/tools.js').TerminalTool} tool
  * @returns {Function}
  */
@@ -239,7 +249,7 @@ async function runList(ctx, parts) {
     }
     const entries = Array.isArray(result['entries']) ? result['entries'] : [];
     ctx.println('');
-    ctx.println(terminalThemeRow('FS local', `${entries.length} entrada(s) · ${operatorPath(result['path'] ?? path)}`));
+    ctx.println(terminalThemeRow('FS local', `${countLabel(entries.length, 'entrada', 'entradas')} · ${operatorPath(result['path'] ?? path)}`));
     for (const entry of entries.slice(0, 120)) {
         const item = entry && typeof entry === 'object' ? /** @type {Record<string, unknown>} */ (entry) : {};
         ctx.println(

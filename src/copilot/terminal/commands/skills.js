@@ -24,6 +24,16 @@ import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../s
  */
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * Handler do comando `/skills`.
  *
  * @param {CmdContext} ctx
@@ -46,7 +56,7 @@ export async function cmdSkills({ println }, arg) {
             if (!skills.paths.length) {
                 println(terminalThemeRow('Skills', 'nenhum caminho configurado', { role: 'muted' }));
             } else {
-                println(terminalThemeHeadline('command', 'Skills', [`${skills.paths.length} caminho(s)`]));
+                println(terminalThemeHeadline('command', 'Skills', [countLabel(skills.paths.length, 'caminho', 'caminhos')]));
                 for (const p of skills.paths) println(terminalThemeRow('Caminho', p, { role: 'fileRead' }));
             }
             break;

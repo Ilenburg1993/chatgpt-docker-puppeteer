@@ -370,7 +370,7 @@ function buildTerminalLiveStatusLine(input = {}) {
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText('warn', 'erro')}` +
-            `${terminalThemeText('muted', ` · provedor BYOK · ${formatLiveDuration(ageMs)}`)}` +
+            `${terminalThemeText('muted', ` · rota BYOK · ${formatLiveDuration(ageMs)}`)}` +
             '\x1b[K'
         );
     }

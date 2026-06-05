@@ -16,6 +16,16 @@ import { broadcastSse } from '../dialog/index.js';
 import { recordTerminalActivity, terminalActivityEmitter } from '../state/boot/index.js';
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @param {import('../runtime-root.js').TerminalBootContext} ctx
  * @returns {Promise<void>}
  */
@@ -42,7 +52,7 @@ export async function runTerminalPinnedContextPhase(ctx) {
         const fileCount = pinnedLoader.getFiles().length;
         log(
             'WARN',
-            `[TerminalServer] Skills/instruções atualizadas — hot-reload ativo (${fileCount} arquivo(s), trigger: ${evt?.file ?? 'unknown'})`,
+            `[TerminalServer] Skills/instruções atualizadas — hot-reload ativo (${countLabel(fileCount, 'arquivo', 'arquivos')}, trigger: ${evt?.file ?? 'unknown'})`,
         );
         broadcastSse('skills.reloaded', {
             updatedAt,

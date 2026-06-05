@@ -978,7 +978,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
     println(terminalThemeHeadline('question', 'Esperas humanas'));
     println(terminalThemeDivider(37));
     println(
-        terminalThemeRow('Estado', totalPending > 0 ? `${totalPending} pendência(s)` : 'nenhuma pendência', {
+        terminalThemeRow('Estado', totalPending > 0 ? pluralPt(totalPending, 'pendência', 'pendências') : 'nenhuma pendência', {
             role: totalPending > 0 ? 'question' : 'success',
         }),
     );
@@ -1045,7 +1045,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
             println(terminalThemeRow('Texto', compactText(entry.question, 220), { role: 'question' }));
         }
         if (structuredInputs.length > 3) {
-            println(terminalThemeRow('Pergunta', `+${structuredInputs.length - 3} pendente(s)`));
+            println(terminalThemeRow('Pergunta', `+${pluralPt(structuredInputs.length - 3, 'pendente', 'pendentes')}`));
         }
     }
     if (totalPending === 0) {
@@ -1447,7 +1447,7 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
         .join(' · ');
 
     println('');
-    println(terminalThemeHeadline('accent', 'Skills SDK', [`${skills.length} skill(s)`]));
+    println(terminalThemeHeadline('accent', 'Skills SDK', [pluralPt(skills.length, 'skill', 'skills')]));
     println(
         terminalThemeRow(
             'Resumo',
@@ -1485,7 +1485,7 @@ async function renderSdkSkills({ println }, rest, runtimeId) {
         if (projectPath) println(terminalThemeRow('Projeto', projectPath));
         if (path && path !== projectPath) println(terminalThemeRow('Caminho', path));
     }
-    if (skills.length > 40) println(terminalThemeRow('Omitidas', `${skills.length - 40} skill(s)`));
+    if (skills.length > 40) println(terminalThemeRow('Omitidas', pluralPt(skills.length - 40, 'skill', 'skills')));
     println(
         terminalThemeRow(
             'Vocabulário',
@@ -1570,7 +1570,7 @@ async function renderSdkSkillsAgents({ println }, runtimeId) {
     });
 
     println('');
-    println(terminalThemeHeadline('accent', 'Custom Agents e Skills', [`${customAgents.length} agent(s)`]));
+    println(terminalThemeHeadline('accent', 'Custom Agents e Skills', [pluralPt(customAgents.length, 'agent', 'agents')]));
     println(
         terminalThemeRow(
             'Resumo',
@@ -1600,8 +1600,8 @@ async function renderSdkSkillsAgents({ println }, runtimeId) {
 
         println(
             terminalThemeRow(
-                'Agent',
-                `${name} (${displayName}) · inferir ${String(infer)} · tools ${tools ? tools.join(', ') || '[]' : 'all'}`,
+                'Agente',
+                `${name} (${displayName}) · inferir ${String(infer)} · ferramentas ${tools ? tools.join(', ') || '[]' : 'todas'}`,
                 { role: 'command' },
             ),
         );
@@ -1687,7 +1687,7 @@ async function renderSdkTools({ println }, model, runtimeId) {
     println(
         terminalThemeHeadline('tool', 'Ferramentas SDK', [
             model ? `modelo ${model}` : null,
-            `${tools.length} tool(s) nativa(s)`,
+            pluralPt(tools.length, 'ferramenta nativa', 'ferramentas nativas'),
         ]),
     );
     for (const tool of tools.slice(0, 50)) {
@@ -1714,7 +1714,7 @@ async function renderSdkTools({ println }, model, runtimeId) {
             println(terminalThemeRow('instruções', instructions, { role: 'muted' }));
         }
     }
-    if (tools.length > 50) println(terminalThemeText('muted', `  ... ${tools.length - 50} tools omitidas`));
+    if (tools.length > 50) println(terminalThemeRow('Omitidas', pluralPt(tools.length - 50, 'ferramenta', 'ferramentas')));
     println('');
     println(terminalThemeHeadline('tool', 'Registry local canônico'));
     println(terminalThemeRow('Total', String(registrySnapshot.total), { role: 'info' }));

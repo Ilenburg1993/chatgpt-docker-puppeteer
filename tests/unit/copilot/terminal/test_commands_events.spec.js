@@ -781,11 +781,12 @@ describe('terminal/commands/events', () => {
 
         expect(ctx.output()).toContain('Erro BYOK');
         expect(ctx.output()).toContain('erro do agente');
-        expect(ctx.output()).toContain('falha do provedor BYOK');
+        expect(ctx.output()).toContain('falha da rota BYOK');
         expect(ctx.output()).toContain('provedor openai');
         expect(ctx.output()).toContain('tratado como erro recuperável do modelo');
         expect(ctx.output()).not.toContain('classe erro recuperável do modelo');
         expect(ctx.output()).not.toContain('falha do provider BYOK');
+        expect(ctx.output()).not.toContain('falha do provedor BYOK');
         expect(ctx.output()).not.toContain('provider openai');
         expect(ctx.output()).toContain('contexto chamada do modelo');
         expect(ctx.output()).toContain('Cancelamento');

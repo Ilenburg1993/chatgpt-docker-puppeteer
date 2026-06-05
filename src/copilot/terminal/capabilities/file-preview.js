@@ -26,6 +26,16 @@ const MAX_PREVIEW_CHARS = 16_000;
 const DEFAULT_LINE_LIMIT = 220;
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @param {string} text
  * @param {number} [max=MAX_PREVIEW_CHARS]
  * @returns {{ output: string; truncated: boolean }}
@@ -48,7 +58,7 @@ function renderJsPreview(text, lineLimit) {
     const limited = lines.slice(0, lineLimit);
     const output = limited.map((line, index) => `${String(index + 1).padStart(4, ' ')} │ ${line}`).join('\n');
     const truncated = lines.length > lineLimit;
-    const suffix = truncated ? `\n... (${lines.length - lineLimit} linha(s) omitida(s))` : '';
+    const suffix = truncated ? `\n... (${countLabel(lines.length - lineLimit, 'linha omitida', 'linhas omitidas')})` : '';
     return truncatePreviewText(`${output}${suffix}`);
 }
 

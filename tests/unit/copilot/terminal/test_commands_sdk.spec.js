@@ -376,7 +376,7 @@ describe('terminal/commands/sdk', () => {
         await cmdSdk({ println: ctx.println }, 'waits');
 
         expect(ctx.output()).toContain('Esperas humanas');
-        expect(ctx.output()).toContain('3 pendência(s)');
+        expect(ctx.output()).toContain('3 pendências');
         expect(ctx.output()).toContain('1 formulário');
         expect(ctx.output()).toContain('1 permissão');
         expect(ctx.output()).toContain('1 pergunta');
@@ -502,7 +502,7 @@ describe('terminal/commands/sdk', () => {
             skillDirectories: ['/extra-skills'],
         });
         expect(ctx.output()).toContain('Skills SDK');
-        expect(ctx.output()).toContain('1 skill(s)');
+        expect(ctx.output()).toContain('1 skill');
         expect(ctx.output()).toContain('ativas 1');
         expect(ctx.output()).toContain('fontes project=1');
         expect(ctx.output()).toContain('skill-pdf');

@@ -62,6 +62,25 @@ import { setupAgentListeners } from './repl-listeners.js';
 import { createTerminalMultilineInputState } from './repl-multiline.js';
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
+ * @param {{ queueSize: number; dropped?: number }} summary
+ * @returns {string}
+ */
+function renderInterventionQueueTail(summary) {
+    const dropped = Number(summary.dropped ?? 0);
+    return `${countLabel(Number(summary.queueSize ?? 0), 'item', 'itens')} na fila${dropped > 0 ? ` · ${countLabel(dropped, 'descartada', 'descartadas')}` : ''}`;
+}
+
+/**
  * Executa o lifecycle completo do REPL readline para o terminal permanente.
  *
  * Cria o readline, registra tab completion e listeners de eventos, exibe o banner e aguarda input interativo do
@@ -256,7 +275,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         println(
             terminalThemeRow(
                 'Intervenção',
-                `registrada para aplicação prioritária na próxima pergunta humana (${summary.queueSize} na fila${summary.dropped > 0 ? ` · ${summary.dropped} descartada(s)` : ''})`,
+                `registrada para aplicação prioritária na próxima pergunta humana (${renderInterventionQueueTail(summary)})`,
                 { role: 'info' },
             ),
         );

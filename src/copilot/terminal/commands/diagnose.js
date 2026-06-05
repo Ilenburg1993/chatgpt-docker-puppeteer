@@ -315,7 +315,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     if (!wantsFull) {
         const backgroundLine =
             typeof health?.['backgroundPendingCount'] === 'number' && health['backgroundPendingCount'] > 0
-                ? ` · ${health['backgroundPendingCount']} tarefa(s) em segundo plano`
+                ? ` · ${pluralPt(health['backgroundPendingCount'], 'tarefa em segundo plano', 'tarefas em segundo plano')}`
                 : '';
         const activityProgress = typeof activity.progress === 'number' ? ` (${activity.progress}%)` : '';
         const activityDetailLine = activity.detail ? ` · ${humanizeDiagnoseToolIdentifiers(activity.detail)}` : '';

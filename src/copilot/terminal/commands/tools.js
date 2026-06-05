@@ -25,6 +25,16 @@ import { terminalThemeHeadline, terminalThemeRow } from '../state/ui/index.js';
  */
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @param {import('../state/tool-lifecycle-state.js').TerminalToolLifecycleDiagnostic} entry
  * @param {{ includeRawDetails?: boolean }} [options]
  * @returns {string}
@@ -120,8 +130,8 @@ function compactTerminalDiagnosticText(text, max) {
  * @returns {string}
  */
 function renderToolStatsSummary(calls, blocked, errors, latency) {
-    return `uso ${calls} · ${blocked > 0 ? `${blocked} bloqueio(s)` : 'sem bloqueios'} · ${
-        errors > 0 ? `${errors} falha(s)` : 'sem falhas'
+    return `uso ${calls} · ${blocked > 0 ? countLabel(blocked, 'bloqueio', 'bloqueios') : 'sem bloqueios'} · ${
+        errors > 0 ? countLabel(errors, 'falha', 'falhas') : 'sem falhas'
     } · latência ${latency}`;
 }
 
@@ -320,7 +330,7 @@ export function cmdTools({ println }, arg = '') {
     } else {
         println('');
         println(terminalThemeHeadline('tool', 'Ferramentas observadas'));
-        println(terminalThemeRow('Resumo', `${entries.length} grupo(s) de ação já apareceram nesta sessão`));
+        println(terminalThemeRow('Resumo', `${countLabel(entries.length, 'grupo de ação', 'grupos de ação')} já apareceram nesta sessão`));
         println('');
     }
 
@@ -419,7 +429,7 @@ export function cmdTools({ println }, arg = '') {
         const detailedContract = readTerminalToolRegistrySnapshot().toolContract;
         if (detailedContract.issues.length > 0) {
             println(
-                terminalThemeRow('Achados', `${Math.min(10, detailedContract.issues.length)} exibido(s)`, {
+                terminalThemeRow('Achados', countLabel(Math.min(10, detailedContract.issues.length), 'achado exibido', 'achados exibidos'), {
                     role: 'muted',
                 }),
             );
@@ -433,7 +443,7 @@ export function cmdTools({ println }, arg = '') {
                 );
             }
             if (detailedContract.issues.length > 10) {
-                println(terminalThemeRow('Omitidas', `${detailedContract.issues.length - 10} issue(s) adicionais`));
+                println(terminalThemeRow('Omitidas', countLabel(detailedContract.issues.length - 10, 'achado adicional', 'achados adicionais')));
             }
         }
 
@@ -457,14 +467,14 @@ export function cmdTools({ println }, arg = '') {
             );
             const active = lifecycle.active.slice(0, 8);
             if (active.length > 0) {
-                println(terminalThemeRow('Em voo', `${active.length} ${active.length === 1 ? 'ferramenta' : 'ferramentas'}`));
+                println(terminalThemeRow('Em voo', countLabel(active.length, 'ferramenta', 'ferramentas')));
                 for (const entry of active) {
                     println(renderLifecycleDiagnosticLine(entry, { includeRawDetails: wantsDeepDiag }));
                 }
             }
             if (lifecycle.recent.length > 0) {
                 const recentCount = Math.min(8, lifecycle.recent.length);
-                println(terminalThemeRow('Recentes', `${recentCount} ${recentCount === 1 ? 'evento' : 'eventos'}`));
+                println(terminalThemeRow('Recentes', countLabel(recentCount, 'evento', 'eventos')));
                 for (const entry of lifecycle.recent.slice(0, 8)) {
                     println(renderLifecycleDiagnosticLine(entry, { includeRawDetails: wantsDeepDiag }));
                 }

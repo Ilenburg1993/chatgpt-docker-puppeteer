@@ -442,7 +442,7 @@ function humanPayloadKind(value) {
     if (text === 'session.background') return 'sessão em segundo plano';
     if (text === 'session.shutdown') return 'sessão encerrada';
     if (text === 'model_retry') return 'retry do modelo';
-    if (text === 'byok_provider_failure') return 'falha do provedor BYOK';
+    if (text === 'byok_provider_failure') return 'falha da rota BYOK';
     if (text === 'model_call') return 'chamada do modelo';
     if (text === 'recoverable_model_call') return 'erro recuperável do modelo';
     if (text === 'erroroccurred' || text === 'error_occurred') return 'erro capturado';
@@ -462,8 +462,8 @@ function humanEventMessage(value) {
     if (!text) return '';
     if (text === 'Operation cancelled by user') return 'operação cancelada pelo operador';
     return text
-        .replace(/\bprovider BYOK\b/giu, 'provedor BYOK')
-        .replace(/\bprovider\/modelo\b/giu, 'provedor/modelo')
+        .replace(/\bprovider BYOK\b/giu, 'rota BYOK')
+        .replace(/\bprovider\/modelo\b/giu, 'rota/modelo')
         .replace(/\bprovider\b/giu, 'provedor')
         .replace(/\bPremium Request\b/giu, 'pedido premium');
 }
@@ -482,7 +482,7 @@ function summarizeAgentErrorPayload(payload) {
     const context = humanPayloadKind(payload['errorContext']);
     const message = humanEventMessage(payload['operatorMeaning'] ?? payload['message']);
     return [
-        isByok ? 'falha do provedor BYOK' : null,
+        isByok ? 'falha da rota BYOK' : null,
         provider,
         profile,
         model,

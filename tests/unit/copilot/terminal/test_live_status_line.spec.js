@@ -426,7 +426,7 @@ describe('terminal/live-status-line', () => {
             ...mocks.activity,
             phase: 'turn',
             label: 'Pending messages alteradas',
-            detail: '0 mensagem(ns) pendente(s)',
+            detail: '0 mensagens pendentes',
             toolName: null,
         };
 
@@ -547,7 +547,7 @@ describe('terminal/live-status-line', () => {
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:03.000-03:00') });
 
         expect(line).toContain('erro');
-        expect(line).toContain('provedor BYOK');
+        expect(line).toContain('rota BYOK');
         expect(line).not.toContain('provider BYOK');
         expect(line).toContain('3s');
         expect(line).not.toContain('Erro do SDK sem mensagem estruturada');

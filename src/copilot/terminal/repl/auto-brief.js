@@ -25,6 +25,16 @@ const TRANSIENT_BOOT_TOOL_WARNING = 'file-tools canônicas locais não estão to
 const AUTO_BRIEF_MODE_FULL = 'full';
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -258,7 +268,7 @@ export function buildTerminalAutoBrief(input = {}) {
     lines.push(
         briefLine(
             'Ferram.',
-            `${projection.toolLoad.total} · arquivos ${yn(projection.toolLoad.hasCanonicalLocalFsTools)} · terminal ${yn(projection.toolLoad.hasCanonicalLocalExecTools)} · workspace SDK ${yn(projection.toolLoad.hasSdkWorkspaceTooling)} · contrato ${projection.toolLoad.toolContract.ok ? 'ok' : `${projection.toolLoad.toolContract.errorCount} erro(s)`}`,
+            `${projection.toolLoad.total} · arquivos ${yn(projection.toolLoad.hasCanonicalLocalFsTools)} · terminal ${yn(projection.toolLoad.hasCanonicalLocalExecTools)} · workspace SDK ${yn(projection.toolLoad.hasSdkWorkspaceTooling)} · contrato ${projection.toolLoad.toolContract.ok ? 'ok' : countLabel(projection.toolLoad.toolContract.errorCount, 'erro', 'erros')}`,
         ),
     );
     lines.push(

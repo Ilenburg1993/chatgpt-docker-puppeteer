@@ -266,7 +266,7 @@ const RECOVERABLE_MODEL_ERROR_RENDER_THROTTLE_MS = 30_000;
 const RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL =
     'roteamento e retry delegados ao SDK; auto é a única recuperação permitida quando aplicável; sem pedido premium confirmado';
 const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
-    'falha de provedor BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provedor/modelo via /byok use ou /byok model; sem pedido premium';
+    'falha da rota BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque rota/modelo via /byok use ou /byok model; sem pedido premium';
 
 /**
  * @returns {boolean}
@@ -850,7 +850,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const isByokModelCall = isRecoverableModelCall && isByokRecoverableModelCall(evt);
         const operatorDetail = isRecoverableModelCall ? resolveRecoverableModelCallOperatorDetail(evt) : null;
         const label = isByokModelCall
-            ? 'Falha do provedor BYOK'
+            ? 'Falha da rota BYOK'
             : isRecoverableModelCall
               ? 'Erro recuperável de modelo SDK'
               : 'Erro do agente';
