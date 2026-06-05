@@ -584,11 +584,102 @@ function summarizeEmptyAfterUserInputAutoRecoveryPayload(payload) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {{ nested?: boolean }} [opts]
+ * @returns {string}
+ */
+function summarizeActivityPayload(payload, opts = {}) {
+    const current = opts.nested && isRecord(payload['current']) ? payload['current'] : payload;
+    const previous = opts.nested && isRecord(payload['previous']) ? payload['previous'] : null;
+    const phase = humanPayloadKind(current['phase']);
+    const label = humanEventMessage(current['label']);
+    const detail = humanEventMessage(current['detail']);
+    const tool = typeof current['toolName'] === 'string' ? getTerminalHumanToolName(current['toolName']) : '';
+    const progress = typeof current['progress'] === 'number' ? `${Math.round(current['progress'])}%` : '';
+    const previousLabel = previous ? humanEventMessage(previous['label']) : '';
+    return [
+        phase ? `fase ${compact(phase, 32)}` : null,
+        label ? compact(label, 72) : null,
+        tool ? `ferramenta ${compact(tool, 48)}` : null,
+        detail ? compact(detail, 120) : null,
+        progress ? `progresso ${progress}` : null,
+        previousLabel ? `antes ${compact(previousLabel, 52)}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {string} event
+ * @returns {string}
+ */
+function summarizeHookPayload(payload, event) {
+    const hookType = humanPayloadKind(payload['hookType']);
+    const success =
+        payload['success'] === true
+            ? 'concluído'
+            : payload['success'] === false
+              ? 'falhou'
+              : event === 'hook.start'
+                ? 'iniciado'
+                : '';
+    const input = isRecord(payload['input']) ? payload['input'] : null;
+    const toolName = typeof input?.['toolName'] === 'string' ? getTerminalHumanToolName(input['toolName']) : '';
+    const reason = typeof input?.['reason'] === 'string' ? humanPayloadKind(input['reason']) : '';
+    return [
+        hookType ? `rotina ${compact(hookType, 48)}` : 'rotina SDK',
+        success || null,
+        toolName ? `ferramenta ${compact(toolName, 48)}` : null,
+        reason ? `motivo ${compact(reason, 48)}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeSdkLifecyclePayload(payload) {
+    const type = humanPayloadKind(payload['type']);
+    const label = humanEventMessage(payload['label']);
+    const detail = humanEventMessage(payload['detail']);
+    return [type ? `tipo ${compact(type, 48)}` : null, label ? compact(label, 72) : null, detail ? compact(detail, 96) : null]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
  * @param {Record<string, unknown>} payload
  * @param {{ showIds?: boolean; event?: string }} [opts]
  * @returns {string}
  */
 function summarizePayload(payload, opts = {}) {
+    if (opts.event === 'activity.changed') {
+        const summary = summarizeActivityPayload(payload, { nested: true });
+        if (summary) return summary;
+    }
+    if (opts.event === 'terminal.activity') {
+        const summary = summarizeActivityPayload(payload);
+        if (summary) return summary;
+    }
+    if (opts.event === 'hook.start' || opts.event === 'hook.end') {
+        const summary = summarizeHookPayload(payload, opts.event);
+        if (summary) return summary;
+    }
+    if (opts.event === 'sdk.lifecycle') {
+        const summary = summarizeSdkLifecyclePayload(payload);
+        if (summary) return summary;
+    }
     if (opts.event === 'terminal.turn.empty_recovery') {
         return summarizeEmptyTurnRecoveryPayload(payload);
     }

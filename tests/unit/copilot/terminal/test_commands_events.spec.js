@@ -1177,6 +1177,83 @@ describe('terminal/commands/events', () => {
         });
     });
 
+    it('humaniza payloadPreview de activity e hooks no preview raw', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 2,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    schemaVersion: 1,
+                    timestamp: 1710000001000,
+                    eventId: 50,
+                    event: 'activity.changed',
+                    source: 'terminal',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        current: {
+                            phase: 'tool',
+                            label: 'Integração externa concluída',
+                            detail: 'lendo arquivo concluído · arquivo: package.json',
+                            toolName: 'read_file_content',
+                            progress: 100,
+                        },
+                        previous: {
+                            label: 'Ferramenta em uso',
+                        },
+                    },
+                },
+                {
+                    schemaVersion: 1,
+                    timestamp: 1710000002000,
+                    eventId: 51,
+                    event: 'hook.start',
+                    source: 'sdk/hook.start',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        hookType: 'postToolUse',
+                        input: { toolName: 'read_file_content' },
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '20 --raw');
+
+        const previewLines = ctx
+            .output()
+            .trim()
+            .split('\n')
+            .filter((line) => line.trim().startsWith('{'))
+            .map((line) => JSON.parse(line));
+        expect(previewLines[0].payloadPreview).toContain('fase ferramenta');
+        expect(previewLines[0].payloadPreview).toContain('Integração externa concluída');
+        expect(previewLines[0].payloadPreview).not.toContain('{"current"');
+        expect(previewLines[1].payloadPreview).toContain('rotina posttooluse');
+        expect(previewLines[1].payloadPreview).toContain('iniciado');
+        expect(previewLines[1].payloadPreview).not.toContain('{"hookType"');
+    });
+
     it('mostra vazio quando archive nao tem entradas', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: { path: null, events: 0, queueDepth: 0, error: null },

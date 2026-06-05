@@ -349,7 +349,7 @@
 - [x] Gap 22: a classificacao de turno sem transcript publico vivia acoplada ao `engine.js`; agora `empty-output-diagnosis` separa `pending_human_input`, `tool_only`, `protocol_transition` e `empty_failure` em core puro testavel.
 - [x] Gap 23: falha BYOK de turno vivo expunha `dialog.byok_*` e mensagem crua do provider no terminal; agora um presenter puro gera resumo humano e preserva detalhe técnico em activity/SSE/health.
 - [x] Gap 24: `/events --raw` despejava JSON extenso dentro da tela visual; agora default é preview JSONL compacto, com `/events --raw full` para auditoria completa.
-- [ ] Gap 25: `payloadPreview` de eventos muito estruturais ainda pode conter mini-JSON; precisa de humanizadores específicos para activity/hook/lifecycle em preview raw.
+- [x] Gap 25: `payloadPreview` de eventos muito estruturais podia conter mini-JSON; agora activity, hook e lifecycle têm humanizadores específicos no preview raw.
 
 ## 08. Criterio de Marco
 
@@ -402,5 +402,5 @@
 - [x] 2026-06-05: runner live passou a aceitar a taxonomia atual de usage (`LLM` + `Pedido sem pedido premium`); live `terminal-ux-default` pass6 PASS cobriu boot, tools, deltas, pergunta, resposta humana, pós-pergunta, `/activity`, `/events`, `/health`, `/export` e shutdown limpo.
 - [x] 2026-06-05: `/events --raw` redesenhado como preview compacto: 12 eventos por default, `payloadKeys`, `payloadPreview`, eventId/source/trace preservados e atalho para `/events --raw full`.
 - [x] 2026-06-05: live `terminal-ux-default` pass7 PASS confirmou preview raw de 12/100 eventos, `Ocultos 88 eventos`, cruzamento de eventIds com SSE e ausência de retorno ao despejo massivo anterior.
-- [ ] 2026-06-05: melhorar humanizadores de `payloadPreview` para activity/hook/lifecycle, reduzindo mini-JSON em previews raw.
+- [x] 2026-06-05: melhorados humanizadores de `payloadPreview` para `activity.changed`, `terminal.activity`, `hook.start`, `hook.end` e `sdk.lifecycle`, reduzindo mini-JSON em previews raw.
 - [ ] 2026-06-05: melhorar estado visual/diagnostico para continuacao pos-`ask_user` lenta ou falha BYOK sem mensagem estruturada.
