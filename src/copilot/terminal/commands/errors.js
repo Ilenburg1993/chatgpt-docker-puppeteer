@@ -22,7 +22,7 @@ import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow } from
  * @typedef {object} TerminalErrorPresentation
  * @property {string} label
  * @property {string} detail
- * @property {'error' | 'warning'} role
+ * @property {'error' | 'warn'} role
  */
 
 /**
@@ -51,21 +51,21 @@ function renderErrorForOperator(err, ts) {
         return {
             label: 'Turno sem progresso',
             detail: `${ts} · ${timeoutLabel ?? 'sem progresso'} · rota/modelo não respondeu · veja /activity 40 · /events 60 · /byok health`,
-            role: 'warning',
+            role: 'warn',
         };
     }
     if (/terminal\.dialog\.empty_output/i.test(source) || /Turno sem saída pública materializada/i.test(message)) {
         return {
             label: 'Turno vazio',
             detail: `${ts} · nenhuma resposta pública materializada · veja /activity 40 · /events 60 · /byok health`,
-            role: 'warning',
+            role: 'warn',
         };
     }
     if (/provider BYOK|rota BYOK|Erro de sessão BYOK|Erro de provider BYOK/i.test(message)) {
         return {
             label: 'Rota BYOK',
             detail: `${ts} · falha operacional contida · veja /byok health · /byok auto status`,
-            role: 'warning',
+            role: 'warn',
         };
     }
     const type = err.errorType ?? 'Error';

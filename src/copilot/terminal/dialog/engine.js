@@ -289,7 +289,6 @@ let _sendTurnMutex = Promise.resolve(null);
 /** @type {Promise<void> | null} */
 let _ensureDialogLoopInFlight = null;
 
-const WAITING_FRAMES = ['⏳', '⌛', '⏳'];
 const LIVE_TURN_NARRATION_INTERVAL_MS = 10_000;
 const BYOK_TURN_TIMEOUT_ENV = 'TERMINAL_BYOK_TURN_TIMEOUT_MS';
 export { evaluateTerminalByokTurnBudget, readTerminalByokAdmissionMode };
@@ -780,30 +779,54 @@ export function shouldBlockTerminalByokTurnBudget(budget, mode = readTerminalByo
  */
 function formatLiveWaitingStatus({ startedAt, model, effort, timeoutMs, timeoutStrategy }) {
     const runtimeState = readTerminalRuntimeState();
+    const now = Date.now();
+    const timestamp = formatTerminalTimeLabel(now, { mode: 'iso' });
     if (runtimeState.status === 'waiting_for_input' && runtimeState.pendingQuestionKind === 'question') {
         const questionText = String(runtimeState.pendingQuestion?.question ?? 'pergunta pendente')
             .replace(/\s+/g, ' ')
             .trim()
             .slice(0, 160);
         const choices = Array.isArray(runtimeState.pendingQuestion?.choices)
-            ? runtimeState.pendingQuestion.choices.join('|')
+            ? runtimeState.pendingQuestion.choices.join(', ')
             : '';
-        return `  \x1b[90m⏸ aguardando resposta humana\x1b[0m\x1b[90m · ${questionText}${choices ? ` · opções ${choices}` : ''} · [/answer <texto>] [/status]\x1b[0m`;
+        return (
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+            `${terminalThemeText('question', 'aguardando você')}` +
+            `${terminalThemeText('muted', ` · pergunta ${questionText}`)}` +
+            (choices ? terminalThemeText('muted', ` · opções ${choices}`) : '') +
+            `${terminalThemeText('command', ' · /answer <texto> · /status')}` +
+            `${terminalThemeText('muted', ` · ${timestamp}`)}`
+        );
     }
-    const elapsedMs = Math.max(0, Date.now() - startedAt);
+    const elapsedMs = Math.max(0, now - startedAt);
     const elapsed = `${(elapsedMs / 1000).toFixed(1)}s`;
-    const frame = WAITING_FRAMES[Math.floor(elapsedMs / 600) % WAITING_FRAMES.length] ?? '⏳';
     const elapsedRatio = timeoutMs && timeoutMs > 0 ? elapsedMs / timeoutMs : 0;
-    const elapsedColor = elapsedRatio >= 0.85 ? '\x1b[31m' : elapsedRatio >= 0.6 ? '\x1b[33m' : '\x1b[90m';
+    const elapsedRole = elapsedRatio >= 0.85 ? 'error' : elapsedRatio >= 0.6 ? 'warn' : 'muted';
     const timeoutLabel = timeoutMs === null ? 'watchdog' : `${Math.max(1, Math.round(timeoutMs / 1000))}s`;
-    const strategyLabel = timeoutStrategy === 'disabled' ? 'no-timeout' : timeoutStrategy;
+    const strategyLabel =
+        timeoutStrategy === 'disabled'
+            ? 'sem timeout explícito'
+            : timeoutStrategy === 'adaptive'
+              ? 'adaptativo'
+              : timeoutStrategy === 'explicit'
+                ? 'explícito'
+                : timeoutStrategy;
     const quickActions =
         elapsedMs >= 30_000
-            ? ' \x1b[90m[/status] [/errors] [/restart]\x1b[0m'
+            ? terminalThemeText('command', ' · /status · /errors · /restart')
             : elapsedMs >= 15_000
-              ? ' \x1b[90m[/status] [/errors]\x1b[0m'
+              ? terminalThemeText('command', ' · /status · /errors')
               : '';
-    return `  \x1b[90m${frame} aguardando \x1b[36m${model}\x1b[90m · \x1b[35m${effort}\x1b[90m · ${elapsedColor}${elapsed}\x1b[0m\x1b[90m · ${timeoutLabel}/${strategyLabel}…\x1b[0m${quickActions}`;
+    return (
+        `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+        `${terminalThemeText('thinking', 'pensando')}` +
+        `${terminalThemeText('muted', ' · modelo ')}${terminalThemeText('assistant', model)}` +
+        `${terminalThemeText('muted', ' · esforço ')}${terminalThemeText('thinking', effort)}` +
+        `${terminalThemeText('muted', ' · decorrido ')}${terminalThemeText(elapsedRole, elapsed)}` +
+        `${terminalThemeText('muted', ` · limite ${timeoutLabel} · estratégia ${strategyLabel}`)}` +
+        `${terminalThemeText('muted', ` · ${timestamp}`)}` +
+        quickActions
+    );
 }
 
 /**
@@ -872,9 +895,10 @@ async function _doEnsureDialogLoop() {
                     severity: 'warn',
                     source: 'sdk',
                 });
-                println(`\n\x1b[31m  ${recoveryMessage.label}\x1b[0m ${recoveryMessage.headline}`);
-                println(`  \x1b[90m${recoveryMessage.detail}\x1b[0m`);
-                println(`  \x1b[90m${recoveryMessage.actionHint}\x1b[0m`);
+                println('');
+                println(terminalThemeHeadline('error', recoveryMessage.label, [recoveryMessage.headline]));
+                println(terminalThemeRow('Detalhe', recoveryMessage.detail, { role: 'muted' }));
+                println(terminalThemeRow('Ação', recoveryMessage.actionHint, { role: 'command' }));
                 emitNerv('copilot:dialog:boot_blocked', {
                     error: message,
                     reason: `sdk_${sdkRecoveryPolicy.kind}`,
@@ -917,7 +941,7 @@ async function _tryStartDialogLoop() {
             detail: 'Status=starting antes de iniciar conversa',
             source: 'dialog',
         });
-        println('\x1b[90m  Aguardando boot do agente concluir…\x1b[0m');
+        println(terminalThemeRow('Inicialização', 'aguardando boot do agente concluir', { role: 'muted' }));
         const deadline = Date.now() + IDLE_TRANSITION_TIMEOUT_MS;
         while (Date.now() < deadline) {
             status = readTerminalRuntimeControlState().status;
@@ -935,7 +959,7 @@ async function _tryStartDialogLoop() {
             detail: 'Inicializando ambiente da conversa',
             source: 'dialog',
         });
-        println(terminalThemeText('muted', '  Preparando agente...'));
+        println(terminalThemeRow('Inicialização', 'preparando agente', { role: 'muted' }));
         await startTerminalAgentRuntime();
         const deadline = Date.now() + IDLE_TRANSITION_TIMEOUT_MS;
         while (Date.now() < deadline) {
@@ -952,7 +976,7 @@ async function _tryStartDialogLoop() {
             detail: 'Há trabalho em andamento antes da conversa',
             source: 'dialog',
         });
-        println(terminalThemeText('muted', '  Aguardando agente concluir tarefa em andamento...'));
+        println(terminalThemeRow('Inicialização', 'aguardando agente concluir tarefa em andamento', { role: 'muted' }));
         const deadline = Date.now() + IDLE_TRANSITION_TIMEOUT_MS;
         while (Date.now() < deadline) {
             const s = readTerminalRuntimeControlState().status;
@@ -977,13 +1001,17 @@ async function _tryStartDialogLoop() {
         detail: 'Iniciando protocolo READY/REPLY do terminal',
         source: 'dialog',
     });
-    println(terminalThemeText('muted', '  Conectando conversa...'));
+    println(terminalThemeRow('Conversa', 'conectando sessão permanente', { role: 'muted' }));
     const resumeSessionAttach = true;
     log('INFO', '[dialog] reanexando terminal sem boot prompt automático.');
-    println(terminalThemeText('muted', '  Retomando sessão sem prompt inicial...'));
+    println(terminalThemeRow('Conversa', 'retomando sessão sem prompt inicial', { role: 'muted' }));
     await startTerminalDialogMode(resumeSessionAttach ? undefined : (BOOT_PROMPT ?? undefined), {
         resumeSessionAttach,
-        onReady: () => println(`\n  ${terminalThemeText('success', 'LLM-B pronta')} — pode começar\n`),
+        onReady: () => {
+            println('');
+            println(terminalThemeHeadline('success', 'LLM-B pronta', ['pode começar']));
+            println('');
+        },
     });
     if (resumeSessionAttach) {
         markTerminalActivityIdle('Sessão retomada; aguardando próxima mensagem');
@@ -1072,11 +1100,12 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             severity: byokBudget.severity === 'block' && admissionMode === 'block' ? 'error' : 'warn',
         });
         const budgetRole = byokBudget.severity === 'block' && admissionMode === 'block' ? 'error' : 'warn';
-        println(terminalThemeRow('BYOK budget', byokBudget.label, { role: budgetRole }));
+        println(terminalThemeRow('Orçamento BYOK', byokBudget.label, { role: budgetRole }));
         println(
-            terminalThemeText(
-                'muted',
-                `  Dica: /byok recommend reasoning safe · /compact · /byok use <perfil> · /byok model <id> · ${TERMINAL_BYOK_ADMISSION_MODE_ENV}=warn para permitir mesmo assim`,
+            terminalThemeRow(
+                'Ação',
+                `/byok recommend reasoning safe · /compact · /byok use <perfil> · /byok model <id> · ${TERMINAL_BYOK_ADMISSION_MODE_ENV}=warn`,
+                { role: 'command' },
             ),
         );
         if (shouldBlockTerminalByokTurnBudget(byokBudget, admissionMode)) {
@@ -1688,18 +1717,18 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                     }
                     if (modelBilling.mismatch) {
                         if (modelBilling.configuredModel) {
-                            parts.push(`modeloCfg=\x1b[35m${modelBilling.configuredModel}\x1b[0m`);
+                            parts.push(`modeloCfg=${terminalThemeText('thinking', modelBilling.configuredModel)}`);
                         }
                         if (modelBilling.billedModel) {
-                            parts.push(`modeloCobrado=\x1b[36m${modelBilling.billedModel}\x1b[0m`);
+                            parts.push(`modeloCobrado=${terminalThemeText('assistant', modelBilling.billedModel)}`);
                         }
                     } else if (modelBilling.displayModel !== '-') {
                         parts.push(
-                            `${prefersLlmUsage ? 'LLM' : 'modelo'} \x1b[36m${modelBilling.displayModel}\x1b[0m`,
+                            `${prefersLlmUsage ? 'LLM' : 'modelo'} ${terminalThemeText('assistant', modelBilling.displayModel)}`,
                         );
                     }
                     if (modelBilling.cost !== null) {
-                        parts.push(`custo \x1b[33m${modelBilling.cost.toFixed(4)}\x1b[0m`);
+                        parts.push(`custo ${terminalThemeText('warn', modelBilling.cost.toFixed(4))}`);
                     }
                 }
                 if (ctxWin) {
@@ -1766,7 +1795,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 severity: 'error',
                 source: 'dialog',
             });
-            println(`[erro] ${err.message}`);
+            println(terminalThemeRow('Erro', err.message, { role: 'error' }));
         }
         if (byokFailure) {
             log('WARN', `[TerminalServer] Turno BYOK encerrado após apresentação operacional ao usuário: ${err.message}`);

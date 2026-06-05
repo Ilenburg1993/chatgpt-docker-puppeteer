@@ -27,6 +27,7 @@ import {
     resolveModelGatewaySelectionPolicy,
     SqliteModelGatewayCatalogStore,
 } from '#copilot/model-gateway';
+import { readConfiguredSessionFsState } from '#copilot/sdk';
 
 import {
     listTerminalSdkSessionInventory,
@@ -223,9 +224,9 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
 
 /**
  * @param {unknown} error
- * @returns {Awaited<ReturnType<typeof listTerminalSdkSessionInventory>> & { unavailableReason?: string | null }}
+ * @returns {Promise<Awaited<ReturnType<typeof listTerminalSdkSessionInventory>> & { unavailableReason?: string | null }>}
  */
-function createUnavailableSdkSessionInventory(error) {
+async function createUnavailableSdkSessionInventory(error) {
     const message = error instanceof Error ? error.message : String(error ?? 'SDK indisponível');
     return {
         currentSessionId: null,
@@ -233,6 +234,7 @@ function createUnavailableSdkSessionInventory(error) {
         foregroundSessionId: null,
         persistedByokBinding: null,
         lastBootDecision: null,
+        sessionFs: await readConfiguredSessionFsState(null),
         sessions: [],
         unavailableReason: message,
     };
@@ -245,7 +247,7 @@ async function readTerminalSdkSessionInventoryForAutomation() {
     try {
         return await listTerminalSdkSessionInventory();
     } catch (error) {
-        return createUnavailableSdkSessionInventory(error);
+        return await createUnavailableSdkSessionInventory(error);
     }
 }
 

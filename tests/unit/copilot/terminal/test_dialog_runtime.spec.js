@@ -34,12 +34,16 @@ describe('terminal/dialog/dialog-runtime', () => {
             'utf8',
         );
 
-        expect(src).toContain('Preparando agente');
+        expect(src).toContain('preparando agente');
         expect(src).toContain('Conectando conversa');
         expect(src).toContain('Boot da conversa bloqueado pela policy SDK');
-        expect(src).toContain('Retomando sessão sem prompt inicial');
+        expect(src).toContain('retomando sessão sem prompt inicial');
         expect(src).toContain('Inicializando ambiente da conversa');
         expect(src).toContain("'Conectando conversa'");
+        expect(src).toContain('Orçamento BYOK');
+        expect(src).not.toContain('BYOK budget');
+        expect(src).not.toContain("println(`[erro]");
+        expect(src).not.toContain('\\x1b[');
         expect(src).not.toContain("'Conectando ao dialog loop'");
         expect(src).not.toContain("'Boot do dialog loop bloqueado pela policy SDK'");
         expect(src).not.toContain('println(\'\\x1b[90m  Iniciando AlwaysAliveAgent');
@@ -55,9 +59,9 @@ describe('terminal/dialog/dialog-runtime', () => {
             new URL('../../../../src/copilot/terminal/events/sdk-session-events.js', import.meta.url),
             'utf8',
         );
-        expect(sdkEvents).toContain("'Modelo confirmado'");
+        expect(sdkEvents).toContain('renderTerminalModelTransitionRow');
         expect(sdkEvents).toContain("'Pergunta ao operador'");
-        expect(sdkEvents).toContain("'Resposta do operador'");
+        expect(sdkEvents).toContain('recordTerminalUserInputCompleted');
         expect(sdkEvents).not.toContain("'Modelo SDK alterado'");
         expect(sdkEvents).not.toContain("'ask_user SDK solicitado'");
         expect(sdkEvents).not.toContain("'ask_user SDK respondido'");
@@ -81,8 +85,9 @@ describe('terminal/dialog/dialog-runtime', () => {
 
         expect(src).toContain('sem pergunta humana ou formulário pendente');
         expect(src).not.toContain('sem ask_user/elicitation pendente');
-        expect(src).toContain("'Turno'");
-        expect(src).toContain("'Diagnóstico'");
+        expect(src).toContain('Turno vazio');
+        expect(src).toContain("'Causa'");
+        expect(src).toContain("'Evidências'");
         expect(src).not.toContain('Turno terminou sem saída pública');
         expect(src).not.toContain('⛔');
         expect(src).not.toContain("println('\\x1b[31m");

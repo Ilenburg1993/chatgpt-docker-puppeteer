@@ -3533,7 +3533,7 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
                         { role: 'warn', columns: 112 },
                     ),
                 );
-                println(terminalThemeWrappedRow('Comando', recommendation.commands[0], { role: 'command', columns: 112 }));
+                println(terminalThemeWrappedRow('Comando', recommendation.commands[0] ?? '-', { role: 'command', columns: 112 }));
             }
         }
         for (const id of result.diff.added.slice(0, 5)) println(terminalThemeWrappedRow('Novo', id, { role: 'success', columns: 112 }));
@@ -3935,7 +3935,7 @@ async function renderByokGatewayCatalogDiff(println) {
                     { role: 'warn', columns: 112 },
                 ),
             );
-            println(terminalThemeWrappedRow('Comando', recommendation.commands[0], { role: 'command', columns: 112 }));
+            println(terminalThemeWrappedRow('Comando', recommendation.commands[0] ?? '-', { role: 'command', columns: 112 }));
         }
     }
     println('');
@@ -4439,7 +4439,7 @@ async function renderByokGatewayCatalogExplain(println, selector) {
         return;
     }
     const eligibility = explanation.eligibility;
-    println(terminalThemeWrappedRow('Modelo', explanation.key, { role: 'warn', columns: 112 }));
+    println(terminalThemeWrappedRow('Modelo', explanation.key ?? normalizedSelector, { role: 'warn', columns: 112 }));
     println(
         terminalThemeWrappedRow(
             'Identidade',
@@ -4524,7 +4524,7 @@ async function renderByokGatewayProviderExplain(println, selector) {
         println('');
         return;
     }
-    println(terminalThemeWrappedRow('Provider', explanation.providerId, { role: 'warn', columns: 112 }));
+    println(terminalThemeWrappedRow('Provider', explanation.providerId ?? normalizedSelector, { role: 'warn', columns: 112 }));
     println(
         terminalThemeWrappedRow(
             'Camadas',
@@ -4814,7 +4814,7 @@ async function renderByokGatewayAutoProofPlan(println, rest) {
             terminalThemeWrappedRow(
                 'Contexto',
                 `perfil ${row.profileId} · rota ${row.providerId}:${row.providerModel} · motivos ${renderByokTokenList(row.reasons.slice(0, 3)) || '-'}`,
-                { role: row.status === 'ready' ? 'success' : 'muted', columns: 112 },
+                { role: row.status === 'selected' ? 'success' : 'muted', columns: 112 },
             ),
         );
     }
