@@ -5986,15 +5986,15 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             id: 'gateway-operator-ready-visible',
             pass:
                 /BYOK model-gateway operator-ready/.test(plain) &&
-                /sem chamada (?:a )?provedor/.test(plain) &&
-                /standby/.test(plain),
+                /sem\s+chamada\s+a\s+provedor/iu.test(plain) &&
+                /Standby\s+\d+/u.test(plain),
             detail: '/byok gateway operator-ready rendered the read-only terminal cockpit',
         },
         {
             id: 'auto-policy-visible',
             pass:
                 /BYOK model-gateway auto policy/.test(plain) &&
-                /efetivo:/.test(plain) &&
+                /Efetivo\s+(?:ativo|desativado)/u.test(plain) &&
                 /troca viva/.test(plain) &&
                 /nova sessão/.test(plain),
             detail: '/byok auto policy rendered effective policy and source-independent flags',
@@ -6010,16 +6010,16 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'auto-alternatives-visible',
-            pass: /alternativas:\s+usáveis|alternativas\s+0\/0|selecionados\s+0\/0/u.test(plain),
+            pass: /Alternativas\s+usáveis|Alternativas\s+0\/0|selecionados\s+0\/0/u.test(plain),
             detail: '/byok auto status/doctor rendered fallback candidate summary or an explicit empty state',
         },
         {
             id: 'auto-doctor-visible',
             pass:
                 /BYOK model-gateway auto doctor/.test(plain) &&
-                /política:/.test(plain) &&
-                /decisão:/.test(plain) &&
-                /registros:/.test(plain),
+                /Política\s+ativa/u.test(plain) &&
+                /Decisão\s+ok/u.test(plain) &&
+                /Registros\s+decisões/u.test(plain),
             detail: '/byok auto doctor rendered policy, decision and ledger cockpit',
         },
         {
@@ -6049,12 +6049,12 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'auto-handoffs-visible',
-            pass: /BYOK model-gateway auto handoffs/.test(plain),
+            pass: /Handoffs BYOK/.test(plain),
             detail: '/byok auto handoffs rendered SDK handoff ledger or empty state',
         },
         {
             id: 'auto-confirmations-visible',
-            pass: /BYOK model-gateway auto confirmations/.test(plain),
+            pass: /Confirmações BYOK/.test(plain),
             detail: '/byok auto confirmations rendered SDK confirmation ledger or empty state',
         },
         {
@@ -6078,14 +6078,14 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         {
             id: 'auto-recovery-fixture-visible',
             pass:
-                /BYOK model-gateway auto recovery fixture/.test(plain) &&
-                /sem chamada (?:a )?provedor/.test(plain) &&
-                /(?:health|saúde sintética|saúde):[\s\S]{0,120}registrado sim|saúde sintética sim/u.test(plain),
+                /Fixture de recuperação BYOK/.test(plain) &&
+                /sem\s+chamada\s+a\s+provedor/iu.test(plain) &&
+                /Saúde\s+registrada sim|saúde sintética sim/u.test(plain),
             detail: '/byok auto recovery-fixture ran synthetic post-turn recovery and persisted health without provider call',
         },
         {
             id: 'auto-recoveries-visible',
-            pass: /BYOK model-gateway auto recoveries/.test(plain) && /rate-limit/.test(plain),
+            pass: /Recuperações BYOK/.test(plain) && /limite de taxa|rate-limit/.test(plain),
             detail: '/byok auto recoveries rendered post-turn recovery ledger or empty state',
         },
         {

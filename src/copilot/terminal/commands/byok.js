@@ -2937,20 +2937,32 @@ function renderByokGatewayPreBuildReadiness(println) {
 function renderByokGatewayCanonicalCommands(println, rest) {
     const surface = rest.find((item) => /^(package|make|terminal)$/iu.test(item))?.toLowerCase();
     const phase = rest.find((item) => /^(orientation|metadata|pre-runtime|selection|validate|prebuild|live-readiness)$/iu.test(item))?.toLowerCase();
+    const full = rest.some((item) => /^(full|all|completo|todos|--full|--all)$/iu.test(item));
     const commands = listModelGatewayCanonicalCommands({ surface, phase });
+    const renderedLines = renderModelGatewayCanonicalCommandLines({ surface, phase });
+    const visibleLines = full || surface || phase ? renderedLines : renderedLines.slice(0, 48);
     println('');
     println(terminalThemeHeadline('tool', 'BYOK model-gateway canonical commands'));
     println(
         terminalThemeWrappedRow(
             'Resumo',
-            `Faixa Y · escopo package + make + terminal · build em preparação · superfície ${surface ?? '-'} · fase ${phase ?? '-'} · comandos ${commands.length}`,
+            `Faixa Y · escopo package + make + terminal · build em preparação · superfície ${surface ?? '-'} · fase ${phase ?? '-'} · comandos ${commands.length} · exibindo ${visibleLines.length}/${renderedLines.length}`,
             { role: 'muted', columns: 112 },
         ),
     );
-    for (const line of renderModelGatewayCanonicalCommandLines({ surface, phase })) {
+    for (const line of visibleLines) {
         const [head, summary] = line.split(' :: ');
         println(terminalThemeWrappedRow('Comando', head, { role: 'command', columns: 112 }));
         if (summary) println(terminalThemeWrappedRow('Descrição', summary, { role: 'muted', columns: 112 }));
+    }
+    if (visibleLines.length < renderedLines.length) {
+        println(
+            terminalThemeWrappedRow(
+                'Mais',
+                '/byok gateway commands full mostra o inventário completo; filtros úteis: live-readiness, metadata, prebuild, package, make, terminal',
+                { role: 'command', columns: 112 },
+            ),
+        );
     }
     println(
         terminalThemeWrappedRow(
