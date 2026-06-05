@@ -301,6 +301,8 @@ function humanEventLabel(event, payload = null) {
         return 'Evento da sessão';
     }
     if (event === 'session.error') return 'Erro da sessão';
+    if (event === 'session.title_changed') return 'Título da sessão';
+    if (event === 'assistant.intent') return 'Intenção da LLM-B';
     if (event === 'agent.error') {
         if (payload?.['byokEnabled'] === true || typeof payload?.['byokProviderType'] === 'string') return 'Erro BYOK';
         return 'Erro do agente';
@@ -390,6 +392,7 @@ function humanEventSource(source) {
     if (!text) return '-';
     if (lower === 'io' || lower.startsWith('io/')) return 'I/O local';
     if (lower.startsWith('sdk/session.info')) return 'controle da sessão';
+    if (lower.startsWith('sdk/session.title_changed')) return 'controle da sessão';
     if (lower.startsWith('sdk/user_input')) return 'pergunta ao operador';
     if (lower.startsWith('sdk/assistant')) return 'LLM-B via SDK';
     if (lower.startsWith('agent/passthrough/question.answered')) return 'ponte da pergunta';
@@ -472,6 +475,7 @@ function humanEventMessage(value) {
     if (!text) return '';
     if (text === 'Operation cancelled by user') return 'operação cancelada pelo operador';
     return text
+        .replace(/^Disabled tools:/iu, 'Ferramentas desabilitadas:')
         .replace(/\bprovider BYOK\b/giu, 'rota BYOK')
         .replace(/\bprovider\/modelo\b/giu, 'rota/modelo')
         .replace(/\bprovider\b/giu, 'provedor')
@@ -950,8 +954,13 @@ export async function cmdEvents({ println }, arg = '') {
     }
 
     const { query, format, rawMode } = parseEventsArg(arg);
-    const projection = await readTerminalSseEventArchiveTail(query);
-    const { state, entries, filters } = projection;
+    const defaultHumanTail = format === 'text' && !hasActiveEventFilters(query);
+    const archiveQuery = defaultHumanTail
+        ? { ...query, limit: Math.min(500, Math.max(100, query.limit * 5)) }
+        : query;
+    const projection = await readTerminalSseEventArchiveTail(archiveQuery);
+    const { state, entries } = projection;
+    const filters = defaultHumanTail ? { ...projection.filters, limit: query.limit } : projection.filters;
 
     if (format === 'json') {
         println(JSON.stringify({ state, filters, entries }, null, 2));
@@ -1027,9 +1036,13 @@ export async function cmdEvents({ println }, arg = '') {
     );
     const now = Date.now();
     const shouldAggregateDefaultEvents = !showDiagnosticIds && !hasActiveEventFilters(/** @type {Record<string, unknown>} */ (filters));
-    const visibleEntries = shouldAggregateDefaultEvents
+    const visibleEntriesRaw = shouldAggregateDefaultEvents
         ? entries.filter((entry) => !isInternalDefaultEvent(entry) && !isRoutineDefaultEvent(entry))
         : entries;
+    const visibleEntries =
+        shouldAggregateDefaultEvents && visibleEntriesRaw.length > filters.limit
+            ? visibleEntriesRaw.slice(-filters.limit)
+            : visibleEntriesRaw;
     if (visibleEntries.length === 0) {
         println(
             terminalThemeRow('Resultado', 'Nenhum evento operacional visível; use /events --raw para auditoria completa.', {

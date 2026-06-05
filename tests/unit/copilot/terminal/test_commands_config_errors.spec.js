@@ -267,4 +267,50 @@ describe('terminal commands config/errors com frontend canônico', () => {
         expect(ctx.output()).toContain('TypeError');
         expect(ctx.output()).toContain('boom');
     });
+
+    it('cmdErrors humaniza timeouts de progresso sem vazar detalhes internos', () => {
+        readTerminalErrorsProjection.mockReturnValueOnce({
+            stats: { total: 1, buffered: 1 },
+            recent: [
+                {
+                    timestamp: 1713250000000,
+                    errorType: 'SessionError',
+                    source: 'swallowed:agent.backpressure.mutex',
+                    message: '[DialogLoopManager] sendTurn sem progresso por 132000ms',
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        cmdErrors({ println: ctx.println }, '1');
+
+        expect(ctx.output()).toContain('Turno sem progresso');
+        expect(ctx.output()).toContain('132s sem progresso');
+        expect(ctx.output()).toContain('/byok health');
+        expect(ctx.output()).not.toContain('DialogLoopManager');
+        expect(ctx.output()).not.toContain('SessionError');
+        expect(ctx.output()).not.toContain('agent.backpressure.mutex');
+    });
+
+    it('cmdErrors humaniza turno vazio rastreado', () => {
+        readTerminalErrorsProjection.mockReturnValueOnce({
+            stats: { total: 1, buffered: 1 },
+            recent: [
+                {
+                    timestamp: 1713250000000,
+                    errorType: 'Error',
+                    source: 'terminal.dialog.empty_output',
+                    message: 'Turno sem saída pública materializada',
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        cmdErrors({ println: ctx.println }, '1');
+
+        expect(ctx.output()).toContain('Turno vazio');
+        expect(ctx.output()).toContain('nenhuma resposta pública materializada');
+        expect(ctx.output()).not.toContain('terminal.dialog.empty_output');
+        expect(ctx.output()).not.toContain('Turno sem saída pública materializada');
+    });
 });

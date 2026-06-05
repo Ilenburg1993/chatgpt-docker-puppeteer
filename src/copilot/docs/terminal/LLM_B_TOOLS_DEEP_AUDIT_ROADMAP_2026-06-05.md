@@ -334,6 +334,10 @@ operador vê e salvar summary com critérios objetivos.
 - [x] K16. Remover cabeçalho duplicado de `/tools diag` quando nenhuma ferramenta foi usada.
 - [x] K17. Trocar aviso antigo `[fila] Mensagem não produziu resposta` por linha semântica do tema do terminal.
 - [x] K18. Fazer `/export` criar Markdown diagnóstico mínimo mesmo quando não há transcript materializado.
+- [x] K19. Classificar rota BYOK sem resposta como bloqueio operacional do live runner, não como falha de protocolo com dezenas de critérios irrelevantes.
+- [x] K20. Humanizar `/errors` para timeouts de progresso e turnos vazios, escondendo `SessionError`, `DialogLoopManager` e sources internos na superfície padrão.
+- [x] K21. Corrigir `/events` default para buscar janela bruta maior e limitar eventos operacionais visíveis depois do filtro, evitando que ruído interno empurre pergunta/resposta/transcript para fora da tela.
+- [x] K22. Humanizar labels/detalhes crus em `/events` para `session.title_changed`, `assistant.intent` e `Disabled tools`.
 
 ### Faixa L — Agente e outras superfícies src/copilot
 
@@ -402,4 +406,10 @@ operador vê e salvar summary com critérios objetivos.
 - [x] 2026-06-05: `/tools diag` vazio agora não imprime `Ferramentas observadas` nem `0 grupos de ação`; teste unitário cobre a regressão.
 - [x] 2026-06-05: iniciada Faixa M para UX de modelo/rota; linha viva agora reconhece `Falha da rota BYOK` como estado BYOK compacto, com teste focado.
 - [x] 2026-06-05: `/byok auto handoffs`, `confirmations`, `recoveries` e `recovery-fixture` trocaram cabeçalhos crus em inglês por títulos humanos do tema do terminal.
-- [ ] Próximo passo: rerodar `recoverable-tool-error` após correção definitiva de `/tools diag`, auditar `/byok auto status|plan|apply` e ajustar prompt/harness para recuperação de ordem deltas→ask_user.
+- [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun5-20260605` confirmou `/tools diag` vazio e `/export` mínimo, mas revelou dois gaps: rota BYOK sem resposta era classificada como `FAIL` e `/errors` vazava `SessionError`/`DialogLoopManager`.
+- [x] 2026-06-05: harness live agora trata `Rota BYOK ficou sem resposta`/`sendTurn sem progresso` como `byok-route-no-response`; `/errors` traduz timeout de progresso e turno vazio para linhas operacionais com ações `/activity`, `/events` e `/byok health`.
+- [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun6-20260605` executou fluxo canônico completo com erro recuperável, deltas, `ask_user`, resposta humana, retomada pós-pergunta e export; sobrou apenas gap de `/events` default por janela bruta curta.
+- [x] 2026-06-05: `/events` default agora overfetches a janela bruta sem alterar raw/json/filtros e renderiza até N eventos operacionais humanos; teste cobre eventos de rotina empurrando transcript/pergunta/resposta.
+- [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun7-20260605` confirmou `/events` com pergunta/resposta/transcript visíveis no default; revelou vazamentos `Disabled tools`, `session title changed` e `assistant intent`.
+- [x] 2026-06-05: `/events` agora traduz `Disabled tools` para `Ferramentas desabilitadas`, `session.title_changed` para `Título da sessão` e `assistant.intent` para `Intenção da LLM-B`; teste cobre a superfície default.
+- [ ] Próximo passo: rerodar `recoverable-tool-error` após humanização final de `/events`, auditar `/byok auto status|plan|apply` e ajustar a tela `[RECUPERANDO]` para usar `terminalThemeRow`/headline em vez de bloco cru.

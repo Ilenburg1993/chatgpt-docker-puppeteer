@@ -3949,6 +3949,17 @@ function detectLiveBlocker(plain, runtime = {}) {
             detail: 'BYOK admission control contained the turn before provider streaming because the declared request budget is too small',
         };
     }
+    const byokRouteNoResponseMatch = plain.match(
+        /Rota BYOK\s+rota BYOK ficou sem resposta dentro da janela esperada[^\n]*|\[DialogLoopManager\]\s+sendTurn sem progresso por\s+(\d+)ms/i,
+    );
+    if (byokRouteNoResponseMatch) {
+        return {
+            id: 'byok-route-no-response',
+            detail:
+                'BYOK route accepted the turn but produced no public response inside the dialog progress window' +
+                `${byokRouteNoResponseMatch[1] ? ` · progress=${byokRouteNoResponseMatch[1]}ms` : ''}`,
+        };
+    }
     const byokPreflight = findByokRealPreflightProbeFailure(plain);
     if (byokPreflight) {
         return {
@@ -6442,7 +6453,8 @@ function evaluateByokRealOutput(
 }
 
 function evaluateBlockedOutput(plain, sseSummary, blocker) {
-    const blockedByByokProvider = blocker?.id === 'byok-provider-turn-failed';
+    const blockedByByokProvider =
+        blocker?.id === 'byok-provider-turn-failed' || blocker?.id === 'byok-route-no-response';
     return [
         {
             id: 'ready',
@@ -6469,17 +6481,17 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
                   {
                       id: 'byok-provider-panel-visible',
                       pass:
-                          /Provider BYOK/.test(plain) &&
-                          /troque provider\/modelo com \/byok use ou \/byok model/.test(plain),
-                      detail: 'BYOK provider failure rendered an actionable operator panel',
+                          /(?:Provider|Rota) BYOK/.test(plain) &&
+                          /(?:troque provider\/modelo com \/byok use ou \/byok model|\/byok health)/.test(plain),
+                      detail: 'BYOK provider/route failure rendered an actionable operator panel',
                   },
                   {
                       id: 'byok-provider-error-tracked',
                       pass:
-                          /Erros rastreados[\s\S]{0,800}(?:terminal\.byok_provider|Erro de provider BYOK|Provider BYOK)/u.test(
+                          /Erros rastreados[\s\S]{0,800}(?:terminal\.byok_provider|Erro de provider BYOK|Provider BYOK|Turno sem progresso|Turno vazio|Rota BYOK)/u.test(
                               plain,
                           ) && !/Erros rastreados\s+·\s+0 total\s+·\s+0 no buffer/u.test(plain),
-                      detail: '/errors surfaced the operator-visible BYOK provider failure',
+                      detail: '/errors surfaced the operator-visible BYOK provider/route failure',
                   },
               ]
             : []),

@@ -1154,6 +1154,151 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('trace=');
     });
 
+    it('busca janela bruta maior no default e limita eventos operacionais visíveis', async () => {
+        const hiddenRoutineEvents = Array.from({ length: 20 }, (_, index) => ({
+            timestamp: 1710000000100 + index,
+            eventId: 300 + index,
+            event: 'sdk.lifecycle',
+            source: 'agent/sdk.lifecycle',
+            eventSource: null,
+            traceId: 'turn:1',
+            turnId: '1',
+            hubSessionId: null,
+            payload: { type: 'session.updated', label: 'Sessão SDK atualizada' },
+        }));
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 23,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 100,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 187,
+                    event: 'assistant.message',
+                    source: 'sdk/assistant.message',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: null,
+                    payload: { content: 'DELTA-CANONICAL-8' },
+                },
+                ...hiddenRoutineEvents,
+                {
+                    timestamp: 1710000002000,
+                    eventId: 204,
+                    event: 'user_input.requested',
+                    source: 'sdk/user_input.requested',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: null,
+                    payload: { requestId: 'ask-1', question: 'ASK-CANONICAL: responda SIM' },
+                },
+                {
+                    timestamp: 1710000003000,
+                    eventId: 213,
+                    event: 'user_input.completed',
+                    source: 'sdk/user_input.completed',
+                    eventSource: null,
+                    traceId: 'turn:1',
+                    turnId: '1',
+                    hubSessionId: null,
+                    payload: { requestId: 'ask-1', content: 'SIM' },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '2');
+
+        expect(readTerminalSseEventArchiveTail).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 100 }));
+        expect(ctx.output()).toContain('Eventos SSE - últimas 2');
+        expect(ctx.output()).toContain('Pergunta ao operador');
+        expect(ctx.output()).toContain('Resposta do operador');
+        expect(ctx.output()).not.toContain('Mensagem da LLM-B');
+        expect(ctx.output()).not.toContain('Sessão atualizada');
+    });
+
+    it('humaniza labels e detalhes de sessão/intenção no default', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 3,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 100,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 20,
+                    event: 'session.info',
+                    source: 'sdk/session.info',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { infoType: 'configuration', message: 'Disabled tools: bash, glob' },
+                },
+                {
+                    timestamp: 1710000001000,
+                    eventId: 21,
+                    event: 'session.title_changed',
+                    source: 'sdk/session.title_changed',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { title: 'Terminal live' },
+                },
+                {
+                    timestamp: 1710000002000,
+                    eventId: 22,
+                    event: 'assistant.intent',
+                    source: 'terminal-intent/assistant.intent',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { intent: 'testar fluxo' },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '20');
+
+        expect(ctx.output()).toContain('Configuração');
+        expect(ctx.output()).toContain('Ferramentas desabilitadas: bash, glob');
+        expect(ctx.output()).toContain('Título da sessão');
+        expect(ctx.output()).toContain('Intenção da LLM-B');
+        expect(ctx.output()).not.toContain('Disabled tools');
+        expect(ctx.output()).not.toContain('session title changed');
+        expect(ctx.output()).not.toContain('assistant intent');
+    });
+
     it('normaliza quebras internas no resumo humano sem afetar raw/json', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: {
