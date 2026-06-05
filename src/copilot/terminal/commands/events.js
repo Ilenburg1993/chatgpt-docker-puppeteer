@@ -63,6 +63,7 @@ function countLabel(count, singular, plural) {
  *         hubSessionId: string | null;
  *     };
  *     format: 'text' | 'json' | 'raw';
+ *     rawMode: 'preview' | 'full';
  * }}
  */
 function parseEventsArg(arg) {
@@ -84,6 +85,8 @@ function parseEventsArg(arg) {
     let hubSessionId = null;
     /** @type {'text' | 'json' | 'raw'} */
     let format = 'text';
+    /** @type {'preview' | 'full'} */
+    let rawMode = 'preview';
     for (let index = 0; index < tokens.length; index += 1) {
         const token = tokens[index] ?? '';
         if (!token) continue;
@@ -94,6 +97,8 @@ function parseEventsArg(arg) {
             format = 'json';
         } else if (token === '--raw' || token === 'raw' || token === 'format=raw') {
             format = 'raw';
+        } else if (token === '--full' || token === 'full' || token === 'raw=full' || token === 'format=raw-full') {
+            rawMode = 'full';
         } else if (token === 'event' && next) {
             event = next;
             index += 1;
@@ -154,6 +159,7 @@ function parseEventsArg(arg) {
     return {
         query: { limit, event, traceId, turnId, source, toolCallId, requestId, hubSessionId },
         format,
+        rawMode,
     };
 }
 
@@ -657,6 +663,44 @@ function summarizePayload(payload, opts = {}) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} payload
+ * @param {string} event
+ * @returns {{ payloadKeys: string[]; payloadPreview: string | null }}
+ */
+function summarizeRawPreviewPayload(payload, event) {
+    if (!payload || typeof payload !== 'object') return { payloadKeys: [], payloadPreview: null };
+    const payloadKeys = Object.keys(payload).slice(0, 12);
+    const summary = summarizePayload(payload, { showIds: true, event });
+    const payloadPreview = summary || compact(JSON.stringify(payload), 180);
+    return { payloadKeys, payloadPreview: payloadPreview || null };
+}
+
+/**
+ * @param {Record<string, unknown>} entry
+ * @returns {Record<string, unknown>}
+ */
+function createRawPreviewEntry(entry) {
+    const event = typeof entry['event'] === 'string' ? entry['event'] : 'event';
+    const payload = /** @type {Record<string, unknown> | null | undefined} */ (entry['payload']);
+    const payloadSummary = summarizeRawPreviewPayload(payload, event);
+    return {
+        schemaVersion: entry['schemaVersion'] ?? 1,
+        timestamp: entry['timestamp'] ?? null,
+        ts: entry['ts'] ?? null,
+        eventId: entry['eventId'] ?? null,
+        event,
+        source: entry['source'] ?? null,
+        eventSource: entry['eventSource'] ?? null,
+        traceId: entry['traceId'] ?? null,
+        turnId: entry['turnId'] ?? null,
+        hubSessionId: entry['hubSessionId'] ?? null,
+        ...payloadSummary,
+    };
+}
+
+const RAW_PREVIEW_LIMIT = 12;
+
+/**
  * @param {{
  *     event: string;
  *     source: string | null;
@@ -802,7 +846,7 @@ export async function cmdEvents({ println }, arg = '') {
         return;
     }
 
-    const { query, format } = parseEventsArg(arg);
+    const { query, format, rawMode } = parseEventsArg(arg);
     const projection = await readTerminalSseEventArchiveTail(query);
     const { state, entries, filters } = projection;
 
@@ -811,7 +855,37 @@ export async function cmdEvents({ println }, arg = '') {
         return;
     }
     if (format === 'raw') {
-        for (const entry of entries) println(JSON.stringify(entry));
+        if (rawMode === 'full') {
+            for (const entry of entries) println(JSON.stringify(entry));
+            return;
+        }
+        println('');
+        println(
+            terminalThemeHeadline(
+                'accent',
+                `Eventos SSE raw - preview ${Math.min(entries.length, RAW_PREVIEW_LIMIT)}/${entries.length}`,
+            ),
+        );
+        println(
+            terminalThemeWrappedRow(
+                'Registro',
+                `${compactTerminalOperatorToolText(state.path ?? '(sem arquivo)', 88)} · ${countLabel(state.events, 'evento', 'eventos')} · fila ${state.queueDepth}`,
+                { role: 'muted' },
+            ),
+        );
+        println(
+            terminalThemeRow('Completo', `/events ${filters.limit} --raw full · /events ${filters.limit} --json`, {
+                role: 'command',
+            }),
+        );
+        for (const entry of entries.slice(0, RAW_PREVIEW_LIMIT)) println(JSON.stringify(createRawPreviewEntry(entry)));
+        if (entries.length > RAW_PREVIEW_LIMIT) {
+            println(
+                terminalThemeRow('Ocultos', countLabel(entries.length - RAW_PREVIEW_LIMIT, 'evento', 'eventos'), {
+                    role: 'muted',
+                }),
+            );
+        }
         return;
     }
 
@@ -835,7 +909,7 @@ export async function cmdEvents({ println }, arg = '') {
         ),
     );
     println(terminalThemeRow('Filtro', filterParts.join(' · ') || 'nenhum', { role: 'muted' }));
-    println(terminalThemeRow('Detalhe', '/events --raw · /events --json · /events sources', { role: 'command' }));
+    println(terminalThemeRow('Detalhe', '/events --raw preview · /events --raw full · /events --json · /events sources', { role: 'command' }));
     if (state.error) {
         println(terminalThemeRow('Erro', state.error, { role: 'error' }));
     }

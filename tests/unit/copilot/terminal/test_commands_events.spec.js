@@ -1142,14 +1142,39 @@ describe('terminal/commands/events', () => {
         expect(parsed.entries[0]).toMatchObject({ eventId: 42, event: 'delta' });
     });
 
-    it('emite JSONL raw para comparacao com artefatos SSE', async () => {
+    it('emite preview JSONL raw compacto para comparacao visual com artefatos SSE', async () => {
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '3 --raw event=delta');
 
+        expect(ctx.output()).toContain('Eventos SSE raw - preview');
+        expect(ctx.output()).toContain('/events 5 --raw full');
+        const rawLine = ctx
+            .output()
+            .trim()
+            .split('\n')
+            .find((line) => line.trim().startsWith('{'));
+        expect(JSON.parse(rawLine)).toMatchObject({
+            eventId: 42,
+            event: 'delta',
+            payloadKeys: expect.arrayContaining(['content']),
+            payloadPreview: expect.stringContaining('DELTA-CANONICAL-1'),
+        });
+        expect(ctx.output()).not.toContain('"payload":');
+    });
+
+    it('mantém JSONL raw completo quando solicitado explicitamente', async () => {
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '3 --raw full event=delta');
+
         const lines = ctx.output().trim().split('\n');
         expect(lines).toHaveLength(1);
-        expect(JSON.parse(lines[0])).toMatchObject({ eventId: 42, event: 'delta' });
+        expect(JSON.parse(lines[0])).toMatchObject({
+            eventId: 42,
+            event: 'delta',
+            payload: { content: 'DELTA-CANONICAL-1' },
+        });
     });
 
     it('mostra vazio quando archive nao tem entradas', async () => {
