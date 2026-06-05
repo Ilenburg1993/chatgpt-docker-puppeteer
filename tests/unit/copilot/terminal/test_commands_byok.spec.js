@@ -3161,8 +3161,10 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('sinal ativo');
         expect(ctx.output()).toContain('janela temporary');
         expect(ctx.output()).toContain('próxima atualização 2026-05-25T00:01:00.000Z');
-        expect(ctx.output()).toContain('próxima ação wait_for_rate_limit_reset_or_choose_another_route');
+        expect(ctx.output()).toContain('Ação');
+        expect(ctx.output()).toContain('wait_for_rate_limit_reset_or_choose_another_route');
         expect(ctx.output()).toContain('AssistantUsageQuotaSnapshot é quota SDK/Copilot');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra matriz de capacidades de quota por provider sem executar runtime', async () => {
@@ -3175,10 +3177,12 @@ describe('terminal /byok command', () => {
             expect.objectContaining({ selector: 'openrouter' }),
         );
         expect(ctx.output()).toContain('BYOK matriz de quotas dos provedores');
-        expect(ctx.output()).toContain('Tipos de quota: key_credit_balance');
+        expect(ctx.output()).toContain('Tipos de quota');
+        expect(ctx.output()).toContain('key_credit_balance');
         expect(ctx.output()).toContain('quota SDK aplicável a BYOK 0');
         expect(ctx.output()).toContain('OPENROUTER_API_KEY');
         expect(ctx.output()).toContain('/api/v1/key');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra comandos canônicos do model-gateway para package, make e terminal', async () => {

@@ -523,3 +523,4 @@
 - [x] 2026-06-05: `/db-history` vazio/sem persistência passou a usar label `Histórico DB`, removendo o nome do comando como rótulo visual; live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T12-29-49-778Z/summary.md`.
 - [x] 2026-06-05: shutdown do REPL trocou `HTTP local permanece ativo` por `API local permanece ativa`, alinhando fechamento, banner e harness live ao mesmo vocabulário.
 - [x] 2026-06-05: `/sdk status` e `/sdk quota` trocaram `escopo entitlement do SDK` por `fonte limite do SDK`, mantendo quota SDK separada de BYOK provider sem jargão cru; live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T12-32-21-659Z/summary.md`.
+- [x] 2026-06-05: `/byok gateway limits` e `/byok gateway quota-matrix` migraram de ANSI hardcoded para rows temáticas; o `diagnostic-ux-cycle` agora cobre as duas telas e PASS em `artifacts/terminal-live/2026-06-05T12-37-14-181Z/summary.md`.

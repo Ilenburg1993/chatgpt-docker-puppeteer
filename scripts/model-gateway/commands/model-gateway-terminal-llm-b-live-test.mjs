@@ -2119,7 +2119,9 @@ function diagnosticUxCycleCriteria(boot) {
     const sdkWaitsStart = plain.indexOf('/session sdk waits 8', Math.max(0, sdkEventsStart));
     const sdkInventoryStart = plain.indexOf('/session sdk 6', Math.max(0, sdkWaitsStart));
     const sdkStatusStart = plain.indexOf('/sdk status', Math.max(0, sdkInventoryStart));
-    const permissionModeStart = plain.indexOf('/permission mode', Math.max(0, sdkStatusStart));
+    const byokLimitsStart = plain.indexOf('/byok gateway limits openrouter', Math.max(0, sdkStatusStart));
+    const byokQuotaMatrixStart = plain.indexOf('/byok gateway quota-matrix openrouter', Math.max(0, byokLimitsStart));
+    const permissionModeStart = plain.indexOf('/permission mode', Math.max(0, byokQuotaMatrixStart));
     const permissionCockpitStart = plain.indexOf('/permission cockpit', Math.max(0, permissionModeStart));
     const queueStart = plain.indexOf('/queue intervenção visual sem turno novo', Math.max(0, permissionCockpitStart));
     const mailboxStatusStart = plain.indexOf('/queue status', Math.max(0, queueStart));
@@ -2157,7 +2159,9 @@ function diagnosticUxCycleCriteria(boot) {
     const sdkEventsSurface = surfaceBetween(sdkEventsStart, sdkWaitsStart);
     const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, sdkInventoryStart);
     const sdkInventorySurface = surfaceBetween(sdkInventoryStart, sdkStatusStart);
-    const sdkStatusSurface = surfaceBetween(sdkStatusStart, permissionModeStart);
+    const sdkStatusSurface = surfaceBetween(sdkStatusStart, byokLimitsStart);
+    const byokLimitsSurface = surfaceBetween(byokLimitsStart, byokQuotaMatrixStart);
+    const byokQuotaMatrixSurface = surfaceBetween(byokQuotaMatrixStart, permissionModeStart);
     const permissionModeSurface = surfaceBetween(permissionModeStart, permissionCockpitStart);
     const permissionCockpitSurface = surfaceBetween(permissionCockpitStart, queueStart);
     const mailboxSurface = surfaceBetween(queueStart, historyStart);
@@ -2390,6 +2394,20 @@ function diagnosticUxCycleCriteria(boot) {
             detail: '/sdk status rendered principal runtime, session presence, quota/status and compact multiline command help without raw ids, raw quota scopes or key=value diagnostics',
         },
         {
+            id: 'diagnostic-ux-byok-quota-surfaces-human',
+            pass:
+                /BYOK limites de conta[\s\S]*Catálogo[\s\S]*Estados[\s\S]*Fontes[\s\S]*(?:Provedor|Resultado|Nota)/iu.test(
+                    byokLimitsSurface,
+                ) &&
+                /BYOK matriz de quotas dos provedores[\s\S]*Resumo[\s\S]*Tipos de quota[\s\S]*(?:Provedor|Resultado|Nota)/iu.test(
+                    byokQuotaMatrixSurface,
+                ) &&
+                !/\\x1b\[|\x1b\[|quota SDK aplicável a BYOK=\d|Tipos de quota:|^\s*(?:\x1b|\[)/imu.test(
+                    `${byokLimitsSurface}\n${byokQuotaMatrixSurface}`,
+                ),
+            detail: '/byok gateway limits/quota-matrix rendered themed pre-runtime quota/account information without raw ANSI or old line formatting',
+        },
+        {
             id: 'diagnostic-ux-permission-human',
             pass:
                 /Modo de permissões[\s\S]*(automáticas|auditoria sem janelas|seletivas)/iu.test(permissionModeSurface) &&
@@ -2532,13 +2550,19 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
                 { line: '/session sdk waits 8', waitFor: 'Esperas SDK da sessão', advanceAfterMs: 1_000 },
                 { line: '/session sdk 6', waitFor: 'Sessões SDK listadas', advanceAfterMs: 1_000 },
                 { line: '/sdk status', waitFor: 'SDK do Terminal', advanceAfterMs: 1_000 },
+                { line: '/byok gateway limits openrouter', waitFor: 'BYOK limites de conta', advanceAfterMs: 1_000 },
+                {
+                    line: '/byok gateway quota-matrix openrouter',
+                    waitFor: 'BYOK matriz de quotas dos provedores',
+                    advanceAfterMs: 1_000,
+                },
                 { line: '/permission mode', waitFor: 'Modo de permissões', advanceAfterMs: 1_000 },
                 { line: '/permission cockpit', waitFor: 'Permissões SDK', advanceAfterMs: 1_000 },
                 { line: '/queue intervenção visual sem turno novo', waitFor: 'intervenção guardada', advanceAfterMs: 1_000 },
                 { line: '/queue status', waitFor: 'Fila de intervenção', advanceAfterMs: 1_000 },
                 { line: '/queue clear', waitFor: 'limpa', advanceAfterMs: 1_000 },
                 { line: '/history 6', waitFor: 'Histórico', advanceAfterMs: 1_000 },
-                { line: '/db-history 6', waitFor: '/db-history', advanceAfterMs: 1_000 },
+                { line: '/db-history 6', waitFor: 'Histórico DB', advanceAfterMs: 1_000 },
                 { line: '/db-sessions 6', waitFor: 'Últimas 6 sessões persistidas', advanceAfterMs: 1_000 },
                 {
                     line: '/scope declare terminal-ux-scope src/copilot/terminal/commands --await --include scope.js --max-files 1',

@@ -4833,15 +4833,20 @@ async function renderByokGatewayLimits(println, rest) {
     const runtimeOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(listByokProviderModelHealth());
     const runtimeSummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeOverlays);
     const explanation = explainModelGatewayAccountLimitOverlays([...catalogOverlays, ...runtimeOverlays], { selector: args.selector });
-    println(`\n  \x1b[36mBYOK limites de conta\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('accent', 'BYOK limites de conta'));
     println(
-        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${explanation.summary.matched}/${explanation.summary.total} · bloqueios ativos ${explanation.summary.activeBlockers} · sinais expirados ${explanation.summary.expiredSignals} · temporários ${explanation.summary.temporaryBlockers} · execução ${runtimeSummary.activeCount}/${runtimeSummary.total}\x1b[0m`,
+        terminalThemeRow(
+            'Catálogo',
+            `${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${explanation.summary.matched}/${explanation.summary.total} · bloqueios ativos ${explanation.summary.activeBlockers} · sinais expirados ${explanation.summary.expiredSignals} · temporários ${explanation.summary.temporaryBlockers} · execução ${runtimeSummary.activeCount}/${runtimeSummary.total}`,
+            { role: explanation.summary.activeBlockers > 0 ? 'warn' : 'muted' },
+        ),
     );
-    println(
-        `  \x1b[90mEstados: ${renderGatewayCountMap(explanation.summary.byStatus)} · camadas de fonte: ${renderGatewayCountMap(explanation.summary.bySourceLayer)}\x1b[0m\n`,
-    );
+    println(terminalThemeRow('Estados', renderGatewayCountMap(explanation.summary.byStatus), { role: 'muted' }));
+    println(terminalThemeRow('Fontes', renderGatewayCountMap(explanation.summary.bySourceLayer), { role: 'muted' }));
     if (explanation.rows.length === 0) {
-        println('    \x1b[33mNenhum limite account/key encontrado para o filtro informado.\x1b[0m\n');
+        println(terminalThemeRow('Resultado', 'nenhum limite account/key encontrado para o filtro informado.', { role: 'warn' }));
+        println('');
         return;
     }
     for (const row of explanation.rows.slice(0, args.limit)) {
@@ -4851,20 +4856,28 @@ async function renderByokGatewayLimits(println, rest) {
             row.remainingUsd !== null ? `USD restante ${row.remainingUsd}` : null,
             row.remainingCreditsUsd !== null ? `créditos USD ${row.remainingCreditsUsd}` : null,
         ].filter(Boolean).join(' · ');
+        println(terminalThemeRow('Provedor', row.providerId, { role: row.activeBlocker ? 'warn' : 'accent' }));
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mescopo ${row.accountScope} · estado ${row.limitStatus} · sinal ${state} · frescor ${row.freshnessStatus} · janela ${row.resetWindowClass} · ${reset} · expira ${row.expiresAt ?? row.effectiveExpiresAt ?? '-'}\x1b[0m`,
+            terminalThemeRow(
+                'Limite',
+                `escopo ${row.accountScope} · estado ${row.limitStatus} · sinal ${state} · frescor ${row.freshnessStatus} · janela ${row.resetWindowClass} · ${reset} · expira ${row.expiresAt ?? row.effectiveExpiresAt ?? '-'}`,
+                { role: row.activeBlocker ? 'warn' : 'muted' },
+            ),
         );
         println(
-            `      \x1b[90mfonte ${renderByokTokenLabel(row.sourceKind)}:${row.sourceId ?? '-'} · camada ${renderByokTokenLabel(row.sourceLayer)} · falha ${renderByokTokenLabel(row.failureKind)} · segredo ${row.secretRef ?? '-'} · próxima atualização ${row.nextRefreshAfter ?? '-'} · ${money || 'saldo -'}\x1b[0m`,
+            terminalThemeRow(
+                'Fonte',
+                `${renderByokTokenLabel(row.sourceKind)}:${row.sourceId ?? '-'} · camada ${renderByokTokenLabel(row.sourceLayer)} · falha ${renderByokTokenLabel(row.failureKind)} · segredo ${row.secretRef ?? '-'} · próxima atualização ${row.nextRefreshAfter ?? '-'} · ${money || 'saldo -'}`,
+                { role: 'muted' },
+            ),
         );
-        println(`      \x1b[90mpróxima ação ${row.nextAction}\x1b[0m`);
+        println(terminalThemeRow('Ação', row.nextAction, { role: row.activeBlocker ? 'command' : 'muted' }));
     }
     if (explanation.rows.length > args.limit) {
-        println(`\n  \x1b[90mexibindo ${args.limit}/${explanation.rows.length}; use filtro ou limite numerico.\x1b[0m`);
+        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${explanation.rows.length}; use filtro ou limite numerico.`, { role: 'muted' }));
     }
-    println(
-        '  \x1b[90mLimites provider/account podem bloquear pré-runtime; AssistantUsageQuotaSnapshot é quota SDK/Copilot e não substitui overlay BYOK externo.\x1b[0m\n',
-    );
+    println(terminalThemeRow('Nota', 'limites provider/account podem bloquear pré-runtime; AssistantUsageQuotaSnapshot é quota SDK/Copilot e não substitui overlay BYOK externo.', { role: 'muted' }));
+    println('');
 }
 
 /**
@@ -4875,28 +4888,43 @@ async function renderByokGatewayLimits(println, rest) {
 function renderByokGatewayQuotaMatrix(println, rest) {
     const args = parseGatewayCatalogListArgs(rest);
     const matrix = summarizeModelGatewayProviderQuotaCapabilities({ selector: args.selector });
-    println(`\n  \x1b[36mBYOK matriz de quotas dos provedores\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('accent', 'BYOK matriz de quotas dos provedores'));
     println(
-        `  \x1b[90mFiltro ${args.selector ?? '-'} · provedores ${matrix.summary.providerCount}/${matrix.summary.total} · visibilidade de conta ${matrix.summary.accountVisibilityCount} · snapshots de quota ${matrix.summary.quotaSnapshotCount} · overlays runtime ${matrix.summary.runtimeFailureOverlayCount} · quota SDK aplicável a BYOK ${matrix.summary.sdkQuotaByokTruthCount}\x1b[0m`,
+        terminalThemeRow(
+            'Resumo',
+            `filtro ${args.selector ?? '-'} · provedores ${matrix.summary.providerCount}/${matrix.summary.total} · visibilidade de conta ${matrix.summary.accountVisibilityCount} · snapshots de quota ${matrix.summary.quotaSnapshotCount} · overlays runtime ${matrix.summary.runtimeFailureOverlayCount} · quota SDK aplicável a BYOK ${matrix.summary.sdkQuotaByokTruthCount}`,
+            { role: 'muted' },
+        ),
     );
-    println(`  \x1b[90mTipos de quota: ${renderGatewayCountMap(matrix.summary.byQuotaSnapshot)}\x1b[0m\n`);
+    println(terminalThemeRow('Tipos de quota', renderGatewayCountMap(matrix.summary.byQuotaSnapshot), { role: 'muted' }));
     if (matrix.rows.length === 0) {
-        println('    \x1b[33mNenhum provedor encontrado para o filtro informado.\x1b[0m\n');
+        println(terminalThemeRow('Resultado', 'nenhum provedor encontrado para o filtro informado.', { role: 'warn' }));
+        println('');
         return;
     }
     for (const row of matrix.rows.slice(0, args.limit)) {
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mvisibilidade ${renderByokTokenLabel(row.accountVisibility)} · quota ${renderByokTokenLabel(row.quotaSnapshot)} · gasto ${renderByokTokenLabel(row.spendingLimit)} · limite de taxa ${renderByokTokenLabel(row.rateLimit)}\x1b[0m`,
+            terminalThemeRow(
+                'Provedor',
+                `${row.providerId} · visibilidade ${renderByokTokenLabel(row.accountVisibility)} · quota ${renderByokTokenLabel(row.quotaSnapshot)} · gasto ${renderByokTokenLabel(row.spendingLimit)} · limite de taxa ${renderByokTokenLabel(row.rateLimit)}`,
+                { role: 'accent' },
+            ),
         );
         println(
-            `      \x1b[90moverlay runtime ${row.runtimeFailureOverlay ? 'sim' : 'nao'} · quota SDK cobre BYOK ${row.sdkQuotaAppliesToByok ? 'sim' : 'nao'} · env ${row.requiredEnv.join(',') || '-'}\x1b[0m`,
+            terminalThemeRow(
+                'Conta',
+                `overlay runtime ${row.runtimeFailureOverlay ? 'sim' : 'nao'} · quota SDK cobre BYOK ${row.sdkQuotaAppliesToByok ? 'sim' : 'nao'} · env ${row.requiredEnv.join(',') || '-'}`,
+                { role: 'muted' },
+            ),
         );
-        println(`      \x1b[90mendpoints ${row.endpoints.slice(0, 4).join(',') || '-'}\x1b[0m`);
+        println(terminalThemeRow('Endpoints', row.endpoints.slice(0, 4).join(',') || '-', { role: 'muted' }));
     }
     if (matrix.rows.length > args.limit) {
-        println(`\n  \x1b[90mexibindo ${args.limit}/${matrix.rows.length}; use filtro ou limite numerico.\x1b[0m`);
+        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${matrix.rows.length}; use filtro ou limite numerico.`, { role: 'muted' }));
     }
-    println('  \x1b[90mA matriz descreve fontes pré-runtime possíveis; ela não prova acesso runtime nem altera catálogo.\x1b[0m\n');
+    println(terminalThemeRow('Nota', 'a matriz descreve fontes pré-runtime possíveis; ela não prova acesso runtime nem altera catálogo.', { role: 'muted' }));
+    println('');
 }
 
 /**
