@@ -1291,10 +1291,12 @@ describe('terminal/commands/events', () => {
         await cmdEvents({ println: ctx.println }, '20');
 
         expect(ctx.output()).toContain('Configuração');
+        expect(ctx.output()).toContain('tipo configuração');
         expect(ctx.output()).toContain('Ferramentas desabilitadas: bash, glob');
         expect(ctx.output()).toContain('Título da sessão');
         expect(ctx.output()).toContain('Intenção da LLM-B');
         expect(ctx.output()).not.toContain('Disabled tools');
+        expect(ctx.output()).not.toContain('tipo configuration');
         expect(ctx.output()).not.toContain('session title changed');
         expect(ctx.output()).not.toContain('assistant intent');
     });

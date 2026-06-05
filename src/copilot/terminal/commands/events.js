@@ -454,6 +454,7 @@ function humanPayloadKind(value) {
     if (text === 'session.foreground') return 'sessão em primeiro plano';
     if (text === 'session.background') return 'sessão em segundo plano';
     if (text === 'session.shutdown') return 'sessão encerrada';
+    if (text === 'configuration') return 'configuração';
     if (text === 'model_retry') return 'retry do modelo';
     if (text === 'byok_provider_failure') return 'falha da rota BYOK';
     if (text === 'model_call') return 'chamada do modelo';

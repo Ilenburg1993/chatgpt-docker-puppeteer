@@ -338,6 +338,8 @@ operador vê e salvar summary com critérios objetivos.
 - [x] K20. Humanizar `/errors` para timeouts de progresso e turnos vazios, escondendo `SessionError`, `DialogLoopManager` e sources internos na superfície padrão.
 - [x] K21. Corrigir `/events` default para buscar janela bruta maior e limitar eventos operacionais visíveis depois do filtro, evitando que ruído interno empurre pergunta/resposta/transcript para fora da tela.
 - [x] K22. Humanizar labels/detalhes crus em `/events` para `session.title_changed`, `assistant.intent` e `Disabled tools`.
+- [x] K23. Ajustar harness `sse-stdout-trace-overlap` para reconhecer que trace IDs são ocultos no default e que preview raw pode cair em cauda sem trace, mantendo o envelope SSE como validação primária.
+- [x] K24. Fazer o harness considerar tools de falha esperada como obrigatórias antes de responder `ask_user`, bloqueando claims de recuperação sem `exec_command` real.
 
 ### Faixa L — Agente e outras superfícies src/copilot
 
@@ -412,4 +414,9 @@ operador vê e salvar summary com critérios objetivos.
 - [x] 2026-06-05: `/events` default agora overfetches a janela bruta sem alterar raw/json/filtros e renderiza até N eventos operacionais humanos; teste cobre eventos de rotina empurrando transcript/pergunta/resposta.
 - [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun7-20260605` confirmou `/events` com pergunta/resposta/transcript visíveis no default; revelou vazamentos `Disabled tools`, `session title changed` e `assistant intent`.
 - [x] 2026-06-05: `/events` agora traduz `Disabled tools` para `Ferramentas desabilitadas`, `session.title_changed` para `Título da sessão` e `assistant.intent` para `Intenção da LLM-B`; teste cobre a superfície default.
-- [ ] Próximo passo: rerodar `recoverable-tool-error` após humanização final de `/events`, auditar `/byok auto status|plan|apply` e ajustar a tela `[RECUPERANDO]` para usar `terminalThemeRow`/headline em vez de bloco cru.
+- [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun8-20260605` validou recuperação controlada quando os deltas saem antes de `ask_user`; revelou `tipo configuration` e critério instável de trace stdout quando o raw preview não contém trace visível.
+- [x] 2026-06-05: `configuration` agora vira `configuração` em `/events`; o critério de trace stdout virou best-effort quando a tela oculta trace no default e o preview raw não inclui trace, preservando a exigência `sse-trace-envelope`.
+- [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun9-20260605` falhou corretamente porque a LLM-B pulou `exec_command`, mas revelou que o runner respondeu `ask_user` mesmo com tool de falha esperada ausente.
+- [x] 2026-06-05: checker `findIncompleteExpectedToolChain` agora inclui expectedOutcome=`failure`; falha esperada só conta como materializada com lifecycle falho ou postToolUse failure.
+- [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun10-20260605` PASS, cobrindo erro recuperável real, segunda leitura, deltas, recuperação controlada para `ask_user` ausente, resposta humana, final pós-pergunta, SSE/export e ausência de labels crus.
+- [ ] Próximo passo: auditar `/byok auto status|plan|apply` e ajustar a tela `[RECUPERANDO]` para usar `terminalThemeRow`/headline em vez de bloco cru.

@@ -3588,16 +3588,18 @@ function findAssistantEndedAfterAskRecoveryWithoutAsk(plain, scenario = LIVE_SCE
 }
 
 function findIncompleteExpectedToolChain(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
-    const expectedTools = scenario.expectedLifecycleTools.filter(
-        (tool) => (tool.expectedOutcome ?? 'success') !== 'failure',
-    );
+    const expectedTools = scenario.expectedLifecycleTools;
     if (expectedTools.length === 0) return null;
     const statuses = expectedTools.map((tool) => {
         const lifecycle = summarizeNamedToolLifecycle(events, tool.name);
+        const expectsFailure = (tool.expectedOutcome ?? 'success') === 'failure';
         return {
             name: tool.name,
-            completed: lifecycle.done || lifecycle.postToolSuccess,
+            completed: expectsFailure
+                ? lifecycle.failed || lifecycle.postToolFailure
+                : lifecycle.done || lifecycle.postToolSuccess,
             started: lifecycle.start,
+            expectedOutcome: expectsFailure ? 'failure' : 'success',
         };
     });
     const completed = statuses.filter((tool) => tool.completed).map((tool) => tool.name);
@@ -4878,8 +4880,12 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
         },
         {
             id: 'sse-stdout-trace-overlap',
-            pass: !expectPublicEvents || traceIds.length === 0 || traceOverlap.length > 0,
-            detail: `stdout traceIds=${plainTraceIds.slice(0, 5).join(', ') || '-'} · sse traceIds=${traceIds.slice(0, 5).join(', ') || '-'} · overlap=${traceOverlap.slice(0, 5).join(', ') || '-'}`,
+            pass:
+                !expectPublicEvents ||
+                traceIds.length === 0 ||
+                plainTraceIds.length === 0 ||
+                traceOverlap.length > 0,
+            detail: `stdout traceIds=${plainTraceIds.slice(0, 5).join(', ') || 'hidden in default/raw tail'} · sse traceIds=${traceIds.slice(0, 5).join(', ') || '-'} · overlap=${traceOverlap.slice(0, 5).join(', ') || '-'}`,
         },
     ];
 }
