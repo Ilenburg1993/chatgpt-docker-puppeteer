@@ -375,6 +375,8 @@
 - [x] Gap 48: live pass16 mostrou que o harness exigia uma corrida temporal específica (`Troca de modelo solicitada` como estado atual), embora a UX correta já pudesse estar em `Modelo SDK confirmado`; agora o critério aceita confirmação rápida desde que a timeline retenha o pedido.
 - [x] Gap 49: `/byok model` imprimia o painel completo de `/byok` antes do resultado, repetindo catálogo, rotina, comandos avançados e fronteira; agora usa um resumo compacto `BYOK modelo` focado em preparada/sessão viva/fronteira/ação.
 - [x] Gap 50: o resumo compacto de `/byok model` ainda herdava labels longos (`perfil/preset/provedor/modelo`) e ação explicativa extensa; agora compacta o vínculo vivo e reduz a ação para confirmação operacional.
+- [x] Gap 51: a limpeza da linha viva no submit usava `clearInlineStatus()` e podia limpar a linha do prompt mesmo sem overlay reservado; agora o REPL usa `clearReservedInlineStatus()` e só remove status vivo real.
+- [x] Gap 52: pass20 revelou que a nova função de limpeza reservada não estava no barrel `terminal/dialog`; agora `clearReservedInlineStatus` é exportada pelo barrel canônico.
 
 ## 08. Criterio de Marco
 
@@ -460,3 +462,5 @@
 - [x] 2026-06-05: live `operator-ux-cycle` pass16 confirmou o prompt limpo em `/activity`; o runner agora aceita tanto estado solicitado quanto confirmação rápida do SDK, exigindo a solicitação preservada na timeline.
 - [x] 2026-06-05: `/byok model` deixou de reaproveitar o painel completo de status e ganhou resumo operacional compacto antes da solicitação live.
 - [x] 2026-06-05: `/byok model` também compactou `Sessão viva` e `Ação`, removendo a frase longa de confirmação duplicada.
+- [x] 2026-06-05: a limpeza de overlay no submit passou a ser reservada-only, evitando clear-line extra em comandos sem linha viva ativa.
+- [x] 2026-06-05: live pass20 falhou no boot por export ausente; `terminal/dialog/index.js` agora reexporta `clearReservedInlineStatus`.

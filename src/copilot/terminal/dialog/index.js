@@ -14,6 +14,7 @@ export {
     buildWaitingPrompt,
     cancelScheduledTerminalPromptRedraw,
     clearInlineStatus,
+    clearReservedInlineStatus,
     deferTerminalIdlePromptRedraw,
     endTerminalRenderLock,
     isTerminalRenderLocked,

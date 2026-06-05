@@ -91,6 +91,7 @@ const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true
 const {
     beginTerminalRenderLock,
     clearInlineStatus,
+    clearReservedInlineStatus,
     deferTerminalIdlePromptRedraw,
     endTerminalRenderLock,
     parkTerminalPromptForContinuation,
@@ -176,6 +177,25 @@ describe('terminal/dialog/output inline status', () => {
         expect(output).not.toContain('request_user_input');
         expect(output).not.toContain('report_intent');
         expect(output).not.toContain('chatcmpl-tool');
+    });
+
+    it('não limpa a linha do prompt quando não há linha viva reservada', () => {
+        clearReservedInlineStatus();
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toBe('');
+    });
+
+    it('limpa apenas a linha viva reservada no submit do readline', () => {
+        writeInlineStatus('LLM-B pensando · carregando contexto');
+        writeSpy.mockClear();
+
+        clearReservedInlineStatus();
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('\x1b[s');
+        expect(output).toContain('\x1b[K');
+        expect(output).not.toBe('\x1b[2K\r');
     });
 
     it('deduplica pulso visual idêntico em sequência curta', () => {

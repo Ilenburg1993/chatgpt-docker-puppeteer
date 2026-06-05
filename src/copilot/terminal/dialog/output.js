@@ -1247,6 +1247,25 @@ export function clearInlineStatus() {
 }
 
 /**
+ * Limpa a linha viva somente quando há linhas reservadas acima do prompt.
+ *
+ * Use no submit do readline: nesse ponto queremos remover um overlay real antes de processar o comando, mas não
+ * queremos limpar a linha atual quando nenhum status vivo foi pintado.
+ *
+ * @returns {void}
+ */
+export function clearReservedInlineStatus() {
+    if (isTerminalRenderLocked()) return;
+    resetInlineStatusVisualDedupe();
+    if (!shouldUseInlineStatus()) {
+        _statusRowsReserved = 0;
+        return;
+    }
+    if (!process.stdout.isTTY || _statusRowsReserved <= 0) return;
+    clearReservedStatusRowsPreservingCursor();
+}
+
+/**
  * Reseta o estado da linha de status reservada. Deve ser chamado quando o readline é fechado.
  *
  * @returns {void}
