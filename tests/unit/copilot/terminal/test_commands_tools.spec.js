@@ -180,8 +180,8 @@ describe('commands/tools', () => {
         expect(diagCtx.output()).not.toContain('read_file_content');
         expect(diagCtx.output()).not.toContain('Nome técnico');
         expect(diagCtx.output()).not.toContain('tool técnico: read_file_content');
-        expect(diagCtx.output()).toContain('Tipo');
         expect(diagCtx.output()).toContain('arquivo');
+        expect(diagCtx.output()).not.toContain('Tipo');
         expect(diagCtx.output()).not.toContain('tipo file');
         expect(diagCtx.output()).not.toContain('tipo: file');
 

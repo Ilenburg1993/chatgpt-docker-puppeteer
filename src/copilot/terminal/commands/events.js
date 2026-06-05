@@ -451,7 +451,7 @@ function summarizeAgentErrorPayload(payload) {
         profile,
         model,
         recoverable,
-        handledAs ? `classe ${compact(handledAs, 52)}` : null,
+        handledAs ? `tratado como ${compact(handledAs, 52)}` : null,
         context ? `contexto ${compact(context, 52)}` : null,
         message ? compact(message, 120) : null,
     ]

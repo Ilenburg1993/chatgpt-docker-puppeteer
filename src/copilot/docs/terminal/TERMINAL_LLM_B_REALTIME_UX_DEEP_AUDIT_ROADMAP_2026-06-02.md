@@ -9022,3 +9022,41 @@
     `artifacts/terminal-live/ux-file-roundtrip-question-tag-fixed-20260604/summary.md`, com
     `ask-user-answer`, `post-ask-final-visible`, `no-sdk-permission-prompt-in-approve-all` e
     `clean-quit` verdes.
+
+### 12.99 `/tools diag` sem repetição de tipo por item — 2026-06-04
+
+- [x] Achado live:
+  - `/tools diag` já removia `Classe ferramenta`, mas ainda imprimia várias linhas `Tipo I/O local`
+    entre ferramentas de arquivo;
+  - a seção `Categorias` já resume essa informação de maneira agregada;
+  - a repetição enfraquecia a leitura visual e recriava o ruído que a seção 12.92 tentou remover.
+- [x] Decisão UX:
+  - `diag` é diagnóstico humano compacto: cada linha principal deve trazer nome, uso, bloqueios,
+    falhas e latência;
+  - categoria/tipo agregado aparece em `Categorias`;
+  - tipo por item fica reservado ao modo profundo `/tools all`.
+- [x] Implementação:
+  - `cmdTools` passou a renderizar `Tipo` por item somente em `wantsDeepDiag`;
+  - teste de `/tools diag` agora exige ausência de `Tipo` no diagnóstico humano, preservando os nomes
+    humanos e a categoria agregada.
+- [x] Validação:
+  - [x] teste focado de `/tools`;
+  - [x] lint/sintaxe escopados;
+  - [ ] próxima live deve confirmar `/tools diag` sem linhas repetidas `Tipo I/O local`.
+
+### 12.100 `/events` default sem “classe” técnica em erro recuperável — 2026-06-04
+
+- [x] Achado:
+  - `agent.error` recuperável já era humanizado, mas o resumo default ainda dizia
+    `classe erro recuperável do modelo`;
+  - “classe” comunica estrutura interna do payload, não estado operacional para o operador.
+- [x] Decisão UX:
+  - `/events` default deve dizer o que aconteceu e como foi tratado;
+  - termos de schema como `class`, `handledAs` e nomes crus continuam restritos a raw/detail;
+  - o default deve usar `tratado como erro recuperável do modelo`.
+- [x] Implementação:
+  - `summarizeAgentErrorPayload()` trocou `classe ...` por `tratado como ...`;
+  - teste de `/events` protege a nova frase e bloqueia regressão para `classe erro recuperável do modelo`.
+- [x] Validação:
+  - [x] teste focado de `/events`;
+  - [x] lint/sintaxe escopados.

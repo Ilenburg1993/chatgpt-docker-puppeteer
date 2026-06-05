@@ -348,7 +348,7 @@ export function cmdTools({ println }, arg = '') {
         if (!wantsRaw && wantsDeepDiag && Array.isArray(d.aliases) && d.aliases.length > 1) {
             println(terminalThemeRow('Aliases', d.aliases.join(', '), { role: 'muted' }));
         }
-        if (wantsDiag && typeof d.kind === 'string' && d.kind.length > 0 && (wantsDeepDiag || d.kind !== 'tool')) {
+        if (wantsDeepDiag && typeof d.kind === 'string' && d.kind.length > 0) {
             println(terminalThemeRow('Tipo', renderToolKindLabel(d.kind), { role: 'muted', width: 22 }));
         }
     }
