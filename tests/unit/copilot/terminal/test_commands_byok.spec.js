@@ -3681,18 +3681,18 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: fixtureCtx.println }, 'auto recovery-fixture profile:repo_agent failure:rate-limit');
         await cmdByok({ println: recoveriesCtx.println }, 'auto recoveries 5');
 
-        expect(handoffsCtx.output()).toContain('BYOK model-gateway auto handoffs');
+        expect(handoffsCtx.output()).toContain('Handoffs BYOK');
         expect(handoffsCtx.output()).toContain('novo boot agendado');
         expect(handoffsCtx.output()).not.toContain('effect_not_authorized');
-        expect(confirmationsCtx.output()).toContain('BYOK model-gateway auto confirmations');
+        expect(confirmationsCtx.output()).toContain('Confirmações BYOK');
         expect(confirmationsCtx.output()).toContain('matched handoff');
-        expect(fixtureCtx.output()).toContain('BYOK model-gateway auto recovery fixture');
+        expect(fixtureCtx.output()).toContain('Fixture de recuperação BYOK');
         expect(fixtureCtx.output()).toContain('sem chamada a provedor');
         expect(fixtureCtx.output()).toContain('saúde sintética sim');
         expect(fixtureCtx.output()).not.toContain('action=');
         expect(fixtureCtx.output()).not.toContain('applied=');
         expect(fixtureCtx.output()).not.toContain('recorded=');
-        expect(recoveriesCtx.output()).toContain('BYOK model-gateway auto recoveries');
+        expect(recoveriesCtx.output()).toContain('Recuperações BYOK');
         expect(recoveriesCtx.output()).toContain('limite de taxa');
         expect(recoveriesCtx.output()).toContain('escopo');
         expect(recoveriesCtx.output()).not.toContain('scope=');

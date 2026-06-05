@@ -4354,9 +4354,11 @@ async function renderByokGatewayAutoHistory(println, rest) {
 async function renderByokGatewayAutoHandoffs(println, rest) {
     const limit = parseByokGatewayAutoHistoryLimit(rest);
     const rows = await new SqliteModelGatewayCatalogStore().readSdkSessionHandoffRecords({ limit });
-    println('\n  \x1b[36mBYOK model-gateway auto handoffs\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'Handoffs BYOK', ['model-gateway auto']));
     if (rows.length === 0) {
-        println('  \x1b[90mNenhum handoff SDK persistido ainda.\x1b[0m\n');
+        println(terminalThemeRow('Estado', 'nenhum handoff SDK persistido ainda', { role: 'muted' }));
+        println('');
         return;
     }
     rows.slice(0, limit).forEach((row, index) => {
@@ -4379,9 +4381,11 @@ async function renderByokGatewayAutoHandoffs(println, rest) {
 async function renderByokGatewayAutoConfirmations(println, rest) {
     const limit = parseByokGatewayAutoHistoryLimit(rest);
     const rows = await new SqliteModelGatewayCatalogStore().readSdkSessionConfirmationRecords({ limit });
-    println('\n  \x1b[36mBYOK model-gateway auto confirmations\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'Confirmações BYOK', ['model-gateway auto']));
     if (rows.length === 0) {
-        println('  \x1b[90mNenhuma confirmação SDK persistida ainda.\x1b[0m\n');
+        println(terminalThemeRow('Estado', 'nenhuma confirmação SDK persistida ainda', { role: 'muted' }));
+        println('');
         return;
     }
     rows.slice(0, limit).forEach((row, index) => {
@@ -4404,9 +4408,11 @@ async function renderByokGatewayAutoConfirmations(println, rest) {
 async function renderByokGatewayAutoRecoveries(println, rest) {
     const limit = parseByokGatewayAutoHistoryLimit(rest);
     const rows = await new SqliteModelGatewayCatalogStore().readRecoveryAttemptRecords({ limit });
-    println('\n  \x1b[36mBYOK model-gateway auto recoveries\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'Recuperações BYOK', ['model-gateway auto']));
     if (rows.length === 0) {
-        println('  \x1b[90mNenhum recovery attempt pós-falha persistido ainda.\x1b[0m\n');
+        println(terminalThemeRow('Estado', 'nenhuma recuperação pós-falha persistida ainda', { role: 'muted' }));
+        println('');
         return;
     }
     rows.slice(0, limit).forEach((row, index) => {
@@ -4467,9 +4473,14 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
         },
         { env: fixtureEnv },
     );
-    println('\n  \x1b[36mBYOK model-gateway auto recovery fixture\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'Fixture de recuperação BYOK', ['model-gateway auto']));
     println(
-        `  \x1b[90mperfil ${args.profileId} · falha ${renderByokTokenLabel(failureKind)} · executou ${result.ran ? 'sim' : 'nao'} · sem chamada a provedor · saúde sintética ${writeRealHealth ? 'nao' : 'sim'}\x1b[0m`,
+        terminalThemeRow(
+            'Resumo',
+            `perfil ${args.profileId} · falha ${renderByokTokenLabel(failureKind)} · executou ${result.ran ? 'sim' : 'nao'} · sem chamada a provedor · saúde sintética ${writeRealHealth ? 'nao' : 'sim'}`,
+            { role: 'muted' },
+        ),
     );
     if (result.ran !== true || !result.status) {
         println('    \x1b[33mFixture não executou; verifique policy e snapshot ativo.\x1b[0m\n');
