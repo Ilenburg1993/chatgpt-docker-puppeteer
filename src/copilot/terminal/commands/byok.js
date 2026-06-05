@@ -2234,6 +2234,31 @@ function resolveByokStatusCapabilities(projection) {
 }
 
 /**
+ * @param {string} liveLabel
+ * @returns {string}
+ */
+function compactByokLiveBindingLabel(liveLabel) {
+    return String(liveLabel)
+        .replace(/^BYOK · perfil /u, '')
+        .replace(/ · preset /u, '/')
+        .replace(/ · provedor /u, ' · ')
+        .replace(/ · modelo /u, ' · ');
+}
+
+/**
+ * @param {string | null | undefined} action
+ * @returns {string | null}
+ */
+function compactByokModelAction(action) {
+    const value = String(action ?? '').trim();
+    if (!value) return null;
+    if (/\/byok model <id>.*confirme/iu.test(value)) {
+        return 'confirme por próximo uso registrado ou evento SDK';
+    }
+    return value;
+}
+
+/**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {(text: string) => void} println
  * @returns {Promise<void>}
@@ -2356,6 +2381,52 @@ async function renderStatus(projection, println) {
     println(terminalThemeRow('Avançado', '/byok gateway commands · /byok auto policy · /byok env', { role: 'command' }));
     println(terminalThemeDivider(66));
     println('');
+}
+
+/**
+ * Renderiza somente o resumo necessário para uma troca de modelo. `/byok` continua sendo o painel completo; `/byok
+ * model` precisa ser uma ação operacional curta, sem repetir catálogo, rotina e comandos avançados.
+ *
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @param {(text: string) => void} println
+ * @returns {Promise<void>}
+ */
+async function renderByokModelSwitchSummary(projection, println) {
+    const { summary } = projection;
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK modelo', [valueOrDash(summary.model)]));
+    println(
+        terminalThemeRow(
+            'Preparada',
+            `${valueOrDash(summary.profile)} · ${valueOrDash(summary.preset)} · ${valueOrDash(summary.providerType)} · ${valueOrDash(summary.model)}`,
+        ),
+    );
+    try {
+        const inventory = await listTerminalSdkSessionInventory();
+        const runtimeConfig = readTerminalConfigProjection();
+        const binding = classifyTerminalByokSdkBinding(
+            summary,
+            inventory.persistedByokBinding,
+            inventory.currentSessionId,
+            runtimeConfig.currentModel,
+        );
+        println(
+            terminalThemeRow(
+                'Sessão viva',
+                `${inventory.currentSessionId ? 'ativa' : 'sem sessão viva'} · ${compactByokLiveBindingLabel(binding.liveLabel)}`,
+            ),
+        );
+        println(
+            terminalThemeRow('Fronteira', binding.headline, {
+                role: binding.state === 'next-boot-required' || binding.state === 'selection-incomplete' ? 'warn' : 'muted',
+            }),
+        );
+        const compactAction = compactByokModelAction(binding.action);
+        if (compactAction) println(terminalThemeRow('Ação', compactAction, { role: 'command' }));
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        println(terminalThemeRow('Sessão viva', `indisponível · ${message}; seleção fica preparada para o próximo boot`, { role: 'warn' }));
+    }
 }
 
 /**
@@ -6256,8 +6327,9 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
         clearRuntimeSelectors(['COPILOT_BYOK_PROFILE']);
         process.env['COPILOT_BYOK_MODEL'] = model;
-        await renderStatus(readTerminalByokProjection(), println);
+        await renderByokModelSwitchSummary(readTerminalByokProjection(), println);
         await tryApplyLiveByokModelSwitch(previousSummary, model, println);
+        println('');
         return;
     }
 

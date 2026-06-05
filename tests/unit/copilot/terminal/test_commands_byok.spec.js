@@ -4462,6 +4462,11 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('solicitado kilo-auto/free → anthropic/claude-sonnet-4.5');
         expect(ctx.output()).toContain('Confirmação');
         expect(ctx.output()).toContain('confirmação do SDK');
+        expect(ctx.output()).toContain('BYOK modelo');
+        expect(ctx.output()).not.toContain('BYOK status');
+        expect(ctx.output()).not.toContain('Rotina');
+        expect(ctx.output()).not.toContain('Avançado');
+        expect(ctx.output()).not.toContain('/byok model <id> pede a troca');
         expect(readTerminalActivityHistory(5)).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
@@ -4509,6 +4514,9 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('sessão atual usa outro provedor/perfil');
         expect(ctx.output()).toContain('sem troca cruzada na conversa viva');
         expect(ctx.output()).not.toContain('bound ao mesmo provider');
+        expect(ctx.output()).toContain('BYOK modelo');
+        expect(ctx.output()).not.toContain('BYOK status');
+        expect(ctx.output()).not.toContain('Rotina');
         expect(readTerminalActivityHistory(5)).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
