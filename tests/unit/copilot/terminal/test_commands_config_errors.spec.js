@@ -155,7 +155,8 @@ describe('terminal commands config/errors com frontend canônico', () => {
 
         await cmdModel({ println: ctx.println }, 'list');
 
-        expect(ctx.output()).toContain('modelo(s) disponível');
+        expect(ctx.output()).toContain('Modelos disponíveis');
+        expect(ctx.output()).toContain('2 modelos');
         expect(ctx.output()).toContain('gpt-4.1');
         expect(listTerminalAvailableModelsProjection).toHaveBeenCalled();
     });

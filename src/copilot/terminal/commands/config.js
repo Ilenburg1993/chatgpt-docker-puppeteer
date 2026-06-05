@@ -57,6 +57,18 @@ const DISABLED_BYOK_SUMMARY = Object.freeze({
     errors: [],
 });
 
+const MODEL_LIST_DEFAULT_LIMIT = 40;
+
+/**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
 /**
  * @param {unknown} value
  * @returns {string}
@@ -177,7 +189,13 @@ export async function cmdModel({ println }, arg) {
         return;
     }
 
-    if (trimmed === 'list') {
+    const modelListParts = trimmed.split(/\s+/u).filter(Boolean);
+    if (modelListParts[0] === 'list') {
+        const showAll =
+            modelListParts.includes('full') ||
+            modelListParts.includes('all') ||
+            modelListParts.includes('--full') ||
+            modelListParts.includes('--all');
         if (byok.enabled) {
             const ready = byok.ready ? 'pronto' : 'incompleto';
             println(
@@ -192,14 +210,29 @@ export async function cmdModel({ println }, arg) {
                 return;
             }
             println('');
-            println(terminalThemeHeadline('assistant', `${models.length} modelo(s) disponível(is)`));
+            const visibleModels = showAll ? models : models.slice(0, MODEL_LIST_DEFAULT_LIMIT);
+            println(
+                terminalThemeHeadline('assistant', 'Modelos disponíveis', [
+                    countLabel(models.length, 'modelo', 'modelos'),
+                    showAll ? 'lista completa' : `mostrando ${countLabel(visibleModels.length, 'modelo', 'modelos')}`,
+                ]),
+            );
             println('');
-            for (const m of models) {
+            for (const m of visibleModels) {
                 const isActive = m.id === current;
                 const activeMarker = isActive ? ` ${terminalThemeText('success', 'ativo')}` : '';
                 const reasoning = m.capabilities?.supports?.reasoningEffort ? ` ${terminalThemeText('muted', '[raciocínio]')}` : '';
                 const vision = m.capabilities?.supports?.vision ? ` ${terminalThemeText('muted', '[visão]')}` : '';
-                println(`    ${terminalThemeText('command', m.id)}${activeMarker}${reasoning}${vision}`);
+                println(terminalThemeRow('Modelo', `${m.id}${activeMarker}${reasoning}${vision}`, { role: 'command' }));
+            }
+            if (visibleModels.length < models.length) {
+                println(
+                    terminalThemeRow(
+                        'Omitidos',
+                        `${countLabel(models.length - visibleModels.length, 'modelo', 'modelos')} · use /model list full`,
+                        { role: 'muted' },
+                    ),
+                );
             }
             println('');
         } catch (e) {

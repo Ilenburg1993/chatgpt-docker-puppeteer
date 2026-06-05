@@ -54,6 +54,7 @@ describe('terminal/commands/index', () => {
         expect(ctx.output()).not.toContain('indexed=');
         expect(ctx.output()).not.toContain('workspaceRoot=');
         expect(ctx.output()).not.toContain('gitignore=');
+        expect(ctx.output()).not.toContain('falhou:');
 
         await cmdIndex(ctx, 'status');
         expect(ctx.output()).toContain('Índice L2 local');
@@ -67,13 +68,16 @@ describe('terminal/commands/index', () => {
         expect(ctx.output()).toContain('/index search');
         expect(ctx.output()).toContain('resultados');
         expect(ctx.output()).toContain('beta.md');
+        expect(ctx.output()).toContain('Arquivo');
 
         await cmdIndex(ctx, 'symbol alphaHelper');
         expect(ctx.output()).toContain('/index symbol');
         expect(ctx.output()).toContain('alphaHelper');
+        expect(ctx.output()).toContain('exportado');
+        expect(ctx.output()).not.toMatch(/alphaHelper\s+export(?:\s|$)/u);
         expect(ctx.output()).not.toContain('matches=');
 
         await cmdIndex(ctx, 'clear');
-        expect(ctx.output()).toContain('Índice L2 limpo');
+        expect(ctx.output()).toMatch(/Índice L2\s+limpo/u);
     });
 });

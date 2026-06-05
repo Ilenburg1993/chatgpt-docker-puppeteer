@@ -79,7 +79,8 @@ describe('commands/memory + resume + search', () => {
     it('cmdResume sem argumento lista sessões', async () => {
         const ctx = mockCtx();
         await cmdResume({ println: ctx.println, hubSessionId: 'hub-1' }, '');
-        expect(ctx.output()).toContain('Sessões Anteriores');
+        expect(ctx.output()).toContain('Sessões anteriores');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('cmdResume com argumento envia summaryPrompt ao dialog engine', async () => {

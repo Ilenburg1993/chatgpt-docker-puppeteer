@@ -1121,14 +1121,16 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 if (limitedParts.length > 0) {
                     enrichedMessage = limitedParts.join('\n\n') + '\n\n' + enrichedMessage;
                     println(
-                        terminalThemeRow('Anexos', `${limitedParts.length} embutido(s): ${attachments.map(describeQueuedAttachment).join(', ')}`, {
-                            role: 'muted',
-                        }),
+                        terminalThemeRow(
+                            'Anexos',
+                            `${limitedParts.length} ${limitedParts.length === 1 ? 'anexo embutido' : 'anexos embutidos'}: ${attachments.map(describeQueuedAttachment).join(', ')}`,
+                            { role: 'muted' },
+                        ),
                     );
                 }
             }
         } catch (embedErr) {
-            println(terminalThemeRow('Anexos', `falha ao embutir arquivo(s): ${toError(embedErr).message}`, { role: 'warn' }));
+            println(terminalThemeRow('Anexos', `falha ao embutir anexos: ${toError(embedErr).message}`, { role: 'warn' }));
         }
     }
 

@@ -1366,13 +1366,13 @@ describe('commands/session — async commands', () => {
     it('cmdSessionSave salva e imprime path', async () => {
         const ctx = mockCtx();
         await cmdSessionSave({ println: ctx.println }, 'test-reason');
-        expect(ctx.output()).toContain('Snapshot salvo');
+        expect(ctx.output()).toMatch(/Snapshot\s+salvo/u);
     });
 
     it('cmdSessionSave aceita runtimeId explícito na cauda do comando', async () => {
         const ctx = mockCtx();
         await cmdSessionSave({ println: ctx.println }, '--runtime alt nightly');
-        expect(ctx.output()).toContain('Snapshot salvo');
+        expect(ctx.output()).toMatch(/Snapshot\s+salvo/u);
     });
 
     it('cmdSessionList lista snapshots', async () => {

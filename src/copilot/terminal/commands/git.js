@@ -21,7 +21,7 @@ import {
     gitStatus,
 } from '#copilot/bridges';
 import { renderTerminalDiffPreview } from '../capabilities/index.js';
-import { terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeRows } from '../state/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -41,9 +41,10 @@ export async function cmdGit({ println }, args) {
     const sub = args[0]?.toLowerCase() ?? '';
 
     if (sub === 'status' || sub === 'st' || sub === '') {
-        println('\x1b[90m  Verificando status git…\x1b[0m');
+        println(terminalThemeRow('Git', 'verificando status', { role: 'muted' }));
         const entries = await gitStatus().catch(() => []);
-        println('\n  \x1b[36mGit Status\x1b[0m');
+        println('');
+        println(terminalThemeHeadline('tool', 'Git status', [`${entries.length} ${entries.length === 1 ? 'arquivo' : 'arquivos'}`]));
         println(formatStatus(entries));
         println('');
         return;
@@ -53,9 +54,10 @@ export async function cmdGit({ println }, args) {
         const oneline = args.includes('--oneline') || args.includes('-1');
         const nArg = args.find((a) => /^\d+$/.test(a));
         const n = nArg ? Number(nArg) : 15;
-        println('\x1b[90m  Buscando log…\x1b[0m');
+        println(terminalThemeRow('Git', 'buscando log', { role: 'muted' }));
         const entries = await gitLog({ n, oneline }).catch(() => []);
-        println(`\n  \x1b[36mGit Log\x1b[0m \x1b[90m(últimos ${entries.length} commits)\x1b[0m`);
+        println('');
+        println(terminalThemeHeadline('tool', 'Git log', [`últimos ${entries.length} commits`]));
         println(formatLog(entries, oneline));
         println('');
         return;
@@ -86,18 +88,19 @@ export async function cmdGit({ println }, args) {
     }
 
     if (sub === 'branch' || sub === 'branches') {
-        println('\x1b[90m  Buscando branches…\x1b[0m');
+        println(terminalThemeRow('Git', 'buscando branches', { role: 'muted' }));
         const branches = await gitBranch().catch(() => []);
-        println('\n  \x1b[36mGit Branch\x1b[0m');
+        println('');
+        println(terminalThemeHeadline('tool', 'Git branches', [`${branches.length}`]));
         println(formatBranch(branches));
         println('');
         return;
     }
 
     if (sub === 'pull') {
-        println('\x1b[90m  Executando git pull…\x1b[0m');
+        println(terminalThemeRow('Git', 'executando pull', { role: 'muted' }));
         const output = await gitPull().catch((e) => `Erro: ${e.message}`);
-        println(output.startsWith('Erro') ? `\x1b[31m  ✗ ${output}\x1b[0m` : `\x1b[32m  ✓ ${output || 'ok'}\x1b[0m`);
+        println(terminalThemeRow('Pull', output || 'ok', { role: output.startsWith('Erro') ? 'error' : 'success' }));
         return;
     }
 
@@ -106,29 +109,36 @@ export async function cmdGit({ println }, args) {
         if (stashSub === 'list') {
             const out = await gitStashList().catch(() => '');
             if (!out) {
-                println('\x1b[90m  Nenhum stash encontrado.\x1b[0m');
+                println(terminalThemeRow('Stash', 'nenhum stash encontrado', { role: 'muted' }));
                 return;
             }
-            println('\n  \x1b[36mGit Stash List\x1b[0m');
+            println('');
+            println(terminalThemeHeadline('tool', 'Git stash'));
             for (const s of out.split('\n').filter(Boolean)) println(`  ${s}`);
             println('');
             return;
         }
         const out2 = await gitStash({ pop: stashSub === 'pop' }).catch((e) => `Erro: ${e.message}`);
-        println(out2.startsWith('Erro') ? `\x1b[31m  ✗ ${out2}\x1b[0m` : `\x1b[32m  ✓ ${out2 || 'ok'}\x1b[0m`);
+        println(terminalThemeRow('Stash', out2 || 'ok', { role: out2.startsWith('Erro') ? 'error' : 'success' }));
         return;
     }
 
     // help / fallback
-    println(`
-  \x1b[36m/git — Git CLI\x1b[0m
-  ─────────────────────────────────────────────────
-  \x1b[33m/git status\x1b[0m                    — status do working tree
-  \x1b[33m/git log [n] [--oneline]\x1b[0m       — log de commits
-  \x1b[33m/git diff [--staged] [--plain] [file]\x1b[0m — diff
-  \x1b[33m/git branch\x1b[0m                    — branches
-  \x1b[33m/git pull\x1b[0m                      — git pull
-  \x1b[33m/git stash [list|pop|drop]\x1b[0m     — stash
-  ─────────────────────────────────────────────────
-`);
+    println('');
+    println(terminalThemeHeadline('tool', '/git', ['Git operacional']));
+    println(
+        terminalThemeRows(
+            'Comandos',
+            [
+                '/git status',
+                '/git log [n] [--oneline]',
+                '/git diff [--staged] [--plain] [file]',
+                '/git branch',
+                '/git pull',
+                '/git stash [list|pop|drop]',
+            ],
+            { role: 'command' },
+        ),
+    );
+    println('');
 }

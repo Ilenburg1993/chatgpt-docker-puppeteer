@@ -27,6 +27,16 @@ import { terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
  */
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @typedef {{
  *     awaitReady: boolean;
  *     exactMatch: boolean;
@@ -347,7 +357,7 @@ function runContext(ctx, parts) {
     ctx.println(terminalThemeRow('Arquivos', `${scope.files} · símbolos ${scope.symbols} · exports ${scope.topExports.length}`));
     for (const item of scope.topExports.slice(0, 30)) ctx.println(terminalThemeRow('Export', renderScopeExportLabel(item)));
     if (scope.topExports.length > 30)
-        ctx.println(terminalThemeRow('Mais', `${scope.topExports.length - 30} export(s) adicional(is)`));
+        ctx.println(terminalThemeRow('Mais', countLabel(scope.topExports.length - 30, 'export adicional', 'exports adicionais')));
     ctx.println('');
 }
 
@@ -375,7 +385,8 @@ function runFind(ctx, parts) {
             ),
         );
     }
-    if (results.length > 80) ctx.println(terminalThemeRow('Mais', `${results.length - 80} resultado(s) adicional(is)`));
+    if (results.length > 80)
+        ctx.println(terminalThemeRow('Mais', countLabel(results.length - 80, 'resultado adicional', 'resultados adicionais')));
     ctx.println('');
 }
 

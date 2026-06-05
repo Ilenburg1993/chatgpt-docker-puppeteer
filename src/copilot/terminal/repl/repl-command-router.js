@@ -441,7 +441,13 @@ function _cmdMailbox(arg) {
     const sub = (subRaw ?? 'status').toLowerCase();
     if (sub === 'clear') {
         const removed = clearRuntimeInterventionMailbox(null);
-        println(terminalThemeRow('Fila de intervenção', `limpa · ${removed} item(ns) removido(s)`, { role: 'success' }));
+        println(
+            terminalThemeRow(
+                'Fila de intervenção',
+                `limpa · ${removed} ${removed === 1 ? 'item removido' : 'itens removidos'}`,
+                { role: 'success' },
+            ),
+        );
         return;
     }
     if (sub === 'consume' || sub === 'pop') {

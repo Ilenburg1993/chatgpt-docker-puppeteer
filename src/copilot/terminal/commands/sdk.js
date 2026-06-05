@@ -1374,14 +1374,15 @@ async function renderSdkModels({ println }, runtimeId) {
     const result = await callWithRuntimeTarget(listTerminalSdkModels, runtimeId);
     const models = arrayFromSdkList(result);
     println('');
-    println(terminalThemeHeadline('accent', 'Modelos SDK', [`${models.length} modelo(s)`]));
+    println(terminalThemeHeadline('accent', 'Modelos SDK', [`${models.length} ${models.length === 1 ? 'modelo' : 'modelos'}`]));
     for (const model of models.slice(0, 30)) {
         const m = objectOrNull(model) ?? {};
         const id = String(m['id'] ?? m['name'] ?? model);
         const effort = Array.isArray(m['supportedReasoningEfforts']) ? m['supportedReasoningEfforts'].join(',') : '';
         println(terminalThemeRow('Modelo', effort ? `${id} · reasoning ${effort}` : id, { role: 'command' }));
     }
-    if (models.length > 30) println(terminalThemeRow('Omitidos', `${models.length - 30} modelo(s)`));
+    if (models.length > 30)
+        println(terminalThemeRow('Omitidos', `${models.length - 30} ${models.length - 30 === 1 ? 'modelo' : 'modelos'}`));
     println('');
 }
 
@@ -2089,7 +2090,7 @@ export async function cmdWorkspace({ println }, arg = '') {
             println('');
             println(
                 terminalThemeHeadline('fileRead', 'Workspace SDK virtual', [
-                    files.length ? `${files.length} arquivo(s)` : 'vazio',
+                    files.length ? `${files.length} ${files.length === 1 ? 'arquivo' : 'arquivos'}` : 'vazio',
                 ]),
             );
             if (files.length > 0) {
@@ -2097,7 +2098,13 @@ export async function cmdWorkspace({ println }, arg = '') {
                     const f = objectOrNull(file) ?? {};
                     println(terminalThemeRow('Arquivo', String(f['path'] ?? f['name'] ?? file), { role: 'fileRead' }));
                 }
-                if (files.length > 80) println(terminalThemeRow('Omitidos', `${files.length - 80} arquivo(s)`));
+                if (files.length > 80)
+                    println(
+                        terminalThemeRow(
+                            'Omitidos',
+                            `${files.length - 80} ${files.length - 80 === 1 ? 'arquivo' : 'arquivos'}`,
+                        ),
+                    );
             } else if (rawOutput) {
                 println(terminalThemeRow('Retorno', pretty(result, 1500)));
             } else {

@@ -277,7 +277,7 @@ describe('terminal/commands/cmdContext', () => {
         expect(output).toContain('Timeline canônica');
         expect(output).toContain('mixed');
         expect(output).toContain('bridge_tail');
-        expect(output).toContain('sync Hub');
+        expect(output).toContain('Sync Hub');
         expect(output).toContain('scheduled');
     });
 

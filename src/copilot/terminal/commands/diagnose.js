@@ -697,7 +697,7 @@ function renderGatewayActiveLabel(active) {
  */
 function renderCompactMcpLine(mcp, toolLoad) {
     if (mcp.available && !mcp.circuitOpen && mcp.toolCount > 0) {
-        return `${mcp.toolCount} ferramenta(s) disponíveis${typeof mcp.latencyMs === 'number' ? ` · ${mcp.latencyMs}ms` : ''}`;
+        return `${mcp.toolCount} ${mcp.toolCount === 1 ? 'ferramenta disponível' : 'ferramentas disponíveis'}${typeof mcp.latencyMs === 'number' ? ` · ${mcp.latencyMs}ms` : ''}`;
     }
     const localReady = Boolean(
         toolLoad?.hasCanonicalLocalFsTools || toolLoad?.hasCanonicalLocalExecTools || toolLoad?.hasSdkWorkspaceTooling,

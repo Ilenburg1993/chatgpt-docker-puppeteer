@@ -20,6 +20,16 @@ import { addAttachment, clearAttachments, getAttachmentQueue } from '../../prese
 import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @param {string | Record<string, unknown>} entry
  * @returns {string}
  */
@@ -82,7 +92,7 @@ export async function cmdAttach({ println }, arg) {
             println(terminalThemeRow('Fila', 'vazia', { role: 'muted' }));
             println(terminalThemeText('muted', '  Use /attach <caminho> ou /attach blob <mime> <base64>.'));
         } else {
-            println(terminalThemeHeadline('fileRead', 'Fila de anexos', [`${queue.length} item(ns)`]));
+            println(terminalThemeHeadline('fileRead', 'Fila de anexos', [countLabel(queue.length, 'item', 'itens')]));
             for (let i = 0; i < queue.length; i++) {
                 const entry = queue[i];
                 if (entry === undefined) continue;
@@ -118,7 +128,7 @@ export async function cmdAttach({ println }, arg) {
                 role: 'success',
             }),
         );
-        println(terminalThemeText('muted', `  Fila: ${queue.length} item(ns) — serão embutidos no próximo turno.`));
+        println(terminalThemeText('muted', `  Fila: ${countLabel(queue.length, 'item', 'itens')} - serão embutidos no próximo turno.`));
         return;
     }
 
@@ -141,7 +151,7 @@ export async function cmdAttach({ println }, arg) {
         println(
             terminalThemeRow('Adicionado', `${filePath} (${(info.size / 1024).toFixed(1)} KB)`, { role: 'success' }),
         );
-        println(terminalThemeText('muted', `  Fila: ${queue.length} item(ns) — serão embutidos no próximo turno.`));
+        println(terminalThemeText('muted', `  Fila: ${countLabel(queue.length, 'item', 'itens')} - serão embutidos no próximo turno.`));
     } catch {
         println(terminalThemeRow('Erro', `arquivo não encontrado ou sem permissão: ${filePath}`, { role: 'error' }));
     }

@@ -10,7 +10,19 @@ const fsMocks = vi.hoisted(() => ({
 const stateMocks = vi.hoisted(() => ({
     addAttachment: vi.fn(),
     clearAttachments: vi.fn(),
+    getShowIntentActivity: vi.fn(() => true),
+    getShowSessionActivity: vi.fn(() => true),
+    getShowStreaming: vi.fn(() => true),
+    getShowThinking: vi.fn(() => true),
+    getShowToolActivity: vi.fn(() => true),
+    getShowUsage: vi.fn(() => true),
     getAttachmentQueue: vi.fn(() => /** @type {(string | Record<string, unknown>)[]} */ ([])),
+    setShowIntentActivity: vi.fn(),
+    setShowSessionActivity: vi.fn(),
+    setShowStreaming: vi.fn(),
+    setShowThinking: vi.fn(),
+    setShowToolActivity: vi.fn(),
+    setShowUsage: vi.fn(),
 }));
 
 vi.mock('node:fs/promises', () => fsMocks);
@@ -57,7 +69,7 @@ describe('terminal/commands/attach', () => {
             }),
         );
         expect(fsMocks.access).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('Blob adicionado à fila');
+        expect(ctx.output()).toContain('Adicionado');
         expect(ctx.output()).toContain('memo.txt');
         expect(ctx.output()).toContain('text/plain');
     });
@@ -78,7 +90,8 @@ describe('terminal/commands/attach', () => {
 
         await cmdAttach({ println: ctx.println }, '');
 
-        expect(ctx.output()).toContain('Fila de attachments (2 item(ns))');
+        expect(ctx.output()).toContain('Fila de anexos');
+        expect(ctx.output()).toContain('2 itens');
         expect(ctx.output()).toContain('/tmp/a.js');
         expect(ctx.output()).toContain('screenshot.png [blob:image/png]');
     });

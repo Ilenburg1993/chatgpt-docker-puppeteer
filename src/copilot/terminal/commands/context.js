@@ -50,7 +50,7 @@ export function cmdContext({ println }, arg = '') {
     const projection = callWithRuntimeTarget(readTerminalContextProjection, runtimeId);
 
     if (!projection.isRealData && !projection.hasHistory) {
-        println(terminalThemeRow('Contexto', 'nenhum histórico em memória ainda; envie um turno primeiro', { role: 'muted' }));
+        println(terminalThemeRow('Contexto', 'Nenhum histórico em memória ainda; envie um turno primeiro', { role: 'muted' }));
         return;
     }
 
@@ -68,7 +68,9 @@ export function cmdContext({ println }, arg = '') {
     println(
         terminalThemeRow(
             `Tokens${isRealData ? ' SDK' : ' estimados'}`,
-            `${usedTokens.toLocaleString('pt-BR')} / ${maxTokens.toLocaleString('pt-BR')}`,
+            isRealData
+                ? `real SDK · ${usedTokens.toLocaleString('pt-BR')} / ${maxTokens.toLocaleString('pt-BR')}`
+                : `${usedTokens.toLocaleString('pt-BR')} / ${maxTokens.toLocaleString('pt-BR')}`,
             { role: 'info', width: 17 },
         ),
     );
@@ -113,9 +115,13 @@ export function cmdContext({ println }, arg = '') {
     );
     if (projection.reconciliationStatus === 'diverged') {
         println(
-            terminalThemeRow('Nota', `bridge e persistência divergiram; sync bloqueado${projection.syncBlockedReason ? ` (${projection.syncBlockedReason})` : ''}; live-tail preservado`, {
-                role: 'warn',
-            }),
+            terminalThemeRow(
+                'Nota',
+                `bridge e persistência divergiram; sync bloqueado${
+                    projection.syncBlockedReason ? ` (${projection.syncBlockedReason})` : ''
+                }; live-tail visível foi preservado`,
+                { role: 'warn' },
+            ),
         );
     }
     if (projection.syncStatus === 'failed') {
@@ -148,13 +154,13 @@ export async function cmdCompact({ println }, arg = '') {
 
     const result = await callWithRuntimeTarget(requestTerminalCompactionProjection, runtimeId);
     if (!result.ok || !result.reply) {
-        println('\x1b[31m  ✗ LLM-B ocupada ou sem resposta. Tente novamente.\x1b[0m');
+        println(terminalThemeRow('Compactação', 'LLM-B ocupada ou sem resposta; tente novamente', { role: 'error' }));
         return;
     }
 
     const estimatedNew = result.estimatedTokens ?? 0;
     println('');
-    println(`\x1b[32m  ✓ Histórico local compactado.\x1b[0m`);
-    println(`\x1b[90m  Tokens estimados após compactação: ~${estimatedNew.toLocaleString('pt-BR')} tokens\x1b[0m`);
+    println(terminalThemeRow('Compactação', 'histórico local compactado', { role: 'success' }));
+    println(terminalThemeRow('Tokens', `~${estimatedNew.toLocaleString('pt-BR')} após compactação`, { role: 'muted' }));
     println('');
 }

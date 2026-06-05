@@ -2192,7 +2192,9 @@ async function renderStatus(projection, println) {
     if (costTag) {
         println(terminalThemeRow('Custo', costTag.replace(/^ · /u, '')));
     }
-    println(terminalThemeRow('Catálogo', `${summary.modelList.count} modelo(s)`));
+    println(
+        terminalThemeRow('Catálogo', `${summary.modelList.count} ${summary.modelList.count === 1 ? 'modelo' : 'modelos'}`),
+    );
     const gateway =
         projection.modelGateway ?? {
             source: 'unavailable',

@@ -18,7 +18,13 @@ import {
     getIoIndexStats,
     searchIoIndex,
 } from '../../infra/index.js';
-import { formatTerminalTimeLabel } from '../state/ui/index.js';
+import {
+    formatTerminalTimeLabel,
+    terminalThemeHeadline,
+    terminalThemeJoin,
+    terminalThemeRow,
+    terminalThemeWrappedRow,
+} from '../state/ui/index.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} IndexCommandContext
@@ -72,6 +78,46 @@ function bytesLabel(value) {
  */
 function boolLabel(value) {
     return value === true ? 'sim' : value === false ? 'não' : '-';
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function stringLabel(value) {
+    const text = typeof value === 'string' ? value.trim() : '';
+    return text || '-';
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} [limit=180] Default is `180`
+ * @returns {string}
+ */
+function compactText(value, limit = 180) {
+    const text = String(value ?? '').replace(/\s+/gu, ' ').trim();
+    if (text.length <= limit) return text;
+    return `${text.slice(0, Math.max(1, limit - 1)).trimEnd()}…`;
+}
+
+/**
+ * @param {unknown} kind
+ * @returns {string}
+ */
+function symbolKindLabel(kind) {
+    const normalized = typeof kind === 'string' ? kind : '';
+    if (normalized === 'function') return 'função';
+    if (normalized === 'class') return 'classe';
+    if (normalized === 'variable') return 'variável';
+    if (normalized === 'import') return 'import';
+    return normalized || 'símbolo';
+}
+
+/**
+ * @returns {string}
+ */
+function usageText() {
+    return '/index status | build [dir] [--ext js] [--include p] [--exclude p] [--depth n] [--concurrency n] [--no-prune] | search <query> | symbol <name> | clear';
 }
 
 /**
@@ -171,22 +217,51 @@ function parseIndexArgs(parts) {
 function printStats(ctx) {
     const stats = /** @type {Record<string, unknown>} */ (getIoIndexStats());
     if (stats['enabled'] === false) {
-        ctx.println(`\x1b[33m  Índice L2 indisponível:\x1b[0m ${String(stats['reason'] ?? 'unavailable')}`);
+        ctx.println('');
+        ctx.println(terminalThemeRow('Índice L2', `indisponível · ${stringLabel(stats['reason'])}`, { role: 'warn' }));
+        ctx.println('');
         return;
     }
     const latest =
         typeof stats['latestIndexedAtMs'] === 'number' ? formatTerminalTimeLabel(stats['latestIndexedAtMs'], { mode: 'dual' }) : '-';
-    ctx.println('\n  \x1b[36mÍndice L2 local\x1b[0m');
+    ctx.println('');
+    ctx.println(terminalThemeHeadline('index', 'Índice L2 local'));
     ctx.println(
-        `  disponibilidade ${boolLabel(stats['available'])} · arquivos ${numberLabel(stats['files'])} · frescos ${numberLabel(stats['freshFiles'])} · falhas ${numberLabel(stats['failedFiles'])}`,
+        terminalThemeRow(
+            'Disponível',
+            terminalThemeJoin([
+                boolLabel(stats['available']),
+                `arquivos ${numberLabel(stats['files'])}`,
+                `frescos ${numberLabel(stats['freshFiles'])}`,
+                `falhas ${numberLabel(stats['failedFiles'])}`,
+            ]),
+        ),
     );
     ctx.println(
-        `  símbolos ${numberLabel(stats['symbols'])} · imports ${numberLabel(stats['imports'])} · chunks ${numberLabel(stats['chunks'])} · bytes ${bytesLabel(stats['bytesIndexed'])}`,
+        terminalThemeRow(
+            'Conteúdo',
+            terminalThemeJoin([
+                `símbolos ${numberLabel(stats['symbols'])}`,
+                `imports ${numberLabel(stats['imports'])}`,
+                `chunks ${numberLabel(stats['chunks'])}`,
+                bytesLabel(stats['bytesIndexed']),
+            ]),
+        ),
     );
     ctx.println(
-        `  builds ${numberLabel(stats['builds'])} · indexados ${numberLabel(stats['indexed'])} · ignorados ${numberLabel(stats['skipped'])} · podados ${numberLabel(stats['pruned'])} · buscas ${numberLabel(stats['searches'])}`,
+        terminalThemeRow(
+            'Builds',
+            terminalThemeJoin([
+                numberLabel(stats['builds']),
+                `indexados ${numberLabel(stats['indexed'])}`,
+                `ignorados ${numberLabel(stats['skipped'])}`,
+                `podados ${numberLabel(stats['pruned'])}`,
+                `buscas ${numberLabel(stats['searches'])}`,
+            ]),
+        ),
     );
-    ctx.println(`  última indexação ${latest} · frescor ${String(stats['freshness'] ?? '-')}\n`);
+    ctx.println(terminalThemeRow('Última', terminalThemeJoin([latest, `frescor ${stringLabel(stats['freshness'])}`])));
+    ctx.println('');
 }
 
 /**
@@ -208,23 +283,48 @@ async function runBuild(ctx, parts) {
     if (parsed.extensions.length > 0) options.extensions = parsed.extensions;
     if (parsed.pruneMissing !== undefined) options.pruneMissing = parsed.pruneMissing;
 
+    ctx.println('');
     ctx.println(
-        `\n  \x1b[36m/index build\x1b[0m ${directory} \x1b[90m(gitignore ${parsed.respectGitignore ? 'on' : 'off'} · prune ${parsed.pruneMissing === false ? 'off' : 'auto'})\x1b[0m`,
+        terminalThemeHeadline('index', '/index build', [
+            directory,
+            `gitignore ${parsed.respectGitignore ? 'on' : 'off'}`,
+            `prune ${parsed.pruneMissing === false ? 'off' : 'auto'}`,
+        ]),
     );
     const result = /** @type {Record<string, unknown>} */ (await buildIoIndexForDirectory(directory, options));
     if (result['available'] === false) {
-        ctx.println(`  \x1b[31mfalhou:\x1b[0m ${String(result['reason'] ?? 'index-unavailable')}`);
+        ctx.println(terminalThemeRow('Índice L2', `falhou · ${stringLabel(result['reason'] ?? 'index-unavailable')}`, { role: 'error' }));
+        ctx.println('');
         return;
     }
     ctx.println(
-        `  Resultado   \x1b[90mvarridos ${numberLabel(result['scannedEntries'])} · candidatos ${numberLabel(result['candidateFiles'])} · indexados ${numberLabel(result['indexed'])} · inalterados ${numberLabel(result['unchanged'])}\x1b[0m`,
+        terminalThemeRow(
+            'Resultado',
+            terminalThemeJoin([
+                `varridos ${numberLabel(result['scannedEntries'])}`,
+                `candidatos ${numberLabel(result['candidateFiles'])}`,
+                `indexados ${numberLabel(result['indexed'])}`,
+                `inalterados ${numberLabel(result['unchanged'])}`,
+            ]),
+        ),
     );
     ctx.println(
-        `  Limpeza     \x1b[90mignorados ${numberLabel(result['skipped'])} · podados ${numberLabel(result['pruned'])} · falhas ${numberLabel(result['failed'])}\x1b[0m`,
+        terminalThemeRow(
+            'Limpeza',
+            terminalThemeJoin([
+                `ignorados ${numberLabel(result['skipped'])}`,
+                `podados ${numberLabel(result['pruned'])}`,
+                `falhas ${numberLabel(result['failed'])}`,
+            ]),
+        ),
     );
     ctx.println(
-        `  Workspace   \x1b[90m${compactPath(String(result['workspaceRoot'] ?? directory))} · duração ${numberLabel(result['durationMs'])}ms\x1b[0m\n`,
+        terminalThemeRow(
+            'Workspace',
+            terminalThemeJoin([compactPath(String(result['workspaceRoot'] ?? directory)), `duração ${numberLabel(result['durationMs'])}ms`]),
+        ),
     );
+    ctx.println('');
 }
 
 /**
@@ -234,16 +334,22 @@ async function runBuild(ctx, parts) {
 function runSearch(ctx, parts) {
     const query = parts.join(' ').trim();
     if (!query) {
-        ctx.println('\x1b[33m  Uso: /index search <consulta>\x1b[0m');
+        ctx.println(terminalThemeRow('Uso', '/index search <consulta>', { role: 'warn' }));
         return;
     }
     const results = searchIoIndex(query).slice(0, 20);
-    ctx.println(`\n  \x1b[36m/index search\x1b[0m "${query}" · resultados ${results.length}`);
+    ctx.println('');
+    ctx.println(terminalThemeHeadline('index', '/index search', [`"${query}"`, `resultados ${results.length}`]));
     for (const item of results) {
-        ctx.println(`  \x1b[90m- ${item.relativePath}\x1b[0m ${String(item.snippet ?? '').replace(/\s+/gu, ' ')}`);
+        ctx.println(
+            terminalThemeWrappedRow('Arquivo', `${item.relativePath} · ${compactText(item.snippet)}`, {
+                role: 'fileRead',
+                columns: 110,
+            }),
+        );
     }
     if (results.length === 0)
-        ctx.println('  \x1b[90mSem resultados. Rode /index build src/copilot se o índice estiver vazio.\x1b[0m');
+        ctx.println(terminalThemeRow('Resultado', 'sem resultados · rode /index build src/copilot se o índice estiver vazio'));
     ctx.println('');
 }
 
@@ -254,18 +360,28 @@ function runSearch(ctx, parts) {
 function runSymbol(ctx, parts) {
     const symbol = parts.join(' ').trim();
     if (!symbol) {
-        ctx.println('\x1b[33m  Uso: /index symbol <nome>\x1b[0m');
+        ctx.println(terminalThemeRow('Uso', '/index symbol <nome>', { role: 'warn' }));
         return;
     }
     const results = findIoIndexSymbol(symbol).slice(0, 30);
-    ctx.println(`\n  \x1b[36m/index symbol\x1b[0m ${symbol} · resultados ${results.length}`);
+    ctx.println('');
+    ctx.println(terminalThemeHeadline('index', '/index symbol', [symbol, `resultados ${results.length}`]));
     for (const item of results) {
         ctx.println(
-            `  \x1b[90m- ${item.relativePath}:${item.line || 0}\x1b[0m ${item.symbolKind} ${item.symbolName}${item.exported ? ' export' : ''}`,
+            terminalThemeWrappedRow(
+                'Símbolo',
+                terminalThemeJoin([
+                    `${item.relativePath}:${item.line || 0}`,
+                    symbolKindLabel(item.symbolKind),
+                    item.symbolName,
+                    item.exported ? 'exportado' : null,
+                ]),
+                { role: 'index', columns: 110 },
+            ),
         );
     }
     if (results.length === 0)
-        ctx.println('  \x1b[90mSem símbolos. Rode /index build src/copilot --ext js --ext ts.\x1b[0m');
+        ctx.println(terminalThemeRow('Resultado', 'sem símbolos · rode /index build src/copilot --ext js --ext ts'));
     ctx.println('');
 }
 
@@ -274,7 +390,7 @@ function runSymbol(ctx, parts) {
  */
 function runClear(ctx) {
     getIoIndex()?.clearAll();
-    ctx.println('\x1b[32m  Índice L2 limpo.\x1b[0m');
+    ctx.println(terminalThemeRow('Índice L2', 'limpo', { role: 'success' }));
 }
 
 /**
@@ -291,11 +407,11 @@ export async function cmdIndex(ctx, arg = '') {
         else if (sub === 'symbol' || sub === 'symbols') runSymbol(ctx, parts);
         else if (sub === 'clear') runClear(ctx);
         else {
-            ctx.println(
-                '\x1b[33m  Uso: /index status | build [dir] [--ext js] [--include p] [--exclude p] [--depth n] [--concurrency n] [--no-prune] | search <query> | symbol <name> | clear\x1b[0m',
-            );
+            ctx.println(terminalThemeRow('Uso', usageText(), { role: 'warn' }));
         }
     } catch (e) {
-        ctx.println(`\n  \x1b[31m✗ Index: ${toError(e).message}\x1b[0m\n`);
+        ctx.println('');
+        ctx.println(terminalThemeRow('Index', toError(e).message, { role: 'error' }));
+        ctx.println('');
     }
 }

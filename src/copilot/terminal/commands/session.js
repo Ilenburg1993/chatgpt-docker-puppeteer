@@ -76,6 +76,16 @@ const DISABLED_BYOK_SUMMARY = Object.freeze({
 });
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @param {import('../frontend/projections/shared.js').TerminalModelBillingProjection} modelBilling
  * @param {string} action
  * @returns {string}
@@ -270,7 +280,9 @@ function renderTerminalIoStatusLines(ioRuntime) {
     const indexFiles = Number(ioIndex['files'] ?? 0);
     return {
         cache: `L1 ${ioL1['enabled'] ? 'ativo' : 'inativo'} · entradas ${ioL1['size'] ?? 0} · bytes ${ioL1['bytesStored'] ?? 0} · L2 ${ioL2['enabled'] ? 'ativo' : 'inativo'} · entradas ${ioL2['size'] ?? 0} · acerto ${hitPercent}`,
-        scope: `escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize} · índice ${ioIndex['available'] ? `${indexFiles} arquivo(s)` : 'vazio'}`,
+        scope: `escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize} · índice ${
+            ioIndex['available'] ? countLabel(indexFiles, 'arquivo', 'arquivos') : 'vazio'
+        }`,
     };
 }
 
@@ -571,7 +583,7 @@ function renderLiveContextLine(ioRuntime) {
     const l1Size = ioRuntime.cache.l1['size'] ?? 0;
     const l2Size = ioRuntime.cache.l2['size'] ?? 0;
     const indexFiles = Number(ioIndex['files'] ?? 0);
-    const indexLabel = ioIndex['available'] ? `${indexFiles} arquivo(s)` : 'vazio';
+    const indexLabel = ioIndex['available'] ? countLabel(indexFiles, 'arquivo', 'arquivos') : 'vazio';
     return [
         `L1 ${renderLiveToggle(l1Enabled)} (${l1Size})`,
         `L2 ${renderLiveToggle(l2Enabled)} (${l2Size})`,
@@ -1297,8 +1309,8 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
             projection.stream.usage ? 'uso visível' : null,
         ].filter(Boolean);
         const traceSummary = [
-            projection.counters.toolCount > 0 ? `${projection.counters.toolCount} ferramenta(s)` : null,
-            projection.counters.fileCount > 0 ? `${projection.counters.fileCount} arquivo(s)` : null,
+            projection.counters.toolCount > 0 ? countLabel(projection.counters.toolCount, 'ferramenta', 'ferramentas') : null,
+            projection.counters.fileCount > 0 ? countLabel(projection.counters.fileCount, 'arquivo', 'arquivos') : null,
             projection.counters.recentIoCount > 0 ? `${projection.counters.recentIoCount} I/O recente` : null,
         ].filter(Boolean);
         const stateLabel = renderLiveFlowStateLabel(projection.state);
@@ -1320,7 +1332,12 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
         println(terminalThemeRow('Sinais', streamBits.join(' · ') || 'sinais reduzidos'));
         println(terminalThemeRow('Atividade', activityLine));
         println(terminalThemeRow('Turno', traceSummary.join(' · ') || 'sem ações recentes'));
-        println(terminalThemeRow('Conexões', `${renderCompactSseLine(projection.sse)} · timeline ${projection.counters.timelineTurns} turno(s)`));
+        println(
+            terminalThemeRow(
+                'Conexões',
+                `${renderCompactSseLine(projection.sse)} · timeline ${countLabel(projection.counters.timelineTurns, 'turno', 'turnos')}`,
+            ),
+        );
         println(terminalThemeRow('Detalhe', renderCommandList(['/live full', `/activity ${requestedLimit} detail`, `/events ${requestedLimit}`])));
         println(terminalThemeDivider(37));
         return;
@@ -1350,13 +1367,17 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
     println(
         terminalThemeRow(
             'Conexões',
-            `${projection.sse.clients} cliente(s) SSE · ${projection.sse.criticalClients} crítico(s) · replay ${projection.sse.replayLastId}`,
+            `${countLabel(projection.sse.clients, 'cliente SSE', 'clientes SSE')} · ${countLabel(
+                projection.sse.criticalClients,
+                'crítico',
+                'críticos',
+            )} · replay ${projection.sse.replayLastId}`,
         ),
     );
     println(
         terminalThemeRow(
             'Timeline',
-            `${renderTerminalTimelineSourceLabel(projection.timeline.timelineSource)} · ${renderTerminalTimelineReconciliationLabel(projection.timeline.reconciliationStatus)} · sincronização ${renderTerminalSyncStatusLabel(projection.timeline.sync.status)} · ${projection.counters.timelineTurns} turno(s)`,
+            `${renderTerminalTimelineSourceLabel(projection.timeline.timelineSource)} · ${renderTerminalTimelineReconciliationLabel(projection.timeline.reconciliationStatus)} · sincronização ${renderTerminalSyncStatusLabel(projection.timeline.sync.status)} · ${countLabel(projection.counters.timelineTurns, 'turno', 'turnos')}`,
         ),
     );
     println(
@@ -1366,7 +1387,12 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
         ),
     );
     println(terminalThemeRow('Atividade', renderLiveActivitySummary(current, { includePhase: true })));
-    println(terminalThemeRow('Trace', `${projection.counters.toolCount} ferramenta(s) · ${projection.counters.fileCount} arquivo(s) · ${projection.counters.recentIoCount} I/O recente`));
+    println(
+        terminalThemeRow(
+            'Trace',
+            `${countLabel(projection.counters.toolCount, 'ferramenta', 'ferramentas')} · ${countLabel(projection.counters.fileCount, 'arquivo', 'arquivos')} · ${projection.counters.recentIoCount} I/O recente`,
+        ),
+    );
     println(terminalThemeDivider(37));
 
     if (activeTrace && (activeTrace.tools.length > 0 || activeTrace.files.length > 0)) {
@@ -1462,7 +1488,7 @@ export function cmdHistory({ println }, n = 10) {
         println(
             terminalThemeRow(
                 'Nota',
-                `histórico em memória divergiu da persistência; ${timeline.liveBridgeTailCount} turno(s) ao vivo preservado(s)${timeline.syncBlockedReason ? ` · motivo ${timeline.syncBlockedReason}` : ''}`,
+                `histórico em memória divergiu da persistência; ${countLabel(timeline.liveBridgeTailCount, 'turno ao vivo preservado', 'turnos ao vivo preservados')}${timeline.syncBlockedReason ? ` · motivo ${timeline.syncBlockedReason}` : ''}`,
                 { role: 'warn' },
             ),
         );
@@ -1471,7 +1497,7 @@ export function cmdHistory({ println }, n = 10) {
         println(
             terminalThemeRow(
                 'Sincronização',
-                `${renderTerminalSyncStatusLabel(timeline.sync.status)} · ${timeline.sync.pendingCount} turno(s) aguardando persistência`,
+                `${renderTerminalSyncStatusLabel(timeline.sync.status)} · ${countLabel(timeline.sync.pendingCount, 'turno aguardando persistência', 'turnos aguardando persistência')}`,
             ),
         );
     } else if (timeline.sync.status === 'failed') {
@@ -1604,10 +1630,10 @@ export function cmdCount({ hubSessionId, println }) {
     println('');
     println(terminalThemeHeadline('assistant', 'Estatísticas da sessão'));
     println(terminalThemeDivider(37));
-    println(terminalThemeRow('Você', `${projection.userTurns} turno(s)`));
-    println(terminalThemeRow('LLM-B', `${projection.llmBTurns} turno(s)`));
-    println(terminalThemeRow('Total', `${projection.turns} turno(s)`));
-    println(terminalThemeRow('Memórias', `${projection.memories} salva(s)`));
+    println(terminalThemeRow('Você', countLabel(projection.userTurns, 'turno', 'turnos')));
+    println(terminalThemeRow('LLM-B', countLabel(projection.llmBTurns, 'turno', 'turnos')));
+    println(terminalThemeRow('Total', countLabel(projection.turns, 'turno', 'turnos')));
+    println(terminalThemeRow('Memórias', countLabel(projection.memories, 'salva', 'salvas')));
     println(
         terminalThemeRow(
             'Sessões',
@@ -2564,8 +2590,8 @@ export async function cmdSessionSave({ println }, reason) {
         runtimeId,
         cleanReason || undefined,
     );
-    println(`\x1b[32m  ✓ Snapshot salvo: ${String(data['snapshotId'] ?? '(sem id)')}\x1b[0m`);
-    println(`\x1b[90m    Path: ${path}\x1b[0m`);
+    println(terminalThemeRow('Snapshot', `salvo · ${String(data['snapshotId'] ?? '(sem id)')}`, { role: 'success' }));
+    println(terminalThemeRow('Arquivo', path, { role: 'fileWrite' }));
 }
 
 /**

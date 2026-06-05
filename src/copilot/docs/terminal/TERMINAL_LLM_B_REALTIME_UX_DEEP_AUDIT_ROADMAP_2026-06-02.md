@@ -9243,3 +9243,76 @@
     contexto;
   - criar ciclo live de viewport estreito para detectar linhas longas em `/events sources`,
     `/session sdk` e `/byok`.
+
+### 12.105 Comandos operacionais sem ilhas ANSI, plurais mecânicos ou nomes crus — 2026-06-04
+
+- [x] Achado:
+  - `/index` ainda era uma superfície antiga: ANSI manual, `falhou:`, bullets cinzas,
+    `symbolKind`, `export`, uso em linha crua e status sem alinhamento temático;
+  - `/resume` imprimia banner ANSI, IDs coloridos manualmente, seta/emoji e erros com `✗`;
+  - `/git status/log/branch/pull/stash/help` misturava progresso ANSI e ajuda multiline crua,
+    destoando do `/git diff`, que já usa preview canônico;
+  - `/compact` e `/session save` ainda usavam `✓/✗` e ANSI manual;
+  - anexos, mailbox, workspace SDK, BYOK, SDK models, live flow, stats e diagnose ainda continham
+    plurais de engenharia como `item(ns)`, `modelo(s)`, `arquivo(s)`, `turno(s)`,
+    `ferramenta(s)`, `cliente(s)` e `salva(s)`;
+  - testes antigos ainda reforçavam parte desses textos provisórios.
+- [x] Decisão UX:
+  - comandos operacionais devem usar `terminalThemeHeadline`, `terminalThemeRow`,
+    `terminalThemeRows` e `terminalThemeWrappedRow` antes de qualquer ANSI manual;
+  - plurais devem ser frases naturais em português, mesmo em contadores pequenos;
+  - default humano pode preservar termos de comando (`/index`, `/git`, `BYOK`, `SDK`), mas não deve
+    expor nomes de schema como `workspaceRoot=`, `indexed=`, `gitignore=`, `export` bruto ou
+    `falhou:`;
+  - sucesso/erro devem ser papéis visuais (`success`, `error`, `warn`), não símbolos soltos;
+  - listas potencialmente enormes devem ter limite default e comando explícito para expansão;
+  - os formatadores brutos de bridge git continuam uma dívida separada: a casca do comando foi
+    humanizada agora; a separação futura deve criar presenters de terminal para `status/log/branch`.
+- [x] Implementação:
+  - `/index status/build/search/symbol/clear` foi convertido para headlines, rows e wrapped rows
+    temáticos;
+  - `/index symbol` passou a mostrar `função/classe/variável` e `exportado`, sem `export` cru;
+  - `/resume` lista sessões com título temático, linha wrapped, `atual`, uso explícito e erros
+    humanos;
+  - `/git` removeu banners ANSI locais e padronizou progresso, títulos, resultados de pull/stash e
+    ajuda;
+  - `/context` agora explicita `real SDK` quando os tokens vêm do SDK e preserva a frase
+    `live-tail visível foi preservado` em divergência;
+  - `/compact` e `/session save` usam rows temáticos para erro/sucesso/path;
+  - anexos inline, `/attach`, `/mailbox clear`, `/model list`, `/byok`, `/sdk models`,
+    workspace SDK virtual, `/session live`, `/session count` e `/diagnose` ganharam plurais
+    naturais;
+  - live revelou que `/model list` despejava 342 modelos; o default passou a mostrar 40 modelos e
+    uma linha `Omitidos ... · use /model list full`, preservando lista completa sob comando
+    explícito;
+  - runner live ganhou `--operator-ux-cycle`, cobrindo `/index`, `/git`, `/context`,
+    `/session save`, `/attach`, `/mailbox`, `/model list`, `/sdk models`, `/workspace list` e
+    `/live` em PTY real;
+  - testes de `/index`, `/attach`, `/model list`, `/resume`, `/context` e `/session save`
+    foram atualizados para travar a linguagem nova.
+- [x] Validação:
+  - [x] `node --check` focado em comandos, diálogo e REPL alterados;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_index.spec.js tests/unit/copilot/terminal/test_commands_attach.spec.js tests/unit/copilot/terminal/test_commands_config_errors.spec.js tests/unit/copilot/terminal/test_commands_memory_resume_search.spec.js tests/unit/copilot/terminal/test_commands_context.spec.js tests/unit/copilot/terminal/test_commands_git.spec.js`
+    com 33 testes verdes;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_context.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`
+    com 102 testes verdes;
+  - [x] `rg` não encontrou mais `\x1b[`, `✗`, `✓`, `item(ns)`, `resultado(s)`,
+    `adicional(is)`, `modelo(s)`, `disponível(is)`, `embutido(s)`, `arquivo(s)`,
+    `turno(s)`, `ferramenta(s)`, `cliente(s)`, `crítico(s)` ou `salva(s)` nas superfícies
+    auditadas, exceto uma asserção negativa de teste.
+  - [x] live inicial FAIL revelou critério incorreto de `/git` e verborragia real em `/model list`:
+    `artifacts/terminal-live/operator-ux-cycle-first-20260604/summary.md`;
+  - [x] live final PASS:
+    `artifacts/terminal-live/operator-ux-cycle-pass-20260604/summary.md`.
+- [x] Resultado observado:
+  - `/index status/search` aparece alinhado e sem campos crus;
+  - `/git help` usa painel de comandos e `/git status` usa shell temático;
+  - `/session save` mostra `Snapshot      salvo · <id>` e path separado;
+  - `/model list` mostra `342 modelos · mostrando 40 modelos` e `Omitidos      302 modelos · use /model list full`;
+  - `/live` mantém a linha `Conexões      SSE sem clientes · timeline 12 turnos`, sem `turno(s)`;
+  - o ciclo live não encontra plurais mecânicos, banners antigos ou campos crus nas superfícies
+    operacionais testadas.
+- [ ] Próximas verificações:
+  - separar presenters de terminal para `formatStatus`, `formatLog` e `formatBranch`, que ainda vêm
+    do bridge git com ANSI próprio;
+  - revisar `/byok` profundo e `/sdk workspace` com a mesma fronteira default/detail.

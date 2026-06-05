@@ -12,7 +12,7 @@
 
 import { toError } from '#copilot/core';
 import { readTerminalResumeListProjection, readTerminalResumeProjection } from '../frontend/index.js';
-import { formatTerminalTimeLabel } from '../state/index.js';
+import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow, terminalThemeWrappedRow } from '../state/index.js';
 
 /**
  * Handler do comando `/resume`.
@@ -32,23 +32,27 @@ export async function cmdResume({ println, hubSessionId }, arg) {
                 limit: 5,
             });
             if (sessions.length === 0) {
-                println('\x1b[90m  Nenhuma sessão anterior encontrada.\x1b[0m');
+                println(terminalThemeRow('Sessões', 'nenhuma sessão anterior encontrada', { role: 'muted' }));
                 return;
             }
             println('');
-            println('\x1b[36m  ─── Sessões Anteriores ─────────────────────────────────────────\x1b[0m');
+            println(terminalThemeHeadline('assistant', 'Sessões anteriores'));
             for (const s of sessions) {
                 const ts = formatTerminalTimeLabel(String(s['created_at'] ?? ''), { mode: 'dual' });
-                const current = s['id'] === currentHubSessionId ? ' \x1b[32m← atual\x1b[0m' : '';
+                const current = s['id'] === currentHubSessionId ? 'atual' : null;
                 println(
-                    `  \x1b[33m${String(s['id'] ?? '').slice(0, 8)}\x1b[90m…\x1b[0m  ${s['title'] ?? 'sem título'}  \x1b[90m(${s['status'] ?? 'unknown'}, ${ts})${current}\x1b[0m`,
+                    terminalThemeWrappedRow(
+                        String(s['id'] ?? '').slice(0, 8),
+                        [String(s['title'] ?? 'sem título'), String(s['status'] ?? 'unknown'), ts, current].filter(Boolean).join(' · '),
+                        { role: current ? 'success' : 'muted', width: 10, columns: 110 },
+                    ),
                 );
             }
             println('');
-            println('\x1b[90m  Use /resume <id> (primeiros 8 chars ou completo) para retomar.\x1b[0m');
+            println(terminalThemeRow('Uso', '/resume <id> para retomar', { role: 'command' }));
             println('');
         } catch (e) {
-            println(`\x1b[31m  ✗ Erro ao listar sessões: ${toError(e).message}\x1b[0m`);
+            println(terminalThemeRow('Sessões', `erro ao listar · ${toError(e).message}`, { role: 'error' }));
         }
         return;
     }
@@ -59,22 +63,30 @@ export async function cmdResume({ println, hubSessionId }, arg) {
         if (!projection.found || !projection.target) {
             if (projection.reason === 'session-empty') {
                 println(
-                    `\x1b[90m  Sessão ${String(projection.target?.['id'] ?? trimmed).slice(0, 8)}… não tem turnos registrados.\x1b[0m`,
+                    terminalThemeRow('Sessão', `${String(projection.target?.['id'] ?? trimmed).slice(0, 8)} · sem turnos registrados`, {
+                        role: 'muted',
+                    }),
                 );
                 return;
             }
-            println(`\x1b[31m  ✗ Sessão não encontrada: ${trimmed}\x1b[0m`);
+            println(terminalThemeRow('Sessão', `não encontrada · ${trimmed}`, { role: 'error' }));
             return;
         }
 
         println(
-            `\x1b[36m  ↩️  Retomando sessão ${String(projection.target['id'] ?? '').slice(0, 8)}… (${projection.turns.length} turnos)\x1b[0m`,
+            terminalThemeRow(
+                'Retomando',
+                `${String(projection.target['id'] ?? '').slice(0, 8)} · ${projection.turns.length} ${
+                    projection.turns.length === 1 ? 'turno' : 'turnos'
+                }`,
+                { role: 'assistant' },
+            ),
         );
 
         // Import dinâmico para evitar ciclo
         const { sendTurn } = await import('../dialog/index.js');
         await sendTurn(projection.summaryPrompt ?? '', 'user');
     } catch (e) {
-        println(`\x1b[31m  ✗ Erro ao retomar sessão: ${toError(e).message}\x1b[0m`);
+        println(terminalThemeRow('Retomar', `erro · ${toError(e).message}`, { role: 'error' }));
     }
 }

@@ -366,7 +366,13 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         }
         const finalMessage = atPaths.length > 0 ? strippedMessage : trimmed;
         if (!finalMessage.trim()) {
-            println(terminalThemeRow('Anexos', 'arquivo(s) anexados. Escreva uma mensagem para enviar o turno', { role: 'warn' }));
+            println(
+                terminalThemeRow(
+                    'Anexos',
+                    `${atPaths.length === 1 ? 'arquivo anexado' : 'arquivos anexados'}; escreva uma mensagem para enviar o turno`,
+                    { role: 'warn' },
+                ),
+            );
             if (isReadlineOpen(rl)) {
                 scheduleTerminalPromptRedraw(rl, buildUserPrompt());
             }

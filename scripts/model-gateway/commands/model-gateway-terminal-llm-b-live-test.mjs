@@ -72,6 +72,7 @@ Common options:
   --ux-cycle
   --diagnostic-ux-cycle
   --audit-ux-cycle
+  --operator-ux-cycle
   --reuse-sdk-session
   --timeout-ms=<ms>
   --transport=<pty|stdio>
@@ -3170,6 +3171,191 @@ async function runAuditUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, 
     return summary;
 }
 
+function operatorUxCycleCriteria(boot) {
+    const plain = stripAnsi(boot.plain);
+    const commandStart = (command, from = 0) => {
+        const pattern = new RegExp(
+            `(?:^|\\n)\\s*voc[eê]\\[[^\\n]*?›\\s+${escapeRegExp(command)}(?:\\s*\\r?\\n|\\r|$)`,
+            'iu',
+        );
+        const match = pattern.exec(plain.slice(from));
+        return match ? from + match.index : -1;
+    };
+    const indexStatusStart = commandStart('/index status');
+    const indexSearchStart = commandStart('/index search terminal');
+    const gitHelpStart = commandStart('/git help');
+    const gitStatusStart = commandStart('/git status', Math.max(0, gitHelpStart + 1));
+    const contextStart = commandStart('/context');
+    const sessionSaveStart = commandStart('/session save terminal-ux-live');
+    const attachEmptyStart = commandStart('/attach');
+    const attachAddStart = commandStart('/attach src/copilot/terminal/commands/workspace-index.js', Math.max(0, attachEmptyStart + 1));
+    const mailboxStart = commandStart('/mailbox clear');
+    const modelListStart = commandStart('/model list');
+    const sdkModelsStart = commandStart('/sdk models');
+    const workspaceStart = commandStart('/workspace list');
+    const liveStart = commandStart('/live');
+    const quitStart = commandStart('/quit');
+    const surfaceStarts = [
+        indexStatusStart,
+        indexSearchStart,
+        gitHelpStart,
+        gitStatusStart,
+        contextStart,
+        sessionSaveStart,
+        attachEmptyStart,
+        attachAddStart,
+        mailboxStart,
+        modelListStart,
+        sdkModelsStart,
+        workspaceStart,
+        liveStart,
+        quitStart,
+    ].filter((index) => index >= 0);
+    const surfaceAt = (start) => {
+        if (start < 0) return '';
+        const position = surfaceStarts.indexOf(start);
+        return plain.slice(start, surfaceStarts[position + 1] ?? plain.length);
+    };
+    const operationalSurface = [
+        surfaceAt(indexStatusStart),
+        surfaceAt(indexSearchStart),
+        surfaceAt(gitHelpStart),
+        surfaceAt(gitStatusStart),
+        surfaceAt(contextStart),
+        surfaceAt(sessionSaveStart),
+        surfaceAt(attachEmptyStart),
+        surfaceAt(attachAddStart),
+        surfaceAt(mailboxStart),
+        surfaceAt(modelListStart),
+        surfaceAt(sdkModelsStart),
+        surfaceAt(workspaceStart),
+        surfaceAt(liveStart),
+    ].join('\n');
+    const staleCopyPattern =
+        /item\(ns\)|resultado\(s\)|adicional\(is\)|modelo\(s\)|dispon[ií]vel\(is\)|embutido\(s\)|arquivo\(s\)|turno\(s\)|ferramenta\(s\)|cliente\(s\)|cr[ií]tico\(s\)|salva\(s\)|falhou:|workspaceRoot=|indexed=|gitignore=|Git CLI|Sessões Anteriores|Blob adicionado à fila/iu;
+    return [
+        {
+            id: 'operator-ux-ready',
+            pass: /LLM-B pronta/iu.test(plain) && boot.exitCode === 0,
+            detail: 'terminal reached ready state and closed cleanly during operator UX cycle',
+        },
+        {
+            id: 'operator-ux-index-human',
+            pass:
+                /Índice L2 local/iu.test(surfaceAt(indexStatusStart)) &&
+                /\/index search[\s\S]*resultados/iu.test(surfaceAt(indexSearchStart)) &&
+                !/workspaceRoot=|indexed=|gitignore=|falhou:|\s+export(?:\s|$)/iu.test(
+                    `${surfaceAt(indexStatusStart)}\n${surfaceAt(indexSearchStart)}`,
+                ),
+            detail: '/index status/search rendered themed human rows without raw index fields',
+        },
+        {
+            id: 'operator-ux-git-human-shell',
+            pass:
+                /\/git help[\s\S]*Git operacional[\s\S]*Comandos/iu.test(surfaceAt(gitHelpStart)) &&
+                /Git status/iu.test(surfaceAt(gitStatusStart)) &&
+                !/Git CLI|Verificando status git|Buscando log|Executando git pull|✗|✓/iu.test(
+                    `${surfaceAt(gitHelpStart)}\n${surfaceAt(gitStatusStart)}`,
+                ),
+            detail: '/git help/status used themed command shell instead of old local ANSI banners',
+        },
+        {
+            id: 'operator-ux-context-session-attach',
+            pass:
+                /Contexto|Uso do contexto/iu.test(surfaceAt(contextStart)) &&
+                /Snapshot\s+salvo/iu.test(surfaceAt(sessionSaveStart)) &&
+                /Fila|Fila de anexos|Adicionado/iu.test(`${surfaceAt(attachEmptyStart)}\n${surfaceAt(attachAddStart)}`),
+            detail: '/context, /session save and /attach rendered the updated operator-facing copy',
+        },
+        {
+            id: 'operator-ux-model-sdk-live',
+            pass:
+                /Modelos disponíveis|Nenhum modelo retornado pelo SDK/iu.test(surfaceAt(modelListStart)) &&
+                /Modelos SDK/iu.test(surfaceAt(sdkModelsStart)) &&
+                /Workspace SDK virtual/iu.test(surfaceAt(workspaceStart)) &&
+                /Fluxo da conversa/iu.test(surfaceAt(liveStart)),
+            detail: '/model list, /sdk models, /workspace list and /live rendered in one PTY session',
+        },
+        {
+            id: 'operator-ux-no-stale-copy',
+            pass: !staleCopyPattern.test(operationalSurface),
+            detail: 'operator command surfaces avoided old mechanical plurals, raw index fields and stale English banners',
+        },
+    ];
+}
+
+async function runOperatorUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+    const boot = await runSessionCycleBoot({
+        id: 'operator-ux-cycle',
+        label: 'operator command UX surfaces',
+        outDir,
+        commands: [
+            { line: '/index status', waitFor: 'Índice L2', advanceAfterMs: 1_500 },
+            { line: '/index search terminal', waitFor: '/index search', advanceAfterMs: 1_500 },
+            { line: '/git help', waitFor: 'Git operacional', advanceAfterMs: 1_500 },
+            { line: '/git status', waitFor: 'Git status', advanceAfterMs: 1_500 },
+            { line: '/context', waitFor: /Contexto|Uso do contexto/u, advanceAfterMs: 1_500 },
+            { line: '/session save terminal-ux-live', waitFor: 'Snapshot', advanceAfterMs: 1_500 },
+            { line: '/attach', waitFor: 'Fila', advanceAfterMs: 1_500 },
+            {
+                line: '/attach src/copilot/terminal/commands/workspace-index.js',
+                waitFor: 'Adicionado',
+                advanceAfterMs: 1_500,
+            },
+            { line: '/mailbox clear', waitFor: 'Fila de intervenção', advanceAfterMs: 1_500 },
+            { line: '/model list', waitFor: /Modelos disponíveis|Nenhum modelo retornado pelo SDK/u, advanceAfterMs: 1_500 },
+            { line: '/sdk models', waitFor: 'Modelos SDK', advanceAfterMs: 1_500 },
+            { line: '/workspace list', waitFor: 'Workspace SDK virtual', advanceAfterMs: 1_500 },
+            { line: '/live', waitFor: 'Fluxo da conversa', advanceAfterMs: 1_500 },
+            '/quit',
+        ],
+        terminalPort,
+        requestedTransport,
+        timeoutMs,
+    });
+    const criteria = operatorUxCycleCriteria(boot);
+    const durationMs = Date.now() - Date.parse(startedAt);
+    const ok = criteria.every((criterion) => criterion.pass);
+    const summary = {
+        ok,
+        startedAt,
+        durationMs,
+        terminalPort,
+        boot: {
+            id: boot.id,
+            label: boot.label,
+            exitCode: boot.exitCode,
+            sessionId: boot.sessionId || null,
+            transport: boot.transport,
+        },
+        criteria,
+    };
+    await writeFile(path.join(outDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await writeFile(
+        path.join(outDir, 'summary.md'),
+        [
+            '# Terminal LLM-B Operator UX Live Test',
+            '',
+            `Started: ${startedAt}`,
+            `Duration: ${durationMs}ms`,
+            `Status: ${ok ? 'PASS' : 'FAIL'}`,
+            `Terminal port: ${terminalPort}`,
+            '',
+            '## Criteria',
+            '',
+            ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+            '',
+            '## Logs',
+            '',
+            `- raw: ${path.relative(ROOT, path.join(outDir, 'operator-ux-cycle.raw.log'))}`,
+            `- plain: ${path.relative(ROOT, path.join(outDir, 'operator-ux-cycle.plain.log'))}`,
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+    return summary;
+}
+
 function hasReturnedToReplPrompt(plain, outputOffset) {
     return REPL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
 }
@@ -3326,6 +3512,7 @@ function liveScenarioKind({
     uxCycle,
     diagnosticUxCycle,
     auditUxCycle,
+    operatorUxCycle,
     modelControlProbe,
     liveScenario,
 }) {
@@ -3336,6 +3523,7 @@ function liveScenarioKind({
     if (uxCycle) return 'default_ux_cycle';
     if (diagnosticUxCycle) return 'diagnostic_ux_cycle';
     if (auditUxCycle) return 'audit_ux_cycle';
+    if (operatorUxCycle) return 'operator_ux_cycle';
     if (modelControlProbe) return 'model_probe';
     if (autoControlProbe) return 'auto_probe';
     if (byokFixture) return 'byok_fixture_no_pr';
@@ -6176,6 +6364,7 @@ async function main() {
     const uxCycle = hasFlag('--ux-cycle');
     const diagnosticUxCycle = hasFlag('--diagnostic-ux-cycle');
     const auditUxCycle = hasFlag('--audit-ux-cycle');
+    const operatorUxCycle = hasFlag('--operator-ux-cycle');
     const reuseSdkSession = hasFlag('--reuse-sdk-session');
     const byokProbe = hasFlag('--byok-probe');
     const byokFixture = hasFlag('--byok-fixture');
@@ -6201,6 +6390,7 @@ async function main() {
         uxCycle,
         diagnosticUxCycle,
         auditUxCycle,
+        operatorUxCycle,
         liveScenario,
     });
     const byokRealProfile = readArg('--byok-real-profile', '');
@@ -6399,6 +6589,20 @@ async function main() {
             startedAt,
         });
         console.log(`[terminal-live] audit ux summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
+        if (!summary.ok) process.exitCode = 1;
+        await byokFixtureProvider?.close();
+        return;
+    }
+
+    if (operatorUxCycle) {
+        const summary = await runOperatorUxCycleLiveTest({
+            outDir,
+            requestedTransport,
+            timeoutMs,
+            terminalPort,
+            startedAt,
+        });
+        console.log(`[terminal-live] operator ux summary: ${path.relative(ROOT, path.join(outDir, 'summary.md'))}`);
         if (!summary.ok) process.exitCode = 1;
         await byokFixtureProvider?.close();
         return;
