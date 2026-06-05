@@ -558,6 +558,36 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(42);
     });
 
+    it('mantém falha da rota BYOK compacta na linha viva', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'error',
+            label: 'Falha da rota BYOK no turno',
+            detail:
+                'rota BYOK ficou sem resposta dentro da janela esperada · sem Premium Request · perfil kilo · provedor kilo-code · modelo kilo-auto/free',
+            source: 'dialog',
+            severity: 'error',
+            toolName: null,
+            startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
+        };
+        mocks.runtime = {
+            ...mocks.runtime,
+            status: 'processing',
+            dialogLoopActive: true,
+        };
+
+        const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:05.000-03:00') });
+
+        expect(line).toContain('erro');
+        expect(line).toContain('rota BYOK');
+        expect(line).toContain('5s');
+        expect(line).not.toContain('kilo-auto/free');
+        expect(line).not.toContain('Premium Request');
+        expect(line.length).toBeLessThan(42);
+    });
+
     it('mostra troca de modelo como estado vivo curto e operacional', async () => {
         const { formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');

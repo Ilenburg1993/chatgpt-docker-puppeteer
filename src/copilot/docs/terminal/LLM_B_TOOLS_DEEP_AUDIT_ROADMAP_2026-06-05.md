@@ -343,6 +343,16 @@ operador vê e salvar summary com critérios objetivos.
 - [ ] L4. Auditar presentation/runtime/tools para não criar contrato paralelo.
 - [ ] L5. Registrar próximos upgrades fora do terminal sem misturar escopos.
 
+### Faixa M — UX de rota, modelo e automação BYOK
+
+- [x] M1. Auditar arquivos centrais de troca viva de modelo: `byok/live-model-switch.js`, `events/model-transition-presentation.js`, `byok/gateway-auto.js` e `repl/live-status-line.js`.
+- [x] M2. Garantir que a linha viva reconhece a terminologia atual `rota BYOK`, além de `provider/provedor BYOK`.
+- [ ] M3. Auditar `/byok auto status|plan|apply` para confirmar linguagem, timestamps ISO e separação entre intenção, aplicação e confirmação.
+- [ ] M4. Auditar eventos `session.model_changed` e confirmação de troca para não misturar pedido de troca com confirmação real do SDK.
+- [ ] M5. Auditar persistência de handoff/confirmation do model-gateway e como ela aparece em `/activity`, `/events`, `/byok auto confirmations` e `/health full`.
+- [ ] M6. Criar live/probe sem PR para troca de modelo fake/fixture, validando layout sem consumir provider real.
+- [ ] M7. Documentar a situação ideal de modelo/rota: selecionado, solicitado, preparado, confirmado, adiado, fallback e falha.
+
 ## Prioridade imediata
 
 1. Faixa A: metadata canônica.
@@ -389,4 +399,5 @@ operador vê e salvar summary com critérios objetivos.
 - [x] 2026-06-05: aviso de turno sem resposta agora usa `terminalThemeRow`; harness detecta `Rota BYOK ficou sem resposta` para diagnóstico imediato; `/export` vazio cria Markdown diagnóstico mínimo para preservar artefatos de live.
 - [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun4-20260605` bloqueou por `assistant-empty-turn`; confirmou `/errors` apontando `terminal.dialog.empty_output` e `/export` criado, mas mostrou que `/tools diag` vazio ainda caía no resumo padrão por branch condicional errada.
 - [x] 2026-06-05: `/tools diag` vazio agora não imprime `Ferramentas observadas` nem `0 grupos de ação`; teste unitário cobre a regressão.
-- [ ] Próximo passo: rerodar `recoverable-tool-error` após correção definitiva de `/tools diag`, ajustar prompt/harness para recuperação de ordem deltas→ask_user e revisar detalhes visuais remanescentes.
+- [x] 2026-06-05: iniciada Faixa M para UX de modelo/rota; linha viva agora reconhece `Falha da rota BYOK` como estado BYOK compacto, com teste focado.
+- [ ] Próximo passo: rerodar `recoverable-tool-error` após correção definitiva de `/tools diag`, auditar `/byok auto` e ajustar prompt/harness para recuperação de ordem deltas→ask_user.

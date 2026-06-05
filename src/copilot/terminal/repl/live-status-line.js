@@ -287,7 +287,10 @@ function isEmptyAfterUserInputActivity(activity) {
  */
 function isByokProviderErrorActivity(activity) {
     const text = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase();
-    return activity.phase === 'error' && (text.includes('provider byok') || text.includes('provedor byok'));
+    return (
+        activity.phase === 'error' &&
+        (text.includes('provider byok') || text.includes('provedor byok') || text.includes('rota byok'))
+    );
 }
 
 /**
