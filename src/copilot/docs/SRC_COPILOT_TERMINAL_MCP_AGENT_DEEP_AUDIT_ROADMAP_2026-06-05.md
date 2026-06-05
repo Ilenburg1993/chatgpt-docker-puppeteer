@@ -358,6 +358,8 @@
 - [x] Gap 31: teste unitário de `/index` apagava o índice real em `copilot.sqlite`; agora usa SQLite em memória via mock de `#copilot/db`, mantendo o estado operacional do terminal intacto.
 - [x] Gap 32: `/index build` ficava silencioso durante varredura/indexação longa; agora consome `copilot.io.scan`/`copilot.io.index` temporariamente e imprime progresso humano por marcos.
 - [x] Gap 33: `operator-ux-cycle` avançava após palavras genéricas do status BYOK (`Sessão viva`/`Modelo vivo`) e podia intercalar `/activity` antes de `Modelo vivo solicitado`; agora espera o marcador específico de pedido/adiamento/falha.
+- [x] Gap 34: `/session save` imprimia caminho absoluto do workspace na superfície default; agora usa path relativo humano, preservando o caminho completo nas camadas de persistência.
+- [x] Gap 35: `/metrics` imprimia o arquivo do archive SSE como caminho absoluto do workspace; agora a superfície default usa caminho relativo humano e mantém o caminho completo apenas em estado interno/export técnico.
 
 ## 08. Criterio de Marco
 
@@ -425,3 +427,5 @@
 - [x] 2026-06-05: `test_commands_index` foi isolado com `better-sqlite3(':memory:')` e `resetIoIndexForTest()`, impedindo que validações destruam o índice L2 persistente visto por `/index status` no terminal real.
 - [x] 2026-06-05: `/index build` passou a renderizar `Progresso`, `Varrendo`, `Varredura` e `Indexando` a partir dos canais canônicos de observabilidade, sem criar um segundo contador no comando.
 - [x] 2026-06-05: live `operator-ux-cycle` pass7 revelou avanço prematuro do harness em `/byok model`; o `waitFor` agora exige `Modelo vivo solicitado` ou saída específica de adiamento/falha, evitando comandos colados no bloco visual anterior.
+- [x] 2026-06-05: `cmdSessionSave` passou a renderizar o arquivo salvo via `formatTerminalToolPathForOperator`, removendo `/workspaces/...` do fluxo visual padrão.
+- [x] 2026-06-05: `/metrics` passou a renderizar o caminho do archive SSE via `formatTerminalToolPathForOperator`, com teste garantindo `data/copilot-terminal/sse-events` sem `process.cwd()`.

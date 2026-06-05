@@ -220,7 +220,7 @@ vi.mock('#copilot/agent', () => ({
         createdAt: Date.now(),
         ...data,
     })),
-    saveRuntimeSnapshot: vi.fn(async () => '/tmp/snap-001.json'),
+    saveRuntimeSnapshot: vi.fn(async () => `${process.cwd()}/.github/hooks/state/snapshots/snap-001.json`),
     listRuntimeSnapshots: vi.fn(async () => [
         { snapshotId: 'snap-001', createdAt: Date.now(), model: 'gpt-5-mini', reason: 'manual' },
     ]),
@@ -295,7 +295,7 @@ vi.mock('#copilot/agent/facades', () => ({
         createdAt: Date.now(),
         ...data,
     })),
-    saveRuntimeSnapshot: vi.fn(async () => '/tmp/snap-001.json'),
+    saveRuntimeSnapshot: vi.fn(async () => `${process.cwd()}/.github/hooks/state/snapshots/snap-001.json`),
     listRuntimeSnapshots: vi.fn(async () => [
         { snapshotId: 'snap-001', createdAt: Date.now(), model: 'gpt-5-mini', reason: 'manual' },
     ]),
@@ -1380,6 +1380,8 @@ describe('commands/session — async commands', () => {
         const ctx = mockCtx();
         await cmdSessionSave({ println: ctx.println }, 'test-reason');
         expect(ctx.output()).toMatch(/Snapshot\s+salvo/u);
+        expect(ctx.output()).toContain('.github/hooks/state/snapshots/snap-001.json');
+        expect(ctx.output()).not.toContain(process.cwd());
     });
 
     it('cmdSessionSave aceita runtimeId explícito na cauda do comando', async () => {

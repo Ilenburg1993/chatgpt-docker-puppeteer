@@ -11,6 +11,7 @@
 import { readTerminalConfigProjection, readTerminalMetricsProjection } from '../frontend/index.js';
 import {
     compactTerminalOperatorToolText,
+    formatTerminalToolPathForOperator,
     humanizeTerminalToolSurfaceText,
 } from '../events/tool-activity-presenter.js';
 import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
@@ -398,7 +399,13 @@ export function cmdMetrics({ println }, arg = '') {
     println(terminalThemeHeadline('info', 'Registro SSE'));
     println(terminalThemeRow('Eventos', `${sseEventArchive.events} (último id ${sseEventArchive.lastEventId ?? '-'})`, { role: 'info' }));
     println(terminalThemeRow('Fila', `${sseEventArchive.queueDepth} (flush ${sseEventArchive.flushInFlight ? 'em andamento' : sseEventArchive.flushScheduled ? 'agendado' : 'ocioso'} · falhas ${sseEventArchive.failedEvents} · descartados ${sseEventArchive.droppedEvents})`, { role: 'muted' }));
-    println(terminalThemeRow('Arquivo', sseEventArchive.enabled ? sseEventArchive.path ?? '(aguardando primeiro evento)' : 'desabilitado', { role: 'muted' }));
+    const archivePath =
+        sseEventArchive.enabled && sseEventArchive.path
+            ? formatTerminalToolPathForOperator(sseEventArchive.path)
+            : sseEventArchive.enabled
+              ? '(aguardando primeiro evento)'
+              : 'desabilitado';
+    println(terminalThemeRow('Arquivo', archivePath, { role: 'muted' }));
     if (sseEventArchive.error) println(terminalThemeRow('Erro SSE', sseEventArchive.error, { role: 'error' }));
 
     println(terminalThemeHeadline('command', 'Injeção'));

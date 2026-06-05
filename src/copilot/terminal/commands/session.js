@@ -2620,7 +2620,7 @@ export async function cmdSessionSave({ println }, reason) {
         cleanReason || undefined,
     );
     println(terminalThemeRow('Snapshot', `salvo · ${String(data['snapshotId'] ?? '(sem id)')}`, { role: 'success' }));
-    println(terminalThemeRow('Arquivo', path, { role: 'fileWrite' }));
+    println(terminalThemeRow('Arquivo', formatTerminalToolPathForOperator(path), { role: 'fileWrite' }));
 }
 
 /**

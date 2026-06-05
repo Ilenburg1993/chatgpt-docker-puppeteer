@@ -233,6 +233,9 @@ vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
 
 const { cmdMetrics } = await import('../../../../src/copilot/terminal/commands/metrics.js');
 const { cmdUsage } = await import('../../../../src/copilot/terminal/commands/usage.js');
+const { recordTerminalSseEventArchive, resetTerminalSseEventArchiveForTests } = await import(
+    '../../../../src/copilot/terminal/state/sse-event-archive.js'
+);
 
 function mockCtx() {
     /** @type {string[]} */
@@ -321,32 +324,44 @@ describe('commands/metrics + usage', () => {
     it('cmdMetrics exibe binding sdk/hub e agregados', () => {
         const ctx = mockCtx();
 
-        cmdMetrics({ println: ctx.println });
+        try {
+            recordTerminalSseEventArchive({
+                event: 'terminal.test',
+                eventId: 42,
+                data: { source: 'test' },
+                timestamp: Date.UTC(2026, 5, 5, 7, 0, 0),
+            });
+            cmdMetrics({ println: ctx.println });
 
-        expect(ctx.output()).toContain('Sessão SDK');
-        expect(ctx.output()).toContain('Sessão hub');
-        expect(ctx.output()).toContain('Modo SDK');
-        expect(ctx.output()).not.toContain('sessão SDK');
-        expect(ctx.output()).not.toContain('sessão hub');
-        expect(ctx.output()).not.toContain('modo sdk');
-        expect(ctx.output()).not.toContain('plan local');
-        expect(ctx.output()).toContain('timeline canônica');
-        expect(ctx.output()).toMatch(/Conversa viva\s+0/u);
-        expect(ctx.output()).toContain('sem histórico · sem autoridade · vazia');
-        expect(ctx.output()).not.toContain('bridge/live');
-        expect(ctx.output()).toContain('Atividade');
-        expect(ctx.output()).toContain('Evento');
-        expect(ctx.output()).not.toContain('Label');
-        expect(ctx.output()).toContain('Injeção');
-        expect(ctx.output()).not.toContain('Inject');
-        expect(ctx.output()).toContain('Registro SSE');
-        expect(ctx.output()).not.toContain('Archive SSE');
-        expect(ctx.output()).toContain('binding ok');
-        expect(ctx.output()).toContain('Processando mensagem');
-        expect(ctx.output()).not.toContain('bound-default');
-        expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
-        expect(ctx.output()).not.toContain('sdk-4567890123456789012345');
-        expect(ctx.output()).not.toContain('hub-4567890123456789012345');
+            expect(ctx.output()).toContain('Sessão SDK');
+            expect(ctx.output()).toContain('Sessão hub');
+            expect(ctx.output()).toContain('Modo SDK');
+            expect(ctx.output()).not.toContain('sessão SDK');
+            expect(ctx.output()).not.toContain('sessão hub');
+            expect(ctx.output()).not.toContain('modo sdk');
+            expect(ctx.output()).not.toContain('plan local');
+            expect(ctx.output()).toContain('timeline canônica');
+            expect(ctx.output()).toMatch(/Conversa viva\s+0/u);
+            expect(ctx.output()).toContain('sem histórico · sem autoridade · vazia');
+            expect(ctx.output()).not.toContain('bridge/live');
+            expect(ctx.output()).toContain('Atividade');
+            expect(ctx.output()).toContain('Evento');
+            expect(ctx.output()).not.toContain('Label');
+            expect(ctx.output()).toContain('Injeção');
+            expect(ctx.output()).not.toContain('Inject');
+            expect(ctx.output()).toContain('Registro SSE');
+            expect(ctx.output()).not.toContain('Archive SSE');
+            expect(ctx.output()).toContain('data/copilot-terminal/sse-events');
+            expect(ctx.output()).not.toContain(process.cwd());
+            expect(ctx.output()).toContain('binding ok');
+            expect(ctx.output()).toContain('Processando mensagem');
+            expect(ctx.output()).not.toContain('bound-default');
+            expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
+            expect(ctx.output()).not.toContain('sdk-4567890123456789012345');
+            expect(ctx.output()).not.toContain('hub-4567890123456789012345');
+        } finally {
+            resetTerminalSseEventArchiveForTests();
+        }
     });
 
     it('cmdMetrics encaminha runtimeId explícito para as projections', () => {
