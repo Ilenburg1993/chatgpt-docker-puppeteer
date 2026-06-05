@@ -245,7 +245,9 @@ function isCompletedLiveStatusActivity(label) {
         normalized.includes('encerrad') ||
         normalized.includes('respondid') ||
         normalized.includes('aprovad') ||
-        normalized.includes('rejeitad')
+        normalized.includes('rejeitad') ||
+        normalized.includes('modelo sdk confirmad') ||
+        normalized.includes('modelo sdk reconfirmad')
     );
 }
 

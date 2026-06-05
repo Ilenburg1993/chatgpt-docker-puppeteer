@@ -486,6 +486,8 @@ describe('terminal/commands/sdk', () => {
         const models = mockCtx();
         await cmdSdk({ println: models.println }, 'models');
         expect(models.output()).toContain('gpt-5-mini');
+        expect(models.output()).toContain('raciocínio high');
+        expect(models.output()).not.toContain('reasoning high');
 
         const tools = mockCtx();
         await cmdSdk({ println: tools.println }, 'tools gpt-5-mini');

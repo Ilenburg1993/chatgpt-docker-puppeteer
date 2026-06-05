@@ -79,6 +79,20 @@ function yesNoPt(value) {
 }
 
 /**
+ * @param {{ capabilities?: { supports?: { reasoningEffort?: boolean; vision?: boolean } } }} model
+ * @param {boolean} isActive
+ * @returns {string}
+ */
+function renderModelListDetails(model, isActive) {
+    const parts = [
+        isActive ? 'ativo' : null,
+        model.capabilities?.supports?.reasoningEffort ? 'raciocínio' : null,
+        model.capabilities?.supports?.vision ? 'visão' : null,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(' · ') : 'sem recursos especiais declarados';
+}
+
+/**
  * @param {ReturnType<typeof readTerminalRuntimeState>} state
  * @returns {{ observedModel: string | null; configuredModel: string | null; modelMismatch: boolean }}
  */
@@ -220,10 +234,9 @@ export async function cmdModel({ println }, arg) {
             println('');
             for (const m of visibleModels) {
                 const isActive = m.id === current;
-                const activeMarker = isActive ? ` ${terminalThemeText('success', 'ativo')}` : '';
-                const reasoning = m.capabilities?.supports?.reasoningEffort ? ` ${terminalThemeText('muted', '[raciocínio]')}` : '';
-                const vision = m.capabilities?.supports?.vision ? ` ${terminalThemeText('muted', '[visão]')}` : '';
-                println(terminalThemeRow('Modelo', `${m.id}${activeMarker}${reasoning}${vision}`, { role: 'command' }));
+                const details = renderModelListDetails(m, isActive);
+                const suffix = details === 'sem recursos especiais declarados' ? '' : ` · ${details}`;
+                println(terminalThemeRow('Modelo', `${m.id}${suffix}`, { role: isActive ? 'success' : 'command' }));
             }
             if (visibleModels.length < models.length) {
                 println(

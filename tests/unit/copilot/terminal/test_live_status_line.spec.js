@@ -587,6 +587,29 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(80);
     });
 
+    it('não mantém linha viva de confirmação de modelo quando a sessão já voltou ao prompt', async () => {
+        const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'model',
+            label: 'Modelo SDK confirmado',
+            detail:
+                'confirmado: kilo-auto/free → terminal-ux-boundary-fixture · raciocínio high · confirma pedido terminal.byok_model',
+            source: 'sdk',
+            severity: 'info',
+            toolName: null,
+            toolTarget: null,
+            startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
+        };
+        mocks.runtime = { ...mocks.runtime, status: 'idle', dialogLoopActive: true, queueSize: 0 };
+
+        expect(formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:04.000-03:00') })).toContain(
+            'modelo confirmado',
+        );
+        expect(shouldRenderTerminalLiveStatusLine()).toBe(false);
+    });
+
     it('mantém ask_user humano formatável, mas fora do pulso periódico para não disputar o input', async () => {
         const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');

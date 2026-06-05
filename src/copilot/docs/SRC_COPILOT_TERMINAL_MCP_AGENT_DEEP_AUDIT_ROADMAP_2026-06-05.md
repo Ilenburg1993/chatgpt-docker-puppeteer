@@ -363,6 +363,10 @@
 - [x] Gap 36: `/session list` e `/session restore` ainda usavam ANSI literal, IDs/status crus e sufixos como `[ready]`; agora usam tema central, rótulos humanos, IDs compactos e instruções consistentes.
 - [x] Gap 37: `/sdk skills` expunha paths absolutos de skills em projetos externos; agora paths passam pelo formatador de operador e ficam compactos.
 - [x] Gap 38: `/workspace mirror|promote|sync` ainda usava `ok=`, `fail=`, `root=` e `traceId` na superfície principal; agora usa contadores humanos, paths compactos e rótulo de auditoria.
+- [x] Gap 39: `/byok status` ainda mostrava `ativo sim`, `protocolo -` e `Azure -`; agora usa estado natural, autenticação/capacidades humanizadas e omite campos opcionais ausentes.
+- [x] Gap 40: `/model list` misturava modelo, `ativo` e badges `[raciocínio]`/`[visão]` sem separadores claros; agora usa uma row compacta por modelo com `· ativo · raciocínio · visão`.
+- [x] Gap 41: live pass11 mostrou `LLM-B modelo confirmado .../sdk models` colado ao input; agora confirmação/reconfirmação de modelo é status concluído e não mantém overlay quando o runtime está idle.
+- [x] Gap 42: `/sdk models` ainda imprimia `reasoning low,medium,high`; agora usa `raciocínio low, medium, high` com espaçamento humano.
 
 ## 08. Criterio de Marco
 
@@ -434,3 +438,9 @@
 - [x] 2026-06-05: `/metrics` passou a renderizar o caminho do archive SSE via `formatTerminalToolPathForOperator`, com teste garantindo `data/copilot-terminal/sse-events` sem `process.cwd()`.
 - [x] 2026-06-05: `/session list` e `/session restore` foram migrados para `terminalThemeHeadline/Row`, com perguntas restauradas humanizadas (`pronto`, `operador`, etc.) e sem ANSI hardcoded nos testes.
 - [x] 2026-06-05: `/sdk skills` e `/workspace` agora reutilizam `formatTerminalToolPathForOperator`/`compactTerminalDiagnosticId` para skills, workspace virtual, mirror e promoção FS↔SDK.
+- [x] 2026-06-05: live `operator-ux-cycle` pass9 PASS confirmou `/session save`, `/workspace list`, `/byok model`, `/activity`, `/live` e revelou as novas limpezas de `/byok status` e `/model list`.
+- [x] 2026-06-05: `/byok status` passou a renderizar estado como `ativo e pronto`, autenticação como `token bearer configurado` e modelo sem `protocolo -`/`Azure -`.
+- [x] 2026-06-05: `/model list` passou a renderizar uma linha por modelo com sufixos humanos (`ativo`, `raciocínio`, `visão`), evitando badges colados e excesso de linhas.
+- [x] 2026-06-05: live `operator-ux-cycle` pass11 FAIL revelou disputa entre overlay de modelo confirmado e input; `shouldRenderTerminalLiveStatusLine` agora suprime confirmações concluídas quando a sessão está ociosa.
+- [x] 2026-06-05: live `operator-ux-cycle` pass12 PASS confirmou `/model list` compacto, `/byok status` limpo e ausência de colisão entre confirmação de modelo e `/sdk models`.
+- [x] 2026-06-05: `/sdk models` passou a humanizar esforços suportados como `raciocínio high`, evitando inglês cru e listas sem espaço.

@@ -158,6 +158,10 @@ describe('terminal commands config/errors com frontend canônico', () => {
         expect(ctx.output()).toContain('Modelos disponíveis');
         expect(ctx.output()).toContain('2 modelos');
         expect(ctx.output()).toContain('gpt-4.1');
+        expect(ctx.output()).toContain('gpt-5 · ativo · raciocínio · visão');
+        expect(ctx.output()).not.toContain('Detalhes');
+        expect(ctx.output()).not.toContain('[raciocínio]');
+        expect(ctx.output()).not.toContain('[visão]');
         expect(listTerminalAvailableModelsProjection).toHaveBeenCalled();
     });
 

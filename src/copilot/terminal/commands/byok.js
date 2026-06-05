@@ -182,6 +182,43 @@ function yesNo(value) {
 }
 
 /**
+ * @param {boolean} enabled
+ * @param {boolean} ready
+ * @returns {string}
+ */
+function renderByokStatusLine(enabled, ready) {
+    if (!enabled) return 'desativado';
+    if (ready) return 'ativo e pronto';
+    return 'ativo, configuração incompleta';
+}
+
+/**
+ * @param {{ apiKeyConfigured?: boolean; bearerTokenConfigured?: boolean; headersConfigured?: boolean }} auth
+ * @returns {string}
+ */
+function renderByokAuthLine(auth) {
+    return [
+        auth.apiKeyConfigured ? 'chave API configurada' : 'chave API ausente',
+        auth.bearerTokenConfigured ? 'token bearer configurado' : 'token bearer ausente',
+        auth.headersConfigured ? 'headers extras configurados' : 'headers extras ausentes',
+    ].join(' · ');
+}
+
+/**
+ * @param {{ reasoningEffort?: boolean | null; sdkReasoningEffort?: boolean | null; vision?: boolean | null; contextWindowTokens?: number | null }} capabilities
+ * @returns {string}
+ */
+function renderByokCapabilityLine(capabilities) {
+    const context = capabilities.contextWindowTokens == null ? 'contexto n/d' : `contexto ${capabilities.contextWindowTokens}`;
+    return [
+        `raciocínio ${yesNo(Boolean(capabilities.reasoningEffort))}`,
+        `SDK ${yesNo(Boolean(capabilities.sdkReasoningEffort))}`,
+        `visão ${yesNo(Boolean(capabilities.vision))}`,
+        context,
+    ].join(' · ');
+}
+
+/**
  * @param {number} count
  * @param {string} singular
  * @param {string} plural
@@ -2208,30 +2245,20 @@ async function renderStatus(projection, println) {
     println(terminalThemeHeadline('tool', 'BYOK status'));
     println(terminalThemeDivider(66));
     println(
-        terminalThemeRow('Estado', `ativo ${yesNo(summary.enabled)} · pronto ${yesNo(summary.ready)}`, {
+        terminalThemeRow('Estado', renderByokStatusLine(summary.enabled, summary.ready), {
             role: summary.ready ? 'success' : summary.enabled ? 'warn' : 'muted',
         }),
     );
     println(terminalThemeRow('Perfil', `${valueOrDash(summary.profile)} · preset ${valueOrDash(summary.preset)}`));
     println(terminalThemeRow('Provedor', `${valueOrDash(summary.providerType)} · base ${valueOrDash(summary.baseUrl)}`));
-    println(
-        terminalThemeRow(
-            'Modelo',
-            `${valueOrDash(summary.model)} · protocolo ${renderByokWireLabel(summary.wireApi)} · Azure ${valueOrDash(summary.azureApiVersion)}`,
-        ),
-    );
-    println(
-        terminalThemeRow(
-            'Autenticação',
-            `chave API ${yesNo(summary.auth.apiKeyConfigured)} · token bearer ${yesNo(summary.auth.bearerTokenConfigured)} · headers ${yesNo(summary.auth.headersConfigured)}`,
-        ),
-    );
-    println(
-        terminalThemeRow(
-            'Capacidades',
-            `raciocínio ${yesNo(statusCapabilities.reasoningEffort)} · SDK ${yesNo(statusCapabilities.sdkReasoningEffort)} · visão ${yesNo(statusCapabilities.vision)} · contexto ${statusCapabilities.contextWindowTokens}`,
-        ),
-    );
+    const modelParts = [
+        valueOrDash(summary.model),
+        summary.wireApi ? `protocolo ${renderByokWireLabel(summary.wireApi)}` : null,
+        summary.azureApiVersion ? `Azure ${summary.azureApiVersion}` : null,
+    ].filter(Boolean);
+    println(terminalThemeRow('Modelo', modelParts.join(' · ')));
+    println(terminalThemeRow('Autenticação', renderByokAuthLine(summary.auth)));
+    println(terminalThemeRow('Capacidades', renderByokCapabilityLine(statusCapabilities)));
     if (statusCapabilities.modelId) {
         println(
             terminalThemeRow(

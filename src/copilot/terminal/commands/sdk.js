@@ -1399,8 +1399,10 @@ async function renderSdkModels({ println }, runtimeId) {
     for (const model of models.slice(0, 30)) {
         const m = objectOrNull(model) ?? {};
         const id = String(m['id'] ?? m['name'] ?? model);
-        const effort = Array.isArray(m['supportedReasoningEfforts']) ? m['supportedReasoningEfforts'].join(',') : '';
-        println(terminalThemeRow('Modelo', effort ? `${id} · reasoning ${effort}` : id, { role: 'command' }));
+        const effort = Array.isArray(m['supportedReasoningEfforts'])
+            ? m['supportedReasoningEfforts'].map(String).join(', ')
+            : '';
+        println(terminalThemeRow('Modelo', effort ? `${id} · raciocínio ${effort}` : id, { role: 'command' }));
     }
     if (models.length > 30)
         println(terminalThemeRow('Omitidos', `${models.length - 30} ${models.length - 30 === 1 ? 'modelo' : 'modelos'}`));

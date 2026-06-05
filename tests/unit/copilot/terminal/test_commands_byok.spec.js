@@ -1933,9 +1933,14 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'status');
 
         expect(ctx.output()).toContain('BYOK status');
+        expect(ctx.output()).toContain('ativo e pronto');
         expect(ctx.output()).toContain('.env.local');
         expect(ctx.output()).toContain('Autenticação');
-        expect(ctx.output()).toContain('token bearer');
+        expect(ctx.output()).toContain('token bearer configurado');
+        expect(ctx.output()).not.toContain('ativo sim');
+        expect(ctx.output()).not.toContain('pronto sim');
+        expect(ctx.output()).not.toContain('protocolo -');
+        expect(ctx.output()).not.toContain('Azure -');
         expect(ctx.output()).toContain('Rotina');
         expect(ctx.output()).toContain('/byok providers · /byok profiles · /byok models · /byok recommend');
         expect(ctx.output()).toContain('Trocar');
