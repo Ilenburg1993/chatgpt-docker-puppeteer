@@ -944,24 +944,25 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onElicitationPending = (/** @type {Record<string, unknown>} */ evt) => {
         const entry = recordTerminalElicitationPending(evt);
-        recordTerminalActivity('question', 'Elicitation SDK pendente', {
+        recordTerminalActivity('question', 'Formulário SDK pendente', {
             detail: `${entry.mode}: ${entry.message.slice(0, 160)}`,
             source: 'sdk',
             severity: 'warn',
         });
         println('');
-        println(terminalThemeRow('Elicitation', entry.message, { role: 'question' }));
+        printTerminalHumanQuestionCard(println, {
+            title: 'Formulário ao operador',
+            question: entry.message,
+            source: 'sdk',
+            state: 'aguardando resposta',
+            action: entry.actionable
+                ? '/elicitation show latest · /elicitation respond latest accept {"answer":"..."}'
+                : '/elicitation show latest · /elicitation list',
+            includeDivider: true,
+            includeShortcuts: false,
+        });
         println(terminalThemeRow('Pedido', renderSdkRequestLabel(entry.id)));
         if (entry.url) println(terminalThemeRow('URL', entry.url, { role: 'command' }));
-        println(
-            entry.actionable
-                ? terminalThemeRow(
-                      'Ação',
-                      '/elicitation show latest · /elicitation respond latest accept {"answer":"..."}',
-                      { role: 'command' },
-                  )
-                : terminalThemeRow('Ação', '/elicitation show latest · /elicitation list', { role: 'command' }),
-        );
         broadcastSse('elicitation.pending', withSdkSessionSseEnvelope({ ...entry }, 'sdk/elicitation.pending'));
         refreshPromptIfIdle();
     };
@@ -970,14 +971,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const entry = recordTerminalElicitationCompleted(evt);
         const data = eventObject(evt);
         const requestId = stringOr(data['requestId'], entry?.id ?? 'unknown');
-        recordTerminalActivity('question', 'Elicitation SDK concluída', {
+        recordTerminalActivity('question', 'Formulário SDK concluído', {
             detail: renderSdkRequestLabel(requestId),
             source: 'sdk',
             recordHistory: Boolean(entry),
         });
         if (entry) {
             println(
-                terminalThemeRow('Elicitation', `concluída · ${renderSdkRequestLabel(entry.id)}`, { role: 'success' }),
+                terminalThemeRow('Formulário', `concluído · ${renderSdkRequestLabel(entry.id)}`, { role: 'success' }),
             );
         }
         broadcastSse('elicitation.completed', withSdkSessionSseEnvelope({ ...data }, 'sdk/elicitation.completed'));

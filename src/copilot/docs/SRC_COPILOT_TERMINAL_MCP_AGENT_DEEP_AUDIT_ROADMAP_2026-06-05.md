@@ -59,7 +59,7 @@
 - [x] O terminal esta muito melhor do que a UX capturada nas screenshots antigas, mas ainda nao ha um contrato visual unico para todos os eventos.
 - [x] A linha viva existe, mas algumas atualizacoes ainda dependem de heuristicas locais e timers.
 - [x] A fala publica da LLM-B e os deltas possuem renderizadores dedicados.
-- [x] Perguntas humanas possuem renderer separado, mas o fluxo de pending/answered ainda precisa de teste live mais forte.
+- [x] Perguntas humanas possuem renderer separado e live estruturada cobrindo pending/answered sem poluicao duravel.
 - [x] O lifecycle de tools ja foi humanizado em parte, mas read/list/patch/exec/batch ainda precisam de provas comparativas em linha viva, `/activity`, `/tools diag`, `/events` e export.
 - [x] A camada MCP segue o contrato basico de `structuredContent` e `isError`.
 - [x] A camada MCP ainda usa um `baseMcpOutputSchema` permissivo para varias tools, o que e aceitavel como ponte, mas nao e ideal.
@@ -109,7 +109,7 @@
 - [ ] Historico: eventos importantes ficam em linhas persistentes curtas.
 - [ ] Detalhe: `/activity`, `/tools diag`, `/events`, `/history`, `/export` preservam a trilha tecnica.
 - [ ] Raw: IDs, call IDs, session IDs completos, payload cru e enums internos ficam apenas em raw/detail.
-- [ ] Pergunta humana: deve parecer uma pergunta do sistema de dialogo, nao uma tool comum.
+- [x] Pergunta humana: deve parecer uma pergunta do sistema de dialogo, nao uma tool comum.
 - [ ] Tool em execucao: deve mostrar verbo humano, alvo seguro, status e duracao; nunca apenas nome tecnico.
 - [ ] Tool concluida: deve mostrar resultado resumido e proximo estado, sem spam repetitivo.
 - [ ] Delta publico: deve mudar estado para respondendo rapidamente.
@@ -197,14 +197,15 @@
 
 - [x] F.1 Confirmar que pergunta humana real ocorreu na live recente.
 - [x] F.2 Confirmar que o runner live reconhece recovery quando ha pergunta depois de empty recovery.
-- [ ] F.3 Auditar `request_user_input`, `ask_user` e elicitation no SDK.
-- [ ] F.4 Garantir que pergunta humana nao seja exibida como tool comum.
-- [ ] F.5 Garantir que pending question tenha lifecycle: criada, aguardando, respondida, consumida, limpa.
+- [x] F.3 Auditar `request_user_input`, `ask_user` e elicitation no SDK.
+- [x] F.4 Garantir que pergunta humana nao seja exibida como tool comum.
+- [x] F.5 Garantir que pending question tenha lifecycle: criada, aguardando, respondida, consumida, limpa.
 - [ ] F.6 Garantir que timeout de pergunta gere erro compreensivel e nao repeticao poluida.
 - [x] F.10 Separar timeout global do cenario e timeout pos-`ask_user`, dando orçamento proprio para continuação depois da resposta humana.
-- [ ] F.7 Criar teste unitario para renderer de pending/answered.
-- [ ] F.8 Criar live com pergunta curta e resposta do operador.
-- [ ] F.9 Garantir que a linha viva indique espera humana sem bloquear input.
+- [x] F.7 Criar teste unitario para renderer de pending/answered.
+- [x] F.8 Criar live com pergunta curta e resposta do operador.
+- [x] F.9 Garantir que a linha viva indique espera humana sem bloquear input.
+- [x] F.11 Humanizar `elicitation.pending/completed` como formulario ao operador, usando o mesmo renderer de pergunta humana em vez de superficie tecnica do SDK.
 
 ## Faixa G - Empty Output, Recovery e Erros
 
@@ -341,11 +342,12 @@
 - [x] Gap 18: linha viva podia mostrar `Uso BYOK sem pedido premium` como trabalho atual durante tool/turn; uso normal agora é observação/background, mantendo mismatch como alerta.
 - [x] Gap 19: troca de modelo tinha linguagem paralela entre `/byok model`, automação e `session.model_changed`; agora há core puro compartilhado, fase `model` e correlação request -> confirmação SDK.
 - [x] Gap 20: live pass3 mostrou `Modelo SDK confirmado` assíncrono entre prompt e comando seguinte; confirmações correlacionadas agora não imprimem linha solta no prompt.
+- [x] Gap 21: `elicitation.pending` ainda podia aparecer como termo tecnico; agora a superficie default usa `Formulário ao operador`, ação clara e IDs apenas como pedido secundario/detail.
 
 ## 08. Criterio de Marco
 
 - [ ] Marco UX-1: read/list/patch/exec aparecem bonitos em linha viva, historico, `/activity`, `/tools diag` e export.
-- [ ] Marco UX-2: ask_user aparece como pergunta humana real, sem repeticao poluida e sem timeout falso.
+- [x] Marco UX-2: ask_user/request_user_input aparece como pergunta humana real, sem repeticao poluida e sem timeout falso no fluxo live estruturado.
 - [ ] Marco UX-3: model switch tem trilha completa e compreensivel.
 - [ ] Marco MCP-1: descriptors criticos possuem labels humanos, schemas melhores e results validados.
 - [ ] Marco Agent-1: resultado semantico de turno e consumido sem reinterpretacao paralela desnecessaria.
@@ -384,4 +386,6 @@
 - [x] 2026-06-05: `session.model_changed` consome pedido vivo pendente quando confirma o mesmo modelo, registrando `matchedTerminalRequest` no SSE e mantendo ISO 8601 completo no detalhe.
 - [x] 2026-06-05: runner `operator-ux-cycle` passou a exercitar `/byok model terminal-ux-boundary-fixture` e `/activity 10`, exigindo `Estado modelo` e rejeitando `Estado model`.
 - [x] 2026-06-05: live `terminal-ux-operator-model-switch` pass3 encontrou interferência visual de confirmação SDK no prompt; pass4 PASS confirmou `/sdk models` limpo, `/activity` com `Estado modelo` e `/live` com confirmação correlacionada.
+- [x] 2026-06-05: live `structured-input-cycle` pass2 PASS confirmou cartão humano para `request_user_input`, prompt `[PERG]`, `/sdk waits` pendente/limpo, resposta roteada e ausencia de `request_user_input ainda executando`, IDs crus e spam duravel.
+- [x] 2026-06-05: `elicitation.pending/completed` foi rebaixado de jargao SDK para `Formulário ao operador`, reaproveitando o renderer canonico de pergunta humana e mantendo o pedido tecnico em linha secundaria.
 - [ ] 2026-06-05: melhorar estado visual/diagnostico para continuacao pos-`ask_user` lenta ou falha BYOK sem mensagem estruturada.

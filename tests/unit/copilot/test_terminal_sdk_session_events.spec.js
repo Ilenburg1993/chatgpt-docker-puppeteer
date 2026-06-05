@@ -533,9 +533,11 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
 
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
-            'Elicitation SDK pendente',
+            'Formulário SDK pendente',
             expect.objectContaining({ severity: 'warn', source: 'sdk' }),
         );
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Formulário ao operador'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Elicitation'));
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
             'Permissão SDK solicitada',
