@@ -98,6 +98,11 @@ import {
     renderAssistantToolClaimAuditFindings,
 } from './assistant-tool-claim-audit.js';
 import {
+    buildTerminalEmptyOutputDiagnosis,
+    classifyTerminalEmptyOutput,
+    hasTerminalPendingHumanInputOutcome,
+} from './empty-output-diagnosis.js';
+import {
     createDeltaCallback,
     createDisplayState,
     createReasoningCallback,
@@ -507,11 +512,11 @@ async function runByokGatewayPreTurnAutomation() {
  * @returns {boolean}
  */
 function hasPendingHumanInputOutcome(runtimeState) {
-    return (
-        runtimeState.status === 'waiting_for_input' &&
-        runtimeState.pendingQuestion !== null &&
-        runtimeState.pendingQuestionKind !== 'ready'
-    );
+    return hasTerminalPendingHumanInputOutcome({
+        runtimeStatus: runtimeState.status,
+        pendingQuestionPresent: runtimeState.pendingQuestion !== null,
+        pendingQuestionKind: runtimeState.pendingQuestionKind,
+    });
 }
 
 /**
@@ -573,74 +578,6 @@ function shouldAttemptPostToolOnlyRecovery(turnResult, context) {
 }
 
 /**
- * @param {number | null | undefined} value
- * @returns {number}
- */
-function safeCounter(value) {
-    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
-}
-
-/**
- * @param {{
- *     semanticOutcome?: import('../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['outcome'];
- *     semanticReplySource?: import('../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['replySource'];
- *     semanticDiagnostics?: import('../../agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['diagnostics'];
- *     materialization: ReturnType<typeof completeTerminalTurnMaterialization>;
- *     quiescence?: Awaited<ReturnType<typeof waitForTerminalTurnMaterializationQuiescence>> | null;
- * }} input
- * @returns {{
- *     cause: string;
- *     evidence: string;
- *     action: string;
- *     operatorSummary: string;
- * }}
- */
-function buildTerminalEmptyOutputDiagnosis(input) {
-    const diagnostics = input.semanticDiagnostics;
-    const assistantMessages = safeCounter(
-        diagnostics?.assistantMessageCount ?? input.materialization.diagnostics.assistantMessageCount,
-    );
-    const toolSignals = safeCounter(diagnostics?.toolSignalCount);
-    const deltaChars = safeCounter(diagnostics?.deltaChars ?? input.materialization.diagnostics.deltaChars);
-    const deltaSlices = safeCounter(input.materialization.diagnostics.deltaSlices);
-    const pendingProtocol = diagnostics?.pendingProtocolKind ?? null;
-    const outcome = input.semanticOutcome ?? 'empty';
-    const source = input.semanticReplySource ?? 'n/d';
-    let cause = 'modelo encerrou o turno sem texto público nem protocolo de continuidade';
-    let action = 'reenvie, peça síntese curta ou troque rota/modelo se repetir';
-
-    if (pendingProtocol) {
-        cause = `protocolo avançou para ${pendingProtocol}, mas sem resposta pública renderizável`;
-        action = '/activity 40 · /events 60 para confirmar o estado protocolar';
-    } else if (toolSignals > 0) {
-        cause = 'tools foram observadas, mas nenhuma síntese pública chegou ao terminal';
-        action = 'peça uma síntese pública antes de repetir ações com efeito colateral';
-    } else if (assistantMessages > 0) {
-        cause = 'o SDK sinalizou mensagem final, mas ela não virou transcript visível';
-        action = '/events event=assistant.message · /export para comparar materialização';
-    } else if (deltaChars > 0 || deltaSlices > 0) {
-        cause = 'deltas foram observados, mas não formaram resposta pública final';
-        action = '/activity detail · /events event=assistant.message_delta para comparar streaming';
-    }
-
-    const evidenceParts = [
-        `resultado ${outcome}`,
-        `origem ${source}`,
-        `tools ${toolSignals}`,
-        `deltas ${deltaSlices}/${deltaChars} caracteres`,
-        `mensagens ${assistantMessages}`,
-        input.quiescence ? `quiescência ${input.quiescence.settledBy}/${input.quiescence.waitedMs}ms` : null,
-    ].filter(Boolean);
-    const evidence = evidenceParts.join(' · ');
-    return {
-        cause,
-        evidence,
-        action,
-        operatorSummary: `${cause} · ${evidence}`,
-    };
-}
-
-/**
  * @param {{
  *     actor: string;
  *     byok: ReturnType<typeof readConfiguredByokSummary>;
@@ -654,21 +591,34 @@ function buildTerminalEmptyOutputDiagnosis(input) {
  * @returns {{ expectedPendingInput: boolean; emptyOutputFailure: boolean }}
  */
 function recordTerminalExplicitEmptyOutput(input) {
-    if (input.materialization.source !== 'empty') {
-        return { expectedPendingInput: false, emptyOutputFailure: false };
-    }
-
     const timestamp = input.timestamp ?? Date.now();
     const runtimeState = readTerminalRuntimeState();
-    const semanticOutcome = input.semanticOutcome ?? 'empty';
-    if (hasPendingHumanInputOutcome(runtimeState) || semanticOutcome === 'pending_human_input') {
+    const classification = classifyTerminalEmptyOutput({
+        materializationSource: input.materialization.source,
+        runtimeStatus: runtimeState.status,
+        pendingQuestionPresent: runtimeState.pendingQuestion !== null,
+        pendingQuestionKind: runtimeState.pendingQuestionKind,
+        semanticOutcome: input.semanticOutcome,
+        semanticDiagnostics: input.semanticDiagnostics,
+    });
+    const semanticOutcome = classification.semanticOutcome;
+    if (classification.kind === 'not_empty') {
+        return {
+            expectedPendingInput: classification.expectedPendingInput,
+            emptyOutputFailure: classification.emptyOutputFailure,
+        };
+    }
+    if (classification.kind === 'pending_human_input') {
         recordTerminalActivity('question', 'Turno sem transcript final aguardando input humano', {
             detail: `pergunta humana pendente · origem ${input.materialization.sourceDetail}`,
             source: 'dialog',
             severity: 'info',
             recordHistory: false,
         });
-        return { expectedPendingInput: true, emptyOutputFailure: false };
+        return {
+            expectedPendingInput: classification.expectedPendingInput,
+            emptyOutputFailure: classification.emptyOutputFailure,
+        };
     }
 
     const semanticDetail =
@@ -680,8 +630,8 @@ function recordTerminalExplicitEmptyOutput(input) {
         `mensagens assistente ${input.materialization.diagnostics.assistantMessageCount} · ${semanticDetail}` +
         (input.quiescence ? ` · quiescência ${input.quiescence.settledBy}/${input.quiescence.waitedMs}ms` : '');
 
-    if (semanticOutcome === 'tool_only' || semanticOutcome === 'protocol_transition') {
-        const toolOnly = semanticOutcome === 'tool_only';
+    if (classification.kind === 'tool_only' || classification.kind === 'protocol_transition') {
+        const toolOnly = classification.kind === 'tool_only';
         reviseRecentTerminalTurnTraceStatus({ timestamp, status: 'completed' });
         recordTerminalActivity('turn', toolOnly ? 'Turno tool-only sem síntese pública' : 'Transição de protocolo sem transcript', {
             detail: failureDetail,
@@ -718,7 +668,10 @@ function recordTerminalExplicitEmptyOutput(input) {
                 }),
             );
         }
-        return { expectedPendingInput: false, emptyOutputFailure: false };
+        return {
+            expectedPendingInput: classification.expectedPendingInput,
+            emptyOutputFailure: classification.emptyOutputFailure,
+        };
     }
 
     reviseRecentTerminalTurnTraceStatus({ timestamp, status: 'failed' });
@@ -784,7 +737,10 @@ function recordTerminalExplicitEmptyOutput(input) {
         });
     }
 
-    return { expectedPendingInput: false, emptyOutputFailure: true };
+    return {
+        expectedPendingInput: classification.expectedPendingInput,
+        emptyOutputFailure: classification.emptyOutputFailure,
+    };
 }
 
 /**

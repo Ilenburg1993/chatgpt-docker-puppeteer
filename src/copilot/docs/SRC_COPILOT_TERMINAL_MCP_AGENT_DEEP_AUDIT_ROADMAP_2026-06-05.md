@@ -212,7 +212,7 @@
 - [x] G.1 Empty output ja possui diagnostico com causa, evidencias e proximo passo no roadmap anterior.
 - [x] G.2 Runner live ja evita falso positivo quando input humano ocorre depois do empty.
 - [ ] G.3 Auditar turn trace completo para provider failure tardio.
-- [ ] G.4 Separar empty de tool-only bem-sucedido, pending question e protocolo.
+- [x] G.4 Separar empty de tool-only bem-sucedido, pending question e protocolo.
 - [ ] G.5 Ligar provider/model failure ao runtime health BYOK quando aplicavel.
 - [ ] G.6 Garantir cooldown de retry sem mascarar falha real.
 - [ ] G.7 Criar testes unitarios para cada causa de empty.
@@ -302,7 +302,7 @@
 
 - [x] N.1 Identificados hotspots grandes em terminal, MCP, SDK, Agent e model-gateway.
 - [ ] N.2 Decompor apenas quando reduzir risco ou duplicacao real.
-- [ ] N.3 Priorizar `byok.js`, `sdk.js`, `session.js`, `engine.js`, `sdk-session-events.js`, `provider.js`, `repo-write.js`.
+- [x] N.3 Iniciar decomposicao de `engine.js` extraindo classificacao pura de saida vazia/nao textual.
 - [ ] N.4 Extrair glossarios e renderers antes de mexer em comandos grandes.
 - [ ] N.5 Evitar refactor amplo sem live/test correspondente.
 - [ ] N.6 Documentar cada decomposicao com owner e contrato.
@@ -343,6 +343,7 @@
 - [x] Gap 19: troca de modelo tinha linguagem paralela entre `/byok model`, automação e `session.model_changed`; agora há core puro compartilhado, fase `model` e correlação request -> confirmação SDK.
 - [x] Gap 20: live pass3 mostrou `Modelo SDK confirmado` assíncrono entre prompt e comando seguinte; confirmações correlacionadas agora não imprimem linha solta no prompt.
 - [x] Gap 21: `elicitation.pending` ainda podia aparecer como termo tecnico; agora a superficie default usa `Formulário ao operador`, ação clara e IDs apenas como pedido secundario/detail.
+- [x] Gap 22: a classificacao de turno sem transcript publico vivia acoplada ao `engine.js`; agora `empty-output-diagnosis` separa `pending_human_input`, `tool_only`, `protocol_transition` e `empty_failure` em core puro testavel.
 
 ## 08. Criterio de Marco
 
@@ -388,4 +389,6 @@
 - [x] 2026-06-05: live `terminal-ux-operator-model-switch` pass3 encontrou interferência visual de confirmação SDK no prompt; pass4 PASS confirmou `/sdk models` limpo, `/activity` com `Estado modelo` e `/live` com confirmação correlacionada.
 - [x] 2026-06-05: live `structured-input-cycle` pass2 PASS confirmou cartão humano para `request_user_input`, prompt `[PERG]`, `/sdk waits` pendente/limpo, resposta roteada e ausencia de `request_user_input ainda executando`, IDs crus e spam duravel.
 - [x] 2026-06-05: `elicitation.pending/completed` foi rebaixado de jargao SDK para `Formulário ao operador`, reaproveitando o renderer canonico de pergunta humana e mantendo o pedido tecnico em linha secundaria.
+- [x] 2026-06-05: extraído `dialog/empty-output-diagnosis.js` para classificar saida vazia/nao textual sem efeitos colaterais; engine permanece responsavel por activity/SSE/BYOK health.
+- [x] 2026-06-05: adicionados testes unitarios para pending human input, READY protocolar, tool-only, protocol transition e diagnostico acionavel de tools sem sintese publica.
 - [ ] 2026-06-05: melhorar estado visual/diagnostico para continuacao pos-`ask_user` lenta ou falha BYOK sem mensagem estruturada.
