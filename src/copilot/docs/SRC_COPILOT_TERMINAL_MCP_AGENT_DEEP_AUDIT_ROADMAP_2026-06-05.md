@@ -389,7 +389,7 @@
 - [x] Gap 62: rodapés de preview divergiam entre `/fs`, `/git` e `/gh`; agora `renderTerminalPreviewSummary` padroniza renderer externo, fallback canônico, motivo, filtro aplicado e truncamento.
 - [x] Gap 63: `/fs preview --json|--yaml --lines` ignorava o limite em previews estruturados e podia despejar centenas de linhas; agora o renderer estruturado limita linhas e reporta `truncado`.
 - [x] Gap 64: `/export` removia HTML e redigia segredos, mas podia preservar ANSI/OSC/control codes vindos de renderers externos; agora sanitiza texto terminal antes da redação e do Markdown.
-- [ ] Gap 65: live diagnóstica mostrou que o harness pode injetar comando durante saída longa antes do prompt redesenhar; criar `waitForPromptStable`/backpressure por comando para aproximar mais a percepção humana.
+- [x] Gap 65: live diagnóstica mostrou que o harness podia injetar comando durante saída longa antes do prompt redesenhar; `runSessionCycleBoot` agora espera conteúdo esperado e prompt retornado, com limite de segurança.
 
 ## 08. Criterio de Marco
 
@@ -491,3 +491,4 @@
 - [x] 2026-06-05: observado em execução real que `/fs preview package.json --json --query .scripts --lines 5` despejava centenas de linhas; `structured-preview` agora aplica `lineLimit` pós-render e o smoke AUX protege `structured-preview-line-limit`.
 - [x] 2026-06-05: `/export` passou a usar `sanitizeTerminalExternalToolText` antes de `redactSecretText`, removendo ANSI/OSC/controles de conteúdo e envelopes preservados no Markdown.
 - [x] 2026-06-05: live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T11-26-53-139Z/summary.md`, cobrindo `/terminal libs`, previews read-only, `--lines`, `/git diff`, `/menu picker`, export/log sanitizado e critérios humanos do terminal.
+- [x] 2026-06-05: `runSessionCycleBoot` recebeu backpressure por prompt estável; live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T11-29-43-334Z/summary.md` confirmou `/session sdk 6` seguido de `/sdk status` com prompt redesenhado.

@@ -22,6 +22,7 @@ const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_POST_ANSWER_DELAY_MS = 6_000;
 const DEFAULT_POST_ASK_CONTINUATION_WAIT_MS = 45_000;
 const DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS = 2_000;
+const SESSION_CYCLE_PROMPT_STABLE_MAX_WAIT_MS = 15_000;
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 const SECRET_ENV_RE = /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|BEARER)/iu;
 const TURN_SETTLED_AFTER_ASK_RE =
@@ -1431,6 +1432,7 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
     let waitingForPrompt = false;
     let activeWaitFor = null;
     let commandOutputOffset = 0;
+    let commandPromptWaitStartedAt = 0;
     /** @type {NodeJS.Timeout | null} */
     let promptFallbackTimer = null;
     const remainingCommands = [...commands];
@@ -1472,19 +1474,42 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
             waitingForPrompt = entry.line.trim() !== '/quit';
             activeWaitFor = entry.waitFor;
             commandOutputOffset = stripAnsi(raw).length;
+            commandPromptWaitStartedAt = Date.now();
             write(entry.line);
             if (waitingForPrompt && entry.advanceAfterMs > 0) {
                 promptFallbackTimer = setTimeout(() => {
                     promptFallbackTimer = null;
                     if (!waitingForPrompt || childClosed) return;
+                    const plain = stripAnsi(raw);
                     const commandOutput = stripAnsi(raw).slice(commandOutputOffset);
-                    if (activeWaitFor && !liveWaitForMatched(activeWaitFor, commandOutput)) {
+                    const waitForMatched = liveWaitForMatched(activeWaitFor, commandOutput);
+                    const promptReturned = hasReturnedToReplPrompt(plain, commandOutputOffset);
+                    const timedOutWaitingForPrompt =
+                        Date.now() - commandPromptWaitStartedAt >= SESSION_CYCLE_PROMPT_STABLE_MAX_WAIT_MS;
+                    if (!waitForMatched || (!promptReturned && !timedOutWaitingForPrompt)) {
                         promptFallbackTimer = setTimeout(() => {
                             promptFallbackTimer = null;
                             if (!waitingForPrompt || childClosed) return;
-                            waitingForPrompt = false;
-                            activeWaitFor = null;
-                            sendNextCommand();
+                            const latestPlain = stripAnsi(raw);
+                            const latestOutput = latestPlain.slice(commandOutputOffset);
+                            if (
+                                liveWaitForMatched(activeWaitFor, latestOutput) &&
+                                (hasReturnedToReplPrompt(latestPlain, commandOutputOffset) ||
+                                    Date.now() - commandPromptWaitStartedAt >= SESSION_CYCLE_PROMPT_STABLE_MAX_WAIT_MS)
+                            ) {
+                                waitingForPrompt = false;
+                                activeWaitFor = null;
+                                sendNextCommand();
+                            } else {
+                                promptFallbackTimer = setTimeout(() => {
+                                    promptFallbackTimer = null;
+                                    if (!waitingForPrompt || childClosed) return;
+                                    waitingForPrompt = false;
+                                    activeWaitFor = null;
+                                    sendNextCommand();
+                                }, entry.advanceAfterMs);
+                                promptFallbackTimer.unref();
+                            }
                         }, entry.advanceAfterMs);
                         promptFallbackTimer.unref();
                         return;
