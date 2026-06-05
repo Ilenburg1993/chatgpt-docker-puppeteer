@@ -276,6 +276,22 @@ function renderByokSourceLabel(value) {
  * @param {string | null | undefined} value
  * @returns {string}
  */
+function renderByokSourceIdLabel(value) {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) return '-';
+    const labels = /** @type {Record<string, string>} */ ({
+        'openrouter-key-account': 'conta OpenRouter',
+        'cloudflare-workers-ai-account': 'conta Cloudflare Workers AI',
+        'kilo-gateway-account': 'conta Kilo gateway',
+        'runtime-health-rate-limit': 'saúde runtime: limite de taxa',
+    });
+    return labels[normalized] ?? normalized.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
 function renderByokWireLabel(value) {
     const normalized = String(value ?? '').trim();
     if (!normalized) return '-';
@@ -4800,22 +4816,36 @@ async function renderByokGatewayAccounts(println, rest) {
     const snapshot = await store.readSnapshot();
     const catalogOverlays = Array.isArray(snapshot.accountOverlays) ? snapshot.accountOverlays : [];
     const runtimeOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(listByokProviderModelHealth());
-    const accountSummary = summarizeModelGatewayAccountOverlays([...catalogOverlays, ...runtimeOverlays], { selector: args.selector });
-    const statusCounts = Object.entries(accountSummary.summary.statusCounts)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([status, count]) => `${status}:${count}`)
-        .join(',');
-    println(`\n  \x1b[36mBYOK contas e chaves\x1b[0m`);
+    const accountSummary = summarizeModelGatewayAccountOverlays([...catalogOverlays, ...runtimeOverlays], {
+        selector: args.selector,
+    });
+    println('');
+    println(terminalThemeHeadline('accent', 'BYOK contas e chaves'));
     println(
-        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${accountSummary.summary.matched}/${accountSummary.summary.total} · sinais runtime ${runtimeOverlays.length} · provedores ${accountSummary.summary.providers} · estados ${statusCounts || '-'}\x1b[0m\n`,
+        terminalThemeRow(
+            'Catálogo',
+            `${formatTerminalToolPathForOperator(store.filePath)} · filtro ${args.selector ?? '-'} · overlays ${accountSummary.summary.matched}/${accountSummary.summary.total} · sinais runtime ${runtimeOverlays.length} · provedores ${accountSummary.summary.providers}`,
+            { role: 'muted' },
+        ),
+    );
+    println(
+        terminalThemeRow('Estados', renderGatewayCountMap(accountSummary.summary.statusCounts, renderByokTokenLabel), {
+            role: 'muted',
+        }),
     );
     if (accountSummary.rows.length === 0) {
-        println('    \x1b[33mNenhuma conta/key overlay encontrada para o filtro informado.\x1b[0m\n');
+        println(terminalThemeRow('Resultado', 'nenhuma conta/key overlay encontrada para o filtro informado.', { role: 'warn' }));
+        println('');
         return;
     }
     for (const row of accountSummary.rows.slice(0, args.limit)) {
-        const retry = row.resetAt ? `reset ${row.resetAt}` : row.retryAfterSeconds ? `retentar em ${row.retryAfterSeconds}s` : 'reset -';
-        const resetState = row.quotaResetExpired === true ? 'janela expirada' : row.quotaResetActive === true ? 'janela ativa' : null;
+        const retry = row.resetAt
+            ? `reset ${row.resetAt}`
+            : row.retryAfterSeconds
+              ? `retentar em ${row.retryAfterSeconds}s`
+              : 'reset -';
+        const resetState =
+            row.quotaResetExpired === true ? 'janela expirada' : row.quotaResetActive === true ? 'janela ativa' : null;
         const remaining = [
             row.remainingUsd !== null ? `USD restante ${row.remainingUsd}` : null,
             row.remainingCreditsUsd !== null ? `créditos USD ${row.remainingCreditsUsd}` : null,
@@ -4823,17 +4853,34 @@ async function renderByokGatewayAccounts(println, rest) {
         ]
             .filter(Boolean)
             .join(' · ');
+        println(terminalThemeRow('Provedor', row.providerId, { role: row.limitStatus === 'ok' ? 'accent' : 'warn' }));
         println(
-            `    \x1b[33m${row.providerId}\x1b[0m  \x1b[90mescopo ${row.accountScope} · segredo ${row.secretRef ?? '-'} · estado ${row.limitStatus} · ${retry}\x1b[0m`,
+            terminalThemeRow(
+                'Conta',
+                `escopo ${renderByokTokenLabel(row.accountScope)} · segredo ${row.secretRef ?? '-'} · estado ${renderByokTokenLabel(row.limitStatus)} · ${retry}`,
+                { role: row.limitStatus === 'ok' ? 'muted' : 'warn' },
+            ),
         );
         println(
-            `      \x1b[90mfonte ${row.sourceId ?? '-'} · tipo ${renderByokTokenLabel(row.sourceKind)} · confiança ${renderByokTokenLabel(row.confidence)} · frescor ${renderByokTokenLabel(row.freshnessStatus)} · habilitados ${row.enabledModelCount} · bloqueados ${row.blockedModelCount} · ${remaining || 'saldo -'}\x1b[0m`,
+            terminalThemeRow(
+                'Fonte',
+                `${renderByokSourceIdLabel(row.sourceId)} · tipo ${renderByokTokenLabel(row.sourceKind)} · confiança ${renderByokTokenLabel(row.confidence)} · frescor ${renderByokTokenLabel(row.freshnessStatus)}`,
+                { role: 'muted' },
+            ),
+        );
+        println(
+            terminalThemeRow(
+                'Modelos',
+                `habilitados ${row.enabledModelCount} · bloqueados ${row.blockedModelCount} · ${remaining || 'saldo -'}`,
+                { role: 'muted' },
+            ),
         );
     }
     if (accountSummary.rows.length > args.limit) {
-        println(`\n  \x1b[90mexibindo ${args.limit}/${accountSummary.rows.length}; use filtro ou limite numerico.\x1b[0m`);
+        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${accountSummary.rows.length}; use filtro ou limite numerico.`, { role: 'muted' }));
     }
-    println('  \x1b[90mEsta visão é da conta/key e não executa modelo; saúde runtime continua em /byok health.\x1b[0m\n');
+    println(terminalThemeRow('Nota', 'esta visão é da conta/key e não executa modelo; saúde runtime continua em /byok health.', { role: 'muted' }));
+    println('');
 }
 
 /**
@@ -4895,7 +4942,7 @@ async function renderByokGatewayLimits(println, rest) {
         println(
             terminalThemeRow(
                 'Fonte',
-                `${renderByokTokenLabel(row.sourceKind)}:${row.sourceId ?? '-'} · camada ${renderByokTokenLabel(row.sourceLayer)} · falha ${renderByokTokenLabel(row.failureKind)} · segredo ${row.secretRef ?? '-'} · próxima atualização ${row.nextRefreshAfter ?? '-'} · ${money || 'saldo -'}`,
+                `${renderByokTokenLabel(row.sourceKind)} · fonte ${renderByokSourceIdLabel(row.sourceId)} · camada ${renderByokTokenLabel(row.sourceLayer)} · falha ${renderByokTokenLabel(row.failureKind)} · segredo ${row.secretRef ?? '-'} · próxima atualização ${row.nextRefreshAfter ?? '-'} · ${money || 'saldo -'}`,
                 { role: 'muted' },
             ),
         );
@@ -4946,7 +4993,7 @@ function renderByokGatewayQuotaMatrix(println, rest) {
                 { role: 'muted' },
             ),
         );
-        println(terminalThemeRow('Endpoints', row.endpoints.slice(0, 4).join(',') || '-', { role: 'muted' }));
+        println(terminalThemeRow('Endpoints', row.endpoints.slice(0, 4).join(', ') || '-', { role: 'muted' }));
     }
     if (matrix.rows.length > args.limit) {
         println(terminalThemeRow('Mais', `exibindo ${args.limit}/${matrix.rows.length}; use filtro ou limite numerico.`, { role: 'muted' }));

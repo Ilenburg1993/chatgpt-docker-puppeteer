@@ -3135,10 +3135,14 @@ describe('terminal /byok command', () => {
             expect.objectContaining({ selector: 'openrouter' }),
         );
         expect(ctx.output()).toContain('BYOK contas e chaves');
-        expect(ctx.output()).toContain('estado rate_limited');
+        expect(ctx.output()).toContain('estado limitado por taxa');
         expect(ctx.output()).toContain('segredo OPENROUTER_API_KEY');
         expect(ctx.output()).toContain('reset 2026-05-25T00:01:00.000Z');
+        expect(ctx.output()).toContain('conta OpenRouter');
         expect(ctx.output()).toContain('saúde runtime continua em /byok health');
+        expect(ctx.output()).not.toContain('\x1b[');
+        expect(ctx.output()).not.toContain('estado rate_limited');
+        expect(ctx.output()).not.toContain('openrouter-key-account');
     });
 
     it('explica limites account/key ativos e expirados antes do runtime', async () => {
@@ -3163,11 +3167,13 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('próxima atualização 2026-05-25T00:01:00.000Z');
         expect(ctx.output()).toContain('Ação');
         expect(ctx.output()).toContain('aguardar reset do limite ou escolher outra rota');
+        expect(ctx.output()).toContain('conta OpenRouter');
         expect(ctx.output()).toContain('AssistantUsageQuotaSnapshot é quota SDK/Copilot');
         expect(ctx.output()).not.toContain('\x1b[');
         expect(ctx.output()).not.toContain('wait_for_rate_limit_reset_or_choose_another_route');
         expect(ctx.output()).not.toContain('refresh_overlay_or_retry_pre_runtime_selection');
         expect(ctx.output()).not.toContain('not_blocking');
+        expect(ctx.output()).not.toContain('openrouter-key-account');
     });
 
     it('mostra matriz de capacidades de quota por provider sem executar runtime', async () => {
