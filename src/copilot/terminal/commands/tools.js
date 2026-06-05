@@ -50,7 +50,8 @@ function renderLifecycleDiagnosticLine(entry, options = {}) {
     const progress = entry.progress !== null ? ` · ${entry.progress}%` : '';
     const duration = entry.durationMs !== null ? ` · ${Math.max(0, Math.round(entry.durationMs))}ms` : '';
     const visualName = getTerminalHumanToolName(entry.toolName);
-    const technicalName = visualName === entry.toolName ? null : entry.toolName;
+    const normalizedTechnicalName = renderTechnicalToolName(entry.toolName);
+    const technicalName = visualName === normalizedTechnicalName ? null : normalizedTechnicalName;
     const rawName =
         entry.rawToolName && entry.rawToolName !== entry.toolName ? renderSdkRawToolName(entry.rawToolName) : null;
     const operation = entry.operation ? renderLifecycleOperationLabel(entry.operation) : null;
@@ -594,6 +595,8 @@ function renderToolDiagnosticName(name) {
  * @returns {string}
  */
 function renderTechnicalToolName(name) {
+    if (name === 'report_intent' || name === 'report_intent_local') return getTerminalHumanToolName(name);
+    if (name === 'request_user_input' || name === 'ask_user') return getTerminalHumanToolName(name);
     return name;
 }
 
@@ -603,7 +606,7 @@ function renderTechnicalToolName(name) {
  */
 function renderSdkRawToolName(name) {
     const visualName = getTerminalHumanToolName(name);
-    return visualName === name ? `SDK ${name}` : `SDK ${visualName} (${name})`;
+    return visualName === name ? 'SDK tool' : `SDK ${visualName}`;
 }
 
 /**

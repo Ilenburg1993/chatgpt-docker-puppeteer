@@ -737,7 +737,8 @@ describe('commands/tools', () => {
         expect(output).toContain('diagnóstico completo');
         expect(output).toContain('Nome interno');
         expect(output).toContain('read_file_content');
-        expect(output).toContain('SDK Intenção capturada (report_intent)');
+        expect(output).toContain('SDK Intenção capturada');
+        expect(output).not.toContain('report_intent');
         expect(output).toContain('Rastreio');
         expect(output).toContain('call call-1234567…');
         expect(output).toContain('req req-12345678…');
