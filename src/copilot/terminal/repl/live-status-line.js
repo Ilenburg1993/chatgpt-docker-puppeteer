@@ -110,6 +110,7 @@ function renderLivePhaseLabel(phase) {
     if (phase === 'question') return 'aguardando operador';
     if (phase === 'task') return 'tarefa';
     if (phase === 'compaction') return 'compactando';
+    if (phase === 'model') return 'modelo';
     if (phase === 'error') return 'erro';
     return 'trabalhando';
 }
@@ -288,6 +289,23 @@ function isByokProviderErrorActivity(activity) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {{ state: string; transition: string }}
+ */
+function renderModelActivityCompact(activity) {
+    const text = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase();
+    const detail = String(activity.detail ?? '').trim();
+    const match = detail.match(
+        /^(?<state>solicitado|confirmado(?:\s+sem\s+troca)?|fallback\s+aplicado):\s*(?<transition>[^·]+)/iu,
+    );
+    const transition = compactLiveStatusText(match?.groups?.['transition'] ?? activity.label ?? 'modelo', 34);
+    if (text.includes('fallback')) return { state: 'fallback modelo', transition };
+    if (text.includes('confirmad')) return { state: 'modelo confirmado', transition };
+    if (text.includes('adiad')) return { state: 'modelo adiado', transition };
+    return { state: 'modelo solicitado', transition };
+}
+
+/**
  * @param {{
  *     activity?: ReturnType<typeof readTerminalActivitySnapshot>;
  *     runtime?: ReturnType<typeof readTerminalRuntimeState>;
@@ -371,6 +389,16 @@ function buildTerminalLiveStatusLine(input = {}) {
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText('warn', 'erro')}` +
             `${terminalThemeText('muted', ` · rota BYOK · ${formatLiveDuration(ageMs)}`)}` +
+            '\x1b[K'
+        );
+    }
+    if (activity.phase === 'model') {
+        const modelActivity = renderModelActivityCompact(activity);
+        return (
+            `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+            `${terminalThemeText(severityRole, modelActivity.state)}` +
+            `${terminalThemeText('info', ` · ${modelActivity.transition}`)}` +
+            `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)}${queue}`)}` +
             '\x1b[K'
         );
     }

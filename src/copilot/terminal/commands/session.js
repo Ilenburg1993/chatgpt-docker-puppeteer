@@ -438,6 +438,7 @@ function renderLivePhaseLabel(value) {
     if (phase === 'thinking') return 'pensando';
     if (phase === 'streaming') return 'respondendo';
     if (phase === 'tool') return 'ferramenta';
+    if (phase === 'model') return 'modelo';
     if (phase === 'ask' || phase === 'user-input') return 'pergunta';
     if (phase === 'error') return 'erro';
     return phase || 'atividade';

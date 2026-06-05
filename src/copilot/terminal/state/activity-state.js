@@ -22,6 +22,7 @@ const FOCUSED_ACTIVITY_MAX_AGE_MS = 10 * 60_000;
  *     | 'compaction'
  *     | 'question'
  *     | 'subagent'
+ *     | 'model'
  *     | 'system'
  *     | 'error'} TerminalActivityPhase
  */
@@ -123,7 +124,8 @@ function isTerminalActivityCompletion(phase, label) {
         normalized.includes('encerrad') ||
         normalized.includes('respondid') ||
         normalized.includes('aprovad') ||
-        normalized.includes('rejeitad')
+        normalized.includes('rejeitad') ||
+        normalized.includes('confirmad')
     );
 }
 
@@ -142,6 +144,7 @@ function isFocusableTerminalActivityPhase(phase) {
         phase === 'compaction' ||
         phase === 'question' ||
         phase === 'subagent' ||
+        phase === 'model' ||
         phase === 'error'
     );
 }

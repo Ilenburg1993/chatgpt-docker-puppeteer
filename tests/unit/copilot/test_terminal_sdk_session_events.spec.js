@@ -367,12 +367,12 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             reasoningEffort: 'high',
         });
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
-            'system',
+            'model',
             'Modelo SDK confirmado',
             expect.objectContaining({
                 detail: expect.stringContaining('confirmado: auto → gpt-5.4 · raciocínio high · origem SDK · 20'),
                 recordHistory: true,
-                updateCurrent: false,
+                updateCurrent: true,
             }),
         );
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Modelo SDK'));

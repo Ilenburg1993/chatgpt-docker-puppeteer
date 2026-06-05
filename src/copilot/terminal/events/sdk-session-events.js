@@ -83,6 +83,7 @@ import {
     readTerminalToolRegistrySnapshot,
 } from '../frontend/gateways/index.js';
 import { observeTerminalModelChangeProjection } from '../frontend/projections/index.js';
+import { consumeTerminalLiveByokModelSwitchConfirmation } from '../byok/live-model-switch.js';
 import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
 import {
     appendTerminalTranscriptTurn,
@@ -1288,12 +1289,16 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const newModel = evt?.newModel ?? 'unknown';
         const reasoningEffort = evt?.reasoningEffort ?? null;
         const changed = previousModel !== newModel;
+        const matchedRequest = consumeTerminalLiveByokModelSwitchConfirmation({ previousModel, newModel });
         const presentation = buildTerminalModelTransitionPresentation({
             from: previousModel,
             to: newModel,
             kind: changed ? 'confirmed' : 'unchanged',
             reasoningEffort,
             source: 'SDK',
+            reason: matchedRequest
+                ? `confirma pedido ${matchedRequest.source} de ${new Date(matchedRequest.requestedAt).toISOString()}`
+                : null,
         });
         observeTerminalModelChangeProjection({ previousModel, newModel, reasoningEffort });
         void recordModelGatewaySdkSessionConfirmation(previousModel, newModel, reasoningEffort).catch((error) => {
@@ -1304,13 +1309,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 recordHistory: false,
             });
         });
-        recordTerminalActivity('system', changed ? 'Modelo SDK confirmado' : 'Modelo SDK reconfirmado', {
+        recordTerminalActivity('model', changed ? 'Modelo SDK confirmado' : 'Modelo SDK reconfirmado', {
             detail: presentation.detail,
             source: 'sdk',
             recordHistory: changed,
-            updateCurrent: false,
+            updateCurrent: changed,
         });
-        if (changed || shouldPrintSessionNarration('verbose')) {
+        const shouldPrintModelTransition = (changed && !matchedRequest) || shouldPrintSessionNarration('verbose');
+        if (shouldPrintModelTransition) {
             println(
                 `\n${renderTerminalModelTransitionRow({
                     from: previousModel,
@@ -1330,6 +1336,15 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                     newModel,
                     reasoningEffort,
                     operatorSummary: presentation.detail,
+                    matchedTerminalRequest: matchedRequest
+                        ? {
+                              model: matchedRequest.model,
+                              previousModel: matchedRequest.previousModel,
+                              source: matchedRequest.source,
+                              reason: matchedRequest.reason,
+                              requestedAt: new Date(matchedRequest.requestedAt).toISOString(),
+                          }
+                        : null,
                 },
                 'sdk/session.model_changed',
             ),

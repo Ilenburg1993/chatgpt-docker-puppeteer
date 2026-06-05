@@ -3244,6 +3244,8 @@ function operatorUxCycleCriteria(boot) {
     const attachAddStart = commandStart('/attach src/copilot/terminal/commands/workspace-index.js', Math.max(0, attachEmptyStart + 1));
     const mailboxStart = commandStart('/mailbox clear');
     const modelListStart = commandStart('/model list');
+    const byokModelStart = commandStart('/byok model terminal-ux-boundary-fixture');
+    const activityAfterByokModelStart = commandStart('/activity 10', Math.max(0, byokModelStart + 1));
     const sdkModelsStart = commandStart('/sdk models');
     const workspaceStart = commandStart('/workspace list');
     const liveStart = commandStart('/live');
@@ -3259,6 +3261,8 @@ function operatorUxCycleCriteria(boot) {
         attachAddStart,
         mailboxStart,
         modelListStart,
+        byokModelStart,
+        activityAfterByokModelStart,
         sdkModelsStart,
         workspaceStart,
         liveStart,
@@ -3280,6 +3284,8 @@ function operatorUxCycleCriteria(boot) {
         surfaceAt(attachAddStart),
         surfaceAt(mailboxStart),
         surfaceAt(modelListStart),
+        surfaceAt(byokModelStart),
+        surfaceAt(activityAfterByokModelStart),
         surfaceAt(sdkModelsStart),
         surfaceAt(workspaceStart),
         surfaceAt(liveStart),
@@ -3330,6 +3336,24 @@ function operatorUxCycleCriteria(boot) {
             detail: '/model list, /sdk models, /workspace list and /live rendered in one PTY session',
         },
         {
+            id: 'operator-ux-byok-model-live-state',
+            pass:
+                /Modelo vivo\s+solicitado\s+[\s\S]{0,140}terminal-ux-boundary-fixture/iu.test(
+                    surfaceAt(byokModelStart),
+                ) &&
+                /Confirmação\s+aguarde\s+session\.model_changed\s+ou próximo uso observado/iu.test(
+                    surfaceAt(byokModelStart),
+                ) &&
+                /Atividade Atual da LLM-B[\s\S]{0,500}Troca de modelo solicitada/iu.test(
+                    surfaceAt(activityAfterByokModelStart),
+                ) &&
+                /Estado\s+modelo/iu.test(surfaceAt(activityAfterByokModelStart)) &&
+                !/Estado\s+model\b|provider-boundary|binding de nascimento|binding da sessão viva|provider BYOK/iu.test(
+                    `${surfaceAt(byokModelStart)}\n${surfaceAt(activityAfterByokModelStart)}`,
+                ),
+            detail: '/byok model rendered a live model request, confirmation guidance and model activity state',
+        },
+        {
             id: 'operator-ux-no-stale-copy',
             pass: !staleCopyPattern.test(operationalSurface),
             detail: 'operator command surfaces avoided old mechanical plurals, raw index fields and stale English banners',
@@ -3357,6 +3381,12 @@ async function runOperatorUxCycleLiveTest({ outDir, requestedTransport, timeoutM
             },
             { line: '/mailbox clear', waitFor: 'Fila de intervenção', advanceAfterMs: 1_500 },
             { line: '/model list', waitFor: /Modelos disponíveis|Nenhum modelo retornado pelo SDK/u, advanceAfterMs: 1_500 },
+            {
+                line: '/byok model terminal-ux-boundary-fixture',
+                waitFor: /Modelo vivo|Troca modelo|Sessão viva/u,
+                advanceAfterMs: 1_500,
+            },
+            { line: '/activity 10', waitFor: 'Atividade Atual da LLM-B', advanceAfterMs: 1_500 },
             { line: '/sdk models', waitFor: 'Modelos SDK', advanceAfterMs: 2_500 },
             { line: '/workspace list', waitFor: 'Workspace SDK virtual', advanceAfterMs: 1_500 },
             { line: '/live', waitFor: 'Fluxo da conversa', advanceAfterMs: 1_500 },

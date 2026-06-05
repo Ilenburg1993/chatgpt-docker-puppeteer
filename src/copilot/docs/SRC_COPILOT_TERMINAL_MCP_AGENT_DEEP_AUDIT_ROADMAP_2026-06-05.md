@@ -138,8 +138,8 @@
 - [ ] B.3 Mapear eventos SDK/Agent/MCP/SSE para taxonomia comum.
 - [ ] B.4 Unificar labels humanos em um glossario compartilhado.
 - [ ] B.5 Garantir timestamp ISO 8601 completo em eventos persistidos.
-- [ ] B.6 Garantir que linha viva use a mesma taxonomia dos eventos persistidos.
-- [ ] B.7 Remover parse ad-hoc duplicado onde presenter comum ja cobre.
+- [x] B.6 Garantir que linha viva use a mesma taxonomia dos eventos persistidos.
+- [x] B.7 Remover parse ad-hoc duplicado onde presenter comum ja cobre.
 - [ ] B.8 Criar testes para cada papel visual: user, assistant, thinking, tool, io, warning, error, model.
 - [ ] B.9 Garantir que raw/detail continuem contendo IDs completos.
 - [ ] B.10 Criar snapshot textual de UX para regressao.
@@ -149,16 +149,17 @@
 
 - [x] C.1 Confirmar existencia de `live-status-line.js`.
 - [x] C.2 Confirmar truncamento single-line sem quebrar ANSI.
-- [x] C.3 Confirmar fases existentes: idle, boot, tool, turn, thinking, streaming, question, task, compaction, error.
+- [x] C.3 Confirmar fases existentes: idle, boot, tool, turn, thinking, streaming, question, task, compaction, model, error.
 - [ ] C.4 Auditar quais eventos nao atualizam activity atual.
 - [ ] C.5 Garantir que READ/LIST/SEARCH/DIFF/EXEC/PATCH/MOVE/DELETE aparecam com alvo.
 - [ ] C.6 Garantir que ask_user substitua heartbeat generico por estado claro de espera humana.
 - [ ] C.7 Garantir que delta publico mude estado para respondendo no primeiro chunk.
-- [ ] C.8 Garantir que troca de modelo apareca na linha viva como estado transitorio.
+- [x] C.8 Garantir que troca de modelo apareca na linha viva como estado transitorio.
 - [ ] C.9 Garantir que cooldown/rate limit de provider apareca de modo compacto.
 - [x] C.10 Criar live visual com captura de terminal igual ao operador.
 - [x] C.11 Deduplicar pulsos identicos imediatos da linha viva na borda fisica `writeInlineStatus`, reduzindo repeticao visual sem perder eventos estruturados.
 - [x] C.12 Impedir que telemetria normal de `llm.usage` BYOK substitua o estado vivo de tool/turn; apenas mismatch vira alerta foreground.
+- [x] C.13 Criar fase `model` no `activity-state` e render compacto `modelo solicitado/confirmado` na linha viva.
 
 ## Faixa D - Tools Local/MCP/SDK como UX Unica
 
@@ -222,13 +223,16 @@
 - [x] H.1 Confirmar presenter de transicao de modelo.
 - [x] H.2 Confirmar normalizer de `session.model_changed`.
 - [x] H.3 Confirmar `/byok model` diferencia sessao preparada e sessao viva.
-- [ ] H.4 Auditar fluxo completo: comando -> request live switch -> SDK -> evento -> terminal -> proximo turno.
+- [x] H.4 Auditar fluxo completo: comando -> request live switch -> SDK -> evento -> terminal -> proximo turno.
 - [ ] H.5 Registrar modelo observado por turno em projection compartilhada.
 - [ ] H.6 Garantir mismatch preparado/vivo como estado aguardando confirmacao, nao erro.
 - [ ] H.7 Garantir que fallback BYOK nao caia em Copilot auto quando a policy bloquear.
 - [ ] H.8 Garantir que Ollama/local nao entre em default selector sem pedido explicito.
 - [ ] H.9 Criar live de troca real de modelo com confirmacao.
 - [ ] H.10 Criar live de fallback/erro de provider com UX clara.
+- [x] H.11 Separar core puro de apresentacao de transicao de modelo do renderer visual, evitando acoplamento BYOK -> UI/config.
+- [x] H.12 Correlacionar pedido local/auto de modelo vivo com `session.model_changed` posterior em detalhe/SSE.
+- [x] H.13 Evitar que confirmacao SDK correlacionada invada o prompt/input; a confirmacao fica em activity, `/live` e SSE.
 
 ## Faixa I - Model Gateway e Pre-Runtime como Fonte de UX
 
@@ -335,6 +339,8 @@
 - [x] Gap 16: terminal confiava visualmente em claims publicos de tool; agora `assistant-tool-claim-audit` compara resposta publica com o ledger recente e emite warning/SSE quando falta lifecycle comprovado.
 - [x] Gap 17: recuperação automática pós-tools podia sair da allowlist do pedido original (`exec_command` em live de file tools); prompt de recovery agora injeta allowlist/pergunta exata e runner detecta `ask_user` divergente.
 - [x] Gap 18: linha viva podia mostrar `Uso BYOK sem pedido premium` como trabalho atual durante tool/turn; uso normal agora é observação/background, mantendo mismatch como alerta.
+- [x] Gap 19: troca de modelo tinha linguagem paralela entre `/byok model`, automação e `session.model_changed`; agora há core puro compartilhado, fase `model` e correlação request -> confirmação SDK.
+- [x] Gap 20: live pass3 mostrou `Modelo SDK confirmado` assíncrono entre prompt e comando seguinte; confirmações correlacionadas agora não imprimem linha solta no prompt.
 
 ## 08. Criterio de Marco
 
@@ -373,4 +379,9 @@
 - [x] 2026-06-05: `buildToolOnlyRecoveryPrompt()` agora preserva allowlist original de tools e pergunta exata de `ask_user`; runner live também bloqueia pergunta divergente com diagnóstico próprio.
 - [x] 2026-06-05: reexecutado live `file-patch-roundtrip` pass7 em PTY; status PASS, scratch limpo, `delete_file` real renderizado como `EXCLUIR`, `ask_user` exato, resposta pós-SIM materializada e export/SSE correlacionados.
 - [x] 2026-06-05: `llm.usage` BYOK sem premium request deixou de tomar a atividade corrente; a linha viva permanece em tool/turn enquanto usage segue em SSE, `/usage` e histórico quando habilitado.
+- [x] 2026-06-05: adicionada fase `model` ao `activity-state`; pedido de `/byok model` e automação model-gateway agora entram como estado vivo compacto sem substituir tool/turn por telemetria de uso.
+- [x] 2026-06-05: extraído `model-transition-presentation.js` como core puro; o presenter visual segue como renderer, e BYOK deixa de importar UI/config para gerar detalhes canônicos.
+- [x] 2026-06-05: `session.model_changed` consome pedido vivo pendente quando confirma o mesmo modelo, registrando `matchedTerminalRequest` no SSE e mantendo ISO 8601 completo no detalhe.
+- [x] 2026-06-05: runner `operator-ux-cycle` passou a exercitar `/byok model terminal-ux-boundary-fixture` e `/activity 10`, exigindo `Estado modelo` e rejeitando `Estado model`.
+- [x] 2026-06-05: live `terminal-ux-operator-model-switch` pass3 encontrou interferência visual de confirmação SDK no prompt; pass4 PASS confirmou `/sdk models` limpo, `/activity` com `Estado modelo` e `/live` com confirmação correlacionada.
 - [ ] 2026-06-05: melhorar estado visual/diagnostico para continuacao pos-`ask_user` lenta ou falha BYOK sem mensagem estruturada.

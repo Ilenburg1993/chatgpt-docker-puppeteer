@@ -558,6 +558,34 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(42);
     });
 
+    it('mostra troca de modelo como estado vivo curto e operacional', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'model',
+            label: 'Troca de modelo solicitada',
+            detail:
+                'solicitado: old-model → openai/gpt-oss-120b · solicitação manual /byok model · origem terminal.byok_model · 2026-05-08T01:00:00.000Z · aguardando confirmação session.model_changed ou próximo uso observado',
+            source: 'terminal.byok_model',
+            severity: 'info',
+            toolName: null,
+            toolTarget: null,
+            startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
+        };
+        mocks.runtime = { ...mocks.runtime, status: 'idle', dialogLoopActive: true };
+
+        const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:04.000-03:00') });
+
+        expect(line).toContain('modelo solicitado');
+        expect(line).toContain('old-model → openai/gpt-oss-120b');
+        expect(line).toContain('4s');
+        expect(line).not.toContain('session.model_changed');
+        expect(line).not.toContain('2026-05-08T01:00:00.000Z');
+        expect(line).not.toContain('raciocínio xhigh');
+        expect(line.length).toBeLessThan(80);
+    });
+
     it('mantém ask_user humano formatável, mas fora do pulso periódico para não disputar o input', async () => {
         const { shouldRenderTerminalLiveStatusLine, formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');

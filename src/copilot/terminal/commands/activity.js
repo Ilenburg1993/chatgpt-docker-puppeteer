@@ -83,6 +83,7 @@ function renderActivityPhaseLabel(phase) {
     if (phase === 'system') return 'sistema';
     if (phase === 'compaction') return 'compactação';
     if (phase === 'subagent') return 'subagente';
+    if (phase === 'model') return 'modelo';
     if (phase === 'error') return 'erro';
     return phase;
 }

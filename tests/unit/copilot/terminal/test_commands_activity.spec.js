@@ -224,6 +224,59 @@ describe('terminal/commands/activity', () => {
         );
     });
 
+    it('humaniza fase de modelo sem vazar enum cru', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'model',
+                label: 'Troca de modelo solicitada',
+                detail:
+                    'solicitado: kilo-auto/free → terminal-ux-boundary-fixture · solicitação manual /byok model · origem terminal.byok_model · 2026-06-05T05:50:42.410Z',
+                source: 'terminal.byok_model',
+                severity: 'info',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 1200,
+            },
+            history: [
+                {
+                    phase: 'model',
+                    label: 'Troca de modelo solicitada',
+                    detail: 'solicitado: kilo-auto/free → terminal-ux-boundary-fixture',
+                    source: 'terminal.byok_model',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 1200,
+                    ts: 2,
+                },
+            ],
+            turnTrace: {
+                current: null,
+                recent: [],
+            },
+            streamDiagnostics: {
+                active: false,
+                pendingDeltas: 0,
+                pendingReasoning: 0,
+                pendingToolEvents: 0,
+                lastFlushAt: null,
+                lastDeltaAt: null,
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '5');
+
+        expect(ctx.output()).toMatch(/Estado\s+modelo/u);
+        expect(ctx.output()).toContain('Troca de modelo solicitada');
+        expect(ctx.output()).not.toMatch(/Estado\s+model\b/u);
+        expect(ctx.output()).not.toContain('terminal.byok_model');
+    });
+
     it('não chama trace concluído recente de turno atual quando não há current ativo', () => {
         vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
             current: {
