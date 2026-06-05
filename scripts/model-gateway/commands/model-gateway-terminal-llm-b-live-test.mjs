@@ -2827,7 +2827,7 @@ function defaultUxCycleCriteria(boot) {
             id: 'ux-cycle-byok-boundary-human',
             pass:
                 /BYOK status[\s\S]*Preparada[\s\S]*Sessão viva[\s\S]*Fronteira/iu.test(byokStatusSurface) &&
-                (/(?:Sessão atual usa outro provedor\/perfil[\s\S]*modelo preparado para o próximo boot[\s\S]*sem troca cruzada na conversa viva)|(?:Modelo vivo[\s\S]*solicitado[\s\S]*Confirmação[\s\S]*(?:session\.model_changed|modelo efetivo))/iu.test(
+                (/(?:Sessão atual usa outro provedor\/perfil[\s\S]*modelo preparado para o próximo boot[\s\S]*sem troca cruzada na conversa viva)|(?:Modelo vivo[\s\S]*solicitado[\s\S]*Confirmação[\s\S]*(?:confirmação do SDK|modelo efetivo))/iu.test(
                     byokModelOutcomeSurface,
                 )) &&
                 /BYOK status[\s\S]*(seleção preparada cruza provedor ou perfil da sessão atual|seleção preparada e sessão BYOK atual estão alinhadas|modelo preparado confirmado no runtime vivo; vínculo de boot original permanece até nova sessão|rota BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação|sem sessão SDK viva)/iu.test(
@@ -2848,7 +2848,7 @@ function defaultUxCycleCriteria(boot) {
                 /Modelo vivo\s+solicitado\s+[\s\S]{0,120}→\s*terminal-ux-boundary-fixture/iu.test(
                     byokModelOutcomeSurface,
                 ) &&
-                /Confirmação\s+aguarde\s+session\.model_changed\s+ou próximo uso observado/iu.test(
+                /Confirmação\s+aguarde\s+confirmação do SDK\s+ou próximo uso observado/iu.test(
                     byokModelOutcomeSurface,
                 ) &&
                 /Atividade Atual da LLM-B[\s\S]*Troca de modelo solicitada/iu.test(byokModelActivitySurface) &&
@@ -3341,7 +3341,7 @@ function operatorUxCycleCriteria(boot) {
                 /Modelo vivo\s+solicitado\s+[\s\S]{0,140}terminal-ux-boundary-fixture/iu.test(
                     surfaceAt(byokModelStart),
                 ) &&
-                /Confirmação\s+aguarde\s+session\.model_changed\s+ou próximo uso observado/iu.test(
+                /Confirmação\s+aguarde\s+confirmação do SDK\s+ou próximo uso observado/iu.test(
                     surfaceAt(byokModelStart),
                 ) &&
                 /Atividade Atual da LLM-B[\s\S]{0,500}Troca de modelo solicitada/iu.test(

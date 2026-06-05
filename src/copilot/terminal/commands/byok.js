@@ -450,7 +450,7 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
         println(
             terminalThemeRow(
                 'Confirmação',
-                'aguarde session.model_changed ou próximo uso observado para confirmar o modelo efetivo',
+                'aguarde confirmação do SDK ou próximo uso observado para confirmar o modelo efetivo',
                 { role: 'muted' },
             ),
         );
@@ -4562,7 +4562,7 @@ async function applyByokGatewayAutoEffects(println, controllerStep) {
             println(
                 terminalThemeRow(
                     'Confirmação',
-                    'aguarde session.model_changed ou próximo uso observado para confirmar o modelo efetivo',
+                    'aguarde confirmação do SDK ou próximo uso observado para confirmar o modelo efetivo',
                     { role: 'muted' },
                 ),
             );

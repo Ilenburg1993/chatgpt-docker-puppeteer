@@ -40,7 +40,7 @@ function renderLiveModelSwitchRequestDetail(previousModel, currentModel, reason,
         reason,
         source,
     });
-    return `${presentation.detail} · aguardando confirmação session.model_changed ou próximo uso observado`;
+    return `${presentation.detail} · aguardando confirmação do SDK ou próximo uso observado`;
 }
 
 /**

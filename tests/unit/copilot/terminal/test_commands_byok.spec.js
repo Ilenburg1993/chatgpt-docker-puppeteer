@@ -3500,7 +3500,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('Auto apply');
         expect(ctx.output()).toContain('modelo vivo solicitado old-model → openai/gpt-oss-120b');
         expect(ctx.output()).toContain('Confirmação');
-        expect(ctx.output()).toContain('session.model_changed');
+        expect(ctx.output()).toContain('confirmação do SDK');
         expect(readTerminalActivityHistory()).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
@@ -4456,7 +4456,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('Modelo vivo');
         expect(ctx.output()).toContain('solicitado kilo-auto/free → anthropic/claude-sonnet-4.5');
         expect(ctx.output()).toContain('Confirmação');
-        expect(ctx.output()).toContain('session.model_changed');
+        expect(ctx.output()).toContain('confirmação do SDK');
         expect(readTerminalActivityHistory(5)).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({

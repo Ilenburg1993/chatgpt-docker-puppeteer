@@ -353,6 +353,7 @@
 - [x] Gap 26: prompt idle podia reaparecer entre resumo de tools e transcript final quando `assistant.turn_end` chegava antes da materialização final; agora redraw considera materialização ativa, não apenas `busy`.
 - [x] Gap 27: `/events` default ainda mostrava limpeza interna de sessões SDK (`session.deleted`); agora lifecycle rotineiro fica em filtros explícitos/raw/json.
 - [x] Gap 28: continuação pós-`ask_user` usava estado genérico de resposta humana e recuperação automática mínima; agora há presenter compartilhado para aguardando continuação, auto-retomada e diagnóstico.
+- [x] Gap 29: superfícies humanas de troca de modelo ainda citavam `session.model_changed`; agora falam em confirmação do SDK/uso observado, mantendo o nome cru apenas em SSE, adapters e inspeção técnica.
 
 ## 08. Criterio de Marco
 
@@ -415,3 +416,4 @@
 - [x] 2026-06-05: recuperação automática pós-pergunta vazia agora usa `buildEmptyAfterUserInputAutoRecoveryRows`, exibindo estado, ação, resposta, turno, diagnóstico e alternativa de troca de modelo.
 - [x] 2026-06-05: validado com `test_dialog_recovery_presenter`, `test_terminal_sdk_session_events`, `test_live_status_line`, `test_terminal_agent_wiring` e `test_commands_events`.
 - [x] 2026-06-05: revisada a trilha BYOK sem mensagem estruturada; a cobertura existente já humaniza `agent.error`/`session.error`, mantém linha viva compacta e evita fallback Copilot automático, ficando pendente apenas cenário live adversarial dedicado.
+- [x] 2026-06-05: `/byok model`, auto-apply do model-gateway e o runner live passaram a usar `confirmação do SDK ou próximo uso observado`; `session.model_changed` permanece como contrato técnico de SSE/event adapter, não como texto padrão ao operador.

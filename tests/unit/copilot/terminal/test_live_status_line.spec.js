@@ -566,7 +566,7 @@ describe('terminal/live-status-line', () => {
             phase: 'model',
             label: 'Troca de modelo solicitada',
             detail:
-                'solicitado: old-model → openai/gpt-oss-120b · solicitação manual /byok model · origem terminal.byok_model · 2026-05-08T01:00:00.000Z · aguardando confirmação session.model_changed ou próximo uso observado',
+                'solicitado: old-model → openai/gpt-oss-120b · solicitação manual /byok model · origem terminal.byok_model · 2026-05-08T01:00:00.000Z · aguardando confirmação do SDK ou próximo uso observado',
             source: 'terminal.byok_model',
             severity: 'info',
             toolName: null,
@@ -581,6 +581,7 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('old-model → openai/gpt-oss-120b');
         expect(line).toContain('4s');
         expect(line).not.toContain('session.model_changed');
+        expect(line).not.toContain('confirmação do SDK');
         expect(line).not.toContain('2026-05-08T01:00:00.000Z');
         expect(line).not.toContain('raciocínio xhigh');
         expect(line.length).toBeLessThan(80);
