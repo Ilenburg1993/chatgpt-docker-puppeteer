@@ -400,6 +400,8 @@
 - [x] Gap 73: `/activity` chamava trace local `implicit:*` de `Resumo do turno atual`, confundindo I/O local com conversa da LLM-B; agora traces implícitos/fonte I/O aparecem como `Atividade operacional atual` ou `Atividade operacional recente`.
 - [x] Gap 74: `/session sdk` podia mostrar `Atual sessão não listada nesta página` e `BYOK pronto BYOK · ...`, soando como paginação interna e duplicando a sigla; agora usa `ativa fora desta página` e label `Preparado`.
 - [x] Gap 75: `/live full` ainda chamava trace local `implicit:*` de `Turno observado`/`turno ativo`, divergindo de `/activity`; agora ambos usam presenter compartilhado para distinguir atividade operacional de turno conversacional.
+- [x] Gap 76: `/fs` ainda expunha labels ingleses `FS search`, `I/O read`, `I/O write`, `I/O search` e `resultados`; agora usa `Busca`, `Resultados` e row `I/O` com operação humana (`leitura`, `escrita`, `busca`).
+- [x] Gap 77: `/tools diag` e `/sdk doctor` ainda usavam `Shell legado`/`Workspace SDK` como labels ambíguos; agora distinguem `Workspace via SDK` e `Terminal SDK legado`.
 
 ## 08. Criterio de Marco
 
@@ -513,3 +515,6 @@
 - [x] 2026-06-05: `/session sdk` passou a renderizar sessão viva fora da janela como `ativa fora desta página` e a seleção BYOK preparada como row `Preparado`, removendo duplicação visual `BYOK pronto BYOK`; `test_commands_session` e critérios live foram atualizados.
 - [x] 2026-06-05: criado `turn-trace-presentation.js` para classificar traces implícitos operacionais; `/live` agora usa `Fluxo operacional`, `atividade operacional`, `Ações` e `Atividade operacional observada` quando não há turno real da LLM-B.
 - [x] 2026-06-05: live `diagnostic-ux-cycle` primeiro falhou em `artifacts/terminal-live/2026-06-05T12-09-58-254Z/summary.md` por critério antigo; após alinhar o harness, PASS em `artifacts/terminal-live/2026-06-05T12-11-49-995Z/summary.md`.
+- [x] 2026-06-05: `/fs create/read/search/preview` passou a renderizar operações I/O com labels humanos em português; `test_commands_fs` e `diagnostic-ux-cycle` foram alinhados para reprovar os labels antigos.
+- [x] 2026-06-05: `/tools diag` e `/sdk doctor` passaram a usar labels de superfície mais precisos para workspace virtual e shell SDK legado; recorte `fs/tools/sdk` passou com 58 testes.
+- [x] 2026-06-05: live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T12-21-58-535Z/summary.md`, confirmando labels `/fs` humanizados, superfícies operacionais renomeadas e harness sem falso positivo sobre o comando `/fs search`.

@@ -46,8 +46,11 @@ describe('terminal/commands/fs', () => {
 
         const create = mockCtx();
         await cmdFs(create, `create ${fileRel} ${token} alpha beta`);
-        expect(create.output()).toContain('FS local criado');
-        expect(create.output()).toContain('I/O write');
+        expect(create.output()).toContain('FS local');
+        expect(create.output()).toContain(`criado · ${fileRel}`);
+        expect(create.output()).toContain('I/O');
+        expect(create.output()).toContain('escrita · motor io-engine.atomic-write');
+        expect(create.output()).not.toContain('I/O write');
         expectNoAnsi(create.output());
         await expect(readFile(join(WORKSPACE, fileRel), 'utf8')).resolves.toContain(token);
 
@@ -57,7 +60,7 @@ describe('terminal/commands/fs', () => {
         expect(read.output()).toContain(`Arquivo       ${fileRel} · (FS local)`);
         expect(read.output()).not.toContain(`${WORKSPACE}/`);
         expect(read.output()).toContain(token);
-        expect(read.output()).toContain('motor io-engine.fs.readFile.text');
+        expect(read.output()).toContain('leitura · motor io-engine.fs.readFile.text');
         expectNoAnsi(read.output());
 
         const list = mockCtx();
@@ -69,12 +72,15 @@ describe('terminal/commands/fs', () => {
 
         const search = mockCtx();
         await cmdFs(search, `search ${token} ${tmpRel}`);
-        expect(search.output()).toContain('FS search');
+        expect(search.output()).toContain('Busca');
+        expect(search.output()).not.toContain('FS search');
         expect(search.output()).toContain(`${fileRel}:1:${token}`);
         expect(search.output()).not.toContain(`${WORKSPACE}/`);
         expect(search.output()).toContain(token);
-        expect(search.output()).toContain('I/O search');
-        expect(search.output()).toContain('resultados');
+        expect(search.output()).toContain('busca · motor io-engine.rg.search');
+        expect(search.output()).not.toContain('I/O search');
+        expect(search.output()).toContain('Resultados');
+        expect(search.output()).not.toContain('resultados');
         expect(search.output()).not.toContain('matches=');
         expectNoAnsi(search.output());
     });
@@ -108,7 +114,8 @@ describe('terminal/commands/fs', () => {
         const write = mockCtx();
         await cmdFs(write, `write ${fileRel} second value`);
 
-        expect(write.output()).toContain('FS local escrito');
+        expect(write.output()).toContain('FS local');
+        expect(write.output()).toContain(`escrito · ${fileRel}`);
         await expect(readFile(join(WORKSPACE, fileRel), 'utf8')).resolves.toBe('second value');
     });
 
@@ -137,7 +144,7 @@ describe('terminal/commands/fs', () => {
 
         expect(read.output()).toContain('Preview');
         expect(read.output()).toContain('linha-alpha');
-        expect(read.output()).toContain('I/O read');
+        expect(read.output()).toContain('leitura · motor io-engine.fs.readFile.text');
         expectNoAnsi(read.output());
     });
 

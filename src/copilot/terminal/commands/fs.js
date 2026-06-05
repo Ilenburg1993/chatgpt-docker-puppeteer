@@ -109,7 +109,22 @@ function ioSummary(result) {
     const engine = typeof io['engine'] === 'string' ? io['engine'] : null;
     const operation = typeof io['operation'] === 'string' ? io['operation'] : null;
     if (!engine && !operation) return '';
-    return terminalThemeRow(`I/O ${operation ?? '-'}`, `motor ${engine ?? '-'}`, { role: 'muted' });
+    return terminalThemeRow('I/O', `${renderIoOperationLabel(operation)} · motor ${engine ?? '-'}`, { role: 'muted' });
+}
+
+/**
+ * @param {string | null} operation
+ * @returns {string}
+ */
+function renderIoOperationLabel(operation) {
+    if (operation === 'read') return 'leitura';
+    if (operation === 'write') return 'escrita';
+    if (operation === 'search') return 'busca';
+    if (operation === 'mkdir') return 'criação de pasta';
+    if (operation === 'scan') return 'varredura';
+    if (operation === 'patch') return 'edição';
+    if (operation === 'delete' || operation === 'unlink') return 'remoção';
+    return operation ?? '-';
 }
 
 /**
@@ -344,9 +359,9 @@ async function runSearch(ctx, parts) {
         return;
     }
     ctx.println('');
-    ctx.println(terminalThemeRow('FS search', operatorPath(result['searchPath'] ?? path) || path));
+    ctx.println(terminalThemeRow('Busca', operatorPath(result['searchPath'] ?? path) || path));
     ctx.println(pretty(formatSearchOutputForOperator(String(result['output'] ?? '')), 8000));
-    ctx.println(terminalThemeRow('resultados', String(result['matchCount'] ?? 0), { role: 'muted' }));
+    ctx.println(terminalThemeRow('Resultados', String(result['matchCount'] ?? 0), { role: 'muted' }));
     const io = ioSummary(result);
     if (io) ctx.println(io);
     ctx.println('');
@@ -376,7 +391,7 @@ async function runWrite(ctx, parts, overwrite) {
         return;
     }
     ctx.println('');
-    ctx.println(terminalThemeRow(`FS local ${overwrite ? 'escrito' : 'criado'}`, path, { role: 'success' }));
+    ctx.println(terminalThemeRow('FS local', `${overwrite ? 'escrito' : 'criado'} · ${path}`, { role: 'success' }));
     ctx.println(terminalThemeRow('Bytes', String(result['bytesWritten'] ?? 0), { role: 'muted' }));
     const io = ioSummary(result);
     if (io) ctx.println(io);

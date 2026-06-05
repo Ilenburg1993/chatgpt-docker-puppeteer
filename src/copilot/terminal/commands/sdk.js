@@ -1754,7 +1754,7 @@ async function renderSdkTools({ println }, model, runtimeId) {
     );
     println(
         terminalThemeRow(
-            'Shell legado',
+            'Terminal SDK legado',
             registrySnapshot.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado',
             { role: registrySnapshot.hasLegacySdkShellToolsLoaded ? 'warn' : 'muted' },
         ),

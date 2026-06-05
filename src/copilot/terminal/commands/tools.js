@@ -487,8 +487,8 @@ export function cmdTools({ println }, arg = '') {
         println(terminalThemeHeadline('tool', 'Superfícies operacionais'));
         println(terminalThemeRow('Arquivos locais', renderActiveLabel(toolLoad.hasCanonicalLocalFsTools), { role: renderActiveRole(toolLoad.hasCanonicalLocalFsTools) }));
         println(terminalThemeRow('Terminal local', renderActiveLabel(toolLoad.hasCanonicalLocalExecTools), { role: renderActiveRole(toolLoad.hasCanonicalLocalExecTools) }));
-        println(terminalThemeRow('Workspace SDK', renderActiveLabel(toolLoad.hasSdkWorkspaceTooling), { role: renderActiveRole(toolLoad.hasSdkWorkspaceTooling) }));
-        println(terminalThemeRow('Shell legado', toolLoad.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado', { role: toolLoad.hasLegacySdkShellToolsLoaded ? 'warn' : 'muted' }));
+        println(terminalThemeRow('Workspace via SDK', renderActiveLabel(toolLoad.hasSdkWorkspaceTooling), { role: renderActiveRole(toolLoad.hasSdkWorkspaceTooling) }));
+        println(terminalThemeRow('Terminal SDK legado', toolLoad.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado', { role: toolLoad.hasLegacySdkShellToolsLoaded ? 'warn' : 'muted' }));
         println(terminalThemeRow('Desabilitadas', renderDisabledToolSummary(toolLoad.disabled.length), { role: toolLoad.disabled.length > 0 ? 'warn' : 'success' }));
         if (toolLoad.disabled.length > 0) {
             println(terminalThemeRow('Lista', toolLoad.disabled.join(', '), { role: 'muted' }));

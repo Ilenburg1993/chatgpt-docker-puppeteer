@@ -2180,9 +2180,10 @@ function diagnosticUxCycleCriteria(boot) {
         {
             id: 'diagnostic-ux-fs-themed',
             pass:
-                /FS local criado[\s\S]*I\/O write/iu.test(plain) &&
+                /FS local[\s\S]*criado[\s\S]*I\/O[\s\S]*escrita · motor/iu.test(plain) &&
                 /Arquivo[\s\S]*TERMINAL_DIAGNOSTIC_UX_\d+\.txt[\s\S]*\(FS local\)/iu.test(fsReadSurface) &&
-                /FS search[\s\S]*resultados[\s\S]*I\/O search/iu.test(plain),
+                /Busca[\s\S]*Resultados[\s\S]*I\/O[\s\S]*busca · motor/iu.test(plain) &&
+                !/(?:^|\n)\s*(?:FS search|I\/O\s+(?:read|write|search)|resultados)\b/mu.test(plain),
             detail: '/fs create/read/search rendered themed local-FS output and I/O summaries',
         },
         {
@@ -2487,25 +2488,25 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
             commands: [
                 {
                     line: `/fs create ${scratchPath} ${marker}`,
-                    waitFor: new RegExp(`FS local criado[\\s\\S]*${escapeRegExp(scratchPath)}`, 'u'),
+                    waitFor: new RegExp(`FS local[\\s\\S]*criado[\\s\\S]*${escapeRegExp(scratchPath)}`, 'u'),
                     advanceAfterMs: 1_000,
                 },
                 {
                     line: `/fs create ${markdownPath} # Terminal UX Markdown - Item de diagnóstico`,
-                    waitFor: new RegExp(`FS local criado[\\s\\S]*${escapeRegExp(markdownPath)}`, 'u'),
+                    waitFor: new RegExp(`FS local[\\s\\S]*criado[\\s\\S]*${escapeRegExp(markdownPath)}`, 'u'),
                     advanceAfterMs: 1_000,
                 },
                 {
                     line: `/fs create ${jsonPath} {"marker":"${marker}","items":[1,2,3,4,5,6,7,8],"nested":{"alpha":1,"beta":2}}`,
-                    waitFor: new RegExp(`FS local criado[\\s\\S]*${escapeRegExp(jsonPath)}`, 'u'),
+                    waitFor: new RegExp(`FS local[\\s\\S]*criado[\\s\\S]*${escapeRegExp(jsonPath)}`, 'u'),
                     advanceAfterMs: 1_000,
                 },
                 {
                     line: `/fs create ${yamlPath} marker: ${marker}`,
-                    waitFor: new RegExp(`FS local criado[\\s\\S]*${escapeRegExp(yamlPath)}`, 'u'),
+                    waitFor: new RegExp(`FS local[\\s\\S]*criado[\\s\\S]*${escapeRegExp(yamlPath)}`, 'u'),
                     advanceAfterMs: 1_000,
                 },
-                { line: `/fs read ${scratchPath}`, waitFor: 'I/O read', advanceAfterMs: 1_000 },
+                { line: `/fs read ${scratchPath}`, waitFor: 'leitura · motor', advanceAfterMs: 1_000 },
                 { line: `/fs preview ${scratchPath} --lines 20`, waitFor: 'Preview', advanceAfterMs: 1_000 },
                 { line: `/fs preview ${markdownPath} --markdown`, waitFor: 'Terminal UX Markdown', advanceAfterMs: 1_000 },
                 {
@@ -2513,8 +2514,8 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
                     waitFor: 'linhas omitidas',
                     advanceAfterMs: 1_000,
                 },
-                { line: `/fs preview ${yamlPath} --yaml --plain --lines 5`, waitFor: 'I/O read', advanceAfterMs: 1_000 },
-                { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, waitFor: 'resultados', advanceAfterMs: 1_000 },
+                { line: `/fs preview ${yamlPath} --yaml --plain --lines 5`, waitFor: 'leitura · motor', advanceAfterMs: 1_000 },
+                { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, waitFor: 'Resultados', advanceAfterMs: 1_000 },
                 { line: '/terminal libs', waitFor: 'Libs auxiliares do terminal', advanceAfterMs: 1_000 },
                 { line: '/menu picker', waitFor: 'Picker do menu', advanceAfterMs: 1_000 },
                 { line: '/git diff --plain src/copilot/terminal/README.md', waitFor: 'Git diff', advanceAfterMs: 1_000 },
