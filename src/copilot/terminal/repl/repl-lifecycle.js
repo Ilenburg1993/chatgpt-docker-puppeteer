@@ -227,7 +227,13 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
         try {
             const reply = await sendTurn(finalMessage, 'user');
             if (reply === null) {
-                println('\x1b[33m  [fila] Mensagem não produziu resposta. Veja /errors ou /status.\x1b[0m');
+                println(
+                    terminalThemeRow(
+                        'Turno sem resposta',
+                        'nenhuma resposta pública foi materializada · veja /activity 40 · /events 60 · /byok health',
+                        { role: 'warn' },
+                    ),
+                );
             }
         } catch (e) {
             log('ERROR', `[TerminalServer] Turno foreground falhou: ${toError(e).message}`);

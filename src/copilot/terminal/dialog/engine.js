@@ -15,7 +15,7 @@ import {
 } from '#copilot/config';
 import { cancelTimer, container, registerInterval, sleepMs, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
-import { log, METRICS_STORE } from '#copilot/observability';
+import { defaultErrorTracker, log, METRICS_STORE } from '#copilot/observability';
 import { resolveOptionalDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
 import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
 import { attachmentToRuntimeEmbed } from '../../presentation/runtime/index.js';
@@ -688,6 +688,21 @@ function recordTerminalExplicitEmptyOutput(input) {
         source: 'dialog',
         severity: 'error',
     });
+    try {
+        defaultErrorTracker?.trackError?.(new Error('Turno sem saída pública materializada'), {
+            source: 'terminal.dialog.empty_output',
+            metadata: {
+                actor: input.actor,
+                semanticOutcome,
+                semanticReplySource: input.semanticReplySource ?? null,
+                cause: diagnosis.cause,
+                evidence: diagnosis.evidence,
+                action: diagnosis.action,
+            },
+        });
+    } catch {
+        // O rastreador de erro não pode interromper a apresentação operacional do terminal.
+    }
     broadcastSse(
         'terminal.turn.empty_output',
         withTerminalTurnCorrelation({
@@ -1753,7 +1768,11 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             });
             println(`[erro] ${err.message}`);
         }
-        log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${err.message}`);
+        if (byokFailure) {
+            log('WARN', `[TerminalServer] Turno BYOK encerrado após apresentação operacional ao usuário: ${err.message}`);
+        } else {
+            log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${err.message}`);
+        }
         if (!readTerminalRuntimeControlState().dialogLoopActive) {
             log('WARN', '[TerminalServer] Dialog loop inativo após erro — reagendando ensureDialogLoop');
             void (async () => {

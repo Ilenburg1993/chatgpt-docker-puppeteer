@@ -328,6 +328,12 @@ operador vê e salvar summary com critérios objetivos.
 - [x] K10. Rodar cenário `file-write-roundtrip` para criação/move/delete e claims.
 - [ ] K11. Consolidar relatório visual comparando screenshots antigas versus saída live atual.
 - [x] K12. Sincronizar comandos diagnósticos live por retorno ao prompt antes de `/quit`.
+- [x] K13. Em timeout de cenário live, coletar `/activity`, `/tools`, `/events`, `/errors`, `/health` e `/export` antes de encerrar.
+- [x] K14. Remover log técnico `TerminalServer` da superfície pública para falhas BYOK já apresentadas em formato operacional.
+- [x] K15. Tratar `Turno vazio` como erro rastreável em `/errors` quando recuperação falha.
+- [x] K16. Remover cabeçalho duplicado de `/tools diag` quando nenhuma ferramenta foi usada.
+- [x] K17. Trocar aviso antigo `[fila] Mensagem não produziu resposta` por linha semântica do tema do terminal.
+- [x] K18. Fazer `/export` criar Markdown diagnóstico mínimo mesmo quando não há transcript materializado.
 
 ### Faixa L — Agente e outras superfícies src/copilot
 
@@ -375,4 +381,10 @@ operador vê e salvar summary com critérios objetivos.
 - [x] 2026-06-05: live `file-write-roundtrip` em `artifacts/terminal-live/llm-b-tools-ux-file-write-20260605` falhou corretamente por `delete_file` ausente; create/move renderizaram sem prompt de permissão, e artefato residual foi limpo.
 - [x] 2026-06-05: harness live agora usa sequência prompt-synchronized para diagnósticos com `/export` e `/quit`, evitando embolar comandos longos durante `[PERG]`.
 - [x] 2026-06-05: rerun live `file-write-roundtrip` PASS em `artifacts/terminal-live/llm-b-tools-ux-file-write-rerun-20260605`, cobrindo `create_file`, `move_file`, `delete_file`, ausência de prompt de permissão, `/activity`, `/intent`, `/tools diag`, `/events`, `/health full`, `/export` e cleanup real.
-- [ ] Próximo passo: ajustar prompt/harness do cenário `recoverable-tool-error` para recuperar tool obrigatória faltante, revisar detalhes visuais remanescentes e consolidar relatório comparando screenshots antigas contra saída live atual.
+- [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun-20260605` bloqueou por `live-timeout` antes das tools; achou dois gaps: timeout encerrava sem diagnósticos/export e falha BYOK apresentava linha técnica `TerminalServer` no terminal público.
+- [x] 2026-06-05: timeouts de cenário live agora passam por diagnóstico/export prompt-synchronized antes de `/quit`; falhas BYOK já apresentadas ao operador são logadas como diagnóstico interno sem linha pública `ERROR`.
+- [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun2-20260605` bloqueou por `assistant-empty-turn`; confirmou diagnóstico/export no bloqueio e ausência da linha técnica `TerminalServer`, mas revelou `/tools diag` com cabeçalho duplicado e `/errors` vazio apesar do turno vazio final.
+- [x] 2026-06-05: `Turno vazio` final agora alimenta `/errors`, sem transformar falhas BYOK recuperáveis em erro vermelho; `/tools diag` evita cabeçalho duplicado quando a sessão ainda não usou tools; harness reconhece o texto atual `Turno vazio` para diagnóstico imediato.
+- [x] 2026-06-05: rerun live `recoverable-tool-error` em `artifacts/terminal-live/llm-b-tools-ux-recoverable-error-rerun3-20260605` bloqueou por `live-timeout` com diagnóstico iniciado; confirmou `/errors` com timeout rastreado e revelou copy antiga `[fila] Mensagem não produziu resposta` e `/export` sem arquivo quando o transcript está vazio.
+- [x] 2026-06-05: aviso de turno sem resposta agora usa `terminalThemeRow`; harness detecta `Rota BYOK ficou sem resposta` para diagnóstico imediato; `/export` vazio cria Markdown diagnóstico mínimo para preservar artefatos de live.
+- [ ] Próximo passo: rerodar `recoverable-tool-error` após correções de `/errors`, `/tools diag`, copy e export vazio; ajustar prompt/harness para recuperação de ordem deltas→ask_user e revisar detalhes visuais remanescentes.

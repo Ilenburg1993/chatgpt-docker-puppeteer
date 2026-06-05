@@ -32,11 +32,6 @@ import { formatTerminalIsoTimestamp, terminalThemeRow } from '../state/index.js'
  */
 export async function cmdExport({ println }, arg) {
     const projection = readTerminalTimelineProjection({ limitPairs: 500 });
-    if (projection.turns.length === 0) {
-        println(terminalThemeRow('Exportar', 'Histórico vazio; nada para exportar.', { role: 'warn' }));
-        return;
-    }
-
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const defaultName = `conversa-${ts}.md`;
     const filePath = arg?.trim() ? resolve(WORKSPACE_ROOT, arg.trim()) : join(WORKSPACE_ROOT, defaultName);
@@ -51,6 +46,10 @@ export async function cmdExport({ println }, arg) {
         `> ${projection.turns.length} mensagens · timeline=${sanitizeExportInline(projection.timelineSource)}/${sanitizeExportInline(projection.reconciliationStatus)} · sync=${sanitizeExportInline(syncDetail)} · redaction=enabled · exportado em ${exportedAt}`,
         '',
     );
+    if (projection.turns.length === 0) {
+        lines.push('Nenhuma mensagem foi materializada neste transcript.', '');
+        lines.push('Este arquivo preserva o diagnóstico mínimo do terminal para cenários de timeout, provider sem resposta ou turno vazio antes de transcript público.', '');
+    }
 
     for (const turn of projection.turns) {
         const time = formatTerminalIsoTimestamp(turn.timestamp ?? Date.now());
@@ -103,7 +102,15 @@ export async function cmdExport({ println }, arg) {
         await mkdir(dirname(filePath), { recursive: true });
         await writeFile(filePath, lines.join('\n'), 'utf-8');
         println(terminalThemeRow('Exportado', formatTerminalToolPathForOperator(filePath), { role: 'success' }));
-        println(terminalThemeRow('Mensagens', `${projection.turns.length} salvas como Markdown.`));
+        println(
+            terminalThemeRow(
+                'Mensagens',
+                projection.turns.length > 0
+                    ? `${projection.turns.length} salvas como Markdown.`
+                    : '0 salvas; arquivo diagnóstico mínimo criado.',
+                { role: projection.turns.length > 0 ? 'muted' : 'warn' },
+            ),
+        );
     } catch (e) {
         println(terminalThemeRow('Erro', `erro ao exportar: ${toError(e).message ?? e}`, { role: 'error' }));
     }

@@ -751,7 +751,8 @@ export function cmdTools({ println }, arg = '') {
         return;
     }
 
-    if (wantsRaw || wantsDiag) {
+    const shouldPrintDiagnosticHeadline = (wantsRaw || wantsDiag) && entries.length > 0;
+    if (shouldPrintDiagnosticHeadline) {
         println('');
         println(
             terminalThemeHeadline('tool', 'Ferramentas', [

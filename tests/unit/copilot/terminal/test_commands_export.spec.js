@@ -364,7 +364,7 @@ describe('terminal/commands/export', () => {
         expect(markdown).not.toContain('\nAuthorization: Bearer tokenvalue1234567890');
     });
 
-    it('reporta histórico vazio quando o frontend runtime não tem feed', async () => {
+    it('cria Markdown diagnóstico mínimo quando o frontend runtime não tem feed', async () => {
         readTerminalTimelineProjection.mockReturnValueOnce({
             timelineSource: 'empty',
             reconciliationStatus: 'empty',
@@ -377,7 +377,11 @@ describe('terminal/commands/export', () => {
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        expect(writeFile).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('Histórico vazio');
+        expect(writeFile).toHaveBeenCalledOnce();
+        const [, content] = writeFile.mock.calls[0];
+        expect(String(content)).toContain('0 mensagens');
+        expect(String(content)).toContain('diagnóstico mínimo');
+        expect(ctx.output()).toContain('Exportado');
+        expect(ctx.output()).toContain('0 salvas');
     });
 });

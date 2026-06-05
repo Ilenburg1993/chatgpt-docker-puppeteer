@@ -7073,6 +7073,25 @@ async function main() {
         });
         if (timedOut) scheduleForcedKill(forceKillDelayMs);
     };
+    const scheduleScenarioTimeoutDiagnostics = () => {
+        if (postCommandsSent) return false;
+        postCommandsSent = true;
+        const diagnostics = [
+            '/activity 40',
+            '/intent 5',
+            '/tools diag',
+            '/events 80',
+            '/events 120 --raw',
+            '/errors 10',
+            '/health full',
+            `/export ${exportArg}`,
+        ];
+        if (byokReal) {
+            diagnostics.splice(6, 0, '/byok providers', '/byok health', '/byok recommend reasoning safe 8');
+        }
+        startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: Math.max(30_000, diagnostics.length * 3_000) });
+        return true;
+    };
     const schedulePostAnswerDiagnostics = (delayMs = postAnswerDelayMs) => {
         if (postCommandsSent) return;
         postCommandsSent = true;
@@ -7288,6 +7307,9 @@ async function main() {
         if (answerSent && !postCommandsSent) {
             schedulePostAnswerDiagnostics(0);
             scheduleForcedKill(Math.max(20_000, postAnswerDelayMs + 12_000));
+            return;
+        }
+        if (scenarioSent && scheduleScenarioTimeoutDiagnostics()) {
             return;
         }
         write('/quit');
@@ -7512,10 +7534,10 @@ async function main() {
         }
         if (
             !postCommandsSent &&
-            (/Erro de sessão \[(?:query|rate_limit)\]|You've hit your rate limit|session\.error|CAPIError|Failed to get response from the AI model/i.test(
+            (/Erro de sessão \[(?:query|rate_limit)\]|You've hit your rate limit|session\.error|CAPIError|Failed to get response from the AI model|Rota BYOK\s+rota BYOK ficou sem resposta/i.test(
                 scenarioTailPlain,
             ) ||
-                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user|Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked|Turno\s+(?:terminou\s+)?sem saída pública/i.test(
+                /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user|Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked|Turno\s+(?:terminou\s+)?sem saída pública|Turno vazio/i.test(
                     scenarioTailPlain,
                 )) &&
             !(byokReal && noPr) &&
