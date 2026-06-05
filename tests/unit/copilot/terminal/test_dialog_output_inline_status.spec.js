@@ -196,6 +196,10 @@ describe('terminal/dialog/output inline status', () => {
         expect(output).toContain('\x1b[s');
         expect(output).toContain('\x1b[K');
         expect(output).not.toBe('\x1b[2K\r');
+
+        writeSpy.mockClear();
+        clearReservedInlineStatus();
+        expect(writeSpy).not.toHaveBeenCalled();
     });
 
     it('deduplica pulso visual idêntico em sequência curta', () => {

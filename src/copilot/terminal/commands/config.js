@@ -57,7 +57,8 @@ const DISABLED_BYOK_SUMMARY = Object.freeze({
     errors: [],
 });
 
-const MODEL_LIST_DEFAULT_LIMIT = 40;
+const MODEL_LIST_DEFAULT_LIMIT = 20;
+const MODEL_LIST_MAX_LIMIT = 200;
 
 /**
  * @param {number} count
@@ -67,6 +68,19 @@ const MODEL_LIST_DEFAULT_LIMIT = 40;
  */
 function countLabel(count, singular, plural) {
     return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
+ * @param {string[]} parts
+ * @returns {number}
+ */
+function parseModelListLimit(parts) {
+    for (const part of parts) {
+        const match = part.match(/^(?:limit=|--limit=)?(?<limit>\d+)$/iu);
+        if (!match?.groups?.['limit']) continue;
+        return Math.min(MODEL_LIST_MAX_LIMIT, Math.max(1, Number(match.groups['limit'])));
+    }
+    return MODEL_LIST_DEFAULT_LIMIT;
 }
 
 /**
@@ -224,7 +238,8 @@ export async function cmdModel({ println }, arg) {
                 return;
             }
             println('');
-            const visibleModels = showAll ? models : models.slice(0, MODEL_LIST_DEFAULT_LIMIT);
+            const requestedLimit = parseModelListLimit(modelListParts.slice(1));
+            const visibleModels = showAll ? models : models.slice(0, requestedLimit);
             println(
                 terminalThemeHeadline('assistant', 'Modelos disponíveis', [
                     countLabel(models.length, 'modelo', 'modelos'),
@@ -242,7 +257,7 @@ export async function cmdModel({ println }, arg) {
                 println(
                     terminalThemeRow(
                         'Omitidos',
-                        `${countLabel(models.length - visibleModels.length, 'modelo', 'modelos')} · use /model list full`,
+                        `${countLabel(models.length - visibleModels.length, 'modelo', 'modelos')} · use /model list 50 ou /model list full`,
                         { role: 'muted' },
                     ),
                 );

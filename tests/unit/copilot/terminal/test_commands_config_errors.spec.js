@@ -165,6 +165,38 @@ describe('terminal commands config/errors com frontend canônico', () => {
         expect(listTerminalAvailableModelsProjection).toHaveBeenCalled();
     });
 
+    it('cmdModel list usa janela compacta por padrão e aceita limite explícito', async () => {
+        listTerminalAvailableModelsProjection.mockResolvedValueOnce({
+            currentModel: 'model-01',
+            models: Array.from({ length: 25 }, (_, index) => ({
+                id: `model-${String(index + 1).padStart(2, '0')}`,
+                capabilities: { supports: { reasoningEffort: false, vision: false } },
+            })),
+        });
+        const compact = mockCtx();
+
+        await cmdModel({ println: compact.println }, 'list');
+
+        expect(compact.output()).toContain('mostrando 20 modelos');
+        expect(compact.output()).toContain('model-20');
+        expect(compact.output()).not.toContain('model-21');
+        expect(compact.output()).toContain('/model list 50');
+
+        listTerminalAvailableModelsProjection.mockResolvedValueOnce({
+            currentModel: 'model-01',
+            models: Array.from({ length: 25 }, (_, index) => ({
+                id: `model-${String(index + 1).padStart(2, '0')}`,
+                capabilities: { supports: { reasoningEffort: false, vision: false } },
+            })),
+        });
+        const expanded = mockCtx();
+
+        await cmdModel({ println: expanded.println }, 'list 25');
+
+        expect(expanded.output()).toContain('mostrando 25 modelos');
+        expect(expanded.output()).toContain('model-25');
+    });
+
     it('cmdModel encaminha runtimeId explícito para a projection', async () => {
         const ctx = mockCtx();
 

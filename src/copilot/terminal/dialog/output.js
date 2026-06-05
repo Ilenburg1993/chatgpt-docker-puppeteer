@@ -1263,6 +1263,7 @@ export function clearReservedInlineStatus() {
     }
     if (!process.stdout.isTTY || _statusRowsReserved <= 0) return;
     clearReservedStatusRowsPreservingCursor();
+    _statusRowsReserved = 0;
 }
 
 /**

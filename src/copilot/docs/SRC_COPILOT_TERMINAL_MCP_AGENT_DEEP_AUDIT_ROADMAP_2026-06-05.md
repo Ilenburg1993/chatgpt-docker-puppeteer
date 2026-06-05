@@ -377,6 +377,8 @@
 - [x] Gap 50: o resumo compacto de `/byok model` ainda herdava labels longos (`perfil/preset/provedor/modelo`) e ação explicativa extensa; agora compacta o vínculo vivo e reduz a ação para confirmação operacional.
 - [x] Gap 51: a limpeza da linha viva no submit usava `clearInlineStatus()` e podia limpar a linha do prompt mesmo sem overlay reservado; agora o REPL usa `clearReservedInlineStatus()` e só remove status vivo real.
 - [x] Gap 52: pass20 revelou que a nova função de limpeza reservada não estava no barrel `terminal/dialog`; agora `clearReservedInlineStatus` é exportada pelo barrel canônico.
+- [x] Gap 53: `/model list` despejava 40 modelos por padrão e dominava a tela; agora mostra 20 por padrão, aceita limite explícito (`/model list 50`/`limit=50`) e mantém `full` para catálogo completo.
+- [x] Gap 54: pass22 mostrou clear reservado colando no prompt antes do próximo comando porque a reserva continuava marcada após submit; agora `clearReservedInlineStatus()` libera a reserva depois de limpar.
 
 ## 08. Criterio de Marco
 
@@ -464,3 +466,5 @@
 - [x] 2026-06-05: `/byok model` também compactou `Sessão viva` e `Ação`, removendo a frase longa de confirmação duplicada.
 - [x] 2026-06-05: a limpeza de overlay no submit passou a ser reservada-only, evitando clear-line extra em comandos sem linha viva ativa.
 - [x] 2026-06-05: live pass20 falhou no boot por export ausente; `terminal/dialog/index.js` agora reexporta `clearReservedInlineStatus`.
+- [x] 2026-06-05: `/model list` passou para janela default de 20 modelos com expansão explícita por número ou `full`.
+- [x] 2026-06-05: pass22 revelou resíduo de reserva no prompt; a limpeza reserved-only agora zera a reserva depois do submit.
