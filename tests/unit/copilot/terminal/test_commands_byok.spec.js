@@ -3159,12 +3159,15 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('bloqueios ativos 1');
         expect(ctx.output()).toContain('sinais expirados 1');
         expect(ctx.output()).toContain('sinal ativo');
-        expect(ctx.output()).toContain('janela temporary');
+        expect(ctx.output()).toContain('janela temporário');
         expect(ctx.output()).toContain('próxima atualização 2026-05-25T00:01:00.000Z');
         expect(ctx.output()).toContain('Ação');
-        expect(ctx.output()).toContain('wait_for_rate_limit_reset_or_choose_another_route');
+        expect(ctx.output()).toContain('aguardar reset do limite ou escolher outra rota');
         expect(ctx.output()).toContain('AssistantUsageQuotaSnapshot é quota SDK/Copilot');
         expect(ctx.output()).not.toContain('\x1b[');
+        expect(ctx.output()).not.toContain('wait_for_rate_limit_reset_or_choose_another_route');
+        expect(ctx.output()).not.toContain('refresh_overlay_or_retry_pre_runtime_selection');
+        expect(ctx.output()).not.toContain('not_blocking');
     });
 
     it('mostra matriz de capacidades de quota por provider sem executar runtime', async () => {
@@ -3178,11 +3181,14 @@ describe('terminal /byok command', () => {
         );
         expect(ctx.output()).toContain('BYOK matriz de quotas dos provedores');
         expect(ctx.output()).toContain('Tipos de quota');
-        expect(ctx.output()).toContain('key_credit_balance');
-        expect(ctx.output()).toContain('quota SDK aplicável a BYOK 0');
+        expect(ctx.output()).toContain('saldo de crédito da key:1');
+        expect(ctx.output()).toContain('cobertura SDK/BYOK 0');
         expect(ctx.output()).toContain('OPENROUTER_API_KEY');
         expect(ctx.output()).toContain('/api/v1/key');
         expect(ctx.output()).not.toContain('\x1b[');
+        expect(ctx.output()).not.toContain('key_credit_balance');
+        expect(ctx.output()).not.toContain('headers_or_runtime_failure');
+        expect(ctx.output()).not.toContain('nao');
     });
 
     it('mostra comandos canônicos do model-gateway para package, make e terminal', async () => {

@@ -134,6 +134,7 @@ import {
     terminalThemeRows,
     terminalThemeWrappedRow,
 } from '../state/theme/index.js';
+import { formatTerminalToolPathForOperator } from '../events/tool-activity-presenter.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
@@ -326,13 +327,39 @@ function renderByokTokenLabel(value) {
         runtime_health: 'saúde runtime',
         authenticated_account_api: 'API autenticada da conta',
         authenticated_catalog: 'catálogo autenticado',
+        authenticated_models: 'modelos autenticados',
+        authenticated_gateway_providers: 'provedores autenticados do gateway',
         probe_failed: 'sonda falhou',
         account: 'conta/key',
         catalog: 'catálogo',
+        default: 'padrão',
+        none: 'nenhum',
         rate_limited: 'limitado por taxa',
         quota: 'quota',
         credits: 'créditos',
         'rate-limit': 'limite de taxa',
+        fresh: 'recente',
+        expired: 'expirado',
+        temporary: 'temporário',
+        not_blocking: 'sem bloqueio',
+        explicit_reset_at: 'reset explícito',
+        key_account_and_public_models: 'conta da key e modelos públicos',
+        key_credit_balance: 'saldo de crédito da key',
+        headers_or_runtime_failure: 'headers ou falha runtime',
+        runtime_failure_only: 'apenas falha runtime',
+        importer_failure_or_runtime_failure: 'falha no importer ou runtime',
+        docs_and_runtime_failure: 'docs e falha runtime',
+        account_models_and_gateway: 'modelos da conta e gateway',
+        credit_balance: 'saldo de crédito',
+        account_spending_limit: 'limite de gasto da conta',
+        gateway_rate_limit: 'limite de taxa do gateway',
+        local_daemon_models: 'modelos do daemon local',
+        local_resource_bound: 'recurso local',
+        sdk_entitlement_separate: 'limite SDK separado',
+        not_applicable: 'não aplicável',
+        unknown: 'desconhecido',
+        wait_for_rate_limit_reset_or_choose_another_route: 'aguardar reset do limite ou escolher outra rota',
+        refresh_overlay_or_retry_pre_runtime_selection: 'atualizar overlay ou tentar seleção pré-runtime novamente',
         'provider.timeout': 'timeout do provedor',
         ok: 'ok',
         failed: 'falhou',
@@ -4811,12 +4838,13 @@ async function renderByokGatewayAccounts(println, rest) {
 
 /**
  * @param {Record<string, number>} counts
+ * @param {(key: string) => string} [labeler]
  * @returns {string}
  */
-function renderGatewayCountMap(counts) {
+function renderGatewayCountMap(counts, labeler = (key) => key) {
     return Object.entries(counts)
         .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, count]) => `${key}:${count}`)
+        .map(([key, count]) => `${labeler(key)}:${count}`)
         .join(',') || '-';
 }
 
@@ -4838,12 +4866,12 @@ async function renderByokGatewayLimits(println, rest) {
     println(
         terminalThemeRow(
             'Catálogo',
-            `${store.filePath} · filtro ${args.selector ?? '-'} · overlays ${explanation.summary.matched}/${explanation.summary.total} · bloqueios ativos ${explanation.summary.activeBlockers} · sinais expirados ${explanation.summary.expiredSignals} · temporários ${explanation.summary.temporaryBlockers} · execução ${runtimeSummary.activeCount}/${runtimeSummary.total}`,
+            `${formatTerminalToolPathForOperator(store.filePath)} · filtro ${args.selector ?? '-'} · overlays ${explanation.summary.matched}/${explanation.summary.total} · bloqueios ativos ${explanation.summary.activeBlockers} · sinais expirados ${explanation.summary.expiredSignals} · temporários ${explanation.summary.temporaryBlockers} · execução ${runtimeSummary.activeCount}/${runtimeSummary.total}`,
             { role: explanation.summary.activeBlockers > 0 ? 'warn' : 'muted' },
         ),
     );
-    println(terminalThemeRow('Estados', renderGatewayCountMap(explanation.summary.byStatus), { role: 'muted' }));
-    println(terminalThemeRow('Fontes', renderGatewayCountMap(explanation.summary.bySourceLayer), { role: 'muted' }));
+    println(terminalThemeRow('Estados', renderGatewayCountMap(explanation.summary.byStatus, renderByokTokenLabel), { role: 'muted' }));
+    println(terminalThemeRow('Fontes', renderGatewayCountMap(explanation.summary.bySourceLayer, renderByokTokenLabel), { role: 'muted' }));
     if (explanation.rows.length === 0) {
         println(terminalThemeRow('Resultado', 'nenhum limite account/key encontrado para o filtro informado.', { role: 'warn' }));
         println('');
@@ -4860,7 +4888,7 @@ async function renderByokGatewayLimits(println, rest) {
         println(
             terminalThemeRow(
                 'Limite',
-                `escopo ${row.accountScope} · estado ${row.limitStatus} · sinal ${state} · frescor ${row.freshnessStatus} · janela ${row.resetWindowClass} · ${reset} · expira ${row.expiresAt ?? row.effectiveExpiresAt ?? '-'}`,
+                `escopo ${renderByokTokenLabel(row.accountScope)} · estado ${renderByokTokenLabel(row.limitStatus)} · sinal ${state} · frescor ${renderByokTokenLabel(row.freshnessStatus)} · janela ${renderByokTokenLabel(row.resetWindowClass)} · ${reset} · expira ${row.expiresAt ?? row.effectiveExpiresAt ?? '-'}`,
                 { role: row.activeBlocker ? 'warn' : 'muted' },
             ),
         );
@@ -4871,7 +4899,7 @@ async function renderByokGatewayLimits(println, rest) {
                 { role: 'muted' },
             ),
         );
-        println(terminalThemeRow('Ação', row.nextAction, { role: row.activeBlocker ? 'command' : 'muted' }));
+        println(terminalThemeRow('Ação', renderByokTokenLabel(row.nextAction), { role: row.activeBlocker ? 'command' : 'muted' }));
     }
     if (explanation.rows.length > args.limit) {
         println(terminalThemeRow('Mais', `exibindo ${args.limit}/${explanation.rows.length}; use filtro ou limite numerico.`, { role: 'muted' }));
@@ -4893,11 +4921,11 @@ function renderByokGatewayQuotaMatrix(println, rest) {
     println(
         terminalThemeRow(
             'Resumo',
-            `filtro ${args.selector ?? '-'} · provedores ${matrix.summary.providerCount}/${matrix.summary.total} · visibilidade de conta ${matrix.summary.accountVisibilityCount} · snapshots de quota ${matrix.summary.quotaSnapshotCount} · overlays runtime ${matrix.summary.runtimeFailureOverlayCount} · quota SDK aplicável a BYOK ${matrix.summary.sdkQuotaByokTruthCount}`,
+            `filtro ${args.selector ?? '-'} · provedores ${matrix.summary.providerCount}/${matrix.summary.total} · visibilidade de conta ${matrix.summary.accountVisibilityCount} · snapshots de quota ${matrix.summary.quotaSnapshotCount} · overlays runtime ${matrix.summary.runtimeFailureOverlayCount} · cobertura SDK/BYOK ${matrix.summary.sdkQuotaByokTruthCount}`,
             { role: 'muted' },
         ),
     );
-    println(terminalThemeRow('Tipos de quota', renderGatewayCountMap(matrix.summary.byQuotaSnapshot), { role: 'muted' }));
+    println(terminalThemeRow('Tipos de quota', renderGatewayCountMap(matrix.summary.byQuotaSnapshot, renderByokTokenLabel), { role: 'muted' }));
     if (matrix.rows.length === 0) {
         println(terminalThemeRow('Resultado', 'nenhum provedor encontrado para o filtro informado.', { role: 'warn' }));
         println('');
@@ -4914,7 +4942,7 @@ function renderByokGatewayQuotaMatrix(println, rest) {
         println(
             terminalThemeRow(
                 'Conta',
-                `overlay runtime ${row.runtimeFailureOverlay ? 'sim' : 'nao'} · quota SDK cobre BYOK ${row.sdkQuotaAppliesToByok ? 'sim' : 'nao'} · env ${row.requiredEnv.join(',') || '-'}`,
+                `overlay runtime ${yesNo(row.runtimeFailureOverlay)} · quota SDK cobre BYOK ${yesNo(row.sdkQuotaAppliesToByok)} · env ${row.requiredEnv.join(',') || '-'}`,
                 { role: 'muted' },
             ),
         );

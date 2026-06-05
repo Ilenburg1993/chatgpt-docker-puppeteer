@@ -2402,7 +2402,7 @@ function diagnosticUxCycleCriteria(boot) {
                 /BYOK matriz de quotas dos provedores[\s\S]*Resumo[\s\S]*Tipos de quota[\s\S]*(?:Provedor|Resultado|Nota)/iu.test(
                     byokQuotaMatrixSurface,
                 ) &&
-                !/\\x1b\[|\x1b\[|quota SDK aplicável a BYOK=\d|Tipos de quota:|^\s*(?:\x1b|\[)/imu.test(
+                !/\\x1b\[|\x1b\[|\/workspaces\/chatgpt-docker-puppeteer\/data\/copilot\/model-gateway\/catalog\.json|quota SDK aplicável a BYOK|Tipos de quota:|key_credit_balance|headers_or_runtime_failure|not_blocking|wait_for_rate_limit_reset_or_choose_another_route|refresh_overlay_or_retry_pre_runtime_selection|^\s*(?:\x1b|\[)/imu.test(
                     `${byokLimitsSurface}\n${byokQuotaMatrixSurface}`,
                 ),
             detail: '/byok gateway limits/quota-matrix rendered themed pre-runtime quota/account information without raw ANSI or old line formatting',
