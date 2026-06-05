@@ -3346,9 +3346,10 @@ function operatorUxCycleCriteria(boot) {
                 /Confirmação\s+aguarde\s+confirmação do SDK\s+ou próximo uso observado/iu.test(
                     surfaceAt(byokModelStart),
                 ) &&
-                /Atividade Atual da LLM-B[\s\S]{0,500}Troca de modelo solicitada/iu.test(
+                /Atividade Atual da LLM-B[\s\S]{0,700}(?:Troca de modelo solicitada|Modelo SDK confirmado)/iu.test(
                     surfaceAt(activityAfterByokModelStart),
                 ) &&
+                /Timeline operacional[\s\S]{0,900}Troca de modelo solicitada/iu.test(surfaceAt(activityAfterByokModelStart)) &&
                 /Estado\s+modelo/iu.test(surfaceAt(activityAfterByokModelStart)) &&
                 !/Estado\s+model\b|provider-boundary|binding de nascimento|binding da sessão viva|provider BYOK/iu.test(
                     `${surfaceAt(byokModelStart)}\n${surfaceAt(activityAfterByokModelStart)}`,

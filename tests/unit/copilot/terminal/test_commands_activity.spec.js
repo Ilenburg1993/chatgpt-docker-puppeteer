@@ -194,7 +194,7 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('há ');
         expect(ctx.output()).not.toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}\]/u);
         expect(ctx.output()).not.toMatch(/\[\d{2}:\d{2}:\d{2}\]/u);
-        expect(ctx.output()).toContain('/activity detail mostra origem, trace, engine e streaming');
+        expect(ctx.output()).toContain('/activity detail mostra origem, auditoria técnica e streaming');
         expect(ctx.output()).toContain('Detalhes');
         expect(ctx.output()).not.toContain('Detalhes técnicos ficam em /activity detail');
         expect(ctx.output()).not.toContain('Técnico');

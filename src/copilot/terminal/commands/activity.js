@@ -553,7 +553,11 @@ export function cmdActivity({ println }, arg) {
         println(terminalThemeRow('Origem', renderSourceLabel(current.source)));
     }
     if (!detail) {
-        println(terminalThemeRow('Detalhes', '/activity detail mostra origem, trace, engine e streaming.', { role: 'command' }));
+        println(
+            terminalThemeRow('Detalhes', '/activity detail mostra origem, auditoria técnica e streaming.', {
+                role: 'command',
+            }),
+        );
     }
 
     if (activeTurnTrace) {

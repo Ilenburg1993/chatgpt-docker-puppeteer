@@ -369,6 +369,10 @@
 - [x] Gap 42: `/sdk models` ainda imprimia `reasoning low,medium,high`; agora usa `raciocínio low, medium, high` com espaçamento humano.
 - [x] Gap 43: `/git help` empilhava todos os comandos em uma única row multiline; agora renderiza ações nomeadas, uma por linha.
 - [x] Gap 44: live pass13 falhou por critério antigo que exigia `Comandos` em `/git help`; harness agora valida as novas ações nomeadas e reprova a row multiline antiga.
+- [x] Gap 45: `/attach` vazio e fila preenchida ainda imprimiam frases soltas fora do tema; agora usam rows `Uso`/`Próximo` e paths formatados para operador.
+- [x] Gap 46: live pass15 mostrou a linha viva de modelo colando no comando seguinte (`…/activity 10`) quando o operador apertava Enter; agora o REPL limpa a linha viva no evento `line` antes de despachar qualquer comando.
+- [x] Gap 47: `/activity` ainda orientava o operador com `trace, engine e streaming`; agora a cópia padrão fala em `auditoria técnica` e deixa IDs brutos para o modo detalhado.
+- [x] Gap 48: live pass16 mostrou que o harness exigia uma corrida temporal específica (`Troca de modelo solicitada` como estado atual), embora a UX correta já pudesse estar em `Modelo SDK confirmado`; agora o critério aceita confirmação rápida desde que a timeline retenha o pedido.
 
 ## 08. Criterio de Marco
 
@@ -449,3 +453,6 @@
 - [x] 2026-06-05: `/git help` passou a usar linhas `Status`, `Log`, `Diff`, `Branches`, `Atualizar` e `Stash`, sem bloco multiline em uma única row.
 - [x] 2026-06-05: live `operator-ux-cycle` pass13 mostrou UX correta, mas critério desatualizado; runner agora espera `Status/Diff/Stash` e rejeita `Comandos /git status` multiline.
 - [x] 2026-06-05: live `operator-ux-cycle` pass14 PASS confirmou Git help em ações nomeadas, BYOK/model list compactos, `/sdk models` humanizado e ausência de colisão de overlay.
+- [x] 2026-06-05: `/attach` deixou de imprimir `Use /attach...`/`Serão embutidos...` como texto solto; filas agora seguem `terminalThemeRow` e paths passam por `formatTerminalToolPathForOperator`.
+- [x] 2026-06-05: live `operator-ux-cycle` pass15 confirmou `/attach`, mas revelou overlay de modelo colando em `/activity`; o REPL agora limpa a linha viva no submit e `/activity` usa linguagem de auditoria humana.
+- [x] 2026-06-05: live `operator-ux-cycle` pass16 confirmou o prompt limpo em `/activity`; o runner agora aceita tanto estado solicitado quanto confirmação rápida do SDK, exigindo a solicitação preservada na timeline.

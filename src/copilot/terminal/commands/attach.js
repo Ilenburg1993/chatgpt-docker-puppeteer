@@ -17,7 +17,8 @@
 import { access, stat } from 'node:fs/promises';
 import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
 import { addAttachment, clearAttachments, getAttachmentQueue } from '../../presentation/state/index.js';
-import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
+import { formatTerminalToolPathForOperator } from '../events/tool-activity-presenter.js';
+import { terminalThemeHeadline, terminalThemeRow } from '../state/ui/index.js';
 
 /**
  * @param {number} count
@@ -43,11 +44,13 @@ function attachmentQueueNextTurnLabel(count) {
  * @returns {string}
  */
 function describeAttachmentEntry(entry) {
-    if (typeof entry === 'string') return entry;
+    if (typeof entry === 'string') return formatTerminalToolPathForOperator(entry);
     const type = typeof entry?.['type'] === 'string' ? entry['type'] : 'file';
-    if ((type === 'file' || type === 'directory') && typeof entry?.['path'] === 'string') return entry['path'];
+    if ((type === 'file' || type === 'directory') && typeof entry?.['path'] === 'string') {
+        return formatTerminalToolPathForOperator(entry['path']);
+    }
     if (type === 'selection' && typeof entry?.['filePath'] === 'string') {
-        return `${entry['filePath']} [selection]`;
+        return `${formatTerminalToolPathForOperator(entry['filePath'])} · seleção`;
     }
     if (type === 'blob') {
         const displayName = typeof entry?.['displayName'] === 'string' ? entry['displayName'] : 'blob';
@@ -99,7 +102,7 @@ export async function cmdAttach({ println }, arg) {
         const queue = getAttachmentQueue();
         if (queue.length === 0) {
             println(terminalThemeRow('Fila', 'vazia', { role: 'muted' }));
-            println(terminalThemeText('muted', '  Use /attach <caminho> ou /attach blob <mime> <base64>.'));
+            println(terminalThemeRow('Uso', '/attach <caminho> · /attach blob <mime> <base64>', { role: 'command' }));
         } else {
             println(terminalThemeHeadline('fileRead', 'Fila de anexos', [countLabel(queue.length, 'item', 'itens')]));
             for (let i = 0; i < queue.length; i++) {
@@ -107,7 +110,7 @@ export async function cmdAttach({ println }, arg) {
                 if (entry === undefined) continue;
                 println(terminalThemeRow(`${i + 1}.`, describeAttachmentEntry(entry), { role: 'fileRead', width: 5 }));
             }
-            println(terminalThemeText('muted', '  Serão embutidos no próximo turno. Use /attach clear para limpar.'));
+            println(terminalThemeRow('Próximo', 'serão embutidos no próximo turno · /attach clear limpa a fila'));
         }
         return;
     }
@@ -148,20 +151,24 @@ export async function cmdAttach({ println }, arg) {
         const info = await stat(filePath);
         if (info.size > MAX_EMBED_BYTES) {
             println(
-                terminalThemeRow('Aviso', `arquivo muito grande: ${filePath} (${(info.size / 1024).toFixed(1)} KB > 64 KB)`, {
-                    role: 'warn',
-                }),
+                terminalThemeRow(
+                    'Aviso',
+                    `arquivo muito grande: ${formatTerminalToolPathForOperator(filePath)} (${(info.size / 1024).toFixed(1)} KB > 64 KB)`,
+                    {
+                        role: 'warn',
+                    },
+                ),
             );
-            println(terminalThemeText('muted', '  Limite por envio é 64 KB total. Arquivo não adicionado.'));
+            println(terminalThemeRow('Limite', '64 KB por envio · arquivo não adicionado', { role: 'warn' }));
             return;
         }
         addAttachment(filePath);
         const queue = getAttachmentQueue();
         println(
-            terminalThemeRow('Adicionado', `${filePath} (${(info.size / 1024).toFixed(1)} KB)`, { role: 'success' }),
+            terminalThemeRow('Adicionado', `${formatTerminalToolPathForOperator(filePath)} (${(info.size / 1024).toFixed(1)} KB)`, { role: 'success' }),
         );
         println(terminalThemeRow('Fila', attachmentQueueNextTurnLabel(queue.length), { role: 'muted' }));
     } catch {
-        println(terminalThemeRow('Erro', `arquivo não encontrado ou sem permissão: ${filePath}`, { role: 'error' }));
+        println(terminalThemeRow('Erro', `arquivo não encontrado ou sem permissão: ${formatTerminalToolPathForOperator(filePath)}`, { role: 'error' }));
     }
 }

@@ -96,6 +96,20 @@ describe('terminal/commands/attach', () => {
         expect(ctx.output()).toContain('2 itens');
         expect(ctx.output()).toContain('/tmp/a.js');
         expect(ctx.output()).toContain('screenshot.png [blob:image/png]');
-        expect(ctx.output()).toContain('Serão embutidos no próximo turno');
+        expect(ctx.output()).toContain('Próximo');
+        expect(ctx.output()).toContain('serão embutidos no próximo turno');
+        expect(ctx.output()).not.toContain('  Serão embutidos');
+    });
+
+    it('/attach vazio mostra uso como row temática, sem frase solta', async () => {
+        const ctx = mockCtx();
+
+        await cmdAttach({ println: ctx.println }, '');
+
+        expect(ctx.output()).toContain('Fila');
+        expect(ctx.output()).toContain('vazia');
+        expect(ctx.output()).toContain('Uso');
+        expect(ctx.output()).toContain('/attach <caminho> · /attach blob <mime> <base64>');
+        expect(ctx.output()).not.toContain('  Use /attach');
     });
 });

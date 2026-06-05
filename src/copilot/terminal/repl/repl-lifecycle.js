@@ -28,6 +28,7 @@ import {
     buildUserPrompt,
     buildWaitingPrompt,
     cancelScheduledTerminalPromptRedraw,
+    clearInlineStatus,
     endTerminalRenderLock,
     getTurnQueueDepth,
     parkTerminalPromptForContinuation,
@@ -404,6 +405,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
     rl.on('line', (line) => {
         cancelScheduledTerminalPromptRedraw(rl);
+        clearInlineStatus();
         // ESCAPE-BYPASS: comandos críticos de saída/restart executam IMEDIATAMENTE, sem entrar na fila serializada.
         // Isso garante que /quit e /restart funcionem mesmo se um sendTurn anterior estiver travado na fila.
         const trimmedForEscape = line.trim();
