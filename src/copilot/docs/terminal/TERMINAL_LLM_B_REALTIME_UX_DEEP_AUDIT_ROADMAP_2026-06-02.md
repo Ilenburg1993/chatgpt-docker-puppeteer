@@ -9721,3 +9721,47 @@
   - procurar outros prints manuais ANSI em `sdk-session-events` e migrar para presenters/rows quando
     forem superfície default;
   - rodar live canônico após consolidar mais uma leva de limpeza textual.
+
+### 12.114 Live no-PR confirma `/usage now` e workspace sem rótulos técnicos — 2026-06-04
+
+- [x] Achado:
+  - o primeiro live no-PR pós-polimento falhou em dois critérios que ficaram mais antigos que a UX:
+    `ux-cycle-usage-byok-current-first` ainda esperava `BYOK provedor`, e
+    `ux-cycle-workspace-human` rejeitava a fronteira visual `SDK → FS`/`FS → SDK`;
+  - a tela real de `/usage now` já estava correta, com `Rota BYOK` antes do histórico Copilot;
+  - a tela real de `/workspace list` ainda podia ser mais elegante: setas técnicas comunicavam
+    direção, mas pareciam siglas de arquitetura dentro de uma superfície de operador.
+- [x] Decisão UX:
+  - contrato live deve seguir o vocabulário canônico atual, não preservar nomes removidos;
+  - `/workspace list` default deve usar verbos humanos como labels primários, deixando a direção no
+    valor: `Materializar` para SDK virtual -> FS local e `Importar` para FS local -> SDK virtual;
+  - `SDK → FS` e `FS → SDK` podem continuar como conceito de arquitetura/documentação, mas não como
+    primeira coluna do painel default.
+- [x] Implementação:
+  - harness `--ux-cycle` passou a exigir `Rota BYOK` e bloquear regressão de `BYOK provedor`;
+  - `/workspace list` vazio trocou `SDK → FS` por `Materializar` e `FS → SDK` por `Importar`;
+  - teste focado garante que os rótulos técnicos não retornam à superfície default.
+- [x] Validação:
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js` com 40 testes verdes;
+  - [x] `npx eslint src/copilot/terminal/commands/sdk.js tests/unit/copilot/terminal/test_commands_sdk.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - [x] `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  - [x] live no-PR:
+    `npm run terminal:llm-b:live-test -- --no-pr --ux-cycle --timeout-ms=180000 --out-dir=artifacts/terminal-live/ux-cycle-after-terminal-polish-rerun-20260604`;
+  - [x] resultado: PASS em 30/30 critérios, incluindo `ux-cycle-usage-byok-current-first` e
+    `ux-cycle-workspace-human`;
+  - [x] artefatos:
+    `artifacts/terminal-live/ux-cycle-after-terminal-polish-rerun-20260604/summary.md`,
+    `artifacts/terminal-live/ux-cycle-after-terminal-polish-rerun-20260604/default-ux-cycle.plain.log`.
+- [x] Resultado observado:
+  - `/usage now` mostrou `Rota BYOK`, `Histórico`, `Telemetria LLM`, `Request`, `Vínculo` e `Modo`
+    sem sugerir cobrança BYOK por telemetria Copilot histórica;
+  - `/workspace list` ficou escaneável como cockpit humano: estado, escopo, comandos, contrato,
+    materialização e importação;
+  - o ciclo default também confirmou ausência de ruído DB, eventos informativos dentro do prompt,
+    JSON bruto em `/sdk capabilities`/`workspace`, IDs crus em `/events` e fechamento limpo.
+- [ ] Próximas verificações:
+  - rodar live canônico com turno real novamente após a próxima leva de limpeza, buscando PASS com
+    deltas, tools, ask_user e pós-ask;
+  - auditar `/byok` e `/session sdk` para decidir onde `provedor` é semântica correta e onde
+    `rota BYOK` deve prevalecer;
+  - seguir a busca por prints manuais ou nomes de backend ainda visíveis em superfícies default.

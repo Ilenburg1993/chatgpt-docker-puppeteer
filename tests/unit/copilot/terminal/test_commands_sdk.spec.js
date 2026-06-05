@@ -596,10 +596,12 @@ describe('terminal/commands/sdk', () => {
         expect(emptyList.output()).toContain('/workspace mirror --to <localDir> [--overwrite]');
         expect(emptyList.output()).toContain('Contrato');
         expect(emptyList.output()).toContain('list/read/write ficam no workspace SDK virtual');
-        expect(emptyList.output()).toContain('SDK → FS');
-        expect(emptyList.output()).toContain('sync/mirror materializam SDK no filesystem local com auditoria');
-        expect(emptyList.output()).toContain('FS → SDK');
-        expect(emptyList.output()).toContain('promote importa arquivo local para SDK virtual com auditoria');
+        expect(emptyList.output()).toContain('Materializar');
+        expect(emptyList.output()).toContain('sync/mirror copiam SDK para FS local');
+        expect(emptyList.output()).toContain('Importar');
+        expect(emptyList.output()).toContain('promote copia FS local para SDK virtual');
+        expect(emptyList.output()).not.toContain('SDK → FS');
+        expect(emptyList.output()).not.toContain('FS → SDK');
         expect((emptyList.output().match(/Promover/g) ?? []).length).toBe(1);
         expect(emptyList.output()).not.toMatch(/\n\s{14,}\[--overwrite\]/);
         expect(emptyList.output()).not.toMatch(/\n\s{14,}com auditoria/);

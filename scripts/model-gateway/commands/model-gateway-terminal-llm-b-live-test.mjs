@@ -2763,14 +2763,14 @@ function defaultUxCycleCriteria(boot) {
         {
             id: 'ux-cycle-usage-byok-current-first',
             pass:
-                (/^\s*BYOK\s{2,}/imu.test(usageSurface) || /BYOK ativo/iu.test(usageSurface)
-                    ? /(?:Janela de contexto|Atenção\s+dados da janela de contexto)[\s\S]*BYOK\s+provedor[\s\S]*Histórico\s+Copilot|BYOK\s+provedor[\s\S]*Histórico\s+Copilot/iu.test(
+                (/^\s*Rota BYOK\s{2,}/imu.test(usageSurface) || /^\s*BYOK\s{2,}/imu.test(usageSurface) || /BYOK ativo/iu.test(usageSurface)
+                    ? /(?:Janela de contexto|Atenção\s+dados da janela de contexto)[\s\S]*Rota BYOK[\s\S]*Histórico\s+Copilot|Rota BYOK[\s\S]*Histórico\s+Copilot/iu.test(
                           usageSurface,
                       )
                     : /(?:Janela de contexto|Atenção\s+dados da janela de contexto)[\s\S]*(?:Telemetria PR|Pedido premium)|Pedido premium/iu.test(
                           usageSurface,
                       )) &&
-                !/Quota Copilot|side-channel|não é cobrança BYOK|BYOK ativo|Histórico Copilot/iu.test(usageSurface),
+                !/Quota Copilot|side-channel|não é cobrança BYOK|BYOK ativo|BYOK\s+provedor|Histórico Copilot/iu.test(usageSurface),
             detail: '/usage now rendered BYOK as current state and Copilot telemetry as compact historical side-channel',
         },
         {
