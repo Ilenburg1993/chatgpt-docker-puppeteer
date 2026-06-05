@@ -156,8 +156,9 @@
 - [ ] C.7 Garantir que delta publico mude estado para respondendo no primeiro chunk.
 - [ ] C.8 Garantir que troca de modelo apareca na linha viva como estado transitorio.
 - [ ] C.9 Garantir que cooldown/rate limit de provider apareca de modo compacto.
-- [ ] C.10 Criar live visual com captura de terminal igual ao operador.
+- [x] C.10 Criar live visual com captura de terminal igual ao operador.
 - [x] C.11 Deduplicar pulsos identicos imediatos da linha viva na borda fisica `writeInlineStatus`, reduzindo repeticao visual sem perder eventos estruturados.
+- [x] C.12 Impedir que telemetria normal de `llm.usage` BYOK substitua o estado vivo de tool/turn; apenas mismatch vira alerta foreground.
 
 ## Faixa D - Tools Local/MCP/SDK como UX Unica
 
@@ -333,6 +334,7 @@
 - [x] Gap 15: prompt live permitia deltas com markup; agora exige texto puro nas linhas `DELTA-CANONICAL` e o runner tem criterio contra HTML bruto na superficie publica.
 - [x] Gap 16: terminal confiava visualmente em claims publicos de tool; agora `assistant-tool-claim-audit` compara resposta publica com o ledger recente e emite warning/SSE quando falta lifecycle comprovado.
 - [x] Gap 17: recuperação automática pós-tools podia sair da allowlist do pedido original (`exec_command` em live de file tools); prompt de recovery agora injeta allowlist/pergunta exata e runner detecta `ask_user` divergente.
+- [x] Gap 18: linha viva podia mostrar `Uso BYOK sem pedido premium` como trabalho atual durante tool/turn; uso normal agora é observação/background, mantendo mismatch como alerta.
 
 ## 08. Criterio de Marco
 
@@ -370,4 +372,5 @@
 - [x] 2026-06-05: pass6 bloqueou corretamente por `unexpected-scenario-tool`: recuperação pós-tools chamou `exec_command` fora da allowlist após falha BYOK/hash mismatch.
 - [x] 2026-06-05: `buildToolOnlyRecoveryPrompt()` agora preserva allowlist original de tools e pergunta exata de `ask_user`; runner live também bloqueia pergunta divergente com diagnóstico próprio.
 - [x] 2026-06-05: reexecutado live `file-patch-roundtrip` pass7 em PTY; status PASS, scratch limpo, `delete_file` real renderizado como `EXCLUIR`, `ask_user` exato, resposta pós-SIM materializada e export/SSE correlacionados.
+- [x] 2026-06-05: `llm.usage` BYOK sem premium request deixou de tomar a atividade corrente; a linha viva permanece em tool/turn enquanto usage segue em SSE, `/usage` e histórico quando habilitado.
 - [ ] 2026-06-05: melhorar estado visual/diagnostico para continuacao pos-`ask_user` lenta ou falha BYOK sem mensagem estruturada.

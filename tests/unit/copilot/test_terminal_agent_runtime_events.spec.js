@@ -175,7 +175,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         const rendered = println.mock.calls.map(([line]) => String(line)).join('\n');
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Falha do provedor BYOK',
+            'Falha da rota BYOK',
             expect.objectContaining({
                 detail: expect.stringContaining('falha sem mensagem estruturada do SDK'),
                 severity: 'warn',
@@ -183,7 +183,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Falha do provedor BYOK',
+            'Falha da rota BYOK',
             expect.objectContaining({
                 detail: expect.not.stringContaining('Erro do SDK sem mensagem estruturada'),
             }),
@@ -1039,7 +1039,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'task',
-            'Tarefa interna concluída',
+            'Tarefa em segundo plano concluída',
             expect.objectContaining({
                 detail: 'Persist latest PR consumption snapshot · concluído',
                 recordHistory: false,
@@ -1188,6 +1188,8 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 detail: 'modelo gpt-5.4 · tokens 10→4 · custo 0.0123',
                 source: 'agent',
                 recordHistory: true,
+                updateCurrent: false,
+                focusMode: 'background',
             }),
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Uso do modelo'));
@@ -1383,7 +1385,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Falha do provedor BYOK',
+            'Falha da rota BYOK',
             expect.objectContaining({
                 severity: 'warn',
                 detail: expect.stringContaining('fallback para Copilot auto bloqueado por contrato'),
@@ -1392,21 +1394,21 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Falha do provedor BYOK',
+            'Falha da rota BYOK',
             expect.objectContaining({
                 detail: expect.not.stringContaining('auto é a única recuperação permitida'),
             }),
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Falha do provedor BYOK',
+            'Falha da rota BYOK',
             expect.objectContaining({
                 detail: expect.stringContaining('provedor gemini'),
             }),
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Falha do provedor BYOK',
+            'Falha da rota BYOK',
             expect.objectContaining({
                 detail: expect.not.stringContaining('provider='),
             }),

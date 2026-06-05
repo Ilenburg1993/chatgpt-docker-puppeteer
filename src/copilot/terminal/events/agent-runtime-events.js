@@ -1180,6 +1180,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             source: 'agent',
             severity: billing.mismatch ? 'warn' : 'info',
             recordHistory: shouldPersist,
+            updateCurrent: billing.mismatch,
+            focusMode: 'background',
         });
         if ((showUsage || billing.mismatch) && !isTerminalRenderLocked()) {
             const rowDetail = billing.mismatch ? technicalDetail : renderLlmUsageModelRowDetail(operatorDetail);
