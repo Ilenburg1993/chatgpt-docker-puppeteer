@@ -150,7 +150,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
 
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'error',
-            'Tarefa interna falhou',
+            'Tarefa em segundo plano falhou',
             expect.objectContaining({
                 detail: 'dialog_boot · reenvio automático bloqueado após reconexão',
                 severity: 'error',
@@ -162,7 +162,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
         );
     });
 
-    it('consome chunk em task.reasoning como thinking colapsado de tarefa interna', async () => {
+    it('consome chunk em task.reasoning como thinking colapsado de tarefa em segundo plano', async () => {
         const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
         const { setupTerminalTaskStreamListeners } =
             await import('../../../src/copilot/terminal/events/task-stream-events.js');
@@ -173,13 +173,13 @@ describe('terminal/task-stream-events.js — contrato', () => {
 
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'task',
-            'Raciocinando tarefa interna',
-            expect.objectContaining({ detail: 'task task-1', source: 'agent', recordHistory: false }),
+            'Raciocínio em segundo plano',
+            expect.objectContaining({ detail: 'tarefa task-1', source: 'agent', recordHistory: false }),
         );
         expect(mocks.appendThinkingHistoryChunk).toHaveBeenCalledWith(
             expect.objectContaining({ id: 'task-task-1', source: 'task', chunk: 'pensando...' }),
         );
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('task thinking capturado'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('raciocínio da tarefa capturado'));
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('/thinking show'));
         expect(stdoutSpy).not.toHaveBeenCalled();
         stdoutSpy.mockRestore();
@@ -227,9 +227,9 @@ describe('terminal/task-stream-events.js — contrato', () => {
 
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'task',
-            'Executando tarefa interna',
+            'Tarefa em segundo plano',
             expect.objectContaining({
-                detail: expect.stringContaining('delta (task-1)'),
+                detail: expect.stringContaining('tarefa task-1 · 1 fragmento · 9 caracteres'),
                 source: 'agent',
                 recordHistory: false,
             }),
@@ -321,16 +321,16 @@ describe('terminal/task-stream-events.js — contrato', () => {
         expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'task',
-            'Tarefa interna concluída',
+            'Tarefa em segundo plano concluída',
             expect.objectContaining({
-                detail: '1 chunks · 25 chars',
+                detail: '1 fragmento · 25 caracteres',
                 recordHistory: false,
                 updateCurrent: false,
             }),
         );
         expect(mocks.recordTerminalActivity).not.toHaveBeenCalledWith(
             'task',
-            'Executando tarefa interna',
+            'Tarefa em segundo plano',
             expect.any(Object),
         );
     });
@@ -353,7 +353,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
         expect(stdoutSpy).not.toHaveBeenCalled();
         expect(mocks.recordTerminalActivity).not.toHaveBeenCalledWith(
             'task',
-            'Executando tarefa interna',
+            'Tarefa em segundo plano',
             expect.any(Object),
         );
         expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalled();
@@ -370,9 +370,9 @@ describe('terminal/task-stream-events.js — contrato', () => {
 
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'task',
-            'Tarefa interna concluída',
+            'Tarefa em segundo plano concluída',
             expect.objectContaining({
-                detail: '0 chunks · 0 chars',
+                detail: '0 fragmentos · 0 caracteres',
                 recordHistory: false,
                 updateCurrent: false,
             }),
@@ -403,7 +403,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
             id: 'task-internal-1',
             ts: Date.now(),
             source: 'task',
-            title: 'Task interna',
+            title: 'Tarefa em segundo plano',
             content: 'pensando...',
             chars: 11,
             durationMs: 15,
@@ -423,7 +423,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
             expect.objectContaining({ id: 'task-internal-1', source: 'task', taskId: null }),
         );
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('/thinking show task-internal-1'));
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('task thinking #task-internal-1 concluído'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('raciocínio da tarefa #task-internal-1 concluído'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('__anonymous__'));
     });
 
@@ -432,7 +432,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
             id: 'task-task-1',
             ts: Date.now(),
             source: 'task',
-            title: 'Task task-1',
+            title: 'Tarefa task-1',
             content: 'pensando...',
             chars: 11,
             durationMs: 15,
@@ -452,6 +452,6 @@ describe('terminal/task-stream-events.js — contrato', () => {
             'task-task-1',
             expect.objectContaining({ status: 'completed' }),
         );
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('task thinking #task-task-1 concluído'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('raciocínio da tarefa #task-task-1 concluído'));
     });
 });

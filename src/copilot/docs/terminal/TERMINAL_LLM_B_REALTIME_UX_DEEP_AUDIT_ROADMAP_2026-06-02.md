@@ -9640,3 +9640,50 @@
   - reabrir a auditoria dos comandos `/session`, `/config`, `/diagnose` e `/events` para separar
     mais claramente `rota`, `provedor`, `perfil`, `preset` e `modelo` conforme o tipo de painel;
   - checar se o live canônico deve validar explicitamente `Rota BYOK` dentro de `/usage now`.
+
+### 12.112 Nomes humanos para origem de tools, intenção e tarefas — 2026-06-04
+
+- [x] Achado:
+  - as screenshots ruins tinham três padrões que ainda podiam reaparecer em superfícies detalhadas:
+    `report_intent`, `tool/report_intent_local` e `Tarefa interna`;
+  - o presenter central já sabia que `report_intent` significa `Intenção capturada`, mas `/tools all`
+    ainda escrevia `SDK report_intent` como detalhe bruto;
+  - `/activity detail` não mostrava origem na timeline, e quando uma origem `tool/...` era usada em
+    outras áreas ela não passava pelo glossário humano;
+  - `task-stream-events` e background tasks ainda usavam `tarefa interna`, termo correto para código,
+    mas ruim para o operador humano.
+- [x] Decisão UX:
+  - nomes brutos de tool podem aparecer apenas como complemento em modo profundo, nunca como texto
+    primário;
+  - origem `tool/<nome>` deve ser renderizada como `ferramenta · <nome humano>`;
+  - a superfície humana deve falar em `tarefa em segundo plano`, não `tarefa interna`;
+  - IDs `task-*` e nomes crus continuam preservados em stores, SSE, export e rastreio quando o modo
+    realmente pede diagnóstico.
+- [x] Implementação:
+  - `/tools all` passou a renderizar raw SDK conhecido como
+    `SDK Intenção capturada (report_intent)`;
+  - `/activity detail` passou a incluir origem humana na timeline completa;
+  - `renderSourceLabel()` agora humaniza fontes `tool/...` com o glossário canônico de tools;
+  - `task-stream-events` passou a registrar `Tarefa em segundo plano`, `Raciocínio em segundo plano`,
+    `Tarefa em segundo plano concluída` e `Tarefa em segundo plano falhou`;
+  - background tasks internas silenciosas do runtime também usam `Tarefa em segundo plano` como
+    label humano, preservando a mesma política de histórico/update.
+- [x] Validação:
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js`
+    com 35 testes verdes;
+  - [x] `npx vitest run tests/unit/copilot/test_terminal_task_stream_events.spec.js tests/unit/copilot/terminal/test_activity_state.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js`
+    com 59 testes verdes;
+  - [x] `npx eslint` focado em task stream, agent runtime events, `/tools`, `/activity` e testes
+    associados;
+  - [x] `rg` não encontrou `Tarefa interna`, `Executando tarefa interna`, `Raciocinando tarefa
+    interna`, `task thinking` ou `SDK report_intent` nas superfícies de terminal e testes focados.
+- [x] Resultado esperado:
+  - `/activity detail` passa a explicar de onde veio uma intenção sem expor `tool/report_intent_local`;
+  - `/tools all` continua útil para engenharia, mas com leitura humana à frente do identificador cru;
+  - a linha viva e a timeline deixam de sugerir que há uma tarefa de implementação “interna” visível
+    ao operador.
+- [ ] Próximas verificações:
+  - reexecutar live canônico depois de mais uma rodada de limpeza para confirmar ausência de
+    `report_intent`, `request_user_input`, IDs de tool e `tarefa interna` no terminal real;
+  - auditar `sdk-session-events` para substituir eventuais prints ANSI manuais restantes de task,
+    skills, session task complete e comandos.

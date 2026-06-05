@@ -52,7 +52,7 @@ function renderLifecycleDiagnosticLine(entry, options = {}) {
     const visualName = getTerminalHumanToolName(entry.toolName);
     const technicalName = visualName === entry.toolName ? null : entry.toolName;
     const rawName =
-        entry.rawToolName && entry.rawToolName !== entry.toolName ? `SDK ${entry.rawToolName}` : null;
+        entry.rawToolName && entry.rawToolName !== entry.toolName ? renderSdkRawToolName(entry.rawToolName) : null;
     const operation = entry.operation ? renderLifecycleOperationLabel(entry.operation) : null;
     const status = renderLifecycleStatusLabel(entry.status);
     const summary = [status, operation].filter(Boolean).join(' · ');
@@ -196,6 +196,15 @@ function renderToolDiagnosticName(name) {
  */
 function renderTechnicalToolName(name) {
     return name;
+}
+
+/**
+ * @param {string} name
+ * @returns {string}
+ */
+function renderSdkRawToolName(name) {
+    const visualName = getTerminalHumanToolName(name);
+    return visualName === name ? `SDK ${name}` : `SDK ${visualName} (${name})`;
 }
 
 /**

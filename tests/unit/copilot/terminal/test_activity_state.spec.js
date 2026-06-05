@@ -123,7 +123,7 @@ describe('terminal/activity-state', () => {
             toolName: 'exec_command',
             source: 'sdk',
         });
-        recordTerminalActivity('task', 'Tarefa interna concluída', {
+        recordTerminalActivity('task', 'Tarefa em segundo plano concluída', {
             detail: 'tarefa auxiliar',
             source: 'agent',
         });
@@ -156,7 +156,7 @@ describe('terminal/activity-state', () => {
     it('registra evento observado sem substituir a atividade atual', () => {
         clearTerminalActivityHistory();
         markTerminalActivityIdle('Aguardando próxima mensagem');
-        recordTerminalActivity('task', 'Tarefa interna concluída', {
+        recordTerminalActivity('task', 'Tarefa em segundo plano concluída', {
             detail: '0 fragmentos · 0 caracteres',
             source: 'agent',
             recordHistory: true,
@@ -168,6 +168,6 @@ describe('terminal/activity-state', () => {
 
         expect(snap.phase).toBe('idle');
         expect(snap.label).toBe('Pronto');
-        expect(history[0]?.label).toBe('Tarefa interna concluída');
+        expect(history[0]?.label).toBe('Tarefa em segundo plano concluída');
     });
 });

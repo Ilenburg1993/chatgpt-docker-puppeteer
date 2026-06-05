@@ -15,6 +15,7 @@ import {
     compactTerminalDiagnosticId,
     compactTerminalOperatorToolText,
     formatTerminalToolPathForOperator,
+    getTerminalHumanToolName,
     humanizeTerminalToolSurfaceText,
     isTerminalInternalCallIdentifier,
 } from '../events/tool-activity-presenter.js';
@@ -104,6 +105,10 @@ function renderSourceLabel(source) {
     const normalized = typeof source === 'string' ? source.trim().toLowerCase() : '';
     if (!normalized) return 'terminal';
     if (normalized === 'sdk' || normalized.startsWith('sdk/')) return 'SDK';
+    if (normalized.startsWith('tool/')) {
+        const toolName = normalized.slice('tool/'.length);
+        return toolName ? `ferramenta · ${getTerminalHumanToolName(toolName)}` : 'ferramenta';
+    }
     if (normalized === 'agent' || normalized.startsWith('agent/')) return 'agente';
     if (normalized === 'dialog' || normalized.startsWith('dialog')) return 'diálogo';
     if (normalized === 'io') return 'I/O';
@@ -596,9 +601,10 @@ export function cmdActivity({ println }, arg) {
     println(terminalThemeHeadline('assistant', detail ? 'Timeline completa' : 'Timeline operacional'));
     for (const entry of timelineEntries) {
         const ts = renderActivityTime(entry.ts, { detail, now });
+        const source = detail ? ` · ${renderSourceLabel(entry.source)}` : '';
         const extra = entry.detail ? ` — ${compactOperatorDetail(entry.detail)}` : '';
         println(
-            terminalThemeWrappedRow('Evento', `${ts} · ${renderTimelineEntryHeading(entry)}${extra}`, {
+            terminalThemeWrappedRow('Evento', `${ts} · ${renderTimelineEntryHeading(entry)}${source}${extra}`, {
                 role: renderActivitySeverityRole(entry.severity),
             }),
         );

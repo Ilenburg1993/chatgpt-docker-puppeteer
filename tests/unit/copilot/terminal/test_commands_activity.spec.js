@@ -634,10 +634,12 @@ describe('terminal/commands/activity', () => {
         });
         const ctx = mockCtx();
 
-        cmdActivity({ println: ctx.println }, '5');
+        cmdActivity({ println: ctx.println }, 'detail 5');
 
         expect(ctx.output()).toMatch(/terminal live canonical deltas\s+tools\s+ask_user usage/u);
         expect(ctx.output()).not.toContain('terminal live canonical deltas tools Pergunta ao operador usage');
+        expect(ctx.output()).toContain('ferramenta · Intenção capturada');
+        expect(ctx.output()).not.toContain('tool/report_intent_local');
     });
 
     it('trata confirmação cruzada SDK/IO do mesmo arquivo como uma operação única', () => {

@@ -230,7 +230,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         }
         taskLastDeltaActivityAt.set(taskKey, now);
         const stats = taskDeltaStats.get(taskKey) ?? { chunks: 0, chars: 0 };
-        recordTerminalActivity('task', 'Executando tarefa interna', {
+        recordTerminalActivity('task', 'Tarefa em segundo plano', {
             detail: `${evt.taskId ? `tarefa ${evt.taskId} · ` : ''}${formatTaskStreamStats(stats)}`,
             source: 'agent',
             recordHistory: false,
@@ -242,15 +242,15 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         if (!text) return;
         const taskId = evt.taskId ?? null;
         const thinkingId = getThinkingId(taskId);
-        recordTerminalActivity('task', 'Raciocinando tarefa interna', {
-            detail: taskId ? `tarefa ${taskId}` : 'tarefa interna',
+        recordTerminalActivity('task', 'Raciocínio em segundo plano', {
+            detail: taskId ? `tarefa ${taskId}` : 'tarefa em segundo plano',
             source: 'agent',
             recordHistory: false,
         });
         appendThinkingHistoryChunk({
             id: thinkingId,
             source: 'task',
-            title: taskId ? `Task ${taskId}` : 'Task interna',
+            title: taskId ? `Tarefa ${taskId}` : 'Tarefa em segundo plano',
             chunk: text,
             taskId,
         });
@@ -259,7 +259,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             openThinkingIds.add(thinkingId);
             if (getShowThinking()) {
                 const thinkingRef = formatTerminalThinkingRef(thinkingId);
-                println(`  \x1b[33m↳ raciocínio da tarefa capturado\x1b[0m \x1b[90m(${taskId ?? 'tarefa interna'})\x1b[0m`);
+                println(`  \x1b[33m↳ raciocínio da tarefa capturado\x1b[0m \x1b[90m(${taskId ?? 'tarefa em segundo plano'})\x1b[0m`);
                 println(`  \x1b[90m    /thinking show ${thinkingRef}  ·  /thinking latest\x1b[0m`);
             }
         }
@@ -274,7 +274,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
         }
         const wasAlreadyRenderedByTurn = taskDeltasSeenWhileBusy.has(taskKey);
         const hadVisiblePayload = (stats.chunks > 0 || stats.chars > 0) && !wasAlreadyRenderedByTurn;
-        recordTerminalActivity('task', 'Tarefa interna concluída', {
+        recordTerminalActivity('task', 'Tarefa em segundo plano concluída', {
             detail: formatTaskStreamStats(stats),
             source: 'agent',
             recordHistory: hadVisiblePayload,
@@ -302,7 +302,7 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             ? `${origin ?? 'task'} · reenvio automático bloqueado após reconexão`
             : formatTaskStreamStats(stats);
         if (!hasCanonicalSessionError) {
-            recordTerminalActivity('error', 'Tarefa interna falhou', {
+            recordTerminalActivity('error', 'Tarefa em segundo plano falhou', {
                 detail,
                 source: 'agent',
                 severity: 'error',

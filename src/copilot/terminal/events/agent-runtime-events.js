@@ -164,7 +164,7 @@ function classifyBackgroundNarration({ description, failed = false }) {
             print: false,
             recordHistory: false,
             updateCurrent: false,
-            labelPrefix: 'Tarefa interna',
+            labelPrefix: 'Tarefa em segundo plano',
         };
     }
     return { print: true, recordHistory: true, updateCurrent: false, labelPrefix: 'Tarefa em segundo plano' };
@@ -1031,11 +1031,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const failed = status === 'failed';
         const narration = classifyBackgroundNarration({ description, failed });
         const operatorDescription = renderBackgroundDescriptionForOperator(description);
-        const activityLabel = failed
-            ? 'Tarefa em segundo plano falhou'
-            : narration.labelPrefix === 'Tarefa interna'
-              ? 'Tarefa interna concluída'
-              : 'Tarefa em segundo plano concluída';
+        const activityLabel = failed ? 'Tarefa em segundo plano falhou' : 'Tarefa em segundo plano concluída';
         recordTerminalActivity('task', activityLabel, {
             detail: `${operatorDescription} · ${renderRuntimeStatusLabel(status)}`,
             severity: failed ? 'error' : 'info',
