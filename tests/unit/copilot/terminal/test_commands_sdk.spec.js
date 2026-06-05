@@ -275,8 +275,10 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('Quota SDK');
         expect(ctx.output()).toContain('91.0%');
         expect(ctx.output()).toContain('restante · reset');
-        expect(ctx.output()).toContain('escopo');
-        expect(ctx.output()).toContain('entitlement do SDK');
+        expect(ctx.output()).toContain('fonte');
+        expect(ctx.output()).toContain('limite do SDK');
+        expect(ctx.output()).not.toContain('escopo entitlement');
+        expect(ctx.output()).not.toContain('entitlement do SDK');
         expect(ctx.output()).not.toContain('restante=');
         expect(ctx.output()).not.toContain('reset=');
         expect(ctx.output()).not.toContain('escopo=');
@@ -295,7 +297,8 @@ describe('terminal/commands/sdk', () => {
         await cmdSdk({ println: ctx.println }, 'quota');
 
         expect(ctx.output()).toContain('Pedidos premium SDK');
-        expect(ctx.output()).toContain('entitlement do SDK');
+        expect(ctx.output()).toContain('limite do SDK');
+        expect(ctx.output()).not.toContain('entitlement do SDK');
         expect(ctx.output()).not.toContain('Premium Requests');
         expect(ctx.output()).not.toContain('premium_interactions');
     });

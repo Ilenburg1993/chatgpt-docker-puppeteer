@@ -2383,7 +2383,8 @@ function diagnosticUxCycleCriteria(boot) {
                 /Modelos\s+\/sdk models · \/sdk tools[\s\S]*Skills\s+\/sdk skills[\s\S]*Rotina\s+\/sdk quota · \/sdk waits[\s\S]*Headers\s+\/sdk headers[\s\S]*Simular\s+\/sdk simulate pergunta/iu.test(
                     sdkStatusSurface,
                 ) &&
-                !/SDK do Terminal\s+·\s+default|\d{4}-\d{2}-\d{2}T|\bsdk-[a-z0-9_-]+\b|copilot_sdk_entitlement|premium_interactions|request-user-input|request_user_input|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|reasoning=|restante=|\/sdk models \| \/sdk skills/iu.test(
+                /fonte\s+limite do SDK/iu.test(sdkStatusSurface) &&
+                !/SDK do Terminal\s+·\s+default|\d{4}-\d{2}-\d{2}T|\bsdk-[a-z0-9_-]+\b|copilot_sdk_entitlement|premium_interactions|escopo entitlement|request-user-input|request_user_input|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|reasoning=|restante=|\/sdk models \| \/sdk skills/iu.test(
                     sdkStatusSurface,
                 ),
             detail: '/sdk status rendered principal runtime, session presence, quota/status and compact multiline command help without raw ids, raw quota scopes or key=value diagnostics',

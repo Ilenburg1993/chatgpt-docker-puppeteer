@@ -298,7 +298,7 @@ function renderSdkQuotaResetLabel(value) {
  */
 function renderSdkQuotaScopeLabel(value) {
     const scope = String(value ?? '').trim();
-    if (scope === 'copilot_sdk_entitlement') return 'entitlement do SDK';
+    if (scope === 'copilot_sdk_entitlement') return 'limite do SDK';
     if (scope === 'copilot_chat') return 'chat Copilot';
     if (scope === 'premium_interactions') return 'quota premium SDK';
     return scope.replace(/[._-]+/gu, ' ') || 'n/d';
@@ -1807,7 +1807,7 @@ async function renderSdkQuota({ println }, runtimeId, opts = {}) {
         println(
             terminalThemeRow(
                 opts.compact ? 'Quota' : quotaLabel,
-                `${opts.compact ? `${quotaLabel} · ` : ''}${pct} restante · reset ${renderSdkQuotaResetLabel(row.resetAt)} · escopo ${renderSdkQuotaScopeLabel(row.scope)}`,
+                `${opts.compact ? `${quotaLabel} · ` : ''}${pct} restante · reset ${renderSdkQuotaResetLabel(row.resetAt)} · fonte ${renderSdkQuotaScopeLabel(row.scope)}`,
                 { role },
             ),
         );
