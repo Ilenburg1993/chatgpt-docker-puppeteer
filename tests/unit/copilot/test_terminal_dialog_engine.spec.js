@@ -549,6 +549,12 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(stdoutWriteSpy?.mock.calls.map((call) => String(call[0])).join('')).toContain(
             '/byok auto record profile:chutes-ai',
         );
+        const renderedOutput = stdoutWriteSpy?.mock.calls.map((call) => String(call[0])).join('') ?? '';
+        expect(renderedOutput).toContain('Rota BYOK');
+        expect(renderedOutput).toContain('rota BYOK recusou a chamada por crédito');
+        expect(renderedOutput).toContain('Destino');
+        expect(renderedOutput).not.toContain('dialog.byok_provider_credits:');
+        expect(renderedOutput).not.toContain('402 402 status code');
         if (previousAuto === undefined) delete process.env.COPILOT_BYOK_GATEWAY_AUTO;
         else process.env.COPILOT_BYOK_GATEWAY_AUTO = previousAuto;
 

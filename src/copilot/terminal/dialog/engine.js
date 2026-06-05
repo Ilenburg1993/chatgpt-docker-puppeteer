@@ -97,6 +97,7 @@ import {
     auditAssistantToolClaims,
     renderAssistantToolClaimAuditFindings,
 } from './assistant-tool-claim-audit.js';
+import { presentByokTurnFailure } from './byok-turn-error-presentation.js';
 import {
     buildTerminalEmptyOutputDiagnosis,
     classifyTerminalEmptyOutput,
@@ -1713,6 +1714,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         const byokFailure = resolveByokTurnErrorDescriptor(e, readConfiguredByokSummary());
         if (byokFailure) {
             const now = Date.now();
+            const byokFailurePresentation = presentByokTurnFailure(byokFailure);
             recordByokProviderModelCallFailure({
                 routeProfile: byokFailure.profile,
                 providerId: byokFailure.provider,
@@ -1731,21 +1733,16 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 completeTerminalTurnTrace({ timestamp: now, status: 'failed' });
             }
             recordTerminalActivity('error', 'Falha da rota BYOK no turno', {
-                detail:
-                    `${byokFailure.errorContext} · perfil ${byokFailure.profile ?? '-'} · ` +
-                    `provedor ${byokFailure.provider ?? '-'} · modelo ${byokFailure.model ?? '-'} · ` +
-                    'sem pedido premium',
+                detail: `${byokFailurePresentation.summary} · ${byokFailurePresentation.destination} · ${byokFailurePresentation.technicalDetail}`,
                 severity: 'error',
                 source: 'dialog',
             });
-            println(
-                terminalThemeRow(
-                    'BYOK',
-                    `${byokFailure.errorContext}: ${byokFailure.message} · ${byokFailure.failure.operatorLabel} · sem pedido premium`,
-                    { role: 'error' },
-                ),
-            );
-            println(terminalThemeRow('Ação', byokFailure.failure.operatorAction, { role: 'command' }));
+            println(terminalThemeRow(byokFailurePresentation.title, byokFailurePresentation.summary, { role: 'error' }));
+            println(terminalThemeRow('Destino', byokFailurePresentation.destination, { role: 'muted' }));
+            if (byokFailurePresentation.window) {
+                println(terminalThemeRow('Janela', byokFailurePresentation.window, { role: 'warn' }));
+            }
+            println(terminalThemeRow('Ação', byokFailurePresentation.action, { role: 'command' }));
             await printByokAutoAfterFailureHint(byokFailure);
         } else {
             clearTerminalTurnMaterialization();

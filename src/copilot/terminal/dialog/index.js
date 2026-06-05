@@ -38,3 +38,4 @@ export {
     classifyTerminalEmptyOutput,
     hasTerminalPendingHumanInputOutcome,
 } from './empty-output-diagnosis.js';
+export { presentByokTurnFailure } from './byok-turn-error-presentation.js';

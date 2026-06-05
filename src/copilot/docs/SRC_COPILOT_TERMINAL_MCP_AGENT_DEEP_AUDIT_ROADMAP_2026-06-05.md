@@ -213,11 +213,12 @@
 - [x] G.2 Runner live ja evita falso positivo quando input humano ocorre depois do empty.
 - [ ] G.3 Auditar turn trace completo para provider failure tardio.
 - [x] G.4 Separar empty de tool-only bem-sucedido, pending question e protocolo.
-- [ ] G.5 Ligar provider/model failure ao runtime health BYOK quando aplicavel.
+- [x] G.5 Ligar provider/model failure ao runtime health BYOK quando aplicavel.
 - [ ] G.6 Garantir cooldown de retry sem mascarar falha real.
 - [ ] G.7 Criar testes unitarios para cada causa de empty.
 - [ ] G.8 Criar live que simule falha de modelo e verifica UX.
 - [ ] G.9 Garantir mensagem final sem verborragia e sem loops repetitivos.
+- [x] G.10 Humanizar falha BYOK de turno vivo como `Rota BYOK`, `Destino`, `Janela` e `Ação`, sem `dialog.byok_*` ou mensagem crua na superfície default.
 
 ## Faixa H - Model Switching, BYOK e Sessao Viva
 
@@ -344,6 +345,7 @@
 - [x] Gap 20: live pass3 mostrou `Modelo SDK confirmado` assíncrono entre prompt e comando seguinte; confirmações correlacionadas agora não imprimem linha solta no prompt.
 - [x] Gap 21: `elicitation.pending` ainda podia aparecer como termo tecnico; agora a superficie default usa `Formulário ao operador`, ação clara e IDs apenas como pedido secundario/detail.
 - [x] Gap 22: a classificacao de turno sem transcript publico vivia acoplada ao `engine.js`; agora `empty-output-diagnosis` separa `pending_human_input`, `tool_only`, `protocol_transition` e `empty_failure` em core puro testavel.
+- [x] Gap 23: falha BYOK de turno vivo expunha `dialog.byok_*` e mensagem crua do provider no terminal; agora um presenter puro gera resumo humano e preserva detalhe técnico em activity/SSE/health.
 
 ## 08. Criterio de Marco
 
@@ -391,4 +393,5 @@
 - [x] 2026-06-05: `elicitation.pending/completed` foi rebaixado de jargao SDK para `Formulário ao operador`, reaproveitando o renderer canonico de pergunta humana e mantendo o pedido tecnico em linha secundaria.
 - [x] 2026-06-05: extraído `dialog/empty-output-diagnosis.js` para classificar saida vazia/nao textual sem efeitos colaterais; engine permanece responsavel por activity/SSE/BYOK health.
 - [x] 2026-06-05: adicionados testes unitarios para pending human input, READY protocolar, tool-only, protocol transition e diagnostico acionavel de tools sem sintese publica.
+- [x] 2026-06-05: criado `dialog/byok-turn-error-presentation.js`; erros BYOK de turno vivo agora mostram `Rota BYOK`, destino, janela de retry/reset quando houver e ação, sem vazar `dialog.byok_*` na linha principal.
 - [ ] 2026-06-05: melhorar estado visual/diagnostico para continuacao pos-`ask_user` lenta ou falha BYOK sem mensagem estruturada.
