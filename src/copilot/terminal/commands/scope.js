@@ -90,7 +90,7 @@ function renderScopeSymbolKind(kind) {
     if (value === 'method') return 'método';
     if (value === 'const') return 'constante';
     if (value === 'let') return 'variável';
-    if (value === 'export') return 'export';
+    if (value === 'export') return 'exportação';
     return value.replace(/[._-]+/gu, ' ') || 'símbolo';
 }
 
@@ -354,10 +354,10 @@ function runContext(ctx, parts) {
     ctx.println('');
     ctx.println(terminalThemeHeadline('assistant', 'Contexto de escopo'));
     ctx.println(terminalThemeRow('Escopo', `${scope.sessionId} · ${ready}`));
-    ctx.println(terminalThemeRow('Arquivos', `${scope.files} · símbolos ${scope.symbols} · exports ${scope.topExports.length}`));
-    for (const item of scope.topExports.slice(0, 30)) ctx.println(terminalThemeRow('Export', renderScopeExportLabel(item)));
+    ctx.println(terminalThemeRow('Arquivos', `${scope.files} · símbolos ${scope.symbols} · exportações ${scope.topExports.length}`));
+    for (const item of scope.topExports.slice(0, 30)) ctx.println(terminalThemeRow('Exportação', renderScopeExportLabel(item)));
     if (scope.topExports.length > 30)
-        ctx.println(terminalThemeRow('Mais', countLabel(scope.topExports.length - 30, 'export adicional', 'exports adicionais')));
+        ctx.println(terminalThemeRow('Mais', countLabel(scope.topExports.length - 30, 'exportação adicional', 'exportações adicionais')));
     ctx.println('');
 }
 

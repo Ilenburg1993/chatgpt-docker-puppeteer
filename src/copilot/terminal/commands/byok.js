@@ -467,6 +467,9 @@ function renderByokTokenLabel(value) {
         selected_route_missing: 'rota selecionada ausente',
         rate_limit_resettable: 'limite de taxa com reset',
         rate_limit: 'limite de taxa',
+        aggregator: 'agregador',
+        aggregator_auto: 'agregador automático',
+        aggregator_models: 'modelos do agregador',
         capabilities_changed: 'capacidades alteradas',
         pricing_changed: 'preço alterado',
         disposition_changed: 'disposição alterada',
@@ -5740,6 +5743,8 @@ async function renderByokGatewayRoutes(println, rest) {
         const providerModel = optionalScalarString(route['providerModel']) ?? '-';
         const selectorKind = renderByokTokenLabel(optionalScalarString(route['selectorKind']));
         const selectorSyntax = optionalScalarString(route['selectorSyntax']) ?? '-';
+        const wireApi = renderByokWireLabel(optionalScalarString(policy['wireApi']));
+        const wireLabel = wireApi === '-' ? 'padrão' : wireApi;
         println(
             terminalThemeRow('Rota', `${providerId}:${providerModel}`, {
                 role: 'accent',
@@ -5755,13 +5760,13 @@ async function renderByokGatewayRoutes(println, rest) {
         println(
             terminalThemeRow(
                 'Política',
-                `camada ${renderByokTokenLabel(optionalScalarString(policy['routeLayer']))} · wire ${renderByokWireLabel(optionalScalarString(policy['wireApi']))} · fonte ${renderByokSourceIdLabel(optionalScalarString(route['sourceId']))} · confiança ${renderByokTokenLabel(optionalScalarString(route['confidence']))}`,
+                `camada ${renderByokTokenLabel(optionalScalarString(policy['routeLayer']))} · protocolo ${wireLabel} · fonte ${renderByokSourceIdLabel(optionalScalarString(route['sourceId']))} · confiança ${renderByokTokenLabel(optionalScalarString(route['confidence']))}`,
                 { role: 'muted' },
             ),
         );
     }
     if (routes.length > displayLimit) {
-        println(terminalThemeRow('Mais', `exibindo ${displayLimit}/${routes.length}; use filtro ou limite numerico.`, { role: 'muted' }));
+        println(terminalThemeRow('Mais', `exibindo ${displayLimit}/${routes.length}; use filtro ou limite numérico.`, { role: 'muted' }));
     }
     println(terminalThemeRow('Nota', 'rotas são metadados de seleção; esta tela não executa modelo.', { role: 'muted' }));
     println('');
@@ -5825,7 +5830,7 @@ async function renderByokGatewayOverlays(println, rest) {
         );
     }
     if (overlays.length > args.limit) {
-        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${overlays.length}; use filtro ou limite numerico.`, { role: 'muted' }));
+        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${overlays.length}; use filtro ou limite numérico.`, { role: 'muted' }));
     }
     println(terminalThemeRow('Nota', 'overlays complementam o catálogo; a tela não executa modelo nem revela valores de segredo.', { role: 'muted' }));
     println('');
@@ -5903,7 +5908,7 @@ async function renderByokGatewayAccounts(println, rest) {
         );
     }
     if (accountSummary.rows.length > args.limit) {
-        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${accountSummary.rows.length}; use filtro ou limite numerico.`, { role: 'muted' }));
+        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${accountSummary.rows.length}; use filtro ou limite numérico.`, { role: 'muted' }));
     }
     println(terminalThemeRow('Nota', 'esta visão é da conta/key e não executa modelo; saúde runtime continua em /byok health.', { role: 'muted' }));
     println('');
@@ -5975,7 +5980,7 @@ async function renderByokGatewayLimits(println, rest) {
         println(terminalThemeRow('Ação', renderByokTokenLabel(row.nextAction), { role: row.activeBlocker ? 'command' : 'muted' }));
     }
     if (explanation.rows.length > args.limit) {
-        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${explanation.rows.length}; use filtro ou limite numerico.`, { role: 'muted' }));
+        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${explanation.rows.length}; use filtro ou limite numérico.`, { role: 'muted' }));
     }
     println(terminalThemeRow('Nota', 'limites provider/account podem bloquear pré-runtime; AssistantUsageQuotaSnapshot é quota SDK/Copilot e não substitui overlay BYOK externo.', { role: 'muted' }));
     println('');
@@ -6022,7 +6027,7 @@ function renderByokGatewayQuotaMatrix(println, rest) {
         println(terminalThemeRow('Endpoints', row.endpoints.slice(0, 4).join(', ') || '-', { role: 'muted' }));
     }
     if (matrix.rows.length > args.limit) {
-        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${matrix.rows.length}; use filtro ou limite numerico.`, { role: 'muted' }));
+        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${matrix.rows.length}; use filtro ou limite numérico.`, { role: 'muted' }));
     }
     println(terminalThemeRow('Nota', 'a matriz descreve fontes pré-runtime possíveis; ela não prova acesso runtime nem altera catálogo.', { role: 'muted' }));
     println('');
@@ -6099,7 +6104,7 @@ async function renderByokGatewayCatalogFreshness(println, rest) {
             ),
         );
     }
-    if (sources.length > args.limit) println(terminalThemeWrappedRow('Omitidos', `exibindo ${args.limit}/${sources.length}; use filtro ou limite numerico`, { role: 'muted', columns: 112 }));
+    if (sources.length > args.limit) println(terminalThemeWrappedRow('Omitidos', `exibindo ${args.limit}/${sources.length}; use filtro ou limite numérico`, { role: 'muted', columns: 112 }));
     println('');
 }
 
@@ -6249,7 +6254,7 @@ async function renderByokGatewayEligibility(println, rest, eventBus = null) {
         if (item.nextActions.length > 0) println(terminalThemeWrappedRow('Próximo', renderByokTokenList(item.nextActions.slice(0, 4).map(String)), { role: 'command', columns: 112 }));
     }
     if (explained.length > args.limit) {
-        println(terminalThemeWrappedRow('Omitidos', `exibindo ${args.limit}/${explained.length}; use filtro ou limite numerico para reduzir`, { role: 'muted', columns: 112 }));
+        println(terminalThemeWrappedRow('Omitidos', `exibindo ${args.limit}/${explained.length}; use filtro ou limite numérico para reduzir`, { role: 'muted', columns: 112 }));
     }
     println('');
 }

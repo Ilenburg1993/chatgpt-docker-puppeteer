@@ -65,8 +65,12 @@ describe('terminal/commands/scope', () => {
 
         await cmdScope(ctx, 'context scope-terminal-test');
         expect(ctx.output()).toContain('Contexto de escopo');
+        expect(ctx.output()).toContain('exportações');
+        expect(ctx.output()).toContain('Exportação');
         expect(ctx.output()).toContain('alphaHelper · função ·');
         expect(ctx.output()).not.toContain('::alphaHelper(function)');
+        expect(ctx.output()).not.toContain('Export        ');
+        expect(ctx.output()).not.toContain('exports ');
 
         await cmdScope(ctx, 'find scope-terminal-test alphaHelper --exact');
         expect(ctx.output()).toContain('Busca de símbolo no escopo');

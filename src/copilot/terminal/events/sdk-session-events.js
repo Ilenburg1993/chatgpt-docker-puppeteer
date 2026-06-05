@@ -1311,10 +1311,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: changed,
             updateCurrent: changed,
         });
-        const shouldPrintModelTransition = (changed && !matchedRequest) || shouldPrintSessionNarration('verbose');
+        const shouldPrintModelTransition =
+            changed || matchedRequest !== null || shouldPrintSessionNarration('verbose');
         if (shouldPrintModelTransition) {
             println(
                 `\n${renderTerminalModelTransitionRow({
+                    label: matchedRequest ? 'Modelo confirmado' : undefined,
                     from: previousModel,
                     to: newModel,
                     kind: changed ? 'confirmed' : 'unchanged',

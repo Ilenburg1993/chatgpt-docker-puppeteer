@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => ({
     renderTerminalAssistantTranscript: vi.fn(() => true),
     readSdkSessionHandoffRecords: vi.fn(() => Promise.resolve([])),
     writeSdkSessionConfirmationRecords: vi.fn(() => Promise.resolve({ sdkSessionConfirmations: 1 })),
+    consumeTerminalLiveByokModelSwitchConfirmation: vi.fn(() => null),
     runtimePermissionMode: 'approve_all',
 }));
 
@@ -124,6 +125,10 @@ vi.mock('../../../src/copilot/terminal/events/assistant-transcript-renderer.js',
     renderTerminalAssistantTranscript: mocks.renderTerminalAssistantTranscript,
 }));
 
+vi.mock('../../../src/copilot/terminal/byok/live-model-switch.js', () => ({
+    consumeTerminalLiveByokModelSwitchConfirmation: mocks.consumeTerminalLiveByokModelSwitchConfirmation,
+}));
+
 function createAgentHost() {
     /** @type {Map<string, Function[]>} */
     const listeners = new Map();
@@ -175,6 +180,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         });
         mocks.readRuntimeInterventionMailboxSummary.mockReturnValue({ queueSize: 0, dropped: 0, runtimeId: 'default' });
         mocks.answerTerminalPendingQuestion.mockReturnValue(true);
+        mocks.consumeTerminalLiveByokModelSwitchConfirmation.mockReturnValue(null);
         clearTerminalTurnMaterialization();
     });
 
@@ -396,6 +402,44 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         agent.emit('session.model_changed', { previousModel: 'gpt-5.4', newModel: 'gpt-5.4', reasoningEffort: 'high' });
 
         expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('confirmado sem troca: gpt-5.4 (sem troca)'));
+    });
+
+    it('narra confirmação SDK casada com pedido vivo de modelo BYOK', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        mocks.consumeTerminalLiveByokModelSwitchConfirmation.mockReturnValueOnce({
+            model: 'anthropic/claude-sonnet-4.5',
+            previousModel: 'kilo-auto/free',
+            source: 'terminal.byok_model',
+            reason: 'solicitação manual /byok model',
+            requestedAt: Date.parse('2026-06-05T12:00:00.000Z'),
+            detail: 'solicitado: kilo-auto/free → anthropic/claude-sonnet-4.5',
+        });
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('session.model_changed', {
+            previousModel: 'kilo-auto/free',
+            newModel: 'anthropic/claude-sonnet-4.5',
+            reasoningEffort: 'high',
+        });
+
+        const rendered = mocks.println.mock.calls.map(([line]) => String(line)).join('\n');
+        expect(rendered).toContain('Modelo confirmado');
+        expect(rendered).toContain('confirmado: kilo-auto/free → anthropic/claude-sonnet-4.5');
+        expect(rendered).toContain('raciocínio high');
+        expect(rendered).not.toContain('session.model_changed');
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'session.model_changed',
+            expect.objectContaining({
+                matchedTerminalRequest: expect.objectContaining({
+                    model: 'anthropic/claude-sonnet-4.5',
+                    source: 'terminal.byok_model',
+                    requestedAt: '2026-06-05T12:00:00.000Z',
+                }),
+            }),
+        );
     });
 
     it('surfa workspace_file_changed e assistant.turn_start/end para a UX local', async () => {
