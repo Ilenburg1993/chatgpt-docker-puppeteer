@@ -118,6 +118,7 @@ import { printTerminalHumanQuestionCard } from './human-question-renderer.js';
 import {
     buildTerminalModelTransitionPresentation,
     renderTerminalModelTransitionRow,
+    renderTerminalModelTransitionSourceLabel,
 } from './model-transition-presenter.js';
 import {
     buildTerminalToolActivityPresentation,
@@ -1292,7 +1293,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             reasoningEffort,
             source: 'SDK',
             reason: matchedRequest
-                ? `confirma pedido ${matchedRequest.source} de ${new Date(matchedRequest.requestedAt).toISOString()}`
+                ? `confirma pedido ${renderTerminalModelTransitionSourceLabel(matchedRequest.source)} de ${new Date(matchedRequest.requestedAt).toISOString()}`
                 : null,
         });
         observeTerminalModelChangeProjection({ previousModel, newModel, reasoningEffort });

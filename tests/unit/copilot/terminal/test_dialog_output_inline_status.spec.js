@@ -100,6 +100,7 @@ const {
     redrawTerminalPrompt,
     resetStatusRowState,
     scheduleTerminalPromptRedraw,
+    suppressInlineStatusForSubmit,
     withTerminalExclusiveTty,
     writeInlineStatus,
 } = await import('../../../../src/copilot/terminal/dialog/output.js');
@@ -230,6 +231,14 @@ describe('terminal/dialog/output inline status', () => {
         writeInlineStatus('LLM-B pensando · 10s sem resposta pública');
 
         expect(writeSpy.mock.calls.length).toBe(writesAfterFirstPulse);
+    });
+
+    it('suprime pulso atrasado da linha viva durante submit do readline', () => {
+        suppressInlineStatusForSubmit(1_000);
+
+        writeInlineStatus('LLM-B modelo solicitado · kilo-auto/free → terminal-ux-boundary-fixture');
+
+        expect(writeSpy).not.toHaveBeenCalled();
     });
 
     it('permite desligar a linha viva por env', () => {

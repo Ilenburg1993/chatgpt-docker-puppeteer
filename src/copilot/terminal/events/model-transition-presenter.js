@@ -16,6 +16,7 @@ import { buildTerminalModelTransitionPresentation } from './model-transition-pre
 export {
     buildTerminalModelTransitionPresentation,
     formatTerminalModelTransitionIsoTimestamp,
+    renderTerminalModelTransitionSourceLabel,
 } from './model-transition-presentation.js';
 
 /**

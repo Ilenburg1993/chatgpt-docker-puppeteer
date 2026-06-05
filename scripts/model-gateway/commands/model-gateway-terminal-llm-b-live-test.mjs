@@ -3402,8 +3402,9 @@ function operatorUxCycleCriteria(boot) {
                 ) &&
                 /Timeline operacional[\s\S]{0,900}Troca de modelo solicitada/iu.test(surfaceAt(activityAfterByokModelStart)) &&
                 /Estado\s+modelo/iu.test(surfaceAt(activityAfterByokModelStart)) &&
-                !/Estado\s+model\b|provider-boundary|binding de nascimento|binding da sessão viva|provider BYOK/iu.test(
-                    `${surfaceAt(byokModelStart)}\n${surfaceAt(activityAfterByokModelStart)}`,
+                /confirma pedido terminal \/byok model/iu.test(surfaceAt(liveStart)) &&
+                !/Estado\s+model\b|provider-boundary|binding de nascimento|binding da sessão viva|provider BYOK|terminal\.byok_model/iu.test(
+                    `${surfaceAt(byokModelStart)}\n${surfaceAt(activityAfterByokModelStart)}\n${surfaceAt(liveStart)}`,
                 ),
             detail: '/byok model rendered a live model request, confirmation guidance and model activity state',
         },

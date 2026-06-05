@@ -36,6 +36,7 @@ import {
     resetStatusRowState,
     scheduleTerminalPromptRedraw,
     sendTurn,
+    suppressInlineStatusForSubmit,
 } from '../dialog/index.js';
 import {
     shouldConsumeTerminalPendingAnswerInput,
@@ -405,6 +406,7 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
 
     rl.on('line', (line) => {
         cancelScheduledTerminalPromptRedraw(rl);
+        suppressInlineStatusForSubmit();
         clearReservedInlineStatus();
         // ESCAPE-BYPASS: comandos críticos de saída/restart executam IMEDIATAMENTE, sem entrar na fila serializada.
         // Isso garante que /quit e /restart funcionem mesmo se um sendTurn anterior estiver travado na fila.

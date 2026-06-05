@@ -230,7 +230,7 @@
 - [ ] H.6 Garantir mismatch preparado/vivo como estado aguardando confirmacao, nao erro.
 - [ ] H.7 Garantir que fallback BYOK nao caia em Copilot auto quando a policy bloquear.
 - [ ] H.8 Garantir que Ollama/local nao entre em default selector sem pedido explicito.
-- [ ] H.9 Criar live de troca real de modelo com confirmacao.
+- [x] H.9 Criar live de troca real de modelo com confirmacao.
 - [ ] H.10 Criar live de fallback/erro de provider com UX clara.
 - [x] H.11 Separar core puro de apresentacao de transicao de modelo do renderer visual, evitando acoplamento BYOK -> UI/config.
 - [x] H.12 Correlacionar pedido local/auto de modelo vivo com `session.model_changed` posterior em detalhe/SSE.
@@ -318,8 +318,8 @@
 - [x] O.4 Cobrir read/list/patch/exec nos testes de presenter e linha viva.
 - [x] O.5 Rodar live curta de read/list/patch/exec, incluindo `file-patch-roundtrip`.
 - [ ] O.6 Corrigir discrepancias visuais observadas.
-- [ ] O.7 Auditar model switch end-to-end.
-- [ ] O.8 Criar live de model switch.
+- [x] O.7 Auditar model switch end-to-end.
+- [x] O.8 Criar live de model switch.
 - [ ] O.9 Consolidar comandos canonicos de terminal UX em package/Makefile.
 - [ ] O.10 Investigar libs auxiliares e criar documento especifico antes de qualquer dependencia nova.
 
@@ -391,6 +391,8 @@
 - [x] Gap 64: `/export` removia HTML e redigia segredos, mas podia preservar ANSI/OSC/control codes vindos de renderers externos; agora sanitiza texto terminal antes da redação e do Markdown.
 - [x] Gap 65: live diagnóstica mostrou que o harness podia injetar comando durante saída longa antes do prompt redesenhar; `runSessionCycleBoot` agora espera conteúdo esperado e prompt retornado, com limite de segurança.
 - [x] Gap 66: `diagnostic-ux-cycle` ainda avançava grande parte do roteiro por tempo fixo e podia ocultar regressões de ordem visual; agora cada comando do ciclo principal espera marcador semântico da própria superfície antes do próximo input.
+- [x] Gap 67: a trilha de troca de modelo ainda podia carregar fontes internas como `terminal.byok_model` em detalhes canônicos; o presenter puro agora humaniza fontes pontuadas (`terminal /byok model`, `automação BYOK`, `SDK`, `model-gateway`) e a confirmação SDK usa a mesma tradução.
+- [x] Gap 68: live de model switch mostrou timer atrasado da linha viva colando `LLM-B modelo solicitado` no comando `/activity 10`; `suppressInlineStatusForSubmit` agora bloqueia pulsos durante a borda do submit do readline.
 
 ## 08. Criterio de Marco
 
@@ -494,3 +496,5 @@
 - [x] 2026-06-05: live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T11-26-53-139Z/summary.md`, cobrindo `/terminal libs`, previews read-only, `--lines`, `/git diff`, `/menu picker`, export/log sanitizado e critérios humanos do terminal.
 - [x] 2026-06-05: `runSessionCycleBoot` recebeu backpressure por prompt estável; live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T11-29-43-334Z/summary.md` confirmou `/session sdk 6` seguido de `/sdk status` com prompt redesenhado.
 - [x] 2026-06-05: `diagnostic-ux-cycle` passou a esperar evidências semânticas por comando (`FS local criado`, `Preview`, `Eventos SSE`, `SDK do Terminal`, etc.); live PASS em `artifacts/terminal-live/2026-06-05T11-32-07-998Z/summary.md` confirmou sequência sem colagem de comandos.
+- [x] 2026-06-05: model switch ganhou humanização central de origem (`terminal.byok_model` -> `terminal /byok model`) e teste puro de ISO/origem; recorte focado de BYOK/activity/events/live-status passou com 163 testes.
+- [x] 2026-06-05: `operator-ux-cycle` primeiro falhou em `artifacts/terminal-live/2026-06-05T11-39-49-569Z/summary.md` por overlay de modelo colado em `/activity 10`; após cooldown pós-submit, live PASS em `artifacts/terminal-live/2026-06-05T11-43-44-400Z/summary.md`.

@@ -28,6 +28,7 @@ export {
     resetStatusRowState,
     scheduleTerminalPromptRedraw,
     SEPARATOR,
+    suppressInlineStatusForSubmit,
     TURN_TIMEOUT_MS,
     withTerminalExclusiveTty,
     writeInlineStatus,

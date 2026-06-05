@@ -26,12 +26,18 @@ function modelLabel(value, fallback) {
  * @param {string} source
  * @returns {string}
  */
-function renderModelTransitionSourceLabel(source) {
-    const normalized = source.trim().toLowerCase();
+export function renderTerminalModelTransitionSourceLabel(source) {
+    const normalized = source.trim().toLowerCase().replace(/_/gu, '-');
     if (normalized === 'sdk') return 'SDK';
+    if (normalized.startsWith('sdk/') || normalized.startsWith('sdk.')) return 'SDK';
     if (normalized === 'agent') return 'agente';
+    if (normalized.startsWith('agent/') || normalized.startsWith('agent.')) return 'agente';
     if (normalized === 'terminal') return 'terminal';
-    if (normalized === 'model-gateway' || normalized === 'model_gateway') return 'model-gateway';
+    if (normalized === 'terminal.byok-model') return 'terminal /byok model';
+    if (normalized === 'terminal.byok-auto') return 'automação BYOK';
+    if (normalized === 'terminal.model') return 'terminal /model';
+    if (normalized.startsWith('terminal.byok-')) return 'terminal BYOK';
+    if (normalized === 'model-gateway' || normalized.startsWith('model-gateway')) return 'model-gateway';
     return source;
 }
 
@@ -79,7 +85,7 @@ export function buildTerminalModelTransitionPresentation(input) {
         `${state}: ${transition}`,
         input.reasoningEffort ? `raciocínio ${input.reasoningEffort}` : null,
         input.reason ? input.reason : null,
-        `origem ${renderModelTransitionSourceLabel(source)}`,
+        `origem ${renderTerminalModelTransitionSourceLabel(source)}`,
         formatTerminalModelTransitionIsoTimestamp(input.timestamp),
     ].filter((part) => typeof part === 'string' && part.length > 0);
     return {

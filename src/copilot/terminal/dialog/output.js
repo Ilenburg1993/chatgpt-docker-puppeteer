@@ -96,6 +96,7 @@ const INLINE_STATUS_MODE_RESERVED = 'reserved';
 const PROMPT_REDRAW_DEDUPE_MS = 250;
 const PROMPT_PARK_DEFAULT_MS = 8_000;
 const INLINE_STATUS_VISUAL_DEDUPE_MS = 1_500;
+const INLINE_STATUS_SUBMIT_SUPPRESSION_MS = 750;
 
 /**
  * @typedef {{
@@ -115,6 +116,7 @@ const INLINE_STATUS_VISUAL_DEDUPE_MS = 1_500;
 let _statusRowsReserved = 0;
 let _terminalPromptParkedUntil = 0;
 let _terminalPromptRedrawSuppressedUntil = 0;
+let _inlineStatusSuppressedUntil = 0;
 let _lastInlineStatusVisualText = '';
 let _lastInlineStatusVisualAt = 0;
 
@@ -661,6 +663,33 @@ export function parkTerminalPromptForContinuation(durationMs = PROMPT_PARK_DEFAU
 }
 
 /**
+ * Impede pulsos atrasados da linha viva durante a borda do submit do readline.
+ *
+ * O evento `line` já limpava a área reservada, mas o timer de status podia acordar no mesmo intervalo e pintar de novo
+ * antes do comando ecoado virar saída durável. Essa pequena janela protege o input sem desligar a linha viva depois que
+ * o comando começa a produzir sua própria superfície.
+ *
+ * @param {number} [durationMs]
+ * @returns {void}
+ */
+export function suppressInlineStatusForSubmit(durationMs = INLINE_STATUS_SUBMIT_SUPPRESSION_MS) {
+    const until = Date.now() + Math.max(0, durationMs);
+    _inlineStatusSuppressedUntil = Math.max(_inlineStatusSuppressedUntil, until);
+}
+
+/**
+ * @returns {boolean}
+ */
+function shouldSuppressInlineStatusForSubmit() {
+    if (_inlineStatusSuppressedUntil <= 0) return false;
+    if (Date.now() > _inlineStatusSuppressedUntil) {
+        _inlineStatusSuppressedUntil = 0;
+        return false;
+    }
+    return true;
+}
+
+/**
  * @returns {boolean}
  */
 function shouldUseParkedTerminalPrompt() {
@@ -1179,6 +1208,7 @@ export function writeInlineStatus(text) {
     if (isTerminalRenderLocked()) return;
     if (!process.stdout.isTTY) return;
     if (!shouldUseInlineStatus()) return;
+    if (shouldSuppressInlineStatusForSubmit()) return;
     if (shouldSuppressDuplicateInlineStatus(text)) return;
     const rows = fitInlineStatusRows(text);
     const rl = getRl();
@@ -1294,6 +1324,7 @@ export function resetStatusRowState() {
     resetInlineStatusVisualDedupe();
     _terminalPromptParkedUntil = 0;
     _terminalPromptRedrawSuppressedUntil = 0;
+    _inlineStatusSuppressedUntil = 0;
     _terminalIdlePromptDeferredUntil = 0;
     _terminalIdlePromptDeferredRequest = null;
     if (_terminalIdlePromptDeferredTimer) {
