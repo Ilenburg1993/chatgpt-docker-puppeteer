@@ -394,6 +394,7 @@
 - [x] Gap 67: a trilha de troca de modelo ainda podia carregar fontes internas como `terminal.byok_model` em detalhes canônicos; o presenter puro agora humaniza fontes pontuadas (`terminal /byok model`, `automação BYOK`, `SDK`, `model-gateway`) e a confirmação SDK usa a mesma tradução.
 - [x] Gap 68: live de model switch mostrou timer atrasado da linha viva colando `LLM-B modelo solicitado` no comando `/activity 10`; `suppressInlineStatusForSubmit` agora bloqueia pulsos durante a borda do submit do readline.
 - [x] Gap 69: o fluxo canônico ainda conduzia o operador ao nome interno `/mailbox`; `/queue status|consume|clear` agora é o cockpit recomendado, com `/mailbox` preservado só como alias legado.
+- [x] Gap 70: `/tools diag` imprimia cada entrada lifecycle multi-linha em um único `println`, deixando linhas secundárias como `Alvo` fora do pipeline durável do TTY; agora cada row lifecycle é impressa separadamente.
 
 ## 08. Criterio de Marco
 
@@ -500,3 +501,4 @@
 - [x] 2026-06-05: model switch ganhou humanização central de origem (`terminal.byok_model` -> `terminal /byok model`) e teste puro de ISO/origem; recorte focado de BYOK/activity/events/live-status passou com 163 testes.
 - [x] 2026-06-05: `operator-ux-cycle` primeiro falhou em `artifacts/terminal-live/2026-06-05T11-39-49-569Z/summary.md` por overlay de modelo colado em `/activity 10`; após cooldown pós-submit, live PASS em `artifacts/terminal-live/2026-06-05T11-43-44-400Z/summary.md`.
 - [x] 2026-06-05: `/queue` ganhou subcomandos `status|consume|clear`, banner/help/live deixaram de recomendar `/mailbox`; `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T11-48-47-241Z/summary.md` confirmou a fila humana e o estado vazio de `/history`.
+- [x] 2026-06-05: `/tools diag` passou a imprimir rows lifecycle uma a uma, evitando que `Alvo`/`Comando` fiquem visualmente fora do fluxo durável do terminal; live PASS em `artifacts/terminal-live/2026-06-05T11-51-53-605Z/summary.md`.

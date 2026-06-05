@@ -122,6 +122,18 @@ function renderLifecycleDiagnosticLine(entry, options = {}) {
 }
 
 /**
+ * @param {(text: string) => void} println
+ * @param {import('../state/tool-lifecycle-state.js').TerminalToolLifecycleDiagnostic} entry
+ * @param {{ includeRawDetails?: boolean }} [options]
+ * @returns {void}
+ */
+function printLifecycleDiagnosticEntry(println, entry, options = {}) {
+    for (const line of renderLifecycleDiagnosticLine(entry, options).split('\n')) {
+        println(line);
+    }
+}
+
+/**
  * @param {import('../state/tool-lifecycle-state.js').TerminalToolLifecycleDiagnostic} entry
  * @returns {string}
  */
@@ -544,14 +556,14 @@ export function cmdTools({ println }, arg = '') {
             if (active.length > 0) {
                 println(terminalThemeRow('Em voo', countLabel(active.length, 'ferramenta', 'ferramentas')));
                 for (const entry of active) {
-                    println(renderLifecycleDiagnosticLine(entry, { includeRawDetails: wantsDeepDiag }));
+                    printLifecycleDiagnosticEntry(println, entry, { includeRawDetails: wantsDeepDiag });
                 }
             }
             if (lifecycle.recent.length > 0) {
                 const recentCount = Math.min(8, lifecycle.recent.length);
                 println(terminalThemeRow('Recentes', countLabel(recentCount, 'evento', 'eventos')));
                 for (const entry of lifecycle.recent.slice(0, 8)) {
-                    println(renderLifecycleDiagnosticLine(entry, { includeRawDetails: wantsDeepDiag }));
+                    printLifecycleDiagnosticEntry(println, entry, { includeRawDetails: wantsDeepDiag });
                 }
             }
         }
