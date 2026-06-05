@@ -4336,6 +4336,177 @@ describe('terminal /byok command', () => {
         expect(diffCtx.output()).not.toContain('\x1b[');
     });
 
+    it('espelha catálogo model-gateway no SQLite com superfície temática', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway catalog sqlite');
+
+        expect(mirrorModelGatewayCatalogSnapshotToSqlite).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sourceStore: expect.any(Object),
+                sqliteStore: expect.any(Object),
+            }),
+        );
+        expect(ctx.output()).toContain('BYOK model-gateway catalog SQLite mirror');
+        expect(ctx.output()).toContain('JSON data/copilot/model-gateway/catalog.json');
+        expect(ctx.output()).toContain('projeções 1');
+        expect(ctx.output()).toContain('rotas 1');
+        expect(ctx.output()).toContain('Paridade');
+        expect(ctx.output()).not.toContain('JSON:');
+        expect(ctx.output()).not.toContain('\x1b[');
+    });
+
+    it('espelha saúde runtime no SQLite sem misturar com catálogo', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway health sqlite');
+
+        expect(flushAndMirrorByokProviderHealthToSqlite).toHaveBeenCalledWith({
+            sqliteStore: expect.any(Object),
+        });
+        expect(ctx.output()).toContain('BYOK espelho SQLite da saúde runtime');
+        expect(ctx.output()).toContain('fatos de execução separados do catálogo');
+        expect(ctx.output()).toContain('Saúde runtime');
+        expect(ctx.output()).toContain('run health-run');
+        expect(ctx.output()).not.toContain('\x1b[');
+    });
+
+    it('renderiza schema OpenAI normalizado com extensão x_model_gateway sem ANSI manual', async () => {
+        mockProjection();
+        toOpenAIModelCatalogList.mockReturnValue({
+            object: 'list',
+            data: [
+                {
+                    id: 'openrouter:new-model',
+                    object: 'model',
+                    x_model_gateway: {
+                        provider_id: 'openrouter',
+                        provider_model: 'new-model',
+                        eligibility: { status: 'eligible' },
+                        route_options: [{ selectorKind: 'exact_model' }],
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway catalog openai');
+
+        expect(toOpenAIModelCatalogList).toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK schema OpenAI normalizado');
+        expect(ctx.output()).toContain('fonte json');
+        expect(ctx.output()).toContain('extensão x_model_gateway');
+        expect(ctx.output()).toContain('openrouter:new-model');
+        expect(ctx.output()).toContain('provedor openrouter');
+        expect(ctx.output()).not.toContain('schema=OpenAI+x_model_gateway');
+        expect(ctx.output()).not.toContain('\x1b[');
+    });
+
+    it('explica entrada do catálogo com camadas e fronteira sem runtime novo', async () => {
+        mockProjection();
+        explainModelGatewayCatalogEntry.mockReturnValue({
+            found: true,
+            key: 'openrouter:new-model:default',
+            projection: {
+                providerId: 'openrouter',
+                providerModel: 'new-model',
+                routeProfile: 'default',
+                displayName: 'New Model',
+                lifecycle: 'active',
+                family: 'gpt',
+            },
+            routeOptions: [
+                {
+                    selectorKind: 'exact_model',
+                    selectorSyntax: 'new-model',
+                    normalizedPolicy: { routeLayer: 'catalog', wireApi: 'openai_chat_completions' },
+                },
+            ],
+            accountOverlays: [
+                {
+                    accountScope: 'default',
+                    secretRef: 'OPENROUTER_API_KEY',
+                    enabledModels: ['new-model'],
+                    blockedModels: [],
+                },
+            ],
+            eligibility: {
+                status: 'eligible',
+                summary: 'eligible:account_model_visible',
+                nextActions: ['candidate_can_be_ranked'],
+            },
+            openai: { id: 'openrouter:new-model' },
+            runtimeHealth: { status: 'ok' },
+            runtimeProbes: [{ kind: 'agent' }],
+            metadataCoverage: {
+                confidenceFields: 2,
+                provenanceFields: 3,
+                supportedParameters: 4,
+                unsupportedParameters: 1,
+            },
+            nextActions: ['route_decision_ready'],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway catalog explain new-model');
+
+        expect(explainModelGatewayCatalogEntry).toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK explicação do catálogo');
+        expect(ctx.output()).toContain('sem runtime novo');
+        expect(ctx.output()).toContain('openrouter:new-model:default');
+        expect(ctx.output()).toContain('Saúde runtime');
+        expect(ctx.output()).toContain('Rota');
+        expect(ctx.output()).toContain('Elegibilidade');
+        expect(ctx.output()).not.toContain('route_decision_ready');
+        expect(ctx.output()).toContain('decisão de rota pronta');
+        expect(ctx.output()).not.toContain('\x1b[');
+    });
+
+    it('explica provider do catálogo com fontes, frescor e conflitos sem ANSI manual', async () => {
+        mockProjection();
+        explainModelGatewayProviderEntry.mockReturnValue({
+            found: true,
+            providerId: 'openrouter',
+            sources: [
+                {
+                    id: 'openrouter-models',
+                    kind: 'public_api',
+                    authMode: 'none',
+                    refreshPolicy: 'ttl',
+                },
+            ],
+            providerEvidences: [{}],
+            projections: [{ providerId: 'openrouter' }],
+            routeOptions: [{}],
+            accountOverlays: [{}],
+            conflicts: [{ projectionKey: 'openrouter:model:default', fieldPath: 'pricing.input' }],
+            freshness: {
+                newestSourceAt: '2026-05-25T00:00:00.000Z',
+                oldestSourceAt: '2026-05-24T00:00:00.000Z',
+            },
+            providerProjection: {
+                displayName: 'OpenRouter',
+                subjectProviderId: 'openrouter',
+            },
+            nextActions: ['refresh_overlay_or_retry_pre_runtime_selection'],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway provider explain openrouter');
+
+        expect(explainModelGatewayProviderEntry).toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK explicação do provedor');
+        expect(ctx.output()).toContain('Provider');
+        expect(ctx.output()).toContain('openrouter');
+        expect(ctx.output()).toContain('Frescor');
+        expect(ctx.output()).toContain('Fonte');
+        expect(ctx.output()).toContain('Conflito');
+        expect(ctx.output()).toContain('atualizar overlay ou tentar seleção pré-runtime novamente');
+        expect(ctx.output()).not.toContain('\x1b[');
+    });
+
     it('encaminha /models catalog refresh com filtro de provider/importer', async () => {
         mockProjection();
         const ctx = mockCtx();

@@ -4192,31 +4192,46 @@ async function renderByokGatewaySelectionAudit(println, rest) {
 async function renderByokGatewayCatalogSqliteMirror(println) {
     const jsonStore = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const sqliteStore = new SqliteModelGatewayCatalogStore();
-    println(`\n  \x1b[36mBYOK model-gateway catalog SQLite mirror\x1b[0m`);
-    println(
-        `  \x1b[90mJSON: ${jsonStore.filePath} · SQLite: copilot.sqlite · modo espelho redigido · sem rede\x1b[0m\n`,
-    );
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway catalog SQLite mirror'));
+    println(terminalThemeWrappedRow('Resumo', `JSON ${jsonStore.filePath} · SQLite copilot.sqlite · modo espelho redigido · sem rede`, { role: 'muted', columns: 112 }));
     const result = await mirrorModelGatewayCatalogSnapshotToSqlite({
         sourceStore: jsonStore,
         sqliteStore,
     });
     const diagnostics = await sqliteStore.readStorageDiagnostics();
     const counts = result.sqliteCounts;
+    const parity = result.parity ?? { ok: true, snapshotIdMatches: true, countMismatches: [] };
     println(
-        `    \x1b[32mSnapshot espelhado no SQLite\x1b[0m  \x1b[90mfonte ${result.sqliteSnapshot.source} · projeções ${counts.projections} · evidências ${counts.evidences} · rotas ${counts.routeOptions} · overlays ${counts.accountOverlays} · elegibilidade ${counts.modelEligibilityDecisions}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Snapshot',
+            `fonte ${result.sqliteSnapshot.source} · projeções ${counts.projections} · evidências ${counts.evidences} · rotas ${counts.routeOptions} · overlays ${counts.accountOverlays} · elegibilidade ${counts.modelEligibilityDecisions}`,
+            { role: 'success', columns: 112 },
+        ),
     );
     println(
-        `    \x1b[90mprovedores ${counts.providerProjections} · evidências de provedor ${counts.providerEvidences} · refs brutas ${counts.rawPayloadRefs} · conflitos ${counts.conflicts} · runs de importação ${counts.importRuns}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Camadas',
+            `provedores ${counts.providerProjections} · evidências de provedor ${counts.providerEvidences} · refs brutas ${counts.rawPayloadRefs} · conflitos ${counts.conflicts} · runs de importação ${counts.importRuns}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
-        `    \x1b[90mSQLite: versão ${diagnostics.userVersion} · linhas de catálogo ${diagnostics.catalogRows} · histórico de conta ${diagnostics.accountHistoryRows} · execução ${diagnostics.runtimeRows} · decisões de rota ${diagnostics.routeDecisionRows}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'SQLite',
+            `versão ${diagnostics.userVersion} · catálogo ${diagnostics.catalogRows} · histórico de conta ${diagnostics.accountHistoryRows} · execução ${diagnostics.runtimeRows} · decisões de rota ${diagnostics.routeDecisionRows}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
-        `    \x1b[90mParidade ${result.parity.ok ? 'ok' : 'divergente'} · snapshot ${result.parity.snapshotIdMatches ? 'ok' : 'diferente'} · divergências ${result.parity.countMismatches.length}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Paridade',
+            `${parity.ok ? 'ok' : 'divergente'} · snapshot ${parity.snapshotIdMatches ? 'ok' : 'diferente'} · divergências ${parity.countMismatches.length}`,
+            { role: parity.ok ? 'success' : 'error', columns: 112 },
+        ),
     );
-    println(
-        '    \x1b[90mJSON permanece como export/debug; SQLite agora materializa as camadas normalizadas para consultas futuras.\x1b[0m\n',
-    );
+    println(terminalThemeWrappedRow('Fronteira', 'JSON permanece como export/debug; SQLite materializa camadas normalizadas para consultas futuras', { role: 'muted', columns: 112 }));
+    println('');
 }
 
 /**
@@ -4225,12 +4240,18 @@ async function renderByokGatewayCatalogSqliteMirror(println) {
  */
 async function renderByokGatewayHealthSqliteMirror(println) {
     const sqliteStore = new SqliteModelGatewayCatalogStore();
-    println(`\n  \x1b[36mBYOK espelho SQLite da saúde runtime\x1b[0m`);
-    println('  \x1b[90mFonte: byok-provider-health · destino: copilot.sqlite · fatos de execução separados do catálogo\x1b[0m\n');
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK espelho SQLite da saúde runtime'));
+    println(terminalThemeWrappedRow('Resumo', 'fonte byok-provider-health · destino copilot.sqlite · fatos de execução separados do catálogo', { role: 'muted', columns: 112 }));
     const result = await flushAndMirrorByokProviderHealthToSqlite({ sqliteStore });
     println(
-        `    \x1b[32mSaúde runtime espelhada no SQLite\x1b[0m  \x1b[90mflush ${result.flushed ? 'sim' : 'nao'} · registros ${result.records} · observações ${result.healthObservations} · sondas ${result.probeResults} · run ${result.runId}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Saúde runtime',
+            `flush ${result.flushed ? 'sim' : 'nao'} · registros ${result.records} · observações ${result.healthObservations} · sondas ${result.probeResults} · run ${result.runId}`,
+            { role: 'success', columns: 112 },
+        ),
     );
+    println('');
 }
 
 /**
@@ -4249,9 +4270,14 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
               eligibilityDecisions: snapshot?.modelEligibilityDecisions ?? [],
               routeOptions: snapshot?.routeOptions ?? [],
     });
-    println(`\n  \x1b[36mBYOK schema OpenAI normalizado\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK schema OpenAI normalizado'));
     println(
-        `  \x1b[90mFonte: ${useSqlite ? 'sqlite' : 'json'} · objeto ${openaiList.object} · modelos ${openaiList.data.length} · extensão x_model_gateway\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `fonte ${useSqlite ? 'sqlite' : 'json'} · objeto ${openaiList.object} · modelos ${openaiList.data.length} · extensão x_model_gateway`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     for (const model of openaiList.data.slice(0, 12)) {
         const gateway = asRecord(model.x_model_gateway);
@@ -4261,11 +4287,15 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
         const eligibilityStatus = renderByokTokenLabel(optionalScalarString(eligibility['status']));
         const routeOptionCount = Array.isArray(gateway['route_options']) ? gateway['route_options'].length : 0;
         println(
-            `    \x1b[33m${model.id}\x1b[0m  \x1b[90mprovedor ${providerId} · modelo do provedor ${providerModel} · rotas ${routeOptionCount} · elegibilidade ${eligibilityStatus}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Modelo',
+                `${model.id} · provedor ${providerId} · modelo do provedor ${providerModel} · rotas ${routeOptionCount} · elegibilidade ${eligibilityStatus}`,
+                { role: 'warn', columns: 112 },
+            ),
         );
     }
     if (openaiList.data.length > 12) {
-        println(`\n  \x1b[90mexibindo 12/${openaiList.data.length}; use JSON/SQLite store para export completo.\x1b[0m`);
+        println(terminalThemeWrappedRow('Omitidos', `exibindo 12/${openaiList.data.length}; use JSON/SQLite store para export completo`, { role: 'muted', columns: 112 }));
     }
     println('');
 }
@@ -4278,18 +4308,25 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
 async function renderByokGatewayCatalogExplain(println, selector) {
     const normalizedSelector = optionalScalarString(selector);
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-    println(`\n  \x1b[36mBYOK explicação do catálogo\x1b[0m`);
-    println(`  \x1b[90mCatálogo: ${store.filePath} · filtro ${normalizedSelector ?? '-'} · sem runtime\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK explicação do catálogo'));
+    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · filtro ${normalizedSelector ?? '-'} · sem runtime novo`, { role: 'muted', columns: 112 }));
     if (!normalizedSelector) {
-        println('    \x1b[33mInforme um modelo, provedor:modelo ou trecho do nome exibido.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Estado', 'informe um modelo, provedor:modelo ou trecho do nome exibido', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
     const snapshot = await store.readSnapshot();
     let explanation = explainModelGatewayCatalogEntry(snapshot, normalizedSelector);
     if (!explanation.found || !explanation.projection) {
         println(
-            `    \x1b[33mModelo não encontrado no snapshot atual.\x1b[0m  \x1b[90mpróxima ação ${explanation.nextActions.join(',')}\x1b[0m\n`,
+            terminalThemeWrappedRow(
+                'Estado',
+                `modelo não encontrado no snapshot atual · próxima ação ${renderByokTokenList(explanation.nextActions.map(String)) || '-'}`,
+                { role: 'warn', columns: 112 },
+            ),
         );
+        println('');
         return;
     }
     try {
@@ -4307,40 +4344,66 @@ async function renderByokGatewayCatalogExplain(println, selector) {
     }
     const projection = explanation.projection;
     if (!projection) {
-        println('    \x1b[33mModelo não encontrado após juntar saúde runtime.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Estado', 'modelo não encontrado após juntar saúde runtime', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
     const eligibility = explanation.eligibility;
-    println(`    \x1b[33m${explanation.key}\x1b[0m`);
+    println(terminalThemeWrappedRow('Modelo', explanation.key, { role: 'warn', columns: 112 }));
     println(
-        `      \x1b[90mnome ${optionalScalarString(projection['displayName']) ?? '-'} · lifecycle ${optionalScalarString(projection['lifecycle']) ?? '-'} · família ${optionalScalarString(projection['family']) ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Identidade',
+            `nome ${optionalScalarString(projection['displayName']) ?? '-'} · lifecycle ${renderByokTokenLabel(optionalScalarString(projection['lifecycle']))} · família ${optionalScalarString(projection['family']) ?? '-'}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
-        `      \x1b[90mrotas ${explanation.routeOptions.length} · overlays ${explanation.accountOverlays.length} · elegibilidade ${eligibility?.status ?? '-'} · OpenAI id ${explanation.openai?.id ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Camadas',
+            `rotas ${explanation.routeOptions.length} · overlays ${explanation.accountOverlays.length} · elegibilidade ${renderByokTokenLabel(eligibility?.status)} · OpenAI id ${explanation.openai?.id ?? '-'}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
-        `      \x1b[90msaúde runtime ${renderByokTokenLabel(explanation.runtimeHealth?.status)} · sondas runtime ${explanation.runtimeProbes.length}\x1b[0m`,
+        terminalThemeWrappedRow('Saúde runtime', `${renderByokTokenLabel(explanation.runtimeHealth?.status)} · sondas runtime ${explanation.runtimeProbes.length}`, { role: 'muted', columns: 112 }),
     );
     println(
-        `      \x1b[90mmetadados: campos com confiança ${explanation.metadataCoverage.confidenceFields} · proveniência ${explanation.metadataCoverage.provenanceFields} · parâmetros suportados ${explanation.metadataCoverage.supportedParameters} · não suportados ${explanation.metadataCoverage.unsupportedParameters}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Metadados',
+            `confiança ${explanation.metadataCoverage.confidenceFields} · proveniência ${explanation.metadataCoverage.provenanceFields} · parâmetros suportados ${explanation.metadataCoverage.supportedParameters} · não suportados ${explanation.metadataCoverage.unsupportedParameters}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     for (const route of explanation.routeOptions.slice(0, 4)) {
         const policy = asRecord(route['normalizedPolicy']);
         println(
-            `      \x1b[90mrota ${renderByokTokenLabel(optionalScalarString(route['selectorKind']))}:${optionalScalarString(route['selectorSyntax']) ?? '-'} · camada ${renderByokTokenLabel(optionalScalarString(policy['routeLayer']))} · protocolo ${renderByokWireLabel(optionalScalarString(policy['wireApi']))}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Rota',
+                `${renderByokTokenLabel(optionalScalarString(route['selectorKind']))}:${optionalScalarString(route['selectorSyntax']) ?? '-'} · camada ${renderByokTokenLabel(optionalScalarString(policy['routeLayer']))} · protocolo ${renderByokWireLabel(optionalScalarString(policy['wireApi']))}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
     }
     for (const overlay of explanation.accountOverlays.slice(0, 3)) {
         println(
-            `      \x1b[90moverlay escopo ${optionalScalarString(overlay['accountScope']) ?? 'default'} · segredo ${optionalScalarString(overlay['secretRef']) ?? '-'} · habilitados ${Array.isArray(overlay['enabledModels']) ? overlay['enabledModels'].length : 0} · bloqueados ${Array.isArray(overlay['blockedModels']) ? overlay['blockedModels'].length : 0}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Overlay',
+                `escopo ${renderByokTokenLabel(optionalScalarString(overlay['accountScope']) ?? 'default')} · segredo ${optionalScalarString(overlay['secretRef']) ?? '-'} · habilitados ${Array.isArray(overlay['enabledModels']) ? overlay['enabledModels'].length : 0} · bloqueados ${Array.isArray(overlay['blockedModels']) ? overlay['blockedModels'].length : 0}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
     }
     if (eligibility) {
         println(
-            `      \x1b[90melegibilidade ${eligibility.summary} · próxima ação ${eligibility.nextActions.slice(0, 4).join(',') || '-'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Elegibilidade',
+                `${eligibility.summary} · próxima ação ${renderByokTokenList(eligibility.nextActions.slice(0, 4).map(String)) || '-'}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
     }
-    println(`      \x1b[90mpróxima ação ${explanation.nextActions.slice(0, 6).join(',') || '-'}\x1b[0m\n`);
+    println(terminalThemeWrappedRow('Próximo', renderByokTokenList(explanation.nextActions.slice(0, 6).map(String)) || '-', { role: 'command', columns: 112 }));
+    println('');
 }
 
 /**
@@ -4351,41 +4414,67 @@ async function renderByokGatewayCatalogExplain(println, selector) {
 async function renderByokGatewayProviderExplain(println, selector) {
     const normalizedSelector = optionalScalarString(selector);
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-    println(`\n  \x1b[36mBYOK explicação do provedor\x1b[0m`);
-    println(`  \x1b[90mCatálogo: ${store.filePath} · filtro ${normalizedSelector ?? '-'} · sem runtime\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK explicação do provedor'));
+    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · filtro ${normalizedSelector ?? '-'} · sem runtime`, { role: 'muted', columns: 112 }));
     if (!normalizedSelector) {
-        println('    \x1b[33mInforme um id de provedor ou nome exibido.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Estado', 'informe um id de provedor ou nome exibido', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
     const explanation = explainModelGatewayProviderEntry(await store.readSnapshot(), normalizedSelector);
     if (!explanation.found) {
-        println(`    \x1b[33mProvedor não encontrado.\x1b[0m  \x1b[90mpróxima ação ${explanation.nextActions.join(',')}\x1b[0m\n`);
+        println(
+            terminalThemeWrappedRow(
+                'Estado',
+                `provedor não encontrado · próxima ação ${renderByokTokenList(explanation.nextActions.map(String)) || '-'}`,
+                { role: 'warn', columns: 112 },
+            ),
+        );
+        println('');
         return;
     }
-    println(`    \x1b[33m${explanation.providerId}\x1b[0m`);
+    println(terminalThemeWrappedRow('Provider', explanation.providerId, { role: 'warn', columns: 112 }));
     println(
-        `      \x1b[90mfontes ${explanation.sources.length} · evidências de provedor ${explanation.providerEvidences.length} · modelos ${explanation.projections.length} · rotas ${explanation.routeOptions.length} · overlays ${explanation.accountOverlays.length} · conflitos ${explanation.conflicts.length}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Camadas',
+            `fontes ${explanation.sources.length} · evidências de provedor ${explanation.providerEvidences.length} · modelos ${explanation.projections.length} · rotas ${explanation.routeOptions.length} · overlays ${explanation.accountOverlays.length} · conflitos ${explanation.conflicts.length}`,
+            { role: explanation.conflicts.length > 0 ? 'warn' : 'muted', columns: 112 },
+        ),
     );
     println(
-        `      \x1b[90mfrescor mais novo ${explanation.freshness.newestSourceAt ?? '-'} · mais antigo ${explanation.freshness.oldestSourceAt ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow('Frescor', `mais novo ${explanation.freshness.newestSourceAt ?? '-'} · mais antigo ${explanation.freshness.oldestSourceAt ?? '-'}`, { role: 'muted', columns: 112 }),
     );
     if (explanation.providerProjection) {
         println(
-            `      \x1b[90mnome ${optionalScalarString(explanation.providerProjection['displayName']) ?? '-'} · provedor descrito ${optionalScalarString(explanation.providerProjection['subjectProviderId']) ?? '-'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Identidade',
+                `nome ${optionalScalarString(explanation.providerProjection['displayName']) ?? '-'} · provedor descrito ${optionalScalarString(explanation.providerProjection['subjectProviderId']) ?? '-'}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
     }
     for (const source of explanation.sources.slice(0, 4)) {
         println(
-            `      \x1b[90mfonte ${optionalScalarString(source['id']) ?? '-'} · tipo ${renderByokTokenLabel(optionalScalarString(source['kind']))} · autenticação ${renderByokTokenLabel(optionalScalarString(source['authMode']))} · atualização ${renderByokTokenLabel(optionalScalarString(source['refreshPolicy']))}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Fonte',
+                `${optionalScalarString(source['id']) ?? '-'} · tipo ${renderByokTokenLabel(optionalScalarString(source['kind']))} · autenticação ${renderByokTokenLabel(optionalScalarString(source['authMode']))} · atualização ${renderByokTokenLabel(optionalScalarString(source['refreshPolicy']))}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
     }
     const firstConflict = explanation.conflicts[0] ?? null;
     if (firstConflict) {
         println(
-            `      \x1b[90mconflito ${optionalScalarString(firstConflict['projectionKey']) ?? '-'} · campo ${optionalScalarString(firstConflict['fieldPath']) ?? '-'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Conflito',
+                `${optionalScalarString(firstConflict['projectionKey']) ?? '-'} · campo ${optionalScalarString(firstConflict['fieldPath']) ?? '-'}`,
+                { role: 'warn', columns: 112 },
+            ),
         );
     }
-    println(`      \x1b[90mpróxima ação ${explanation.nextActions.slice(0, 6).join(',') || '-'}\x1b[0m\n`);
+    println(terminalThemeWrappedRow('Próximo', renderByokTokenList(explanation.nextActions.slice(0, 6).map(String)) || '-', { role: 'command', columns: 112 }));
+    println('');
 }
 
 /**
