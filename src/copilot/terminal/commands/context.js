@@ -4,7 +4,7 @@
  *
  * Comandos `/context` e `/compact` para gerenciamento de contexto do dialog loop.
  *
- * `/context` → mostra uso do context window (tokens reais do SDK quando disponíveis; fallback para heurística 4
+ * `/context` → mostra uso da janela de contexto (tokens reais do SDK quando disponíveis; fallback para heurística 4
  * chars/token) `/compact` → envia pedido de compactação à LLM-B e limpa o histórico local
  *
  * @module copilot/terminal/commands/context
@@ -36,10 +36,103 @@ function progressBar(used, total, width = 20) {
     return terminalThemeText(role, `${'█'.repeat(filled)}${'░'.repeat(empty)}`);
 }
 
+/**
+ * @param {unknown} value
+ * @param {Record<string, string>} labels
+ * @returns {string}
+ */
+function humanEnum(value, labels) {
+    const text = String(value ?? '').trim();
+    if (!text) return '-';
+    return labels[text] ?? text.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTimelineSourceLabel(value) {
+    return humanEnum(value, {
+        hub: 'hub persistido',
+        bridge: 'conversa viva',
+        terminal: 'terminal',
+        mixed: 'mista',
+        empty: 'vazia',
+    });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTimelineAuthorityLabel(value) {
+    return humanEnum(value, {
+        persistent: 'persistência',
+        transport: 'transporte vivo',
+        reconciled: 'reconciliada',
+        none: 'sem autoridade',
+    });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderReconciliationLabel(value) {
+    return humanEnum(value, {
+        persistent_only: 'só persistência',
+        bridge_only: 'só conversa viva',
+        aligned: 'alinhada',
+        bridge_tail: 'cauda viva',
+        diverged: 'divergente',
+        empty: 'vazia',
+    });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSyncStatusLabel(value) {
+    return humanEnum(value, {
+        not_needed: 'em dia',
+        scheduled: 'agendada',
+        unavailable: 'indisponível',
+        blocked: 'bloqueada',
+        failed: 'falhou',
+        empty: 'vazia',
+    });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderSyncReasonLabel(value) {
+    return humanEnum(value, {
+        empty: 'sem histórico',
+        aligned: 'timeline alinhada',
+        bridge_tail: 'cauda viva pendente',
+        'no-hub-session': 'sem sessão do hub',
+        'diverged-no-overlap': 'sem sobreposição segura entre conversa viva e persistência',
+    });
+}
+
+/**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string | null}
+ */
+function optionalCount(count, singular, plural) {
+    if (!Number.isFinite(count) || count <= 0) return null;
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
 // ─── /context ─────────────────────────────────────────────────────────────────
 
 /**
- * Exibe o uso do context window — usa tokens reais do SDK quando disponíveis; fallback para heurística.
+ * Exibe o uso da janela de contexto — usa tokens reais do SDK quando disponíveis; fallback para heurística.
  *
  * @param {{ println: (text: string) => void }} ctx
  * @param {string} [arg]
@@ -63,7 +156,7 @@ export function cmdContext({ println }, arg = '') {
     const bar = progressBar(usedTokens, maxTokens);
 
     println('');
-    println(terminalThemeHeadline('command', 'Uso do contexto'));
+    println(terminalThemeHeadline('command', 'Janela de contexto'));
     println(`  ${bar} ${terminalThemeText('info', `${pctStr}%`)}`);
     println(
         terminalThemeRow(
@@ -75,41 +168,48 @@ export function cmdContext({ println }, arg = '') {
         ),
     );
     if (projection.turnCount > 0) {
-        println(terminalThemeRow('Chars totais', projection.totalChars.toLocaleString('pt-BR'), { role: 'info', width: 17 }));
-        println(terminalThemeRow('Turnos memória', String(projection.turnCount), { role: 'info', width: 17 }));
+        println(terminalThemeRow('Caracteres', projection.totalChars.toLocaleString('pt-BR'), { role: 'info', width: 17 }));
+        println(terminalThemeRow('Turnos em memória', String(projection.turnCount), { role: 'info', width: 17 }));
     }
 
     if (pct > 0.85) {
         println('');
-        println(terminalThemeRow('Atenção', 'context window acima de 85%; considere usar /compact', { role: 'error' }));
+        println(terminalThemeRow('Atenção', 'janela de contexto acima de 85%; considere usar /compact', { role: 'error' }));
     } else if (pct > 0.65) {
         println('');
-        println(terminalThemeRow('Atenção', 'context window acima de 65%; monitore conversas longas', { role: 'warn' }));
+        println(terminalThemeRow('Atenção', 'janela de contexto acima de 65%; monitore conversas longas', { role: 'warn' }));
     }
 
     if (!isRealData) {
-        println(terminalThemeText('muted', '  (estimativa heurística: 4 chars ~= 1 token; limite real depende do modelo)'));
+        println(terminalThemeText('muted', '  (estimativa heurística: 4 caracteres ~= 1 token; limite real depende do modelo)'));
     }
 
     // AG.5 — workspace SessionContext
     const ws = projection.workspace;
     println(terminalThemeHeadline('command', 'Workspace'));
-    println(terminalThemeRow('cwd', ws.cwd, { role: 'muted' }));
-    if (ws.gitRoot) println(terminalThemeRow('git', `${ws.gitRoot} · branch ${ws.currentBranch ?? '?'}`, { role: 'muted' }));
+    println(terminalThemeRow('Diretório', ws.cwd, { role: 'muted' }));
+    if (ws.gitRoot) println(terminalThemeRow('Git', `${ws.gitRoot} · branch ${ws.currentBranch ?? '?'}`, { role: 'muted' }));
 
     println(terminalThemeHeadline('command', 'Timeline canônica'));
     println(
-        terminalThemeRow('Autoridade', `${projection.timelineSource} · ${projection.timelineAuthority} · ${projection.reconciliationStatus}`, {
+        terminalThemeRow('Fonte', `${renderTimelineSourceLabel(projection.timelineSource)} · ${renderTimelineAuthorityLabel(projection.timelineAuthority)} · ${renderReconciliationLabel(projection.reconciliationStatus)}`, {
             role: 'muted',
         }),
     );
     println(
-        terminalThemeRow('Persistência', `${projection.persistedTurnCount} persistidos · ${projection.bridgeTurnCount} bridge · ${projection.liveBridgeTailCount} live-tail`, {
+        terminalThemeRow('Histórico', `${projection.persistedTurnCount} persistidos · ${projection.bridgeTurnCount} vivos · ${projection.liveBridgeTailCount} na cauda viva`, {
             role: 'muted',
         }),
     );
+    const syncDetails = [
+        renderSyncStatusLabel(projection.syncStatus),
+        renderSyncReasonLabel(projection.syncReason),
+        optionalCount(projection.syncPendingCount, 'pendente', 'pendentes'),
+        optionalCount(projection.syncSyncedCount, 'gravado', 'gravados'),
+        optionalCount(projection.syncFailedCount, 'falha', 'falhas'),
+    ].filter(Boolean);
     println(
-        terminalThemeRow('Sync Hub', `${projection.syncStatus}${projection.syncPendingCount > 0 ? ` · pendentes=${projection.syncPendingCount}` : ''}${projection.syncSyncedCount > 0 ? ` · gravados=${projection.syncSyncedCount}` : ''}${projection.syncFailedCount > 0 ? ` · falhas=${projection.syncFailedCount}` : ''}`, {
+        terminalThemeRow('Sincronização', syncDetails.join(' · '), {
             role: 'muted',
         }),
     );
@@ -117,9 +217,9 @@ export function cmdContext({ println }, arg = '') {
         println(
             terminalThemeRow(
                 'Nota',
-                `bridge e persistência divergiram; sync bloqueado${
-                    projection.syncBlockedReason ? ` (${projection.syncBlockedReason})` : ''
-                }; live-tail visível foi preservado`,
+                `conversa viva e persistência divergiram; sincronização bloqueada${
+                    projection.syncBlockedReason ? ` (${renderSyncReasonLabel(projection.syncBlockedReason)})` : ''
+                }; cauda viva visível foi preservada`,
                 { role: 'warn' },
             ),
         );
@@ -129,7 +229,7 @@ export function cmdContext({ println }, arg = '') {
             typeof projection.syncNextRetryAt === 'number'
                 ? ` próxima tentativa ${formatTerminalTimeLabel(projection.syncNextRetryAt, { mode: 'dual' })}`
                 : '';
-        println(terminalThemeRow('Sync Hub', `falhou: ${projection.syncLastError ?? 'erro desconhecido'}${retryLabel}`, { role: 'warn' }));
+        println(terminalThemeRow('Sincronização', `falhou: ${projection.syncLastError ?? 'erro desconhecido'}${retryLabel}`, { role: 'warn' }));
     }
 
     println('');

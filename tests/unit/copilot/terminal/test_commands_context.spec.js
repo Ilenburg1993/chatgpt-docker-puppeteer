@@ -134,7 +134,7 @@ describe('terminal/commands/cmdContext', () => {
         cmdContext({ println });
         const output = lines.join('\n');
         expect(output).toContain('estimad');
-        expect(output).toContain('Chars');
+        expect(output).toContain('Caracteres');
     });
 
     it('exibe dados do SDK real quando disponível', () => {
@@ -172,7 +172,7 @@ describe('terminal/commands/cmdContext', () => {
         expect(output).toContain('5.000');
     });
 
-    it('alerta quando context window > 85%', () => {
+    it('alerta quando a janela de contexto passa de 85%', () => {
         frontendMocks.readTerminalContextProjection.mockReturnValue({
             isRealData: true,
             hasHistory: true,
@@ -206,7 +206,7 @@ describe('terminal/commands/cmdContext', () => {
         expect(output).toContain('compact');
     });
 
-    it('alerta moderado quando context window > 65%', () => {
+    it('alerta moderado quando a janela de contexto passa de 65%', () => {
         frontendMocks.readTerminalContextProjection.mockReturnValue({
             isRealData: true,
             hasHistory: true,
@@ -275,10 +275,13 @@ describe('terminal/commands/cmdContext', () => {
         expect(output).toContain('/workspaces/test');
         expect(output).toContain('main');
         expect(output).toContain('Timeline canônica');
-        expect(output).toContain('mixed');
-        expect(output).toContain('bridge_tail');
-        expect(output).toContain('Sync Hub');
-        expect(output).toContain('scheduled');
+        expect(output).toContain('mista');
+        expect(output).toContain('cauda viva');
+        expect(output).toContain('Sincronização');
+        expect(output).toContain('agendada');
+        expect(output).not.toContain('cwd');
+        expect(output).not.toContain('bridge_tail');
+        expect(output).not.toContain('pendentes=');
     });
 
     it('explica divergência preservando live-tail sem sugerir perda visual', () => {
@@ -312,9 +315,11 @@ describe('terminal/commands/cmdContext', () => {
         });
         cmdContext({ println });
         const output = lines.join('\n');
-        expect(output).toContain('sync bloqueado');
-        expect(output).toContain('diverged-no-overlap');
-        expect(output).toContain('live-tail visível foi preservado');
+        expect(output).toContain('sincronização bloqueada');
+        expect(output).toContain('sem sobreposição segura');
+        expect(output).toContain('cauda viva visível foi preservada');
+        expect(output).not.toContain('diverged-no-overlap');
+        expect(output).not.toContain('live-tail');
     });
 });
 

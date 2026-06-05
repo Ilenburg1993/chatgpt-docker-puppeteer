@@ -204,11 +204,24 @@ function renderTerminalSyncStatusLabel(value) {
 function renderTerminalTimelineSourceLabel(value) {
     const source = String(value ?? '');
     if (!source || source === 'empty') return 'sem histórico';
-    if (source === 'hub') return 'hub';
-    if (source === 'bridge') return 'bridge';
-    if (source === 'mixed') return 'misto';
+    if (source === 'hub') return 'hub persistido';
+    if (source === 'bridge') return 'conversa viva';
+    if (source === 'mixed') return 'mista';
     if (source === 'live') return 'ao vivo';
     return source.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTerminalTimelineAuthorityLabel(value) {
+    const authority = String(value ?? '');
+    if (!authority || authority === 'none') return 'sem autoridade';
+    if (authority === 'persistent') return 'persistência';
+    if (authority === 'transport') return 'transporte vivo';
+    if (authority === 'reconciled') return 'reconciliada';
+    return authority.replace(/[_-]+/gu, ' ');
 }
 
 /**
@@ -223,7 +236,22 @@ function renderTerminalTimelineReconciliationLabel(value) {
     if (status === 'diverged') return 'divergente';
     if (status === 'pending') return 'pendente';
     if (status === 'persistent_only') return 'histórico persistido';
+    if (status === 'bridge_only') return 'só conversa viva';
+    if (status === 'bridge_tail') return 'cauda viva';
     return status.replace(/[_-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function renderTerminalTimelineReasonLabel(value) {
+    const reason = String(value ?? '').trim();
+    if (!reason) return 'sem motivo registrado';
+    if (reason === 'diverged-no-overlap') return 'sem sobreposição segura entre conversa viva e persistência';
+    if (reason === 'bridge_tail') return 'cauda viva pendente';
+    if (reason === 'aligned') return 'timeline alinhada';
+    return reason.replace(/[._-]+/gu, ' ');
 }
 
 /**
@@ -882,7 +910,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     println(
         terminalThemeRow(
             'Timeline',
-            `${renderTerminalTimelineSourceLabel(projection.timelineSource)} · ${projection.timelineAuthority} · ${renderTerminalTimelineReconciliationLabel(projection.timelineReconciliationStatus)} · ${projection.timelineTurnCount} turnos${timelineSyncLabel}`,
+            `${renderTerminalTimelineSourceLabel(projection.timelineSource)} · ${renderTerminalTimelineAuthorityLabel(projection.timelineAuthority)} · ${renderTerminalTimelineReconciliationLabel(projection.timelineReconciliationStatus)} · ${projection.timelineTurnCount} turnos${timelineSyncLabel}`,
         ),
     );
     println(terminalThemeRow('Prompt', promptBindingDigest ? 'vinculado' : 'sem vínculo'));
@@ -915,8 +943,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     println(terminalThemeRow('Sessão hub', projection.hubSessionId ?? 'sem hub'));
     println(
         terminalThemeRow(
-            'Turnos canon',
-            `${projection.turnCount} · persistidos ${projection.persistedTimelineTurnCount} · bridge ${projection.bridgeTurnCount} · live-tail ${projection.liveBridgeTailCount}`,
+            'Turnos canônicos',
+            `${projection.turnCount} · persistidos ${projection.persistedTimelineTurnCount} · vivos ${projection.bridgeTurnCount} · cauda viva ${projection.liveBridgeTailCount}`,
         ),
     );
     println(terminalThemeRow('Porta entrada', String(projection.injectPort)));
@@ -952,7 +980,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     if (autoPolicyLine) println(terminalThemeRow('Política auto', autoPolicyLine));
     println(terminalThemeDivider(37));
     println(terminalThemeRow('Workspace', ws.cwd));
-    println(terminalThemeRow('Git root', ws.gitRoot ?? 'não é git repo'));
+    println(terminalThemeRow('Raiz Git', ws.gitRoot ?? 'não é repositório Git'));
     println(terminalThemeRow('Branch', branchStr));
     println(terminalThemeDivider(37));
     if (pendingPreview) {
@@ -1085,7 +1113,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         println(
             terminalThemeRow(
                 'Nota',
-                'timeline do bridge divergiu da persistência; a UX está priorizando o hub como autoridade canônica.',
+                'conversa viva e persistência divergiram; a UX está priorizando o hub como autoridade canônica.',
                 { role: 'warn' },
             ),
         );
@@ -1471,7 +1499,7 @@ export function cmdHistory({ println }, n = 10) {
     println(
         terminalThemeHeadline('assistant', 'Histórico', [
             renderTerminalTimelineSourceLabel(timeline.timelineSource),
-            renderTerminalTimelineReconciliationLabel(timeline.timelineAuthority),
+            renderTerminalTimelineAuthorityLabel(timeline.timelineAuthority),
             renderTerminalTimelineReconciliationLabel(timeline.reconciliationStatus),
         ]),
     );
@@ -1488,7 +1516,7 @@ export function cmdHistory({ println }, n = 10) {
         println(
             terminalThemeRow(
                 'Nota',
-                `histórico em memória divergiu da persistência; ${countLabel(timeline.liveBridgeTailCount, 'turno ao vivo preservado', 'turnos ao vivo preservados')}${timeline.syncBlockedReason ? ` · motivo ${timeline.syncBlockedReason}` : ''}`,
+                `histórico em memória divergiu da persistência; ${countLabel(timeline.liveBridgeTailCount, 'turno ao vivo preservado', 'turnos ao vivo preservados')}${timeline.syncBlockedReason ? ` · motivo ${renderTerminalTimelineReasonLabel(timeline.syncBlockedReason)}` : ''}`,
                 { role: 'warn' },
             ),
         );
@@ -2564,7 +2592,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
     println(
         terminalThemeRows('Filtros', [
             '/session sdk <n> offset=<n>',
-            'cwd=<path> · gitRoot=<path>',
+            'cwd=<path> (diretório) · gitRoot=<path> (raiz Git)',
             'repo=<owner/repo> · branch=<nome>',
         ], { role: 'command' }),
     );

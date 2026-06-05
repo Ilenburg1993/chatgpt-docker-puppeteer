@@ -83,6 +83,66 @@ function humanMetricPromptState(value) {
  * @param {unknown} value
  * @returns {string}
  */
+function humanMetricTimelineSource(value) {
+    const source = String(value ?? '').trim();
+    if (!source || source === 'empty') return 'sem histórico';
+    if (source === 'hub') return 'hub persistido';
+    if (source === 'bridge') return 'conversa viva';
+    if (source === 'mixed') return 'mista';
+    if (source === 'terminal') return 'terminal';
+    return source.replace(/[._-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanMetricTimelineAuthority(value) {
+    const authority = String(value ?? '').trim();
+    if (!authority || authority === 'none') return 'sem autoridade';
+    if (authority === 'persistent') return 'persistência';
+    if (authority === 'transport') return 'transporte vivo';
+    if (authority === 'reconciled') return 'reconciliada';
+    return authority.replace(/[._-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanMetricTimelineStatus(value) {
+    const status = String(value ?? '').trim();
+    if (!status || status === 'empty') return 'vazia';
+    if (status === 'aligned') return 'alinhada';
+    if (status === 'bridge_only') return 'só conversa viva';
+    if (status === 'bridge_tail') return 'cauda viva';
+    if (status === 'persistent_only') return 'só persistência';
+    if (status === 'diverged') return 'divergente';
+    if (status === 'reconciled') return 'reconciliada';
+    return status.replace(/[._-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanMetricSyncStatus(value) {
+    const status = String(value ?? '').trim();
+    if (!status || status === 'empty') return 'vazia';
+    if (status === 'not_needed') return 'em dia';
+    if (status === 'scheduled') return 'agendada';
+    if (status === 'inflight') return 'em andamento';
+    if (status === 'synced') return 'sincronizada';
+    if (status === 'failed') return 'falhou';
+    if (status === 'blocked') return 'bloqueada';
+    if (status === 'idle') return 'ociosa';
+    return status.replace(/[._-]+/gu, ' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 function humanMetricActivityText(value) {
     const text =
         typeof value === 'string'
@@ -280,8 +340,20 @@ export function cmdMetrics({ println }, arg = '') {
 
     println(terminalThemeHeadline('command', 'Uso'));
     println(terminalThemeRow('Turnos', `${turnCount} ${terminalThemeText('muted', '(timeline canônica)')}`, { role: 'info' }));
-    println(terminalThemeRow('Timeline', `${bridgeTurnCount} ${terminalThemeText('muted', `(${timelineSource} · ${timelineAuthority} · ${timelineReconciliationStatus})`)}`, { role: 'info' }));
-    println(terminalThemeRow('Sincronização', `${timelineSyncStatus} ${terminalThemeText('muted', `(pendentes ${timelineSyncPendingCount} · agendados ${timelineSyncTelemetry.scheduledTotal} · gravados ${timelineSyncTelemetry.turnsSyncedTotal} · falhas ${timelineSyncTelemetry.failedTotal} · retentativas ${timelineSyncTelemetry.retryTotal} · cache ${timelineSyncTelemetry.completedCacheSize}/${timelineSyncTelemetry.failureCacheSize})`)}`, { role: 'info' }));
+    println(
+        terminalThemeRow(
+            'Conversa viva',
+            `${bridgeTurnCount} ${terminalThemeText('muted', `(${humanMetricTimelineSource(timelineSource) || 'sem histórico'} · ${humanMetricTimelineAuthority(timelineAuthority)} · ${humanMetricTimelineStatus(timelineReconciliationStatus)})`)}`,
+            { role: 'info' },
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Sincronização',
+            `${humanMetricSyncStatus(timelineSyncStatus)} ${terminalThemeText('muted', `(pendentes ${timelineSyncPendingCount} · agendados ${timelineSyncTelemetry.scheduledTotal} · gravados ${timelineSyncTelemetry.turnsSyncedTotal} · falhas ${timelineSyncTelemetry.failedTotal} · retentativas ${timelineSyncTelemetry.retryTotal} · cache ${timelineSyncTelemetry.completedCacheSize}/${timelineSyncTelemetry.failureCacheSize})`)}`,
+            { role: 'info' },
+        ),
+    );
     println(terminalThemeRow('Contexto', ctxStr, { role: 'info' }));
     println(terminalThemeRow('Cobrança', billingLine, { role: 'info' }));
     println(

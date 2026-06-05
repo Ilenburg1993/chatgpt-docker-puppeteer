@@ -9765,3 +9765,90 @@
   - auditar `/byok` e `/session sdk` para decidir onde `provedor` é semântica correta e onde
     `rota BYOK` deve prevalecer;
   - seguir a busca por prints manuais ou nomes de backend ainda visíveis em superfícies default.
+
+### 12.115 `/context` sem enums de backend na superfície default — 2026-06-04
+
+- [x] Achado:
+  - a próxima varredura estática apontou `/context` como ilha de vocabulário antigo:
+    `context window`, `cwd`, `git`, `bridge`, `live-tail`, `pendentes=`, `gravados=` e
+    `Sync Hub`;
+  - esses termos aparecem em fluxo de operador, inclusive no ciclo `/context`/`/compact`, e por isso
+    degradam a sensação de cockpit mesmo quando o restante da UX está polido;
+  - a projeção interna está correta e deve continuar preservando enums para testes, sync e auditoria.
+- [x] Decisão UX:
+  - `/context` default deve falar em `Janela de contexto`, `Diretório`, `Git`, `Fonte`,
+    `Histórico` e `Sincronização`;
+  - fonte/autoridade/reconciliação devem ser traduzidas no presenter:
+    `bridge` -> `conversa viva`, `hub` -> `hub persistido`, `bridge_tail` -> `cauda viva`;
+  - contadores de sincronização devem usar plural real (`1 pendente`, `2 gravados`), nunca
+    `pendentes=2`;
+  - motivos técnicos como `diverged-no-overlap` ficam em enums internos, mas viram texto humano na
+    tela: `sem sobreposição segura entre conversa viva e persistência`.
+- [x] Implementação:
+  - `context.js` ganhou helpers locais para humanizar fonte, autoridade, reconciliação, status e
+    motivo de sync;
+  - alertas de limite passaram de `context window` para `janela de contexto`;
+  - `Chars totais` virou `Caracteres`, `Turnos memória` virou `Turnos em memória`;
+  - `Sync Hub` virou `Sincronização`, e a nota de divergência agora preserva `cauda viva` sem falar
+    `bridge/live-tail`.
+- [x] Validação:
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_context.spec.js` com 11 testes verdes;
+  - [x] `node --check src/copilot/terminal/commands/context.js`;
+  - [x] `npx eslint src/copilot/terminal/commands/context.js tests/unit/copilot/terminal/test_commands_context.spec.js`;
+  - [x] testes focados bloqueiam retorno de `cwd`, `bridge_tail`, `pendentes=`,
+    `diverged-no-overlap` e `live-tail` na saída default.
+- [x] Resultado esperado:
+  - `/context` passa a ler como painel de operador, não como dump de reconciliação;
+  - a arquitetura de timeline continua transparente, mas com nomes que explicam o que o operador
+    precisa decidir;
+  - o próximo ciclo de operador deve ver `/context` coerente com `/usage`, `/activity`, `/events` e
+    `/workspace`.
+- [ ] Próximas verificações:
+  - incluir `/context` em uma live de operador curta depois de mais uma leva de limpeza;
+  - auditar `/session` e `/metrics` porque ainda exibem `bridge` como termo técnico em alguns modos;
+  - revisar eventos `session_context_changed` do SDK, que ainda têm print ANSI manual em modo verbose.
+
+### 12.116 Timeline humana em `/session` e `/metrics` — 2026-06-04
+
+- [x] Achado:
+  - após `/context`, `/session` e `/metrics` ainda expunham `bridge`, `live-tail`,
+    `timelineAuthority` cru e `Git root` em superfícies humanas;
+  - `cmdHistory` também revelava `motivo diverged-no-overlap` quando a conversa viva divergia da
+    persistência;
+  - a arquitetura de timeline é correta, mas seus enums só devem aparecer em raw/detail/testes.
+- [x] Decisão UX:
+  - `bridge` passa a ser `conversa viva` nas telas humanas;
+  - `hub` vira `hub persistido` quando a tela fala de fonte de timeline;
+  - `bridge_tail` vira `cauda viva`;
+  - motivos de bloqueio devem explicar o risco operacional, não repetir o identificador interno;
+  - `/metrics` deve resumir a parte viva da timeline como `Conversa viva`, preservando contadores e
+    sync em uma linha técnica, mas legível.
+- [x] Implementação:
+  - `session.js` ganhou helper de autoridade de timeline e tradução para `bridge_only`,
+    `bridge_tail` e `diverged-no-overlap`;
+  - `/status full` trocou `Turnos canon` por `Turnos canônicos` e `bridge/live-tail` por
+    `vivos/cauda viva`;
+  - notas de divergência passaram a falar em `conversa viva e persistência`;
+  - histórico da sessão traduz motivo `diverged-no-overlap` para
+    `sem sobreposição segura entre conversa viva e persistência`;
+  - `/session sdk` manteve os filtros reais `cwd=`/`gitRoot=`, mas adicionou glossário curto no
+    próprio valor;
+  - `/metrics` trocou a linha `Timeline` por `Conversa viva` e humanizou fonte, autoridade,
+    reconciliação e status de sincronização;
+  - `Git root` virou `Raiz Git`.
+- [x] Validação:
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_context.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`
+    com 65 testes verdes;
+  - [x] `node --check src/copilot/terminal/commands/session.js src/copilot/terminal/commands/metrics.js src/copilot/terminal/commands/context.js`;
+  - [x] `npx eslint src/copilot/terminal/commands/context.js src/copilot/terminal/commands/session.js src/copilot/terminal/commands/metrics.js tests/unit/copilot/terminal/test_commands_context.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
+  - [x] varredura textual focada confirmou que ocorrências restantes de `diverged-no-overlap` e
+    `live-tail` são mapeamentos internos ou fixtures com asserções negativas.
+- [x] Resultado esperado:
+  - `/context`, `/session`, `/history` e `/metrics` agora compartilham a mesma gramática de timeline;
+  - a UX explica reconciliação sem transformar o terminal em dump de enum;
+  - o operador consegue distinguir persistência, conversa viva e cauda pendente com menos esforço.
+- [ ] Próximas verificações:
+  - rodar ciclo de operador com `/context`, `/metrics`, `/session` e `/history`;
+  - extrair glossário de timeline compartilhado se os helpers duplicados crescerem;
+  - investigar `session_context_changed` em `sdk-session-events`, ainda com print ANSI manual em
+    verbose.
