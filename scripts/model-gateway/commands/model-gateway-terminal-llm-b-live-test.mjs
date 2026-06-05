@@ -4923,6 +4923,10 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const promptDoubleRender =
         /voc[eê]\[[^\r\n]*?›[ \t]+voc[eê]\[[^\r\n]*?›/iu.test(plain) ||
         /(?:^|\n)voc[eê]\[[^\r\n]*?›[^\S\r\n]*(?:\r?\n)+voc[eê]\[[^\r\n]*?›/iu.test(plain);
+    const readyPromptDuringActiveTurn =
+        /(?:^|\n)voc[eê]\[[^\]\r\n]+\](?!\[PERG(?:UNTA)?\])›[ \t]*(?:\r[^\n\r]*){1,8}\r?[ \t]*─{3,}[\s\S]{0,320}^\s*LLM-B\s+·/imu.test(
+            plain,
+        );
     const inlineStatusRendered = /(?:⟲|⏳|⌛)\s+(?:LLM-B|aguardando)\b|LLM-B\s+(?:turno|pensando|iniciando)\s+·/iu.test(plain);
     const duplicatePathologies = [/__anonymous__/, /hook:error_occurred/];
     const beforeRawWithoutExpectedScenarioMarkers = scenario.expectedOutputMarkers.reduce(
@@ -5517,6 +5521,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'no-prompt-double-render',
             pass: !promptDoubleRender,
             detail: promptDoubleRender ? 'adjacent prompt repaint detected' : 'no adjacent prompt repaint detected',
+        },
+        {
+            id: 'ux-no-ready-prompt-during-active-turn',
+            pass: !readyPromptDuringActiveTurn,
+            detail: readyPromptDuringActiveTurn
+                ? 'idle prompt appeared while the assistant turn was still producing final transcript'
+                : 'idle prompt did not appear between tool summary/live status and final transcript',
         },
         {
             id: 'inline-status-rendered',

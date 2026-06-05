@@ -350,6 +350,8 @@
 - [x] Gap 23: falha BYOK de turno vivo expunha `dialog.byok_*` e mensagem crua do provider no terminal; agora um presenter puro gera resumo humano e preserva detalhe técnico em activity/SSE/health.
 - [x] Gap 24: `/events --raw` despejava JSON extenso dentro da tela visual; agora default é preview JSONL compacto, com `/events --raw full` para auditoria completa.
 - [x] Gap 25: `payloadPreview` de eventos muito estruturais podia conter mini-JSON; agora activity, hook e lifecycle têm humanizadores específicos no preview raw.
+- [x] Gap 26: prompt idle podia reaparecer entre resumo de tools e transcript final quando `assistant.turn_end` chegava antes da materialização final; agora redraw considera materialização ativa, não apenas `busy`.
+- [x] Gap 27: `/events` default ainda mostrava limpeza interna de sessões SDK (`session.deleted`); agora lifecycle rotineiro fica em filtros explícitos/raw/json.
 
 ## 08. Criterio de Marco
 
@@ -403,4 +405,9 @@
 - [x] 2026-06-05: `/events --raw` redesenhado como preview compacto: 12 eventos por default, `payloadKeys`, `payloadPreview`, eventId/source/trace preservados e atalho para `/events --raw full`.
 - [x] 2026-06-05: live `terminal-ux-default` pass7 PASS confirmou preview raw de 12/100 eventos, `Ocultos 88 eventos`, cruzamento de eventIds com SSE e ausência de retorno ao despejo massivo anterior.
 - [x] 2026-06-05: melhorados humanizadores de `payloadPreview` para `activity.changed`, `terminal.activity`, `hook.start`, `hook.end` e `sdk.lifecycle`, reduzindo mini-JSON em previews raw.
+- [x] 2026-06-05: corrigida janela visual em que `você[...]›` aparecia entre `Turno 2 ações`/`Arquivos LER` e o transcript final; `output.js` agora trata `readTerminalTurnMaterialization().status=active` como turno visualmente ativo.
+- [x] 2026-06-05: runner live ganhou critério `ux-no-ready-prompt-during-active-turn`, que reprova o log antigo e protege contra prompt idle antes da fala final.
+- [x] 2026-06-05: live `terminal-ux-default` pass9 PASS confirmou deltas, tools, pergunta, resposta, export/SSE e ausência de prompt pronto entre resumo de tools/linha viva/transcript.
+- [x] 2026-06-05: `/events` default passou a ocultar lifecycle rotineiro de sessão SDK (`session.created/deleted/foreground/background/ended`) como já fazia com `session.updated`, preservando inspeção por `event=sdk.lifecycle` e `--raw`.
+- [x] 2026-06-05: live `default-ux-cycle` pass10 PASS confirmou que limpeza de sessão SDK não polui mais `/events` default e que as superfícies de UX padrão seguem estáveis.
 - [ ] 2026-06-05: melhorar estado visual/diagnostico para continuacao pos-`ask_user` lenta ou falha BYOK sem mensagem estruturada.

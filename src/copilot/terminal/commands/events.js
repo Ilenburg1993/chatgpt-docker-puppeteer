@@ -863,7 +863,15 @@ function isRoutineDefaultEvent(entry) {
     }
     if (entry.event === 'sdk.lifecycle') {
         const lifecycleType = normalizeEventSummaryText(entry.payload?.['type']).toLowerCase();
-        return lifecycleType === 'session.updated';
+        return [
+            'session.updated',
+            'session.created',
+            'session.deleted',
+            'session.foreground',
+            'session.background',
+            'session.ended',
+            'session.end',
+        ].includes(lifecycleType);
     }
     return false;
 }

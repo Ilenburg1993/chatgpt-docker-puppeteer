@@ -502,6 +502,17 @@ describe('terminal/commands/events', () => {
             {
                 timestamp: 1710000003000,
                 eventId: 94,
+                event: 'sdk.lifecycle',
+                source: 'agent/sdk.lifecycle',
+                eventSource: null,
+                traceId: null,
+                turnId: null,
+                hubSessionId: null,
+                payload: { type: 'session.deleted', label: 'Sessão SDK removida' },
+            },
+            {
+                timestamp: 1710000004000,
+                eventId: 95,
                 event: 'hook.start',
                 source: 'sdk/hooks',
                 eventSource: null,
@@ -511,8 +522,8 @@ describe('terminal/commands/events', () => {
                 payload: { hookType: 'beforeToolUse' },
             },
             {
-                timestamp: 1710000004000,
-                eventId: 95,
+                timestamp: 1710000005000,
+                eventId: 96,
                 event: 'session.usage',
                 source: 'terminal-dialog/usage',
                 eventSource: null,
@@ -522,8 +533,8 @@ describe('terminal/commands/events', () => {
                 payload: { classification: 'non_user_initiated' },
             },
             {
-                timestamp: 1710000005000,
-                eventId: 96,
+                timestamp: 1710000006000,
+                eventId: 97,
                 event: 'streaming.progress',
                 source: 'terminal-dialog/streaming',
                 eventSource: null,
@@ -533,8 +544,8 @@ describe('terminal/commands/events', () => {
                 payload: { status: 'active' },
             },
             {
-                timestamp: 1710000006000,
-                eventId: 97,
+                timestamp: 1710000007000,
+                eventId: 98,
                 event: 'assistant.turn_end',
                 source: 'sdk/assistant.turn_end',
                 eventSource: null,
@@ -544,8 +555,8 @@ describe('terminal/commands/events', () => {
                 payload: { turnId: 'turn-1' },
             },
             {
-                timestamp: 1710000007000,
-                eventId: 98,
+                timestamp: 1710000008000,
+                eventId: 99,
                 event: 'user_input.completed',
                 source: 'sdk/user_input.completed',
                 eventSource: null,
@@ -583,6 +594,7 @@ describe('terminal/commands/events', () => {
         expect(defaultCtx.output()).not.toContain('Atividade');
         expect(defaultCtx.output()).not.toContain('Ocupado');
         expect(defaultCtx.output()).not.toContain('Sessão atualizada');
+        expect(defaultCtx.output()).not.toContain('Sessão removida');
         expect(defaultCtx.output()).not.toContain('Rotina iniciada');
         expect(defaultCtx.output()).not.toContain('Uso LLM');
         expect(defaultCtx.output()).not.toContain('Streaming');
@@ -631,7 +643,7 @@ describe('terminal/commands/events', () => {
                 requestId: null,
                 hubSessionId: null,
             },
-            entries: [routineEntries[6]],
+            entries: [routineEntries[7]],
         });
         const turnCtx = mockCtx();
 

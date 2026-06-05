@@ -23,6 +23,7 @@ import {
     readTerminalActivitySnapshot,
     formatTerminalTimeLabel,
     readTerminalPromptDisplayPolicy,
+    readTerminalTurnMaterialization,
     terminalThemeDivider,
     terminalThemeDuration,
     terminalThemeHeadline,
@@ -714,6 +715,24 @@ function hasActiveHumanInputPromptState() {
 }
 
 /**
+ * @returns {boolean}
+ */
+function hasActiveTerminalTurnMaterialization() {
+    const materialization = readTerminalTurnMaterialization();
+    return materialization?.status === 'active';
+}
+
+/**
+ * O SDK pode encerrar `assistant.turn_end` antes de o motor materializar a fala final em bloco durável. Nessa janela,
+ * `busy` pode estar falso para alguns listeners, mas o turno ainda não voltou visualmente ao operador.
+ *
+ * @returns {boolean}
+ */
+function isTerminalTurnPresentationActive() {
+    return getBusy() || hasActiveTerminalTurnMaterialization();
+}
+
+/**
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} rl
  * @param {string} prompt
  * @param {{ force?: boolean }} [options]
@@ -752,7 +771,7 @@ function shouldSkipDuplicatePromptPaint(rl, prompt, now = Date.now()) {
  */
 function redrawPromptIfInteractive() {
     const rl = getRl();
-    if (!rl || getBusy() || _terminalRenderLockDepth > 0) return;
+    if (!rl || isTerminalTurnPresentationActive() || _terminalRenderLockDepth > 0) return;
     if (isTerminalBootActivityActive()) return;
     scheduleTerminalPromptRedraw(rl, () => buildUserPrompt());
 }
@@ -889,7 +908,16 @@ export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(
             const inputLine = /** @type {{ line?: string }} */ (openReadline).line;
             if (state.force !== true && typeof inputLine === 'string' && inputLine.length > 0) return;
             const nextPrompt = typeof state.prompt === 'function' ? state.prompt() : state.prompt;
-            const prompt = getBusy() && !shouldKeepHumanPromptWithInlineStatus() ? buildWaitingPrompt() : nextPrompt;
+            const activeTurn = isTerminalTurnPresentationActive();
+            if (
+                state.force !== true &&
+                activeTurn &&
+                shouldKeepHumanPromptWithInlineStatus() &&
+                !hasActiveHumanInputPromptState()
+            ) {
+                return;
+            }
+            const prompt = activeTurn && !shouldKeepHumanPromptWithInlineStatus() ? buildWaitingPrompt() : nextPrompt;
             redrawTerminalPrompt(openReadline, prompt, { force: state.force });
         }),
     };

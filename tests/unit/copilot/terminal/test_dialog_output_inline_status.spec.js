@@ -1,6 +1,10 @@
 // @ts-check
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    beginTerminalTurnMaterialization,
+    clearTerminalTurnMaterialization,
+} from '../../../../src/copilot/terminal/state/turn-materialization-state.js';
 
 const mocks = vi.hoisted(() => ({
     rl: {
@@ -135,9 +139,11 @@ describe('terminal/dialog/output inline status', () => {
             updatedAt: 2,
             ageMs: 1000,
         };
+        clearTerminalTurnMaterialization();
     });
 
     afterEach(() => {
+        clearTerminalTurnMaterialization();
         clearInlineStatus();
         resetStatusRowState();
         if (originalIsTTY) Object.defineProperty(process.stdout, 'isTTY', originalIsTTY);
@@ -316,6 +322,20 @@ describe('terminal/dialog/output inline status', () => {
 
         const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
         expect(output).toContain('linha permanente durante streaming');
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+        expect(mocks.rl.prompt).not.toHaveBeenCalled();
+    });
+
+    it('não anuncia prompt pronto enquanto materialização de turno ainda está ativa', async () => {
+        mocks.busy = false;
+        beginTerminalTurnMaterialization({ turnId: 'turn-before-final-transcript', timestamp: 1_000 });
+
+        printlnBlock(['Turno         2 ações · 1 arquivo']);
+        scheduleTerminalPromptRedraw(mocks.rl, 'você› ');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('Turno         2 ações');
         expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
         expect(mocks.rl.prompt).not.toHaveBeenCalled();
     });
