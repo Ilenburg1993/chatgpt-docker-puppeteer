@@ -9597,3 +9597,46 @@
     transição para `rota BYOK`;
   - avaliar se `/health full` deve ter `full` traduzido no headline ou se o termo deve permanecer
     por ser comando literal.
+
+### 12.111 `/usage now` separa rota BYOK atual de histórico Copilot — 2026-06-04
+
+- [x] Achado:
+  - o live canônico ainda mostrava `BYOK provedor kilo-code · modelo ...` em `/usage now`;
+  - isso conflita com a decisão recente de usar `rota BYOK` quando a interface fala do caminho
+    efetivo da sessão viva, e reservar `provedor` para catálogo, metadados, inventário e diagnóstico
+    de fonte;
+  - a linha histórica de `/metrics` também dizia `BYOK ativo provedor ...`, misturando uma rota BYOK
+    atual com telemetria GitHub PR lateral.
+- [x] Decisão UX:
+  - `/usage now` deve usar a coluna `Rota BYOK` para a configuração ativa do terminal;
+  - o valor da rota deve ser compacto: `<perfil/preset> · modelo <id>`;
+  - o histórico Copilot deve continuar explícito como histórico/lateral, com `BYOK atual separado`,
+    para evitar interpretação de cobrança BYOK a partir de snapshot GitHub PR;
+  - `provedor` continua válido em telas de catálogo e auditoria BYOK, onde o objeto exibido é de fato
+    o provedor ou sua fonte de metadados.
+- [x] Implementação:
+  - `/usage now` passou de `BYOK / provedor ...` para `Rota BYOK / ... · modelo ...`;
+  - `/metrics` passou de `BYOK ativo provedor ...` para `rota BYOK atual ...`;
+  - `/status full` herdou a mesma gramática visual de `/health full`: `Rota BYOK`, `SDK`,
+    `Plano arquivo`, `Segundo plano`, `Sessão local`, `Perfil local`, `Mapa local` e `Tela`;
+  - teste focado impede retorno de `provedor ` na superfície default de `/usage now` e exige
+    `Rota BYOK`.
+- [x] Validação:
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js` com 8
+    testes verdes;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`
+    com 54 testes verdes;
+  - [x] `npx eslint src/copilot/terminal/commands/usage.js src/copilot/terminal/commands/metrics.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
+  - [x] `npx eslint src/copilot/terminal/commands/session.js src/copilot/terminal/commands/usage.js src/copilot/terminal/commands/metrics.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
+  - [x] `rg` confirmou que o vazamento específico saiu de `/usage` e `/metrics`; ocorrências
+    restantes de `provedor` pertencem a catálogo, BYOK detail, health, sessão e testes dessas
+    superfícies.
+- [x] Resultado esperado no próximo live:
+  - `/usage now` deve mostrar `Rota BYOK` antes do histórico Copilot;
+  - nenhuma linha default deve sugerir que a telemetria PR histórica é cobrança BYOK;
+  - o operador deve conseguir distinguir rapidamente: rota atual, último snapshot GitHub PR,
+    telemetria LLM do turno e vínculo ambiente/SDK/hub.
+- [ ] Próximas verificações:
+  - reabrir a auditoria dos comandos `/session`, `/config`, `/diagnose` e `/events` para separar
+    mais claramente `rota`, `provedor`, `perfil`, `preset` e `modelo` conforme o tipo de painel;
+  - checar se o live canônico deve validar explicitamente `Rota BYOK` dentro de `/usage now`.

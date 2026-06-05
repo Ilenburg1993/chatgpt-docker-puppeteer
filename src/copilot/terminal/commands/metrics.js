@@ -184,8 +184,10 @@ export function cmdMetrics({ println }, arg = '') {
         : `rota ${modelBilling.displayModel}${modelBilling.observedModel && modelBilling.observedModel !== modelBilling.displayModel ? ` · observado ${modelBilling.observedModel}` : ''}`;
     const costStr = modelBilling.cost === null ? '-' : `$${modelBilling.cost.toFixed(4)}`;
     const billingStatus = terminalThemeText(modelBilling.mismatch ? 'error' : 'success', modelBilling.mismatch ? 'divergente' : 'ok');
+    const byokRouteLabel = byok?.preset ?? byok?.providerType ?? '-';
+    const byokModelLabel = byok?.model ?? '-';
     const billingLine = byokActive
-        ? `GitHub PR lateral ${lastModel} · ${costStr} · ${billingStatus} ${terminalThemeText('muted', `(histórica; BYOK ativo provedor ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}; não é cobrança BYOK)`)}`
+        ? `GitHub PR lateral ${lastModel} · ${costStr} · ${billingStatus} ${terminalThemeText('muted', `(histórica; rota BYOK atual ${byokRouteLabel} · modelo ${byokModelLabel}; não é cobrança BYOK)`)}`
         : `telemetria PR ${lastModel} · ${costStr} · ${billingStatus} ${terminalThemeText('muted', '(histórica)')}`;
     const promptDigest = typeof systemPromptBinding?.['digest'] === 'string' ? systemPromptBinding['digest'] : null;
     const promptIsStale =

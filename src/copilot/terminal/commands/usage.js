@@ -87,6 +87,8 @@ export function cmdUsage({ println }, arg) {
         const modelBilling = projection.modelBilling;
         const byok = configProjection.byok;
         const byokActive = byok?.enabled === true;
+        const byokRouteLabel = byok?.preset ?? byok?.providerType ?? '-';
+        const byokModelLabel = byok?.model ?? '-';
         if (projection.pr) {
             const cost = modelBilling.cost === null ? '?' : modelBilling.cost.toFixed(4);
             const modelLabel = modelBilling.mismatch
@@ -95,8 +97,8 @@ export function cmdUsage({ println }, arg) {
             if (byokActive) {
                 println(
                     terminalThemeRow(
-                        'BYOK',
-                        `provedor ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
+                        'Rota BYOK',
+                        `${byokRouteLabel} · modelo ${byokModelLabel}`,
                         { role: 'success' },
                     ),
                 );
@@ -117,8 +119,8 @@ export function cmdUsage({ println }, arg) {
         } else if (byokActive) {
             println(
                 terminalThemeRow(
-                    'BYOK',
-                    `provedor ${byok.preset ?? byok.providerType ?? '-'} · modelo ${byok.model ?? '-'}`,
+                    'Rota BYOK',
+                    `${byokRouteLabel} · modelo ${byokModelLabel}`,
                     { role: 'success' },
                 ),
             );

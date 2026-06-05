@@ -868,17 +868,17 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     println(terminalThemeRow('Esperas SDK', sdkInterruptions.length > 0 ? sdkInterruptions.join(' · ') : 'nenhuma'));
     println(terminalThemeRow('UI SDK', `formulários ${uiElicitationFlag == null ? 'sem leitura' : uiElicitationFlag ? 'disponíveis' : 'indisponíveis'}`));
     println(terminalThemeRow('Modelo', `${snap['model']} · raciocínio ${effort}`));
-    if (byokLine) println(terminalThemeRow('BYOK provedor', byokLine, { role: byok.ready ? 'success' : 'warn' }));
-    println(terminalThemeRow('Modo SDK', renderLiveSdkMode(sdkMode)));
+    if (byokLine) println(terminalThemeRow('Rota BYOK', byokLine, { role: byok.ready ? 'success' : 'warn' }));
+    println(terminalThemeRow('SDK', renderLiveSdkMode(sdkMode)));
     println(terminalThemeRow('Permissões', permissionModeDetail));
-    println(terminalThemeRow('Plan arquivo', sdkPlanOpLabel));
-    println(terminalThemeRow('Tarefas fundo', String(health?.['backgroundPendingCount'] ?? 0)));
+    println(terminalThemeRow('Plano arquivo', sdkPlanOpLabel));
+    println(terminalThemeRow('Segundo plano', String(health?.['backgroundPendingCount'] ?? 0)));
     println(terminalThemeRow('Alertas', String(Array.isArray(health?.['issues']) ? health['issues'].length : 0)));
     println(terminalThemeRow('Próximo passo', renderTerminalActionLabel(projection.recommendedAction), { role: 'command' }));
-    println(terminalThemeRow('Sessão ambiente', projection.runtimeSessionId ?? 'sem sessão'));
+    println(terminalThemeRow('Sessão local', projection.runtimeSessionId ?? 'sem sessão'));
     println(terminalThemeRow('Ambiente alvo', renderRuntimeTargetLabel(projection.runtimeId)));
-    println(terminalThemeRow('Perfil ambiente', projection.agentProfileId ?? 'sem perfil'));
-    println(terminalThemeRow('Mapa ambiente', renderTerminalRuntimeTopologyLabel(projection.runtimeTopologyLabel)));
+    println(terminalThemeRow('Perfil local', projection.agentProfileId ?? 'sem perfil'));
+    println(terminalThemeRow('Mapa local', renderTerminalRuntimeTopologyLabel(projection.runtimeTopologyLabel)));
     println(
         terminalThemeRow(
             'Timeline',
@@ -926,7 +926,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     println(terminalThemeRow('Encerramento', shutdownLine));
     println(
         terminalThemeRow(
-            'Display',
+            'Tela',
             `raciocínio ${display.thinking ? 'ativo' : 'inativo'} · streaming ${display.streaming ? 'ativo' : 'inativo'} · uso ${display.usage ? 'ativo' : 'inativo'} · ferramentas ${display.tools ? 'ativo' : 'inativo'} · intenção ${display.intent ? 'ativo' : 'inativo'}`,
         ),
     );

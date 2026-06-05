@@ -380,6 +380,8 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toMatch(/Telemetria PR|Histórico\s+Copilot/);
         expect(ctx.output()).not.toContain('Histórico Copilot');
         expect(ctx.output()).not.toContain('BYOK ativo');
+        expect(ctx.output()).not.toContain('provedor ');
+        expect(ctx.output()).toContain('Rota BYOK');
         expect(ctx.output()).not.toContain('side-channel');
         expect(ctx.output()).toMatch(/não implica consumo neste boot\/sonda|BYOK atual separado/);
         expect(ctx.output()).not.toContain('Premium Request');
