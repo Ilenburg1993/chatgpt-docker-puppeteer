@@ -306,6 +306,7 @@ function renderCategoryLabel(value) {
     if (value === 'tool') return 'Ferramenta';
     if (value === 'file') return 'Arquivo';
     if (value === 'io') return 'I/O local';
+    if (value === 'bridge') return 'Ponte local';
     if (value === 'shell' || value === 'exec') return 'Terminal';
     if (value === 'diagnostic') return 'Diagnóstico';
     if (value === 'sdk') return 'SDK';

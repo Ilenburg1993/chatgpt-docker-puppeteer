@@ -46,7 +46,7 @@ ${terminalThemeHeadline('assistant', 'Terminal LLM-B', ['sessão permanente'])}
 ${terminalThemeDivider(62)}
   ${terminalThemeText('muted', 'Operar'.padEnd(9))} ${commandList(['/status', '/now', '/activity 10', '/help'])}
   ${terminalThemeText('muted', 'Entrada'.padEnd(9))} texto direto = próxima pergunta · ${command('/turn <msg>')} envia agora · ${command('@arquivo')} anexa
-  ${terminalThemeText('muted', 'Sistema'.padEnd(9))} HTTP :${injectPort} · ${commandList(['/events', '/sessions', '/health', '/tools'])}
+  ${terminalThemeText('muted', 'API local'.padEnd(9))} :${injectPort} · ${commandList(['/events', '/sessions', '/health', '/tools'])}
 `;
 }
 

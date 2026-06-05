@@ -818,6 +818,20 @@ describe('commands/session — sync commands', () => {
         const ctx = mockCtx();
         cmdDbHistory({ hubSessionId: null, println: ctx.println });
         expect(ctx.output()).toContain('não disponível');
+        expect(ctx.output()).toContain('Histórico DB');
+        expect(ctx.output()).not.toContain('/db-history');
+    });
+
+    it('cmdDbHistory vazio usa estado humano sem comando como label', () => {
+        conversationStore.readTurns.mockReturnValueOnce([]);
+        conversationStore.countTurns.mockReturnValueOnce(0);
+        const ctx = mockCtx();
+
+        cmdDbHistory({ hubSessionId: 'hub-1', println: ctx.println });
+
+        expect(ctx.output()).toContain('Histórico DB');
+        expect(ctx.output()).toContain('Nenhum turno persistido ainda');
+        expect(ctx.output()).not.toContain('/db-history');
     });
 
     it('cmdDbHistory com hubSessionId exibe turnos', () => {

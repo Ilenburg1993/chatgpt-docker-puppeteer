@@ -518,3 +518,7 @@
 - [x] 2026-06-05: `/fs create/read/search/preview` passou a renderizar operações I/O com labels humanos em português; `test_commands_fs` e `diagnostic-ux-cycle` foram alinhados para reprovar os labels antigos.
 - [x] 2026-06-05: `/tools diag` e `/sdk doctor` passaram a usar labels de superfície mais precisos para workspace virtual e shell SDK legado; recorte `fs/tools/sdk` passou com 58 testes.
 - [x] 2026-06-05: live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T12-21-58-535Z/summary.md`, confirmando labels `/fs` humanizados, superfícies operacionais renomeadas e harness sem falso positivo sobre o comando `/fs search`.
+- [x] 2026-06-05: banner compacto e banner de boot trocaram `Sistema HTTP` por `API local`, mantendo endpoints técnicos no menu completo opt-in e reduzindo ruído na primeira viewport.
+- [x] 2026-06-05: `/tools diag` passou a humanizar categoria `bridge` como `Ponte local`, com teste unitário e critério live impedindo retorno de `bridge uso` na superfície humana.
+- [x] 2026-06-05: `/db-history` vazio/sem persistência passou a usar label `Histórico DB`, removendo o nome do comando como rótulo visual; live `diagnostic-ux-cycle` PASS em `artifacts/terminal-live/2026-06-05T12-29-49-778Z/summary.md`.
+- [x] 2026-06-05: shutdown do REPL trocou `HTTP local permanece ativo` por `API local permanece ativa`, alinhando fechamento, banner e harness live ao mesmo vocabulário.

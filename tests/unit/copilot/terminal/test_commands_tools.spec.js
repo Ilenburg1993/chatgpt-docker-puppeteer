@@ -286,6 +286,36 @@ describe('commands/tools', () => {
         expect(ctx.output()).not.toContain('\ntool');
     });
 
+    it('humaniza categoria bridge no diagnóstico humano', () => {
+        readTerminalToolStatsProjection.mockReturnValueOnce({
+            stats: {
+                'bridge.git.diff': { calls: 1, errors: 0, avgLatencyMs: 33 },
+            },
+            canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
+                ['bridge.git.diff', { calls: 1, errors: 0, avgLatencyMs: 33, kind: 'tool' }],
+            ]),
+            entries: /** @type {[string, Record<string, any>][]} */ ([
+                ['bridge.git.diff', { calls: 1, errors: 0, avgLatencyMs: 33, kind: 'tool' }],
+            ]),
+            tools: [],
+            byCategory: {
+                bridge: { totalCalls: 1, totalErrors: 0, totalBlocked: 0, avgLatencyMs: 33 },
+            },
+            toolCount: 1,
+            lifecycle: {
+                active: [],
+                recent: [],
+                summary: { active: 0, recent: 0, waitingUser: 0, failedRecent: 0 },
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdTools({ println: ctx.println }, 'diag');
+
+        expect(ctx.output()).toContain('Ponte local');
+        expect(ctx.output()).not.toMatch(/\n\s*bridge\s+uso/u);
+    });
+
     it('renderiza lifecycle compacto em modo diag', () => {
         readTerminalToolStatsProjection.mockReturnValueOnce({
             stats: {

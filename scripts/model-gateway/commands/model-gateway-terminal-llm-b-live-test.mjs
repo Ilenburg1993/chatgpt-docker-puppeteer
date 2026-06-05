@@ -110,7 +110,7 @@ function hasCommand(name) {
     return result.status === 0;
 }
 
-const HUMAN_TERMINAL_SHUTDOWN_RE = /Terminal\s+fechado; HTTP local permanece ativo até o processo encerrar/u;
+const HUMAN_TERMINAL_SHUTDOWN_RE = /Terminal\s+fechado; API local permanece ativa até o processo encerrar/u;
 const LEGACY_TERMINAL_SHUTDOWN_RE = /\[terminal\]\s+(?:readline fechado|Encerrando sessão)/iu;
 
 function hasHumanTerminalShutdownCopy(plain) {
@@ -2266,8 +2266,8 @@ function diagnosticUxCycleCriteria(boot) {
         {
             id: 'diagnostic-ux-no-old-intervention-jargon',
             pass:
-                /Operar[\s\S]*Entrada[\s\S]*texto direto = próxima pergunta[\s\S]*Sistema/iu.test(plain) &&
-                !/mailbox zero-PR|texto livre → fila (?:zero-PR|de intervenção)|\[mailbox/iu.test(plain),
+                /Operar[\s\S]*Entrada[\s\S]*texto direto = próxima pergunta[\s\S]*API local/iu.test(plain) &&
+                !/Sistema\s+HTTP\s+:\d+|mailbox zero-PR|texto livre → fila (?:zero-PR|de intervenção)|\[mailbox/iu.test(plain),
             detail: 'terminal banner/help/intervention cycle used compact first-viewport copy without old mailbox/intervention jargon',
         },
         {
@@ -2322,7 +2322,8 @@ function diagnosticUxCycleCriteria(boot) {
                 /Ferramentas[\s\S]*diagnóstico humano[\s\S]*Categorias[\s\S]*Superfícies operacionais[\s\S]*Contrato das ferramentas[\s\S]*Lifecycle recente/iu.test(
                     toolsDiagSurface,
                 ) &&
-                !/Nome técnico|Nome interno|Técnico|Refs|Rastreio\s+(?:call|req|trace)|chatcmpl-tool|call chatcmpl|Classe\s+tool|(?:^|\n)\s*tool\s+uso|tipo file|chamada |requisição |tool\(s\)|Superfícies de tools/iu.test(
+                /Ponte local/iu.test(toolsDiagSurface) &&
+                !/Nome técnico|Nome interno|Técnico|Refs|Rastreio\s+(?:call|req|trace)|chatcmpl-tool|call chatcmpl|Classe\s+tool|(?:^|\n)\s*(?:tool|bridge)\s+uso|tipo file|chamada |requisição |tool\(s\)|Superfícies de tools/iu.test(
                     toolsDiagSurface,
                 ),
             detail: '/tools diag separated human summary from raw technical names/references, leaving trace ids to /tools all/raw',
@@ -2425,6 +2426,7 @@ function diagnosticUxCycleCriteria(boot) {
                 /(Últimos|Nenhum turno|janela persistida não tem mensagens visíveis|não disponível)/iu.test(
                     dbHistorySurface,
                 ) &&
+                /Histórico DB|Últimos \d+ turnos da sessão atual/iu.test(dbHistorySurface) &&
                 (!/Últimos/iu.test(dbHistorySurface) || (hasIsoSeconds(dbHistorySurface) && hasRelativeAge(dbHistorySurface))) &&
                 !/(?:Você|LLM-B|Sistema)\s+\d{4}-\d{2}-\d{2}T[^\n]*·\s*(?:\n|$)/iu.test(dbHistorySurface),
             detail: '/db-history rendered visible persisted turns or empty state with ISO seconds plus relative time and without empty rows',

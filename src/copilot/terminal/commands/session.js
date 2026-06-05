@@ -1603,7 +1603,7 @@ export function cmdHistory({ println }, n = 10) {
 export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
     const projection = readTerminalDbHistoryProjection({ hubSessionId: hubSessionId ?? null, limit: n, offset });
     if (!projection.available) {
-        println(terminalThemeRow('/db-history', 'Hub session não disponível (sem persistência).'));
+        println(terminalThemeRow('Histórico DB', 'persistência não disponível nesta sessão.', { role: 'warn' }));
         return;
     }
     try {
@@ -1613,7 +1613,7 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
                 projection.turns.length > 0
                     ? 'A janela persistida não tem mensagens visíveis.'
                     : 'Nenhum turno persistido ainda.';
-            println(terminalThemeRow('/db-history', label));
+            println(terminalThemeRow('Histórico DB', label, { role: 'muted' }));
             return;
         }
         const offsetLabel = offset > 0 ? ` (offset recente ${offset})` : '';
@@ -1635,7 +1635,7 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
         println(terminalThemeDivider(52));
         println('');
     } catch (e) {
-        println(terminalThemeRow('/db-history', `erro: ${toError(e).message}`, { role: 'error' }));
+        println(terminalThemeRow('Histórico DB', `erro: ${toError(e).message}`, { role: 'error' }));
     }
 }
 

@@ -38,7 +38,7 @@ export function buildTerminalStandaloneBannerView(opts, deps = {}) {
     const lines = [
         '',
         `  Ambiente  ${modeLine}`,
-        `  Sistema   ${opts.serverUrl} · /tools · /health · /session sdk · /events`,
+        `  API local ${opts.serverUrl} · /tools · /health · /session sdk · /events`,
     ];
 
     if (warnings.length > 0) {
