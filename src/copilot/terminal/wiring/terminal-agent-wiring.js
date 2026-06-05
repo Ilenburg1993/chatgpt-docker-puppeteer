@@ -49,7 +49,7 @@ import {
     writeTerminalHubSystemTurn,
 } from '../frontend/gateways/index.js';
 import { markTerminalActivityIdle, recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
-import { terminalThemeBadge, terminalThemeRow } from '../state/events/index.js';
+import { terminalThemeBadge, terminalThemeHeadline, terminalThemeRow } from '../state/events/index.js';
 import { shouldSuppressTerminalAssistantMessageAsMaterializedTurn, withTerminalTurnCorrelation } from '../state/events/index.js';
 import { drainMailboxToTurnIfIdle } from './mailbox-drain.js';
 
@@ -565,7 +565,9 @@ export function registerAgentEventListeners(printBanner) {
                         println(
                             [
                                 '',
-                                `  ${terminalThemeBadge('warn', 'RECUPERANDO')} ${terminalThemeText('warn', 'Continuação pós-pergunta sem resposta pública; retomada automática enviada')}`,
+                                terminalThemeHeadline('warn', 'Retomada automática', [
+                                    'continuação pós-pergunta sem resposta pública',
+                                ]),
                                 ...buildEmptyAfterUserInputAutoRecoveryRows({
                                     detail,
                                     turnId,
@@ -634,7 +636,9 @@ export function registerAgentEventListeners(printBanner) {
                     println(
                         [
                             '',
-                            `  ${terminalThemeBadge('warn', 'RECUPERAR')} ${terminalThemeText('warn', 'Continuação pós-pergunta sem resposta pública')}`,
+                            terminalThemeHeadline('warn', 'Continuação vazia', [
+                                'pós-pergunta sem resposta pública',
+                            ]),
                             ...recoveryRows.map((row) =>
                                 terminalThemeRow(row.label, row.value, { role: row.role, width: 11 }),
                             ),

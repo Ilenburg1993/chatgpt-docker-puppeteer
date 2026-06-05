@@ -3268,18 +3268,19 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'gateway operator-ready profile:repo_agent 5');
 
         expect(ctx.output()).toContain('BYOK model-gateway operator-ready');
-        expect(ctx.output()).toContain('sem chamada a provedor');
-        expect(ctx.output()).toContain('runtime_selector');
-        expect(ctx.output()).toContain('standby 1:');
-        expect(ctx.output()).toContain('banco standby:');
-        expect(ctx.output()).toContain('banco live:');
-        expect(ctx.output()).toContain('provar:');
-        expect(ctx.output()).toContain('novo boot:');
-        expect(ctx.output()).toContain('clear: /byok health clear provider:');
+        expect(ctx.output()).toMatch(/sem\s+chamada\s+a\s+provedor/u);
+        expect(ctx.output()).toContain('runtime selector');
+        expect(ctx.output()).toContain('Standby 1');
+        expect(ctx.output()).toContain('Banco standby');
+        expect(ctx.output()).toContain('Banco live');
+        expect(ctx.output()).toContain('Provar');
+        expect(ctx.output()).toContain('Novo boot');
+        expect(ctx.output()).toContain('/byok health clear provider:');
         expect(ctx.output()).toContain('artifacts/terminal-live/unit/summary.md');
         expect(ctx.output()).toContain('kilo-code:kilo-auto/free');
         expect(ctx.output()).toContain('--write-sqlite');
-        expect(ctx.output()).toContain('/byok auto standby profile:repo_agent 5');
+        expect(ctx.output()).toMatch(/\/byok auto standby\s+profile:repo_agent 5/u);
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('renderiza standby persistido sem recalcular selector no terminal', async () => {
@@ -3433,7 +3434,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('/byok probe agent provider:zai model:glm-4.5-flash timeout:20000');
     });
 
-    it('renderiza proof-plan auto sem executar provider nem aplicar efeito', async () => {
+    it('renderiza plano auto sem executar provider nem aplicar efeito', async () => {
         mockProjection();
         buildModelGatewayRuntimeSelectorPlan.mockReturnValueOnce({
             schema: 'model-gateway-runtime-selector-plan',
@@ -3483,11 +3484,36 @@ describe('terminal /byok command', () => {
         });
         const ctx = mockCtx();
 
-        await cmdByok({ println: ctx.println }, 'auto proof-plan profile:repo_agent 5');
+        await cmdByok({ println: ctx.println }, 'auto plan profile:repo_agent 5');
 
-        expect(ctx.output()).toContain('BYOK plano de provas automáticas');
-        expect(ctx.output()).toContain('sem chamada a provedor');
+        expect(ctx.output()).toContain('Plano de provas BYOK');
+        expect(ctx.output()).toMatch(/sem chamada\s+a\s+provedor/u);
+        expect(ctx.output()).toContain('Contexto');
         expect(ctx.output()).toContain('/byok probe agent provider:kilo-code model:kilo-auto/free timeout:20000');
+        expect(ctx.output()).not.toContain('\x1b[');
+    });
+
+    it('mantém proof-plan como alias compatível para automação existente', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway auto proof-plan profile:repo_agent 5');
+
+        expect(ctx.output()).toContain('Plano de provas BYOK');
+        expect(ctx.output()).toMatch(/sem chamada\s+a\s+provedor/u);
+    });
+
+    it('renderiza plano auto mesmo quando o SDK ainda não expõe inventário vivo', async () => {
+        mockProjection();
+        listTerminalSdkSessionInventory.mockRejectedValueOnce(new Error('[AlwaysAlive] client SDK indisponível'));
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'auto plan profile:repo_agent 5');
+
+        expect(ctx.output()).toContain('Plano de provas BYOK');
+        expect(ctx.output()).toContain('sem chamada');
+        expect(ctx.output()).not.toContain('SessionError');
+        expect(ctx.output()).not.toContain('client SDK indisponível');
     });
 
     it('renderiza rotas standby auto sem chamar provider', async () => {
@@ -3504,7 +3530,7 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'auto standby profile:repo_agent 5');
 
         expect(ctx.output()).toContain('BYOK model-gateway auto standby');
-        expect(ctx.output()).toContain('sem chamada a provedor');
+        expect(ctx.output()).toMatch(/sem chamada\s+a\s+provedor/u);
         expect(ctx.output()).toContain('/byok probe agent provider:kilo-code model:kilo-auto/free timeout:20000');
         expect(ctx.output()).toContain('/byok model kilo-auto/free');
         expect(ctx.output()).toContain('/session sdk next new && /byok provider kilo-code kilo-auto/free');
@@ -3727,13 +3753,14 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK model-gateway auto doctor');
         expect(ctx.output()).toContain('perfil repo_agent');
         expect(ctx.output()).toContain('snapshot ativo sim');
-        expect(ctx.output()).toContain('decisão:');
-        expect(ctx.output()).toContain('origem policy:');
-        expect(ctx.output()).toContain('cooldown:');
+        expect(ctx.output()).toContain('Decisão');
+        expect(ctx.output()).toContain('Origem');
+        expect(ctx.output()).toContain('Cooldown');
         expect(ctx.output()).toContain('reset 2026-06-01T10:00:00.000Z');
-        expect(ctx.output()).toContain('registros:');
-        expect(ctx.output()).toContain('bloqueios:');
-        expect(ctx.output()).toContain('próximo:');
+        expect(ctx.output()).toContain('Registros');
+        expect(ctx.output()).toContain('Bloqueios');
+        expect(ctx.output()).toContain('Próximo');
+        expect(ctx.output()).not.toContain('\x1b[');
         expect(ctx.output()).not.toContain('blockers:');
         expect(ctx.output()).not.toContain('proximo:');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();

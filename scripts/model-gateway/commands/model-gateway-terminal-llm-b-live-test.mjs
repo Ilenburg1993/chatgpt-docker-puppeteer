@@ -536,7 +536,7 @@ function buildAutoProbeCommands({ profile = 'repo_agent' } = {}) {
         '/byok auto history 10',
         '/byok auto handoffs 10',
         '/byok auto confirmations 10',
-        `/byok auto proof-plan profile:${routeProfile} 5`,
+        `/byok auto plan profile:${routeProfile} 5`,
         `/byok auto standby profile:${routeProfile} 5`,
         `/byok auto recovery-fixture profile:${routeProfile} provider:zai model:glm-4.5-flash failure:rate-limit`,
         '/byok auto recoveries 10',
@@ -4048,7 +4048,7 @@ function detectLiveBlocker(plain, runtime = {}) {
         const recoveredAfterUserInput =
             id === 'assistant-empty-after-user-input' &&
             scenario.postAskFinalRe.test(plain) &&
-            /Retomada automática|RECUPERANDO|dialog\.empty_after_user_input\.auto_recovery/iu.test(plain);
+            /Retomada automática|Continuação vazia|RECUPERANDO|dialog\.empty_after_user_input\.auto_recovery/iu.test(plain);
         if (recoveredAfterUserInput) return null;
         const phaseDetail = answered
             ? 'after the operator answered the required ask_user prompt'
@@ -4329,6 +4329,8 @@ function shouldEvaluateScenarioDespiteBlocker(blocker) {
 function evaluateEmptyAfterUserInputRecoveryVisible(plain) {
     const text = String(plain ?? '');
     const hasTitle =
+        /Retomada autom[aá]tica[\s\S]{0,260}continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica/iu.test(text) ||
+        /Continua[cç][aã]o vazia[\s\S]{0,260}p[oó]s-pergunta sem resposta p[uú]blica/iu.test(text) ||
         /RECUPERAR[\s\S]{0,260}Continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica/iu.test(text) ||
         /Continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica[\s\S]{0,260}RECUPERAR/iu.test(text) ||
         /RECUPERANDO[\s\S]{0,260}Continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica/iu.test(text) ||
@@ -6058,19 +6060,19 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         {
             id: 'auto-proof-plan-visible',
             pass:
-                /BYOK (?:model-gateway auto proof plan|plano de provas automáticas)/.test(plain) &&
+                /Plano de provas BYOK|BYOK (?:model-gateway auto proof plan|plano de provas automáticas)/.test(plain) &&
                 (/\/byok probe (?:agent|chat) provider:/u.test(plain) ||
-                    /Nenhum comando de prova foi derivado das alternativas bloqueadas atuais/u.test(plain)),
-            detail: '/byok auto proof-plan rendered explicit provider/model runtime proof commands or an explicit empty state without provider calls',
+                    /nenhum comando de prova foi derivado das alternativas bloqueadas atuais/iu.test(plain)),
+            detail: '/byok auto plan rendered explicit provider/model runtime proof commands or an explicit empty state without provider calls',
         },
         {
             id: 'auto-standby-visible',
             pass:
                 /BYOK model-gateway auto standby/.test(plain) &&
-                /sem chamada (?:a )?provedor/.test(plain) &&
-                ((/(?:provar|prove):\s+\/byok probe/u.test(plain) &&
-                    /novo boot:\s+\/session sdk next new/u.test(plain)) ||
-                    /Nenhuma rota de prontid[aã]o foi derivada do seletor atual/u.test(plain)),
+                /sem chamada\s+a\s+provedor/iu.test(plain) &&
+                ((/Provar\s+\/byok probe/u.test(plain) &&
+                    /Novo boot\s+\/session sdk next new/u.test(plain)) ||
+                    /nenhuma rota de prontid[aã]o foi derivada do seletor atual/iu.test(plain)),
             detail: '/byok auto standby rendered ready replacement commands or an explicit empty state without provider calls',
         },
         {

@@ -2979,61 +2979,109 @@ async function renderByokGatewayOperatorReady(println, rest) {
     const nextCommands = [
         ...status.decision.nextCommands,
         `/byok auto standby profile:${status.args.profileId} ${limit}`,
-        `/byok auto proof-plan profile:${status.args.profileId} ${limit}`,
+        `/byok auto plan profile:${status.args.profileId} ${limit}`,
         `npm run model-gateway:auto:standby -- --profile=${status.args.profileId} --limit=${limit} --write-sqlite`,
         ...standbyPlan.nextCommands,
         'npm run model-gateway:runtime-health:diff -- --write-snapshot --fail-on-regression',
     ];
-    println('\n  \x1b[36mBYOK model-gateway operator-ready\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway operator-ready'));
     println(
-        `  \x1b[90mperfil ${status.args.profileId} · ok ${blockers.length === 0 ? 'sim' : 'nao'} · checagens ${checks.length - blockers.length}/${checks.length} · standby ${standbyRows.length} · persistidos ${persistedStandbyRows} · provedores ${standbyProviderCount} · sem chamada a provedor\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `perfil ${status.args.profileId} · ok ${yesNo(blockers.length === 0)} · checagens ${checks.length - blockers.length}/${checks.length} · standby ${standbyRows.length} · persistidos ${persistedStandbyRows} · provedores ${standbyProviderCount} · sem chamada a provedor`,
+            { role: blockers.length === 0 ? 'success' : 'warn', columns: 112 },
+        ),
     );
     println(
-        `    política:      \x1b[33mativa ${policy.enabled ? 'sim' : 'nao'} · preset ${policy.preset} · modo ${renderByokTokenLabel(policy.policy)} · modelo vivo ${policy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${policy.allowNewSession ? 'sim' : 'nao'} · local privado ${policy.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Política',
+            `ativa ${yesNo(policy.enabled)} · preset ${policy.preset} · modo ${renderByokTokenLabel(policy.policy)} · modelo vivo ${yesNo(policy.allowLiveSetModel)} · nova sessão ${yesNo(policy.allowNewSession)} · local privado ${yesNo(policy.allowLocalPrivate)}`,
+            { role: policy.enabled ? 'success' : 'warn', columns: 112 },
+        ),
     );
     println(
-        `    vivo:          \x1b[33m${status.decision.currentBoundary.preset ?? '-'} · ${status.decision.currentBoundary.model ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Vivo',
+            `${status.decision.currentBoundary.preset ?? '-'} · ${status.decision.currentBoundary.model ?? '-'}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
-        `    alvo:          \x1b[33m${status.decision.targetBoundary.preset ?? '-'} · ${status.decision.targetBoundary.model ?? '-'} · ação ${renderByokTokenLabel(status.decision.action)}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Alvo',
+            `${status.decision.targetBoundary.preset ?? '-'} · ${status.decision.targetBoundary.model ?? '-'} · ação ${renderByokTokenLabel(status.decision.action)}`,
+            { role: status.decision.ok ? 'success' : 'warn', columns: 112 },
+        ),
     );
     if (status.decision.fallbackFromSelectedRouteKey || status.decision.fallbackReason) {
         println(
-            `    alternativa:   \x1b[33mde ${status.decision.fallbackFromSelectedRouteKey ?? '-'} · motivo ${renderByokTokenLabel(status.decision.fallbackReason)}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Alternativa',
+                `de ${status.decision.fallbackFromSelectedRouteKey ?? '-'} · motivo ${renderByokTokenLabel(status.decision.fallbackReason)}`,
+                { role: 'warn', columns: 112 },
+            ),
         );
     }
     for (const check of checks) {
         println(
-            `    ${check.pass ? '\x1b[32m[x]\x1b[0m' : '\x1b[31m[ ]\x1b[0m'} \x1b[33m${check.id}\x1b[0m  \x1b[90m${check.detail}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Check',
+                `${check.pass ? 'ok' : 'pendente'} · ${renderByokTokenLabel(check.id)} · ${check.detail}`,
+                { role: check.pass ? 'success' : 'warn', columns: 112 },
+            ),
         );
     }
     for (const [index, row] of standbyRows.slice(0, Math.min(limit, 5)).entries()) {
         println(
-            `    standby ${index + 1}:  \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m \x1b[90m${renderByokSourceLabel(row.source)} · classe ${renderByokTokenLabel(row.standbyClass)} · sonda ${row.needsProbe ? 'sim' : 'nao'} · prova ${row.hasRuntimeProof ? 'sim' : 'nao'} · env ${renderByokTokenLabel(row.runtimeEnvStatus)}\x1b[0m`,
+            terminalThemeWrappedRow(
+                `Standby ${index + 1}`,
+                `${row.providerId}:${row.providerModel} · ${renderByokSourceLabel(row.source)} · classe ${renderByokTokenLabel(row.standbyClass)} · sonda ${yesNo(row.needsProbe)} · prova ${yesNo(row.hasRuntimeProof)} · env ${renderByokTokenLabel(row.runtimeEnvStatus)}`,
+                { role: row.needsProbe ? 'warn' : 'success', columns: 112 },
+            ),
         );
-        println(`      \x1b[90mprovar: ${row.commands.probeAgent ?? '-'}\x1b[0m`);
-        println(`      \x1b[90musar: ${row.commands.liveModel ?? '-'}\x1b[0m`);
-        println(`      \x1b[90mnovo boot: ${row.commands.newSession ?? '-'} && ${row.commands.provider ?? '-'}\x1b[0m`);
+        println(terminalThemeWrappedRow('Provar', row.commands.probeAgent ?? '-', { role: 'command', columns: 112 }));
+        println(terminalThemeWrappedRow('Usar', row.commands.liveModel ?? '-', { role: 'command', columns: 112 }));
+        println(terminalThemeWrappedRow('Novo boot', `${row.commands.newSession ?? '-'} && ${row.commands.provider ?? '-'}`, { role: 'command', columns: 112 }));
         if (row.providerId && row.providerModel) {
             println(
-                `      \x1b[90mclear: /byok health clear provider:${row.providerId} model:${row.providerModel} profile:${row.profileId ?? status.args.profileId}\x1b[0m`,
+                terminalThemeWrappedRow(
+                    'Limpar',
+                    `/byok health clear provider:${row.providerId} model:${row.providerModel} profile:${row.profileId ?? status.args.profileId}`,
+                    { role: 'command', columns: 112 },
+                ),
             );
         }
     }
     println(
-        `    banco standby: \x1b[33mlinhas ${persistedStandbyRows} · mais recente ${latestPersistedStandby.standbyPlanId ?? '-'} · perfil ${latestPersistedStandby.routeProfile ?? '-'} · rotas ${latestPersistedStandby.routeCount ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Banco standby',
+            `linhas ${persistedStandbyRows} · mais recente ${latestPersistedStandby.standbyPlanId ?? '-'} · perfil ${latestPersistedStandby.routeProfile ?? '-'} · rotas ${latestPersistedStandby.routeCount ?? '-'}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
-        `    banco live:    \x1b[33mlinhas ${liveRunRows} · mais recente ${optionalScalarString(latestLiveRun['scenarioKind']) ?? '-'} · estado ${optionalScalarString(latestLiveRun['status']) ?? '-'} · resumo ${optionalScalarString(latestLiveRun['summaryPath']) ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Banco live',
+            `linhas ${liveRunRows} · mais recente ${optionalScalarString(latestLiveRun['scenarioKind']) ?? '-'} · estado ${optionalScalarString(latestLiveRun['status']) ?? '-'} · resumo ${optionalScalarString(latestLiveRun['summaryPath']) ?? '-'}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     for (const [index, run] of liveRuns.slice(0, 3).entries()) {
         println(
-            `    live ${index + 1}:     \x1b[33m${optionalScalarString(run['scenarioKind']) ?? optionalScalarString(run['kind']) ?? '-'}\x1b[0m \x1b[90mestado ${optionalScalarString(run['status']) ?? '-'} · ok ${run['ok'] === true ? 'sim' : run['ok'] === false ? 'nao' : '-'} · resumo ${optionalScalarString(run['summaryPath']) ?? '-'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                `Live ${index + 1}`,
+                `${optionalScalarString(run['scenarioKind']) ?? optionalScalarString(run['kind']) ?? '-'} · estado ${optionalScalarString(run['status']) ?? '-'} · ok ${run['ok'] === true ? 'sim' : run['ok'] === false ? 'não' : '-'} · resumo ${optionalScalarString(run['summaryPath']) ?? '-'}`,
+                { role: run['ok'] === true ? 'success' : 'warn', columns: 112 },
+            ),
         );
     }
-    if (status.decision.blockers.length > 0) println(`    bloqueios:     \x1b[33m${status.decision.blockers.join(', ')}\x1b[0m`);
-    println(`    resumo:        \x1b[90m${status.decision.operatorSummary}\x1b[0m`);
-    println(`    próximo:       \x1b[90m${[...new Set(nextCommands)].slice(0, 5).join(' && ')}\x1b[0m\n`);
+    if (status.decision.blockers.length > 0) {
+        println(terminalThemeWrappedRow('Bloqueios', renderByokTokenList(status.decision.blockers), { role: 'warn', columns: 112 }));
+    }
+    println(terminalThemeWrappedRow('Operador', status.decision.operatorSummary, { role: 'muted', columns: 112 }));
+    println(terminalThemeWrappedRow('Próximo', [...new Set(nextCommands)].slice(0, 5).join(' && '), { role: 'command', columns: 112 }));
+    println('');
 }
 
 /**
@@ -4158,20 +4206,49 @@ async function renderByokGatewayAutoProofPlan(println, rest) {
     const visibleRows = rows.slice(0, limit);
     const evaluated = status.runtimeSelectorPlan.routes.reduce((sum, route) => sum + route.alternativeSummary.evaluatedCount, 0);
     const usable = status.runtimeSelectorPlan.routes.reduce((sum, route) => sum + route.alternativeSummary.usableCount, 0);
-    println('\n  \x1b[36mBYOK plano de provas automáticas\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'Plano de provas BYOK', ['model-gateway auto']));
     println(
-        `  \x1b[90mperfil ${status.args.profileId} · seletor de execução ${status.runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · comandos ${rows.length} · alternativas ${usable}/${evaluated} · sem chamada a provedor\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `perfil ${status.args.profileId} · seletor de execução ${status.runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · comandos ${rows.length} · alternativas ${usable}/${evaluated} · sem chamada a provedor`,
+            { role: status.runtimeSelectorPlan.ok ? 'success' : 'warn', columns: 112 },
+        ),
     );
     if (visibleRows.length === 0) {
-        println('  \x1b[90mNenhum comando de prova foi derivado das alternativas bloqueadas atuais.\x1b[0m\n');
+        println(
+            terminalThemeWrappedRow(
+                'Estado',
+                'nenhum comando de prova foi derivado das alternativas bloqueadas atuais',
+                { role: 'muted', columns: 112 },
+            ),
+        );
+        println('');
         return;
     }
     for (const [index, row] of visibleRows.entries()) {
         println(
-            `    ${index + 1}. \x1b[33m${row.command}\x1b[0m  \x1b[90mperfil ${row.profileId} · motivos ${renderByokTokenList(row.reasons.slice(0, 3)) || '-'}\x1b[0m`,
+            terminalThemeWrappedRow(`${index + 1}. Provar`, row.command, {
+                role: 'command',
+                columns: 112,
+            }),
+        );
+        println(
+            terminalThemeWrappedRow(
+                'Contexto',
+                `perfil ${row.profileId} · rota ${row.providerId}:${row.providerModel} · motivos ${renderByokTokenList(row.reasons.slice(0, 3)) || '-'}`,
+                { role: row.status === 'ready' ? 'success' : 'muted', columns: 112 },
+            ),
         );
     }
-    println('  \x1b[90mCada comando roda sessão SDK descartável e alimenta a saúde runtime usada pelo seletor; nada é aplicado automaticamente aqui.\x1b[0m\n');
+    println(
+        terminalThemeWrappedRow(
+            'Garantia',
+            'cada comando roda sessão SDK descartável e alimenta a saúde runtime usada pelo seletor; nada é aplicado automaticamente aqui',
+            { role: 'muted', columns: 112 },
+        ),
+    );
+    println('');
 }
 
 /**
@@ -4190,23 +4267,38 @@ async function renderByokGatewayAutoStandby(println, rest) {
         const latest = plans[0] ?? null;
         const latestSummary = asRecord(latest?.['summary']);
         const latestRoutes = Array.isArray(latest?.['routes']) ? latest['routes'] : [];
-        println('\n  \x1b[36mBYOK model-gateway auto standby persistido\x1b[0m');
+        println('');
+        println(terminalThemeHeadline('accent', 'BYOK model-gateway auto standby persistido'));
         println(
-            `  \x1b[90mperfil ${profile} · planos ${plans.length} · rotas mais recentes ${latestSummary['routeCount'] ?? latestRoutes.length} · sem chamada a provedor\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Resumo',
+                `perfil ${profile} · planos ${plans.length} · rotas mais recentes ${latestSummary['routeCount'] ?? latestRoutes.length} · sem chamada a provedor`,
+                { role: 'muted', columns: 112 },
+            ),
         );
         if (plans.length === 0) {
             println(
-                `  \x1b[90mNenhum standby persistido. Grave com: npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit} --write-sqlite\x1b[0m\n`,
+                terminalThemeWrappedRow(
+                    'Estado',
+                    `nenhum standby persistido; grave com npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit} --write-sqlite`,
+                    { role: 'muted', columns: 112 },
+                ),
             );
+            println('');
             return;
         }
         for (const [index, plan] of plans.entries()) {
             const summary = asRecord(plan['summary']);
             const routes = Array.isArray(plan['routes']) ? plan['routes'] : [];
             println(
-                `    ${index + 1}. \x1b[33m${plan['standbyPlanId'] ?? '-'}\x1b[0m  \x1b[90mestado ${renderByokTokenLabel(optionalScalarString(plan['status']))} · rotas ${summary['routeCount'] ?? routes.length} · provedores ${summary['providerCount'] ?? 0} · gerado ${plan['generatedAt'] ?? plan['generatedAtMs'] ?? '-'}\x1b[0m`,
+                terminalThemeWrappedRow(
+                    `${index + 1}. Plano`,
+                    `${plan['standbyPlanId'] ?? '-'} · estado ${renderByokTokenLabel(optionalScalarString(plan['status']))} · rotas ${summary['routeCount'] ?? routes.length} · provedores ${summary['providerCount'] ?? 0} · gerado ${plan['generatedAt'] ?? plan['generatedAtMs'] ?? '-'}`,
+                    { role: 'muted', columns: 112 },
+                ),
             );
         }
+        println('');
         return;
     }
     const status = await buildTerminalByokGatewayAutoStatus(rest, {
@@ -4221,25 +4313,48 @@ async function renderByokGatewayAutoStandby(println, rest) {
     const visibleRows = rows.slice(0, limit);
     const proofCount = standbyPlan.summary.runtimeProofCount;
     const providerCount = standbyPlan.summary.providerCount;
-    println('\n  \x1b[36mBYOK model-gateway auto standby\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'BYOK model-gateway auto standby'));
     println(
-        `  \x1b[90mperfil ${status.args.profileId} · seletor de execução ${status.runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · rotas ${rows.length} · provas ${proofCount} · provedores ${providerCount} · sem chamada a provedor\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `perfil ${status.args.profileId} · seletor de execução ${status.runtimeSelectorPlan.ok ? 'ok' : 'bloqueado'} · rotas ${rows.length} · provas ${proofCount} · provedores ${providerCount} · sem chamada a provedor`,
+            { role: status.runtimeSelectorPlan.ok ? 'success' : 'warn', columns: 112 },
+        ),
     );
     if (visibleRows.length === 0) {
-        println('  \x1b[90mNenhuma rota de prontidão foi derivada do seletor atual.\x1b[0m\n');
+        println(
+            terminalThemeWrappedRow(
+                'Estado',
+                'nenhuma rota de prontidão foi derivada do seletor atual',
+                { role: 'muted', columns: 112 },
+            ),
+        );
+        println('');
         return;
     }
     for (const [index, row] of visibleRows.entries()) {
         const source = row.source === 'selected' ? 'selecionada' : 'alternativa';
         println(
-            `    ${index + 1}. \x1b[33m${row.providerId}:${row.providerModel}\x1b[0m  \x1b[90m${source} · classe ${renderByokTokenLabel(row.standbyClass)} · precisa sonda ${row.needsProbe ? 'sim' : 'nao'} · perfil ${row.profileId} · prova ${row.hasRuntimeProof ? 'sim' : 'nao'} · env ${renderByokTokenLabel(row.runtimeEnvStatus)} · pontuação ${row.score ?? '-'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                `${index + 1}. Rota`,
+                `${row.providerId}:${row.providerModel} · ${source} · classe ${renderByokTokenLabel(row.standbyClass)} · precisa sonda ${yesNo(row.needsProbe)} · perfil ${row.profileId} · prova ${yesNo(row.hasRuntimeProof)} · env ${renderByokTokenLabel(row.runtimeEnvStatus)} · pontuação ${row.score ?? '-'}`,
+                { role: row.needsProbe ? 'warn' : 'success', columns: 112 },
+            ),
         );
-        println(`       \x1b[90mprovar: ${row.commands.probeAgent ?? '-'}\x1b[0m`);
-        println(`       \x1b[90mmesmo provedor: ${row.commands.liveModel ?? '-'}\x1b[0m`);
-        println(`       \x1b[90mnovo boot: ${row.commands.newSession} && ${row.commands.provider ?? '-'}\x1b[0m`);
-        println(`       \x1b[90mpersistir: ${row.commands.persistProvider ?? '-'}\x1b[0m`);
+        println(terminalThemeWrappedRow('Provar', row.commands.probeAgent ?? '-', { role: 'command', columns: 112 }));
+        println(terminalThemeWrappedRow('Mesmo provedor', row.commands.liveModel ?? '-', { role: 'command', columns: 112 }));
+        println(terminalThemeWrappedRow('Novo boot', `${row.commands.newSession} && ${row.commands.provider ?? '-'}`, { role: 'command', columns: 112 }));
+        println(terminalThemeWrappedRow('Persistir', row.commands.persistProvider ?? '-', { role: 'command', columns: 112 }));
     }
-    println('  \x1b[90mStandby nao aplica efeitos; ele mostra substitutos prontos e comandos explicitos para o operador escolher.\x1b[0m\n');
+    println(
+        terminalThemeWrappedRow(
+            'Garantia',
+            'standby não aplica efeitos; ele mostra substitutos prontos e comandos explícitos para o operador escolher',
+            { role: 'muted', columns: 112 },
+        ),
+    );
+    println('');
 }
 
 /**
@@ -4277,10 +4392,12 @@ async function renderByokGatewayAutoOn(println, rest) {
     });
     const policyValidation = validateModelGatewayRuntimeAutomationPolicy(policyPatch);
     if (policyValidation.ok !== true) {
-        println('\n  \x1b[36mBYOK model-gateway auto on\x1b[0m');
-        println(`    preset:        \x1b[33m${args.presetId}\x1b[0m`);
-        println(`    validacao:     \x1b[33m${policyValidation.issues.join(', ')}\x1b[0m`);
-        println(`    presets:       \x1b[90m${policyValidation.allowedPresets.join(', ')}\x1b[0m\n`);
+        println('');
+        println(terminalThemeHeadline('tool', 'BYOK model-gateway auto on'));
+        println(terminalThemeRow('Preset', args.presetId, { role: 'warn' }));
+        println(terminalThemeWrappedRow('Validação', renderByokTokenList(policyValidation.issues), { role: 'error', columns: 112 }));
+        println(terminalThemeWrappedRow('Presets', policyValidation.allowedPresets.join(', '), { role: 'muted', columns: 112 }));
+        println('');
         return;
     }
     const written = await writeModelGatewayRuntimeAutomationPolicyFile(policyPatch);
@@ -4293,22 +4410,45 @@ async function renderByokGatewayAutoOn(println, rest) {
         `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION=${args.allowNewSession ? 'true' : 'false'}`,
         `COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LOCAL_PRIVATE=${args.allowLocalPrivate ? 'true' : 'false'}`,
     ];
-    println('\n  \x1b[36mBYOK model-gateway auto on\x1b[0m');
-    println('  \x1b[90mPolicy segura persistida para o proximo boot; segredos nao sao gravados nesse arquivo.\x1b[0m');
-    println(`    arquivo:       \x1b[33m${written.filePath}\x1b[0m`);
-    println(`    perfil:        \x1b[33m${args.profileId}\x1b[0m`);
-    println(`    preset:        \x1b[33m${written.policy.preset}\x1b[0m`);
-    println(`    policy:        \x1b[33m${written.policy.policy}\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway auto on'));
     println(
-        `    flags:         \x1b[33mtroca viva ${args.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${args.allowNewSession ? 'sim' : 'nao'} · local privado ${args.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Estado',
+            'política segura persistida para o próximo boot; segredos não são gravados nesse arquivo',
+            { role: 'success', columns: 112 },
+        ),
     );
-    println(`    preview:       \x1b[33mação ${decision.action} · rota ${decision.selectedRouteKey ?? '-'} · ok ${decision.ok ? 'sim' : 'nao'}\x1b[0m`);
-    println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
-    println('    env sugerido:');
+    println(terminalThemeRow('Arquivo', written.filePath, { role: 'command' }));
+    println(terminalThemeRow('Perfil', args.profileId, { role: 'command' }));
+    println(terminalThemeRow('Preset', written.policy.preset, { role: 'warn' }));
+    println(terminalThemeRow('Policy', written.policy.policy, { role: 'warn' }));
+    println(
+        terminalThemeWrappedRow(
+            'Flags',
+            `troca viva ${yesNo(args.allowLiveSetModel)} · nova sessão ${yesNo(args.allowNewSession)} · local privado ${yesNo(args.allowLocalPrivate)}`,
+            { role: 'warn', columns: 112 },
+        ),
+    );
+    println(
+        terminalThemeWrappedRow(
+            'Preview',
+            `ação ${renderByokTokenLabel(decision.action)} · rota ${decision.selectedRouteKey ?? '-'} · ok ${yesNo(decision.ok)}`,
+            { role: decision.ok ? 'success' : 'warn', columns: 112 },
+        ),
+    );
+    println(terminalThemeWrappedRow('Resumo', decision.operatorSummary, { role: 'muted', columns: 112 }));
     for (const line of exports) {
-        println(`      \x1b[90mexport ${line}\x1b[0m`);
+        println(terminalThemeWrappedRow('Export', `export ${line}`, { role: 'command', columns: 112 }));
     }
-    println('    próximo:       \x1b[90mreinicie o terminal ou exporte as variaveis antes de iniciar a proxima sessao\x1b[0m\n');
+    println(
+        terminalThemeWrappedRow(
+            'Próximo',
+            'reinicie o terminal ou exporte as variáveis antes de iniciar a próxima sessão',
+            { role: 'command', columns: 112 },
+        ),
+    );
+    println('');
 }
 
 /**
@@ -4328,9 +4468,17 @@ function parseByokGatewayAutoHistoryLimit(rest) {
 async function renderByokGatewayAutoHistory(println, rest) {
     const limit = parseByokGatewayAutoHistoryLimit(rest);
     const rows = await new SqliteModelGatewayCatalogStore().readAutomationDecisionRecords({ limit });
-    println('\n  \x1b[36mBYOK model-gateway auto history\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('accent', 'BYOK model-gateway auto history'));
     if (rows.length === 0) {
-        println('  \x1b[90mNenhuma decisão auto persistida ainda. Use /byok auto record profile:<id> para gravar uma trilha.\x1b[0m\n');
+        println(
+            terminalThemeWrappedRow(
+                'Estado',
+                'nenhuma decisão auto persistida ainda; use /byok auto record profile:<id> para gravar uma trilha',
+                { role: 'muted', columns: 112 },
+            ),
+        );
+        println('');
         return;
     }
     rows.slice(0, limit).forEach((row, index) => {
@@ -4340,7 +4488,11 @@ async function renderByokGatewayAutoHistory(println, rest) {
         const profile = optionalScalarString(row['routeProfile']) ?? '-';
         const ok = row['ok'] === true ? 'ok' : row['ok'] === false ? 'blocked' : optionalScalarString(row['status']) ?? '-';
         println(
-            `    ${index + 1}. \x1b[33m${renderByokTokenLabel(action)}\x1b[0m  \x1b[90mrota ${route} · perfil ${profile} · estado ${renderByokTokenLabel(ok)} · decidido ${decidedAt}\x1b[0m`,
+            terminalThemeWrappedRow(
+                `${index + 1}. Decisão`,
+                `${renderByokTokenLabel(action)} · rota ${route} · perfil ${profile} · estado ${renderByokTokenLabel(ok)} · decidido ${decidedAt}`,
+                { role: ok === 'ok' ? 'success' : 'warn', columns: 112 },
+            ),
         );
     });
     println('');
@@ -4367,7 +4519,11 @@ async function renderByokGatewayAutoHandoffs(println, rest) {
         const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
         const requestedAt = optionalScalarString(row['requestedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
         println(
-            `    ${index + 1}. \x1b[33m${renderByokTokenLabel(status)}\x1b[0m  \x1b[90mmodelo ${model} · rota ${route} · solicitado ${requestedAt}\x1b[0m`,
+            terminalThemeWrappedRow(
+                `${index + 1}. Handoff`,
+                `${renderByokTokenLabel(status)} · modelo ${model} · rota ${route} · solicitado ${requestedAt}`,
+                { role: status === 'completed' ? 'success' : 'muted', columns: 112 },
+            ),
         );
     });
     println('');
@@ -4394,7 +4550,11 @@ async function renderByokGatewayAutoConfirmations(println, rest) {
         const confirmedModel = optionalScalarString(row['confirmedModel']) ?? optionalScalarString(row['newModel']) ?? '-';
         const observedAt = optionalScalarString(row['observedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
         println(
-            `    ${index + 1}. \x1b[33m${renderByokTokenLabel(status)}\x1b[0m  \x1b[90m${previousModel} -> ${confirmedModel} · observado ${observedAt}\x1b[0m`,
+            terminalThemeWrappedRow(
+                `${index + 1}. Confirmação`,
+                `${renderByokTokenLabel(status)} · ${previousModel} -> ${confirmedModel} · observado ${observedAt}`,
+                { role: status === 'confirmed' ? 'success' : 'muted', columns: 112 },
+            ),
         );
     });
     println('');
@@ -4422,7 +4582,11 @@ async function renderByokGatewayAutoRecoveries(println, rest) {
         const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
         const observedAt = optionalScalarString(row['observedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
         println(
-            `    ${index + 1}. \x1b[33m${renderByokTokenLabel(status)}\x1b[0m  \x1b[90mescopo ${renderByokTokenLabel(scope)} · falha ${renderByokTokenLabel(failureKind)} · rota ${route} · observado ${observedAt}\x1b[0m`,
+            terminalThemeWrappedRow(
+                `${index + 1}. Recuperação`,
+                `${renderByokTokenLabel(status)} · escopo ${renderByokTokenLabel(scope)} · falha ${renderByokTokenLabel(failureKind)} · rota ${route} · observado ${observedAt}`,
+                { role: status === 'applied' ? 'success' : 'muted', columns: 112 },
+            ),
         );
     });
     println('');
@@ -4483,29 +4647,51 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
         ),
     );
     if (result.ran !== true || !result.status) {
-        println('    \x1b[33mFixture não executou; verifique policy e snapshot ativo.\x1b[0m\n');
+        println(
+            terminalThemeWrappedRow(
+                'Estado',
+                'fixture não executou; verifique policy e snapshot ativo',
+                { role: 'warn', columns: 112 },
+            ),
+        );
+        println('');
         return;
     }
     const applied = result.application?.applied ?? [];
     const skipped = result.application?.skipped ?? [];
     println(
-        `    decisão:       \x1b[33mação ${renderByokTokenLabel(result.status.decision.action)} · rota ${result.status.decision.selectedRouteKey ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Decisão',
+            `ação ${renderByokTokenLabel(result.status.decision.action)} · rota ${result.status.decision.selectedRouteKey ?? '-'}`,
+            { role: result.status.decision.ok ? 'success' : 'warn', columns: 112 },
+        ),
     );
     println(
-        `    efeitos:       \x1b[33maplicados ${applied.length} · pulados ${skipped.length} · persistidos ${result.effectPersistence?.automationEffectApplications ?? 0}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Efeitos',
+            `aplicados ${applied.length} · pulados ${skipped.length} · persistidos ${result.effectPersistence?.automationEffectApplications ?? 0}`,
+            { role: applied.length > 0 ? 'success' : 'muted', columns: 112 },
+        ),
     );
     println(
-        `    recoveries:    \x1b[33m${result.effectPersistence?.recoveryAttempts ?? 0}\x1b[0m`,
+        terminalThemeRow('Recoveries', String(result.effectPersistence?.recoveryAttempts ?? 0), { role: 'muted' }),
     );
     const health = result.healthPersistence;
     if (health) {
         println(
-            `    saúde:         \x1b[33mregistrada ${health.recorded ? 'sim' : 'nao'} · rota ${health.providerId ?? '-'}:${health.providerModel ?? '-'} · SQLite ${health.sqlite ? `${health.sqlite.healthObservations}/${health.sqlite.records}` : '-'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Saúde',
+                `registrada ${yesNo(health.recorded)} · rota ${health.providerId ?? '-'}:${health.providerModel ?? '-'} · SQLite ${health.sqlite ? `${health.sqlite.healthObservations}/${health.sqlite.records}` : '-'}`,
+                { role: health.recorded ? 'success' : 'warn', columns: 112 },
+            ),
         );
     }
     const details = [...applied, ...skipped].map(describeTerminalByokGatewayAutoEffect).slice(0, 5);
-    if (details.length > 0) println(`    detalhe:       \x1b[90m${details.join('; ')}\x1b[0m`);
-    println('  \x1b[90mUse /byok auto recoveries 10 para ler o ledger persistido.\x1b[0m\n');
+    if (details.length > 0) {
+        println(terminalThemeWrappedRow('Detalhe', details.join('; '), { role: 'muted', columns: 112 }));
+    }
+    println(terminalThemeWrappedRow('Próximo', 'use /byok auto recoveries 10 para ler o ledger persistido', { role: 'command', columns: 112 }));
+    println('');
 }
 
 /**
@@ -4545,30 +4731,52 @@ async function renderByokGatewayAutoPolicy(println) {
     const presets = listModelGatewayRuntimeAutomationPolicyPresets();
     const fileConfigured = Object.keys(filePolicy).length > 0;
     const envConfigured = Object.keys(process.env).some((key) => key.startsWith('COPILOT_BYOK_GATEWAY_AUTO'));
-    println('\n  \x1b[36mBYOK model-gateway auto policy\x1b[0m');
-    println(`    arquivo:       \x1b[33m${DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH}\x1b[0m`);
-    println(`    arquivo cfg:   \x1b[33m${fileConfigured ? 'sim' : 'nao'}\x1b[0m`);
-    println(`    env cfg:       \x1b[33m${envConfigured ? 'sim' : 'nao'}\x1b[0m`);
-    println(`    efetivo:       \x1b[33m${enabledDisabled(effectivePolicy.enabled)}\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway auto policy'));
+    println(terminalThemeRow('Arquivo', DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, { role: 'command' }));
+    println(terminalThemeRow('Arquivo cfg', fileConfigured ? 'sim' : 'não', { role: fileConfigured ? 'success' : 'muted' }));
+    println(terminalThemeRow('Env cfg', envConfigured ? 'sim' : 'não', { role: envConfigured ? 'warn' : 'muted' }));
+    println(terminalThemeRow('Efetivo', enabledDisabled(effectivePolicy.enabled), { role: effectivePolicy.enabled ? 'success' : 'warn' }));
     println(
-        `    política:      \x1b[33m${renderByokAutoPresetLabel(effectivePolicy.preset)}\x1b[0m  \x1b[90mfonte ${policySources['preset']?.source ?? '-'} · preset ${effectivePolicy.preset}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Política',
+            `${renderByokAutoPresetLabel(effectivePolicy.preset)} · fonte ${policySources['preset']?.source ?? '-'} · preset ${effectivePolicy.preset}`,
+            { role: 'warn', columns: 112 },
+        ),
     );
-    println(`    regra:         \x1b[33m${effectivePolicy.policy}\x1b[0m`);
-    println(`    perfis:        \x1b[33m${effectivePolicy.profiles.join(', ') || '-'}\x1b[0m`);
+    println(terminalThemeRow('Regra', renderByokTokenLabel(effectivePolicy.policy), { role: 'warn' }));
+    println(terminalThemeRow('Perfis', effectivePolicy.profiles.join(', ') || '-', { role: 'command' }));
     println(
-        `    flags:         \x1b[33mtroca viva ${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${effectivePolicy.allowNewSession ? 'sim' : 'nao'} · probes provider ${effectivePolicy.allowProviderProbes ? 'sim' : 'nao'} · local privado ${effectivePolicy.allowLocalPrivate ? 'sim' : 'nao'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Flags',
+            `troca viva ${yesNo(effectivePolicy.allowLiveSetModel)} · nova sessão ${yesNo(effectivePolicy.allowNewSession)} · probes provider ${yesNo(effectivePolicy.allowProviderProbes)} · local privado ${yesNo(effectivePolicy.allowLocalPrivate)}`,
+            { role: 'warn', columns: 112 },
+        ),
     );
     println(
-        `    conta:         \x1b[33mfalhas globais ${effectivePolicy.accountWideFailureKinds.join(', ') || '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Conta',
+            `falhas globais ${renderByokTokenList(effectivePolicy.accountWideFailureKinds) || '-'}`,
+            { role: 'warn', columns: 112 },
+        ),
     );
-    println('    presets:');
     for (const preset of presets) {
         println(
-            `      \x1b[90m${renderByokAutoPresetLabel(String(preset['preset']))} (${preset['preset']}) · regra ${preset['policy']} · troca viva ${preset['allowLiveSetModel'] ? 'sim' : 'nao'} · nova sessão ${preset['allowNewSession'] ? 'sim' : 'nao'} · local privado ${preset['allowLocalPrivate'] ? 'sim' : 'nao'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Preset',
+                `${renderByokAutoPresetLabel(String(preset['preset']))} (${preset['preset']}) · regra ${renderByokTokenLabel(optionalScalarString(preset['policy']))} · troca viva ${yesNo(preset['allowLiveSetModel'] === true)} · nova sessão ${yesNo(preset['allowNewSession'] === true)} · local privado ${yesNo(preset['allowLocalPrivate'] === true)}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
     }
     if (envConfigured && envPolicy.enabled !== effectivePolicy.enabled) {
-        println('    \x1b[33mobs: env explicito pode sobrescrever o arquivo persistente no proximo boot.\x1b[0m');
+        println(
+            terminalThemeWrappedRow(
+                'Observação',
+                'env explícito pode sobrescrever o arquivo persistente no próximo boot',
+                { role: 'warn', columns: 112 },
+            ),
+        );
     }
     println('');
 }
@@ -4609,25 +4817,50 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     if (!activeSnapshot) warnings.push('no_active_catalog_snapshot');
     if (decision.ok !== true) warnings.push('automation_decision_blocked');
     if (policyValidation.ok !== true) warnings.push(...policyValidation.issues);
-    println('\n  \x1b[36mBYOK model-gateway auto doctor\x1b[0m');
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway auto doctor'));
     println(
-        `  \x1b[90mperfil ${status.args.profileId} · snapshot ativo ${activeSnapshot ? 'sim' : 'nao'} · comandos ${commandCount} · avisos ${warnings.length}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `perfil ${status.args.profileId} · snapshot ativo ${activeSnapshot ? 'sim' : 'não'} · comandos ${commandCount} · avisos ${warnings.length}`,
+            { role: warnings.length === 0 ? 'success' : 'warn', columns: 112 },
+        ),
     );
     println(
-        `    política:      \x1b[33mativa ${effectivePolicy.enabled ? 'sim' : 'nao'} · arquivo ${fileConfigured ? 'sim' : 'nao'} · modelo vivo ${effectivePolicy.allowLiveSetModel ? 'sim' : 'nao'} · nova sessão ${effectivePolicy.allowNewSession ? 'sim' : 'nao'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Política',
+            `ativa ${yesNo(effectivePolicy.enabled)} · arquivo ${yesNo(fileConfigured)} · modelo vivo ${yesNo(effectivePolicy.allowLiveSetModel)} · nova sessão ${yesNo(effectivePolicy.allowNewSession)}`,
+            { role: effectivePolicy.enabled ? 'success' : 'warn', columns: 112 },
+        ),
     );
     println(
-        `    origem policy: \x1b[33mativa ${policySources['enabled']?.source ?? '-'} · perfis ${policySources['profiles']?.source ?? '-'} · modelo vivo ${policySources['allowLiveSetModel']?.source ?? '-'} · nova sessão ${policySources['allowNewSession']?.source ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Origem',
+            `ativa ${policySources['enabled']?.source ?? '-'} · perfis ${policySources['profiles']?.source ?? '-'} · modelo vivo ${policySources['allowLiveSetModel']?.source ?? '-'} · nova sessão ${policySources['allowNewSession']?.source ?? '-'}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
-        `    decisão:       \x1b[33mok ${decision.ok ? 'sim' : 'nao'} · ação ${renderByokTokenLabel(decision.action)} · rota ${decision.selectedRouteKey ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Decisão',
+            `ok ${yesNo(decision.ok)} · ação ${renderByokTokenLabel(decision.action)} · rota ${decision.selectedRouteKey ?? '-'}`,
+            { role: decision.ok ? 'success' : 'warn', columns: 112 },
+        ),
     );
     println(
-        `    alvo:          \x1b[33m${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Alvo',
+            `${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}`,
+            { role: 'warn', columns: 112 },
+        ),
     );
     if (decision.cooldown?.active === true) {
         println(
-            `    cooldown:      \x1b[33m${renderByokTokenLabel(decision.cooldown.reason)} · reset ${decision.cooldown.resetAt ?? '-'} · nova tentativa ${decision.cooldown.retryAfterSeconds ?? '-'}s\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Cooldown',
+                `${renderByokTokenLabel(decision.cooldown.reason)} · reset ${decision.cooldown.resetAt ?? '-'} · nova tentativa ${decision.cooldown.retryAfterSeconds ?? '-'}s`,
+                { role: 'warn', columns: 112 },
+            ),
         );
     }
     if (alternativeSummary) {
@@ -4638,24 +4871,45 @@ async function renderByokGatewayAutoDoctor(println, rest) {
             .map(([reason, count]) => `${renderByokTokenLabel(reason)} ${count}`)
             .join(', ');
         println(
-            `    alternativas:  \x1b[33musáveis ${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · provedores ${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Alternativas',
+                `usáveis ${alternativeSummary.usableCount}/${alternativeSummary.evaluatedCount} · provedores ${alternativeSummary.providerCount}${topReasons ? ` · ${topReasons}` : ''}`,
+                { role: 'warn', columns: 112 },
+            ),
         );
         for (const proof of buildModelGatewayRuntimeProofCommands(alternativeSummary)) {
-            println(`      \x1b[90mprovar: ${proof.command}\x1b[0m`);
+            println(terminalThemeWrappedRow('Provar', proof.command, { role: 'command', columns: 112 }));
         }
     }
     println(
-        `    registros:     \x1b[33mdecisões ${diagnostics.automationDecisionRows ?? 0} · políticas ${diagnostics.automationPolicySnapshotRows ?? 0} · efeitos ${effectsRows} · recoveries ${recoveryRows} · handoffs ${handoffRows} · confirmações ${confirmationRows} · testes vivos ${liveScenarioRunRows}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'Registros',
+            `decisões ${diagnostics.automationDecisionRows ?? 0} · políticas ${diagnostics.automationPolicySnapshotRows ?? 0} · efeitos ${effectsRows} · recoveries ${recoveryRows} · handoffs ${handoffRows} · confirmações ${confirmationRows} · testes vivos ${liveScenarioRunRows}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
-        `    sdk:           \x1b[33msessão ${status.inventory.currentSessionId ?? '-'} · sessão viva ${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}\x1b[0m`,
+        terminalThemeWrappedRow(
+            'SDK',
+            `sessão ${status.inventory.currentSessionId ?? '-'} · sessão viva ${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
-    if (decision.blockers.length > 0) println(`    bloqueios:     \x1b[33m${renderByokTokenList(decision.blockers)}\x1b[0m`);
-    if (warnings.length > 0) println(`    avisos:        \x1b[33m${renderByokTokenList(warnings)}\x1b[0m`);
-    println(`    resumo:        \x1b[90m${decision.operatorSummary}\x1b[0m`);
+    if (decision.blockers.length > 0) {
+        println(terminalThemeWrappedRow('Bloqueios', renderByokTokenList(decision.blockers), { role: 'warn', columns: 112 }));
+    }
+    if (warnings.length > 0) {
+        println(terminalThemeWrappedRow('Avisos', renderByokTokenList(warnings), { role: 'warn', columns: 112 }));
+    }
+    println(terminalThemeWrappedRow('Operador', decision.operatorSummary, { role: 'muted', columns: 112 }));
     println(
-        `    próximo:       \x1b[90m${warnings.includes('policy_disabled') ? '/byok auto on profile:' + status.args.profileId : decision.nextCommands.join(' && ')}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Próximo',
+            warnings.includes('policy_disabled') ? `/byok auto on profile:${status.args.profileId}` : decision.nextCommands.join(' && '),
+            { role: 'command', columns: 112 },
+        ),
     );
+    println('');
 }
 
 /**
@@ -4668,12 +4922,24 @@ async function renderByokGatewayAutoOff(println) {
         ...effectivePolicy,
         enabled: false,
     });
-    println('\n  \x1b[36mBYOK model-gateway auto off\x1b[0m');
-    println('  \x1b[90mPolicy persistente atualizada para disabled; segredos e catalogo nao foram alterados.\x1b[0m');
-    println(`    arquivo:       \x1b[33m${written.filePath}\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway auto off'));
     println(
-        '  \x1b[90mSe COPILOT_BYOK_GATEWAY_AUTO=true continuar no ambiente, ele ainda sobrescreve o arquivo no proximo boot.\x1b[0m\n',
+        terminalThemeWrappedRow(
+            'Estado',
+            'policy persistente atualizada para desativado; segredos e catálogo não foram alterados',
+            { role: 'success', columns: 112 },
+        ),
     );
+    println(terminalThemeRow('Arquivo', written.filePath, { role: 'command' }));
+    println(
+        terminalThemeWrappedRow(
+            'Ambiente',
+            'se COPILOT_BYOK_GATEWAY_AUTO=true continuar no ambiente, ele ainda sobrescreve o arquivo no próximo boot',
+            { role: 'warn', columns: 112 },
+        ),
+    );
+    println('');
 }
 
  /**
@@ -5813,7 +6079,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayAutoDoctor(println, rest);
             return;
         }
-        if (rest.some((item) => /^(proof-plan|proofs|runtime-proofs|provas|plano-provas)$/iu.test(item))) {
+        if (rest.some((item) => /^(plan|plano|proof-plan|proofs|runtime-proofs|provas|plano-provas)$/iu.test(item))) {
             await renderByokGatewayAutoProofPlan(println, rest);
             return;
         }
@@ -5876,7 +6142,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 await renderByokGatewayAutoDoctor(println, autoRest);
                 return;
             }
-            if (autoRest.some((item) => /^(proof-plan|proofs|runtime-proofs|provas|plano-provas)$/iu.test(item))) {
+            if (autoRest.some((item) => /^(plan|plano|proof-plan|proofs|runtime-proofs|provas|plano-provas)$/iu.test(item))) {
                 await renderByokGatewayAutoProofPlan(println, autoRest);
                 return;
             }

@@ -129,7 +129,7 @@ No terminal:
 /byok auto status profile:repo_agent
 /byok auto record profile:repo_agent
 /byok auto apply profile:repo_agent allow-live-set-model
-/byok auto proof-plan profile:repo_agent 12
+/byok auto plan profile:repo_agent 12
 /byok auto standby profile:repo_agent 12
 /byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit
 /byok probe agent provider:zai model:glm-4.5-flash timeout:20000

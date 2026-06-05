@@ -188,6 +188,34 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
 }
 
 /**
+ * @param {unknown} error
+ * @returns {Awaited<ReturnType<typeof listTerminalSdkSessionInventory>> & { unavailableReason?: string | null }}
+ */
+function createUnavailableSdkSessionInventory(error) {
+    const message = error instanceof Error ? error.message : String(error ?? 'SDK indisponível');
+    return {
+        currentSessionId: null,
+        lastSessionId: null,
+        foregroundSessionId: null,
+        persistedByokBinding: null,
+        lastBootDecision: null,
+        sessions: [],
+        unavailableReason: message,
+    };
+}
+
+/**
+ * @returns {Promise<Awaited<ReturnType<typeof listTerminalSdkSessionInventory>> & { unavailableReason?: string | null }>}
+ */
+async function readTerminalSdkSessionInventoryForAutomation() {
+    try {
+        return await listTerminalSdkSessionInventory();
+    } catch (error) {
+        return createUnavailableSdkSessionInventory(error);
+    }
+}
+
+/**
  * @param {string[]} rest
  * @param {{ allowEffects?: boolean; catalogPath?: string; env?: NodeJS.ProcessEnv; persistAutomationDecision?: boolean; turnFailure?: Record<string, unknown> | null }} [options]
  * @returns {Promise<{
@@ -224,7 +252,7 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
         source: 'terminal-byok-auto-status',
         runtimeHealthRecords: healthRecords,
     });
-    const inventory = await listTerminalSdkSessionInventory();
+    const inventory = await readTerminalSdkSessionInventoryForAutomation();
     const decision = buildModelGatewayRuntimeAutomationDecision({
         runtimeSelectorPlan,
         profileId: args.profileId,

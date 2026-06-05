@@ -245,7 +245,7 @@ function buildScenarios(profile) {
             order: 5,
             phase: 'read-only',
             command: `npm run model-gateway:auto:proof-plan -- --profile=${profile} --limit=12`,
-            terminalCommand: `/byok auto proof-plan profile:${profile} 12`,
+            terminalCommand: `/byok auto plan profile:${profile} 12`,
             purpose: 'List explicit provider/model disposable probe commands that can promote blocked fallback candidates into verified runtime health.',
             gateIds: ['auto_proof_plan'],
         }),
