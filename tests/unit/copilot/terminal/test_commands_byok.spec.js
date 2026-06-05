@@ -4222,19 +4222,23 @@ describe('terminal /byok command', () => {
         expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:model_changed' }));
         expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:import_completed' }));
         expect(ctx.output()).toContain('BYOK model-gateway catalog refresh');
-        expect(ctx.output()).toContain('Schema: OpenAI + x_model_gateway');
+        expect(ctx.output()).toContain('schema OpenAI + x_model_gateway');
         expect(ctx.output()).toContain('projeções 1');
         expect(ctx.output()).toContain('modelos OpenAI 1');
         expect(ctx.output()).toContain('novos 1');
         expect(ctx.output()).toContain('alterados 1');
-        expect(ctx.output()).toContain('Persistência: commit');
-        expect(ctx.output()).toContain('Diferença de elegibilidade: novas 1');
-        expect(ctx.output()).toContain('pricing_changed');
-        expect(ctx.output()).toContain('Sugestões de prova runtime: 1');
+        expect(ctx.output()).toContain('Persistência');
+        expect(ctx.output()).toContain('commit · commit sim');
+        expect(ctx.output()).toContain('Diferença de elegibilidade');
+        expect(ctx.output()).toContain('novas 1');
+        expect(ctx.output()).toContain('preço alterado');
+        expect(ctx.output()).not.toContain('pricing_changed');
+        expect(ctx.output()).toContain('Sugestões de prova runtime');
         expect(ctx.output()).toContain('/byok probe agent model:changed-model');
         expect(ctx.output()).toContain('openrouter:new-model:default');
         expect(ctx.output()).not.toContain('schema=OpenAI+x_model_gateway');
         expect(ctx.output()).not.toContain('write=commit');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('resume o último log JSONL de refresh do catálogo model-gateway', async () => {
@@ -4334,6 +4338,52 @@ describe('terminal /byok command', () => {
         expect(diffCtx.output()).toContain('disposição alterada');
         expect(diffCtx.output()).not.toContain('disposition_changed');
         expect(diffCtx.output()).not.toContain('\x1b[');
+    });
+
+    it('explica elegibilidade pré-runtime com estados humanos sem executar modelo', async () => {
+        mockProjection();
+        evaluateModelGatewayCatalogEligibility.mockReturnValue({
+            run: { runId: 'eligibility-run', policyProfile: 'default' },
+            decisions: [
+                {
+                    providerId: 'openrouter',
+                    providerModel: 'new-model',
+                    routeProfile: 'default',
+                },
+            ],
+            summary: { modelCount: 1, eligibleCount: 1, unknownCount: 0, excludedCount: 0 },
+        });
+        explainModelGatewayEligibilityDecision.mockReturnValue({
+            status: 'eligible',
+            key: 'openrouter:new-model:default:exact_model:new-model',
+            summary: 'eligible:account_model_visible',
+            disposition: 'eligible',
+            hardExclusions: [],
+            softPenalties: [],
+            actionable: {
+                category: 'rankable',
+                dataNeeded: [],
+                probeSafe: false,
+                operatorHint: 'no_extra_action',
+            },
+            nextActions: ['candidate_can_be_ranked'],
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway eligibility new-model');
+
+        expect(evaluateModelGatewayCatalogEligibility).toHaveBeenCalled();
+        expect(explainModelGatewayEligibilityDecision).toHaveBeenCalled();
+        expect(ctx.output()).toContain('BYOK model-gateway eligibility');
+        expect(ctx.output()).toContain('política permitir sonda');
+        expect(ctx.output()).toContain('acesso é desconhecido');
+        expect(ctx.output()).toContain('elegível');
+        expect(ctx.output()).toContain('modelo visível na conta');
+        expect(ctx.output()).toContain('sem ação extra');
+        expect(ctx.output()).toContain('candidato pode ser ranqueado');
+        expect(ctx.output()).not.toContain('account_model_visible');
+        expect(ctx.output()).not.toContain('candidate_can_be_ranked');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('espelha catálogo model-gateway no SQLite com superfície temática', async () => {
@@ -4518,9 +4568,17 @@ describe('terminal /byok command', () => {
                 importers: [expect.objectContaining({ id: 'openrouter-models' })],
             }),
         );
-        expect(ctx.output()).toContain('Filtro: openrouter');
+        expect(ctx.output()).toContain('BYOK model-gateway catalog refresh');
+        expect(ctx.output()).toContain('filtro openrouter');
         expect(ctx.output()).toContain('openrouter-models');
         expect(ctx.output()).not.toContain('openai-models · Schema');
+        expect(ctx.output()).toContain('Refresh concluído');
+        expect(ctx.output()).toContain('Diferença do catálogo');
+        expect(ctx.output()).toContain('Persistência');
+        expect(ctx.output()).toContain('Sugestões de prova runtime');
+        expect(ctx.output()).toContain('preço alterado');
+        expect(ctx.output()).not.toContain('pricing_changed');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('encaminha /models catalog diff para a mesma UX persistida', async () => {
@@ -4531,6 +4589,41 @@ describe('terminal /byok command', () => {
 
         expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
         expect(ctx.output()).toContain('BYOK model-gateway catalog diff');
+    });
+
+    it('busca catálogo model-gateway com filtros sem runtime e sem ANSI manual', async () => {
+        mockProjection();
+        searchModelGatewayCatalogEntries.mockReturnValue([
+            {
+                key: 'openrouter:new-model:default',
+                score: 87,
+                eligibilityStatus: 'eligible',
+                displayName: 'New Model',
+                routeOptionCount: 2,
+                accountOverlayCount: 1,
+                matchedFields: ['displayName', 'providerModel'],
+            },
+        ]);
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway catalog search new-model provider:openrouter eligible tools 5');
+
+        expect(searchModelGatewayCatalogEntries).toHaveBeenCalledWith(
+            expect.any(Object),
+            expect.objectContaining({
+                query: 'new-model',
+                providerId: 'openrouter',
+                onlyEligible: true,
+                requireTools: true,
+            }),
+        );
+        expect(ctx.output()).toContain('BYOK model-gateway catalog search');
+        expect(ctx.output()).toContain('busca new-model');
+        expect(ctx.output()).toContain('só');
+        expect(ctx.output()).toContain('elegíveis sim');
+        expect(ctx.output()).toContain('openrouter:new-model:default');
+        expect(ctx.output()).toContain('elegibilidade elegível');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('exibe conflitos persistidos do catálogo via /models conflicts', async () => {
@@ -4544,6 +4637,20 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('capabilities.tools');
         expect(ctx.output()).toContain('catalog-tools');
         expect(ctx.output()).toContain('heuristic-tools');
+        expect(ctx.output()).not.toContain('\x1b[');
+    });
+
+    it('lista frescor das fontes do catálogo sem rede e sem ANSI manual', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway catalog freshness openrouter');
+
+        expect(ctx.output()).toContain('BYOK model-gateway catalog freshness');
+        expect(ctx.output()).toContain('fontes 1/2');
+        expect(ctx.output()).toContain('openrouter-models');
+        expect(ctx.output()).toContain('refresh ttl');
+        expect(ctx.output()).not.toContain('\x1b[');
     });
 
     it('mostra health operacional persistido de BYOK', async () => {

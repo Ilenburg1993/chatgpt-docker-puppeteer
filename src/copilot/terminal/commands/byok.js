@@ -406,6 +406,11 @@ function renderByokTokenLabel(value) {
         sdk_entitlement_separate: 'limite SDK separado',
         not_applicable: 'não aplicável',
         unknown: 'desconhecido',
+        eligible: 'elegível',
+        excluded: 'excluído',
+        candidate_can_be_ranked: 'candidato pode ser ranqueado',
+        account_model_visible: 'modelo visível na conta',
+        no_extra_action: 'sem ação extra',
         sanitized: 'sanitizado',
         redacted: 'redigido',
         wait_for_rate_limit_reset_or_choose_another_route: 'aguardar reset do limite ou escolher outra rota',
@@ -3338,12 +3343,24 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
         storePath: store.filePath,
         importerIds: importers.map((importer) => importer.id),
     };
-    println(`\n  \x1b[36mBYOK model-gateway catalog refresh\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway catalog refresh'));
     println(
-        `  \x1b[90mCatálogo: ${store.filePath} · Filtro: ${normalizedSelector ?? '-'} · Importers: ${importers.map((importer) => importer.id).join(', ') || '-'} · Schema: OpenAI + x_model_gateway\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · filtro ${normalizedSelector ?? '-'} · importers ${importers.map((importer) => importer.id).join(', ') || '-'} · schema OpenAI + x_model_gateway`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     if (importers.length === 0) {
-        println('    \x1b[33mNenhum importer habilitado para este seletor. Configure rede/credenciais, remova o filtro ou use uma fonte pública disponível.\x1b[0m\n');
+        println(
+            terminalThemeWrappedRow(
+                'Estado',
+                'nenhum importer habilitado para este seletor; configure rede/credenciais, remova o filtro ou use uma fonte pública disponível',
+                { role: 'warn', columns: 112 },
+            ),
+        );
+        println('');
         return;
     }
     try {
@@ -3406,7 +3423,11 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
                     typeof event.changedCount === 'number' ? `alterados ${event.changedCount}` : '',
                 ]);
                 println(
-                    `    \x1b[90m${String(progressPct).padStart(3)}% · ${phase}${importer ? ` · importer ${importer}` : ''}${counts ? ` · ${counts}` : ''}\x1b[0m`,
+                    terminalThemeWrappedRow(
+                        'Progresso',
+                        `${String(progressPct).padStart(3)}% · ${phase}${importer ? ` · importer ${importer}` : ''}${counts ? ` · ${counts}` : ''}`,
+                        { role: event.phase.endsWith(':importer_failed') ? 'error' : 'muted', columns: 112 },
+                    ),
                 );
             },
             retentionPolicy: {
@@ -3424,46 +3445,74 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
         });
         for (const event of refreshEvents.events) eventBus?.emit?.(event);
         println(
-            `    \x1b[32mRefresh concluído\x1b[0m  \x1b[90mprojeções ${result.snapshot.projections.length} · modelos OpenAI ${result.openai.data.length} · runs retidos ${result.snapshot.importRuns.length}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Refresh concluído',
+                `projeções ${result.snapshot.projections.length} · modelos OpenAI ${result.openai.data.length} · runs retidos ${result.snapshot.importRuns.length}`,
+                { role: 'success', columns: 112 },
+            ),
         );
         println(
-            `    \x1b[90mDiferença do catálogo: novos ${result.diff.added.length} · removidos ${result.diff.removed.length} · alterados ${result.diff.changed.length}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Diferença do catálogo',
+                `novos ${result.diff.added.length} · removidos ${result.diff.removed.length} · alterados ${result.diff.changed.length}`,
+                { role: result.diff.added.length > 0 || result.diff.removed.length > 0 || result.diff.changed.length > 0 ? 'warn' : 'success', columns: 112 },
+            ),
         );
         println(
-            `    \x1b[90mPersistência: ${result.writePolicy.mode} · commit ${yesNoPlain(result.writePolicy.committed)} · overlays ${result.overlayRefresh.total} · elegibilidade ${result.eligibilityRefresh.decisionCount} · runs retidos ${result.retention.importRuns.after}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Persistência',
+                `${renderByokTokenLabel(result.writePolicy.mode)} · commit ${yesNoPlain(result.writePolicy.committed)} · overlays ${result.overlayRefresh.total} · elegibilidade ${result.eligibilityRefresh.decisionCount} · runs retidos ${result.retention.importRuns.after}`,
+                { role: result.writePolicy.committed ? 'success' : 'warn', columns: 112 },
+            ),
         );
         const eligibilityDiffSummary = result.eligibilityRefresh.diffSummary;
         if (eligibilityDiffSummary) {
             println(
-                `    \x1b[90mDiferença de elegibilidade: novas ${eligibilityDiffSummary.addedCount} · removidas ${eligibilityDiffSummary.removedCount} · alteradas ${eligibilityDiffSummary.changedCount} · ficaram elegíveis ${eligibilityDiffSummary.becameEligibleCount} · ficaram excluídas ${eligibilityDiffSummary.becameExcludedCount}\x1b[0m`,
+                terminalThemeWrappedRow(
+                    'Diferença de elegibilidade',
+                    `novas ${eligibilityDiffSummary.addedCount} · removidas ${eligibilityDiffSummary.removedCount} · alteradas ${eligibilityDiffSummary.changedCount} · ficaram elegíveis ${eligibilityDiffSummary.becameEligibleCount} · ficaram excluídas ${eligibilityDiffSummary.becameExcludedCount}`,
+                    { role: eligibilityDiffSummary.addedCount > 0 || eligibilityDiffSummary.removedCount > 0 || eligibilityDiffSummary.changedCount > 0 ? 'warn' : 'muted', columns: 112 },
+                ),
             );
             if (eligibilityDiffSummary.changedKinds.length > 0) {
-                println(`    \x1b[90mTipos de mudança em elegibilidade: ${eligibilityDiffSummary.changedKinds.join(',')}\x1b[0m`);
+                println(terminalThemeWrappedRow('Tipos de elegibilidade', renderByokTokenList(eligibilityDiffSummary.changedKinds), { role: 'muted', columns: 112 }));
             }
         }
         if (refreshEvents.completedEvent.changedKinds.length > 0) {
-            println(`    \x1b[90mTipos de mudança no catálogo: ${refreshEvents.completedEvent.changedKinds.join(',')}\x1b[0m`);
+            println(terminalThemeWrappedRow('Tipos de catálogo', renderByokTokenList(refreshEvents.completedEvent.changedKinds), { role: 'muted', columns: 112 }));
         }
         const probeRecommendations = recommendCatalogDiffProbes(buildByokProbeRecommendationInput(result.snapshot, result.diff, 5));
         if (probeRecommendations.length > 0) {
-            println(`    \x1b[90mSugestões de prova runtime: ${probeRecommendations.length}\x1b[0m`);
+            println(terminalThemeWrappedRow('Sugestões de prova runtime', String(probeRecommendations.length), { role: 'warn', columns: 112 }));
             for (const recommendation of probeRecommendations) {
                 println(
-                    `      \x1b[90m? ${recommendation.key}: ${recommendation.probeKinds.join(',')} · ${recommendation.priority} · ${recommendation.reasons.slice(0, 4).join(',')}\x1b[0m`,
+                    terminalThemeWrappedRow(
+                        'Provar',
+                        `${recommendation.key}: ${renderByokTokenList(recommendation.probeKinds)} · ${renderByokTokenLabel(recommendation.priority)} · ${renderByokTokenList(recommendation.reasons.slice(0, 4))}`,
+                        { role: 'warn', columns: 112 },
+                    ),
                 );
-                println(`        \x1b[90m${recommendation.commands[0]}\x1b[0m`);
+                println(terminalThemeWrappedRow('Comando', recommendation.commands[0], { role: 'command', columns: 112 }));
             }
         }
-        for (const id of result.diff.added.slice(0, 5)) println(`      \x1b[32m+\x1b[0m ${id}`);
-        for (const id of result.diff.removed.slice(0, 5)) println(`      \x1b[31m-\x1b[0m ${id}`);
+        for (const id of result.diff.added.slice(0, 5)) println(terminalThemeWrappedRow('Novo', id, { role: 'success', columns: 112 }));
+        for (const id of result.diff.removed.slice(0, 5)) println(terminalThemeWrappedRow('Removido', id, { role: 'error', columns: 112 }));
         for (const item of result.diff.changed.slice(0, 5)) {
-            const kinds = Array.isArray(item.changedKinds) && item.changedKinds.length > 0 ? ` · ${item.changedKinds.join(',')}` : '';
-            println(`      \x1b[33m~\x1b[0m ${item.key} (${item.changedFields.join(',')}${kinds})`);
+            const kinds = Array.isArray(item.changedKinds) && item.changedKinds.length > 0 ? ` · ${renderByokTokenList(item.changedKinds)}` : '';
+            println(terminalThemeWrappedRow('Alterado', `${item.key} (${item.changedFields.join(',')}${kinds})`, { role: 'warn', columns: 112 }));
         }
-        println('\n  \x1b[90mSaída interoperável disponível como OpenAI Models list em memória; snapshot interno ficou em data/copilot/model-gateway/catalog.json.\x1b[0m\n');
+        println(
+            terminalThemeWrappedRow(
+                'Fronteira',
+                'saída interoperável disponível como OpenAI Models list em memória; snapshot interno ficou em data/copilot/model-gateway/catalog.json',
+                { role: 'muted', columns: 112 },
+            ),
+        );
+        println('');
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        println(`    \x1b[31mrefresh falhou: ${message}\x1b[0m\n`);
+        println(terminalThemeWrappedRow('Erro', `refresh falhou: ${message}`, { role: 'error', columns: 112 }));
+        println('');
     }
 }
 
@@ -5586,18 +5635,34 @@ async function renderByokGatewayCatalogSearch(println, rest) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
     const results = searchModelGatewayCatalogEntries(snapshot, args);
-    println(`\n  \x1b[36mBYOK model-gateway catalog search\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway catalog search'));
     println(
-        `  \x1b[90mCatálogo: ${store.filePath} · busca ${args.query || '-'} · provider ${args.providerId ?? '-'} · só elegíveis ${args.onlyEligible ? 'sim' : 'nao'} · exige tools ${args.requireTools ? 'sim' : 'nao'} · resultados ${results.length}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · busca ${args.query || '-'} · provider ${args.providerId ?? '-'} · só elegíveis ${yesNo(args.onlyEligible)} · exige tools ${yesNo(args.requireTools)} · resultados ${results.length}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     if (results.length === 0) {
-        println('    \x1b[33mNenhum modelo encontrado para os filtros informados.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Resultado', 'nenhum modelo encontrado para os filtros informados', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
     for (const result of results) {
-        println(`    \x1b[33m${result.key}\x1b[0m  \x1b[90mscore ${result.score} · elegibilidade ${result.eligibilityStatus}\x1b[0m`);
         println(
-            `      \x1b[90m${result.displayName} · rotas ${result.routeOptionCount} · overlays ${result.accountOverlayCount} · campos encontrados ${result.matchedFields.slice(0, 4).join(',') || '-'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Modelo',
+                `${result.key} · score ${result.score} · elegibilidade ${renderByokTokenLabel(result.eligibilityStatus)}`,
+                { role: 'warn', columns: 112 },
+            ),
+        );
+        println(
+            terminalThemeWrappedRow(
+                'Detalhe',
+                `${result.displayName} · rotas ${result.routeOptionCount} · overlays ${result.accountOverlayCount} · campos encontrados ${result.matchedFields.slice(0, 4).join(',') || '-'}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
     }
     println('');
@@ -5928,11 +5993,13 @@ function renderByokGatewayQuotaMatrix(println, rest) {
  */
 async function renderByokGatewayCatalogConflicts(println) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-    println(`\n  \x1b[36mBYOK model-gateway catalog conflicts\x1b[0m`);
-    println(`  \x1b[90mCatálogo: ${store.filePath} · fonte: snapshot persistido · sem rede\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway catalog conflicts'));
+    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · fonte snapshot persistido · sem rede`, { role: 'muted', columns: 112 }));
     const snapshot = await store.readSnapshot();
     if (snapshot.conflicts.length === 0) {
-        println('    \x1b[32mNenhum conflito de evidência no snapshot atual.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Resultado', 'nenhum conflito de evidência no snapshot atual', { role: 'success', columns: 112 }));
+        println('');
         return;
     }
     for (const conflict of snapshot.conflicts.slice(0, 20)) {
@@ -5943,10 +6010,16 @@ async function renderByokGatewayCatalogConflicts(println) {
         const conflicting = Array.isArray(record['conflictingEvidenceIds'])
             ? record['conflictingEvidenceIds'].map(String).slice(0, 4).join(',')
             : '-';
-        println(`    \x1b[33m${projectionKey}\x1b[0m  \x1b[90mcampo ${fieldPath} · evidência selecionada ${selected} · conflitos ${conflicting}\x1b[0m`);
+        println(
+            terminalThemeWrappedRow(
+                'Conflito',
+                `${projectionKey} · campo ${fieldPath} · evidência selecionada ${selected} · conflitos ${conflicting}`,
+                { role: 'warn', columns: 112 },
+            ),
+        );
     }
     if (snapshot.conflicts.length > 20) {
-        println(`\n  \x1b[90mexibindo 20/${snapshot.conflicts.length}; refine depois com /models explain <provider:model>.\x1b[0m`);
+        println(terminalThemeWrappedRow('Omitidos', `exibindo 20/${snapshot.conflicts.length}; refine depois com /models explain <provider:model>`, { role: 'muted', columns: 112 }));
     }
     println('');
 }
@@ -5967,19 +6040,25 @@ async function renderByokGatewayCatalogFreshness(println, rest) {
             at: optionalScalarString(source['updatedAt']) ?? optionalScalarString(source['createdAt']) ?? '-',
         }))
         .sort((a, b) => b.at.localeCompare(a.at));
-    println(`\n  \x1b[36mBYOK model-gateway catalog freshness\x1b[0m`);
-    println(`  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · fontes ${sources.length}/${snapshot.sources.length}\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway catalog freshness'));
+    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · filtro ${args.selector ?? '-'} · fontes ${sources.length}/${snapshot.sources.length}`, { role: 'muted', columns: 112 }));
     if (sources.length === 0) {
-        println('    \x1b[33mNenhuma source encontrada para o filtro informado.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Resultado', 'nenhuma source encontrada para o filtro informado', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
     for (const item of sources.slice(0, args.limit)) {
         const source = item.source;
         println(
-            `    \x1b[33m${optionalScalarString(source['id']) ?? '-'}\x1b[0m  \x1b[90mprovedor ${optionalScalarString(source['providerId']) ?? '-'} · tipo ${optionalScalarString(source['kind']) ?? '-'} · autenticação ${optionalScalarString(source['authMode']) ?? '-'} · refresh ${optionalScalarString(source['refreshPolicy']) ?? '-'} · atualizado ${item.at}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Fonte',
+                `${optionalScalarString(source['id']) ?? '-'} · provedor ${optionalScalarString(source['providerId']) ?? '-'} · tipo ${renderByokTokenLabel(optionalScalarString(source['kind']))} · autenticação ${renderByokTokenLabel(optionalScalarString(source['authMode']))} · refresh ${renderByokTokenLabel(optionalScalarString(source['refreshPolicy']))} · atualizado ${item.at}`,
+                { role: 'warn', columns: 112 },
+            ),
         );
     }
-    if (sources.length > args.limit) println(`\n  \x1b[90mexibindo ${args.limit}/${sources.length}; use filtro ou limite numerico.\x1b[0m`);
+    if (sources.length > args.limit) println(terminalThemeWrappedRow('Omitidos', `exibindo ${args.limit}/${sources.length}; use filtro ou limite numerico`, { role: 'muted', columns: 112 }));
     println('');
 }
 
@@ -6083,37 +6162,53 @@ async function renderByokGatewayEligibility(println, rest, eventBus = null) {
     const unknownCount = explained.filter((item) => item.status === 'unknown').length;
     const eligibleCount = explained.filter((item) => item.status === 'eligible').length;
 
-    println(`\n  \x1b[36mBYOK model-gateway eligibility\x1b[0m`);
+    println('');
+    println(terminalThemeHeadline('tool', 'BYOK model-gateway eligibility'));
     println(
-        `  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · política ${args.strict ? 'strict/block_unknown' : 'allow_probe_unknown'} · persistir ${args.persist ? 'sim' : 'nao'} · total ${explained.length} · elegíveis ${eligibleCount} · desconhecidos ${unknownCount} · excluídos ${excludedCount}\x1b[0m\n`,
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · filtro ${args.selector ?? '-'} · política ${args.strict ? renderByokTokenLabel('block_unknown') : renderByokTokenLabel('allow_probe_unknown')} · persistir ${yesNo(args.persist)} · total ${explained.length} · elegíveis ${eligibleCount} · desconhecidos ${unknownCount} · excluídos ${excludedCount}`,
+            { role: excludedCount > 0 ? 'warn' : 'muted', columns: 112 },
+        ),
     );
     if (snapshot.projections.length === 0) {
-        println('    \x1b[33mNenhum snapshot de catálogo encontrado. Rode /byok gateway catalog refresh primeiro.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Estado', 'nenhum snapshot de catálogo encontrado; rode /byok gateway catalog refresh primeiro', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
     if (explained.length === 0) {
-        println('    \x1b[33mNenhum modelo encontrado para o filtro informado.\x1b[0m\n');
+        println(terminalThemeWrappedRow('Resultado', 'nenhum modelo encontrado para o filtro informado', { role: 'warn', columns: 112 }));
+        println('');
         return;
     }
     if (args.persist) {
         const run = asRecord(evaluated.run);
         println(
-            `    \x1b[32melegibilidade persistida\x1b[0m  \x1b[90mrun ${optionalScalarString(run['runId']) ?? '-'} · decisões ${evaluated.decisions.length}\x1b[0m`,
+            terminalThemeWrappedRow('Persistência', `elegibilidade persistida · run ${optionalScalarString(run['runId']) ?? '-'} · decisões ${evaluated.decisions.length}`, { role: 'success', columns: 112 }),
         );
     }
     for (const item of explained.slice(0, args.limit)) {
-        const color = item.status === 'eligible' ? '\x1b[32m' : item.status === 'unknown' ? '\x1b[33m' : '\x1b[31m';
-        println(`    ${color}${item.status}\x1b[0m  \x1b[33m${item.key}\x1b[0m`);
-        println(`      \x1b[90m${item.summary} · disposição ${item.disposition}\x1b[0m`);
         println(
-            `      \x1b[90mdica ${item.actionable?.operatorHint ?? '-'} · dados necessários ${item.actionable?.dataNeeded?.slice(0, 4).join(',') || '-'} · probe seguro ${item.actionable?.probeSafe ? 'sim' : 'nao'}\x1b[0m`,
+            terminalThemeWrappedRow(
+                'Modelo',
+                `${renderByokTokenLabel(item.status)} · ${item.key}`,
+                { role: item.status === 'eligible' ? 'success' : item.status === 'unknown' ? 'warn' : 'error', columns: 112 },
+            ),
         );
-        if (item.hardExclusions.length > 0) println(`      \x1b[90mexclusões fortes ${item.hardExclusions.slice(0, 4).join(',')}\x1b[0m`);
-        if (item.softPenalties.length > 0) println(`      \x1b[90mpenalidades leves ${item.softPenalties.slice(0, 4).join(',')}\x1b[0m`);
-        if (item.nextActions.length > 0) println(`      \x1b[90mpróxima ação ${item.nextActions.slice(0, 4).join(',')}\x1b[0m`);
+        println(terminalThemeWrappedRow('Decisão', `${renderByokTokenLabel(item.summary)} · disposição ${renderByokTokenLabel(item.disposition)}`, { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Ação',
+                `dica ${renderByokTokenLabel(item.actionable?.operatorHint)} · dados necessários ${renderByokTokenList(item.actionable?.dataNeeded?.slice(0, 4).map(String) ?? []) || '-'} · probe seguro ${yesNo(item.actionable?.probeSafe === true)}`,
+                { role: item.actionable?.probeSafe ? 'command' : 'muted', columns: 112 },
+            ),
+        );
+        if (item.hardExclusions.length > 0) println(terminalThemeWrappedRow('Exclusões fortes', renderByokTokenList(item.hardExclusions.slice(0, 4).map(String)), { role: 'error', columns: 112 }));
+        if (item.softPenalties.length > 0) println(terminalThemeWrappedRow('Penalidades leves', renderByokTokenList(item.softPenalties.slice(0, 4).map(String)), { role: 'warn', columns: 112 }));
+        if (item.nextActions.length > 0) println(terminalThemeWrappedRow('Próximo', renderByokTokenList(item.nextActions.slice(0, 4).map(String)), { role: 'command', columns: 112 }));
     }
     if (explained.length > args.limit) {
-        println(`\n  \x1b[90mexibindo ${args.limit}/${explained.length}. Use filtro ou limite numerico para reduzir.\x1b[0m`);
+        println(terminalThemeWrappedRow('Omitidos', `exibindo ${args.limit}/${explained.length}; use filtro ou limite numerico para reduzir`, { role: 'muted', columns: 112 }));
     }
     println('');
 }
