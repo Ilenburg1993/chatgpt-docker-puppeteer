@@ -2334,7 +2334,7 @@ describe('terminal /byok command', () => {
                 message: 'agent probe tool-missing',
             }),
         );
-        expect(ctx.output()).toContain('BYOK agent probe');
+        expect(ctx.output()).toContain('BYOK sonda agente');
         expect(ctx.output()).toContain('chamadas de ferramenta 0');
         expect(ctx.output()).toContain('marcador 0');
         expect(ctx.output()).toContain('leituras 0');
@@ -2488,7 +2488,7 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(recordByokProviderModelAgentProbeSuccess).toHaveBeenCalledTimes(2);
-        expect(ctx.output()).toContain('BYOK shortlist agent probe');
+        expect(ctx.output()).toContain('BYOK shortlist com sonda agente');
         expect(ctx.output()).toContain('kilo/model-a');
         expect(ctx.output()).toContain('openrouter/model-b');
         expect(ctx.output()).toContain('Shortlist');
@@ -2738,7 +2738,7 @@ describe('terminal /byok command', () => {
                 status: 'no-delta',
             }),
         );
-        expect(ctx.output()).toContain('BYOK streaming probe');
+        expect(ctx.output()).toContain('BYOK sonda streaming');
         expect(ctx.output()).toContain('UX live cega');
     });
 
@@ -2790,7 +2790,7 @@ describe('terminal /byok command', () => {
                 ok: true,
             }),
         );
-        expect(ctx.output()).toContain('BYOK json probe');
+        expect(ctx.output()).toContain('BYOK sonda JSON');
         expect(ctx.output()).toContain('sonda JSON confirma saída estruturada');
     });
 
@@ -2844,7 +2844,7 @@ describe('terminal /byok command', () => {
                 ok: true,
             }),
         );
-        expect(ctx.output()).toContain('BYOK vision probe');
+        expect(ctx.output()).toContain('BYOK sonda visão');
         expect(ctx.output()).toContain('fixture image/png/68 bytes');
         expect(ctx.output()).toContain('sonda de visão confirmou');
     });
@@ -3029,7 +3029,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'gateway local');
 
-        expect(ctx.output()).toContain('BYOK model-gateway local/Ollama');
+        expect(ctx.output()).toContain('BYOK local/Ollama');
         expect(ctx.output()).toContain('Política');
         expect(ctx.output()).toContain('excluir providers locais por padrão');
         expect(ctx.output()).toContain('provedor local exige pedido explícito');
@@ -3070,7 +3070,7 @@ describe('terminal /byok command', () => {
 
         expect(evaluateModelGatewayProviderEnvRequirements).toHaveBeenCalledWith({ env: process.env, providerId: 'kilo' });
         expect(summarizeModelGatewayProviderEnvRequirements).toHaveBeenCalled();
-        expect(ctx.output()).toContain('BYOK provider env requirements');
+        expect(ctx.output()).toContain('BYOK requisitos de ambiente');
         expect(ctx.output()).toContain('estado ausente');
         expect(ctx.output()).toContain('obrigatórias ausentes KILO_API_KEY,KILO_CODE_API_KEY');
         expect(ctx.output()).not.toContain('kilo-secret');
@@ -3118,7 +3118,7 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'gateway');
 
         expect(buildModelGatewayPreKCompatibilityReport).toHaveBeenCalled();
-        expect(ctx.output()).toContain('BYOK model-gateway pre-K gate');
+        expect(ctx.output()).toContain('BYOK gate pré-K');
         expect(ctx.output()).toContain('checks 2/2');
         expect(ctx.output()).toContain('sdk provider config boundary');
         expect(ctx.output()).toContain('route trace attributes are stable');
@@ -3132,7 +3132,7 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'gateway prebuild');
 
         expect(buildModelGatewayPreBuildReadinessReport).toHaveBeenCalled();
-        expect(ctx.output()).toContain('BYOK model-gateway pre-build readiness');
+        expect(ctx.output()).toContain('BYOK prontidão pré-build');
         expect(ctx.output()).toContain('checks 3/3');
         expect(ctx.output()).toContain('universal catalog contracts are exported');
         expect(ctx.output()).toContain('provider gateway traits are metadata');
@@ -3260,7 +3260,7 @@ describe('terminal /byok command', () => {
 
         expect(listModelGatewayCanonicalCommands).toHaveBeenCalledWith({ surface: undefined, phase: undefined });
         expect(renderModelGatewayCanonicalCommandLines).toHaveBeenCalledWith({ surface: undefined, phase: undefined });
-        expect(ctx.output()).toContain('BYOK model-gateway canonical commands');
+        expect(ctx.output()).toContain('Comandos canônicos BYOK');
         expect(ctx.output()).toContain('Faixa Y');
         expect(ctx.output()).toContain('npm run model-gateway:prebuild');
         expect(ctx.output()).toContain('make model-gateway-prebuild');
@@ -3291,7 +3291,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'gateway operator-ready profile:repo_agent 5');
 
-        expect(ctx.output()).toContain('BYOK model-gateway operator-ready');
+        expect(ctx.output()).toContain('BYOK operador pronto');
         expect(ctx.output()).toMatch(/sem\s+chamada\s+a\s+provedor/u);
         expect(ctx.output()).toContain('preset manual do operador');
         expect(ctx.output()).toContain('seletor de execução');
@@ -3325,7 +3325,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'auto standby persisted profile:repo_agent 5');
 
-        expect(ctx.output()).toContain('BYOK model-gateway auto standby persistido');
+        expect(ctx.output()).toContain('BYOK prontidão automática persistida');
         expect(ctx.output()).toContain('standby-1');
         expect(ctx.output()).toContain('rotas 2');
         expect(ctx.output()).toContain('sem chamada a provedor');
@@ -3347,7 +3347,7 @@ describe('terminal /byok command', () => {
                 secretRegistry: expect.any(Object),
             }),
         );
-        expect(ctx.output()).toContain('BYOK model-gateway selection audit');
+        expect(ctx.output()).toContain('BYOK auditoria de seleção');
         expect(ctx.output()).toContain('catálogo ');
         expect(ctx.output()).not.toContain('store ');
         expect(ctx.output()).toContain('sem execução');
@@ -3371,7 +3371,7 @@ describe('terminal /byok command', () => {
                 }),
             }),
         );
-        expect(ctx.output()).toContain('BYOK model-gateway auto');
+        expect(ctx.output()).toContain('BYOK automação do gateway');
         expect(ctx.output()).toMatch(/troca viva n(?:ão|ao)/u);
         expect(ctx.output()).not.toContain('live setModel');
         expect(ctx.output()).toContain('preparar novo boot SDK');
@@ -3566,7 +3566,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'auto standby profile:repo_agent 5');
 
-        expect(ctx.output()).toContain('BYOK model-gateway auto standby');
+        expect(ctx.output()).toContain('BYOK prontidão automática');
         expect(ctx.output()).toMatch(/sem chamada\s+a\s+provedor/u);
         expect(ctx.output()).toContain('alternativa candidata');
         expect(ctx.output()).toContain('novo provedor');
@@ -3623,7 +3623,7 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'auto apply profile:repo_agent allow-live-set-model');
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('openai/gpt-oss-120b');
-        expect(ctx.output()).toContain('Auto apply');
+        expect(ctx.output()).toContain('Aplicação');
         expect(ctx.output()).toContain('modelo vivo solicitado old-model → openai/gpt-oss-120b');
         expect(ctx.output()).toContain('Confirmação');
         expect(ctx.output()).toContain('confirmação do SDK');
@@ -3644,7 +3644,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'auto on profile:repo_agent allow-live-set-model');
 
-        expect(ctx.output()).toContain('BYOK model-gateway auto on');
+        expect(ctx.output()).toContain('BYOK automação ativada');
         expect(ctx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO=true');
         expect(ctx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO_PRESET=auto_same_boundary');
         expect(ctx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO_PROFILES=repo_agent');
@@ -3683,7 +3683,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: policyCtx.println }, 'auto policy');
 
-        expect(policyCtx.output()).toContain('BYOK model-gateway auto policy');
+        expect(policyCtx.output()).toContain('BYOK política da automação');
         expect(policyCtx.output()).toContain(DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH);
         expect(policyCtx.output()).toContain('ativo');
         expect(policyCtx.output()).toContain('auto_same_boundary');
@@ -3706,7 +3706,7 @@ describe('terminal /byok command', () => {
         const offCtx = mockCtx();
         await cmdByok({ println: offCtx.println }, 'auto off');
 
-        expect(offCtx.output()).toContain('model-gateway auto off');
+        expect(offCtx.output()).toContain('BYOK automação desativada');
         expect(writeModelGatewayRuntimeAutomationPolicyFile).toHaveBeenCalledWith(
             expect.objectContaining({ enabled: false, profiles: ['repo_agent'] }),
         );
@@ -3720,7 +3720,7 @@ describe('terminal /byok command', () => {
 
         const offCtx = mockCtx();
         await cmdByok({ println: offCtx.println }, 'auto off');
-        expect(offCtx.output()).toContain('model-gateway auto off');
+        expect(offCtx.output()).toContain('BYOK automação desativada');
         expect(offCtx.output()).toContain('COPILOT_BYOK_GATEWAY_AUTO');
     });
 
@@ -3730,7 +3730,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'auto history 5');
 
-        expect(ctx.output()).toContain('BYOK model-gateway auto history');
+        expect(ctx.output()).toContain('BYOK histórico da automação');
         expect(ctx.output()).toContain('preparar nova sessão');
         expect(ctx.output()).toContain('zai:glm-4.5-flash');
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
@@ -3793,7 +3793,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'auto doctor profile:repo_agent');
 
-        expect(ctx.output()).toContain('BYOK model-gateway auto doctor');
+        expect(ctx.output()).toContain('BYOK diagnóstico da automação');
         expect(ctx.output()).toContain('perfil repo_agent');
         expect(ctx.output()).toContain('snapshot ativo sim');
         expect(ctx.output()).toContain('Decisão');
@@ -3819,9 +3819,9 @@ describe('terminal /byok command', () => {
 
         expect(explainCtx.output()).toContain('Explicação BYOK auto');
         expect(explainCtx.output()).toContain('decisão atual + diagnóstico operacional');
-        expect(explainCtx.output()).toContain('BYOK model-gateway auto');
-        expect(explainCtx.output()).toContain('BYOK model-gateway auto doctor');
-        expect(switchCtx.output()).toContain('BYOK model-gateway auto');
+        expect(explainCtx.output()).toContain('BYOK automação do gateway');
+        expect(explainCtx.output()).toContain('BYOK diagnóstico da automação');
+        expect(switchCtx.output()).toContain('BYOK automação do gateway');
         expect(switchCtx.output()).toContain('Trilha auto');
     });
 
@@ -4085,7 +4085,7 @@ describe('terminal /byok command', () => {
         });
         expect(ctx.output()).toContain('modo permitir sonda quando');
         expect(ctx.output()).toContain('acesso é desconhecido + efetivo');
-        expect(ctx.output()).toContain('persistido nao');
+        expect(ctx.output()).toContain('persistido não');
         expect(ctx.output()).toContain('Saúde observada');
         expect(ctx.output()).toContain('Pós-execução');
         expect(ctx.output()).toContain('perfis 1/1');
@@ -4221,7 +4221,7 @@ describe('terminal /byok command', () => {
         expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:import_started' }));
         expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:model_changed' }));
         expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:import_completed' }));
-        expect(ctx.output()).toContain('BYOK model-gateway catalog refresh');
+        expect(ctx.output()).toContain('BYOK refresh do catálogo');
         expect(ctx.output()).toContain('schema OpenAI + x_model_gateway');
         expect(ctx.output()).toContain('projeções 1');
         expect(ctx.output()).toContain('modelos OpenAI 1');
@@ -4259,7 +4259,7 @@ describe('terminal /byok command', () => {
         expect(summarizeModelGatewayRefreshLogText).toHaveBeenCalledWith('{"phase":"refresh_completed"}\n', {
             logPath: expect.stringContaining('latest.jsonl'),
         });
-        expect(ctx.output()).toContain('BYOK model-gateway refresh log');
+        expect(ctx.output()).toContain('BYOK log de refresh');
         expect(ctx.output()).toContain('eventos 6');
         expect(ctx.output()).toMatch(/Refresh completo\s+sim/u);
         expect(ctx.output()).toContain('projeções 42');
@@ -4283,7 +4283,7 @@ describe('terminal /byok command', () => {
             }),
         );
         expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('BYOK model-gateway catalog refresh plan');
+        expect(ctx.output()).toContain('BYOK plano de refresh');
         expect(ctx.output()).toContain('sem rede');
         expect(ctx.output()).toContain('executar agora 1');
         expect(ctx.output()).toContain('executar');
@@ -4309,7 +4309,7 @@ describe('terminal /byok command', () => {
                 limit: 8,
             }),
         );
-        expect(ctx.output()).toContain('BYOK model-gateway catalog diff');
+        expect(ctx.output()).toContain('BYOK diff do catálogo');
         expect(ctx.output()).toContain('sem rede');
         expect(ctx.output()).toContain('novos 1');
         expect(ctx.output()).toContain('capabilities_changed');
@@ -4327,13 +4327,13 @@ describe('terminal /byok command', () => {
 
         expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
         expect(summarizeModelGatewayEligibilityDiff).toHaveBeenCalled();
-        expect(runsCtx.output()).toContain('BYOK model-gateway eligibility runs');
+        expect(runsCtx.output()).toContain('BYOK runs de elegibilidade');
         expect(runsCtx.output()).toContain('eligibility-run-1');
         expect(runsCtx.output()).toMatch(/Diferença\s+novas 1/u);
         expect(runsCtx.output()).toContain('disposição alterada');
         expect(runsCtx.output()).not.toContain('disposition_changed');
         expect(runsCtx.output()).not.toContain('\x1b[');
-        expect(diffCtx.output()).toContain('BYOK model-gateway eligibility diff');
+        expect(diffCtx.output()).toContain('BYOK diff de elegibilidade');
         expect(diffCtx.output()).toContain('ficaram elegíveis 0');
         expect(diffCtx.output()).toContain('disposição alterada');
         expect(diffCtx.output()).not.toContain('disposition_changed');
@@ -4374,7 +4374,7 @@ describe('terminal /byok command', () => {
 
         expect(evaluateModelGatewayCatalogEligibility).toHaveBeenCalled();
         expect(explainModelGatewayEligibilityDecision).toHaveBeenCalled();
-        expect(ctx.output()).toContain('BYOK model-gateway eligibility');
+        expect(ctx.output()).toContain('BYOK elegibilidade');
         expect(ctx.output()).toContain('política permitir sonda');
         expect(ctx.output()).toContain('acesso é desconhecido');
         expect(ctx.output()).toContain('elegível');
@@ -4398,7 +4398,7 @@ describe('terminal /byok command', () => {
                 sqliteStore: expect.any(Object),
             }),
         );
-        expect(ctx.output()).toContain('BYOK model-gateway catalog SQLite mirror');
+        expect(ctx.output()).toContain('BYOK espelho SQLite do catálogo');
         expect(ctx.output()).toContain('JSON data/copilot/model-gateway/catalog.json');
         expect(ctx.output()).toContain('projeções 1');
         expect(ctx.output()).toContain('rotas 1');
@@ -4548,7 +4548,7 @@ describe('terminal /byok command', () => {
 
         expect(explainModelGatewayProviderEntry).toHaveBeenCalled();
         expect(ctx.output()).toContain('BYOK explicação do provedor');
-        expect(ctx.output()).toContain('Provider');
+        expect(ctx.output()).toContain('Provedor');
         expect(ctx.output()).toContain('openrouter');
         expect(ctx.output()).toContain('Frescor');
         expect(ctx.output()).toContain('Fonte');
@@ -4568,7 +4568,7 @@ describe('terminal /byok command', () => {
                 importers: [expect.objectContaining({ id: 'openrouter-models' })],
             }),
         );
-        expect(ctx.output()).toContain('BYOK model-gateway catalog refresh');
+        expect(ctx.output()).toContain('BYOK refresh do catálogo');
         expect(ctx.output()).toContain('filtro openrouter');
         expect(ctx.output()).toContain('openrouter-models');
         expect(ctx.output()).not.toContain('openai-models · Schema');
@@ -4588,7 +4588,7 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'models catalog diff');
 
         expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('BYOK model-gateway catalog diff');
+        expect(ctx.output()).toContain('BYOK diff do catálogo');
     });
 
     it('busca catálogo model-gateway com filtros sem runtime e sem ANSI manual', async () => {
@@ -4617,7 +4617,7 @@ describe('terminal /byok command', () => {
                 requireTools: true,
             }),
         );
-        expect(ctx.output()).toContain('BYOK model-gateway catalog search');
+        expect(ctx.output()).toContain('BYOK busca no catálogo');
         expect(ctx.output()).toContain('busca new-model');
         expect(ctx.output()).toContain('só');
         expect(ctx.output()).toContain('elegíveis sim');
@@ -4633,7 +4633,7 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'models conflicts');
 
         expect(refreshModelGatewayCatalog).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('BYOK model-gateway catalog conflicts');
+        expect(ctx.output()).toContain('BYOK conflitos do catálogo');
         expect(ctx.output()).toContain('capabilities.tools');
         expect(ctx.output()).toContain('catalog-tools');
         expect(ctx.output()).toContain('heuristic-tools');
@@ -4646,10 +4646,10 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'gateway catalog freshness openrouter');
 
-        expect(ctx.output()).toContain('BYOK model-gateway catalog freshness');
+        expect(ctx.output()).toContain('BYOK frescor do catálogo');
         expect(ctx.output()).toContain('fontes 1/2');
         expect(ctx.output()).toContain('openrouter-models');
-        expect(ctx.output()).toContain('refresh ttl');
+        expect(ctx.output()).toContain('atualização ttl');
         expect(ctx.output()).not.toContain('\x1b[');
     });
 
@@ -5147,7 +5147,7 @@ describe('terminal /byok command', () => {
             'repo_agent',
             expect.objectContaining({ routeProfile: 'kilo-free', excludeFailed: true, requireAgentProbeOk: false }),
         );
-        expect(ctx.output()).toContain('BYOK model route');
+        expect(ctx.output()).toContain('BYOK rota de modelo');
         expect(ctx.output()).toContain('Decisão');
         expect(ctx.output()).toContain('route-test');
         expect(ctx.output()).toContain('modo pré-sonda');
@@ -5960,7 +5960,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'models refresh');
 
-        expect(ctx.output()).toMatch(/modelo configurado 'provider\/stale-model' nao apareceu no catalogo remoto\s+atual/u);
+        expect(ctx.output()).toMatch(/modelo configurado 'provider\/stale-model' não apareceu no catálogo remoto\s+atual/u);
         expect(ctx.output()).toContain('/byok probe agent profile:chutes-ai model:<id>');
         expect(ctx.output()).toContain('provider/current-model');
     });
@@ -6077,7 +6077,7 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'recommend free reasoning safe 2');
 
-        expect(ctx.output()).toContain('BYOK recommend');
+        expect(ctx.output()).toContain('BYOK recomendação');
         expect(ctx.output()).toContain('free-comfortable');
         expect(ctx.output()).not.toContain('free-low-limit');
         expect(ctx.output()).not.toContain('paid-vision');
