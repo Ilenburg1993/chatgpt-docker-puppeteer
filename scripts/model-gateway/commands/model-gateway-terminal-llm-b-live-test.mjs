@@ -2088,9 +2088,9 @@ function diagnosticUxCycleCriteria(boot) {
     const whoSurface = surfaceBetween(whoStart, countStart);
     const countSurface = surfaceBetween(countStart, clearStart);
     const clearSurface = surfaceBetween(clearStart, quitStart);
-    const hasIsoSeconds = (surface) => /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}/u.test(surface);
+    const hasIsoSeconds = (surface) =>
+        /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?[+-]\d{2}:\d{2}/u.test(surface);
     const hasRelativeAge = (surface) => /há \d+[smhda]/iu.test(surface);
-    const hasIsoMilliseconds = (surface) => /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/u.test(surface);
     return [
         {
             id: 'diagnostic-ux-ready',
@@ -2157,7 +2157,7 @@ function diagnosticUxCycleCriteria(boot) {
             pass:
                 /Picker do menu/iu.test(menuPickerSurface) &&
                 /picker textual seguro/iu.test(menuPickerSurface) &&
-                /runtime ainda não entregou controle exclusivo do TTY/iu.test(menuPickerSurface) &&
+                /sessão ainda não liberou controle exclusivo do TTY/iu.test(menuPickerSurface) &&
                 /\/menu <n> ou \/menu <id>/iu.test(menuPickerSurface) &&
                 !/renderização terminal em andamento/iu.test(menuPickerSurface) &&
                 !/chatcmpl-tool-|toolu_|\\x1b\[/iu.test(menuPickerSurface),
@@ -2189,9 +2189,8 @@ function diagnosticUxCycleCriteria(boot) {
             pass:
                 /Atividade Atual da LLM-B[\s\S]*(Arquivo|Ferramenta|Evento)/iu.test(activitySurface) &&
                 hasIsoSeconds(activitySurface) &&
-                hasRelativeAge(activitySurface) &&
-                !hasIsoMilliseconds(activitySurface),
-            detail: '/activity after local FS operations used ISO seconds plus relative time without millisecond timestamp noise',
+                hasRelativeAge(activitySurface),
+            detail: '/activity after local FS operations used complete ISO 8601 timestamps plus relative time',
         },
         {
             id: 'diagnostic-ux-live-full-human',
@@ -2199,14 +2198,13 @@ function diagnosticUxCycleCriteria(boot) {
                 /Fluxo detalhado da conversa[\s\S]*I\/O real recente[\s\S]*Eventos recentes/iu.test(liveFullSurface) &&
                 hasIsoSeconds(liveFullSurface) &&
                 hasRelativeAge(liveFullSurface) &&
-                !hasIsoMilliseconds(liveFullSurface) &&
                 !/\bsearch\b|phase:|approve_all|not_needed|\bempty\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     liveFullSurface,
                 ) &&
                 !/Runtime\s+default|Timeline\s+.*persistent only|Cache\/escopo|não pausada/iu.test(
                     liveFullSurface,
                 ),
-            detail: '/live full rendered detailed flow with ISO seconds plus relative time and without raw labels, permission constants, empty/not_needed states, raw runtime/timeline labels, or UUIDs',
+            detail: '/live full rendered detailed flow with complete ISO 8601 timestamps plus relative time and without raw labels, permission constants, empty/not_needed states, raw runtime/timeline labels, or UUIDs',
         },
         {
             id: 'diagnostic-ux-health-full-themed',
@@ -2233,7 +2231,7 @@ function diagnosticUxCycleCriteria(boot) {
         {
             id: 'diagnostic-ux-tools-diag-hierarchy',
             pass:
-                /Ferramentas[\s\S]*diagnóstico humano[\s\S]*Classe[\s\S]*Superfícies operacionais[\s\S]*Contrato das ferramentas[\s\S]*Lifecycle recente/iu.test(
+                /Ferramentas[\s\S]*diagnóstico humano[\s\S]*Categorias[\s\S]*Superfícies operacionais[\s\S]*Contrato das ferramentas[\s\S]*Lifecycle recente/iu.test(
                     toolsDiagSurface,
                 ) &&
                 !/Nome técnico|Nome interno|Técnico|Refs|Rastreio\s+(?:call|req|trace)|chatcmpl-tool|call chatcmpl|Classe\s+tool|(?:^|\n)\s*tool\s+uso|tipo file|chamada |requisição |tool\(s\)|Superfícies de tools/iu.test(
@@ -2247,10 +2245,10 @@ function diagnosticUxCycleCriteria(boot) {
                 /Eventos[\s\S]*(Ferramenta|Atividade|terminal|io)/iu.test(eventsSurface) &&
                 hasIsoSeconds(eventsSurface) &&
                 hasRelativeAge(eventsSurface) &&
-                !/estado io op|io_op|chatcmpl-tool-[a-z0-9-]+|rastreamento implicit:|#\d+ ·|hub [a-z0-9-]+|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/iu.test(
+                !/estado io op|io_op|chatcmpl-tool-[a-z0-9-]+|rastreamento implicit:|#\d+ ·|hub [a-z0-9-]+/iu.test(
                     eventsSurface,
                 ),
-            detail: '/events default rendered diagnostics with ISO seconds plus relative time and without raw tool ids, trace ids, event ids, raw io_op state, hub ids, or millisecond timestamps',
+            detail: '/events default rendered diagnostics with complete ISO 8601 timestamps plus relative time and without raw tool ids, trace ids, event ids, raw io_op state or hub ids',
         },
         {
             id: 'diagnostic-ux-session-sdk-events-human',
@@ -2293,7 +2291,7 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-sdk-status-human',
             pass:
                 /SDK do Terminal\s+·\s+principal[\s\S]*Sessão\s+sessão ativa/iu.test(sdkStatusSurface) &&
-                /Uso[\s\S]*\/sdk models · \/sdk tools[\s\S]*\/sdk skills[\s\S]*\/sdk quota · \/sdk waits[\s\S]*\/sdk headers[\s\S]*\/sdk simulate request-user-input/iu.test(
+                /Modelos\s+\/sdk models · \/sdk tools[\s\S]*Skills\s+\/sdk skills[\s\S]*Rotina\s+\/sdk quota · \/sdk waits[\s\S]*Headers\s+\/sdk headers[\s\S]*Simular\s+\/sdk simulate request-user-input/iu.test(
                     sdkStatusSurface,
                 ) &&
                 !/SDK do Terminal\s+·\s+default|\d{4}-\d{2}-\d{2}T|\bsdk-[a-z0-9_-]+\b|copilot_sdk_entitlement|premium_interactions|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|reasoning=|restante=|\/sdk models \| \/sdk skills/iu.test(

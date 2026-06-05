@@ -17,6 +17,7 @@ import {
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { requireTerminalFileTool } from '../frontend/gateways/index.js';
 import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
+import { formatTerminalToolPathForOperator } from '../events/tool-activity-presenter.js';
 import { terminalThemeRow } from '../state/ui/index.js';
 
 /**
@@ -97,6 +98,29 @@ function ioSummary(result) {
     const operation = typeof io['operation'] === 'string' ? io['operation'] : null;
     if (!engine && !operation) return '';
     return terminalThemeRow(`I/O ${operation ?? '-'}`, `motor ${engine ?? '-'}`, { role: 'muted' });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function operatorPath(value) {
+    return formatTerminalToolPathForOperator(typeof value === 'string' ? value : '');
+}
+
+/**
+ * @param {string} output
+ * @returns {string}
+ */
+function formatSearchOutputForOperator(output) {
+    const root = process.cwd().replace(/\\/gu, '/');
+    return output
+        .split('\n')
+        .map((line) => {
+            const normalized = line.replace(/\\/gu, '/');
+            return normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : line;
+        })
+        .join('\n');
 }
 
 /**
@@ -215,7 +239,7 @@ async function runList(ctx, parts) {
     }
     const entries = Array.isArray(result['entries']) ? result['entries'] : [];
     ctx.println('');
-    ctx.println(terminalThemeRow('FS local', `${entries.length} entrada(s) · ${String(result['path'] ?? path)}`));
+    ctx.println(terminalThemeRow('FS local', `${entries.length} entrada(s) · ${operatorPath(result['path'] ?? path)}`));
     for (const entry of entries.slice(0, 120)) {
         const item = entry && typeof entry === 'object' ? /** @type {Record<string, unknown>} */ (entry) : {};
         ctx.println(
@@ -249,8 +273,9 @@ async function runRead(ctx, parts, previewDefault = false) {
         return;
     }
     const content = String(result['content'] ?? '');
+    const displayPath = operatorPath(result['path'] ?? path) || path;
     ctx.println('');
-    ctx.println(terminalThemeRow('Arquivo', `${String(result['path'] ?? path)} · (FS local)`));
+    ctx.println(terminalThemeRow('Arquivo', `${displayPath} · (FS local)`));
     if (flags.preview) {
         const rendered = flags.structured
             ? renderTerminalStructuredPreview(content, {
@@ -311,8 +336,8 @@ async function runSearch(ctx, parts) {
         return;
     }
     ctx.println('');
-    ctx.println(terminalThemeRow('FS search', String(result['searchPath'] ?? path)));
-    ctx.println(pretty(String(result['output'] ?? ''), 8000));
+    ctx.println(terminalThemeRow('FS search', operatorPath(result['searchPath'] ?? path) || path));
+    ctx.println(pretty(formatSearchOutputForOperator(String(result['output'] ?? '')), 8000));
     ctx.println(terminalThemeRow('resultados', String(result['matchCount'] ?? 0), { role: 'muted' }));
     const io = ioSummary(result);
     if (io) ctx.println(io);

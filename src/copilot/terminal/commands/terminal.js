@@ -63,6 +63,16 @@ function renderAvailability(value) {
 }
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @param {(text: string) => void} println
  * @param {Array<[string, string]>} rows
  * @param {{ width?: number }} [options]
@@ -205,7 +215,7 @@ function printTerminalLibsCompact(println, refresh, filterTokens = []) {
     println(terminalThemeRow('Aceitas', `${summary.acceptedAvailable} disponíveis`));
     printRows(println, [
         ['Com guardas', `${summary.guardedAvailable} disponíveis`],
-        ['Adiada', `${summary.deferredAvailable} disponível(is)`],
+        ['Adiada', countLabel(summary.deferredAvailable, 'disponível', 'disponíveis')],
         ['Fallback', 'terminal JS canônico continua sendo o padrão'],
     ]);
     if (!filter.matched) {

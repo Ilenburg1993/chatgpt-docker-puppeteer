@@ -92,6 +92,7 @@ describe('terminal/commands/terminal', () => {
         expect(ctx.output()).toContain('aceita com guardas');
         expect(ctx.output()).toContain('/terminal libs detail');
         expect(ctx.output()).toContain('terminal:aux-libs:smoke');
+        expect(ctx.output()).not.toContain('disponível(is)');
     });
 
     it('mostra detail com path, docs, risco e fallback', () => {

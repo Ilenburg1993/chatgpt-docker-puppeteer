@@ -22,6 +22,7 @@ describe('terminal/tool-activity-presenter', () => {
         expect(getTerminalHumanToolName('io.mkdir.io-engine.ensure-dir')).toBe('Pasta local');
         expect(getTerminalHumanToolName('io.write.io-engine.atomic-write')).toBe('Escrita local');
         expect(getTerminalHumanToolName('io.search.io-engine.rg.search')).toBe('Busca local');
+        expect(getTerminalHumanToolName('bridge.git.diff')).toBe('Git diff');
         expect(getTerminalHumanToolName('tool.fast')).toBe('tool.fast');
         expect(isTerminalInternalCallIdentifier('chatcmpl-tool-80d5a00b25801fef')).toBe(true);
         expect(isTerminalInternalCallIdentifier('toolu_bdrk_019v9X862pjamNysAemC1UAW')).toBe(true);

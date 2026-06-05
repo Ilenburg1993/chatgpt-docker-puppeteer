@@ -2244,7 +2244,7 @@ async function cmdSessionSdkWaits({ println }, tokens) {
     const counts = new Map(SDK_SESSION_WAIT_ARCHIVE_EVENTS.map((event) => [event, 0]));
     for (const entry of merged) counts.set(entry.event, (counts.get(entry.event) ?? 0) + 1);
     println('');
-    println(terminalThemeHeadline('assistant', 'Interações SDK da sessão'));
+    println(terminalThemeHeadline('assistant', 'Esperas SDK da sessão'));
     println(
         terminalThemeRow(
             'Registro',

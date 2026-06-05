@@ -599,14 +599,21 @@ function summarizePayload(payload, opts = {}) {
     const renderedStatus = humanStatus(status);
     const renderedType = humanPayloadKind(type);
     const renderedClassification = humanPayloadKind(classification);
+    const typeIsRedundant =
+        renderedType &&
+        ((humanToolName && renderedType === 'I/O local') || renderedType === humanPayloadKind(payload['kind']));
+    const classificationIsRedundant =
+        renderedClassification &&
+        (renderedClassification === renderedType ||
+            (humanToolName && (renderedClassification === 'I/O local' || renderedClassification === 'ferramenta')));
     const classificationLabel = renderedType ? 'classe' : 'tipo';
     return [
         humanToolName ? `ferramenta ${compact(humanToolName, 48)}` : null,
         showIds && toolCallId ? `call ${compactTerminalDiagnosticId(String(toolCallId), 14)}` : null,
         showIds && requestId ? `req ${compactTerminalDiagnosticId(String(requestId), 14)}` : null,
         renderedStatus ? `estado ${compact(renderedStatus)}` : null,
-        renderedType ? `tipo ${compact(renderedType)}` : null,
-        renderedClassification ? `${classificationLabel} ${compact(renderedClassification)}` : null,
+        renderedType && !typeIsRedundant ? `tipo ${compact(renderedType)}` : null,
+        renderedClassification && !classificationIsRedundant ? `${classificationLabel} ${compact(renderedClassification)}` : null,
         content ? compact(humanEventMessage(content)) : null,
     ]
         .filter(Boolean)

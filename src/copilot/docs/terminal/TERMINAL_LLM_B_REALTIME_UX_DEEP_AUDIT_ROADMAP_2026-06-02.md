@@ -9129,3 +9129,61 @@
   - confirmar em live que `/activity 10` não exibe `Drill-down`, tool IDs ou fontes cruas;
   - revisar `/diagnose` para a mesma fronteira default/detail;
   - fazer uma live curta de boot/status/activity após o próximo bloco de limpeza.
+
+### 12.103 Superfícies diagnósticas live com polimento humano e harness ISO completo — 2026-06-04
+
+- [x] Achado live:
+  - o ciclo `--diagnostic-ux-cycle` já validava muitas superfícies, mas ainda tinha expectativas
+    antigas contra a própria decisão de UX atual;
+  - o operador pediu timestamps ISO 8601 completos, então o harness não deve rejeitar milissegundos;
+  - `/events` default ainda podia repetir `tipo I/O local` depois de já mostrar origem/categoria;
+  - `bridge.git.diff` aparecia como nome técnico em agregações de ferramenta;
+  - `/session sdk waits` dizia `Interações SDK da sessão`, menos direto do que a superfície real de
+    esperas;
+  - `/terminal libs` imprimia `1 disponível(is)`;
+  - `/menu picker` expunha `runtime ainda não entregou controle exclusivo do TTY`;
+  - `/scope context` mostrava export bruto como `scope.js::cmdScope(function)`;
+  - `/fs read/preview/search` repetia paths absolutos do workspace na tela humana.
+- [x] Decisão UX:
+  - ISO 8601 completo, com milissegundos e offset, é o formato canônico para timestamps operacionais;
+  - payload bruto, IDs e nomes técnicos continuam disponíveis em raw/detail, mas default deve ser
+    leitura humana;
+  - nomes de ferramentas bridge devem ser traduzidos quando representarem ações conhecidas;
+  - o picker textual deve falar em `sessão`, não `runtime`;
+  - caminhos dentro do workspace aparecem relativos no terminal default;
+  - exports de escopo devem mostrar `símbolo · tipo · arquivo`, sem separadores de parser.
+- [x] Implementação:
+  - `getTerminalHumanToolName()` passou a mapear `bridge.git.diff` para `Git diff`;
+  - `/events` default omite `tipo`/`classe` redundantes quando a origem já comunica `I/O local` ou
+    ferramenta;
+  - `/session sdk waits` usa o título `Esperas SDK da sessão`;
+  - o runner live aceita ISO completo com milissegundos e atualizou critérios de `/tools diag`,
+    `/sdk status` e `/menu picker`;
+  - `/terminal libs` ganhou pluralização humana para contagens adiadas;
+  - `buildTerminalPickerPlan()` trocou a guarda para `sessão ainda não liberou controle exclusivo do
+    TTY`;
+  - `/scope context` renderiza exports como `cmdScope · função · scope.js`;
+  - `/fs` usa `formatTerminalToolPathForOperator()` em list/read/search e reescreve linhas de busca
+    para paths relativos ao workspace.
+- [x] Validação:
+  - [x] `node --check` dos comandos, presenters, harness e testes alterados;
+  - [x] `npx vitest run` focado com 119 testes verdes nas superfícies de FS, scope, menu, terminal,
+    picker, tools/events/session;
+  - [x] live inicial PASS após correções de harness:
+    `artifacts/terminal-live/ux-diagnostic-surfaces-humanized-rerun-20260604/summary.md`;
+  - [x] live intermediária FAIL capturou apenas critério stale do picker:
+    `artifacts/terminal-live/ux-diagnostic-surfaces-polished-rerun-20260604/summary.md`;
+  - [x] live final PASS:
+    `artifacts/terminal-live/ux-diagnostic-surfaces-polished-pass-20260604/summary.md`.
+- [x] Resultado observado:
+  - `/fs` não mostra mais `/workspaces/chatgpt-docker-puppeteer/...` em read/preview/search default;
+  - `/terminal libs` mostra `1 disponível`;
+  - `/menu picker` mostra `sessão ainda não liberou controle exclusivo do TTY`;
+  - `/scope context` mostra `Export        cmdScope · função · scope.js`;
+  - grep do plain log final não encontra `request_user_input`, `report_intent`, `scope.js::`,
+    `disponível(is)`, `runtime ainda`, `bridge.git.diff` ou paths absolutos do workspace.
+- [ ] Próximas verificações:
+  - revisar `/diagnose`, `/errors`, `/sources`, `/audit` e `/intent` com a mesma lente default/detail;
+  - criar uma live de turno real com deltas parciais para comparar fala da LLM-B, thinking e tools no
+    mesmo fluxo;
+  - medir truncamento/alinhamento em viewport menor e ajustar larguras responsivas do terminal.

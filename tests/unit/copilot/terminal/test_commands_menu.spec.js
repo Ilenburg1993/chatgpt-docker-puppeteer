@@ -188,7 +188,7 @@ describe('terminal/commands/menu', () => {
 
         expect(ctx.output()).toContain('Picker do menu');
         expect(ctx.output()).toContain('picker textual seguro');
-        expect(ctx.output()).toContain('runtime ainda não entregou controle exclusivo do TTY');
+        expect(ctx.output()).toContain('sessão ainda não liberou controle exclusivo do TTY');
         expect(ctx.output()).toContain('/menu <n> ou /menu <id>');
         expect(ctx.output()).not.toContain('fzf --');
     });

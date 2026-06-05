@@ -85,6 +85,19 @@ function renderScopeSymbolKind(kind) {
 }
 
 /**
+ * @param {string} item
+ * @returns {string}
+ */
+function renderScopeExportLabel(item) {
+    const match = /^(?<file>.+)::(?<name>[^()]+)\((?<kind>[^()]+)\)$/u.exec(item.trim());
+    if (!match?.groups) return item.replace(/::/gu, ' · ').replace(/[()]/gu, '');
+    const file = compactPath(match.groups.file ?? '');
+    const name = (match.groups.name ?? '').trim();
+    const kind = renderScopeSymbolKind(match.groups.kind);
+    return [name, kind, file].filter(Boolean).join(' · ');
+}
+
+/**
  * @param {string | undefined} value
  * @returns {number | undefined}
  */
@@ -332,7 +345,7 @@ function runContext(ctx, parts) {
     ctx.println(terminalThemeHeadline('assistant', 'Contexto de escopo'));
     ctx.println(terminalThemeRow('Escopo', `${scope.sessionId} · ${ready}`));
     ctx.println(terminalThemeRow('Arquivos', `${scope.files} · símbolos ${scope.symbols} · exports ${scope.topExports.length}`));
-    for (const item of scope.topExports.slice(0, 30)) ctx.println(terminalThemeRow('Export', item));
+    for (const item of scope.topExports.slice(0, 30)) ctx.println(terminalThemeRow('Export', renderScopeExportLabel(item)));
     if (scope.topExports.length > 30)
         ctx.println(terminalThemeRow('Mais', `${scope.topExports.length - 30} export(s) adicional(is)`));
     ctx.println('');

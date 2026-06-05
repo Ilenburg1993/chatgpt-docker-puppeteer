@@ -20,12 +20,12 @@ const FZF_TOOL = /** @type {const} */ ({
 });
 
 describe('terminal/capabilities/picker-plan', () => {
-    it('bloqueia picker externo quando runtime não entregou controle exclusivo do TTY', () => {
+    it('bloqueia picker externo quando a sessão não liberou controle exclusivo do TTY', () => {
         const plan = buildTerminalPickerPlan({ tools: [FZF_TOOL] });
 
         expect(plan.mode).toBe('textual');
         expect(plan.toolId).toBeNull();
-        expect(plan.reasons).toContain('runtime ainda não entregou controle exclusivo do TTY');
+        expect(plan.reasons).toContain('sessão ainda não liberou controle exclusivo do TTY');
         expect(plan.fallbackCommand).toBe('/menu <n>');
     });
 

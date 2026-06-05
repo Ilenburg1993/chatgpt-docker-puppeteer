@@ -65,7 +65,8 @@ describe('terminal/commands/scope', () => {
 
         await cmdScope(ctx, 'context scope-terminal-test');
         expect(ctx.output()).toContain('Contexto de escopo');
-        expect(ctx.output()).toContain('alphaHelper');
+        expect(ctx.output()).toContain('alphaHelper · função ·');
+        expect(ctx.output()).not.toContain('::alphaHelper(function)');
 
         await cmdScope(ctx, 'find scope-terminal-test alphaHelper --exact');
         expect(ctx.output()).toContain('Busca de símbolo no escopo');

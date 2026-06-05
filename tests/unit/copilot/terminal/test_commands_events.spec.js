@@ -399,7 +399,7 @@ describe('terminal/commands/events', () => {
 
         expect(ctx.output()).toContain('I/O local');
         expect(ctx.output()).toContain('ferramenta Busca local');
-        expect(ctx.output()).toContain('tipo I/O local');
+        expect(ctx.output()).not.toContain('tipo I/O local');
         expect(ctx.output()).not.toContain('estado io op');
         expect(ctx.output()).not.toContain('io_op');
     });

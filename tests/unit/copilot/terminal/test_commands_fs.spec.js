@@ -54,6 +54,8 @@ describe('terminal/commands/fs', () => {
         const read = mockCtx();
         await cmdFs(read, `read ${fileRel}`);
         expect(read.output()).toContain('(FS local)');
+        expect(read.output()).toContain(`Arquivo       ${fileRel} · (FS local)`);
+        expect(read.output()).not.toContain(`${WORKSPACE}/`);
         expect(read.output()).toContain(token);
         expect(read.output()).toContain('motor io-engine.fs.readFile.text');
         expectNoAnsi(read.output());
@@ -68,6 +70,8 @@ describe('terminal/commands/fs', () => {
         const search = mockCtx();
         await cmdFs(search, `search ${token} ${tmpRel}`);
         expect(search.output()).toContain('FS search');
+        expect(search.output()).toContain(`${fileRel}:1:${token}`);
+        expect(search.output()).not.toContain(`${WORKSPACE}/`);
         expect(search.output()).toContain(token);
         expect(search.output()).toContain('I/O search');
         expect(search.output()).toContain('resultados');

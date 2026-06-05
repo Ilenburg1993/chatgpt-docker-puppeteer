@@ -46,7 +46,7 @@ export function buildTerminalPickerPlan(options = {}) {
     for (const reason of options.blockReasons ?? []) {
         if (reason && !reasons.includes(reason)) reasons.push(reason);
     }
-    if (!options.allowInteractive) reasons.push('runtime ainda não entregou controle exclusivo do TTY');
+    if (!options.allowInteractive) reasons.push('sessão ainda não liberou controle exclusivo do TTY');
     if (!chosen?.command) reasons.push(preferred === 'auto' ? 'fzf/gum indisponíveis' : `${preferred} indisponível`);
 
     if (reasons.length > 0 || !chosen?.command) {

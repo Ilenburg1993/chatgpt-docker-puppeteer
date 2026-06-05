@@ -1348,7 +1348,7 @@ describe('commands/session — async commands', () => {
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'user_input.requested', limit: 6 });
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'elicitation.pending', limit: 6 });
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'permission.requested', limit: 6 });
-        expect(ctx.output()).toContain('Interações SDK da sessão');
+        expect(ctx.output()).toContain('Esperas SDK da sessão');
         expect(ctx.output()).toContain('Registro');
         expect(ctx.output()).not.toContain('Archive');
         expect(ctx.output()).toContain('perguntas 2');

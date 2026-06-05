@@ -345,6 +345,7 @@ function resolveHumanToolName(toolName, canonicalToolName) {
     if (/^io\.(?:delete|remove)(?:\.|$)/iu.test(raw)) return 'Exclusão local';
     if (/^io\.search(?:\.|$)/iu.test(raw)) return 'Busca local';
     if (/^io\.(?:scan|stat|fetch)(?:\.|$)/iu.test(raw)) return 'Inspeção local';
+    if (/^bridge\.git\.diff(?:\.|$)/iu.test(raw)) return 'Git diff';
     return HUMAN_TOOL_NAMES[raw] ?? raw;
 }
 
