@@ -48,6 +48,48 @@ const READ_FILE_CONTENT_FEEDBACK_PARAMETERS = /** @type {const} */ ({
  */
 
 /**
+ * @param {ReadFileFailureCode} code
+ * @returns {string}
+ */
+function readFailureNextAction(code) {
+    if (code === 'ERR_READ_PATH_INVALID') return 'Corrija o path para um arquivo permitido dentro do workspace.';
+    if (code === 'ERR_READ_BINARY_LINE_WINDOW') return 'Remova a janela por linha ou use encoding=utf8.';
+    if (code === 'ERR_READ_CURSOR_INVALID') return 'Reutilize exatamente o nextCursor retornado pela leitura anterior.';
+    if (code === 'ERR_READ_LINE_WINDOW_INVALID') return 'Envie uma janela crescente com startLine menor ou igual a endLine.';
+    if (code === 'ERR_READ_DIRECTORY') return 'Use list_directory para inspecionar o diretório ou informe um arquivo regular.';
+    return 'Revalide o path e repita com escopo menor; se persistir, tente readStrategy=stream.';
+}
+
+/**
+ * @param {ReadFileFailureCode} code
+ * @param {string} message
+ * @param {Record<string, unknown>} receivedParameters
+ * @param {Record<string, unknown>} details
+ * @returns {{
+ *     operation: 'read';
+ *     path: string | null;
+ *     status: 'failed';
+ *     code: ReadFileFailureCode;
+ *     summary: string;
+ *     nextAction: string;
+ * }}
+ */
+function buildReadFailureTerminalSummary(code, message, receivedParameters, details) {
+    const rawPath = details['path'] ?? receivedParameters['path'];
+    const path = typeof rawPath === 'string' && rawPath.length > 0 ? rawPath : null;
+    const nextAction = readFailureNextAction(code);
+    const target = path ? `${path} · ` : '';
+    return {
+        operation: 'read',
+        path,
+        status: 'failed',
+        code,
+        summary: `Leitura falhou: ${target}${code} · ${message}`,
+        nextAction,
+    };
+}
+
+/**
  * @param {string} message
  * @param {ReadFileFailureCode} code
  * @param {Record<string, unknown>} receivedParameters
@@ -55,6 +97,7 @@ const READ_FILE_CONTENT_FEEDBACK_PARAMETERS = /** @type {const} */ ({
  * @param {{ category?: import('../../infra/tool-feedback.js').ToolFailureCategory; error?: unknown; retryable?: boolean }} [options]
  */
 export function createReadFileFailure(message, code, receivedParameters, details = {}, options = {}) {
+    const terminalSummary = buildReadFailureTerminalSummary(code, message, receivedParameters, details);
     return createToolFailureResult({
         toolName: 'read_file_content',
         message,
@@ -62,7 +105,19 @@ export function createReadFileFailure(message, code, receivedParameters, details
         parameters: READ_FILE_CONTENT_FEEDBACK_PARAMETERS,
         receivedParameters,
         details: { code, ...details },
-        extra: { code },
+        extra: {
+            code,
+            operation: 'read',
+            terminalSummary,
+            llmNextAction: terminalSummary.nextAction,
+            presentation: {
+                operation: 'read',
+                path: terminalSummary.path,
+                targetKinds: [code === 'ERR_READ_DIRECTORY' ? 'directory' : 'file'],
+                status: 'failed',
+                summary: terminalSummary.summary,
+            },
+        },
         ...(options.error !== undefined ? { error: options.error } : {}),
         ...(options.category !== undefined ? { category: options.category } : {}),
         ...(options.retryable !== undefined ? { retryable: options.retryable } : {}),

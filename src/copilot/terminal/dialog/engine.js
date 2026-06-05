@@ -599,8 +599,8 @@ function recordTerminalExplicitEmptyOutput(input) {
         runtimeStatus: runtimeState.status,
         pendingQuestionPresent: runtimeState.pendingQuestion !== null,
         pendingQuestionKind: runtimeState.pendingQuestionKind,
-        semanticOutcome: input.semanticOutcome,
-        semanticDiagnostics: input.semanticDiagnostics,
+        semanticOutcome: input.semanticOutcome ?? null,
+        semanticDiagnostics: input.semanticDiagnostics ?? null,
     });
     const semanticOutcome = classification.semanticOutcome;
     if (classification.kind === 'not_empty') {
@@ -678,10 +678,10 @@ function recordTerminalExplicitEmptyOutput(input) {
     reviseRecentTerminalTurnTraceStatus({ timestamp, status: 'failed' });
     const diagnosis = buildTerminalEmptyOutputDiagnosis({
         semanticOutcome,
-        semanticReplySource: input.semanticReplySource,
-        semanticDiagnostics: input.semanticDiagnostics,
+        semanticReplySource: input.semanticReplySource ?? null,
+        semanticDiagnostics: input.semanticDiagnostics ?? null,
         materialization: input.materialization,
-        quiescence: input.quiescence,
+        quiescence: input.quiescence ?? null,
     });
     recordTerminalActivity('error', 'Turno sem saída pública materializada', {
         detail: `${diagnosis.operatorSummary} · ${failureDetail} · sem pergunta humana ou formulário pendente`,

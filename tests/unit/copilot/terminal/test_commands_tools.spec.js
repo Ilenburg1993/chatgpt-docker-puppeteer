@@ -88,6 +88,7 @@ describe('commands/tools', () => {
 
         expect(readTerminalToolStatsProjection).toHaveBeenCalledTimes(1);
         expect(ctx.output()).toContain('Ferramentas observadas');
+        expect(ctx.output()).toContain('Categorias');
         expect(ctx.output()).toContain('tool.fast');
         expect(ctx.output()).toContain('uso');
         expect(ctx.output()).toContain('sem falhas');
@@ -115,6 +116,188 @@ describe('commands/tools', () => {
         cmdTools({ println: ctx.println });
 
         expect(ctx.output()).toContain('Nenhuma ferramenta observada');
+    });
+
+    it('mostra diagnóstico e contrato mesmo sem tools observadas quando modo diag é explícito', () => {
+        readTerminalToolStatsProjection.mockReturnValueOnce({
+            stats: {},
+            canonicalEntries: [],
+            entries: [],
+            tools: [],
+            byCategory: {},
+            toolCount: 0,
+            lifecycle: {
+                active: [],
+                recent: [],
+                summary: { active: 0, recent: 0, waitingUser: 0, failedRecent: 0 },
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdTools({ println: ctx.println }, 'diag');
+
+        const output = ctx.output();
+        expect(output).toContain('nenhuma tool usada ainda');
+        expect(output).toContain('Superfícies operacionais');
+        expect(output).toContain('Contrato das ferramentas');
+        expect(output).toContain('/tools contract');
+    });
+
+    it('renderiza decisões de autonomia no contrato sem tratá-las como aviso operacional', () => {
+        readTerminalToolRegistrySnapshot.mockReturnValueOnce({
+            toolContract: {
+                ok: true,
+                errorCount: 0,
+                warningCount: 0,
+                noticeCount: 0,
+                decisionCount: 1,
+                riskySkipPermissionCount: 0,
+                autonomySkipPermissionCount: 1,
+                permissionMode: 'approve_all',
+                metadataCoverage: {
+                    descriptionPct: 100,
+                    parametersPct: 100,
+                    categoryPct: 100,
+                    tagsPct: 100,
+                    instructionsPct: 100,
+                },
+                issues: [
+                    {
+                        severity: 'decision',
+                        code: 'AUTONOMY_SKIP_PERMISSION',
+                        toolName: 'patch_file',
+                        message: 'autonomia efetiva em tool patch (high) por permissionMode=approve_all.',
+                    },
+                ],
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdTools({ println: ctx.println }, 'contract');
+
+        const output = ctx.output();
+        expect(output).toContain('Contrato das ferramentas');
+        expect(output).toContain('decisões 1');
+        expect(output).toContain('autonomia 1');
+        expect(output).toContain('Decisão');
+        expect(output).toContain('AUTONOMY_SKIP_PERMISSION');
+        expect(output).toContain('Editar arquivo');
+        expect(output).not.toContain('Aviso   AUTONOMY_SKIP_PERMISSION');
+    });
+
+    it('renderiza superfície canônica de filesystem sem depender de tools já observadas', () => {
+        readTerminalToolRegistrySnapshot.mockReturnValueOnce({
+            hasCanonicalLocalFsTools: true,
+            metadataByName: {
+                patch_file: {
+                    name: 'patch_file',
+                    category: 'file',
+                    operation: 'patch',
+                    risk: 'high',
+                    sideEffect: 'filesystem',
+                    targetKinds: ['file'],
+                    effectiveSkipPermission: true,
+                    capabilities: {
+                        dryRun: true,
+                        rollback: true,
+                        hashPrecondition: true,
+                        pagination: false,
+                        streaming: false,
+                        diff: true,
+                        preview: true,
+                    },
+                },
+                read_file_content: {
+                    name: 'read_file_content',
+                    category: 'file',
+                    operation: 'read',
+                    risk: 'low',
+                    sideEffect: 'none',
+                    targetKinds: ['file'],
+                    effectiveSkipPermission: true,
+                    capabilities: {
+                        dryRun: false,
+                        rollback: false,
+                        hashPrecondition: false,
+                        pagination: true,
+                        streaming: true,
+                        diff: false,
+                        preview: true,
+                    },
+                },
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdTools({ println: ctx.println }, 'fs');
+
+        const output = ctx.output();
+        expect(output).toContain('Tools de filesystem');
+        expect(output).toContain('FS canônico ativo');
+        expect(output).toContain('Ler arquivo');
+        expect(output).toContain('Editar arquivo');
+        expect(output).toContain('caps cursor/stream');
+        expect(output).toContain('caps dry-run/hash/diff/rollback');
+        expect(output.indexOf('Ler arquivo')).toBeLessThan(output.indexOf('Editar arquivo'));
+        expect(output).toContain('/tools contract');
+    });
+
+    it('renderiza falhas de tools com lifecycle humano compacto', () => {
+        readTerminalToolStatsProjection.mockReturnValueOnce({
+            stats: {
+                patch_file: { calls: 2, errors: 1, blocked: 0, avgLatencyMs: 44 },
+            },
+            canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
+                ['patch_file', { calls: 2, errors: 1, blocked: 0, avgLatencyMs: 44, kind: 'file' }],
+            ]),
+            entries: /** @type {[string, Record<string, any>][]} */ ([
+                ['patch_file', { calls: 2, errors: 1, blocked: 0, avgLatencyMs: 44, kind: 'file' }],
+            ]),
+            tools: [],
+            byCategory: {},
+            toolCount: 1,
+            lifecycle: {
+                active: [],
+                recent: [
+                    {
+                        key: 'call-failed',
+                        type: 'complete',
+                        status: 'failed',
+                        source: 'sdk',
+                        toolName: 'patch_file',
+                        rawToolName: 'patch_file',
+                        operation: 'patch',
+                        toolCallId: 'chatcmpl-tool-failed',
+                        requestId: 'req-failed',
+                        traceId: 'turn:failed',
+                        turnId: '9',
+                        target: 'src/copilot/file.js',
+                        path: 'src/copilot/file.js',
+                        primaryTargetKind: 'patch',
+                        resultSummary: 'Patch falhou: ERR_PATCH_NOT_FOUND',
+                        progress: null,
+                        progressMessage: null,
+                        success: false,
+                        durationMs: 12,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        completedAt: 2,
+                    },
+                ],
+                summary: { active: 0, recent: 1, waitingUser: 0, failedRecent: 1 },
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdTools({ println: ctx.println }, 'failures');
+
+        const output = ctx.output();
+        expect(output).toContain('Falhas de tools');
+        expect(output).toContain('Editar arquivo');
+        expect(output).toContain('1 falha');
+        expect(output).toContain('Patch falhou: ERR_PATCH_NOT_FOUND');
+        expect(output).not.toContain('chatcmpl-tool-failed');
+        expect(output).toContain('/errors');
     });
 
     it('usa nomes humanos no modo default, diag humano e nomes técnicos apenas no all/raw', () => {
@@ -556,5 +739,6 @@ describe('commands/tools', () => {
         expect(output).toContain('Rastreio');
         expect(output).toContain('call call-1234567…');
         expect(output).toContain('req req-12345678…');
+        expect(output).toContain('1970-01-01T00:00:00.002Z');
     });
 });

@@ -142,7 +142,6 @@ function visibleTextLength(value) {
  */
 function shouldSuppressDuplicateInlineStatus(text) {
     const visualText = stripAnsiEscapes(String(text ?? ''))
-        .replace(/\x1b\[K/gu, '')
         .replace(/\s+/gu, ' ')
         .trim();
     const now = Date.now();

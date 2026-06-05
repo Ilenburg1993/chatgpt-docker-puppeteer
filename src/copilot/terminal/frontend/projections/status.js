@@ -108,6 +108,7 @@ function objectOrNull(value) {
  *         total: number;
  *         categories: Record<string, number>;
  *         disabled: string[];
+ *         disabledRecords: { name: string; source: 'runtime' | 'session'; reason: string; disabledAt: string }[];
  *         hasCanonicalLocalFsTools: boolean;
  *         hasCanonicalLocalExecTools: boolean;
  *         hasSdkWorkspaceTooling: boolean;
@@ -116,6 +117,11 @@ function objectOrNull(value) {
  *             ok: boolean;
  *             errorCount: number;
  *             warningCount: number;
+ *             noticeCount: number;
+ *             decisionCount: number;
+ *             riskySkipPermissionCount: number;
+ *             autonomySkipPermissionCount: number;
+ *             permissionMode: 'approve_all' | 'audit_only' | 'selective';
  *             metadataCoverage: {
  *                 descriptionPct: number;
  *                 parametersPct: number;
@@ -186,6 +192,7 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
         total: toolLoadSnapshot.total,
         categories: toolLoadSnapshot.categories,
         disabled: toolLoadSnapshot.disabled,
+        disabledRecords: toolLoadSnapshot.disabledRecords,
         hasCanonicalLocalFsTools: toolLoadSnapshot.hasCanonicalLocalFsTools,
         hasCanonicalLocalExecTools: toolLoadSnapshot.hasCanonicalLocalExecTools,
         hasSdkWorkspaceTooling: toolLoadSnapshot.hasSdkWorkspaceTooling,
@@ -194,6 +201,11 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
             ok: toolLoadSnapshot.toolContract.ok,
             errorCount: toolLoadSnapshot.toolContract.errorCount,
             warningCount: toolLoadSnapshot.toolContract.warningCount,
+            noticeCount: toolLoadSnapshot.toolContract.noticeCount,
+            decisionCount: toolLoadSnapshot.toolContract.decisionCount,
+            riskySkipPermissionCount: toolLoadSnapshot.toolContract.riskySkipPermissionCount,
+            autonomySkipPermissionCount: toolLoadSnapshot.toolContract.autonomySkipPermissionCount,
+            permissionMode: toolLoadSnapshot.toolContract.permissionMode,
             metadataCoverage: toolLoadSnapshot.toolContract.metadataCoverage,
         },
     };

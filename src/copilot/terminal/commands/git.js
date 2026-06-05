@@ -251,6 +251,7 @@ export async function cmdGit({ println }, args) {
     // help / fallback
     println('');
     println(terminalThemeHeadline('tool', '/git', ['Git operacional']));
+    /** @type {[string, string][]} */
     const rows = [
         ['Status', '/git status'],
         ['Log', '/git log [n] [--oneline]'],

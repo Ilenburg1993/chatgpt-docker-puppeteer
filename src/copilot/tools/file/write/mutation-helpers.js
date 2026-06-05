@@ -18,7 +18,13 @@ import {
 } from '#copilot/infra/public/runtime';
 import { toError } from '#copilot/core';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';
-import { patchFailureCategory, patchFailureFix, readErrorCode, readErrorDetails } from './patch-feedback.js';
+import {
+    buildPatchFailureTerminalSummary,
+    patchFailureCategory,
+    patchFailureFix,
+    readErrorCode,
+    readErrorDetails,
+} from './patch-feedback.js';
 
 export const ADVISORY_WRITE_CONTENT_BYTES = 2 * 1024 * 1024;
 export const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
@@ -204,21 +210,38 @@ export function mutationFailureResult(toolName, error, receivedParameters, extra
     const code = readErrorCode(error);
     const category = toolName === 'patch_file' ? patchFailureCategory(error) : undefined;
     const fix = toolName === 'patch_file' ? patchFailureFix(error) : undefined;
+    const details = {
+        ...(code ? { code } : {}),
+        ...readErrorDetails(error),
+        ...extraDetails,
+    };
+    const patchTerminalSummary =
+        toolName === 'patch_file' ? buildPatchFailureTerminalSummary(code, e.message, details, receivedParameters) : null;
     return createToolFailureResult({
         toolName,
         error,
         ...(category ? { category } : {}),
         ...(fix ? { fix } : {}),
         receivedParameters,
-        details: {
-            ...(code ? { code } : {}),
-            ...readErrorDetails(error),
-            ...extraDetails,
-        },
+        details,
         extra: {
             ...extra,
             ...(code ? { code } : {}),
             error: e.message,
+            ...(patchTerminalSummary
+                ? {
+                      operationName: 'patch',
+                      terminalSummary: patchTerminalSummary,
+                      llmNextAction: patchTerminalSummary.nextAction,
+                      presentation: {
+                          operation: 'patch',
+                          path: patchTerminalSummary.path,
+                          targetKinds: ['file'],
+                          status: 'failed',
+                          summary: patchTerminalSummary.summary,
+                      },
+                  }
+                : {}),
         },
     });
 }

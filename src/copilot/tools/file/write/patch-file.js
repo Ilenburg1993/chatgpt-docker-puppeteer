@@ -22,7 +22,91 @@ import {
     mutationFailureResult,
     pathFailureResult,
 } from './mutation-helpers.js';
-import { PATCH_FEEDBACK_FIX } from './patch-feedback.js';
+import { buildPatchFailureTerminalSummary, PATCH_FEEDBACK_FIX } from './patch-feedback.js';
+
+/**
+ * @param {{
+ *     path: string;
+ *     dryRun: boolean;
+ *     replacedOccurrences: number;
+ *     occurrences: number;
+ *     byteDelta: number;
+ *     lineDelta: number;
+ *     firstMatchLine: number | null;
+ *     lastMatchLine: number | null;
+ *     diffPreviewTruncated: boolean;
+ *     previousHash?: string | null;
+ *     contentHash?: string | null;
+ * }} input
+ * @returns {{
+ *     operation: 'patch';
+ *     path: string;
+ *     dryRun: boolean;
+ *     summary: string;
+ *     nextAction: string | null;
+ *     changed: boolean;
+ *     hashes: { previousHash: string | null; contentHash: string | null };
+ * }}
+ */
+function buildPatchTerminalSummary(input) {
+    const status = input.dryRun ? 'Patch validado em dry-run' : 'Patch aplicado';
+    const lines =
+        input.firstMatchLine !== null
+            ? ` · linhas ${input.firstMatchLine}-${input.lastMatchLine ?? input.firstMatchLine}`
+            : '';
+    const diff = input.diffPreviewTruncated ? ' · diff truncado' : '';
+    const delta = ` · ${input.byteDelta >= 0 ? '+' : ''}${input.byteDelta} bytes · ${
+        input.lineDelta >= 0 ? '+' : ''
+    }${input.lineDelta} linhas`;
+    const summary = `${status}: ${input.replacedOccurrences}/${input.occurrences} ocorrencias${lines}${delta}${diff}`;
+    const nextAction = input.dryRun
+        ? 'Se o diffPreview estiver correto, repita a chamada com dryRun=false e expectedHash preservado quando disponível.'
+        : 'Use previousHash/contentHash para auditoria; não afirme mudanças adicionais sem nova tool.';
+    return {
+        operation: 'patch',
+        path: input.path,
+        dryRun: input.dryRun,
+        summary,
+        nextAction,
+        changed: input.replacedOccurrences > 0 && !input.dryRun,
+        hashes: {
+            previousHash: input.previousHash ?? null,
+            contentHash: input.contentHash ?? null,
+        },
+    };
+}
+
+/**
+ * @param {string} message
+ * @param {keyof typeof PATCH_FEEDBACK_FIX} code
+ * @param {Record<string, unknown>} receivedParameters
+ * @param {Record<string, unknown>} details
+ * @returns {{ success: false; error: string; toolFeedback: import('../../infra/tool-feedback.js').ToolFailureFeedback } & Record<string, unknown>}
+ */
+function createPatchValidationFailure(message, code, receivedParameters, details) {
+    const terminalSummary = buildPatchFailureTerminalSummary(code, message, details, receivedParameters);
+    return createToolFailureResult({
+        toolName: 'patch_file',
+        message,
+        category: 'invalid-parameters',
+        fix: PATCH_FEEDBACK_FIX[code],
+        receivedParameters,
+        details: { ...details, code },
+        extra: {
+            code,
+            operationName: 'patch',
+            terminalSummary,
+            llmNextAction: terminalSummary.nextAction,
+            presentation: {
+                operation: 'patch',
+                path: terminalSummary.path,
+                targetKinds: ['file'],
+                status: 'failed',
+                summary: terminalSummary.summary,
+            },
+        },
+    });
+}
 
 /**
  * Tool: patch_file — edição cirúrgica por substituição de string exata.
@@ -123,26 +207,20 @@ export const patchFileTool = buildTool({
             return pathFailureResult('patch_file', v.reason ?? 'Caminho inválido.', receivedParameters);
         }
         if (typeof old_string !== 'string' || old_string.length === 0) {
-            return createToolFailureResult({
-                toolName: 'patch_file',
-                message: 'old_string deve ser uma string não vazia.',
-                category: 'invalid-parameters',
-                fix: PATCH_FEEDBACK_FIX.ERR_PATCH_INVALID_OLD_STRING,
+            return createPatchValidationFailure(
+                'old_string deve ser uma string não vazia.',
+                'ERR_PATCH_INVALID_OLD_STRING',
                 receivedParameters,
-                details: { path: v.resolved, code: 'ERR_PATCH_INVALID_OLD_STRING' },
-                extra: { code: 'ERR_PATCH_INVALID_OLD_STRING' },
-            });
+                { path: v.resolved },
+            );
         }
         if (replace_all && occurrence_index !== undefined) {
-            return createToolFailureResult({
-                toolName: 'patch_file',
-                message: 'Use replace_all ou occurrence_index, não ambos na mesma chamada.',
-                category: 'invalid-parameters',
-                fix: PATCH_FEEDBACK_FIX.ERR_PATCH_CONFLICTING_MODE,
+            return createPatchValidationFailure(
+                'Use replace_all ou occurrence_index, não ambos na mesma chamada.',
+                'ERR_PATCH_CONFLICTING_MODE',
                 receivedParameters,
-                details: { path: v.resolved, code: 'ERR_PATCH_CONFLICTING_MODE' },
-                extra: { code: 'ERR_PATCH_CONFLICTING_MODE' },
-            });
+                { path: v.resolved },
+            );
         }
         const operation = createIoOperationEnvelope({
             capability: IO_CAPABILITY.filePatch,
@@ -175,6 +253,19 @@ export const patchFileTool = buildTool({
                 },
             });
             log('INFO', `[copilot/patch_file] Patch ${dryRun ? 'simulado' : 'aplicado'}: ${v.resolved}`);
+            const terminalSummary = buildPatchTerminalSummary({
+                path: v.resolved,
+                dryRun: patchResult.dryRun,
+                replacedOccurrences: patchResult.replacedOccurrences,
+                occurrences: patchResult.occurrences,
+                byteDelta: patchResult.byteDelta,
+                lineDelta: patchResult.lineDelta,
+                firstMatchLine: patchResult.firstMatchLine,
+                lastMatchLine: patchResult.lastMatchLine,
+                diffPreviewTruncated: patchResult.diffPreviewTruncated,
+                previousHash: patchResult.previousHash,
+                contentHash: patchResult.contentHash,
+            });
             return withIoMeta(
                 {
                     success: true,
@@ -197,6 +288,16 @@ export const patchFileTool = buildTool({
                     diffContextLines: patchResult.diffContextLines,
                     previousHash: patchResult.previousHash,
                     contentHash: patchResult.contentHash,
+                    operationName: 'patch',
+                    terminalSummary,
+                    llmNextAction: terminalSummary.nextAction,
+                    presentation: {
+                        operation: 'patch',
+                        path: v.resolved,
+                        targetKinds: ['file'],
+                        status: dryRun ? 'dry-run' : 'completed',
+                        summary: terminalSummary.summary,
+                    },
                     operation: await completeAndAuditMutation(
                         operation,
                         {

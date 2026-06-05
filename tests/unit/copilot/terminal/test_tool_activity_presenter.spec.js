@@ -202,6 +202,27 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.completeLine(true, '0.1s')).toContain('sucesso · 1 resultado');
     });
 
+    it('prefere presentation estruturado de tool result quando disponível', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'patch_file',
+            result: {
+                success: true,
+                presentation: {
+                    operation: 'patch',
+                    path: 'src/copilot/tools/file/write/patch-file.js',
+                    summary: 'Patch aplicado: 1/1 ocorrencias · linhas 20-20 · +4 bytes · +0 linhas',
+                },
+            },
+        });
+
+        expect(presentation.operation).toBe('edit');
+        expect(presentation.path).toBe('src/copilot/tools/file/write/patch-file.js');
+        expect(presentation.resultSummary).toBe(
+            'Patch aplicado: 1/1 ocorrencias · linhas 20-20 · +4 bytes · +0 linhas',
+        );
+        expect(presentation.completeLine(true, '0.1s')).toContain('Patch aplicado: 1/1 ocorrencias');
+    });
+
     it('resume read_file_content com bytes e truncamento sem poluir a superfície com conteúdo bruto', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'read_file_content',

@@ -74,10 +74,9 @@ export function claimTerminalAssistantTranscript(content, options = {}) {
     pruneRecentTranscriptHashes();
     const hash = createHash('sha256').update(normalized).digest('hex');
     if (recentTranscriptHashes.has(hash)) return false;
-    if (
-        options.suppressIfCoveredByRecent &&
-        isTerminalAssistantTranscriptCovered(normalized, { minChars: options.coverageMinChars })
-    ) {
+    const coverageOptions =
+        typeof options.coverageMinChars === 'number' ? { minChars: options.coverageMinChars } : {};
+    if (options.suppressIfCoveredByRecent && isTerminalAssistantTranscriptCovered(normalized, coverageOptions)) {
         return false;
     }
     recentTranscriptHashes.set(hash, { ts: Date.now(), normalized });
@@ -115,9 +114,12 @@ function formatAssistantTranscriptSourceForOperator(source) {
  */
 export function renderTerminalAssistantTranscript(input) {
     const content = input.content.trim();
-    const claimOptions = input.suppressIfCoveredByRecent
-        ? { suppressIfCoveredByRecent: true, coverageMinChars: input.coverageMinChars }
-        : {};
+    const claimOptions =
+        input.suppressIfCoveredByRecent && typeof input.coverageMinChars === 'number'
+            ? { suppressIfCoveredByRecent: true, coverageMinChars: input.coverageMinChars }
+            : input.suppressIfCoveredByRecent
+              ? { suppressIfCoveredByRecent: true }
+              : {};
     if (!content || !claimTerminalAssistantTranscript(content, claimOptions)) {
         return false;
     }

@@ -65,6 +65,7 @@ export {
 export { hubTools, resetHubForTests } from './hub/index.js';
 export {
     createEmptyToolContractReport,
+    getDisabledToolRecords,
     getDisabledTools,
     introspectionTools,
     isToolDisabled,

@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { getSummary as getMetricsSummary, getToolStats } from '../infra/metrics-proxy.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
+import { summarizeToolParameterSchema } from '../infra/tool-feedback.js';
+import { buildToolDefinitionMetadata } from './tool-metadata.js';
 import { createEmptyToolContractReport } from './tool-contract-verifier.js';
 /**
  * src/copilot/tools/introspection/introspection-tools.js
@@ -32,6 +34,13 @@ import { createEmptyToolContractReport } from './tool-contract-verifier.js';
  *     tags: string[];
  *     readOnly: boolean;
  * }} ToolIntrospectionMetadata
+ *
+ * @typedef {{
+ *     name: string;
+ *     source: 'runtime' | 'session';
+ *     reason: string;
+ *     disabledAt: string;
+ * }} DisabledToolRecord
  */
 
 /**
@@ -51,6 +60,13 @@ let _introspectionRegistry = null;
 const _disabledTools = new Set();
 
 /**
+ * Metadados das tools desabilitadas dinamicamente via `toggle_tool`.
+ *
+ * @type {Map<string, DisabledToolRecord>}
+ */
+const _disabledToolRecords = new Map();
+
+/**
  * Tools excluídas estaticamente na configuração da sessão SDK (`excludedTools`).
  *
  * Essas tools devem permanecer indisponíveis para o modelo mesmo quando `toggle_tool` tenta habilitá-las.
@@ -60,6 +76,33 @@ const _disabledTools = new Set();
 const _sessionExcludedTools = new Set();
 
 /**
+ * Metadados das tools excluídas na criação/configuração da sessão.
+ *
+ * @type {Map<string, DisabledToolRecord>}
+ */
+const _sessionExcludedToolRecords = new Map();
+
+/**
+ * @param {string} name
+ * @param {'runtime' | 'session'} source
+ * @param {string | null | undefined} reason
+ * @returns {DisabledToolRecord}
+ */
+function createDisabledToolRecord(name, source, reason) {
+    return {
+        name,
+        source,
+        reason:
+            typeof reason === 'string' && reason.trim()
+                ? reason.trim()
+                : source === 'session'
+                  ? 'excludedTools da sessão SDK'
+                  : 'toggle_tool runtime',
+        disabledAt: new Date().toISOString(),
+    };
+}
+
+/**
  * Atualiza o snapshot de tools excluídas estaticamente na sessão atual.
  *
  * @param {string[] | null | undefined} toolNames
@@ -67,12 +110,14 @@ const _sessionExcludedTools = new Set();
  */
 export function setSessionExcludedTools(toolNames) {
     _sessionExcludedTools.clear();
+    _sessionExcludedToolRecords.clear();
     if (!Array.isArray(toolNames)) return;
     for (const toolName of toolNames) {
         if (typeof toolName !== 'string') continue;
         const normalized = toolName.trim().toLowerCase();
         if (!normalized) continue;
         _sessionExcludedTools.add(normalized);
+        _sessionExcludedToolRecords.set(normalized, createDisabledToolRecord(normalized, 'session', undefined));
     }
 }
 
@@ -97,6 +142,17 @@ export function getDisabledTools() {
 }
 
 /**
+ * Retorna registros ricos das tools desabilitadas, preservando compatibilidade de `getDisabledTools()`.
+ *
+ * @returns {DisabledToolRecord[]}
+ */
+export function getDisabledToolRecords() {
+    return [..._sessionExcludedToolRecords.values(), ..._disabledToolRecords.values()].sort((a, b) =>
+        a.name.localeCompare(b.name),
+    );
+}
+
+/**
  * Retorna somente as tools desabilitadas dinamicamente em runtime (via `toggle_tool`).
  *
  * @returns {string[]}
@@ -106,12 +162,26 @@ function getRuntimeDisabledTools() {
 }
 
 /**
+ * @returns {DisabledToolRecord[]}
+ */
+function getRuntimeDisabledToolRecords() {
+    return [..._disabledToolRecords.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
  * Retorna somente as tools excluídas estaticamente pela configuração da sessão SDK.
  *
  * @returns {string[]}
  */
 function getSessionExcludedTools() {
     return [..._sessionExcludedTools];
+}
+
+/**
+ * @returns {DisabledToolRecord[]}
+ */
+function getSessionExcludedToolRecords() {
+    return [..._sessionExcludedToolRecords.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** @type {import('./tool-contract-verifier.js').ToolContractReport} */
@@ -199,6 +269,46 @@ function getToolMetadata(toolName) {
 }
 
 /**
+ * @param {Tool} tool
+ * @returns {{
+ *     legacy: ToolIntrospectionMetadata;
+ *     metadata: import('./tool-metadata.js').ToolDefinitionMetadata;
+ * }}
+ */
+function getToolMetadataEnvelope(tool) {
+    for (const [name, entry] of _introspectionRegistry?.entries ?? []) {
+        if (name.toLowerCase() !== tool.name.toLowerCase()) continue;
+        return {
+            legacy: getToolMetadata(tool.name),
+            metadata:
+                _toolContractReport.metadataByName?.[tool.name] ??
+                buildToolDefinitionMetadata(name, entry, {
+                    permissionMode: _toolContractReport.permissionMode ?? 'selective',
+                }),
+        };
+    }
+    return {
+        legacy: getToolMetadata(tool.name),
+        metadata:
+            _toolContractReport.metadataByName?.[tool.name] ??
+            buildToolDefinitionMetadata(tool.name, { tool, category: 'unknown', tags: [], readOnly: false }, {
+                permissionMode: _toolContractReport.permissionMode ?? 'selective',
+            }),
+    };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function summarizeToolInstructionText(value) {
+    if (typeof value !== 'string') return null;
+    const text = value.trim().replace(/\s+/gu, ' ');
+    if (!text) return null;
+    return text.length > 640 ? `${text.slice(0, 640)}...` : text;
+}
+
+/**
  * Resolve uma entrada de telemetria por nome canônico ou alias observado.
  *
  * @param {Record<string, Record<string, unknown>>} stats
@@ -280,13 +390,17 @@ export function readToolContractReport() {
  *     names: string[];
  *     categories: Record<string, number>;
  *     disabled: string[];
+ *     disabledRecords: DisabledToolRecord[];
  *     runtimeDisabled: string[];
+ *     runtimeDisabledRecords: DisabledToolRecord[];
  *     sessionExcluded: string[];
+ *     sessionExcludedRecords: DisabledToolRecord[];
  *     hasCanonicalLocalFsTools: boolean;
  *     hasCanonicalLocalExecTools: boolean;
  *     hasSdkWorkspaceTooling: boolean;
  *     hasLegacySdkShellToolsLoaded: boolean;
  *     toolContract: import('./tool-contract-verifier.js').ToolContractReport;
+ *     metadataByName: Record<string, import('./tool-metadata.js').ToolDefinitionMetadata>;
  * }}
  */
 export function readIntrospectionRegistrySnapshot() {
@@ -317,13 +431,17 @@ export function readIntrospectionRegistrySnapshot() {
         names,
         categories,
         disabled: getDisabledTools(),
+        disabledRecords: getDisabledToolRecords(),
         hasCanonicalLocalFsTools,
         hasCanonicalLocalExecTools,
         hasSdkWorkspaceTooling,
         hasLegacySdkShellToolsLoaded,
         toolContract: _toolContractReport,
+        metadataByName: _toolContractReport.metadataByName ?? {},
         runtimeDisabled: getRuntimeDisabledTools(),
+        runtimeDisabledRecords: getRuntimeDisabledToolRecords(),
         sessionExcluded: getSessionExcludedTools(),
+        sessionExcludedRecords: getSessionExcludedToolRecords(),
     };
 }
 /**
@@ -334,7 +452,9 @@ export function readIntrospectionRegistrySnapshot() {
 export function resetIntrospectionStateForTests() {
     _introspectionRegistry = null;
     _disabledTools.clear();
+    _disabledToolRecords.clear();
     _sessionExcludedTools.clear();
+    _sessionExcludedToolRecords.clear();
     _toolContractReport = createEmptyToolContractReport();
     _agentInfoProvider = null;
 }
@@ -349,7 +469,17 @@ const listToolsTool = buildTool({
     description:
         'Lista todas as ferramentas (Custom Tools) disponíveis nesta sessão. ' +
         'Retorna nome, descrição e parâmetros de cada ferramenta.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ category?: string; search?: string }>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{
+     *     category?: string;
+     *     search?: string;
+     *     operation?: string;
+     *     risk?: string;
+     *     sideEffect?: string;
+     *     capability?: string;
+     *     detailed?: boolean;
+     *     includeSchema?: boolean;
+     *     includeInstructions?: boolean;
+     * }>} */ (
         /** @type {unknown} */ (
             z.object({
                 category: z
@@ -357,11 +487,64 @@ const listToolsTool = buildTool({
                     .optional()
                     .describe('Filtrar por categoria (ex: "code", "git", "session", "task", "hook", "introspection")'),
                 search: z.string().optional().describe('Filtrar por termo no nome ou descrição da tool'),
+                operation: z
+                    .string()
+                    .optional()
+                    .describe('Filtrar por operação canônica: read, patch, write, delete, search, shell, web etc.'),
+                risk: z.string().optional().describe('Filtrar por risco canônico: low, medium, high, destructive.'),
+                sideEffect: z
+                    .string()
+                    .optional()
+                    .describe('Filtrar por efeito colateral: none, filesystem, process, network, session etc.'),
+                capability: z
+                    .string()
+                    .optional()
+                    .describe('Filtrar por capability booleana: dryRun, rollback, hashPrecondition, pagination, streaming, diff, preview.'),
+                detailed: z
+                    .boolean()
+                    .optional()
+                    .default(false)
+                    .describe('Se true, inclui metadata canônica, schema resumido e instructions quando solicitado.'),
+                includeSchema: z
+                    .boolean()
+                    .optional()
+                    .default(false)
+                    .describe('Se true, inclui resumo sanitizado de parameters. Implica detailed=true.'),
+                includeInstructions: z
+                    .boolean()
+                    .optional()
+                    .default(false)
+                    .describe('Se true, inclui instructions sanitizadas. Implica detailed=true.'),
             })
         )
     ),
-    handler: async (/** @type {{ category?: string; search?: string }} */ { category, search }) => {
-        log('INFO', `[introspection/list_tools] category=${category ?? '*'} search=${search ?? '*'}`);
+    handler: async (
+        /** @type {{
+         *     category?: string;
+         *     search?: string;
+         *     operation?: string;
+         *     risk?: string;
+         *     sideEffect?: string;
+         *     capability?: string;
+         *     detailed?: boolean;
+         *     includeSchema?: boolean;
+         *     includeInstructions?: boolean;
+         * }} */ {
+            category,
+            search,
+            operation,
+            risk,
+            sideEffect,
+            capability,
+            detailed,
+            includeSchema,
+            includeInstructions,
+        },
+    ) => {
+        log(
+            'INFO',
+            `[introspection/list_tools] category=${category ?? '*'} search=${search ?? '*'} operation=${operation ?? '*'} risk=${risk ?? '*'}`,
+        );
 
         let tools = listRegisteredTools();
 
@@ -383,14 +566,54 @@ const listToolsTool = buildTool({
             if (allowed) tools = tools.filter((t) => allowed.includes(t.name));
         }
 
+        const effectiveDetailed = detailed === true || includeSchema === true || includeInstructions === true;
+        const normalizedOperation = typeof operation === 'string' ? operation.trim().toLowerCase() : '';
+        const normalizedRisk = typeof risk === 'string' ? risk.trim().toLowerCase() : '';
+        const normalizedSideEffect = typeof sideEffect === 'string' ? sideEffect.trim().toLowerCase() : '';
+        const normalizedCapability = typeof capability === 'string' ? capability.trim() : '';
+
+        if (normalizedOperation) {
+            tools = tools.filter((t) => getToolMetadataEnvelope(t).metadata.operation === normalizedOperation);
+        }
+        if (normalizedRisk) {
+            tools = tools.filter((t) => getToolMetadataEnvelope(t).metadata.risk === normalizedRisk);
+        }
+        if (normalizedSideEffect) {
+            tools = tools.filter((t) => getToolMetadataEnvelope(t).metadata.sideEffect === normalizedSideEffect);
+        }
+        if (normalizedCapability) {
+            tools = tools.filter((t) => {
+                const capabilities = getToolMetadataEnvelope(t).metadata.capabilities;
+                return capabilities[/** @type {keyof typeof capabilities} */ (normalizedCapability)] === true;
+            });
+        }
+
         return {
             count: tools.length,
-            tools: tools.map((t) => ({
-                ...getToolMetadata(t.name),
-                name: t.name,
-                description: t.description ?? null,
-                disabled: isToolDisabled(t.name),
-            })),
+            tools: tools.map((t) => {
+                const envelope = getToolMetadataEnvelope(t);
+                const base = {
+                    ...envelope.legacy,
+                    name: t.name,
+                    description: t.description ?? null,
+                    disabled: isToolDisabled(t.name),
+                    disabledRecord:
+                        getDisabledToolRecords().find((record) => record.name === t.name.toLowerCase()) ?? null,
+                    operation: envelope.metadata.operation,
+                    risk: envelope.metadata.risk,
+                    sideEffect: envelope.metadata.sideEffect,
+                    effectiveSkipPermission: envelope.metadata.effectiveSkipPermission,
+                };
+                if (!effectiveDetailed) return base;
+                return {
+                    ...base,
+                    metadata: envelope.metadata,
+                    ...(includeSchema ? { parameters: summarizeToolParameterSchema(t.parameters) } : {}),
+                    ...(includeInstructions
+                        ? { instructions: summarizeToolInstructionText(/** @type {{ instructions?: unknown }} */ (t).instructions) }
+                        : {}),
+                };
+            }),
         };
     },
 });
@@ -445,6 +668,9 @@ const getAgentInfoTool = buildTool({
             disabledTools: getDisabledTools(),
             runtimeDisabledTools: getRuntimeDisabledTools(),
             sessionExcludedTools: getSessionExcludedTools(),
+            disabledToolRecords: getDisabledToolRecords(),
+            runtimeDisabledToolRecords: getRuntimeDisabledToolRecords(),
+            sessionExcludedToolRecords: getSessionExcludedToolRecords(),
             hasTelemetry: true,
             io: {
                 generatedAt: ioHealth.generatedAt,
@@ -606,15 +832,19 @@ const toggleToolTool = buildTool({
         'Desabilita ou habilita uma tool em runtime. Tools desabilitadas são bloqueadas e não aparecem em list_tools. ' +
         'Use para restringir temporariamente o acesso a tools durante operações sensíveis. ' +
         'As tools de introspecção não podem ser desabilitadas.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ toolName: string; enabled: boolean }>} */ (
+    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ toolName: string; enabled: boolean; reason?: string }>} */ (
         /** @type {unknown} */ (
             z.object({
                 toolName: z.string().describe('Nome da tool a habilitar/desabilitar'),
                 enabled: z.boolean().describe('true para habilitar, false para desabilitar'),
+                reason: z
+                    .string()
+                    .optional()
+                    .describe('Motivo operacional curto para auditoria quando enabled=false.'),
             })
         )
     ),
-    handler: async (/** @type {{ toolName: string; enabled: boolean }} */ { toolName, enabled }) => {
+    handler: async (/** @type {{ toolName: string; enabled: boolean; reason?: string }} */ { toolName, enabled, reason }) => {
         const normalized = toolName.toLowerCase();
 
         if (PROTECTED_TOOLS.has(normalized)) {
@@ -639,10 +869,12 @@ const toggleToolTool = buildTool({
                 };
             }
             _disabledTools.delete(normalized);
+            _disabledToolRecords.delete(normalized);
             log('INFO', `[introspection/toggle_tool] tool habilitada: ${toolName}`);
         } else {
             _disabledTools.add(normalized);
-            log('INFO', `[introspection/toggle_tool] tool desabilitada: ${toolName}`);
+            _disabledToolRecords.set(normalized, createDisabledToolRecord(normalized, 'runtime', reason));
+            log('INFO', `[introspection/toggle_tool] tool desabilitada: ${toolName}${reason ? ` · ${reason}` : ''}`);
         }
 
         return {
@@ -652,6 +884,9 @@ const toggleToolTool = buildTool({
             disabledTools: getDisabledTools(),
             runtimeDisabledTools: getRuntimeDisabledTools(),
             sessionExcludedTools: getSessionExcludedTools(),
+            disabledToolRecords: getDisabledToolRecords(),
+            runtimeDisabledToolRecords: getRuntimeDisabledToolRecords(),
+            sessionExcludedToolRecords: getSessionExcludedToolRecords(),
         };
     },
 });

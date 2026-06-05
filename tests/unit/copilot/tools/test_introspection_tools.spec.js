@@ -212,6 +212,7 @@ describe('introspection-tools', () => {
 
         it('getDisabledTools retorna array vazio inicialmente', () => {
             expect(mod.getDisabledTools()).toEqual([]);
+            expect(mod.getDisabledToolRecords()).toEqual([]);
         });
     });
 
@@ -243,6 +244,26 @@ describe('introspection-tools', () => {
             ).toBe(true);
         });
 
+        it('filtra por operação e retorna metadata detalhada quando solicitado', async () => {
+            const result = await find().handler({ operation: 'shell', detailed: true });
+
+            expect(result.count).toBe(1);
+            expect(result.tools[0]).toMatchObject({
+                name: 'shell_exec',
+                operation: 'shell',
+                risk: 'high',
+                sideEffect: 'process',
+                metadata: {
+                    operation: 'shell',
+                    risk: 'high',
+                    sideEffect: 'process',
+                    capabilities: {
+                        streaming: true,
+                    },
+                },
+            });
+        });
+
         it('exclui tools desabilitadas', async () => {
             // Desabilitar web_fetch_local
             const toggle = mod.introspectionTools.find((t) => t.name === 'toggle_tool');
@@ -251,6 +272,23 @@ describe('introspection-tools', () => {
             const result = await find().handler({});
             expect(result.tools.some((/** @type {{ name: string }} */ t) => t.name === 'web_fetch_local')).toBe(false);
             expect(result.count).toBe(4);
+        });
+
+        it('inclui registro rico quando a consulta detalhada inclui tool desabilitada por filtro direto', async () => {
+            const toggle = mod.introspectionTools.find((t) => t.name === 'toggle_tool');
+            await /** @type {any} */ (toggle).handler({
+                toolName: 'web_fetch_local',
+                enabled: false,
+                reason: 'teste unitario',
+            });
+
+            const records = mod.getDisabledToolRecords();
+            expect(records).toHaveLength(1);
+            expect(records[0]).toMatchObject({
+                name: 'web_fetch_local',
+                source: 'runtime',
+                reason: 'teste unitario',
+            });
         });
     });
 
@@ -267,6 +305,7 @@ describe('introspection-tools', () => {
             expect(result.toolNames).toContain('web_fetch_local');
             expect(result.categories.web).toBe(1);
             expect(result.disabledTools).toEqual([]);
+            expect(result.disabledToolRecords).toEqual([]);
             expect(result.hasTelemetry).toBe(true);
             expect(result.env.COPILOT_MCP_SERVERS).toBe('test-server');
         });
@@ -340,12 +379,21 @@ describe('introspection-tools', () => {
         const find = () => mod.introspectionTools.find((t) => t.name === 'toggle_tool');
 
         it('desabilita uma tool', async () => {
-            const result = await find().handler({ toolName: 'web_fetch_local', enabled: false });
+            const result = await find().handler({
+                toolName: 'web_fetch_local',
+                enabled: false,
+                reason: 'reduzir superficie durante teste',
+            });
 
             expect(result.success).toBe(true);
             expect(result.enabled).toBe(false);
             expect(mod.isToolDisabled('web_fetch_local')).toBe(true);
             expect(mod.getDisabledTools()).toContain('web_fetch_local');
+            expect(result.runtimeDisabledToolRecords[0]).toMatchObject({
+                name: 'web_fetch_local',
+                source: 'runtime',
+                reason: 'reduzir superficie durante teste',
+            });
         });
 
         it('habilita uma tool previamente desabilitada', async () => {

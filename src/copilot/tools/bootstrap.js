@@ -224,7 +224,7 @@ export function bootstrapTools(registry, mcpTools) {
     // Expõe registry para as ferramentas de introspecção (necessário antes de iniciar sessão)
     registerForIntrospection(registry);
 
-    const contractReport = verifyToolRegistryContracts(registry);
+    const contractReport = verifyToolRegistryContracts(registry, { permissionMode });
     setToolContractReport(contractReport);
     if (contractReport.errorCount > 0 || contractReport.warningCount > 0) {
         log(

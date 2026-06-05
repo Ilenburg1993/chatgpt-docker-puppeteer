@@ -8,6 +8,7 @@
  */
 
 export {
+    getDisabledToolRecords,
     getDisabledTools,
     introspectionTools,
     isToolDisabled,
@@ -21,3 +22,8 @@ export {
 } from './introspection-tools.js';
 
 export { createEmptyToolContractReport, verifyToolRegistryContracts } from './tool-contract-verifier.js';
+export {
+    buildToolDefinitionMetadata,
+    isHighImpactToolRisk,
+    permissionModeSkipsPrompts,
+} from './tool-metadata.js';

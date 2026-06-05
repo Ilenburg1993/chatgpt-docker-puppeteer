@@ -22,6 +22,10 @@ export const PATCH_FEEDBACK_FIX = /** @type {const} */ ({
     EEXPECTEDHASH: 'O arquivo mudou desde a leitura anterior. Releia o arquivo, atualize expectedHash e tente novamente.',
 });
 
+/**
+ * @typedef {keyof typeof PATCH_FEEDBACK_FIX | 'ERR_PATCH_FAILED'} PatchFailureCode
+ */
+
 const PATCH_FEEDBACK_CATEGORY = /** @type {const} */ ({
     ERR_PATCH_INVALID_OLD_STRING: 'invalid-parameters',
     ERR_PATCH_INVALID_NEW_STRING: 'invalid-parameters',
@@ -34,6 +38,55 @@ const PATCH_FEEDBACK_CATEGORY = /** @type {const} */ ({
     ERR_PATCH_OCCURRENCE_INDEX_OUT_OF_RANGE: 'invalid-parameters',
     EEXPECTEDHASH: 'conflict',
 });
+
+/**
+ * @param {PatchFailureCode | string | undefined} code
+ * @returns {string}
+ */
+export function patchFailureNextAction(code) {
+    if (code === 'EEXPECTEDHASH') return 'Releia o arquivo com includeHash=true, atualize expectedHash e repita o patch.';
+    if (code === 'ERR_PATCH_NOT_FOUND') return 'Releia o trecho atual e envie old_string literal com mais contexto.';
+    if (code === 'ERR_PATCH_AMBIGUOUS_MATCH') {
+        return 'Use occurrence_index para um match especifico ou replace_all com expected_occurrences.';
+    }
+    if (code === 'ERR_PATCH_EXPECTED_OCCURRENCES') {
+        return 'Releia o arquivo e ajuste expected_occurrences para a contagem atual.';
+    }
+    if (code === 'ERR_PATCH_NOOP') return 'Altere new_string ou use allowNoop=true se a validacao sem mudanca for intencional.';
+    if (code === 'ERR_PATCH_INVALID_OLD_STRING') return 'Envie old_string nao vazio copiado da leitura mais recente.';
+    if (code === 'ERR_PATCH_CONFLICTING_MODE') return 'Escolha replace_all ou occurrence_index, nunca ambos.';
+    if (code === 'ERR_PATCH_OCCURRENCE_INDEX_OUT_OF_RANGE') return 'Releia a contagem de matches e escolha occurrence_index valido.';
+    return 'Releia o arquivo, reduza o escopo do patch e tente novamente com dryRun=true.';
+}
+
+/**
+ * @param {PatchFailureCode | string | undefined} code
+ * @param {string} message
+ * @param {Record<string, unknown>} details
+ * @param {Record<string, unknown>} [receivedParameters]
+ * @returns {{
+ *     operation: 'patch';
+ *     path: string | null;
+ *     status: 'failed';
+ *     code: string;
+ *     summary: string;
+ *     nextAction: string;
+ * }}
+ */
+export function buildPatchFailureTerminalSummary(code, message, details, receivedParameters = {}) {
+    const rawPath = details['path'] ?? receivedParameters['path'];
+    const path = typeof rawPath === 'string' && rawPath.length > 0 ? rawPath : null;
+    const normalizedCode = typeof code === 'string' && code.length > 0 ? code : 'ERR_PATCH_FAILED';
+    const target = path ? `${path} · ` : '';
+    return {
+        operation: 'patch',
+        path,
+        status: 'failed',
+        code: normalizedCode,
+        summary: `Patch falhou: ${target}${normalizedCode} · ${message}`,
+        nextAction: patchFailureNextAction(normalizedCode),
+    };
+}
 
 /**
  * @param {unknown} error

@@ -636,6 +636,18 @@ describe('F35 — patch_file (F187)', () => {
             },
         });
         expect(result.toolFeedback.fix).toContain('Escolha apenas um modo');
+        expect(result.terminalSummary).toMatchObject({
+            operation: 'patch',
+            status: 'failed',
+            code: 'ERR_PATCH_CONFLICTING_MODE',
+            nextAction: expect.stringContaining('replace_all'),
+        });
+        expect(result.presentation).toMatchObject({
+            operation: 'patch',
+            status: 'failed',
+            targetKinds: ['file'],
+            summary: expect.stringContaining('Patch falhou'),
+        });
         expect(fsMock.readFile).not.toHaveBeenCalled();
     });
 
@@ -660,6 +672,14 @@ describe('F35 — patch_file (F187)', () => {
             },
         });
         expect(result.toolFeedback.fix).toContain('Releia o arquivo');
+        expect(result.operationName).toBe('patch');
+        expect(result.terminalSummary).toMatchObject({
+            operation: 'patch',
+            status: 'failed',
+            code: 'ERR_PATCH_NOT_FOUND',
+            nextAction: expect.stringContaining('old_string'),
+        });
+        expect(result.presentation.summary).toContain('/workspace/file.txt');
     });
 
     it('falha se old_string encontrada múltiplas vezes', async () => {
@@ -683,6 +703,12 @@ describe('F35 — patch_file (F187)', () => {
             },
         });
         expect(result.toolFeedback.fix).toContain('occurrence_index');
+        expect(result.terminalSummary).toMatchObject({
+            operation: 'patch',
+            status: 'failed',
+            code: 'ERR_PATCH_AMBIGUOUS_MATCH',
+            nextAction: expect.stringContaining('occurrence_index'),
+        });
     });
 
     it('falha antes de ler quando old_string é vazia', async () => {
@@ -700,6 +726,12 @@ describe('F35 — patch_file (F187)', () => {
             toolFeedback: {
                 category: 'invalid-parameters',
             },
+        });
+        expect(result.terminalSummary).toMatchObject({
+            operation: 'patch',
+            status: 'failed',
+            code: 'ERR_PATCH_INVALID_OLD_STRING',
+            nextAction: expect.stringContaining('old_string'),
         });
         expect(fsMock.readFile).not.toHaveBeenCalled();
     });

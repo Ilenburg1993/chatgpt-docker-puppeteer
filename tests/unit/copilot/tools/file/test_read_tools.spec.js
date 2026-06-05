@@ -205,6 +205,19 @@ describe('tools/file/readFileContentTool', () => {
             toolName: 'read_file_content',
             reason: expect.stringContaining('diretório'),
         });
+        expect(r.operation).toBe('read');
+        expect(r.terminalSummary).toMatchObject({
+            operation: 'read',
+            status: 'failed',
+            code: 'ERR_READ_DIRECTORY',
+            nextAction: expect.stringContaining('list_directory'),
+        });
+        expect(r.presentation).toMatchObject({
+            operation: 'read',
+            status: 'failed',
+            targetKinds: ['directory'],
+            summary: expect.stringContaining('Leitura falhou'),
+        });
     });
 
     it('erro para arquivo inexistente', async () => {
@@ -216,6 +229,13 @@ describe('tools/file/readFileContentTool', () => {
             category: 'not-found',
             retryable: false,
         });
+        expect(r.terminalSummary).toMatchObject({
+            operation: 'read',
+            status: 'failed',
+            code: 'ERR_READ_FAILED',
+            nextAction: expect.stringContaining('readStrategy=stream'),
+        });
+        expect(r.presentation.summary).toContain('ERR_READ_FAILED');
     });
 
     it('retorna feedback acionável para cursor textual inválido', async () => {
@@ -231,6 +251,12 @@ describe('tools/file/readFileContentTool', () => {
             receivedParameters: expect.objectContaining({ cursor: 'abc' }),
         });
         expect(r.toolFeedback.expectedParameters.properties).toHaveProperty('cursor');
+        expect(r.llmNextAction).toContain('nextCursor');
+        expect(r.presentation).toMatchObject({
+            operation: 'read',
+            status: 'failed',
+            targetKinds: ['file'],
+        });
     });
 
     it('retorna feedback acionável quando parâmetros de linha são usados com base64', async () => {
@@ -247,6 +273,8 @@ describe('tools/file/readFileContentTool', () => {
                 startLine: 1,
             }),
         });
+        expect(r.terminalSummary.summary).toContain('ERR_READ_BINARY_LINE_WINDOW');
+        expect(r.llmNextAction).toContain('encoding=utf8');
     });
 });
 

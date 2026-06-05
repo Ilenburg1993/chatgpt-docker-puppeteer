@@ -40,6 +40,60 @@ const MIN_READ_THROUGH_BYTES = 1024;
 const DEFAULT_STREAM_CHUNK_LINES = 200;
 
 /**
+ * @param {{
+ *     path: string;
+ *     encoding: 'utf8' | 'base64';
+ *     readStrategy: string;
+ *     returnedLines?: { start: number; end: number } | null;
+ *     totalLines?: number;
+ *     totalLinesKnown?: boolean;
+ *     bytesReturned: number;
+ *     truncated: boolean;
+ *     nextCursor: string | null;
+ *     sanitized?: boolean;
+ *     redactions?: number;
+ * }} input
+ * @returns {{
+ *     operation: 'read';
+ *     path: string;
+ *     encoding: 'utf8' | 'base64';
+ *     readStrategy: string;
+ *     summary: string;
+ *     nextAction: string | null;
+ *     truncated: boolean;
+ *     nextCursor: string | null;
+ * }}
+ */
+function buildReadTerminalSummary(input) {
+    const range =
+        input.encoding === 'utf8' && input.returnedLines
+            ? `linhas ${input.returnedLines.start}-${input.returnedLines.end}` +
+              (input.totalLinesKnown && typeof input.totalLines === 'number' ? ` de ${input.totalLines}` : '')
+            : `${input.bytesReturned} bytes`;
+    const policy = input.truncated
+        ? ` · truncado · nextCursor=${input.nextCursor ?? 'n/a'}`
+        : input.nextCursor
+          ? ` · nextCursor=${input.nextCursor}`
+          : '';
+    const sanitized = input.sanitized ? ` · ${input.redactions ?? 0} redacoes` : '';
+    const nextAction = input.truncated
+        ? 'Continue com o nextCursor para ler a próxima janela antes de editar ou resumir conclusões.'
+        : input.nextCursor
+          ? 'Use nextCursor se precisar da próxima janela; use includeHash=true antes de uma escrita otimista.'
+          : 'Use includeHash=true numa releitura curta se a próxima etapa for escrever ou aplicar patch com expectedHash.';
+    return {
+        operation: 'read',
+        path: input.path,
+        encoding: input.encoding,
+        readStrategy: input.readStrategy,
+        summary: `Leitura concluida: ${range} · ${input.encoding}/${input.readStrategy}${policy}${sanitized}`,
+        nextAction,
+        truncated: input.truncated,
+        nextCursor: input.nextCursor,
+    };
+}
+
+/**
  * Tool: read_file_content — lê o conteúdo de um arquivo.
  */
 export const readFileContentTool = buildTool({
@@ -272,6 +326,14 @@ export const readFileContentTool = buildTool({
                     ...(includeCacheStats ? { cacheStats: getIoCacheStats() } : {}),
                     ...(includeHash ? { contentHash: raw.contentHash } : {}),
                 });
+                const terminalSummary = buildReadTerminalSummary({
+                    path: resolved,
+                    encoding: 'base64',
+                    readStrategy: 'cached',
+                    bytesReturned,
+                    truncated,
+                    nextCursor,
+                });
                 return withIoMeta(
                     {
                         success: true,
@@ -284,6 +346,16 @@ export const readFileContentTool = buildTool({
                         nextCursor,
                         bytesReturned,
                         rawReturnedBytes: limitedBuffer.byteLength,
+                        operation: 'read',
+                        terminalSummary,
+                        llmNextAction: terminalSummary.nextAction,
+                        presentation: {
+                            operation: 'read',
+                            path: resolved,
+                            targetKinds: ['file'],
+                            status: 'completed',
+                            summary: terminalSummary.summary,
+                        },
                         ...(includeMetadata === false ? {} : { metadata }),
                         ...(truncated
                             ? {
@@ -382,6 +454,19 @@ export const readFileContentTool = buildTool({
                 ...(includeHash && 'contentHash' in text ? { contentHash: text.contentHash } : {}),
                 ...(includeHash && 'returnedContentHash' in text ? { returnedContentHash: text.returnedContentHash } : {}),
             });
+            const terminalSummary = buildReadTerminalSummary({
+                path: resolved,
+                encoding: 'utf8',
+                readStrategy: resolvedReadStrategy,
+                returnedLines,
+                totalLines: text.totalLines,
+                totalLinesKnown,
+                bytesReturned: metadata.bytesReturned,
+                truncated,
+                nextCursor,
+                sanitized: sanitized.sanitized,
+                redactions: sanitized.redactions,
+            });
 
             return withIoMeta(
                 {
@@ -401,6 +486,16 @@ export const readFileContentTool = buildTool({
                     readStrategy: resolvedReadStrategy,
                     bytesReturned: metadata.bytesReturned,
                     rawReturnedBytes: metadata.rawReturnedBytes,
+                    operation: 'read',
+                    terminalSummary,
+                    llmNextAction: terminalSummary.nextAction,
+                    presentation: {
+                        operation: 'read',
+                        path: resolved,
+                        targetKinds: ['file'],
+                        status: 'completed',
+                        summary: terminalSummary.summary,
+                    },
                     ...(includeMetadata === false ? {} : { metadata }),
                     ...(truncated
                         ? {

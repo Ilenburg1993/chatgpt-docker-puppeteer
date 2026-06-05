@@ -512,6 +512,23 @@ function buildResultSummary(meta) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {{ operation?: unknown; path?: string | null; summary?: string | null; status?: string | null } | null}
+ */
+function extractToolPresentationHint(value) {
+    const result = objectOrNull(value);
+    const presentation = objectOrNull(result?.['presentation']);
+    const terminalSummary = objectOrNull(result?.['terminalSummary']);
+    if (!presentation && !terminalSummary) return null;
+    return {
+        operation: presentation?.['operation'] ?? terminalSummary?.['operation'],
+        path: stringOrNull(presentation?.['path']) ?? stringOrNull(terminalSummary?.['path']),
+        summary: stringOrNull(presentation?.['summary']) ?? stringOrNull(terminalSummary?.['summary']),
+        status: stringOrNull(presentation?.['status']),
+    };
+}
+
+/**
  * @param {string} toolName
  * @param {string | null} canonicalToolName
  * @returns {boolean}
@@ -799,6 +816,7 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
     const displayToolName = resolveHumanToolName(toolName, canonicalToolName);
     const toolArgs = extractTerminalToolArgsPayload(evt);
     const toolResult = extractTerminalToolResultPayload(evt);
+    const presentationHint = extractToolPresentationHint(toolResult);
     const meta = introspectToolTargets({ args: toolArgs, result: toolResult });
     const isStructuredInputTool = (canonicalToolName ?? toolName) === 'request_user_input';
     const isIntentTool = (canonicalToolName ?? toolName) === 'report_intent_local' || toolName === 'report_intent';
@@ -806,8 +824,8 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
     const questionChoices = isStructuredInputTool ? inferQuestionChoices(toolArgs) : [];
     const allowFreeformQuestion = isStructuredInputTool ? inferQuestionAllowFreeform(toolArgs) : null;
     const intentPreview = isIntentTool ? inferIntentText({ ...evt, args: toolArgs }) : null;
-    const path = isStructuredInputTool ? null : (meta.fileTargets[0] ?? null);
-    const { operation, label } = inferOperation(toolName, path, evt['operation']);
+    const path = isStructuredInputTool ? null : (presentationHint?.path ?? meta.fileTargets[0] ?? null);
+    const { operation, label } = inferOperation(toolName, path, evt['operation'] ?? presentationHint?.operation);
     const commandSummary = operation === 'run' ? buildCommandSummary(meta) : null;
     const targetSummary = buildTargetSummary(meta);
     const operationCountSummary = isBatchFileTool(toolName, canonicalToolName)
@@ -828,7 +846,9 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
     const detail = `${effectiveLabel}${targetSuffix}`;
     const startLine = target ? `${effectiveLabel}: ${target}` : effectiveLabel;
     const progressLinePrefix = target ? `${displayToolName} · ${target}` : displayToolName;
-    const resultSummary = buildResultSummary(meta);
+    const resultSummary = presentationHint?.summary
+        ? compactTerminalToolText(presentationHint.summary, 96)
+        : buildResultSummary(meta);
 
     return {
         toolName,

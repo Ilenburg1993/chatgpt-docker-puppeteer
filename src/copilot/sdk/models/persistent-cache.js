@@ -68,23 +68,24 @@ function parsePersistentModelCachePayload(data) {
         log('WARN', '[model-cache] Cache não é object');
         return null;
     }
+    const payload = /** @type {Record<string, unknown>} */ (data);
 
-    if (data.version !== CACHE_SCHEMA_VERSION) {
-        log('WARN', `[model-cache] Schema version mismatch: ${data.version} !== ${CACHE_SCHEMA_VERSION}`);
+    if (payload['version'] !== CACHE_SCHEMA_VERSION) {
+        log('WARN', `[model-cache] Schema version mismatch: ${payload['version']} !== ${CACHE_SCHEMA_VERSION}`);
         return null;
     }
 
-    if (!Array.isArray(data.models)) {
+    if (!Array.isArray(payload['models'])) {
         log('WARN', '[model-cache] Cache models não é array');
         return null;
     }
 
-    if (typeof data.fetchedAt !== 'number' || !Number.isFinite(data.fetchedAt)) {
+    if (typeof payload['fetchedAt'] !== 'number' || !Number.isFinite(payload['fetchedAt'])) {
         log('WARN', '[model-cache] Cache fetchedAt inválido');
         return null;
     }
 
-    if (typeof data.schema !== 'string' || data.schema !== 'ModelInfo[]') {
+    if (typeof payload['schema'] !== 'string' || payload['schema'] !== 'ModelInfo[]') {
         log('WARN', '[model-cache] Cache schema inválido');
         return null;
     }

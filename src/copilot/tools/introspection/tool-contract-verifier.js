@@ -13,8 +13,14 @@
  * @typedef {import('#copilot/sdk/types').ToolRegistry} ToolRegistry
  */
 
+import {
+    buildToolDefinitionMetadata,
+    isHighImpactToolRisk,
+    permissionModeSkipsPrompts,
+} from './tool-metadata.js';
+
 /**
- * @typedef {'error' | 'warning'} ToolContractIssueSeverity
+ * @typedef {'error' | 'warning' | 'notice' | 'decision'} ToolContractIssueSeverity
  */
 
 /**
@@ -40,6 +46,10 @@
  *     missingTagsCount: number;
  *     missingInstructionsCount: number;
  *     riskySkipPermissionCount: number;
+ *     autonomySkipPermissionCount: number;
+ *     noticeCount: number;
+ *     decisionCount: number;
+ *     permissionMode: import('./tool-metadata.js').ToolPermissionMode;
  *     metadataCoverage: {
  *         descriptionPct: number;
  *         parametersPct: number;
@@ -47,6 +57,7 @@
  *         tagsPct: number;
  *         instructionsPct: number;
  *     };
+ *     metadataByName: Record<string, import('./tool-metadata.js').ToolDefinitionMetadata>;
  *     issues: ToolContractIssue[];
  * }} ToolContractReport
  */
@@ -87,73 +98,6 @@ function isUsableSchema(schema) {
 }
 
 /**
- * @param {string} toolName
- * @returns {string[]}
- */
-function toolNameTokens(toolName) {
-    return String(toolName ?? '')
-        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-        .toLowerCase()
-        .split(/[^a-z0-9]+/u)
-        .filter(Boolean);
-}
-
-/**
- * @param {string} toolName
- * @returns {boolean}
- */
-function looksMutatingByName(toolName) {
-    const mutatingTokens = new Set([
-        'write',
-        'create',
-        'delete',
-        'remove',
-        'patch',
-        'exec',
-        'run',
-        'toggle',
-        'set',
-        'update',
-        'commit',
-        'push',
-        'merge',
-        'checkout',
-        'reset',
-        'install',
-        'kill',
-        'stop',
-        'start',
-        'restart',
-        'clean',
-        'append',
-        'mkdir',
-        'rm',
-        'rename',
-    ]);
-    return toolNameTokens(toolName).some((token) => mutatingTokens.has(token));
-}
-
-/**
- * @param {string} toolName
- * @returns {boolean}
- */
-function looksReadOnlyByName(toolName) {
-    const tokens = toolNameTokens(toolName);
-    const first = tokens[0] ?? '';
-    const last = tokens.at(-1) ?? '';
-    const readOnlyTokens = new Set(['get', 'read', 'list', 'status', 'info', 'health', 'find', 'search', 'count']);
-    return readOnlyTokens.has(first) || readOnlyTokens.has(last) || first === 'is' || last === 'current';
-}
-
-/**
- * @param {string} category
- * @returns {boolean}
- */
-function isHighImpactCategory(category) {
-    return ['shell', 'web', 'permission', 'hook', 'session-rpc', 'file'].includes(category);
-}
-
-/**
  * @returns {ToolContractReport}
  */
 export function createEmptyToolContractReport() {
@@ -170,6 +114,10 @@ export function createEmptyToolContractReport() {
         missingTagsCount: 0,
         missingInstructionsCount: 0,
         riskySkipPermissionCount: 0,
+        autonomySkipPermissionCount: 0,
+        noticeCount: 0,
+        decisionCount: 0,
+        permissionMode: 'selective',
         metadataCoverage: {
             descriptionPct: 100,
             parametersPct: 100,
@@ -177,6 +125,7 @@ export function createEmptyToolContractReport() {
             tagsPct: 100,
             instructionsPct: 100,
         },
+        metadataByName: {},
         issues: [],
     };
 }
@@ -185,14 +134,17 @@ export function createEmptyToolContractReport() {
  * Verifica o contrato das tools registradas no ToolRegistry.
  *
  * @param {ToolRegistry | null | undefined} registry
+ * @param {{ permissionMode?: import('./tool-metadata.js').ToolPermissionMode }} [options]
  * @returns {ToolContractReport}
  */
-export function verifyToolRegistryContracts(registry) {
+export function verifyToolRegistryContracts(registry, options = {}) {
+    const permissionMode = options.permissionMode ?? 'selective';
     if (!(registry?.entries instanceof Map)) {
         return {
             ...createEmptyToolContractReport(),
             ok: false,
             errorCount: 1,
+            permissionMode,
             issues: [
                 {
                     severity: 'error',
@@ -219,11 +171,16 @@ export function verifyToolRegistryContracts(registry) {
     let missingTagsCount = 0;
     let missingInstructionsCount = 0;
     let riskySkipPermissionCount = 0;
+    let autonomySkipPermissionCount = 0;
+    /** @type {Record<string, import('./tool-metadata.js').ToolDefinitionMetadata>} */
+    const metadataByName = {};
 
     for (const [entryName, entryValue] of registry.entries) {
         const entry = /** @type {Record<string, unknown>} */ (entryValue ?? {});
         const tool = /** @type {Record<string, unknown>} */ (entry['tool'] ?? {});
         const toolName = typeof tool['name'] === 'string' && tool['name'] ? tool['name'] : entryName;
+        const metadata = buildToolDefinitionMetadata(entryName, entryValue, { permissionMode });
+        metadataByName[toolName] = metadata;
 
         if (typeof tool['handler'] !== 'function') {
             issues.push({
@@ -312,24 +269,38 @@ export function verifyToolRegistryContracts(registry) {
             });
         }
 
-        const readOnly = entry['readOnly'] === true;
-        const skipPermission = tool['skipPermission'] === true;
-        const riskyByCategory = isHighImpactCategory(category) && !looksReadOnlyByName(toolName);
-        const riskyByName = looksMutatingByName(toolName);
-        if (skipPermission && !readOnly && (riskyByCategory || riskyByName)) {
-            riskySkipPermissionCount += 1;
-            issues.push({
-                severity: 'warning',
-                code: 'RISKY_SKIP_PERMISSION',
-                toolName,
-                message: `skipPermission=true em tool potencialmente mutável (category=${category || 'unknown'}).`,
-            });
+        const declaredSkipPermission = tool['skipPermission'] === true;
+        const highImpact = !metadata.readOnly && isHighImpactToolRisk(metadata.risk);
+        if (metadata.effectiveSkipPermission && highImpact) {
+            if (permissionModeSkipsPrompts(permissionMode)) {
+                autonomySkipPermissionCount += 1;
+                issues.push({
+                    severity: 'decision',
+                    code: 'AUTONOMY_SKIP_PERMISSION',
+                    toolName,
+                    message:
+                        `autonomia efetiva em tool ${metadata.operation} (${metadata.risk}) por ` +
+                        `${metadata.autonomyReason ?? `permissionMode=${permissionMode}`}.`,
+                });
+            } else if (declaredSkipPermission) {
+                riskySkipPermissionCount += 1;
+                issues.push({
+                    severity: 'warning',
+                    code: 'RISKY_SKIP_PERMISSION',
+                    toolName,
+                    message:
+                        `skipPermission=true em tool ${metadata.operation} potencialmente mutável ` +
+                        `(risk=${metadata.risk}, category=${category || 'unknown'}).`,
+                });
+            }
         }
     }
 
     const totalTools = registry.entries.size;
     const errorCount = issues.filter((issue) => issue.severity === 'error').length;
     const warningCount = issues.filter((issue) => issue.severity === 'warning').length;
+    const noticeCount = issues.filter((issue) => issue.severity === 'notice').length;
+    const decisionCount = issues.filter((issue) => issue.severity === 'decision').length;
 
     return {
         generatedAt: Date.now(),
@@ -337,6 +308,8 @@ export function verifyToolRegistryContracts(registry) {
         ok: errorCount === 0,
         errorCount,
         warningCount,
+        noticeCount,
+        decisionCount,
         missingDescriptionCount,
         missingParametersCount,
         invalidParametersCount,
@@ -344,6 +317,8 @@ export function verifyToolRegistryContracts(registry) {
         missingTagsCount,
         missingInstructionsCount,
         riskySkipPermissionCount,
+        autonomySkipPermissionCount,
+        permissionMode,
         metadataCoverage: {
             descriptionPct: pct(withDescription, totalTools),
             parametersPct: pct(withParameters, totalTools),
@@ -351,6 +326,7 @@ export function verifyToolRegistryContracts(registry) {
             tagsPct: pct(withTags, totalTools),
             instructionsPct: pct(withInstructions, totalTools),
         },
+        metadataByName,
         issues,
     };
 }

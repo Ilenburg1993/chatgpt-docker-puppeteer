@@ -101,9 +101,9 @@ function renderScopeSymbolKind(kind) {
 function renderScopeExportLabel(item) {
     const match = /^(?<file>.+)::(?<name>[^()]+)\((?<kind>[^()]+)\)$/u.exec(item.trim());
     if (!match?.groups) return item.replace(/::/gu, ' · ').replace(/[()]/gu, '');
-    const file = compactPath(match.groups.file ?? '');
-    const name = (match.groups.name ?? '').trim();
-    const kind = renderScopeSymbolKind(match.groups.kind);
+    const file = compactPath(match.groups['file'] ?? '');
+    const name = (match.groups['name'] ?? '').trim();
+    const kind = renderScopeSymbolKind(match.groups['kind']);
     return [name, kind, file].filter(Boolean).join(' · ');
 }
 

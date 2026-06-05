@@ -321,6 +321,7 @@ function processStructuredEntry(keyName, raw, state) {
  *     allowResultMetadata: boolean;
  *     resultCount: number | null;
  *     resultOperationCount: number | null;
+ *     operationCount: number | null;
  *     resultReplacementCount: number | null;
  *     resultBytes: number | null;
  *     resultTruncated: boolean | null;

@@ -57,4 +57,28 @@ describe('tool-contract-verifier', () => {
         expect(report.issues.filter((issue) => issue.code === 'RISKY_SKIP_PERMISSION').map((issue) => issue.toolName))
             .toEqual(['run_tests', 'permission_mode_set']);
     });
+
+    it('classifica skipPermission efetivo por approve_all como decisão operacional, não warning', () => {
+        const registry = createRegistry();
+        registerTool(registry, makeTool('patch_file'), {
+            category: 'file',
+            tags: ['filesystem', 'write'],
+        });
+
+        const report = verifyToolRegistryContracts(registry, { permissionMode: 'approve_all' });
+
+        expect(report.ok).toBe(true);
+        expect(report.riskySkipPermissionCount).toBe(0);
+        expect(report.autonomySkipPermissionCount).toBe(1);
+        expect(report.decisionCount).toBe(1);
+        expect(report.permissionMode).toBe('approve_all');
+        expect(report.metadataByName.patch_file).toMatchObject({
+            operation: 'patch',
+            risk: 'high',
+            sideEffect: 'filesystem',
+            effectiveSkipPermission: true,
+            autonomyReason: 'permissionMode=approve_all',
+        });
+        expect(report.issues.map((issue) => issue.code)).toContain('AUTONOMY_SKIP_PERMISSION');
+    });
 });
