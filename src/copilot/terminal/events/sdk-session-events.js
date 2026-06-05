@@ -112,6 +112,7 @@ import {
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
 import { drainMailboxToTurnIfIdle } from '../wiring/mailbox/index.js';
+import { summarizeAfterUserInputContinuation } from './dialog-recovery-presenter.js';
 import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
 import { printTerminalHumanQuestionCard } from './human-question-renderer.js';
 import {
@@ -470,14 +471,6 @@ function renderPermissionDecisionLabel(result, granted) {
  */
 function shouldRenderSdkPermissionPromptSurface() {
     return !terminalPermissionModeSkipsSdkPrompts(readTerminalRuntimePermissionMode());
-}
-
-/**
- * @param {boolean} wasFreeform
- * @returns {string}
- */
-function renderUserInputAnswerModeLabel(wasFreeform) {
-    return wasFreeform ? 'resposta livre' : 'escolha estruturada';
 }
 
 /**
@@ -1230,14 +1223,15 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         }
         const wasFreeform = evt?.wasFreeform === true;
         const completed = recordTerminalUserInputCompleted(evt);
+        const answerPreview = String(evt?.answer ?? '').slice(0, 120);
         recordTerminalTurnUserInputActivity({
             requestId,
             status: 'answered',
-            answerPreview: String(evt?.answer ?? '').slice(0, 120),
+            answerPreview,
             source: 'sdk',
         });
-        recordTerminalActivity('question', 'Resposta do operador', {
-            detail: renderUserInputAnswerModeLabel(wasFreeform),
+        recordTerminalActivity('question', 'Continuação pós-pergunta', {
+            detail: summarizeAfterUserInputContinuation({ answerPreview, wasFreeform }),
             source: 'sdk',
             recordHistory: false,
         });

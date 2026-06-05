@@ -630,8 +630,8 @@ describe('terminal/live-status-line', () => {
         mocks.activity = {
             ...mocks.activity,
             phase: 'question',
-            label: 'Resposta do operador',
-            detail: 'escolha estruturada',
+            label: 'Continuação pós-pergunta',
+            detail: 'resposta registrada; aguardando resposta final da LLM-B · resposta SIM',
             toolName: null,
         };
         mocks.runtime = { ...mocks.runtime, status: 'processing', pendingQuestion: null, pendingQuestionKind: null };
@@ -642,8 +642,8 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('12s');
         expect(line).not.toContain('resposta recebida');
         expect(line).not.toContain('aguardando LLM-B');
-        expect(line).not.toContain('Resposta do operador');
-        expect(line).not.toContain('escolha estruturada');
+        expect(line).not.toContain('Continuação pós-pergunta');
+        expect(line).not.toContain('resposta registrada');
         expect(line).not.toContain('modelo auto');
         expect(line).not.toContain('conversa ativa');
         expect(line.length).toBeLessThan(32);

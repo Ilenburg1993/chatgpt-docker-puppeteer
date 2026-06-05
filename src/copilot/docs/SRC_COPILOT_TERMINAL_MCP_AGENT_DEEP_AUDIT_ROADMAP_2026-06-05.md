@@ -352,6 +352,7 @@
 - [x] Gap 25: `payloadPreview` de eventos muito estruturais podia conter mini-JSON; agora activity, hook e lifecycle têm humanizadores específicos no preview raw.
 - [x] Gap 26: prompt idle podia reaparecer entre resumo de tools e transcript final quando `assistant.turn_end` chegava antes da materialização final; agora redraw considera materialização ativa, não apenas `busy`.
 - [x] Gap 27: `/events` default ainda mostrava limpeza interna de sessões SDK (`session.deleted`); agora lifecycle rotineiro fica em filtros explícitos/raw/json.
+- [x] Gap 28: continuação pós-`ask_user` usava estado genérico de resposta humana e recuperação automática mínima; agora há presenter compartilhado para aguardando continuação, auto-retomada e diagnóstico.
 
 ## 08. Criterio de Marco
 
@@ -410,4 +411,7 @@
 - [x] 2026-06-05: live `terminal-ux-default` pass9 PASS confirmou deltas, tools, pergunta, resposta, export/SSE e ausência de prompt pronto entre resumo de tools/linha viva/transcript.
 - [x] 2026-06-05: `/events` default passou a ocultar lifecycle rotineiro de sessão SDK (`session.created/deleted/foreground/background/ended`) como já fazia com `session.updated`, preservando inspeção por `event=sdk.lifecycle` e `--raw`.
 - [x] 2026-06-05: live `default-ux-cycle` pass10 PASS confirmou que limpeza de sessão SDK não polui mais `/events` default e que as superfícies de UX padrão seguem estáveis.
-- [ ] 2026-06-05: melhorar estado visual/diagnostico para continuacao pos-`ask_user` lenta ou falha BYOK sem mensagem estruturada.
+- [x] 2026-06-05: resposta humana agora registra atividade `Continuação pós-pergunta`, com detalhe `resposta registrada; aguardando resposta final da LLM-B` e comandos de acompanhamento, mantendo a linha viva compacta como `LLM-B continuando`.
+- [x] 2026-06-05: recuperação automática pós-pergunta vazia agora usa `buildEmptyAfterUserInputAutoRecoveryRows`, exibindo estado, ação, resposta, turno, diagnóstico e alternativa de troca de modelo.
+- [x] 2026-06-05: validado com `test_dialog_recovery_presenter`, `test_terminal_sdk_session_events`, `test_live_status_line`, `test_terminal_agent_wiring` e `test_commands_events`.
+- [x] 2026-06-05: revisada a trilha BYOK sem mensagem estruturada; a cobertura existente já humaniza `agent.error`/`session.error`, mantém linha viva compacta e evita fallback Copilot automático, ficando pendente apenas cenário live adversarial dedicado.

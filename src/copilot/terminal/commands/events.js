@@ -576,7 +576,7 @@ function summarizeEmptyAfterUserInputAutoRecoveryPayload(payload) {
     const detail = typeof payload['detail'] === 'string' ? humanEventMessage(payload['detail']) : '';
     return [
         detail ? compact(detail, 120) : 'continuação pós-pergunta terminou sem texto público',
-        'retomada automática enfileirada uma vez',
+        'retomada automática enviada uma vez',
         'sem repetir a pergunta humana',
     ]
         .filter(Boolean)

@@ -819,7 +819,7 @@ describe('terminal/commands/events', () => {
         );
         expect(ctx.output()).toContain('diagnóstico /activity 40 · /events 60 · /byok health');
         expect(ctx.output()).toContain('Retomada automática');
-        expect(ctx.output()).toContain('retomada automática enfileirada uma vez');
+        expect(ctx.output()).toContain('retomada automática enviada uma vez');
         expect(ctx.output()).toContain('sem repetir a pergunta humana');
         expect(ctx.output()).not.toContain('ask-request-1234567890');
         expect(ctx.output()).not.toContain('request:ask-request');

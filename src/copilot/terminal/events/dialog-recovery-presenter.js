@@ -13,6 +13,7 @@ export const EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE =
 export const EMPTY_AFTER_USER_INPUT_RESUME_COMMAND = `/turn ${EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE}`;
 export const EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS = '/activity 40 · /events 60 · /byok health';
 export const EMPTY_AFTER_USER_INPUT_MODEL_COMMAND = '/byok model';
+export const AFTER_USER_INPUT_CONTINUATION_DIAGNOSTIC_COMMANDS = '/activity 40 · /events 60 · /errors 10';
 
 /**
  * @param {unknown} value
@@ -54,6 +55,59 @@ export function buildEmptyAfterUserInputRecoveryRows(input = {}) {
         input.includeModelSwitch
             ? { label: 'Alternativa', value: `${EMPTY_AFTER_USER_INPUT_MODEL_COMMAND} para trocar modelo`, role: 'command' }
             : null,
+    ];
+    /** @type {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' }>} */
+    const visibleRows = [];
+    for (const row of rows) {
+        if (row && row.value.length > 0) visibleRows.push(row);
+    }
+    return visibleRows;
+}
+
+/**
+ * @param {{
+ *     answerPreview?: unknown;
+ *     wasFreeform?: boolean;
+ * }} [input]
+ * @returns {string}
+ */
+export function summarizeAfterUserInputContinuation(input = {}) {
+    const answerPreview = compactTerminalRecoveryText(input.answerPreview, 80);
+    return [
+        'resposta registrada; aguardando resposta final da LLM-B',
+        input.wasFreeform === true ? 'texto livre' : 'opção/entrada aceita',
+        answerPreview ? `resposta ${answerPreview}` : null,
+        `acompanhar ${AFTER_USER_INPUT_CONTINUATION_DIAGNOSTIC_COMMANDS}`,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {{
+ *     detail?: unknown;
+ *     answerPreview?: unknown;
+ *     turnId?: unknown;
+ * }} [input]
+ * @returns {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' }>}
+ */
+export function buildEmptyAfterUserInputAutoRecoveryRows(input = {}) {
+    const detail = compactTerminalRecoveryText(input.detail, 132);
+    const answerPreview = compactTerminalRecoveryText(input.answerPreview, 80);
+    const turnId = compactTerminalRecoveryText(input.turnId, 40);
+    /** @type {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' } | null>} */
+    const rows = [
+        {
+            label: 'Estado',
+            value: 'resposta humana registrada; a continuação voltou sem texto público',
+            role: 'warn',
+        },
+        { label: 'Ação', value: 'retomada automática enviada uma vez', role: 'command' },
+        answerPreview ? { label: 'Resposta', value: answerPreview, role: 'muted' } : null,
+        turnId ? { label: 'Turno', value: `turno ${turnId}`, role: 'muted' } : null,
+        detail ? { label: 'Detalhe', value: detail, role: 'muted' } : null,
+        { label: 'Diagnóstico', value: EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS, role: 'command' },
+        { label: 'Se repetir', value: `${EMPTY_AFTER_USER_INPUT_MODEL_COMMAND} para trocar modelo`, role: 'command' },
     ];
     /** @type {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' }>} */
     const visibleRows = [];

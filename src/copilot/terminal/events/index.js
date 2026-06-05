@@ -20,8 +20,11 @@ export {
     EMPTY_AFTER_USER_INPUT_MODEL_COMMAND,
     EMPTY_AFTER_USER_INPUT_RESUME_COMMAND,
     EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,
+    AFTER_USER_INPUT_CONTINUATION_DIAGNOSTIC_COMMANDS,
+    buildEmptyAfterUserInputAutoRecoveryRows,
     buildEmptyAfterUserInputRecoveryRows,
     compactTerminalRecoveryText,
+    summarizeAfterUserInputContinuation,
     summarizeEmptyAfterUserInputRecovery,
 } from './dialog-recovery-presenter.js';
 export {

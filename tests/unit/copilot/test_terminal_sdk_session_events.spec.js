@@ -558,8 +558,10 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
-            'Resposta do operador',
-            expect.objectContaining({ detail: 'escolha estruturada' }),
+            'Continuação pós-pergunta',
+            expect.objectContaining({
+                detail: expect.stringContaining('resposta registrada; aguardando resposta final da LLM-B'),
+            }),
         );
         expect(mocks.recordTerminalActivity).not.toHaveBeenCalledWith(
             'question',

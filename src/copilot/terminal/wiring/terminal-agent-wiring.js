@@ -29,6 +29,7 @@ import { logSwallowed } from '../../core/error-handlers.js';
 import { getHubSessionId } from '../../presentation/state/index.js';
 import { broadcastSse, ensureDialogLoop, println, sendTurn } from '../dialog/index.js';
 import {
+    buildEmptyAfterUserInputAutoRecoveryRows,
     buildEmptyAfterUserInputRecoveryRows,
     EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,
     createTerminalHandledAgentEventsSet,
@@ -565,10 +566,11 @@ export function registerAgentEventListeners(printBanner) {
                             [
                                 '',
                                 `  ${terminalThemeBadge('warn', 'RECUPERANDO')} ${terminalThemeText('warn', 'Continuação pós-pergunta vazia; tentando retomar automaticamente uma vez')}`,
-                                terminalThemeRow('Ação', 'continuação enfileirada sem repetir a pergunta humana', {
-                                    role: 'command',
-                                    width: 11,
-                                }),
+                                ...buildEmptyAfterUserInputAutoRecoveryRows({
+                                    detail,
+                                    turnId,
+                                    answerPreview: lastUserInputCompleted?.answerPreview ?? null,
+                                }).map((row) => terminalThemeRow(row.label, row.value, { role: row.role, width: 11 })),
                             ].join('\n'),
                         );
                         recordTerminalActivity('turn', 'Recuperando continuação pós-pergunta vazia', {
