@@ -36,6 +36,8 @@ import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
     compactTerminalToolText,
+    extractTerminalToolArgsPayload,
+    extractTerminalToolResultPayload,
     isGenericTerminalToolName,
     mapTerminalToolOperationRole,
 } from './tool-activity-presenter.js';
@@ -69,6 +71,16 @@ export function objectArgsOrEmpty(value) {
     return value && typeof value === 'object' && !Array.isArray(value)
         ? /** @type {Record<string, unknown>} */ (value)
         : {};
+}
+
+/**
+ * @param {Record<string, unknown>} evt
+ * @param {Record<string, unknown>} [fallback]
+ * @returns {Record<string, unknown>}
+ */
+function extractToolArgsOrFallback(evt, fallback = {}) {
+    const args = extractTerminalToolArgsPayload(evt);
+    return Object.keys(args).length > 0 ? args : fallback;
 }
 
 /**
@@ -657,7 +669,7 @@ function shouldPrintToolNarration(entry, toolCallId, registry) {
 export function handleTerminalNativeToolStart({ registry, evt }) {
     const toolCallId = /** @type {string} */ (evt?.['toolCallId'] ?? '');
     const rawName = /** @type {string} */ (evt?.['toolName'] ?? evt?.['name'] ?? 'tool');
-    const rawArgs = objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? null);
+    const rawArgs = extractTerminalToolArgsPayload(evt);
     const presentation = buildTerminalToolActivityPresentation(evt, rawName);
     const name = presentation.toolName;
     if (shouldSuppressTerminalToolNarration(name)) return;
@@ -716,13 +728,13 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
             urlTargets: presentation.urlTargets,
             searchTerms: presentation.searchTerms,
             lineRange: presentation.lineRange,
-        patchFiles: presentation.patchFiles,
-        commands: presentation.commands,
-        filters: presentation.filters,
-        resultCount: presentation.resultCount,
-        resultSummary: presentation.resultSummary,
-        primaryTargetKind: presentation.primaryTargetKind,
-    }),
+            patchFiles: presentation.patchFiles,
+            commands: presentation.commands,
+            filters: presentation.filters,
+            resultCount: presentation.resultCount,
+            resultSummary: presentation.resultSummary,
+            primaryTargetKind: presentation.primaryTargetKind,
+        }),
     );
 }
 
@@ -895,7 +907,7 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
         toolName: name,
         evt: {
             ...evt,
-            args: objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? entry?.rawArgs ?? null),
+            args: extractToolArgsOrFallback(evt, entry?.rawArgs ?? {}),
         },
         source: `tool/${name}`,
         toolCallId,
@@ -909,7 +921,8 @@ export function handleTerminalNativeToolComplete({ registry, evt }) {
     const completionPresentation = buildTerminalToolActivityPresentation(
         {
             ...evt,
-            args: objectArgsOrEmpty(evt?.['args'] ?? evt?.['arguments'] ?? evt?.['input'] ?? entry?.rawArgs ?? null),
+            args: extractToolArgsOrFallback(evt, entry?.rawArgs ?? {}),
+            result: extractTerminalToolResultPayload(evt),
         },
         name,
     );
@@ -1051,6 +1064,7 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
     registry.register(toolCallId, registryToolName, 'external', {
         requestId,
         canonicalName: presentation.canonicalToolName,
+        rawArgs: extractTerminalToolArgsPayload(/** @type {Record<string, unknown>} */ (evt ?? {})),
         presentation,
     });
     recordToolTurnProjection(presentation, 'requested', toolCallId, null);
@@ -1113,13 +1127,11 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
  * @returns {void}
  */
 export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarration = false }) {
+    const eventRecord = /** @type {Record<string, unknown>} */ (evt ?? {});
     const originalToolName = evt?.toolName ?? 'external_tool';
-    const effectiveOriginalToolName = resolveEffectiveExternalToolName(
-        /** @type {Record<string, unknown>} */ (evt ?? {}),
-        originalToolName,
-    );
+    const effectiveOriginalToolName = resolveEffectiveExternalToolName(eventRecord, originalToolName);
     const requestId = evt?.requestId ?? null;
-    const inferredResult = inferToolResultSuccess(/** @type {Record<string, unknown>} */ (evt ?? {}), evt?.success !== false);
+    const inferredResult = inferToolResultSuccess(eventRecord, evt?.success !== false);
     const success = inferredResult.success;
     const evtToolCallId = evt?.toolCallId ?? null;
     /** @type {string | null} */
@@ -1131,14 +1143,21 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
     const resolvedEntry = resolvedByRequest ?? registry.resolveByName(toolName);
     renderReportIntentToolPayload({
         toolName,
-        evt: /** @type {Record<string, unknown>} */ (evt ?? {}),
+        evt: eventRecord,
         source: `sdk/external/${toolName}`,
         toolCallId: resolvedToolCallId,
     });
     if (resolvedEntry) {
         resolvedToolCallId = resolvedEntry.toolCallId;
     }
-    const completionPresentation = buildTerminalToolActivityPresentation(evt ?? {}, toolName);
+    const completionPresentation = buildTerminalToolActivityPresentation(
+        {
+            ...(evt ?? {}),
+            args: extractToolArgsOrFallback(eventRecord, resolvedEntry?.rawArgs ?? {}),
+            result: extractTerminalToolResultPayload(eventRecord),
+        },
+        toolName,
+    );
     const presentation = hasSemanticToolTarget(completionPresentation)
         ? completionPresentation
         : (resolvedEntry?.presentation ?? completionPresentation);
@@ -1228,12 +1247,16 @@ export function reconcileTerminalPostToolUseResult({ registry, evt }) {
     const result = inferToolResultSuccess(evt, true);
     if (!result.hasStructuredResult || result.success) return;
     const toolName = typeof evt['toolName'] === 'string' && evt['toolName'].trim() ? evt['toolName'].trim() : 'tool';
-    const args = objectArgsOrEmpty(evt['toolArgs'] ?? evt['args'] ?? evt['arguments'] ?? evt['input'] ?? null);
+    const args = extractTerminalToolArgsPayload(evt);
     const presentation = buildTerminalToolActivityPresentation(
         {
             toolName,
             args,
-            result: extractToolResultEnvelope(evt)?.parsed ?? evt['toolResult'] ?? null,
+            result:
+                extractTerminalToolResultPayload(evt) ??
+                extractToolResultEnvelope(evt)?.parsed ??
+                evt['toolResult'] ??
+                null,
         },
         toolName,
     );

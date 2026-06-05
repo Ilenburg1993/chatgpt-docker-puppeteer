@@ -225,6 +225,58 @@ describe('terminal/tool-lifecycle-runtime', () => {
         );
     });
 
+    it('mantém alvo de exec_command quando tool.execution_start chega com arguments JSON', async () => {
+        const { createToolCallRegistry } = await import(
+            '../../../../src/copilot/terminal/state/tool-call-registry.js'
+        );
+        const { handleTerminalNativeToolStart } = await import(
+            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
+        );
+
+        const registry = createToolCallRegistry();
+
+        handleTerminalNativeToolStart({
+            registry,
+            evt: {
+                toolCallId: 'chatcmpl-tool-json-exec',
+                toolName: 'external_tool',
+                arguments: JSON.stringify({
+                    toolName: 'exec_command',
+                    command: 'git status --short',
+                    cwd: '/workspaces/chatgpt-docker-puppeteer',
+                }),
+            },
+        });
+
+        const entry = registry.getEntry('chatcmpl-tool-json-exec');
+        expect(entry?.rawArgs).toEqual(
+            expect.objectContaining({
+                command: 'git status --short',
+                cwd: '/workspaces/chatgpt-docker-puppeteer',
+            }),
+        );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'tool',
+            'Ferramenta em uso',
+            expect.objectContaining({
+                detail: 'executando comando · git status --short',
+                toolName: 'Executar comando',
+                toolTarget: 'git status --short',
+            }),
+        );
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'tool.lifecycle',
+            expect.objectContaining({
+                commands: ['git status --short'],
+                primaryTargetKind: 'command',
+                target: 'git status --short',
+                toolName: 'exec_command',
+            }),
+        );
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('git status --short'));
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('chatcmpl-tool-json-exec'));
+    });
+
     it('reconcilia postToolUse com exitCode não zero como falha visual da tool', async () => {
         const { createToolCallRegistry } = await import(
             '../../../../src/copilot/terminal/state/tool-call-registry.js'

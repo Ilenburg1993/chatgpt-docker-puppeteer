@@ -174,6 +174,14 @@ describe('terminal/io-activity-events', () => {
                 timestamp: 321,
             }),
         );
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'tool',
+            'Arquivo: movimento concluído',
+            expect.objectContaining({
+                detail: expect.stringContaining('movimento · data/copilot-terminal/live-scratch/source.txt'),
+                toolName: 'io.move',
+            }),
+        );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('movimento'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('[MOVER]'));
         expect(broadcastSse).toHaveBeenCalledWith(

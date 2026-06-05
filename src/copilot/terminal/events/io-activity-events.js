@@ -147,12 +147,22 @@ const IO_OPERATION_LABELS = new Map([
     ['stat', 'inspeção'],
 ]);
 
+const IO_MASCULINE_OPERATION_LABELS = new Set(['append', 'move']);
+
 /**
  * @param {string} operation
  * @returns {string}
  */
 function renderIoOperationLabel(operation) {
     return IO_OPERATION_LABELS.get(operation) ?? operation;
+}
+
+/**
+ * @param {string} operation
+ * @returns {string}
+ */
+function renderIoCompletionLabel(operation) {
+    return IO_MASCULINE_OPERATION_LABELS.has(operation) ? 'concluído' : 'concluída';
 }
 
 /**
@@ -245,7 +255,8 @@ function handleIoOperation(message, registry = null) {
     const humanExtra = [byteLabel, durationLabel].filter(Boolean).join(' · ');
     const operationLabel = renderIoOperationLabel(io.operation);
     const detail = `${operationLabel} · ${primaryTarget}${humanExtra ? ` · ${humanExtra}` : ''}`;
-    const label = success ? `Arquivo: ${operationLabel} concluída` : `Arquivo: ${operationLabel} falhou`;
+    const completionLabel = renderIoCompletionLabel(io.operation);
+    const label = success ? `Arquivo: ${operationLabel} ${completionLabel}` : `Arquivo: ${operationLabel} falhou`;
     const entry = {
         timestamp: message.ts ?? Date.now(),
         success,
@@ -344,6 +355,7 @@ export const __test__ = {
     mapIoOperationToTurnOperation,
     handleIoOperation,
     isDuplicateIoOperation,
+    renderIoCompletionLabel,
     renderIoOperationLabel,
     get ioDedupWindow() {
         return _ioDedupWindow;

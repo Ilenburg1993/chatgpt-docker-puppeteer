@@ -63,7 +63,49 @@ function renderLifecycleDiagnosticLine(entry, options = {}) {
         }),
     ];
     if (target) {
-        lines.push(terminalThemeRow('Alvo', compactTerminalDiagnosticText(target, 96), { role: 'fileRead', width: 22 }));
+        lines.push(
+            terminalThemeRow(renderLifecycleTargetLabel(entry), compactTerminalDiagnosticText(target, 96), {
+                role: renderLifecycleTargetRole(entry),
+                width: 22,
+            }),
+        );
+    }
+    const primaryCommand = entry.commands?.[0] ?? null;
+    if (primaryCommand && primaryCommand !== target) {
+        lines.push(
+            terminalThemeRow('Comando', compactTerminalDiagnosticText(primaryCommand, 120), {
+                role: 'tool',
+                width: 22,
+            }),
+        );
+    }
+    if ((entry.filters?.length ?? 0) > 0) {
+        lines.push(
+            terminalThemeRow('Filtros', entry.filters.map((filter) => compactTerminalDiagnosticText(filter, 48)).join(' · '), {
+                role: 'muted',
+                width: 22,
+            }),
+        );
+    }
+    if ((entry.directoryTargets?.length ?? 0) > 0) {
+        lines.push(
+            terminalThemeRow(
+                'Diretório',
+                entry.directoryTargets
+                    .slice(0, 2)
+                    .map((directory) => compactTerminalDiagnosticText(directory, 48))
+                    .join(' · '),
+                { role: 'muted', width: 22 },
+            ),
+        );
+    }
+    if (entry.resultSummary) {
+        lines.push(
+            terminalThemeRow('Resultado', compactTerminalDiagnosticText(entry.resultSummary, 96), {
+                role: entry.status === 'failed' ? 'error' : 'success',
+                width: 22,
+            }),
+        );
     }
     if (includeRawDetails && (technicalName || rawName)) {
         lines.push(
@@ -77,6 +119,30 @@ function renderLifecycleDiagnosticLine(entry, options = {}) {
         lines.push(terminalThemeRow('Rastreio', refs, { role: 'muted', width: 13 }));
     }
     return lines.join('\n');
+}
+
+/**
+ * @param {import('../state/tool-lifecycle-state.js').TerminalToolLifecycleDiagnostic} entry
+ * @returns {string}
+ */
+function renderLifecycleTargetLabel(entry) {
+    if (entry.primaryTargetKind === 'command') return 'Comando';
+    if (entry.primaryTargetKind === 'directory') return 'Diretório';
+    if (entry.primaryTargetKind === 'url') return 'Página';
+    if (entry.primaryTargetKind === 'search') return 'Busca';
+    if (entry.primaryTargetKind === 'filter') return 'Filtro';
+    if (entry.primaryTargetKind === 'patch') return 'Patch';
+    return 'Alvo';
+}
+
+/**
+ * @param {import('../state/tool-lifecycle-state.js').TerminalToolLifecycleDiagnostic} entry
+ * @returns {'fileRead' | 'tool' | 'muted'}
+ */
+function renderLifecycleTargetRole(entry) {
+    if (entry.primaryTargetKind === 'file' || entry.primaryTargetKind === 'patch') return 'fileRead';
+    if (entry.primaryTargetKind === 'command' || entry.primaryTargetKind === 'url') return 'tool';
+    return 'muted';
 }
 
 /**

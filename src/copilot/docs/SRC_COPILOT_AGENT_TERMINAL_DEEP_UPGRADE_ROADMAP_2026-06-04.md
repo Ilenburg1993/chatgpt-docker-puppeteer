@@ -151,10 +151,51 @@
 - [x] E.2 IDs internos são ocultados em default.
 - [ ] E.3 Auditar `exec_command`, `LIST`, `READ`, write/move/delete e shell legacy.
 - [ ] E.4 Padronizar shape visual: ferramenta, ação, alvo, status, duração, comando seguro, detalhe.
-- [ ] E.5 Consolidar `tool-activity-presenter`, `tool-lifecycle-runtime` e `/tools`.
-- [ ] E.6 Criar testes para comando redigido.
+- [x] E.5 Consolidar `tool-activity-presenter`, `tool-lifecycle-runtime` e `/tools`.
+- [x] E.6 Criar testes para comando redigido.
 - [ ] E.7 Criar live com tools variadas e validar linha viva + `/activity` + `/tools diag`.
-- [ ] E.8 Garantir que raw IDs fiquem em detail/raw.
+- [x] E.8 Garantir que raw IDs fiquem em detail/raw.
+
+### Atualização E — 2026-06-04
+
+- [x] `tool-activity-presenter.js` passou a extrair argumentos de `args`, `arguments`,
+  `toolArgs`, `input`, `data` e `payload`, incluindo JSON serializado.
+- [x] `tool-activity-presenter.js` passou a entender `toolResult` e envelopes
+  `textResultForLlm`, preservando resumo de resultado, contagem e ranges retornados.
+- [x] `tool-lifecycle-runtime.js` passou a registrar no `ToolCallRegistry` os argumentos
+  normalizados, reduzindo completions genéricas quando o SDK omite payload no fim da tool.
+- [x] `exec_command` serializado em `arguments` agora aparece como `Executar comando` com
+  comando seguro em `terminal.activity`, linha viva e `tool.lifecycle`.
+- [x] Testes escopados cobrem argumentos JSON, resultado estruturado e ausência de vazamento de
+  `toolCallId` na superfície default.
+- [x] A base de extração de metadados está mais forte para `exec_command`, leitura e resultados
+  estruturados.
+- [x] `/tools diag` agora renderiza `Comando`, `Filtros`, `Diretório` e `Resultado` quando o
+  lifecycle possui esses metadados.
+- [x] `/tools diag` mantém IDs internos fora da superfície humana; `/tools all` preserva rastreio
+  técnico.
+- [ ] Ainda falta auditar profundamente `/tools diag`, shell legacy e operações write/move/delete
+  em execução live.
+- [ ] Ainda falta live real com lista/leitura/escrita/move/delete/exec para comparar `/activity`,
+  linha viva, `/tools diag` e artefatos SSE.
+
+### Atualização E2 — 2026-06-05
+
+- [x] `file-write-roundtrip` executou `report_intent`, `read_file_content`, `create_file`,
+  `move_file`, `delete_file` e `ask_user` reais via SDK, sem prompt de permissão do SDK.
+- [x] `/health full` no live confirmou `Permissões automáticas · prompts SDK ignorados`.
+- [x] `/tools diag` mostrou `Criar arquivo`, `Mover arquivo`, `Excluir arquivo` e I/O local com
+  nomes humanos, alvos claros e IDs internos fora da superfície default.
+- [x] `io-activity-events.js` passou a concordar corretamente operações masculinas como
+  `Arquivo: movimento concluído`, preservando `leitura/escrita/remoção concluída`.
+- [x] O runner live deixou de classificar recuperação vazia pré-ação como
+  `assistant-empty-after-user-input` quando o `user_input.completed` ocorreu apenas depois; a
+  classificação agora respeita ordem temporal dos eventos.
+- [x] O runner live reconhece `terminal.turn.empty_recovery` como recuperado quando há
+  materialização pública, delta, reply suprimido já materializado ou nova pergunta depois da
+  recuperação.
+- [ ] Ainda falta live específico para `exec_command`, `LIST` e patch/edit em um único ciclo
+  comparando linha viva, `/activity`, `/tools diag`, `/events` e export.
 
 ## Faixa F — Model Switching e BYOK Runtime Boundary
 
@@ -220,6 +261,11 @@
 - [ ] K.6 Criar live específico para exec_command visível.
 - [ ] K.7 Criar live completo terminal + agent + presentation + SSE.
 - [ ] K.8 Comparar plain log com critérios de estética: largura, ids, enums, ANSI solto.
+- [x] K.9 Live `file-write-roundtrip` passou em 2026-06-05: create/move/delete/ask_user reais,
+  permissões automáticas, SSE sem erros, export correlacionado e pós-pergunta materializado.
+- [ ] K.10 Criar live de patch/edit real e leitura profunda, pois read/patch são tools de maior
+  uso operacional.
+- [ ] K.11 Criar live de exec/list/search com foco em targets, cwd e comando seguro.
 
 ## Faixa L — Documentação e Governança Contínua
 
@@ -233,10 +279,12 @@
 ## 06. Próxima Sequência Técnica Recomendada
 
 - [ ] Primeiro: auditar e melhorar empty output em `terminal/dialog/engine.js` usando outcome semântico do agent.
-- [ ] Segundo: auditar tool lifecycle para `exec_command` e comandos LIST/READ.
-- [ ] Terceiro: criar projection compartilhada de turn diagnostics em `presentation/runtime`.
-- [ ] Quarto: executar live canônico com tools/deltas/ask_user após as correções.
-- [ ] Quinto: iniciar decomposição de hotspots, começando por presenters e subcomandos sem mudar comportamento.
+- [ ] Segundo: auditar tool lifecycle para `exec_command`, LIST, READ e patch/edit reais.
+- [ ] Terceiro: criar documento de auditoria ampla de `src/copilot` com Agent, terminal, tools,
+  MCP/OpenAI e fronteiras de arquitetura.
+- [ ] Quarto: criar projection compartilhada de turn diagnostics em `presentation/runtime`.
+- [ ] Quinto: executar live canônico com read/patch/exec/list/search após as correções.
+- [ ] Sexto: iniciar decomposição de hotspots, começando por presenters e subcomandos sem mudar comportamento.
 
 ## 07. Comandos de Evidência Usados
 
@@ -247,6 +295,9 @@
 - [x] `find src/copilot/agent src/copilot/presentation src/copilot/terminal -name '*.js' -print0 | xargs -0 wc -l | sort -nr`
 - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_context.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`
 - [x] `npx eslint src/copilot/terminal/commands/context.js src/copilot/terminal/commands/session.js src/copilot/terminal/commands/metrics.js ...`
+- [x] `npx vitest run tests/unit/copilot/terminal/test_io_activity_events.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js`
+- [x] `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs src/copilot/terminal/events/io-activity-events.js src/copilot/terminal/commands/tools.js src/copilot/terminal/events/tool-activity-presenter.js src/copilot/terminal/events/tool-lifecycle-runtime.js tests/unit/copilot/terminal/test_io_activity_events.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js`
+- [x] `npm run terminal:llm-b:live-test -- --live-scenario=file-write-roundtrip --timeout-ms=260000 --out-dir=artifacts/terminal-live/tool-lifecycle-file-write-roundtrip-rerun-20260604`
 
 ## 08. Notas de Risco
 

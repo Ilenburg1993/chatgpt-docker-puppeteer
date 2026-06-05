@@ -380,6 +380,72 @@ describe('commands/tools', () => {
         expect(output).not.toContain('call=call-1234567');
     });
 
+    it('mostra comando, filtros e resultado no lifecycle humano sem IDs internos', () => {
+        readTerminalToolStatsProjection.mockReturnValueOnce({
+            stats: {
+                exec_command: { calls: 1, errors: 0, avgLatencyMs: 80 },
+            },
+            canonicalEntries: /** @type {[string, Record<string, any>][]} */ ([
+                ['exec_command', { calls: 1, errors: 0, avgLatencyMs: 80, kind: 'exec' }],
+            ]),
+            entries: /** @type {[string, Record<string, any>][]} */ ([
+                ['exec_command', { calls: 1, errors: 0, avgLatencyMs: 80, kind: 'exec' }],
+            ]),
+            tools: [],
+            byCategory: {
+                exec: { totalCalls: 1, totalErrors: 0, totalBlocked: 0, avgLatencyMs: 80 },
+            },
+            toolCount: 1,
+            lifecycle: {
+                active: [],
+                recent: [
+                    {
+                        key: 'chatcmpl-tool-json-exec',
+                        type: 'complete',
+                        status: 'completed',
+                        source: 'sdk',
+                        toolName: 'exec_command',
+                        rawToolName: 'external_tool',
+                        operation: 'run',
+                        toolCallId: 'chatcmpl-tool-json-exec',
+                        requestId: 'req-json-exec',
+                        traceId: 'turn:json-exec',
+                        turnId: '7',
+                        target: 'git status --short',
+                        path: null,
+                        directoryTargets: ['/workspaces/chatgpt-docker-puppeteer'],
+                        commands: ['git status --short'],
+                        filters: ['timeout: 10s'],
+                        resultCount: null,
+                        resultSummary: 'sucesso · saída 0',
+                        primaryTargetKind: 'command',
+                        progress: 100,
+                        progressMessage: null,
+                        success: true,
+                        durationMs: 80,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        completedAt: 2,
+                    },
+                ],
+                summary: { active: 0, recent: 1, waitingUser: 0, failedRecent: 0 },
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdTools({ println: ctx.println }, 'diag');
+
+        const output = ctx.output();
+        expect(output).toContain('Executar comando');
+        expect(output).toMatch(/Comando\s+git status --short/u);
+        expect(output).toMatch(/Filtros\s+timeout: 10s/u);
+        expect(output).toMatch(/Resultado\s+sucesso · saída 0/u);
+        expect(output).toContain('Diretório');
+        expect(output).not.toContain('chatcmpl-tool-json-exec');
+        expect(output).not.toContain('req-json-exec');
+        expect(output).not.toContain('external_tool');
+    });
+
     it('preserva rastreio técnico de lifecycle no modo all', () => {
         readTerminalToolStatsProjection.mockReturnValueOnce({
             stats: {

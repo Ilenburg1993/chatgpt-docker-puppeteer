@@ -174,10 +174,11 @@ export function isGenericTerminalToolName(value) {
  * @param {unknown} raw
  * @returns {Record<string, unknown>}
  */
-function normalizeToolArgsPayload(raw) {
-    if (!raw || typeof raw !== 'object') return {};
-    const base = /** @type {Record<string, unknown>} */ (raw);
-    const wrappedArgs = base['arguments'] ?? base['args'] ?? null;
+export function normalizeTerminalToolArgsPayload(raw) {
+    const parsedRaw = objectOrParsedJson(raw);
+    if (!parsedRaw) return {};
+    const base = parsedRaw;
+    const wrappedArgs = base['arguments'] ?? base['args'] ?? base['toolArgs'] ?? base['input'] ?? null;
     if (wrappedArgs === null || wrappedArgs === undefined) return base;
     if (typeof wrappedArgs === 'string') {
         try {
@@ -193,6 +194,84 @@ function normalizeToolArgsPayload(raw) {
         return /** @type {Record<string, unknown>} */ (wrappedArgs);
     }
     return base;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} evt
+ * @returns {Record<string, unknown>}
+ */
+export function extractTerminalToolArgsPayload(evt) {
+    const source = objectOrNull(evt);
+    if (!source) return {};
+    const nestedData = objectOrParsedJson(source['data']);
+    const nestedPayload = objectOrParsedJson(source['payload']);
+    const candidates = [
+        source['args'],
+        source['arguments'],
+        source['toolArgs'],
+        source['input'],
+        nestedData?.['args'],
+        nestedData?.['arguments'],
+        nestedData?.['toolArgs'],
+        nestedData?.['input'],
+        nestedPayload?.['args'],
+        nestedPayload?.['arguments'],
+        nestedPayload?.['toolArgs'],
+        nestedPayload?.['input'],
+        source['data'],
+        source['payload'],
+    ];
+    for (const candidate of candidates) {
+        const normalized = normalizeTerminalToolArgsPayload(candidate);
+        if (Object.keys(normalized).length > 0) return normalized;
+    }
+    return {};
+}
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function normalizeToolResultEnvelope(value) {
+    const envelope = objectOrParsedJson(value);
+    if (!envelope) return value ?? null;
+    const llmText = envelope['textResultForLlm'];
+    const parsedLlmText = objectOrParsedJson(llmText);
+    if (parsedLlmText) return parsedLlmText;
+    const nested =
+        objectOrParsedJson(envelope['result']) ??
+        objectOrParsedJson(envelope['output']) ??
+        objectOrParsedJson(envelope['data']) ??
+        null;
+    return nested ?? envelope;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} evt
+ * @returns {unknown}
+ */
+export function extractTerminalToolResultPayload(evt) {
+    const source = objectOrNull(evt);
+    if (!source) return null;
+    const nestedData = objectOrParsedJson(source['data']);
+    const nestedPayload = objectOrParsedJson(source['payload']);
+    const candidates = [
+        source['toolResult'],
+        source['result'],
+        source['output'],
+        nestedData?.['toolResult'],
+        nestedData?.['result'],
+        nestedData?.['output'],
+        nestedPayload?.['toolResult'],
+        nestedPayload?.['result'],
+        nestedPayload?.['output'],
+    ];
+    for (const candidate of candidates) {
+        if (candidate === null || candidate === undefined) continue;
+        const normalized = normalizeToolResultEnvelope(candidate);
+        if (normalized !== null && normalized !== undefined) return normalized;
+    }
+    return null;
 }
 
 /**
@@ -650,9 +729,8 @@ export function buildTerminalToolActivityPresentation(evt, fallbackName = 'tool'
             : (nestedToolName ?? fallbackName);
     const canonicalToolName = resolveToolName(toolName);
     const displayToolName = resolveHumanToolName(toolName, canonicalToolName);
-    const rawToolArgs = evt['args'] ?? evt['arguments'] ?? evt['input'] ?? evt['data'];
-    const toolArgs = normalizeToolArgsPayload(rawToolArgs);
-    const toolResult = evt['result'] ?? evt['output'] ?? null;
+    const toolArgs = extractTerminalToolArgsPayload(evt);
+    const toolResult = extractTerminalToolResultPayload(evt);
     const meta = introspectToolTargets({ args: toolArgs, result: toolResult });
     const isStructuredInputTool = (canonicalToolName ?? toolName) === 'request_user_input';
     const isIntentTool = (canonicalToolName ?? toolName) === 'report_intent_local' || toolName === 'report_intent';

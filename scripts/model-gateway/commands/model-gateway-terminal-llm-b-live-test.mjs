@@ -3826,12 +3826,17 @@ function detectLiveBlocker(plain, runtime = {}) {
         findUnrecoveredTerminalEmptyOutputEvent(runtime.sseEvents) ??
         findUnrecoveredEmptyDialogTurnEnd(runtime.sseEvents);
     if (/Turno\s+(?:terminou\s+)?sem saída pública/i.test(plain) || emptyOutput) {
-        const asked = Boolean(findUserInputRequestedEvent(runtime.sseEvents)) || scenario.askRenderedRe.test(plain);
+        const emptyOutputIndex = Number.isInteger(emptyOutput?.index) ? emptyOutput.index : null;
+        const asked =
+            Boolean(findUserInputRequestedEvent(runtime.sseEvents, { beforeIndex: emptyOutputIndex })) ||
+            (emptyOutputIndex === null && scenario.askRenderedRe.test(plain));
         const answered =
-            Boolean(findUserInputCompletedEvent(runtime.sseEvents)) ||
-            new RegExp(`\\[PERG(?:UNTA)?\\]›\\s*${escapeRegExp(scenario.answerSteps.at(-1)?.answer ?? '')}`, 'iu').test(
-                plain,
-            );
+            Boolean(findUserInputCompletedEvent(runtime.sseEvents, { beforeIndex: emptyOutputIndex })) ||
+            (emptyOutputIndex === null &&
+                new RegExp(
+                    `\\[PERG(?:UNTA)?\\]›\\s*${escapeRegExp(scenario.answerSteps.at(-1)?.answer ?? '')}`,
+                    'iu',
+                ).test(plain));
         const id = answered ? 'assistant-empty-after-user-input' : asked ? 'assistant-empty-after-ask' : 'assistant-empty-turn';
         const phaseDetail = answered
             ? 'after the operator answered the required ask_user prompt'
@@ -3993,6 +3998,44 @@ function hasPublicAssistantMessageAfterEvent(events, eventIndex, identity) {
     return false;
 }
 
+function hasPublicMaterializationAfterEvent(events, eventIndex) {
+    if (!Array.isArray(events)) return false;
+    for (let index = eventIndex + 1; index < events.length; index += 1) {
+        const evt = events[index];
+        if (!isObjectPayload(evt?.data)) continue;
+        if (evt.event === 'assistant.message') {
+            const content = typeof evt.data.content === 'string' ? evt.data.content.trim() : '';
+            if (content.length > 0) return true;
+        }
+        if (evt.event === 'delta') {
+            const chunk = typeof evt.data.chunk === 'string' ? evt.data.chunk.trim() : '';
+            if (chunk.length > 0) return true;
+        }
+        if (evt.event === 'dialog.reply') {
+            const reply = typeof evt.data.reply === 'string' ? evt.data.reply.trim() : '';
+            if (reply.length > 0) return true;
+        }
+        if (evt.event === 'dialog.turn_end') {
+            const reply = typeof evt.data.reply === 'string' ? evt.data.reply.trim() : '';
+            const originalReplyChars = Number(evt.data.originalReplyChars ?? 0);
+            if (reply.length > 0 || (evt.data.replySuppressed === true && originalReplyChars > 0)) return true;
+        }
+        if (evt.event === 'user_input.requested' || evt.event === 'elicitation.pending') return true;
+    }
+    return false;
+}
+
+function hasRecoveredEmptyTurnAfterEvent(events, eventIndex, identity) {
+    if (!Array.isArray(events)) return false;
+    for (let index = eventIndex + 1; index < events.length; index += 1) {
+        const evt = events[index];
+        if (evt?.event !== 'terminal.turn.empty_recovery' || !isObjectPayload(evt.data)) continue;
+        if (!eventPayloadMatchesTurnIdentity(evt.data, identity)) continue;
+        return hasPublicMaterializationAfterEvent(events, index);
+    }
+    return false;
+}
+
 function findUnrecoveredEmptyDialogTurnEnd(events) {
     if (!Array.isArray(events)) return null;
     for (let index = events.length - 1; index >= 0; index -= 1) {
@@ -4006,10 +4049,12 @@ function findUnrecoveredEmptyDialogTurnEnd(events) {
             turnId: typeof evt.data.turnId === 'string' ? evt.data.turnId : null,
         };
         if (hasPublicAssistantMessageAfterEvent(events, index, identity)) continue;
+        if (hasRecoveredEmptyTurnAfterEvent(events, index, identity)) continue;
         return {
             eventId: evt.id,
             traceId: identity.traceId,
             turnId: identity.turnId,
+            index,
         };
     }
     return null;
@@ -4025,31 +4070,39 @@ function findUnrecoveredTerminalEmptyOutputEvent(events) {
             turnId: typeof evt.data.turnId === 'string' ? evt.data.turnId : null,
         };
         if (hasPublicAssistantMessageAfterEvent(events, index, identity)) continue;
+        if (hasRecoveredEmptyTurnAfterEvent(events, index, identity)) continue;
         return {
             eventId: evt.id,
             traceId: identity.traceId,
             turnId: identity.turnId,
+            index,
         };
     }
     return null;
 }
 
-function findUserInputRequestedEvent(events) {
+function findUserInputRequestedEvent(events, options = {}) {
     if (!Array.isArray(events)) return null;
+    const beforeIndex = Number.isInteger(options.beforeIndex) ? options.beforeIndex : events.length;
     return (
-        events.find((evt) => evt?.event === 'user_input.requested' || evt?.event === 'elicitation.pending') ?? null
+        events
+            .slice(0, beforeIndex)
+            .find((evt) => evt?.event === 'user_input.requested' || evt?.event === 'elicitation.pending') ?? null
     );
 }
 
-function findUserInputCompletedEvent(events) {
+function findUserInputCompletedEvent(events, options = {}) {
     if (!Array.isArray(events)) return null;
+    const beforeIndex = Number.isInteger(options.beforeIndex) ? options.beforeIndex : events.length;
     return (
-        events.find(
-            (evt) =>
-                evt?.event === 'user_input.completed' ||
-                evt?.event === 'question.answered' ||
-                evt?.event === 'elicitation.completed',
-        ) ?? null
+        events
+            .slice(0, beforeIndex)
+            .find(
+                (evt) =>
+                    evt?.event === 'user_input.completed' ||
+                    evt?.event === 'question.answered' ||
+                    evt?.event === 'elicitation.completed',
+            ) ?? null
     );
 }
 

@@ -160,6 +160,46 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.detail).not.toContain('operando arquivo');
     });
 
+    it('extrai comando de arguments JSON serializado sem cair em ferramenta genérica', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'external_tool',
+            arguments: JSON.stringify({
+                toolName: 'exec_command',
+                command: 'git status --short',
+                cwd: '/workspaces/chatgpt-docker-puppeteer',
+            }),
+            toolCallId: 'chatcmpl-tool-json-args',
+        });
+
+        expect(presentation.toolName).toBe('exec_command');
+        expect(presentation.displayToolName).toBe('Executar comando');
+        expect(presentation.operation).toBe('run');
+        expect(presentation.target).toBe('git status --short');
+        expect(presentation.commands).toEqual(['git status --short']);
+        expect(presentation.detail).not.toContain('chatcmpl-tool');
+    });
+
+    it('usa toolResult textResultForLlm para enriquecer conclusão de leitura', () => {
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'read_file_content',
+            args: { path: 'src/copilot/terminal/events/tool-activity-presenter.js' },
+            toolResult: {
+                resultType: 'success',
+                textResultForLlm: JSON.stringify({
+                    success: true,
+                    count: 1,
+                    returnedLines: { start: 20, end: 28 },
+                }),
+            },
+        });
+
+        expect(presentation.lineRange).toEqual({ start: 20, end: 28 });
+        expect(presentation.resultCount).toBe(1);
+        expect(presentation.resultSummary).toBe('sucesso · 1 resultado');
+        expect(presentation.completeLine(true, '0.1s')).toContain('linhas 20-28');
+        expect(presentation.completeLine(true, '0.1s')).toContain('sucesso · 1 resultado');
+    });
+
     it('mostra list_tools como listagem humana com filtro e contagem materializada', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'list_tools',
