@@ -40,6 +40,16 @@ import {
  */
 
 /**
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
+ * @returns {string}
+ */
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
  * @param {string} arg
  * @returns {{
  *     query: {
@@ -820,7 +830,7 @@ export async function cmdEvents({ println }, arg = '') {
     println(
         terminalThemeWrappedRow(
             'Registro',
-            `${compactTerminalOperatorToolText(state.path ?? '(sem arquivo)', 88)} · ${state.events} evento(s) · fila ${state.queueDepth}`,
+            `${compactTerminalOperatorToolText(state.path ?? '(sem arquivo)', 88)} · ${countLabel(state.events, 'evento', 'eventos')} · fila ${state.queueDepth}`,
             { role: 'muted' },
         ),
     );

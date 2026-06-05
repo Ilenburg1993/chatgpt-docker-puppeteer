@@ -9379,3 +9379,74 @@
   - criar live de turno real com deltas, tools, thinking e troca de modelo no mesmo fluxo;
   - investigar o uso de `gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`, `zoxide`, `jq` e `yq` após
     estabilizar terminal/BYOK, com documento técnico próprio antes de qualquer dependência nova.
+
+### 12.107 Menu, BYOK profundo e archive SSE com gramática visual única — 2026-06-04
+
+- [x] Achado:
+  - `/menu` ainda renderizava tabela manual com `[01]`, setas soltas e footer de ações rápidas
+    em estilo antigo;
+  - `/menu picker` já era seguro, mas a indisponibilidade e a lista planejada não usavam o mesmo
+    vocabulário visual da superfície default;
+  - `/byok health`, `/byok recommend`, `/byok models`, `/byok providers`, `/byok use`,
+    `/byok model`, `/byok provider` e `/byok auto status` ainda misturavam ANSI manual,
+    plurais mecânicos e mensagens longas demais para uma tela de operador;
+  - `/byok health` em live real despejava dezenas de registros por default, reduzindo a legibilidade
+    justamente na tela que deveria ser primeiro diagnóstico operacional;
+  - o harness BYOK fixture estava preso à gramática antiga (`endpoint=`, `profile:`, `model:`,
+    `meta=`), mesmo quando o terminal já havia migrado para labels humanos;
+  - `/events` ainda expunha `evento(s)` na linha de registro do archive SSE.
+- [x] Decisão UX/arquitetura:
+  - `/menu` deve parecer um painel de ações, não uma tabela técnica: índice curto `#01`, nome da
+    ação, comando explícito e descrição em row wrapped;
+  - default de `/byok health` deve ser compacto e escaneável; a lista completa passa a exigir
+    intenção explícita com `full`;
+  - BYOK pode manter termos técnicos necessários (`profile`, `provider`, endpoint, model id), mas
+    o rótulo da tela deve explicar a função operacional do dado;
+  - diagnósticos de filtro safe, prova de agente, catálogos remotos, troca viva e automação devem
+    usar `terminalThemeRow`/`terminalThemeWrappedRow`, sem ANSI local;
+  - harness live deve validar a UX real vista pelo operador, não strings legadas;
+  - plural natural passa a ser requisito também em `/events`, porque o archive SSE é parte do fluxo
+    canônico de auditoria do terminal.
+- [x] Implementação:
+  - `/menu` passou a renderizar `Painel de ações · N ações contextuais` e linhas `#01 ...`,
+    com footer `Executar /menu <n> · /menu <id> · /menu picker`;
+  - `/menu picker` passou a usar rows temáticos para modo, fallback, guarda e segurança;
+  - `/session sdk` removeu o resíduo `sessão(ões) omitida(s)`;
+  - `/byok health` passou a headline temático, rows de persistência/filtro/registro/estado/limite
+    e limite default de 12 registros, com `Omitidos ... · use /byok health full para ampliar`;
+  - `/byok providers` e `/byok profiles` passaram a headlines com plural natural;
+  - diagnósticos de filtro safe e prova de agente agora indicam o motivo e o próximo comando em
+    rows separadas;
+  - alertas de catálogo, bloqueio de saúde e hint de provider local foram migrados para wrapped rows;
+  - `/byok use sdk`, erros de uso, troca de modelo/provider e auto status saíram de ANSI manual
+    para labels humanos (`BYOK`, `Próximo`, `Modelo`, `Alternativa`, `Trilha auto`);
+  - `/events` usa `18 eventos`/`1 evento` na linha de registro do archive SSE;
+  - o runner live `--byok-fixture` foi sincronizado com a nova linguagem visual e passou a validar
+    endpoint remoto como `Fonte provider · endpoint http://.../v1/models`.
+- [x] Validação:
+  - [x] `node --check src/copilot/terminal/commands/byok.js`;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js -t "status|perfis|profiles|health falho|safe|recomenda|health|auto|catálogo remoto|use sdk|wireApi"`
+    com 45 testes verdes;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_menu.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`
+    com 57 testes verdes;
+  - [x] `npx eslint` focado em `byok.js`, `menu.js`, `session.js`, testes alterados e runner live;
+  - [x] live menu PASS:
+    `artifacts/terminal-live/menu-cycle-themed-pass-20260604/summary.md`;
+  - [x] live BYOK fixture PASS:
+    `artifacts/terminal-live/byok-fixture-themed-rerun2-pass-20260604/summary.md`.
+- [x] Resultado observado:
+  - `/menu` ficou alinhado, curto e sem bracket table antiga;
+  - `/byok health` mostra estado operacional com limite default e sem despejar todo o ledger;
+  - `/byok models refresh` mostra fonte estática/remota/cache e endpoint sem vazar segredo;
+  - `/byok use codex-fixture`, `/byok model fixture/model-b`, `/byok provider ...` e
+    `/byok use sdk` comunicam a fronteira entre seleção preparada e sessão viva;
+  - `/events 30` mostra `18 eventos`, filtro, detalhe e eventos humanos sem plural mecânico;
+  - o fixture live confirmou catálogo remoto, troca de modelo, troca de provider, retorno ao SDK,
+    ausência de vazamento do token fixture e `/errors 10` limpo.
+- [ ] Próximas verificações:
+  - auditar `/tools`, `/sdk`, `/diagnose`, `/fs`, `/skills` e eventos de `sdk-session-events` que
+    ainda possuem `tool(s)`, `pendente(s)`, `mensagem(ns)`, `arquivo(s)` ou labels técnicos;
+  - criar live de turno real com LLM-B emitindo deltas, usando tools e pedindo input humano, para
+    validar linha viva, timeline, ask_user e finalização no mesmo fluxo;
+  - desenhar o documento de investigação de libs (`gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`,
+    `zoxide`, `jq`, `yq`) apenas depois de fechar o bloco terminal/BYOK atual.

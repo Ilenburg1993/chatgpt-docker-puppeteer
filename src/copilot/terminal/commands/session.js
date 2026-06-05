@@ -2549,7 +2549,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
         println(
             terminalThemeRow(
                 'Mais',
-                `${inventory.sessions.length - inventoryArgs.offset - visibleSessions.length} sessão(ões) omitida(s). Use /session sdk ${inventoryArgs.limit} offset=${inventoryArgs.offset + visibleSessions.length}.`,
+                `${countLabel(inventory.sessions.length - inventoryArgs.offset - visibleSessions.length, 'sessão omitida', 'sessões omitidas')} · use /session sdk ${inventoryArgs.limit} offset=${inventoryArgs.offset + visibleSessions.length}`,
             ),
         );
     }

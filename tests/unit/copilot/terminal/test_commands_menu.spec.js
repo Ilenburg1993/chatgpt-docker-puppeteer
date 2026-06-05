@@ -74,9 +74,11 @@ describe('terminal/commands/menu', () => {
         await cmdMenu({ println: ctx.println });
 
         expect(ctx.output()).toContain('Painel de ações');
-        expect(ctx.output()).toContain('[01]');
+        expect(ctx.output()).toContain('#01');
         expect(ctx.output()).toContain('/status');
         expect(ctx.output()).toContain('pergunta pendente');
+        expect(ctx.output()).toContain('Executar');
+        expect(ctx.output()).not.toContain('[01]');
         expect(ctx.output()).not.toContain('pending question');
         expect(ctx.output()).not.toContain('Command Palette');
     });
@@ -178,7 +180,9 @@ describe('terminal/commands/menu', () => {
         await cmdMenu({ println: ctx.println }, '1', [], { executeCommandLine });
 
         expect(executeCommandLine).toHaveBeenCalledWith('/status');
-        expect(ctx.output()).toContain('⏵');
+        expect(ctx.output()).toContain('Ação');
+        expect(ctx.output()).toContain('Status completo · /status');
+        expect(ctx.output()).not.toContain('⏵');
     });
 
     it('renderiza /menu picker como plano seguro sem iniciar TUI externa', async () => {
@@ -222,7 +226,8 @@ describe('terminal/commands/menu', () => {
 
         expect(withExclusiveTty).not.toHaveBeenCalled();
         expect(ctx.output()).toContain('turno em execução');
-        expect(ctx.output()).toContain('Picker interativo indisponível');
+        expect(ctx.output()).toContain('Picker');
+        expect(ctx.output()).toContain('interativo indisponível; use /menu <n> ou /menu <id>');
     });
 
     it('não abre picker interativo quando há pergunta humana pendente', async () => {
@@ -255,7 +260,7 @@ describe('terminal/commands/menu', () => {
 
         expect(withExclusiveTty).not.toHaveBeenCalled();
         expect(ctx.output()).toContain('pergunta humana pendente');
-        expect(ctx.output()).toContain('Picker interativo indisponível');
+        expect(ctx.output()).toContain('interativo indisponível; use /menu <n> ou /menu <id>');
     });
 
     it('interpreta flags de picker quando o parser entrega arg agregado', async () => {
@@ -271,7 +276,7 @@ describe('terminal/commands/menu', () => {
         });
 
         expect(withExclusiveTty).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('Picker interativo indisponível');
+        expect(ctx.output()).toContain('interativo indisponível; use /menu <n> ou /menu <id>');
         expect(ctx.output()).not.toContain('Seleção inválida');
     });
 
@@ -288,7 +293,7 @@ describe('terminal/commands/menu', () => {
         });
 
         expect(withExclusiveTty).not.toHaveBeenCalled();
-        expect(ctx.output()).toContain('Picker interativo indisponível');
+        expect(ctx.output()).toContain('interativo indisponível; use /menu <n> ou /menu <id>');
         expect(ctx.output()).not.toContain('Seleção inválida');
     });
 });

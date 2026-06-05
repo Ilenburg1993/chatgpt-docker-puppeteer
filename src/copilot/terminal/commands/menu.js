@@ -22,8 +22,9 @@ import {
 } from '../state/sdk/index.js';
 import {
     renderTerminalPendingQuestionKindLabel,
-    terminalActionChip,
-    terminalThemeText,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeWrappedRow,
 } from '../state/ui/index.js';
 
 /**
@@ -74,7 +75,7 @@ export function buildTerminalSmartMenuEntries() {
             commandLine: '/intent 20',
             description:
                 intentStats.entries > 0
-                    ? `${intentStats.entries} intenção(ões) explícita(s) capturada(s)`
+                    ? countLabel(intentStats.entries, 'intenção explícita capturada', 'intenções explícitas capturadas')
                     : 'Histórico de intenções explícitas da LLM-B',
         },
         {
@@ -152,7 +153,7 @@ export function buildTerminalSmartMenuEntries() {
             id: 'elicitation-latest',
             label: 'Revisar elicitation pendente',
             commandLine: '/elicitation show latest',
-            description: `${elicitation.pending} pendente(s) · modo ${elicitation.latest?.mode ?? 'form'}`,
+            description: `${countLabel(elicitation.pending, 'pendente', 'pendentes')} · modo ${elicitation.latest?.mode ?? 'form'}`,
             hot: true,
         });
     }
@@ -162,7 +163,7 @@ export function buildTerminalSmartMenuEntries() {
             id: 'permission-latest',
             label: 'Revisar permissão pendente',
             commandLine: '/permission show latest',
-            description: `${permission.pending} pendente(s)${permission.latest?.permissionType ? ` · ${permission.latest.permissionType}` : ''}`,
+            description: `${countLabel(permission.pending, 'pendente', 'pendentes')}${permission.latest?.permissionType ? ` · ${permission.latest.permissionType}` : ''}`,
             hot: true,
         });
     }
@@ -242,24 +243,13 @@ export function resolveTerminalSmartMenuSelection(entries, token) {
 }
 
 /**
- * @param {string} text
- * @param {number} max
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} plural
  * @returns {string}
  */
-function compactMenuCell(text, max) {
-    const clean = text.replace(/\s+/gu, ' ').trim();
-    if (clean.length <= max) return clean;
-    return `${clean.slice(0, Math.max(0, max - 1))}…`;
-}
-
-/**
- * @param {string} text
- * @param {number} width
- * @returns {string}
- */
-function padMenuCell(text, width) {
-    const clean = compactMenuCell(text, width);
-    return clean.padEnd(width);
+function countLabel(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
 }
 
 /**
@@ -268,24 +258,25 @@ function padMenuCell(text, width) {
  * @returns {void}
  */
 function renderTerminalSmartMenu(println, entries) {
-    println(`\n  ${terminalThemeText('info', 'Painel de ações')}`);
-    println(
-        `  ${terminalThemeText('muted', `${entries.length} ações contextuais · execute com /menu <n> ou /menu <id>`)}\n`,
-    );
+    println('');
+    println(terminalThemeHeadline('assistant', 'Painel de ações', [countLabel(entries.length, 'ação contextual', 'ações contextuais')]));
     for (let i = 0; i < entries.length; i += 1) {
         const entry = /** @type {TerminalSmartMenuEntry} */ (entries[i]);
-        const index = terminalThemeText('index', `[${String(i + 1).padStart(2, '0')}]`);
-        const hot = entry.hot ? `${terminalThemeText('warn', 'Agora')} ` : '      ';
-        const label = padMenuCell(entry.label, 28);
-        const command = padMenuCell(entry.commandLine, 24);
-        const description = compactMenuCell(entry.description, 64);
         println(
-            `  ${index} ${hot}${terminalThemeText('info', label)} ${terminalThemeText('command', command)} ${terminalThemeText('muted', description)}`,
+            terminalThemeWrappedRow(
+                `#${String(i + 1).padStart(2, '0')}`,
+                `${entry.hot ? 'Agora · ' : ''}${entry.label} · ${entry.commandLine} · ${entry.description}`,
+                { role: entry.hot ? 'warn' : 'command', width: 6, columns: 118 },
+            ),
         );
     }
     println(
-        `\n  ${terminalThemeText('muted', 'Ações rápidas:')} ${terminalActionChip('/menu 1')} ${terminalActionChip('/menu status')} ${terminalActionChip('/menu help')}\n`,
+        terminalThemeWrappedRow('Executar', '/menu <n> · /menu <id> · /menu picker', {
+            role: 'command',
+            columns: 118,
+        }),
     );
+    println('');
 }
 
 /**
@@ -302,18 +293,19 @@ function renderTerminalPickerPlan(println, entries, ttyReadiness = null) {
         blockReasons: ttyReadiness?.ready === false ? ttyReadiness.reasons : [],
         preferred: 'auto',
     });
-    println(`\n  ${terminalThemeText('info', 'Picker do menu')}`);
-    println(`  ${terminalThemeText('muted', `${entries.length} ações contextuais · fallback ${plan.fallbackCommand}`)}\n`);
-    println(`  ${terminalThemeText('muted', 'Modo'.padEnd(12))} ${terminalThemeText(plan.mode === 'external' ? 'success' : 'warn', plan.label)}`);
+    println('');
+    println(terminalThemeHeadline('assistant', 'Picker do menu', [countLabel(entries.length, 'ação contextual', 'ações contextuais')]));
+    println(terminalThemeRow('Modo', plan.label, { role: plan.mode === 'external' ? 'success' : 'warn' }));
+    println(terminalThemeRow('Fallback', plan.fallbackCommand, { role: 'command' }));
     if (plan.command) {
-        println(`  ${terminalThemeText('muted', 'Comando'.padEnd(12))} ${terminalThemeText('command', plan.command)}`);
+        println(terminalThemeRow('Comando', plan.command, { role: 'command' }));
     }
     if (plan.reasons.length > 0) {
         for (const reason of plan.reasons) {
-            println(`  ${terminalThemeText('muted', 'Guarda'.padEnd(12))} ${terminalThemeText('warn', reason)}`);
+            println(terminalThemeRow('Guarda', reason, { role: 'warn' }));
         }
     }
-    println(`  ${terminalThemeText('muted', 'Seguro'.padEnd(12))} ${terminalThemeText('command', '/menu <n> ou /menu <id>')}`);
+    println(terminalThemeRow('Seguro', '/menu <n> ou /menu <id>', { role: 'command' }));
     println('');
 }
 
@@ -367,7 +359,7 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
         });
         if (plan.mode !== 'external' || !plan.command || !plan.toolId || !deps.withExclusiveTty) {
             renderTerminalPickerPlan(println, entries, ttyReadiness);
-            println(`  ${terminalThemeText('warn', 'Picker interativo indisponível; use /menu <n> ou /menu <id>.')}`);
+            println(terminalThemeRow('Picker', 'interativo indisponível; use /menu <n> ou /menu <id>', { role: 'warn' }));
             return;
         }
         const pickerCommand = plan.command;
@@ -380,24 +372,24 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
             }),
         );
         if (!selected.ok) {
-            println(`  ${terminalThemeText('warn', `Picker indisponível: ${selected.reason}`)}`);
+            println(terminalThemeRow('Picker', `indisponível: ${selected.reason}`, { role: 'warn' }));
             return;
         }
         const result = selected.value;
         if (result.status !== 'selected' || !result.item) {
             const role = result.status === 'failed' ? 'error' : 'muted';
-            println(`  ${terminalThemeText(role, `Picker: ${result.reason ?? 'seleção cancelada'}`)}`);
+            println(terminalThemeRow('Picker', result.reason ?? 'seleção cancelada', { role }));
             return;
         }
         const entry = resolveTerminalSmartMenuSelection(entries, result.item.id);
         if (!entry) {
-            println(`  ${terminalThemeText('error', 'Picker retornou uma ação desconhecida.')}`);
+            println(terminalThemeRow('Picker', 'retornou uma ação desconhecida', { role: 'error' }));
             return;
         }
-        println(`  ${terminalThemeText('info', `⏵ ${entry.label}`)}  ${terminalThemeText('muted', `→ ${entry.commandLine}`)}`);
+        println(terminalThemeRow('Ação', `${entry.label} · ${entry.commandLine}`, { role: 'command' }));
         if (typeof deps.executeCommandLine === 'function') {
             const ok = await deps.executeCommandLine(entry.commandLine);
-            if (!ok) println(`  ${terminalThemeText('warn', 'Não foi possível executar a ação automaticamente; copie o comando acima.')}`);
+            if (!ok) println(terminalThemeRow('Ação', 'execução automática falhou; copie o comando acima', { role: 'warn' }));
         }
         return;
     }
@@ -405,25 +397,19 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
     const selectionToken = primary.toLowerCase() === 'run' ? (remaining[0] ?? '') : primary;
     const selected = resolveTerminalSmartMenuSelection(entries, selectionToken);
     if (!selected) {
-        println(`  ${terminalThemeText('error', `Seleção inválida: ${selectionToken || '(vazio)'}`)}`);
-        println(`  ${terminalThemeText('muted', 'Use /menu para listar opções e /menu <n> para executar.')}`);
+        println(terminalThemeRow('Seleção', `inválida: ${selectionToken || '(vazio)'}`, { role: 'error' }));
+        println(terminalThemeRow('Uso', '/menu para listar opções · /menu <n> para executar', { role: 'command' }));
         return;
     }
 
-    println(
-        `  ${terminalThemeText('info', `⏵ ${selected.label}`)}  ${terminalThemeText('muted', `→ ${selected.commandLine}`)}`,
-    );
+    println(terminalThemeRow('Ação', `${selected.label} · ${selected.commandLine}`, { role: 'command' }));
 
     if (typeof deps.executeCommandLine === 'function') {
         const ok = await deps.executeCommandLine(selected.commandLine);
         if (!ok) {
-            println(
-                `  ${terminalThemeText('warn', 'Não foi possível executar a ação automaticamente; copie o comando acima.')}`,
-            );
+            println(terminalThemeRow('Ação', 'execução automática falhou; copie o comando acima', { role: 'warn' }));
         }
     } else {
-        println(
-            `  ${terminalThemeText('muted', '(execução automática indisponível neste contexto; copie e execute manualmente)')}`,
-        );
+        println(terminalThemeRow('Ação', 'execução automática indisponível; copie e execute manualmente', { role: 'muted' }));
     }
 }

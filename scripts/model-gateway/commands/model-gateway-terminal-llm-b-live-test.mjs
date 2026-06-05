@@ -1760,9 +1760,12 @@ function menuCycleCriteria(boot) {
             detail: 'terminal reached ready state before opening the command palette',
         },
         {
-            id: 'menu-cycle-compact-table',
-            pass: /Painel de ações/u.test(plain) && /\[01\]\s+Status completo\s+\/status/iu.test(plain),
-            detail: '/menu rendered a compact one-line-per-action table',
+            id: 'menu-cycle-themed-actions',
+            pass:
+                /Painel de ações/u.test(plain) &&
+                /#01\s+Status completo\s+·\s+\/status/iu.test(plain) &&
+                !/\[01\]/u.test(menuPlain),
+            detail: '/menu rendered themed one-action rows without the old bracket table',
         },
         {
             id: 'menu-cycle-human-copy',
@@ -1775,8 +1778,8 @@ function menuCycleCriteria(boot) {
         },
         {
             id: 'menu-cycle-quick-actions',
-            pass: /Ações rápidas:[\s\S]*\/menu 1[\s\S]*\/menu status[\s\S]*\/menu help/iu.test(plain),
-            detail: '/menu rendered compact quick actions footer',
+            pass: /Executar[\s\S]*\/menu <n>[\s\S]*\/menu <id>[\s\S]*\/menu picker/iu.test(menuPlain),
+            detail: '/menu rendered compact execution guidance footer',
         },
         {
             id: 'menu-cycle-clean-close',
@@ -5542,7 +5545,7 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'byok-env-visible',
-            pass: /BYOK env canonico/.test(plain) && /COPILOT_BYOK_PROFILES_JSON/.test(plain),
+            pass: /BYOK env can[oô]nico|BYOK env canônico/u.test(plain) && /COPILOT_BYOK_PROFILES_JSON/.test(plain),
             detail: '/byok env rendered the canonical operator contract',
         },
         {
@@ -5552,7 +5555,7 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'byok-providers-visible',
-            pass: /BYOK providers/.test(plain) && /\/byok use |Nenhum provider BYOK configurado/.test(plain),
+            pass: /BYOK provedores/.test(plain) && /\/byok use |nenhum configurado/iu.test(plain),
             detail: '/byok providers rendered the redacted provider cockpit and operator actions',
         },
         {
@@ -5567,7 +5570,7 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'byok-model-filters-visible',
-            pass: /BYOK models[\s\S]{0,500}filtros=free,reasoning,safe/.test(plain),
+            pass: /BYOK models[\s\S]{0,800}filtros[\s\S]{0,120}gratuito[\s\S]{0,120}raciocínio[\s\S]{0,120}modo seguro/iu.test(plain),
             detail: '/byok models accepted operator filters for free/reasoning/safe discovery',
         },
         {
@@ -5575,7 +5578,7 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
             pass:
                 /BYOK recommend/.test(plain) &&
                 /\/byok probe agent(?:\s+profile:[^\s]+)?\s+model:/.test(plain) &&
-                /live fake descartável/.test(plain),
+                /live descartável/.test(plain),
             detail: '/byok recommend rendered ranked operational recommendations with disposable agent probe actions',
         },
         {
@@ -5616,12 +5619,12 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
             0,
             {
                 id: 'byok-fixture-profile-visible',
-                pass: /codex-fixture/.test(plain) && /meta=owner,purpose|meta=purpose,owner/.test(plain),
+                pass: /codex-fixture/.test(plain) && /metadados owner,purpose|metadados purpose,owner/.test(plain),
                 detail: 'fixture profile appeared with redacted metadata keys',
             },
             {
                 id: 'byok-fixture-profile-activation',
-                pass: /profile:\s+codex-fixture/.test(plain) && /model:\s+fixture\/model-a/.test(plain),
+                pass: /Perfil\s+codex-fixture/iu.test(plain) && /Modelo\s+fixture\/model-a/iu.test(plain),
                 detail: '/byok use codex-fixture activated profile model in the current process',
             },
             {
@@ -5632,22 +5635,22 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
             {
                 id: 'byok-fixture-remote-discovery',
                 pass:
-                    /BYOK models[\s\S]{0,1200}fonte=provider/.test(plain) &&
-                    /endpoint=http:\/\/127\.0\.0\.1:\d+\/v1\/models/.test(plain) &&
+                    /BYOK models[\s\S]{0,1200}Fonte\s+provider/.test(plain) &&
+                    /endpoint\s+http:\/\/127\.0\.0\.1:\d+\/v1\/models/.test(plain) &&
                     /fixture\/model-remote-c/.test(plain),
                 detail: 'fixture provider /models endpoint was discovered live and redacted',
             },
             {
                 id: 'byok-fixture-model-switch',
-                pass: /model:\s+fixture\/model-b/.test(plain),
+                pass: /Modelo\s+fixture\/model-b/iu.test(plain),
                 detail: '/byok model switched model inside active BYOK process state',
             },
             {
                 id: 'byok-fixture-provider-switch',
                 pass:
-                    /preset:\s+openai-compatible/.test(plain) &&
-                    /model:\s+fixture\/model-c/.test(plain) &&
-                    /baseUrl:\s+http:\/\/127\.0\.0\.1:\d+\/v1/.test(plain),
+                    /preset openai-compatible/.test(plain) &&
+                    /Modelo\s+fixture\/model-c/iu.test(plain) &&
+                    /base http:\/\/127\.0\.0\.1:\d+\/v1/.test(plain),
                 detail: '/byok provider switched provider preset/model/baseUrl in the current process',
             },
         );
