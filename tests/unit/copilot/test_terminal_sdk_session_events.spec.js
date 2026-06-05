@@ -828,7 +828,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
             'Skills SDK carregadas',
-            expect.objectContaining({ detail: '2/3 habilitada(s)', recordHistory: false }),
+            expect.objectContaining({ detail: '2/3 habilitadas', recordHistory: false }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
@@ -840,8 +840,8 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Background tasks SDK alteradas',
-            expect.objectContaining({ detail: '4 pendente(s)', severity: 'warn' }),
+            'Tarefas em segundo plano do SDK',
+            expect.objectContaining({ detail: '4 pendentes', severity: 'warn' }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'session.skills_loaded',
@@ -853,6 +853,30 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Skills SDK'));
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Ferramentas dinâmicas do SDK atualizadas'));
+    });
+
+    it('renderiza session.task_complete como tarefa em segundo plano sem print ANSI manual', async () => {
+        mocks.getShowSessionActivity.mockReturnValue(true);
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('session.task_complete', { summary: 'indexação terminou' });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'task',
+            'Tarefa em segundo plano concluída',
+            expect.objectContaining({ detail: 'indexação terminou', source: 'sdk' }),
+        );
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('Tarefa'));
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('concluída · indexação terminou'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('🏁'));
+        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Task concluída'));
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'session.task_complete',
+            expect.objectContaining({ summary: 'indexação terminou' }),
+        );
     });
 
     it('mantém inventário verbose de skills/tools fora da linha viva e da atividade atual', async () => {
@@ -1078,7 +1102,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
             'Comandos SDK atualizados',
-            expect.objectContaining({ detail: expect.stringContaining('2 comando(s) · /plan, /auto') }),
+            expect.objectContaining({ detail: expect.stringContaining('2 comandos · /plan, /auto') }),
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
@@ -1098,7 +1122,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'system',
             'Saída do plan mode solicitada',
-            expect.objectContaining({ detail: expect.stringContaining('approve · 3 ação(ões)') }),
+            expect.objectContaining({ detail: expect.stringContaining('approve · 3 ações') }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'hook.start',

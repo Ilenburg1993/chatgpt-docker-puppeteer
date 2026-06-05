@@ -9687,3 +9687,37 @@
     `report_intent`, `request_user_input`, IDs de tool e `tarefa interna` no terminal real;
   - auditar `sdk-session-events` para substituir eventuais prints ANSI manuais restantes de task,
     skills, session task complete e comandos.
+
+### 12.113 Eventos SDK de task/background sem ANSI manual nem plural mecânico — 2026-06-04
+
+- [x] Achado:
+  - `sdk-session-events` ainda imprimia `🏁 Task concluída...` com ANSI manual;
+  - a atividade de background vinha como `Background tasks SDK alteradas`;
+  - `exit_plan_mode.requested` ainda montava `ação(ões)`, e alguns testes preservavam `comando(s)` e
+    `pendente(s)`.
+- [x] Decisão UX:
+  - eventos SDK visíveis devem usar `terminalThemeRow()` e rótulos humanos;
+  - símbolos decorativos soltos não entram na superfície default;
+  - pluralização deve ser real (`1 ação`, `3 ações`), nunca `(s)`/`(ões)`;
+  - nomes de evento SDK permanecem em SSE/export, mas o terminal fala de tarefas em segundo plano.
+- [x] Implementação:
+  - `session.task_complete` passou a registrar `Tarefa em segundo plano concluída`;
+  - o print importante virou coluna `Tarefa` com valor `concluída · <summary>` via row temática;
+  - `session.background_tasks_changed` passou a registrar `Tarefas em segundo plano do SDK`;
+  - `session.mcp_servers_loaded` passou a usar row temática em modo verbose;
+  - `exit_plan_mode.requested` usa `pluralPt(actions.length, 'ação', 'ações')`.
+- [x] Validação:
+  - [x] `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_sdk_session_events_turn_summary.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_activity_state.spec.js`
+    com 55 testes verdes;
+  - [x] `npx eslint src/copilot/terminal/events/sdk-session-events.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_activity_state.spec.js`;
+  - [x] `rg` não encontrou `Task concluída`, `Background tasks SDK alteradas`, `MCP servers
+    carregados:`, `ação(ões)`, `comando(s)`, `pendente(s)` ou `habilitada(s)` nas superfícies
+    alteradas, exceto asserções negativas deliberadas.
+- [x] Resultado esperado:
+  - eventos de tarefa SDK ficam parecidos com o restante do terminal;
+  - o operador lê estado e ação, não nome interno de evento;
+  - o terminal mantém estética sem símbolos acidentais e sem pluralização artificial.
+- [ ] Próximas verificações:
+  - procurar outros prints manuais ANSI em `sdk-session-events` e migrar para presenters/rows quando
+    forem superfície default;
+  - rodar live canônico após consolidar mais uma leva de limpeza textual.

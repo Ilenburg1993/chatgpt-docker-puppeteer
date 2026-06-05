@@ -65,7 +65,7 @@ describe('terminal/activity-state', () => {
             toolName: 'bash',
             source: 'sdk',
         });
-        recordTerminalActivity('system', 'Background tasks SDK alteradas', {
+        recordTerminalActivity('system', 'Tarefas em segundo plano do SDK', {
             detail: '0 pendentes',
             source: 'sdk',
             recordHistory: false,

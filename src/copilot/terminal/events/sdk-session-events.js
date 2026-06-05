@@ -1476,12 +1476,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onSessionMcpServersLoaded = (/** @type {{ count?: number }} */ evt) => {
         const count = Number(evt?.count ?? 0);
-        recordTerminalActivity('system', 'MCP servers carregados', {
+        recordTerminalActivity('system', 'Servidores MCP carregados', {
             detail: pluralPt(count, 'server', 'servers'),
             source: 'sdk',
             recordHistory: false,
         });
-        if (shouldPrintSessionNarration('verbose')) println(`  \x1b[90mMCP servers carregados: ${count}\x1b[0m`);
+        if (shouldPrintSessionNarration('verbose')) {
+            println(terminalThemeRow('MCP', `${pluralPt(count, 'server carregado', 'servers carregados')}`));
+        }
         broadcastSse(
             'session.mcp_servers_loaded',
             withSdkSessionSseEnvelope({ count }, 'sdk/session.mcp_servers_loaded'),
@@ -1490,7 +1492,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onSessionBackgroundTasksChanged = (/** @type {{ count?: number }} */ evt) => {
         const count = Number(evt?.count ?? 0);
-        recordTerminalActivity('system', 'Background tasks SDK alteradas', {
+        recordTerminalActivity('system', 'Tarefas em segundo plano do SDK', {
             detail: pluralPt(count, 'pendente', 'pendentes'),
             source: 'sdk',
             severity: count > 0 ? 'warn' : 'info',
@@ -1504,12 +1506,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
 
     const onSessionTaskComplete = (/** @type {{ summary?: string | null }} */ evt) => {
         const summary = typeof evt?.summary === 'string' ? evt.summary.trim() : '';
-        recordTerminalActivity('task', 'Sessão marcou tarefa como concluída', {
-            detail: summary || 'SDK sinalizou task_complete',
+        recordTerminalActivity('task', 'Tarefa em segundo plano concluída', {
+            detail: summary || 'SDK sinalizou conclusão de tarefa',
             source: 'sdk',
         });
         if (shouldPrintSessionNarration('important')) {
-            println(`  \x1b[32m🏁 Task concluída${summary ? `: ${summary}` : ''}\x1b[0m`);
+            println(terminalThemeRow('Tarefa', `concluída${summary ? ` · ${summary}` : ''}`, { role: 'success' }));
         }
         broadcastSse(
             'session.task_complete',
@@ -2041,7 +2043,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const preview =
             typeof evt?.planContent === 'string' ? compactSummaryText(evt.planContent.replace(/\s+/gu, ' '), 96) : null;
         recordTerminalActivity('system', 'Saída do plan mode solicitada', {
-            detail: `${recommendedAction ?? 'sem recomendação'} · ${actions.length} ação(ões)${preview ? ` · ${preview}` : ''}`,
+            detail: `${recommendedAction ?? 'sem recomendação'} · ${pluralPt(actions.length, 'ação', 'ações')}${preview ? ` · ${preview}` : ''}`,
             source: 'sdk',
             severity: 'warn',
         });
