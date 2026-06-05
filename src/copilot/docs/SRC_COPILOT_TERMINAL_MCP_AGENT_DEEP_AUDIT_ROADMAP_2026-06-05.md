@@ -258,6 +258,7 @@
 - [ ] J.6 Documentar comandos para operador humano e LLM.
 - [ ] J.7 Separar comandos de leitura, diagnostico, mutacao e live.
 - [ ] J.8 Criar comando de inventario que compare package, Makefile e terminal.
+- [ ] J.9 Redesenhar comandos raw (`/events --raw`, `/tools raw`) para preview paginado/arquivo por default em TTY, evitando despejo JSON massivo no fluxo visual.
 
 ## Faixa K - Auxiliar UX Libs
 
@@ -346,6 +347,7 @@
 - [x] Gap 21: `elicitation.pending` ainda podia aparecer como termo tecnico; agora a superficie default usa `Formulário ao operador`, ação clara e IDs apenas como pedido secundario/detail.
 - [x] Gap 22: a classificacao de turno sem transcript publico vivia acoplada ao `engine.js`; agora `empty-output-diagnosis` separa `pending_human_input`, `tool_only`, `protocol_transition` e `empty_failure` em core puro testavel.
 - [x] Gap 23: falha BYOK de turno vivo expunha `dialog.byok_*` e mensagem crua do provider no terminal; agora um presenter puro gera resumo humano e preserva detalhe técnico em activity/SSE/health.
+- [ ] Gap 24: `/events --raw` ainda despeja JSON extenso dentro da tela visual; precisa virar detalhe deliberado com limite, preview, arquivo ou pager, mantendo raw completo acessivel.
 
 ## 08. Criterio de Marco
 
@@ -394,4 +396,7 @@
 - [x] 2026-06-05: extraído `dialog/empty-output-diagnosis.js` para classificar saida vazia/nao textual sem efeitos colaterais; engine permanece responsavel por activity/SSE/BYOK health.
 - [x] 2026-06-05: adicionados testes unitarios para pending human input, READY protocolar, tool-only, protocol transition e diagnostico acionavel de tools sem sintese publica.
 - [x] 2026-06-05: criado `dialog/byok-turn-error-presentation.js`; erros BYOK de turno vivo agora mostram `Rota BYOK`, destino, janela de retry/reset quando houver e ação, sem vazar `dialog.byok_*` na linha principal.
+- [x] 2026-06-05: live `terminal-ux-default` pass5 falhou apenas porque o harness ainda esperava labels antigos de uso LLM; a tela real já mostrava `LLM`, `Pedido sem pedido premium` e `Tipo continuação da pergunta humana`.
+- [x] 2026-06-05: runner live passou a aceitar a taxonomia atual de usage (`LLM` + `Pedido sem pedido premium`); live `terminal-ux-default` pass6 PASS cobriu boot, tools, deltas, pergunta, resposta humana, pós-pergunta, `/activity`, `/events`, `/health`, `/export` e shutdown limpo.
+- [ ] 2026-06-05: redesenhar `/events --raw` para não despejar centenas de linhas JSON no terminal default quando o operador quer inspecionar sem perder contexto visual.
 - [ ] 2026-06-05: melhorar estado visual/diagnostico para continuacao pos-`ask_user` lenta ou falha BYOK sem mensagem estruturada.

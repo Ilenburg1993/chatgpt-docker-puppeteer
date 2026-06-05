@@ -5175,8 +5175,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 /Telemetria LLM sem Premium Request/.test(plain) ||
                 /Telemetria LLM sem pedido premium/.test(plain) ||
                 /Última telemetria LLM/.test(plain) ||
-                /Premium Request classificada/.test(plain),
-            detail: 'llm.usage telemetry surfaced separately from PR',
+                /Premium Request classificada/.test(plain) ||
+                /LLM\s+modelo [^\n\r]+(?:\n|\r\n?)\s*Pedido\s+sem pedido premium/iu.test(plain),
+            detail: 'llm.usage telemetry surfaced separately from PR with current or legacy labels',
         },
         {
             id: 'sse-archive-query-visible',
