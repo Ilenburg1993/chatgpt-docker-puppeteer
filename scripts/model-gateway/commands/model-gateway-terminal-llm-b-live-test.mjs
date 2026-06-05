@@ -2119,7 +2119,8 @@ function diagnosticUxCycleCriteria(boot) {
     const sdkWaitsStart = plain.indexOf('/session sdk waits 8', Math.max(0, sdkEventsStart));
     const sdkInventoryStart = plain.indexOf('/session sdk 6', Math.max(0, sdkWaitsStart));
     const sdkStatusStart = plain.indexOf('/sdk status', Math.max(0, sdkInventoryStart));
-    const byokAccountsStart = plain.indexOf('/byok gateway accounts openrouter', Math.max(0, sdkStatusStart));
+    const byokRoutesStart = plain.indexOf('/byok gateway routes openrouter', Math.max(0, sdkStatusStart));
+    const byokAccountsStart = plain.indexOf('/byok gateway accounts openrouter', Math.max(0, byokRoutesStart));
     const byokOverlaysStart = plain.indexOf('/byok gateway overlays openrouter', Math.max(0, byokAccountsStart));
     const byokLimitsStart = plain.indexOf('/byok gateway limits openrouter', Math.max(0, byokOverlaysStart));
     const byokQuotaMatrixStart = plain.indexOf('/byok gateway quota-matrix openrouter', Math.max(0, byokLimitsStart));
@@ -2161,7 +2162,8 @@ function diagnosticUxCycleCriteria(boot) {
     const sdkEventsSurface = surfaceBetween(sdkEventsStart, sdkWaitsStart);
     const sdkWaitsSurface = surfaceBetween(sdkWaitsStart, sdkInventoryStart);
     const sdkInventorySurface = surfaceBetween(sdkInventoryStart, sdkStatusStart);
-    const sdkStatusSurface = surfaceBetween(sdkStatusStart, byokAccountsStart);
+    const sdkStatusSurface = surfaceBetween(sdkStatusStart, byokRoutesStart);
+    const byokRoutesSurface = surfaceBetween(byokRoutesStart, byokAccountsStart);
     const byokAccountsSurface = surfaceBetween(byokAccountsStart, byokOverlaysStart);
     const byokOverlaysSurface = surfaceBetween(byokOverlaysStart, byokLimitsStart);
     const byokLimitsSurface = surfaceBetween(byokLimitsStart, byokQuotaMatrixStart);
@@ -2400,6 +2402,7 @@ function diagnosticUxCycleCriteria(boot) {
         {
             id: 'diagnostic-ux-byok-quota-surfaces-human',
             pass:
+                /BYOK rotas do gateway[\s\S]*Catálogo[\s\S]*(?:Rota|Resultado|Nota)/iu.test(byokRoutesSurface) &&
                 /BYOK contas e chaves[\s\S]*Catálogo[\s\S]*Estados[\s\S]*(?:Provedor|Resultado|Nota)/iu.test(
                     byokAccountsSurface,
                 ) &&
@@ -2412,10 +2415,10 @@ function diagnosticUxCycleCriteria(boot) {
                 /BYOK matriz de quotas dos provedores[\s\S]*Resumo[\s\S]*Tipos de quota[\s\S]*(?:Provedor|Resultado|Nota)/iu.test(
                     byokQuotaMatrixSurface,
                 ) &&
-                !/\\x1b\[|\x1b\[|\/workspaces\/chatgpt-docker-puppeteer\/data\/copilot\/model-gateway\/catalog\.json|BYOK model-gateway account overlays|openrouter-key-account|redigido sanitized|estado rate_limited|quota SDK aplicável a BYOK|Tipos de quota:|key_credit_balance|headers_or_runtime_failure|not_blocking|wait_for_rate_limit_reset_or_choose_another_route|refresh_overlay_or_retry_pre_runtime_selection|^\s*(?:\x1b|\[)/imu.test(
-                    `${byokAccountsSurface}\n${byokOverlaysSurface}\n${byokLimitsSurface}\n${byokQuotaMatrixSurface}`,
+                !/\\x1b\[|\x1b\[|\/workspaces\/chatgpt-docker-puppeteer\/data\/copilot\/model-gateway\/catalog\.json|BYOK model-gateway routes|BYOK model-gateway account overlays|openrouter-key-account|redigido sanitized|estado rate_limited|quota SDK aplicável a BYOK|Tipos de quota:|key_credit_balance|headers_or_runtime_failure|not_blocking|wait_for_rate_limit_reset_or_choose_another_route|refresh_overlay_or_retry_pre_runtime_selection|^\s*(?:\x1b|\[)/imu.test(
+                    `${byokRoutesSurface}\n${byokAccountsSurface}\n${byokOverlaysSurface}\n${byokLimitsSurface}\n${byokQuotaMatrixSurface}`,
                 ),
-            detail: '/byok gateway accounts/overlays/limits/quota-matrix rendered themed pre-runtime quota/account information without raw ANSI or old line formatting',
+            detail: '/byok gateway routes/accounts/overlays/limits/quota-matrix rendered themed pre-runtime quota/account information without raw ANSI or old line formatting',
         },
         {
             id: 'diagnostic-ux-permission-human',
@@ -2560,6 +2563,7 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
                 { line: '/session sdk waits 8', waitFor: 'Esperas SDK da sessão', advanceAfterMs: 1_000 },
                 { line: '/session sdk 6', waitFor: 'Sessões SDK listadas', advanceAfterMs: 1_000 },
                 { line: '/sdk status', waitFor: 'SDK do Terminal', advanceAfterMs: 1_000 },
+                { line: '/byok gateway routes openrouter', waitFor: 'BYOK rotas do gateway', advanceAfterMs: 1_000 },
                 { line: '/byok gateway accounts openrouter', waitFor: 'BYOK contas e chaves', advanceAfterMs: 1_000 },
                 { line: '/byok gateway overlays openrouter', waitFor: 'BYOK overlays de conta', advanceAfterMs: 1_000 },
                 { line: '/byok gateway limits openrouter', waitFor: 'BYOK limites de conta', advanceAfterMs: 1_000 },

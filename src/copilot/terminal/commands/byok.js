@@ -3992,7 +3992,7 @@ function matchesGatewayCatalogRecordSelector(item, selector) {
 
 /**
  * @param {string[]} rest
- * @returns {{ selector: string | null; limit: number }}
+ * @returns {{ selector: string | null; limit: number; hasExplicitLimit: boolean }}
  */
 function parseGatewayCatalogListArgs(rest) {
     const numeric = rest.map((item) => Number(item)).find((value) => Number.isFinite(value) && value > 0);
@@ -4003,6 +4003,7 @@ function parseGatewayCatalogListArgs(rest) {
     return {
         selector,
         limit: Math.min(Math.floor(numeric ?? 30), 150),
+        hasExplicitLimit: numeric !== undefined,
     };
 }
 
@@ -4756,22 +4757,51 @@ async function renderByokGatewayRoutes(println, rest) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
     const routes = snapshot.routeOptions.filter((route) => matchesGatewayCatalogRecordSelector(route, args.selector));
-    println(`\n  \x1b[36mBYOK model-gateway routes\x1b[0m`);
-    println(`  \x1b[90mCatálogo: ${store.filePath} · filtro ${args.selector ?? '-'} · rotas ${routes.length}/${snapshot.routeOptions.length}\x1b[0m\n`);
+    println('');
+    println(terminalThemeHeadline('accent', 'BYOK rotas do gateway'));
+    println(
+        terminalThemeRow(
+            'Catálogo',
+            `${formatTerminalToolPathForOperator(store.filePath)} · filtro ${args.selector ?? '-'} · rotas ${routes.length}/${snapshot.routeOptions.length}`,
+            { role: 'muted' },
+        ),
+    );
     if (routes.length === 0) {
-        println('    \x1b[33mNenhuma route option encontrada para o filtro informado.\x1b[0m\n');
+        println(terminalThemeRow('Resultado', 'nenhuma rota encontrada para o filtro informado.', { role: 'warn' }));
+        println('');
         return;
     }
-    for (const route of routes.slice(0, args.limit)) {
+    const displayLimit = args.hasExplicitLimit ? args.limit : Math.min(args.limit, 12);
+    for (const route of routes.slice(0, displayLimit)) {
         const policy = asRecord(route['normalizedPolicy']);
+        const providerId = optionalScalarString(route['providerId']) ?? '-';
+        const providerModel = optionalScalarString(route['providerModel']) ?? '-';
+        const selectorKind = renderByokTokenLabel(optionalScalarString(route['selectorKind']));
+        const selectorSyntax = optionalScalarString(route['selectorSyntax']) ?? '-';
         println(
-            `    \x1b[33m${optionalScalarString(route['providerId']) ?? '-'}:${optionalScalarString(route['providerModel']) ?? '-'}\x1b[0m  \x1b[90mperfil ${optionalScalarString(route['routeProfile']) ?? 'default'} · seletor ${optionalScalarString(route['selectorKind']) ?? '-'}:${optionalScalarString(route['selectorSyntax']) ?? '-'}\x1b[0m`,
+            terminalThemeRow('Rota', `${providerId}:${providerModel}`, {
+                role: 'accent',
+            }),
         );
         println(
-            `      \x1b[90mcamada ${optionalScalarString(policy['routeLayer']) ?? '-'} · wire ${optionalScalarString(policy['wireApi']) ?? '-'} · fonte ${optionalScalarString(route['sourceId']) ?? '-'} · confiança ${optionalScalarString(route['confidence']) ?? '-'}\x1b[0m`,
+            terminalThemeRow(
+                'Seleção',
+                `perfil ${renderByokTokenLabel(optionalScalarString(route['routeProfile']) ?? 'default')} · seletor ${selectorKind} · sintaxe ${selectorSyntax}`,
+                { role: 'muted' },
+            ),
+        );
+        println(
+            terminalThemeRow(
+                'Política',
+                `camada ${renderByokTokenLabel(optionalScalarString(policy['routeLayer']))} · wire ${renderByokWireLabel(optionalScalarString(policy['wireApi']))} · fonte ${renderByokSourceIdLabel(optionalScalarString(route['sourceId']))} · confiança ${renderByokTokenLabel(optionalScalarString(route['confidence']))}`,
+                { role: 'muted' },
+            ),
         );
     }
-    if (routes.length > args.limit) println(`\n  \x1b[90mexibindo ${args.limit}/${routes.length}; use filtro ou limite numerico.\x1b[0m`);
+    if (routes.length > displayLimit) {
+        println(terminalThemeRow('Mais', `exibindo ${displayLimit}/${routes.length}; use filtro ou limite numerico.`, { role: 'muted' }));
+    }
+    println(terminalThemeRow('Nota', 'rotas são metadados de seleção; esta tela não executa modelo.', { role: 'muted' }));
     println('');
 }
 

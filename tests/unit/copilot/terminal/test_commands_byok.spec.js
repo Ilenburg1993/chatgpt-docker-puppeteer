@@ -3143,6 +3143,24 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('/workspaces/chatgpt-docker-puppeteer/data/copilot/model-gateway/catalog.json');
     });
 
+    it('lista rotas do model-gateway com rótulos humanos e sem ANSI', async () => {
+        mockProjection();
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'gateway routes openrouter');
+
+        expect(ctx.output()).toContain('BYOK rotas do gateway');
+        expect(ctx.output()).toContain('data/copilot/model-gateway/catalog.json');
+        expect(ctx.output()).toContain('Rota');
+        expect(ctx.output()).toContain('openrouter:openai/gpt-oss-120b');
+        expect(ctx.output()).toContain('perfil padrão');
+        expect(ctx.output()).toContain('seletor provedor explícito');
+        expect(ctx.output()).toContain('rotas são metadados de seleção');
+        expect(ctx.output()).not.toContain('\x1b[');
+        expect(ctx.output()).not.toContain('BYOK model-gateway routes');
+        expect(ctx.output()).not.toContain('selectorKind');
+    });
+
     it('mostra contas e limites account/key do model-gateway sem executar runtime', async () => {
         mockProjection();
         const ctx = mockCtx();
