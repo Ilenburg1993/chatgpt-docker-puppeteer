@@ -107,13 +107,13 @@ import {
     readConfiguredByokModelDiscoveryCacheFromEnv,
     readConfiguredByokProfilesFromEnv,
 } from '#copilot/config';
+import { listTerminalSdkSessionInventory } from '../frontend/gateways/session/index.js';
+import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 import {
-    listTerminalSdkSessionInventory,
-    readTerminalConfigProjection,
     readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
-    readTerminalRuntimeState,
-} from '../frontend/index.js';
+    readTerminalConfigProjection,
+} from '../frontend/projections/config.js';
 import {
     applyTerminalByokGatewayAutoEffects,
     buildTerminalByokGatewayAutoStatus,

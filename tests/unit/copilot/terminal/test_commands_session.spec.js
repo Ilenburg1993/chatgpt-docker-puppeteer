@@ -360,11 +360,20 @@ vi.mock('#copilot/conversation-hub', () => ({
     },
 }));
 
-vi.mock('../../../../src/copilot/terminal/frontend/index.js', async (importOriginal) => ({
+vi.mock('../../../../src/copilot/terminal/frontend/projections/index.js', async (importOriginal) => ({
     ...(await importOriginal()),
     listTerminalSdkSessionInventory,
-    readTerminalSdkSessionBootSelection,
+}));
+
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/session/index.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    listTerminalSdkSessionInventory,
     scheduleTerminalSdkSessionBootSelection,
+}));
+
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    readTerminalSdkSessionBootSelection,
     deleteTerminalSdkSession,
 }));
 

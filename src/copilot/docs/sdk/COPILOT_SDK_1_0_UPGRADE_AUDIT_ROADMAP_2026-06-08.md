@@ -2630,8 +2630,35 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Vigésima Segunda Passada
 
-- [ ] SDK10-P122-01: fazer a passagem separada nos comandos de maior acoplamento (`session` e `byok`), para cortar o
+- [x] SDK10-P122-01: fazer a passagem separada nos comandos de maior acoplamento (`session` e `byok`), para cortar o
   último barrel amplo e decidir, com cuidado, se convém expor uma fronteira de projection/adapter mais granular.
+
+### Execução Contínua Em 2026-06-08 - Centésima Vigésima Terceira Passada
+
+- [x] `session` passou a ler projeções via `frontend/projections/index.js`, e os imperativos de boot/remoção ficaram
+  separados entre `frontend/gateways/session/index.js` e `frontend/gateways/sdk-session.js`.
+- [x] `byok` passou a buscar `readTerminalByokProjection`, `readTerminalByokGatewayProjectionFromEnv`, `readTerminalConfigProjection`
+  e `setTerminalModelProjection` diretamente em `frontend/projections/config.js`, enquanto `listTerminalSdkSessionInventory`
+  e `readTerminalRuntimeState` vieram de gateways específicos.
+- [x] Os testes grandes de `session` e `byok` foram realinhados para mockar essas portas estreitas, mantendo o isolamento
+  sem depender do barrel `frontend/index.js`.
+- [x] A busca residual por `from '../frontend/index.js'` e `from '../events/index.js'` dentro de
+  `src/copilot/terminal/commands` ficou vazia.
+- [x] Validado com `node --check` dos comandos tocados.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+  (2 arquivos, 170 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T15-40-10-686Z/summary.md`, confirmando `/usage now`, `/activity`, `/session sdk`,
+  `/session sdk commands`, `/session sdk events`, `/session sdk waits`, `/metrics`, `/events sources` e `/errors` sem
+  regressão visual.
+
+### Achados Novos Da Centésima Vigésima Terceira Passada
+
+- [ ] SDK10-P123-01: continuar a investigação além dos comandos, agora revisando barrels amplos restantes em
+  `src/copilot/terminal` e procurando oportunidades de UX/hardening que apareçam em `frontend/index.js`,
+  `events/index.js` e módulos vizinhos.
 
 ---
 

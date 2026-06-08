@@ -1401,10 +1401,21 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     setTerminalModelProjection,
 }));
 
+vi.mock('../../../../src/copilot/terminal/frontend/projections/config.js', () => ({
+    readTerminalByokGatewayProjectionFromEnv,
+    readTerminalByokProjection,
+    readTerminalConfigProjection,
+    setTerminalModelProjection,
+}));
+
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/session/index.js', () => ({
     listTerminalSdkSessionInventory,
     readTerminalConfiguredSessionFsState,
     scheduleTerminalSdkSessionBootSelection,
+}));
+
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
+    readTerminalRuntimeState,
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/model-selection/index.js', () => ({

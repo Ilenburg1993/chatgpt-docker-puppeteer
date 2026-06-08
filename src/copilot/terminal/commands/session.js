@@ -14,9 +14,7 @@ import { toError } from '#copilot/core';
 import {
     clearPendingTerminalQuestionShadow,
     clearTerminalHistory,
-    deleteTerminalSdkSession,
     listTerminalSnapshotsProjection,
-    listTerminalSdkSessionInventory,
     loadTerminalSnapshotProjection,
     readTerminalActivityProjection,
     readTerminalConfigProjection,
@@ -27,11 +25,9 @@ import {
     readTerminalLiveFlowProjection,
     readTerminalStatusProjection,
     readTerminalTimelineProjection,
-    readTerminalSdkSessionBootSelection,
     readTerminalByokProjection,
     saveTerminalSnapshotProjection,
-    scheduleTerminalSdkSessionBootSelection,
-} from '../frontend/index.js';
+} from '../frontend/projections/index.js';
 import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
 import {
     shouldConsumeTerminalPendingAnswerInput,
@@ -46,7 +42,7 @@ import {
     isTerminalImplicitOperationalTrace,
     renderTerminalTraceFlowSummary,
     renderTerminalTraceSummaryTitle,
-} from '../events/index.js';
+} from '../events/turn-trace-presentation.js';
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
@@ -67,6 +63,14 @@ import {
     terminalThemeRows,
     terminalThemeText,
 } from '../state/index.js';
+import {
+    listTerminalSdkSessionInventory,
+    scheduleTerminalSdkSessionBootSelection,
+} from '../frontend/gateways/session/index.js';
+import {
+    deleteTerminalSdkSession,
+    readTerminalSdkSessionBootSelection,
+} from '../frontend/gateways/sdk-session.js';
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
     enabled: false,
