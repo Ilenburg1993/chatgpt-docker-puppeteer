@@ -92,6 +92,9 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     readTerminalRuntimeState,
     setTerminalModelProjection,
     setTerminalReasoningProjection,
+}));
+
+vi.mock('../../../../src/copilot/terminal/frontend/projections/metrics.js', () => ({
     readTerminalErrorsProjection,
 }));
 

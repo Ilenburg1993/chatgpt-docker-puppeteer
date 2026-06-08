@@ -55,7 +55,7 @@ const readTerminalTimelineProjection = vi.fn(() => ({
 const mkdir = vi.fn(async () => undefined);
 const writeFile = vi.fn(async () => undefined);
 
-vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
+vi.mock('../../../../src/copilot/terminal/frontend/projections/timeline.js', () => ({
     readTerminalTimelineProjection,
 }));
 

@@ -18,7 +18,8 @@
  * @see EventBus
  */
 
-import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
+import { readTerminalConfigProjection } from '../frontend/projections/config.js';
+import { readTerminalDiagnoseProjection } from '../frontend/projections/now.js';
 import {
     formatTerminalTimeLabel,
     renderTerminalPendingQuestionKindLabel,

@@ -43,7 +43,7 @@ const frontendMocks = vi.hoisted(() => ({
     })),
 }));
 
-vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
+vi.mock('../../../../src/copilot/terminal/frontend/projections/timeline.js', () => ({
     readTerminalContextProjection: frontendMocks.readTerminalContextProjection,
     requestTerminalCompactionProjection: frontendMocks.requestTerminalCompactionProjection,
 }));

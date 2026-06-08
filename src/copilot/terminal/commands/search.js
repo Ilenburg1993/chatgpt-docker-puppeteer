@@ -11,7 +11,7 @@
  */
 
 import { toError } from '#copilot/core';
-import { searchTerminalTurnsProjection } from '../frontend/index.js';
+import { searchTerminalTurnsProjection } from '../frontend/projections/now.js';
 import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/index.js';
 
 /**

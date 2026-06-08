@@ -16,7 +16,8 @@ import {
     getTerminalHumanToolName,
 } from '../events/presenters/tools/index.js';
 import { readTerminalToolRegistrySnapshot } from '../frontend/gateways/index.js';
-import { readTerminalStatusProjection, readTerminalToolStatsProjection } from '../frontend/index.js';
+import { readTerminalToolStatsProjection } from '../frontend/projections/metrics.js';
+import { readTerminalStatusProjection } from '../frontend/projections/status.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/ui/index.js';
 
 /**

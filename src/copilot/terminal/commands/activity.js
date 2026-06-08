@@ -1,7 +1,8 @@
 // @ts-check
 
-import { readTerminalIoActivityProjection, renderTerminalTraceSummaryTitle } from '../events/index.js';
-import { readTerminalActivityProjection } from '../frontend/index.js';
+import { readTerminalIoActivityProjection } from '../events/projections/index.js';
+import { renderTerminalTraceSummaryTitle } from '../events/turn-trace-presentation.js';
+import { readTerminalActivityProjection } from '../frontend/projections/now.js';
 import {
     formatTerminalElapsedDuration,
     formatTerminalTimeLabel,

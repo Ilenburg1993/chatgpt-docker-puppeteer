@@ -8,7 +8,8 @@
  * @see EventBus
  */
 
-import { readTerminalConfigProjection, readTerminalMetricsProjection } from '../frontend/index.js';
+import { readTerminalConfigProjection } from '../frontend/projections/config.js';
+import { readTerminalMetricsProjection } from '../frontend/projections/metrics.js';
 import {
     compactTerminalOperatorToolText,
     formatTerminalToolPathForOperator,

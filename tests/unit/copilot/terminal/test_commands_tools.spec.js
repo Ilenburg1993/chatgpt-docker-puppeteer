@@ -36,8 +36,11 @@ const { readTerminalToolStatsProjection, readTerminalStatusProjection, readTermi
     }),
 );
 
-vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
+vi.mock('../../../../src/copilot/terminal/frontend/projections/metrics.js', () => ({
     readTerminalToolStatsProjection,
+}));
+
+vi.mock('../../../../src/copilot/terminal/frontend/projections/status.js', () => ({
     readTerminalStatusProjection,
 }));
 

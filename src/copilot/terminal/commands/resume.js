@@ -11,7 +11,7 @@
  */
 
 import { toError } from '#copilot/core';
-import { readTerminalResumeListProjection, readTerminalResumeProjection } from '../frontend/index.js';
+import { readTerminalResumeListProjection, readTerminalResumeProjection } from '../frontend/projections/now.js';
 import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow, terminalThemeWrappedRow } from '../state/index.js';
 
 /**

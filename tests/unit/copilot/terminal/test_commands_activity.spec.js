@@ -4,7 +4,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
+vi.mock('../../../../src/copilot/terminal/frontend/projections/now.js', () => ({
     readTerminalActivityProjection: vi.fn(() => ({
         current: {
             phase: 'tool',
@@ -130,7 +130,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     })),
 }));
 
-vi.mock('../../../../src/copilot/terminal/events/io-activity-events.js', () => ({
+vi.mock('../../../../src/copilot/terminal/events/projections/index.js', () => ({
     readTerminalIoActivityProjection: vi.fn(() => [
         {
             timestamp: 2,
@@ -150,7 +150,7 @@ vi.mock('../../../../src/copilot/terminal/events/io-activity-events.js', () => (
 }));
 
 const { cmdActivity } = await import('../../../../src/copilot/terminal/commands/activity.js');
-const terminalFrontend = await import('../../../../src/copilot/terminal/frontend/index.js');
+const terminalFrontend = await import('../../../../src/copilot/terminal/frontend/projections/now.js');
 
 function mockCtx() {
     /** @type {string[]} */

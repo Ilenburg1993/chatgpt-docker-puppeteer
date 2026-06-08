@@ -12,7 +12,8 @@
 
 import { getShowUsage, setShowUsage } from '../../presentation/state/index.js';
 import { compactTerminalDiagnosticId } from '../events/presenters/tools/index.js';
-import { readTerminalConfigProjection, readTerminalUsageNowProjection } from '../frontend/index.js';
+import { readTerminalConfigProjection } from '../frontend/projections/config.js';
+import { readTerminalUsageNowProjection } from '../frontend/projections/usage.js';
 import { terminalThemeHeadline, terminalThemeRow, terminalThemeRows, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 

@@ -2577,8 +2577,36 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Vigésima Passada
 
-- [ ] SDK10-P120-01: voltar da frente de microcopy para hardening estrutural: revisar se algum comando terminal ainda
+- [x] SDK10-P120-01: voltar da frente de microcopy para hardening estrutural: revisar se algum comando terminal ainda
   importa barrels largos quando há porta estreita disponível, priorizando `src/copilot/terminal/commands`.
+
+### Execução Contínua Em 2026-06-08 - Centésima Vigésima Primeira Passada
+
+- [x] Migração estrutural inicial dos comandos simples para portas estreitas: `tools`, `usage`, `metrics`, `diagnose`,
+  `resume`, `search`, `export`, `activity`, `context` e `errors` deixaram de importar projeções via
+  `terminal/frontend/index.js`.
+- [x] `activity` passou a validar o caminho consolidado de eventos via `terminal/events/projections/index.js`,
+  evitando fixture preso em módulo interno antigo.
+- [x] Testes unitários foram atualizados para mockar as portas reais (`frontend/projections/{config,metrics,usage,now,timeline,status}.js`
+  e `events/projections/index.js`) em vez do barrel largo quando o comando já usa a projection específica.
+- [x] A busca residual em `src/copilot/terminal/commands` ficou limitada a comandos mais densos (`session`, `byok`,
+  `plan`, `config`, `memory`, `fs`, `sdk`, `events`), separados para a próxima passada por terem acoplamento maior ou
+  mock suites extensas.
+- [x] Validado com `node --check` dos comandos tocados.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_export.spec.js tests/unit/copilot/terminal/test_commands_context.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_config_errors.spec.js tests/unit/copilot/terminal/test_commands_memory_resume_search.spec.js tests/unit/copilot/contracts/test_terminal_timeline_projection_consistency.spec.js tests/unit/copilot/contracts/test_arch_contracts.spec.js`
+  (10 arquivos, 157 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T15-29-53-139Z/summary.md`, confirmando `/usage now`, `/activity`, `/session sdk`,
+  `/session sdk commands`, `/session sdk events`, `/session sdk waits`, `/metrics`, `/events sources` e `/errors` sem
+  regressão visual.
+
+### Achados Novos Da Centésima Vigésima Primeira Passada
+
+- [ ] SDK10-P121-01: continuar o corte de barrels largos nos comandos densos restantes (`session`, `byok`, `plan`,
+  `config`, `memory`, `fs`, `sdk`, `events`), criando portas estreitas novas somente onde a projection/gateway atual
+  ainda não expõe uma fronteira suficientemente específica.
 
 ---
 
