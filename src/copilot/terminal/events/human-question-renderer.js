@@ -75,8 +75,8 @@ export function buildTerminalHumanQuestionCard(input = {}) {
     const state = input.state ?? 'decisão pendente';
     const action =
         input.action ??
-        (input.allowFreeform === false
-            ? 'Escolha uma opção digitando o número ou o texto.'
+        (choicesLine
+            ? 'Digite o número, o texto da opção ou qualquer texto livre.'
             : 'Responda digitando normalmente ou use /answer <texto>.');
     const now = input.now ?? Date.now();
     /** @type {string[]} */

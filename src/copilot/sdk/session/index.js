@@ -220,6 +220,12 @@ export {
 } from './ui.js';
 
 export {
+    USER_INPUT_FREEFORM_POLICY,
+    normalizeUserInputChoices,
+    resolveEffectiveUserInputAllowFreeform,
+} from './user-input-policy.js';
+
+export {
     cancelAllPendingStructuredUserInput,
     classifyUserInputQuestionKind,
     configureDefaultUserInputContext,

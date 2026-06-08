@@ -20,6 +20,7 @@ import {
     normalizeUserInputCompletedEvent,
     normalizeUserInputRequestedEvent,
     registerPendingStructuredUserInputResolver,
+    resolveEffectiveUserInputAllowFreeform,
 } from '#copilot/sdk/session';
 import {
     compactAgentSdkSession,
@@ -108,7 +109,7 @@ export function createTerminalPendingStructuredUserInput(input) {
     const choices = Array.isArray(input.choices)
         ? input.choices.map((choice) => choice.trim()).filter((choice) => choice.length > 0)
         : [];
-    const allowFreeform = input.allowFreeform !== false;
+    const allowFreeform = resolveEffectiveUserInputAllowFreeform();
     /** @type {(answer: string) => void} */
     let resolveAnswer = () => {};
     const promise = new Promise((resolve) => {

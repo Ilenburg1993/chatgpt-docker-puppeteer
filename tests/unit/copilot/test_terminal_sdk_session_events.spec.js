@@ -595,7 +595,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
             'Pergunta ao operador',
-            expect.objectContaining({ detail: expect.stringContaining('Escolha?'), severity: 'warn' }),
+            expect.objectContaining({ detail: expect.stringContaining('Escolha?'), severity: 'info' }),
         );
         expect(mocks.recordTerminalUserInputRequested).toHaveBeenCalledWith(
             expect.objectContaining({ requestId: 'ui-1' }),
@@ -650,7 +650,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'user_input.requested',
-            expect.objectContaining({ requestId: 'ui-1', allowFreeform: false }),
+            expect.objectContaining({ requestId: 'ui-1', allowFreeform: true }),
         );
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'user_input.completed',

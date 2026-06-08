@@ -306,7 +306,7 @@ describe('session-setup (F63)', () => {
             );
         });
 
-        it('preserva allowFreeform=false quando o SDK envia false explicitamente', async () => {
+        it('normaliza allowFreeform=false legado para texto livre efetivo', async () => {
             const tools = /** @type {any} */ (['t1']);
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
@@ -319,7 +319,7 @@ describe('session-setup (F63)', () => {
             expect(handleUserInputRequest).toHaveBeenLastCalledWith(
                 {
                     question: 'Escolha',
-                    allowFreeform: false,
+                    allowFreeform: true,
                 },
                 expect.any(Object),
             );

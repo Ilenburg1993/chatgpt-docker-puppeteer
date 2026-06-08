@@ -700,7 +700,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                     requestId: input.requestId,
                     toolCallId: input.toolCallId ?? null,
                     choices,
-                    allowFreeform: input.allowFreeform !== false,
+                    allowFreeform: true,
                     terminalInteractionKind: 'ask_user',
                     terminalInteractionPhase: 'requested',
                 },
@@ -1087,7 +1087,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     ) => {
         const question = evt?.question ?? '(sem pergunta)';
         const choices = Array.isArray(evt?.choices) ? evt.choices : [];
-        const allowFreeform = evt?.allowFreeform !== false;
+        const allowFreeform = true;
         const requestId = evt?.requestId ?? null;
         const kind = DialogProtocol.classify(question);
         const tracked = recordTerminalUserInputRequested(evt);
@@ -1125,7 +1125,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         recordTerminalActivity('question', 'Pergunta ao operador', {
             detail: `${question.slice(0, 160)}${choices.length > 0 ? ` · opções ${choices.join('|')}` : ''}`,
             source: 'sdk',
-            severity: allowFreeform ? 'info' : 'warn',
+            severity: 'info',
         });
         const requestedEnvelope = withSdkSessionSseEnvelope(
             {
@@ -1316,7 +1316,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (shouldPrintModelTransition) {
             println(
                 `\n${renderTerminalModelTransitionRow({
-                    label: matchedRequest ? 'Modelo confirmado' : undefined,
+                    ...(matchedRequest ? { label: 'Modelo confirmado' } : {}),
                     from: previousModel,
                     to: newModel,
                     kind: changed ? 'confirmed' : 'unchanged',

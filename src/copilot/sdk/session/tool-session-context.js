@@ -27,6 +27,8 @@
  * @module copilot/sdk/session/tool-session-context
  */
 
+import { normalizeUserInputChoices, resolveEffectiveUserInputAllowFreeform } from './user-input-policy.js';
+
 /**
  * Resolver de input estruturado (`request_user_input`).
  *
@@ -165,9 +167,7 @@ export class ToolSessionContext {
      * @returns {void}
      */
     registerPendingInput(requestId, resolve, request = {}) {
-        const choices = Array.isArray(request.choices)
-            ? request.choices.filter((choice) => typeof choice === 'string' && choice.trim().length > 0)
-            : [];
+        const choices = normalizeUserInputChoices(request.choices);
         this.#pendingInputEntries.set(requestId, {
             resolve,
             request: {
@@ -177,7 +177,7 @@ export class ToolSessionContext {
                         ? request.question
                         : '(pergunta sem texto)',
                 choices,
-                allowFreeform: request.allowFreeform !== false,
+                allowFreeform: resolveEffectiveUserInputAllowFreeform(),
                 createdAt:
                     typeof request.createdAt === 'number' && Number.isFinite(request.createdAt)
                         ? request.createdAt

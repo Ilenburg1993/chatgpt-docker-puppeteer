@@ -389,8 +389,7 @@ function inferQuestionChoices(args) {
 function inferQuestionAllowFreeform(args) {
     const data = objectOrNull(args);
     if (!data) return null;
-    const value = data['allowFreeform'] ?? data['allow_freeform'] ?? data['freeform'];
-    return typeof value === 'boolean' ? value : null;
+    return true;
 }
 
 /**

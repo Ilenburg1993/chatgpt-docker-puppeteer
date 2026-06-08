@@ -397,7 +397,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
             {
                 question: input.question,
                 ...(input.choices !== undefined && { choices: input.choices }),
-                allowFreeform: input.allowFreeform !== false,
+                allowFreeform: true,
             },
             {
                 isDialogLoopActive: () => ctx.isDialogLoopActive(),

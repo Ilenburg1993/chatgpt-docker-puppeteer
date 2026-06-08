@@ -360,6 +360,26 @@ operador vê e salvar summary com critérios objetivos.
 - [ ] M7. Criar live/probe sem PR para troca de modelo fake/fixture, validando layout sem consumir provider real.
 - [ ] M8. Documentar a situação ideal de modelo/rota: selecionado, solicitado, preparado, confirmado, adiado, fallback e falha.
 
+### Faixa N — Perguntas humanas e texto livre universal
+
+- [x] N1. Criar auditoria específica de free text universal:
+  `src/copilot/docs/terminal/LLM_B_TERMINAL_TOOLS_UX_FREE_TEXT_AUDIT_2026-06-08.md`.
+- [x] N2. Confirmar que `request_user_input`, `ask_user`, `/answer`, REPL e `/sdk waits`
+  ainda tinham caminhos de seleção obrigatória.
+- [x] N3. Normalizar `requires_selection` como compatibilidade legada sem bloqueio de texto livre.
+- [x] N4. Normalizar `allowFreeform=false` vindo do SDK como `allowFreeform=true` efetivo no Terminal LLM-B.
+- [x] N5. Atualizar cards, linha viva e comandos para opções como sugestões numeradas.
+- [x] N6. Atualizar testes focados para provar texto livre com choices em todas as rotas.
+- [x] N7. Executar live/probe com resposta livre fora das opções.
+
+### Faixa O — Reauditoria de padrões oficiais MCP/OpenAI para tools LLM-B
+
+- [x] O1. Reconsultar Apps SDK sobre descriptors, schemas, annotations e tool results.
+- [x] O2. Reconsultar MCP 2025-11-25 sobre `server/tools` e elicitation.
+- [ ] O3. Mapear affordances de `read_file_content` e `patch_file` para metadata/resultados estruturados.
+- [ ] O4. Garantir que a UX terminal use status curto e semântico como Apps SDK `_meta openai/toolInvocation/*`.
+- [ ] O5. Garantir que erros de tools sigam envelope estruturado e recuperável, sem stack trace público.
+
 ## Prioridade imediata
 
 1. Faixa A: metadata canônica.

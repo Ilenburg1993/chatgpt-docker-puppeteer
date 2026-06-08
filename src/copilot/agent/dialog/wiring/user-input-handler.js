@@ -13,6 +13,7 @@
 import { toError } from '#copilot/core';
 import { DialogProtocol } from '#copilot/dialog';
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
+import { resolveEffectiveUserInputAllowFreeform } from '#copilot/sdk/session';
 import { persistAgentRuntimePendingQuestionState } from '../../facades/index.js';
 import { log } from '../../ports/index.js';
 
@@ -122,14 +123,11 @@ function buildPendingQuestionMeta({ kind, askedAt, allowFreeform, choices }) {
  *           ok: true;
  *           answer: string;
  *           wasFreeform: boolean;
- *       }
- *     | {
- *           ok: false;
- *           reason: 'choice_required';
  *       }}
  */
 function normalizeUserInputAnswer(rawAnswer, choices, allowFreeform) {
     const answer = rawAnswer.trim();
+    resolveEffectiveUserInputAllowFreeform(allowFreeform);
     if (Array.isArray(choices) && choices.length > 0) {
         const numericIndex = Number(answer);
         if (Number.isInteger(numericIndex) && numericIndex >= 1 && numericIndex <= choices.length) {
@@ -142,9 +140,6 @@ function normalizeUserInputAnswer(rawAnswer, choices, allowFreeform) {
         const normalizedMatches = choices.filter((choice) => choice.toLocaleLowerCase() === normalizedAnswer);
         if (normalizedMatches.length === 1) {
             return { ok: true, answer: normalizedMatches[0] ?? answer, wasFreeform: false };
-        }
-        if (!allowFreeform) {
-            return { ok: false, reason: 'choice_required' };
         }
     }
     return { ok: true, answer, wasFreeform: true };
@@ -219,32 +214,19 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, kind = 'q
     ctx.setStatus('waiting_for_input');
     const askedAt = Date.now();
     const questionKind = kind;
+    const effectiveAllowFreeform = resolveEffectiveUserInputAllowFreeform(allowFreeform);
 
     return new Promise((resolve) => {
         /** @type {PendingQuestion} */
         const pq = {
             question,
-            allowFreeform,
+            allowFreeform: effectiveAllowFreeform,
             askedAt,
             kind: questionKind,
             protocolControlled: questionKind !== 'question',
             ...(choices !== undefined && { choices }),
             resolve: (/** @type {string} */ answer) => {
-                const normalized = normalizeUserInputAnswer(answer, choices, allowFreeform);
-                if (!normalized.ok) {
-                    log(
-                        'WARN',
-                        `[AlwaysAlive] Resposta rejeitada: pergunta exige uma das opções (${(choices ?? []).join(' | ')}).`,
-                    );
-                    ctx.emit('question.answer_rejected', {
-                        question,
-                        choices,
-                        answer,
-                        reason: normalized.reason,
-                        ts: Date.now(),
-                    });
-                    return false;
-                }
+                const normalized = normalizeUserInputAnswer(answer, choices, effectiveAllowFreeform);
                 ctx.setStatus('processing');
                 resolve({ answer: normalized.answer, wasFreeform: normalized.wasFreeform });
                 return true;
@@ -262,7 +244,7 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, kind = 'q
                     meta: buildPendingQuestionMeta({
                         kind: questionKind,
                         askedAt,
-                        allowFreeform,
+                        allowFreeform: effectiveAllowFreeform,
                         ...(choices !== undefined ? { choices } : {}),
                     }),
                 },
@@ -272,6 +254,6 @@ function handleInteractiveQuestion({ question, choices, allowFreeform, kind = 'q
                 },
             );
         }
-        ctx.emit(EMITTER_QUESTION_PENDING, { question, choices, allowFreeform });
+        ctx.emit(EMITTER_QUESTION_PENDING, { question, choices, allowFreeform: effectiveAllowFreeform });
     });
 }

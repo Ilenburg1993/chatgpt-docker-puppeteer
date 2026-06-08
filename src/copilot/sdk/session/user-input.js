@@ -13,6 +13,7 @@
 
 import { createInterface } from 'node:readline';
 import { ToolSessionContext } from './tool-session-context.js';
+import { normalizeUserInputChoices, resolveEffectiveUserInputAllowFreeform } from './user-input-policy.js';
 
 /**
  * @typedef {import('../types.js').UserInputHandler} UserInputHandler
@@ -90,9 +91,7 @@ function stringOr(value, fallback) {
  * @returns {string[]}
  */
 function arrayOfStrings(value) {
-    return Array.isArray(value)
-        ? value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter((item) => item.length > 0)
-        : [];
+    return normalizeUserInputChoices(value);
 }
 
 /**
@@ -152,7 +151,7 @@ export function normalizeUserInputRequestedEvent(eventOrData) {
             null,
         question: stringOr(payload['question'], ''),
         choices: arrayOfStrings(payload['choices']),
-        allowFreeform: payload['allowFreeform'] !== false,
+        allowFreeform: resolveEffectiveUserInputAllowFreeform(),
         toolCallId: stringOr(payload['toolCallId'], '') || null,
         data: payload,
         ts: tsOrNow(root['timestamp'] ?? root['ts'] ?? payload['ts']),
@@ -200,16 +199,14 @@ export function createReadlineInputHandler(opts = {}) {
         const rl = createInterface({ input, output, terminal: true });
 
         const question = request.question ?? '';
-        const choices = request.choices ?? [];
-        const allowFreeform = request.allowFreeform !== false;
+        const choices = normalizeUserInputChoices(request.choices ?? []);
+        resolveEffectiveUserInputAllowFreeform(request.allowFreeform);
 
         let displayText = `\n[ask_user] ${question}`;
         if (choices.length > 0) {
             displayText += `\nOpções: ${choices.map((c, i) => `[${i + 1}] ${c}`).join(' | ')}`;
         }
-        if (allowFreeform) {
-            displayText += '\n(ou texto livre)';
-        }
+        displayText += '\n(ou texto livre)';
         displayText += `\n${prompt}`;
 
         return new Promise((resolve) => {

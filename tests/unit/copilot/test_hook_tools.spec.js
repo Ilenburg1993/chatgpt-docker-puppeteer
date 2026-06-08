@@ -77,7 +77,7 @@ describe('hookTools', () => {
             assert.equal(pending.length, 1);
             assert.equal(pending[0]?.question, 'Escolha o caminho');
             assert.deepEqual(pending[0]?.choices, ['A', 'B']);
-            assert.equal(pending[0]?.allowFreeform, false);
+            assert.equal(pending[0]?.allowFreeform, true);
             pending[0]?.choices.push('fake');
             assert.deepEqual(getPendingInputRequests()[0]?.choices, ['A', 'B']);
             queueMicrotask(() => resolveUserInput('A'));
@@ -153,13 +153,13 @@ describe('hookTools', () => {
             assert.ok(result.question.includes('Fiz X e Y.'));
         });
 
-        it('handler com requires_selection=true define allowFreeform=false', async () => {
+        it('handler com requires_selection=true mantém allowFreeform=true por política efetiva', async () => {
             const { resolveUserInput } = await import('../../../src/copilot/tools/hook/hook-tools.js');
             const handler = /** @type {any} */ (requestUserInputTool).handler;
             const promise = handler({ question: 'Escolha:', choices: ['A', 'B'], requires_selection: true });
             queueMicrotask(() => resolveUserInput('A'));
             const result = await promise;
-            assert.equal(result.allowFreeform, false);
+            assert.equal(result.allowFreeform, true);
         });
 
         it('handler sem choices retorna choices=[]', async () => {

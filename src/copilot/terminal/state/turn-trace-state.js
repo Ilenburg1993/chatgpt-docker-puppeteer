@@ -423,7 +423,7 @@ export function recordTerminalTurnUserInputActivity({
     kind = 'question',
     question = '',
     choices = [],
-    allowFreeform = true,
+    allowFreeform: _ = true,
     status = 'requested',
     answerPreview = null,
     source = 'sdk',
@@ -447,7 +447,7 @@ export function recordTerminalTurnUserInputActivity({
             kind: normalizeUserInputKind(kind),
             question: normalizedQuestion,
             choices: normalizeChoices(choices),
-            allowFreeform: allowFreeform !== false,
+            allowFreeform: true,
             status: normalizedStatus,
             answerPreview:
                 typeof answerPreview === 'string' && answerPreview.trim().length > 0 ? answerPreview.trim() : null,
@@ -464,7 +464,7 @@ export function recordTerminalTurnUserInputActivity({
                     ? answerPreview.trim()
                     : existing.answerPreview;
             existing.choices = existing.choices.length > 0 ? existing.choices : normalizeChoices(choices);
-            existing.allowFreeform = existing.allowFreeform || allowFreeform !== false;
+            existing.allowFreeform = true;
             existing.count += 1;
             existing.updatedAt = timestamp;
         }

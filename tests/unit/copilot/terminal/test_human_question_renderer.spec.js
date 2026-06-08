@@ -31,7 +31,7 @@ describe('terminal/human-question-renderer', () => {
         expect(output).toMatch(/\[PERGUNTA\]\s+ASK-CANONICAL: responda SIM para fechar o teste/u);
         expect(output).toContain('[1] SIM');
         expect(output).toContain('[2] NAO');
-        expect(output).toContain('Escolha uma opção digitando o número ou o texto.');
+        expect(output).toContain('Digite o número, o texto da opção ou qualquer texto livre.');
         expect(output).toContain('/answer <texto>');
         expect(output).not.toContain('request_user_input');
         expect(output).not.toContain('ask_user SDK');

@@ -124,6 +124,6 @@ export function normalizeUserInputBridgeContract(input) {
         requestId: input.requestId,
         question: input.question,
         choices: Array.isArray(input.choices) ? input.choices.filter((c) => typeof c === 'string') : [],
-        allowFreeform: input.allowFreeform !== false,
+        allowFreeform: true,
     };
 }

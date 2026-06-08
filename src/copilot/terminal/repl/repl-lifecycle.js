@@ -171,14 +171,6 @@ export async function runReplLifecycle(injectServer, { injectPort, onReady }) {
      * @returns {void}
      */
     function printPendingAnswerResult(pendingAnswer) {
-        if (pendingAnswer.reason === 'invalid_choice') {
-            const choices =
-                pendingAnswer.pendingQuestionChoices.length > 0
-                    ? ` Opções: ${pendingAnswer.pendingQuestionChoices.join(' | ')}.`
-                    : '';
-            println(terminalThemeRow('Resposta', `não corresponde às opções da pergunta pendente.${choices}`, { role: 'warn' }));
-            return;
-        }
         const runtimeSuffix =
             pendingAnswer.runtimeId && pendingAnswer.runtimeId !== 'default'
                 ? ` · ambiente ${pendingAnswer.runtimeId}`

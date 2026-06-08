@@ -1046,7 +1046,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         const latest = userInputSummary.latest;
         if (latest) {
             const choices = latest.choices.length > 0 ? ` · opções ${latest.choices.join(' | ')}` : '';
-            const freeform = latest.allowFreeform ? 'livre' : 'seleção obrigatória';
+            const freeform = 'texto livre permitido';
             println(
                 terminalThemeRow('Pergunta', `${formatAge(latest.createdAt)} · ${latest.kind} · ${freeform}${choices}`),
             );
@@ -1060,7 +1060,7 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         );
         for (const entry of structuredInputs.slice(0, 3)) {
             const choices = entry.choices.length > 0 ? ` · opções ${entry.choices.join(' | ')}` : '';
-            const freeform = entry.allowFreeform ? 'livre' : 'seleção obrigatória';
+            const freeform = 'texto livre permitido';
             println(terminalThemeRow('Pergunta', `${formatAge(entry.createdAt)} · ${freeform}${choices}`));
             if (detail) println(terminalThemeRow('ID', entry.requestId));
             println(terminalThemeRow('Texto', compactText(entry.question, 220), { role: 'question' }));
@@ -1105,8 +1105,8 @@ function parseSdkSimulateRequestUserInputArgs(rest) {
     for (let i = 0; i < rest.length; i++) {
         const token = rest[i] ?? '';
         if (!token) continue;
-        if (token === '--required' || token === '--no-freeform') {
-            allowFreeform = false;
+        if (token === '--required' || token === '--legacy-required') {
+            allowFreeform = true;
             continue;
         }
         if (token === '--freeform') {
@@ -1138,7 +1138,7 @@ function renderSdkSimulate({ println }, rest) {
     if (kind !== 'pergunta' && kind !== 'question' && kind !== 'request-user-input' && kind !== 'request_user_input') {
         println('');
         println(
-            terminalThemeRow('Uso', '/sdk simulate pergunta [--choices "sim|nao"] [--required] [texto]', {
+            terminalThemeRow('Uso', '/sdk simulate pergunta [--choices "sim|nao"] [--required legado] [texto]', {
                 role: 'command',
             }),
         );
@@ -1150,7 +1150,7 @@ function renderSdkSimulate({ println }, rest) {
     const created = createTerminalPendingStructuredUserInput({
         question: parsed.question,
         choices: parsed.choices,
-        allowFreeform: parsed.allowFreeform,
+        allowFreeform: true,
         data: { command: '/sdk simulate pergunta' },
     });
     println('');
@@ -1158,10 +1158,9 @@ function renderSdkSimulate({ println }, rest) {
         title: 'Pergunta humana estruturada',
         question: compactText(parsed.question, 220),
         choices: parsed.choices,
-        allowFreeform: parsed.allowFreeform,
+        allowFreeform: true,
         source: 'diagnóstico de pergunta estruturada',
         state: 'aguardando operador',
-        action: `digite a resposta normalmente ou use ${terminalThemeText('command', '/answer <texto>')}`,
         includeDivider: true,
     });
     println(terminalThemeRow('Detalhe', terminalThemeText('command', '/sdk waits detail')));

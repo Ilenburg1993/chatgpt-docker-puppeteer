@@ -91,7 +91,7 @@ vi.mock('../../../src/copilot/terminal/frontend/gateways/index.js', () => ({
         runtimeId: evt?.runtimeId ?? null,
         question: evt?.question ?? '',
         choices: Array.isArray(evt?.choices) ? evt.choices : [],
-        allowFreeform: evt?.allowFreeform !== false,
+        allowFreeform: true,
         toolCallId: evt?.toolCallId ?? null,
         data: evt?.data ?? {},
         ts: evt?.timestamp ?? evt?.ts ?? Date.now(),

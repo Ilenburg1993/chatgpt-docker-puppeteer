@@ -42,6 +42,7 @@ import {
     hasPendingStructuredUserInputRequests as hasPendingStructuredUserInputRequestsState,
     nextStructuredUserInputRequestId,
     registerPendingStructuredUserInputResolver,
+    resolveEffectiveUserInputAllowFreeform,
     resolvePendingStructuredUserInput,
     ToolSessionContext,
 } from '#copilot/sdk/session';
@@ -349,7 +350,7 @@ const requestUserInputTool = buildTool({
             .boolean()
             .optional()
             .default(false)
-            .describe('Se true, o usuário DEVE escolher uma das choices (sem texto livre)'),
+            .describe('Compatibilidade legada: no Terminal LLM-B, choices são sugestões e texto livre continua permitido'),
     }),
     handler: async (
         /** @type {{ question: string; context?: string; choices?: string[]; requires_selection?: boolean }} */ {
@@ -365,7 +366,7 @@ const requestUserInputTool = buildTool({
                 ? context.slice(0, MAX_CONTEXT_CHARS).replace(/\n{3,}/g, '\n\n')
                 : undefined;
         const fullQuestion = safeContext ? `${question}\n\n**Contexto**: ${safeContext}` : question;
-        const allowFreeform = !requires_selection;
+        const allowFreeform = resolveEffectiveUserInputAllowFreeform();
 
         log('INFO', `[hook-tools/request_user_input] Pergunta: "${fullQuestion.slice(0, 100)}"`);
 
@@ -397,7 +398,11 @@ const requestUserInputTool = buildTool({
                 choices: choices ?? [],
                 allowFreeform,
                 createdAt: Date.now(),
-                data: { source: 'request_user_input', requires_selection: requires_selection === true },
+                data: {
+                    source: 'request_user_input',
+                    requires_selection_requested: requires_selection === true,
+                    effective_policy: 'freeform_always',
+                },
             });
             // BUG-P2-06: auto-cleanup após 10min para evitar memory leak se resolver nunca é chamado
             const autoCleanupTimer = setTimeout(() => {

@@ -263,18 +263,14 @@ const LIVE_SCENARIOS = Object.freeze({
     }),
     'invalid-choice': createLiveScenario({
         id: 'invalid-choice',
-        description: 'choice-only: resposta inválida local, pergunta preservada e resposta válida posterior',
-        askQuestion: 'ASK-CHOICE: escolha SIM para fechar o teste',
-        finalMarker: 'POST-ASK-CHOICE-FINAL: usuário escolheu SIM após tentativa inválida',
-        answerSteps: [
-            { answer: 'TALVEZ', trigger: 'ask', delayMs: 500 },
-            { answer: 'SIM', trigger: 'invalid-feedback', delayMs: 800 },
-        ],
+        description: 'compatibilidade: choices presentes, mas resposta livre fora das opções aceita',
+        askQuestion: 'ASK-CHOICE: escolha SIM ou responda livremente para fechar o teste',
+        finalMarker: 'POST-ASK-CHOICE-FINAL: usuário respondeu livremente fora das opções',
+        answerSteps: [{ answer: 'TALVEZ LIVRE - fora das opções', trigger: 'ask', delayMs: 500 }],
         askToolInstruction:
-            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-CHOICE: escolha SIM para fechar o teste", com choices contendo apenas SIM e allowFreeform=false se esses campos existirem no schema da tool.',
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-CHOICE: escolha SIM ou responda livremente para fechar o teste", com choices contendo apenas SIM. Se o schema expuser allowFreeform, não bloqueie texto livre.',
         finalInstruction:
-            'Depois que o usuário primeiro responder algo inválido e depois responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-CHOICE-FINAL: usuário escolheu SIM após tentativa inválida".',
-        invalidChoiceExpected: true,
+            'Depois que o usuário responder livremente fora das opções, escreva uma última mensagem pública contendo exatamente "POST-ASK-CHOICE-FINAL: usuário respondeu livremente fora das opções".',
     }),
     'long-tool-heartbeat': createLiveScenario({
         id: 'long-tool-heartbeat',
@@ -1727,8 +1723,9 @@ function structuredInputCycleCriteria(boot) {
             pass:
                 /Pergunta humana estruturada\s+·\s+aguardando operador/iu.test(plain) &&
                 /Origem\s+diagnóstico de pergunta estruturada/iu.test(plain) &&
-                /Hora\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/u.test(plain),
-            detail: 'request_user_input rendered as a durable human question card with source and ISO timestamp',
+                /Hora\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/u.test(plain) &&
+                /qualquer texto livre/iu.test(plain),
+            detail: 'request_user_input rendered as a durable human question card with source, ISO timestamp and free-text action',
         },
         {
             id: 'structured-input-waits-pending',
@@ -1742,8 +1739,8 @@ function structuredInputCycleCriteria(boot) {
         },
         {
             id: 'structured-input-answer-routed',
-            pass: answerConfirmationRe.test(plain),
-            detail: 'plain human answer was routed to the pending structured input',
+            pass: answerConfirmationRe.test(plain) && /TALVEZ LIVRE - fora das opções/iu.test(plain),
+            detail: 'plain human answer outside choices was routed to the pending structured input',
         },
         {
             id: 'structured-input-waits-cleared',
@@ -1773,7 +1770,7 @@ async function runStructuredInputCycleLiveTest({ outDir, requestedTransport, tim
         commands: [
             '/sdk simulate pergunta --choices SIM|NAO --required REQUEST_USER_INPUT-SIM: responda para fechar o teste',
             { line: '/sdk waits', waitBeforeMs: 1_500, advanceAfterMs: 1_500 },
-            'SIM',
+            'TALVEZ LIVRE - fora das opções',
             { line: '/sdk waits', advanceAfterMs: 1_500 },
             '/quit',
         ],

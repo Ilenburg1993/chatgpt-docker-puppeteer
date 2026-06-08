@@ -1774,7 +1774,11 @@ export function cmdAnswer({ println }, arg) {
     if (shouldConsumeTerminalPendingAnswerInput(result)) {
         const choices =
             result.pendingQuestionChoices.length > 0 ? ` Opções: ${result.pendingQuestionChoices.join(' | ')}.` : '';
-        println(terminalThemeRow('/answer', `Resposta inválida para a pergunta pendente.${choices}`, { role: 'warn' }));
+        println(
+            terminalThemeRow('/answer', `Texto livre permitido; tente novamente ou use o número da opção.${choices}`, {
+                role: 'warn',
+            }),
+        );
         return;
     }
     const projection = readTerminalStatusProjection(withRuntimeTarget({}, runtimeId));

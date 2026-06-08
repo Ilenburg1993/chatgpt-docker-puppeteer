@@ -138,7 +138,7 @@ describe('agent/dialog/user-input-handler', () => {
         await expect(promise).resolves.toEqual({ answer: 'verde', wasFreeform: false });
     });
 
-    it('mapeia índice de choice e rejeita freeform quando allowFreeform=false', async () => {
+    it('mapeia índice de choice e aceita freeform quando chamada legada envia allowFreeform=false', async () => {
         const ctx = createCtx(false);
         const promise = handleUserInputRequest(
             { question: 'Escolha?', allowFreeform: false, choices: ['A', 'B'] },
@@ -146,13 +146,9 @@ describe('agent/dialog/user-input-handler', () => {
         );
 
         const pending = ctx.setPendingQuestion.mock.calls[0]?.[0];
-        expect(pending.resolve('x')).toBe(false);
-        expect(ctx.emit).toHaveBeenCalledWith(
-            'question.answer_rejected',
-            expect.objectContaining({ reason: 'choice_required', answer: 'x' }),
-        );
-
-        expect(pending.resolve('2')).toBe(true);
-        await expect(promise).resolves.toEqual({ answer: 'B', wasFreeform: false });
+        expect(pending.allowFreeform).toBe(true);
+        expect(pending.resolve('x')).toBe(true);
+        expect(ctx.emit).not.toHaveBeenCalledWith('question.answer_rejected', expect.anything());
+        await expect(promise).resolves.toEqual({ answer: 'x', wasFreeform: true });
     });
 });
