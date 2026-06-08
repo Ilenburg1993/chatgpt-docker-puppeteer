@@ -1380,6 +1380,7 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('Esperas SDK da sessão');
         expect(ctx.output()).toContain('normal após resume silencioso');
         expect(ctx.output()).toContain('sem ask_user/elicitation/permission');
+        expect(ctx.output()).toContain('Mais detalhes');
         expect(ctx.output()).toContain('/sdk waits para pendências vivas');
         expect(ctx.output()).not.toContain('nenhuma espera SDK arquivada ainda');
     });

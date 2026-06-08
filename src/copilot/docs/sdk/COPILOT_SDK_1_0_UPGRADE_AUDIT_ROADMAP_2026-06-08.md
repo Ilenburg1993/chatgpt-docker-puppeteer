@@ -2438,8 +2438,49 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Décima Terceira Passada
 
-- [ ] SDK10-P113-01: seguir revisando superfícies de operação com foco em coerência entre comandos irmãos (`/events`,
+- [x] SDK10-P113-01: seguir revisando superfícies de operação com foco em coerência entre comandos irmãos (`/events`,
   `/activity`, `/session sdk`, `/metrics`) e eliminar mais um caso de microcopy duplicada ou técnica demais no default.
+
+### Execução Contínua Em 2026-06-08 - Centésima Décima Quarta Passada
+
+- [x] `/session sdk events` trocou o rodapé vazio para `Mais detalhes /events sources · /session sdk commands`, removendo
+  a explicação de arquivo bruto do caminho padrão.
+- [x] `/session sdk waits` trocou o rodapé vazio para `Mais detalhes /sdk waits para pendências vivas`, sem citar o
+  arquivo bruto no default.
+- [x] O modo detalhado de `/events sources` e os catálogos irmãos seguem preservados; a simplificação vale só para o
+  empty-state/summary path do operador.
+- [x] Testes unitários de sessão foram atualizados para proteger os novos footers humanos.
+- [x] Validado com `node --check src/copilot/terminal/commands/session.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`
+  (2 arquivos, 80 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T15-07-49-033Z/summary.md`, confirmando os footers novos em `/session sdk events`
+  e `/session sdk waits` sem regressão em `/events`, `/metrics`, `/usage now` e `/session sdk`.
+
+### Achados Novos Da Centésima Décima Quarta Passada
+
+- [x] SDK10-P114-01: revisar `/activity` e reduzir também o rodapé técnico do default, buscando o mesmo padrão humano
+  usado em `/events`, `/session sdk events` e `/session sdk waits`.
+
+### Execução Contínua Em 2026-06-08 - Centésima Décima Quinta Passada
+
+- [x] `/activity` trocou o rodapé default para `Mais detalhes /activity detail`, removendo a explicação de origem,
+  auditoria técnica e streaming do caminho comum.
+- [x] Teste de `/activity` passou a proteger o atalho curto e o rótulo humano, sem depender da frase técnica antiga.
+- [x] Validado com `node --check src/copilot/terminal/commands/activity.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js` (1 arquivo, 11 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T15-09-36-725Z/summary.md`, confirmando `/activity`, `/session sdk events`,
+  `/session sdk waits`, `/metrics`, `/usage now` e `/events` sem regressão visual.
+
+### Achados Novos Da Centésima Décima Quinta Passada
+
+- [ ] SDK10-P115-01: continuar caçando rodapés e dicas default que ainda misturam instrução técnica com navegação
+  humana, começando pelos comandos irmãos de status/diagnóstico e suas telas de vazio.
 
 ---
 

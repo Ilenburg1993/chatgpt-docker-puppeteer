@@ -554,7 +554,7 @@ export function cmdActivity({ println }, arg) {
     }
     if (!detail) {
         println(
-            terminalThemeRow('Detalhes', '/activity detail mostra origem, auditoria técnica e streaming.', {
+            terminalThemeRow('Mais detalhes', '/activity detail', {
                 role: 'command',
             }),
         );

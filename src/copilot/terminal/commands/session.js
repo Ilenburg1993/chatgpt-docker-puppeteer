@@ -2313,7 +2313,7 @@ async function cmdSessionSdkEvents({ println }, tokens) {
                 { role: 'muted' },
             ),
         );
-        println(terminalThemeRow('Detalhe', '/events sources · bruto em /events --raw · catálogo em /session sdk commands'));
+        println(terminalThemeRow('Mais detalhes', '/events sources · /session sdk commands'));
         println('');
         return;
     }
@@ -2383,7 +2383,7 @@ async function cmdSessionSdkWaits({ println }, tokens) {
                 { role: 'warn' },
             ),
         );
-        println(terminalThemeRow('Detalhe', '/sdk waits para pendências vivas · bruto em /events --raw'));
+        println(terminalThemeRow('Mais detalhes', '/sdk waits para pendências vivas'));
         println('');
         return;
     }
