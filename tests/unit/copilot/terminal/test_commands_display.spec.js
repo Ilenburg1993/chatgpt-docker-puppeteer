@@ -172,7 +172,7 @@ describe('terminal/commands/display', () => {
 
         cmdDisplay({ println: c.println }, 'detail', ['compact']);
         expect(getTerminalDetailLevel()).toBe('compact');
-        expect(c.output()).toContain('Detalhe');
+        expect(c.output()).toContain('Mais detalhes');
         expect(c.output()).toContain('compact');
     });
 

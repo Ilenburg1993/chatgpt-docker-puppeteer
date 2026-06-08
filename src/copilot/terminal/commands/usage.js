@@ -195,7 +195,7 @@ export function cmdUsage({ println }, arg) {
                 );
                 println(terminalThemeRow('Pedido', premiumRequest));
                 println(terminalThemeRow('Tipo', llmUsageKind));
-                println(terminalThemeRow('Detalhe', '/usage now detail para classe técnica', { role: 'command' }));
+                println(terminalThemeRow('Mais detalhes', '/usage now detail para classe técnica', { role: 'command' }));
             }
             if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
                 println(

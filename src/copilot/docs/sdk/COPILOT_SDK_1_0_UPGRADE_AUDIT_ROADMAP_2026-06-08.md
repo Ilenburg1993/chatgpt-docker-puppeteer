@@ -2533,8 +2533,28 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Décima Oitava Passada
 
-- [ ] SDK10-P118-01: revisar `display`, `usage` e demais comandos de suporte para padronizar o mesmo rótulo curto em
+- [x] SDK10-P118-01: revisar `display`, `usage` e demais comandos de suporte para padronizar o mesmo rótulo curto em
   atalhos compactos e reduzir ainda mais a linguagem de instrução no default.
+
+### Execução Contínua Em 2026-06-08 - Centésima Décima Nona Passada
+
+- [x] `/display` passou a usar `Mais detalhes` nos atalhos e estados de nível de detalhe, preservando os comandos
+  `/display detail <...>`.
+- [x] `/usage now` passou a usar `Mais detalhes /usage now detail para classe técnica` no bloco resumido de cobrança LLM.
+- [x] Teste de `/display` atualizado para o novo rótulo, e o bloco de `/usage now` foi revalidado junto de `/metrics`.
+- [x] Validado com `node --check src/copilot/terminal/commands/display.js && node --check src/copilot/terminal/commands/usage.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_display.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`
+  (2 arquivos, 20 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T15-19-06-305Z/summary.md`, confirmando `/display`, `/usage now`, `/activity`,
+  `/session sdk events`, `/session sdk waits`, `/metrics` e `/events` sem regressão visual.
+
+### Achados Novos Da Centésima Décima Nona Passada
+
+- [ ] SDK10-P119-01: rodar uma busca final por rótulos `Detalhe` em summaries default restantes e separar o que é
+  detalhe de dado real do que ainda é apenas atalho de navegação.
 
 ---
 

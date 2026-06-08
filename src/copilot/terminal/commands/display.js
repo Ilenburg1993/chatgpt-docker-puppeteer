@@ -108,14 +108,14 @@ export function cmdDisplay({ println }, arg, rest) {
         println(terminalThemeRow('Ações', '/display all on  ·  /display all off', { role: 'command' }));
         println(terminalThemeRow('Preset', `/display preset <${presetUsageLabel()}>`, { role: 'command' }));
         println(terminalThemeRow('Tema', `/display theme <${themeUsageLabel()}>`, { role: 'command' }));
-        println(terminalThemeRow('Detalhe', `/display detail <${detailUsageLabel()}>`, { role: 'command' }));
+        println(terminalThemeRow('Mais detalhes', `/display detail <${detailUsageLabel()}>`, { role: 'command' }));
         println('');
         return;
     }
 
     if (toggle === 'detail') {
         if (!value) {
-            println(terminalThemeRow('Detalhe', getTerminalDetailLevel(), { role: 'assistant' }));
+            println(terminalThemeRow('Mais detalhes', getTerminalDetailLevel(), { role: 'assistant' }));
             println(terminalThemeRow('Uso', `/display detail <${detailUsageLabel()}>`, { role: 'command' }));
             return;
         }
@@ -125,7 +125,7 @@ export function cmdDisplay({ println }, arg, rest) {
         }
         setTerminalDetailLevel(value);
         println(
-            terminalThemeRow('Detalhe', `${value} · ${value === 'compact' ? 'menos ruído, mais síntese' : 'máximo contexto operacional'}`, { role: 'success' }),
+            terminalThemeRow('Mais detalhes', `${value} · ${value === 'compact' ? 'menos ruído, mais síntese' : 'máximo contexto operacional'}`, { role: 'success' }),
         );
         return;
     }
