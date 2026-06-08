@@ -54,6 +54,10 @@ describe('terminal/commands/help', () => {
         expect(ctx.output()).toContain('Terminal LLM-B - Ajuda completa');
         expect(ctx.output()).toContain('/session sdk commands');
         expect(ctx.output()).toContain('comandos registrados no SDK');
+        expect(ctx.output()).toContain('ciclo de vida e comandos SDK pelo arquivo SSE canônico');
+        expect(ctx.output()).toContain('histórico de perguntas, formulários e permissões no arquivo SSE');
+        expect(ctx.output()).toContain('arquivo SSE, JSON compacto e mapa de fontes canônicas');
+        expect(ctx.output()).toContain('pendências humanas vivas agora');
         expect(ctx.output()).toContain('POST /inject');
         expect(ctx.output()).toContain('Sessão e observação');
         expect(ctx.output()).toContain('Previews e libs auxiliares');
@@ -63,6 +67,9 @@ describe('terminal/commands/help', () => {
         expect(ctx.output()).toContain('/fs preview <path> --json [--query .x]');
         expect(ctx.output()).toContain('/menu picker --interactive');
         expect(ctx.output()).toContain('atuin/zoxide');
+        expect(ctx.output()).not.toContain('histórico/archive');
+        expect(ctx.output()).not.toContain('archive SSE');
+        expect(ctx.output()).not.toContain('lifecycle e comandos');
         expect(ctx.output()).not.toContain('CommandDefinition[]');
         expect(ctx.output()).not.toContain('╚');
         expect(ctx.output()).not.toContain('\x1b[33m/status');

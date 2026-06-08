@@ -15,6 +15,8 @@ import {
 describe('terminal/tool-activity-presenter', () => {
     it('expõe helpers canônicos para diagnósticos humanos sem duplicar glossário', () => {
         expect(getTerminalHumanToolName('read_file_content')).toBe('Ler arquivo');
+        expect(getTerminalHumanToolName('list_directory')).toBe('Listar arquivos');
+        expect(getTerminalHumanToolName('search_in_files')).toBe('Buscar texto');
         expect(getTerminalHumanToolName('report_intent_local')).toBe('Intenção capturada');
         expect(getTerminalHumanToolName('workspace.read_file')).toBe('Ler arquivo');
         expect(getTerminalHumanToolName('write_file_content')).toBe('Escrever arquivo');
@@ -30,6 +32,28 @@ describe('terminal/tool-activity-presenter', () => {
         expect(isTerminalInternalCallIdentifier('chatcmpl-tool-80d5a00b25801fef')).toBe(true);
         expect(isTerminalInternalCallIdentifier('toolu_bdrk_019v9X862pjamNysAemC1UAW')).toBe(true);
         expect(compactTerminalDiagnosticId('chatcmpl-tool-80d5a00b25801fef')).toBe('chatcmpl-too…');
+    });
+
+    it('humaniza nomes canônicos do SDK 1.0 antes de cair no fallback técnico', () => {
+        expect(getTerminalHumanToolName('list_available_tools')).toBe('Listar tools');
+        expect(getTerminalHumanToolName('run_tests')).toBe('Rodar testes');
+        expect(getTerminalHumanToolName('typecheck')).toBe('Verificar tipos');
+        expect(getTerminalHumanToolName('git_changed_files')).toBe('Arquivos alterados');
+        expect(getTerminalHumanToolName('session_plan_update')).toBe('Atualizar plano');
+        expect(getTerminalHumanToolName('workspace_index_search')).toBe('Buscar no índice');
+
+        const text = humanizeTerminalToolSurfaceText(
+            'list_directory · search_in_files · list_available_tools · run_tests · session_plan_update',
+        );
+
+        expect(text).toContain('Listar arquivos');
+        expect(text).toContain('Buscar texto');
+        expect(text).toContain('Listar tools');
+        expect(text).toContain('Rodar testes');
+        expect(text).toContain('Atualizar plano');
+        expect(text).not.toContain('list_directory');
+        expect(text).not.toContain('search_in_files');
+        expect(text).not.toContain('session_plan_update');
     });
 
     it('humaniza superfícies default sem vazar nomes internos ou ids de chamada', () => {
@@ -95,11 +119,11 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.detail).toContain('aguardando decisão humana');
         expect(presentation.startLine).toContain('Qual caminho seguir?');
         expect(presentation.questionChoices).toEqual([]);
-        expect(presentation.allowFreeformQuestion).toBeNull();
+        expect(presentation.allowFreeformQuestion).toBe(true);
         expect(presentation.completeLine(true, '1.0s')).toContain('aguardando decisão humana concluído');
     });
 
-    it('carrega opções estruturadas de request_user_input para o card humano', () => {
+    it('carrega opções estruturadas de request_user_input como sugestões sem bloquear texto livre', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'request_user_input',
             args: {
@@ -113,7 +137,7 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.operation).toBe('ask');
         expect(presentation.target).toBe('Como continuar?');
         expect(presentation.questionChoices).toEqual(['seguir', 'pausar']);
-        expect(presentation.allowFreeformQuestion).toBe(false);
+        expect(presentation.allowFreeformQuestion).toBe(true);
     });
 
     it('mostra ask_user como pergunta humana mesmo quando vem do hook SDK', () => {

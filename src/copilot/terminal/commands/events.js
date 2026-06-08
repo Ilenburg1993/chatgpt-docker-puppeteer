@@ -6,14 +6,15 @@
  */
 
 import { listTerminalPublicStreamSourcePolicies, summarizeEmptyAfterUserInputRecovery } from '../events/index.js';
+import { redactSecretRecord } from '../../core/security/redaction.js';
 import {
     compactTerminalDiagnosticId,
     compactTerminalOperatorToolText,
     formatTerminalToolPathForOperator,
     getTerminalHumanToolName,
-} from '../events/tool-activity-presenter.js';
+} from '../events/presenters/tools/index.js';
+import { classifyRuntimeSdkRateLimitScope, describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk/index.js';
 import {
-    formatTerminalIsoTimestamp,
     formatTerminalTimeLabel,
     readTerminalSseEventArchiveTail,
     terminalThemeHeadline,
@@ -63,6 +64,7 @@ function countLabel(count, singular, plural) {
  *         hubSessionId: string | null;
  *     };
  *     format: 'text' | 'json' | 'raw';
+ *     jsonMode: 'full' | 'compact';
  *     rawMode: 'preview' | 'full';
  * }}
  */
@@ -85,6 +87,8 @@ function parseEventsArg(arg) {
     let hubSessionId = null;
     /** @type {'text' | 'json' | 'raw'} */
     let format = 'text';
+    /** @type {'full' | 'compact'} */
+    let jsonMode = 'full';
     /** @type {'preview' | 'full'} */
     let rawMode = 'preview';
     for (let index = 0; index < tokens.length; index += 1) {
@@ -95,6 +99,14 @@ function parseEventsArg(arg) {
             limit = Math.min(500, Math.max(1, Number(token)));
         } else if (token === '--json' || token === 'json' || token === 'format=json') {
             format = 'json';
+        } else if (
+            token === '--compact' ||
+            token === 'compact' ||
+            token === 'json=compact' ||
+            token === 'format=json-compact'
+        ) {
+            jsonMode = 'compact';
+            if (format !== 'raw') format = 'json';
         } else if (token === '--raw' || token === 'raw' || token === 'format=raw') {
             format = 'raw';
         } else if (token === '--full' || token === 'full' || token === 'raw=full' || token === 'format=raw-full') {
@@ -159,6 +171,7 @@ function parseEventsArg(arg) {
     return {
         query: { limit, event, traceId, turnId, source, toolCallId, requestId, hubSessionId },
         format,
+        jsonMode,
         rawMode,
     };
 }
@@ -216,7 +229,9 @@ function buildPolicyQueryHints(policy) {
  */
 function buildHumanPolicyQueryHint(policy) {
     const labels = uniqueHumanEventLabels(policy.publicEvents);
-    const subject = labels.length > 0 ? labels.join(' + ') : humanPolicyId(policy.id);
+    const visibleLabels = labels.slice(0, 3);
+    const suffix = labels.length > visibleLabels.length ? ` +${labels.length - visibleLabels.length}` : '';
+    const subject = visibleLabels.length > 0 ? `${visibleLabels.join(' + ')}${suffix}` : humanPolicyId(policy.id);
     return `ver ${subject}: /events 50 · detalhe técnico: /events sources detail`;
 }
 
@@ -279,9 +294,17 @@ function compact(value, max = 100) {
  */
 function humanEventLabel(event, payload = null) {
     if (event === 'assistant.message') return 'Mensagem da LLM-B';
+    if (event === 'user.message') return 'Mensagem do operador';
     if (event === 'user_input.requested') return 'Pergunta ao operador';
     if (event === 'user_input.completed') return 'Resposta do operador';
     if (event === 'tool.lifecycle') return 'Ferramenta';
+    if (event === 'tool.user_requested') return 'Ferramenta solicitada';
+    if (event === 'tool.execution_start') return 'Ferramenta iniciada';
+    if (event === 'tool.execution_progress') return 'Ferramenta em andamento';
+    if (event === 'tool.execution_partial_result') return 'Resultado parcial';
+    if (event === 'tool.execution_complete') return 'Ferramenta concluída';
+    if (event === 'external_tool.requested') return 'Ferramenta externa solicitada';
+    if (event === 'external_tool.completed') return 'Ferramenta externa concluída';
     if (event === 'terminal.activity' || event === 'activity.changed') return 'Atividade';
     if (event === 'terminal.runtime.wired') return 'Sessão pronta';
     if (event === 'terminal.started') return 'Terminal iniciado';
@@ -323,6 +346,21 @@ function humanEventLabel(event, payload = null) {
     if (event === 'permission.requested') return 'Permissão solicitada';
     if (event === 'permission.completed') return 'Permissão concluída';
     if (event === 'permission.mode_changed') return 'Permissões alteradas';
+    if (event === 'session.permissions_changed') return 'Permissões da sessão';
+    if (event === 'model.call_failure') return 'Falha do modelo';
+    if (event === 'hook.progress') return 'Rotina em andamento';
+    if (event === 'session.canvas.opened') return 'Canvas aberto';
+    if (event === 'session.canvas.registry_changed') return 'Canvas disponíveis';
+    if (event === 'mcp_app.tool_call_complete') return 'MCP App concluído';
+    if (event === 'session.autopilot_objective_changed') return 'Objetivo autopiloto';
+    if (event === 'extension_context') return 'Contexto de extensão';
+    if (event === 'session.custom_agents_updated') return 'Agentes customizados';
+    if (event === 'session.custom_notification') return 'Notificação customizada';
+    if (event === 'session.extensions.attachments_pushed') return 'Anexos de extensão';
+    if (event === 'session.remote_steerable_changed') return 'Controle remoto';
+    if (event === 'session.schedule_created') return 'Agendamento criado';
+    if (event === 'session.schedule_cancelled') return 'Agendamento cancelado';
+    if (event === 'new_inbox_message') return 'Mensagem recebida';
     if (event === 'agent.background.completed') return 'Tarefa em segundo plano concluída';
     if (event === 'agent.background.idle') return 'Tarefa em segundo plano ociosa';
     if (event === 'task.started') return 'Tarefa iniciada';
@@ -333,6 +371,19 @@ function humanEventLabel(event, payload = null) {
     if (event === 'assistant.reasoning_complete') return 'Raciocínio concluído';
     if (event === 'dialog.turn_start' || event === 'assistant.turn_start') return 'Turno iniciado';
     if (event === 'dialog.turn_end' || event === 'assistant.turn_end') return 'Turno concluído';
+    if (event === 'text') return 'Conteúdo de texto';
+    if (event === 'image') return 'Imagem';
+    if (event === 'audio') return 'Áudio';
+    if (event === 'blob') return 'Blob';
+    if (event === 'resource') return 'Recurso';
+    if (event === 'resource_link') return 'Link de recurso';
+    if (event === 'file') return 'Arquivo';
+    if (event === 'directory') return 'Diretório';
+    if (event === 'selection') return 'Seleção';
+    if (event === 'object') return 'Objeto';
+    if (event === 'function') return 'Função';
+    if (event === 'terminal') return 'Terminal';
+    if (event === 'github_reference') return 'Referência GitHub';
     if (event === 'sdk.lifecycle') {
         const lifecycleType = typeof payload?.['type'] === 'string' ? humanPayloadKind(payload['type']) : '';
         if (lifecycleType === 'sessão atualizada') return 'Sessão atualizada';
@@ -393,6 +444,22 @@ function humanEventSource(source) {
     if (lower === 'io' || lower.startsWith('io/')) return 'I/O local';
     if (lower.startsWith('sdk/session.info')) return 'controle da sessão';
     if (lower.startsWith('sdk/session.title_changed')) return 'controle da sessão';
+    if (lower.startsWith('sdk/session.permissions_changed')) return 'controle de permissões';
+    if (lower.startsWith('sdk/model.call_failure')) return 'modelo via SDK';
+    if (lower.startsWith('sdk/hook.progress')) return 'rotinas do SDK';
+    if (lower.startsWith('sdk/session.canvas')) return 'canvas via SDK';
+    if (lower.startsWith('sdk/mcp_app') || lower.startsWith('sdk/mcp-app')) return 'MCP App via SDK';
+    if (lower.startsWith('sdk/extension_context')) return 'extensão via SDK';
+    if (lower.startsWith('sdk/new_inbox_message')) return 'caixa de entrada via SDK';
+    if (
+        lower.startsWith('sdk/session.autopilot') ||
+        lower.startsWith('sdk/session.custom') ||
+        lower.startsWith('sdk/session.extensions.attachments') ||
+        lower.startsWith('sdk/session.remote_steerable') ||
+        lower.startsWith('sdk/session.schedule')
+    ) {
+        return 'extensões/sessão via SDK';
+    }
     if (lower.startsWith('sdk/user_input')) return 'pergunta ao operador';
     if (lower.startsWith('sdk/assistant')) return 'LLM-B via SDK';
     if (lower.startsWith('agent/passthrough/question.answered')) return 'ponte da pergunta';
@@ -443,6 +510,19 @@ function humanPayloadKind(value) {
     if (!text) return '';
     if (text === 'io' || text === 'io_op') return 'I/O local';
     if (text === 'tool' || text === 'tool_lifecycle') return 'ferramenta';
+    if (text === 'text') return 'texto';
+    if (text === 'image') return 'imagem';
+    if (text === 'audio') return 'áudio';
+    if (text === 'blob') return 'blob';
+    if (text === 'resource') return 'recurso';
+    if (text === 'resource_link') return 'link de recurso';
+    if (text === 'file') return 'arquivo';
+    if (text === 'directory') return 'diretório';
+    if (text === 'selection') return 'seleção';
+    if (text === 'object') return 'objeto';
+    if (text === 'function') return 'função';
+    if (text === 'terminal') return 'terminal';
+    if (text === 'github_reference') return 'referência GitHub';
     if (text === 'background' || text === 'background_task') return 'tarefa em segundo plano';
     if (text === 'ask_user_continuation') return 'continuação da pergunta humana';
     if (text === 'non_user_initiated') return 'iniciado pelo agente';
@@ -669,10 +749,423 @@ function summarizeSdkLifecyclePayload(payload) {
 
 /**
  * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeTerminalRuntimePayload(payload) {
+    const phase = humanPayloadKind(payload['phase']);
+    const duration = typeof payload['durationMs'] === 'number' ? `${Math.round(payload['durationMs'])}ms` : '';
+    const ok = payload['preflightOk'] === true ? 'preflight ok' : payload['preflightOk'] === false ? 'preflight falhou' : '';
+    return [phase ? `fase ${compact(phase, 48)}` : null, ok || null, duration || null].filter(Boolean).join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeTerminalStartedPayload(payload) {
+    const mode = humanPayloadKind(payload['operationMode']);
+    const model = humanEventMessage(payload['model']);
+    const tools = typeof payload['mcpToolCount'] === 'number' ? `${payload['mcpToolCount']} MCP` : '';
+    const dialog = payload['dialogLoopActive'] === true ? 'diálogo ativo' : payload['dialogLoopActive'] === false ? 'diálogo inativo' : '';
+    const preflight = isRecord(payload['bootPreflight']) ? payload['bootPreflight'] : null;
+    const preflightStatus = preflight?.['ok'] === true ? 'preflight ok' : preflight?.['ok'] === false ? 'preflight falhou' : '';
+    return [
+        mode || null,
+        model ? `modelo ${compact(model, 48)}` : null,
+        tools || null,
+        dialog || null,
+        preflightStatus || null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeQuotaPayload(payload) {
+    const quotaId = humanPayloadKind(payload['quotaId']);
+    const snapshot = isRecord(payload['snapshot']) ? payload['snapshot'] : null;
+    const hasQuota =
+        snapshot?.['hasQuota'] === true ? 'quota disponível' : snapshot?.['hasQuota'] === false ? 'sem quota' : '';
+    const remaining =
+        typeof snapshot?.['remainingPercentage'] === 'number'
+            ? `restante ${Math.round(snapshot['remainingPercentage'])}%`
+            : '';
+    const reset = typeof snapshot?.['resetDate'] === 'string' ? `reset ${compact(snapshot['resetDate'], 32)}` : '';
+    return [quotaId ? compact(quotaId, 48) : 'quota', hasQuota || null, remaining || null, reset || null]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeBackgroundPayload(payload) {
+    const status = humanStatus(payload['status']) || (payload['pendingCount'] === 0 ? 'ocioso' : '');
+    const label = humanEventMessage(payload['label'] ?? payload['description']);
+    const duration = typeof payload['durationMs'] === 'number' ? `${Math.round(payload['durationMs'])}ms` : '';
+    const pending = typeof payload['pendingCount'] === 'number' ? `pendentes ${payload['pendingCount']}` : '';
+    return [status ? `estado ${status}` : null, label ? compact(label, 96) : null, duration || null, pending || null]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {Record<string, unknown>}
+ */
+function payloadDataOrSelf(payload) {
+    return isRecord(payload['data']) ? /** @type {Record<string, unknown>} */ (payload['data']) : payload;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function humanMime(value) {
+    const text = normalizeEventSummaryText(value);
+    if (!text) return '';
+    return text.replace(/^application\/octet-stream$/iu, 'binário');
+}
+
+/**
+ * @param {Record<string, unknown>} item
+ * @returns {string}
+ */
+function summarizeStructuredContentItem(item) {
+    const type = humanPayloadKind(item['type']) || 'conteúdo';
+    const title = humanEventMessage(item['title'] ?? item['displayName'] ?? item['name']);
+    const mime = humanMime(item['mimeType']);
+    const uri = humanEventMessage(item['uri'] ?? (isRecord(item['resource']) ? item['resource']['uri'] : null));
+    const exitCode = typeof item['exitCode'] === 'number' ? `exit ${item['exitCode']}` : '';
+    const text = typeof item['text'] === 'string' ? `${item['text'].length} caracteres` : '';
+    const size = typeof item['size'] === 'number' ? `${Math.round(item['size'])} bytes` : '';
+    return [
+        type,
+        title ? compact(title, 44) : null,
+        mime || null,
+        uri ? compact(uri, 52) : null,
+        exitCode || null,
+        text || null,
+        size || null,
+    ]
+        .filter(Boolean)
+        .join(' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function summarizeStructuredContentList(value) {
+    if (!Array.isArray(value) || value.length === 0) return '';
+    const items = value
+        .map((item) => (isRecord(item) ? summarizeStructuredContentItem(item) : humanPayloadKind(item)))
+        .filter(Boolean)
+        .slice(0, 4);
+    const suffix = value.length > items.length ? ` +${value.length - items.length}` : '';
+    return items.length ? `${countLabel(value.length, 'conteúdo', 'conteúdos')}: ${items.join(', ')}${suffix}` : '';
+}
+
+/**
+ * @param {Record<string, unknown>} attachment
+ * @returns {string}
+ */
+function summarizeAttachmentItem(attachment) {
+    const type = humanPayloadKind(attachment['type']) || 'anexo';
+    const title = humanEventMessage(
+        attachment['displayName'] ?? attachment['title'] ?? attachment['path'] ?? attachment['filePath'] ?? attachment['url'],
+    );
+    const mime = humanMime(attachment['mimeType']);
+    const referenceType = humanPayloadKind(attachment['referenceType']);
+    const number = typeof attachment['number'] === 'number' ? `#${attachment['number']}` : '';
+    return [type, title ? compact(title, 54) : null, referenceType || null, number || null, mime || null]
+        .filter(Boolean)
+        .join(' ');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function summarizeAttachmentList(value) {
+    if (!Array.isArray(value) || value.length === 0) return '';
+    const items = value
+        .map((item) => (isRecord(item) ? summarizeAttachmentItem(item) : humanPayloadKind(item)))
+        .filter(Boolean)
+        .slice(0, 4);
+    const suffix = value.length > items.length ? ` +${value.length - items.length}` : '';
+    return items.length ? `${countLabel(value.length, 'anexo', 'anexos')}: ${items.join(', ')}${suffix}` : '';
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeMultimodalPayload(payload) {
+    const data = payloadDataOrSelf(payload);
+    const result = isRecord(data['result']) ? /** @type {Record<string, unknown>} */ (data['result']) : data;
+    const contentBlocks = summarizeStructuredContentList(result['contents'] ?? result['contentBlocks'] ?? data['contents']);
+    const attachments = summarizeAttachmentList(data['attachments']);
+    const uiResource = isRecord(result['uiResource']) ? summarizeStructuredContentItem(result['uiResource']) : '';
+    return [contentBlocks, attachments, uiResource ? `UI ${uiResource}` : null].filter(Boolean).join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} data
+ * @returns {{ status: number | null; message: string; code?: string; errorType?: string }}
+ */
+function createModelCallFailureErrorFingerprint(data) {
+    const status = typeof data['statusCode'] === 'number' ? data['statusCode'] : null;
+    const message =
+        typeof data['errorMessage'] === 'string' && data['errorMessage'].trim().length > 0
+            ? data['errorMessage']
+            : typeof data['message'] === 'string'
+              ? data['message']
+              : '';
+    return {
+        status,
+        message,
+        ...(typeof data['code'] === 'string' ? { code: data['code'] } : {}),
+        ...(typeof data['errorType'] === 'string' ? { errorType: data['errorType'] } : {}),
+    };
+}
+
+/**
+ * @param {ReturnType<typeof getSdkRecoveryPolicy>['kind']} kind
+ * @param {unknown} fingerprint
+ * @returns {string}
+ */
+function humanModelCallFailureKind(kind, fingerprint) {
+    if (kind === 'rate_limit') {
+        const scope = classifyRuntimeSdkRateLimitScope(fingerprint);
+        if (scope === 'session') return 'limite de sessão';
+        if (scope === 'weekly_model') return 'limite semanal/modelo';
+        return 'rate limit';
+    }
+    if (kind === 'quota_exhausted') return 'quota esgotada';
+    if (kind === 'account') return 'conta/cobrança';
+    if (kind === 'auth') return 'autenticação';
+    if (kind === 'model_unsupported') return 'modelo incompatível';
+    if (kind === 'network') return 'rede';
+    if (kind === 'timeout') return 'timeout';
+    return 'não classificada';
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeModelCallFailurePayload(payload) {
+    const data = payloadDataOrSelf(payload);
+    const model = typeof data['model'] === 'string' ? data['model'] : '';
+    const source = humanPayloadKind(data['source']);
+    const statusCode = typeof data['statusCode'] === 'number' ? `HTTP ${data['statusCode']}` : '';
+    const durationMs = typeof data['durationMs'] === 'number' ? `${Math.round(data['durationMs'])}ms` : '';
+    const message = humanEventMessage(data['errorMessage']);
+    const fingerprint = createModelCallFailureErrorFingerprint(data);
+    const policy = getSdkRecoveryPolicy(fingerprint, 'session');
+    const recoveryMessage = describeSdkRecoveryPolicy(policy, fingerprint);
+    const failureKind = humanModelCallFailureKind(policy.kind, fingerprint);
+    const requestId =
+        typeof data['serviceRequestId'] === 'string'
+            ? compactTerminalDiagnosticId(data['serviceRequestId'], 16)
+            : typeof data['providerCallId'] === 'string'
+              ? compactTerminalDiagnosticId(data['providerCallId'], 16)
+              : '';
+    return [
+        model ? `modelo ${compact(model, 48)}` : null,
+        source ? `origem ${compact(source, 32)}` : null,
+        `classe ${failureKind}`,
+        statusCode || null,
+        durationMs || null,
+        message ? compact(message, 96) : null,
+        recoveryMessage.actionHint ? compact(recoveryMessage.actionHint, 96) : null,
+        requestId ? `request ${requestId}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizePermissionsChangedPayload(payload) {
+    const data = payloadDataOrSelf(payload);
+    const current = data['allowAllPermissions'];
+    const previous = data['previousAllowAllPermissions'];
+    if (typeof current === 'boolean' && typeof previous === 'boolean') {
+        if (current === previous) return current ? 'aprovação ampla já ativa' : 'aprovação ampla segue desativada';
+        return current ? 'aprovação ampla ativada' : 'aprovação ampla desativada';
+    }
+    if (typeof current === 'boolean') return current ? 'aprovação ampla ativa' : 'aprovação ampla desativada';
+    return 'estado de permissões alterado';
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeCanvasOpenedPayload(payload) {
+    const data = payloadDataOrSelf(payload);
+    const title = humanEventMessage(data['title']);
+    const extensionName = humanEventMessage(data['extensionName']);
+    const availability = humanStatus(data['availability']);
+    const status = humanEventMessage(data['status']);
+    const reopen = data['reopen'] === true ? 'reabertura' : '';
+    return [
+        title ? compact(title, 72) : 'canvas sem título',
+        extensionName ? `extensão ${compact(extensionName, 48)}` : null,
+        availability ? `estado ${compact(availability, 32)}` : null,
+        status ? compact(status, 72) : null,
+        reopen || null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeCanvasRegistryChangedPayload(payload) {
+    const data = payloadDataOrSelf(payload);
+    const canvases = Array.isArray(data['canvases']) ? data['canvases'] : [];
+    const names = canvases
+        .map((canvas) => (isRecord(canvas) ? humanEventMessage(canvas['displayName'] ?? canvas['canvasId']) : ''))
+        .filter(Boolean)
+        .slice(0, 3);
+    const suffix = canvases.length > names.length ? ` +${canvases.length - names.length}` : '';
+    return [`${countLabel(canvases.length, 'canvas disponível', 'canvas disponíveis')}`, names.length ? `${names.join(', ')}${suffix}` : null]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @returns {string}
+ */
+function summarizeMcpAppToolCallCompletePayload(payload) {
+    const data = payloadDataOrSelf(payload);
+    const appName = humanEventMessage(data['appName'] ?? data['app'] ?? data['extensionName'] ?? data['serverName']);
+    const toolName = humanEventMessage(data['toolName'] ?? data['name']);
+    const status = humanStatus(data['status'] ?? data['resultType']);
+    const title = humanEventMessage(data['title'] ?? data['displayName']);
+    const uri = humanEventMessage(data['uri'] ?? data['resourceUri']);
+    return [
+        appName ? `app ${compact(appName, 48)}` : 'MCP App',
+        toolName ? `tool ${compact(toolName, 48)}` : null,
+        status ? `estado ${compact(status, 32)}` : null,
+        title ? compact(title, 72) : null,
+        uri ? `recurso ${compact(uri, 52)}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {string} event
+ * @returns {string}
+ */
+function summarizeSdkExtensionSignalPayload(payload, event) {
+    const nested = payloadDataOrSelf(payload);
+    const data = nested === payload ? payload : { ...payload, ...nested };
+    if (event === 'session.autopilot_objective_changed') {
+        const objective = humanEventMessage(data['objective'] ?? data['title'] ?? data['summary']);
+        return objective ? `objetivo ${compact(objective, 96)}` : 'objetivo atualizado';
+    }
+    if (event === 'extension_context') {
+        const extensionName = humanEventMessage(data['extensionName'] ?? data['extension'] ?? data['name']);
+        const contextType = humanPayloadKind(data['contextType'] ?? data['kind'] ?? data['type']);
+        return [extensionName ? `extensão ${compact(extensionName, 48)}` : 'contexto recebido', contextType || null]
+            .filter(Boolean)
+            .join(' · ');
+    }
+    if (event === 'session.custom_agents_updated') {
+        const agents = Array.isArray(data['agents']) ? data['agents'] : Array.isArray(data['customAgents']) ? data['customAgents'] : [];
+        const count = typeof data['count'] === 'number' ? data['count'] : agents.length;
+        const names = agents
+            .map((agent) => (isRecord(agent) ? humanEventMessage(agent['name'] ?? agent['displayName'] ?? agent['id']) : ''))
+            .filter(Boolean)
+            .slice(0, 3);
+        return [`${countLabel(count, 'agente', 'agentes')}`, names.length ? names.map((name) => compact(name, 32)).join(', ') : null]
+            .filter(Boolean)
+            .join(' · ');
+    }
+    if (event === 'session.custom_notification') {
+        const title = humanEventMessage(data['title']);
+        const message = humanEventMessage(data['message']);
+        const level = humanStatus(data['level'] ?? data['severity']);
+        return [title ? compact(title, 48) : null, message ? compact(message, 96) : null, level ? `nível ${level}` : null]
+            .filter(Boolean)
+            .join(' · ');
+    }
+    if (event === 'session.extensions.attachments_pushed') {
+        const attachments = Array.isArray(data['attachments']) ? data['attachments'] : [];
+        const count = typeof data['count'] === 'number' ? data['count'] : attachments.length;
+        const extensionName = humanEventMessage(data['extensionName'] ?? data['extension']);
+        return [
+            `${countLabel(count, 'anexo', 'anexos')}`,
+            extensionName ? `extensão ${compact(extensionName, 48)}` : null,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+    }
+    if (event === 'session.remote_steerable_changed') {
+        const enabled = data['enabled'] ?? data['remoteSteerable'];
+        if (enabled === true) return 'controle remoto ativado';
+        if (enabled === false) return 'controle remoto desativado';
+        return 'controle remoto alterado';
+    }
+    if (event === 'session.schedule_created' || event === 'session.schedule_cancelled') {
+        const title = humanEventMessage(data['title'] ?? data['name']);
+        const scheduleId = humanEventMessage(data['scheduleId'] ?? data['id']);
+        const cadence = humanEventMessage(data['cadence'] ?? data['cron'] ?? data['when']);
+        return [
+            title ? compact(title, 64) : event === 'session.schedule_created' ? 'agendamento criado' : 'agendamento cancelado',
+            scheduleId ? `id ${compact(scheduleId, 24)}` : null,
+            cadence ? compact(cadence, 48) : null,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+    }
+    if (event === 'new_inbox_message') {
+        const message = humanEventMessage(data['message'] ?? data['subject'] ?? data['title']);
+        const sender = humanEventMessage(data['sender'] ?? data['from']);
+        return [sender ? `de ${compact(sender, 40)}` : null, message ? compact(message, 96) : 'mensagem recebida']
+            .filter(Boolean)
+            .join(' · ');
+    }
+    return '';
+}
+
+/**
+ * @param {Record<string, unknown>} payload
  * @param {{ showIds?: boolean; event?: string }} [opts]
  * @returns {string}
  */
 function summarizePayload(payload, opts = {}) {
+    if (opts.event === 'terminal.runtime.wired') {
+        const summary = summarizeTerminalRuntimePayload(payload);
+        if (summary) return summary;
+    }
+    if (opts.event === 'terminal.started') {
+        const summary = summarizeTerminalStartedPayload(payload);
+        if (summary) return summary;
+    }
+    if (opts.event === 'quota.warning') {
+        const summary = summarizeQuotaPayload(payload);
+        if (summary) return summary;
+    }
+    if (opts.event === 'agent.background.completed' || opts.event === 'agent.background.idle') {
+        const summary = summarizeBackgroundPayload(payload);
+        if (summary) return summary;
+    }
     if (opts.event === 'activity.changed') {
         const summary = summarizeActivityPayload(payload, { nested: true });
         if (summary) return summary;
@@ -687,6 +1180,47 @@ function summarizePayload(payload, opts = {}) {
     }
     if (opts.event === 'sdk.lifecycle') {
         const summary = summarizeSdkLifecyclePayload(payload);
+        if (summary) return summary;
+    }
+    if (opts.event === 'model.call_failure') {
+        const summary = summarizeModelCallFailurePayload(payload);
+        if (summary) return summary;
+    }
+    if (opts.event === 'session.permissions_changed') {
+        const summary = summarizePermissionsChangedPayload(payload);
+        if (summary) return summary;
+    }
+    if (opts.event === 'session.canvas.opened') {
+        const summary = summarizeCanvasOpenedPayload(payload);
+        if (summary) return summary;
+    }
+    if (opts.event === 'session.canvas.registry_changed') {
+        const summary = summarizeCanvasRegistryChangedPayload(payload);
+        if (summary) return summary;
+    }
+    if (opts.event === 'mcp_app.tool_call_complete') {
+        const summary = summarizeMcpAppToolCallCompletePayload(payload);
+        if (summary) return summary;
+    }
+    if (
+        opts.event === 'session.autopilot_objective_changed' ||
+        opts.event === 'extension_context' ||
+        opts.event === 'session.custom_agents_updated' ||
+        opts.event === 'session.custom_notification' ||
+        opts.event === 'session.extensions.attachments_pushed' ||
+        opts.event === 'session.remote_steerable_changed' ||
+        opts.event === 'session.schedule_created' ||
+        opts.event === 'session.schedule_cancelled' ||
+        opts.event === 'new_inbox_message'
+    ) {
+        const summary = summarizeSdkExtensionSignalPayload(payload, opts.event);
+        if (summary) return summary;
+    }
+    if (opts.event === 'hook.progress' && typeof payloadDataOrSelf(payload)['message'] === 'string') {
+        return compact(humanEventMessage(payloadDataOrSelf(payload)['message']), 140);
+    }
+    if (opts.event === 'tool.execution_complete' || opts.event === 'user.message') {
+        const summary = summarizeMultimodalPayload(payload);
         if (summary) return summary;
     }
     if (opts.event === 'terminal.turn.empty_recovery') {
@@ -769,10 +1303,39 @@ function summarizePayload(payload, opts = {}) {
  */
 function summarizeRawPreviewPayload(payload, event) {
     if (!payload || typeof payload !== 'object') return { payloadKeys: [], payloadPreview: null };
-    const payloadKeys = Object.keys(payload).slice(0, 12);
-    const summary = summarizePayload(payload, { showIds: true, event });
-    const payloadPreview = summary || compact(JSON.stringify(payload), 180);
+    const redactedPayload = redactSecretRecord(payload);
+    const payloadKeys = Object.keys(redactedPayload).slice(0, 12);
+    const summary = summarizePayload(redactedPayload, { showIds: true, event });
+    const payloadPreview = summary || compact(JSON.stringify(redactedPayload), 180);
     return { payloadKeys, payloadPreview: payloadPreview || null };
+}
+
+/**
+ * @param {Record<string, unknown>} entry
+ * @returns {Record<string, unknown>}
+ */
+function redactRawEventEntry(entry) {
+    return redactSecretRecord(entry);
+}
+
+/**
+ * @param {unknown} value
+ * @param {string[]} fieldNames
+ * @param {number} [depth=0]
+ * @returns {string | null}
+ */
+function findCompactPayloadString(value, fieldNames, depth = 0) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 2) return null;
+    const record = /** @type {Record<string, unknown>} */ (value);
+    for (const fieldName of fieldNames) {
+        const fieldValue = record[fieldName];
+        if (typeof fieldValue === 'string' && fieldValue.length > 0) return fieldValue;
+    }
+    for (const nestedKey of ['data', 'payload', 'request', 'invocation', 'context', 'toolCall', 'permission']) {
+        const found = findCompactPayloadString(record[nestedKey], fieldNames, depth + 1);
+        if (found) return found;
+    }
+    return null;
 }
 
 /**
@@ -783,6 +1346,8 @@ function createRawPreviewEntry(entry) {
     const event = typeof entry['event'] === 'string' ? entry['event'] : 'event';
     const payload = /** @type {Record<string, unknown> | null | undefined} */ (entry['payload']);
     const payloadSummary = summarizeRawPreviewPayload(payload, event);
+    const toolCallId = findCompactPayloadString(payload, ['toolCallId', 'tool_call_id', 'callId']);
+    const requestId = findCompactPayloadString(payload, ['requestId', 'request_id', 'pendingRequestId']);
     return {
         schemaVersion: entry['schemaVersion'] ?? 1,
         timestamp: entry['timestamp'] ?? null,
@@ -794,6 +1359,8 @@ function createRawPreviewEntry(entry) {
         traceId: entry['traceId'] ?? null,
         turnId: entry['turnId'] ?? null,
         hubSessionId: entry['hubSessionId'] ?? null,
+        toolCallId,
+        requestId,
         ...payloadSummary,
     };
 }
@@ -921,6 +1488,16 @@ export async function cmdEvents({ println }, arg = '') {
         if (!detailMode) {
             println(terminalThemeRow('Detalhe', '/events sources detail', { role: 'command' }));
         }
+        println(
+            terminalThemeRow('Formatos', '/events --json compact · /events --raw preview · /events --raw full', {
+                role: 'command',
+            }),
+        );
+        println(
+            terminalThemeRow('Segurança', 'payload público redigido; compacto usa preview e ids de filtro', {
+                role: 'muted',
+            }),
+        );
         for (const policy of policies) {
             const policyCount = policy.publicEvents.reduce((sum, event) => sum + (counts.get(event) ?? 0), 0);
             const humanEvents = uniqueHumanEventLabels(policy.publicEvents);
@@ -954,7 +1531,7 @@ export async function cmdEvents({ println }, arg = '') {
         return;
     }
 
-    const { query, format, rawMode } = parseEventsArg(arg);
+    const { query, format, jsonMode, rawMode } = parseEventsArg(arg);
     const defaultHumanTail = format === 'text' && !hasActiveEventFilters(query);
     const archiveQuery = defaultHumanTail
         ? { ...query, limit: Math.min(500, Math.max(100, query.limit * 5)) }
@@ -964,12 +1541,13 @@ export async function cmdEvents({ println }, arg = '') {
     const filters = defaultHumanTail ? { ...projection.filters, limit: query.limit } : projection.filters;
 
     if (format === 'json') {
-        println(JSON.stringify({ state, filters, entries }, null, 2));
+        const jsonEntries = jsonMode === 'compact' ? entries.map(createRawPreviewEntry) : entries;
+        println(JSON.stringify(redactSecretRecord({ state, filters, entries: jsonEntries }), null, 2));
         return;
     }
     if (format === 'raw') {
         if (rawMode === 'full') {
-            for (const entry of entries) println(JSON.stringify(entry));
+            for (const entry of entries) println(JSON.stringify(redactRawEventEntry(entry)));
             return;
         }
         println('');
@@ -987,9 +1565,11 @@ export async function cmdEvents({ println }, arg = '') {
             ),
         );
         println(
-            terminalThemeRow('Completo', `/events ${filters.limit} --raw full · /events ${filters.limit} --json`, {
-                role: 'command',
-            }),
+            terminalThemeRow(
+                'Completo',
+                `/events ${filters.limit} --raw full · JSON leve /events ${filters.limit} --json compact · JSON full /events ${filters.limit} --json`,
+                { role: 'command' },
+            ),
         );
         for (const entry of entries.slice(0, RAW_PREVIEW_LIMIT)) println(JSON.stringify(createRawPreviewEntry(entry)));
         if (entries.length > RAW_PREVIEW_LIMIT) {
@@ -1022,7 +1602,11 @@ export async function cmdEvents({ println }, arg = '') {
         ),
     );
     println(terminalThemeRow('Filtro', filterParts.join(' · ') || 'nenhum', { role: 'muted' }));
-    println(terminalThemeRow('Detalhe', '/events --raw preview · /events --raw full · /events --json · /events sources', { role: 'command' }));
+    println(
+        terminalThemeRow('Detalhe', '/events --raw preview · /events --raw full · /events --json compact · /events sources', {
+            role: 'command',
+        }),
+    );
     if (state.error) {
         println(terminalThemeRow('Erro', state.error, { role: 'error' }));
     }
@@ -1055,7 +1639,7 @@ export async function cmdEvents({ println }, arg = '') {
     }
     const eventRows = visibleEntries.map((entry) => {
         const time = showDiagnosticIds
-            ? formatTerminalIsoTimestamp(entry.timestamp, { precision: 'seconds' })
+            ? formatTerminalTimeLabel(entry.timestamp, { now, mode: 'dual' })
             : formatTerminalTimeLabel(entry.timestamp, { now, mode: 'dual' });
         const origin = compact(humanEventSource(entry.eventSource ?? entry.source ?? '-'), 52);
         const eventId = showDiagnosticIds && entry.eventId ? ` · #${entry.eventId}` : '';

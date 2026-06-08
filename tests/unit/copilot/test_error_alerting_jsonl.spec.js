@@ -215,4 +215,23 @@ describe('F49 — createJsonlWriter', () => {
         await new Promise((r) => setTimeout(r, 50));
         expect(mockFs.rename).not.toHaveBeenCalled();
     });
+
+    it('redige segredos antes de escrever JSONL', async () => {
+        const githubToken = 'ghs_abcdefghijklmnopqrstuvwxyz1234567890';
+        const byokToken = 'sk-testsecret1234567890';
+        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/redacted.jsonl' });
+
+        writer.write({
+            gitHubToken: githubToken,
+            headers: { Authorization: `Bearer ${byokToken}` },
+            tokens: 42,
+        });
+        await new Promise((r) => setTimeout(r, 50));
+
+        const written = String(/** @type {any[]} */ (mockFs.appendFile.mock.calls[0] ?? [])[1] ?? '');
+        expect(written).not.toContain(githubToken);
+        expect(written).not.toContain(byokToken);
+        expect(written).toContain('[redacted]');
+        expect(written).toContain('"tokens":42');
+    });
 });

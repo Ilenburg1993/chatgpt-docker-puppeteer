@@ -7,7 +7,7 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { onSessionEvent } from '#copilot/sdk/session';
+import { onSessionEvent } from '#copilot/events/sdk-events';
 
 /**
  * @param {import('./contracts.js').CopilotSessionLike} session

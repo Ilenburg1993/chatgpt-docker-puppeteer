@@ -32,7 +32,7 @@ import {
     compactTerminalToolText,
     getTerminalHumanToolName,
     humanizeTerminalToolSurfaceText,
-} from '../events/tool-activity-presenter.js';
+} from '../events/presenters/tools/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /** @typedef {import('../state/ui-theme.js').TerminalThemeRole} TerminalThemeRole */

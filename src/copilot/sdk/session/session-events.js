@@ -32,7 +32,49 @@ function stringOr(value, fallback) {
  * @returns {number}
  */
 function tsOrNow(value) {
-    return typeof value === 'number' && Number.isFinite(value) ? value : Date.now();
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+        const parsed = Date.parse(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return Date.now();
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean | null}
+ */
+function booleanOrNull(value) {
+    return typeof value === 'boolean' ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function finiteNumberOrNull(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function stringOrNull(value) {
+    return stringOr(value, '') || null;
+}
+
+/**
+ * @param {Record<string, unknown>} root
+ * @param {Record<string, unknown>} data
+ * @returns {{ ts: number; timestamp: string | null }}
+ */
+function normalizeTimestamp(root, data) {
+    const raw = root['timestamp'] ?? root['ts'] ?? data['timestamp'] ?? data['ts'];
+    return {
+        ts: tsOrNow(raw),
+        timestamp: typeof raw === 'string' && raw.trim().length > 0 ? raw : null,
+    };
 }
 
 // ─── session.model_changed ──────────────────────────────────────────────────
@@ -189,4 +231,202 @@ export function normalizeModeChangedEvent(eventOrData) {
 
     const ts = tsOrNow(root['timestamp'] ?? root['ts'] ?? data['ts']);
     return { previousMode, newMode, ts };
+}
+
+// ─── model.call_failure ────────────────────────────────────────────────────
+
+/**
+ * @typedef {object} NormalizedModelCallFailureEvent
+ * @property {string | null} model Modelo usado na chamada com falha.
+ * @property {string} source Origem da chamada (`top_level`, `subagent`, `mcp_sampling` ou `unknown`).
+ * @property {number | null} statusCode Status HTTP, quando disponível.
+ * @property {number | null} durationMs Duração da chamada em ms, quando disponível.
+ * @property {string | null} errorMessage Mensagem de erro restrita.
+ * @property {string | null} apiCallId ID de completion do provider.
+ * @property {string | null} providerCallId ID de request do provider/GitHub.
+ * @property {string | null} serviceRequestId ID de request do serviço Copilot.
+ * @property {string | null} initiator Iniciador da chamada.
+ * @property {number} ts Timestamp compat numérico.
+ * @property {string | null} timestamp Timestamp ISO original.
+ */
+
+/**
+ * Normaliza `model.call_failure` para telemetry/UX.
+ *
+ * @param {unknown} eventOrData
+ * @returns {NormalizedModelCallFailureEvent}
+ */
+export function normalizeModelCallFailureEvent(eventOrData) {
+    const root = objectOrEmpty(eventOrData);
+    const data = objectOrEmpty(root['data']);
+    const time = normalizeTimestamp(root, data);
+    return {
+        model: stringOrNull(data['model'] ?? root['model']),
+        source: stringOr(data['source'], '') || stringOr(root['source'], 'unknown'),
+        statusCode: finiteNumberOrNull(data['statusCode'] ?? root['statusCode']),
+        durationMs: finiteNumberOrNull(data['durationMs'] ?? root['durationMs']),
+        errorMessage: stringOrNull(data['errorMessage'] ?? root['errorMessage']),
+        apiCallId: stringOrNull(data['apiCallId'] ?? root['apiCallId']),
+        providerCallId: stringOrNull(data['providerCallId'] ?? root['providerCallId']),
+        serviceRequestId: stringOrNull(data['serviceRequestId'] ?? root['serviceRequestId']),
+        initiator: stringOrNull(data['initiator'] ?? root['initiator']),
+        ...time,
+    };
+}
+
+// ─── session.permissions_changed ───────────────────────────────────────────
+
+/**
+ * @typedef {object} NormalizedPermissionsChangedEvent
+ * @property {boolean | null} allowAllPermissions Valor agregado após a mudança.
+ * @property {boolean | null} previousAllowAllPermissions Valor agregado antes da mudança.
+ * @property {'enabled' | 'disabled' | 'unchanged' | 'unknown'} transition Transição humana.
+ * @property {number} ts Timestamp compat numérico.
+ * @property {string | null} timestamp Timestamp ISO original.
+ */
+
+/**
+ * Normaliza `session.permissions_changed`.
+ *
+ * @param {unknown} eventOrData
+ * @returns {NormalizedPermissionsChangedEvent}
+ */
+export function normalizePermissionsChangedEvent(eventOrData) {
+    const root = objectOrEmpty(eventOrData);
+    const data = objectOrEmpty(root['data']);
+    const allowAllPermissions = booleanOrNull(data['allowAllPermissions'] ?? root['allowAllPermissions']);
+    const previousAllowAllPermissions = booleanOrNull(
+        data['previousAllowAllPermissions'] ?? root['previousAllowAllPermissions'],
+    );
+    /** @type {'enabled' | 'disabled' | 'unchanged' | 'unknown'} */
+    let transition = 'unknown';
+    if (allowAllPermissions !== null && previousAllowAllPermissions !== null) {
+        transition =
+            allowAllPermissions === previousAllowAllPermissions
+                ? 'unchanged'
+                : allowAllPermissions
+                  ? 'enabled'
+                  : 'disabled';
+    }
+    return {
+        allowAllPermissions,
+        previousAllowAllPermissions,
+        transition,
+        ...normalizeTimestamp(root, data),
+    };
+}
+
+// ─── session.canvas.* ──────────────────────────────────────────────────────
+
+/**
+ * @typedef {object} NormalizedCanvasOpenedEvent
+ * @property {string | null} canvasId Provider-local canvas id.
+ * @property {string | null} instanceId Instância aberta.
+ * @property {string | null} extensionId Provider da extensão.
+ * @property {string | null} extensionName Nome da extensão.
+ * @property {string | null} title Título renderizado.
+ * @property {string | null} status Status provider-side.
+ * @property {string | null} url URL web, se houver.
+ * @property {string} availability Estado de disponibilidade (`ready`, `stale` ou `unknown`).
+ * @property {boolean} reopen Indica reopen idempotente.
+ * @property {number} ts Timestamp compat numérico.
+ * @property {string | null} timestamp Timestamp ISO original.
+ */
+
+/**
+ * Normaliza `session.canvas.opened`.
+ *
+ * @param {unknown} eventOrData
+ * @returns {NormalizedCanvasOpenedEvent}
+ */
+export function normalizeCanvasOpenedEvent(eventOrData) {
+    const root = objectOrEmpty(eventOrData);
+    const data = objectOrEmpty(root['data']);
+    return {
+        canvasId: stringOrNull(data['canvasId'] ?? root['canvasId']),
+        instanceId: stringOrNull(data['instanceId'] ?? root['instanceId']),
+        extensionId: stringOrNull(data['extensionId'] ?? root['extensionId']),
+        extensionName: stringOrNull(data['extensionName'] ?? root['extensionName']),
+        title: stringOrNull(data['title'] ?? root['title']),
+        status: stringOrNull(data['status'] ?? root['status']),
+        url: stringOrNull(data['url'] ?? root['url']),
+        availability: stringOr(data['availability'], '') || stringOr(root['availability'], 'unknown'),
+        reopen: Boolean(data['reopen'] ?? root['reopen']),
+        ...normalizeTimestamp(root, data),
+    };
+}
+
+/**
+ * @typedef {object} NormalizedCanvasRegistryEntry
+ * @property {string | null} canvasId Provider-local canvas id.
+ * @property {string | null} displayName Nome humano.
+ * @property {string | null} description Descrição curta.
+ * @property {string | null} extensionId Provider da extensão.
+ * @property {string | null} extensionName Nome da extensão.
+ * @property {number} actionCount Quantidade de actions declaradas.
+ */
+
+/**
+ * @typedef {object} NormalizedCanvasRegistryChangedEvent
+ * @property {number} count Quantidade de canvases declarados.
+ * @property {NormalizedCanvasRegistryEntry[]} canvases Canvases resumidos.
+ * @property {number} ts Timestamp compat numérico.
+ * @property {string | null} timestamp Timestamp ISO original.
+ */
+
+/**
+ * Normaliza `session.canvas.registry_changed`.
+ *
+ * @param {unknown} eventOrData
+ * @returns {NormalizedCanvasRegistryChangedEvent}
+ */
+export function normalizeCanvasRegistryChangedEvent(eventOrData) {
+    const root = objectOrEmpty(eventOrData);
+    const data = objectOrEmpty(root['data']);
+    const rawCanvases = Array.isArray(data['canvases'])
+        ? /** @type {unknown[]} */ (data['canvases'])
+        : Array.isArray(root['canvases'])
+          ? /** @type {unknown[]} */ (root['canvases'])
+          : [];
+    const canvases = rawCanvases.map((canvas) => {
+        const item = objectOrEmpty(canvas);
+        const actions = Array.isArray(item['actions']) ? item['actions'] : [];
+        return {
+            canvasId: stringOrNull(item['canvasId']),
+            displayName: stringOrNull(item['displayName']),
+            description: stringOrNull(item['description']),
+            extensionId: stringOrNull(item['extensionId']),
+            extensionName: stringOrNull(item['extensionName']),
+            actionCount: actions.length,
+        };
+    });
+    return {
+        count: canvases.length,
+        canvases,
+        ...normalizeTimestamp(root, data),
+    };
+}
+
+// ─── hook.progress ─────────────────────────────────────────────────────────
+
+/**
+ * @typedef {object} NormalizedHookProgressEvent
+ * @property {string} message Mensagem humana de progresso.
+ * @property {number} ts Timestamp compat numérico.
+ * @property {string | null} timestamp Timestamp ISO original.
+ */
+
+/**
+ * Normaliza `hook.progress`.
+ *
+ * @param {unknown} eventOrData
+ * @returns {NormalizedHookProgressEvent}
+ */
+export function normalizeHookProgressEvent(eventOrData) {
+    const root = objectOrEmpty(eventOrData);
+    const data = objectOrEmpty(root['data']);
+    return {
+        message: stringOr(data['message'], '') || stringOr(root['message'], ''),
+        ...normalizeTimestamp(root, data),
+    };
 }

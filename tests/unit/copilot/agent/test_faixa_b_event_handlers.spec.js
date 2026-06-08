@@ -104,7 +104,7 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
         const emit = vi.fn();
         const unsubs = wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
         expect(Array.isArray(unsubs)).toBe(true);
-        expect(unsubs.length).toBe(11);
+        expect(unsubs.length).toBe(20);
         unsubs.forEach((u) => expect(typeof u).toBe('function'));
     });
 
@@ -230,6 +230,48 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
             'session.snapshot_rewind',
             expect.objectContaining({ data: expect.any(Object) }),
         );
+    });
+
+    it('emite sinais SDK 1.0 de extensões, agenda e inbox com payload normalizado', async () => {
+        const { wireSessionLifecycleEvents } = await import('#copilot/event-handlers/session-lifecycle');
+        const session = createMockSession();
+        const emit = vi.fn();
+        wireSessionLifecycleEvents(/** @type {any} */ (session), { emit });
+
+        session._emit('session.autopilot_objective_changed', { objective: 'Investigar falha de CI' });
+        session._emit('extension_context', { extensionName: 'GitHub' });
+        session._emit('session.custom_agents_updated', { agents: [{ name: 'Reviewer' }] });
+        session._emit('session.custom_notification', { title: 'Aviso', message: 'Ação necessária', severity: 'warn' });
+        session._emit('session.extensions.attachments_pushed', { extensionName: 'GitHub', attachments: [{ id: 'att-1' }] });
+        session._emit('session.remote_steerable_changed', { enabled: true });
+        session._emit('session.schedule_created', { scheduleId: 'sched-1', title: 'Revisão diária' });
+        session._emit('session.schedule_cancelled', { scheduleId: 'sched-1', title: 'Revisão diária' });
+        session._emit('new_inbox_message', { subject: 'Nova solicitação' });
+
+        expect(emit).toHaveBeenCalledWith(
+            'session.autopilot_objective_changed',
+            expect.objectContaining({ objective: 'Investigar falha de CI' }),
+        );
+        expect(emit).toHaveBeenCalledWith('extension_context', expect.objectContaining({ extensionName: 'GitHub' }));
+        expect(emit).toHaveBeenCalledWith('session.custom_agents_updated', expect.objectContaining({ count: 1 }));
+        expect(emit).toHaveBeenCalledWith(
+            'session.custom_notification',
+            expect.objectContaining({ title: 'Aviso', message: 'Ação necessária', level: 'warn' }),
+        );
+        expect(emit).toHaveBeenCalledWith(
+            'session.extensions.attachments_pushed',
+            expect.objectContaining({ count: 1, extensionName: 'GitHub' }),
+        );
+        expect(emit).toHaveBeenCalledWith('session.remote_steerable_changed', expect.objectContaining({ enabled: true }));
+        expect(emit).toHaveBeenCalledWith(
+            'session.schedule_created',
+            expect.objectContaining({ scheduleId: 'sched-1', title: 'Revisão diária' }),
+        );
+        expect(emit).toHaveBeenCalledWith(
+            'session.schedule_cancelled',
+            expect.objectContaining({ scheduleId: 'sched-1', title: 'Revisão diária' }),
+        );
+        expect(emit).toHaveBeenCalledWith('new_inbox_message', expect.objectContaining({ message: 'Nova solicitação' }));
     });
 });
 
@@ -564,7 +606,7 @@ describe('Faixa B4 — interaction-events handlers', () => {
                 requestId: 'ui-1',
                 question: 'Escolha?',
                 choices: ['A', 'B'],
-                allowFreeform: false,
+                allowFreeform: true,
                 toolCallId: 'tool-1',
             }),
         );

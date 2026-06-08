@@ -143,7 +143,7 @@ export function buildTerminalSmartMenuEntries() {
             id: 'sdk-waits',
             label: 'Painel de interrupções SDK',
             commandLine: '/sdk waits',
-            description: 'Resumo unificado de waits e ações rápidas',
+            description: 'Pendências vivas agora; histórico em /session sdk waits',
             hot: true,
         });
     }

@@ -42,6 +42,7 @@ vi.mock('@github/copilot-sdk', () => {
         context: 'context',
     });
     return {
+        SYSTEM_MESSAGE_SECTIONS: SYSTEM_PROMPT_SECTIONS,
         SYSTEM_PROMPT_SECTIONS,
         CopilotClient: vi.fn(),
         defineTool: vi.fn(),

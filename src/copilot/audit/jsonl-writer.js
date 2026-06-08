@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { logSwallowed } from '#copilot/core';
+import { logSwallowed, redactSecretRecord } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -74,7 +74,7 @@ export function createJsonlWriter(opts) {
          * @returns {void}
          */
         write(record) {
-            _queue.push(JSON.stringify(record) + '\n');
+            _queue.push(JSON.stringify(redactSecretRecord(/** @type {Record<string, unknown>} */ (record))) + '\n');
             scheduleFlush();
         },
     };

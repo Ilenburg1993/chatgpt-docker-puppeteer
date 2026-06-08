@@ -31,7 +31,11 @@
  * @see EventBus
  */
 
-import { createTool as createToolCore, createToolSync as createToolSyncCore } from './tools/core.js';
+import {
+    createDeclarationTool as createDeclarationToolCore,
+    createTool as createToolCore,
+    createToolSync as createToolSyncCore,
+} from './tools/core.js';
 
 export {
     _injectClientForTest,
@@ -42,6 +46,8 @@ export {
     createClientSession,
     createCopilotClient,
     createCopilotClientManager,
+    createServerCopilotClient,
+    createTerminalCopilotClient,
     defaultClientManager,
     deleteClientSession,
     disconnectClientSession,
@@ -202,8 +208,13 @@ export {
 } from './session/permission-runtime.js';
 export { approveAll, createAllowlistPermissionHandler, createPermissionHandler } from './session/permissions.js';
 export {
+    normalizeCanvasOpenedEvent,
+    normalizeCanvasRegistryChangedEvent,
+    normalizeHookProgressEvent,
     normalizeModeChangedEvent,
+    normalizeModelCallFailureEvent,
     normalizeModelChangedEvent,
+    normalizePermissionsChangedEvent,
     normalizePlanChangedEvent,
     normalizeToolsUpdatedEvent,
 } from './session/session-events.js';
@@ -226,8 +237,20 @@ export {
     registerPendingStructuredUserInputResolver,
     resolvePendingStructuredUserInput,
 } from './session/user-input.js';
+export {
+    USER_INPUT_FREEFORM_POLICY,
+    normalizeUserInputChoices,
+    resolveEffectiveUserInputAllowFreeform,
+} from './session/user-input-policy.js';
 export { AgentToolPolicy } from './tools/agent-policy.js';
-export { defineTool, normalizeToolParametersSchema } from './tools/core.js';
+export {
+    BuiltInTools,
+    ToolSet,
+    convertMcpCallToolResult,
+    defineTool,
+    normalizeToolParametersSchema,
+    normalizeToolTelemetry,
+} from './tools/core.js';
 
 /**
  * Hoist-safe facade para consumers que importam de `#copilot/sdk` durante ciclos ESM de tools.
@@ -238,6 +261,17 @@ export { defineTool, normalizeToolParametersSchema } from './tools/core.js';
  */
 export function createTool(options) {
     return createToolCore(options);
+}
+
+/**
+ * Factory para tools declaration-only do SDK 1.0.
+ *
+ * @template [T=unknown] Default is `unknown`
+ * @param {import('./tools/core.js').CreateDeclarationToolOptions<T>} options
+ * @returns {import('@github/copilot-sdk').Tool<T>}
+ */
+export function createDeclarationTool(options) {
+    return createDeclarationToolCore(options);
 }
 
 /**

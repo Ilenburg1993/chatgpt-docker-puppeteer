@@ -12,7 +12,7 @@ import { TERMINAL_LIVE_STATUS_ENABLED, TERMINAL_LIVE_STATUS_INTERVAL_MS } from '
 import { cancelTimer, registerInterval } from '#copilot/core';
 import { getBusy } from '../../presentation/state/index.js';
 import { clearInlineStatus, writeInlineStatus } from '../dialog/index.js';
-import { getTerminalHumanToolName, humanizeTerminalToolSurfaceText } from '../events/tool-activity-presenter.js';
+import { getTerminalHumanToolName, humanizeTerminalToolSurfaceText } from '../events/presenters/tools/index.js';
 import {
     listTerminalPendingStructuredUserInputs,
     readTerminalDialogStreamMeta,
@@ -314,7 +314,7 @@ function isByokProviderErrorActivity(activity) {
 
 /**
  * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
- * @returns {{ state: string; transition: string }}
+ * @returns {{ state: string; transition: string; confidence: string | null }}
  */
 function renderModelActivityCompact(activity) {
     const text = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase();
@@ -322,11 +322,13 @@ function renderModelActivityCompact(activity) {
     const match = detail.match(
         /^(?<state>solicitado|confirmado(?:\s+sem\s+troca)?|fallback\s+aplicado):\s*(?<transition>[^·]+)/iu,
     );
+    const confidence = detail.match(/(?:^|·)\s*confiança\s+(?<confidence>[^·]+)/iu)?.groups?.['confidence'] ?? null;
     const transition = compactLiveStatusText(match?.groups?.['transition'] ?? activity.label ?? 'modelo', 34);
-    if (text.includes('fallback')) return { state: 'fallback modelo', transition };
-    if (text.includes('confirmad')) return { state: 'modelo confirmado', transition };
-    if (text.includes('adiad')) return { state: 'modelo adiado', transition };
-    return { state: 'modelo solicitado', transition };
+    const compactConfidence = confidence ? compactLiveStatusText(confidence, 12) : null;
+    if (text.includes('fallback')) return { state: 'fallback modelo', transition, confidence: compactConfidence };
+    if (text.includes('confirmad')) return { state: 'modelo confirmado', transition, confidence: compactConfidence };
+    if (text.includes('adiad')) return { state: 'modelo adiado', transition, confidence: compactConfidence };
+    return { state: 'modelo solicitado', transition, confidence: compactConfidence };
 }
 
 /**
@@ -431,6 +433,7 @@ function buildTerminalLiveStatusLine(input = {}) {
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
             `${terminalThemeText(severityRole, modelActivity.state)}` +
             `${terminalThemeText('info', ` · ${modelActivity.transition}`)}` +
+            `${modelActivity.confidence ? terminalThemeText('muted', ` · conf ${modelActivity.confidence}`) : ''}` +
             `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)}${queue}`)}` +
             '\x1b[K'
         );

@@ -117,16 +117,20 @@ import {
 import {
     applyTerminalByokGatewayAutoEffects,
     buildTerminalByokGatewayAutoStatus,
-    classifyTerminalByokSdkBinding,
     describeTerminalByokGatewayAutoEffect,
-    evaluateTerminalByokProbeBudget,
-    isSameTerminalByokProviderBoundary,
     parseTerminalByokGatewayAutoArgs,
     persistTerminalByokGatewayAutoEffectApplications,
+    runTerminalByokGatewayPostTurnAutomation,
+} from '../byok/gateway/index.js';
+import { evaluateTerminalByokProbeBudget } from '../byok/policy/index.js';
+import {
+    classifyTerminalByokSdkBinding,
+    isSameTerminalByokProviderBoundary,
+} from '../byok/binding/index.js';
+import {
     recordTerminalLiveByokModelSwitchDeferred,
     requestTerminalLiveByokModelSwitch,
-    runTerminalByokGatewayPostTurnAutomation,
-} from '../byok/index.js';
+} from '../byok/live/index.js';
 import {
     terminalThemeDivider,
     terminalThemeHeadline,
@@ -134,7 +138,7 @@ import {
     terminalThemeRows,
     terminalThemeWrappedRow,
 } from '../state/theme/index.js';
-import { formatTerminalToolPathForOperator } from '../events/tool-activity-presenter.js';
+import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
@@ -2321,6 +2325,40 @@ function renderProfileAuth(profile) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalByokProjection>['profiles'][number]} profile
+ * @returns {{ label: string; detail: string; role: 'success' | 'warn' | 'error' | 'muted' }}
+ */
+function classifyByokProfileReadiness(profile) {
+    const errors = Array.isArray(profile['errors']) ? profile['errors'].map(String).filter(Boolean) : [];
+    const hasModel = typeof profile.model === 'string' && profile.model.trim().length > 0;
+    const hasBaseUrl = typeof profile.baseUrl === 'string' && profile.baseUrl.trim().length > 0;
+    const hasProvider = typeof profile.providerType === 'string' && profile.providerType.trim().length > 0;
+    const explicitReady = typeof profile['ready'] === 'boolean' ? profile['ready'] : null;
+    if (!hasModel || errors.some((error) => /COPILOT_BYOK_MODEL|model=auto|model id/iu.test(error))) {
+        return {
+            label: 'bloqueado',
+            detail: 'defina modelo explícito para o SDK 1.0',
+            role: 'error',
+        };
+    }
+    if (!hasBaseUrl || !hasProvider || errors.length > 0 || explicitReady === false) {
+        return {
+            label: 'incompleto',
+            detail: errors[0] ?? 'confira provedor/base antes do próximo boot',
+            role: 'warn',
+        };
+    }
+    if (!profile.auth.bearerTokenConfigured && !profile.auth.apiKeyConfigured && !profile.auth.headersConfigured) {
+        return {
+            label: 'sem credencial',
+            detail: 'ok apenas para providers locais ou sem auth',
+            role: 'warn',
+        };
+    }
+    return { label: 'pronto', detail: 'provider e modelo explícitos', role: 'success' };
+}
+
+/**
  * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @param {ReturnType<typeof readTerminalByokProjection>['summary']} summary
  * @param {string} source
@@ -2441,6 +2479,15 @@ async function renderStatus(projection, println) {
     ].filter(Boolean);
     println(terminalThemeRow('Modelo', modelParts.join(' · ')));
     println(terminalThemeRow('Autenticação', renderByokAuthLine(summary.auth)));
+    if (summary.enabled) {
+        println(
+            terminalThemeWrappedRow(
+                'Quota',
+                'BYOK usa quota/cobrança do provider externo; GitHub Copilot/Premium Requests só valem para rotas não-BYOK',
+                { role: 'muted', columns: 112 },
+            ),
+        );
+    }
     println(terminalThemeRow('Capacidades', renderByokCapabilityLine(statusCapabilities)));
     if (statusCapabilities.modelId) {
         println(
@@ -7204,6 +7251,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             .map(([preset, count]) => `${preset} ${count}`)
             .join(' · ');
         const omittedPresetCount = Math.max(0, configuredPresetEntries.length - 6);
+        const readyProfileCount = profiles.filter((profile) => classifyByokProfileReadiness(profile).label === 'pronto').length;
         const presetSummary = configuredPresets
             ? `${countLabel(configuredPresetEntries.length, 'tipo', 'tipos')} · ${configuredPresets}${omittedPresetCount > 0 ? ` · +${omittedPresetCount}` : ''}`
             : '-';
@@ -7213,7 +7261,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         println(
             terminalThemeRow(
                 'Resumo',
-                `ativo ${summary.profile ?? summary.preset ?? 'sdk'} · prontos ${profiles.length} · presets ${presetSummary}`,
+                `ativo ${summary.profile ?? summary.preset ?? 'sdk'} · prontos ${readyProfileCount}/${profiles.length} · presets ${presetSummary}`,
             ),
         );
         if (profiles.length === 0) {
@@ -7228,15 +7276,12 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             const cost = renderByokProfileCostTag(profile.name);
             const health = readHealthForByokProfile(profile);
             const healthLabel = ` · ${renderByokHealthTag(health)} · ${renderByokAgentProbeHealthTag(health)}`;
-            const readiness =
-                profile.auth.bearerTokenConfigured || profile.auth.apiKeyConfigured || profile.auth.headersConfigured
-                    ? 'pronto'
-                    : 'sem credencial';
-            println(terminalThemeRow(profile.name, `${active} · ${readiness}`, { role: readiness === 'pronto' ? 'success' : 'warn', width: 24 }));
+            const readiness = classifyByokProfileReadiness(profile);
+            println(terminalThemeRow(profile.name, `${active} · ${readiness.label}`, { role: readiness.role, width: 24 }));
             println(
                 terminalThemeRow(
                     'Configuração',
-                    `preset ${profile.preset ?? '-'} · provedor ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · autenticação ${renderProfileAuth(profile)}${metadata}${cost}${healthLabel}`,
+                    `preset ${profile.preset ?? '-'} · provedor ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · autenticação ${renderProfileAuth(profile)} · prontidão ${readiness.detail}${metadata}${cost}${healthLabel}`,
                     { width: 24 },
                 ),
             );
@@ -7271,11 +7316,12 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             const active = profile.name === summary.profile ? 'ativo' : 'disponível';
             const metadata = profile.metadataKeys.length ? ` · metadados ${profile.metadataKeys.join(',')}` : '';
             const cost = renderByokProfileCostTag(profile.name);
-            println(terminalThemeRow(profile.name, active, { role: active === 'ativo' ? 'success' : 'muted', width: 24 }));
+            const readiness = classifyByokProfileReadiness(profile);
+            println(terminalThemeRow(profile.name, `${active} · ${readiness.label}`, { role: readiness.role, width: 24 }));
             println(
                 terminalThemeRow(
                     'Configuração',
-                    `preset ${profile.preset ?? '-'} · provedor ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · autenticação ${renderProfileAuth(profile)}${metadata}${cost}`,
+                    `preset ${profile.preset ?? '-'} · provedor ${profile.providerType ?? '-'} · modelo ${profile.model ?? '-'} · autenticação ${renderProfileAuth(profile)} · prontidão ${readiness.detail}${metadata}${cost}`,
                     { width: 24 },
                 ),
             );

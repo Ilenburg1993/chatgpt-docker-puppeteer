@@ -758,6 +758,7 @@ vi.mock('#copilot/sdk', () => ({
         allStats: () => [{ modelId: 'gpt-5', totalCalls: 2, avgLatencyMs: 44, successRate: 1, totalTokens: 200 }],
     },
     createTool: vi.fn((spec) => spec),
+    SYSTEM_MESSAGE_SECTIONS: {},
     SYSTEM_PROMPT_SECTIONS: {},
     loadCustomToolsAsync: vi.fn(async () => []),
     loadToolsConfigAsync: vi.fn(async () => ({ categories: [] })),
@@ -828,7 +829,7 @@ describe('terminal/frontend/index', () => {
         );
         expect(projection.sdkSessionId).toBe('sdk-1');
         expect(projection.hubSessionId).toBe('hub-1');
-        expect(projection.turnCount).toBe(2);
+        expect(projection.turnCount).toBe(4);
         expect(projection.bridgeTurnCount).toBe(2);
         expect(projection.workspace.currentBranch).toBe('main');
         expect(projection.pendingQuestionKind).toBe('question');
@@ -868,18 +869,18 @@ describe('terminal/frontend/index', () => {
         expect(config.currentModel).toBe('gpt-5-mini');
         expect(context.usedTokens).toBe(8000);
         expect(context.maxTokens).toBe(64000);
-        expect(context.timelineSource).toBe('hub');
+        expect(context.timelineSource).toBe('mixed');
     });
 
-    it('expõe timeline canônica reconciliada com autoridade persistida', () => {
+    it('expõe timeline canônica reconciliada com divergência explícita entre hub e bridge vivo', () => {
         const timeline = frontend.readTerminalTimelineProjection();
 
-        expect(timeline.timelineSource).toBe('hub');
-        expect(timeline.timelineAuthority).toBe('persistent');
+        expect(timeline.timelineSource).toBe('mixed');
+        expect(timeline.timelineAuthority).toBe('reconciled');
         expect(timeline.reconciliationStatus).toBe('diverged');
         expect(timeline.sync.status).toBe('blocked');
         expect(timeline.sync.reason).toBe('diverged-no-overlap');
-        expect(timeline.turns[0]?.content).toBe('a');
+        expect(timeline.turns.map((turn) => turn.content)).toEqual(['olá', 'oi', 'a', 'b']);
     });
 
     it('expõe fallback explícito quando o runtime solicitado não existe', () => {
@@ -1022,7 +1023,7 @@ describe('terminal/frontend/index', () => {
 
         expect(context.isRealData).toBe(true);
         expect(context.workspace.currentBranch).toBe('main');
-        expect(context.timelineAuthority).toBe('persistent');
+        expect(context.timelineAuthority).toBe('reconciled');
         expect(errors.stats.total).toBe(3);
         expect(errors.recent[0]?.message).toBe('kaboom');
         expect(compact.ok).toBe(true);

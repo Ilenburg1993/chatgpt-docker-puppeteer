@@ -9,12 +9,12 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
 import { EventEmitter } from 'node:events';
 import { watch } from 'node:fs';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { logSwallowed, toError } from '../core/error-handlers.js';
+import { log } from '../observability/logger.js';
 
 const DEBOUNCE_MS = 500;
 const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.js', '.ts', '.json', '.yaml', '.yml'];

@@ -6,7 +6,7 @@
  */
 
 import { SESSION_EVENTS } from '#copilot/events';
-import { onSessionEvent } from '#copilot/sdk/session';
+import { onSessionEvent } from '#copilot/events/sdk-events';
 
 /** @type {WeakSet<object>} */
 const SEEN_MESSAGE_DELTA_EVENTS = new WeakSet();

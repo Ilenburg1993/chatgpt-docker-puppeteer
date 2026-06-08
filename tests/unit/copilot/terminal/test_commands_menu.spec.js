@@ -160,6 +160,8 @@ describe('terminal/commands/menu', () => {
         expect(ids).toContain('sdk-waits');
         expect(ids).toContain('elicitation-latest');
         expect(ids).toContain('permission-latest');
+        expect(entries.find((entry) => entry.id === 'sdk-waits')?.description).toContain('Pendências vivas agora');
+        expect(entries.find((entry) => entry.id === 'sdk-waits')?.description).toContain('/session sdk waits');
     });
 
     it('resolve seleção por número e id', () => {

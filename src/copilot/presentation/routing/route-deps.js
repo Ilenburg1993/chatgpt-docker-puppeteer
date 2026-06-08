@@ -7,7 +7,7 @@
  *   `server/routes/sdk/*`, não a `presentation/`.
  */
 
-import { resolveAgentRuntimeSelection } from '../agent/index.js';
+import { resolveAgentRuntimeSelection } from '../agent/runtime/runtime-selection.js';
 import { buildRuntimeRouteMetaFromSelection } from './meta.js';
 
 /**

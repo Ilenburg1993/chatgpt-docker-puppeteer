@@ -474,15 +474,15 @@ function buildSessionConfig(opts, mode) {
         if (co.availableTools !== undefined) cfg.availableTools = co.availableTools;
         if (co.excludedTools !== undefined) cfg.excludedTools = co.excludedTools;
         if (co.provider !== undefined) cfg.provider = co.provider;
-        if (co.configDirectory !== undefined) cfg.configDirectory = co.configDirectory;
         if (co.configDir !== undefined) cfg.configDirectory = co.configDir;
+        if (co.configDirectory !== undefined) cfg.configDirectory = co.configDirectory;
         if (co.onEvent !== undefined) cfg.onEvent = co.onEvent;
         if (co.agent !== undefined) cfg.agent = co.agent;
         if (co.skillDirectories !== undefined) cfg.skillDirectories = co.skillDirectories;
         if (co.disabledSkills !== undefined) cfg.disabledSkills = co.disabledSkills;
         if (co.gitHubToken !== undefined) cfg.gitHubToken = co.gitHubToken;
-        if (co.createSessionFsProvider !== undefined) cfg.createSessionFsProvider = co.createSessionFsProvider;
         if (co.createSessionFsHandler !== undefined) cfg.createSessionFsProvider = co.createSessionFsHandler;
+        if (co.createSessionFsProvider !== undefined) cfg.createSessionFsProvider = co.createSessionFsProvider;
         // BUG-HIGH-06 (fix): só aplicar infiniteSessions quando explicitamente fornecido
         // Evita habilitar compaction automática em sessões que não solicitaram (ex: routes/sessions.js)
         if (co.infiniteSessions !== undefined) {
@@ -529,8 +529,8 @@ function buildSessionConfig(opts, mode) {
         if (ro.availableTools !== undefined) cfg.availableTools = ro.availableTools;
         if (ro.excludedTools !== undefined) cfg.excludedTools = ro.excludedTools;
         if (ro.provider !== undefined) cfg.provider = ro.provider;
-        if (ro.configDirectory !== undefined) cfg.configDirectory = ro.configDirectory;
         if (ro.configDir !== undefined) cfg.configDirectory = ro.configDir;
+        if (ro.configDirectory !== undefined) cfg.configDirectory = ro.configDirectory;
         if (ro.onEvent !== undefined) cfg.onEvent = ro.onEvent;
         if (ro.agent !== undefined) cfg.agent = ro.agent;
         if (ro.skillDirectories !== undefined) cfg.skillDirectories = ro.skillDirectories;
@@ -539,10 +539,10 @@ function buildSessionConfig(opts, mode) {
             cfg.infiniteSessions = buildInfiniteSessionConfig(ro.infiniteSessions);
         }
         if (ro.gitHubToken !== undefined) cfg.gitHubToken = ro.gitHubToken;
-        if (ro.createSessionFsProvider !== undefined) cfg.createSessionFsProvider = ro.createSessionFsProvider;
         if (ro.createSessionFsHandler !== undefined) cfg.createSessionFsProvider = ro.createSessionFsHandler;
-        if (ro.suppressResumeEvent !== undefined) cfg.suppressResumeEvent = ro.suppressResumeEvent;
+        if (ro.createSessionFsProvider !== undefined) cfg.createSessionFsProvider = ro.createSessionFsProvider;
         if (ro.disableResume !== undefined) cfg.suppressResumeEvent = ro.disableResume;
+        if (ro.suppressResumeEvent !== undefined) cfg.suppressResumeEvent = ro.suppressResumeEvent;
         if (ro.continuePendingWork !== undefined) cfg.continuePendingWork = ro.continuePendingWork;
     }
 

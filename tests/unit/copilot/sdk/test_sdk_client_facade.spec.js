@@ -11,6 +11,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@github/copilot-sdk', () => ({
     approveAll: Object.assign(async () => ({ kind: 'approve-once' }), { _isMockApproveAll: true }),
     CopilotClient: vi.fn(),
+    SYSTEM_MESSAGE_SECTIONS: {
+        identity: { description: 'Identity' },
+        tone: { description: 'Tone' },
+        tool_efficiency: { description: 'Tool efficiency' },
+        environment_context: { description: 'Environment' },
+        code_change_rules: { description: 'Code changes' },
+        guidelines: { description: 'Guidelines' },
+        safety: { description: 'Safety' },
+        tool_instructions: { description: 'Tool instructions' },
+        custom_instructions: { description: 'Custom instructions' },
+        last_instructions: { description: 'Last instructions' },
+    },
     SYSTEM_PROMPT_SECTIONS: {
         identity: { description: 'Identity' },
         tone: { description: 'Tone' },

@@ -75,7 +75,12 @@ describe('MCP auth hardening', () => {
             MCP_AUTH_SCOPES.validate,
             MCP_AUTH_SCOPES.admin,
         ]);
-        assert.deepEqual(config.acceptedAudiences, ['https://mcp.example.test', 'https://mcp.example.test/mcp']);
+        assert.deepEqual(config.acceptedAudiences, [
+            'https://mcp.example.test',
+            'https://mcp.example.test/',
+            'https://mcp.example.test/mcp',
+            'https://mcp.example.test/mcp/',
+        ]);
     });
 
     it('sanitizes WWW-Authenticate challenge values without dropping required scopes', () => {
@@ -133,12 +138,16 @@ describe('MCP auth hardening', () => {
             COPILOT_MCP_AUTH_MODE: 'oauth',
             COPILOT_MCP_PUBLIC_URL: 'https://mcp.example.test',
             COPILOT_MCP_STATIC_BEARER_TOKEN: 'local-static-token',
+            COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED: 'true',
         });
         const decision = await authorizeMcpToolCall(
             readTool,
             { bearerToken: 'local-static-token' },
             config,
-            { COPILOT_MCP_STATIC_BEARER_TOKEN: 'local-static-token' },
+            {
+                COPILOT_MCP_STATIC_BEARER_TOKEN: 'local-static-token',
+                COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED: 'true',
+            },
         );
 
         assert.equal(decision.allowed, true);
@@ -155,6 +164,6 @@ describe('MCP auth hardening', () => {
             MCP_AUTH_SCOPES.validate,
             MCP_AUTH_SCOPES.admin,
         ]);
-        assert.deepEqual(metadata['token_endpoint_auth_methods_supported'], ['none']);
+        assert.deepEqual(metadata['token_endpoint_auth_methods_supported'], ['none', 'private_key_jwt']);
     });
 });

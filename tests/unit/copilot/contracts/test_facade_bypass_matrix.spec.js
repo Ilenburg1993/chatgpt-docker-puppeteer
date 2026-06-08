@@ -32,8 +32,11 @@ const FACADE_OPERATION_MATRIX = {
     'agent-runtime-todos.js': { role: 'query', allowedFacadeImports: [] },
     'agent-runtime-tools.js': { role: 'query', allowedFacadeImports: [] },
     'agent-runtime-webhooks.js': { role: 'mutation', allowedFacadeImports: [] },
-    'health-facade.js': { role: 'query', allowedFacadeImports: [] },
-    'permission-tools-facade.js': { role: 'query', allowedFacadeImports: [] },
+    'health-facade.js': { role: 'query', allowedFacadeImports: ['sdk-access.js'] },
+    'permission-tools-facade.js': {
+        role: 'query',
+        allowedFacadeImports: ['agent-runtime-controls.js', 'agent-webhook-ops.js'],
+    },
     'sdk-query-facade.js': { role: 'query', allowedFacadeImports: [] },
     'state-query-facade.js': { role: 'query', allowedFacadeImports: [] },
     'sdk-access.js': {
@@ -184,6 +187,7 @@ describe('contracts/facade-bypass-matrix — consumers permitidos por facade cr�
 
     it('agent-runtime-controls só é consumida por runtime-surface (entrypoint compat)', () => {
         const violations = findFacadeImportViolations('facades/agent-runtime-controls.js', [
+            'agent/lifecycle/process-host/',
             'agent/agent-runtime-surface.js',
             'agent/runtime/root-surface/',
         ]);

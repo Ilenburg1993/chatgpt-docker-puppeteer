@@ -9,7 +9,7 @@
  */
 
 import { getBusy } from '../../presentation/state/index.js';
-import { buildUserPrompt, scheduleTerminalPromptRedraw } from '../dialog/index.js';
+import { buildUserPrompt, scheduleTerminalPromptRedraw } from '../dialog/io/index.js';
 import { readTerminalAgentRuntimeEventHost, readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import { createToolCallRegistry } from '../state/events/index.js';
 import { setupTerminalAgentRuntimeEventListeners } from './agent-runtime-events.js';

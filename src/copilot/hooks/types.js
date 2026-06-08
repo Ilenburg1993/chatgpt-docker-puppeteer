@@ -112,6 +112,8 @@
  * @property {string} [workingDirectory]
  * @property {string} [cwd]
  * @property {string} [agentName]
+ * @property {string} [traceparent]
+ * @property {string} [tracestate]
  */
 
 /**
@@ -125,6 +127,8 @@
  * @property {Date | number} timestamp
  * @property {string} [workingDirectory]
  * @property {string} [cwd]
+ * @property {string} [traceparent]
+ * @property {string} [tracestate]
  */
 
 /**
@@ -136,6 +140,8 @@
  * @property {Date | number} timestamp
  * @property {string} [workingDirectory]
  * @property {string} [cwd]
+ * @property {string} [traceparent]
+ * @property {string} [tracestate]
  */
 
 /**
@@ -147,6 +153,8 @@
  * @property {Date | number} timestamp
  * @property {string} [workingDirectory]
  * @property {string} [cwd]
+ * @property {string} [traceparent]
+ * @property {string} [tracestate]
  */
 
 /**

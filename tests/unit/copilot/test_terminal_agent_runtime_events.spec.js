@@ -577,6 +577,47 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         cleanup();
     });
 
+    it('não renderiza heartbeat de pergunta humana como tool longa', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-05-18T10:00:00.000Z'));
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        const cleanup = setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('tool.execution_start')?.[0]?.({
+            toolCallId: 'chatcmpl-tool-80d5a00b25801fef',
+            toolName: 'external_tool',
+            canonicalName: 'request_user_input',
+            detail: 'request_user_input ainda executando · 44s · chatcmpl-tool-80d5a00b25801fef',
+        });
+        println.mockClear();
+        writeInlineStatus.mockClear();
+        recordTerminalActivity.mockClear();
+
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(recordTerminalActivity).not.toHaveBeenCalledWith(
+            'tool',
+            'Ferramenta em andamento',
+            expect.anything(),
+        );
+        expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ainda trabalhando'));
+        expect(writeInlineStatus).not.toHaveBeenCalledWith(expect.stringContaining('ainda trabalhando'));
+        expect(writeInlineStatus).not.toHaveBeenCalledWith(expect.stringContaining('chatcmpl-tool'));
+
+        cleanup();
+    });
+
     it('permite heartbeat durável de tool longa apenas por opt-in explícito', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-05-18T10:00:00.000Z'));

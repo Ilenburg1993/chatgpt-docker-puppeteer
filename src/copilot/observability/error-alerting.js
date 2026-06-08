@@ -17,7 +17,7 @@
  * @see EventBus
  */
 
-import { cancelTimer, registerInterval } from '#copilot/core';
+import { cancelTimer, redactSecretRecord, registerInterval } from '#copilot/core';
 import { log } from './logger.js';
 
 const WEBHOOK_TIMEOUT_MS = 5_000;
@@ -117,7 +117,7 @@ export function createErrorAlerter(tracker, config = {}) {
         fetch(webhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'copilot_error_alert', ...alert }),
+            body: JSON.stringify(redactSecretRecord({ type: 'copilot_error_alert', ...alert })),
             signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
         }).catch((err) => {
             log('WARN', `[error-alerting] F39.4: webhook falhou: ${err.message}`);

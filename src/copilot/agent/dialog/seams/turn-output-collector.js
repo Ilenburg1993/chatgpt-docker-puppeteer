@@ -22,7 +22,7 @@ import {
     EMITTER_TOOL_EXECUTION_COMPLETE,
     EMITTER_TOOL_EXECUTION_START,
 } from '#copilot/events';
-import { log } from '../../ports/index.js';
+import { log } from '../../ports/logging/index.js';
 
 const MAX_DELTA_FALLBACK_CHARS = 50_000;
 

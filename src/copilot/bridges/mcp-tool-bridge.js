@@ -26,6 +26,7 @@
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError, container, toError, withRetry } from '#copilot/core';
 import * as observability from '#copilot/observability';
+import { convertMcpCallToolResult } from '#copilot/sdk';
 import { buildTool } from '#copilot/tools';
 import net from 'node:net';
 import { buildZodSchema } from './mcp-tool-schema.js';
@@ -65,6 +66,7 @@ const BOOT_BACKOFF_MS = [0, 200, 1000, 5_000];
  * @property {(ms: number) => Promise<void>} delayFn
  * @property {(inputSchema: object) => import('zod').ZodType<any>} schemaBuilder
  * @property {typeof buildTool} buildToolFn
+ * @property {typeof convertMcpCallToolResult} convertMcpCallToolResultFn
  * @property {(() => Promise<boolean>) | undefined} [isPortOpenFn]
  */
 
@@ -158,6 +160,7 @@ function resolveMcpBridgeDeps(overrides = {}) {
         delayFn: overrides.delayFn ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
         schemaBuilder: overrides.schemaBuilder ?? buildZodSchema,
         buildToolFn: overrides.buildToolFn ?? buildTool,
+        convertMcpCallToolResultFn: overrides.convertMcpCallToolResultFn ?? convertMcpCallToolResult,
         ...(typeof overrides.isPortOpenFn === 'function' ? { isPortOpenFn: overrides.isPortOpenFn } : {}),
     };
 }
@@ -217,6 +220,30 @@ function _isMcpPortOpen(deps) {
         });
         socket.on('error', () => resolve(false));
     });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is { content: unknown[]; isError?: boolean }}
+ */
+function isMcpCallToolResult(value) {
+    return !!value && typeof value === 'object' && Array.isArray(/** @type {{ content?: unknown }} */ (value).content);
+}
+
+/**
+ * @param {unknown} result
+ * @param {McpBridgeDeps} deps
+ * @returns {import('#copilot/sdk/types').ToolResult}
+ */
+function normalizeMcpToolResultForSdk(result, deps) {
+    if (typeof result === 'string') return result;
+    if (isMcpCallToolResult(result)) {
+        return deps.convertMcpCallToolResultFn(/** @type {Parameters<typeof convertMcpCallToolResult>[0]} */ (result));
+    }
+    return {
+        textResultForLlm: JSON.stringify(result, null, 2),
+        resultType: 'success',
+    };
 }
 
 /**
@@ -372,21 +399,14 @@ function createSdkToolFromMcp(mcpTool, deps) {
                     arguments: params,
                 });
 
-                if (typeof result === 'string') return result;
-
-                // MCP retorna { content: [{ type: 'text', text: '...' }] } ou texto direto
-                const obj = /** @type {{ content?: { type: string; text?: string }[] }} */ (result);
-                const content = obj?.content;
-                if (Array.isArray(content)) {
-                    return content
-                        .filter((/** @type {{ type: string; text?: string }} */ c) => c?.type === 'text')
-                        .map((/** @type {{ type: string; text?: string }} */ c) => c.text)
-                        .join('\n');
-                }
-                return JSON.stringify(result, null, 2);
+                return normalizeMcpToolResultForSdk(result, deps);
             } catch (e) {
                 deps.logFn('WARN', `[mcp-tool-bridge] Falha ao executar tool '${mcpTool.name}': ${toError(e).message}`);
-                return `Erro ao executar ${mcpTool.name}: ${toError(e).message}`;
+                return {
+                    textResultForLlm: `Erro ao executar ${mcpTool.name}: ${toError(e).message}`,
+                    resultType: 'failure',
+                    error: toError(e).message,
+                };
             }
         },
     });

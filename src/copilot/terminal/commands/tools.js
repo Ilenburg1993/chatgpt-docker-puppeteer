@@ -14,7 +14,7 @@ import {
     compactTerminalDiagnosticId,
     compactTerminalOperatorToolText,
     getTerminalHumanToolName,
-} from '../events/tool-activity-presenter.js';
+} from '../events/presenters/tools/index.js';
 import { readTerminalToolRegistrySnapshot } from '../frontend/gateways/index.js';
 import { readTerminalStatusProjection, readTerminalToolStatsProjection } from '../frontend/index.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/ui/index.js';
@@ -322,7 +322,7 @@ function printToolFailureDiagnostic(println, projection, options = {}) {
     );
     if (problematicEntries.length === 0 && failedRecent.length === 0) {
         println(terminalThemeRow('Estado', 'nenhuma falha ou bloqueio observado nesta sessão', { role: 'success' }));
-        println(terminalThemeRow('Detalhe', '/tools diag · /events --raw · /errors', { role: 'command' }));
+        println(terminalThemeRow('Detalhe', '/tools diag · /events --raw · /events --json compact · /errors', { role: 'command' }));
         return;
     }
     for (const entry of problematicEntries.slice(0, 12)) {
@@ -341,7 +341,13 @@ function printToolFailureDiagnostic(println, projection, options = {}) {
             printLifecycleDiagnosticEntry(println, entry, options);
         }
     }
-    println(terminalThemeRow('Próximo', '/tools diag para lifecycle completo · /errors para stack/logs · /events --raw para SDK bruto', { role: 'command' }));
+    println(
+        terminalThemeRow(
+            'Próximo',
+            '/tools diag para lifecycle completo · /errors para stack/logs · /events --json compact para trilha estruturada',
+            { role: 'command' },
+        ),
+    );
 }
 
 /**
@@ -905,7 +911,7 @@ export function cmdTools({ println }, arg = '') {
                   'Comandos',
                   wantsDeepDiag
                       ? '/tools diag · FS: /tools fs · falhas: /tools failures · contrato: /tools contract · nomes crus: /tools raw'
-                      : '/tools all · FS: /tools fs · falhas: /tools failures · contrato: /tools contract · rastreio bruto: /tools raw · /events --raw',
+                      : '/tools all · FS: /tools fs · falhas: /tools failures · contrato: /tools contract · nomes crus: /tools raw · eventos: /events --json compact',
                   { role: 'command' },
               )
             : terminalThemeRow('Detalhes', '/tools diag · /tools fs · /tools failures · contrato: /tools contract · nomes crus: /tools raw', { role: 'command' }),

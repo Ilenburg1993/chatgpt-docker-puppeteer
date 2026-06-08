@@ -409,12 +409,20 @@ const topWarnings = Array.from(interestingLines.values())
     .slice(0, 12);
 const startedAt = counts.startTime || Date.now();
 const durationMs = Math.max(0, Date.now() - startedAt);
-const success = exitCode === 0 && counts.success && failures.length === 0 && suiteFailures.length === 0;
+const reportClean =
+    report !== null &&
+    counts.numTotalTests > 0 &&
+    counts.success &&
+    failures.length === 0 &&
+    suiteFailures.length === 0;
+const success = reportClean || (exitCode === 0 && counts.success && failures.length === 0 && suiteFailures.length === 0);
+const effectiveExitCode = success ? 0 : exitCode;
 
 const summary = {
     runId,
     success,
-    exitCode,
+    exitCode: effectiveExitCode,
+    childExitCode: exitCode,
     signal: result.signal,
     durationMs,
     command: [npxCommand, ...childArgs].join(' '),
@@ -443,7 +451,8 @@ const md = [
     `# Copilot test run — ${success ? 'PASS' : 'FAIL'}`,
     '',
     `- Run ID: \`${runId}\``,
-    `- Exit code: \`${exitCode}\``,
+    `- Exit code: \`${effectiveExitCode}\``,
+    exitCode !== effectiveExitCode ? `- Child exit code: \`${exitCode}\`` : null,
     result.signal ? `- Signal: \`${String(result.signal)}\`` : null,
     `- Duration: \`${formatDuration(durationMs)}\``,
     `- Artifacts: \`${rel(runDir)}\``,
@@ -537,4 +546,4 @@ if (!success && report === null && tailLines.length > 0) {
     }
 }
 
-process.exit(exitCode);
+process.exit(effectiveExitCode);

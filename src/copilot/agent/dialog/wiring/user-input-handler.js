@@ -13,9 +13,9 @@
 import { toError } from '#copilot/core';
 import { DialogProtocol } from '#copilot/dialog';
 import { EMITTER_QUESTION_PENDING } from '#copilot/events';
-import { resolveEffectiveUserInputAllowFreeform } from '#copilot/sdk/session';
-import { persistAgentRuntimePendingQuestionState } from '../../facades/index.js';
-import { log } from '../../ports/index.js';
+import { resolveEffectiveUserInputAllowFreeform } from '#copilot/sdk';
+import { persistAgentRuntimePendingQuestionState } from '../../facades/agent-runtime-state.js';
+import { log } from '../../ports/logging/index.js';
 
 const REPLY_PROTOCOL_CONTINUE =
     'CONTINUE_DIALOG_LOOP: resposta entregue ao usuario; chame ask_user("READY: aguardando próxima mensagem") agora.';

@@ -21,7 +21,7 @@
 import assert from 'node:assert/strict';
 import { beforeAll, describe, it } from 'vitest';
 
-import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
+import { alwaysAliveAgent } from '#copilot/agent/always-alive';
 
 // ─── Suite: estrutura do módulo ────────────────────────────────────────────────
 

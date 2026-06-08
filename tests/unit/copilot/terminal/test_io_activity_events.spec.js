@@ -9,8 +9,19 @@ const recordTerminalTurnFileActivity = vi.fn();
 const readTerminalTurnTraceProjection = vi.fn(() => ({ current: null, recent: [] }));
 const broadcastSse = vi.fn();
 const println = vi.fn();
+const getShowIntentActivity = vi.fn(() => true);
+const getShowSessionActivity = vi.fn(() => true);
+const getShowStreaming = vi.fn(() => true);
 const getShowToolActivity = vi.fn(() => true);
+const getShowThinking = vi.fn(() => true);
+const getShowUsage = vi.fn(() => true);
 const readTerminalRuntimeState = vi.fn(() => ({ status: 'idle', pendingQuestionKind: null }));
+const setShowIntentActivity = vi.fn();
+const setShowSessionActivity = vi.fn();
+const setShowStreaming = vi.fn();
+const setShowThinking = vi.fn();
+const setShowToolActivity = vi.fn();
+const setShowUsage = vi.fn();
 
 vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity,
@@ -26,8 +37,24 @@ vi.mock('../../../../src/copilot/terminal/dialog/index.js', () => ({
     println,
 }));
 
+vi.mock('../../../../src/copilot/terminal/dialog/io/index.js', () => ({
+    broadcastSse,
+    println,
+}));
+
 vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
+    getShowIntentActivity,
+    getShowSessionActivity,
+    getShowStreaming,
+    getShowThinking,
     getShowToolActivity,
+    getShowUsage,
+    setShowIntentActivity,
+    setShowSessionActivity,
+    setShowStreaming,
+    setShowThinking,
+    setShowToolActivity,
+    setShowUsage,
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/index.js', () => ({
@@ -37,7 +64,12 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/index.js', () => ({
 describe('terminal/io-activity-events', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getShowIntentActivity.mockReturnValue(true);
+        getShowSessionActivity.mockReturnValue(true);
+        getShowStreaming.mockReturnValue(true);
+        getShowThinking.mockReturnValue(true);
         getShowToolActivity.mockReturnValue(true);
+        getShowUsage.mockReturnValue(true);
         readTerminalRuntimeState.mockReturnValue({ status: 'idle', pendingQuestionKind: null });
         readTerminalTurnTraceProjection.mockReturnValue({ current: null, recent: [] });
     });

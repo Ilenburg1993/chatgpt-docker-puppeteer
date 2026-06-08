@@ -10,7 +10,17 @@
 
 export { AgentToolPolicy } from './agent-policy.js';
 
-export { createTool, createToolSync, defineTool, normalizeToolParametersSchema } from './core.js';
+export {
+    BuiltInTools,
+    ToolSet,
+    convertMcpCallToolResult,
+    createDeclarationTool,
+    createTool,
+    createToolSync,
+    defineTool,
+    normalizeToolParametersSchema,
+    normalizeToolTelemetry,
+} from './core.js';
 
 export {
     BUILTIN_HANDLER_MAP,

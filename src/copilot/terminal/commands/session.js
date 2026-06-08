@@ -41,7 +41,7 @@ import { callWithRuntimeTarget, extractRuntimeTarget, renderRuntimeTargetLabel, 
 import {
     classifyTerminalByokSdkBinding,
     renderTerminalSdkProviderBinding,
-} from '../byok/index.js';
+} from '../byok/binding/index.js';
 import {
     isTerminalImplicitOperationalTrace,
     renderTerminalTraceFlowSummary,
@@ -55,7 +55,7 @@ import {
     formatTerminalToolPathForOperator,
     humanizeTerminalToolSurfaceText,
     isTerminalInternalCallIdentifier,
-} from '../events/tool-activity-presenter.js';
+} from '../events/presenters/tools/index.js';
 import {
     readTerminalSseEventArchiveTail,
     formatTerminalTimeLabel,
@@ -2052,7 +2052,7 @@ function findSdkSessionHandle(sessionId, sessions, offset = 0) {
 function renderSdkSessionTopReference(sessionId, sessions, offset = 0) {
     if (!sessionId) return 'ausente';
     const handle = findSdkSessionHandle(sessionId, sessions, offset);
-    return handle ? `sessão ${handle}` : 'ativa fora desta página';
+    return handle ? `sessão ${handle}` : 'não listada nesta janela';
 }
 
 /**
@@ -2306,8 +2306,14 @@ async function cmdSessionSdkEvents({ println }, tokens) {
         println(terminalThemeRow('Erro', lifecycle.state.error ?? commands.state.error ?? 'erro desconhecido', { role: 'error' }));
     }
     if (merged.length === 0) {
-        println(terminalThemeRow('Resultado', 'nenhum ciclo de vida SDK ou comando SDK arquivado ainda', { role: 'warn' }));
-        println(terminalThemeRow('Detalhe', '/events sources · bruto em /events --raw'));
+        println(
+            terminalThemeRow(
+                'Resultado',
+                'nenhum ciclo de vida SDK ou comando SDK arquivado nesta janela; normal após resume silencioso ou sem chamada de CommandDefinition',
+                { role: 'muted' },
+            ),
+        );
+        println(terminalThemeRow('Detalhe', '/events sources · bruto em /events --raw · catálogo em /session sdk commands'));
         println('');
         return;
     }
@@ -2370,7 +2376,13 @@ async function cmdSessionSdkWaits({ println }, tokens) {
     const error = projections.find((projection) => projection.state.error)?.state.error;
     if (error) println(terminalThemeRow('Erro', error, { role: 'error' }));
     if (merged.length === 0) {
-        println(terminalThemeRow('Resultado', 'nenhuma espera SDK arquivada ainda', { role: 'warn' }));
+        println(
+            terminalThemeRow(
+                'Resultado',
+                'nenhuma espera SDK arquivada nesta janela; normal após resume silencioso ou sem ask_user/elicitation/permission',
+                { role: 'warn' },
+            ),
+        );
         println(terminalThemeRow('Detalhe', '/sdk waits para pendências vivas · bruto em /events --raw'));
         println('');
         return;
@@ -2411,13 +2423,41 @@ function cmdSessionSdkCommands({ println }) {
     const specs = listTerminalSdkCommandSpecs();
     println('');
     println(terminalThemeHeadline('assistant', 'Comandos SDK expostos ao Copilot'));
-    println(terminalThemeRow('Fonte', `agent/session/commands · ${countLabel(specs.length, 'comando', 'comandos')} · safelist observável; execução local continua no REPL`));
+    println(terminalThemeRow('Fonte', `agent/session/commands · ${countLabel(specs.length, 'comando', 'comandos')} · lista segura observável; execução local continua no REPL`));
     for (const spec of specs) {
         println(terminalThemeRow(spec.name, `${spec.localCommand}${spec.safe ? ' · seguro' : ''}`));
         println(terminalThemeRow('Descrição', spec.description));
     }
-    println(terminalThemeRow('Nota', 'quando o SDK chama um desses comandos, o terminal publica sdk.command.executed no fanout canônico'));
+    println(terminalThemeRow('Nota', 'quando o SDK chama um desses comandos, o terminal publica sdk.command.executed na emissão canônica'));
     println('');
+}
+
+/**
+ * Resume o contrato CommandDefinition[] exposto ao SDK contra chamadas observadas no archive SSE.
+ *
+ * @returns {Promise<string>}
+ */
+async function renderSdkCommandCatalogArchiveSummary() {
+    const specs = listTerminalSdkCommandSpecs();
+    const exposed = countLabel(specs.length, 'CommandDefinition exposto', 'CommandDefinitions expostos');
+    try {
+        const commands = await readTerminalSseEventArchiveTail({ event: 'sdk.command.executed', limit: 50 });
+        if (commands.state.error) {
+            return `${exposed} · arquivo SSE com erro: ${compactHumanTerminalText(commands.state.error)} · /session sdk commands`;
+        }
+        if (commands.entries.length === 0) {
+            return `${exposed} · nenhum comando chamado nesta janela · /session sdk commands`;
+        }
+        const last = commands.entries.at(-1);
+        if (!last) {
+            return `${exposed} · nenhum comando chamado nesta janela · /session sdk commands`;
+        }
+        const payload = last.payload && typeof last.payload === 'object' ? /** @type {Record<string, unknown>} */ (last.payload) : {};
+        const commandName = compactHumanTerminalText(payload['commandName'] ?? payload['name'] ?? last.event);
+        return `${exposed} · ${countLabel(commands.entries.length, 'chamada', 'chamadas')} na janela · último ${commandName} · /session sdk events`;
+    } catch (error) {
+        return `${exposed} · arquivo SSE indisponível: ${compactHumanTerminalText(toError(error).message)} · /session sdk commands`;
+    }
 }
 
 /**
@@ -2569,6 +2609,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
     println(terminalThemeRow('Primeiro plano', renderSdkSessionTopReference(inventory.foregroundSessionId, inventory.sessions)));
     println(terminalThemeRow('Próximo boot', nextLabel));
     println(terminalThemeRow('Arquivos', renderSdkSessionFsState(inventory.sessionFs)));
+    println(terminalThemeRow('CommandDefinitions', await renderSdkCommandCatalogArchiveSummary()));
     const byokBinding = classifyTerminalByokSdkBinding(
         readTerminalByokProjection().summary,
         inventory.persistedByokBinding,

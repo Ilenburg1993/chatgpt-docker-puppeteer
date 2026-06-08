@@ -207,7 +207,7 @@ describe('Block B — lifecycle ownership contracts', () => {
         assert.match(surface, /from '\.\/runtime\/root-surface\/index\.js'/);
         assert.match(rootSurface, /from '\.\.\/\.\.\/lifecycle\/orchestrators\/agent-lifecycle\.js'/);
         assert.match(rootSurface, /from '\.\.\/\.\.\/messaging\/agent-messaging\.js'/);
-        assert.match(rootSurface, /from '\.\.\/\.\.\/facades\/index\.js'/);
+        assert.match(rootSurface, /from '\.\.\/\.\.\/facades\/sdk-access\.js'/);
         assert.doesNotMatch(surface, /from '\.\/runtime-registry\.js'/);
         assert.doesNotMatch(surface, /from '\.\/event-bridge-wiring\.js'/);
     });

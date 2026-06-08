@@ -81,6 +81,7 @@ vi.mock('#copilot/sdk', () => ({
         handler: config.handler,
         parameters: config.parameters,
     })),
+    SYSTEM_MESSAGE_SECTIONS: {},
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 

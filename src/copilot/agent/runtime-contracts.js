@@ -12,7 +12,8 @@
 
 import { SessionError } from '#copilot/core';
 import { toError } from '#copilot/core';
-import { log, setSessionModel } from './ports/index.js';
+import { setSessionModel } from './ports/core-runtime-port.js';
+import { log } from './ports/logging/index.js';
 
 /**
  * @typedef {import('./types.js').AgentEventHost} AgentEventHost

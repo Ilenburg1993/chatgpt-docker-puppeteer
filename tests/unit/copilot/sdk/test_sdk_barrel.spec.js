@@ -69,6 +69,7 @@ describe('F86 - Barrel complete export coverage', () => {
             'startClient',
             'buildClientOptions',
             'createClientSession',
+            'createCopilotClient',
             'deleteClientSession',
             'disconnectClientSession',
             'forceStopClient',
@@ -90,6 +91,8 @@ describe('F86 - Barrel complete export coverage', () => {
             '_resetClientState',
             'CopilotClientManager',
             'createCopilotClientManager',
+            'createServerCopilotClient',
+            'createTerminalCopilotClient',
             'defaultClientManager',
         ];
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
@@ -135,7 +138,14 @@ describe('F86 - Barrel complete export coverage', () => {
     // ─── tools.js + permissions.js (F2) ────────────────────────────────
     it('exports tools.js and permissions.js', async () => {
         barrel = barrel ?? (await import('#copilot/sdk'));
-        const names = ['createTool', 'createToolSync', 'defineTool', 'approveAll', 'createAllowlistPermissionHandler'];
+        const names = [
+            'createTool',
+            'createToolSync',
+            'defineTool',
+            'normalizeToolTelemetry',
+            'approveAll',
+            'createAllowlistPermissionHandler',
+        ];
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
     });
 
@@ -199,6 +209,16 @@ describe('F86 - Barrel complete export coverage', () => {
             'supportsElicitation',
             'waitForElicitationCapability',
             'watchCapabilities',
+        ];
+        for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
+    });
+
+    it('exports canonical user-input policy helpers', async () => {
+        barrel = barrel ?? (await import('#copilot/sdk'));
+        const names = [
+            'USER_INPUT_FREEFORM_POLICY',
+            'normalizeUserInputChoices',
+            'resolveEffectiveUserInputAllowFreeform',
         ];
         for (const n of names) expect(barrel[n], `missing: ${n}`).toBeDefined();
     });

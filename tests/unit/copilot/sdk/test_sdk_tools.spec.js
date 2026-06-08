@@ -16,8 +16,26 @@ vi.mock('#copilot/observability/logger', () => ({
 
 // Mock defineTool do SDK — retorna o config recebido para inspeção
 vi.mock('@github/copilot-sdk', () => ({
+    BuiltInTools: { Isolated: ['read_file'] },
+    ToolSet: class ToolSet {},
+    convertMcpCallToolResult: vi.fn((value) => ({
+        textResultForLlm: JSON.stringify(value),
+        resultType: value?.isError ? 'failure' : 'success',
+    })),
     defineTool: vi.fn((name, config) => ({ name, ...config })),
     approveAll: vi.fn(),
+    SYSTEM_MESSAGE_SECTIONS: {
+        identity: { description: 'Identity' },
+        tone: { description: 'Tone' },
+        tool_efficiency: { description: 'Tool efficiency' },
+        environment_context: { description: 'Environment' },
+        code_change_rules: { description: 'Code changes' },
+        guidelines: { description: 'Guidelines' },
+        safety: { description: 'Safety' },
+        tool_instructions: { description: 'Tool instructions' },
+        custom_instructions: { description: 'Custom instructions' },
+        last_instructions: { description: 'Last instructions' },
+    },
     SYSTEM_PROMPT_SECTIONS: {
         identity: { description: 'Identity' },
         tone: { description: 'Tone' },
@@ -123,6 +141,70 @@ describe('sdk/tools.js', () => {
             const result = await tool.handler('args', /** @type {any} */ ({ sessionId: 'sess-1' }));
             expect(result).toBe('resultado');
         });
+
+        it('anexa toolTelemetry 1.0 apenas em ToolResultObject estruturado', async () => {
+            const original = vi.fn().mockResolvedValue({
+                textResultForLlm: 'ok',
+                resultType: 'success',
+                toolTelemetry: {
+                    provider: { route: 'unit' },
+                    invalid: 'drop-me',
+                },
+            });
+            const tool = tools.createTool({
+                name: 'telemetry_test',
+                description: 'Test',
+                handler: original,
+            });
+
+            const result = await tool.handler({}, /** @type {any} */ ({ sessionId: 'sess-1' }));
+
+            expect(result).toMatchObject({
+                textResultForLlm: 'ok',
+                resultType: 'success',
+                toolTelemetry: {
+                    provider: { route: 'unit' },
+                    copilot: { toolName: 'telemetry_test', resultType: 'success' },
+                },
+            });
+            expect(/** @type {any} */ (result).toolTelemetry.invalid).toBeUndefined();
+            expect(/** @type {any} */ (result).toolTelemetry.copilot.durationMs).toBeGreaterThanOrEqual(0);
+        });
+
+        it('normalizeToolTelemetry descarta entradas fora do shape SDK 1.0', () => {
+            expect(
+                tools.normalizeToolTelemetry({
+                    ok: { count: 1 },
+                    disabled: undefined,
+                    badArray: [],
+                    badPrimitive: true,
+                }),
+            ).toEqual({
+                ok: { count: 1 },
+                disabled: undefined,
+            });
+            expect(tools.normalizeToolTelemetry(null)).toBeUndefined();
+        });
+
+        it('createDeclarationTool() cria declaração sem handler', () => {
+            const schema = { type: 'object', properties: { path: { type: 'string' } } };
+            const tool = tools.createDeclarationTool({
+                name: 'external_lookup',
+                description: 'Lookup resolvido por RPC externo',
+                parameters: schema,
+            });
+            expect(tool.name).toBe('external_lookup');
+            expect(tool.parameters).toEqual(schema);
+            expect('handler' in tool).toBe(false);
+        });
+
+        it('expõe helpers oficiais ToolSet, BuiltInTools e convertMcpCallToolResult', () => {
+            expect(typeof tools.ToolSet).toBe('function');
+            expect(tools.BuiltInTools).toEqual({ Isolated: ['read_file'] });
+            expect(tools.convertMcpCallToolResult({ content: [], isError: false })).toMatchObject({
+                resultType: 'success',
+            });
+        });
     });
 
     describe('createToolSync()', () => {
@@ -153,6 +235,21 @@ describe('sdk/tools.js', () => {
                     handler: /** @type {any} */ (null),
                 }),
             ).toThrow(TypeError);
+        });
+
+        it('também anexa toolTelemetry em resultado estruturado de handler sync', async () => {
+            const tool = tools.createToolSync({
+                name: 'sync_telemetry',
+                description: 'Sync tool',
+                handler: () => ({ textResultForLlm: 'ok', resultType: 'success' }),
+            });
+
+            const result = await tool.handler({}, /** @type {any} */ ({ sessionId: 'sess-1' }));
+
+            expect(/** @type {any} */ (result).toolTelemetry.copilot).toMatchObject({
+                toolName: 'sync_telemetry',
+                resultType: 'success',
+            });
         });
     });
 

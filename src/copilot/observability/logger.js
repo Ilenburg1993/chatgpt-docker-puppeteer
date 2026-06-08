@@ -19,6 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COPILOT_LOG_DIR, COPILOT_LOG_LEVEL, COPILOT_LOG_MAX_ARCHIVES } from '../config/env.js';
 import { toError } from '../core/error-handlers.js';
+import { redactSecretRecord, redactSecretText } from '../core/security/redaction.js';
 
 /** @type {boolean} */
 let _stdoutUnavailable = false;
@@ -150,6 +151,25 @@ function safeAppendFileSync(filePath, content) {
 }
 
 /**
+ * @param {string | Error | Record<string, unknown>} msg
+ * @returns {string}
+ */
+function formatRedactedLogMessage(msg) {
+    if (msg instanceof Error) {
+        const e = toError(msg);
+        return redactSecretText(`${e.message}\n${e.stack ?? ''}`);
+    }
+    if (typeof msg === 'object') {
+        try {
+            return JSON.stringify(redactSecretRecord(msg));
+        } catch (_) {
+            return redactSecretText(String(msg));
+        }
+    }
+    return redactSecretText(msg);
+}
+
+/**
  * Rotaciona um arquivo se ele exceder o limite de tamanho.
  *
  * @param {string} filePath - Caminho do arquivo.
@@ -210,7 +230,11 @@ const RING_BUFFER_SIZE = 1000;
  */
 export function getRecentLogs(n = 50, level) {
     const entries = level ? _logRingBuffer.filter((e) => e.level === level.toUpperCase()) : _logRingBuffer;
-    return entries.slice(-Math.min(n, RING_BUFFER_SIZE));
+    return entries.slice(-Math.min(n, RING_BUFFER_SIZE)).map((entry) => ({
+        ...entry,
+        taskId: redactSecretText(entry.taskId),
+        msg: redactSecretText(entry.msg),
+    }));
 }
 
 /**
@@ -256,21 +280,11 @@ function log(level, msg, metaOrTaskId = '-') {
     const taskId = meta.taskId ?? '-';
     const sessionId = meta.sessionId ?? '';
 
-    let content = msg;
-    if (msg instanceof Error) {
-        const e = toError(msg);
-        content = `${e.message}\n${e.stack}`;
-    } else if (typeof msg === 'object') {
-        try {
-            content = JSON.stringify(msg);
-        } catch (_) {
-            content = String(msg);
-        }
-    }
+    let content = formatRedactedLogMessage(msg);
 
     // F110.2: inclui stack trace em WARN quando msg é Error
     if (level.toUpperCase() === 'WARN' && msg instanceof Error && msg.stack) {
-        content = `${msg.message}\n${msg.stack}`;
+        content = redactSecretText(`${msg.message}\n${msg.stack}`);
     }
 
     if (_isProduction) {
@@ -282,7 +296,7 @@ function log(level, msg, metaOrTaskId = '-') {
             ...(sessionId ? { sessionId } : {}),
             ...(meta.component ? { component: meta.component } : {}),
             msg: String(content),
-            ...(meta.extra ?? {}),
+            ...(meta.extra ? redactSecretRecord(meta.extra) : {}),
         };
         const jsonLine = JSON.stringify(jsonEntry);
         _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
@@ -379,7 +393,7 @@ log.fatal = (/** @type {string | Error | Record<string, unknown>} */ msg, /** @t
 function audit(action, details) {
     rotateFile(AUDIT_FILE, 'copilot_audit_', MAX_AUDIT_SIZE);
     const ts = new Date().toISOString();
-    const entry = `[${ts}] [AUDIT] ${action} | ${JSON.stringify(details)}\n`;
+    const entry = `[${ts}] [AUDIT] ${action} | ${JSON.stringify(redactSecretRecord(details))}\n`;
     try {
         fs.appendFileSync(AUDIT_FILE, entry, 'utf-8');
     } catch {
@@ -399,7 +413,11 @@ function audit(action, details) {
 function metric(name, payload) {
     rotateFile(METRICS_FILE, 'copilot_metrics_', MAX_LOG_SIZE);
     try {
-        const entry = JSON.stringify({ ts: new Date().toISOString(), metric: name, ...(payload ?? {}) });
+        const entry = JSON.stringify({
+            ts: new Date().toISOString(),
+            metric: name,
+            ...(payload ? redactSecretRecord(payload) : {}),
+        });
         fs.appendFileSync(METRICS_FILE, `${entry}\n`, 'utf-8');
     } catch (_) {
         // Silencioso — métricas não são críticas

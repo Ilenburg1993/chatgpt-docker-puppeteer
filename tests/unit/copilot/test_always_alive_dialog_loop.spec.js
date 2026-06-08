@@ -27,7 +27,7 @@
 import assert from 'node:assert/strict';
 import { beforeAll, describe, it } from 'vitest';
 
-import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
+import { alwaysAliveAgent } from '#copilot/agent/always-alive';
 
 // ─── Suite: análise estrutural do source ─────────────────────────────────────
 
@@ -262,7 +262,7 @@ describe('always-alive › dialog loop: protocolo 0-PR', async () => {
 
     it('sendTurn() delega para #turnQueue.enqueue() para serializar execução (F59)', () => {
         assert.ok(
-            dlmSourceCode.includes('#turnQueue.enqueue('),
+            /#turnQueue\s*\.\s*enqueue\s*\(/.test(dlmSourceCode),
             'sendTurn deve delegar para #turnQueue.enqueue() para serializar execução',
         );
     });
@@ -296,7 +296,7 @@ describe('always-alive › dialog loop: DL-PERM hardening', async () => {
     it('DL-PERM-04: sendTurn() pinga watchdog antes de serializar o turno', () => {
         // DL-PERM-04: ping do watchdog deve ocorrer dentro de sendTurn, antes do enqueue
         const pingIdx = dlmSourceCode.indexOf('#watchdogSupervisor.ping()');
-        const enqueueIdx = dlmSourceCode.indexOf('#turnQueue.enqueue(');
+        const enqueueIdx = dlmSourceCode.search(/#turnQueue\s*\.\s*enqueue\s*\(/);
         assert.ok(pingIdx !== -1, 'sendTurn deve chamar this.#watchdogSupervisor.ping()');
         assert.ok(enqueueIdx !== -1, 'sendTurn deve delegar para #turnQueue.enqueue()');
         assert.ok(pingIdx < enqueueIdx, '#watchdogSupervisor.ping() deve ocorrer antes de #turnQueue.enqueue()');

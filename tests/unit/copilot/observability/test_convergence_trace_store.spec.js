@@ -75,6 +75,36 @@ describe('observability/convergence-trace-store', () => {
 
         assert.equal(store.getSnapshot().totalTraces, 0);
     });
+
+    it('redige segredos em snapshots de trace sem perder métricas numéricas', () => {
+        const store = createConvergenceTraceStore();
+        const githubToken = 'ghs_abcdefghijklmnopqrstuvwxyz1234567890';
+        const byokToken = 'sk-testsecret1234567890';
+
+        store.recordMetric({
+            operation: 'workspace.promote',
+            status: 'failed',
+            sessionId: githubToken,
+            durationMs: 9,
+            attributes: {
+                traceId: githubToken,
+                phase: `write_${byokToken}`,
+                localPath: `/tmp/${githubToken}/a.txt`,
+                sdkPath: `notes/${byokToken}.txt`,
+                bytes: 42,
+                reason: `Authorization: Bearer ${byokToken}`,
+            },
+        });
+
+        const snapshot = store.getSnapshot({ traceId: githubToken });
+        const serialized = JSON.stringify(snapshot);
+
+        assert.equal(serialized.includes(githubToken), false);
+        assert.equal(serialized.includes(byokToken), false);
+        assert.match(serialized, /\[redacted\]/);
+        assert.equal(snapshot.selectedTrace?.bytes, 42);
+        assert.equal(snapshot.selectedTrace?.events[0]?.bytes, 42);
+    });
 });
 
 describe('observability/convergence-trace-store — SQLite persistence', () => {
@@ -187,5 +217,30 @@ describe('observability/convergence-trace-store — SQLite persistence', () => {
         assert.ok(result !== null);
         assert.ok(result.events.length <= 3);
         assert.ok(result.total >= 10);
+    });
+
+    it('getPersistedSnapshot redige segredos persistidos', () => {
+        const db = openInMemoryDb();
+        initConvergenceTracePersistence(db);
+        const store = createConvergenceTraceStore();
+        const githubToken = 'ghs_abcdefghijklmnopqrstuvwxyz1234567890';
+        const byokToken = 'sk-testsecret1234567890';
+
+        store.recordMetric({
+            operation: 'workspace.promote',
+            status: 'failed',
+            attributes: {
+                traceId: githubToken,
+                phase: `write_${byokToken}`,
+                reason: `Authorization: Bearer ${byokToken}`,
+            },
+        });
+
+        const result = getPersistedSnapshot({ traceId: githubToken });
+        assert.ok(result !== null);
+        const serialized = JSON.stringify(result);
+        assert.equal(serialized.includes(githubToken), false);
+        assert.equal(serialized.includes(byokToken), false);
+        assert.match(serialized, /\[redacted\]/);
     });
 });

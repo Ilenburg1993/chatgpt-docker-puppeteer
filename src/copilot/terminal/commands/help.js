@@ -226,10 +226,10 @@ function renderFullHelp({ injectPort, println }) {
     renderHelpSection(println, 'Sessão SDK persistente', [
         { command: '/session [sdk [n]]', description: 'cockpit da sessão SDK persistente' },
         { command: '/session sdk commands', description: 'comandos registrados no SDK' },
-        { command: '/session sdk events [n]', description: 'lifecycle e comandos SDK pelo archive SSE canônico' },
+        { command: '/session sdk events [n]', description: 'ciclo de vida e comandos SDK pelo arquivo SSE canônico' },
         {
             command: '/session sdk waits [n]',
-            description: 'perguntas, formulários e permissões publicados pelo fanout',
+            description: 'histórico de perguntas, formulários e permissões no arquivo SSE',
         },
         { command: '/session sdk next <new|resume|auto>', description: 'agenda seleção de sessão SDK no próximo boot' },
         { command: '/session sdk delete <id|#n>', description: 'apaga estado persistido SDK fora da sessão viva' },
@@ -291,11 +291,11 @@ function renderFullHelp({ injectPort, println }) {
             command: '/sdk [status|models|tools|quota|prompt|capabilities|waits|compact]',
             description: 'catálogo e operações SDK via Agent',
         },
-        { command: '/sdk waits', description: 'esperas humanas unificadas' },
+        { command: '/sdk waits', description: 'pendências humanas vivas agora' },
         { command: '/elicitation [list|show|request|respond]', description: 'formulários e URL estruturados do SDK' },
         { command: '/permission [list|show|mode|respond]', description: 'permissões SDK observadas e governança' },
         { command: '/tools [diag|all|raw]', description: 'telemetria canônica de ferramentas' },
-        { command: '/events [n|sources|trace|tool]', description: 'archive SSE e mapa de fontes canônicas' },
+        { command: '/events [n|sources|trace|tool|--json compact]', description: 'arquivo SSE, JSON compacto e mapa de fontes canônicas' },
         { command: '/errors [n]', description: 'últimos erros rastreados' },
         { command: '/audit [n]', description: 'últimas entradas do audit log' },
     ]);

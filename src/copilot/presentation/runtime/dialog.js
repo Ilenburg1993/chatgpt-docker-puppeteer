@@ -38,7 +38,7 @@ export { MAX_EMBED_BYTES };
  *     sendDialogTurnDetailed?: (
  *         message: string,
  *         options?: { timeout?: number | null; signal?: AbortSignal; traceId?: string },
- *     ) => Promise<import('#copilot/agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult>;
+ *     ) => Promise<import('#copilot/agent/types').DialogTurnSemanticResult>;
  *     stopDialogLoop: (opts?: {
  *         authorized?: boolean;
  *         reason?: 'watchdog_restart' | 'authorized_stop' | 'recovery_restart';
@@ -143,7 +143,7 @@ export async function sendRuntimeDialogTurnOnActiveLoop(message, options, runtim
  * @param {string} message
  * @param {{ timeout?: number | null; signal?: AbortSignal; traceId?: string }} [options]
  * @param {RuntimeDialogTarget | null | undefined} [runtime]
- * @returns {Promise<import('#copilot/agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult>}
+ * @returns {Promise<import('#copilot/agent/types').DialogTurnSemanticResult>}
  */
 export async function sendRuntimeDialogTurnOnActiveLoopDetailed(message, options, runtime) {
     const agent = resolveRuntimeDialogTarget(runtime);

@@ -7,8 +7,7 @@
 
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { normalizeModeChangedEvent, normalizePlanChangedEvent } from '#copilot/sdk/session';
-import { onSessionEvent } from '#copilot/sdk/session';
+import { normalizeModeChangedEvent, normalizePlanChangedEvent, onSessionEvent } from '#copilot/events/sdk-events';
 
 /**
  * @param {import('./contracts.js').CopilotSessionLike} session

@@ -32,7 +32,7 @@ describe('terminal/terminal-phases/boot-banner', () => {
             true,
         );
         assert.equal(
-            view.lines.some((line) => line.includes('Sistema') && line.includes('/tools') && line.includes('/events')),
+            view.lines.some((line) => line.includes('API local') && line.includes('/tools') && line.includes('/events')),
             true,
         );
         assert.equal(

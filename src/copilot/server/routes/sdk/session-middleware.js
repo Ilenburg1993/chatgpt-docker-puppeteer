@@ -8,6 +8,7 @@
  * @see EventBus
  */
 
+import { redactSecretText } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { toError } from '../../../core/error-handlers.js';
 import {
@@ -133,7 +134,8 @@ export async function withErrorHandler(req, res, fn) {
         const projection = projectSdkHttpError(req, e);
         const { status, body } = projection;
         const code = body.code;
-        log('ERROR', `[sdk-api/sessions] ${req.method} ${req.path} → ${status} ${code}: ${toError(e).message}`);
+        const safeMessage = redactSecretText(toError(e).message);
+        log('ERROR', `[sdk-api/sessions] ${req.method} ${req.path} → ${status} ${code}: ${safeMessage}`);
         if (!res.headersSent) {
             if (status === 500) {
                 res.status(500).json({ ...body, ...buildSessionRouteRuntimeMeta(req) });

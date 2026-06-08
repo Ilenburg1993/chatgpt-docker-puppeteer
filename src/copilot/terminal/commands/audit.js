@@ -12,7 +12,7 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
-import { getTerminalHumanToolName } from '../events/tool-activity-presenter.js';
+import { getTerminalHumanToolName } from '../events/presenters/tools/index.js';
 
 /**
  * @typedef {object} AuditContext

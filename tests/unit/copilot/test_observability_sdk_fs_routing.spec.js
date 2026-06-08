@@ -177,4 +177,78 @@ describe('sdk observability health sdkFsRouting', () => {
         assert.equal(res.body.convergence.traceStore.totalTraces, 1);
         assert.equal(res.body.convergence.traceStore.operations['workspace.promote'].succeeded, 1);
     });
+
+    it('redige segredos nas superfícies públicas de observabilidade', async () => {
+        const githubToken = 'ghs_abcdefghijklmnopqrstuvwxyz1234567890';
+        const byokToken = 'sk-testsecret1234567890';
+        const deps = makeDeps({
+            sdkObservability: {
+                ...makeDeps().sdkObservability,
+                defaultMetrics: {
+                    getSummary: () => ({
+                        tools: {},
+                        tokens: { inputTokens: 42 },
+                        sessions: {},
+                        counters: { [`sdk.operation.workspace.promote.${githubToken}`]: 1 },
+                        gauges: { [`sdk.operation.workspace.promote.${byokToken}`]: { value: 1, ts: 1 } },
+                    }),
+                },
+                defaultErrorTracker: {
+                    getStats: () => ({
+                        buffered: 1,
+                        total: 1,
+                        last: { message: `gitHubToken=${githubToken}`, metadata: { Authorization: `Bearer ${byokToken}` } },
+                    }),
+                    getErrors: () => [{ message: `gitHubToken=${githubToken}`, metadata: { Authorization: `Bearer ${byokToken}` } }],
+                    clearErrors: () => {},
+                },
+                getRecentLogs: () => [{ level: 'INFO', msg: `Authorization: Bearer ${byokToken}`, taskId: githubToken }],
+                defaultAuditLog: {
+                    getLast: () => [{ type: 'audit', data: { gitHubToken: githubToken, headers: { Authorization: `Bearer ${byokToken}` } } }],
+                    flush: async () => {},
+                },
+                getAuditTail: () => [{ toolName: `tool_${byokToken}`, toolArgs: { gitHubToken: githubToken } }],
+                getCatalog: () => ({ secret: `gitHubToken=${githubToken}` }),
+                getDeadLetters: () => [{ payload: { Authorization: `Bearer ${byokToken}` } }],
+                getLastQuotaSnapshots: () => ({ snapshots: { secret: { token: githubToken } }, ts: 1 }),
+                convergenceTraceStore: {
+                    getSnapshot: () => ({
+                        totalTraces: 1,
+                        operations: {},
+                        traces: [{ traceId: githubToken, reason: `Authorization: Bearer ${byokToken}` }],
+                        selectedTrace: null,
+                        updatedAt: 1,
+                    }),
+                },
+                getMcpStatus: () => ({ available: true, circuitOpen: false }),
+                nervEventBusAdapter: { isMounted: true },
+                isOtelEnabled: () => true,
+                otelExporterOtlpEndpoint: `https://otel.example/${githubToken}`,
+                defaultOtelFile: `/tmp/${byokToken}.jsonl`,
+                log: () => {},
+            },
+        });
+        const app = makeApp(deps);
+        const paths = [
+            '/observability/metrics',
+            '/observability/convergence',
+            '/observability/quota',
+            '/observability/errors',
+            '/observability/errors/stats',
+            '/observability/logs',
+            '/observability/audit',
+            '/observability/audit-tail',
+            '/observability/otel-status',
+            '/observability/events/catalog',
+            '/observability/events/dead-letter',
+        ];
+
+        for (const path of paths) {
+            const res = await request(app).get(path).expect(200);
+            const serialized = JSON.stringify(res.body);
+            assert.equal(serialized.includes(githubToken), false, `${path} vazou GitHub token`);
+            assert.equal(serialized.includes(byokToken), false, `${path} vazou BYOK token`);
+            assert.match(serialized, /\[redacted\]/u, `${path} não aplicou redaction`);
+        }
+    });
 });

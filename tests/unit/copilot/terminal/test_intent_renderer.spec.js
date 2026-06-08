@@ -13,6 +13,12 @@ vi.mock('../../../../src/copilot/terminal/dialog/index.js', () => ({
     printlnBlock: dialogMocks.printlnBlock,
 }));
 
+vi.mock('../../../../src/copilot/terminal/dialog/io/index.js', () => ({
+    SEPARATOR: '---',
+    broadcastSse: dialogMocks.broadcastSse,
+    printlnBlock: dialogMocks.printlnBlock,
+}));
+
 const {
     clearTerminalActivityHistory,
     clearTerminalIntentHistory,

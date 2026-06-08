@@ -237,6 +237,7 @@ describe('W4-9 — fronteira agent→sdk: barrel-only fora de facades/ports', ()
             for (const line of lines) {
                 const t = line.trim();
                 if (t.startsWith('//') || t.startsWith('*')) continue;
+                if (/from ['"]\.\/facades\/sdk\//.test(t)) continue;
                 if (/import.+from.+['"]\.{1,2}\/.*sdk\//.test(t)) {
                     violations.push(`${rel}: ${t.slice(0, 120)}`);
                 }
@@ -268,6 +269,40 @@ describe('W4-9 — fronteira agent→sdk: barrel-only fora de facades/ports', ()
         }
 
         assert.deepEqual(violations, [], `Deep-imports #copilot/sdk/* fora da fronteira:\n${violations.join('\n')}`);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3B.1. Event handlers → SDK: seam leve de eventos, sem barrel raiz pesado
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('W4-9 — event handlers usam seam leve de eventos SDK', () => {
+    it('event-handlers e observability/collectors não importam SDK diretamente', () => {
+        const dirs = [copilotPath('event-handlers'), copilotPath('observability/collectors')];
+        /** @type {string[]} */
+        const violations = [];
+
+        for (const dir of dirs) {
+            const files = listJsFilesRecursive(dir);
+            for (const abs of files) {
+                const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
+                const src = readFileSync(abs, 'utf-8');
+                const lines = src.split('\n');
+                for (const line of lines) {
+                    const t = line.trim();
+                    if (t.startsWith('//') || t.startsWith('*')) continue;
+                    if (/from\s+['"]#copilot\/sdk(?:\/[^'"]*)?['"]/.test(t)) {
+                        violations.push(`${rel}: ${t.slice(0, 120)}`);
+                    }
+                }
+            }
+        }
+
+        assert.deepEqual(
+            violations,
+            [],
+            `Handlers/collectors devem usar #copilot/events/sdk-events, não o SDK direto:\n${violations.join('\n')}`,
+        );
     });
 });
 
@@ -557,6 +592,17 @@ describe('W4-9 — SDK routes propagam runtime metadata canônica', () => {
         assert.match(middlewareSrc, /status\(500\)\.json\(\{[\s\S]*buildSessionRouteRuntimeMeta\(req\)/);
         assert.doesNotMatch(middlewareSrc, /status\(429\)\.json\(\{\s*ok:\s*false,\s*error:/);
         assert.doesNotMatch(sessionsSrc, /status\(401\)\.json\(\{\s*ok:\s*false,\s*error:/);
+    });
+
+    it('rotas SDK documentam classificação de payload e redigem hooks SSE', () => {
+        const readme = readSrc('server/routes/sdk/README.md');
+        const hooksSrc = readSrc('server/routes/sdk/hooks.js');
+
+        assert.match(readme, /Payload Classification/);
+        assert.match(readme, /Intentional content/);
+        assert.match(readme, /Diagnostic metadata/);
+        assert.match(hooksSrc, /redactSecretRecord/);
+        assert.match(hooksSrc, /pool\.broadcast\('hook',\s*redactSecretRecord/);
     });
 });
 
@@ -858,7 +904,7 @@ describe('W87.1 — agent lifecycle consome core via porta local', () => {
         const lifecycle = readSrc('agent/lifecycle/orchestrators/agent-lifecycle.js');
         const port = readSrc('agent/ports/core-runtime-port.js');
 
-        assert.match(lifecycle, /from ['"]\.\.\/\.\.\/ports\/index\.js['"]/);
+        assert.match(lifecycle, /from ['"]\.\.\/\.\.\/ports\/legacy-runtime\/index\.js['"]/);
         assert.match(port, /from ['"]#copilot\/core['"]/);
         assert.doesNotMatch(port, /from ['"]\.\.\/\.\.\/core\/(?:di-container|error-handlers)\.js['"]/);
 

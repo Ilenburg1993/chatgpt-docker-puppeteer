@@ -19,8 +19,9 @@ import {
     deleteAgentSdkSessionByClient,
     listAgentSdkProtectedSessionIdsByClient,
     listAgentSdkSessionsByClient,
-} from '../../facades/index.js';
-import { log, startSpan } from '../../ports/index.js';
+} from '../../facades/sdk-access.js';
+import { log } from '../../ports/logging/index.js';
+import { startSpan } from '../../ports/tracing-port.js';
 
 /**
  * @typedef {Object} SessionCleanupResult

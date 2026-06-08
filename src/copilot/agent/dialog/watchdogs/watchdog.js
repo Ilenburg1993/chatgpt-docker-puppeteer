@@ -11,7 +11,7 @@
 
 import { WATCHDOG_THRESHOLDS } from '#copilot/config/agent';
 import { cancelTimer, registerInterval } from '#copilot/core';
-import { log } from '../../ports/index.js';
+import { log } from '../../ports/logging/index.js';
 
 /**
  * @typedef {Object} DialogWatchdogOptions

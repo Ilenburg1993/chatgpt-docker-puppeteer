@@ -13,7 +13,11 @@
 /** @readonly */
 export const HOOK_PRE_TOOL_USE = 'hook:pre_tool_use';
 /** @readonly */
+export const HOOK_PRE_MCP_TOOL_CALL = 'hook:pre_mcp_tool_call';
+/** @readonly */
 export const HOOK_POST_TOOL_USE = 'hook:post_tool_use';
+/** @readonly */
+export const HOOK_POST_TOOL_USE_FAILURE = 'hook:post_tool_use_failure';
 /** @readonly */
 export const HOOK_PROMPT_SUBMITTED = 'hook:prompt_submitted';
 /** @readonly */

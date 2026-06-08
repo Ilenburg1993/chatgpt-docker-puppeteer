@@ -74,6 +74,9 @@ vi.mock('../../../../src/copilot/config/sdk-config-port.js', async () => {
         BUILTIN_HANDLER_MAP: new Map(),
         ClientOptionsBuilder: clientOptions.ClientOptionsBuilder,
         buildCopilotClientOptionsFromEnv: clientOptions.buildCopilotClientOptionsFromEnv,
+        buildServerCopilotClientOptions: clientOptions.buildServerCopilotClientOptions,
+        buildTerminalCopilotClientOptions: clientOptions.buildTerminalCopilotClientOptions,
+        SYSTEM_MESSAGE_SECTIONS: {},
         SYSTEM_PROMPT_SECTIONS: {},
         INFINITE_SESSION_DEFAULTS: {
             BACKGROUND_COMPACTION_THRESHOLD: 0.8,
@@ -109,6 +112,8 @@ vi.mock('../../../../src/copilot/config/sdk-config-port.js', async () => {
 import {
     ClientOptionsBuilder,
     buildCopilotClientOptionsFromEnv,
+    buildServerCopilotClientOptions,
+    buildTerminalCopilotClientOptions,
 } from '../../../../src/copilot/config/client-options.js';
 import { ResumeSessionConfigBuilder } from '../../../../src/copilot/config/resume-session-config.js';
 import { SessionConfigBuilder } from '../../../../src/copilot/config/session-config.js';
@@ -169,6 +174,16 @@ describe('SessionConfigBuilder', () => {
     it('excludedTools() define denylist', () => {
         const config = new SessionConfigBuilder().excludedTools(['powershell']).build();
         expect(config.excludedTools).toEqual(['powershell']);
+    });
+
+    it('availableTools() e excludedTools() aceitam ToolSet do SDK 1.0', () => {
+        const toolSet = { toArray: () => ['builtin:read_file'] };
+        const config = new SessionConfigBuilder()
+            .availableTools(/** @type {any} */ (toolSet))
+            .excludedTools(/** @type {any} */ (toolSet))
+            .build();
+        expect(config.availableTools).toBe(toolSet);
+        expect(config.excludedTools).toBe(toolSet);
     });
 
     it('skillDirectories() define diretórios de skills', () => {
@@ -306,6 +321,24 @@ describe('SessionConfigBuilder', () => {
         expect(config.suppressResumeEvent).toBe(true);
     });
 
+    it('buildForResume() inclui openCanvases sem vazar em build()', () => {
+        const openCanvases = [{ id: 'canvas-1', title: 'Canvas 1' }];
+        const builder = new SessionConfigBuilder().openCanvases(/** @type {any} */ (openCanvases));
+        expect('openCanvases' in builder.build()).toBe(false);
+        expect(builder.buildForResume().openCanvases).toEqual(openCanvases);
+    });
+
+    it('build() e buildForResume() não expõem cloud sem fluxo cloud/remote UX explícito', () => {
+        const builder = new SessionConfigBuilder().merge(
+            /** @type {any} */ ({
+                cloud: { workspaceId: 'remote-workspace-1' },
+            }),
+        );
+
+        expect('cloud' in builder.build()).toBe(false);
+        expect('cloud' in builder.buildForResume()).toBe(false);
+    });
+
     it('build() não vaza disableResume em SessionConfig', () => {
         const config = new SessionConfigBuilder().model('gpt-4.1').disableResume(true).build();
         expect('disableResume' in config).toBe(false);
@@ -343,6 +376,12 @@ describe('SessionConfigBuilder', () => {
         const handler = vi.fn();
         const config = new SessionConfigBuilder().createSessionFsHandler(/** @type {any} */ (handler)).build();
         expect(config.createSessionFsProvider).toBe(handler);
+    });
+
+    it('ResumeSessionConfigBuilder.openCanvases() preserva canvases abertos no resume', () => {
+        const openCanvases = [{ id: 'canvas-1', title: 'Canvas 1' }];
+        const config = new ResumeSessionConfigBuilder().openCanvases(/** @type {any} */ (openCanvases)).build();
+        expect(config.openCanvases).toEqual(openCanvases);
     });
 });
 
@@ -623,6 +662,20 @@ describe('ClientOptionsBuilder', () => {
         }
     });
 
+    it('modela modos explícitos para terminal local e server multiusuário', () => {
+        const original = { ...process.env };
+        try {
+            process.env.COPILOT_CLIENT_MODE = 'empty';
+
+            expect(buildTerminalCopilotClientOptions().mode).toBe('copilot-cli');
+            expect(buildServerCopilotClientOptions().mode).toBe('empty');
+            expect(buildTerminalCopilotClientOptions({ mode: 'empty' }).mode).toBe('empty');
+            expect(buildServerCopilotClientOptions({ mode: 'copilot-cli' }).mode).toBe('copilot-cli');
+        } finally {
+            process.env = original;
+        }
+    });
+
     it('buildCopilotClientOptionsFromEnv registra onListModels BYOK seguro', async () => {
         const original = { ...process.env };
         try {
@@ -639,6 +692,28 @@ describe('ClientOptionsBuilder', () => {
             expect(opts.onListModels).toBeTypeOf('function');
             await expect(opts.onListModels?.()).resolves.toHaveLength(2);
             expect(opts.env?.COPILOT_BYOK_API_KEY).toBeUndefined();
+        } finally {
+            process.env = original;
+        }
+    });
+
+    it('permite que o terminal injete onListModels canônico do model-gateway sobre o fallback BYOK', async () => {
+        const original = { ...process.env };
+        try {
+            delete process.env.COPILOT_CLI_URL;
+            process.env.COPILOT_BYOK_ENABLED = 'true';
+            process.env.COPILOT_BYOK_BASE_URL = 'https://provider.example/v1';
+            process.env.COPILOT_BYOK_MODEL = 'provider-model';
+            process.env.COPILOT_BYOK_MODELS = 'provider-model,provider-model-2';
+            process.env.COPILOT_BYOK_API_KEY = 'secret';
+            process.env.COPILOT_BYOK_MODEL_DISCOVERY_ENABLED = 'false';
+            const gatewayHandler = vi.fn(async () => [{ id: 'gateway-model' }]);
+
+            const opts = buildTerminalCopilotClientOptions({ onListModels: gatewayHandler });
+
+            expect(opts.onListModels).toBe(gatewayHandler);
+            await expect(opts.onListModels?.()).resolves.toEqual([{ id: 'gateway-model' }]);
+            expect(gatewayHandler).toHaveBeenCalledTimes(1);
         } finally {
             process.env = original;
         }

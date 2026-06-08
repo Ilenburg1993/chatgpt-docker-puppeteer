@@ -21,15 +21,15 @@ import {
 } from '#copilot/events';
 import { BackgroundTasks } from './background/index.js';
 import { DialogLoopManager } from './dialog/orchestrators/index.js';
-import { createAgentSdkToolsRegistry } from './facades/index.js';
+import { createAgentSdkToolsRegistry } from './facades/sdk/tools.js';
 import { HandoffManager, MessageQueue, WebhookManager } from './infra/index.js';
 import {
-    createAgentPermissionController,
     createQueuedElicitationHandler,
-    defaultMetrics,
     normalizeElicitationCompletedEvent,
     normalizeElicitationPendingEvent,
-} from './ports/index.js';
+} from './ports/hook-port.js';
+import { defaultMetrics } from './ports/metrics-port.js';
+import { createAgentPermissionController } from './ports/permission-port.js';
 import { SessionMessagesCache } from './session/history/index.js';
 import { SessionKeepalive } from './session/lifecycle/index.js';
 

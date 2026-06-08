@@ -19,7 +19,7 @@ describe('system-prompt › exportações do módulo', () => {
         assert.ok(typeof m.readResolvedSystemPromptUserConfigSync === 'function');
     });
 
-    it('reexporta SYSTEM_PROMPT_SECTIONS com as 10 seções esperadas', async () => {
+    it('reexporta SYSTEM_PROMPT_SECTIONS com as seções SDK 1.0 esperadas', async () => {
         const { SYSTEM_PROMPT_SECTIONS } = await import('#copilot/config/system-prompt');
         const expected = [
             'identity',
@@ -31,6 +31,7 @@ describe('system-prompt › exportações do módulo', () => {
             'safety',
             'tool_instructions',
             'custom_instructions',
+            'runtime_instructions',
             'last_instructions',
         ];
         assert.deepEqual(Object.keys(SYSTEM_PROMPT_SECTIONS), expected);

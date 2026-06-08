@@ -156,6 +156,21 @@ describe('sdk session workspace routes — materialize', () => {
         expect(workspaceRouteMocks.writeHandler).not.toHaveBeenCalled();
     });
 
+    it('redige segredos em erros de path local do workspace', async () => {
+        const res = await request(createApp())
+            .post('/sessions/sdk-1/workspace/materialize')
+            .send({
+                path: 'notes/plan.md',
+                destinationPath: '../sk-test-workspace-secret123/out.md',
+            })
+            .expect(400);
+        const serialized = JSON.stringify(res.body);
+
+        assert.equal(res.body.ok, false);
+        assert.equal(res.body.code, 'INVALID_LOCAL_PATH');
+        assert.equal(serialized.includes('sk-test-workspace-secret123'), false);
+    });
+
     it('espelha workspace SDK para FS local via endpoint mirror', async () => {
         workspaceRouteMocks.routeDeps.sdkSessionRpc.workspaceListFiles.mockResolvedValueOnce({
             files: ['notes/one.md', 'notes/two.md'],

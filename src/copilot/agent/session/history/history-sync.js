@@ -11,8 +11,8 @@
  */
 
 import { withAgentErrorPolicy } from '../../error/index.js';
-import { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from '../../facades/index.js';
-import { log } from '../../ports/index.js';
+import { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from '../../facades/agent-sdk-runtime.js';
+import { log } from '../../ports/logging/index.js';
 
 const DEFAULT_MESSAGES_CACHE_MAX_ITEMS = 1_000;
 
@@ -51,7 +51,7 @@ function getRootErrorMessage(err) {
  *     hubSessionId: string | null;
  *     synced: number;
  *     skipped: number;
- *     unavailableReason: 'hub_session_missing' | 'sdk_getMessages_unavailable' | null;
+ *     unavailableReason: 'hub_session_missing' | 'sdk_getEvents_unavailable' | null;
  * }} SessionHistorySyncResult
  */
 
@@ -71,7 +71,7 @@ async function runSdkHistorySync(session, deps) {
             hubSessionId,
             synced: 0,
             skipped: 0,
-            unavailableReason: 'sdk_getMessages_unavailable',
+            unavailableReason: 'sdk_getEvents_unavailable',
         };
     }
 
@@ -130,7 +130,7 @@ export async function syncSdkHistory(session, emit, deps, policy = {}) {
         return result;
     }
 
-    if (result.value.unavailableReason === 'sdk_getMessages_unavailable') {
+    if (result.value.unavailableReason === 'sdk_getEvents_unavailable') {
         log(
             'WARN',
             '[AlwaysAlive] Leitura de histórico indisponível nesta versão do SDK — histórico não sincronizado.',

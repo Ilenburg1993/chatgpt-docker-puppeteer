@@ -6,7 +6,7 @@
  */
 
 import { log } from '#copilot/observability';
-import { onAllSessionEvents } from '#copilot/sdk/session';
+import { onAllSessionEvents } from '#copilot/events/sdk-events';
 
 /**
  * G2-PERF-02: Set de eventos SDK conhecidos como constante de módulo para evitar realocação.
@@ -41,7 +41,9 @@ export const KNOWN_SDK_EVENTS = new Set([
     'session.compaction_start',
     'session.context_changed',
     'session.custom_agents_updated',
+    'session.custom_notification',
     'session.error',
+    'session.extensions.attachments_pushed',
     'session.extensions_loaded',
     'session.handoff',
     'session.idle',
@@ -50,6 +52,10 @@ export const KNOWN_SDK_EVENTS = new Set([
     'session.mode_changed',
     'session.model_change',
     'session.plan_changed',
+    'session.autopilot_objective_changed',
+    'session.remote_steerable_changed',
+    'session.schedule_created',
+    'session.schedule_cancelled',
     'session.resume',
     'session.shutdown',
     'session.skills_loaded',
@@ -66,6 +72,8 @@ export const KNOWN_SDK_EVENTS = new Set([
     'subagent.selected',
     'subagent.started',
     'system.notification',
+    'extension_context',
+    'new_inbox_message',
     'tool.execution_progress',
     'tool.user_requested',
     'user_input.completed',

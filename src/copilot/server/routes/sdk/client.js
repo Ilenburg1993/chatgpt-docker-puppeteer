@@ -21,7 +21,7 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core';
+import { redactSecretRecord, toError } from '#copilot/core';
 import { Router } from 'express';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
@@ -77,6 +77,18 @@ function resolveClientRouterDeps(binding, req) {
  */
 function buildClientRuntimeMeta(routeDeps) {
     return routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps);
+}
+
+/**
+ * Keep `/sdk/models` useful for provider diagnostics while treating the SDK listModels payload as an external boundary:
+ * BYOK providers may attach headers or API keys to model metadata.
+ *
+ * @param {unknown} model
+ * @returns {unknown}
+ */
+function redactClientModel(model) {
+    if (!model || typeof model !== 'object' || Array.isArray(model)) return model;
+    return redactSecretRecord(/** @type {Record<string, unknown>} */ (model));
 }
 
 /**
@@ -181,7 +193,7 @@ export default function createClientRouter(deps) {
             const routeDeps = resolveClientRouterDeps(deps, req);
             const { getClient } = routeDeps;
             const client = await getClient();
-            const models = await client.listModels();
+            const models = (await client.listModels()).map(redactClientModel);
             res.json({ ok: true, ...buildClientRuntimeMeta(routeDeps), count: models.length, models });
         });
     });

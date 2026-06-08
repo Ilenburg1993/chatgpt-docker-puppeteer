@@ -30,27 +30,24 @@ import {
     getHubSessionId,
     initEventCollector,
     isShuttingDown,
-    log,
     logSwallowed,
     resolveAgentMcpCapability,
-    resolveConversationStore,
     SessionError,
     setSharedSdkSessionId,
     startSpan,
     toError,
-} from '../../ports/index.js';
+} from '../../ports/legacy-runtime/index.js';
+import { log } from '../../ports/logging/index.js';
 
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '#copilot/config/agent';
 import {
-    createAgentSdkClient,
-    ensureAgentSdkClientStarted,
     persistAgentRuntimeGracefulShutdownState,
     persistAgentRuntimePrConsumptionSnapshot,
-    raceAgentSdkEvents,
     resetAgentRuntimeGracefulShutdownFlag,
     restoreAgentRuntimePersistentBootState,
     saveAgentRuntimeShutdownSnapshot,
-} from '../../facades/index.js';
+} from '../../facades/agent-runtime-state.js';
+import { createAgentSdkClient, ensureAgentSdkClientStarted, raceAgentSdkEvents } from '../../facades/sdk-access.js';
 import { performBootWiring } from '../../session/boot/index.js';
 import { syncSdkHistory } from '../../session/history/index.js';
 import { initOrResumeSession } from '../../session/initializers/index.js';
@@ -61,6 +58,14 @@ import {
 import { tryReconnect } from '../policies/index.js';
 import { buildSessionHooks, buildSessionOptions, buildSessionTools, finalizeSessionInit } from '../setup/index.js';
 import { detachRuntimeObservers, disconnectRuntimeSdkHandles, teardownRuntimeSidecars } from '../teardown/index.js';
+
+/**
+ * @returns {Promise<import('../../../conversation-hub/store.js').ConversationStore | null>}
+ */
+async function resolveConversationStoreLazy() {
+    const { resolveConversationStore } = await import('../../ports/conversation-port.js');
+    return resolveConversationStore(container);
+}
 
 /**
  * @typedef {import('../../agent-context.js').AgentContext} AgentContext
@@ -123,7 +128,7 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
         {
             getHubSessionId,
             setSharedSdkSessionId,
-            conversationStore: resolveConversationStore(container),
+            conversationStore: await resolveConversationStoreLazy(),
         },
         { label: options.ownershipLabel ?? 'agent.session.ownership.sync' },
     );
@@ -267,7 +272,7 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
     log('INFO', `[AlwaysAlive] Agente pronto. SessionId: ${session.sessionId} (${isResumed ? 'retomada' : 'nova'})`);
 
     if (isResumed) {
-        const convStore = resolveConversationStore(container);
+        const convStore = await resolveConversationStoreLazy();
         if (convStore) {
             void ctx.trackBackgroundTask(
                 syncSdkHistory(session, (event, payload) => host.emit(event, payload), {

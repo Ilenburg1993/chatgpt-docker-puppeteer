@@ -15,7 +15,7 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core';
+import { redactSecretRecord, redactSecretText, toError } from '#copilot/core';
 import { log } from './logger.js';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -89,14 +89,18 @@ function nextId() {
 function extractErrorInfo(err) {
     const e = toError(err);
     if (err instanceof Error) {
-        return { message: e.message, stack: e.stack, errorType: e.constructor.name };
+        return {
+            message: redactSecretText(e.message),
+            stack: e.stack ? redactSecretText(e.stack) : undefined,
+            errorType: e.constructor.name,
+        };
     }
     if (typeof err === 'string') {
-        return { message: err, stack: undefined, errorType: 'string' };
+        return { message: redactSecretText(err), stack: undefined, errorType: 'string' };
     }
     if (err && typeof err === 'object') {
         try {
-            const serialized = JSON.stringify(err);
+            const serialized = JSON.stringify(redactSecretRecord(/** @type {Record<string, unknown>} */ (err)));
             return {
                 message:
                     serialized && serialized !== '{}'
@@ -106,10 +110,18 @@ function extractErrorInfo(err) {
                 errorType: err.constructor?.name ?? 'object',
             };
         } catch {
-            return { message: String(err), stack: undefined, errorType: err.constructor?.name ?? 'object' };
+            return { message: redactSecretText(String(err)), stack: undefined, errorType: err.constructor?.name ?? 'object' };
         }
     }
-    return { message: String(err), stack: undefined, errorType: typeof err };
+    return { message: redactSecretText(String(err)), stack: undefined, errorType: typeof err };
+}
+
+/**
+ * @param {ErrorEntry} entry
+ * @returns {ErrorEntry}
+ */
+function redactErrorEntry(entry) {
+    return /** @type {ErrorEntry} */ (redactSecretRecord(/** @type {Record<string, unknown>} */ (entry)));
 }
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
@@ -142,6 +154,7 @@ export function createErrorTracker(opts = {}) {
      */
     function trackError(err, trackOpts = {}) {
         const { source = 'unknown', toolName, sessionId = defaultSessionId ?? undefined, metadata } = trackOpts;
+        const safeSource = redactSecretText(source);
 
         const { message, stack, errorType } = extractErrorInfo(err);
 
@@ -152,10 +165,10 @@ export function createErrorTracker(opts = {}) {
             message,
             ...(stack !== undefined ? { stack } : {}),
             errorType,
-            source,
-            ...(sessionId != null ? { sessionId } : {}),
-            ...(toolName !== undefined ? { toolName } : {}),
-            ...(metadata !== undefined ? { metadata } : {}),
+            source: safeSource,
+            ...(sessionId != null ? { sessionId: redactSecretText(sessionId) } : {}),
+            ...(toolName !== undefined ? { toolName: redactSecretText(toolName) } : {}),
+            ...(metadata !== undefined ? { metadata: redactSecretRecord(metadata) } : {}),
         };
 
         // Ring buffer
@@ -165,7 +178,7 @@ export function createErrorTracker(opts = {}) {
 
         // Contagens
         _byType[errorType] = (_byType[errorType] ?? 0) + 1;
-        _bySource[source] = (_bySource[source] ?? 0) + 1;
+        _bySource[safeSource] = (_bySource[safeSource] ?? 0) + 1;
 
         return entry;
     }
@@ -177,7 +190,7 @@ export function createErrorTracker(opts = {}) {
      */
     function getErrors(n = 20, filterSource) {
         const buf = filterSource ? _buffer.filter((e) => e.source === filterSource) : _buffer;
-        return buf.slice(-n);
+        return buf.slice(-n).map(redactErrorEntry);
     }
 
     /**
@@ -189,7 +202,7 @@ export function createErrorTracker(opts = {}) {
             buffered: _buffer.length,
             byType: { ..._byType },
             bySource: { ..._bySource },
-            last: _buffer[_buffer.length - 1],
+            last: _buffer[_buffer.length - 1] ? redactErrorEntry(/** @type {ErrorEntry} */ (_buffer[_buffer.length - 1])) : undefined,
         };
     }
 

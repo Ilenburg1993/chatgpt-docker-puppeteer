@@ -86,8 +86,15 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('1 recentes');
         expect(ctx.output()).toContain('ver Streaming: /events 50');
         expect(ctx.output()).toContain('detalhe técnico: /events sources detail');
+        expect(ctx.output()).toContain('/events --json compact · /events --raw preview · /events --raw full');
+        expect(ctx.output()).toContain('payload público redigido; compacto usa preview e ids de filtro');
         expect(ctx.output()).toContain('Pergunta ao operador');
         expect(ctx.output()).toContain('Configuração BYOK');
+        expect(ctx.output()).toContain('Canvas aberto + Canvas disponíveis');
+        expect(ctx.output()).toContain('MCP App concluído');
+        expect(ctx.output()).toContain('Objetivo autopiloto + Contexto de extensão');
+        expect(ctx.output()).toContain('Agentes customizados');
+        expect(ctx.output()).toContain('ver Objetivo autopiloto + Contexto de extensão + Agentes customizados +6: /events 50');
         expect(ctx.output()).toContain('/events sources detail');
         expect(ctx.output()).not.toContain('/events source terminal/dialog/turn-display.createDeltaCallback 50');
         expect(ctx.output()).not.toContain('user_input.requested');
@@ -101,11 +108,20 @@ describe('terminal/commands/events', () => {
         await cmdEvents({ println: ctx.println }, 'sources detail 50');
 
         expect(ctx.output()).toContain('Fontes do Terminal - Detalhe');
+        expect(ctx.output()).toContain('/events --json compact · /events --raw preview · /events --raw full');
+        expect(ctx.output()).toContain('payload público redigido; compacto usa preview e ids de filtro');
         expect(ctx.output()).toContain('assistant.text.delta');
         expect(ctx.output()).toContain('/events source terminal/dialog/turn-display.createDeltaCallback 50');
         expect(ctx.output()).toContain('task.delta only when dialog loop is inactive');
         expect(ctx.output()).toContain('COPILOT_BYOK_* resolved into SDK provider');
         expect(ctx.output()).toContain('/byok env · /byok profiles · /byok models refresh · /status');
+        expect(ctx.output()).toContain('canvas.mcp-app.summary');
+        expect(ctx.output()).toContain('mcp_app.tool_call_complete');
+        expect(ctx.output()).toContain('raw iframe/canvas payload in default terminal output');
+        expect(ctx.output()).toContain('sdk.session.extension-signals');
+        expect(ctx.output()).toContain('session.autopilot_objective_changed');
+        expect(ctx.output()).toContain('extension_context');
+        expect(ctx.output()).toContain('unowned SDK 1.0 extension/session signals');
     });
 
     it('aceita filtros humanos sem sinal de igual', async () => {
@@ -144,6 +160,8 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('/events --raw');
         expect(ctx.output()).toContain('#42');
         expect(ctx.output()).toContain('Streaming');
+        expect(ctx.output()).toContain('2024-03-09T16:00:00.000+00:00 (há 5s)');
+        expect(ctx.output()).toContain('rastreamento turn:abc');
         expect(ctx.output()).toContain('DELTA-CANONICAL-1');
         expect(ctx.output()).not.toContain('call=call_123');
         expect(ctx.output()).not.toContain('req=req-123');
@@ -229,6 +247,401 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('terminal runtime wired');
         expect(ctx.output()).not.toContain('quota warning');
         expect(ctx.output()).not.toContain('session model changed');
+    });
+
+    it('humaniza eventos SDK 1.0 novos no resumo default', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 4,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 10,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 1,
+                    event: 'model.call_failure',
+                    source: 'sdk/model.call_failure',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: {
+                        data: {
+                            source: 'top_level',
+                            model: 'gpt-5.4',
+                            statusCode: 429,
+                            durationMs: 1200,
+                            errorMessage: 'rate limited',
+                            serviceRequestId: 'svc-request-123456',
+                        },
+                    },
+                },
+                {
+                    timestamp: 1710000000500,
+                    eventId: 5,
+                    event: 'model.call_failure',
+                    source: 'sdk/model.call_failure',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: {
+                        data: {
+                            source: 'top_level',
+                            model: 'gpt-5.4-legacy',
+                            statusCode: 400,
+                            durationMs: 300,
+                            errorMessage: 'model not supported by provider',
+                            serviceRequestId: 'svc-request-legacy',
+                        },
+                    },
+                },
+                {
+                    timestamp: 1710000001000,
+                    eventId: 2,
+                    event: 'session.permissions_changed',
+                    source: 'sdk/session.permissions_changed',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: {
+                        data: {
+                            previousAllowAllPermissions: false,
+                            allowAllPermissions: true,
+                        },
+                    },
+                },
+                {
+                    timestamp: 1710000002000,
+                    eventId: 3,
+                    event: 'session.canvas.opened',
+                    source: 'sdk/session.canvas.opened',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: {
+                        data: {
+                            title: 'Preview',
+                            extensionName: 'Demo',
+                            availability: 'ready',
+                            reopen: true,
+                        },
+                    },
+                },
+                {
+                    timestamp: 1710000003000,
+                    eventId: 4,
+                    event: 'hook.progress',
+                    source: 'sdk/hook.progress',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { data: { message: 'rodando hook de segurança' } },
+                },
+                {
+                    timestamp: 1710000004000,
+                    eventId: 6,
+                    event: 'mcp_app.tool_call_complete',
+                    source: 'sdk/mcp_app.tool_call_complete',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: {
+                        data: {
+                            appName: 'Demo App',
+                            toolName: 'show_panel',
+                            status: 'completed',
+                            title: 'Preview de painel',
+                            uri: 'mcp://demo/panel',
+                        },
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '10');
+
+        expect(ctx.output()).toContain('Falha do modelo');
+        expect(ctx.output()).toContain('modelo gpt-5.4');
+        expect(ctx.output()).toContain('classe rate limit');
+        expect(ctx.output()).toContain('HTTP 429');
+        expect(ctx.output()).toContain('modelo gpt-5.4-legacy');
+        expect(ctx.output()).toContain('classe modelo incompatível');
+        expect(ctx.output()).toContain('/model auto');
+        expect(ctx.output()).toContain('Permissões da sessão');
+        expect(ctx.output()).toContain('aprovação ampla ativada');
+        expect(ctx.output()).toContain('Canvas aberto');
+        expect(ctx.output()).toContain('Preview');
+        expect(ctx.output()).toContain('Rotina em andamento');
+        expect(ctx.output()).toContain('rodando hook de segurança');
+        expect(ctx.output()).toContain('MCP App concluído');
+        expect(ctx.output()).toContain('MCP App via SDK');
+        expect(ctx.output()).toContain('app Demo App');
+        expect(ctx.output()).toContain('tool show_panel');
+        expect(ctx.output()).toContain('Preview de painel');
+        expect(ctx.output()).toContain('recurso mcp://demo/panel');
+        expect(ctx.output()).not.toContain('model call failure');
+        expect(ctx.output()).not.toContain('session permissions changed');
+        expect(ctx.output()).not.toContain('hook progress');
+        expect(ctx.output()).not.toContain('appName');
+    });
+
+    it('resume anexos e conteúdos multimodais SDK 1.0 sem objetos crus', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 2,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 10,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 1,
+                    event: 'tool.execution_complete',
+                    source: 'sdk/tool.execution_complete',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: {
+                        toolName: 'render_preview',
+                        result: {
+                            content: 'preview ready',
+                            contents: [
+                                { type: 'image', mimeType: 'image/png', data: 'BASE64_IMAGE_SHOULD_NOT_RENDER' },
+                                { type: 'terminal', text: 'ok', exitCode: 0, cwd: '/repo' },
+                                {
+                                    type: 'resource_link',
+                                    title: 'Relatório',
+                                    name: 'report',
+                                    uri: 'ui://report',
+                                    mimeType: 'text/html',
+                                },
+                            ],
+                        },
+                    },
+                },
+                {
+                    timestamp: 1710000001000,
+                    eventId: 2,
+                    event: 'user.message',
+                    source: 'sdk/user.message',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: {
+                        content: 'analise isso',
+                        attachments: [
+                            { type: 'file', displayName: 'app.js', path: '/repo/app.js' },
+                            { type: 'selection', displayName: 'trecho crítico', filePath: '/repo/app.js', text: 'secret-ish' },
+                            {
+                                type: 'github_reference',
+                                referenceType: 'pr',
+                                number: 42,
+                                title: 'Upgrade SDK',
+                                url: 'https://github.example/pull/42',
+                                state: 'open',
+                            },
+                            { type: 'blob', displayName: 'payload.pdf', mimeType: 'application/pdf', data: 'BASE64_PDF_SHOULD_NOT_RENDER' },
+                        ],
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '10');
+
+        expect(ctx.output()).toContain('Ferramenta concluída');
+        expect(ctx.output()).toContain('3 conteúdos');
+        expect(ctx.output()).toContain('imagem image/png');
+        expect(ctx.output()).toContain('terminal exit 0');
+        expect(ctx.output()).toContain('link de recurso Relatório');
+        expect(ctx.output()).toContain('Mensagem do operador');
+        expect(ctx.output()).toContain('4 anexos');
+        expect(ctx.output()).toContain('arquivo app.js');
+        expect(ctx.output()).toContain('seleção trecho crítico');
+        expect(ctx.output()).toContain('referência GitHub Upgrade SDK pr #42');
+        expect(ctx.output()).not.toContain('BASE64_IMAGE_SHOULD_NOT_RENDER');
+        expect(ctx.output()).not.toContain('BASE64_PDF_SHOULD_NOT_RENDER');
+        expect(ctx.output()).not.toContain('[object Object]');
+        expect(ctx.output()).not.toContain('tool execution complete');
+        expect(ctx.output()).not.toContain('github reference');
+    });
+
+    it('humaniza sinais long-tail SDK 1.0 de extensões e sessão no resumo default', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 9,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 1,
+                    event: 'session.autopilot_objective_changed',
+                    source: 'sdk/session.autopilot_objective_changed',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { objective: 'Investigar falha de CI' },
+                },
+                {
+                    timestamp: 1710000001000,
+                    eventId: 2,
+                    event: 'extension_context',
+                    source: 'sdk/extension_context',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { extensionName: 'GitHub', contextType: 'pull_request' },
+                },
+                {
+                    timestamp: 1710000002000,
+                    eventId: 3,
+                    event: 'session.custom_agents_updated',
+                    source: 'sdk/session.custom_agents_updated',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { agents: [{ name: 'Reviewer' }] },
+                },
+                {
+                    timestamp: 1710000003000,
+                    eventId: 4,
+                    event: 'session.custom_notification',
+                    source: 'sdk/session.custom_notification',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { title: 'Aviso', message: 'Ação necessária', severity: 'warn' },
+                },
+                {
+                    timestamp: 1710000004000,
+                    eventId: 5,
+                    event: 'session.extensions.attachments_pushed',
+                    source: 'sdk/session.extensions.attachments_pushed',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { extensionName: 'GitHub', attachments: [{ id: 'att-1' }] },
+                },
+                {
+                    timestamp: 1710000005000,
+                    eventId: 6,
+                    event: 'session.remote_steerable_changed',
+                    source: 'sdk/session.remote_steerable_changed',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { enabled: true },
+                },
+                {
+                    timestamp: 1710000006000,
+                    eventId: 7,
+                    event: 'session.schedule_created',
+                    source: 'sdk/session.schedule_created',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { scheduleId: 'sched-1', title: 'Revisão diária', cadence: 'daily' },
+                },
+                {
+                    timestamp: 1710000007000,
+                    eventId: 8,
+                    event: 'session.schedule_cancelled',
+                    source: 'sdk/session.schedule_cancelled',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { scheduleId: 'sched-1', title: 'Revisão diária' },
+                },
+                {
+                    timestamp: 1710000008000,
+                    eventId: 9,
+                    event: 'new_inbox_message',
+                    source: 'sdk/new_inbox_message',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { from: 'GitHub', subject: 'Nova solicitação' },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '20');
+
+        expect(ctx.output()).toContain('Objetivo autopiloto');
+        expect(ctx.output()).toContain('objetivo Investigar falha de CI');
+        expect(ctx.output()).toContain('Contexto de extensão');
+        expect(ctx.output()).toContain('extensão GitHub');
+        expect(ctx.output()).toContain('Agentes customizados');
+        expect(ctx.output()).toContain('1 agente');
+        expect(ctx.output()).toContain('Notificação customizada');
+        expect(ctx.output()).toContain('Ação necessária');
+        expect(ctx.output()).toContain('Anexos de extensão');
+        expect(ctx.output()).toContain('1 anexo');
+        expect(ctx.output()).toContain('Controle remoto');
+        expect(ctx.output()).toContain('controle remoto ativado');
+        expect(ctx.output()).toContain('Agendamento criado');
+        expect(ctx.output()).toContain('Revisão diária');
+        expect(ctx.output()).toContain('Agendamento cancelado');
+        expect(ctx.output()).toContain('Mensagem recebida');
+        expect(ctx.output()).toContain('de GitHub');
+        expect(ctx.output()).not.toContain('autopilot objective changed');
+        expect(ctx.output()).not.toContain('extension context');
+        expect(ctx.output()).not.toContain('attachments_pushed');
     });
 
     it('usa operatorSummary para reconfirmação de modelo sem chamar de alteração', async () => {
@@ -1353,6 +1766,27 @@ describe('terminal/commands/events', () => {
         expect(parsed.entries[0]).toMatchObject({ eventId: 42, event: 'delta' });
     });
 
+    it('emite JSON compacto parseável com preview em vez de payload completo', async () => {
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '3 --json compact event=delta');
+
+        const parsed = JSON.parse(ctx.output());
+        expect(parsed.filters).toMatchObject({ limit: 5, event: 'delta' });
+        expect(parsed.entries[0]).toMatchObject({
+            eventId: 42,
+            event: 'delta',
+            traceId: 'turn:abc',
+            turnId: 'turn-1',
+            hubSessionId: 'hub-1',
+            toolCallId: 'call_123',
+            requestId: 'req-123',
+            payloadKeys: expect.arrayContaining(['content']),
+            payloadPreview: expect.stringContaining('DELTA-CANONICAL-1'),
+        });
+        expect(parsed.entries[0]).not.toHaveProperty('payload');
+    });
+
     it('emite preview JSONL raw compacto para comparacao visual com artefatos SSE', async () => {
         const ctx = mockCtx();
 
@@ -1368,6 +1802,11 @@ describe('terminal/commands/events', () => {
         expect(JSON.parse(rawLine)).toMatchObject({
             eventId: 42,
             event: 'delta',
+            traceId: 'turn:abc',
+            turnId: 'turn-1',
+            hubSessionId: 'hub-1',
+            toolCallId: 'call_123',
+            requestId: 'req-123',
             payloadKeys: expect.arrayContaining(['content']),
             payloadPreview: expect.stringContaining('DELTA-CANONICAL-1'),
         });
@@ -1386,6 +1825,68 @@ describe('terminal/commands/events', () => {
             event: 'delta',
             payload: { content: 'DELTA-CANONICAL-1' },
         });
+    });
+
+    it('redige segredos em /events --json, --raw full e preview raw sem perder o formato técnico', async () => {
+        const secretProjection = () => ({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 1,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 5,
+                event: 'tool.execution_complete',
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 77,
+                    event: 'tool.execution_complete',
+                    source: 'sdk/tool.execution_complete',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: {
+                        headers: { Authorization: 'Bearer abcdefghijklmnopqrstuvwxyz' },
+                        content: 'api_key=sk-testsecret123456789',
+                    },
+                },
+            ],
+        });
+
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(secretProjection());
+        const jsonCtx = mockCtx();
+        await cmdEvents({ println: jsonCtx.println }, '5 --json event=tool.execution_complete');
+        const json = JSON.parse(jsonCtx.output());
+        expect(json.entries[0].payload.headers.Authorization).toBe('[redacted]');
+        expect(json.entries[0].payload.content).toBe('api_key=[redacted]');
+        expect(jsonCtx.output()).not.toContain('abcdefghijklmnopqrstuvwxyz');
+        expect(jsonCtx.output()).not.toContain('sk-testsecret123456789');
+
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(secretProjection());
+        const fullCtx = mockCtx();
+        await cmdEvents({ println: fullCtx.println }, '5 --raw full event=tool.execution_complete');
+        const full = JSON.parse(fullCtx.output());
+        expect(full.payload.headers.Authorization).toBe('[redacted]');
+        expect(full.payload.content).toBe('api_key=[redacted]');
+        expect(fullCtx.output()).not.toContain('abcdefghijklmnopqrstuvwxyz');
+        expect(fullCtx.output()).not.toContain('sk-testsecret123456789');
+
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(secretProjection());
+        const previewCtx = mockCtx();
+        await cmdEvents({ println: previewCtx.println }, '5 --raw event=tool.execution_complete');
+        expect(previewCtx.output()).toContain('Eventos SSE raw - preview');
+        expect(previewCtx.output()).not.toContain('abcdefghijklmnopqrstuvwxyz');
+        expect(previewCtx.output()).not.toContain('sk-testsecret123456789');
     });
 
     it('humaniza payloadPreview de activity e hooks no preview raw', async () => {
@@ -1463,6 +1964,113 @@ describe('terminal/commands/events', () => {
         expect(previewLines[1].payloadPreview).toContain('rotina posttooluse');
         expect(previewLines[1].payloadPreview).toContain('iniciado');
         expect(previewLines[1].payloadPreview).not.toContain('{"hookType"');
+    });
+
+    it('humaniza payloadPreview de boot, quota e background no preview raw', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 4,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    schemaVersion: 1,
+                    timestamp: 1710000001000,
+                    eventId: 60,
+                    event: 'terminal.runtime.wired',
+                    source: 'terminal/runtime-root.runtime-config',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: null,
+                    payload: { phase: 'runtime-config', durationMs: 7, preflightOk: true },
+                },
+                {
+                    schemaVersion: 1,
+                    timestamp: 1710000002000,
+                    eventId: 61,
+                    event: 'terminal.started',
+                    source: 'terminal-boot/terminal.started',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        operationMode: 'standalone',
+                        model: 'auto',
+                        mcpToolCount: 0,
+                        dialogLoopActive: false,
+                        bootPreflight: { ok: true },
+                    },
+                },
+                {
+                    schemaVersion: 1,
+                    timestamp: 1710000003000,
+                    eventId: 62,
+                    event: 'quota.warning',
+                    source: 'agent/passthrough/quota.warning',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        quotaId: 'premium_interactions',
+                        snapshot: { hasQuota: false, remainingPercentage: 0, resetDate: '2026-06-08T11:10:36.070Z' },
+                    },
+                },
+                {
+                    schemaVersion: 1,
+                    timestamp: 1710000004000,
+                    eventId: 63,
+                    event: 'agent.background.completed',
+                    source: 'agent/background.completed',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        status: 'success',
+                        label: 'session.cleanup.stale',
+                        durationMs: 42,
+                        pendingCount: 0,
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '20 --raw');
+
+        const previews = ctx
+            .output()
+            .trim()
+            .split('\n')
+            .filter((line) => line.trim().startsWith('{'))
+            .map((line) => JSON.parse(line).payloadPreview);
+        expect(previews[0]).toContain('fase runtime config');
+        expect(previews[0]).toContain('preflight ok');
+        expect(previews[0]).not.toContain('{"phase"');
+        expect(previews[1]).toContain('standalone');
+        expect(previews[1]).toContain('modelo auto');
+        expect(previews[1]).not.toContain('{"timestamp"');
+        expect(previews[2]).toContain('premium interactions');
+        expect(previews[2]).toContain('sem quota');
+        expect(previews[2]).not.toContain('{"quotaId"');
+        expect(previews[3]).toContain('estado concluído');
+        expect(previews[3]).toContain('session.cleanup.stale');
+        expect(previews[3]).not.toContain('{"agentType"');
     });
 
     it('mostra vazio quando archive nao tem entradas', async () => {

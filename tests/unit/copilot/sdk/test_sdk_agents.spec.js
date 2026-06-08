@@ -22,7 +22,7 @@ vi.mock('@github/copilot-sdk', () => {
         docs: 'docs',
         context: 'context',
     });
-    return { SYSTEM_PROMPT_SECTIONS, CopilotClient: vi.fn() };
+    return { SYSTEM_MESSAGE_SECTIONS: SYSTEM_PROMPT_SECTIONS, SYSTEM_PROMPT_SECTIONS, CopilotClient: vi.fn() };
 });
 
 vi.mock('#copilot/core/errors', () => ({

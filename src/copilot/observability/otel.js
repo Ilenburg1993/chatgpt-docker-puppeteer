@@ -31,6 +31,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toError } from '../core/error-handlers.js';
+import { redactSecretRecord, redactSecretText } from '../core/security/redaction.js';
 
 const __otel_dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__otel_dirname, '..', '..', '..');
@@ -189,10 +190,14 @@ export async function startSpan(name, attrs, fn) {
         span.setAttribute('model', attrs.model ?? '');
         span.setAttribute('actor', attrs.actor ?? '');
         if (attrs.extra) {
-            for (const [k, v] of Object.entries(attrs.extra)) {
+            for (const [k, v] of Object.entries(redactSecretRecord(attrs.extra))) {
                 span.setAttribute(
                     k,
-                    typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? v : JSON.stringify(v),
+                    typeof v === 'string'
+                        ? redactSecretText(v)
+                        : typeof v === 'number' || typeof v === 'boolean'
+                          ? v
+                          : redactSecretText(JSON.stringify(v)),
                 );
             }
         }
@@ -208,8 +213,9 @@ export async function startSpan(name, attrs, fn) {
             return result;
         } catch (err) {
             span.setAttribute('duration_ms', Date.now() - start);
-            span.setStatus({ code: /** SpanStatusCode.ERROR */ 2, message: toError(err).message });
-            span.recordException(err);
+            const redactedErrorMessage = redactSecretText(toError(err).message);
+            span.setStatus({ code: /** SpanStatusCode.ERROR */ 2, message: redactedErrorMessage });
+            span.recordException(new Error(redactedErrorMessage));
             throw err;
         } finally {
             span.end();
@@ -234,7 +240,7 @@ export function startSpanImmediate(name, attrs = {}) {
     try {
         const span = _tracer.startSpan(name);
         for (const [k, v] of Object.entries(attrs)) {
-            span.setAttribute(k, v);
+            span.setAttribute(k, typeof v === 'string' ? redactSecretText(v) : v);
         }
         return span;
     } catch {

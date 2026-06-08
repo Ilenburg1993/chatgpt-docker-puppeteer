@@ -14,7 +14,7 @@
  * @see EventBus
  */
 
-import { log } from '../../ports/index.js';
+import { log } from '../../ports/logging/index.js';
 
 /** @typedef {{ getModel: () => string; setModel?: (model: string) => void }} AgentHostForFallback */
 

@@ -7,7 +7,6 @@
  */
 
 import {
-    listWebhooks,
     readRuntimeContextFactoryCapabilities,
     readRuntimePermissionCapability,
     readRuntimePermissionMode,
@@ -15,10 +14,13 @@ import {
     readRuntimeToolRegistry,
     readRuntimeToolRegistryEntries,
     readRuntimeToolSessionContext,
-    registerWebhook,
     setRuntimePermissionMode,
+} from './agent-runtime-controls.js';
+import {
+    listWebhooks,
+    registerWebhook,
     unregisterWebhook,
-} from '../runtime/root-surface/index.js';
+} from './agent-webhook-ops.js';
 
 /**
  * Façade para Permissões e Tools Registry.

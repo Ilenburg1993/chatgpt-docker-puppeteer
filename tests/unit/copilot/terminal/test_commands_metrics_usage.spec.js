@@ -18,7 +18,11 @@ const defaultRuntime = /** @type {any} */ ({
         reasoningEffort: 'medium',
         contextState: { tokens: 64000, tokenLimit: 128000, utilization: 0.5 },
         systemPromptBinding: { digest: 'bound-default' },
-        systemPromptFreshness: { isStale: false, reason: 'binding ok', recommendedAction: 'none' },
+        systemPromptFreshness: {
+            isStale: false,
+            reason: 'Vínculo persistido coincide com a revisão atual do prompt do sistema.',
+            recommendedAction: 'none',
+        },
     }),
     getHealthSnapshot: () => ({
         status: 'healthy',
@@ -259,7 +263,7 @@ describe('commands/metrics + usage', () => {
             transportTimeoutStrategy: 'adaptive',
             runtimeId: 'default',
             promptDigest: 'digest-default',
-            promptFreshnessReason: 'binding ok',
+            promptFreshnessReason: 'Vínculo persistido coincide com a revisão atual do prompt do sistema.',
             promptRecommendedAction: 'none',
             promptIsStale: false,
             diagnostics: {
@@ -349,11 +353,15 @@ describe('commands/metrics + usage', () => {
             expect(ctx.output()).not.toContain('Label');
             expect(ctx.output()).toContain('Injeção');
             expect(ctx.output()).not.toContain('Inject');
+            expect(ctx.output()).toContain('checagem n/d');
+            expect(ctx.output()).not.toContain('-ms');
             expect(ctx.output()).toContain('Registro SSE');
             expect(ctx.output()).not.toContain('Archive SSE');
             expect(ctx.output()).toContain('data/copilot-terminal/sse-events');
             expect(ctx.output()).not.toContain(process.cwd());
-            expect(ctx.output()).toContain('binding ok');
+            expect(ctx.output()).toContain('Vínculo persistido coincide com a revisão atual do prompt do sistema.');
+            expect(ctx.output()).not.toContain('binding ok');
+            expect(ctx.output()).not.toContain('system prompt');
             expect(ctx.output()).toContain('Processando mensagem');
             expect(ctx.output()).not.toContain('bound-default');
             expect(ctx.output()).not.toContain('runtime-4567890123456789012345');

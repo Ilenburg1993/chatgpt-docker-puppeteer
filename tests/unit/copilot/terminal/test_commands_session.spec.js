@@ -79,7 +79,11 @@ const defaultRuntime = /** @type {any} */ ({
         pendingQuestion: null,
         contextWindow: 128000,
         systemPromptBinding: { digest: 'bound-default' },
-        systemPromptFreshness: { isStale: false, reason: 'binding ok', recommendedAction: 'none' },
+        systemPromptFreshness: {
+            isStale: false,
+            reason: 'Vínculo persistido coincide com a revisão atual do prompt do sistema.',
+            recommendedAction: 'none',
+        },
     }),
     dialogPrMetrics: null,
     answerPendingQuestion,
@@ -489,7 +493,9 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('vinculado');
         expect(ctx.output()).not.toContain('Prompt digest');
         expect(ctx.output()).toContain('Prompt frescor');
-        expect(ctx.output()).toContain('binding ok');
+        expect(ctx.output()).toContain('Vínculo persistido coincide com a revisão atual do prompt do sistema.');
+        expect(ctx.output()).not.toContain('binding ok');
+        expect(ctx.output()).not.toContain('system prompt');
         expect(ctx.output()).toContain('Ferramentas');
         expect(ctx.output()).not.toContain('tools load');
         expect(ctx.output()).toContain('Porta entrada');
@@ -923,10 +929,40 @@ describe('commands/session — async commands', () => {
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '2');
         expect(ctx.output()).toContain('Sessão SDK');
+        expect(ctx.output()).toContain('não listada nesta janela');
+        expect(ctx.output()).not.toContain('ativa fora desta página');
+        expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.command.executed', limit: 50 });
+        expect(ctx.output()).toContain('7 CommandDefinitions expostos');
+        expect(ctx.output()).toContain('nenhum comando chamado nesta janela');
+        expect(ctx.output()).toContain('/session sdk commands');
         expect(ctx.output()).toContain('/restart reinicia só a conversa');
         expect(ctx.output()).not.toContain('dialog loop');
         expect(ctx.output()).toContain('/resume injeta histórico do hub');
         expect(ctx.output()).toContain('#1');
+    });
+
+    it('cmdSessionSdk resume comandos SDK chamados no archive principal', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            entries: [
+                {
+                    event: 'sdk.command.executed',
+                    payload: {
+                        commandName: 'terminal_status',
+                        localCommand: '/status',
+                        status: 'completed',
+                    },
+                },
+            ],
+            state: { error: null },
+            filters: {},
+        });
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, '2');
+
+        expect(ctx.output()).toContain('7 CommandDefinitions expostos');
+        expect(ctx.output()).toContain('1 chamada na janela');
+        expect(ctx.output()).toContain('último terminal_status');
+        expect(ctx.output()).toContain('/session sdk events');
     });
 
     it('cmdSessionSdk respeita limite numérico e compacta previews longos', async () => {
@@ -1245,12 +1281,26 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('Registro');
         expect(ctx.output()).not.toContain('Archive');
         expect(ctx.output()).toContain('Ciclo de vida SDK');
+        expect(ctx.output()).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2} \(há \d+[smhda]\)/u);
         expect(ctx.output()).toContain('sessão atualizada');
         expect(ctx.output()).toContain('×2');
         expect(ctx.output()).toContain('terminal_status');
         expect(ctx.output()).toContain('este comando não cria eventos');
         expect(ctx.output()).not.toContain('#10');
         expect(ctx.output()).not.toContain('agent/sdk.lifecycle');
+    });
+
+    it('cmdSessionSdkEvents explica janela vazia como normal após resume silencioso', async () => {
+        const ctx = mockCtx();
+
+        await cmdSessionSdk({ println: ctx.println }, 'events 5');
+
+        expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.lifecycle', limit: 5 });
+        expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.command.executed', limit: 5 });
+        expect(ctx.output()).toContain('Eventos SDK da sessão');
+        expect(ctx.output()).toContain('normal após resume silencioso');
+        expect(ctx.output()).toContain('/session sdk commands');
+        expect(ctx.output()).not.toContain('nenhum ciclo de vida SDK ou comando SDK arquivado ainda');
     });
 
     it('cmdSessionSdk commands lista CommandDefinition[] expostos ao SDK', async () => {
@@ -1260,7 +1310,78 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('terminal_status');
         expect(ctx.output()).toContain('/status');
         expect(ctx.output()).toContain('terminal_session_waits');
+        expect(ctx.output()).toContain('lista segura observável');
+        expect(ctx.output()).toContain('emissão canônica');
+        expect(ctx.output()).toContain('diagnóstico de saúde');
+        expect(ctx.output()).toContain('sessão SDK viva');
+        expect(ctx.output()).toContain('arquivo SSE canônico');
+        expect(ctx.output()).toContain('provedor preparado');
+        expect(ctx.output()).toContain('vínculo vivo');
+        expect(ctx.output()).toContain('saúde resumida');
         expect(ctx.output()).toContain('sdk.command.executed');
+        expect(ctx.output()).not.toContain('safelist');
+        expect(ctx.output()).not.toContain('fanout');
+        expect(ctx.output()).not.toContain('provider preparado');
+        expect(ctx.output()).not.toContain('binding vivo');
+        expect(ctx.output()).not.toContain('health resumido');
+        expect(ctx.output()).not.toContain('diagnostico');
+        expect(ctx.output()).not.toContain('saude');
+        expect(ctx.output()).not.toContain('sessao');
+        expect(ctx.output()).not.toContain('canonico');
+    });
+
+    it('cmdSessionSdk descreve erro do arquivo SSE sem termo archive cru', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            entries: [],
+            state: { error: 'falha de leitura' },
+            filters: {},
+        });
+        const ctx = mockCtx();
+
+        await cmdSessionSdk({ println: ctx.println }, '2');
+
+        expect(ctx.output()).toContain('arquivo SSE com erro: falha de leitura');
+        expect(ctx.output()).not.toContain('archive com erro');
+    });
+
+    it('cmdSessionSdkWaits explica estado vazio após resume silencioso', async () => {
+        const emptyProjection = (/** @type {string} */ event) => ({
+            entries: [],
+            state: {
+                enabled: true,
+                path: '/tmp/terminal-sse-events.jsonl',
+                error: null,
+                events: 0,
+                bytes: 0,
+                queueDepth: 0,
+                flushScheduled: false,
+                flushInFlight: false,
+                failedEvents: 0,
+                droppedEvents: 0,
+                lastEventId: 0,
+            },
+            filters: {
+                limit: 5,
+                event,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+        });
+        readTerminalSseEventArchiveTail.mockImplementation(({ event }) => Promise.resolve(emptyProjection(event)));
+
+        const ctx = mockCtx();
+        await cmdSessionSdk({ println: ctx.println }, 'waits 5');
+
+        expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'user_input.requested', limit: 5 });
+        expect(ctx.output()).toContain('Esperas SDK da sessão');
+        expect(ctx.output()).toContain('normal após resume silencioso');
+        expect(ctx.output()).toContain('sem ask_user/elicitation/permission');
+        expect(ctx.output()).toContain('/sdk waits para pendências vivas');
+        expect(ctx.output()).not.toContain('nenhuma espera SDK arquivada ainda');
     });
 
     it('cmdSessionSdkWaits agrega ask_user, elicitation e permission pelo archive SSE canônico', async () => {
@@ -1381,6 +1502,7 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('Registro');
         expect(ctx.output()).not.toContain('Archive');
         expect(ctx.output()).toContain('perguntas 2');
+        expect(ctx.output()).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2} \(há \d+[smhda]\)/u);
         expect(ctx.output()).toContain('formulários 1');
         expect(ctx.output()).toContain('permissões 1');
         expect(ctx.output()).toContain('Continuar?');

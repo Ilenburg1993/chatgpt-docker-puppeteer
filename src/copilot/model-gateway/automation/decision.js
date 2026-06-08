@@ -33,6 +33,16 @@ function textList(value) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} selected
+ * @returns {string[]}
+ */
+function selectedPolicyTerms(selected) {
+    const policy = record(selected?.['policy']);
+    const terms = text(policy?.['terms']);
+    return terms ? terms.split(/\s+/gu).map(text).filter((item) => item !== null) : [];
+}
+
+/**
  * @param {Record<string, unknown> | null | undefined} route
  * @returns {Record<string, unknown> | null}
  */
@@ -46,6 +56,32 @@ function selectedRoute(route) {
  */
 function routeKey(route) {
     return text(route?.['selectedRouteKey']) ?? text(route?.['selected'] && record(route['selected'])?.['id']);
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} route
+ * @returns {string[]}
+ */
+function selectedRouteReasons(route) {
+    const selected = selectedRoute(route);
+    return [...new Set([...textList(route?.['reasons']), ...textList(selected?.['reasons']), ...selectedPolicyTerms(selected)])];
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} route
+ * @returns {string | null}
+ */
+function selectedRouteConfidence(route) {
+    const selected = selectedRoute(route);
+    const verification = record(selected?.['verification']);
+    const direct =
+        text(verification?.['confidence']) ??
+        text(selected?.['confidence']) ??
+        text(route?.['confidence']) ??
+        selectedRouteReasons(route)
+            .map((reason) => reason.match(/^confidence:(?<value>.+)$/iu)?.groups?.['value'] ?? null)
+            .find((value) => value !== null);
+    return direct ?? null;
 }
 
 /**
@@ -314,6 +350,8 @@ function routeWithPostTurnFallback(route, turnFailure) {
  *   route: Record<string, unknown> | null;
  *   routeProfile: string | null;
  *   selectedRouteKey: string | null;
+ *   selectedRouteReasons: string[];
+ *   selectedRouteConfidence: string | null;
  *   blockers: string[];
  *   waitForReset: boolean;
  * }}
@@ -326,6 +364,8 @@ export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, pr
         route,
         routeProfile: text(route?.['profileId']) ?? target.profile,
         selectedRouteKey: routeKey(route),
+        selectedRouteReasons: selectedRouteReasons(route),
+        selectedRouteConfidence: selectedRouteConfidence(route),
         blockers: routeBlockers(route),
         waitForReset: shouldWaitForReset(route),
     };
@@ -348,6 +388,8 @@ export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, pr
  *   status: 'ready' | 'blocked';
  *   action: 'keep_current' | 'apply_live_model' | 'prepare_new_session' | 'wait_for_reset' | 'manual_intervention';
  *   selectedRouteKey: string | null;
+ *   selectedRouteReasons: string[];
+ *   selectedRouteConfidence: string | null;
  *   routeProfile: string | null;
  *   fallbackFromSelectedRouteKey: string | null;
  *   fallbackReason: string | null;
@@ -377,6 +419,8 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
     const currentBlockerClass = blockerClass(blockers);
     const selectedKey = routeKey(route) ?? automationRoute.selectedRouteKey;
     const routeProfile = automationRoute.routeProfile;
+    const selectedReasons = selectedRouteReasons(route);
+    const selectedConfidence = selectedRouteConfidence(route);
     const fallbackDecisionFields = {
         fallbackFromSelectedRouteKey: text(route?.['fallbackFromSelectedRouteKey']),
         fallbackReason: text(route?.['fallbackReason']),
@@ -392,6 +436,8 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             status: 'blocked',
             action: wait ? 'wait_for_reset' : 'manual_intervention',
             selectedRouteKey: selectedKey,
+            selectedRouteReasons: selectedReasons,
+            selectedRouteConfidence: selectedConfidence,
             routeProfile,
             ...fallbackDecisionFields,
             canApplyLiveModel: false,
@@ -419,6 +465,8 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             status: 'ready',
             action: 'prepare_new_session',
             selectedRouteKey: selectedKey,
+            selectedRouteReasons: selectedReasons,
+            selectedRouteConfidence: selectedConfidence,
             routeProfile,
             ...fallbackDecisionFields,
             canApplyLiveModel: false,
@@ -440,6 +488,8 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             status: 'ready',
             action: 'keep_current',
             selectedRouteKey: selectedKey,
+            selectedRouteReasons: selectedReasons,
+            selectedRouteConfidence: selectedConfidence,
             routeProfile,
             ...fallbackDecisionFields,
             canApplyLiveModel: false,
@@ -461,6 +511,8 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             status: 'ready',
             action: 'apply_live_model',
             selectedRouteKey: selectedKey,
+            selectedRouteReasons: selectedReasons,
+            selectedRouteConfidence: selectedConfidence,
             routeProfile,
             ...fallbackDecisionFields,
             canApplyLiveModel: true,
@@ -482,6 +534,8 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
         status: input.policy?.allowNewSession === true || !requiresNewSession ? 'ready' : 'blocked',
         action: requiresNewSession ? (input.policy?.allowNewSession === true ? 'prepare_new_session' : 'manual_intervention') : 'manual_intervention',
         selectedRouteKey: selectedKey,
+        selectedRouteReasons: selectedReasons,
+        selectedRouteConfidence: selectedConfidence,
         routeProfile,
         ...fallbackDecisionFields,
         canApplyLiveModel: false,

@@ -6,13 +6,12 @@
  *   Extração de 5 métodos do AlwaysAliveAgent para reduzir complexidade.
  */
 
+import { getAgentHealthSnapshot as healthSnapshot } from '../health-check.js';
+import { getSdkHandles, getSdkResourceSnapshot } from './sdk-access.js';
 import {
-    getSdkHandles,
-    getSdkResourceSnapshot,
-    healthSnapshot,
-    stateDiagnostics,
-    stateSnapshot,
-} from '../runtime/root-surface/index.js';
+    getStatusSnapshot as stateSnapshot,
+    listenerDiagnostics as stateDiagnostics,
+} from '../state/agent-state.js';
 
 /**
  * Façade para Health & Diagnostics.

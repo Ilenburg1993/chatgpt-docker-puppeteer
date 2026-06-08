@@ -23,7 +23,7 @@ import {
     SDK_LOGGER,
     TOOLS_BUILDER,
 } from '#copilot/sdk/di';
-import { createCopilotClient, defaultBus as defaultHookBus } from '#copilot/sdk/session';
+import { createTerminalCopilotClient, defaultBus as defaultHookBus } from '#copilot/sdk/session';
 import { getAuthStatus as checkAuthStatus, runCopilotSdkBootPreflight } from '#copilot/sdk/telemetry';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { COPILOT_MODEL, PING_TIMEOUT_MS } from '../config/agent.js';
@@ -173,7 +173,7 @@ export async function bootCopilot(options) {
             },
             'sdk-preflight': async () => {
                 bootState.bootPreflight = await runCopilotSdkBootPreflight({
-                    createClient: () => createCopilotClient(buildModelGatewayClientOptions()),
+                    createClient: () => createTerminalCopilotClient(buildModelGatewayClientOptions()),
                     checkAuthStatus,
                     configuredModel: COPILOT_MODEL,
                     pingTimeoutMs: PING_TIMEOUT_MS,

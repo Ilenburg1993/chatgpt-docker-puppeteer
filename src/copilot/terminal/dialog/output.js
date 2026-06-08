@@ -12,7 +12,7 @@ import { LLM_B_BOOT_PROMPT, LLM_B_TURN_TIMEOUT_MS } from '#copilot/config';
 import { resolveModelSelectionMismatch } from '#copilot/core';
 import readline from 'node:readline';
 import { getBusy, getRl, getSdkSessionMode } from '../../presentation/state/index.js';
-import { humanizeTerminalToolSurfaceText } from '../events/tool-activity-presenter.js';
+import { humanizeTerminalToolSurfaceText } from '../events/presenters/tools/index.js';
 import {
     getTerminalPendingStructuredUserInputCount,
     readTerminalDialogStreamMeta,

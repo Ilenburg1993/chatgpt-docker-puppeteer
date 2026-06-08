@@ -54,7 +54,7 @@ import {
     println,
     scheduleTerminalPromptRedraw,
     writeInlineStatus,
-} from '../dialog/index.js';
+} from '../dialog/io/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     completeTerminalTurnMaterialization,
@@ -273,6 +273,36 @@ const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
  */
 function shouldPersistToolHeartbeatNarration() {
     return process.env['COPILOT_TERMINAL_DURABLE_TOOL_HEARTBEAT'] === 'true';
+}
+
+/**
+ * Heartbeats de `ask_user`/`request_user_input` não são progresso de tool para o operador: são estado de pergunta
+ * humana, já coberto pelo renderer dedicado e pela linha viva. Esta checagem usa nome cru, canonicalName, apresentação e
+ * detalhe para cobrir eventos incompletos de SDK/MCP.
+ *
+ * @param {ReturnType<ReturnType<typeof createToolCallRegistry>['getAllInFlight']>[number]} entry
+ * @returns {boolean}
+ */
+function isHumanQuestionToolHeartbeat(entry) {
+    const raw = [
+        entry.toolName,
+        entry.canonicalName,
+        entry.presentation?.displayToolName,
+        entry.presentation?.label,
+        entry.presentation?.detail,
+        entry.presentation?.startLine,
+    ]
+        .filter((value) => typeof value === 'string' && value.trim().length > 0)
+        .join(' ')
+        .toLowerCase();
+    return (
+        entry.presentation?.operation === 'ask' ||
+        raw.includes('ask_user') ||
+        raw.includes('request_user_input') ||
+        raw.includes('pergunta ao operador') ||
+        raw.includes('aguardando decisão humana') ||
+        raw.includes('aguardando decisao humana')
+    );
 }
 
 /**
@@ -635,10 +665,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 const toolCallId = entry.toolCallId;
                 if (
                     entry.suppressLiveNarration === true ||
-                    entry.toolName === 'ask_user' ||
-                    entry.toolName === 'request_user_input' ||
-                    entry.canonicalName === 'request_user_input' ||
-                    entry.presentation?.operation === 'ask'
+                    isHumanQuestionToolHeartbeat(entry)
                 ) {
                     continue;
                 }
@@ -1197,11 +1224,13 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const from = typeof evt?.['from'] === 'string' ? evt['from'] : '?';
         const to = typeof evt?.['to'] === 'string' ? evt['to'] : '?';
         const reason = typeof evt?.['reason'] === 'string' ? evt['reason'] : null;
+        const confidence = typeof evt?.['confidence'] === 'string' ? evt['confidence'] : null;
         const presentation = buildTerminalModelTransitionPresentation({
             from,
             to,
             kind: 'fallback',
             reason,
+            confidence,
             source: 'agent',
         });
         recordTerminalActivity('system', 'Fallback de modelo aplicado', {
@@ -1215,6 +1244,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 to,
                 kind: 'fallback',
                 reason,
+                confidence,
                 source: 'agent',
                 role: 'warn',
             })}`,

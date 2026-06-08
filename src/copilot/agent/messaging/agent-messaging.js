@@ -25,11 +25,13 @@ import { withAgentErrorPolicy } from '../error/index.js';
 import {
     onAgentSdkSessionEvent,
     onAllAgentSdkSessionEvents,
-    persistAgentRuntimeStatePartial,
     sendAgentSdkSession,
     sendAgentSdkSessionAndWait,
-} from '../facades/index.js';
-import { log, resolveAgentUserInput, startSpan, startSpanImmediate } from '../ports/index.js';
+} from '../facades/agent-sdk-runtime.js';
+import { persistAgentRuntimeStatePartial } from '../facades/agent-runtime-state.js';
+import { log } from '../ports/logging/index.js';
+import { resolveAgentUserInput } from '../ports/tool-port.js';
+import { startSpan, startSpanImmediate } from '../ports/tracing-port.js';
 
 /**
  * @typedef {import('../agent-context.js').AgentContext} AgentContext

@@ -19,7 +19,7 @@ import {
 import { readTerminalIoActivityProjection } from '../events/index.js';
 import { requireTerminalFileTool } from '../frontend/gateways/index.js';
 import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
-import { formatTerminalToolPathForOperator } from '../events/tool-activity-presenter.js';
+import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 import { terminalThemeRow } from '../state/ui/index.js';
 
 /**

@@ -83,6 +83,7 @@ describe('sdk/session/lifecycle core hardening', () => {
         await createSession(client, {
             model: 'gpt-4.1',
             gitHubToken: 'ghs_session',
+            configDir: '/tmp/copilot-config',
             createSessionFsHandler: sessionFsHandler,
             onElicitationRequest: elicitationHandler,
             commands: [{ name: 'diagnose', description: 'Diagnose', handler: commandHandler }],
@@ -96,6 +97,7 @@ describe('sdk/session/lifecycle core hardening', () => {
             expect.objectContaining({
                 model: 'gpt-4.1',
                 gitHubToken: 'ghs_session',
+                configDirectory: '/tmp/copilot-config',
                 createSessionFsProvider: sessionFsHandler,
                 onElicitationRequest: elicitationHandler,
                 commands: [expect.objectContaining({ name: 'diagnose', handler: commandHandler })],
@@ -105,6 +107,32 @@ describe('sdk/session/lifecycle core hardening', () => {
                 defaultAgent: { excludedTools: ['shell'] },
             }),
         );
+        const payload = client.createSession.mock.calls[0]?.[0];
+        expect(payload).not.toHaveProperty('configDir');
+        expect(payload).not.toHaveProperty('createSessionFsHandler');
+    });
+
+    it('createSession prioriza nomes oficiais SDK 1.0 sobre aliases locais', async () => {
+        const client = fakeClient();
+        const legacySessionFsHandler = vi.fn();
+        const officialSessionFsProvider = vi.fn();
+
+        await createSession(client, {
+            model: 'gpt-4.1',
+            configDir: '/tmp/legacy-config',
+            configDirectory: '/tmp/official-config',
+            createSessionFsHandler: legacySessionFsHandler,
+            createSessionFsProvider: officialSessionFsProvider,
+        });
+
+        const payload = client.createSession.mock.calls[0]?.[0];
+        expect(payload).toMatchObject({
+            configDirectory: '/tmp/official-config',
+            createSessionFsProvider: officialSessionFsProvider,
+        });
+        expect(payload.createSessionFsProvider).not.toBe(legacySessionFsHandler);
+        expect(payload).not.toHaveProperty('configDir');
+        expect(payload).not.toHaveProperty('createSessionFsHandler');
     });
 
     it('createSession aplica retry curto e emite métricas em falha transitória', async () => {
@@ -204,7 +232,9 @@ describe('sdk/session/lifecycle core hardening', () => {
 
         await resumeSession(client, 's2', {
             gitHubToken: 'ghs_resume',
+            configDir: '/tmp/copilot-resume',
             createSessionFsHandler: sessionFsHandler,
+            disableResume: true,
             onElicitationRequest: elicitationHandler,
             commands: [{ name: 'resume-diagnose', handler: commandHandler }],
             modelCapabilities: { supports: { vision: true } },
@@ -217,7 +247,9 @@ describe('sdk/session/lifecycle core hardening', () => {
             's2',
             expect.objectContaining({
                 gitHubToken: 'ghs_resume',
+                configDirectory: '/tmp/copilot-resume',
                 createSessionFsProvider: sessionFsHandler,
+                suppressResumeEvent: true,
                 onElicitationRequest: elicitationHandler,
                 commands: [expect.objectContaining({ name: 'resume-diagnose', handler: commandHandler })],
                 modelCapabilities: { supports: { vision: true } },
@@ -226,6 +258,36 @@ describe('sdk/session/lifecycle core hardening', () => {
                 defaultAgent: { availableTools: ['read_file'] },
             }),
         );
+        const payload = client.resumeSession.mock.calls[0]?.[1];
+        expect(payload).not.toHaveProperty('configDir');
+        expect(payload).not.toHaveProperty('createSessionFsHandler');
+        expect(payload).not.toHaveProperty('disableResume');
+    });
+
+    it('resumeSession prioriza nomes oficiais SDK 1.0 sobre aliases locais', async () => {
+        const client = fakeClient();
+        const legacySessionFsHandler = vi.fn();
+        const officialSessionFsProvider = vi.fn();
+
+        await resumeSession(client, 's2', {
+            configDir: '/tmp/legacy-resume',
+            configDirectory: '/tmp/official-resume',
+            createSessionFsHandler: legacySessionFsHandler,
+            createSessionFsProvider: officialSessionFsProvider,
+            disableResume: true,
+            suppressResumeEvent: false,
+        });
+
+        const payload = client.resumeSession.mock.calls[0]?.[1];
+        expect(payload).toMatchObject({
+            configDirectory: '/tmp/official-resume',
+            createSessionFsProvider: officialSessionFsProvider,
+            suppressResumeEvent: false,
+        });
+        expect(payload.createSessionFsProvider).not.toBe(legacySessionFsHandler);
+        expect(payload).not.toHaveProperty('configDir');
+        expect(payload).not.toHaveProperty('createSessionFsHandler');
+        expect(payload).not.toHaveProperty('disableResume');
     });
 
     it('resumeSession preserva model="auto" nativo e omite reasoningEffort sem modelo concreto', async () => {

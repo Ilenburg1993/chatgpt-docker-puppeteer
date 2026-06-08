@@ -9,6 +9,7 @@
  */
 
 import { createHistogram } from './metrics-histogram.js';
+import { redactSecretText } from '../core/security/redaction.js';
 
 // ─── Persistência SQLite (opcional, L2) ──────────────────────────────────────
 
@@ -66,11 +67,11 @@ export function getPersistedSnapshot(options = {}) {
 
     if (options.traceId) {
         conditions.push('trace_id = ?');
-        params.push(options.traceId);
+        params.push(redactSecretText(options.traceId));
     }
     if (options.operation) {
         conditions.push('operation = ?');
-        params.push(options.operation);
+        params.push(redactSecretText(options.operation));
     }
     if (options.status) {
         conditions.push('status = ?');
@@ -93,15 +94,15 @@ export function getPersistedSnapshot(options = {}) {
     return {
         events: events.map((row) => ({
             id: row.id,
-            traceId: row.trace_id,
-            operation: row.operation,
-            phase: row.phase,
+            traceId: redactSecretText(row.trace_id),
+            operation: redactSecretText(row.operation),
+            phase: redactSecretText(row.phase),
             direction: row.direction,
             status: row.status,
             bytesRead: row.bytes_read,
             bytesWritten: row.bytes_written,
             durationMs: row.duration_ms,
-            errorMsg: row.error_msg,
+            errorMsg: row.error_msg ? redactSecretText(row.error_msg) : null,
             createdAtMs: row.created_at_ms,
         })),
         total: countRow?.n ?? 0,
@@ -265,7 +266,7 @@ export function createConvergenceTraceStore(
         let trace = traces.get(traceId);
         if (!trace) {
             trace = {
-                traceId,
+            traceId: redactSecretText(traceId),
                 operation: event.operation,
                 sessionId: event.sessionId,
                 status: event.status === 'failed' ? 'failed' : 'running',
@@ -314,11 +315,11 @@ export function createConvergenceTraceStore(
             phase.activeStartedAt = null;
         }
 
-        trace.events.push(event);
+        trace.events.push(redactConvergenceEvent(event));
         if (trace.events.length > maxEventsPerTrace) trace.events.shift();
         trace.status = resolveTraceStatus(trace);
         updatedAt = event.ts;
-        persistEvent(traceId, event);
+        persistEvent(redactSecretText(traceId), redactConvergenceEvent(event));
     }
 
     /**
@@ -402,17 +403,33 @@ function normalizeConvergenceMetric(metric) {
                 : null,
         event: {
             ts: Date.now(),
-            operation: metric.operation,
-            phase,
+            operation: redactSecretText(metric.operation),
+            phase: redactSecretText(phase),
             status: metric.status,
-            sessionId: metric.sessionId ?? null,
+            sessionId: metric.sessionId ? redactSecretText(metric.sessionId) : null,
             durationMs:
                 typeof durationMs === 'number' && Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : null,
             bytes: typeof bytes === 'number' && Number.isFinite(bytes) && bytes >= 0 ? bytes : null,
-            sdkPath: typeof attributes['sdkPath'] === 'string' ? attributes['sdkPath'] : null,
-            localPath: typeof attributes['localPath'] === 'string' ? attributes['localPath'] : null,
-            reason: typeof attributes['reason'] === 'string' ? attributes['reason'] : null,
+            sdkPath: typeof attributes['sdkPath'] === 'string' ? redactSecretText(attributes['sdkPath']) : null,
+            localPath: typeof attributes['localPath'] === 'string' ? redactSecretText(attributes['localPath']) : null,
+            reason: typeof attributes['reason'] === 'string' ? redactSecretText(attributes['reason']) : null,
         },
+    };
+}
+
+/**
+ * @param {ConvergenceTraceEvent} event
+ * @returns {ConvergenceTraceEvent}
+ */
+function redactConvergenceEvent(event) {
+    return {
+        ...event,
+        operation: redactSecretText(event.operation),
+        phase: redactSecretText(event.phase),
+        sessionId: event.sessionId ? redactSecretText(event.sessionId) : null,
+        sdkPath: event.sdkPath ? redactSecretText(event.sdkPath) : null,
+        localPath: event.localPath ? redactSecretText(event.localPath) : null,
+        reason: event.reason ? redactSecretText(event.reason) : null,
     };
 }
 
@@ -462,20 +479,22 @@ function resolveTraceStatus(trace) {
 function snapshotTrace(trace) {
     if (!trace) return null;
     return {
-        traceId: trace.traceId,
-        operation: trace.operation,
-        sessionId: trace.sessionId,
+        traceId: redactSecretText(trace.traceId),
+        operation: redactSecretText(trace.operation),
+        sessionId: trace.sessionId ? redactSecretText(trace.sessionId) : null,
         status: trace.status,
         startedAt: trace.startedAt,
         updatedAt: trace.updatedAt,
         eventCount: trace.events.length,
         bytes: trace.bytes,
-        sdkPath: trace.sdkPath,
-        localPath: trace.localPath,
+        sdkPath: trace.sdkPath ? redactSecretText(trace.sdkPath) : null,
+        localPath: trace.localPath ? redactSecretText(trace.localPath) : null,
         overwrite: trace.overwrite,
-        destinationRoot: trace.destinationRoot,
-        phases: Object.fromEntries([...trace.phases.entries()].map(([name, phase]) => [name, snapshotPhase(phase)])),
-        events: [...trace.events],
+        destinationRoot: trace.destinationRoot ? redactSecretText(trace.destinationRoot) : null,
+        phases: Object.fromEntries(
+            [...trace.phases.entries()].map(([name, phase]) => [redactSecretText(name), snapshotPhase(phase)]),
+        ),
+        events: trace.events.map(redactConvergenceEvent),
     };
 }
 
@@ -485,7 +504,7 @@ function snapshotTrace(trace) {
  */
 function snapshotPhase(phase) {
     return {
-        phase: phase.phase,
+        phase: redactSecretText(phase.phase),
         total: phase.total,
         started: phase.started,
         succeeded: phase.succeeded,

@@ -56,6 +56,15 @@ export const TERMINAL_EXPLICIT_AGENT_EVENTS = new Set([
     'session.shutdown',
     'session.handoff',
     'session.workspace_file_changed',
+    'session.autopilot_objective_changed',
+    'session.custom_agents_updated',
+    'session.custom_notification',
+    'session.extensions.attachments_pushed',
+    'session.remote_steerable_changed',
+    'session.schedule_created',
+    'session.schedule_cancelled',
+    'extension_context',
+    'new_inbox_message',
     'hook.start',
     'hook.end',
     'sampling.requested',
@@ -121,7 +130,7 @@ export const TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS = new Set([
  *
  * @type {ReadonlyArray<{
  *     id: string;
- *     class: 'content' | 'interaction' | 'tool' | 'state' | 'telemetry' | 'diagnostic' | 'lifecycle' | 'provider';
+ *     class: 'content' | 'interaction' | 'tool' | 'state' | 'telemetry' | 'diagnostic' | 'lifecycle' | 'provider' | 'extension';
  *     canonicalEmitter: string;
  *     publicEvents: string[];
  *     accepts: string[];
@@ -231,6 +240,46 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
         ],
         fallback: '/byok env · /byok profiles · /byok models refresh · /status',
         owner: 'sdk/session/provider.js + terminal/commands/byok.js + terminal/frontend/projections/config.js',
+    },
+    {
+        id: 'canvas.mcp-app.summary',
+        class: 'extension',
+        canonicalEmitter: 'terminal/events/sdk-session-events.canvas + mcp_app',
+        publicEvents: ['session.canvas.opened', 'session.canvas.registry_changed', 'mcp_app.tool_call_complete'],
+        accepts: ['session.canvas.opened', 'session.canvas.registry_changed', 'mcp_app.tool_call_complete'],
+        suppresses: ['raw iframe/canvas payload in default terminal output'],
+        fallback: '/events --json compact exposes redacted ids and preview until a visual canvas renderer exists',
+        owner: 'terminal/events/sdk-session-events.js + terminal/commands/events.js',
+    },
+    {
+        id: 'sdk.session.extension-signals',
+        class: 'extension',
+        canonicalEmitter: 'terminal/events/sdk-session-events.extension_signals',
+        publicEvents: [
+            'session.autopilot_objective_changed',
+            'extension_context',
+            'session.custom_agents_updated',
+            'session.custom_notification',
+            'session.extensions.attachments_pushed',
+            'session.remote_steerable_changed',
+            'session.schedule_created',
+            'session.schedule_cancelled',
+            'new_inbox_message',
+        ],
+        accepts: [
+            'session.autopilot_objective_changed',
+            'extension_context',
+            'session.custom_agents_updated',
+            'session.custom_notification',
+            'session.extensions.attachments_pushed',
+            'session.remote_steerable_changed',
+            'session.schedule_created',
+            'session.schedule_cancelled',
+            'new_inbox_message',
+        ],
+        suppresses: ['unowned SDK 1.0 extension/session signals in catch-all warning logs'],
+        fallback: '/events --json compact exposes redacted payload preview when no dedicated renderer exists',
+        owner: 'event-handlers/session-lifecycle.js + terminal/events/sdk-session-events.js + terminal/commands/events.js',
     },
     {
         id: 'session.error.diagnostic',

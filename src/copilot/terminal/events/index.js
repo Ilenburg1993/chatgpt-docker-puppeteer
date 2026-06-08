@@ -15,6 +15,7 @@ export {
     humanTerminalIntentSource,
     terminalIntentRiskTheme,
 } from './intent-presenter.js';
+export { buildTerminalHumanQuestionCard, printTerminalHumanQuestionCard } from './human-question-renderer.js';
 export {
     EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS,
     EMPTY_AFTER_USER_INPUT_MODEL_COMMAND,
@@ -57,4 +58,24 @@ export {
     renderTerminalTraceFlowSummary,
     renderTerminalTraceSummaryTitle,
 } from './turn-trace-presentation.js';
+export {
+    formatTerminalModelTransitionIsoTimestamp,
+    renderTerminalModelTransitionSourceLabel,
+    buildTerminalModelTransitionPresentation,
+} from './model-transition-presentation.js';
+export {
+    buildTerminalToolActivityPresentation,
+    compactTerminalDiagnosticId,
+    compactTerminalOperatorToolText,
+    compactTerminalToolText,
+    extractTerminalToolArgsPayload,
+    extractTerminalToolResultPayload,
+    formatTerminalToolPathForOperator,
+    getTerminalHumanToolName,
+    humanizeTerminalToolSurfaceText,
+    isGenericTerminalToolName,
+    isTerminalInternalCallIdentifier,
+    mapTerminalToolOperationRole,
+    normalizeTerminalToolArgsPayload,
+} from './tool-activity-presenter.js';
 export { setupTerminalTaskStreamListeners } from './task-stream-events.js';

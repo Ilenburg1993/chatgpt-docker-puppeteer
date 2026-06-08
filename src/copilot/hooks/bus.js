@@ -7,4 +7,4 @@
  * @module copilot/hooks/bus
  */
 
-export { HookBus, attachBus, defaultBus } from '#copilot/sdk/session';
+export { HookBus, attachBus, defaultBus, normalizeHookInputForSdk10 } from '#copilot/sdk/session';

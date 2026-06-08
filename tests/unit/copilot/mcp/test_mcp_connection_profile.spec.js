@@ -118,7 +118,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(metadata.userinfo_endpoint, 'https://mcp.aurelin.org/oauth/userinfo');
         assert.equal(metadata.client_id_metadata_document_supported, true);
         assert.ok(/** @type {string[]} */ (metadata.grant_types_supported).includes('refresh_token'));
-        assert.deepEqual(metadata.token_endpoint_auth_methods_supported, ['none']);
+        assert.deepEqual(metadata.token_endpoint_auth_methods_supported, ['none', 'private_key_jwt']);
         assert.ok(/** @type {string[]} */ (metadata.scopes_supported).includes('openid'));
         assert.ok(/** @type {string[]} */ (metadata.claims_supported).includes('email'));
         assert.deepEqual(buildProtectedResourceMetadata(config).scopes_supported, [
@@ -197,6 +197,7 @@ describe('copilot MCP ChatGPT connection profile', () => {
             COPILOT_MCP_AUTH_ENFORCEMENT: 'write',
             COPILOT_MCP_PUBLIC_URL: 'https://example.com/mcp',
             COPILOT_MCP_STATIC_BEARER_TOKEN: 'dev-token',
+            COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED: 'true',
         };
         const config = readMcpAuthConfig(env);
         const missing = await authorizeMcpToolCall(writeTool, { bearerToken: undefined }, config, env);

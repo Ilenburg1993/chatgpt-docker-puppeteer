@@ -11,7 +11,7 @@ import {
     normalizeElicitationCompletedEvent,
     normalizeElicitationPendingEvent,
     onSessionEvents,
-} from '#copilot/sdk/session';
+} from '#copilot/events/sdk-events';
 
 /**
  * @param {import('./contracts.js').CopilotSessionLike} session

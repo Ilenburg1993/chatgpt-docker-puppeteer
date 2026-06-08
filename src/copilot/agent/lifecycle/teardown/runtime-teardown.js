@@ -8,8 +8,10 @@
  */
 
 import { toError } from '#copilot/core';
-import { disconnectAgentSdkSession, stopAgentSdkClient } from '../../facades/index.js';
-import { defaultMetrics, log, unbindAgentSessionTools } from '../../ports/index.js';
+import { disconnectAgentSdkSession, stopAgentSdkClient } from '../../facades/sdk-access.js';
+import { log } from '../../ports/logging/index.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
+import { unbindAgentSessionTools } from '../../ports/tool-port.js';
 
 /**
  * @typedef {import('../../agent-context.js').AgentContext} AgentContext

@@ -32,6 +32,18 @@ vi.mock('@github/copilot-sdk', () => ({
     CopilotClient: vi.fn(),
     approveAll: vi.fn(),
     defineTool: vi.fn(),
+    SYSTEM_MESSAGE_SECTIONS: {
+        guidelines: { name: 'guidelines' },
+        identity: { name: 'identity' },
+        context: { name: 'context' },
+        safety: { name: 'safety' },
+        responseFormat: { name: 'responseFormat' },
+        tools: { name: 'tools' },
+        abilities: { name: 'abilities' },
+        instructions: { name: 'instructions' },
+        conversationRules: { name: 'conversationRules' },
+        errorHandling: { name: 'errorHandling' },
+    },
     SYSTEM_PROMPT_SECTIONS: {
         guidelines: { name: 'guidelines' },
         identity: { name: 'identity' },
@@ -70,7 +82,7 @@ function fakeSession(overrides = {}) {
         abort: vi.fn().mockResolvedValue(undefined),
         setModel: vi.fn().mockResolvedValue(undefined),
         log: vi.fn().mockResolvedValue(undefined),
-        getMessages: vi.fn().mockResolvedValue([]),
+        getEvents: vi.fn().mockResolvedValue([]),
         disconnect: vi.fn().mockResolvedValue(undefined),
         [Symbol.asyncDispose]: vi.fn().mockResolvedValue(undefined),
         workspacePath: '/tmp/ws/sess-test-001',
@@ -260,6 +272,11 @@ describe('sdk/session-lifecycle', () => {
             );
             expect(s.log).not.toHaveBeenCalled();
         });
+
+        it('falha com mensagem clara quando runtime antigo não expõe session.log', async () => {
+            const s = fakeSession({ log: undefined });
+            await expect(logSessionTimeline(s, 'hello timeline')).rejects.toThrow('sessão não expõe session.log()');
+        });
     });
 
     // ─── getSessionMessages ────────────────────────────────────────────────
@@ -267,10 +284,10 @@ describe('sdk/session-lifecycle', () => {
     describe('getSessionMessages', () => {
         it('retorna os eventos da sessão', async () => {
             const events = [{ type: 'assistant.message', data: { content: 'hello' } }];
-            const s = fakeSession({ getMessages: vi.fn().mockResolvedValue(events) });
+            const s = fakeSession({ getEvents: vi.fn().mockResolvedValue(events) });
             const result = await getSessionMessages(s);
             expect(result).toEqual(events);
-            expect(s.getMessages).toHaveBeenCalledOnce();
+            expect(s.getEvents).toHaveBeenCalledOnce();
         });
 
         it('retorna array vazio se não houver eventos', async () => {
@@ -284,12 +301,12 @@ describe('sdk/session-lifecycle', () => {
         });
 
         it('propaga erro do SDK', async () => {
-            const s = fakeSession({ getMessages: vi.fn().mockRejectedValue(new Error('no connection')) });
+            const s = fakeSession({ getEvents: vi.fn().mockRejectedValue(new Error('no connection')) });
             await expect(getSessionMessages(s)).rejects.toThrow('no connection');
         });
 
-        it('normaliza erro de getMessages em SdkOperationError', async () => {
-            const s = fakeSession({ getMessages: vi.fn().mockRejectedValue(new Error('connection reset')) });
+        it('normaliza erro de getEvents em SdkOperationError', async () => {
+            const s = fakeSession({ getEvents: vi.fn().mockRejectedValue(new Error('connection reset')) });
             await expect(getSessionMessages(s)).rejects.toBeInstanceOf(SdkOperationError);
         });
     });

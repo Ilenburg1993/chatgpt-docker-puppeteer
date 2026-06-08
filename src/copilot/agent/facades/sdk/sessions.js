@@ -16,7 +16,7 @@ import {
     listSessions,
     resumeOrCreate,
 } from '#copilot/sdk/session';
-import { log } from '../../ports/index.js';
+import { log } from '../../ports/logging/index.js';
 import { requireClient } from './core/index.js';
 
 /**

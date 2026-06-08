@@ -34,7 +34,9 @@ describe('HookBus', () => {
         const event = /** @type {{ hookName: string; sessionId: string; input: Record<string, unknown> }} */ (received);
         assert.equal(event.hookName, 'pre_tool_use', 'hookName deve ser correto');
         assert.equal(event.sessionId, 'session-123', 'sessionId deve ser correto');
-        assert.deepEqual(event.input, { tool: 'bash' }, 'input deve ser passado');
+        assert.equal(event.input.tool, 'bash', 'input deve preservar campos do operador');
+        assert.equal(event.input.sessionId, 'session-123', 'input deve carregar sessão normalizada');
+        assert.ok(event.input.timestamp instanceof Date, 'input deve carregar timestamp normalizado');
     });
 
     it('emitHook dispara wildcard listener', async () => {

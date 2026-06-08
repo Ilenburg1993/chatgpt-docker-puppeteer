@@ -58,6 +58,7 @@ import {
     globalAuditBuffer,
     HookBus,
     HookRegistry,
+    normalizeHookInputForSdk10,
     pipeline,
     raceWithTimeout,
     SDK_HOOKS,
@@ -506,14 +507,61 @@ describe('hooks/bus (Gap 6 — HookBus)', () => {
         assert.strictEqual(result?.permissionDecision, 'allow');
         assert.strictEqual(events.length, 1);
     });
+
+    it('normalizeHookInputForSdk10 converte cwd/timestamp legado para contrato 1.0', () => {
+        const normalized = normalizeHookInputForSdk10(
+            { toolName: 'shell', toolArgs: {}, timestamp: 1_710_000_000_000, cwd: '/tmp' },
+            'sess-10',
+        );
+        const input = /** @type {{ sessionId?: string; timestamp?: unknown; workingDirectory?: string; cwd?: string }} */ (
+            normalized
+        );
+        assert.strictEqual(input.sessionId, 'sess-10');
+        assert.ok(input.timestamp instanceof Date);
+        assert.strictEqual(input.workingDirectory, '/tmp');
+        assert.strictEqual(input.cwd, '/tmp');
+    });
+
+    it('attachBus observa onPreMcpToolCall e onPostToolUseFailure normalizados', async () => {
+        const bus = new HookBus();
+        /** @type {unknown[]} */
+        const inputs = [];
+        bus.on('*', (/** @type {any} */ event) => inputs.push(event.input));
+        const hooks = anyAttachBus(
+            {
+                onPreMcpToolCall: async () => ({ metaToUse: { ok: true } }),
+                onPostToolUseFailure: async () => ({ additionalContext: 'falha registrada' }),
+            },
+            bus,
+        );
+
+        await hooks.onPreMcpToolCall(
+            { serverName: 'mcp', toolName: 'search', arguments: {}, timestamp: 1, cwd: '/repo' },
+            { sessionId: 'sess-mcp' },
+        );
+        await hooks.onPostToolUseFailure(
+            { toolName: 'search', toolArgs: {}, error: 'boom', timestamp: '2026-01-01T00:00:00.000Z', cwd: '/repo' },
+            { sessionId: 'sess-mcp' },
+        );
+
+        assert.strictEqual(inputs.length, 2);
+        for (const input of inputs) {
+            const record = /** @type {{ sessionId?: string; timestamp?: unknown; workingDirectory?: string }} */ (input);
+            assert.strictEqual(record.sessionId, 'sess-mcp');
+            assert.ok(record.timestamp instanceof Date);
+            assert.strictEqual(record.workingDirectory, '/repo');
+        }
+    });
 });
 
 // ─── Seção 7: registry.js ─────────────────────────────────────────────────────
 
 describe('hooks/registry › SDK_HOOKS', () => {
-    it('SDK_HOOKS registra todos os 8 hooks do SDK', () => {
+    it('SDK_HOOKS registra todos os hooks do SDK', () => {
         const list = SDK_HOOKS.list();
-        assert.strictEqual(list.length, 8);
+        assert.strictEqual(list.length, 10);
+        assert.ok(SDK_HOOKS.isRegistered('onPreMcpToolCall'));
+        assert.ok(SDK_HOOKS.isRegistered('onPostToolUseFailure'));
     });
 
     it('SDK_HOOKS.isRegistered: conhecido e desconhecido', () => {
@@ -523,6 +571,7 @@ describe('hooks/registry › SDK_HOOKS', () => {
 
     it('SDK_HOOKS.validate: retorna null para input válido', () => {
         const result = SDK_HOOKS.validate('onPreToolUse', {
+            sessionId: 'sess-1',
             toolName: 'shell',
             toolArgs: {},
             timestamp: 0,
@@ -532,7 +581,7 @@ describe('hooks/registry › SDK_HOOKS', () => {
     });
 
     it('SDK_HOOKS.validate: mensagem de erro quando campo ausente', () => {
-        const result = SDK_HOOKS.validate('onPreToolUse', { toolName: 'shell' });
+        const result = SDK_HOOKS.validate('onPreToolUse', { sessionId: 'sess-1', toolName: 'shell' });
         assert.ok(typeof result === 'string' && result.includes('toolArgs'));
     });
 
@@ -1231,6 +1280,25 @@ describe('hooks/audit › getAuditTail', () => {
         const entry = tail[0];
         assert.ok(entry);
         assert.strictEqual(entry.toolName, 'custom');
+    });
+
+    it('redige segredos ao retornar audit tail SDK', () => {
+        const githubToken = 'ghs_abcdefghijklmnopqrstuvwxyz1234567890';
+        const byokToken = 'sk-testsecret1234567890';
+        const buf = new AuditRingBuffer({ capacity: 5 });
+        buf.push({
+            toolName: `tool_${byokToken}`,
+            toolArgs: { gitHubToken: githubToken },
+            toolResult: `Authorization: Bearer ${byokToken}`,
+            sessionId: githubToken,
+            ts: '',
+            durationMs: 0,
+        });
+
+        const serialized = JSON.stringify(getAuditTail(5, buf));
+        assert.equal(serialized.includes(githubToken), false);
+        assert.equal(serialized.includes(byokToken), false);
+        assert.match(serialized, /\[redacted\]/);
     });
 
     it('retorna vazio quando buffer está vazio', () => {

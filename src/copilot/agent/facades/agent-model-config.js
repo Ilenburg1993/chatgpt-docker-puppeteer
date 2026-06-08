@@ -11,9 +11,9 @@
 
 import { resolveModelSelectionMismatch, toError } from '#copilot/core';
 import { describeAutoModelPolicy, listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
-import { log } from '../ports/index.js';
+import { log } from '../ports/logging/index.js';
 import { trySetLiveSessionModel } from '../runtime/contracts/index.js';
-import { readAgentRuntimeStatusSnapshot } from '../runtime/index.js';
+import { readAgentRuntimeStatusSnapshot } from '../runtime/status-readers.js';
 import { persistAgentRuntimeStatePartial } from './agent-runtime-state.js';
 
 /**

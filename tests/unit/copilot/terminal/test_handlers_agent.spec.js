@@ -10,6 +10,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockStartAgentDialogLoop = vi.fn(async () => {});
 const mockSendAgentDialogTurn = vi.fn(async () => 'reply');
+const mockSendAgentDialogTurnDetailed = vi.fn(
+    async (/** @type {any} */ runtime, /** @type {string} */ message, /** @type {any} */ options) => {
+        const reply = await mockSendAgentDialogTurn(runtime, message, options);
+        return {
+            reply,
+            outcome: String(reply).trim() ? 'public_reply' : 'empty',
+            replySource: 'mock',
+            diagnostics: {
+                dispatched: true,
+                assistantMessageCount: 1,
+                deltaChars: String(reply).length,
+                deltaEligible: true,
+                pendingProtocolKind: null,
+                pendingHumanInput: false,
+                toolSignalCount: 0,
+            },
+        };
+    },
+);
 const mockStopAgentDialogLoopAuthorized = vi.fn(async () => {});
 const mockAbortRuntimeCurrentMessage = vi.fn(async (/** @type {any} */ runtime) => runtime.abortCurrentMessage?.());
 const mockSteerRuntimeMessage = vi.fn(async (/** @type {any} */ runtime, /** @type {string} */ prompt) => {
@@ -151,6 +170,7 @@ vi.mock('#copilot/agent', () => ({
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     startAgentDialogLoop: mockStartAgentDialogLoop,
     sendAgentDialogTurn: mockSendAgentDialogTurn,
+    sendAgentDialogTurnDetailed: mockSendAgentDialogTurnDetailed,
     stopAgentDialogLoopAuthorized: mockStopAgentDialogLoopAuthorized,
 }));
 
@@ -208,6 +228,7 @@ vi.mock('#copilot/agent/facades', () => ({
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
     startAgentDialogLoop: mockStartAgentDialogLoop,
     sendAgentDialogTurn: mockSendAgentDialogTurn,
+    sendAgentDialogTurnDetailed: mockSendAgentDialogTurnDetailed,
     stopAgentDialogLoopAuthorized: mockStopAgentDialogLoopAuthorized,
     recoverAgentDialogInputChannel: vi.fn(async () => ({
         recovered: true,
@@ -240,6 +261,7 @@ beforeEach(() => {
     vi.stubEnv('INJECT_ZERO_PR_USER_ALLOW_STEER', 'false');
     mockStartAgentDialogLoop.mockClear();
     mockSendAgentDialogTurn.mockClear();
+    mockSendAgentDialogTurnDetailed.mockClear();
     mockStopAgentDialogLoopAuthorized.mockClear();
     mockAbortRuntimeCurrentMessage.mockClear();
     mockSteerRuntimeMessage.mockClear();

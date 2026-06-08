@@ -414,6 +414,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             previousModel: 'kilo-auto/free',
             source: 'terminal.byok_model',
             reason: 'solicitação manual /byok model',
+            confidence: 'catalog',
             requestedAt: Date.parse('2026-06-05T12:00:00.000Z'),
             detail: 'solicitado: kilo-auto/free → anthropic/claude-sonnet-4.5',
         });
@@ -429,6 +430,8 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         expect(rendered).toContain('Modelo confirmado');
         expect(rendered).toContain('confirmado: kilo-auto/free → anthropic/claude-sonnet-4.5');
         expect(rendered).toContain('raciocínio high');
+        expect(rendered).toContain('solicitação manual /byok model');
+        expect(rendered).toContain('confiança catalog');
         expect(rendered).not.toContain('session.model_changed');
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'session.model_changed',
@@ -436,6 +439,8 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
                 matchedTerminalRequest: expect.objectContaining({
                     model: 'anthropic/claude-sonnet-4.5',
                     source: 'terminal.byok_model',
+                    reason: 'solicitação manual /byok model',
+                    confidence: 'catalog',
                     requestedAt: '2026-06-05T12:00:00.000Z',
                 }),
             }),

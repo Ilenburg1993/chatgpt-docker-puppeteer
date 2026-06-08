@@ -63,4 +63,26 @@ describe('presentation/sdk-recovery-policy', () => {
         expect(message.detail).toContain('host local continua vivo');
         expect(message.actionHint).toContain('Reautentique');
     });
+
+    it('classifica bloqueios de conta e modelo sem sugerir reconnect local', () => {
+        const accountPolicy = getSdkRecoveryPolicy({ status: 402, message: 'payment required for this account' }, 'session');
+        const modelPolicy = getSdkRecoveryPolicy({ status: 400, message: 'unsupported model for this request' }, 'session');
+
+        expect(accountPolicy).toMatchObject({
+            kind: 'account',
+            allowReconnect: false,
+            resetCircuit: true,
+        });
+        expect(describeSdkRecoveryPolicy(accountPolicy, { message: 'payment required for this account' })).toMatchObject({
+            label: '[sdk conta]',
+        });
+        expect(modelPolicy).toMatchObject({
+            kind: 'model_unsupported',
+            allowReconnect: false,
+            resetCircuit: true,
+        });
+        expect(describeSdkRecoveryPolicy(modelPolicy, { message: 'unsupported model for this request' })).toMatchObject({
+            label: '[sdk modelo]',
+        });
+    });
 });

@@ -8,7 +8,7 @@
  * @see EventBus
  */
 
-import { CopilotError, toError } from '#copilot/core';
+import { CopilotError, redactSecretText, toError } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 import { buildSdkMissingRuntimeRouteMeta, resolveSdkRequestedRuntimeId } from './deps.js';
@@ -100,7 +100,7 @@ export function projectSdkHttpError(req, err) {
         body: {
             ok: false,
             ...buildSdkRuntimeErrorMeta(req, err),
-            error: sanitizeHttpErrorMessage(toError(err).message, status),
+            error: redactSecretText(sanitizeHttpErrorMessage(toError(err).message, status)),
             code,
             status,
         },
@@ -123,7 +123,8 @@ export async function withErrorHandler(prefix, req, res, fn) {
         const projection = projectSdkHttpError(req, e);
         const { status, body } = projection;
         const code = body.code;
-        log('ERROR', `[${prefix}] ${req.method} ${req.path} → ${status} ${code}: ${toError(e).message}`);
+        const safeMessage = redactSecretText(toError(e).message);
+        log('ERROR', `[${prefix}] ${req.method} ${req.path} → ${status} ${code}: ${safeMessage}`);
         if (!res.headersSent) {
             res.status(status).json(body);
         }

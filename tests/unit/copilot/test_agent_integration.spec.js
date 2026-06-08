@@ -112,6 +112,7 @@ vi.mock('#copilot/sdk/event-helpers', () => ({
                 emitter.once(event, handler);
             }),
     ),
+    SYSTEM_MESSAGE_SECTIONS: {},
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 

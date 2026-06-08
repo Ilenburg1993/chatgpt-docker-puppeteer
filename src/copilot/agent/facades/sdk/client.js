@@ -12,7 +12,7 @@ import { buildCustomAgentsConfig } from '#copilot/config';
 import { SESSION_LIFECYCLE_EVENTS } from '#copilot/sdk/constants';
 import { raceEvents } from '#copilot/sdk/event-helpers';
 import { modelsList, skillsConfigSetDisabledSkills, skillsDiscover, toolsList } from '#copilot/sdk/rpc';
-import { createCopilotClient, disconnectSessionSafe, LIFECYCLE_EVENTS, onLifecycleEvents } from '#copilot/sdk/session';
+import { createTerminalCopilotClient, disconnectSessionSafe, LIFECYCLE_EVENTS, onLifecycleEvents } from '#copilot/sdk/session';
 import { getAuthStatus as checkAuthStatus } from '#copilot/sdk/telemetry';
 import {
     getClientRef,
@@ -38,7 +38,7 @@ const startedAgentSdkClients = new WeakSet();
  * @returns {import('#copilot/sdk/types').CopilotClient}
  */
 export function createAgentSdkClient(options) {
-    return createCopilotClient(options);
+    return createTerminalCopilotClient(options);
 }
 
 /**

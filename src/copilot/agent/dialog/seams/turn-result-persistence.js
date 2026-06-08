@@ -14,7 +14,8 @@ import {
     EMITTER_LOOP_STOPPED,
     EMITTER_QUESTION_PENDING,
 } from '#copilot/events';
-import { METRICS_STORE, log } from '../../ports/index.js';
+import { log } from '../../ports/logging/index.js';
+import { METRICS_STORE } from '../../ports/metrics-port.js';
 
 /**
  * Constrói os event handlers principais de resolução/rejeição de um turno.

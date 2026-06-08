@@ -236,6 +236,40 @@ describe('sdk routes session ownership SSOT', () => {
         assert.equal(typeof createdConfigs[0].onPermissionRequest, 'function');
     });
 
+    it('POST /sessions preserva gitHubToken por sessão em rota não-BYOK', async () => {
+        await request(createApp())
+            .post('/sessions')
+            .send({ sessionId: 'sdk-gh-token', model: 'auto', gitHubToken: 'ghs_session_token' })
+            .expect(201);
+
+        assert.equal(createdConfigs.length, 1);
+        assert.equal(createdConfigs[0].gitHubToken, 'ghs_session_token');
+        assert.equal(createdConfigs[0].provider, undefined);
+        assert.equal(createdConfigs[0].model, 'auto');
+    });
+
+    it('POST /sessions prioriza configDirectory oficial sobre configDir legado', async () => {
+        await request(createApp())
+            .post('/sessions')
+            .send({
+                sessionId: 'sdk-config-priority',
+                model: 'gpt-4.1',
+                configDir: '/tmp/legacy-config',
+                configDirectory: '/tmp/official-config',
+            })
+            .expect(201);
+
+        assert.equal(createdConfigs.length, 1);
+        assert.equal(createdConfigs[0].configDirectory, '/tmp/official-config');
+        assert.equal('configDir' in createdConfigs[0], false);
+    });
+
+    it('POST /sessions rejeita gitHubToken vazio antes de chamar o SDK', async () => {
+        await request(createApp()).post('/sessions').send({ model: 'auto', gitHubToken: '   ' }).expect(400);
+
+        assert.equal(createdConfigs.length, 0);
+    });
+
     it('POST /sessions rejeita provider inválido antes de chegar ao SDK', async () => {
         const res = await request(createApp())
             .post('/sessions')
@@ -257,6 +291,28 @@ describe('sdk routes session ownership SSOT', () => {
         assert.deepEqual(persistedBindings, [{ hubSessionId: 'hub-2', sdkSessionId: 'sdk-foreground' }]);
     });
 
+    it('GET /sessions redige segredos vindos da metadata listada pelo SDK', async () => {
+        listSessionsSpy.mockResolvedValue([
+            {
+                sessionId: 'sdk-secret-list',
+                summary: 'listed',
+                provider: {
+                    apiKey: 'sk-test-listed-secret123',
+                    headers: { Authorization: 'Bearer sk-test-listed-secret123' },
+                },
+            },
+        ]);
+
+        const res = await request(createApp()).get('/sessions').expect(200);
+        const serialized = JSON.stringify(res.body);
+
+        assert.equal(res.body.count, 1);
+        assert.equal(res.body.sessions[0].sessionId, 'sdk-secret-list');
+        assert.equal(res.body.sessions[0].provider.apiKey, '[redacted]');
+        assert.equal(res.body.sessions[0].provider.headers.Authorization, '[redacted]');
+        assert.equal(serialized.includes('sk-test-listed-secret123'), false);
+    });
+
     it('GET /sessions/:id usa getSessionMetadata dedicado sem varrer listSessions', async () => {
         getSessionMetadataSpy.mockResolvedValue({ sessionId: 'sdk-meta', summary: 'metadata-dedicated' });
 
@@ -267,6 +323,24 @@ describe('sdk routes session ownership SSOT', () => {
         assert.equal(res.body.metadata.summary, 'metadata-dedicated');
         assert.equal(getSessionMetadataSpy.mock.calls.length, 1);
         assert.equal(listSessionsSpy.mock.calls.length, 0);
+    });
+
+    it('GET /sessions/:id redige segredos da metadata detalhada da sessão', async () => {
+        getSessionMetadataSpy.mockResolvedValue({
+            sessionId: 'sdk-meta-secret',
+            summary: 'metadata-secret',
+            provider: {
+                apiKey: 'sk-test-meta-secret123',
+                headers: { Authorization: 'Bearer sk-test-meta-secret123' },
+            },
+        });
+
+        const res = await request(createApp()).get('/sessions/sdk-meta-secret').expect(200);
+        const serialized = JSON.stringify(res.body);
+
+        assert.equal(res.body.metadata.provider.apiKey, '[redacted]');
+        assert.equal(res.body.metadata.provider.headers.Authorization, '[redacted]');
+        assert.equal(serialized.includes('sk-test-meta-secret123'), false);
     });
 
     it('POST /sessions/:id/resume sincroniza a sessão retomada na SSOT compartilhada', async () => {
@@ -327,6 +401,42 @@ describe('sdk routes session ownership SSOT', () => {
         assert.equal(typeof resumedConfigs[0].onPermissionRequest, 'function');
     });
 
+    it('POST /sessions/:id/resume preserva gitHubToken independente de provider BYOK', async () => {
+        await request(createApp())
+            .post('/sessions/sdk-gh-byok/resume')
+            .send({
+                model: 'provider-model',
+                gitHubToken: 'ghs_resume_token',
+                provider: { type: 'openai', baseUrl: 'https://provider.example/v1/' },
+            })
+            .expect(200);
+
+        assert.equal(resumedConfigs.length, 1);
+        assert.equal(resumedConfigs[0].gitHubToken, 'ghs_resume_token');
+        assert.deepEqual(resumedConfigs[0].provider, {
+            type: 'openai',
+            baseUrl: 'https://provider.example/v1',
+        });
+    });
+
+    it('POST /sessions/:id/resume prioriza nomes oficiais sobre aliases legados', async () => {
+        await request(createApp())
+            .post('/sessions/sdk-official-priority/resume')
+            .send({
+                configDir: '/tmp/legacy-resume',
+                configDirectory: '/tmp/official-resume',
+                disableResume: true,
+                suppressResumeEvent: false,
+            })
+            .expect(200);
+
+        assert.equal(resumedConfigs.length, 1);
+        assert.equal(resumedConfigs[0].configDirectory, '/tmp/official-resume');
+        assert.equal(resumedConfigs[0].suppressResumeEvent, false);
+        assert.equal('configDir' in resumedConfigs[0], false);
+        assert.equal('disableResume' in resumedConfigs[0], false);
+    });
+
     it('POST /sessions/:id/resume rejeita provider inválido antes de chamar resumeSession', async () => {
         const res = await request(createApp())
             .post('/sessions/sdk-rich/resume')
@@ -352,6 +462,18 @@ describe('sdk routes session ownership SSOT', () => {
         });
     });
 
+    it('rotas de sessão ativa redigem sessionId token-like em 404', async () => {
+        const res = await request(createApp())
+            .post('/sessions/sk-test-missing-session-secret123/model')
+            .send({ model: 'gpt-4.1' })
+            .expect(404);
+        const serialized = JSON.stringify(res.body);
+
+        assert.equal(res.body.ok, false);
+        assert.equal(serialized.includes('sk-test-missing-session-secret123'), false);
+        assert.match(String(res.body.error), /\[redacted\]/);
+    });
+
     it('POST /sessions/:id/model expõe projection e repassa reasoningEffort/modelCapabilities', async () => {
         setSharedHubSessionId('hub-5');
         setSharedSdkSessionId('sdk-msg');
@@ -368,6 +490,8 @@ describe('sdk routes session ownership SSOT', () => {
             .send({
                 model: 'gpt-4.1',
                 reasoningEffort: 'high',
+                reasoningSummary: 'concise',
+                contextTier: 'long_context',
                 modelCapabilities: { supports: { reasoningEffort: true } },
             })
             .expect(200);
@@ -379,11 +503,18 @@ describe('sdk routes session ownership SSOT', () => {
         assert.equal(res.body.verifiedSwitch, true);
         assert.equal(res.body.modelMismatch, false);
         assert.equal(res.body.reasoningEffort, 'high');
+        assert.equal(res.body.reasoningSummary, 'concise');
+        assert.equal(res.body.contextTier, 'long_context');
         assert.equal(res.body.modelCapabilitiesApplied, true);
         assert.deepEqual(modelCalls, [
             {
                 model: 'gpt-4.1',
-                options: { reasoningEffort: 'high', modelCapabilities: { supports: { reasoningEffort: true } } },
+                options: {
+                    reasoningEffort: 'high',
+                    reasoningSummary: 'concise',
+                    contextTier: 'long_context',
+                    modelCapabilities: { supports: { reasoningEffort: true } },
+                },
             },
         ]);
         assert.equal(res.body.isSharedSdkSession, true);

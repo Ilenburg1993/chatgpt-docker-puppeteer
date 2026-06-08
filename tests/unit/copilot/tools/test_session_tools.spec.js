@@ -71,6 +71,7 @@ vi.mock('node:child_process', () => ({
 // createTool: passthrough para obter handler
 vi.mock('#copilot/sdk', () => ({
     createTool: vi.fn((config) => config),
+    SYSTEM_MESSAGE_SECTIONS: {},
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 

@@ -24,6 +24,18 @@ vi.mock('@github/copilot-sdk', () => ({
     CopilotClient: vi.fn(),
     approveAll: vi.fn(),
     defineTool: vi.fn(),
+    SYSTEM_MESSAGE_SECTIONS: {
+        guidelines: { name: 'guidelines' },
+        identity: { name: 'identity' },
+        context: { name: 'context' },
+        safety: { name: 'safety' },
+        responseFormat: { name: 'responseFormat' },
+        tools: { name: 'tools' },
+        abilities: { name: 'abilities' },
+        instructions: { name: 'instructions' },
+        conversationRules: { name: 'conversationRules' },
+        errorHandling: { name: 'errorHandling' },
+    },
     SYSTEM_PROMPT_SECTIONS: {
         guidelines: { name: 'guidelines' },
         identity: { name: 'identity' },

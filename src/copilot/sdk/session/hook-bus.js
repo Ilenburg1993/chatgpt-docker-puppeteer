@@ -8,7 +8,9 @@
 import { toError } from '#copilot/core/error-handlers';
 import {
     HOOK_ERROR_OCCURRED,
+    HOOK_POST_TOOL_USE_FAILURE,
     HOOK_POST_TOOL_USE,
+    HOOK_PRE_MCP_TOOL_CALL,
     HOOK_PRE_TOOL_USE,
     HOOK_PROMPT_SUBMITTED,
     HOOK_SESSION_END,
@@ -26,7 +28,9 @@ import { log } from './hook-logger.js';
 /** @type {Record<string, string>} */
 const HOOK_NAME_TO_EVENTBUS = {
     pre_tool_use: HOOK_PRE_TOOL_USE,
+    pre_mcp_tool_call: HOOK_PRE_MCP_TOOL_CALL,
     post_tool_use: HOOK_POST_TOOL_USE,
+    post_tool_use_failure: HOOK_POST_TOOL_USE_FAILURE,
     prompt_submitted: HOOK_PROMPT_SUBMITTED,
     session_start: HOOK_SESSION_START,
     session_end: HOOK_SESSION_END,
@@ -57,6 +61,44 @@ function normalizeHookErrorMessage(raw) {
     return String(raw);
 }
 
+/**
+ * @param {unknown} value
+ * @returns {Date}
+ */
+function normalizeHookTimestamp(value) {
+    if (value instanceof Date && Number.isFinite(value.getTime())) return value;
+    if (typeof value === 'number' && Number.isFinite(value)) return new Date(value);
+    if (typeof value === 'string') {
+        const parsed = Date.parse(value);
+        if (Number.isFinite(parsed)) return new Date(parsed);
+    }
+    return new Date();
+}
+
+/**
+ * Normaliza inputs de hook para o contrato SDK 1.0 sem quebrar consumers legados.
+ *
+ * @param {unknown} input
+ * @param {string} sessionId
+ * @returns {unknown}
+ */
+export function normalizeHookInputForSdk10(input, sessionId) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+    const record = /** @type {Record<string, unknown>} */ (input);
+    const workingDirectory =
+        typeof record['workingDirectory'] === 'string'
+            ? record['workingDirectory']
+            : typeof record['cwd'] === 'string'
+              ? record['cwd']
+              : undefined;
+    return {
+        ...record,
+        ...(typeof record['sessionId'] === 'string' && record['sessionId'] ? {} : { sessionId }),
+        timestamp: normalizeHookTimestamp(record['timestamp']),
+        ...(workingDirectory !== undefined ? { workingDirectory } : {}),
+    };
+}
+
 export class HookBus extends EventEmitter {
     /** @type {EventBus | null} */
     #eventBus = null;
@@ -81,11 +123,12 @@ export class HookBus extends EventEmitter {
      * @param {unknown} [output]
      */
     emitHook(hookName, sessionId, input, output) {
+        const normalizedInput = normalizeHookInputForSdk10(input, sessionId);
         const event = {
             hookName,
             sessionId,
             timestamp: Date.now(),
-            input,
+            input: normalizedInput,
             output,
         };
         // Separar try/catch por emissão para evitar que erros em um listener suprimam outros
@@ -103,13 +146,15 @@ export class HookBus extends EventEmitter {
         if (busType && this.#eventBus) {
             try {
                 const inputRecord =
-                    input && typeof input === 'object' ? /** @type {Record<string, unknown>} */ (input) : {};
+                    normalizedInput && typeof normalizedInput === 'object'
+                        ? /** @type {Record<string, unknown>} */ (normalizedInput)
+                        : {};
                 this.#eventBus.emit({
                     type: busType,
                     hookName,
                     sessionId,
                     timestamp: event.timestamp,
-                    input,
+                    input: normalizedInput,
                     output,
                     ...(hookName === 'error_occurred'
                         ? {
@@ -147,11 +192,29 @@ export function attachBus(hooks, bus = defaultBus) {
         };
     }
 
+    if (hooks.onPreMcpToolCall) {
+        const orig = hooks.onPreMcpToolCall;
+        wrapped.onPreMcpToolCall = async (input, invocation) => {
+            const result = await orig(input, invocation);
+            bus.emitHook('pre_mcp_tool_call', invocation?.sessionId ?? '', input, result);
+            return result;
+        };
+    }
+
     if (hooks.onPostToolUse) {
         const orig = hooks.onPostToolUse;
         wrapped.onPostToolUse = async (input, invocation) => {
             const result = await orig(input, invocation);
             bus.emitHook('post_tool_use', invocation?.sessionId ?? '', input, result);
+            return result;
+        };
+    }
+
+    if (hooks.onPostToolUseFailure) {
+        const orig = hooks.onPostToolUseFailure;
+        wrapped.onPostToolUseFailure = async (input, invocation) => {
+            const result = await orig(input, invocation);
+            bus.emitHook('post_tool_use_failure', invocation?.sessionId ?? '', input, result);
             return result;
         };
     }

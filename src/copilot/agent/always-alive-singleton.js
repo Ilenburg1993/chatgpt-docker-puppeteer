@@ -10,11 +10,11 @@
  * @module copilot/agent/always-alive-singleton
  */
 
-import { AlwaysAliveAgent } from './runtime/always-alive/index.js';
+import { AlwaysAliveAgent } from './always-alive.js';
 import { ensureAgentEventBusBridge, resetAgentEventBusBridgeWiring } from './event-bridge/index.js';
 import { registerAgentRuntime, unregisterAgentRuntime } from './runtime/registry/index.js';
 
-export { AlwaysAliveAgent } from './runtime/always-alive/index.js';
+export { AlwaysAliveAgent } from './always-alive.js';
 
 /** @type {AlwaysAliveAgent | null} */
 let _alwaysAliveAgent = null;

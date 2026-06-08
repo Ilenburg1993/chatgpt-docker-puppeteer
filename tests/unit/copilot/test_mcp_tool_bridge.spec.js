@@ -153,3 +153,63 @@ describe('mcp-tool-bridge › instance isolation', () => {
         assert.equal(statusB.circuitOpen, false, 'instância B deve permanecer intocada');
     });
 });
+
+describe('mcp-tool-bridge › SDK 1.0 tool result conversion', () => {
+    it('converte CallToolResult MCP pelo conversor oficial do SDK', async () => {
+        const calls = [];
+        const bridge = createMcpToolBridge({
+            isPortOpenFn: async () => true,
+            logFn: () => {},
+            now: () => 10,
+            withRetryFn: async (fn) => fn(),
+            schemaBuilder: () => ({}),
+            buildToolFn: (tool) => tool,
+            convertMcpCallToolResultFn: (result) => ({
+                textResultForLlm: result.content
+                    .filter((item) => item.type === 'text')
+                    .map((item) => item.text)
+                    .join('\n'),
+                resultType: result.isError === true ? 'failure' : 'success',
+            }),
+            fetchImpl: async (_input, init) => {
+                const body = JSON.parse(String(init?.body ?? '{}'));
+                calls.push(body.method);
+                if (body.method === 'tools/list') {
+                    return {
+                        ok: true,
+                        json: async () => ({
+                            result: {
+                                tools: [
+                                    {
+                                        name: 'repo_status',
+                                        description: 'Repo status',
+                                        inputSchema: { type: 'object' },
+                                    },
+                                ],
+                            },
+                        }),
+                    };
+                }
+                return {
+                    ok: true,
+                    json: async () => ({
+                        result: {
+                            content: [{ type: 'text', text: 'status ok' }],
+                            structuredContent: { success: true },
+                        },
+                    }),
+                };
+            },
+        });
+
+        const tools = await bridge.buildMcpTools();
+        assert.equal(tools.length, 1);
+        const result = await /** @type {any} */ (tools[0]).handler({ path: '.' });
+
+        assert.deepEqual(calls, ['tools/list', 'tools/call']);
+        assert.deepEqual(result, {
+            textResultForLlm: 'status ok',
+            resultType: 'success',
+        });
+    });
+});

@@ -10,6 +10,7 @@
  */
 
 import { toError } from '../core/error-handlers.js';
+import { redactSecretRecord } from '../core/security/redaction.js';
 import { log } from './logger.js';
 import { AuditRingBuffer } from './ring-buffer.js';
 
@@ -49,7 +50,9 @@ export const globalAuditBuffer = new AuditRingBuffer({
  * @returns {SdkAuditEntry[]}
  */
 export function getAuditTail(n = 20, buffer = globalAuditBuffer) {
-    return buffer.tail(n);
+    return buffer.tail(n).map((entry) =>
+        /** @type {SdkAuditEntry} */ (redactSecretRecord(/** @type {Record<string, unknown>} */ (entry))),
+    );
 }
 
 /**
@@ -67,14 +70,16 @@ export function getAuditTail(n = 20, buffer = globalAuditBuffer) {
  */
 export function createAuditPostToolHandler(logger, buffer = globalAuditBuffer) {
     return async (input, invocation) => {
-        const entry = /** @type {SdkAuditEntry} */ ({
+        const entry = /** @type {SdkAuditEntry} */ (
+            redactSecretRecord({
             toolName: input.toolName,
             toolArgs: input.toolArgs,
             toolResult: input.toolResult,
             sessionId: invocation.sessionId,
             ts: input.timestamp ?? new Date().toISOString(),
             durationMs: 0,
-        });
+            })
+        );
 
         buffer.push(entry);
 

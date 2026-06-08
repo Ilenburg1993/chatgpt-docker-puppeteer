@@ -112,7 +112,7 @@ export { createQueuedElicitationHandler } from './elicitation.js';
 export { createQueuedInputHandler, createReadlineInputHandler, createStaticInputHandler } from './user-input.js';
 
 // ─── HookBus (Gap 6) ──────────────────────────────────────────────────────────
-export { HookBus, attachBus, defaultBus } from './bus.js';
+export { HookBus, attachBus, defaultBus, normalizeHookInputForSdk10 } from './bus.js';
 
 // ─── HookRegistry ─────────────────────────────────────────────────────────────
 export { HookRegistry, SDK_HOOKS } from './registry.js';

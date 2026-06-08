@@ -49,6 +49,22 @@ function selectedRouteKey(decision) {
 }
 
 /**
+ * @param {Record<string, unknown>} decision
+ * @returns {string[]}
+ */
+function selectedRouteReasons(decision) {
+    return textList(decision['selectedRouteReasons']);
+}
+
+/**
+ * @param {Record<string, unknown>} decision
+ * @returns {string | null}
+ */
+function selectedRouteConfidence(decision) {
+    return text(decision['selectedRouteConfidence']);
+}
+
+/**
  * @param {object} input
  * @param {boolean} input.allowEffects
  * @param {boolean} input.allowedByPolicy
@@ -112,6 +128,9 @@ export function buildModelGatewayRuntimeAutomationControllerStep(input) {
     const effects = [];
     const model = targetModel(decision);
     const routeKey = selectedRouteKey(decision);
+    const routeReasons = selectedRouteReasons(decision);
+    const confidence = selectedRouteConfidence(decision);
+    const reason = text(decision['operatorSummary']) ?? 'Automacao model-gateway.';
 
     if (phase === 'post_turn' && input.turnOutcome?.ok === false) {
         const accountWideFailure = accountWideFailureKinds.has(input.turnOutcome.failureKind ?? '');
@@ -136,6 +155,9 @@ export function buildModelGatewayRuntimeAutomationControllerStep(input) {
             kind: 'set_live_model',
             model,
             routeKey,
+            routeReasons,
+            reason,
+            confidence,
             ...effectAuthorization({
                 allowEffects,
                 allowedByPolicy: policy.allowLiveSetModel === true,
@@ -148,6 +170,9 @@ export function buildModelGatewayRuntimeAutomationControllerStep(input) {
             kind: 'prepare_new_sdk_session',
             model,
             routeKey,
+            routeReasons,
+            reason,
+            confidence,
             ...effectAuthorization({
                 allowEffects,
                 allowedByPolicy: policy.allowNewSession === true,

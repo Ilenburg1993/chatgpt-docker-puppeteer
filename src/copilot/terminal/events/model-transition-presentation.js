@@ -23,6 +23,15 @@ function modelLabel(value, fallback) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function detailLabel(value) {
+    const label = modelLabel(value, '');
+    return label ? label.replace(/[_-]+/gu, ' ') : null;
+}
+
+/**
  * @param {string} source
  * @returns {string}
  */
@@ -63,6 +72,7 @@ export function formatTerminalModelTransitionIsoTimestamp(value = Date.now()) {
  *     reasoningEffort?: string | null;
  *     source?: string | null;
  *     reason?: string | null;
+ *     confidence?: string | null;
  *     timestamp?: number | string | Date | null;
  * }} input
  * @returns {{ transition: string; detail: string; headline: string }}
@@ -85,6 +95,7 @@ export function buildTerminalModelTransitionPresentation(input) {
         `${state}: ${transition}`,
         input.reasoningEffort ? `raciocínio ${input.reasoningEffort}` : null,
         input.reason ? input.reason : null,
+        input.confidence ? `confiança ${detailLabel(input.confidence)}` : null,
         `origem ${renderTerminalModelTransitionSourceLabel(source)}`,
         formatTerminalModelTransitionIsoTimestamp(input.timestamp),
     ].filter((part) => typeof part === 'string' && part.length > 0);

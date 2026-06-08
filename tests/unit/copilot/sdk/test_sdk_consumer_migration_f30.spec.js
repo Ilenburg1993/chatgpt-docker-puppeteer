@@ -74,7 +74,7 @@ describe('F148 — agent/lifecycle/ usa barrel para event-helpers', () => {
 
     it('agent-lifecycle.js usa façade agent-sdk-access para raceAgentSdkEvents', () => {
         const content = src('agent/lifecycle/orchestrators/agent-lifecycle.js');
-        expect(content).toContain("from '../../facades/index.js'");
+        expect(content).toContain("from '../../facades/sdk-access.js'");
         expect(content).toContain('raceAgentSdkEvents');
         expect(content).not.toContain("from '#copilot/sdk'");
     });
@@ -95,12 +95,12 @@ describe('F148 — agent/lifecycle/ usa barrel para event-helpers', () => {
     });
 
     it('loop-boot-runner.js usa a façade agent-sdk-runtime para waitForAgentSdkEvent', () => {
-        expect(src('agent/dialog/boot/loop-boot-runner.js')).toContain("from '../../facades/index.js'");
+        expect(src('agent/dialog/boot/loop-boot-runner.js')).toContain("from '../../facades/agent-sdk-runtime.js'");
         expect(src('agent/dialog/boot/loop-boot-runner.js')).toContain('waitForAgentSdkEvent');
     });
 
     it('resume-policy.js usa a façade agent-sdk-runtime para waitForAgentSdkEvent', () => {
-        expect(src('agent/dialog/policies/resume-policy.js')).toContain("from '../../facades/index.js'");
+        expect(src('agent/dialog/policies/resume-policy.js')).toContain("from '../../facades/agent-sdk-runtime.js'");
         expect(src('agent/dialog/policies/resume-policy.js')).toContain('waitForAgentSdkEvent');
         expect(src('agent/dialog/policies/resume-policy.js')).not.toContain("from '#copilot/sdk'");
     });
@@ -115,7 +115,7 @@ describe('F149 — agent/session/ converge para façades do agent', () => {
 
     it('cleanup.js usa façade agent-sdk-access', () => {
         const content = src('agent/session/lifecycle/cleanup.js');
-        expect(content).toContain("from '../../facades/index.js'");
+        expect(content).toContain("from '../../facades/sdk-access.js'");
         expect(content).toContain('listAgentSdkSessionsByClient');
         expect(content).toContain('deleteAgentSdkSessionByClient');
         expect(content).not.toContain("from '#copilot/sdk'");
@@ -131,7 +131,7 @@ describe('F149 — agent/session/ converge para façades do agent', () => {
 
     it('initializer.js usa façade agent-sdk-access', () => {
         const content = src('agent/session/initializers/initializer.js');
-        expect(content).toContain("from '../../facades/index.js'");
+        expect(content).toContain("from '../../facades/sdk-access.js'");
         expect(content).toContain('resumeOrCreateAgentSdkSession');
         expect(content).toContain('createAgentSdkSessionByClient');
         expect(content).not.toContain("from '#copilot/sdk'");

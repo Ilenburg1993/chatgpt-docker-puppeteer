@@ -16,7 +16,7 @@
 import assert from 'node:assert/strict';
 import { beforeAll, describe, it } from 'vitest';
 
-import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
+import { alwaysAliveAgent } from '#copilot/agent/always-alive';
 import { MAX_QUEUE_SIZE } from '../../../src/copilot/config/env.js';
 
 // ─── Suite: análise estrutural ───────────────────────────────────────────────

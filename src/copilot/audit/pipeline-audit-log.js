@@ -9,7 +9,14 @@
  * @see EventBus
  */
 
-import { SHUTDOWN_PRIORITY, logSwallowed, registerShutdownHandler, toError } from '#copilot/core';
+import {
+    SHUTDOWN_PRIORITY,
+    logSwallowed,
+    redactSecretRecord,
+    redactSecretText,
+    registerShutdownHandler,
+    toError,
+} from '#copilot/core';
 import fs from 'node:fs';
 import { appendFile, mkdir, open, rename, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -117,11 +124,19 @@ async function readLastNLines(filePath, n = 50) {
  */
 function _argsSummary(args) {
     try {
-        const str = JSON.stringify(args);
+        const str = JSON.stringify(redactSecretRecord(/** @type {Record<string, unknown>} */ (args)));
         return str.length > 200 ? str.slice(0, 200) + '…' : str;
     } catch {
         return '(não serializável)';
     }
+}
+
+/**
+ * @param {AuditEntry} entry
+ * @returns {AuditEntry}
+ */
+function redactAuditEntry(entry) {
+    return /** @type {AuditEntry} */ (redactSecretRecord(/** @type {Record<string, unknown>} */ (entry)));
 }
 
 /**
@@ -186,14 +201,14 @@ export function createAuditLog(opts = {}) {
         ) {
             return;
         }
-        const full = /** @type {AuditEntry} */ ({ ...entry, ts: new Date().toISOString() });
+        const full = redactAuditEntry(/** @type {AuditEntry} */ ({ ...entry, ts: new Date().toISOString() }));
         _buffer.push(full);
         if (_buffer.length > maxEntries) _buffer.shift();
     }
 
     /** @returns {AuditEntry[]} */
     function getEntries() {
-        return [..._buffer];
+        return _buffer.map(redactAuditEntry);
     }
 
     /**
@@ -201,7 +216,7 @@ export function createAuditLog(opts = {}) {
      * @returns {AuditEntry[]}
      */
     function getLast(n = 50) {
-        return _buffer.slice(-n);
+        return _buffer.slice(-n).map(redactAuditEntry);
     }
 
     /** @returns {Promise<void>} */
@@ -209,7 +224,7 @@ export function createAuditLog(opts = {}) {
         if (_buffer.length === 0) return;
         try {
             await mkdir(dirname(/** @type {string} */ (auditFile)), { recursive: true });
-            const lines = _buffer.map((e) => JSON.stringify(e)).join('\n') + '\n';
+            const lines = _buffer.map((e) => JSON.stringify(redactAuditEntry(e))).join('\n') + '\n';
             await appendFile(auditFile, lines, 'utf8');
         } catch (err) {
             log('WARN', `[audit/pipeline] flush failed: ${toError(err).message ?? err}`);
@@ -239,9 +254,9 @@ export function createAuditLog(opts = {}) {
             if (now - val.ts > TTL) _pending.delete(id);
         }
         _pending.set(entry.toolCallId, {
-            toolName: entry.toolName,
-            mcpServerName: entry.mcpServerName ?? null,
-            args: entry.args ?? {},
+            toolName: redactSecretText(entry.toolName),
+            mcpServerName: entry.mcpServerName ? redactSecretText(entry.mcpServerName) : null,
+            args: redactSecretRecord(/** @type {Record<string, unknown>} */ (entry.args ?? {})),
             ts: now,
         });
     }
@@ -260,11 +275,11 @@ export function createAuditLog(opts = {}) {
             ts: new Date().toISOString(),
             sessionId: entry.sessionId ?? null,
             taskId: entry.taskId ?? null,
-            toolCallId: entry.toolCallId,
-            toolName: pending?.toolName ?? '(desconhecido)',
-            mcpServerName: pending?.mcpServerName ?? null,
+            toolCallId: redactSecretText(entry.toolCallId),
+            toolName: redactSecretText(pending?.toolName ?? '(desconhecido)'),
+            mcpServerName: pending?.mcpServerName ? redactSecretText(pending.mcpServerName) : null,
             argsSummary: pending ? _argsSummary(pending.args) : null,
-            resultSummary: entry.resultContent ? entry.resultContent.slice(0, 200) : null,
+            resultSummary: entry.resultContent ? redactSecretText(entry.resultContent.slice(0, 200)) : null,
             durationMs,
             success: entry.success,
         };
@@ -275,7 +290,7 @@ export function createAuditLog(opts = {}) {
             data: { toolName: jsonRecord.toolName, durationMs, success: entry.success },
         });
 
-        _toolWriteQueue.push(JSON.stringify(jsonRecord) + '\n');
+        _toolWriteQueue.push(JSON.stringify(redactSecretRecord(jsonRecord)) + '\n');
         scheduleFlushTool();
     }
 
@@ -299,7 +314,9 @@ export function createAuditLog(opts = {}) {
                 })
                 .filter(Boolean);
             const filtered = sessionId ? entries.filter((e) => e.sessionId === sessionId) : entries;
-            return filtered.slice(-limit);
+            return filtered
+                .slice(-limit)
+                .map((entry) => redactSecretRecord(/** @type {Record<string, unknown>} */ (entry)));
         } catch {
             return [];
         }

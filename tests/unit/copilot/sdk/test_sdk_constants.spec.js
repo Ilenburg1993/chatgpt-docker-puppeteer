@@ -246,6 +246,13 @@ describe('SESSION_EVENTS', () => {
 // ─── INFINITE_SESSION_DEFAULTS ────────────────────────────────────────────────
 
 describe('INFINITE_SESSION_DEFAULTS', () => {
+    it('expõe apenas os thresholds oficiais sem aliases duplicados', () => {
+        expect(Object.keys(INFINITE_SESSION_DEFAULTS).sort()).toEqual([
+            'BACKGROUND_COMPACTION_THRESHOLD',
+            'BUFFER_EXHAUSTION_THRESHOLD',
+        ]);
+    });
+
     it('thresholds são números entre 0 e 1', () => {
         expect(INFINITE_SESSION_DEFAULTS.BACKGROUND_COMPACTION_THRESHOLD).toBeGreaterThan(0);
         expect(INFINITE_SESSION_DEFAULTS.BACKGROUND_COMPACTION_THRESHOLD).toBeLessThan(1);
@@ -257,6 +264,19 @@ describe('INFINITE_SESSION_DEFAULTS', () => {
         expect(INFINITE_SESSION_DEFAULTS.BUFFER_EXHAUSTION_THRESHOLD).toBeGreaterThan(
             INFINITE_SESSION_DEFAULTS.BACKGROUND_COMPACTION_THRESHOLD,
         );
+    });
+});
+
+// ─── SDK Type Contract Guards ────────────────────────────────────────────────
+
+describe('SDK 1.0 type contracts', () => {
+    it('ToolBinaryResult.type permanece restrito a image/resource no SDK vendor', () => {
+        const typesDts = readFileSync(
+            resolve(process.cwd(), 'node_modules/@github/copilot-sdk/dist/types.d.ts'),
+            'utf8',
+        );
+
+        expect(typesDts).toMatch(/export type ToolBinaryResult = \{\s*data: string;\s*mimeType: string;\s*type: "image" \| "resource";/u);
     });
 });
 

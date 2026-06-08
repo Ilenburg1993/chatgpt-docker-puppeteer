@@ -83,6 +83,18 @@ function resolveToolDecision(toolName, allowTools, denyTools, denyPatterns) {
     return 'allow';
 }
 
+/**
+ * @param {{ traceparent?: string; tracestate?: string }} input
+ * @returns {string}
+ */
+function hookTraceSuffix(input) {
+    const traceparent = typeof input.traceparent === 'string' ? input.traceparent.slice(0, 80) : '';
+    const tracestate = typeof input.tracestate === 'string' ? input.tracestate.slice(0, 80) : '';
+    return [traceparent ? `traceparent='${traceparent}'` : null, tracestate ? `tracestate='${tracestate}'` : null]
+        .filter(Boolean)
+        .join(' ');
+}
+
 // ─── Handler builders ────────────────────────────────────────────────────────
 
 /**
@@ -140,10 +152,10 @@ function buildPreToolUseHandler({
                 }
                 // askHandler aprovou → early return com allow (bypass resolveToolDecision)
                 if (auditLog || debugTools) {
-                    log(
-                        'DEBUG',
-                        `[hooks/factory] onPreToolUse: tool='${toolName}' decision='allow' (askHandler) sessionId='${invocation?.sessionId}'`,
-                    );
+                log(
+                    'DEBUG',
+                    `[hooks/factory] onPreToolUse: tool='${toolName}' decision='allow' (askHandler) sessionId='${invocation?.sessionId}' ${hookTraceSuffix(input)}`.trim(),
+                );
                 }
                 return { permissionDecision: /** @type {'allow'} */ ('allow') };
             }
@@ -154,7 +166,7 @@ function buildPreToolUseHandler({
         if (auditLog || debugTools) {
             log(
                 'DEBUG',
-                `[hooks/factory] onPreToolUse: tool='${toolName}' decision='${decision}' sessionId='${invocation?.sessionId}'`,
+                `[hooks/factory] onPreToolUse: tool='${toolName}' decision='${decision}' sessionId='${invocation?.sessionId}' ${hookTraceSuffix(input)}`.trim(),
             );
         }
 
@@ -196,7 +208,7 @@ function buildDynamicOnlyPreToolUseHandler({ auditLog, debugTools, askHandler, a
         if (auditLog || debugTools) {
             log(
                 'DEBUG',
-                `[hooks/factory] onPreToolUse (dynamic): tool='${toolName}' sessionId='${invocation?.sessionId}'`,
+                `[hooks/factory] onPreToolUse (dynamic): tool='${toolName}' sessionId='${invocation?.sessionId}' ${hookTraceSuffix(input)}`.trim(),
             );
         }
 
@@ -334,7 +346,7 @@ export function createHooks(cfg = {}) {
         ) => {
             log(
                 'DEBUG',
-                `[hooks/factory] onPreMcpToolCall: server='${input.serverName}' tool='${input.toolName}' sessionId='${invocation?.sessionId}'`,
+                `[hooks/factory] onPreMcpToolCall: server='${input.serverName}' tool='${input.toolName}' sessionId='${invocation?.sessionId}' ${hookTraceSuffix(input)}`.trim(),
             );
         };
         hooks.onPreMcpToolCall = /** @type {PreMcpToolCallHandler} */ (preMcpFn);
@@ -350,7 +362,7 @@ export function createHooks(cfg = {}) {
         ) => {
             log(
                 'DEBUG',
-                `[hooks/factory] onPostToolUse: tool='${input.toolName}' sessionId='${invocation?.sessionId}'`,
+                `[hooks/factory] onPostToolUse: tool='${input.toolName}' sessionId='${invocation?.sessionId}' ${hookTraceSuffix(input)}`.trim(),
             );
         };
         hooks.onPostToolUse = /** @type {PostToolUseHandler} */ (postToolFn);
@@ -367,7 +379,7 @@ export function createHooks(cfg = {}) {
             const errorPreview = String(input.error ?? '').slice(0, 120);
             log(
                 'DEBUG',
-                `[hooks/factory] onPostToolUseFailure: tool='${input.toolName}' error='${errorPreview}' sessionId='${invocation?.sessionId}'`,
+                `[hooks/factory] onPostToolUseFailure: tool='${input.toolName}' error='${errorPreview}' sessionId='${invocation?.sessionId}' ${hookTraceSuffix(input)}`.trim(),
             );
         };
         hooks.onPostToolUseFailure = /** @type {PostToolUseFailureHandler} */ (postToolFailureFn);

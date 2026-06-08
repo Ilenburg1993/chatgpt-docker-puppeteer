@@ -20,7 +20,7 @@ import {
     getBusy,
     getShowThinking,
 } from '../../presentation/state/index.js';
-import { println } from '../dialog/index.js';
+import { println } from '../dialog/io/index.js';
 import {
     buildTerminalTaskThinkingId,
     formatTerminalThinkingRef,

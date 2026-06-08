@@ -64,6 +64,14 @@
  * @property {boolean} protocolControlled - `true` quando a pergunta foi emitida como parte do protocolo READY/REPLY.
  */
 
+/**
+ * Resultado semântico canônico de um turno explícito do dialog loop.
+ *
+ * Mantido neste seam público para que `presentation/` e `channel/` não precisem referenciar o executor interno.
+ *
+ * @typedef {import('./dialog/executors/turn-executor.js').DialogTurnSemanticResult} DialogTurnSemanticResult
+ */
+
 // ─── AgentContext Partitioning (K1a) ───────────────────────────────────────
 
 /**

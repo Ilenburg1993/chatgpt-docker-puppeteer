@@ -209,6 +209,62 @@ describe('sdk runtime projection routes', () => {
         assert.equal(res.body.usedDefaultRuntimeFallback, true);
     });
 
+    it('GET /models preserva metadata SDK 1.0 útil e redige segredos BYOK', async () => {
+        const app = express();
+        app.use(
+            createClientRouter(
+                routeDeps({
+                    agent: createMockAgent(),
+                    getClient: async () => ({
+                        ...createMockClient(),
+                        listModels: async () => [
+                            {
+                                id: 'qwen3-coder-next',
+                                name: 'Qwen3 Coder Next',
+                                byok: {
+                                    provider: 'ollama-local',
+                                    providerModel: 'qwen3-coder-next',
+                                    routeLayer: 'local_daemon',
+                                    wireApi: 'openai_compatible',
+                                    apiKey: 'sk-test-local-secret',
+                                    headers: {
+                                        Authorization: 'Bearer sk-test-local-secret',
+                                    },
+                                },
+                                capabilities: {
+                                    supports: { reasoningEffort: true },
+                                    limits: { max_context_window_tokens: 128_000 },
+                                },
+                                supportedReasoningSummaries: ['none', 'concise'],
+                                supportedContextTiers: ['default', 'long_context'],
+                            },
+                        ],
+                    }),
+                    getClientState: () => 'connected',
+                    stopClient: async () => [],
+                    forceStopClient: async () => {},
+                    allTools: [],
+                }),
+            ),
+        );
+
+        const res = await request(app).get('/models').expect(200);
+        const [model] = res.body.models;
+        const serialized = JSON.stringify(res.body);
+
+        assert.equal(res.body.count, 1);
+        assert.equal(model.byok.provider, 'ollama-local');
+        assert.equal(model.byok.providerModel, 'qwen3-coder-next');
+        assert.equal(model.byok.routeLayer, 'local_daemon');
+        assert.equal(model.byok.wireApi, 'openai_compatible');
+        assert.deepEqual(model.supportedReasoningSummaries, ['none', 'concise']);
+        assert.deepEqual(model.supportedContextTiers, ['default', 'long_context']);
+        assert.equal(model.byok.apiKey, '[redacted]');
+        assert.equal(model.byok.headers.Authorization, '[redacted]');
+        assert.equal(serialized.includes('sk-test-local-secret'), false);
+        assert.equal(serialized.includes('Bearer sk-test-local-secret'), false);
+    });
+
     it('POST /client/stop limpa o sdk binding preservando hubSessionId', async () => {
         const app = express();
         app.use(

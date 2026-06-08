@@ -19,7 +19,7 @@ import { DRAIN_WRITES_TIMEOUT_MS } from '#copilot/config/agent';
 import { safeJsonParse } from '#copilot/core';
 import { AliveAgentStateSchema } from '#copilot/core';
 import { withAgentErrorPolicy } from '../../error/index.js';
-import { log } from '../../ports/index.js';
+import { log } from '../../ports/logging/index.js';
 import {
     readStateFileIfExists,
     removeStateFileIfExists,

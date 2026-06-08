@@ -5,8 +5,8 @@
  * @module copilot/terminal/commands/terminal
  */
 
-import { readTerminalExternalToolCapabilitySummary } from '../capabilities/external-tools.js';
-import { terminalThemeHeadline, terminalThemeRow, terminalThemeWrappedRow } from '../state/ui-theme.js';
+import { readTerminalExternalToolCapabilitySummary } from '../capabilities/index.js';
+import { terminalThemeHeadline, terminalThemeRow, terminalThemeWrappedRow } from '../state/ui/index.js';
 
 /**
  * @typedef {object} TerminalCommandContext

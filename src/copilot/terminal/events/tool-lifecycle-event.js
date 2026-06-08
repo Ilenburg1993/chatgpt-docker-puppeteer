@@ -23,6 +23,8 @@
  * @see tool-call-registry.js
  */
 
+import { redactSecretRecord, redactSecretText } from '#copilot/core';
+
 /**
  * Tipos válidos de evento de lifecycle de tool.
  *
@@ -134,51 +136,61 @@
  * @returns {ToolLifecycleEvent}
  */
 export function buildToolLifecycleEvent(type, source, fields) {
+    const redactText = (/** @type {string | null | undefined} */ value) =>
+        typeof value === 'string' ? redactSecretText(value) : null;
+    const redactTexts = (/** @type {string[] | undefined} */ values) =>
+        Array.isArray(values) ? values.map((value) => redactSecretText(value)) : [];
+    const safeIoError =
+        fields.ioError && typeof fields.ioError === 'object'
+            ? /** @type {{ name?: string; message?: string }} */ (
+                  redactSecretRecord(/** @type {Record<string, unknown>} */ (fields.ioError))
+              )
+            : null;
     return {
         type,
         source,
         timestamp: fields.timestamp ?? Date.now(),
-        traceId: fields.traceId ?? null,
-        turnId: fields.turnId ?? null,
+        traceId: redactText(fields.traceId),
+        turnId: redactText(fields.turnId),
 
-        toolCallId: fields.toolCallId ?? null,
-        toolName: fields.toolName ?? 'tool',
-        rawToolName: fields.rawToolName ?? null,
-        requestId: fields.requestId ?? null,
+        toolCallId: redactText(fields.toolCallId),
+        toolName: redactSecretText(fields.toolName ?? 'tool'),
+        rawToolName: redactText(fields.rawToolName),
+        requestId: redactText(fields.requestId),
 
-        operation: fields.operation ?? null,
-        path: fields.path ?? null,
-        target: fields.target ?? null,
-        fileTargets: fields.fileTargets ?? [],
-        directoryTargets: fields.directoryTargets ?? [],
-        urlTargets: fields.urlTargets ?? [],
-        searchTerms: fields.searchTerms ?? [],
+        operation: redactText(fields.operation),
+        path: redactText(fields.path),
+        target: redactText(fields.target),
+        fileTargets: redactTexts(fields.fileTargets),
+        directoryTargets: redactTexts(fields.directoryTargets),
+        urlTargets: redactTexts(fields.urlTargets),
+        searchTerms: redactTexts(fields.searchTerms),
         lineRange: fields.lineRange ?? null,
-        patchFiles: fields.patchFiles ?? [],
-        commands: fields.commands ?? [],
-        filters: fields.filters ?? [],
+        patchFiles: redactTexts(fields.patchFiles),
+        commands: redactTexts(fields.commands),
+        filters: redactTexts(fields.filters),
         resultCount: fields.resultCount ?? null,
-        resultSummary: fields.resultSummary ?? null,
-        primaryTargetKind: fields.primaryTargetKind ?? null,
+        resultSummary: redactText(fields.resultSummary),
+        primaryTargetKind: redactText(fields.primaryTargetKind),
 
         progress: fields.progress ?? null,
-        progressMessage: fields.progressMessage ?? null,
-        partialOutput: fields.partialOutput ?? null,
+        progressMessage: redactText(fields.progressMessage),
+        partialOutput: redactText(fields.partialOutput),
 
         success: fields.success ?? null,
         durationMs: fields.durationMs ?? null,
 
-        ioEngine: fields.ioEngine ?? null,
-        ioTargetKind: fields.ioTargetKind ?? null,
+        ioEngine: redactText(fields.ioEngine),
+        ioTargetKind: redactText(fields.ioTargetKind),
         ioBytesRead: fields.ioBytesRead ?? null,
         ioBytesWritten: fields.ioBytesWritten ?? null,
-        ioRiskClass: fields.ioRiskClass ?? null,
+        ioRiskClass: redactText(fields.ioRiskClass),
         ioDryRun: fields.ioDryRun === true,
-        ioTargets: fields.ioTargets ?? [],
-        ioError: fields.ioError ?? null,
+        ioTargets: redactTexts(fields.ioTargets),
+        ioError: safeIoError,
 
-        correlatedToolCallId: fields.correlatedToolCallId ?? null,
-        correlatedToolName: fields.correlatedToolName ?? null,
+        correlatedToolCallId: redactText(fields.correlatedToolCallId),
+        correlatedToolName: redactText(fields.correlatedToolName),
     };
 }
 

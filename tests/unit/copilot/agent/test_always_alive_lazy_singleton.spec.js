@@ -7,7 +7,7 @@ import {
     alwaysAliveAgent,
     getAgent,
     resetAgent,
-} from '../../../../src/copilot/agent/always-alive.js';
+} from '#copilot/agent/always-alive';
 
 describe('AlwaysAliveAgent lazy singleton (K8)', () => {
     afterEach(() => {

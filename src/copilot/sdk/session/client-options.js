@@ -555,3 +555,23 @@ export function buildCopilotClientOptionsFromEnv(overrides = {}) {
 
     return builder.merge(overrides).build();
 }
+
+/**
+ * Default explícito para o host terminal local: preservar a estratégia completa do Copilot CLI.
+ *
+ * @param {Partial<CopilotClientOptions>} [overrides]
+ * @returns {Partial<CopilotClientOptions>}
+ */
+export function buildTerminalCopilotClientOptions(overrides = {}) {
+    return buildCopilotClientOptionsFromEnv({ mode: 'copilot-cli', ...overrides });
+}
+
+/**
+ * Default explícito para hosts server/multiusuário: não herdar ferramentas/configuração do ambiente CLI do operador.
+ *
+ * @param {Partial<CopilotClientOptions>} [overrides]
+ * @returns {Partial<CopilotClientOptions>}
+ */
+export function buildServerCopilotClientOptions(overrides = {}) {
+    return buildCopilotClientOptionsFromEnv({ mode: 'empty', ...overrides });
+}

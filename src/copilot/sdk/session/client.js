@@ -13,7 +13,11 @@ import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { setModelListClientProvider } from '../models/client-provider.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
-import { buildCopilotClientOptionsFromEnv } from './client-options.js';
+import {
+    buildCopilotClientOptionsFromEnv,
+    buildServerCopilotClientOptions,
+    buildTerminalCopilotClientOptions,
+} from './client-options.js';
 import { createSession as createLifecycleSession, resumeSession as resumeLifecycleSession } from './lifecycle.js';
 import { createSdkSessionRegistry, defaultSdkSessionRegistry } from './session-registry.js';
 
@@ -136,6 +140,28 @@ export function buildClientOptions(overrides = {}) {
  */
 export function createCopilotClient(overrides = {}) {
     const options = buildClientOptions(overrides);
+    return new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {unknown} */ (options)));
+}
+
+/**
+ * Cria client para o host terminal local, explicitando `mode: "copilot-cli"` em vez de depender do default do SDK.
+ *
+ * @param {Partial<CopilotClientOptions>} [overrides]
+ * @returns {CopilotClient}
+ */
+export function createTerminalCopilotClient(overrides = {}) {
+    const options = buildTerminalCopilotClientOptions(overrides);
+    return new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {unknown} */ (options)));
+}
+
+/**
+ * Cria client para hosts server/multiusuário isolados, explicitando `mode: "empty"`.
+ *
+ * @param {Partial<CopilotClientOptions>} [overrides]
+ * @returns {CopilotClient}
+ */
+export function createServerCopilotClient(overrides = {}) {
+    const options = buildServerCopilotClientOptions(overrides);
     return new CopilotClient(/** @type {CopilotClientOptions} */ (/** @type {unknown} */ (options)));
 }
 

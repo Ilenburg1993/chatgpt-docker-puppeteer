@@ -49,6 +49,7 @@ import { approveAll, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, validateProvi
  *     configDir?: string;
  *     createSessionFsHandler?: CreateSessionFsProvider;
  *     disableResume?: boolean;
+ *     cloud?: unknown;
  * }} CompatSessionConfig
  */
 
@@ -262,7 +263,7 @@ export class SessionConfigBuilder {
     }
 
     /**
-     * @param {string[]} names
+     * @param {NonNullable<SessionConfig['availableTools']>} names
      * @returns {this}
      */
     availableTools(names) {
@@ -271,7 +272,7 @@ export class SessionConfigBuilder {
     }
 
     /**
-     * @param {string[]} names
+     * @param {NonNullable<SessionConfig['excludedTools']>} names
      * @returns {this}
      */
     excludedTools(names) {
@@ -520,6 +521,15 @@ export class SessionConfigBuilder {
         return this;
     }
 
+    /**
+     * @param {NonNullable<ResumeSessionConfig['openCanvases']>} canvases
+     * @returns {this}
+     */
+    openCanvases(canvases) {
+        this.#config.openCanvases = canvases;
+        return this;
+    }
+
     // ─── Merge ────────────────────────────────────────────────────────────
 
     /**
@@ -549,12 +559,14 @@ export class SessionConfigBuilder {
             this.#config.streaming = true;
         }
         const {
+            cloud: _ignoredCloud,
             disableResume: _ignoredDisableResume,
             suppressResumeEvent: _ignoredSuppressResumeEvent,
             continuePendingWork: _ignoredContinuePendingWork,
             openCanvases: _ignoredOpenCanvases,
             ...sessionConfig
         } = this.#config;
+        void _ignoredCloud;
         void _ignoredDisableResume;
         void _ignoredSuppressResumeEvent;
         void _ignoredContinuePendingWork;
@@ -578,6 +590,7 @@ export class SessionConfigBuilder {
             ...(this.#config.continuePendingWork !== undefined
                 ? { continuePendingWork: this.#config.continuePendingWork }
                 : {}),
+            ...(this.#config.openCanvases !== undefined ? { openCanvases: this.#config.openCanvases } : {}),
         });
     }
 }

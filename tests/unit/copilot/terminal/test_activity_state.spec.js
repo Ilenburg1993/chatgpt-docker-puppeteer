@@ -29,6 +29,25 @@ describe('terminal/activity-state', () => {
         expect(history[0]?.label).toBe('Executando tool');
     });
 
+    it('redige secrets em detalhes e alvos antes de expor snapshot/histórico', () => {
+        clearTerminalActivityHistory();
+        const secret = 'sk-supersecret1234567890';
+        recordTerminalActivity('tool', 'Executando tool', {
+            detail: `api_key=${secret}`,
+            toolName: 'exec_command',
+            toolTarget: `curl -H "Authorization: Bearer ${secret}" https://example.test`,
+            source: 'sdk',
+        });
+
+        const serializedSnapshot = JSON.stringify(readTerminalActivitySnapshot());
+        const serializedHistory = JSON.stringify(readTerminalActivityHistory(5));
+
+        expect(serializedSnapshot).not.toContain(secret);
+        expect(serializedHistory).not.toContain(secret);
+        expect(serializedSnapshot).toContain('api_key=[redacted]');
+        expect(serializedSnapshot).toContain('Bearer [redacted]');
+    });
+
     it('volta para idle com detalhe semântico', () => {
         markTerminalActivityIdle('Aguardando próxima mensagem');
 

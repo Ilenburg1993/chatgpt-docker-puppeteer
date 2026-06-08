@@ -12,8 +12,8 @@ import {
     markAgentRuntimeDialogPausedForRecovery,
     shouldReapAgentRuntimePendingQuestionShadow,
     shouldScheduleAgentRuntimeDialogBootRecovery,
-} from '../../facades/index.js';
-import { log } from '../../ports/index.js';
+} from '../../facades/agent-runtime-state.js';
+import { log } from '../../ports/logging/index.js';
 
 /**
  * @typedef {import('./boot-session-prep.js').BootWiringContext} BootWiringContext

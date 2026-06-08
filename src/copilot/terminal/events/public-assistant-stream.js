@@ -11,7 +11,7 @@
 
 import { getShowStreaming } from '../../presentation/state/index.js';
 import { readTerminalDialogStreamMeta } from '../frontend/gateways/index.js';
-import { createDeltaCallback, createDisplayState, renderStreamingFooter } from '../dialog/index.js';
+import { createDeltaCallback, createDisplayState, renderStreamingFooter } from '../dialog/io/index.js';
 import {
     completeTerminalTurnMaterialization,
     readTerminalTurnMaterialization,

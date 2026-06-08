@@ -13,6 +13,7 @@ import { describe, expect, it, vi } from 'vitest';
 // ─── Mocks genéricos para dependências pesadas ──────────────────────────
 
 vi.mock('@github/copilot-sdk', () => ({
+    SYSTEM_MESSAGE_SECTIONS: Object.freeze({ identity: 'identity' }),
     SYSTEM_PROMPT_SECTIONS: Object.freeze({ identity: 'identity' }),
     CopilotClient: vi.fn(),
     defineTool: vi.fn(() => ({ name: 'mock-tool', description: 'mock', schema: {}, handler: async () => ({}) })),
@@ -87,6 +88,45 @@ describe('FG-3 — core barrel contract', () => {
         for (const name of expected) {
             expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
         }
+    });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 2.1. sdk event seam contract
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('FG-3 — sdk event seam contract', () => {
+    it('events/sdk-events exporta listeners e normalizers leves usados por handlers', async () => {
+        const barrel = await import('#copilot/events/sdk-events');
+        const expected = [
+            'SESSION_EVENTS',
+            'ALL_EVENT_TYPES',
+            'getSessionCapabilities',
+            'normalizeElicitationCompletedEvent',
+            'normalizeElicitationPendingEvent',
+            'normalizeModeChangedEvent',
+            'normalizeModelChangedEvent',
+            'normalizePermissionCompletedEvent',
+            'normalizePermissionRequestedEvent',
+            'normalizePlanChangedEvent',
+            'normalizeToolsUpdatedEvent',
+            'normalizeUserInputCompletedEvent',
+            'normalizeUserInputRequestedEvent',
+            'onAllSessionEvents',
+            'onSessionEvent',
+            'onSessionEvents',
+        ];
+        for (const name of expected) {
+            expect(/** @type {Record<string, unknown>} */ (barrel)[name], `missing: ${name}`).toBeDefined();
+        }
+    });
+
+    it('events/sdk-events não importa o barrel raiz pesado do SDK', async () => {
+        const { readFile } = await import('node:fs/promises');
+        const { join } = await import('node:path');
+        const src = await readFile(join(process.cwd(), 'src', 'copilot', 'events', 'sdk-events.js'), 'utf-8');
+        expect(src).not.toMatch(/from\s+['"]#copilot\/sdk['"]/);
+        expect(src).toContain("from '#copilot/sdk/session'");
     });
 });
 

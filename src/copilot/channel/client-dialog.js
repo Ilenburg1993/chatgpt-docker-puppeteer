@@ -76,9 +76,9 @@ function resolveDeltaCausalKey(evt) {
  *     reply: string;
  *     replySource: 'runtime_return' | 'transport_mirror' | 'empty';
  *     hadReplyEvent: boolean;
- *     semanticOutcome: import('#copilot/agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['outcome'];
- *     semanticReplySource: import('#copilot/agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['replySource'];
- *     semanticDiagnostics: import('#copilot/agent/dialog/executors/turn-executor.js').DialogTurnSemanticResult['diagnostics'];
+ *     semanticOutcome: import('#copilot/agent/types').DialogTurnSemanticResult['outcome'];
+ *     semanticReplySource: import('#copilot/agent/types').DialogTurnSemanticResult['replySource'];
+ *     semanticDiagnostics: import('#copilot/agent/types').DialogTurnSemanticResult['diagnostics'];
  * }} DialogTurnTransportResult
  */
 

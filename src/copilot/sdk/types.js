@@ -96,9 +96,9 @@
 // ─── Tools ────────────────────────────────────────────────────────────────────
 
 /**
- * Definição de tool para o SDK. Campos: `name`, `description?`, `parameters?` (ZodSchema | JSON schema), `handler`,
- * `overridesBuiltInTool?` (bool — obrigatório se sobrescrever tool builtin), `skipPermission?` (bool — pula prompt de
- * permissão).
+ * Definição de tool para o SDK. Campos: `name`, `description?`, `parameters?` (ZodSchema | JSON schema), `handler?`
+ * (ausente em tools declaration-only), `overridesBuiltInTool?` (bool — obrigatório se sobrescrever tool builtin),
+ * `skipPermission?` (bool — pula prompt de permissão).
  *
  * @template [TArgs=unknown] Default is `unknown`
  * @typedef {import('@github/copilot-sdk').Tool<TArgs>} Tool
@@ -134,13 +134,13 @@
 
 /**
  * Resultado de tool binário (embutido em `ToolResultObject.binaryResultsForLlm`). Campos: `data` (string base64),
- * `mimeType`, `type` (string), `description?`. Nota: NÃO é membro direto de `ToolResult` — está encapsulado dentro de
- * `ToolResultObject`.
+ * `mimeType`, `type` (`"image" | "resource"`), `description?`. Nota: NÃO é membro direto de `ToolResult` — está
+ * encapsulado dentro de `ToolResultObject`.
  *
  * @typedef {{
  *     data: string;
  *     mimeType: string;
- *     type: string;
+ *     type: 'image' | 'resource';
  *     description?: string;
  * }} ToolBinaryResult
  */
@@ -488,12 +488,14 @@
  */
 
 /**
- * Configuração de hooks de sessão. Todos os handlers são opcionais. Campos: `onPreToolUse?`, `onPostToolUse?`,
- * `onUserPromptSubmitted?`, `onSessionStart?`, `onSessionEnd?`, `onErrorOccurred?`.
+ * Configuração de hooks de sessão. Todos os handlers são opcionais. SDK 1.0 separa sucesso (`onPostToolUse`) de falha
+ * (`onPostToolUseFailure`) e adiciona `onPreMcpToolCall`.
  *
  * @typedef {{
  *     onPreToolUse?: PreToolUseHandler;
+ *     onPreMcpToolCall?: PreMcpToolCallHandler;
  *     onPostToolUse?: PostToolUseHandler;
+ *     onPostToolUseFailure?: PostToolUseFailureHandler;
  *     onUserPromptSubmitted?: UserPromptSubmittedHandler;
  *     onSessionStart?: SessionStartHandler;
  *     onSessionEnd?: SessionEndHandler;
@@ -507,6 +509,8 @@
  * @typedef {BaseHookInput & {
  *     toolName: string;
  *     toolArgs: unknown;
+ *     traceparent?: string;
+ *     tracestate?: string;
  * }} PreToolUseHookInput
  */
 
@@ -534,6 +538,33 @@
  */
 
 /**
+ * Input do hook `onPreMcpToolCall`.
+ *
+ * @typedef {BaseHookInput & {
+ *     toolCallId?: string;
+ *     serverName: string;
+ *     toolName: string;
+ *     arguments: unknown;
+ *     _meta?: Record<string, unknown>;
+ *     traceparent?: string;
+ *     tracestate?: string;
+ * }} PreMcpToolCallHookInput
+ */
+
+/**
+ * @typedef {{
+ *     metaToUse?: Record<string, unknown> | null;
+ * }} PreMcpToolCallHookOutput
+ */
+
+/**
+ * @typedef {(
+ *     input: PreMcpToolCallHookInput,
+ *     invocation: { sessionId?: string; agentName?: string }
+ * ) => Promise<PreMcpToolCallHookOutput | void> | PreMcpToolCallHookOutput | void} PreMcpToolCallHandler
+ */
+
+/**
  * Input do hook `postToolUse`. Campos: `toolName`, `toolArgs`, `toolResult` (`ToolResultObject`)
  *
  * - campos de `BaseHookInput`.
@@ -542,6 +573,8 @@
  *     toolName: string;
  *     toolArgs: unknown;
  *     toolResult: ToolResultObject;
+ *     traceparent?: string;
+ *     tracestate?: string;
  * }} PostToolUseHookInput
  */
 
@@ -564,6 +597,31 @@
  *     input: PostToolUseHookInput,
  *     invocation: { sessionId: string },
  * ) => Promise<PostToolUseHookOutput | void> | PostToolUseHookOutput | void} PostToolUseHandler
+ */
+
+/**
+ * Input do hook `onPostToolUseFailure`.
+ *
+ * @typedef {BaseHookInput & {
+ *     toolName: string;
+ *     toolArgs: unknown;
+ *     error: string;
+ *     traceparent?: string;
+ *     tracestate?: string;
+ * }} PostToolUseFailureHookInput
+ */
+
+/**
+ * @typedef {{
+ *     additionalContext?: string;
+ * }} PostToolUseFailureHookOutput
+ */
+
+/**
+ * @typedef {(
+ *     input: PostToolUseFailureHookInput,
+ *     invocation: { sessionId?: string; agentName?: string }
+ * ) => Promise<PostToolUseFailureHookOutput | void> | PostToolUseFailureHookOutput | void} PostToolUseFailureHandler
  */
 
 /**

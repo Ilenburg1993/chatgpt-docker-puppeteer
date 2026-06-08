@@ -15,6 +15,7 @@ vi.mock('#copilot/sdk', () => ({
         HIGH: 'high',
         XHIGH: 'xhigh',
     },
+    SYSTEM_MESSAGE_SECTIONS: {},
     SYSTEM_PROMPT_SECTIONS: {},
     approveAll: vi.fn(async () => ({ kind: 'approve-once' })),
     createTool: vi.fn(() => ({ name: 'mock-tool', execute: vi.fn() })),

@@ -9,7 +9,7 @@
  */
 
 import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config';
-import { SHUTDOWN_PRIORITY, logSwallowed, registerShutdownHandler } from '#copilot/core';
+import { SHUTDOWN_PRIORITY, logSwallowed, redactSecretRecord, registerShutdownHandler } from '#copilot/core';
 import { onSessionEvent } from '#copilot/events';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -148,7 +148,7 @@ function scheduleFlush() {
  * @returns {void}
  */
 function persistEvent(entry) {
-    _writeQueue.push(JSON.stringify({ _collected: new Date().toISOString(), ...entry }) + '\n');
+    _writeQueue.push(JSON.stringify(redactSecretRecord({ _collected: new Date().toISOString(), ...entry })) + '\n');
     scheduleFlush();
 }
 /**

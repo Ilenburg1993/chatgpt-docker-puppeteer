@@ -15,6 +15,7 @@ import { log } from '../../observability/index.js';
 import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../infra/sse/state.js';
 import { CRITICAL_EVENTS } from '../../presentation/state/index.js';
 import { getHubSessionId } from '../../presentation/state/index.js';
+import { redactSecretRecord } from '../../core/security/redaction.js';
 import { recordTerminalSseEventArchive } from '../state/events/index.js';
 
 export { CRITICAL_EVENTS } from '../../presentation/state/index.js';
@@ -109,8 +110,8 @@ export function broadcastSse(event, data) {
 
     const hubSessionId = getHubSessionId();
     const safeEvent = String(event).replace(/[\r\n]/g, '_');
-    const safeData = normalizeSsePayloadForTransport(data);
-    const enrichedData = { ...safeData, hubSessionId: hubSessionId ?? null };
+    const transportData = normalizeSsePayloadForTransport(data);
+    const enrichedData = redactSecretRecord({ ...transportData, hubSessionId: hubSessionId ?? null });
     const eventId = getTerminalReplayBuffer().push(safeEvent, enrichedData);
     try {
         recordTerminalSseEventArchive({

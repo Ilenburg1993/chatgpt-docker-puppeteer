@@ -5,7 +5,7 @@
  */
 
 import { withAgentErrorPolicy } from '../../error/index.js';
-import { log } from '../../ports/index.js';
+import { log } from '../../ports/logging/index.js';
 
 /**
  * @param {string} label

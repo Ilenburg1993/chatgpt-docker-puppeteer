@@ -35,7 +35,13 @@ const readTerminalModelStatsProjection = vi.fn(() => ({
 const listTerminalAvailableModelsProjection = vi.fn(async () => ({
     currentModel: 'gpt-5',
     models: [
-        { id: 'gpt-5', capabilities: { supports: { reasoningEffort: true, vision: true } } },
+        {
+            id: 'gpt-5',
+            capabilities: { supports: { reasoningEffort: true, vision: true } },
+            supportedReasoningEfforts: ['low', 'high'],
+            supportedReasoningSummaries: ['none', 'concise'],
+            supportedContextTiers: ['default', 'long_context'],
+        },
         { id: 'gpt-4.1', capabilities: { supports: { reasoningEffort: false, vision: false } } },
     ],
 }));
@@ -158,7 +164,7 @@ describe('terminal commands config/errors com frontend canônico', () => {
         expect(ctx.output()).toContain('Modelos disponíveis');
         expect(ctx.output()).toContain('2 modelos');
         expect(ctx.output()).toContain('gpt-4.1');
-        expect(ctx.output()).toContain('gpt-5 · ativo · raciocínio · visão');
+        expect(ctx.output()).toContain('gpt-5 · ativo · raciocínio low, high · resumo none, concise · contexto default, long_context · visão');
         expect(ctx.output()).not.toContain('Detalhes');
         expect(ctx.output()).not.toContain('[raciocínio]');
         expect(ctx.output()).not.toContain('[visão]');

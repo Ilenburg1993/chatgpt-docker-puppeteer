@@ -15,8 +15,8 @@
  * @see EventBus
  */
 
-import { ConfigError } from '#copilot/core';
 import { lookup as dnsLookup } from 'node:dns/promises';
+import { ConfigError } from '../errors.js';
 
 /**
  * Seletor injetável para testes da resolução DNS usada por `checkResolvedIp`.

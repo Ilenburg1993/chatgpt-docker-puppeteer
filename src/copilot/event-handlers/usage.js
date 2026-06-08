@@ -7,7 +7,7 @@
 
 import { EMITTER_LLM_USAGE, SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { onSessionEvent } from '#copilot/sdk/session';
+import { onSessionEvent } from '#copilot/events/sdk-events';
 import { createAssistantUsageClassifier, normalizeAssistantUsageEvent } from './usage-classifier.js';
 
 /**

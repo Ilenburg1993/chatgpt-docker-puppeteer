@@ -18,7 +18,7 @@ vi.mock('@github/copilot-sdk', () => {
         docs: 'docs',
         context: 'context',
     });
-    return { SYSTEM_PROMPT_SECTIONS };
+    return { SYSTEM_MESSAGE_SECTIONS: SYSTEM_PROMPT_SECTIONS, SYSTEM_PROMPT_SECTIONS };
 });
 
 // ─── Imports ───────────────────────────────────────────────────────────────
@@ -701,6 +701,44 @@ describe('F72 — BYOK env configuration', () => {
         });
         expect(JSON.stringify(state.summary)).not.toContain('kilo-secret');
         expect(JSON.stringify(profiles)).not.toContain('kilo-secret');
+    });
+
+    it('marca perfil custom sem modelo como bloqueado antes do boot SDK', () => {
+        const env = {
+            COPILOT_BYOK_PROFILES_JSON: JSON.stringify({
+                local: {
+                    preset: 'openai-compatible',
+                    baseUrl: 'http://127.0.0.1:11434/v1',
+                    bearerToken: 'fixture-secret',
+                },
+            }),
+        };
+
+        const summaries = readConfiguredByokProfileSummaries(env);
+        const state = readConfiguredByokState({
+            ...env,
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROFILE: 'local',
+        });
+
+        expect(summaries[0]).toMatchObject({
+            name: 'local',
+            preset: 'openai-compatible',
+            providerType: 'openai',
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            model: null,
+            ready: false,
+        });
+        expect(summaries[0]?.errors.join('\n')).toContain('COPILOT_BYOK_MODEL');
+        expect(state.ready).toBe(false);
+        expect(() =>
+            resolveConfiguredByokSessionOverrides({
+                ...env,
+                COPILOT_BYOK_ENABLED: 'true',
+                COPILOT_BYOK_PROFILE: 'local',
+            }),
+        ).toThrow('COPILOT_BYOK_MODEL');
+        expect(JSON.stringify(summaries)).not.toContain('fixture-secret');
     });
 
     it('permite override transiente de modelo mantendo provider e credenciais do perfil ativo', () => {

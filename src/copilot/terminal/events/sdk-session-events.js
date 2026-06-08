@@ -26,6 +26,7 @@ import {
     EMITTER_COMMANDS_CHANGED,
     EMITTER_ELICITATION_COMPLETED,
     EMITTER_ELICITATION_PENDING,
+    EMITTER_EXTENSION_CONTEXT,
     EMITTER_EXIT_PLAN_MODE_COMPLETED,
     EMITTER_EXIT_PLAN_MODE_REQUESTED,
     EMITTER_EXTERNAL_TOOL_COMPLETED,
@@ -35,14 +36,19 @@ import {
     EMITTER_MCP_OAUTH_COMPLETED,
     EMITTER_MCP_OAUTH_REQUIRED,
     EMITTER_MCP_SERVER_STATUS_CHANGED,
+    EMITTER_NEW_INBOX_MESSAGE,
     EMITTER_PENDING_MESSAGES_MODIFIED,
     EMITTER_PERMISSION_COMPLETED,
     EMITTER_PERMISSION_MODE_CHANGED,
     EMITTER_PERMISSION_REQUESTED,
     EMITTER_SAMPLING_COMPLETED,
     EMITTER_SAMPLING_REQUESTED,
+    EMITTER_SESSION_AUTOPILOT_OBJECTIVE_CHANGED,
     EMITTER_SESSION_BACKGROUND_TASKS_CHANGED,
     EMITTER_SESSION_CONTEXT_CHANGED,
+    EMITTER_SESSION_CUSTOM_AGENTS_UPDATED,
+    EMITTER_SESSION_CUSTOM_NOTIFICATION,
+    EMITTER_SESSION_EXTENSIONS_ATTACHMENTS_PUSHED,
     EMITTER_SESSION_EXTENSIONS_LOADED,
     EMITTER_SESSION_HANDOFF,
     EMITTER_SESSION_INFO,
@@ -50,6 +56,9 @@ import {
     EMITTER_SESSION_MODE_CHANGED,
     EMITTER_SESSION_MODEL_CHANGED,
     EMITTER_SESSION_PLAN_CHANGED,
+    EMITTER_SESSION_REMOTE_STEERABLE_CHANGED,
+    EMITTER_SESSION_SCHEDULE_CANCELLED,
+    EMITTER_SESSION_SCHEDULE_CREATED,
     EMITTER_SESSION_SHUTDOWN,
     EMITTER_SESSION_SKILLS_LOADED,
     EMITTER_SESSION_SNAPSHOT_REWIND,
@@ -74,7 +83,7 @@ import {
     setLastSdkPlanOperation,
     setSdkSessionMode,
 } from '../../presentation/state/index.js';
-import { broadcastSse, println } from '../dialog/index.js';
+import { broadcastSse, println } from '../dialog/io/index.js';
 import {
     answerTerminalPendingQuestion,
     classifyTerminalPermissionDecision,
@@ -83,7 +92,7 @@ import {
     readTerminalToolRegistrySnapshot,
 } from '../frontend/gateways/index.js';
 import { observeTerminalModelChangeProjection } from '../frontend/projections/index.js';
-import { consumeTerminalLiveByokModelSwitchConfirmation } from '../byok/live-model-switch.js';
+import { consumeTerminalLiveByokModelSwitchConfirmation } from '../byok/live/index.js';
 import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
 import {
     appendTerminalTranscriptTurn,
@@ -1286,15 +1295,22 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const reasoningEffort = evt?.reasoningEffort ?? null;
         const changed = previousModel !== newModel;
         const matchedRequest = consumeTerminalLiveByokModelSwitchConfirmation({ previousModel, newModel });
+        const matchedRequestReason = matchedRequest
+            ? [
+                  `confirma pedido ${renderTerminalModelTransitionSourceLabel(matchedRequest.source)} de ${new Date(matchedRequest.requestedAt).toISOString()}`,
+                  matchedRequest.reason,
+              ]
+                  .filter((part) => typeof part === 'string' && part.length > 0)
+                  .join(' · ')
+            : null;
         const presentation = buildTerminalModelTransitionPresentation({
             from: previousModel,
             to: newModel,
             kind: changed ? 'confirmed' : 'unchanged',
             reasoningEffort,
             source: 'SDK',
-            reason: matchedRequest
-                ? `confirma pedido ${renderTerminalModelTransitionSourceLabel(matchedRequest.source)} de ${new Date(matchedRequest.requestedAt).toISOString()}`
-                : null,
+            reason: matchedRequestReason,
+            confidence: matchedRequest?.confidence ?? null,
         });
         observeTerminalModelChangeProjection({ previousModel, newModel, reasoningEffort });
         void recordModelGatewaySdkSessionConfirmation(previousModel, newModel, reasoningEffort).catch((error) => {
@@ -1321,6 +1337,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                     to: newModel,
                     kind: changed ? 'confirmed' : 'unchanged',
                     reasoningEffort,
+                    reason: matchedRequestReason,
+                    confidence: matchedRequest?.confidence ?? null,
                     source: 'SDK',
                     role: changed ? 'info' : 'muted',
                 })}`,
@@ -1340,6 +1358,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                               previousModel: matchedRequest.previousModel,
                               source: matchedRequest.source,
                               reason: matchedRequest.reason,
+                              confidence: matchedRequest.confidence,
                               requestedAt: new Date(matchedRequest.requestedAt).toISOString(),
                           }
                         : null,
@@ -1641,6 +1660,219 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         broadcastSse(
             'session.workspace_file_changed',
             withSdkSessionSseEnvelope({ path, operation }, 'sdk/session.workspace_file_changed'),
+        );
+    };
+
+    const onSessionAutopilotObjectiveChanged = (
+        /** @type {{ objective?: string | null; data?: Record<string, unknown> }} */ evt,
+    ) => {
+        const objective = compactOneLine(evt?.objective ?? '');
+        const detail = objective ? compactSummaryText(objective, 140) : 'objetivo de autopiloto atualizado';
+        recordTerminalActivity('task', 'Objetivo autopiloto atualizado', {
+            detail,
+            source: 'sdk',
+            recordHistory: Boolean(objective),
+            updateCurrent: true,
+        });
+        if (shouldPrintSessionNarration('important')) {
+            println(terminalThemeRow('Autopiloto', detail, { role: 'info' }));
+        }
+        broadcastSse(
+            'session.autopilot_objective_changed',
+            withSdkSessionSseEnvelope(
+                {
+                    objective: objective || null,
+                    data: evt?.data ?? null,
+                },
+                'sdk/session.autopilot_objective_changed',
+            ),
+        );
+    };
+
+    const onSessionCustomAgentsUpdated = (/** @type {{ count?: number; agents?: unknown[]; data?: Record<string, unknown> }} */ evt) => {
+        const count = Number.isFinite(Number(evt?.count)) ? Number(evt?.count) : Array.isArray(evt?.agents) ? evt.agents.length : 0;
+        recordTerminalActivity('subagent', 'Agentes customizados atualizados', {
+            detail: pluralPt(count, 'agente', 'agentes'),
+            source: 'sdk',
+            recordHistory: false,
+            updateCurrent: false,
+        });
+        broadcastSse(
+            'session.custom_agents_updated',
+            withSdkSessionSseEnvelope(
+                {
+                    count,
+                    data: evt?.data ?? null,
+                },
+                'sdk/session.custom_agents_updated',
+            ),
+        );
+    };
+
+    const onSessionCustomNotification = (
+        /** @type {{ title?: string | null; message?: string | null; level?: string | null; data?: Record<string, unknown> }} */ evt,
+    ) => {
+        const title = compactOneLine(evt?.title ?? '');
+        const message = renderSdkOperatorMessage(evt?.message ?? '');
+        const level = compactOneLine(evt?.level ?? '');
+        const severity = /warn|error|fail|denied|blocked/iu.test(level) ? 'warn' : 'info';
+        const detail = [title || null, message ? compactSummaryText(message, 140) : null, level ? `nível ${level}` : null]
+            .filter(Boolean)
+            .join(' · ');
+        recordTerminalActivity('system', 'Notificação customizada SDK', {
+            detail: detail || 'notificação sem mensagem',
+            source: 'sdk',
+            severity,
+            recordHistory: severity === 'warn',
+            updateCurrent: severity === 'warn',
+        });
+        if (severity === 'warn' && shouldPrintSessionNarration('important')) {
+            println(terminalThemeRow('Notificação SDK', detail || 'sem mensagem', { role: 'warn' }));
+        }
+        broadcastSse(
+            'session.custom_notification',
+            withSdkSessionSseEnvelope(
+                {
+                    title: title || null,
+                    message: message || null,
+                    level: level || null,
+                    data: evt?.data ?? null,
+                },
+                'sdk/session.custom_notification',
+            ),
+        );
+    };
+
+    const onSessionExtensionsAttachmentsPushed = (
+        /** @type {{ count?: number; extensionName?: string | null; data?: Record<string, unknown> }} */ evt,
+    ) => {
+        const count = Number.isFinite(Number(evt?.count)) ? Number(evt?.count) : 0;
+        const extensionName = compactOneLine(evt?.extensionName ?? '');
+        recordTerminalActivity('system', 'Anexos de extensão recebidos', {
+            detail: `${pluralPt(count, 'anexo', 'anexos')}${extensionName ? ` · ${extensionName}` : ''}`,
+            source: 'sdk',
+            recordHistory: count > 0,
+            updateCurrent: false,
+        });
+        broadcastSse(
+            'session.extensions.attachments_pushed',
+            withSdkSessionSseEnvelope(
+                {
+                    count,
+                    extensionName: extensionName || null,
+                    data: evt?.data ?? null,
+                },
+                'sdk/session.extensions.attachments_pushed',
+            ),
+        );
+    };
+
+    const onSessionRemoteSteerableChanged = (/** @type {{ enabled?: boolean | null; data?: Record<string, unknown> }} */ evt) => {
+        const enabled = typeof evt?.enabled === 'boolean' ? evt.enabled : null;
+        const detail = enabled === true ? 'controle remoto ativado' : enabled === false ? 'controle remoto desativado' : 'estado remoto alterado';
+        recordTerminalActivity('system', 'Controle remoto da sessão alterado', {
+            detail,
+            source: 'sdk',
+            severity: enabled ? 'warn' : 'info',
+            recordHistory: enabled === true,
+            updateCurrent: enabled === true,
+        });
+        if (enabled === true && shouldPrintSessionNarration('important')) {
+            println(terminalThemeRow('Controle remoto', detail, { role: 'warn' }));
+        }
+        broadcastSse(
+            'session.remote_steerable_changed',
+            withSdkSessionSseEnvelope(
+                {
+                    enabled,
+                    data: evt?.data ?? null,
+                },
+                'sdk/session.remote_steerable_changed',
+            ),
+        );
+    };
+
+    const onSessionScheduleCreated = (/** @type {{ scheduleId?: string | null; title?: string | null; data?: Record<string, unknown> }} */ evt) => {
+        const scheduleId = compactOneLine(evt?.scheduleId ?? '');
+        const title = compactOneLine(evt?.title ?? '');
+        const detail = [title || null, scheduleId ? renderSdkRequestLabel(scheduleId) : null].filter(Boolean).join(' · ');
+        recordTerminalActivity('task', 'Agendamento SDK criado', {
+            detail: detail || 'agendamento criado',
+            source: 'sdk',
+            recordHistory: true,
+        });
+        broadcastSse(
+            'session.schedule_created',
+            withSdkSessionSseEnvelope(
+                {
+                    scheduleId: scheduleId || null,
+                    title: title || null,
+                    data: evt?.data ?? null,
+                },
+                'sdk/session.schedule_created',
+            ),
+        );
+    };
+
+    const onSessionScheduleCancelled = (/** @type {{ scheduleId?: string | null; title?: string | null; data?: Record<string, unknown> }} */ evt) => {
+        const scheduleId = compactOneLine(evt?.scheduleId ?? '');
+        const title = compactOneLine(evt?.title ?? '');
+        const detail = [title || null, scheduleId ? renderSdkRequestLabel(scheduleId) : null].filter(Boolean).join(' · ');
+        recordTerminalActivity('task', 'Agendamento SDK cancelado', {
+            detail: detail || 'agendamento cancelado',
+            source: 'sdk',
+            recordHistory: true,
+        });
+        broadcastSse(
+            'session.schedule_cancelled',
+            withSdkSessionSseEnvelope(
+                {
+                    scheduleId: scheduleId || null,
+                    title: title || null,
+                    data: evt?.data ?? null,
+                },
+                'sdk/session.schedule_cancelled',
+            ),
+        );
+    };
+
+    const onExtensionContext = (/** @type {{ extensionName?: string | null; data?: Record<string, unknown> }} */ evt) => {
+        const extensionName = compactOneLine(evt?.extensionName ?? '');
+        recordTerminalActivity('system', 'Contexto de extensão atualizado', {
+            detail: extensionName || 'contexto recebido',
+            source: 'sdk',
+            recordHistory: false,
+            updateCurrent: false,
+        });
+        broadcastSse(
+            'extension_context',
+            withSdkSessionSseEnvelope(
+                {
+                    extensionName: extensionName || null,
+                    data: evt?.data ?? null,
+                },
+                'sdk/extension_context',
+            ),
+        );
+    };
+
+    const onNewInboxMessage = (/** @type {{ message?: string | null; data?: Record<string, unknown> }} */ evt) => {
+        const message = renderSdkOperatorMessage(evt?.message ?? '');
+        recordTerminalActivity('question', 'Nova mensagem na caixa de entrada', {
+            detail: message ? compactSummaryText(message, 140) : 'mensagem recebida',
+            source: 'sdk',
+            severity: 'info',
+            recordHistory: true,
+        });
+        broadcastSse(
+            'new_inbox_message',
+            withSdkSessionSseEnvelope(
+                {
+                    message: message || null,
+                    data: evt?.data ?? null,
+                },
+                'sdk/new_inbox_message',
+            ),
         );
     };
 
@@ -2158,6 +2390,15 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     agent.on(EMITTER_SESSION_SHUTDOWN, onSessionShutdown);
     agent.on(EMITTER_SESSION_HANDOFF, onSessionHandoff);
     agent.on(EMITTER_SESSION_WORKSPACE_FILE_CHANGED, onWorkspaceFileChanged);
+    agent.on(EMITTER_SESSION_AUTOPILOT_OBJECTIVE_CHANGED, onSessionAutopilotObjectiveChanged);
+    agent.on(EMITTER_SESSION_CUSTOM_AGENTS_UPDATED, onSessionCustomAgentsUpdated);
+    agent.on(EMITTER_SESSION_CUSTOM_NOTIFICATION, onSessionCustomNotification);
+    agent.on(EMITTER_SESSION_EXTENSIONS_ATTACHMENTS_PUSHED, onSessionExtensionsAttachmentsPushed);
+    agent.on(EMITTER_SESSION_REMOTE_STEERABLE_CHANGED, onSessionRemoteSteerableChanged);
+    agent.on(EMITTER_SESSION_SCHEDULE_CREATED, onSessionScheduleCreated);
+    agent.on(EMITTER_SESSION_SCHEDULE_CANCELLED, onSessionScheduleCancelled);
+    agent.on(EMITTER_EXTENSION_CONTEXT, onExtensionContext);
+    agent.on(EMITTER_NEW_INBOX_MESSAGE, onNewInboxMessage);
     agent.on(EMITTER_TOOL_USER_REQUESTED, onToolUserRequested);
     agent.on(EMITTER_EXTERNAL_TOOL_REQUESTED, onExternalToolRequested);
     agent.on(EMITTER_EXTERNAL_TOOL_COMPLETED, onExternalToolCompleted);
@@ -2206,6 +2447,15 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         agent.off(EMITTER_SESSION_SHUTDOWN, onSessionShutdown);
         agent.off(EMITTER_SESSION_HANDOFF, onSessionHandoff);
         agent.off(EMITTER_SESSION_WORKSPACE_FILE_CHANGED, onWorkspaceFileChanged);
+        agent.off(EMITTER_SESSION_AUTOPILOT_OBJECTIVE_CHANGED, onSessionAutopilotObjectiveChanged);
+        agent.off(EMITTER_SESSION_CUSTOM_AGENTS_UPDATED, onSessionCustomAgentsUpdated);
+        agent.off(EMITTER_SESSION_CUSTOM_NOTIFICATION, onSessionCustomNotification);
+        agent.off(EMITTER_SESSION_EXTENSIONS_ATTACHMENTS_PUSHED, onSessionExtensionsAttachmentsPushed);
+        agent.off(EMITTER_SESSION_REMOTE_STEERABLE_CHANGED, onSessionRemoteSteerableChanged);
+        agent.off(EMITTER_SESSION_SCHEDULE_CREATED, onSessionScheduleCreated);
+        agent.off(EMITTER_SESSION_SCHEDULE_CANCELLED, onSessionScheduleCancelled);
+        agent.off(EMITTER_EXTENSION_CONTEXT, onExtensionContext);
+        agent.off(EMITTER_NEW_INBOX_MESSAGE, onNewInboxMessage);
         agent.off(EMITTER_TOOL_USER_REQUESTED, onToolUserRequested);
         agent.off(EMITTER_EXTERNAL_TOOL_REQUESTED, onExternalToolRequested);
         agent.off(EMITTER_EXTERNAL_TOOL_COMPLETED, onExternalToolCompleted);

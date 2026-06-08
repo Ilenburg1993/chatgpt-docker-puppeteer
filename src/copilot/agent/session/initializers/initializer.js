@@ -31,20 +31,25 @@ import {
     readSystemPromptStatus,
 } from '../../../config/system-prompt/index.js';
 import {
-    AGENT_SDK_DEFAULT_MODEL,
     canReadAgentSdkSessionMessages,
+    readAgentSdkSessionMessages,
+} from '../../facades/agent-sdk-runtime.js';
+import {
+    persistAgentRuntimeStatePartial,
+    readAgentRuntimePersistedStateAsync,
+} from '../../facades/agent-runtime-state.js';
+import {
+    AGENT_SDK_DEFAULT_MODEL,
     createAgentSdkSessionByClient,
     formatValidationResult,
     getAgentConfiguredSessionFsHandler,
     loadAgentSdkToolsConfigAsync,
-    persistAgentRuntimeStatePartial,
     pickDefinedAgentSdkOptions,
-    readAgentRuntimePersistedStateAsync,
-    readAgentSdkSessionMessages,
     resumeOrCreateAgentSdkSession,
     validateAgentContracts,
-} from '../../facades/index.js';
-import { defaultMetrics, log } from '../../ports/index.js';
+} from '../../facades/sdk-access.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
+import { log } from '../../ports/logging/index.js';
 import { buildHookSystemContextSafe } from '../context/index.js';
 
 // Re-exports para backward compatibility

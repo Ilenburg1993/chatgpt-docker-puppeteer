@@ -45,7 +45,7 @@ import {
     MAX_WEBHOOKS,
     WEBHOOK_MAX_RETRIES,
     WEBHOOK_TIMEOUT_MS,
-} from '#copilot/config';
+} from './env.js';
 
 // ── Dialog Loop ──────────────────────────────────────────────
 

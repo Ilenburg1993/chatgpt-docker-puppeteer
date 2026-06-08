@@ -32,7 +32,7 @@ import {
     listTerminalSdkSessionInventory,
     readTerminalConfiguredSessionFsState,
     scheduleTerminalSdkSessionBootSelection,
-} from '../frontend/index.js';
+} from '../frontend/gateways/session/index.js';
 import { requestTerminalLiveByokModelSwitch } from './live-model-switch.js';
 
 /**
@@ -101,6 +101,10 @@ function renderAutomationTokenLabel(value) {
         new_session_not_allowed: 'nova sessão não autorizada',
         policy_denied: 'política não autorizou',
         policy_disabled: 'política desativada',
+        catalog: 'catálogo',
+        authenticated_catalog: 'catálogo autenticado',
+        static_seed: 'seed estático',
+        probe_verified: 'probe verificado',
         rate_limit: 'limite de taxa',
         rate_limited: 'limitado por taxa',
         unknown_failure: 'falha desconhecida',
@@ -157,12 +161,14 @@ export function describeTerminalByokGatewayAutoEffect(effect) {
     const model = optionalScalarString(effect['model']);
     const previousModel = optionalScalarString(effect['previousModel']);
     const currentModel = optionalScalarString(effect['currentModel']) ?? model;
+    const confidence = optionalScalarString(effect['confidence']);
     const skippedReason = optionalScalarString(effect['skippedReason']);
     if (effect['applied'] === true && kind === 'set_live_model') {
+        const confidenceSuffix = confidence ? ` · confiança ${renderAutomationTokenLabel(confidence)}` : '';
         if (previousModel && currentModel && previousModel !== currentModel) {
-            return `modelo vivo solicitado ${previousModel} → ${currentModel}`;
+            return `modelo vivo solicitado ${previousModel} → ${currentModel}${confidenceSuffix}`;
         }
-        return currentModel ? `modelo vivo solicitado ${currentModel}` : 'modelo vivo solicitado';
+        return currentModel ? `modelo vivo solicitado ${currentModel}${confidenceSuffix}` : `modelo vivo solicitado${confidenceSuffix}`;
     }
     if (effect['applied'] === true && kind === 'prepare_new_sdk_session') {
         return model ? `novo boot SDK preparado para ${model}` : 'novo boot SDK preparado';
@@ -374,7 +380,8 @@ export async function applyTerminalByokGatewayAutoEffects(controllerStep) {
         if (effect['kind'] === 'set_live_model' && typeof effect['model'] === 'string' && effect['model'].trim()) {
             const request = requestTerminalLiveByokModelSwitch(effect['model'], {
                 source: 'terminal.byok_auto',
-                reason: 'automação model-gateway',
+                reason: optionalScalarString(effect['reason']) ?? 'automação model-gateway',
+                confidence: optionalScalarString(effect['confidence']),
             });
             applied.push({
                 ...effect,

@@ -14,7 +14,7 @@
 import { KEEPALIVE_IDLE_THRESHOLD_MS, KEEPALIVE_INTERVAL_MS } from '#copilot/config/agent';
 import { cancelTimer, registerInterval } from '#copilot/core';
 import { withAgentErrorPolicy } from '../../error/index.js';
-import { log } from '../../ports/index.js';
+import { log } from '../../ports/logging/index.js';
 
 /**
  * @typedef {Object} SessionKeepaliveOptions

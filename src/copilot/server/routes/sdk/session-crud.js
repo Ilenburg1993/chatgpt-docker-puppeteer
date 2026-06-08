@@ -6,7 +6,7 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core';
+import { redactSecretRecord, toError } from '#copilot/core';
 import { Router } from 'express';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { rateLimitMiddleware, validateBody, validateModel, withErrorHandler } from './session-middleware.js';
@@ -63,6 +63,18 @@ function withRuntimeMeta(routeDeps, payload) {
         ...payload,
         ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
     };
+}
+
+/**
+ * Metadata de sessão vem do SDK/CLI e pode carregar provider headers ou tokens em campos arbitrários.
+ *
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function redactSdkRoutePayload(value) {
+    if (Array.isArray(value)) return value.map(redactSdkRoutePayload);
+    if (!value || typeof value !== 'object') return value;
+    return redactSecretRecord(/** @type {Record<string, unknown>} */ (value));
 }
 
 /**
@@ -208,7 +220,10 @@ router.get('/sessions', (req, res) => {
         const active = new Set(listActiveSessions(routeDeps).map((s) => s.sessionId));
 
         const enriched = sessions.map((s) => ({
-            ...routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(s, s.sessionId),
+            ...routeDeps.sdkSessionOwnership.attachSdkSessionOwnership(
+                /** @type {Record<string, unknown>} */ (redactSdkRoutePayload(s)),
+                s.sessionId,
+            ),
             isActive: active.has(s.sessionId),
         }));
         res.json(withRuntimeMeta(routeDeps, { ok: true, count: enriched.length, sessions: enriched }));
@@ -401,7 +416,7 @@ router.get('/sessions/:id', (req, res) => {
                         messagesCount: entry?.messagesCount ?? 0,
                         activeMs: entry ? Date.now() - entry.createdAt : null,
                         workspacePath: entry?.session.workspacePath ?? null,
-                        metadata: meta ?? null,
+                        metadata: meta ? redactSdkRoutePayload(meta) : null,
                     },
                     id,
                 ),

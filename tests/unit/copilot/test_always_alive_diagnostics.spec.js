@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
+import { alwaysAliveAgent } from '#copilot/agent/always-alive';
 
 describe('AlwaysAliveAgent — diagnósticos de listeners e starvation', () => {
     describe('setMaxListeners', () => {

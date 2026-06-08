@@ -8,8 +8,8 @@ import { BOOT_LATE_PROTOCOL_GRACE_MS, LONG_TASK_TIMEOUT_MS } from '#copilot/conf
 import { toError } from '#copilot/core';
 import { DialogProtocol } from '#copilot/dialog';
 import { EMITTER_LOOP_CHANGED, EMITTER_LOOP_READY, EMITTER_LOOP_TURN_TIMEOUT } from '#copilot/events';
-import { waitForAgentSdkEvent } from '../../facades/index.js';
-import { log } from '../../ports/index.js';
+import { waitForAgentSdkEvent } from '../../facades/agent-sdk-runtime.js';
+import { log } from '../../ports/logging/index.js';
 
 /**
  * @typedef {import('node:events').EventEmitter} EventEmitter

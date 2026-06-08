@@ -8,15 +8,14 @@
  * @module copilot/presentation/sdk-recovery-policy
  */
 
-/** @typedef {'rate_limit' | 'quota_exhausted' | 'auth' | 'network' | 'timeout' | 'unknown'} RuntimeSdkErrorKind */
+import {
+    classifySdkError as classifyCoreSdkError,
+    classifySdkRateLimitScope as classifyCoreSdkRateLimitScope,
+} from '#copilot/core';
+
+/** @typedef {'rate_limit' | 'quota_exhausted' | 'account' | 'auth' | 'model_unsupported' | 'network' | 'timeout' | 'unknown'} RuntimeSdkErrorKind */
 /** @typedef {'connection' | 'session'} RuntimeSdkRecoveryScope */
 /** @typedef {'session' | 'weekly_model' | 'unknown'} RuntimeSdkRateLimitScope */
-
-const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
-const isError =
-    typeof errorCtor.isError === 'function'
-        ? /** @type {(value: unknown) => boolean} */ (errorCtor.isError.bind(Error))
-        : /** @type {(value: unknown) => boolean} */ ((value) => value instanceof Error);
 
 /**
  * @typedef {{
@@ -40,41 +39,6 @@ const isError =
  */
 
 /**
- * @param {unknown} value
- * @returns {string}
- */
-function lower(value) {
-    return typeof value === 'string' ? value.toLowerCase() : '';
-}
-
-/**
- * @param {unknown} error
- * @returns {{ code: string; errorType: string; message: string; status: number | null }}
- */
-function getRuntimeSdkErrorFingerprint(error) {
-    if (isError(error)) {
-        const err = /** @type {Error} */ (error);
-        const raw = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (err));
-        return {
-            code: lower(raw['code']),
-            errorType: lower(raw['errorType'] ?? raw['type']),
-            message: lower(err.message),
-            status: typeof raw['status'] === 'number' ? raw['status'] : null,
-        };
-    }
-    if (typeof error === 'object' && error !== null) {
-        const raw = /** @type {Record<string, unknown>} */ (error);
-        return {
-            code: lower(raw['code']),
-            errorType: lower(raw['errorType'] ?? raw['type']),
-            message: lower(raw['message'] ?? raw['error']),
-            status: typeof raw['status'] === 'number' ? raw['status'] : null,
-        };
-    }
-    return { code: '', errorType: '', message: lower(error), status: null };
-}
-
-/**
  * Diferencia os dois limites públicos do Copilot:
  *
  * - limite de sessão: precisa aguardar reset;
@@ -86,32 +50,7 @@ function getRuntimeSdkErrorFingerprint(error) {
  * @returns {RuntimeSdkRateLimitScope}
  */
 export function classifyRuntimeSdkRateLimitScope(error) {
-    const fp = getRuntimeSdkErrorFingerprint(error);
-    const haystack = `${fp.code} ${fp.errorType} ${fp.message}`;
-
-    if (
-        haystack.includes('weekly') ||
-        haystack.includes('7-day') ||
-        haystack.includes('premium request') ||
-        haystack.includes('premium requests') ||
-        haystack.includes('auto model') ||
-        haystack.includes('model choice') ||
-        haystack.includes('model selection')
-    ) {
-        return 'weekly_model';
-    }
-
-    if (
-        haystack.includes('session limit') ||
-        haystack.includes('wait for your limit to reset') ||
-        haystack.includes('wait until it resets') ||
-        /\breset in \d+/.test(haystack) ||
-        /\breset\s+(?:em|in)\s+\d+/.test(haystack)
-    ) {
-        return 'session';
-    }
-
-    return 'unknown';
+    return classifyCoreSdkRateLimitScope(error);
 }
 
 /**
@@ -119,44 +58,7 @@ export function classifyRuntimeSdkRateLimitScope(error) {
  * @returns {RuntimeSdkErrorKind}
  */
 export function classifyRuntimeSdkError(error) {
-    const fp = getRuntimeSdkErrorFingerprint(error);
-    const haystack = `${fp.code} ${fp.errorType} ${fp.message}`;
-    if (
-        fp.status === 429 ||
-        /\brate[_-]?limit\b/.test(haystack) ||
-        haystack.includes('hit a rate limit') ||
-        haystack.includes('too many requests')
-    ) {
-        return 'rate_limit';
-    }
-    if (
-        haystack.includes('quota') ||
-        haystack.includes('premium request') ||
-        haystack.includes('premium requests') ||
-        haystack.includes('usage limit') ||
-        haystack.includes('limit exceeded')
-    ) {
-        return 'quota_exhausted';
-    }
-    if (
-        haystack.includes('unauthorized') ||
-        haystack.includes('forbidden') ||
-        haystack.includes('authentication') ||
-        haystack.includes('auth')
-    ) {
-        return 'auth';
-    }
-    if (haystack.includes('timeout') || fp.code === 'etimedout' || fp.code === 'time_out') {
-        return 'timeout';
-    }
-    if (
-        ['econnrefused', 'econnreset', 'epipe', 'eai_again', 'err_ipc_channel_closed', 'err_ipc_disconnected'].includes(
-            fp.code,
-        )
-    ) {
-        return 'network';
-    }
-    return 'unknown';
+    return classifyCoreSdkError(error);
 }
 
 /**
@@ -189,6 +91,17 @@ export function getSdkRecoveryPolicy(error, scope = 'connection') {
                 backoffMs: 0,
                 reason: 'quota esgotada exige intervenção externa; reconnect local só piora a UX',
             };
+        case 'account':
+            return {
+                kind,
+                scope,
+                retryable: false,
+                allowReconnect: false,
+                tripCircuit: false,
+                resetCircuit: true,
+                backoffMs: 0,
+                reason: 'estado de conta/cobrança bloqueou o SDK; reconnect local não altera o bloqueio externo',
+            };
         case 'auth':
             return {
                 kind,
@@ -199,6 +112,17 @@ export function getSdkRecoveryPolicy(error, scope = 'connection') {
                 resetCircuit: true,
                 backoffMs: 0,
                 reason: 'falha de autenticação não representa indisponibilidade do transporte',
+            };
+        case 'model_unsupported':
+            return {
+                kind,
+                scope,
+                retryable: false,
+                allowReconnect: false,
+                tripCircuit: false,
+                resetCircuit: true,
+                backoffMs: 0,
+                reason: 'modelo ou capacidade não suportada exige troca de modelo, não reconnect do runtime',
             };
         case 'timeout':
             return {
@@ -251,7 +175,7 @@ export function getSdkRecoveryPolicy(error, scope = 'connection') {
  * @returns {RuntimeSdkRecoveryMessage}
  */
 export function describeSdkRecoveryPolicy(policy, error) {
-    const message = isError(error)
+    const message = error instanceof Error
         ? /** @type {Error} */ (error).message
         : typeof error === 'object' && error !== null
           ? String(/** @type {Record<string, unknown>} */ (error)['message'] ?? error)
@@ -297,6 +221,20 @@ export function describeSdkRecoveryPolicy(policy, error) {
                 detail: 'Quota do SDK esgotada; reconnect automático foi desativado para evitar consumo repetido de PRs.',
                 actionHint:
                     'Aguarde o reset da quota, altere o modelo com /model <id> ou use /model auto e depois /restart.',
+            };
+        case 'account':
+            return {
+                label: '[sdk conta]',
+                headline: message,
+                detail: 'Conta, cobrança ou assinatura bloqueou a chamada do SDK; o runtime local continua saudável.',
+                actionHint: 'Revise autenticação, assinatura/quota da conta e depois use /restart.',
+            };
+        case 'model_unsupported':
+            return {
+                label: '[sdk modelo]',
+                headline: message,
+                detail: 'O modelo ou uma capacidade solicitada não é aceito pelo SDK/provider atual.',
+                actionHint: 'Troque para /model auto ou selecione um modelo compatível com /model <id> e use /restart.',
             };
         case 'timeout':
         case 'network':

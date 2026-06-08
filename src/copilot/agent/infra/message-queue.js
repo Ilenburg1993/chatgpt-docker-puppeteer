@@ -14,7 +14,7 @@
 
 import { MAX_QUEUE_SIZE } from '#copilot/config';
 import { SessionError } from '#copilot/core';
-import { log } from '../ports/index.js';
+import { log } from '../ports/logging/index.js';
 
 // ─── Typedefs ────────────────────────────────────────────────────────────────
 

@@ -32,7 +32,7 @@ import {
     getShowUsage,
     setBusy,
 } from '../../presentation/state/index.js';
-import { renderTerminalAssistantTranscript } from '../events/index.js';
+import { renderTerminalAssistantTranscript } from '../events/transcript/index.js';
 import {
     readTerminalDialogStreamMeta,
     readTerminalRuntimeControlState,
@@ -69,10 +69,12 @@ import {
     TERMINAL_BYOK_ADMISSION_MODE_ENV,
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
+} from '../byok/policy/index.js';
+import {
     describeTerminalByokGatewayAutoEffect,
     runTerminalByokGatewayPostTurnAutomation,
     runTerminalByokGatewayPreTurnAutomation,
-} from '../byok/index.js';
+} from '../byok/gateway/index.js';
 import {
     classifyByokProviderFailure,
     readModelGatewayRuntimeAutomationEffectivePolicy,

@@ -35,6 +35,38 @@ function classifySecretRefs(refs) {
 }
 
 /**
+ * @param {string} providerId
+ * @param {ReturnType<typeof readConfiguredByokState>} state
+ * @returns {Record<string, unknown>}
+ */
+function buildEnvCompatModelRouting(providerId, state) {
+    const base = {
+        tier: 'balanced',
+        useCases: [],
+        ...(state.summary.wireApi ? { wireApi: state.summary.wireApi } : {}),
+    };
+    if (providerId === 'ollama-local') {
+        return {
+            ...base,
+            routeLayer: 'local_daemon',
+            wireApi: 'openai_compatible',
+            runtimeKind: 'local',
+            localPrivate: true,
+        };
+    }
+    if (providerId === 'ollama-cloud') {
+        return {
+            ...base,
+            routeLayer: 'direct_provider',
+            wireApi: 'openai_compatible',
+            runtimeKind: 'cloud',
+            localPrivate: false,
+        };
+    }
+    return base;
+}
+
+/**
  * @param {unknown} modelInfo
  * @param {string} providerId
  * @param {ReturnType<typeof readConfiguredByokState>} state
@@ -79,6 +111,7 @@ function modelInfoToRecord(modelInfo, providerId, state) {
             inputUsdPerMillion: byok.pricing?.prompt ?? undefined,
             outputUsdPerMillion: byok.pricing?.completion ?? undefined,
         },
+        routing: buildEnvCompatModelRouting(providerId, state),
         verification: {
             confidence: byok.source === 'remote' ? 'catalog' : 'static_seed',
             sources: [byok.source === 'remote' ? 'provider_catalog' : 'env_compat'],

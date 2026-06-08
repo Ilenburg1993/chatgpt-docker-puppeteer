@@ -11,7 +11,7 @@
 import { channel } from 'node:diagnostics_channel';
 import { relative } from 'node:path';
 import { getShowToolActivity } from '../../presentation/state/index.js';
-import { println } from '../dialog/index.js';
+import { println } from '../dialog/io/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     recordTerminalActivity,

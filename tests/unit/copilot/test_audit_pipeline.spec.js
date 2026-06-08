@@ -125,6 +125,37 @@ describe('audit/pipeline › createAuditLog', () => {
         const entries = log.getEntries();
         expect(entries.some((e) => /** @type {any} */ (e).data?.toolName === 'read')).toBe(true);
     });
+
+    it('redige segredos em getEntries/getLast e entradas tool.executed', () => {
+        const githubToken = 'ghs_abcdefghijklmnopqrstuvwxyz1234567890';
+        const byokToken = 'sk-testsecret1234567890';
+
+        auditLog.record({
+            type: 'auth',
+            sessionId: githubToken,
+            data: {
+                gitHubToken: githubToken,
+                headers: { Authorization: `Bearer ${byokToken}` },
+                tokens: 42,
+            },
+        });
+        auditLog.recordToolStart({
+            toolCallId: 'tool-secret',
+            toolName: `shell_${byokToken}`,
+            args: { command: `echo ${githubToken}` },
+        });
+        auditLog.recordToolComplete({
+            toolCallId: 'tool-secret',
+            success: false,
+            resultContent: `Authorization: Bearer ${byokToken}`,
+        });
+
+        const serialized = JSON.stringify({ entries: auditLog.getEntries(), last: auditLog.getLast(10) });
+        expect(serialized).not.toContain(githubToken);
+        expect(serialized).not.toContain(byokToken);
+        expect(serialized).toContain('[redacted]');
+        expect(auditLog.getEntries()[0]?.data?.['tokens']).toBe(42);
+    });
 });
 
 // ─── Part 3: isHighRiskTool ──────────────────────────────────────────────────

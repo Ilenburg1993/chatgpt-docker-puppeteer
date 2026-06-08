@@ -160,6 +160,7 @@ vi.mock('#copilot/sdk/tools', async (importOriginal) => ({
         Object.assign(_toolsState.current, patch);
     },
     loadToolsConfigAsync: vi.fn(async () => ({ ..._toolsState.current })),
+    SYSTEM_MESSAGE_SECTIONS: {},
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 

@@ -38,8 +38,11 @@ import {
     HOOK_SESSION_END,
     HOOK_SESSION_START,
 } from '../../../events/index.js';
-import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../../facades/index.js';
-import { ERROR_TRACKER, getDefaultHookBus, log, runCopilotSdkBootPreflight } from '../../ports/index.js';
+import { checkAgentSdkAuthStatus, createAgentSdkClient } from '../../facades/sdk-access.js';
+import { ERROR_TRACKER } from '../../ports/error-tracking-port.js';
+import { getDefaultHookBus } from '../../ports/hook-port.js';
+import { log } from '../../ports/logging/index.js';
+import { runCopilotSdkBootPreflight } from '../../ports/sdk-preflight-port.js';
 import { getAgent } from '../../singleton/index.js';
 import {
     discoverRuntimePlugins,

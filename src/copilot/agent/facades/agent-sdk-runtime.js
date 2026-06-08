@@ -64,17 +64,17 @@ export function onAllAgentSdkSessionEvents(session, handler) {
 }
 
 /**
- * Expõe de forma canônica se a sessão SDK ativa suporta leitura de histórico (`getMessages`).
+ * Expõe de forma canônica se a sessão SDK ativa suporta leitura de histórico (`getEvents`).
  *
- * Regra arquitetural: módulos de `agent/session/*` não devem sondar `session.getMessages` diretamente; a capacidade
+ * Regra arquitetural: módulos de `agent/session/*` não devem sondar `session.getEvents` diretamente; a capacidade
  * vanilla deve ser consultada por uma façade do runtime.
  *
  * @param {import('#copilot/sdk/types').CopilotSession} session
  * @returns {boolean}
  */
 export function canReadAgentSdkSessionMessages(session) {
-    const candidate = /** @type {{ getMessages?: unknown } | null} */ (/** @type {unknown} */ (session));
-    return typeof candidate?.getMessages === 'function';
+    const candidate = /** @type {{ getEvents?: unknown } | null} */ (/** @type {unknown} */ (session));
+    return typeof candidate?.getEvents === 'function';
 }
 
 /**

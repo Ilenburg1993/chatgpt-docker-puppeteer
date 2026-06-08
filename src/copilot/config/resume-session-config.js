@@ -51,6 +51,9 @@ export class ResumeSessionConfigBuilder {
     /** @type {boolean | undefined} */
     #suppressResumeEvent;
 
+    /** @type {ResumeSessionConfig['openCanvases']} */
+    #openCanvases;
+
     /** @param {string} name @returns {this} */
     clientName(name) {
         this.#base.clientName(name);
@@ -111,13 +114,13 @@ export class ResumeSessionConfigBuilder {
         return this;
     }
 
-    /** @param {string[]} names @returns {this} */
+    /** @param {NonNullable<ResumeSessionConfig['availableTools']>} names @returns {this} */
     availableTools(names) {
         this.#base.availableTools(names);
         return this;
     }
 
-    /** @param {string[]} names @returns {this} */
+    /** @param {NonNullable<ResumeSessionConfig['excludedTools']>} names @returns {this} */
     excludedTools(names) {
         this.#base.excludedTools(names);
         return this;
@@ -254,16 +257,25 @@ export class ResumeSessionConfigBuilder {
         return this;
     }
 
+    /** @param {NonNullable<ResumeSessionConfig['openCanvases']>} canvases @returns {this} */
+    openCanvases(canvases) {
+        this.#openCanvases = canvases;
+        return this;
+    }
+
     /**
      * @param {Partial<ResumeSessionConfig> & { disableResume?: boolean }} partial
      * @returns {this}
      */
     merge(partial) {
         const normalized = sanitizeResumeSessionConfig(partial);
-        const { suppressResumeEvent, ...resumeConfig } = normalized;
+        const { openCanvases, suppressResumeEvent, ...resumeConfig } = normalized;
         this.#base.merge(/** @type {any} */ (resumeConfig));
         if (suppressResumeEvent !== undefined) {
             this.#suppressResumeEvent = suppressResumeEvent;
+        }
+        if (openCanvases !== undefined) {
+            this.#openCanvases = openCanvases;
         }
         return this;
     }
@@ -275,6 +287,7 @@ export class ResumeSessionConfigBuilder {
             ...(this.#suppressResumeEvent !== undefined
                 ? { suppressResumeEvent: this.#suppressResumeEvent }
                 : {}),
+            ...(this.#openCanvases !== undefined ? { openCanvases: this.#openCanvases } : {}),
         });
     }
 

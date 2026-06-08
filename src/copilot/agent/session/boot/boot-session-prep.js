@@ -5,7 +5,8 @@
  */
 
 import { EMITTER_SESSION_CLEANUP } from '#copilot/events';
-import { defaultEventCollector, defaultMetrics } from '../../ports/index.js';
+import { defaultEventCollector } from '../../ports/event-observer-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
 import { cleanupStaleSessionsWithPolicy } from '../lifecycle/index.js';
 import { wireSessionEvents } from '../wiring/index.js';
 

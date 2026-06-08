@@ -14,7 +14,7 @@ import { dirname, join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretText } from '../../core/security/redaction.js';
 import { sanitizeTerminalExternalToolText } from '../capabilities/index.js';
-import { formatTerminalToolPathForOperator } from '../events/tool-activity-presenter.js';
+import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 import { readTerminalTimelineProjection } from '../frontend/index.js';
 import { formatTerminalIsoTimestamp, terminalThemeRow } from '../state/index.js';
 

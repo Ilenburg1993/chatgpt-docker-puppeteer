@@ -3,13 +3,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const recordToolCall = vi.fn();
+const getShowIntentActivity = vi.fn(() => true);
+const getShowSessionActivity = vi.fn(() => true);
+const getShowStreaming = vi.fn(() => true);
 const getShowToolActivity = vi.fn(() => true);
+const getShowThinking = vi.fn(() => true);
+const getShowUsage = vi.fn(() => true);
 const broadcastSse = vi.fn();
 const clearInlineStatus = vi.fn();
 const parkTerminalPromptForContinuation = vi.fn();
 const println = vi.fn();
 const writeInlineStatus = vi.fn();
 const readTerminalRuntimeState = vi.fn(() => ({ status: 'idle', pendingQuestionKind: null }));
+const setShowIntentActivity = vi.fn();
+const setShowSessionActivity = vi.fn();
+const setShowStreaming = vi.fn();
+const setShowThinking = vi.fn();
+const setShowToolActivity = vi.fn();
+const setShowUsage = vi.fn();
 const completeTerminalTurnToolCall = vi.fn();
 const recordTerminalActivity = vi.fn();
 const recordTerminalToolLifecycleDiagnostic = vi.fn();
@@ -22,10 +33,29 @@ vi.mock('../../../../src/copilot/observability/index.js', () => ({
 }));
 
 vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
+    getShowIntentActivity,
+    getShowSessionActivity,
+    getShowStreaming,
+    getShowThinking,
     getShowToolActivity,
+    getShowUsage,
+    setShowIntentActivity,
+    setShowSessionActivity,
+    setShowStreaming,
+    setShowThinking,
+    setShowToolActivity,
+    setShowUsage,
 }));
 
 vi.mock('../../../../src/copilot/terminal/dialog/index.js', () => ({
+    broadcastSse,
+    clearInlineStatus,
+    parkTerminalPromptForContinuation,
+    println,
+    writeInlineStatus,
+}));
+
+vi.mock('../../../../src/copilot/terminal/dialog/io/index.js', () => ({
     broadcastSse,
     clearInlineStatus,
     parkTerminalPromptForContinuation,
@@ -65,7 +95,12 @@ vi.mock('../../../../src/copilot/terminal/state/events/index.js', async (importO
 describe('terminal/tool-lifecycle-runtime', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getShowIntentActivity.mockReturnValue(true);
+        getShowSessionActivity.mockReturnValue(true);
+        getShowStreaming.mockReturnValue(true);
+        getShowThinking.mockReturnValue(true);
         getShowToolActivity.mockReturnValue(true);
+        getShowUsage.mockReturnValue(true);
         readTerminalRuntimeState.mockReturnValue({ status: 'idle', pendingQuestionKind: null });
     });
 
@@ -277,6 +312,39 @@ describe('terminal/tool-lifecycle-runtime', () => {
         );
         expect(println).toHaveBeenCalledWith(expect.stringContaining('git status --short'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('chatcmpl-tool-json-exec'));
+    });
+
+    it('redige secrets em partial result antes de emitir tool.lifecycle', async () => {
+        const { createToolCallRegistry } = await import(
+            '../../../../src/copilot/terminal/state/tool-call-registry.js'
+        );
+        const { handleTerminalNativeToolPartialResult } = await import(
+            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
+        );
+
+        const registry = createToolCallRegistry();
+        const secret = 'sk-supersecret1234567890';
+
+        handleTerminalNativeToolPartialResult({
+            registry,
+            evt: {
+                toolCallId: 'chatcmpl-tool-partial-secret',
+                toolName: 'exec_command',
+                partialOutput: `api_key=${secret}\nAuthorization: Bearer ${secret}`,
+            },
+        });
+
+        const lifecycleCall = broadcastSse.mock.calls.find(([event]) => event === 'tool.lifecycle');
+        const serializedPayload = JSON.stringify(lifecycleCall?.[1]);
+
+        expect(lifecycleCall?.[1]).toEqual(
+            expect.objectContaining({
+                type: 'partial_result',
+                partialOutput: expect.stringContaining('api_key=[redacted]'),
+            }),
+        );
+        expect(serializedPayload).toContain('Bearer [redacted]');
+        expect(serializedPayload).not.toContain(secret);
     });
 
     it('reconcilia postToolUse com exitCode não zero como falha visual da tool', async () => {

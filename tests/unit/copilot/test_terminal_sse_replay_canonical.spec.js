@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getSseClients, getTerminalReplayBuffer } from '../../../src/copilot/infra/sse/state.js';
@@ -105,6 +105,51 @@ describe('terminal SSE replay canonical', () => {
             });
             expect(byTool.entries).toHaveLength(1);
             expect(byTool.entries[0]?.eventId).toBe(eventId + 1);
+
+            const secret = 'sk-supersecret1234567890';
+            recordTerminalSseEventArchive({
+                event: 'unit.secret',
+                eventId: eventId + 2,
+                data: {
+                    source: 'unit',
+                    requestId: 'req-secret',
+                    detail: `api_key=${secret}`,
+                    headers: { authorization: `Bearer ${secret}` },
+                    nested: { token: secret },
+                },
+            });
+            const secretTail = await readTerminalSseEventArchiveTail({ event: 'unit.secret', limit: 1 });
+            const serializedTail = JSON.stringify(secretTail.entries);
+            const rawArchive = await readFile(String(readTerminalSseEventArchiveState().path), 'utf8');
+
+            expect(secretTail.entries).toHaveLength(1);
+            expect(serializedTail).not.toContain(secret);
+            expect(rawArchive).not.toContain(secret);
+            expect(serializedTail).toContain('api_key=[redacted]');
+            expect(rawArchive).toContain('api_key=[redacted]');
+
+            const secretWrites = /** @type {string[]} */ ([]);
+            const secretClient = createRawClient(secretWrites);
+            const beforeSecretBroadcast = getTerminalReplayBuffer().lastId;
+            clients.add(secretClient);
+            try {
+                broadcastSse('unit.secret.broadcast', {
+                    detail: `api_key=${secret}`,
+                    headers: { authorization: `Bearer ${secret}` },
+                });
+                await nextImmediate();
+            } finally {
+                clients.delete(secretClient);
+            }
+
+            const replayPayload = JSON.stringify(getTerminalReplayBuffer().getAfter(beforeSecretBroadcast));
+            const rawSsePayload = secretWrites.join('\n');
+
+            expect(getTerminalReplayBuffer().lastId).toBe(beforeSecretBroadcast + 1);
+            expect(rawSsePayload).not.toContain(secret);
+            expect(replayPayload).not.toContain(secret);
+            expect(rawSsePayload).toContain('api_key=[redacted]');
+            expect(replayPayload).toContain('api_key=[redacted]');
         } finally {
             resetTerminalSseEventArchiveForTests();
             if (previousArchiveDir === undefined) {

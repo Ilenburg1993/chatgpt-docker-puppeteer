@@ -17,7 +17,7 @@
 
 import { recordToolCall } from '#copilot/observability';
 import { getShowToolActivity } from '../../presentation/state/index.js';
-import { broadcastSse, clearInlineStatus, parkTerminalPromptForContinuation, println, writeInlineStatus } from '../dialog/index.js';
+import { broadcastSse, clearInlineStatus, parkTerminalPromptForContinuation, println, writeInlineStatus } from '../dialog/io/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     completeTerminalTurnToolCall,

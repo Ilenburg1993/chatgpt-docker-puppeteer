@@ -171,7 +171,7 @@ describe('F166 — Auditoria de zero-bypass SDK em src/copilot/', () => {
 
     it('boot-wiring.js usa fachada sdk-access para quota monitor (sem bypass)', () => {
         const src = read('src/copilot/agent/session/boot/boot-wiring.js');
-        expect(src).toContain("from '../../facades/index.js'");
+        expect(src).toContain("from '../../facades/sdk-access.js'");
         expect(src).toContain('startAgentSdkBootQuotaBridge');
         expect(src).not.toContain("from '#copilot/sdk'");
     });

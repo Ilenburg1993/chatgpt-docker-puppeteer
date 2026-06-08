@@ -75,6 +75,7 @@ vi.mock('#copilot/observability/otel', () => ({
 
 vi.mock('#copilot/sdk/event-helpers', () => ({
     waitForEvent: vi.fn(),
+    SYSTEM_MESSAGE_SECTIONS: {},
     SYSTEM_PROMPT_SECTIONS: {},
 }));
 

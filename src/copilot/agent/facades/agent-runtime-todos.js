@@ -4,7 +4,7 @@
  * @file Façade agent-level para projections da capacidade TODO.
  */
 
-import { listActiveTodoSummaries } from '../ports/index.js';
+import { listActiveTodoSummaries } from '../ports/todo-port.js';
 
 /**
  * @param {{ limit?: number }} [input]

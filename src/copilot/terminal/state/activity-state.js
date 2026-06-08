@@ -7,6 +7,7 @@
  */
 
 import { EventEmitter } from 'node:events';
+import { redactSecretText } from '#copilot/core';
 
 const MAX_ACTIVITY_HISTORY = 100;
 const FOCUSED_ACTIVITY_MAX_AGE_MS = 10 * 60_000;
@@ -86,6 +87,14 @@ let _activityHistory = [];
 function normalizeProgress(value) {
     if (typeof value !== 'number' || !Number.isFinite(value)) return null;
     return Math.max(0, Math.min(100, value));
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {string | null}
+ */
+function redactActivityText(value) {
+    return typeof value === 'string' ? redactSecretText(value) : null;
 }
 
 /**
@@ -212,18 +221,19 @@ function readFocusedActivity() {
  */
 export function recordTerminalActivity(phase, label, opts = {}) {
     const timestamp = opts.timestamp ?? Date.now();
-    const source = opts.source ?? 'terminal';
-    const detail = opts.detail ?? null;
+    const source = redactSecretText(opts.source ?? 'terminal');
+    const detail = redactActivityText(opts.detail);
     const severity = opts.severity ?? 'info';
     const progress = normalizeProgress(opts.progress ?? null);
-    const toolName = opts.toolName ?? null;
-    const toolTarget = opts.toolTarget ?? null;
+    const toolName = redactActivityText(opts.toolName);
+    const toolTarget = redactActivityText(opts.toolTarget);
+    const safeLabel = redactSecretText(label);
     const recordHistory = opts.recordHistory !== false;
     const updateCurrent = opts.updateCurrent !== false;
     const focusMode = opts.focusMode ?? 'foreground';
     const keepStart =
         _currentActivity.phase === phase &&
-        _currentActivity.label === label &&
+        _currentActivity.label === safeLabel &&
         _currentActivity.source === source &&
         _currentActivity.toolName === toolName &&
         _currentActivity.toolTarget === toolTarget;
@@ -244,7 +254,7 @@ export function recordTerminalActivity(phase, label, opts = {}) {
 
     const next = withAge({
         phase,
-        label,
+        label: safeLabel,
         detail,
         source,
         severity,

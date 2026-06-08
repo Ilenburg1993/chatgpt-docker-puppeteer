@@ -9,8 +9,11 @@
  */
 
 import { SESSION_EVENTS as SE } from '#copilot/events';
-import { normalizePermissionCompletedEvent, normalizePermissionRequestedEvent } from '#copilot/sdk/session';
-import { onSessionEvent } from '#copilot/sdk/session';
+import {
+    normalizePermissionCompletedEvent,
+    normalizePermissionRequestedEvent,
+    onSessionEvent,
+} from '#copilot/events/sdk-events';
 import { log } from '../logger.js';
 
 /** @typedef {import('./context.js').CollectorContext} CollectorContext */

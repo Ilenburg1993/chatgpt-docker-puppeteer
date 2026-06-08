@@ -13,7 +13,7 @@ import {
     compactTerminalOperatorToolText,
     formatTerminalToolPathForOperator,
     humanizeTerminalToolSurfaceText,
-} from '../events/tool-activity-presenter.js';
+} from '../events/presenters/tools/index.js';
 import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -29,6 +29,15 @@ import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js
 function yesNoPt(value) {
     if (typeof value !== 'boolean') return 'n/d';
     return value ? 'sim' : 'não';
+}
+
+/**
+ * @param {string} label
+ * @param {number | null} value
+ * @returns {string}
+ */
+function renderMetricDuration(label, value) {
+    return `${label} ${typeof value === 'number' && Number.isFinite(value) ? `${value}ms` : 'n/d'}`;
 }
 
 /**
@@ -413,7 +422,18 @@ export function cmdMetrics({ println }, arg = '') {
     println(terminalThemeRow('Transporte', latestInjectTransport, { role: 'muted' }));
     println(terminalThemeRow('Prompt', detail ? `${latestInjectPrompt} · ${latestInjectFreshness}` : humanMetricPromptState(latestInjectFreshness), { role: 'muted' }));
     println(terminalThemeRow('Motivo', latestInjectReason, { role: 'muted' }));
-    println(terminalThemeRow('Fases', `checagem ${latestInjectPreflightMs ?? '-'}ms · contexto ${latestInjectContextMs ?? '-'}ms · anexos ${latestInjectAttachmentsMs ?? '-'}ms · diálogo ${latestInjectDialogMs ?? '-'}ms`, { role: 'muted' }));
+    println(
+        terminalThemeRow(
+            'Fases',
+            [
+                renderMetricDuration('checagem', latestInjectPreflightMs),
+                renderMetricDuration('contexto', latestInjectContextMs),
+                renderMetricDuration('anexos', latestInjectAttachmentsMs),
+                renderMetricDuration('diálogo', latestInjectDialogMs),
+            ].join(' · '),
+            { role: 'muted' },
+        ),
+    );
     println(terminalThemeRow('Retomada', `auto-início ${yesNoPt(latestInjectAutoStart)} · recuperação ${yesNoPt(latestInjectRecovery)}`, { role: 'muted' }));
     println(terminalThemeDivider(52));
 }

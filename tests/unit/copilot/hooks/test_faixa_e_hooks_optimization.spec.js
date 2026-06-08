@@ -26,9 +26,11 @@ vi.mock('#copilot/audit/pipeline', () => ({
 
 vi.mock(
     '#copilot/config/env',
-    () =>
-        new Proxy(
+    async (importOriginal) => {
+        const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+        return new Proxy(
             {
+                ...actual,
                 COPILOT_MCP_SERVERS: '',
                 COPILOT_CUSTOM_AGENTS: '',
                 COPILOT_DISABLED_AGENTS: '',
@@ -44,6 +46,8 @@ vi.mock(
                 SSE_REPLAY_BUFFER_SIZE: 100,
                 SSE_MAX_CONCURRENT: 10,
                 LLM_B_DIALOG_QUEUE_MAX: 50,
+                LLM_B_BOOT_TIMEOUT_MS: 1000,
+                LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK: false,
                 TERMINAL_MAX_INJECT_HISTORY: 20,
                 TERMINAL_MAX_LISTENERS: 50,
                 TERMINAL_MAX_ATTACHMENTS: 10,
@@ -56,7 +60,8 @@ vi.mock(
                     return Reflect.get(target, prop);
                 },
             },
-        ),
+        );
+    },
 );
 
 vi.mock('#copilot/sdk/models', () => ({

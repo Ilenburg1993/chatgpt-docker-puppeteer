@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 // ─── Mocks genéricos para dependências pesadas ──────────────────────────
 
 vi.mock('@github/copilot-sdk', () => ({
+    SYSTEM_MESSAGE_SECTIONS: Object.freeze({ identity: 'identity' }),
     SYSTEM_PROMPT_SECTIONS: Object.freeze({ identity: 'identity' }),
     CopilotClient: vi.fn(),
     defineTool: vi.fn(() => ({ name: 'mock-tool', description: 'mock', schema: {}, handler: async () => ({}) })),
@@ -168,6 +169,7 @@ describe('FI-7 — deep-import guard (Faixa I enforcement)', () => {
         '#copilot/config/custom-tools-registry',
         '#copilot/config/tools-state',
         '#copilot/observability/logger',
+        '#copilot/tools/observability',
     ]);
 
     /** Arquivos com exceção explícita (usa alias intencional) */

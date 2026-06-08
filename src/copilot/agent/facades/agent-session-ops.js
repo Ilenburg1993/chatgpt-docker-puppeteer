@@ -11,7 +11,7 @@
 
 import { logSwallowed, toError } from '#copilot/core';
 import { logSessionTimeline, sendSession } from '#copilot/sdk/session-runtime';
-import { log } from '../ports/index.js';
+import { log } from '../ports/logging/index.js';
 
 /**
  * Aborta a mensagem SDK em processamento na sessão atual.

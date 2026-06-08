@@ -8,7 +8,7 @@
 import { CONTEXT_UTIL_WARN_THRESHOLD } from '#copilot/config';
 import { SESSION_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { onSessionEvent } from '#copilot/sdk/session';
+import { onSessionEvent } from '#copilot/events/sdk-events';
 
 /**
  * @param {{ currentTokens: number; tokenLimit: number }} usageData

@@ -11,7 +11,7 @@
  * @internal
  */
 
-import { CONVERSATION_STORE } from '#copilot/conversation-hub';
+import { CONVERSATION_STORE } from '../../conversation-hub/di-tokens.js';
 
 /**
  * Resolve o store conversacional via DI sem expor o token para módulos de lifecycle/session.

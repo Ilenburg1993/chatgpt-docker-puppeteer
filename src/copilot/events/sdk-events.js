@@ -12,4 +12,20 @@
  */
 
 export { SESSION_EVENTS } from '../sdk/constants.js';
-export { ALL_EVENT_TYPES, onSessionEvent, onSessionEvents } from '#copilot/sdk/session';
+export {
+    ALL_EVENT_TYPES,
+    getSessionCapabilities,
+    normalizeElicitationCompletedEvent,
+    normalizeElicitationPendingEvent,
+    normalizeModeChangedEvent,
+    normalizeModelChangedEvent,
+    normalizePermissionCompletedEvent,
+    normalizePermissionRequestedEvent,
+    normalizePlanChangedEvent,
+    normalizeToolsUpdatedEvent,
+    normalizeUserInputCompletedEvent,
+    normalizeUserInputRequestedEvent,
+    onAllSessionEvents,
+    onSessionEvent,
+    onSessionEvents,
+} from '#copilot/sdk/session';

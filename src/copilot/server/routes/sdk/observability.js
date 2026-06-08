@@ -20,7 +20,7 @@
  * @see EventBus
  */
 
-import { decideSdkFsRouting, hasCanonicalLocalFsTools } from '#copilot/core';
+import { decideSdkFsRouting, hasCanonicalLocalFsTools, redactSecretRecord } from '#copilot/core';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/io';
 import { Router } from 'express';
 import { logSwallowed } from '../../../core/error-handlers.js';
@@ -68,6 +68,18 @@ function resolveObservabilityRouterDeps(binding, req) {
  */
 function buildObservabilityRuntimeMeta(routeDeps) {
     return routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps);
+}
+
+/**
+ * Defesa de borda: observability agrega dados de muitos subsistemas. Mesmo que a origem já tenha redaction própria, a
+ * resposta HTTP também sanitiza payloads para cobrir mocks, buffers legados e dependências customizadas.
+ *
+ * @template {Record<string, unknown>} T
+ * @param {T} payload
+ * @returns {T}
+ */
+function redactObservabilityPayload(payload) {
+    return /** @type {T} */ (redactSecretRecord(payload));
 }
 
 /**
@@ -311,14 +323,14 @@ export default function createObservabilityRouter(deps) {
                 for (const [k, v] of Object.entries(summary.counters)) {
                     if (k.startsWith(prefix)) filtered[k] = v;
                 }
-                return res.json({
+                return res.json(redactObservabilityPayload({
                     ok: true,
                     ...buildObservabilityRuntimeMeta(routeDeps),
                     ...summary,
                     counters: filtered,
-                });
+                }));
             }
-            return res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), ...summary });
+            return res.json(redactObservabilityPayload({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), ...summary }));
         }),
     );
 
@@ -348,7 +360,7 @@ export default function createObservabilityRouter(deps) {
                           ...(limit !== undefined ? { limit } : {}),
                       })
                     : null;
-            return res.json({
+            return res.json(redactObservabilityPayload({
                 ok: true,
                 ...buildObservabilityRuntimeMeta(routeDeps),
                 convergence: {
@@ -361,7 +373,7 @@ export default function createObservabilityRouter(deps) {
                         Object.entries(gauges).filter(([key]) => key.startsWith('sdk.operation.workspace.')),
                     ),
                 },
-            });
+            }));
         }),
     );
 
@@ -378,13 +390,13 @@ export default function createObservabilityRouter(deps) {
             const { sdkObservability } = routeDeps;
             const { snapshots, ts } = sdkObservability.getLastQuotaSnapshots();
             const hasData = Object.keys(snapshots).length > 0;
-            res.json({
+            res.json(redactObservabilityPayload({
                 ok: true,
                 ...buildObservabilityRuntimeMeta(routeDeps),
                 quotaSnapshots: snapshots,
                 lastUpdated: ts || null,
                 hasData,
-            });
+            }));
         }),
     );
 
@@ -397,7 +409,7 @@ export default function createObservabilityRouter(deps) {
             const n = Math.min(Number(req.query['n']) || 20, 100);
             const source = typeof req.query['source'] === 'string' ? req.query['source'] : undefined;
             const errors = sdkObservability.defaultErrorTracker.getErrors(n, source);
-            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), errors, count: errors.length });
+            res.json(redactObservabilityPayload({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), errors, count: errors.length }));
         }),
     );
 
@@ -407,11 +419,11 @@ export default function createObservabilityRouter(deps) {
         withErrorHandler(req, res, async () => {
             const routeDeps = resolveObservabilityRouterDeps(deps, req);
             const { sdkObservability } = routeDeps;
-            res.json({
+            res.json(redactObservabilityPayload({
                 ok: true,
                 ...buildObservabilityRuntimeMeta(routeDeps),
                 ...sdkObservability.defaultErrorTracker.getStats(),
-            });
+            }));
         }),
     );
 
@@ -424,7 +436,7 @@ export default function createObservabilityRouter(deps) {
             const n = Math.min(Number(req.query['n']) || 50, 200);
             const level = typeof req.query['level'] === 'string' ? req.query['level'].toUpperCase() : undefined;
             const entries = sdkObservability.getRecentLogs(n, level);
-            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length });
+            res.json(redactObservabilityPayload({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length }));
         }),
     );
 
@@ -475,7 +487,7 @@ export default function createObservabilityRouter(deps) {
             if (type) {
                 entries = entries.filter((e) => e.type === type);
             }
-            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length });
+            res.json(redactObservabilityPayload({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length }));
         }),
     );
 
@@ -512,7 +524,7 @@ export default function createObservabilityRouter(deps) {
                     return record?.data?.toolName === tool;
                 });
             }
-            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length });
+            res.json(redactObservabilityPayload({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length }));
         }),
     );
 
@@ -522,14 +534,14 @@ export default function createObservabilityRouter(deps) {
         void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
             const routeDeps = resolveObservabilityRouterDeps(deps, /** @type {Req} */ (_req));
             const { sdkObservability } = routeDeps;
-            res.json({
+            res.json(redactObservabilityPayload({
                 ok: true,
                 ...buildObservabilityRuntimeMeta(routeDeps),
                 enabled: sdkObservability.isOtelEnabled(),
                 endpoint: sdkObservability.otelExporterOtlpEndpoint ?? null,
                 traceFile: sdkObservability.defaultOtelFile,
                 spanTypes: ['session.boot'],
-            });
+            }));
         });
     });
 
@@ -539,7 +551,7 @@ export default function createObservabilityRouter(deps) {
         void withErrorHandler(/** @type {Req} */ (_req), res, async () => {
             const routeDeps = resolveObservabilityRouterDeps(deps, /** @type {Req} */ (_req));
             const { sdkObservability } = routeDeps;
-            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), catalog: sdkObservability.getCatalog() });
+            res.json(redactObservabilityPayload({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), catalog: sdkObservability.getCatalog() }));
         });
     });
 
@@ -551,7 +563,7 @@ export default function createObservabilityRouter(deps) {
             const { sdkObservability } = routeDeps;
             const limit = Math.min(Number(req.query['limit']) || 50, 200);
             const entries = sdkObservability.getDeadLetters(limit);
-            res.json({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length });
+            res.json(redactObservabilityPayload({ ok: true, ...buildObservabilityRuntimeMeta(routeDeps), entries, count: entries.length }));
         });
     });
 

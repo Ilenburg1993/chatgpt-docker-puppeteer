@@ -42,7 +42,7 @@ import {
     METRICS_STORE,
     readAgentMcpCapabilitySnapshot,
     withAgentRuntimeToolPolicy,
-} from '../../ports/index.js';
+} from '../../ports/session-setup/index.js';
 
 import { DialogProtocol } from '#copilot/dialog';
 import { handleUserInputRequest } from '../../dialog/wiring/index.js';
@@ -50,7 +50,7 @@ import {
     createAgentSdkToolsRegistry,
     getAgentSdkToolsConfig,
     readAgentSdkModelRegistryEntry,
-} from '../../facades/index.js';
+} from '../../facades/sdk-access.js';
 import { buildTerminalSdkCommandDefinitions } from '../../session/commands/index.js';
 
 /**

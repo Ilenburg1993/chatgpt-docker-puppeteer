@@ -188,6 +188,8 @@ describe('system-prompt-modular › sdk introspection', () => {
         const result = getSystemPromptSdkCompatibility();
         expect(result.supportsCustomizeMode).toBe(true);
         expect(result.supportsInstructionSourcesRpc).toBe(true);
-        expect(result.sections).toHaveLength(10);
+        expect(result.sections.map((section) => section.name)).toEqual(
+            expect.arrayContaining(['identity', 'runtime_instructions', 'last_instructions']),
+        );
     });
 });

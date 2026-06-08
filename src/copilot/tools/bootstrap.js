@@ -16,8 +16,9 @@
  * @see module:copilot/sdk/tools-registry
  */
 
-import { log, wrapWithStats } from '#copilot/observability';
 import { buildCustomTools, getAllTools as getRegistryTools, registerTools } from '#copilot/sdk/tools';
+import { log } from '../observability/logger.js';
+import { wrapWithStats } from '../observability/tool-stats.js';
 import { codeTools } from './code/index.js';
 import { fileReadTools, fileWriteTools, indexTools, scopeTools } from './file/index.js';
 import { searchTools } from './search/index.js';

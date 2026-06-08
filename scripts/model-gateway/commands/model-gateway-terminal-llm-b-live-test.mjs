@@ -473,12 +473,15 @@ function buildNoPrProbeCommands() {
     return [
         '/usage now',
         '/activity 20',
+        '/session sdk 6',
         '/session sdk commands',
         '/session sdk events 20',
         '/session sdk waits 20',
         '/metrics',
         '/events 20',
         '/events 20 --raw',
+        '/events 20 --json compact',
+        '/events sources',
         '/errors 10',
         '/quit',
     ];
@@ -2350,7 +2353,7 @@ function diagnosticUxCycleCriteria(boot) {
             id: 'diagnostic-ux-session-sdk-events-human',
             pass:
                 /Eventos SDK da sessão[\s\S]*(Evento|Resultado)/iu.test(sdkEventsSurface) &&
-                (/nenhum ciclo de vida SDK ou comando SDK arquivado ainda/iu.test(sdkEventsSurface) ||
+                (/nenhum ciclo de vida SDK ou comando SDK arquivado nesta janela/iu.test(sdkEventsSurface) ||
                     (hasIsoSeconds(sdkEventsSurface) && hasRelativeAge(sdkEventsSurface))) &&
                 !/#\d+|agent\/sdk|sdk\.lifecycle|session deleted|sessão sessão|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     sdkEventsSurface,
@@ -2374,6 +2377,9 @@ function diagnosticUxCycleCriteria(boot) {
                 /Sessão SDK[\s\S]*(Sessões SDK listadas|nenhuma sessão SDK listada)/iu.test(sdkInventorySurface) &&
                 /Última usada|Primeiro plano/iu.test(sdkInventorySurface) &&
                 /Vínculo SDK/iu.test(sdkInventorySurface) &&
+                /CommandDefinitions\s+\d+ CommandDefinitions expostos[\s\S]*(?:nenhum comando chamado nesta janela|chamadas? na janela)/iu.test(
+                    sdkInventorySurface,
+                ) &&
                 /Comandos[\s\S]*\/session sdk controla sessões SDK[\s\S]*\/restart reinicia só a conversa[\s\S]*Próximo boot[\s\S]*\/session sdk next new[\s\S]*Filtros[\s\S]*offset=<n>/iu.test(
                     sdkInventorySurface,
                 ) &&
@@ -4694,6 +4700,63 @@ function extractArchiveRawEvents(plain) {
     return entries;
 }
 
+function countJsonStructuralBraceDelta(line, state) {
+    let delta = 0;
+    for (const char of String(line ?? '')) {
+        if (state.escape) {
+            state.escape = false;
+            continue;
+        }
+        if (char === '\\' && state.inString) {
+            state.escape = true;
+            continue;
+        }
+        if (char === '"') {
+            state.inString = !state.inString;
+            continue;
+        }
+        if (state.inString) continue;
+        if (char === '{') delta += 1;
+        if (char === '}') delta -= 1;
+    }
+    return delta;
+}
+
+function extractArchiveJsonDump(plain) {
+    const lines = String(plain ?? '').split('\n');
+    for (let start = 0; start < lines.length; start += 1) {
+        const first = (lines[start] ?? '').trim();
+        if (first !== '{') continue;
+        const collected = [];
+        let depth = 0;
+        const braceState = { inString: false, escape: false };
+        for (let index = start; index < lines.length; index += 1) {
+            const line = lines[index] ?? '';
+            collected.push(line);
+            depth += countJsonStructuralBraceDelta(line, braceState);
+            if (depth !== 0) continue;
+            const raw = collected.join('\n');
+            if (!raw.includes('"state"') || !raw.includes('"filters"') || !raw.includes('"entries"')) break;
+            try {
+                const parsed = JSON.parse(raw);
+                if (
+                    parsed &&
+                    typeof parsed === 'object' &&
+                    parsed.state &&
+                    parsed.filters &&
+                    Array.isArray(parsed.entries)
+                ) {
+                    return parsed;
+                }
+            } catch {
+                break;
+            }
+            break;
+        }
+    }
+    return null;
+}
+
 function extractTerminalBlocks(plain, headerRe) {
     const lines = String(plain ?? '').split('\n');
     const blocks = [];
@@ -4823,7 +4886,7 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
             {
                 id: 'sse-disabled',
                 pass: true,
-                detail: 'SSE collector disabled by --no-sse',
+                detail: 'coletor SSE desativado por --no-sse',
             },
         ];
     }
@@ -4840,17 +4903,17 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
         {
             id: 'sse-connected',
             pass: sseSummary.connected && sseSummary.errors.length === 0,
-            detail: `SSE collector connected with ${sseSummary.errors.length} error(s)`,
+            detail: `coletor SSE conectado com ${sseSummary.errors.length} erro(s)`,
         },
         {
             id: 'sse-no-internal-envelope',
             pass: !sseSummary.raw.includes('__terminalSseEventId'),
-            detail: 'internal replay envelope metadata was not exposed to SSE clients',
+            detail: 'metadados internos de replay não foram expostos aos clientes SSE',
         },
         {
             id: 'sse-event-ids-monotonic',
             pass: publicEvents.length === 0 || (ids.length > 0 && monotonic),
-            detail: `observed ${ids.length}/${publicEvents.length} public SSE events with monotonic ids`,
+            detail: `${ids.length}/${publicEvents.length} eventos SSE públicos observados com ids monotônicos`,
         },
         {
             id: 'sse-public-events',
@@ -4860,22 +4923,22 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
                 names.has('assistant.message') ||
                 names.has('tool.lifecycle') ||
                 names.has('user_input.requested'),
-            detail: `observed public SSE events: ${[...names].slice(0, 8).join(', ') || 'none'}`,
+            detail: `eventos SSE públicos observados: ${[...names].slice(0, 8).join(', ') || 'nenhum'}`,
         },
         {
             id: 'sse-source-envelope',
             pass: payloadObjects.length === 0 || sourceEnvelopeEvents.length === payloadObjects.length,
-            detail: `${sourceEnvelopeEvents.length}/${payloadObjects.length} object payload events include source/eventSource`,
+            detail: `${sourceEnvelopeEvents.length}/${payloadObjects.length} eventos com payload objeto incluem source/eventSource`,
         },
         {
             id: 'sse-critical-events-sourced',
             pass: criticalEvents.length === 0 || criticalWithSource.length === criticalEvents.length,
-            detail: `${criticalWithSource.length}/${criticalEvents.length} critical transcript/tool/user-input events include source/eventSource`,
+            detail: `${criticalWithSource.length}/${criticalEvents.length} eventos críticos transcript/tool/user-input incluem source/eventSource`,
         },
         {
             id: 'sse-trace-envelope',
             pass: !expectPublicEvents || traceEvents.length > 0,
-            detail: `${traceEvents.length}/${payloadObjects.length} object payload events include traceId; traceIds=${traceIds.slice(0, 5).join(', ') || '-'}`,
+            detail: `${traceEvents.length}/${payloadObjects.length} eventos com payload objeto incluem traceId; traceIds=${traceIds.slice(0, 5).join(', ') || '-'}`,
         },
         {
             id: 'sse-stdout-trace-overlap',
@@ -4884,7 +4947,7 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
                 traceIds.length === 0 ||
                 plainTraceIds.length === 0 ||
                 traceOverlap.length > 0,
-            detail: `stdout traceIds=${plainTraceIds.slice(0, 5).join(', ') || 'hidden in default/raw tail'} · sse traceIds=${traceIds.slice(0, 5).join(', ') || '-'} · overlap=${traceOverlap.slice(0, 5).join(', ') || '-'}`,
+            detail: `stdout traceIds=${plainTraceIds.slice(0, 5).join(', ') || 'ocultos na cauda default/raw'} · sse traceIds=${traceIds.slice(0, 5).join(', ') || '-'} · interseção=${traceOverlap.slice(0, 5).join(', ') || '-'}`,
         },
     ];
 }
@@ -5092,12 +5155,12 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'ready',
             pass: /LLM-B pronta/.test(plain),
-            detail: 'terminal reached ready state',
+            detail: 'terminal chegou ao estado pronto',
         },
         {
             id: 'interactive-repl',
             pass: !/Modo headless detectado/.test(plain),
-            detail: 'terminal ran with an interactive REPL/TTY surface',
+            detail: 'terminal executou com superfície interativa REPL/TTY',
         },
         {
             id: 'partial-deltas',
@@ -5313,7 +5376,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'sse-archive-query-visible',
             pass: /Eventos SSE/.test(plain) && /arquivo(?:=|\s)/.test(plain),
-            detail: '/events rendered the durable public SSE archive tail',
+            detail: '/events renderizou a cauda do arquivo SSE público durável',
         },
         {
             id: 'sse-archive-human-source-labels',
@@ -5352,7 +5415,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'sse-archive-raw-visible',
             pass: archiveRawEvents.length > 0,
-            detail: `/events --raw exposed ${archiveRawEvents.length} archived event(s)`,
+            detail: `/events --raw expôs ${archiveRawEvents.length} evento(s) do arquivo SSE`,
         },
         {
             id: 'sse-archive-http-overlap',
@@ -5685,12 +5748,12 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'no-terminal-errors',
             pass: /nenhum erro recente/iu.test(plain) && !/\bERROR\b/.test(beforeRawWithoutExpectedScenarioMarkers),
-            detail: 'terminal error tracker stayed clean',
+            detail: 'rastreador de erros do terminal permaneceu limpo',
         },
         {
             id: 'clean-quit',
             pass: hasHumanTerminalShutdownCopy(plain),
-            detail: 'terminal exited through /quit with human shutdown copy',
+            detail: 'terminal saiu por /quit com texto humano de encerramento',
         },
         {
             id: 'export-created',
@@ -5733,21 +5796,22 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
 
 function evaluateNoPrOutput(plain, sseSummary) {
     const archiveRawEvents = extractArchiveRawEvents(plain);
+    const archiveJsonDump = extractArchiveJsonDump(plain);
     return [
         {
             id: 'ready',
             pass: /LLM-B pronta/.test(plain),
-            detail: 'terminal reached ready state',
+            detail: 'terminal chegou ao estado pronto',
         },
         {
             id: 'interactive-repl',
             pass: !/Modo headless detectado/.test(plain),
-            detail: 'terminal ran with an interactive REPL/TTY surface',
+            detail: 'terminal executou com superfície interativa REPL/TTY',
         },
         {
             id: 'no-explicit-turn',
             pass: !/\[intervene→turn\]/.test(plain) && !/Processando mensagem/.test(plain),
-            detail: 'no explicit LLM turn was opened during --no-pr probe',
+            detail: 'nenhum turno explícito de LLM foi aberto durante o probe --no-pr',
         },
         {
             id: 'usage-visible',
@@ -5755,22 +5819,31 @@ function evaluateNoPrOutput(plain, sseSummary) {
                 /Premium Request:|Última (?:Premium Request|telemetria PR) classificada:|GitHub Copilot quota\/PR side-channel:|Histórico\s+Copilot último snapshot|Cobrança\s+GitHub PR/.test(
                     plain,
                 ) && /Modo\s+SDK|Modo:\s*sdk=/.test(plain),
-            detail: '/usage now rendered context, PR and SDK mode telemetry',
+            detail: '/usage now renderizou contexto, PR e telemetria de modo SDK',
         },
         {
             id: 'activity-visible',
             pass: /Atividade Atual da LLM-B/.test(plain) && /Streaming público/.test(plain),
-            detail: '/activity rendered activity and streaming diagnostics sections',
+            detail: '/activity renderizou seções de atividade e diagnósticos de streaming',
+        },
+        {
+            id: 'sdk-session-main-cockpit-visible',
+            pass:
+                /Sessão SDK[\s\S]*(Sessões SDK listadas|nenhuma sessão SDK listada)/u.test(plain) &&
+                /CommandDefinitions\s+\d+ CommandDefinitions expostos[\s\S]*(?:nenhum comando chamado nesta janela|chamadas? na janela)[\s\S]*\/session sdk (?:commands|events)/u.test(
+                    plain,
+                ),
+            detail: '/session sdk renderizou o cockpit principal com catálogo de CommandDefinitions e estado de comandos no arquivo SSE',
         },
         {
             id: 'sdk-session-command-catalog-visible',
             pass: /Comandos SDK expostos ao Copilot/.test(plain) && /terminal_status/.test(plain),
-            detail: '/session sdk commands rendered the CommandDefinition catalog exposed to the SDK',
+            detail: '/session sdk commands renderizou o catálogo de CommandDefinitions exposto ao SDK',
         },
         {
             id: 'sdk-session-events-cockpit-visible',
-            pass: /Eventos SDK da sessão/.test(plain) && /Registro\s+arquivo|archive SSE canônico/.test(plain),
-            detail: '/session sdk events rendered lifecycle/command diagnostics from the canonical archive',
+            pass: /Eventos SDK da sessão/.test(plain) && /Registro\s+arquivo|arquivo SSE canônico/.test(plain),
+            detail: '/session sdk events renderizou diagnóstico de ciclo de vida/comandos a partir do arquivo SSE canônico',
         },
         {
             id: 'sdk-session-waits-cockpit-visible',
@@ -5778,37 +5851,58 @@ function evaluateNoPrOutput(plain, sseSummary) {
                 /(?:Waits|Esperas) SDK da sessão/.test(plain) &&
                 /perguntas\s+\d+|perguntas=\d+/.test(plain) &&
                 /(?:formulários|elicitation)\s+\d+|elicitation=\d+/.test(plain),
-            detail: '/session sdk waits rendered ask_user/elicitation/permission diagnostics from the canonical archive',
+            detail: '/session sdk waits renderizou diagnóstico de ask_user/elicitation/permission a partir do arquivo SSE canônico',
+        },
+        {
+            id: 'sdk-session-waits-empty-state-human',
+            pass:
+                /nenhuma espera SDK arquivada nesta janela/iu.test(plain) &&
+                /normal após resume silencioso ou sem ask_user\/elicitation\/permission/iu.test(plain) &&
+                /\/sdk waits para pendências vivas/iu.test(plain),
+            detail: '/session sdk waits explicou janela vazia do arquivo SSE como normal após resume silencioso e apontou pendências vivas',
         },
         {
             id: 'metrics-visible',
             pass: /Métricas da sessão|Métricas da Sessão/.test(plain) && /Streaming público/.test(plain),
-            detail: '/metrics rendered session and public streaming counters',
+            detail: '/metrics renderizou sessão e contadores de streaming público',
         },
         {
             id: 'sse-archive-query-visible',
             pass: /Eventos SSE/.test(plain) && /arquivo(?:=|\s)/.test(plain),
-            detail: '/events rendered the durable public SSE archive tail without opening a turn',
+            detail: '/events renderizou a cauda do arquivo SSE público durável sem abrir turno',
         },
         {
             id: 'sse-archive-raw-visible',
             pass: archiveRawEvents.length > 0,
-            detail: `/events --raw exposed ${archiveRawEvents.length} archived control event(s) without opening a turn`,
+            detail: `/events --raw expôs ${archiveRawEvents.length} evento(s) de controle do arquivo SSE sem abrir turno`,
+        },
+        {
+            id: 'sse-archive-json-parseable',
+            pass: Boolean(archiveJsonDump && Array.isArray(archiveJsonDump.entries)),
+            detail: `/events --json compact renderizou ${archiveJsonDump?.entries?.length ?? 0} evento(s) estruturado(s) do arquivo SSE sem abrir turno`,
+        },
+        {
+            id: 'events-sources-guidance-visible',
+            pass:
+                /Fontes do Terminal/u.test(plain) &&
+                /\/events --json compact · \/events --raw preview · \/events --raw full/u.test(plain) &&
+                /payload público redigido; compacto usa preview e ids de filtro/u.test(plain),
+            detail: '/events sources renderizou orientação de formatos, payload redigido e ids de filtro',
         },
         {
             id: 'no-tools-started',
             pass: !/\[TOOL\]/.test(plain) && !/\[DONE\]/.test(plain),
-            detail: 'probe did not invoke tools',
+            detail: 'probe não invocou tools',
         },
         {
             id: 'no-terminal-errors',
             pass: /nenhum erro recente/iu.test(plain) && !/\bERROR\b/.test(plain),
-            detail: 'terminal error tracker stayed clean',
+            detail: 'rastreador de erros do terminal permaneceu limpo',
         },
         {
             id: 'clean-quit',
             pass: hasHumanTerminalShutdownCopy(plain),
-            detail: 'terminal exited through /quit with human shutdown copy',
+            detail: 'terminal saiu por /quit com texto humano de encerramento',
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];
@@ -5816,16 +5910,19 @@ function evaluateNoPrOutput(plain, sseSummary) {
 
 function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
     const archiveRawEvents = extractArchiveRawEvents(plain);
+    const byokProfilesRe = /BYOK (?:profiles|perfis)/iu;
+    const byokModelsRe = /BYOK (?:models|modelos)/iu;
+    const byokRecommendRe = /BYOK (?:recommend|recomenda(?:ç|c)[aã]o)/iu;
     const criteria = [
         {
             id: 'ready',
             pass: /LLM-B pronta/.test(plain),
-            detail: 'terminal reached ready state',
+            detail: 'terminal chegou ao estado pronto',
         },
         {
             id: 'interactive-repl',
             pass: !/Modo headless detectado/.test(plain),
-            detail: 'terminal ran with an interactive REPL/TTY surface',
+            detail: 'terminal executou com superfície interativa REPL/TTY',
         },
         {
             id: 'no-explicit-turn',
@@ -5844,7 +5941,7 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'byok-profiles-visible',
-            pass: /BYOK profiles/.test(plain),
+            pass: byokProfilesRe.test(plain),
             detail: '/byok profiles rendered configured profile information or the empty-state',
         },
         {
@@ -5859,18 +5956,21 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         },
         {
             id: 'byok-models-visible',
-            pass: /BYOK models/.test(plain),
+            pass: byokModelsRe.test(plain),
             detail: '/byok models refresh rendered model catalog state without exposing secrets',
         },
         {
             id: 'byok-model-filters-visible',
-            pass: /BYOK models[\s\S]{0,800}filtros[\s\S]{0,120}gratuito[\s\S]{0,120}raciocínio[\s\S]{0,120}modo seguro/iu.test(plain),
+            pass:
+                /BYOK (?:models|modelos)[\s\S]{0,800}filtros[\s\S]{0,120}gratuito[\s\S]{0,120}raciocínio[\s\S]{0,120}modo seguro/iu.test(
+                    plain,
+                ),
             detail: '/byok models accepted operator filters for free/reasoning/safe discovery',
         },
         {
             id: 'byok-recommend-visible',
             pass:
-                /BYOK recommend/.test(plain) &&
+                byokRecommendRe.test(plain) &&
                 /\/byok probe agent(?:\s+profile:[^\s]+)?\s+model:/.test(plain) &&
                 /live descartável/.test(plain),
             detail: '/byok recommend rendered ranked operational recommendations with disposable agent probe actions',
@@ -5888,22 +5988,22 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
         {
             id: 'sse-archive-query-visible',
             pass: /Eventos SSE/.test(plain) && /arquivo(?:=|\s)/.test(plain),
-            detail: '/events rendered the durable public SSE archive tail',
+            detail: '/events renderizou a cauda do arquivo SSE público durável',
         },
         {
             id: 'sse-archive-raw-visible',
             pass: archiveRawEvents.length > 0,
-            detail: `/events --raw exposed ${archiveRawEvents.length} archived control event(s)`,
+            detail: `/events --raw expôs ${archiveRawEvents.length} evento(s) de controle do arquivo SSE`,
         },
         {
             id: 'no-terminal-errors',
             pass: /nenhum erro recente/iu.test(plain) && !/\bERROR\b/.test(plain),
-            detail: 'terminal error tracker stayed clean',
+            detail: 'rastreador de erros do terminal permaneceu limpo',
         },
         {
             id: 'clean-quit',
             pass: hasHumanTerminalShutdownCopy(plain),
-            detail: 'terminal exited through /quit with human shutdown copy',
+            detail: 'terminal saiu por /quit com texto humano de encerramento',
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];
@@ -5923,13 +6023,13 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
             },
             {
                 id: 'byok-fixture-model-list',
-                pass: /BYOK models[\s\S]{0,800}fixture\/model-a/.test(plain) && /fixture\/model-b/.test(plain),
+                pass: /BYOK (?:models|modelos)[\s\S]{0,800}fixture\/model-a/iu.test(plain) && /fixture\/model-b/.test(plain),
                 detail: '/byok models refresh returned fixture model catalog',
             },
             {
                 id: 'byok-fixture-remote-discovery',
                 pass:
-                    /BYOK models[\s\S]{0,1200}Fonte\s+provider/.test(plain) &&
+                    /BYOK (?:models|modelos)[\s\S]{0,1200}Fonte\s+provider/iu.test(plain) &&
                     /endpoint\s+http:\/\/127\.0\.0\.1:\d+\/v1\/models/.test(plain) &&
                     /fixture\/model-remote-c/.test(plain),
                 detail: 'fixture provider /models endpoint was discovered live and redacted',
@@ -5959,12 +6059,12 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         {
             id: 'ready',
             pass: /LLM-B pronta/.test(plain),
-            detail: 'terminal reached ready state',
+            detail: 'terminal chegou ao estado pronto',
         },
         {
             id: 'interactive-repl',
             pass: !/Modo headless detectado/.test(plain),
-            detail: 'terminal ran with an interactive REPL/TTY surface',
+            detail: 'terminal executou com superfície interativa REPL/TTY',
         },
         {
             id: 'no-explicit-turn',
@@ -6102,22 +6202,22 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         {
             id: 'auto-sse-archive-query-visible',
             pass: /Eventos SSE/.test(plain) && /arquivo(?:=|\s)/.test(plain),
-            detail: '/events rendered the durable public SSE archive tail',
+            detail: '/events renderizou a cauda do arquivo SSE público durável',
         },
         {
             id: 'auto-sse-archive-raw-visible',
             pass: archiveRawEvents.length > 0,
-            detail: `/events --raw exposed ${archiveRawEvents.length} archived control event(s)`,
+            detail: `/events --raw expôs ${archiveRawEvents.length} evento(s) de controle do arquivo SSE`,
         },
         {
             id: 'no-terminal-errors',
             pass: /nenhum erro recente/iu.test(plain) && !/\bERROR\b/.test(plain),
-            detail: 'terminal error tracker stayed clean',
+            detail: 'rastreador de erros do terminal permaneceu limpo',
         },
         {
             id: 'clean-quit',
             pass: hasHumanTerminalShutdownCopy(plain),
-            detail: 'terminal exited through /quit with human shutdown copy',
+            detail: 'terminal saiu por /quit com texto humano de encerramento',
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];
@@ -6130,12 +6230,12 @@ function evaluateModelProbeOutput(plain, sseSummary) {
         {
             id: 'ready',
             pass: /LLM-B pronta/.test(plain),
-            detail: 'terminal reached ready state',
+            detail: 'terminal chegou ao estado pronto',
         },
         {
             id: 'interactive-repl',
             pass: !/Modo headless detectado/.test(plain),
-            detail: 'terminal ran with an interactive REPL/TTY surface',
+            detail: 'terminal executou com superfície interativa REPL/TTY',
         },
         {
             id: 'no-explicit-turn',
@@ -6192,22 +6292,22 @@ function evaluateModelProbeOutput(plain, sseSummary) {
         {
             id: 'model-sse-archive-query-visible',
             pass: /Eventos SSE/.test(plain) && /arquivo(?:=|\s)/.test(plain),
-            detail: '/events rendered the durable public SSE archive tail during model probe',
+            detail: '/events renderizou a cauda do arquivo SSE público durável durante o probe de modelo',
         },
         {
             id: 'model-sse-archive-raw-visible',
             pass: archiveRawEvents.length > 0,
-            detail: `/events --raw exposed ${archiveRawEvents.length} archived control event(s)`,
+            detail: `/events --raw expôs ${archiveRawEvents.length} evento(s) de controle do arquivo SSE`,
         },
         {
             id: 'no-terminal-errors',
             pass: /nenhum erro recente/iu.test(plain) && !/\bERROR\b/.test(plain),
-            detail: 'terminal error tracker stayed clean',
+            detail: 'rastreador de erros do terminal permaneceu limpo',
         },
         {
             id: 'clean-quit',
             pass: hasHumanTerminalShutdownCopy(plain),
-            detail: 'terminal exited through /quit with human shutdown copy',
+            detail: 'terminal saiu por /quit com texto humano de encerramento',
         },
         ...evaluateSseCriteria(sseSummary, { expectPublicEvents: false, plain }),
     ];
@@ -6471,12 +6571,12 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
         {
             id: 'ready',
             pass: /LLM-B pronta/.test(plain),
-            detail: 'terminal reached ready state before blocker',
+            detail: 'terminal chegou ao estado pronto antes do bloqueio',
         },
         {
             id: 'interactive-repl',
             pass: !/Modo headless detectado/.test(plain),
-            detail: 'terminal ran with an interactive REPL/TTY surface',
+            detail: 'terminal executou com superfície interativa REPL/TTY',
         },
         {
             id: `blocked-by-${blocker.id}`,

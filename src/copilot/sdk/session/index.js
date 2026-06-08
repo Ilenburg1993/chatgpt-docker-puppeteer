@@ -49,7 +49,12 @@ export {
     withSession,
 } from './client-facade.js';
 
-export { ClientOptionsBuilder, buildCopilotClientOptionsFromEnv } from './client-options.js';
+export {
+    ClientOptionsBuilder,
+    buildCopilotClientOptionsFromEnv,
+    buildServerCopilotClientOptions,
+    buildTerminalCopilotClientOptions,
+} from './client-options.js';
 
 export {
     CopilotClient,
@@ -60,6 +65,8 @@ export {
     createClientSession,
     createCopilotClient,
     createCopilotClientManager,
+    createServerCopilotClient,
+    createTerminalCopilotClient,
     defaultClientManager,
     deleteClientSession,
     disconnectClientSession,
@@ -106,7 +113,7 @@ export {
     onSessionEvents,
 } from './events.js';
 
-export { HookBus, attachBus, defaultBus } from './hook-bus.js';
+export { HookBus, attachBus, defaultBus, normalizeHookInputForSdk10 } from './hook-bus.js';
 export { clearHooksLogger, log, setHooksLogger } from './hook-logger.js';
 export { HookRegistry, SDK_HOOKS } from './hook-registry.js';
 
@@ -167,8 +174,13 @@ export {
     validateProviderConfig,
 } from './provider.js';
 export {
+    normalizeCanvasOpenedEvent,
+    normalizeCanvasRegistryChangedEvent,
+    normalizeHookProgressEvent,
     normalizeModeChangedEvent,
+    normalizeModelCallFailureEvent,
     normalizeModelChangedEvent,
+    normalizePermissionsChangedEvent,
     normalizePlanChangedEvent,
     normalizeToolsUpdatedEvent,
 } from './session-events.js';

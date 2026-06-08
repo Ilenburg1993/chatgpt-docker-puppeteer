@@ -194,9 +194,14 @@ export function registerSessionCoreRoutes(router) {
                 }
             }
 
+            const selectionDetails = [
+                reasoningEffort !== undefined ? `reasoning=${reasoningEffort}` : '',
+                reasoningSummary !== undefined ? `summary=${reasoningSummary}` : '',
+                contextTier !== undefined ? `context=${contextTier}` : '',
+            ].filter(Boolean);
             routeDeps.sdkObservability.log(
                 verification.verifiedSwitch ? 'INFO' : 'WARN',
-                `[sdk-api] modelo solicitado: sessão ${id} → ${verification.requestedModel} (effective=${effectiveModel}, verified=${verification.verifiedSwitch}${verification.usedRpcFallback ? ', rpc-fallback=true' : ''})`,
+                `[sdk-api] modelo solicitado: sessão ${id} → ${verification.requestedModel} (effective=${effectiveModel}, verified=${verification.verifiedSwitch}${verification.usedRpcFallback ? ', rpc-fallback=true' : ''}${selectionDetails.length > 0 ? `, ${selectionDetails.join(', ')}` : ''})`,
             );
             res.json(
                 withSessionRuntimeMeta(

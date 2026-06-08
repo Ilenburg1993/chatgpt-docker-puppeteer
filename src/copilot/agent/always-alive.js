@@ -16,7 +16,10 @@ import { EventEmitter } from 'node:events';
 import { MAX_LISTENERS } from '#copilot/config/agent';
 // F35: AgentContext — contexto compartilhado entre módulos internos
 import { AgentContext } from './context/index.js';
-import { HealthFacade, PermissionToolsFacade, SdkQueryFacade, StateQueryFacade } from './facades/index.js';
+import { HealthFacade } from './facades/health-facade.js';
+import { PermissionToolsFacade } from './facades/permission-tools-facade.js';
+import { SdkQueryFacade } from './facades/sdk-query-facade.js';
+import { StateQueryFacade } from './facades/state-query-facade.js';
 import {
     abortCurrentMessage,
     agentStart,
@@ -1264,4 +1267,3 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.stop().catch((e) => logSwallowed(e, 'AlwaysAliveAgent.Symbol.dispose'));
     }
 }
-export { alwaysAliveAgent, getAgent, resetAgent } from './always-alive-singleton.js';

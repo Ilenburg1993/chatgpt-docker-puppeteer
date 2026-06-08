@@ -21,6 +21,8 @@ export {
     appendSystemMessage,
     approveAll,
     buildCopilotClientOptionsFromEnv,
+    buildServerCopilotClientOptions,
+    buildTerminalCopilotClientOptions,
     buildConfiguredByokModelListHandler,
     customizeSystemMessage,
     discoverConfiguredByokModelsFromEnv,

@@ -8,7 +8,7 @@
  */
 
 import { AGENT_EVENTS } from '#copilot/events';
-import { broadcastSse } from '../dialog/index.js';
+import { broadcastSse } from '../dialog/io/index.js';
 import { withTerminalTurnCorrelation } from '../state/events/index.js';
 
 /**

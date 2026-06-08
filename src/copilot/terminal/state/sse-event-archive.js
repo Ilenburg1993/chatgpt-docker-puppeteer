@@ -11,6 +11,7 @@
 import { mkdir, appendFile, open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
+import { redactSecretRecord } from '../../core/security/redaction.js';
 
 const DEFAULT_TERMINAL_SSE_EVENT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'sse-events');
 const TERMINAL_SSE_EVENT_ARCHIVE_SOFT_QUEUE = 10_000;
@@ -225,8 +226,9 @@ export async function flushTerminalSseEventArchive() {
 export function recordTerminalSseEventArchive(input) {
     if (!isTerminalSseEventArchiveEnabled()) return { queued: false, path: null, error: null };
     const data = input.data && typeof input.data === 'object' ? /** @type {Record<string, unknown>} */ (input.data) : {};
+    const safeData = redactSecretRecord(data);
     const timestamp = input.timestamp ?? Date.now();
-    const envelope = projectTerminalSseEventEnvelope(data);
+    const envelope = projectTerminalSseEventEnvelope(safeData);
     try {
         const record = {
             schemaVersion: 1,
@@ -235,7 +237,7 @@ export function recordTerminalSseEventArchive(input) {
             event: input.event,
             eventId: input.eventId,
             ...envelope,
-            payload: data,
+            payload: safeData,
         };
         const line = `${JSON.stringify(record)}\n`;
         _terminalSseEventArchiveQueue.push(line);

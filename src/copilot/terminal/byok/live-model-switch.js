@@ -8,13 +8,13 @@
  * @module copilot/terminal/byok/live-model-switch
  */
 
-import { setTerminalModelProjection } from '../frontend/index.js';
-import { buildTerminalModelTransitionPresentation } from '../events/model-transition-presentation.js';
-import { recordTerminalActivity } from '../state/activity-state.js';
+import { setTerminalModelProjection } from '../frontend/projections/model-selection/index.js';
+import { buildTerminalModelTransitionPresentation } from '../events/presenters/model/index.js';
+import { recordTerminalActivity } from '../state/index.js';
 
 const MODEL_SWITCH_REQUEST_TTL_MS = 10 * 60_000;
 
-/** @type {{ model: string; previousModel: string | null; source: string; reason: string | null; requestedAt: number; detail: string } | null} */
+/** @type {{ model: string; previousModel: string | null; source: string; reason: string | null; confidence: string | null; requestedAt: number; detail: string } | null} */
 let latestLiveByokModelSwitchRequest = null;
 
 /**
@@ -30,14 +30,16 @@ function optionalText(value) {
  * @param {string} currentModel
  * @param {string | null} reason
  * @param {string} source
+ * @param {string | null} confidence
  * @returns {string}
  */
-function renderLiveModelSwitchRequestDetail(previousModel, currentModel, reason, source) {
+function renderLiveModelSwitchRequestDetail(previousModel, currentModel, reason, source, confidence) {
     const presentation = buildTerminalModelTransitionPresentation({
         from: previousModel,
         to: currentModel,
         kind: 'requested',
         reason,
+        confidence,
         source,
     });
     return `${presentation.detail} · aguardando confirmação do SDK ou próximo uso observado`;
@@ -51,6 +53,7 @@ function renderLiveModelSwitchRequestDetail(previousModel, currentModel, reason,
  *     runtimeId?: string | null;
  *     source?: string;
  *     reason?: string | null;
+ *     confidence?: string | null;
  *     updateCurrent?: boolean;
  * }} [options]
  * @returns {{
@@ -75,12 +78,14 @@ export function requestTerminalLiveByokModelSwitch(model, options = {}) {
     const reasoningAdjusted = projected['reasoningAdjusted'] === true;
     const source = options.source ?? 'terminal.byok_model';
     const reason = optionalText(options.reason);
-    const detail = renderLiveModelSwitchRequestDetail(previousModel, currentModel, reason, source);
+    const confidence = optionalText(options.confidence);
+    const detail = renderLiveModelSwitchRequestDetail(previousModel, currentModel, reason, source, confidence);
     latestLiveByokModelSwitchRequest = {
         model: currentModel,
         previousModel,
         source,
         reason,
+        confidence,
         requestedAt: Date.now(),
         detail,
     };
@@ -103,7 +108,7 @@ export function requestTerminalLiveByokModelSwitch(model, options = {}) {
 }
 
 /**
- * @returns {{ model: string; previousModel: string | null; source: string; reason: string | null; requestedAt: number; detail: string } | null}
+ * @returns {{ model: string; previousModel: string | null; source: string; reason: string | null; confidence: string | null; requestedAt: number; detail: string } | null}
  */
 export function readTerminalLiveByokModelSwitchRequest() {
     if (!latestLiveByokModelSwitchRequest) return null;
@@ -116,7 +121,7 @@ export function readTerminalLiveByokModelSwitchRequest() {
 
 /**
  * @param {{ previousModel?: string | null; newModel?: string | null; timestamp?: number }} confirmation
- * @returns {{ model: string; previousModel: string | null; source: string; reason: string | null; requestedAt: number; detail: string } | null}
+ * @returns {{ model: string; previousModel: string | null; source: string; reason: string | null; confidence: string | null; requestedAt: number; detail: string } | null}
  */
 export function consumeTerminalLiveByokModelSwitchConfirmation(confirmation) {
     const pending = readTerminalLiveByokModelSwitchRequest();
@@ -133,13 +138,20 @@ export function consumeTerminalLiveByokModelSwitchConfirmation(confirmation) {
  * @param {{
  *     model: string;
  *     reason: string;
+ *     confidence?: string | null;
  *     source?: string;
  *     severity?: 'info' | 'warn' | 'error';
  * }} input
  * @returns {ReturnType<typeof recordTerminalActivity>}
  */
 export function recordTerminalLiveByokModelSwitchDeferred(input) {
-    const detail = renderLiveModelSwitchRequestDetail(null, input.model, input.reason, input.source ?? 'terminal.byok_model');
+    const detail = renderLiveModelSwitchRequestDetail(
+        null,
+        input.model,
+        input.reason,
+        input.source ?? 'terminal.byok_model',
+        optionalText(input.confidence),
+    );
     return recordTerminalActivity('model', 'Troca de modelo adiada', {
         detail,
         source: input.source ?? 'terminal.byok_model',

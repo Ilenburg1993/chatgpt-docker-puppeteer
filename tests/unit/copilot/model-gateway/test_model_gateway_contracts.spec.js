@@ -1455,6 +1455,7 @@ describe('model-gateway foundation', () => {
         assert.equal(liveSwitchDecision.action, 'apply_live_model');
         assert.equal(liveSwitchDecision.canApplyLiveModel, true);
         assert.equal(liveSwitchDecision.requiresNewSession, false);
+        assert.equal(Array.isArray(liveSwitchDecision.selectedRouteReasons), true);
 
         const postTurnFallbackDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan: {
@@ -1524,6 +1525,46 @@ describe('model-gateway foundation', () => {
         assert.equal(liveControllerStep.effects[0]['authorization'], 'authorized');
         assert.equal(liveControllerStep.effects[0]['policyGate'], 'allowLiveSetModel');
         assert.equal(liveControllerStep.effects[0]['blockedReason'], null);
+        assert.equal(liveControllerStep.effects[0]['confidence'], liveSwitchDecision.selectedRouteConfidence);
+        assert.equal(liveControllerStep.effects[0]['reason'], liveSwitchDecision.operatorSummary);
+
+        const confidenceSwitchDecision = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan: {
+                routes: [
+                    {
+                        profileId: 'repo_agent',
+                        status: 'selected',
+                        selectedRouteKey: 'openrouter:verified-model',
+                        reasons: ['preferred:large_context'],
+                        selected: {
+                            id: 'openrouter:verified-model',
+                            routeProfile: 'repo_agent',
+                            providerId: 'openrouter',
+                            providerModel: 'verified-model',
+                            selectorSyntax: 'verified-model',
+                            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+                        },
+                    },
+                ],
+            },
+            profileId: 'repo_agent',
+            currentSessionId: 'sdk-live',
+            liveByokBinding: {
+                enabled: true,
+                profile: 'repo_agent',
+                preset: 'openrouter',
+                providerType: 'openai_compatible_aggregator',
+                model: 'older-model',
+            },
+            policy: { allowLiveSetModel: true },
+        });
+        assert.equal(confidenceSwitchDecision.selectedRouteConfidence, 'catalog');
+        const confidenceControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
+            phase: 'pre_turn',
+            decision: confidenceSwitchDecision,
+            policy: { allowEffects: true, allowLiveSetModel: true },
+        });
+        assert.equal(confidenceControllerStep.effects[0]['confidence'], 'catalog');
 
         const newSessionDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan,
@@ -4539,8 +4580,8 @@ describe('model-gateway foundation', () => {
                 },
                 {
                     id: 'invalid-choice',
-                    ask: 'ASK-CHOICE: escolha SIM para fechar o teste',
-                    final: 'POST-ASK-CHOICE-FINAL: usuário escolheu SIM após tentativa inválida',
+                    ask: 'ASK-CHOICE: escolha SIM ou responda livremente para fechar o teste',
+                    final: 'POST-ASK-CHOICE-FINAL: usuário respondeu livremente fora das opções',
                 },
                 {
                     id: 'long-tool-heartbeat',
@@ -13141,6 +13182,23 @@ describe('model-gateway foundation', () => {
         assert.ok(models?.some((model) => model.id === 'deepseek/deepseek-v4-flash:free'));
         assert.ok(models?.some((model) => model.byok?.gatewayId === 'openrouter:deepseek/deepseek-v4-flash:free'));
         assert.equal(JSON.stringify(models).includes(secret), false);
+    });
+
+    it('keeps Ollama/local in onListModels only as an explicit active provider opt-in', async () => {
+        const handler = buildModelGatewayOnListModelsHandler({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'ollama-local',
+            COPILOT_BYOK_MODEL: 'qwen3-coder-next',
+            OLLAMA_LOCAL_BASE_URL: 'http://localhost:11434/v1',
+        });
+        assert.equal(typeof handler, 'function');
+
+        const models = await handler?.();
+        const local = models?.find((model) => model.id === 'qwen3-coder-next');
+        assert.equal(local?.byok?.provider, 'ollama-local');
+        assert.equal(local?.byok?.providerModel, 'qwen3-coder-next');
+        assert.equal(local?.byok?.routeLayer, 'local_daemon');
+        assert.equal(local?.byok?.wireApi, 'openai_compatible');
     });
 
     it('does not install a gateway onListModels handler when BYOK is disabled', () => {

@@ -15,9 +15,8 @@
 
 import { AUDIT_LOGGER } from '#copilot/audit';
 import { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
+import { defaultHookBus, setHooksLogger } from '#copilot/sdk';
 import { HOOKS_LOGGER, SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk/di';
-import { defaultBus as defaultHookBus, setHooksLogger } from '#copilot/sdk/session';
-import { setToolsLogger, setToolsMetrics, TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
 import { channel } from 'node:diagnostics_channel';
 import { setAuditLogger } from '../audit/logger.js';
 import { container } from '../core/di-container.js';
@@ -39,6 +38,7 @@ import { log, LOG_DIR } from './logger.js';
 import { defaultMetrics } from './metrics.js';
 import { projectSdkOperationMetric } from './sdk-metric-bridge.js';
 import { getToolStats, recordBlockedToolCall, recordToolCall } from './tool-stats.js';
+import { TOOLS_LOGGER, TOOLS_METRICS, setToolsLogger, setToolsMetrics } from '#copilot/tools/observability';
 
 /** @type {boolean} */
 let _obsBooted = false;

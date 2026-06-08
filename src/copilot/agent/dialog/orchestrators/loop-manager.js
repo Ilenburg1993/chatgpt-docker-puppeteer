@@ -25,8 +25,12 @@ import {
 import { EventEmitter } from 'node:events';
 import { logSwallowed } from '#copilot/core';
 import { DialogProtocol } from '#copilot/dialog';
-import { persistAgentRuntimeDialogState, readAgentRuntimeDialogPersistedState } from '../../facades/index.js';
-import { log, startSpanImmediate } from '../../ports/index.js';
+import {
+    persistAgentRuntimeDialogState,
+    readAgentRuntimeDialogPersistedState,
+} from '../../facades/agent-runtime-state.js';
+import { log } from '../../ports/logging/index.js';
+import { startSpanImmediate } from '../../ports/tracing-port.js';
 import { createDialogLoopRuntimeKit, DialogBootCircuit, runDialogLoopBoot } from '../boot/index.js';
 import { executeTurnImpl } from '../executors/index.js';
 import { selectDialogResumeStrategy } from '../policies/index.js';

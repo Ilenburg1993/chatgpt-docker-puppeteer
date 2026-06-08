@@ -783,21 +783,31 @@ export function readConfiguredByokProfilesFromEnv(env = process.env) {
 
 /**
  * @param {Record<string, string | undefined>} [env]
- * @returns {Array<{ name: string; preset: string | null; providerType: string | null; baseUrl: string | null; model: string | null; auth: { apiKeyConfigured: boolean; bearerTokenConfigured: boolean; headersConfigured: boolean }; metadataKeys: string[] }>}
+ * @returns {Array<{ name: string; preset: string | null; providerType: string | null; baseUrl: string | null; model: string | null; ready: boolean; auth: { apiKeyConfigured: boolean; bearerTokenConfigured: boolean; headersConfigured: boolean }; metadataKeys: string[]; warnings: string[]; errors: string[] }>}
  */
 export function readConfiguredByokProfileSummaries(env = process.env) {
     const profiles = readConfiguredByokProfilesFromEnv(env);
     return Object.entries(profiles).map(([name, profile]) => {
+        const summaryEnv = { ...env, COPILOT_BYOK_ENABLED: 'true', COPILOT_BYOK_PROFILE: name };
         const profileEnv = applyProfileToEnv(profile, env);
-        const preset = normalizePreset(profileEnv['COPILOT_BYOK_PROVIDER_PRESET']);
+        let preset = normalizePreset(profileEnv['COPILOT_BYOK_PROVIDER_PRESET']);
         let providerType = profileEnv['COPILOT_BYOK_PROVIDER_TYPE'] ?? null;
         let baseUrl = profileEnv['COPILOT_BYOK_BASE_URL'] ?? null;
         let model = profileEnv['COPILOT_BYOK_MODEL'] ?? null;
+        let ready = false;
+        /** @type {string[]} */
+        let warnings = [];
+        /** @type {string[]} */
+        let errors = [];
         try {
-            const inferredProviderType = inferProviderType(profileEnv, preset);
-            providerType = inferredProviderType;
-            baseUrl = inferBaseUrl(profileEnv, preset, inferredProviderType) ?? baseUrl;
-            model = inferModel(profileEnv, preset, inferredProviderType) ?? model;
+            const state = readConfiguredByokState(summaryEnv);
+            preset = state.summary.preset ?? preset;
+            providerType = state.summary.providerType;
+            baseUrl = state.summary.baseUrl;
+            model = state.summary.model;
+            ready = state.ready;
+            warnings = [...state.summary.warnings];
+            errors = [...state.summary.errors];
         } catch {
             // Profile list is diagnostic-only; full validation errors are reported by readConfiguredByokState().
         }
@@ -807,12 +817,15 @@ export function readConfiguredByokProfileSummaries(env = process.env) {
             providerType,
             baseUrl,
             model,
+            ready,
             auth: {
                 apiKeyConfigured: Boolean(profileEnv['COPILOT_BYOK_API_KEY']),
                 bearerTokenConfigured: Boolean(profileEnv['COPILOT_BYOK_BEARER_TOKEN']),
                 headersConfigured: Boolean(profileEnv['COPILOT_BYOK_HEADERS_JSON']),
             },
             metadataKeys: Object.keys(asPlainObject(profile['metadata'])).sort(),
+            warnings,
+            errors,
         };
     });
 }

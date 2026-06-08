@@ -9,7 +9,7 @@
  */
 
 import { SESSION_EVENTS as SE } from '#copilot/events';
-import { normalizeToolsUpdatedEvent, onSessionEvent } from '#copilot/sdk/session';
+import { normalizeToolsUpdatedEvent, onSessionEvent } from '#copilot/events/sdk-events';
 import { log } from '../logger.js';
 
 /**

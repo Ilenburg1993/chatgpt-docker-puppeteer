@@ -74,13 +74,15 @@ describe('terminal/event-adapter-events.js — contrato', () => {
                 'tool.lifecycle',
                 'dialog.loop.state',
                 'usage.telemetry',
+                'canvas.mcp-app.summary',
+                'sdk.session.extension-signals',
                 'session.error.diagnostic',
                 'terminal.lifecycle',
             ]),
         );
         expect(new Set(sourcePolicies.map((policy) => policy.id)).size).toBe(sourcePolicies.length);
         for (const policy of sourcePolicies) {
-            expect(policy.class).toMatch(/^(content|interaction|tool|state|telemetry|diagnostic|lifecycle|provider)$/u);
+            expect(policy.class).toMatch(/^(content|interaction|tool|state|telemetry|diagnostic|lifecycle|provider|extension)$/u);
             expect(policy.canonicalEmitter).toBeTruthy();
             expect(policy.owner).toBeTruthy();
             expect(policy.publicEvents.length).toBeGreaterThan(0);
@@ -114,6 +116,18 @@ describe('terminal/event-adapter-events.js — contrato', () => {
             expect.objectContaining({
                 id: 'usage.telemetry',
                 fallback: 'usage is telemetry only; pr.consumed is the only public PR-consumption signal',
+            }),
+        );
+        expect(findTerminalPublicStreamSourcePolicyByEvent('session.autopilot_objective_changed')).toEqual(
+            expect.objectContaining({
+                id: 'sdk.session.extension-signals',
+                class: 'extension',
+            }),
+        );
+        expect(findTerminalPublicStreamSourcePolicyByEvent('mcp_app.tool_call_complete')).toEqual(
+            expect.objectContaining({
+                id: 'canvas.mcp-app.summary',
+                class: 'extension',
             }),
         );
         expect(findTerminalPublicStreamSourcePolicyByEvent('missing.event')).toBeNull();

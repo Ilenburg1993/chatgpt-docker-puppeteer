@@ -16,7 +16,7 @@ vi.mock('@github/copilot-sdk', () => {
         docs: 'docs',
         context: 'context',
     });
-    return { SYSTEM_PROMPT_SECTIONS };
+    return { SYSTEM_MESSAGE_SECTIONS: SYSTEM_PROMPT_SECTIONS, SYSTEM_PROMPT_SECTIONS };
 });
 
 // ─── Imports ───────────────────────────────────────────────────────────────

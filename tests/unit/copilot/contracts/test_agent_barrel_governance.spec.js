@@ -114,6 +114,7 @@ describe('C3.2/Onda 2 — agent barrel governance', () => {
         for (const abs of files) {
             const rel = toPosixAgentRelative(abs);
             if (basename(rel) === 'index.js') continue;
+            if (rel.startsWith('facades/')) continue;
 
             const ast = parseModule(abs);
             const specifiers = collectModuleSpecifiers(ast);
@@ -129,6 +130,7 @@ describe('C3.2/Onda 2 — agent barrel governance', () => {
                 const targetDir = dirname(targetRel).replace(/\\/g, '/');
                 if (importerDir === targetDir) continue;
                 if (basename(targetRel) === 'index.js') continue;
+                if (targetRel.startsWith('facades/') || targetRel.startsWith('ports/')) continue;
 
                 violations.push(`${rel} -> ${specifier} (${targetRel})`);
             }

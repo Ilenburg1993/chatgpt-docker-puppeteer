@@ -68,7 +68,7 @@ export function evaluateSystemPromptFreshness(status, binding, sessionId = null)
             digestMatches: false,
             liveReloadCoversEdits: status.liveReloadEnabled,
             isStale: true,
-            reason: 'Sessão sem binding persistido do system prompt.',
+            reason: 'Sessão sem vínculo persistido do prompt do sistema.',
             recommendedAction: status.liveReloadEnabled ? 'observe-live-reload' : 'resume-session',
         };
     }
@@ -85,7 +85,7 @@ export function evaluateSystemPromptFreshness(status, binding, sessionId = null)
             digestMatches,
             liveReloadCoversEdits,
             isStale: true,
-            reason: 'Binding do system prompt pertence a outra sessão SDK.',
+            reason: 'Vínculo do prompt do sistema pertence a outra sessão SDK.',
             recommendedAction: 'resume-session',
         };
     }
@@ -97,7 +97,7 @@ export function evaluateSystemPromptFreshness(status, binding, sessionId = null)
             digestMatches,
             liveReloadCoversEdits,
             isStale: false,
-            reason: 'Binding persistido coincide com a revisão atual do system prompt.',
+            reason: 'Vínculo persistido coincide com a revisão atual do prompt do sistema.',
             recommendedAction: 'none',
         };
     }
@@ -109,7 +109,7 @@ export function evaluateSystemPromptFreshness(status, binding, sessionId = null)
             digestMatches,
             liveReloadCoversEdits,
             isStale: false,
-            reason: 'Revisão mudou, mas o reload live via SDK cobre edições durante a sessão.',
+            reason: 'Revisão mudou, mas o recarregamento vivo via SDK cobre edições durante a sessão.',
             recommendedAction: 'observe-live-reload',
         };
     }
@@ -120,7 +120,7 @@ export function evaluateSystemPromptFreshness(status, binding, sessionId = null)
         digestMatches,
         liveReloadCoversEdits,
         isStale: true,
-        reason: 'Revisão mudou e a sessão atual depende de snapshot estático do system prompt.',
+        reason: 'Revisão mudou e a sessão atual depende de snapshot estático do prompt do sistema.',
         recommendedAction: 'resume-session',
     };
 }

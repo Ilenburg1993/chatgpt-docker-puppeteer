@@ -9,7 +9,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
-import { IO_PATH_POLICY_VERSION, evaluateIoPathPolicyAsync, toError } from '#copilot/core';
+import { IO_PATH_POLICY_VERSION, evaluateIoPathPolicyAsync, redactSecretText, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, withErrorHandler } from './session-middleware.js';
@@ -272,12 +272,13 @@ function sendOk(res, routeDeps, payload, sessionId) {
  * @returns {void}
  */
 function sendError(res, routeDeps, status, error, message) {
+    const safeMessage = redactSecretText(message);
     res.status(status).json({
         ok: false,
         ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
-        error: message,
+        error: safeMessage,
         code: error,
-        message,
+        message: safeMessage,
     });
 }
 
@@ -533,7 +534,7 @@ export function registerSessionWorkspaceRoutes(router) {
                         localPath: localCandidate,
                         status: 'failed',
                         traceId,
-                        reason: toError(error).message,
+                        reason: redactSecretText(toError(error).message),
                     });
                     continue;
                 }
@@ -801,7 +802,7 @@ export function registerSessionWorkspaceRoutes(router) {
                                 localPath: localPath.normalizedPath,
                                 sdkPath,
                                 overwrite,
-                                reason: toError(error).message,
+                                reason: redactSecretText(toError(error).message),
                             },
                         });
                         throw error;

@@ -15,8 +15,10 @@ import {
     EMITTER_QUESTION_PENDING,
     EMITTER_TURN_START,
 } from '#copilot/events';
-import { persistAgentRuntimePendingTurnState } from '../../facades/index.js';
-import { log, METRICS_STORE, startSpan } from '../../ports/index.js';
+import { persistAgentRuntimePendingTurnState } from '../../facades/agent-runtime-state.js';
+import { log } from '../../ports/logging/index.js';
+import { METRICS_STORE } from '../../ports/metrics-port.js';
+import { startSpan } from '../../ports/tracing-port.js';
 import {
     buildTurnResolutionListenersImpl,
     castListener as castListenerImpl,

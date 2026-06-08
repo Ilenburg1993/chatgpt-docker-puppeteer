@@ -21,11 +21,13 @@ describe('terminal/events/model-transition-presentation', () => {
             to: 'anthropic/claude-sonnet-4.5',
             kind: 'requested',
             reason: 'solicitação manual /byok model',
+            confidence: 'authenticated_catalog',
             source: 'terminal.byok_model',
             timestamp: '2026-06-05T12:34:56.789Z',
         });
 
         expect(presentation.detail).toContain('solicitado: kilo-auto/free → anthropic/claude-sonnet-4.5');
+        expect(presentation.detail).toContain('confiança authenticated catalog');
         expect(presentation.detail).toContain('origem terminal /byok model');
         expect(presentation.detail).toContain('2026-06-05T12:34:56.789Z');
         expect(presentation.detail).not.toContain('terminal.byok_model');

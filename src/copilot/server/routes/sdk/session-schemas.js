@@ -34,7 +34,7 @@ export const CreateSessionBodySchema = z.object({
     skillDirectories: z.array(z.string()).optional(),
     disabledSkills: z.array(z.string()).optional(),
     infiniteSessions: z.unknown().optional(),
-    gitHubToken: z.string().optional(),
+    gitHubToken: z.string().trim().min(1).optional(),
 });
 
 /** Schema para POST /sessions/:id/send body */
@@ -81,7 +81,7 @@ export const ResumeSessionBodySchema = z
         skillDirectories: z.array(z.string()).optional(),
         disabledSkills: z.array(z.string()).optional(),
         infiniteSessions: z.unknown().optional(),
-        gitHubToken: z.string().optional(),
+        gitHubToken: z.string().trim().min(1).optional(),
         disableResume: z.boolean().optional(),
         suppressResumeEvent: z.boolean().optional(),
         continuePendingWork: z.boolean().optional(),

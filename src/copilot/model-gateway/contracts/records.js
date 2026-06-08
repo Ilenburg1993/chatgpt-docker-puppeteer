@@ -225,7 +225,11 @@ export function createModelRecord(input) {
                 .filter(([, value]) => typeof value === 'number' && Number.isFinite(value) && value >= 0),
         ),
         routing: isRecord(input.routing)
-            ? { tier: optionalString(input.routing['tier']) ?? 'balanced', useCases: Array.isArray(input.routing['useCases']) ? input.routing['useCases'] : [] }
+            ? {
+                  ...input.routing,
+                  tier: optionalString(input.routing['tier']) ?? 'balanced',
+                  useCases: Array.isArray(input.routing['useCases']) ? input.routing['useCases'] : [],
+              }
             : { tier: 'balanced', useCases: [] },
         verification: normalizeVerification(input.verification),
         createdAt: now,

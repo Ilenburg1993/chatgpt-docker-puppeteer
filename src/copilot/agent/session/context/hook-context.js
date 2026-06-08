@@ -21,7 +21,9 @@ import { access, open, readdir, readFile, stat } from 'node:fs/promises';
 import { z } from 'zod';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '#copilot/config/agent';
 import { safeJsonParse } from '#copilot/core';
-import { log, METRICS_STORE, readAgentTodoStore } from '../../ports/index.js';
+import { log } from '../../ports/logging/index.js';
+import { METRICS_STORE } from '../../ports/metrics-port.js';
+import { readAgentTodoStore } from '../../ports/tool-port.js';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
 

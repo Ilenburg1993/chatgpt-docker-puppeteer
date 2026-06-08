@@ -12,16 +12,14 @@ import {
     EMITTER_QUESTION_ANSWERED,
     EMITTER_SESSION_KEEPALIVE,
 } from '#copilot/events';
-import { getAgentSdkModelStatsTracker, isAgentSdkExperimentalEnabled } from '../../facades/index.js';
-import {
-    createAgentEventObserver,
-    defaultErrorTracker,
-    defaultMetrics,
-    log,
-    readAgentMcpCapabilitySnapshot,
-    resolveAgentUserInput,
-} from '../../ports/index.js';
-import { reapExpiredPendingQuestionShadow } from './index.js';
+import { getAgentSdkModelStatsTracker, isAgentSdkExperimentalEnabled } from '../../facades/sdk-access.js';
+import { createAgentEventObserver } from '../../ports/event-observer-port.js';
+import { defaultErrorTracker } from '../../ports/error-tracking-port.js';
+import { log } from '../../ports/logging/index.js';
+import { readAgentMcpCapabilitySnapshot } from '../../ports/mcp-port.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
+import { resolveAgentUserInput } from '../../ports/tool-port.js';
+import { reapExpiredPendingQuestionShadow } from './boot-dialog-recovery.js';
 
 /**
  * @typedef {import('./boot-session-prep.js').BootWiringContext} BootWiringContext

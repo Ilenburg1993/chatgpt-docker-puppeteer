@@ -15,6 +15,7 @@
  * @see EventBus
  */
 
+import { redactSecretRecord } from '#copilot/core';
 import { defaultMetrics } from '#copilot/observability';
 import { Router } from 'express';
 import { SseClientPool } from '../../../infra/sse/stream-hub.js';
@@ -64,7 +65,10 @@ function ensureHookRuntimeState(routeDeps) {
             .../** @type {object} */ (ev ?? {}),
             runtimeId: runtimeKey,
         });
-        pool.broadcast('hook', payload, { replayEvent: 'hook', filterEvent: 'hook' });
+        pool.broadcast('hook', redactSecretRecord(/** @type {Record<string, unknown>} */ (payload)), {
+            replayEvent: 'hook',
+            filterEvent: 'hook',
+        });
     };
 
     routeDeps.sdkHooks.bus.on('*', listener);

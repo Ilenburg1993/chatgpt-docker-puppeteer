@@ -10,7 +10,7 @@
  */
 
 import { WORKSPACE_ROOT } from '#copilot/boot';
-import { log } from '#copilot/observability';
+import { log } from '../observability/logger.js';
 import { DEFAULT_EXCLUDED_TOOLS } from './defaults.js';
 import * as env from './env.js';
 

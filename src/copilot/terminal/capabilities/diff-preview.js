@@ -10,7 +10,7 @@
 
 import { spawnSync } from 'node:child_process';
 
-import { terminalThemeText } from '../state/ui-theme.js';
+import { terminalThemeText } from '../state/ui/index.js';
 import { readTerminalExternalToolCapabilities } from './external-tools.js';
 
 /**

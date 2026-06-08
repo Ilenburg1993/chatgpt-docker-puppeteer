@@ -17,7 +17,7 @@
 import { access, stat } from 'node:fs/promises';
 import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
 import { addAttachment, clearAttachments, getAttachmentQueue } from '../../presentation/state/index.js';
-import { formatTerminalToolPathForOperator } from '../events/tool-activity-presenter.js';
+import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/ui/index.js';
 
 /**

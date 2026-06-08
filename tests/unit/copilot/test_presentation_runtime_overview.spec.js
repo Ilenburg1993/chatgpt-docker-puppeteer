@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { resetAgent } from '../../../src/copilot/agent/always-alive.js';
+import { resetAgent } from '#copilot/agent/always-alive';
 import {
     clearAgentRuntimeRegistry,
     registerAgentRuntime,

@@ -9,7 +9,7 @@
 
 import { getCopilotFallbackModel } from '#copilot/config';
 import { BOOT_TIMEOUT_MS, DIALOG_QUEUE_MAX, WATCHDOG_INTERVAL_MS, WATCHDOG_STALL_MS } from '#copilot/config/agent';
-import { readAgentRuntimeDialogBootstrapState } from '../../facades/index.js';
+import { readAgentRuntimeDialogBootstrapState } from '../../facades/agent-runtime-state.js';
 import { DialogCompactionPolicy, ModelFallbackState } from '../policies/index.js';
 import { DialogCostLedger, DialogLoopStateMachine, TurnQueue } from '../state/index.js';
 import { DialogWatchdogSupervisor } from '../watchdogs/index.js';

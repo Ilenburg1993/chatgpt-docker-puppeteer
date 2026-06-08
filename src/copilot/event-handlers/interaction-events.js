@@ -14,7 +14,7 @@ import {
     normalizeUserInputCompletedEvent,
     normalizeUserInputRequestedEvent,
     onSessionEvent,
-} from '#copilot/sdk/session';
+} from '#copilot/events/sdk-events';
 import { DialogProtocol } from '../dialog/protocol.js';
 
 /**

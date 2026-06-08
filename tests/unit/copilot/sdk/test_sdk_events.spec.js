@@ -34,6 +34,11 @@ import {
     getEventPayload,
     getEventType,
     isKnownEventType,
+    normalizeCanvasOpenedEvent,
+    normalizeCanvasRegistryChangedEvent,
+    normalizeHookProgressEvent,
+    normalizeModelCallFailureEvent,
+    normalizePermissionsChangedEvent,
     onAllSessionEvents,
     onSessionEvent,
     onSessionEvents,
@@ -86,6 +91,90 @@ describe('F57 — ALL_EVENT_TYPES & isKnownEventType', () => {
         expect(types.has('assistant.turn_start')).toBe(true);
         expect(types.has('tool.execution_start')).toBe(true);
         expect(types.has('hook.start')).toBe(true);
+    });
+});
+
+describe('SDK 1.0 event normalizers', () => {
+    it('normaliza model.call_failure com IDs de diagnóstico', () => {
+        const normalized = normalizeModelCallFailureEvent({
+            type: 'model.call_failure',
+            timestamp: '2026-06-08T05:00:00.000Z',
+            data: {
+                source: 'top_level',
+                model: 'gpt-5.4',
+                statusCode: 429,
+                durationMs: 1234,
+                errorMessage: 'rate limited',
+                providerCallId: 'gh-req',
+                serviceRequestId: 'svc-req',
+            },
+        });
+        expect(normalized).toMatchObject({
+            source: 'top_level',
+            model: 'gpt-5.4',
+            statusCode: 429,
+            durationMs: 1234,
+            errorMessage: 'rate limited',
+            providerCallId: 'gh-req',
+            serviceRequestId: 'svc-req',
+            timestamp: '2026-06-08T05:00:00.000Z',
+        });
+        expect(normalized.ts).toBe(Date.parse('2026-06-08T05:00:00.000Z'));
+    });
+
+    it('normaliza session.permissions_changed com transição humana', () => {
+        expect(
+            normalizePermissionsChangedEvent({
+                data: { previousAllowAllPermissions: false, allowAllPermissions: true },
+            }),
+        ).toMatchObject({
+            previousAllowAllPermissions: false,
+            allowAllPermissions: true,
+            transition: 'enabled',
+        });
+    });
+
+    it('normaliza eventos de canvas e hook progress', () => {
+        expect(
+            normalizeCanvasOpenedEvent({
+                timestamp: '2026-06-08T05:01:00.000Z',
+                data: {
+                    canvasId: 'preview',
+                    instanceId: 'inst-1',
+                    extensionId: 'github-app:demo',
+                    title: 'Preview',
+                    availability: 'ready',
+                    reopen: true,
+                },
+            }),
+        ).toMatchObject({
+            canvasId: 'preview',
+            instanceId: 'inst-1',
+            title: 'Preview',
+            availability: 'ready',
+            reopen: true,
+        });
+        expect(
+            normalizeCanvasRegistryChangedEvent({
+                data: {
+                    canvases: [
+                        {
+                            canvasId: 'preview',
+                            displayName: 'Preview',
+                            description: 'Render preview',
+                            extensionId: 'github-app:demo',
+                            actions: [{ name: 'reload' }],
+                        },
+                    ],
+                },
+            }),
+        ).toMatchObject({
+            count: 1,
+            canvases: [expect.objectContaining({ canvasId: 'preview', actionCount: 1 })],
+        });
+        expect(normalizeHookProgressEvent({ data: { message: 'rodando hook' } })).toMatchObject({
+            message: 'rodando hook',
+        });
     });
 });
 

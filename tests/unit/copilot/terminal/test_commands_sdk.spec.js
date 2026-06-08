@@ -32,7 +32,14 @@ const runtimeMocks = vi.hoisted(() => {
         isTerminalSdkSessionUiElicitationAvailable: vi.fn(() => true),
         listTerminalPendingStructuredUserInputs: vi.fn(() => pendingStructuredInputs),
         listTerminalSdkModels: vi.fn(async () => ({
-            models: [{ id: 'gpt-5-mini', supportedReasoningEfforts: ['high'] }],
+            models: [
+                {
+                    id: 'gpt-5-mini',
+                    supportedReasoningEfforts: ['high'],
+                    supportedReasoningSummaries: ['none', 'concise'],
+                    supportedContextTiers: ['default', 'long_context'],
+                },
+            ],
         })),
         listTerminalSdkSkills: vi.fn(async () => ({
             skills: [
@@ -389,6 +396,18 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).toContain('/permission show latest');
     });
 
+    it('/sdk waits explica estado vazio como ausência de pendência viva', async () => {
+        const ctx = mockCtx();
+        await cmdSdk({ println: ctx.println }, 'waits');
+
+        expect(ctx.output()).toContain('Esperas humanas');
+        expect(ctx.output()).toContain('nenhuma pendência');
+        expect(ctx.output()).toContain('sem espera humana viva agora');
+        expect(ctx.output()).toContain('normal após resume silencioso');
+        expect(ctx.output()).toContain('/session sdk waits');
+        expect(ctx.output()).toContain('/events --raw');
+    });
+
     it('/sdk waits respeita runtimeId para elicitation/permission/user_input', async () => {
         recordTerminalElicitationPending({
             requestId: 'el-default',
@@ -507,6 +526,8 @@ describe('terminal/commands/sdk', () => {
         await cmdSdk({ println: models.println }, 'models');
         expect(models.output()).toContain('gpt-5-mini');
         expect(models.output()).toContain('raciocínio high');
+        expect(models.output()).toContain('resumo none, concise');
+        expect(models.output()).toContain('contexto default, long_context');
         expect(models.output()).not.toContain('reasoning high');
 
         const tools = mockCtx();

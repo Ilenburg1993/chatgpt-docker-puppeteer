@@ -17,7 +17,7 @@ import {
     normalizeTerminalPermissionRequestedEvent,
     normalizeTerminalUserInputCompletedEvent,
     normalizeTerminalUserInputRequestedEvent,
-} from '../frontend/gateways/index.js';
+} from '../frontend/gateways/sdk-events/index.js';
 import { summarizeModelGatewaySdkQuotaSnapshots } from '#copilot/model-gateway';
 
 /** @typedef {'pending' | 'completed' | 'cleared'} SdkInteractionStatus */

@@ -18,7 +18,7 @@ import {
     getTerminalHumanToolName,
     humanizeTerminalToolSurfaceText,
     isTerminalInternalCallIdentifier,
-} from '../events/tool-activity-presenter.js';
+} from '../events/presenters/tools/index.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} ActivityContext

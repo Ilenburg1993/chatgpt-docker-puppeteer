@@ -54,7 +54,9 @@ export class HookRegistry {
         if (!schema) return `Hook '${name}' não está registrado`;
         const inputFields = Array.isArray(schema['inputFields']) ? schema['inputFields'] : [];
         for (const field of inputFields) {
-            if (typeof field === 'string' && !(field in input)) {
+            if (typeof field !== 'string') continue;
+            const hasField = field in input || (field === 'workingDirectory' && 'cwd' in input);
+            if (!hasField) {
                 return `Hook '${name}': campo obrigatório '${field}' ausente no input`;
             }
         }
@@ -86,42 +88,56 @@ export const SDK_HOOKS = Object.freeze(
     new HookRegistry()
         .register('onPreToolUse', {
             description: 'Intercepta tool antes de executar. Pode allow/deny ou modificar args.',
-            inputFields: ['toolName', 'toolArgs', 'timestamp', 'cwd'],
+            inputFields: ['sessionId', 'toolName', 'toolArgs', 'timestamp', 'workingDirectory'],
             outputFields: ['permissionDecision', 'modifiedArgs', 'additionalContext'],
             canModifyInput: true,
             canAbort: true,
         })
+        .register('onPreMcpToolCall', {
+            description: 'Intercepta tool MCP antes da chamada. Pode ajustar metadados MCP.',
+            inputFields: ['sessionId', 'serverName', 'toolName', 'arguments', 'timestamp', 'workingDirectory'],
+            outputFields: ['metaToUse'],
+            canModifyInput: true,
+            canAbort: false,
+        })
         .register('onPostToolUse', {
-            description: 'Processa resultado após execução da tool. Pode adicionar contexto ao modelo.',
-            inputFields: ['toolName', 'toolArgs', 'toolResult', 'timestamp', 'cwd'],
+            description: 'Processa resultado após execução bem-sucedida da tool. Pode adicionar contexto ao modelo.',
+            inputFields: ['sessionId', 'toolName', 'toolArgs', 'toolResult', 'timestamp', 'workingDirectory'],
+            outputFields: ['additionalContext'],
+            canModifyInput: false,
+            canAbort: false,
+        })
+        .register('onPostToolUseFailure', {
+            description: 'Processa falha de tool em hook dedicado; onPostToolUse é sucesso-only no SDK 1.0.',
+            inputFields: ['sessionId', 'toolName', 'toolArgs', 'error', 'timestamp', 'workingDirectory'],
             outputFields: ['additionalContext'],
             canModifyInput: false,
             canAbort: false,
         })
         .register('onUserPromptSubmitted', {
             description: 'Intercepta prompt do usuário. Pode modificar o prompt antes do processamento.',
-            inputFields: ['prompt', 'timestamp', 'cwd'],
+            inputFields: ['sessionId', 'prompt', 'timestamp', 'workingDirectory'],
             outputFields: ['modifiedPrompt'],
             canModifyInput: true,
             canAbort: false,
         })
         .register('onSessionStart', {
             description: 'Executado ao iniciar ou retomar sessão. Pode injetar contexto inicial.',
-            inputFields: ['source', 'timestamp', 'cwd'],
+            inputFields: ['sessionId', 'source', 'timestamp', 'workingDirectory'],
             outputFields: ['additionalContext'],
             canModifyInput: false,
             canAbort: false,
         })
         .register('onSessionEnd', {
             description: 'Limpeza ao encerrar sessão.',
-            inputFields: ['reason', 'timestamp', 'cwd'],
+            inputFields: ['sessionId', 'reason', 'timestamp', 'workingDirectory'],
             outputFields: [],
             canModifyInput: false,
             canAbort: false,
         })
         .register('onErrorOccurred', {
             description: 'Controle de recuperação de erros com estratégias retry/skip/abort.',
-            inputFields: ['error', 'errorContext', 'recoverable', 'timestamp', 'cwd'],
+            inputFields: ['sessionId', 'error', 'errorContext', 'recoverable', 'timestamp', 'workingDirectory'],
             outputFields: ['errorHandling', 'retryCount'],
             canModifyInput: false,
             canAbort: true,

@@ -304,6 +304,19 @@ describe('sdk/errors › getSdkRecoveryPolicy', () => {
             tripCircuit: true,
         });
     });
+
+    it('classifica conta e modelo incompatível como bloqueios externos', () => {
+        expect(getSdkRecoveryPolicy({ status: 402, message: 'payment required for this account' }, 'session')).toMatchObject({
+            kind: 'account',
+            allowReconnect: false,
+            resetCircuit: true,
+        });
+        expect(getSdkRecoveryPolicy({ status: 400, message: 'model not supported by provider' }, 'session')).toMatchObject({
+            kind: 'model_unsupported',
+            allowReconnect: false,
+            resetCircuit: true,
+        });
+    });
 });
 
 // ─── stopClient ─────────────────────────────────────────────────────────────

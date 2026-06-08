@@ -11,7 +11,7 @@
  */
 
 import { EMITTER_STATUS } from '#copilot/events';
-import { log } from '../ports/index.js';
+import { log } from '../ports/logging/index.js';
 
 /**
  * @typedef {import('../types.js').AgentStatus} AgentStatus

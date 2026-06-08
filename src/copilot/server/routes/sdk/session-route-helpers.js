@@ -6,6 +6,8 @@
  * remonte payload HTTP de erro/sucesso manualmente.
  */
 
+import { redactSecretText } from '#copilot/core';
+
 /**
  * @typedef {import('express').Response} Res
  *
@@ -63,10 +65,11 @@ export function getActiveSessionEntryOrReply(routeDeps, id, res) {
         );
     }
 
+    const safeId = redactSecretText(id);
     res.status(404).json({
         ok: false,
         ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
-        error: `Sessão "${id}" não está ativa. Use POST /api/sdk/sessions/${id}/resume primeiro.`,
+        error: `Sessão "${safeId}" não está ativa. Use POST /api/sdk/sessions/${safeId}/resume primeiro.`,
     });
     return null;
 }

@@ -22,7 +22,7 @@ import {
     humanTerminalIntentRiskLabel,
     humanTerminalIntentSource,
     terminalIntentRiskTheme,
-} from '../events/intent-presenter.js';
+} from '../events/presenters/intent/index.js';
 
 /**
  * @typedef {object} IntentCommandContext

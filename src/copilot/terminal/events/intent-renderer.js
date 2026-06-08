@@ -9,7 +9,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { SEPARATOR, broadcastSse, printlnBlock } from '../dialog/index.js';
+import { SEPARATOR, broadcastSse, printlnBlock } from '../dialog/io/index.js';
 import {
     appendTerminalIntent,
     appendTerminalTranscriptTurn,

@@ -17,7 +17,7 @@ import {
     setNextTurnRequestHeaders,
 } from '../../presentation/state/index.js';
 import { readTerminalIoActivityProjection } from '../events/index.js';
-import { printTerminalHumanQuestionCard } from '../events/human-question-renderer.js';
+import { printTerminalHumanQuestionCard } from '../events/presenters/human-question/index.js';
 import {
     compactTerminalSdkSession,
     confirmTerminalSdkSessionUi,
@@ -83,7 +83,7 @@ import {
 import {
     compactTerminalDiagnosticId,
     formatTerminalToolPathForOperator,
-} from '../events/tool-activity-presenter.js';
+} from '../events/presenters/tools/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, renderRuntimeTargetLabel } from './runtime-target.js';
 
 /**
@@ -1070,7 +1070,8 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         }
     }
     if (totalPending === 0) {
-        println(terminalThemeRow('Status', 'Sem bloqueios de input humano do SDK no momento.'));
+        println(terminalThemeRow('Status', 'sem espera humana viva agora; normal após resume silencioso ou sem ask_user/elicitation/permission'));
+        println(terminalThemeRow('Histórico', '/session sdk waits · auditoria bruta em /events --raw'));
     }
     println(terminalThemeDivider(37));
     println('');
@@ -1387,6 +1388,32 @@ function renderSdkRequestHeadersSummary({ println }, rest) {
 }
 
 /**
+ * @param {Record<string, unknown>} model
+ * @param {string} field
+ * @returns {string}
+ */
+function renderSdkModelStringList(model, field) {
+    const value = model[field];
+    if (!Array.isArray(value)) return '';
+    return value.map(String).filter(Boolean).join(', ');
+}
+
+/**
+ * @param {Record<string, unknown>} model
+ * @returns {string}
+ */
+function renderSdkModelOptions(model) {
+    const details = [];
+    const effort = renderSdkModelStringList(model, 'supportedReasoningEfforts');
+    const summaries = renderSdkModelStringList(model, 'supportedReasoningSummaries');
+    const contextTiers = renderSdkModelStringList(model, 'supportedContextTiers');
+    if (effort) details.push(`raciocínio ${effort}`);
+    if (summaries) details.push(`resumo ${summaries}`);
+    if (contextTiers) details.push(`contexto ${contextTiers}`);
+    return details.join(' · ');
+}
+
+/**
  * @param {CommandContext} ctx
  * @param {string | null | undefined} runtimeId
  * @returns {Promise<void>}
@@ -1399,10 +1426,8 @@ async function renderSdkModels({ println }, runtimeId) {
     for (const model of models.slice(0, 30)) {
         const m = objectOrNull(model) ?? {};
         const id = String(m['id'] ?? m['name'] ?? model);
-        const effort = Array.isArray(m['supportedReasoningEfforts'])
-            ? m['supportedReasoningEfforts'].map(String).join(', ')
-            : '';
-        println(terminalThemeRow('Modelo', effort ? `${id} · raciocínio ${effort}` : id, { role: 'command' }));
+        const options = renderSdkModelOptions(m);
+        println(terminalThemeRow('Modelo', options ? `${id} · ${options}` : id, { role: 'command' }));
     }
     if (models.length > 30)
         println(terminalThemeRow('Omitidos', `${models.length - 30} ${models.length - 30 === 1 ? 'modelo' : 'modelos'}`));

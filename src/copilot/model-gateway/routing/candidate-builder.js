@@ -115,6 +115,7 @@ function buildCandidate(projection, route) {
     const routeRef = route ? routeOptionRef(route) : [provider, model, profile, selectorKind, selectorSyntax].join(':');
     const canonicalModelId = optionalString(projection['id']) ?? [provider, model].join(':');
     const routeCandidateId = route ? [provider, model, profile, selectorKind, selectorSyntax].join(':') : canonicalModelId;
+    const projectionRouting = isRecord(projection['routing']) ? projection['routing'] : {};
     return {
         ...projection,
         id: routeCandidateId,
@@ -131,9 +132,9 @@ function buildCandidate(projection, route) {
         normalizedPolicy: policy,
         routeTraits: traits,
         routing: {
-            ...(isRecord(projection['routing']) ? projection['routing'] : {}),
-            routeLayer: optionalString(policy['routeLayer']),
-            wireApi: optionalString(policy['wireApi']),
+            ...projectionRouting,
+            routeLayer: optionalString(policy['routeLayer']) ?? optionalString(projectionRouting['routeLayer']),
+            wireApi: optionalString(policy['wireApi']) ?? optionalString(projectionRouting['wireApi']),
             selectorKind,
             selectorSyntax,
             upstreamProvider:

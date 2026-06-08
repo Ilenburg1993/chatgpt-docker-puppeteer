@@ -20,8 +20,8 @@ import {
     setTerminalModelProjection,
     setTerminalReasoningProjection,
 } from '../frontend/index.js';
-import { buildTerminalModelTransitionPresentation } from '../events/model-transition-presenter.js';
-import { recordTerminalActivity } from '../state/activity-state.js';
+import { buildTerminalModelTransitionPresentation } from '../events/presenters/model/index.js';
+import { recordTerminalActivity } from '../state/index.js';
 import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -93,14 +93,30 @@ function yesNoPt(value) {
 }
 
 /**
- * @param {{ capabilities?: { supports?: { reasoningEffort?: boolean; vision?: boolean } } }} model
+ * @param {Record<string, unknown>} model
+ * @param {string} field
+ * @returns {string}
+ */
+function renderModelStringList(model, field) {
+    const value = model[field];
+    if (!Array.isArray(value)) return '';
+    return value.map(String).filter(Boolean).join(', ');
+}
+
+/**
+ * @param {{ capabilities?: { supports?: { reasoningEffort?: boolean; vision?: boolean } } } & Record<string, unknown>} model
  * @param {boolean} isActive
  * @returns {string}
  */
 function renderModelListDetails(model, isActive) {
+    const efforts = renderModelStringList(model, 'supportedReasoningEfforts');
+    const summaries = renderModelStringList(model, 'supportedReasoningSummaries');
+    const contextTiers = renderModelStringList(model, 'supportedContextTiers');
     const parts = [
         isActive ? 'ativo' : null,
-        model.capabilities?.supports?.reasoningEffort ? 'raciocínio' : null,
+        efforts ? `raciocínio ${efforts}` : model.capabilities?.supports?.reasoningEffort ? 'raciocínio' : null,
+        summaries ? `resumo ${summaries}` : null,
+        contextTiers ? `contexto ${contextTiers}` : null,
         model.capabilities?.supports?.vision ? 'visão' : null,
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : 'sem recursos especiais declarados';

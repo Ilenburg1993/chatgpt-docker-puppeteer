@@ -46,4 +46,13 @@ describe('middleware — error sanitizer (F136)', () => {
         const mod = await import('../../../src/copilot/server/routes/sdk/middleware.js');
         assert.ok(typeof mod.withErrorHandler === 'function');
     });
+
+    it('hooks/events redige payload antes de publicar SSE', async () => {
+        const source = await import('node:fs/promises').then((fs) =>
+            fs.readFile(new URL('../../../src/copilot/server/routes/sdk/hooks.js', import.meta.url), 'utf8'),
+        );
+
+        assert.ok(source.includes('redactSecretRecord'));
+        assert.match(source, /pool\.broadcast\('hook',\s*redactSecretRecord/u);
+    });
 });

@@ -15,7 +15,7 @@
  */
 
 import { SHUTDOWN_PRIORITY, registerShutdownHandler, runShutdown, toError } from '#copilot/core';
-import { readRuntimeControlState } from '../../facades/index.js';
+import { readRuntimeControlState } from '../../facades/agent-runtime-controls.js';
 
 /** @type {boolean} */
 let _processSignalHandlersRegistered = false;

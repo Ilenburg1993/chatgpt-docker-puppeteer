@@ -49,6 +49,55 @@ Function-valued SDK capabilities (`tools[].handler`, `onPermissionRequest`, `onU
 `hooks`, `onEvent`, trace context callbacks) remain process-local capabilities. They enter through
 `deps.js`, hooks, tools registry or agent ports, not through JSON request bodies.
 
+## Public Response Contracts
+
+All public JSON responses that can aggregate SDK, provider, hook, audit or observability payloads
+must include runtime route metadata when a route is runtime-aware:
+
+- `runtimeId`: resolved runtime serving the request;
+- `requestedRuntimeId`: runtime requested by the caller before fallback;
+- `runtimeFound`: whether the requested runtime exists;
+- `usedDefaultRuntimeFallback`: whether the default runtime served the response.
+
+Public responses must also apply boundary redaction before `res.json` whenever a payload can contain
+provider credentials, request headers, tool arguments, audit entries or arbitrary metadata. Redaction
+is defense in depth; producers should still sanitize at write time.
+
+### Payload Classification
+
+Each route must classify its payload before returning it:
+
+- Intentional content may remain raw: chat messages, explicit workspace file content, shell/tool/RPC
+  command output and UI answers are the content the caller requested.
+- Diagnostic metadata must be redacted: model/session metadata, hook events, observability entries,
+  audit/log/error payloads, route error messages, convergence reasons and provider/BYOK records.
+- Mixed payloads must redact only the diagnostic shell around intentional content. For example,
+  workspace read returns raw `content`, while `INVALID_LOCAL_PATH` messages and convergence `reason`
+  fields are redacted.
+
+When a route is ambiguous, prefer a small helper at the route boundary and a focused test proving
+that token-like values do not appear in the serialized response. Do not invent “effective”
+model/reasoning fields unless the SDK or runtime exposes a trustworthy source of truth.
+
+### `GET /models`
+
+`/models` is the HTTP view of `client.listModels()`. In this application, `client.listModels()` is
+the canonical SDK 1.0 model catalog seam and may be backed by `CopilotClientOptions.onListModels`
+from the model-gateway/BYOK importer.
+
+The route returns:
+
+- `ok`, `count`, `models` and runtime metadata;
+- official SDK model fields such as `id`, `name`, `defaultReasoningEffort` and
+  `supportedReasoningEfforts`;
+- local extension metadata when present, such as `byok.provider`, `byok.providerModel`,
+  `byok.routeLayer`, `byok.wireApi`, `supportedReasoningSummaries` and `supportedContextTiers`.
+
+The route must not leak provider secrets. `apiKey`, `Authorization`, `headers` and matching token
+strings are redacted at the HTTP boundary even if the model-gateway already sanitized the source
+record. Ollama/local metadata may be exposed only as operational metadata (`local_daemon`,
+`openai_compatible`, local/private flags), never as credentials.
+
 ## Current Hotspots
 
 - `session-messaging.js`: now only composes route families. Core behavior lives in

@@ -141,7 +141,7 @@ describe('F18 — SDK tools/core.js permanece o wrapper canônico', () => {
 
     it('sdk/tools/core.js re-exporta defineTool para backward compat', () => {
         const src = readSource('sdk/tools/core.js');
-        expect(src).toContain('export { defineTool }');
+        expect(src).toMatch(/export\s*\{[^}]*\bdefineTool\b[^}]*\}/su);
     });
 });
 
