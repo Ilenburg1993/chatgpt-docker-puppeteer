@@ -360,7 +360,7 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
             ),
         );
         println(terminalThemeRow('Próximo', renderCompactActionLine(health?.['recommendedAction']), { role: 'command' }));
-        println(terminalThemeRow('Detalhe', renderCommandList(['/health full', '/diagnose', '/tools diag', '/activity detail'])));
+        println(terminalThemeRow('Mais detalhes', renderCommandList(['/health full', '/diagnose', '/tools diag', '/activity detail'])));
         println(terminalThemeDivider(36));
         if (configProjection.runtimeFallbackWarning) {
             println(

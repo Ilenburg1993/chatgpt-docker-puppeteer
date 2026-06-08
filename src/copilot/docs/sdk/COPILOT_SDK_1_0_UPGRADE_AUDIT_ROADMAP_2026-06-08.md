@@ -2479,8 +2479,26 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Décima Quinta Passada
 
-- [ ] SDK10-P115-01: continuar caçando rodapés e dicas default que ainda misturam instrução técnica com navegação
+- [x] SDK10-P115-01: continuar caçando rodapés e dicas default que ainda misturam instrução técnica com navegação
   humana, começando pelos comandos irmãos de status/diagnóstico e suas telas de vazio.
+
+### Execução Contínua Em 2026-06-08 - Centésima Décima Sexta Passada
+
+- [x] `/diagnose` trocou o rodapé default para `Mais detalhes`, preservando o conjunto de comandos e reduzindo a
+  frase explicativa no caminho comum.
+- [x] O teste de `/diagnose` passou a verificar o atalho humano e o acesso a `/health full`.
+- [x] Validado com `node --check src/copilot/terminal/commands/diagnose.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js` (1 arquivo, 5 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T15-11-52-080Z/summary.md`, confirmando `/diagnose`, `/activity`, `/session sdk events`,
+  `/session sdk waits`, `/metrics`, `/usage now` e `/events` sem regressão visual.
+
+### Achados Novos Da Centésima Décima Sexta Passada
+
+- [ ] SDK10-P116-01: revisar ainda os fluxos de diagnóstico e saúde adjacentes para padronizar o mesmo vocabulário
+  curto em footers de summary, empty-state e next-step.
 
 ---
 
