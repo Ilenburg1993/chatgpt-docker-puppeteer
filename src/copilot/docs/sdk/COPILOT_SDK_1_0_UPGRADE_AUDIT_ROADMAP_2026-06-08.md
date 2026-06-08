@@ -2553,8 +2553,32 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Décima Nona Passada
 
-- [ ] SDK10-P119-01: rodar uma busca final por rótulos `Detalhe` em summaries default restantes e separar o que é
+- [x] SDK10-P119-01: rodar uma busca final por rótulos `Detalhe` em summaries default restantes e separar o que é
   detalhe de dado real do que ainda é apenas atalho de navegação.
+
+### Execução Contínua Em 2026-06-08 - Centésima Vigésima Passada
+
+- [x] Busca final por `terminalThemeRow('Detalhe'|'Detalhes')` separou atalhos de navegação de linhas que carregam dado
+  real do runtime.
+- [x] `/status`, `/live`, `/events`, `/activity` truncado e `/terminal libs` passaram a usar `Mais detalhes` nos atalhos
+  de navegação.
+- [x] `/activity` truncado deixou de renderizar a frase longa `mostra timeline completa` e passou a apontar diretamente
+  para `/activity detail`.
+- [x] Mantidos como `Detalhe` os campos que são dado operacional real: detalhe da atividade atual, detalhe de métrica,
+  detalhe de diagnóstico e tags de modelo BYOK.
+- [x] Validado com `node --check` dos comandos tocados.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_terminal.spec.js`
+  (4 arquivos, 100 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T15-21-58-598Z/summary.md`, confirmando `/events` com `Mais detalhes`,
+  `/activity`, `/session sdk events`, `/session sdk waits`, `/metrics`, `/usage now` e `/errors` sem regressão visual.
+
+### Achados Novos Da Centésima Vigésima Passada
+
+- [ ] SDK10-P120-01: voltar da frente de microcopy para hardening estrutural: revisar se algum comando terminal ainda
+  importa barrels largos quando há porta estreita disponível, priorizando `src/copilot/terminal/commands`.
 
 ---
 

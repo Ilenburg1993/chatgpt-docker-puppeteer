@@ -439,7 +439,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toContain('\x1b[36mStatus do Terminal LLM-B');
         expect(ctx.output()).toContain('Conversa');
         expect(ctx.output()).toContain('Entrada');
-        expect(ctx.output()).toContain('Detalhe');
+        expect(ctx.output()).toContain('Mais detalhes');
         expect(ctx.output()).toContain('/status full');
         expect(ctx.output()).not.toContain('\x1b[90m/status full · /now');
         expect(ctx.output()).toContain('gpt-5-mini');

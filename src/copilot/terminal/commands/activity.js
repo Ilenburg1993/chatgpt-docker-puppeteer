@@ -633,7 +633,7 @@ export function cmdActivity({ println }, arg) {
         );
     }
     if (!detail && projection.history.length > timelineEntries.length) {
-        println(terminalThemeRow('Detalhes', '/activity detail mostra timeline completa.', { role: 'command' }));
+        println(terminalThemeRow('Mais detalhes', '/activity detail', { role: 'command' }));
     }
     println('');
 }

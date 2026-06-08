@@ -1615,7 +1615,7 @@ export async function cmdEvents({ println }, arg = '') {
     );
     println(terminalThemeRow('Filtro', filterParts.join(' · ') || 'nenhum', { role: 'muted' }));
     println(
-        terminalThemeRow('Detalhe', '/events --raw preview · /events --raw full · /events --json compact · /events sources', {
+        terminalThemeRow('Mais detalhes', '/events --raw preview · /events --raw full · /events --json compact · /events sources', {
             role: 'command',
         }),
     );

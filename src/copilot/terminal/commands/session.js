@@ -782,7 +782,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         );
         println(terminalThemeRow('Atividade', renderLiveActivitySummary(projection.activity)));
         println(terminalThemeRow('Próximo', action, { role: 'command' }));
-        println(terminalThemeRow('Detalhe', renderCommandList(['/status full', '/now', '/health', '/menu'])));
+        println(terminalThemeRow('Mais detalhes', renderCommandList(['/status full', '/now', '/health', '/menu'])));
         println(terminalThemeDivider(37));
         println('');
         return;
@@ -1412,7 +1412,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
                 `${renderCompactSseLine(projection.sse)} · timeline ${countLabel(projection.counters.timelineTurns, 'turno', 'turnos')}`,
             ),
         );
-        println(terminalThemeRow('Detalhe', renderCommandList(['/live full', `/activity ${requestedLimit} detail`, `/events ${requestedLimit}`])));
+        println(terminalThemeRow('Mais detalhes', renderCommandList(['/live full', `/activity ${requestedLimit} detail`, `/events ${requestedLimit}`])));
         println(terminalThemeDivider(37));
         return;
     }

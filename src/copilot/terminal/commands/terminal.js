@@ -270,7 +270,7 @@ function printTerminalLibsCompact(println, refresh, filterTokens = []) {
         println(terminalThemeRow('Resultado', 'nenhuma ferramenta para este filtro', { role: 'warn' }));
     }
     println('');
-    println(terminalThemeRow('Detalhes', '/terminal libs detail [filtro] · /terminal libs json [filtro] · /terminal libs refresh'));
+    println(terminalThemeRow('Mais detalhes', '/terminal libs detail [filtro] · /terminal libs json [filtro] · /terminal libs refresh'));
     println(terminalThemeRow('Smoke', 'npm run terminal:aux-libs:smoke · npm --silent run terminal:aux-libs:smoke -- --json'));
     println(terminalThemeRow('Guia', TERMINAL_AUX_LIBS_GUIDE));
     println('');
