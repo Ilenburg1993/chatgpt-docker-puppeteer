@@ -372,6 +372,35 @@ describe('commands/metrics + usage', () => {
         }
     });
 
+    it('cmdMetrics humaniza contexto ainda não medido com limite conhecido do modelo', () => {
+        const originalGetStatusSnapshot = defaultRuntime.getStatusSnapshot;
+        defaultRuntime.getStatusSnapshot = () => ({
+            status: 'idle',
+            model: 'gpt-5-mini',
+            reasoningEffort: 'medium',
+            contextState: null,
+            systemPromptBinding: { digest: 'bound-default' },
+            systemPromptFreshness: {
+                isStale: false,
+                reason: 'Vínculo persistido coincide com a revisão atual do prompt do sistema.',
+                recommendedAction: 'none',
+            },
+        });
+
+        try {
+            const ctx = mockCtx();
+
+            cmdMetrics({ println: ctx.println });
+
+            expect(ctx.output()).toContain('Contexto');
+            expect(ctx.output()).toContain('uso ainda não medido');
+            expect(ctx.output()).toContain('limite 128.000 tokens');
+            expect(ctx.output()).not.toContain('Contexto      (sem dados)');
+        } finally {
+            defaultRuntime.getStatusSnapshot = originalGetStatusSnapshot;
+        }
+    });
+
     it('cmdMetrics encaminha runtimeId explícito para as projections', () => {
         const ctx = mockCtx();
 

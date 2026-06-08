@@ -41,6 +41,24 @@ function renderMetricDuration(label, value) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalConfigProjection>} configProjection
+ * @returns {number | null}
+ */
+function readKnownMetricContextLimit(configProjection) {
+    const candidates = [
+        configProjection.modelMeta?.contextWindow,
+        configProjection.observedModelMeta?.contextWindow,
+        configProjection.byok?.capabilities?.contextWindowTokens,
+    ];
+    for (const candidate of candidates) {
+        if (typeof candidate === 'number' && Number.isFinite(candidate) && candidate > 0) {
+            return Math.round(candidate);
+        }
+    }
+    return null;
+}
+
+/**
  * @param {unknown} value
  * @returns {string}
  */
@@ -238,7 +256,11 @@ export function cmdMetrics({ println }, arg = '') {
     const byokActive = byok?.enabled === true;
 
     // ── Token context ────────────────────────────────────────────────
-    let ctxStr = terminalThemeText('muted', '(sem dados)');
+    const knownContextLimit = readKnownMetricContextLimit(configProjection);
+    let ctxStr =
+        knownContextLimit === null
+            ? terminalThemeText('muted', 'uso ainda não medido')
+            : `${terminalThemeText('muted', 'uso ainda não medido')} · limite ${knownContextLimit.toLocaleString('pt-BR')} tokens`;
     if (contextWindow) {
         const tokens = contextWindow.tokens;
         const limit = contextWindow.tokenLimit;

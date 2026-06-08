@@ -2395,8 +2395,29 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Décima Primeira Passada
 
-- [ ] SDK10-P111-01: aplicar a mesma estratégia de estado vazio humano em `/metrics`, onde a linha `Contexto (sem dados)`
+- [x] SDK10-P111-01: aplicar a mesma estratégia de estado vazio humano em `/metrics`, onde a linha `Contexto (sem dados)`
   ainda pode ser enriquecida com limite do modelo sem fingir uso medido.
+
+### Execução Contínua Em 2026-06-08 - Centésima Décima Segunda Passada
+
+- [x] `/metrics` deixou de renderizar `Contexto (sem dados)` quando o runtime ainda não mediu tokens usados, mas o
+  catálogo/model-gateway já conhece o limite do modelo.
+- [x] Novo helper `readKnownMetricContextLimit()` centraliza a leitura de `modelMeta`, metadados observados e capacidades
+  BYOK antes de montar a linha visual de contexto.
+- [x] Estado vazio de contexto agora renderiza `uso ainda não medido · limite N tokens`, preservando o caminho antigo de
+  percentual/tokens quando `contextState` real existe.
+- [x] Teste unitário cobre o caso sem `contextState`, garante `limite 128.000 tokens` e bloqueia a regressão para
+  `Contexto      (sem dados)`.
+- [x] Validado com `node --check src/copilot/terminal/commands/metrics.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js` (1 arquivo, 10 testes).
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T14-59-18-020Z/summary.md`, confirmando `/metrics` com
+  `Contexto      uso ainda não medido · limite 200.000 tokens` e `/usage now` mantendo a microcopy nova.
+
+### Achados Novos Da Centésima Décima Segunda Passada
+
+- [ ] SDK10-P112-01: auditar `/events sources` no plain log live, separando detalhe técnico útil de ruído default e
+  verificando se `sdk.session.extension-signals` precisa de microcopy mais humana sem perder rastreabilidade.
 
 ---
 
