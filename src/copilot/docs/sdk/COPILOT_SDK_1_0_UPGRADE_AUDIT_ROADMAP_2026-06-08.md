@@ -2374,10 +2374,29 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Décima Passada
 
-- [ ] SDK10-P110-01: investigar por que `/usage now` ainda renderiza `dados da janela de contexto não disponíveis` no live
-  mesmo com sessão SDK conectada; decidir se é lacuna real de telemetria SDK 1.0 ou microcopy de estado vazio.
+- [x] SDK10-P110-01: investigar por que `/usage now` ainda renderiza `dados da janela de contexto não disponíveis` no live
+  mesmo com sessão SDK conectada; decidido como estado vazio legítimo de medição SDK ainda não reportada, com limite do
+  modelo disponível via metadados BYOK/model-gateway.
 - [ ] SDK10-P110-02: avaliar se os 5 warnings externos do madge devem virar allowlist documentada em contrato próprio para
   evitar ambiguidade em revisões futuras.
+
+### Execução Contínua Em 2026-06-08 - Centésima Décima Primeira Passada
+
+- [x] `/usage now` deixou de renderizar o alerta genérico `dados da janela de contexto não disponíveis`.
+- [x] Estado vazio de contexto agora renderiza `Janela de contexto · uso ainda não medido`, linha `Medição` explicando que
+  o SDK ainda não reportou tokens usados e `Limite do modelo` quando metadados de modelo/BYOK estão disponíveis.
+- [x] Teste unitário cobre o estado sem `contextState`, garante limite conhecido do modelo e bloqueia a string antiga.
+- [x] Harness `llmBLiveTest` reconhece a nova microcopy de `/usage now`.
+- [x] Validado com `node --check src/copilot/terminal/commands/usage.js`.
+- [x] Validado com `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js` (1 arquivo, 9 testes).
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T14-56-15-736Z/summary.md`.
+
+### Achados Novos Da Centésima Décima Primeira Passada
+
+- [ ] SDK10-P111-01: aplicar a mesma estratégia de estado vazio humano em `/metrics`, onde a linha `Contexto (sem dados)`
+  ainda pode ser enriquecida com limite do modelo sem fingir uso medido.
 
 ---
 

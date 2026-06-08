@@ -49,6 +49,24 @@ function renderUsageSdkMode(value) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalConfigProjection>} configProjection
+ * @returns {number | null}
+ */
+function readKnownContextLimit(configProjection) {
+    const candidates = [
+        configProjection.modelMeta?.contextWindow,
+        configProjection.observedModelMeta?.contextWindow,
+        configProjection.byok?.capabilities?.contextWindowTokens,
+    ];
+    for (const candidate of candidates) {
+        if (typeof candidate === 'number' && Number.isFinite(candidate) && candidate > 0) {
+            return Math.round(candidate);
+        }
+    }
+    return null;
+}
+
+/**
  * Comando `/usage [on|off|now]`.
  *
  * - Sem argumento: toggle do display pós-turno.
@@ -80,8 +98,25 @@ export function cmdUsage({ println }, arg) {
                 role: 'info',
             }));
         } else {
+            const knownLimit = readKnownContextLimit(configProjection);
             println('');
-            println(terminalThemeRow('Atenção', 'dados da janela de contexto não disponíveis', { role: 'warn' }));
+            println(terminalThemeHeadline('command', 'Janela de contexto', ['uso ainda não medido']));
+            println(
+                terminalThemeRow(
+                    'Medição',
+                    'SDK ainda não reportou tokens usados nesta sessão',
+                    { role: 'warn' },
+                ),
+            );
+            if (knownLimit !== null) {
+                println(
+                    terminalThemeRow(
+                        'Limite do modelo',
+                        `${knownLimit.toLocaleString('pt-BR')} tokens`,
+                        { role: 'info' },
+                    ),
+                );
+            }
         }
 
         const modelBilling = projection.modelBilling;

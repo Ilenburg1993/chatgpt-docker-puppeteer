@@ -2662,6 +2662,7 @@ function defaultUxCycleCriteria(boot) {
     const nowStart = nowPanelStart >= 0 ? nowPanelStart + 1 : plain.indexOf('[agora]');
     const usageStart = [
         plain.indexOf('Janela de contexto', Math.max(0, nowStart)),
+        plain.indexOf('Medição       SDK ainda não reportou tokens usados nesta sessão', Math.max(0, nowStart)),
         plain.indexOf('Atenção       dados da janela de contexto', Math.max(0, nowStart)),
         plain.indexOf('\n  BYOK', Math.max(0, nowStart)),
         plain.indexOf('BYOK ativo', Math.max(0, nowStart)),
@@ -2914,10 +2915,10 @@ function defaultUxCycleCriteria(boot) {
             id: 'ux-cycle-usage-byok-current-first',
             pass:
                 (/^\s*Rota BYOK\s{2,}/imu.test(usageSurface) || /^\s*BYOK\s{2,}/imu.test(usageSurface) || /BYOK ativo/iu.test(usageSurface)
-                    ? /(?:Janela de contexto|Atenção\s+dados da janela de contexto)[\s\S]*Rota BYOK[\s\S]*Histórico\s+Copilot|Rota BYOK[\s\S]*Histórico\s+Copilot/iu.test(
+                    ? /(?:Janela de contexto|Medição\s+SDK ainda não reportou tokens usados nesta sessão|Atenção\s+dados da janela de contexto)[\s\S]*Rota BYOK[\s\S]*Histórico\s+Copilot|Rota BYOK[\s\S]*Histórico\s+Copilot/iu.test(
                           usageSurface,
                       )
-                    : /(?:Janela de contexto|Atenção\s+dados da janela de contexto)[\s\S]*(?:Telemetria PR|Pedido premium)|Pedido premium/iu.test(
+                    : /(?:Janela de contexto|Medição\s+SDK ainda não reportou tokens usados nesta sessão|Atenção\s+dados da janela de contexto)[\s\S]*(?:Telemetria PR|Pedido premium)|Pedido premium/iu.test(
                           usageSurface,
                       )) &&
                 !/Quota Copilot|side-channel|não é cobrança BYOK|BYOK ativo|BYOK\s+provedor|Histórico Copilot/iu.test(usageSurface),

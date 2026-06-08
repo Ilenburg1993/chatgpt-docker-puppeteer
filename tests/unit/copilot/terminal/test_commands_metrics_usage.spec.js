@@ -130,7 +130,7 @@ vi.mock('#copilot/agent', () => ({
         canForcePreference: false,
     }),
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
-    readSdkModelMetadata: () => null,
+    readSdkModelMetadata: () => ({ contextWindow: 128000 }),
     createRuntimeSnapshot: vi.fn(),
     saveRuntimeSnapshot: vi.fn(),
     listRuntimeSnapshots: vi.fn(async () => []),
@@ -178,7 +178,7 @@ vi.mock('#copilot/agent/facades', () => ({
         canForcePreference: false,
     }),
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
-    readSdkModelMetadata: () => null,
+    readSdkModelMetadata: () => ({ contextWindow: 128000 }),
     createRuntimeSnapshot: vi.fn(),
     saveRuntimeSnapshot: vi.fn(),
     listRuntimeSnapshots: vi.fn(async () => []),
@@ -412,6 +412,37 @@ describe('commands/metrics + usage', () => {
         expect(ctx.output()).toMatch(/não implica consumo neste boot\/sonda|BYOK atual separado/);
         expect(ctx.output()).not.toContain('Premium Request');
         expect(ctx.output()).not.toContain('\x1b[');
+    });
+
+    it('cmdUsage now humaniza contexto ainda não medido sem esconder limite conhecido do modelo', () => {
+        const originalGetStatusSnapshot = defaultRuntime.getStatusSnapshot;
+        defaultRuntime.getStatusSnapshot = () => ({
+            status: 'idle',
+            model: 'gpt-5-mini',
+            reasoningEffort: 'medium',
+            contextState: null,
+            systemPromptBinding: { digest: 'bound-default' },
+            systemPromptFreshness: {
+                isStale: false,
+                reason: 'Vínculo persistido coincide com a revisão atual do prompt do sistema.',
+                recommendedAction: 'none',
+            },
+        });
+
+        try {
+            const ctx = mockCtx();
+
+            cmdUsage({ println: ctx.println }, 'now');
+
+            expect(ctx.output()).toContain('Janela de contexto');
+            expect(ctx.output()).toContain('uso ainda não medido');
+            expect(ctx.output()).toContain('SDK ainda não reportou tokens usados nesta sessão');
+            expect(ctx.output()).toContain('Limite do modelo');
+            expect(ctx.output()).toContain('128.000 tokens');
+            expect(ctx.output()).not.toContain('dados da janela de contexto não disponíveis');
+        } finally {
+            defaultRuntime.getStatusSnapshot = originalGetStatusSnapshot;
+        }
     });
 
     it('cmdUsage now aceita runtimeId explícito', () => {
