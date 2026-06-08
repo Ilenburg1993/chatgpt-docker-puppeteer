@@ -2515,8 +2515,26 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Décima Sétima Passada
 
-- [ ] SDK10-P117-01: seguir padronizando atalhos de navegação em comandos irmãos e revisar se `Detalhe` ainda aparece
+- [x] SDK10-P117-01: seguir padronizando atalhos de navegação em comandos irmãos e revisar se `Detalhe` ainda aparece
   em algum summary default que possa virar `Mais detalhes` sem perda de informação.
+
+### Execução Contínua Em 2026-06-08 - Centésima Décima Oitava Passada
+
+- [x] `/sdk` passou a usar `Mais detalhes` nos atalhos compactos de waits, capabilities, elicitation e permission.
+- [x] O modo detalhado continua disponível, sem alterar o conteúdo técnico dos comandos ou dos painéis de suporte.
+- [x] Teste de `/sdk` passou a cobrir o novo vocabulário compactado sem perder cobertura funcional.
+- [x] Validado com `node --check src/copilot/terminal/commands/sdk.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js` (1 arquivo, 42 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T15-16-42-754Z/summary.md`, confirmando `/sdk`, `/session sdk events`,
+  `/session sdk waits`, `/metrics`, `/usage now` e `/events` sem regressão visual.
+
+### Achados Novos Da Centésima Décima Oitava Passada
+
+- [ ] SDK10-P118-01: revisar `display`, `usage` e demais comandos de suporte para padronizar o mesmo rótulo curto em
+  atalhos compactos e reduzir ainda mais a linguagem de instrução no default.
 
 ---
 

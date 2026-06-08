@@ -1164,7 +1164,7 @@ function renderSdkSimulate({ println }, rest) {
         state: 'aguardando operador',
         includeDivider: true,
     });
-    println(terminalThemeRow('Detalhe', terminalThemeText('command', '/sdk waits detail')));
+    println(terminalThemeRow('Mais detalhes', terminalThemeText('command', '/sdk waits detail')));
     println(terminalThemeDivider(37));
     println('');
     void created.promise;
@@ -1207,7 +1207,7 @@ function renderSdkCapabilitiesSummary({ println }, runtimeId, options = {}) {
     if (options.detail) {
         println(terminalThemeRow('Retorno', pretty(capabilities, 1200)));
     } else {
-        println(terminalThemeRow('Detalhe', '/sdk capabilities detail · /sdk doctor · /sdk waits', { role: 'command' }));
+        println(terminalThemeRow('Mais detalhes', '/sdk capabilities detail · /sdk doctor · /sdk waits', { role: 'command' }));
     }
     println('');
 }
@@ -2669,7 +2669,7 @@ function renderElicitationEntry({ println }, entry, options = {}) {
         if (entry.requestedSchema) println(`\n  schema:\n${pretty(entry.requestedSchema, 2500)}`);
         if (entry.data) println(`\n  data:\n${pretty(entry.data, 2500)}`);
     } else {
-        println(terminalThemeRow('Detalhes', '/elicitation show latest detail', { role: 'command' }));
+        println(terminalThemeRow('Mais detalhes', '/elicitation show latest detail', { role: 'command' }));
     }
     println('');
 }
@@ -2719,7 +2719,7 @@ function renderPermissionEntry({ println }, entry, options = {}) {
     if (detail) {
         println(`\n  data:\n${pretty(entry.data, 2500)}\n`);
     } else {
-        println(terminalThemeRow('Detalhes', '/permission show latest detail', { role: 'command' }));
+        println(terminalThemeRow('Mais detalhes', '/permission show latest detail', { role: 'command' }));
         println('');
     }
 }
