@@ -94,6 +94,7 @@ describe('commands/tools', () => {
         expect(ctx.output()).toContain('sem falhas');
         expect(ctx.output()).not.toContain('calls=');
         expect(ctx.output()).not.toContain('errors=');
+        expect(ctx.output()).toContain('Mais detalhes');
         expect(ctx.output()).toContain('140ms');
     });
 
@@ -333,7 +334,7 @@ describe('commands/tools', () => {
         expect(defaultCtx.output()).toContain('Intenção capturada');
         expect(defaultCtx.output()).not.toContain('read_file_content');
         expect(defaultCtx.output()).not.toContain('report_intent_local');
-        expect(defaultCtx.output()).toContain('Detalhes');
+        expect(defaultCtx.output()).toContain('Mais detalhes');
         expect(defaultCtx.output()).toContain('/tools diag');
 
         readTerminalToolStatsProjection.mockReturnValueOnce({

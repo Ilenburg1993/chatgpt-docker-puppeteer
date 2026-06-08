@@ -2497,8 +2497,26 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Décima Sexta Passada
 
-- [ ] SDK10-P116-01: revisar ainda os fluxos de diagnóstico e saúde adjacentes para padronizar o mesmo vocabulário
+- [x] SDK10-P116-01: revisar ainda os fluxos de diagnóstico e saúde adjacentes para padronizar o mesmo vocabulário
   curto em footers de summary, empty-state e next-step.
+
+### Execução Contínua Em 2026-06-08 - Centésima Décima Sétima Passada
+
+- [x] `/tools` trocou os footers default para `Mais detalhes` nos caminhos de observação e fallback.
+- [x] O modo explícito `diag` preservou o conjunto de comandos de investigação, agora com rótulo humano curto.
+- [x] O teste de `/tools` passou a proteger o rótulo curto no caminho default e no caminho de diagnóstico.
+- [x] Validado com `node --check src/copilot/terminal/commands/tools.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js` (1 arquivo, 13 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T15-14-43-175Z/summary.md`, confirmando `/tools`, `/activity`, `/session sdk events`,
+  `/session sdk waits`, `/metrics`, `/usage now` e `/events` sem regressão visual.
+
+### Achados Novos Da Centésima Décima Sétima Passada
+
+- [ ] SDK10-P117-01: seguir padronizando atalhos de navegação em comandos irmãos e revisar se `Detalhe` ainda aparece
+  em algum summary default que possa virar `Mais detalhes` sem perda de informação.
 
 ---
 

@@ -286,7 +286,9 @@ function printFilesystemToolDiagnostic(println) {
             }),
         );
     }
-    println(terminalThemeRow('Detalhe', '/tools contract · /tools diag · /fs read <path> · /fs search <pattern>', { role: 'command' }));
+    println(terminalThemeRow('Mais detalhes', '/tools contract · /tools diag · /fs read <path> · /fs search <pattern>', {
+        role: 'command',
+    }));
 }
 
 /**
@@ -322,7 +324,9 @@ function printToolFailureDiagnostic(println, projection, options = {}) {
     );
     if (problematicEntries.length === 0 && failedRecent.length === 0) {
         println(terminalThemeRow('Estado', 'nenhuma falha ou bloqueio observado nesta sessão', { role: 'success' }));
-        println(terminalThemeRow('Detalhe', '/tools diag · /events --raw · /events --json compact · /errors', { role: 'command' }));
+        println(terminalThemeRow('Mais detalhes', '/tools diag · /events --raw · /events --json compact · /errors', {
+            role: 'command',
+        }));
         return;
     }
     for (const entry of problematicEntries.slice(0, 12)) {
@@ -914,7 +918,7 @@ export function cmdTools({ println }, arg = '') {
                       : '/tools all · FS: /tools fs · falhas: /tools failures · contrato: /tools contract · nomes crus: /tools raw · eventos: /events --json compact',
                   { role: 'command' },
               )
-            : terminalThemeRow('Detalhes', '/tools diag · /tools fs · /tools failures · contrato: /tools contract · nomes crus: /tools raw', { role: 'command' }),
+            : terminalThemeRow('Mais detalhes', '/tools diag · /tools fs · /tools failures · contrato: /tools contract · nomes crus: /tools raw', { role: 'command' }),
     );
     println('');
 }
