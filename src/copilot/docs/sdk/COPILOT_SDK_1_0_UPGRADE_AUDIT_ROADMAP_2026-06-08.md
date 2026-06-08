@@ -2416,8 +2416,30 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Décima Segunda Passada
 
-- [ ] SDK10-P112-01: auditar `/events sources` no plain log live, separando detalhe técnico útil de ruído default e
+- [x] SDK10-P112-01: auditar `/events sources` no plain log live, separando detalhe técnico útil de ruído default e
   verificando se `sdk.session.extension-signals` precisa de microcopy mais humana sem perder rastreabilidade.
+
+### Execução Contínua Em 2026-06-08 - Centésima Décima Terceira Passada
+
+- [x] `/events sources` ganhou um default mais escaneável: `Mais detalhes` vira a porta explícita para o modo técnico,
+  enquanto o catálogo padrão reduz a lista de eventos por política a um resumo humano com `+N`.
+- [x] As dicas de investigação no default deixaram de repetir o ruído `detalhe técnico` em cada linha; o detalhe
+  estrutural fica concentrado no modo `sources detail`.
+- [x] O modo detalhe segue mostrando a lista completa, incluindo `id`, `classe`, `dono técnico`, `emissor`, `aceita`,
+  `suprime` e `fallback`.
+- [x] Teste unitário atualizado para proteger o resumo humano padrão, o atalho `Mais detalhes` e o modo detail técnico.
+- [x] Validado com `node --check src/copilot/terminal/commands/events.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js` (1 arquivo, 29 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000`; PASS em
+  `artifacts/terminal-live/2026-06-08T15-05-16-026Z/summary.md`, confirmando `/events sources` mais humano,
+  `/events`, `/metrics`, `/usage now`, `/session sdk events` e `/session sdk waits` sem regressão visual.
+
+### Achados Novos Da Centésima Décima Terceira Passada
+
+- [ ] SDK10-P113-01: seguir revisando superfícies de operação com foco em coerência entre comandos irmãos (`/events`,
+  `/activity`, `/session sdk`, `/metrics`) e eliminar mais um caso de microcopy duplicada ou técnica demais no default.
 
 ---
 

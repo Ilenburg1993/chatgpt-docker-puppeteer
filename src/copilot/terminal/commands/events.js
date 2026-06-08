@@ -232,7 +232,19 @@ function buildHumanPolicyQueryHint(policy) {
     const visibleLabels = labels.slice(0, 3);
     const suffix = labels.length > visibleLabels.length ? ` +${labels.length - visibleLabels.length}` : '';
     const subject = visibleLabels.length > 0 ? `${visibleLabels.join(' + ')}${suffix}` : humanPolicyId(policy.id);
-    return `ver ${subject}: /events 50 · detalhe técnico: /events sources detail`;
+    return `ver ${subject}: /events 50`;
+}
+
+/**
+ * @param {string[]} events
+ * @param {{ detailMode: boolean }} opts
+ * @returns {string}
+ */
+function renderEventsSourcePolicyEventList(events, opts) {
+    const labels = uniqueHumanEventLabels(events);
+    const visibleLabels = opts.detailMode ? labels : labels.slice(0, 3);
+    const suffix = labels.length > visibleLabels.length ? ` +${labels.length - visibleLabels.length}` : '';
+    return visibleLabels.length > 0 ? `${visibleLabels.join(', ')}${suffix}` : '-';
 }
 
 /**
@@ -1486,7 +1498,7 @@ export async function cmdEvents({ println }, arg = '') {
             ),
         );
         if (!detailMode) {
-            println(terminalThemeRow('Detalhe', '/events sources detail', { role: 'command' }));
+            println(terminalThemeRow('Mais detalhes', '/events sources detail', { role: 'command' }));
         }
         println(
             terminalThemeRow('Formatos', '/events --json compact · /events --raw preview · /events --raw full', {
@@ -1501,7 +1513,7 @@ export async function cmdEvents({ println }, arg = '') {
         for (const policy of policies) {
             const policyCount = policy.publicEvents.reduce((sum, event) => sum + (counts.get(event) ?? 0), 0);
             const humanEvents = uniqueHumanEventLabels(policy.publicEvents);
-            const events = humanEvents.join(', ');
+            const events = renderEventsSourcePolicyEventList(policy.publicEvents, { detailMode });
             const title = detailMode
                 ? policy.id
                 : humanEvents.slice(0, 2).join(' + ');

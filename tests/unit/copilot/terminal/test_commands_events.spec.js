@@ -85,7 +85,7 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Streaming');
         expect(ctx.output()).toContain('1 recentes');
         expect(ctx.output()).toContain('ver Streaming: /events 50');
-        expect(ctx.output()).toContain('detalhe técnico: /events sources detail');
+        expect(ctx.output()).not.toContain('detalhe técnico: /events sources detail');
         expect(ctx.output()).toContain('/events --json compact · /events --raw preview · /events --raw full');
         expect(ctx.output()).toContain('payload público redigido; compacto usa preview e ids de filtro');
         expect(ctx.output()).toContain('Pergunta ao operador');
@@ -95,6 +95,10 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Objetivo autopiloto + Contexto de extensão');
         expect(ctx.output()).toContain('Agentes customizados');
         expect(ctx.output()).toContain('ver Objetivo autopiloto + Contexto de extensão + Agentes customizados +6: /events 50');
+        expect(ctx.output()).toContain('Objetivo autopiloto, Contexto de extensão, Agentes customizados +6');
+        expect(ctx.output()).not.toContain(
+            'Objetivo autopiloto, Contexto de extensão, Agentes customizados, Notificação customizada, Anexos de extensão',
+        );
         expect(ctx.output()).toContain('/events sources detail');
         expect(ctx.output()).not.toContain('/events source terminal/dialog/turn-display.createDeltaCallback 50');
         expect(ctx.output()).not.toContain('user_input.requested');
