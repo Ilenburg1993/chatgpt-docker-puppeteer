@@ -5,7 +5,6 @@
  * @module copilot/terminal/commands/events
  */
 
-import { listTerminalPublicStreamSourcePolicies, summarizeEmptyAfterUserInputRecovery } from '../events/index.js';
 import { redactSecretRecord } from '../../core/security/redaction.js';
 import {
     compactTerminalDiagnosticId,
@@ -13,6 +12,8 @@ import {
     formatTerminalToolPathForOperator,
     getTerminalHumanToolName,
 } from '../events/presenters/tools/index.js';
+import { summarizeEmptyAfterUserInputRecovery } from '../events/dialog-recovery-presenter.js';
+import { listTerminalPublicStreamSourcePolicies } from '../events/event-adapter-events.js';
 import { classifyRuntimeSdkRateLimitScope, describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk/index.js';
 import {
     formatTerminalTimeLabel,

@@ -85,13 +85,16 @@ const readTerminalRuntimeState = vi.fn(() => ({
     lastPrInfo: { model: 'claude-haiku-4.5', configuredModel: 'gpt-4.1', modelMismatch: true, ts: 10 },
 }));
 
-vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
+vi.mock('../../../../src/copilot/terminal/frontend/projections/config.js', () => ({
     readTerminalConfigProjection,
     readTerminalModelStatsProjection,
     listTerminalAvailableModelsProjection,
-    readTerminalRuntimeState,
     setTerminalModelProjection,
     setTerminalReasoningProjection,
+}));
+
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
+    readTerminalRuntimeState,
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/metrics.js', () => ({

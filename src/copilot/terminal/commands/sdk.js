@@ -16,7 +16,7 @@ import {
     getNextTurnRequestHeaders,
     setNextTurnRequestHeaders,
 } from '../../presentation/state/index.js';
-import { readTerminalIoActivityProjection } from '../events/index.js';
+import { readTerminalIoActivityProjection } from '../events/projections/index.js';
 import { printTerminalHumanQuestionCard } from '../events/presenters/human-question/index.js';
 import {
     compactTerminalSdkSession,

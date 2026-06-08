@@ -16,10 +16,10 @@ import {
     listTerminalAvailableModelsProjection,
     readTerminalConfigProjection,
     readTerminalModelStatsProjection,
-    readTerminalRuntimeState,
     setTerminalModelProjection,
     setTerminalReasoningProjection,
-} from '../frontend/index.js';
+} from '../frontend/projections/config.js';
+import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
 import { buildTerminalModelTransitionPresentation } from '../events/presenters/model/index.js';
 import { recordTerminalActivity } from '../state/index.js';
 import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';

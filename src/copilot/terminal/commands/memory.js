@@ -12,7 +12,7 @@ import {
     forgetTerminalMemoryProjection,
     recallTerminalMemoriesProjection,
     rememberTerminalMemoryProjection,
-} from '../frontend/index.js';
+} from '../frontend/projections/now.js';
 import {
     formatTerminalTimeLabel,
     terminalThemeDivider,

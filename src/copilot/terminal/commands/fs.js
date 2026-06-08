@@ -16,7 +16,7 @@ import {
     renderTerminalStructuredPreview,
     terminalPreviewSummaryRole,
 } from '../capabilities/index.js';
-import { readTerminalIoActivityProjection } from '../events/index.js';
+import { readTerminalIoActivityProjection } from '../events/projections/index.js';
 import { requireTerminalFileTool } from '../frontend/gateways/index.js';
 import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
 import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';

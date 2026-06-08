@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
+vi.mock('../../../../src/copilot/terminal/frontend/projections/now.js', () => ({
     rememberTerminalMemoryProjection: vi.fn((/** @type {{ input: string }} */ input) => ({
         ok: Boolean(input.input.trim()),
         reason: input.input.trim() ? null : 'empty-content',
@@ -15,9 +15,6 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
         memories: [{ tag: 'arch', content: 'Node.js 24+', created_at: Date.now() }],
     })),
     forgetTerminalMemoryProjection: vi.fn(() => true),
-}));
-
-vi.mock('../../../../src/copilot/terminal/frontend/projections/now.js', () => ({
     readTerminalResumeListProjection: vi.fn(() => ({
         currentHubSessionId: 'hub-1',
         sessions: [{ id: 'hub-1', status: 'active', title: 'Sessão 1', created_at: Date.now() }],

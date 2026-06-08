@@ -19,7 +19,7 @@ const updateTerminalSdkPlanProjection = vi.fn(async (content) => ({
 }));
 const deleteTerminalSdkPlanProjection = vi.fn(async () => ({ exists: false, content: null, path: '/tmp/plan.md' }));
 
-vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
+vi.mock('../../../../src/copilot/terminal/frontend/projections/sdk-session-vanilla.js', () => ({
     readTerminalSdkSessionProjection,
     setTerminalSdkModeProjection,
     updateTerminalSdkPlanProjection,
