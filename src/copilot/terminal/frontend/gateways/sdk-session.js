@@ -19,6 +19,7 @@ import {
     normalizePermissionRequestedEvent,
     normalizeUserInputCompletedEvent,
     normalizeUserInputRequestedEvent,
+    readConfiguredSessionFsState,
     registerPendingStructuredUserInputResolver,
     resolveEffectiveUserInputAllowFreeform,
 } from '#copilot/sdk/session';
@@ -68,6 +69,14 @@ import {
  */
 export function getTerminalPendingStructuredUserInputCount() {
     return getPendingStructuredUserInputCount();
+}
+
+/**
+ * @param {string | null | undefined} [sessionId]
+ * @returns {ReturnType<typeof readConfiguredSessionFsState>}
+ */
+export function readTerminalConfiguredSessionFsState(sessionId) {
+    return readConfiguredSessionFsState(sessionId);
 }
 
 /**

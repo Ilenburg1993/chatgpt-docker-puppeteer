@@ -196,6 +196,7 @@ export {
 } from './session-registry.js';
 
 export {
+    SYSTEM_MESSAGE_SECTIONS,
     SYSTEM_PROMPT_SECTIONS,
     appendSystemMessage,
     appendToGuidelines,

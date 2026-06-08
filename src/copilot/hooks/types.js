@@ -28,7 +28,9 @@
  *
  * @typedef {object} SessionHooks
  * @property {PreToolUseHandler} [onPreToolUse]
+ * @property {PreMcpToolCallHandler} [onPreMcpToolCall]
  * @property {PostToolUseHandler} [onPostToolUse]
+ * @property {PostToolUseFailureHandler} [onPostToolUseFailure]
  * @property {UserPromptSubmittedHandler} [onUserPromptSubmitted]
  * @property {SessionStartHandler} [onSessionStart]
  * @property {SessionEndHandler} [onSessionEnd]
@@ -43,10 +45,24 @@
  */
 
 /**
+ * @callback PreMcpToolCallHandler
+ * @param {PreMcpToolCallHookInput} input
+ * @param {InvocationContext} invocation
+ * @returns {Promise<PreMcpToolCallHookOutput | void> | PreMcpToolCallHookOutput | void}
+ */
+
+/**
  * @callback PostToolUseHandler
  * @param {PostToolUseHookInput} input
  * @param {InvocationContext} invocation
  * @returns {Promise<PostToolUseHookOutput | void> | PostToolUseHookOutput | void}
+ */
+
+/**
+ * @callback PostToolUseFailureHandler
+ * @param {PostToolUseFailureHookInput} input
+ * @param {InvocationContext} invocation
+ * @returns {Promise<PostToolUseFailureHookOutput | void> | PostToolUseFailureHookOutput | void}
  */
 
 /**
@@ -80,36 +96,74 @@
 // ─── Inputs dos hooks ─────────────────────────────────────────────────────────
 
 /**
+ * @typedef {object} BaseHookInput
+ * @property {string} [sessionId]
+ * @property {Date | number} timestamp
+ * @property {string} [workingDirectory]
+ * @property {string} [cwd] Alias legado local para `workingDirectory`.
+ */
+
+/**
  * @typedef {object} PreToolUseHookInput
+ * @property {string} [sessionId]
  * @property {string} toolName
  * @property {unknown} toolArgs
- * @property {number} timestamp
- * @property {string} cwd
+ * @property {Date | number} timestamp
+ * @property {string} [workingDirectory]
+ * @property {string} [cwd]
  * @property {string} [agentName]
  */
 
 /**
+ * @typedef {object} PreMcpToolCallHookInput
+ * @property {string} [sessionId]
+ * @property {string} [toolCallId]
+ * @property {string} serverName
+ * @property {string} toolName
+ * @property {unknown} arguments
+ * @property {Record<string, unknown>} [_meta]
+ * @property {Date | number} timestamp
+ * @property {string} [workingDirectory]
+ * @property {string} [cwd]
+ */
+
+/**
  * @typedef {object} PostToolUseHookInput
+ * @property {string} [sessionId]
  * @property {string} toolName
  * @property {unknown} toolArgs
  * @property {import('#copilot/sdk/types.js').ToolResultObject} toolResult
- * @property {number} timestamp
- * @property {string} cwd
+ * @property {Date | number} timestamp
+ * @property {string} [workingDirectory]
+ * @property {string} [cwd]
+ */
+
+/**
+ * @typedef {object} PostToolUseFailureHookInput
+ * @property {string} [sessionId]
+ * @property {string} toolName
+ * @property {unknown} toolArgs
+ * @property {string} error
+ * @property {Date | number} timestamp
+ * @property {string} [workingDirectory]
+ * @property {string} [cwd]
  */
 
 /**
  * @typedef {object} UserPromptSubmittedHookInput
  * @property {string} prompt
- * @property {number} timestamp
- * @property {string} cwd
+ * @property {Date | number} timestamp
+ * @property {string} [workingDirectory]
+ * @property {string} [cwd]
  */
 
 /**
  * @typedef {object} SessionStartHookInput
  * @property {'startup' | 'resume' | 'new'} source
  * @property {string} [initialPrompt]
- * @property {number} timestamp
- * @property {string} cwd
+ * @property {Date | number} timestamp
+ * @property {string} [workingDirectory]
+ * @property {string} [cwd]
  */
 
 /**
@@ -117,8 +171,9 @@
  * @property {'complete' | 'error' | 'abort' | 'timeout' | 'user_exit'} reason
  * @property {string} [finalMessage]
  * @property {string} [error]
- * @property {number} timestamp
- * @property {string} cwd
+ * @property {Date | number} timestamp
+ * @property {string} [workingDirectory]
+ * @property {string} [cwd]
  */
 
 /**
@@ -126,8 +181,9 @@
  * @property {string} error
  * @property {string} errorContext
  * @property {boolean} recoverable
- * @property {number} timestamp
- * @property {string} cwd
+ * @property {Date | number} timestamp
+ * @property {string} [workingDirectory]
+ * @property {string} [cwd]
  */
 
 /**
@@ -140,12 +196,22 @@
 // ─── Outputs dos hooks ────────────────────────────────────────────────────────
 
 /**
+ * @typedef {object} PreMcpToolCallHookOutput
+ * @property {Record<string, unknown> | null} [metaToUse]
+ */
+
+/**
  * @typedef {object} PreToolUseHookOutput
  * @property {'allow' | 'deny' | 'ask'} [permissionDecision]
  * @property {string} [permissionDecisionReason] - Razão legível da decisão
  * @property {unknown} [modifiedArgs] - Args modificados para substituir os originais
  * @property {string} [additionalContext] - Contexto adicional injetado no modelo
  * @property {boolean} [suppressOutput] - Solicita supressão da saída do hook/tool
+ */
+
+/**
+ * @typedef {object} PostToolUseFailureHookOutput
+ * @property {string} [additionalContext] - Contexto adicional injetado no modelo após falha de tool
  */
 
 /**
@@ -197,7 +263,9 @@
  * @property {(toolName: string, args: object) => object | null | undefined} [argsModifier] - Callback para modificar
  *   args antes da execução. Retornar null/undefined para não modificar.
  * @property {PreToolUseHandler} [onPreToolUse] - Override completo do handler pré-tool
+ * @property {PreMcpToolCallHandler} [onPreMcpToolCall] - Override do handler pré-MCP tool
  * @property {PostToolUseHandler} [onPostToolUse] - Override completo do handler pós-tool
+ * @property {PostToolUseFailureHandler} [onPostToolUseFailure] - Override do handler pós-falha de tool
  * @property {UserPromptSubmittedHandler} [onUserPromptSubmitted] - Override do handler de prompt
  * @property {SessionStartHandler} [onSessionStart] - Override do handler de início de sessão
  * @property {SessionEndHandler} [onSessionEnd] - Override do handler de encerramento de sessão

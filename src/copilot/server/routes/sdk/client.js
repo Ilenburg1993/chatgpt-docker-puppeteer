@@ -196,9 +196,9 @@ export default function createClientRouter(deps) {
     router.post('/client/start', (req, res) => {
         void withErrorHandler(req, res, async () => {
             const routeDeps = resolveClientRouterDeps(deps, req);
-            const { getClient, runtimeId, sdkSessionOwnership } = routeDeps;
+            const { getClient, getClientState, runtimeId, sdkSessionOwnership } = routeDeps;
             const client = await getClient();
-            const state = client.getState();
+            const state = getClientState();
             const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjectionForRuntime(
                 runtimeId,
                 client,

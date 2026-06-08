@@ -7,10 +7,12 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 // Mock SDK (necessário para barrel import que carrega system-message.js)
-vi.mock('@github/copilot-sdk', () => ({
-    SYSTEM_PROMPT_SECTIONS: {
+const mocks = vi.hoisted(() => ({
+    SYSTEM_MESSAGE_SECTIONS: {
         identity: { description: 'Identity' },
         tone: { description: 'Tone' },
         tool_efficiency: { description: 'Tool efficiency' },
@@ -20,8 +22,14 @@ vi.mock('@github/copilot-sdk', () => ({
         safety: { description: 'Safety' },
         tool_instructions: { description: 'Tool instructions' },
         custom_instructions: { description: 'Custom instructions' },
+        runtime_instructions: { description: 'Runtime instructions' },
         last_instructions: { description: 'Last instructions' },
     },
+}));
+
+vi.mock('@github/copilot-sdk', () => ({
+    SYSTEM_MESSAGE_SECTIONS: mocks.SYSTEM_MESSAGE_SECTIONS,
+    SYSTEM_PROMPT_SECTIONS: mocks.SYSTEM_MESSAGE_SECTIONS,
     defineTool: vi.fn(),
     approveAll: vi.fn(),
 }));
@@ -88,9 +96,10 @@ describe('CONNECTION_STATES', () => {
 // ─── SYSTEM_PROMPT_SECTION_NAMES ──────────────────────────────────────────────
 
 describe('SYSTEM_PROMPT_SECTION_NAMES', () => {
-    it('contém as 10 seções conhecidas', () => {
-        expect(Object.keys(SYSTEM_PROMPT_SECTION_NAMES)).toHaveLength(10);
+    it('contém as seções conhecidas do SDK 1.0', () => {
+        expect(Object.keys(SYSTEM_PROMPT_SECTION_NAMES)).toHaveLength(11);
         expect(SYSTEM_PROMPT_SECTION_NAMES.IDENTITY).toBe('identity');
+        expect(SYSTEM_PROMPT_SECTION_NAMES.RUNTIME_INSTRUCTIONS).toBe('runtime_instructions');
         expect(SYSTEM_PROMPT_SECTION_NAMES.LAST_INSTRUCTIONS).toBe('last_instructions');
     });
 });
@@ -215,6 +224,22 @@ describe('SESSION_EVENTS', () => {
     it('valores não têm duplicatas', () => {
         const values = Object.values(SESSION_EVENTS);
         expect(new Set(values).size).toBe(values.length);
+    });
+
+    it('cobre todos os event types gerados pelo @github/copilot-sdk 1.0', () => {
+        const sessionEventsDts = readFileSync(
+            resolve(process.cwd(), 'node_modules/@github/copilot-sdk/dist/generated/session-events.d.ts'),
+            'utf8',
+        );
+        const generated = [
+            ...new Set([...sessionEventsDts.matchAll(/type:\s*"([^"]+)"/g)].map((match) => match[1])),
+        ].sort();
+        const local = [...new Set(Object.values(SESSION_EVENTS))].sort();
+        const missing = generated.filter((eventType) => !local.includes(eventType));
+
+        expect(generated).toHaveLength(108);
+        expect(missing).toEqual([]);
+        expect(local).toContain('custom');
     });
 });
 

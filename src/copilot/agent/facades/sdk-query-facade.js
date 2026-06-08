@@ -51,7 +51,7 @@ export class SdkQueryFacade {
     /**
      * Executa um ping no client SDK atualmente acoplado ao agent.
      *
-     * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
+     * @returns {Promise<{ message: string; timestamp: string; protocolVersion?: number }>}
      */
     async pingSdk() {
         return pingSdk(this.ctx);

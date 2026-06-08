@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 // ─── Hoisted mocks ────────────────────────────────────────────────────────
 
 vi.mock('@github/copilot-sdk', () => {
-    const SYSTEM_PROMPT_SECTIONS = Object.freeze({
+    const SYSTEM_MESSAGE_SECTIONS = Object.freeze({
         identity: 'identity',
         tone: 'tone',
         tool_efficiency: 'tool_efficiency',
@@ -17,7 +17,8 @@ vi.mock('@github/copilot-sdk', () => {
         context: 'context',
     });
     return {
-        SYSTEM_PROMPT_SECTIONS,
+        SYSTEM_MESSAGE_SECTIONS,
+        SYSTEM_PROMPT_SECTIONS: SYSTEM_MESSAGE_SECTIONS,
         CopilotClient: vi.fn(),
         defineTool: vi.fn(),
         approveAll: vi.fn(),
@@ -142,6 +143,7 @@ describe('F86 - Barrel complete export coverage', () => {
     it('exports system-message.js', async () => {
         barrel = barrel ?? (await import('#copilot/sdk'));
         const names = [
+            'SYSTEM_MESSAGE_SECTIONS',
             'SYSTEM_PROMPT_SECTIONS',
             'appendSystemMessage',
             'appendToGuidelines',

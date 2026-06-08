@@ -10,7 +10,7 @@ const { mockClientOn } = vi.hoisted(() => ({
 // ─── SDK mock (padrão obrigatório) ─────────────────────────────────────────
 
 vi.mock('@github/copilot-sdk', () => {
-    const SYSTEM_PROMPT_SECTIONS = Object.freeze({
+    const SYSTEM_MESSAGE_SECTIONS = Object.freeze({
         identity: 'identity',
         tone: 'tone',
         tool_efficiency: 'tool_efficiency',
@@ -22,7 +22,7 @@ vi.mock('@github/copilot-sdk', () => {
         docs: 'docs',
         context: 'context',
     });
-    return { SYSTEM_PROMPT_SECTIONS };
+    return { SYSTEM_MESSAGE_SECTIONS, SYSTEM_PROMPT_SECTIONS: SYSTEM_MESSAGE_SECTIONS };
 });
 
 // ─── Imports sob teste ─────────────────────────────────────────────────────

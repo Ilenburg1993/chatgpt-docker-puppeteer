@@ -5,7 +5,7 @@
  * Faixa 3 / F11-F15 — Builder centralizado de SystemMessageConfig do `@github/copilot-sdk`. Ponto único para criação de
  * configurações de system prompt.
  *
- * Consumers **não** devem importar `SYSTEM_PROMPT_SECTIONS` diretamente do `@github/copilot-sdk`.
+ * Consumers **não** devem importar `SYSTEM_MESSAGE_SECTIONS` diretamente do `@github/copilot-sdk`.
  *
  * Tres modos suportados pelo SDK:
  *
@@ -18,11 +18,22 @@
  * @see module:copilot/config/system-prompt
  */
 
-import { SYSTEM_PROMPT_SECTIONS } from '@github/copilot-sdk';
+import * as CopilotSdk from '@github/copilot-sdk';
+
+/**
+ * @typedef {typeof import('@github/copilot-sdk') & {
+ *     SYSTEM_PROMPT_SECTIONS?: typeof import('@github/copilot-sdk').SYSTEM_MESSAGE_SECTIONS;
+ * }} CopilotSdkNamespace
+ */
+
+const sdkNamespace = /** @type {CopilotSdkNamespace} */ (CopilotSdk);
 
 // ─── Re-exports do SDK ────────────────────────────────────────────────────────
 
-export { SYSTEM_PROMPT_SECTIONS };
+export const SYSTEM_MESSAGE_SECTIONS = sdkNamespace.SYSTEM_MESSAGE_SECTIONS ?? sdkNamespace.SYSTEM_PROMPT_SECTIONS ?? {};
+
+// Alias legado local: o SDK 1.0 renomeou "prompt sections" para "message sections".
+export const SYSTEM_PROMPT_SECTIONS = SYSTEM_MESSAGE_SECTIONS;
 
 /**
  * @typedef {import('@github/copilot-sdk').SystemMessageConfig} SystemMessageConfig
@@ -33,7 +44,7 @@ export { SYSTEM_PROMPT_SECTIONS };
  *
  * @typedef {import('@github/copilot-sdk').SystemMessageCustomizeConfig} SystemMessageCustomizeConfig
  *
- * @typedef {import('@github/copilot-sdk').SystemPromptSection} SystemPromptSection
+ * @typedef {import('@github/copilot-sdk').SystemMessageSection} SystemMessageSection
  *
  * @typedef {import('@github/copilot-sdk').SectionOverride} SectionOverride
  *
@@ -50,9 +61,9 @@ export { SYSTEM_PROMPT_SECTIONS };
  * @type {boolean}
  */
 const _supportsCustomize =
-    typeof SYSTEM_PROMPT_SECTIONS === 'object' &&
-    SYSTEM_PROMPT_SECTIONS !== null &&
-    'guidelines' in SYSTEM_PROMPT_SECTIONS;
+    typeof SYSTEM_MESSAGE_SECTIONS === 'object' &&
+    SYSTEM_MESSAGE_SECTIONS !== null &&
+    'guidelines' in SYSTEM_MESSAGE_SECTIONS;
 
 /**
  * Retorna true se o SDK suporta mode:'customize'.
@@ -102,7 +113,7 @@ export function replaceSystemMessage(content) {
  *
  * Se o SDK não suportar customize (< v0.2.0), faz fallback para mode:'append' concatenando os conteúdos de override.
  *
- * @param {Partial<Record<SystemPromptSection, SectionOverride>>} [sections] - Overrides por seção
+ * @param {Partial<Record<SystemMessageSection, SectionOverride>>} [sections] - Overrides por seção
  * @param {string} [content] - Conteúdo adicional após todas as seções
  * @returns {SystemMessageConfig}
  */
@@ -189,19 +200,19 @@ export function replaceIdentity(content) {
 /**
  * Retorna a lista de nomes de seções suportadas pelo SDK.
  *
- * @returns {SystemPromptSection[]}
+ * @returns {SystemMessageSection[]}
  */
 export function getSectionNames() {
-    if (!SYSTEM_PROMPT_SECTIONS) return [];
-    return /** @type {SystemPromptSection[]} */ (Object.keys(SYSTEM_PROMPT_SECTIONS));
+    if (!SYSTEM_MESSAGE_SECTIONS) return [];
+    return /** @type {SystemMessageSection[]} */ (Object.keys(SYSTEM_MESSAGE_SECTIONS));
 }
 
 /**
  * Retorna a descrição de uma seção do system prompt.
  *
- * @param {SystemPromptSection} section - Nome da seção
+ * @param {SystemMessageSection} section - Nome da seção
  * @returns {string | undefined}
  */
 export function getSectionDescription(section) {
-    return SYSTEM_PROMPT_SECTIONS?.[section]?.description;
+    return SYSTEM_MESSAGE_SECTIONS?.[section]?.description;
 }

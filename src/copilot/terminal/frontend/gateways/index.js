@@ -93,6 +93,7 @@ export {
     normalizeTerminalPermissionRequestedEvent,
     normalizeTerminalUserInputCompletedEvent,
     normalizeTerminalUserInputRequestedEvent,
+    readTerminalConfiguredSessionFsState,
     readTerminalSdkPlan,
     readTerminalSdkSessionBootSelection,
     readTerminalSdkSkillsGovernance,

@@ -147,7 +147,7 @@ describe('SessionConfigBuilder', () => {
 
     it('configDir() define o diretório de configuração', () => {
         const config = new SessionConfigBuilder().configDir('/tmp/config').build();
-        expect(config.configDir).toBe('/tmp/config');
+        expect(config.configDirectory).toBe('/tmp/config');
     });
 
     it('streaming(false) desativa streaming', () => {
@@ -303,7 +303,7 @@ describe('SessionConfigBuilder', () => {
 
     it('buildForResume() inclui disableResume', () => {
         const config = new SessionConfigBuilder().model('gpt-4.1').disableResume(true).buildForResume();
-        expect(config.disableResume).toBe(true);
+        expect(config.suppressResumeEvent).toBe(true);
     });
 
     it('build() não vaza disableResume em SessionConfig', () => {
@@ -319,7 +319,7 @@ describe('SessionConfigBuilder', () => {
             .buildForResume();
         expect('sessionId' in config).toBe(false);
         expect(config.model).toBe('gpt-4.1');
-        expect(config.disableResume).toBe(true);
+        expect(config.suppressResumeEvent).toBe(true);
     });
 
     it('provider() define BYOK config', () => {
@@ -342,7 +342,7 @@ describe('SessionConfigBuilder', () => {
     it('createSessionFsHandler() define handler de session filesystem', () => {
         const handler = vi.fn();
         const config = new SessionConfigBuilder().createSessionFsHandler(/** @type {any} */ (handler)).build();
-        expect(config.createSessionFsHandler).toBe(handler);
+        expect(config.createSessionFsProvider).toBe(handler);
     });
 });
 
@@ -359,17 +359,20 @@ describe('ClientOptionsBuilder', () => {
 
     it('cliUrl() define URL do CLI existente', () => {
         const opts = new ClientOptionsBuilder().cliUrl('localhost:8080').build();
-        expect(opts.cliUrl).toBe('localhost:8080');
+        expect(opts.connection).toMatchObject({ kind: 'uri', url: 'localhost:8080' });
+        expect('cliUrl' in opts).toBe(false);
     });
 
     it('cliPath() define executável CLI', () => {
         const opts = new ClientOptionsBuilder().cliPath('/usr/bin/copilot').build();
-        expect(opts.cliPath).toBe('/usr/bin/copilot');
+        expect(opts.connection).toMatchObject({ kind: 'stdio', path: '/usr/bin/copilot' });
+        expect('cliPath' in opts).toBe(false);
     });
 
     it('cwd() define diretório de trabalho do processo CLI', () => {
         const opts = new ClientOptionsBuilder().cwd('/workspace/project').build();
-        expect(opts.cwd).toBe('/workspace/project');
+        expect(opts.workingDirectory).toBe('/workspace/project');
+        expect('cwd' in opts).toBe(false);
     });
 
     it('logLevel() define nível de log', () => {
@@ -531,31 +534,33 @@ describe('ClientOptionsBuilder', () => {
     it('merge() aplica overrides', () => {
         const opts = new ClientOptionsBuilder().logLevel('info').merge({ logLevel: 'debug', autoStart: false }).build();
         expect(opts.logLevel).toBe('debug');
-        expect(opts.autoStart).toBe(false);
+        expect('autoStart' in opts).toBe(false);
     });
 
-    it('port() e useStdio() são mutuamente exclusivos (builder aceita ambos)', () => {
+    it('port() e useStdio(false) materializam conexão TCP', () => {
         const opts = new ClientOptionsBuilder().port(8080).useStdio(false).build();
-        expect(opts.port).toBe(8080);
-        expect(opts.useStdio).toBe(false);
+        expect(opts.connection).toMatchObject({ kind: 'tcp', port: 8080 });
+        expect('port' in opts).toBe(false);
+        expect('useStdio' in opts).toBe(false);
     });
 
-    it('isChildProcess() propaga a flag de conexão por stdio ao parent', () => {
+    it('useStdio(true) materializa conexão stdio e ignora isChildProcess legado', () => {
         const opts = new ClientOptionsBuilder().useStdio(true).isChildProcess(true).build();
-        expect(opts.useStdio).toBe(true);
-        expect(opts.isChildProcess).toBe(true);
+        expect(opts.connection).toMatchObject({ kind: 'stdio' });
+        expect('useStdio' in opts).toBe(false);
+        expect('isChildProcess' in opts).toBe(false);
     });
 
-    it('autoRestart() preserva a flag legada/deprecated como pass-through', () => {
+    it('autoRestart() é alias legado e não vaza para CopilotClientOptions 1.0', () => {
         const opts = new ClientOptionsBuilder().autoRestart(false).build();
-        expect(opts.autoRestart).toBe(false);
+        expect('autoRestart' in opts).toBe(false);
     });
 
     it('encadeamento fluent funciona', () => {
         const opts = new ClientOptionsBuilder().cliUrl('localhost:9000').logLevel('info').autoStart(true).build();
-        expect(opts.cliUrl).toBe('localhost:9000');
+        expect(opts.connection).toMatchObject({ kind: 'uri', url: 'localhost:9000' });
         expect(opts.logLevel).toBe('info');
-        expect(opts.autoStart).toBe(true);
+        expect('autoStart' in opts).toBe(false);
     });
 
     it('buildCopilotClientOptionsFromEnv centraliza cliUrl e omite transporte conflitante', () => {
@@ -567,7 +572,8 @@ describe('ClientOptionsBuilder', () => {
             process.env.COPILOT_CLI_PORT = '9011';
             process.env.COPILOT_LOG_LEVEL = 'DEBUG';
             const opts = buildCopilotClientOptionsFromEnv();
-            expect(opts.cliUrl).toBe('http://127.0.0.1:9010');
+            expect(opts.connection).toMatchObject({ kind: 'uri', url: 'http://127.0.0.1:9010' });
+            expect(opts.cliUrl).toBeUndefined();
             expect(opts.cliPath).toBeUndefined();
             expect(opts.useStdio).toBeUndefined();
             expect(opts.port).toBeUndefined();
@@ -594,13 +600,15 @@ describe('ClientOptionsBuilder', () => {
             process.env.FORCE_COLOR = '1';
             process.env.NO_COLOR = '1';
             const opts = buildCopilotClientOptionsFromEnv();
-            expect(opts.cliPath).toBe('/opt/copilot');
-            expect(opts.cliArgs).toEqual(['--stdio']);
-            expect(opts.cwd).toBe('/workspace/copilot');
-            expect(opts.useStdio).toBe(true);
-            expect(opts.isChildProcess).toBe(false);
-            expect(opts.autoStart).toBe(false);
-            expect(opts.autoRestart).toBe(false);
+            expect(opts.connection).toMatchObject({ kind: 'stdio', path: '/opt/copilot', args: ['--stdio'] });
+            expect(opts.workingDirectory).toBe('/workspace/copilot');
+            expect(opts.cliPath).toBeUndefined();
+            expect(opts.cliArgs).toBeUndefined();
+            expect(opts.cwd).toBeUndefined();
+            expect(opts.useStdio).toBeUndefined();
+            expect(opts.isChildProcess).toBeUndefined();
+            expect(opts.autoStart).toBeUndefined();
+            expect(opts.autoRestart).toBeUndefined();
             expect(opts.gitHubToken).toBe('ghp_env');
             expect(opts.useLoggedInUser).toBe(false);
             expect(opts.env?.NO_COLOR).toBeUndefined();
@@ -652,7 +660,7 @@ describe('ResumeSessionConfigBuilder', () => {
         expect(config.model).toBe('gpt-4.1');
         expect(config.workingDirectory).toBe('/tmp/resume');
         expect(config.onPermissionRequest).toBe(handler);
-        expect(config.disableResume).toBe(true);
+        expect(config.suppressResumeEvent).toBe(true);
         expect('sessionId' in config).toBe(false);
     });
 
@@ -668,7 +676,7 @@ describe('ResumeSessionConfigBuilder', () => {
             .build();
 
         expect(config.clientName).toBe('resume-client');
-        expect(config.disableResume).toBe(true);
+        expect(config.suppressResumeEvent).toBe(true);
         expect('sessionId' in config).toBe(false);
     });
 

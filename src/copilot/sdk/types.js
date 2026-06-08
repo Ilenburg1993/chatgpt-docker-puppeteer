@@ -20,18 +20,17 @@
 /**
  * Classe principal do SDK. Gerencia conexão com o CLI, autenticação, criação/resumo de sessões, metadata e lifecycle
  * events. Métodos principais: `start()`, `stop()`, `forceStop()`, `createSession()`, `resumeSession()`, `ping()`,
- * `getState()`, `getStatus()`, `getAuthStatus()`, `listModels()`, `getLastSessionId()`, `listSessions()`,
- * `getSessionMetadata()`, `deleteSession()`, `getForegroundSessionId()`, `setForegroundSessionId()` e `on()`
+ * `getStatus()`, `getAuthStatus()`, `listModels()`, `getLastSessionId()`, `listSessions()`,
+ * `getSessionMetadata()`, `deleteSession()`, `getForegroundSessionId()`, `setForegroundSessionId()` e `onLifecycle()`
  * (lifecycle).
  *
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
  */
 
 /**
- * Opções de criação do CopilotClient. Permite configurar: `cliPath`, `cliArgs`, `cwd`, `port`, `useStdio`,
- * `isChildProcess`, `cliUrl`, `logLevel`, `autoStart`, `autoRestart` (deprecated/no-op no SDK atual), `env`,
- * `gitHubToken`, `useLoggedInUser`, `onListModels`, `telemetry`, `onGetTraceContext`, `sessionFs` e
- * `sessionIdleTimeoutSeconds`.
+ * Opções de criação do CopilotClient. No SDK 1.0 o transporte é configurado via `connection` (`RuntimeConnection`), com
+ * `workingDirectory`, `baseDirectory`, `mode`, `env`, `gitHubToken`, `useLoggedInUser`, `onListModels`, `telemetry`,
+ * `onGetTraceContext`, `sessionFs`, `sessionIdleTimeoutSeconds` e `enableRemoteSessions`.
  *
  * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
  */
@@ -45,11 +44,12 @@
 
 /**
  * Configuração completa para criação de sessão. Campos principais: `sessionId?`, `clientName?`, `model?`,
- * `reasoningEffort?`, `modelCapabilities?`, `configDir?`, `enableConfigDiscovery?`, `tools?`, `commands?`,
+ * `reasoningEffort?`, `reasoningSummary?`, `contextTier?`, `modelCapabilities?`, `configDirectory?`,
+ * `enableConfigDiscovery?`, `tools?`, `commands?`,
  * `systemMessage?`, `availableTools?`, `excludedTools?`, `provider?`, `onPermissionRequest`, `onUserInputRequest?`,
  * `onElicitationRequest?`, `hooks?`, `workingDirectory?`, `streaming?`, `includeSubAgentStreamingEvents?`,
  * `mcpServers?`, `customAgents?`, `defaultAgent?`, `agent?`, `skillDirectories?`, `disabledSkills?`,
- * `infiniteSessions?`, `gitHubToken?`, `onEvent?` e `createSessionFsHandler?`.
+ * `infiniteSessions?`, `gitHubToken?`, `onEvent?` e `createSessionFsProvider?`.
  *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
  */
@@ -59,8 +59,8 @@
  * principais knobs operacionais: `clientName?`, `model?`, `reasoningEffort?`, `modelCapabilities?`, `tools?`,
  * `commands?`, `systemMessage?`, `availableTools?`, `excludedTools?`, `provider?`, `workingDirectory?`, `streaming?`,
  * `includeSubAgentStreamingEvents?`, `mcpServers?`, `customAgents?`, `defaultAgent?`, `agent?`, `skillDirectories?`,
- * `disabledSkills?`, `infiniteSessions?`, `gitHubToken?`, `onEvent?` e `createSessionFsHandler?`. Adicionalmente aceita
- * `disableResume?: boolean` para reconectar sem emitir `session.resume`.
+ * `disabledSkills?`, `infiniteSessions?`, `gitHubToken?`, `onEvent?`, `createSessionFsProvider?`,
+ * `suppressResumeEvent?` e `continuePendingWork?`.
  *
  * @typedef {import('@github/copilot-sdk').ResumeSessionConfig} ResumeSessionConfig
  */
@@ -74,9 +74,10 @@
  */
 
 /**
- * Estado da conexão do client com o CLI server. Valores: `"disconnected"` | `"connecting"` | `"connected"` | `"error"`.
+ * Estado local da conexão do client com o runtime. O SDK 1.0 não reexporta mais esse tipo nem expõe `getState()` como
+ * método público; a fachada local deriva esse estado a partir do ciclo de start/stop.
  *
- * @typedef {import('@github/copilot-sdk').ConnectionState} ConnectionState
+ * @typedef {'not_started' | 'disconnected' | 'connecting' | 'connected'} ConnectionState
  */
 
 /**
@@ -370,7 +371,9 @@
 /**
  * Opções da conveniência `session.ui.input()`.
  *
- * @typedef {import('@github/copilot-sdk').InputOptions} InputOptions
+ * @typedef {import('@github/copilot-sdk').UiInputOptions} UiInputOptions
+ *
+ * @typedef {UiInputOptions} InputOptions
  */
 
 /**
@@ -438,7 +441,7 @@
 
 /**
  * System message em modo **customize**. Override por seção — mais seguro e preciso. Campos: `mode: "customize"`,
- * `sections?: Partial<Record<SystemPromptSection, SectionOverride>>`, `content?` (appended após todas as seções).
+ * `sections?: Partial<Record<SystemMessageSection, SectionOverride>>`, `content?` (appended após todas as seções).
  *
  * @typedef {import('@github/copilot-sdk').SystemMessageCustomizeConfig} SystemMessageCustomizeConfig
  */
@@ -448,7 +451,9 @@
  * `"code_change_rules"` | `"guidelines"` | `"safety"` | `"tool_instructions"` | `"custom_instructions"` |
  * `"last_instructions"`.
  *
- * @typedef {import('@github/copilot-sdk').SystemPromptSection} SystemPromptSection
+ * @typedef {import('@github/copilot-sdk').SystemMessageSection} SystemMessageSection
+ *
+ * @typedef {SystemMessageSection} SystemPromptSection
  */
 
 /**
@@ -472,11 +477,13 @@
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 /**
- * Campos base compartilhados por todos os hook inputs. Campos: `timestamp` (number — ms epoch), `cwd` (string).
+ * Campos base compartilhados por todos os hook inputs. No SDK 1.0: `sessionId`, `timestamp` (`Date`) e
+ * `workingDirectory`.
  *
  * @typedef {{
- *     timestamp: number;
- *     cwd: string;
+ *     sessionId: string;
+ *     timestamp: Date;
+ *     workingDirectory: string;
  * }} BaseHookInput
  */
 
@@ -851,10 +858,12 @@
  */
 
 /**
- * Factory opcional de handler de session filesystem por sessão. Assinatura: `(session: CopilotSession) =>
+ * Factory opcional de provider de session filesystem por sessão. Assinatura: `(session: CopilotSession) =>
  * SessionFsProvider`.
  *
- * @typedef {(session: CopilotSession) => SessionFsProvider} CreateSessionFsHandler
+ * @typedef {(session: CopilotSession) => SessionFsProvider} CreateSessionFsProvider
+ *
+ * @typedef {CreateSessionFsProvider} CreateSessionFsHandler
  */
 
 // ─── Session Context & Metadata ───────────────────────────────────────────────
@@ -1101,7 +1110,7 @@
  */
 
 // ─── Runtime re-exports (non-type) ───────────────────────────────────────────
-// Nota: `defineTool`, `approveAll`, `SYSTEM_PROMPT_SECTIONS` são runtime values.
+// Nota: `defineTool`, `approveAll`, `SYSTEM_MESSAGE_SECTIONS` e `SYSTEM_PROMPT_SECTIONS` são runtime values.
 // Re-exportados no barrel sdk/index.js — consumers de runtime DEVEM usar #copilot/sdk.
 
 export {};

@@ -8,8 +8,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 // Mock do SDK
-vi.mock('@github/copilot-sdk', () => ({
-    SYSTEM_PROMPT_SECTIONS: {
+const mocks = vi.hoisted(() => ({
+    SYSTEM_MESSAGE_SECTIONS: {
         identity: { description: 'Agent identity' },
         tone: { description: 'Communication tone' },
         tool_efficiency: { description: 'Tool usage guidelines' },
@@ -21,6 +21,11 @@ vi.mock('@github/copilot-sdk', () => ({
         custom_instructions: { description: 'Custom instructions' },
         last_instructions: { description: 'Final instructions' },
     },
+}));
+
+vi.mock('@github/copilot-sdk', () => ({
+    SYSTEM_MESSAGE_SECTIONS: mocks.SYSTEM_MESSAGE_SECTIONS,
+    SYSTEM_PROMPT_SECTIONS: mocks.SYSTEM_MESSAGE_SECTIONS,
 }));
 
 import {

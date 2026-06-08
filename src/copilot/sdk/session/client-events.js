@@ -2,8 +2,8 @@
 /**
  * src/copilot/sdk/client-events.js
  *
- * Faixa 11 - Session Lifecycle Events tipados. Abstrai `client.on(eventType, handler)` para os 5 lifecycle events do
- * CopilotClient.
+ * Faixa 11 - Session Lifecycle Events tipados. Abstrai `client.onLifecycle(eventType, handler)` para os lifecycle
+ * events públicos do CopilotClient no SDK 1.0.
  *
  * Lifecycle events (emitidos pelo CLIENT, não pela session):
  *
@@ -33,7 +33,8 @@ import { getClientSnapshot } from './client.js';
  * @typedef {object} LifecycleEvent
  * @property {LifecycleEventType} type - tipo do evento
  * @property {string} sessionId - ID da sessão relacionada
- * @property {{ startTime: string; modifiedTime: string; summary?: string }} [metadata] - metadados (ausente em deleted)
+ * @property {{ startTime: Date; modifiedTime: Date; summary?: string | undefined } | undefined} [metadata] - metadados
+ *   (ausente em deleted)
  */
 
 /**
@@ -73,7 +74,7 @@ const LIFECYCLE_TYPE_SET = new Set(Object.values(LIFECYCLE_EVENTS));
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
 
 /**
- * Asserts que o client é válido e possui `.on()`.
+ * Asserts que o client é válido e possui `.onLifecycle()` no SDK 1.0, preservando `.on()` apenas como fallback legado.
  *
  * @param {unknown} client
  * @returns {asserts client is CopilotClient}
@@ -82,9 +83,44 @@ function assertClient(client) {
     if (!client || typeof client !== 'object') {
         throw new Error('[sdk/client-events] client não inicializado ou já finalizado (required)');
     }
-    if (typeof (/** @type {Record<string, unknown>} */ (client)['on']) !== 'function') {
-        throw new Error('[sdk/client-events] client deve ter método .on() (RPC indisponível)');
+    const record = /** @type {Record<string, unknown>} */ (client);
+    if (typeof record['onLifecycle'] !== 'function' && typeof record['on'] !== 'function') {
+        throw new Error('[sdk/client-events] client deve ter método .onLifecycle() (RPC indisponível)');
     }
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {string} eventType
+ * @param {LifecycleHandler} handler
+ * @returns {() => void}
+ */
+function subscribeLifecycleEvent(client, eventType, handler) {
+    const lifecycleClient = /** @type {{ onLifecycle?: (eventType: string, handler: LifecycleHandler) => () => void }} */ (
+        /** @type {unknown} */ (client)
+    );
+    if (typeof lifecycleClient.onLifecycle === 'function') {
+        return lifecycleClient.onLifecycle(eventType, handler);
+    }
+    return /** @type {import('../types.js').ClientEventSubscriber} */ (/** @type {unknown} */ (client)).on(
+        eventType,
+        handler,
+    );
+}
+
+/**
+ * @param {CopilotClient} client
+ * @param {LifecycleHandler} handler
+ * @returns {() => void}
+ */
+function subscribeAllLifecycleEvents(client, handler) {
+    const lifecycleClient = /** @type {{ onLifecycle?: (handler: LifecycleHandler) => () => void }} */ (
+        /** @type {unknown} */ (client)
+    );
+    if (typeof lifecycleClient.onLifecycle === 'function') {
+        return lifecycleClient.onLifecycle(handler);
+    }
+    return /** @type {import('../types.js').ClientEventSubscriber} */ (/** @type {unknown} */ (client)).on(handler);
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -124,10 +160,7 @@ export function onLifecycleEvent(eventType, handler, client) {
     if (typeof handler !== 'function') {
         throw new Error('[sdk/client-events] handler must be a function');
     }
-    return /** @type {import('../types.js').ClientEventSubscriber} */ (/** @type {unknown} */ (c)).on(
-        eventType,
-        handler,
-    );
+    return subscribeLifecycleEvent(c, eventType, handler);
 }
 
 /**
@@ -150,7 +183,7 @@ export function onAllLifecycleEvents(handler, client) {
     if (typeof handler !== 'function') {
         throw new Error('[sdk/client-events] handler must be a function');
     }
-    return /** @type {import('../types.js').ClientEventSubscriber} */ (/** @type {unknown} */ (c)).on(handler);
+    return subscribeAllLifecycleEvents(c, handler);
 }
 
 /**
@@ -185,10 +218,7 @@ export function onLifecycleEvents(handlerMap, client) {
         if (typeof handler !== 'function') {
             throw new Error(`[sdk/client-events] handler for '${eventType}' must be a function`);
         }
-        const unsub = /** @type {import('../types.js').ClientEventSubscriber} */ (/** @type {unknown} */ (c)).on(
-            eventType,
-            handler,
-        );
+        const unsub = subscribeLifecycleEvent(c, eventType, handler);
         unsubscribers.push(unsub);
     }
 

@@ -262,6 +262,7 @@ export {
     replaceSystemMessage,
     sectionOverride,
     supportsCustomizeMode,
+    SYSTEM_MESSAGE_SECTIONS,
     SYSTEM_PROMPT_SECTIONS,
     transformSection,
 } from './session/system-message.js';

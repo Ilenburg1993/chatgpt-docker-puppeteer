@@ -165,7 +165,8 @@ import {
  * @returns {void}
  */
 function stepRegisterClientLifecycleHandlers(client, ctx, state) {
-    if (typeof client.on !== 'function') {
+    const lifecycleClient = /** @type {{ onLifecycle?: unknown; on?: unknown }} */ (/** @type {unknown} */ (client));
+    if (typeof lifecycleClient.onLifecycle !== 'function' && typeof lifecycleClient.on !== 'function') {
         return;
     }
 

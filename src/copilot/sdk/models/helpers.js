@@ -445,7 +445,7 @@ export function isModelEnabled(model) {
  */
 export function getBillingMultiplier(model) {
     if (!model || !model.billing) return 1;
-    return model.billing.multiplier;
+    return model.billing.multiplier ?? 1;
 }
 
 /**

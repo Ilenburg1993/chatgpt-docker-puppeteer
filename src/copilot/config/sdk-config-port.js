@@ -36,6 +36,7 @@ export {
     replaceSystemMessage,
     resolveConfiguredByokSessionOverrides,
     sectionOverride,
+    SYSTEM_MESSAGE_SECTIONS,
     SYSTEM_PROMPT_SECTIONS,
     supportsCustomizeMode,
     validateProviderConfig,
@@ -82,6 +83,8 @@ export {
  * @typedef {import('#copilot/sdk/types').ModelCapabilitiesOverride} ModelCapabilitiesOverride
  *
  * @typedef {import('#copilot/sdk/types').SessionEventHandler} SessionEventHandler
+ *
+ * @typedef {import('#copilot/sdk/types').CreateSessionFsProvider} CreateSessionFsProvider
  *
  * @typedef {import('#copilot/sdk/types').CreateSessionFsHandler} CreateSessionFsHandler
  *

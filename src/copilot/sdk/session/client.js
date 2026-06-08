@@ -8,6 +8,7 @@ import { sleepMs } from '#copilot/core';
 import { CircuitBreaker } from '#copilot/core/circuit-breaker';
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { CopilotClient } from '@github/copilot-sdk';
+import { CONNECTION_STATES } from '../constants.js';
 import { getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
 import { setModelListClientProvider } from '../models/client-provider.js';
@@ -35,8 +36,6 @@ export { CopilotClient };
  *
  * @typedef {import('@github/copilot-sdk').GetAuthStatusResponse} GetAuthStatusResponse
  *
- * @typedef {import('@github/copilot-sdk').ConnectionState} ConnectionState
- *
  * @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions
  *
  * @typedef {import('./session-registry.js').SdkSessionRegistry} SdkSessionRegistry
@@ -57,6 +56,10 @@ export { CopilotClient };
  * @property {SdkSessionRegistry} [registry]
  * @property {(overrides?: Partial<CopilotClientOptions>) => CopilotClient} [createClient]
  * @property {() => Promise<void>} [clearModelsCache]
+ */
+
+/**
+ * @typedef {'not_started' | 'disconnected' | 'connecting' | 'connected'} ClientConnectionState
  */
 
 export const sdkConnectionCircuitBreaker = new CircuitBreaker('sdk-connection', {
@@ -86,6 +89,33 @@ async function clearModelsCacheBestEffort() {
     } catch (error) {
         logSwallowed(error, 'sdk.client.clearModelsCache');
     }
+}
+
+/**
+ * SDK 1.0 não expõe mais `getState()` como API pública. Mantemos leitura compatível apenas para mocks/SDKs antigos e
+ * fazemos o manager local ser a SSOT do estado de conexão que o resto de `src/copilot` consome.
+ *
+ * @param {CopilotClient | null} client
+ * @returns {ClientConnectionState | undefined}
+ */
+function readCompatClientState(client) {
+    if (!client) return undefined;
+    const candidate = /** @type {{ getState?: () => unknown }} */ (/** @type {unknown} */ (client)).getState;
+    if (typeof candidate !== 'function') return undefined;
+    try {
+        const state = candidate.call(client);
+        if (
+            state === CONNECTION_STATES.CONNECTED ||
+            state === CONNECTION_STATES.CONNECTING ||
+            state === CONNECTION_STATES.DISCONNECTED ||
+            state === 'not_started'
+        ) {
+            return state;
+        }
+    } catch (error) {
+        logSwallowed(error, 'sdk.client.readCompatClientState');
+    }
+    return undefined;
 }
 
 /**
@@ -119,6 +149,9 @@ export class CopilotClientManager {
 
     /** @type {Promise<CopilotClient> | null} */
     #startPromise = null;
+
+    /** @type {ClientConnectionState} */
+    #connectionState = 'not_started';
 
     /** @type {boolean} */
     #registryHasActiveSessions = false;
@@ -163,7 +196,7 @@ export class CopilotClientManager {
      * @returns {Promise<CopilotClient>}
      */
     async getClient(overrides = {}) {
-        if (this.#client && this.#client.getState() === 'connected') {
+        if (this.#client && this.#readConnectionState() === CONNECTION_STATES.CONNECTED) {
             return this.#client;
         }
 
@@ -192,6 +225,7 @@ export class CopilotClientManager {
     async #connect(overrides) {
         const startedAt = Date.now();
         emitSdkOperationMetric({ operation: 'client.connect', status: 'started' });
+        this.#connectionState = CONNECTION_STATES.CONNECTING;
         try {
             log('INFO', '[lib/sdk-client] Iniciando CopilotClient...');
             const maxAttempts = 2;
@@ -205,7 +239,8 @@ export class CopilotClientManager {
                     await client.start();
                     this.#breaker.recordSuccess();
                     this.#client = client;
-                    log('INFO', `[lib/sdk-client] CopilotClient conectado. Estado: ${client.getState()}`);
+                    this.#connectionState = CONNECTION_STATES.CONNECTED;
+                    log('INFO', `[lib/sdk-client] CopilotClient conectado. Estado: ${this.#readConnectionState()}`);
                     emitSdkOperationMetric({
                         operation: 'client.connect',
                         status: 'succeeded',
@@ -247,6 +282,7 @@ export class CopilotClientManager {
                     tripCircuit: policy.tripCircuit,
                 },
             });
+            this.#connectionState = CONNECTION_STATES.DISCONNECTED;
             throw finalSdkError;
         } finally {
             this.#startPromise = null;
@@ -266,6 +302,7 @@ export class CopilotClientManager {
         this.#clearRegistryIfOwned();
         await this.#clearModelsCache();
         this.#client = null;
+        this.#connectionState = 'not_started';
         return errors;
     }
 
@@ -286,13 +323,21 @@ export class CopilotClientManager {
         this.#clearRegistryIfOwned();
         await this.#clearModelsCache();
         this.#client = null;
+        this.#connectionState = 'not_started';
     }
 
     /**
-     * @returns {ConnectionState | 'not_started'}
+     * @returns {ClientConnectionState}
      */
     getClientState() {
-        return this.#client?.getState() ?? 'not_started';
+        return this.#readConnectionState();
+    }
+
+    /**
+     * @returns {ClientConnectionState}
+     */
+    #readConnectionState() {
+        return readCompatClientState(this.#client) ?? this.#connectionState;
     }
 
     /**
@@ -306,7 +351,7 @@ export class CopilotClientManager {
     }
 
     /**
-     * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
+     * @returns {Promise<{ message: string; timestamp: string; protocolVersion?: number }>}
      */
     async pingClient() {
         const client = await this.getClient();
@@ -504,6 +549,7 @@ export class CopilotClientManager {
     resetForTest() {
         this.#client = null;
         this.#startPromise = null;
+        this.#connectionState = 'not_started';
         this.#breaker.reset();
         this.#registry.clear();
         this.#registryHasActiveSessions = false;
@@ -517,6 +563,7 @@ export class CopilotClientManager {
     injectClientForTest(mockClient) {
         this.#client = mockClient;
         this.#startPromise = null;
+        this.#connectionState = readCompatClientState(mockClient) ?? CONNECTION_STATES.CONNECTED;
     }
 
     /** @returns {void} */

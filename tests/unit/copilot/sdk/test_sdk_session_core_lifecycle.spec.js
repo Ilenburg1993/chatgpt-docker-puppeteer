@@ -23,6 +23,11 @@ vi.mock('@github/copilot-sdk', () => {
 
     return {
         CopilotClient: MockCopilotClient,
+        RuntimeConnection: {
+            forUri: vi.fn((url, opts) => ({ kind: 'uri', url, ...(opts ?? {}) })),
+            forStdio: vi.fn((opts) => ({ kind: 'stdio', ...(opts ?? {}) })),
+            forTcp: vi.fn((opts) => ({ kind: 'tcp', ...(opts ?? {}) })),
+        },
         approveAll: vi.fn().mockResolvedValue({ kind: 'approve-once' }),
     };
 });
@@ -69,7 +74,7 @@ describe('sdk/session/lifecycle core hardening', () => {
         await expect(createSession(client, { model: 'gpt-4.1' })).rejects.toBeInstanceOf(SdkOperationError);
     });
 
-    it('createSession propaga gitHubToken e createSessionFsHandler', async () => {
+    it('createSession traduz createSessionFsHandler para createSessionFsProvider', async () => {
         const client = fakeClient();
         const sessionFsHandler = vi.fn();
         const elicitationHandler = vi.fn();
@@ -91,7 +96,7 @@ describe('sdk/session/lifecycle core hardening', () => {
             expect.objectContaining({
                 model: 'gpt-4.1',
                 gitHubToken: 'ghs_session',
-                createSessionFsHandler: sessionFsHandler,
+                createSessionFsProvider: sessionFsHandler,
                 onElicitationRequest: elicitationHandler,
                 commands: [expect.objectContaining({ name: 'diagnose', handler: commandHandler })],
                 modelCapabilities: { supports: { vision: false } },
@@ -191,7 +196,7 @@ describe('sdk/session/lifecycle core hardening', () => {
         await expect(resumeSession(client, 's2')).rejects.toBeInstanceOf(SdkOperationError);
     });
 
-    it('resumeSession propaga gitHubToken e createSessionFsHandler', async () => {
+    it('resumeSession traduz createSessionFsHandler para createSessionFsProvider', async () => {
         const client = fakeClient();
         const sessionFsHandler = vi.fn();
         const elicitationHandler = vi.fn();
@@ -212,7 +217,7 @@ describe('sdk/session/lifecycle core hardening', () => {
             's2',
             expect.objectContaining({
                 gitHubToken: 'ghs_resume',
-                createSessionFsHandler: sessionFsHandler,
+                createSessionFsProvider: sessionFsHandler,
                 onElicitationRequest: elicitationHandler,
                 commands: [expect.objectContaining({ name: 'resume-diagnose', handler: commandHandler })],
                 modelCapabilities: { supports: { vision: true } },
@@ -302,6 +307,8 @@ describe('sdk/session/lifecycle core hardening', () => {
 
         const client = createClientFromCliUrl('http://localhost:3111');
         expect(client).toBeDefined();
-        expect(copilotCtor).toHaveBeenCalledWith({ cliUrl: 'http://localhost:3111' });
+        expect(copilotCtor).toHaveBeenCalledWith({
+            connection: { kind: 'uri', url: 'http://localhost:3111' },
+        });
     });
 });

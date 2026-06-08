@@ -30,7 +30,16 @@ import { verifyModelSwitchWithRetry } from './model-switch-verify-retry.js';
  *
  * @typedef {import('@github/copilot-sdk').ModelCapabilitiesOverride} ModelCapabilitiesOverride
  *
- * @typedef {{ reasoningEffort?: ReasoningEffort; modelCapabilities?: ModelCapabilitiesOverride }} SessionModelOptions
+ * @typedef {import('@github/copilot-sdk').ReasoningSummary} ReasoningSummary
+ *
+ * @typedef {import('@github/copilot-sdk').ContextTier} ContextTier
+ *
+ * @typedef {{
+ *     reasoningEffort?: ReasoningEffort;
+ *     reasoningSummary?: ReasoningSummary;
+ *     contextTier?: ContextTier;
+ *     modelCapabilities?: ModelCapabilitiesOverride;
+ * }} SessionModelOptions
  *
  * @typedef {{ level?: 'info' | 'warning' | 'error'; ephemeral?: boolean }} SessionLogOptions
  */
@@ -159,9 +168,11 @@ async function verifySessionModelSwitch(session, model, options) {
         await modelSwitchTo(
             session,
             model,
-            options?.reasoningEffort || options?.modelCapabilities
+            options?.reasoningEffort || options?.reasoningSummary || options?.contextTier || options?.modelCapabilities
                 ? {
                       ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
+                      ...(options.reasoningSummary ? { reasoningSummary: options.reasoningSummary } : {}),
+                      ...(options.contextTier ? { contextTier: options.contextTier } : {}),
                       ...(options.modelCapabilities ? { modelCapabilities: options.modelCapabilities } : {}),
                   }
                 : undefined,
@@ -361,6 +372,12 @@ export async function setSessionModel(session, model, options) {
     if (safeOptions?.reasoningEffort) {
         Reflect.set(session, '__copilotConfiguredReasoningEffort', safeOptions.reasoningEffort);
     }
+    if (safeOptions?.reasoningSummary) {
+        Reflect.set(session, '__copilotConfiguredReasoningSummary', safeOptions.reasoningSummary);
+    }
+    if (safeOptions?.contextTier) {
+        Reflect.set(session, '__copilotConfiguredContextTier', safeOptions.contextTier);
+    }
     if (safeOptions?.modelCapabilities) {
         Reflect.set(session, '__copilotConfiguredModelCapabilities', safeOptions.modelCapabilities);
     }
@@ -371,9 +388,14 @@ export async function setSessionModel(session, model, options) {
             await modelSwitchTo(
                 session,
                 model,
-                safeOptions?.reasoningEffort || safeOptions?.modelCapabilities
+                safeOptions?.reasoningEffort ||
+                    safeOptions?.reasoningSummary ||
+                    safeOptions?.contextTier ||
+                    safeOptions?.modelCapabilities
                     ? {
                           ...(safeOptions.reasoningEffort ? { reasoningEffort: safeOptions.reasoningEffort } : {}),
+                          ...(safeOptions.reasoningSummary ? { reasoningSummary: safeOptions.reasoningSummary } : {}),
+                          ...(safeOptions.contextTier ? { contextTier: safeOptions.contextTier } : {}),
                           ...(safeOptions.modelCapabilities ? { modelCapabilities: safeOptions.modelCapabilities } : {}),
                       }
                     : undefined,
@@ -411,6 +433,8 @@ export async function setSessionModel(session, model, options) {
             verifiedSwitch: verification.verifiedSwitch,
             ...(verification.effectiveModel ? { effectiveModel: verification.effectiveModel } : {}),
             ...(verification.usedRpcFallback ? { usedRpcFallback: true } : {}),
+            ...(safeOptions?.reasoningSummary ? { reasoningSummary: safeOptions.reasoningSummary } : {}),
+            ...(safeOptions?.contextTier ? { contextTier: safeOptions.contextTier } : {}),
             ...(safeOptions?.modelCapabilities ? { modelCapabilities: true } : {}),
         },
     });
@@ -483,14 +507,17 @@ export async function logSessionTimeline(session, message, options = {}) {
 /** @param {CopilotSession} session @returns {Promise<SessionEvent[]>} */
 export async function getSessionMessages(session) {
     assertSession(session, 'getMessages');
-    log('DEBUG', `[session-runtime] getMessages: sessionId='${session.sessionId}'`);
+    log('DEBUG', `[session-runtime] getEvents compat(getMessages): sessionId='${session.sessionId}'`);
     let messages;
     try {
-        messages = await session.getMessages();
+        if (typeof session.getEvents !== 'function') {
+            throw new TypeError('[session-runtime/getMessages] sessão não expõe session.getEvents().');
+        }
+        messages = await session.getEvents();
     } catch (error) {
-        throw toSdkOperationError('session.getMessages', error);
+        throw toSdkOperationError('session.getEvents', error);
     }
-    log('DEBUG', `[session-runtime] getMessages retornou ${messages.length} eventos: sessionId='${session.sessionId}'`);
+    log('DEBUG', `[session-runtime] getEvents retornou ${messages.length} eventos: sessionId='${session.sessionId}'`);
     return messages;
 }
 

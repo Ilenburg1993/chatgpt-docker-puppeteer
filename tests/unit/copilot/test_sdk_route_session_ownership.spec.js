@@ -225,9 +225,12 @@ describe('sdk routes session ownership SSOT', () => {
 
         assert.equal(res.body.sessionId, 'sdk-rich');
         assert.equal(createdConfigs.length, 1);
+        const { configDir: _legacyConfigDir, ...expectedBody } = body;
+        void _legacyConfigDir;
         assert.deepEqual(createdConfigs[0], {
             onPermissionRequest: createdConfigs[0].onPermissionRequest,
-            ...body,
+            ...expectedBody,
+            configDirectory: body.configDir,
             provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1' },
         });
         assert.equal(typeof createdConfigs[0].onPermissionRequest, 'function');
@@ -307,9 +310,14 @@ describe('sdk routes session ownership SSOT', () => {
 
         assert.equal(res.body.sessionId, 'sdk-rich');
         assert.equal(resumedConfigs.length, 1);
+        const { configDir: _legacyConfigDir, disableResume: _legacyDisableResume, ...expectedBody } = body;
+        void _legacyConfigDir;
+        void _legacyDisableResume;
         assert.deepEqual(resumedConfigs[0], {
             onPermissionRequest: resumedConfigs[0].onPermissionRequest,
-            ...body,
+            ...expectedBody,
+            configDirectory: body.configDir,
+            suppressResumeEvent: body.disableResume,
             provider: { type: 'openai', baseUrl: 'http://localhost:11434/v1' },
             infiniteSessions: {
                 enabled: false,

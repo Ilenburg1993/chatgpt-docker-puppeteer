@@ -51,6 +51,7 @@ export {
     readTerminalRuntimeControlState,
     readTerminalRuntimePermissionMode,
     readTerminalRuntimeState,
+    readTerminalConfiguredSessionFsState,
     readTerminalSdkSessionBootSelection,
     readTerminalSdkPlan,
     readTerminalSdkSystemPromptProjection,

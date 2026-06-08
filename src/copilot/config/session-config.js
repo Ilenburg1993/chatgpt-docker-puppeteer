@@ -39,15 +39,23 @@ import { approveAll, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, validateProvi
  *
  * @typedef {import('./sdk-config-port.js').SessionEventHandler} SessionEventHandler
  *
+ * @typedef {import('./sdk-config-port.js').CreateSessionFsProvider} CreateSessionFsProvider
+ *
  * @typedef {import('./sdk-config-port.js').CreateSessionFsHandler} CreateSessionFsHandler
  *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffortLevel
+ *
+ * @typedef {Partial<SessionConfig> & Partial<ResumeSessionConfig> & {
+ *     configDir?: string;
+ *     createSessionFsHandler?: CreateSessionFsProvider;
+ *     disableResume?: boolean;
+ * }} CompatSessionConfig
  */
 
 /**
  * Chaves serializáveis aceitas pelo contrato oficial de `ResumeSessionConfig`.
  *
- * @type {readonly (keyof ResumeSessionConfig)[]}
+ * @type {readonly string[]}
  */
 export const RESUME_SESSION_CONFIG_KEYS = Object.freeze([
     'clientName',
@@ -62,39 +70,74 @@ export const RESUME_SESSION_CONFIG_KEYS = Object.freeze([
     'streaming',
     'includeSubAgentStreamingEvents',
     'reasoningEffort',
+    'reasoningSummary',
+    'contextTier',
+    'largeOutput',
     'onPermissionRequest',
     'onUserInputRequest',
     'onElicitationRequest',
+    'onExitPlanModeRequest',
+    'onAutoModeSwitchRequest',
     'hooks',
     'workingDirectory',
-    'configDir',
+    'configDirectory',
     'enableConfigDiscovery',
+    'enableSessionTelemetry',
+    'skipCustomInstructions',
+    'customAgentsLocalOnly',
+    'coauthorEnabled',
+    'manageScheduleEnabled',
+    'mcpOAuthTokenStorage',
     'mcpServers',
     'customAgents',
     'defaultAgent',
     'agent',
     'skillDirectories',
+    'pluginDirectories',
+    'instructionDirectories',
     'disabledSkills',
     'infiniteSessions',
     'gitHubToken',
+    'skipEmbeddingRetrieval',
+    'embeddingCacheStorage',
+    'organizationCustomInstructions',
+    'enableOnDemandInstructionDiscovery',
+    'enableFileHooks',
+    'enableHostGitOperations',
+    'enableSessionStore',
+    'enableSkills',
+    'remoteSession',
     'onEvent',
-    'createSessionFsHandler',
+    'createSessionFsProvider',
+    'suppressResumeEvent',
+    'continuePendingWork',
+    'openCanvases',
 ]);
 
 /**
- * @param {Partial<SessionConfig> & { disableResume?: boolean }} config
- * @returns {ResumeSessionConfig & { disableResume?: boolean }}
+ * @param {CompatSessionConfig} config
+ * @returns {ResumeSessionConfig}
  */
 export function sanitizeResumeSessionConfig(config) {
-    /** @type {Partial<ResumeSessionConfig> & { disableResume?: boolean }} */
+    /** @type {Partial<ResumeSessionConfig>} */
     const resume = {};
     const resumeRecord = /** @type {Record<string, unknown>} */ (resume);
     const configRecord = /** @type {Record<string, unknown>} */ (config);
 
     for (const key of RESUME_SESSION_CONFIG_KEYS) {
-        if (Object.prototype.hasOwnProperty.call(config, key) && config[key] !== undefined) {
+        if (Object.prototype.hasOwnProperty.call(configRecord, key) && configRecord[key] !== undefined) {
             resumeRecord[key] = configRecord[key];
         }
+    }
+
+    if (config.configDir !== undefined) {
+        resume.configDirectory = config.configDir;
+    }
+    if (config.createSessionFsHandler !== undefined) {
+        resume.createSessionFsProvider = config.createSessionFsHandler;
+    }
+    if (config.disableResume !== undefined) {
+        resume.suppressResumeEvent = config.disableResume;
     }
 
     if (resume.onPermissionRequest === undefined) {
@@ -103,11 +146,8 @@ export function sanitizeResumeSessionConfig(config) {
     if (resume.streaming === undefined) {
         resume.streaming = true;
     }
-    if (config.disableResume !== undefined) {
-        resume.disableResume = config.disableResume;
-    }
 
-    return /** @type {ResumeSessionConfig & { disableResume?: boolean }} */ (/** @type {unknown} */ (resume));
+    return /** @type {ResumeSessionConfig} */ (/** @type {unknown} */ (resume));
 }
 
 /**
@@ -124,7 +164,7 @@ export function sanitizeResumeSessionConfig(config) {
  *         .build();
  */
 export class SessionConfigBuilder {
-    /** @type {Partial<SessionConfig> & { disableResume?: boolean }} */
+    /** @type {CompatSessionConfig} */
     #config = {};
 
     // ─── Identificação ────────────────────────────────────────────────────
@@ -198,7 +238,15 @@ export class SessionConfigBuilder {
      * @returns {this}
      */
     configDir(dir) {
-        this.#config.configDir = dir;
+        return this.configDirectory(dir);
+    }
+
+    /**
+     * @param {string} dir
+     * @returns {this}
+     */
+    configDirectory(dir) {
+        this.#config.configDirectory = dir;
         return this;
     }
 
@@ -417,11 +465,19 @@ export class SessionConfigBuilder {
     }
 
     /**
-     * @param {CreateSessionFsHandler} handler
+     * @param {CreateSessionFsProvider} handler
      * @returns {this}
      */
     createSessionFsHandler(handler) {
-        this.#config.createSessionFsHandler = handler;
+        return this.createSessionFsProvider(handler);
+    }
+
+    /**
+     * @param {CreateSessionFsProvider} handler
+     * @returns {this}
+     */
+    createSessionFsProvider(handler) {
+        this.#config.createSessionFsProvider = handler;
         return this;
     }
 
@@ -443,7 +499,24 @@ export class SessionConfigBuilder {
      * @returns {this}
      */
     disableResume(disable) {
-        this.#config.disableResume = disable;
+        return this.suppressResumeEvent(disable);
+    }
+
+    /**
+     * @param {boolean} suppress
+     * @returns {this}
+     */
+    suppressResumeEvent(suppress) {
+        this.#config.suppressResumeEvent = suppress;
+        return this;
+    }
+
+    /**
+     * @param {boolean} enabled
+     * @returns {this}
+     */
+    continuePendingWork(enabled) {
+        this.#config.continuePendingWork = enabled;
         return this;
     }
 
@@ -452,7 +525,7 @@ export class SessionConfigBuilder {
     /**
      * Aplica um `Partial<SessionConfig>` sobre a configuração corrente (spread merge).
      *
-     * @param {Partial<SessionConfig>} partial
+     * @param {CompatSessionConfig} partial
      * @returns {this}
      */
     merge(partial) {
@@ -475,21 +548,36 @@ export class SessionConfigBuilder {
         if (this.#config.streaming === undefined) {
             this.#config.streaming = true;
         }
-        const { disableResume: _ignoredDisableResume, ...sessionConfig } = this.#config;
+        const {
+            disableResume: _ignoredDisableResume,
+            suppressResumeEvent: _ignoredSuppressResumeEvent,
+            continuePendingWork: _ignoredContinuePendingWork,
+            openCanvases: _ignoredOpenCanvases,
+            ...sessionConfig
+        } = this.#config;
         void _ignoredDisableResume;
+        void _ignoredSuppressResumeEvent;
+        void _ignoredContinuePendingWork;
+        void _ignoredOpenCanvases;
         return /** @type {SessionConfig} */ (/** @type {unknown} */ ({ ...sessionConfig }));
     }
 
     /**
-     * Constrói como `ResumeSessionConfig` (inclui `disableResume`).
+     * Constrói como `ResumeSessionConfig` (traduz aliases legados para campos oficiais).
      *
-     * @returns {ResumeSessionConfig & { disableResume?: boolean }}
+     * @returns {ResumeSessionConfig}
      */
     buildForResume() {
         const full = this.build();
         return sanitizeResumeSessionConfig({
             ...full,
+            ...(this.#config.suppressResumeEvent !== undefined
+                ? { suppressResumeEvent: this.#config.suppressResumeEvent }
+                : {}),
             ...(this.#config.disableResume !== undefined ? { disableResume: this.#config.disableResume } : {}),
+            ...(this.#config.continuePendingWork !== undefined
+                ? { continuePendingWork: this.#config.continuePendingWork }
+                : {}),
         });
     }
 }

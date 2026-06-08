@@ -3,8 +3,8 @@
  * src/copilot/sdk/session/session-fs.js
  *
  * Helpers canônicos para promover SessionFs no runtime local do Copilot. Mantém em L1 tanto a configuração client-side
- * (`CopilotClientOptions.sessionFs`) quanto o handler session-level (`createSessionFsHandler`), sem reabrir o vendor
- * SDK fora da wrapper layer.
+ * (`CopilotClientOptions.sessionFs`) quanto o provider session-level (`createSessionFsProvider`), mantendo
+ * `createSessionFsHandler` apenas como alias legado na wrapper layer.
  *
  * @module copilot/sdk/session/session-fs
  */
@@ -28,6 +28,8 @@ import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 
 /**
  * @typedef {import('../types.js').SessionFsProvider} SessionFsProvider
+ *
+ * @typedef {import('../types.js').CreateSessionFsProvider} CreateSessionFsProvider
  *
  * @typedef {import('../types.js').CreateSessionFsHandler} CreateSessionFsHandler
  *

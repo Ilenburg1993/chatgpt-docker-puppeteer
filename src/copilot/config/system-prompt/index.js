@@ -7,7 +7,7 @@
  * @module copilot/config/system-prompt
  */
 
-import { SYSTEM_PROMPT_SECTIONS } from '../sdk-config-port.js';
+import { SYSTEM_MESSAGE_SECTIONS, SYSTEM_PROMPT_SECTIONS } from '../sdk-config-port.js';
 
 export { CONTENT as CODE_CHANGE_RULES } from './sections/code-change-rules.js';
 export { CONTENT as ENVIRONMENT_CONTEXT } from './sections/environment-context.js';
@@ -28,7 +28,7 @@ export {
     buildSystemMessage,
 } from './builders.js';
 
-export { SYSTEM_PROMPT_SECTIONS };
+export { SYSTEM_MESSAGE_SECTIONS, SYSTEM_PROMPT_SECTIONS };
 
 export { buildSystemPromptBindingSnapshot, evaluateSystemPromptFreshness } from './freshness.js';
 export { buildLiveSystemMessage } from './live-builders.js';

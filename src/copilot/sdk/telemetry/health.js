@@ -111,7 +111,7 @@ export async function pingCheck(client) {
         return {
             ok: true,
             latencyMs,
-            protocolVersion: result.protocolVersion,
+            protocolVersion: result.protocolVersion ?? 0,
             message: result.message,
         };
     } catch (err) {

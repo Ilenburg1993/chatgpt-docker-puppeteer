@@ -57,6 +57,7 @@ export const SYSTEM_PROMPT_SECTION_NAMES = /** @type {const} */ ({
     SAFETY: 'safety',
     TOOL_INSTRUCTIONS: 'tool_instructions',
     CUSTOM_INSTRUCTIONS: 'custom_instructions',
+    RUNTIME_INSTRUCTIONS: 'runtime_instructions',
     LAST_INSTRUCTIONS: 'last_instructions',
 });
 
@@ -157,6 +158,16 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     SESSION_EXTENSIONS_LOADED: 'session.extensions_loaded',
     SESSION_BACKGROUND_TASKS_CHANGED: 'session.background_tasks_changed',
     SESSION_WORKSPACE_FILE_CHANGED: 'session.workspace_file_changed',
+    SESSION_AUTOPILOT_OBJECTIVE_CHANGED: 'session.autopilot_objective_changed',
+    SESSION_CANVAS_OPENED: 'session.canvas.opened',
+    SESSION_CANVAS_REGISTRY_CHANGED: 'session.canvas.registry_changed',
+    SESSION_CUSTOM_AGENTS_UPDATED: 'session.custom_agents_updated',
+    SESSION_CUSTOM_NOTIFICATION: 'session.custom_notification',
+    SESSION_EXTENSIONS_ATTACHMENTS_PUSHED: 'session.extensions.attachments_pushed',
+    SESSION_PERMISSIONS_CHANGED: 'session.permissions_changed',
+    SESSION_REMOTE_STEERABLE_CHANGED: 'session.remote_steerable_changed',
+    SESSION_SCHEDULE_CREATED: 'session.schedule_created',
+    SESSION_SCHEDULE_CANCELLED: 'session.schedule_cancelled',
 
     // ── Assistant ──
     ASSISTANT_TURN_START: 'assistant.turn_start',
@@ -182,6 +193,7 @@ export const SESSION_EVENTS = /** @type {const} */ ({
 
     // ── Hook ──
     HOOK_START: 'hook.start',
+    HOOK_PROGRESS: 'hook.progress',
     HOOK_END: 'hook.end',
 
     // ── Sampling ──
@@ -189,6 +201,7 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     SAMPLING_COMPLETED: 'sampling.completed',
 
     // ── Skill ──
+    INSTRUCTION_DISCOVERED: 'instruction_discovered',
     SKILL_INVOKED: 'skill.invoked',
 
     // ── Subagent ──
@@ -238,16 +251,37 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     // ── MCP ──
     MCP_OAUTH_REQUIRED: 'mcp.oauth_required',
     MCP_OAUTH_COMPLETED: 'mcp.oauth_completed',
+    MCP_APP_TOOL_CALL_COMPLETE: 'mcp_app.tool_call_complete',
+
+    // ── Model ──
+    MODEL_CALL_FAILURE: 'model.call_failure',
 
     // ── System ──
+    EXTENSION_CONTEXT: 'extension_context',
     SYSTEM_MESSAGE: 'system.message',
     SYSTEM_NOTIFICATION: 'system.notification',
 
     // ── Pending Messages ──
+    NEW_INBOX_MESSAGE: 'new_inbox_message',
     PENDING_MESSAGES_MODIFIED: 'pending_messages.modified',
 
     // ── Abort ──
     ABORT: 'abort',
+
+    // ── Multimodal / Content Fragments ──
+    AUDIO: 'audio',
+    BLOB: 'blob',
+    DIRECTORY: 'directory',
+    FILE: 'file',
+    FUNCTION: 'function',
+    GITHUB_REFERENCE: 'github_reference',
+    IMAGE: 'image',
+    OBJECT: 'object',
+    RESOURCE: 'resource',
+    RESOURCE_LINK: 'resource_link',
+    SELECTION: 'selection',
+    TERMINAL: 'terminal',
+    TEXT: 'text',
 
     // ── Custom ──
     CUSTOM: 'custom',

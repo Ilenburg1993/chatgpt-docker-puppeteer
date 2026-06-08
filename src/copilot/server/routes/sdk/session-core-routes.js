@@ -161,7 +161,7 @@ export function registerSessionCoreRoutes(router) {
         void withErrorHandler(req, res, async () => {
             const routeDeps = resolveSdkRouteSharedDeps(req);
             const id = /** @type {string} */ (req.params['id']);
-            const { model, reasoningEffort, modelCapabilities } = req.body ?? {};
+            const { model, reasoningEffort, reasoningSummary, contextTier, modelCapabilities } = req.body ?? {};
             const modelValidation = validateModel(model);
             if (!modelValidation.ok) {
                 res.status(400).json(withRuntimeMeta(routeDeps, { ok: false, error: modelValidation.error }));
@@ -173,7 +173,7 @@ export function registerSessionCoreRoutes(router) {
             const verification = await routeDeps.sdkSessionRuntime.setSessionModel(
                 entry.session,
                 safeModel,
-                routeDeps.sdkSession.pickDefined({ reasoningEffort, modelCapabilities }),
+                routeDeps.sdkSession.pickDefined({ reasoningEffort, reasoningSummary, contextTier, modelCapabilities }),
             );
 
             const effectiveModel = verification.effectiveModel ?? safeModel;
@@ -211,6 +211,8 @@ export function registerSessionCoreRoutes(router) {
                         usedRpcFallback: verification.usedRpcFallback,
                         modelMismatch,
                         reasoningEffort: reasoningEffort ?? null,
+                        reasoningSummary: reasoningSummary ?? null,
+                        contextTier: contextTier ?? null,
                         modelCapabilitiesApplied: Boolean(modelCapabilities),
                     },
                     id,

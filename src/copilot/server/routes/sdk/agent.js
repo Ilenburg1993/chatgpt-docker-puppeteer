@@ -52,6 +52,7 @@ const _agentTracker = new SseConnectionTracker('agent/stream');
  * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente AlwaysAlive.
  * @property {import('#copilot/observability/metrics.js').MetricsStore} metrics - Store de métricas.
  * @property {() => Promise<import('#copilot/sdk/types').CopilotClient>} getClient - Factory do SDK client.
+ * @property {() => import('#copilot/sdk/types').ConnectionState} [getClientState] - Estado local da conexão SDK.
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSystemPrompt']} sdkSystemPrompt
  * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
@@ -84,6 +85,50 @@ function resolveAgentRouterDeps(binding, req) {
  */
 function buildAgentRuntimeMeta(routeDeps) {
     return routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps);
+}
+
+/**
+ * @param {import('#copilot/sdk/types').CopilotClient} client
+ * @param {(event: { type?: string }) => void} handler
+ * @returns {() => void}
+ */
+function subscribeClientLifecycle(client, handler) {
+    const lifecycleClient = /** @type {{ onLifecycle?: (handler: (event: { type?: string }) => void) => () => void }} */ (
+        /** @type {unknown} */ (client)
+    );
+    if (typeof lifecycleClient.onLifecycle === 'function') {
+        return lifecycleClient.onLifecycle(handler);
+    }
+
+    const legacyClient = /** @type {{ on?: (handler: (event: { type?: string }) => void) => () => void }} */ (
+        /** @type {unknown} */ (client)
+    );
+    if (typeof legacyClient.on === 'function') {
+        return legacyClient.on(handler);
+    }
+
+    return () => {};
+}
+
+/**
+ * @param {AgentRouterDeps} routeDeps
+ * @param {import('#copilot/sdk/types').CopilotClient | null} [client]
+ * @returns {import('#copilot/sdk/types').ConnectionState | null}
+ */
+function resolveAgentClientState(routeDeps, client = null) {
+    if (typeof routeDeps.getClientState === 'function') {
+        return routeDeps.getClientState();
+    }
+    const compatReader = client
+        ? /** @type {{ getState?: () => unknown }} */ (/** @type {unknown} */ (client)).getState
+        : undefined;
+    if (typeof compatReader === 'function') {
+        const state = compatReader.call(client);
+        if (state === 'connected' || state === 'connecting' || state === 'disconnected' || state === 'not_started') {
+            return state;
+        }
+    }
+    return client ? 'connected' : null;
 }
 
 /**
@@ -125,7 +170,7 @@ export default function createAgentRouter(deps) {
             metrics: routeDeps.metrics,
         });
 
-        const unsubscribe = client.on((event) => {
+        const unsubscribe = subscribeClientLifecycle(client, (event) => {
             const type = /** @type {string} */ (event?.type ?? 'lifecycle');
             const payload = standardizeSsePayload({
                 .../** @type {object} */ (event ?? {}),
@@ -175,7 +220,7 @@ export default function createAgentRouter(deps) {
             const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjectionForRuntime(
                 runtimeId,
                 client,
-                client?.getState?.() ?? null,
+                resolveAgentClientState(routeDeps, client),
             );
             res.json({
                 ok: true,
@@ -293,7 +338,7 @@ export default function createAgentRouter(deps) {
             const routeDeps = resolveAgentRouterDeps(deps, req);
             const { getClient, runtimeId, sdkSessionOwnership } = routeDeps;
             const client = await getClient();
-            const state = client.getState();
+            const state = resolveAgentClientState(routeDeps, client) ?? 'not_started';
             const runtimeProjection = await sdkSessionOwnership.resolveSdkRuntimeProjectionForRuntime(
                 runtimeId,
                 client,
@@ -347,7 +392,7 @@ export default function createAgentRouter(deps) {
                 'connected',
                 {
                     ...buildAgentRuntimeMeta(routeDeps),
-                    state: state.client.getState(),
+                    state: resolveAgentClientState(routeDeps, state.client) ?? 'not_started',
                     timestamp: Date.now(),
                 },
                 { skipBuffer: true },

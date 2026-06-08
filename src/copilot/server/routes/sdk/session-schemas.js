@@ -14,8 +14,11 @@ export const CreateSessionBodySchema = z.object({
     sessionId: z.string().optional(),
     clientName: z.string().optional(),
     reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
+    reasoningSummary: z.enum(['none', 'concise', 'detailed']).optional(),
+    contextTier: z.enum(['default', 'long_context']).optional(),
     modelCapabilities: z.record(z.string(), z.unknown()).optional(),
     configDir: z.string().optional(),
+    configDirectory: z.string().optional(),
     enableConfigDiscovery: z.boolean().optional(),
     includeSubAgentStreamingEvents: z.boolean().optional(),
     systemMessage: z.unknown().optional(),
@@ -47,6 +50,8 @@ export const SendMessageBodySchema = z.object({
 export const SetModelBodySchema = z.object({
     model: z.string(),
     reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
+    reasoningSummary: z.enum(['none', 'concise', 'detailed']).optional(),
+    contextTier: z.enum(['default', 'long_context']).optional(),
     modelCapabilities: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -56,8 +61,11 @@ export const ResumeSessionBodySchema = z
         clientName: z.string().optional(),
         model: z.string().optional(),
         reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
+        reasoningSummary: z.enum(['none', 'concise', 'detailed']).optional(),
+        contextTier: z.enum(['default', 'long_context']).optional(),
         modelCapabilities: z.record(z.string(), z.unknown()).optional(),
         configDir: z.string().optional(),
+        configDirectory: z.string().optional(),
         enableConfigDiscovery: z.boolean().optional(),
         includeSubAgentStreamingEvents: z.boolean().optional(),
         systemMessage: z.unknown().optional(),
@@ -75,6 +83,8 @@ export const ResumeSessionBodySchema = z
         infiniteSessions: z.unknown().optional(),
         gitHubToken: z.string().optional(),
         disableResume: z.boolean().optional(),
+        suppressResumeEvent: z.boolean().optional(),
+        continuePendingWork: z.boolean().optional(),
     })
     .optional();
 

@@ -115,7 +115,12 @@ export async function modelGetCurrent(session) {
  *
  * @param {CopilotSession} session
  * @param {string} modelId
- * @param {{ reasoningEffort?: string; modelCapabilities?: import('@github/copilot-sdk').ModelCapabilitiesOverride }} [options]
+ * @param {{
+ *     reasoningEffort?: string;
+ *     reasoningSummary?: import('@github/copilot-sdk').ReasoningSummary;
+ *     contextTier?: import('@github/copilot-sdk').ContextTier;
+ *     modelCapabilities?: import('@github/copilot-sdk').ModelCapabilitiesOverride;
+ * }} [options]
  * @returns {Promise<ModelSwitchResult>}
  */
 export async function modelSwitchTo(session, modelId, options) {
@@ -125,11 +130,23 @@ export async function modelSwitchTo(session, modelId, options) {
     }
     appLog('INFO', `[sdk/rpc] model.switchTo: modelId='${modelId}', sessionId='${session.sessionId}'`);
     const params =
-        /** @type {{ modelId: string; reasoningEffort?: string; modelCapabilities?: import('@github/copilot-sdk').ModelCapabilitiesOverride }} */ ({
+        /** @type {{
+         *     modelId: string;
+         *     reasoningEffort?: string;
+         *     reasoningSummary?: import('@github/copilot-sdk').ReasoningSummary;
+         *     contextTier?: import('@github/copilot-sdk').ContextTier;
+         *     modelCapabilities?: import('@github/copilot-sdk').ModelCapabilitiesOverride;
+         * }} */ ({
             modelId,
         });
     if (options?.reasoningEffort) {
         params.reasoningEffort = options.reasoningEffort;
+    }
+    if (options?.reasoningSummary) {
+        params.reasoningSummary = options.reasoningSummary;
+    }
+    if (options?.contextTier) {
+        params.contextTier = options.contextTier;
     }
     if (options?.modelCapabilities !== undefined) {
         params.modelCapabilities = options.modelCapabilities;
@@ -139,11 +156,13 @@ export async function modelSwitchTo(session, modelId, options) {
         operation: 'rpc.model.switchTo',
         status: 'started',
         sessionId: session.sessionId,
-        attributes: {
-            modelId,
-            ...(options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
-            ...(options?.modelCapabilities ? { modelCapabilities: true } : {}),
-        },
+            attributes: {
+                modelId,
+                ...(options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
+                ...(options?.reasoningSummary ? { reasoningSummary: options.reasoningSummary } : {}),
+                ...(options?.contextTier ? { contextTier: options.contextTier } : {}),
+                ...(options?.modelCapabilities ? { modelCapabilities: true } : {}),
+            },
     });
     try {
         const result = /** @type {ModelSwitchResult} */ (await session.rpc.model.switchTo(params));

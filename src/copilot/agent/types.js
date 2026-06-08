@@ -683,7 +683,7 @@
  * @property {() => Record<string, number>} listenerDiagnostics - Retorna diagnóstico de listeners por evento
  * @property {((n: number) => void) | undefined} setMaxListeners - Define o número máximo de listeners
  * @property {((prompt: string) => Promise<string>) | undefined} steerMessage - Envia mensagem em modo steering
- * @property {(() => Promise<{ message: string; timestamp: number; protocolVersion?: number }>) | undefined} pingSdk -
+ * @property {(() => Promise<{ message: string; timestamp: string; protocolVersion?: number }>) | undefined} pingSdk -
  *   Executa ping no client SDK atual
  * @property {(() => Promise<import('#copilot/sdk/types').GetStatusResponse>) | undefined} getSdkStatus - Retorna status
  *   do SDK/CLI atual

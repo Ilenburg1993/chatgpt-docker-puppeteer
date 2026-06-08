@@ -27,10 +27,10 @@ import {
     resolveModelGatewaySelectionPolicy,
     SqliteModelGatewayCatalogStore,
 } from '#copilot/model-gateway';
-import { readConfiguredSessionFsState } from '#copilot/sdk';
 
 import {
     listTerminalSdkSessionInventory,
+    readTerminalConfiguredSessionFsState,
     scheduleTerminalSdkSessionBootSelection,
 } from '../frontend/index.js';
 import { requestTerminalLiveByokModelSwitch } from './live-model-switch.js';
@@ -234,7 +234,7 @@ async function createUnavailableSdkSessionInventory(error) {
         foregroundSessionId: null,
         persistedByokBinding: null,
         lastBootDecision: null,
-        sessionFs: await readConfiguredSessionFsState(null),
+        sessionFs: await readTerminalConfiguredSessionFsState(null),
         sessions: [],
         unavailableReason: message,
     };

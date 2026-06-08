@@ -24,6 +24,9 @@ import {
     requireClient,
 } from './core/index.js';
 
+/** @type {WeakSet<import('#copilot/sdk/types').CopilotClient>} */
+const startedAgentSdkClients = new WeakSet();
+
 /**
  * @typedef {import('#copilot/agent/types').AgentSdkHandles} AgentSdkHandles
  *
@@ -43,15 +46,21 @@ export function createAgentSdkClient(options) {
  * @returns {Promise<void>}
  */
 export async function ensureAgentSdkClientStarted(client) {
-    if (typeof client?.getState === 'function' && client.getState() === 'connected') {
+    const compatStateReader = /** @type {{ getState?: () => unknown }} */ (/** @type {unknown} */ (client)).getState;
+    if (typeof compatStateReader === 'function' && compatStateReader.call(client) === 'connected') {
+        startedAgentSdkClients.add(client);
+        return;
+    }
+    if (startedAgentSdkClients.has(client)) {
         return;
     }
     await client.start();
+    startedAgentSdkClients.add(client);
 }
 
 /**
  * @param {import('#copilot/sdk/types').CopilotClient} client
- * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
+ * @returns {Promise<{ message: string; timestamp: string; protocolVersion?: number }>}
  */
 export async function pingAgentSdkClient(client) {
     return client.ping();
@@ -209,7 +218,9 @@ export function getSdkResourceSnapshot(ctx) {
             (handles.session ? typeof Reflect.get(handles.session, 'switchModel') === 'function' : false),
         abortAvailable: typeof handles.session?.abort === 'function',
         sessionLogAvailable: typeof handles.session?.log === 'function',
-        historyAvailable: typeof handles.session?.getMessages === 'function',
+        historyAvailable:
+            typeof handles.session?.getEvents === 'function' ||
+            (handles.session ? typeof Reflect.get(handles.session, 'getMessages') === 'function' : false),
         serverModelsListAvailable:
             typeof handles.serverRpc === 'object' && hasRpcNamespace(handles.serverRpc, 'models'),
         serverToolsListAvailable: typeof handles.serverRpc === 'object' && hasRpcNamespace(handles.serverRpc, 'tools'),
@@ -268,7 +279,7 @@ export function getSdkResourceSnapshot(ctx) {
 
 /**
  * @param {unknown} ctx
- * @returns {Promise<{ message: string; timestamp: number; protocolVersion?: number }>}
+ * @returns {Promise<{ message: string; timestamp: string; protocolVersion?: number }>}
  */
 export async function pingSdk(ctx) {
     return requireClient(ctx, 'pingSdk').ping();

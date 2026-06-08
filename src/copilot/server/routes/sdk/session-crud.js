@@ -199,7 +199,8 @@ router.get('/sessions', (req, res) => {
         const filter = {};
         if (req.query['repository']) filter.repository = String(req.query['repository']);
         if (req.query['branch']) filter.branch = String(req.query['branch']);
-        if (req.query['cwd']) filter.cwd = String(req.query['cwd']);
+        if (req.query['workingDirectory']) filter.workingDirectory = String(req.query['workingDirectory']);
+        if (req.query['cwd'] && !filter.workingDirectory) filter.workingDirectory = String(req.query['cwd']);
 
         const sessions = await routeDeps.sdkSession.listAllClientSessions(
             Object.keys(filter).length ? filter : undefined,
@@ -228,6 +229,7 @@ router.get('/sessions', (req, res) => {
  *     "model": "claude-sonnet-4-5", // opcional, exceto quando provider custom exige modelo
  *     "sessionId": "my-id", // opcional — ID customizado
  *     "configDir": "/tmp/copilot-config", // opcional
+ *     "configDirectory": "/tmp/copilot-config", // opcional — nome oficial SDK 1.0
  *     "enableConfigDiscovery": true, // opcional — descobre MCP/skills/configs a partir do workingDirectory
  *     "includeSubAgentStreamingEvents": false, // opcional — inclui deltas de streaming de subagentes
  *     "systemMessage": { "content": "..." }, // opcional
@@ -235,6 +237,8 @@ router.get('/sessions', (req, res) => {
  *     "workingDirectory": "/caminho/do/projeto", // opcional
  *     "streaming": true, // opcional — emite message_delta via SSE
  *     "reasoningEffort": "high", // opcional — "low" | "medium" | "high" | "xhigh"
+ *     "reasoningSummary": "concise", // opcional — "none" | "concise" | "detailed"
+ *     "contextTier": "long_context", // opcional — "default" | "long_context"
  *     "modelCapabilities": { "supports": { "reasoningEffort": true } }, // opcional — overrides granulares
  *     "availableTools": ["read_file"], // opcional — whitelist de tools
  *     "excludedTools": ["run_in_terminal"], // opcional — blacklist de tools
@@ -266,8 +270,11 @@ router.post(
                 streaming,
                 provider,
                 reasoningEffort,
+                reasoningSummary,
+                contextTier,
                 modelCapabilities,
                 configDir,
+                configDirectory,
                 enableConfigDiscovery,
                 includeSubAgentStreamingEvents,
                 availableTools,
@@ -311,8 +318,10 @@ router.post(
                 sessionId,
                 clientName,
                 reasoningEffort,
+                reasoningSummary,
+                contextTier,
                 modelCapabilities,
-                configDir,
+                configDirectory: configDirectory ?? configDir,
                 enableConfigDiscovery,
                 includeSubAgentStreamingEvents,
                 systemMessage,
@@ -513,6 +522,8 @@ router.post('/sessions/:id/disconnect', (req, res) => {
  * {
  *     "model": "gpt-4.1", // opcional — modelo para retomada
  *     "reasoningEffort": "high", // opcional
+ *     "reasoningSummary": "concise", // opcional
+ *     "contextTier": "long_context", // opcional
  *     "modelCapabilities": { "supports": { "reasoningEffort": true } }, // opcional — overrides granulares
  *     "configDir": "/tmp/copilot-config", // opcional
  *     "enableConfigDiscovery": true, // opcional
@@ -530,7 +541,9 @@ router.post('/sessions/:id/disconnect', (req, res) => {
  *     "skillDirectories": [".github/skills"], // opcional
  *     "disabledSkills": ["legacy-skill"], // opcional
  *     "gitHubToken": "ghs_session_token", // opcional — token por sessão
- *     "disableResume": true // opcional — reconexão silenciosa
+ *     "disableResume": true, // opcional — alias legado
+ *     "suppressResumeEvent": true, // opcional — nome oficial SDK 1.0
+ *     "continuePendingWork": true // opcional — continua prompts/tools pendentes
  * }
  * ```
  */
@@ -544,6 +557,7 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
             reasoningEffort,
             modelCapabilities,
             configDir,
+            configDirectory,
             enableConfigDiscovery,
             includeSubAgentStreamingEvents,
             systemMessage,
@@ -552,6 +566,8 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
             provider,
             workingDirectory,
             streaming,
+            reasoningSummary,
+            contextTier,
             mcpServers,
             customAgents,
             defaultAgent,
@@ -561,6 +577,8 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
             infiniteSessions,
             gitHubToken,
             disableResume,
+            suppressResumeEvent,
+            continuePendingWork,
         } = req.body ?? {};
 
         /** @type {string | undefined} */
@@ -591,8 +609,10 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
         const resumeOptions = routeDeps.sdkSession.pickDefined({
             clientName,
             reasoningEffort,
+            reasoningSummary,
+            contextTier,
             modelCapabilities,
-            configDir,
+            configDirectory: configDirectory ?? configDir,
             enableConfigDiscovery,
             includeSubAgentStreamingEvents,
             systemMessage,
@@ -608,7 +628,8 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
             disabledSkills,
             infiniteSessions,
             gitHubToken,
-            disableResume,
+            suppressResumeEvent: suppressResumeEvent ?? disableResume,
+            continuePendingWork,
         });
         if (safeProvider !== undefined) resumeOptions.provider = safeProvider;
         if (safeModel !== undefined) resumeOptions.model = safeModel;

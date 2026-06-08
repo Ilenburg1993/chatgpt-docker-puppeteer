@@ -27,6 +27,10 @@ import { isDynamicOnly } from './tool-filter.js';
  *
  * @typedef {import('./types.js').PostToolUseHandler} PostToolUseHandler
  *
+ * @typedef {import('./types.js').PreMcpToolCallHandler} PreMcpToolCallHandler
+ *
+ * @typedef {import('./types.js').PostToolUseFailureHandler} PostToolUseFailureHandler
+ *
  * @typedef {import('./types.js').UserPromptSubmittedHandler} UserPromptSubmittedHandler
  *
  * @typedef {import('./types.js').SessionStartHandler} SessionStartHandler
@@ -38,6 +42,10 @@ import { isDynamicOnly } from './tool-filter.js';
  * @typedef {import('./types.js').PreToolUseHookInput} PreToolUseHookInput
  *
  * @typedef {import('./types.js').PostToolUseHookInput} PostToolUseHookInput
+ *
+ * @typedef {import('./types.js').PreMcpToolCallHookInput} PreMcpToolCallHookInput
+ *
+ * @typedef {import('./types.js').PostToolUseFailureHookInput} PostToolUseFailureHookInput
  *
  * @typedef {import('./types.js').UserPromptSubmittedHookInput} UserPromptSubmittedHookInput
  *
@@ -314,6 +322,22 @@ export function createHooks(cfg = {}) {
             askHandler,
             argsModifier,
         });
+	    }
+
+    // ── onPreMcpToolCall ─────────────────────────────────────────────────────
+    if (cfg.onPreMcpToolCall) {
+        hooks.onPreMcpToolCall = cfg.onPreMcpToolCall;
+    } else if (auditLog) {
+        const preMcpFn = async (
+            /** @type {PreMcpToolCallHookInput} */ input,
+            /** @type {InvocationContext} */ invocation,
+        ) => {
+            log(
+                'DEBUG',
+                `[hooks/factory] onPreMcpToolCall: server='${input.serverName}' tool='${input.toolName}' sessionId='${invocation?.sessionId}'`,
+            );
+        };
+        hooks.onPreMcpToolCall = /** @type {PreMcpToolCallHandler} */ (preMcpFn);
     }
 
     // ── onPostToolUse ────────────────────────────────────────────────────────
@@ -330,6 +354,23 @@ export function createHooks(cfg = {}) {
             );
         };
         hooks.onPostToolUse = /** @type {PostToolUseHandler} */ (postToolFn);
+    }
+
+    // ── onPostToolUseFailure ─────────────────────────────────────────────────
+    if (cfg.onPostToolUseFailure) {
+        hooks.onPostToolUseFailure = cfg.onPostToolUseFailure;
+    } else if (auditLog) {
+        const postToolFailureFn = async (
+            /** @type {PostToolUseFailureHookInput} */ input,
+            /** @type {InvocationContext} */ invocation,
+        ) => {
+            const errorPreview = String(input.error ?? '').slice(0, 120);
+            log(
+                'DEBUG',
+                `[hooks/factory] onPostToolUseFailure: tool='${input.toolName}' error='${errorPreview}' sessionId='${invocation?.sessionId}'`,
+            );
+        };
+        hooks.onPostToolUseFailure = /** @type {PostToolUseFailureHandler} */ (postToolFailureFn);
     }
 
     // ── onUserPromptSubmitted ─────────────────────────────────────────────────

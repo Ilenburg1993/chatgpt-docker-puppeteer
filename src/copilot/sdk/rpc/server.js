@@ -25,7 +25,7 @@ import { log as appLog } from '../logger.js';
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
  *
- * @typedef {{ message: string; timestamp: number; protocolVersion: number }} PingResult
+ * @typedef {{ message: string; timestamp: string; protocolVersion?: number }} PingResult
  *
  * @typedef {{
  *     id: string;
@@ -113,7 +113,9 @@ export async function ping(client, message) {
 
     appLog('DEBUG', `[sdk/server-rpc] ping: message='${message ?? ''}'`);
     try {
-        return /** @type {PingResult} */ (await client.rpc.ping(/** @type {{ message?: string }} */ (params)));
+        return /** @type {PingResult} */ (
+            /** @type {unknown} */ (await client.rpc.ping(/** @type {{ message?: string }} */ (params)))
+        );
     } catch (error) {
         throw toSdkOperationError('server.ping', error);
     }
@@ -133,7 +135,7 @@ export async function modelsList(client) {
     assertClient(client, 'models.list');
     appLog('DEBUG', '[sdk/server-rpc] models.list');
     try {
-        return /** @type {ModelsListResult} */ (await client.rpc.models.list());
+        return /** @type {ModelsListResult} */ (/** @type {unknown} */ (await client.rpc.models.list({})));
     } catch (error) {
         throw toSdkOperationError('server.models.list', error);
     }
@@ -178,7 +180,7 @@ export async function accountGetQuota(client) {
     assertClient(client, 'account.getQuota');
     appLog('DEBUG', '[sdk/server-rpc] account.getQuota');
     try {
-        return /** @type {AccountQuotaResult} */ (await client.rpc.account.getQuota());
+        return /** @type {AccountQuotaResult} */ (/** @type {unknown} */ (await client.rpc.account.getQuota({})));
     } catch (error) {
         throw toSdkOperationError('server.account.getQuota', error);
     }

@@ -18,7 +18,7 @@
 
 import { sleepMs } from '#copilot/core';
 import { toError } from '#copilot/core/error-handlers';
-import { CopilotClient } from '@github/copilot-sdk';
+import { CopilotClient, RuntimeConnection } from '@github/copilot-sdk';
 import { DEFAULT_MODEL, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '../constants.js';
 import { getSdkErrorFingerprint, getSdkRecoveryPolicy, toSdkOperationError } from '../errors.js';
 import { log } from '../logger.js';
@@ -94,13 +94,15 @@ export async function resolveSessionCreateModel(model, fallback = DEFAULT_MODEL)
  * @property {string[]} [availableTools] - Lista de tools permitidas (overrides excludedTools)
  * @property {string[]} [excludedTools] - Lista de tools desabilitadas
  * @property {SessionConfig['provider']} [provider] - Provider/BYOK por sessão
- * @property {string} [configDir] - Diretorio de configuracao do SDK
+ * @property {string} [configDir] - Alias local legado para `configDirectory`
+ * @property {string} [configDirectory] - Diretório de configuração do SDK
  * @property {SessionConfig['onEvent']} [onEvent] - Handler de eventos genéricos do SDK
  * @property {string} [agent] - Agente customizado a selecionar na sessao
  * @property {string[]} [skillDirectories] - Diretórios de skills customizadas
  * @property {string[]} [disabledSkills] - Skills a desabilitar
  * @property {string} [gitHubToken] - Token GitHub por sessão (multitenancy/session-level auth)
- * @property {SessionConfig['createSessionFsHandler']} [createSessionFsHandler] - Factory de SessionFs por sessão
+ * @property {SessionConfig['createSessionFsProvider']} [createSessionFsHandler] - Alias local legado de SessionFs
+ * @property {SessionConfig['createSessionFsProvider']} [createSessionFsProvider] - Factory de SessionFs por sessão
  */
 
 /**
@@ -128,14 +130,18 @@ export async function resolveSessionCreateModel(model, fallback = DEFAULT_MODEL)
  * @property {string[]} [availableTools] - Lista de tools permitidas
  * @property {string[]} [excludedTools] - Lista de tools desabilitadas
  * @property {SessionConfig['provider']} [provider] - Provider/BYOK da sessão retomada
- * @property {string} [configDir] - Diretorio de configuracao
+ * @property {string} [configDir] - Alias local legado para `configDirectory`
+ * @property {string} [configDirectory] - Diretório de configuração
  * @property {SessionConfig['onEvent']} [onEvent] - Handler de eventos genéricos
  * @property {string} [agent] - Agente customizado a selecionar
  * @property {string[]} [skillDirectories] - Diretórios de skills
  * @property {string[]} [disabledSkills] - Skills a desabilitar
  * @property {string} [gitHubToken] - Token GitHub por sessão
- * @property {SessionConfig['createSessionFsHandler']} [createSessionFsHandler] - Factory de SessionFs por sessão
- * @property {boolean} [disableResume] - RF-PR-06: se true, reconecta sem emitir session.resume (reconexão silenciosa)
+ * @property {SessionConfig['createSessionFsProvider']} [createSessionFsHandler] - Alias local legado de SessionFs
+ * @property {SessionConfig['createSessionFsProvider']} [createSessionFsProvider] - Factory de SessionFs por sessão
+ * @property {boolean} [disableResume] - Alias local legado para `suppressResumeEvent`
+ * @property {boolean} [suppressResumeEvent] - Se true, reconecta sem emitir session.resume
+ * @property {boolean} [continuePendingWork] - Continua prompts/tools pendentes ao retomar
  */
 
 /**
@@ -214,6 +220,37 @@ const EXPECTED_RESUME_MISS_PATTERNS = [
     'session is not active',
 ];
 
+const SDK10_SESSION_BASE_PASSTHROUGH_KEYS = Object.freeze([
+    'reasoningSummary',
+    'contextTier',
+    'largeOutput',
+    'enableSessionTelemetry',
+    'skipCustomInstructions',
+    'customAgentsLocalOnly',
+    'coauthorEnabled',
+    'manageScheduleEnabled',
+    'enableMcpApps',
+    'canvases',
+    'requestCanvasRenderer',
+    'requestExtensions',
+    'extensionSdkPath',
+    'extensionInfo',
+    'onExitPlanModeRequest',
+    'onAutoModeSwitchRequest',
+    'mcpOAuthTokenStorage',
+    'pluginDirectories',
+    'instructionDirectories',
+    'skipEmbeddingRetrieval',
+    'embeddingCacheStorage',
+    'organizationCustomInstructions',
+    'enableOnDemandInstructionDiscovery',
+    'enableFileHooks',
+    'enableHostGitOperations',
+    'enableSessionStore',
+    'enableSkills',
+    'remoteSession',
+]);
+
 /**
  * Sessões persistidas podem expirar no backend do SDK entre boots. Nesse caso `resumeOrCreate()` vai criar uma nova
  * sessão logo em seguida; a falha continua sendo métrica de lifecycle, mas não deve aparecer como erro fatal na UX.
@@ -231,6 +268,20 @@ function isExpectedResumeMiss(operation, error) {
     if (fp.status === 404 || fp.status === 410) return true;
     const haystack = `${fp.code} ${fp.errorType} ${fp.message}`.toLowerCase();
     return EXPECTED_RESUME_MISS_PATTERNS.some((pattern) => haystack.includes(pattern));
+}
+
+/**
+ * Copia campos oficiais do SDK 1.0 ainda não modelados na API fluent local.
+ *
+ * @param {Record<string, unknown>} source
+ * @param {Record<string, unknown>} target
+ */
+function copySdk10SessionBasePassthroughOptions(source, target) {
+    for (const key of SDK10_SESSION_BASE_PASSTHROUGH_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(source, key) && source[key] !== undefined) {
+            target[key] = source[key];
+        }
+    }
 }
 
 /**
@@ -379,19 +430,22 @@ function getDefaultGpt5MiniReasoningEffort() {
  *
  * @param {SessionCreateOptions | SessionResumeOptions} opts
  * @param {'create' | 'resume'} mode
- * @returns {import('@github/copilot-sdk').SessionConfig
- *     | (import('@github/copilot-sdk').SessionConfig & { disableResume?: boolean })}
+ * @returns {import('@github/copilot-sdk').SessionConfig | import('@github/copilot-sdk').ResumeSessionConfig}
  */
 function buildSessionConfig(opts, mode) {
     if (!opts.onPermissionRequest) {
         log('WARN', '[lib/session] onPermissionRequest não fornecido — usando approveAll como fallback');
     }
 
-    /** @type {Partial<import('@github/copilot-sdk').SessionConfig> & { disableResume?: boolean }} */
+    /** @type {Partial<import('@github/copilot-sdk').SessionConfig> & Partial<import('@github/copilot-sdk').ResumeSessionConfig> & { disableResume?: boolean }} */
     const cfg = {
         streaming: opts.streaming ?? true,
         onPermissionRequest: opts.onPermissionRequest ?? approveAll,
     };
+    copySdk10SessionBasePassthroughOptions(
+        /** @type {Record<string, unknown>} */ (opts),
+        /** @type {Record<string, unknown>} */ (cfg),
+    );
 
     if (mode === 'create') {
         const co = /** @type {SessionCreateOptions} */ (opts);
@@ -420,13 +474,15 @@ function buildSessionConfig(opts, mode) {
         if (co.availableTools !== undefined) cfg.availableTools = co.availableTools;
         if (co.excludedTools !== undefined) cfg.excludedTools = co.excludedTools;
         if (co.provider !== undefined) cfg.provider = co.provider;
-        if (co.configDir !== undefined) cfg.configDir = co.configDir;
+        if (co.configDirectory !== undefined) cfg.configDirectory = co.configDirectory;
+        if (co.configDir !== undefined) cfg.configDirectory = co.configDir;
         if (co.onEvent !== undefined) cfg.onEvent = co.onEvent;
         if (co.agent !== undefined) cfg.agent = co.agent;
         if (co.skillDirectories !== undefined) cfg.skillDirectories = co.skillDirectories;
         if (co.disabledSkills !== undefined) cfg.disabledSkills = co.disabledSkills;
         if (co.gitHubToken !== undefined) cfg.gitHubToken = co.gitHubToken;
-        if (co.createSessionFsHandler !== undefined) cfg.createSessionFsHandler = co.createSessionFsHandler;
+        if (co.createSessionFsProvider !== undefined) cfg.createSessionFsProvider = co.createSessionFsProvider;
+        if (co.createSessionFsHandler !== undefined) cfg.createSessionFsProvider = co.createSessionFsHandler;
         // BUG-HIGH-06 (fix): só aplicar infiniteSessions quando explicitamente fornecido
         // Evita habilitar compaction automática em sessões que não solicitaram (ex: routes/sessions.js)
         if (co.infiniteSessions !== undefined) {
@@ -473,7 +529,8 @@ function buildSessionConfig(opts, mode) {
         if (ro.availableTools !== undefined) cfg.availableTools = ro.availableTools;
         if (ro.excludedTools !== undefined) cfg.excludedTools = ro.excludedTools;
         if (ro.provider !== undefined) cfg.provider = ro.provider;
-        if (ro.configDir !== undefined) cfg.configDir = ro.configDir;
+        if (ro.configDirectory !== undefined) cfg.configDirectory = ro.configDirectory;
+        if (ro.configDir !== undefined) cfg.configDirectory = ro.configDir;
         if (ro.onEvent !== undefined) cfg.onEvent = ro.onEvent;
         if (ro.agent !== undefined) cfg.agent = ro.agent;
         if (ro.skillDirectories !== undefined) cfg.skillDirectories = ro.skillDirectories;
@@ -482,15 +539,20 @@ function buildSessionConfig(opts, mode) {
             cfg.infiniteSessions = buildInfiniteSessionConfig(ro.infiniteSessions);
         }
         if (ro.gitHubToken !== undefined) cfg.gitHubToken = ro.gitHubToken;
-        if (ro.createSessionFsHandler !== undefined) cfg.createSessionFsHandler = ro.createSessionFsHandler;
-        if (ro.disableResume !== undefined) cfg.disableResume = ro.disableResume;
+        if (ro.createSessionFsProvider !== undefined) cfg.createSessionFsProvider = ro.createSessionFsProvider;
+        if (ro.createSessionFsHandler !== undefined) cfg.createSessionFsProvider = ro.createSessionFsHandler;
+        if (ro.suppressResumeEvent !== undefined) cfg.suppressResumeEvent = ro.suppressResumeEvent;
+        if (ro.disableResume !== undefined) cfg.suppressResumeEvent = ro.disableResume;
+        if (ro.continuePendingWork !== undefined) cfg.continuePendingWork = ro.continuePendingWork;
     }
 
     const systemMsg = buildSystemMessageConfig(opts.systemMessage, opts.systemMessageContent);
     if (systemMsg !== undefined)
         cfg.systemMessage = /** @type {import('@github/copilot-sdk').SystemMessageConfig} */ (systemMsg);
 
-    return /** @type {import('@github/copilot-sdk').SessionConfig} */ (cfg);
+    return /** @type {import('@github/copilot-sdk').SessionConfig | import('@github/copilot-sdk').ResumeSessionConfig} */ (
+        cfg
+    );
 }
 
 /**
@@ -501,7 +563,12 @@ function buildSessionConfig(opts, mode) {
  * “switch to auto model”. Reasoning effort é omitido nesse caso porque o modelo efetivo será decidido pelo SDK.
  *
  * @param {SessionResumeOptions} options
- * @returns {{ model?: string | undefined; reasoningEffort?: ReasoningEffortLevel | undefined }}
+ * @returns {{
+ *     model?: string | undefined;
+ *     reasoningEffort?: ReasoningEffortLevel | undefined;
+ *     reasoningSummary?: import('@github/copilot-sdk').ReasoningSummary | undefined;
+ *     contextTier?: import('@github/copilot-sdk').ContextTier | undefined;
+ * }}
  */
 function normalizeResumeModelSelection(options) {
     const selectedModel = options.model;
@@ -528,6 +595,18 @@ function normalizeResumeModelSelection(options) {
     return {
         ...(selectedModel !== undefined ? { model: selectedModel } : {}),
         ...(options.reasoningEffort !== undefined ? { reasoningEffort: options.reasoningEffort } : {}),
+        ...(/** @type {{ reasoningSummary?: import('@github/copilot-sdk').ReasoningSummary }} */ (options)
+            .reasoningSummary !== undefined
+            ? {
+                  reasoningSummary:
+                      /** @type {{ reasoningSummary: import('@github/copilot-sdk').ReasoningSummary }} */ (options)
+                          .reasoningSummary,
+              }
+            : {}),
+        ...(/** @type {{ contextTier?: import('@github/copilot-sdk').ContextTier }} */ (options).contextTier !==
+        undefined
+            ? { contextTier: /** @type {{ contextTier: import('@github/copilot-sdk').ContextTier }} */ (options).contextTier }
+            : {}),
     };
 }
 
@@ -618,12 +697,22 @@ export async function resumeSession(client, sessionId, opts) {
         ...(normalizedSelection.reasoningEffort !== undefined
             ? { reasoningEffort: normalizedSelection.reasoningEffort }
             : {}),
+        ...(normalizedSelection.reasoningSummary !== undefined
+            ? { reasoningSummary: normalizedSelection.reasoningSummary }
+            : {}),
+        ...(normalizedSelection.contextTier !== undefined ? { contextTier: normalizedSelection.contextTier } : {}),
     };
     if (normalizedSelection.model === undefined && 'model' in sanitizedOptions) {
         delete sanitizedOptions.model;
     }
     if (normalizedSelection.reasoningEffort === undefined && 'reasoningEffort' in sanitizedOptions) {
         delete sanitizedOptions.reasoningEffort;
+    }
+    if (normalizedSelection.reasoningSummary === undefined && 'reasoningSummary' in sanitizedOptions) {
+        delete /** @type {Record<string, unknown>} */ (sanitizedOptions)['reasoningSummary'];
+    }
+    if (normalizedSelection.contextTier === undefined && 'contextTier' in sanitizedOptions) {
+        delete /** @type {Record<string, unknown>} */ (sanitizedOptions)['contextTier'];
     }
     const config = buildSessionConfig(sanitizedOptions, 'resume');
 
@@ -635,7 +724,11 @@ export async function resumeSession(client, sessionId, opts) {
             sessionId,
             model: normalizedSelection.model ?? null,
             reasoningEffort: normalizedSelection.reasoningEffort ?? null,
-            disableResume: Boolean(/** @type {{ disableResume?: boolean }} */ (config).disableResume),
+            reasoningSummary: normalizedSelection.reasoningSummary ?? null,
+            contextTier: normalizedSelection.contextTier ?? null,
+            suppressResumeEvent: Boolean(
+                /** @type {{ suppressResumeEvent?: boolean }} */ (config).suppressResumeEvent,
+            ),
         },
         run: async () => client.resumeSession(sessionId, config),
     });
@@ -748,7 +841,7 @@ export function createClientFromCliUrl(cliUrl) {
         throw new TypeError('[lib/session/createClientFromCliUrl] cliUrl deve ser string não-vazia.');
     }
     log('INFO', `[lib/session] Conectando ao CLI externo: ${cliUrl}`);
-    return new CopilotClient({ cliUrl });
+    return new CopilotClient({ connection: RuntimeConnection.forUri(cliUrl) });
 }
 
 /** @internal Expõe funções internas para testes unitários. */

@@ -10,6 +10,7 @@
  */
 
 import { COPILOT_CANONICAL_OTEL_SOURCE_NAME } from '#copilot/boot/contract';
+import { RuntimeConnection } from '@github/copilot-sdk';
 import { log } from '../logger.js';
 import { BYOK_SECRET_ENV_KEYS, buildConfiguredByokModelListHandler } from './provider.js';
 import { buildConfiguredClientSessionFsConfig, getConfiguredSessionIdleTimeoutSeconds } from './session-fs.js';
@@ -18,6 +19,19 @@ import { buildConfiguredClientSessionFsConfig, getConfiguredSessionIdleTimeoutSe
  * @typedef {import('../types.js').CopilotClientOptions} CopilotClientOptions
  *
  * @typedef {import('../types.js').ModelInfo} ModelInfo
+ *
+ * @typedef {Partial<CopilotClientOptions> & {
+ *     cliPath?: string;
+ *     cliArgs?: string[];
+ *     cwd?: string;
+ *     cliUrl?: string;
+ *     useStdio?: boolean;
+ *     isChildProcess?: boolean;
+ *     port?: number;
+ *     autoStart?: boolean;
+ *     autoRestart?: boolean;
+ *     connectionToken?: string;
+ * }} CompatClientOptions
  */
 
 /** @type {Readonly<Record<string, NonNullable<CopilotClientOptions['logLevel']>>>} */
@@ -122,8 +136,80 @@ function normalizeCliSpawnEnv(env) {
     return next;
 }
 
+/**
+ * @param {CompatClientOptions} opts
+ * @returns {CopilotClientOptions['connection'] | undefined}
+ */
+function buildRuntimeConnectionFromCompatOptions(opts) {
+    const cliPath = opts.cliPath;
+    const cliArgs = opts.cliArgs;
+    const connectionToken = opts.connectionToken;
+
+    if (opts.cliUrl) {
+        return RuntimeConnection.forUri(
+            opts.cliUrl,
+            connectionToken ? { connectionToken } : undefined,
+        );
+    }
+
+    if (opts.useStdio === false || opts.port !== undefined) {
+        return RuntimeConnection.forTcp({
+            ...(opts.port !== undefined ? { port: opts.port } : {}),
+            ...(connectionToken ? { connectionToken } : {}),
+            ...(cliPath ? { path: cliPath } : {}),
+            ...(cliArgs ? { args: cliArgs } : {}),
+        });
+    }
+
+    if (opts.useStdio === true || cliPath || cliArgs) {
+        return RuntimeConnection.forStdio({
+            ...(cliPath ? { path: cliPath } : {}),
+            ...(cliArgs ? { args: cliArgs } : {}),
+        });
+    }
+
+    return undefined;
+}
+
+/**
+ * @param {CompatClientOptions} opts
+ * @returns {Partial<CopilotClientOptions>}
+ */
+function normalizeClientOptionsForSdk10(opts) {
+    const {
+        cliPath: _cliPath,
+        cliArgs: _cliArgs,
+        cwd,
+        cliUrl: _cliUrl,
+        useStdio: _useStdio,
+        isChildProcess: _isChildProcess,
+        port: _port,
+        autoStart: _autoStart,
+        autoRestart: _autoRestart,
+        connectionToken: _connectionToken,
+        ...official
+    } = opts;
+    void _cliPath;
+    void _cliArgs;
+    void _cliUrl;
+    void _useStdio;
+    void _isChildProcess;
+    void _port;
+    void _autoStart;
+    void _autoRestart;
+    void _connectionToken;
+
+    const connection = official.connection ?? buildRuntimeConnectionFromCompatOptions(opts);
+    return {
+        ...official,
+        ...(connection ? { connection } : {}),
+        ...(official.workingDirectory === undefined && cwd ? { workingDirectory: cwd } : {}),
+        ...(official.env ? { env: normalizeCliSpawnEnv(official.env) } : {}),
+    };
+}
+
 export class ClientOptionsBuilder {
-    /** @type {Partial<CopilotClientOptions>} */
+    /** @type {CompatClientOptions} */
     #opts = {};
 
     /** @param {string} path @returns {this} */
@@ -165,6 +251,42 @@ export class ClientOptionsBuilder {
     /** @param {number} p @returns {this} */
     port(p) {
         this.#opts.port = p;
+        return this;
+    }
+
+    /** @param {NonNullable<CopilotClientOptions['connection']>} connection @returns {this} */
+    connection(connection) {
+        this.#opts.connection = connection;
+        return this;
+    }
+
+    /** @param {string} path @returns {this} */
+    workingDirectory(path) {
+        this.#opts.workingDirectory = path;
+        return this;
+    }
+
+    /** @param {string} path @returns {this} */
+    baseDirectory(path) {
+        this.#opts.baseDirectory = path;
+        return this;
+    }
+
+    /** @param {NonNullable<CopilotClientOptions['mode']>} mode @returns {this} */
+    mode(mode) {
+        this.#opts.mode = mode;
+        return this;
+    }
+
+    /** @param {string} token @returns {this} */
+    connectionToken(token) {
+        this.#opts.connectionToken = token;
+        return this;
+    }
+
+    /** @param {boolean} enabled @returns {this} */
+    enableRemoteSessions(enabled) {
+        this.#opts.enableRemoteSessions = enabled;
         return this;
     }
 
@@ -291,12 +413,16 @@ export class ClientOptionsBuilder {
         const cliUrl = process.env['COPILOT_CLI_URL'];
         const cliArgs = parseCliArgsEnv(process.env['COPILOT_CLI_ARGS']);
         const cwd = process.env['COPILOT_CLI_CWD'] || process.env['COPILOT_WORKING_DIRECTORY'];
+        const baseDirectory = process.env['COPILOT_BASE_DIRECTORY'] || process.env['COPILOT_HOME'];
         const port = parseIntegerEnv(process.env['COPILOT_CLI_PORT']);
         const useStdio = parseBooleanEnv(process.env['COPILOT_USE_STDIO']);
         const isChildProcess = parseBooleanEnv(process.env['COPILOT_CLI_IS_CHILD_PROCESS']);
         const autoStart = parseBooleanEnv(process.env['COPILOT_AUTO_START']);
         const autoRestart = parseBooleanEnv(process.env['COPILOT_AUTO_RESTART']);
         const useLoggedInUser = parseBooleanEnv(process.env['COPILOT_USE_LOGGED_IN_USER']);
+        const enableRemoteSessions = parseBooleanEnv(process.env['COPILOT_ENABLE_REMOTE_SESSIONS']);
+        const mode = process.env['COPILOT_CLIENT_MODE'];
+        const connectionToken = process.env['COPILOT_CONNECTION_TOKEN'];
         const githubToken = process.env['COPILOT_GITHUB_TOKEN'] || process.env['GITHUB_TOKEN'];
         const logLevel =
             parseLogLevelEnv(process.env['COPILOT_CLI_LOG_LEVEL']) ??
@@ -307,11 +433,15 @@ export class ClientOptionsBuilder {
         if (cliUrl) this.#opts.cliUrl = cliUrl;
         if (cliArgs) this.#opts.cliArgs = cliArgs;
         if (cwd) this.#opts.cwd = cwd;
+        if (baseDirectory) this.#opts.baseDirectory = baseDirectory;
         if (port !== undefined) this.#opts.port = port;
         if (useStdio !== undefined) this.#opts.useStdio = useStdio;
         if (isChildProcess !== undefined) this.#opts.isChildProcess = isChildProcess;
         if (autoStart !== undefined) this.#opts.autoStart = autoStart;
         if (autoRestart !== undefined) this.#opts.autoRestart = autoRestart;
+        if (enableRemoteSessions !== undefined) this.#opts.enableRemoteSessions = enableRemoteSessions;
+        if (mode === 'empty' || mode === 'copilot-cli') this.#opts.mode = mode;
+        if (connectionToken) this.#opts.connectionToken = connectionToken;
         if (useLoggedInUser !== undefined) this.#opts.useLoggedInUser = useLoggedInUser;
         if (githubToken) this.#opts.gitHubToken = githubToken;
         if (logLevel) this.#opts.logLevel = logLevel;
@@ -319,7 +449,7 @@ export class ClientOptionsBuilder {
         return this.telemetryFromEnv();
     }
 
-    /** @param {Partial<CopilotClientOptions>} overrides @returns {this} */
+    /** @param {CompatClientOptions} overrides @returns {this} */
     merge(overrides) {
         this.#opts = { ...this.#opts, ...overrides };
         return this;
@@ -327,10 +457,7 @@ export class ClientOptionsBuilder {
 
     /** @returns {Partial<CopilotClientOptions>} */
     build() {
-        return {
-            ...this.#opts,
-            ...(this.#opts.env ? { env: normalizeCliSpawnEnv(this.#opts.env) } : {}),
-        };
+        return normalizeClientOptionsForSdk10(this.#opts);
     }
 }
 
@@ -354,6 +481,7 @@ export function buildCopilotClientOptionsFromEnv(overrides = {}) {
         const cliPath = process.env['COPILOT_CLI_PATH']?.trim();
         const cliArgs = parseCliArgsEnv(process.env['COPILOT_CLI_ARGS']);
         const cwd = process.env['COPILOT_CLI_CWD'] || process.env['COPILOT_WORKING_DIRECTORY'];
+        const baseDirectory = process.env['COPILOT_BASE_DIRECTORY'] || process.env['COPILOT_HOME'];
         const port = parseIntegerEnv(process.env['COPILOT_CLI_PORT']);
         const useStdio = parseBooleanEnv(process.env['COPILOT_USE_STDIO']);
         const isChildProcess = parseBooleanEnv(process.env['COPILOT_CLI_IS_CHILD_PROCESS']);
@@ -361,11 +489,21 @@ export function buildCopilotClientOptionsFromEnv(overrides = {}) {
         if (cliPath) builder.cliPath(cliPath);
         if (cliArgs) builder.cliArgs(cliArgs);
         if (cwd) builder.cwd(cwd);
+        if (baseDirectory) builder.baseDirectory(baseDirectory);
         if (port !== undefined) builder.port(port);
         if (useStdio !== undefined) builder.useStdio(useStdio);
         if (isChildProcess !== undefined) builder.isChildProcess(isChildProcess);
         builder.envPassthrough(['PATH', 'HOME', 'SHELL', 'USER', 'USERNAME', 'TMPDIR']);
     }
+
+    const connectionToken = process.env['COPILOT_CONNECTION_TOKEN'];
+    if (connectionToken) builder.connectionToken(connectionToken);
+
+    const clientMode = process.env['COPILOT_CLIENT_MODE'];
+    if (clientMode === 'empty' || clientMode === 'copilot-cli') builder.mode(clientMode);
+
+    const enableRemoteSessions = parseBooleanEnv(process.env['COPILOT_ENABLE_REMOTE_SESSIONS']);
+    if (enableRemoteSessions !== undefined) builder.enableRemoteSessions(enableRemoteSessions);
 
     if (logLevel) builder.logLevel(logLevel);
 

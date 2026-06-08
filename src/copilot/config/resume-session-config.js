@@ -39,6 +39,8 @@ import { SessionConfigBuilder, sanitizeResumeSessionConfig } from './session-con
  *
  * @typedef {import('./sdk-config-port.js').SessionEventHandler} SessionEventHandler
  *
+ * @typedef {import('./sdk-config-port.js').CreateSessionFsProvider} CreateSessionFsProvider
+ *
  * @typedef {import('./sdk-config-port.js').CreateSessionFsHandler} CreateSessionFsHandler
  */
 
@@ -47,7 +49,7 @@ export class ResumeSessionConfigBuilder {
     #base = new SessionConfigBuilder();
 
     /** @type {boolean | undefined} */
-    #disableResume;
+    #suppressResumeEvent;
 
     /** @param {string} name @returns {this} */
     clientName(name) {
@@ -76,6 +78,12 @@ export class ResumeSessionConfigBuilder {
     /** @param {string} dir @returns {this} */
     configDir(dir) {
         this.#base.configDir(dir);
+        return this;
+    }
+
+    /** @param {string} dir @returns {this} */
+    configDirectory(dir) {
+        this.#base.configDirectory(dir);
         return this;
     }
 
@@ -217,15 +225,32 @@ export class ResumeSessionConfigBuilder {
         return this;
     }
 
-    /** @param {CreateSessionFsHandler} handler @returns {this} */
+    /** @param {CreateSessionFsProvider} handler @returns {this} */
     createSessionFsHandler(handler) {
         this.#base.createSessionFsHandler(handler);
         return this;
     }
 
+    /** @param {CreateSessionFsProvider} handler @returns {this} */
+    createSessionFsProvider(handler) {
+        this.#base.createSessionFsProvider(handler);
+        return this;
+    }
+
     /** @param {boolean} disable @returns {this} */
     disableResume(disable) {
-        this.#disableResume = disable;
+        return this.suppressResumeEvent(disable);
+    }
+
+    /** @param {boolean} suppress @returns {this} */
+    suppressResumeEvent(suppress) {
+        this.#suppressResumeEvent = suppress;
+        return this;
+    }
+
+    /** @param {boolean} enabled @returns {this} */
+    continuePendingWork(enabled) {
+        this.#base.continuePendingWork(enabled);
         return this;
     }
 
@@ -235,23 +260,25 @@ export class ResumeSessionConfigBuilder {
      */
     merge(partial) {
         const normalized = sanitizeResumeSessionConfig(partial);
-        const { disableResume, ...resumeConfig } = normalized;
-        this.#base.merge(resumeConfig);
-        if (disableResume !== undefined) {
-            this.#disableResume = disableResume;
+        const { suppressResumeEvent, ...resumeConfig } = normalized;
+        this.#base.merge(/** @type {any} */ (resumeConfig));
+        if (suppressResumeEvent !== undefined) {
+            this.#suppressResumeEvent = suppressResumeEvent;
         }
         return this;
     }
 
-    /** @returns {ResumeSessionConfig & { disableResume?: boolean }} */
+    /** @returns {ResumeSessionConfig} */
     build() {
         return sanitizeResumeSessionConfig({
             ...this.#base.build(),
-            ...(this.#disableResume !== undefined ? { disableResume: this.#disableResume } : {}),
+            ...(this.#suppressResumeEvent !== undefined
+                ? { suppressResumeEvent: this.#suppressResumeEvent }
+                : {}),
         });
     }
 
-    /** @returns {ResumeSessionConfig & { disableResume?: boolean }} */
+    /** @returns {ResumeSessionConfig} */
     buildForResume() {
         return this.build();
     }
