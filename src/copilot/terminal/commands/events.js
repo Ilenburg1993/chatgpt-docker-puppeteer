@@ -12,7 +12,10 @@ import {
     formatTerminalToolPathForOperator,
     getTerminalHumanToolName,
 } from '../events/presenters/tools/index.js';
-import { summarizeEmptyAfterUserInputRecovery } from '../events/dialog-recovery-presenter.js';
+import {
+    EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL,
+    summarizeEmptyAfterUserInputRecovery,
+} from '../events/dialog-recovery-presenter.js';
 import { listTerminalPublicStreamSourcePolicies } from '../events/event-adapter-events.js';
 import { classifyRuntimeSdkRateLimitScope, describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk/index.js';
 import {
@@ -677,7 +680,7 @@ function summarizeEmptyAfterUserInputPayload(payload, opts = {}) {
 function summarizeEmptyAfterUserInputAutoRecoveryPayload(payload) {
     const detail = typeof payload['detail'] === 'string' ? humanEventMessage(payload['detail']) : '';
     return [
-        detail ? compact(detail, 120) : 'continuação pós-pergunta terminou sem texto público',
+        detail ? compact(detail, 120) : EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL,
         'retomada automática enviada uma vez',
         'sem repetir a pergunta humana',
     ]

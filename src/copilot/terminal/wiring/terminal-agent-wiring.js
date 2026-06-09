@@ -582,7 +582,7 @@ export function registerAgentEventListeners(printBanner) {
                     })
                 ) {
                     const detail = [
-                        'continuação pós-pergunta terminou sem texto público',
+                        'continuação após resposta humana sem texto público',
                         turnId ? `turno ${turnId}` : null,
                         lastUserInputCompleted?.answerPreview ? `resposta ${lastUserInputCompleted.answerPreview}` : null,
                     ]
@@ -598,7 +598,7 @@ export function registerAgentEventListeners(printBanner) {
                             [
                                 '',
                                 terminalThemeHeadline('warn', 'Retomada automática', [
-                                    'continuação pós-pergunta sem resposta pública',
+                                    'após resposta humana sem texto público',
                                 ]),
                                 ...buildEmptyAfterUserInputAutoRecoveryRows({
                                     detail,
@@ -607,7 +607,7 @@ export function registerAgentEventListeners(printBanner) {
                                 }).map((row) => terminalThemeRow(row.label, row.value, { role: row.role, width: 11 })),
                             ].join('\n'),
                         );
-                        recordTerminalActivity('turn', 'Recuperando continuação pós-pergunta vazia', {
+                        recordTerminalActivity('turn', 'Retomando resposta final sem texto público', {
                             detail,
                             severity: 'warn',
                             source: 'dialog.turn_end',
@@ -627,7 +627,7 @@ export function registerAgentEventListeners(printBanner) {
                             ),
                         );
                         const reportAutoRecoveryFailure = (/** @type {string} */ message) => {
-                            recordTerminalActivity('error', 'Recuperação pós-pergunta falhou ao enfileirar', {
+                            recordTerminalActivity('error', 'Retomada após resposta humana falhou ao enfileirar', {
                                 detail: message,
                                 severity: 'error',
                                 source: 'dialog.turn_end',
@@ -669,14 +669,14 @@ export function registerAgentEventListeners(printBanner) {
                         [
                             '',
                             terminalThemeHeadline('warn', 'Continuação vazia', [
-                                'pós-pergunta sem resposta pública',
+                                'após resposta humana sem texto público',
                             ]),
                             ...recoveryRows.map((row) =>
                                 terminalThemeRow(row.label, row.value, { role: row.role, width: 11 }),
                             ),
                         ].join('\n'),
                     );
-                    recordTerminalActivity('turn', 'Continuação pós-pergunta vazia', {
+                    recordTerminalActivity('turn', 'Continuação sem resposta pública', {
                         detail,
                         severity: 'warn',
                         source: 'dialog.turn_end',

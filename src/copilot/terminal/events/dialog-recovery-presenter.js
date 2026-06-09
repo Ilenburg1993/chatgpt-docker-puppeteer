@@ -14,6 +14,7 @@ export const EMPTY_AFTER_USER_INPUT_RESUME_COMMAND = `/turn ${EMPTY_AFTER_USER_I
 export const EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS = '/activity 40 · /events 60 · /byok health';
 export const EMPTY_AFTER_USER_INPUT_MODEL_COMMAND = '/byok model';
 export const AFTER_USER_INPUT_CONTINUATION_DIAGNOSTIC_COMMANDS = '/activity 40 · /events 60 · /errors 10';
+export const EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL = 'continuação após resposta humana sem texto público';
 
 /**
  * @param {unknown} value
@@ -127,7 +128,7 @@ export function buildEmptyAfterUserInputAutoRecoveryRows(input = {}) {
  * @returns {string}
  */
 export function summarizeEmptyAfterUserInputRecovery(input = {}) {
-    const detail = compactTerminalRecoveryText(input.detail, 120) || 'continuação pós-pergunta terminou sem texto público';
+    const detail = compactTerminalRecoveryText(input.detail, 120) || EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL;
     const requestId = compactTerminalRecoveryText(input.requestId, 14);
     return [
         detail,

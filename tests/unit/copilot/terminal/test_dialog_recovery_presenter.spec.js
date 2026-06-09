@@ -14,9 +14,9 @@ import {
 } from '../../../../src/copilot/terminal/events/dialog-recovery-presenter.js';
 
 describe('terminal/events/dialog-recovery-presenter', () => {
-    it('renderiza recuperação pós-pergunta como estado acionável sem IDs crus no default', () => {
+    it('renderiza recuperação após resposta humana como estado acionável sem IDs crus no default', () => {
         const rows = buildEmptyAfterUserInputRecoveryRows({
-            detail: 'continuação pós-pergunta terminou sem texto público · turno 2 · resposta SIM',
+            detail: 'continuação após resposta humana sem texto público · turno 2 · resposta SIM',
             answerPreview: 'SIM',
             turnId: '2',
             includeModelSwitch: true,
@@ -36,11 +36,11 @@ describe('terminal/events/dialog-recovery-presenter', () => {
 
     it('resume evento para /events com comando de retomada e IDs só quando solicitado', () => {
         const defaultText = summarizeEmptyAfterUserInputRecovery({
-            detail: 'continuação pós-pergunta terminou sem texto público · resposta SIM',
+            detail: 'continuação após resposta humana sem texto público · resposta SIM',
             requestId: 'ask-request-1234567890',
         });
         const detailText = summarizeEmptyAfterUserInputRecovery({
-            detail: 'continuação pós-pergunta terminou sem texto público · resposta SIM',
+            detail: 'continuação após resposta humana sem texto público · resposta SIM',
             requestId: 'ask-request-1234567890',
             showIds: true,
         });
@@ -65,9 +65,9 @@ describe('terminal/events/dialog-recovery-presenter', () => {
         expect(text).not.toContain('user_input.completed');
     });
 
-    it('renderiza recuperação automática pós-pergunta com linhas completas de ação', () => {
+    it('renderiza recuperação automática após resposta humana com linhas completas de ação', () => {
         const rows = buildEmptyAfterUserInputAutoRecoveryRows({
-            detail: 'continuação pós-pergunta terminou sem texto público · resposta SIM',
+            detail: 'continuação após resposta humana sem texto público · resposta SIM',
             answerPreview: 'SIM',
             turnId: '3',
         });

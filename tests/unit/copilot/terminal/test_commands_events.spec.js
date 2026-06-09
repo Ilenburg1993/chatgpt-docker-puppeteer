@@ -1169,7 +1169,7 @@ describe('terminal/commands/events', () => {
                     hubSessionId: 'hub-1',
                     payload: {
                         turnId: 'turn:ask',
-                        detail: 'continuação pós-pergunta terminou sem texto público · resposta SIM',
+                        detail: 'continuação após resposta humana sem texto público · resposta SIM',
                         requestId: 'ask-request-1234567890',
                     },
                 },
@@ -1184,7 +1184,7 @@ describe('terminal/commands/events', () => {
                     hubSessionId: 'hub-1',
                     payload: {
                         turnId: 'turn:ask',
-                        detail: 'continuação pós-pergunta terminou sem texto público · resposta SIM',
+                        detail: 'continuação após resposta humana sem texto público · resposta SIM',
                         requestId: 'ask-request-1234567890',
                         recoveryKey: 'request:ask-request-1234567890',
                         resumeMessage:
@@ -1274,7 +1274,7 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('origem sem saída');
         expect(ctx.output()).toContain('deltas 0/0 caracteres');
         expect(ctx.output()).toContain('Continuação vazia');
-        expect(ctx.output()).toContain('continuação pós-pergunta terminou sem texto público · resposta SIM');
+        expect(ctx.output()).toContain('continuação após resposta humana sem texto público · resposta SIM');
         expect(ctx.output()).toContain(
             'retomar /turn Continue a partir da ultima resposta humana e entregue a resposta final em texto publico.',
         );

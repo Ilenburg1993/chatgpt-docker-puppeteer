@@ -356,7 +356,13 @@ function isEmptyAfterUserInputActivity(activity) {
     const text = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase();
     return (
         activity.phase === 'turn' &&
-        (text.includes('continuação pós-pergunta vazia') ||
+        (text.includes('continuação sem resposta pública') ||
+            text.includes('continuacao sem resposta publica') ||
+            text.includes('retomando resposta final sem texto público') ||
+            text.includes('retomando resposta final sem texto publico') ||
+            text.includes('continuação após resposta humana sem texto público') ||
+            text.includes('continuacao apos resposta humana sem texto publico') ||
+            text.includes('continuação pós-pergunta vazia') ||
             text.includes('continuacao pos-pergunta vazia') ||
             text.includes('continuação pós-pergunta terminou sem texto público') ||
             text.includes('continuacao pos-pergunta terminou sem texto publico'))

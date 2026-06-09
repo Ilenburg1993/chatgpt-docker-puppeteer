@@ -155,7 +155,7 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
         ).toBe(false);
     });
 
-    it('gera chave estavel para recuperação automática pós-pergunta vazia', async () => {
+    it('gera chave estavel para recuperação automática após resposta humana vazia', async () => {
         const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
 
         expect(
@@ -181,7 +181,7 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
         ).toBe('answer-window:2');
     });
 
-    it('tenta recuperação automática pós-pergunta uma única vez por chave', async () => {
+    it('tenta recuperação automática após resposta humana uma única vez por chave', async () => {
         const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
         const attemptedKeys = new Set(['request:already-used']);
 
@@ -217,7 +217,7 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
         ).toEqual({ attempt: false, key: null, reason: 'not_empty_after_recent_user_input' });
     });
 
-    it('liga o ledger de recuperação pós-pergunta ao listener do turn_end', async () => {
+    it('liga o ledger de recuperação após resposta humana ao listener do turn_end', async () => {
         const src = await readFile(
             new URL('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js', import.meta.url),
             'utf8',

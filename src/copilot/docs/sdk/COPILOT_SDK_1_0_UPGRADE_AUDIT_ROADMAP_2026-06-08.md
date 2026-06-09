@@ -3194,6 +3194,43 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `npm run lint:copilot`.
 - [x] Validado com `npm run typecheck:strict:src.copilot`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quadragésima Quarta Passada
+
+- [x] A revisão da captura foi aprofundada no fluxo de recuperação após resposta humana: `Resposta pós-pergunta` já não
+  aparecia no caminho principal de `assistant.message`, mas a família de strings `continuação pós-pergunta` ainda vazava
+  em `dialog.turn_end` vazio, `/events`, linha viva e atividades de recuperação automática.
+- [x] A decisão de UX foi aposentar `pós-pergunta` como linguagem pública. O estado real agora é descrito como
+  `continuação após resposta humana sem texto público`, com headlines `Continuação vazia`/`Retomada automática` e
+  atividades `Continuação sem resposta pública`/`Retomando resposta final sem texto público`.
+- [x] A linha viva passou a reconhecer os novos textos e preserva os textos antigos apenas como compatibilidade de
+  histórico/arquivo, evitando manter o pulso ativo quando uma recuperação antiga já terminou e o runtime voltou ao
+  prompt.
+- [x] `dialog/output.js` trocou o detector interno de `isPostQuestionContinuationActivity()` para
+  `isAfterUserInputContinuationActivity()`, mantendo compat com sinais legados, mas alinhando o código ao contrato mental
+  correto: pergunta ao operador, resposta do operador registrada e continuação pública da LLM-B.
+- [x] `/events` agora usa `EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL` compartilhado pelo presenter, eliminando fallback
+  textual divergente entre card humano, comandos e auto-recovery.
+- [x] Validado com `node --check src/copilot/terminal/events/dialog-recovery-presenter.js
+  src/copilot/terminal/wiring/terminal-agent-wiring.js src/copilot/terminal/repl/live-status-line.js
+  src/copilot/terminal/commands/events.js src/copilot/terminal/dialog/output.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_dialog_recovery_presenter.spec.js
+  tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js
+  tests/unit/copilot/test_terminal_agent_wiring.spec.js` (4 arquivos, 79 testes).
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_build_user_prompt.spec.js --testTimeout=30000`
+  (1 arquivo, 17 testes), confirmando que o rename do detector não quebrou o prompt `LLM-B continuando`.
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
+  --live-scenario=canonical`; PASS em `artifacts/terminal-live/2026-06-09T05-24-03-688Z/summary.md`, incluindo
+  `ux-no-legacy-post-answer-labels`, `no-prompt-double-render`, `ux-answer-live-status-stays-single-line` e transcript
+  final como `Resposta da LLM-B  LLM-B via SDK`.
+
+### Achados Novos Da Centésima Quadragésima Quarta Passada
+
+- [x] SDK10-P144-01: manter uma varredura contínua para termos técnicos que nasceram como diagnóstico temporário e viram
+  contrato visual. A regra operacional passa a ser: termos de protocolo podem ficar em raw/export explícito; stdout,
+  linha viva, cards e `/events` default devem falar em estados humanos acionáveis.
+
 ---
 
 ## Decisões Arquiteturais

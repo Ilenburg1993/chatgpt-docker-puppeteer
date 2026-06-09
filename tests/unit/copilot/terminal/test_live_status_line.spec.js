@@ -626,14 +626,14 @@ describe('terminal/live-status-line', () => {
         expect(line).not.toContain('continuando');
     });
 
-    it('não mantém linha viva para continuação pós-pergunta vazia já encerrada', async () => {
+    it('não mantém linha viva para continuação sem resposta pública já encerrada', async () => {
         const { shouldRenderTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');
         mocks.activity = {
             ...mocks.activity,
             phase: 'turn',
-            label: 'Continuação pós-pergunta vazia',
-            detail: 'continuação pós-pergunta terminou sem texto público · resposta SIM',
+            label: 'Continuação sem resposta pública',
+            detail: 'continuação após resposta humana sem texto público · resposta SIM',
             source: 'dialog.turn_end',
             severity: 'warn',
             toolName: null,
@@ -821,7 +821,7 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('12s');
         expect(line).not.toContain('resposta recebida');
         expect(line).not.toContain('aguardando LLM-B');
-        expect(line).not.toContain('Continuação pós-pergunta');
+        expect(line).not.toContain('Continuação sem resposta pública');
         expect(line).not.toContain('Resposta registrada');
         expect(line).not.toContain('resposta registrada');
         expect(line).not.toContain('modelo auto');
