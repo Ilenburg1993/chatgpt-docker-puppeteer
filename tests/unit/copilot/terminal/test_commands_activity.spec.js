@@ -705,7 +705,7 @@ describe('terminal/commands/activity', () => {
                 },
                 {
                     phase: 'turn',
-                    label: 'Processando mensagem',
+                    label: 'Preparando resposta',
                     detail: 'Faça um teste integrado canônico do terminal',
                     source: 'dialog',
                     severity: 'info',
@@ -774,6 +774,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).not.toContain('tarefa · Tarefa em segundo plano concluída');
         expect(ctx.output()).not.toContain('turno · Processando mensagem');
         expect(ctx.output()).not.toContain('conversa · Processando mensagem');
+        expect(ctx.output()).not.toContain('turno · Preparando resposta');
+        expect(ctx.output()).not.toContain('conversa · Preparando resposta');
         expect(ctx.output()).toContain('Intenção da LLM-B');
         expect(ctx.output()).not.toContain('turno · Intenção da LLM-B');
         expect(ctx.output()).not.toContain('conversa · Intenção da LLM-B');

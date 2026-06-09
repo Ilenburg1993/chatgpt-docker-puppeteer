@@ -576,7 +576,7 @@ function isGenericTurnProcessingActivity(activity) {
         .toLowerCase()
         .normalize('NFD')
         .replace(/\p{Diacritic}/gu, '');
-    return activity.phase === 'turn' && text.includes('processando mensagem');
+    return activity.phase === 'turn' && (text.includes('processando mensagem') || text.includes('preparando resposta'));
 }
 
 /**

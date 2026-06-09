@@ -3299,6 +3299,32 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   `ux-no-post-answer-turn-processing-copy`, `no-extra-output-after-post-ask-final`, `/events` default com
   `tipo continuação da pergunta humana` e `sse-delta-public-chunk=22/22`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quadragésima Oitava Passada
+
+- [x] A investigação pós-live mostrou que o terminal já escondia `turno · Processando mensagem` nos prompts e timelines
+  principais, mas `dialog/engine.js` ainda era o produtor canônico do label interno `Processando mensagem` ao iniciar
+  qualquer turno.
+- [x] O início de turno agora registra `Preparando resposta` (`Preparando resposta da LLM-A` no caso LLM-A), removendo o
+  jargão antigo da atividade nova sem quebrar renderização de arquivos/estado legados.
+- [x] `buildWaitingPrompt()`, a linha viva permanente e `/activity` default tratam tanto `Processando mensagem` legado
+  quanto `Preparando resposta` novo como estado genérico de preparação, renderizando `LLM-B pensando`/timeline compacta
+  em vez de expor fase técnica.
+- [x] O grep ativo de `src/copilot/terminal` não encontra mais emissão de `Processando mensagem`; restaram apenas
+  asserts negativos em testes para impedir regressão nas superfícies públicas.
+- [x] Validado com `node --check src/copilot/terminal/commands/activity.js src/copilot/terminal/dialog/engine.js
+  src/copilot/terminal/dialog/output.js src/copilot/terminal/repl/live-status-line.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_activity_state.spec.js
+  tests/unit/copilot/terminal/test_build_user_prompt.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js
+  tests/unit/copilot/terminal/test_commands_activity.spec.js
+  tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js` (5 arquivos, 83 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
+  --live-scenario=canonical`; PASS em `artifacts/terminal-live/2026-06-09T05-53-28-219Z/summary.md`, com
+  `ux-no-post-answer-turn-processing-copy`, `ux-activity-post-turn-timeline-operational`,
+  `no-extra-output-after-post-ask-final`, `sse-delta-public-chunk=24/24` e grep do log público sem
+  `Processando mensagem`/`Preparando resposta`.
+
 ---
 
 ## Decisões Arquiteturais

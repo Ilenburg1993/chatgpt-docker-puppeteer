@@ -1155,7 +1155,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
 
     setBusy(true);
     beginTerminalTurnMaterialization({ timestamp: t0, source: 'terminal/explicit-turn' });
-    recordTerminalActivity('turn', actor === 'llm-a' ? 'Processando mensagem da LLM-A' : 'Processando mensagem', {
+    recordTerminalActivity('turn', actor === 'llm-a' ? 'Preparando resposta da LLM-A' : 'Preparando resposta', {
         detail: message.slice(0, 120),
         source: 'dialog',
     });

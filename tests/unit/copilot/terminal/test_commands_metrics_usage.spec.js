@@ -222,7 +222,7 @@ vi.mock('#copilot/observability', () => ({
 vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
     readTerminalActivitySnapshot: () => ({
         phase: 'turn',
-        label: 'Processando mensagem',
+        label: 'Preparando resposta',
         detail: 'mensagem do usuário',
         source: 'dialog',
         severity: 'info',
@@ -362,7 +362,7 @@ describe('commands/metrics + usage', () => {
             expect(ctx.output()).toContain('Vínculo persistido coincide com a revisão atual do prompt do sistema.');
             expect(ctx.output()).not.toContain('binding ok');
             expect(ctx.output()).not.toContain('system prompt');
-            expect(ctx.output()).toContain('Processando mensagem');
+            expect(ctx.output()).toContain('Preparando resposta');
             expect(ctx.output()).not.toContain('bound-default');
             expect(ctx.output()).not.toContain('runtime-4567890123456789012345');
             expect(ctx.output()).not.toContain('sdk-4567890123456789012345');

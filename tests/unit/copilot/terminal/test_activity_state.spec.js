@@ -119,9 +119,9 @@ describe('terminal/activity-state', () => {
         expect(snap.toolTarget).toBe('npm test');
     });
 
-    it('permite que watchdog de thinking em background refine um turno genérico', () => {
+    it('permite que watchdog de thinking em background refine preparação genérica de turno', () => {
         clearTerminalActivityHistory();
-        recordTerminalActivity('turn', 'Processando mensagem', {
+        recordTerminalActivity('turn', 'Preparando resposta', {
             detail: 'prompt do operador',
             source: 'dialog',
         });

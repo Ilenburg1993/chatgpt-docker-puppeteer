@@ -12,7 +12,7 @@ const getShowSessionActivity = vi.fn(() => false);
 const getTerminalPendingStructuredUserInputCount = vi.fn(() => 0);
 const readTerminalActivitySnapshot = vi.fn(() => ({
     phase: 'turn',
-    label: 'Processando mensagem',
+    label: 'Preparando resposta',
     detail: 'detalhe',
     source: 'dialog',
     severity: 'info',

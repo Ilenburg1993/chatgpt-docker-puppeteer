@@ -342,7 +342,7 @@ function renderTurnActivityCompact(activity, label) {
     if (text.includes('intenção da llm-b') || text.includes('intencao da llm-b')) {
         return { state: 'planejando', label };
     }
-    if (text.includes('processando mensagem')) {
+    if (text.includes('processando mensagem') || text.includes('preparando resposta')) {
         return { state: 'pensando', label: null };
     }
     return { state: 'trabalhando', label };

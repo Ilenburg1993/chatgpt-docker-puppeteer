@@ -510,13 +510,13 @@ describe('terminal/live-status-line', () => {
         expect(line.length).toBeLessThan(72);
     });
 
-    it('compacta processamento genérico de turno como pensamento humano', async () => {
+    it('compacta preparação genérica de turno como pensamento humano', async () => {
         const { formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');
         mocks.activity = {
             ...mocks.activity,
             phase: 'turn',
-            label: 'Processando mensagem',
+            label: 'Preparando resposta',
             detail: null,
             toolName: null,
         };
@@ -526,7 +526,7 @@ describe('terminal/live-status-line', () => {
         expect(line).toContain('LLM-B pensando');
         expect(line).toContain('12s');
         expect(line).not.toContain('turno');
-        expect(line).not.toContain('Processando mensagem');
+        expect(line).not.toContain('Preparando resposta');
     });
 
     it('compacta finalização de turno sem rótulo truncado longo', async () => {
