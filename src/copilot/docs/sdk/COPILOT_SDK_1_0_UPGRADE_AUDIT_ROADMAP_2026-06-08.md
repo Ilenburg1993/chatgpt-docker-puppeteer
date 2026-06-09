@@ -2955,9 +2955,30 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Trigésima Quinta Passada
 
-- [ ] SDK10-P135-01: os runs bloqueados intermediários mostraram que o modelo pode chamar `ask_user` antes dos oito
-  deltas públicos obrigatórios ou escrever deltas com texto extra na mesma linha. O harness já bloqueia esses casos, mas
-  vale investigar se o prompt canônico pode reduzir a variância sem esconder falhas reais do SDK/LLM.
+- [x] SDK10-P135-01: os runs bloqueados intermediários mostraram que o modelo pode chamar `ask_user` antes dos oito
+  deltas públicos obrigatórios ou escrever deltas com texto extra na mesma linha. O harness agora torna essa regra
+  explícita no prompt canônico e reprova deltas que não sejam linhas exatas `DELTA-CANONICAL-1..8`, sem esconder falhas
+  reais do SDK/LLM.
+
+### Execução Contínua Em 2026-06-08 - Centésima Trigésima Sexta Passada
+
+- [x] O prompt canônico do live test passou a dizer que cada uma das oito linhas `DELTA-CANONICAL-*` deve conter apenas
+  o marcador exato, sem texto auxiliar na mesma linha.
+- [x] `llm-b-live-test` ganhou o critério obrigatório `canonical-delta-lines-exact`, calculado tanto pelos blocos
+  visíveis do terminal quanto pelos eventos `assistant.message` do transcript canônico.
+- [x] A checagem normaliza bordas renderizadas com `│`, ANSI e espaços, mas exige as oito linhas distintas
+  `DELTA-CANONICAL-1` até `DELTA-CANONICAL-8`; marcador correto colado em frase ou lista passa a falhar.
+- [x] Validado com `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T03-54-53-189Z/summary.md`, incluindo
+  `canonical-delta-lines-exact` e `ux-diagnostic-commands-start-at-prompt`.
+
+### Achados Novos Da Centésima Trigésima Sexta Passada
+
+- [ ] SDK10-P136-01: auditar a janela pós-`ask_user` no log bruto e nos eventos exportados para garantir que a sequência
+  visual e semântica seja sempre `Resposta enviada` -> continuação/ferramentas -> `Resposta da LLM-B` -> prompt pronto,
+  sem ressurgimento de rótulos antigos como `Resposta pós-pergunta`, `turno · Processando mensagem` ou status duplicado
+  `pensando/processando` após uma resposta já materializada.
 
 ---
 

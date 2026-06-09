@@ -410,6 +410,7 @@ function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]
         'Depois invoque a ferramenta real read_file_content para ler as primeiras 3 linhas de package.json.',
         ...scenario.beforeDeltaInstructions,
         'Em seguida escreva obrigatoriamente uma resposta pública antes de qualquer ask_user, com exatamente 8 linhas separadas: DELTA-CANONICAL-1, DELTA-CANONICAL-2, DELTA-CANONICAL-3, DELTA-CANONICAL-4, DELTA-CANONICAL-5, DELTA-CANONICAL-6, DELTA-CANONICAL-7 e DELTA-CANONICAL-8.',
+        'Cada uma dessas oito linhas deve conter somente o marcador exato da linha; por exemplo, a primeira linha deve ser exatamente "DELTA-CANONICAL-1" e nada mais.',
         'Essas oito linhas DELTA-CANONICAL devem ser texto puro: não use Markdown, HTML, links, imagens, tabelas, listas ou blocos de código nelas.',
         'Não invoque ask_user antes dessas 8 linhas públicas aparecerem no transcript.',
         scenario.askToolInstruction,
@@ -4798,6 +4799,16 @@ function countCanonicalDeltaMarkers(value) {
     return (String(value ?? '').match(/DELTA-CANONICAL-\d/g) ?? []).length;
 }
 
+function countExactCanonicalDeltaLines(value) {
+    const observed = new Set();
+    for (const rawLine of stripAnsi(String(value ?? '')).split(/\r?\n/u)) {
+        const line = rawLine.replace(/^\s*│\s*/u, '').trim();
+        const match = line.match(/^DELTA-CANONICAL-([1-8])$/u);
+        if (match) observed.add(match[1]);
+    }
+    return observed.size;
+}
+
 function countRequiredDeltaMarkers(value) {
     return (String(value ?? '').match(/DELTA-(?:CANONICAL-)?\d/g) ?? []).length;
 }
@@ -5072,6 +5083,10 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         (count, block) => count + countCanonicalDeltaMarkers(block),
         0,
     );
+    const liveExactCanonicalDeltaLineCount = liveDeltaBlocks.reduce(
+        (count, block) => Math.max(count, countExactCanonicalDeltaLines(block)),
+        0,
+    );
     const assistantMessageDeltaMarkerCount = canonicalEvents.reduce((count, evt) => {
         const payload = eventPayload(evt);
         if (evt?.event !== 'assistant.message' || !payload) return count;
@@ -5082,10 +5097,19 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         if (evt?.event !== 'assistant.message' || !payload) return count;
         return count + countCanonicalDeltaMarkers(payload.content);
     }, 0);
+    const assistantMessageExactCanonicalDeltaLineCount = canonicalEvents.reduce((count, evt) => {
+        const payload = eventPayload(evt);
+        if (evt?.event !== 'assistant.message' || !payload) return count;
+        return Math.max(count, countExactCanonicalDeltaLines(payload.content));
+    }, 0);
     const publicDeltaMarkerCount = Math.max(liveDeltaMarkerCount, assistantMessageDeltaMarkerCount);
     const canonicalPublicDeltaMarkerCount = Math.max(
         liveCanonicalDeltaMarkerCount,
         assistantMessageCanonicalDeltaMarkerCount,
+    );
+    const exactCanonicalDeltaLineCount = Math.max(
+        liveExactCanonicalDeltaLineCount,
+        assistantMessageExactCanonicalDeltaLineCount,
     );
     const liveDeltaBlockVisible = liveDeltaBlocks.length > 0;
     const assistantMessageTranscriptHeadingRe =
@@ -5184,6 +5208,14 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                     : `assistant used noncanonical public delta labels · canonical=${canonicalPublicDeltaMarkerCount} · public=${publicDeltaMarkerCount}`,
             severity: 'warning',
             required: false,
+        },
+        {
+            id: 'canonical-delta-lines-exact',
+            pass: exactCanonicalDeltaLineCount >= 8,
+            detail:
+                exactCanonicalDeltaLineCount >= 8
+                    ? 'assistant rendered the eight DELTA-CANONICAL lines as exact marker-only lines'
+                    : `assistant rendered extra text or missing exact canonical delta lines · exact=${exactCanonicalDeltaLineCount}/8`,
         },
         {
             id: 'final-delta-block',
