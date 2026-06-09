@@ -11,6 +11,7 @@
 
 import { createHash } from 'node:crypto';
 import { SEPARATOR, printlnBlock } from '../dialog/io/index.js';
+import { sanitizeTerminalRenderText } from '../dialog/turn-display.js';
 import { appendTerminalTranscriptTurn, terminalThemeRow, terminalThemeText } from '../state/events/index.js';
 
 const RECENT_TRANSCRIPT_TTL_MS = 5 * 60_000;
@@ -113,7 +114,7 @@ function formatAssistantTranscriptSourceForOperator(source) {
  * @returns {boolean}
  */
 export function renderTerminalAssistantTranscript(input) {
-    const content = input.content.trim();
+    const content = sanitizeTerminalRenderText(input.content).trim();
     const claimOptions =
         input.suppressIfCoveredByRecent && typeof input.coverageMinChars === 'number'
             ? { suppressIfCoveredByRecent: true, coverageMinChars: input.coverageMinChars }

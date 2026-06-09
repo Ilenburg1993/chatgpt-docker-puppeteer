@@ -16,6 +16,7 @@ const {
     measureVisibleTerminalChars,
     renderStreamingFooter,
     releaseDisplayState,
+    stripPublicReasoningLeakText,
     sanitizeTerminalRenderText,
 } = await import('../../../../src/copilot/terminal/dialog/turn-display.js');
 const { broadcastSse } = await import('../../../../src/copilot/terminal/dialog/sse.js');
@@ -68,6 +69,35 @@ describe('terminal/dialog/turn-display', () => {
         expect(sanitizeTerminalRenderText('<a href="https://x.example"><img src=x>oie</a>')).toBe(
             '&lt;a href="https://x.example"&gt;&lt;img src=x&gt;oie&lt;/a&gt;',
         );
+    });
+
+    it('remove bloco inicial de thinking vazado antes de renderizar texto público', () => {
+        expect(stripPublicReasoningLeakText('<thinking>\nsegredo\n</thinking>\n\nDELTA-CANONICAL-1')).toBe(
+            'DELTA-CANONICAL-1',
+        );
+        expect(sanitizeTerminalRenderText('&lt;thinking&gt;\nsegredo\n&lt;/thinking&gt;\n\nOK')).toBe('OK');
+        expect(sanitizeTerminalRenderText('Exemplo literal: <thinking>texto</thinking>')).toBe(
+            'Exemplo literal: &lt;thinking&gt;texto&lt;/thinking&gt;',
+        );
+    });
+
+    it('não exibe thinking público vazado antes dos deltas no streaming live', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: true,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('<thinking>\nsegredo\n</thinking>\n\nDELTA-CANONICAL-1');
+        renderStreamingFooter(state, 20);
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('DELTA-CANONICAL-1');
+        expect(output).not.toContain('segredo');
+        expect(output).not.toContain('thinking');
     });
 
     it('não abre streaming visual apenas com chunks vazios/brancos; deixa fallback textual decidir', () => {

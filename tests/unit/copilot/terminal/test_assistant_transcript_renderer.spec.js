@@ -50,6 +50,31 @@ describe('terminal/events/assistant-transcript-renderer', () => {
         expect(output).not.toContain('LLM-B via SDK · Resposta da LLM-B');
     });
 
+    it('remove bloco inicial de thinking vazado do transcript público e do histórico exportável', () => {
+        terminalAssistantTranscriptRendererTestHarness.clearRecentTranscriptHashes();
+        const writes = [];
+        const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+            writes.push(String(chunk));
+            return true;
+        });
+        try {
+            expect(
+                renderTerminalAssistantTranscript({
+                    title: 'LLM-B',
+                    source: 'sdk/assistant.message',
+                    content: '<thinking>\nsegredo\n</thinking>\n\nDELTA-CANONICAL-1',
+                }),
+            ).toBe(true);
+        } finally {
+            writeSpy.mockRestore();
+        }
+
+        const output = writes.join('');
+        expect(output).toContain('DELTA-CANONICAL-1');
+        expect(output).not.toContain('segredo');
+        expect(output).not.toContain('thinking');
+    });
+
     it('reconhece prefixo truncado como coberto por transcript recente completo', () => {
         terminalAssistantTranscriptRendererTestHarness.clearRecentTranscriptHashes();
 

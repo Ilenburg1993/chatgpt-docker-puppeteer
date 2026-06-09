@@ -5147,6 +5147,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         /(?:^|\n)\/(?:usage now|activity \d+|intent(?: detail)? \d+|tools diag|events \d+(?: --raw)?|errors \d+|health full|export \S+|quit)\s*(?:\r?\n|$)/iu.test(
             plain,
         );
+    const publicReasoningTagLeak = /(?:<|&lt;)\/?(?:thinking|analysis|reasoning)(?:>|&gt;)/iu.test(
+        beforeRawDiagnosticsPlain,
+    );
     const rawPreviewHasIntermediateTurnCompletion =
         /"event":"activity\.changed"[^\n]*"payloadPreview":"fase turn · (?:Turno do assistente concluído|continuação do pedido)/iu.test(
             plain,
@@ -5527,6 +5530,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-no-raw-html-in-public-output',
             pass: !/<\s*(?:a|img|script|iframe|object|embed)\b/iu.test(beforeRawDiagnosticsPlain),
             detail: 'public terminal/export surface escaped raw HTML-like markup from assistant text',
+        },
+        {
+            id: 'ux-no-public-reasoning-tags',
+            pass: !publicReasoningTagLeak,
+            detail: publicReasoningTagLeak
+                ? 'public output exposed thinking/analysis/reasoning tags'
+                : 'public output did not expose thinking/analysis/reasoning tags from assistant text',
         },
         {
             id: 'ux-no-generic-tool-failure-copy',

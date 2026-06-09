@@ -84,6 +84,7 @@ import {
     setSdkSessionMode,
 } from '../../presentation/state/index.js';
 import { broadcastSse, println } from '../dialog/io/index.js';
+import { sanitizeTerminalRenderText } from '../dialog/turn-display.js';
 import {
     answerTerminalPendingQuestion,
     classifyTerminalPermissionDecision,
@@ -774,9 +775,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         if (kind === 'ready' || kind === 'stopped') return null;
         if (kind === 'reply') {
             const reply = DialogProtocol.extractReply(trimmed);
-            return reply ? { content: reply, kind } : null;
+            const sanitizedReply = sanitizeTerminalRenderText(reply).trim();
+            return sanitizedReply ? { content: sanitizedReply, kind } : null;
         }
-        return { content: trimmed, kind };
+        const sanitizedContent = sanitizeTerminalRenderText(trimmed).trim();
+        return sanitizedContent ? { content: sanitizedContent, kind } : null;
     }
 
     const onAssistantTurnStart = (/** @type {{ turnId?: string | null }} */ evt) => {

@@ -35,6 +35,9 @@ const TERMINAL_ESCAPE_SEQUENCE_RE = new RegExp(
     'g',
 );
 const TERMINAL_UNSAFE_CONTROL_RE = new RegExp(String.raw`[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]`, 'g');
+const PUBLIC_REASONING_BLOCK_RE =
+    /^\s*(?:(?:<|&lt;)(thinking|analysis|reasoning)(?:>|&gt;)[\s\S]*?(?:<|&lt;)\/\1(?:>|&gt;)\s*)+/iu;
+const PUBLIC_REASONING_OPEN_RE = /^\s*(?:<|&lt;)(?:thinking|analysis|reasoning)(?:>|&gt;)/iu;
 
 /**
  * Estado mutável compartilhado entre os callbacks de reasoning e streaming.
@@ -76,6 +79,27 @@ export function stripTerminalInvisibleText(text) {
 }
 
 /**
+ * Remove blocos de raciocínio que vazaram como texto público no começo da resposta.
+ *
+ * O SDK já fornece canais separados para reasoning; quando o provider devolve tags como `<thinking>` dentro do canal
+ * público, o operador não deve receber esse conteúdo como fala da LLM-B. A regra é deliberadamente conservadora:
+ * só remove blocos no início da mensagem, preservando exemplos literais que apareçam depois de texto público.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function stripPublicReasoningLeakText(text) {
+    let current = stripTerminalInvisibleText(text);
+    while (true) {
+        const next = current.replace(PUBLIC_REASONING_BLOCK_RE, '');
+        if (next === current) break;
+        current = next;
+    }
+    if (PUBLIC_REASONING_OPEN_RE.test(current)) return '';
+    return current;
+}
+
+/**
  * Sanitiza texto não confiável antes de renderizar no terminal. Deltas do modelo, tools e SDK não podem executar
  * sequências ANSI/OSC; newlines e tabs permanecem como conteúdo textual.
  *
@@ -83,7 +107,7 @@ export function stripTerminalInvisibleText(text) {
  * @returns {string}
  */
 export function sanitizeTerminalRenderText(text) {
-    return stripTerminalInvisibleText(text).replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
+    return stripPublicReasoningLeakText(text).replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
 }
 
 /**
@@ -365,7 +389,7 @@ export function createDeltaCallback(state) {
 
         state.streamingBuffer += chunk;
 
-        if (!state.streamingStarted && measureVisibleTerminalChars(state.streamingBuffer) > 0) {
+        if (!state.streamingStarted && measureVisibleTerminalChars(sanitizeTerminalRenderText(state.streamingBuffer)) > 0) {
             state.streamingStarted = true;
             state.firstChunkTime = state.firstChunkTime || Date.now();
             ensureRenderLock(state);

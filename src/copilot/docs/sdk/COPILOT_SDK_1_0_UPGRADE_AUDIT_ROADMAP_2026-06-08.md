@@ -3048,7 +3048,7 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Trigésima Oitava Passada
 
-- [ ] SDK10-P138-01: em `artifacts/terminal-live/2026-06-09T04-20-59-779Z/terminal.plain.log`, a resposta pública antes
+- [x] SDK10-P138-01: em `artifacts/terminal-live/2026-06-09T04-20-59-779Z/terminal.plain.log`, a resposta pública antes
   dos deltas incluiu `&lt;thinking&gt;`, uma frase em chinês e `&lt;/thinking&gt;`. O HTML foi escapado, mas a semântica
   de "thinking" vazou para o operador; adicionar critério live e decidir se o terminal deve filtrar tags de raciocínio
   conhecidas ou apenas reprovar o provider/modelo.
@@ -3056,6 +3056,39 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   chamar `ask_user` antes de materializar a resposta pública obrigatória, mesmo com instrução explícita. Investigar se o
   terminal deve oferecer uma política opcional de guarda para fluxos que exigem "resposta pública antes da pergunta", ou
   se isso deve ficar como contrato/validador de harness.
+
+### Execução Contínua Em 2026-06-08 - Centésima Trigésima Nona Passada
+
+- [x] `turn-display.js` agora possui `stripPublicReasoningLeakText()`, uma sanitização única para remover blocos iniciais
+  `<thinking>`, `<analysis>` e `<reasoning>` que vazem no canal público. A regra é conservadora: só remove blocos no
+  começo da resposta e preserva exemplos literais que apareçam depois de texto público.
+- [x] O streaming visual passa a decidir abertura do bloco usando `sanitizeTerminalRenderText(state.streamingBuffer)`;
+  assim, um bloco inicial de raciocínio completo ou ainda aberto não dispara transcript público nem aparece antes dos
+  deltas reais.
+- [x] `assistant-transcript-renderer.js` e `sdk-session-events.js` usam o mesmo sanitizador antes de renderizar,
+  materializar e arquivar `assistant.message`, evitando divergência entre tela ao vivo, transcript local, export Markdown
+  e envelope público canônico.
+- [x] O live harness ganhou o critério `ux-no-public-reasoning-tags`, calculado antes dos diagnósticos raw, para reprovar
+  qualquer tag pública `thinking/analysis/reasoning` sem confundir com comandos técnicos posteriores.
+- [x] Validado com `node --check src/copilot/terminal/dialog/turn-display.js
+  src/copilot/terminal/events/assistant-transcript-renderer.js src/copilot/terminal/events/sdk-session-events.js
+  scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_turn_display.spec.js
+  tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js
+  tests/unit/copilot/test_terminal_sdk_session_events.spec.js` (3 arquivos, 52 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T04-41-25-967Z/summary.md`, incluindo
+  `ux-no-public-reasoning-tags`, `canonical-delta-lines-exact`, `sse-archive-raw-preview-humanized-intermediate-turn` e
+  `ux-diagnostic-commands-start-at-prompt`.
+
+### Achados Novos Da Centésima Trigésima Nona Passada
+
+- [ ] SDK10-P139-01: auditar o contrato de `assistant.message` sanitizado versus SSE raw: hoje o canal público canônico
+  passa a receber conteúdo sem blocos iniciais de raciocínio, mas os eventos `delta` ainda preservam chunks crus para
+  diagnóstico. Decidir se `/events --raw full` deve continuar como evidência forense crua ou também carregar um campo
+  público sanitizado paralelo.
 
 ---
 
