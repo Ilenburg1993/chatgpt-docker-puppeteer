@@ -26,8 +26,15 @@ import {
 } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { logSwallowed } from '../../core/error-handlers.js';
-import { getHubSessionId } from '../../presentation/state/index.js';
-import { broadcastSse, ensureDialogLoop, println, sendTurn } from '../dialog/index.js';
+import { getHubSessionId, getRl } from '../../presentation/state/index.js';
+import {
+    broadcastSse,
+    buildUserPrompt,
+    ensureDialogLoop,
+    println,
+    scheduleTerminalPromptRedraw,
+    sendTurn,
+} from '../dialog/index.js';
 import {
     buildEmptyAfterUserInputAutoRecoveryRows,
     buildEmptyAfterUserInputRecoveryRows,
@@ -48,7 +55,7 @@ import {
     stopTerminalDialogMode,
     writeTerminalHubSystemTurn,
 } from '../frontend/gateways/index.js';
-import { markTerminalActivityIdle, recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
+import { markTerminalActivityIdle, readTerminalActivitySnapshot, recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
 import { terminalThemeBadge, terminalThemeHeadline, terminalThemeRow } from '../state/events/index.js';
 import { shouldSuppressTerminalAssistantMessageAsMaterializedTurn, withTerminalTurnCorrelation } from '../state/events/index.js';
 import { drainMailboxToTurnIfIdle } from './mailbox-drain.js';
@@ -63,6 +70,25 @@ const EMITTER_DIALOG_TURN_END = 'dialog.turn_end';
 const DIALOG_LOOP_CHANGED_DEDUP_WINDOW_MS = 250;
 const EMPTY_DIALOG_AFTER_USER_INPUT_WINDOW_MS = 30_000;
 const EMPTY_DIALOG_AFTER_USER_INPUT_AUTO_RECOVERY_MAX_KEYS = 64;
+const MATERIALIZED_TURN_END_PROMPT_REDRAW_DELAY_MS = 120;
+
+/**
+ * @returns {void}
+ */
+function scheduleMaterializedTurnEndPromptRedraw() {
+    const rl = getRl();
+    if (!rl) return;
+    const timer = setTimeout(() => {
+        const activity = readTerminalActivitySnapshot();
+        const phase =
+            activity && typeof activity === 'object' && typeof /** @type {{ phase?: unknown }} */ (activity).phase === 'string'
+                ? /** @type {{ phase: string }} */ (activity).phase
+                : '';
+        if (phase !== 'idle') return;
+        scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { force: true });
+    }, MATERIALIZED_TURN_END_PROMPT_REDRAW_DELAY_MS);
+    if (typeof timer.unref === 'function') timer.unref();
+}
 
 /**
  * @template {Record<string, unknown>} T
@@ -545,6 +571,7 @@ export function registerAgentEventListeners(printBanner) {
                     now: Date.now(),
                     requestId: lastUserInputCompleted?.requestId ?? null,
                     turnId,
+                    attemptedKeys: emptyAfterUserInputAutoRecoveryKeys,
                 });
                 if (
                     shouldWarnEmptyDialogTurnAfterUserInput({
@@ -676,6 +703,7 @@ export function registerAgentEventListeners(printBanner) {
                     recordHistory: false,
                     updateCurrent: false,
                 });
+                scheduleMaterializedTurnEndPromptRedraw();
                 return;
             }
             recordTerminalActivity('turn', 'Mensagem final da conversa recebida', {

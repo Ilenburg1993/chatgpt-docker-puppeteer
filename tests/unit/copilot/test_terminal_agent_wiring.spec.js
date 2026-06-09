@@ -216,4 +216,25 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
             }),
         ).toEqual({ attempt: false, key: null, reason: 'not_empty_after_recent_user_input' });
     });
+
+    it('liga o ledger de recuperação pós-pergunta ao listener do turn_end', async () => {
+        const src = await readFile(
+            new URL('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js', import.meta.url),
+            'utf8',
+        );
+
+        expect(src).toContain('attemptedKeys: emptyAfterUserInputAutoRecoveryKeys');
+    });
+
+    it('devolve o prompt com guarda idle quando turn_end já foi materializado', async () => {
+        const src = await readFile(
+            new URL('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js', import.meta.url),
+            'utf8',
+        );
+
+        expect(src).toContain('if (replyAlreadyMaterialized)');
+        expect(src).toContain('scheduleMaterializedTurnEndPromptRedraw()');
+        expect(src).toContain("if (phase !== 'idle') return");
+        expect(src).toContain('scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { force: true })');
+    });
 });

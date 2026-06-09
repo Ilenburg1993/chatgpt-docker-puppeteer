@@ -2919,9 +2919,45 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Trigésima Quarta Passada
 
-- [ ] SDK10-P134-01: em um live run apareceu uma pintura breve do comando `/activity 12` na linha do prompt antes da
+- [x] SDK10-P134-01: em um live run apareceu uma pintura breve do comando `/activity 12` na linha do prompt antes da
   saída do comando; investigar se comandos rápidos ainda podem ecoar/repintar input de forma visualmente irregular sob
   PTY e linha viva ativa.
+
+### Execução Contínua Em 2026-06-08 - Centésima Trigésima Quinta Passada
+
+- [x] O runner live passou a sincronizar também o primeiro comando de uma sequência diagnóstica com o prompt REPL, não
+  apenas os comandos seguintes. Isso evita que o próprio teste injete `/usage now`/`/activity` antes de o operador
+  humano ter uma linha de prompt visível.
+- [x] O live canônico ganhou o critério `ux-diagnostic-commands-start-at-prompt`, que reprova comandos diagnósticos
+  ecoados como linha solta (`/usage now`, `/activity 40`, `/events`, `/health`, etc.) sem `você[…]›`.
+- [x] A investigação do P134 expôs um bug real mascarado: a recuperação automática pós-pergunta mantinha um ledger de
+  chaves, mas o listener de `dialog.turn_end` não passava esse ledger para `shouldAttemptEmptyAfterUserInputAutoRecovery`,
+  permitindo retomadas repetidas para a mesma resposta humana dentro da janela de 30s.
+- [x] `terminal-agent-wiring.js` agora passa `attemptedKeys: emptyAfterUserInputAutoRecoveryKeys`, impedindo a segunda
+  retomada automática pós-pergunta e evitando uma fala extra de fechamento depois de `POST-ASK-CANONICAL-FINAL`.
+- [x] `dialog.turn_end` com reply já materializado por `assistant.message` agora agenda um redraw final de prompt com
+  guarda por fase `idle`. Se uma pergunta humana aparece logo depois dos deltas, o redraw é descartado; se era o final
+  pós-pergunta, o prompt volta e o operador pode seguir com diagnósticos/comandos.
+- [x] `output.js` passou a tratar `question` como fase operacional para suppression de prompt, evitando que o prompt
+  default apareça entre `Resposta enviada`, `Pergunta respondida` e o resumo `Turno 1 ação`.
+- [x] O harness e os testes cobrem os três pontos: comando diagnóstico deve começar em prompt visível; fase `question`
+  continua protegida contra repaint prematuro; `turn_end` materializado devolve o prompt apenas quando a atividade
+  realmente voltou para `idle`.
+- [x] Validado com `node --check src/copilot/terminal/wiring/terminal-agent-wiring.js
+  src/copilot/terminal/dialog/output.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js
+  tests/unit/copilot/test_terminal_agent_wiring.spec.js tests/unit/copilot/test_terminal_dialog_engine.spec.js`
+  (3 arquivos, 63 testes).
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T03-49-48-450Z/summary.md`, confirmando prompt pós-`POST-ASK`,
+  `/usage now` pós-resposta iniciado em `você[…]›`, ausência de retomada duplicada e ausência de prompt prematuro entre
+  resposta humana e resumo da pergunta.
+
+### Achados Novos Da Centésima Trigésima Quinta Passada
+
+- [ ] SDK10-P135-01: os runs bloqueados intermediários mostraram que o modelo pode chamar `ask_user` antes dos oito
+  deltas públicos obrigatórios ou escrever deltas com texto extra na mesma linha. O harness já bloqueia esses casos, mas
+  vale investigar se o prompt canônico pode reduzir a variância sem esconder falhas reais do SDK/LLM.
 
 ---
 

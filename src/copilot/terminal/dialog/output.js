@@ -763,6 +763,7 @@ function shouldSuppressPromptRedrawForContinuation(options = {}) {
         _terminalPromptRedrawSuppressedUntil = 0;
         return false;
     }
+    if (!isTerminalTurnPresentationActive() && !isTerminalOperationalActivityActiveForPromptRedraw()) return false;
     return !hasActiveHumanInputPromptState();
 }
 
@@ -806,6 +807,7 @@ function isTerminalOperationalActivityActiveForPromptRedraw() {
         phase === 'thinking' ||
         phase === 'streaming' ||
         phase === 'tool' ||
+        phase === 'question' ||
         phase === 'task' ||
         phase === 'compaction' ||
         phase === 'subagent' ||

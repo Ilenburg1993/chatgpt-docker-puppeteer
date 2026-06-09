@@ -357,6 +357,50 @@ describe('terminal/dialog/output inline status', () => {
         expect(mocks.rl.prompt).not.toHaveBeenCalled();
     });
 
+    it('devolve prompt final mesmo dentro da janela pós-resposta quando o turno já ficou ocioso', async () => {
+        parkTerminalPromptForContinuation(1_000);
+        mocks.activitySnapshot = {
+            phase: 'idle',
+            label: 'Pronto',
+            detail: 'Turno concluído; aguardando próxima mensagem',
+            source: 'dialog',
+            severity: 'info',
+            progress: null,
+            toolName: null,
+            startedAt: 1,
+            updatedAt: 2,
+            ageMs: 0,
+        };
+
+        scheduleTerminalPromptRedraw(mocks.rl, 'você-final› ');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(mocks.rl.setPrompt).toHaveBeenCalledWith('você-final› ');
+        expect(mocks.rl.prompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('mantém prompt suprimido durante resumo de resposta humana em fase question', async () => {
+        parkTerminalPromptForContinuation(1_000);
+        mocks.activitySnapshot = {
+            phase: 'question',
+            label: 'Pergunta respondida',
+            detail: 'aguardando decisão humana concluído',
+            source: 'sdk',
+            severity: 'info',
+            progress: null,
+            toolName: 'Pergunta ao operador',
+            startedAt: 1,
+            updatedAt: 2,
+            ageMs: 0,
+        };
+
+        scheduleTerminalPromptRedraw(mocks.rl, 'você› ');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+        expect(mocks.rl.prompt).not.toHaveBeenCalled();
+    });
+
     it('usa prompt de espera estacionado apenas quando linha viva esta desligada', () => {
         process.env['COPILOT_TERMINAL_INLINE_STATUS'] = 'off';
         parkTerminalPromptForContinuation(1_000);

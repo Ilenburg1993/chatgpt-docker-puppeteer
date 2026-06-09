@@ -5119,6 +5119,10 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             plain,
         );
     const inlineStatusRendered = /(?:⟲|⏳|⌛)\s+(?:LLM-B|aguardando)\b|LLM-B\s+(?:turno|pensando|iniciando)\s+·/iu.test(plain);
+    const promptlessDiagnosticCommand =
+        /(?:^|\n)\/(?:usage now|activity \d+|intent(?: detail)? \d+|tools diag|events \d+(?: --raw)?|errors \d+|health full|export \S+|quit)\s*(?:\r?\n|$)/iu.test(
+            plain,
+        );
     const duplicatePathologies = [/__anonymous__/, /hook:error_occurred/];
     const beforeRawWithoutExpectedScenarioMarkers = scenario.expectedOutputMarkers.reduce(
         (text, marker) => text.replaceAll(marker, 'EXPECTED_SCENARIO_MARKER'),
@@ -5687,6 +5691,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-live-status-not-input-prompt',
             pass: !/^\s*LLM-B pensando\s*$/imu.test(plain),
             detail: 'live status stayed above the input instead of becoming a standalone prompt line',
+        },
+        {
+            id: 'ux-diagnostic-commands-start-at-prompt',
+            pass: !promptlessDiagnosticCommand,
+            detail: promptlessDiagnosticCommand
+                ? 'a diagnostic command was echoed without the REPL prompt'
+                : 'diagnostic commands were echoed from a visible REPL prompt',
         },
         {
             id: 'ux-health-human-tool-stats',
@@ -7106,6 +7117,7 @@ async function main() {
     let onPromptSynchronizedCommandsDrained = null;
     let promptSynchronizedCommandOutputOffset = 0;
     let waitingForPromptSynchronizedCommand = false;
+    let waitingForPromptBeforeSynchronizedCommand = false;
     let pendingByokLiveProtocolDiagnostics = false;
     let askBeforeDeltasDiagnosticsSent = false;
     let askBeforeDeltasDiagnosticsPendingAfterAnswer = false;
@@ -7154,6 +7166,7 @@ async function main() {
         }
     };
     const sendNextPromptSynchronizedCommand = () => {
+        waitingForPromptBeforeSynchronizedCommand = false;
         const next = promptSynchronizedCommands.shift();
         if (!next) {
             waitingForPromptSynchronizedCommand = false;
@@ -7182,7 +7195,13 @@ async function main() {
         promptSynchronizedCommands = [...commands];
         onPromptSynchronizedCommandsDrained = onDrained;
         waitingForPromptSynchronizedCommand = false;
-        sendNextPromptSynchronizedCommand();
+        const plain = stripAnsi(raw);
+        if (hasReturnedToReplPrompt(plain, Math.max(0, plain.length - 512))) {
+            sendNextPromptSynchronizedCommand();
+            return;
+        }
+        waitingForPromptBeforeSynchronizedCommand = true;
+        promptSynchronizedCommandOutputOffset = plain.length;
     };
     const scheduleForcedKill = (delayMs = 2_000) => {
         if (forcedKillTimer) return;
@@ -7477,6 +7496,12 @@ async function main() {
         raw += text;
         process.stdout.write(text);
         const plain = stripAnsi(raw);
+        if (
+            waitingForPromptBeforeSynchronizedCommand &&
+            hasReturnedToReplPrompt(plain, promptSynchronizedCommandOutputOffset)
+        ) {
+            sendNextPromptSynchronizedCommand();
+        }
         if (
             waitingForPromptSynchronizedCommand &&
             hasReturnedToReplPrompt(plain, promptSynchronizedCommandOutputOffset)
