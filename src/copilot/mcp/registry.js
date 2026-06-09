@@ -446,6 +446,27 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
     const requiredScopes = collectToolSecurityScopes(tool);
     /** @type {Record<string, number>} */
     const phases = {};
+    let activePhase = 'auditStart';
+    let activePhaseStartedAt = startedAt;
+    /**
+     * @param {string} phase
+     * @returns {number}
+     */
+    const startPhase = (phase) => {
+        activePhase = phase;
+        activePhaseStartedAt = Date.now();
+        return activePhaseStartedAt;
+    };
+    /**
+     * @param {string} phase
+     * @param {number} phaseStartedAt
+     * @returns {void}
+     */
+    const finishPhase = (phase, phaseStartedAt) => {
+        phases[phase] = elapsedMs(phaseStartedAt);
+        activePhase = 'idle';
+        activePhaseStartedAt = Date.now();
+    };
     await safeAppendMcpAuditEvent({
         event: 'tool_call_started',
         callId,
@@ -457,9 +478,9 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
         requiredScopes,
     });
     try {
-        const rateLimitStartedAt = Date.now();
+        const rateLimitStartedAt = startPhase('rateLimit');
         const rateLimit = consumeToolInvocationBudget(tool, options, registryPolicy);
-        phases['rateLimit'] = elapsedMs(rateLimitStartedAt);
+        finishPhase('rateLimit', rateLimitStartedAt);
         if (!rateLimit.allowed) {
             const durationMs = elapsedMs(startedAt);
             await safeAppendMcpAuditEvent({
@@ -470,7 +491,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
                 retryAfterMs: rateLimit.retryAfterMs,
                 risk,
             });
-            safeRecordMcpToolMetric(tool.name, { durationMs, isError: true });
+            safeRecordMcpToolMetric(tool.name, { durationMs, isError: true, phases });
             return errorResult('MCP tool rate limit exceeded.', {
                 code: 'MCP_TOOL_RATE_LIMITED',
                 retryAfterMs: rateLimit.retryAfterMs,
@@ -478,9 +499,9 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             });
         }
 
-        const authorizationStartedAt = Date.now();
+        const authorizationStartedAt = startPhase('authorization');
         const authorization = await authorizeMcpToolCall(tool, options.authContext);
-        phases['authorization'] = elapsedMs(authorizationStartedAt);
+        finishPhase('authorization', authorizationStartedAt);
         if (!authorization.allowed) {
             const durationMs = elapsedMs(startedAt);
             await safeAppendMcpAuditEvent({
@@ -492,7 +513,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
                 requiredScopes: authorization.requiredScopes,
                 risk,
             });
-            safeRecordMcpToolMetric(tool.name, { durationMs, isError: true });
+            safeRecordMcpToolMetric(tool.name, { durationMs, isError: true, phases });
             return errorResult(
                 authorization.message ?? 'MCP authorization failed.',
                 {
@@ -510,12 +531,12 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             );
         }
 
-        const handlerStartedAt = Date.now();
+        const handlerStartedAt = startPhase('handler');
         const result = await runToolHandlerWithTimeout(tool, args, registryPolicy);
-        phases['handler'] = elapsedMs(handlerStartedAt);
-        const resultSizeStartedAt = Date.now();
+        finishPhase('handler', handlerStartedAt);
+        const resultSizeStartedAt = startPhase('resultSize');
         const resultSizeError = validateToolResultSize(result, registryPolicy);
-        phases['resultSize'] = elapsedMs(resultSizeStartedAt);
+        finishPhase('resultSize', resultSizeStartedAt);
         if (resultSizeError) {
             const durationMs = elapsedMs(startedAt);
             await safeAppendMcpAuditEvent({
@@ -526,7 +547,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
                 reason: resultSizeError,
                 risk,
             });
-            safeRecordMcpToolMetric(tool.name, { durationMs, isError: true });
+            safeRecordMcpToolMetric(tool.name, { durationMs, isError: true, phases });
             return errorResult('MCP tool result rejected by registry policy.', {
                 code: 'MCP_TOOL_RESULT_REJECTED',
                 hint: resultSizeError,
@@ -534,11 +555,11 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             });
         }
 
-        const outputValidationStartedAt = Date.now();
+        const outputValidationStartedAt = startPhase('outputValidation');
         const outputValidation = registryPolicy.validateStructuredOutput
             ? validateToolStructuredOutput(tool, result)
             : [];
-        phases['outputValidation'] = elapsedMs(outputValidationStartedAt);
+        finishPhase('outputValidation', outputValidationStartedAt);
         if (outputValidation.length > 0) {
             await safeAppendMcpAuditEvent({
                 event: 'tool_call_output_validation_warning',
@@ -549,7 +570,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             });
         }
         const durationMs = elapsedMs(startedAt);
-        const auditCompletionStartedAt = Date.now();
+        const auditCompletionStartedAt = startPhase('auditCompletion');
         await safeAppendMcpAuditEvent({
             event: 'tool_call_completed',
             callId,
@@ -558,12 +579,15 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             isError: result.isError === true,
             risk,
         });
-        phases['auditCompletion'] = elapsedMs(auditCompletionStartedAt);
+        finishPhase('auditCompletion', auditCompletionStartedAt);
         safeRecordMcpToolMetric(tool.name, { durationMs, isError: result.isError === true, phases });
         return result;
     } catch (error) {
         const durationMs = elapsedMs(startedAt);
         const errorMessage = error instanceof Error ? error.message : String(error);
+        if (activePhase !== 'idle' && phases[activePhase] === undefined) {
+            phases[activePhase] = elapsedMs(activePhaseStartedAt);
+        }
         await safeAppendMcpAuditEvent({
             event: 'tool_call_failed',
             callId,
@@ -572,7 +596,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             error: errorMessage,
             risk,
         });
-        safeRecordMcpToolMetric(tool.name, { durationMs, isError: true });
+        safeRecordMcpToolMetric(tool.name, { durationMs, isError: true, phases });
         if (registryPolicy.handlerExceptionMode === 'tool-result') {
             return errorResult('MCP tool execution failed.', {
                 code: 'MCP_TOOL_EXECUTION_FAILED',

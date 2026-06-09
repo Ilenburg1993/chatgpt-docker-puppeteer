@@ -3402,6 +3402,28 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `npm run lint:copilot`.
 - [x] Validado com `npm run typecheck:strict:src.copilot`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quinquagésima Terceira Passada
+
+- [x] A investigação saiu do terminal e revisou a observabilidade MCP para sessões longas: havia início de métricas por
+  fase, mas caminhos de falha ainda podiam registrar apenas `durationMs/isError`, deixando o operador sem indicação se o
+  erro ocorreu em rate limit, autorização, handler, validação de tamanho, schema ou auditoria.
+- [x] `guardedToolHandler()` passou a acompanhar a fase ativa e registrar `phases` também no `catch`; timeouts/exceções do
+  handler agora preservam a etapa que estava em curso, sem alterar a política de retornar tool-result ou relançar erro.
+- [x] Os retornos antecipados de rate limit, autorização negada e resultado rejeitado ficam alinhados ao mesmo contrato de
+  métrica por fase, eliminando o fluxo paralelo em que falhas só apareciam como contadores agregados.
+- [x] `mcp_runtime_health` ganhou `metrics.phaseTotals`, agregando as fases por todo o runtime para revelar gargalos
+  transversais como autorização lenta, handler lento ou auditoria lenta sem exigir inspeção manual por ferramenta.
+- [x] O resumo de fases foi endurecido contra valores não finitos/parciais e ordenado por maior tempo total, tornando a
+  saída estável e própria para leitura humana em sessões de muitas horas.
+- [x] Cobertura adicionada para `recordMcpToolMetric()` com fases, rejeição de `NaN` e exposição de `phaseTotals` +
+  `slowestPhases` via `mcp_runtime_health`.
+- [x] Validado com `node --check src/copilot/mcp/registry.js src/copilot/mcp/tools/runtime-health.js
+  tests/unit/copilot/mcp/test_mcp_runtime_metrics.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/mcp/test_mcp_runtime_metrics.spec.js
+  tests/unit/copilot/mcp/test_mcp_registry.spec.js` (2 arquivos, 11 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+
 ---
 
 ## Decisões Arquiteturais

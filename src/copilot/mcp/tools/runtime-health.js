@@ -150,10 +150,11 @@ function summarizeSlowestPhases(tools) {
         const phaseAverages = metric['phaseAverages'];
         if (!phaseAverages || typeof phaseAverages !== 'object' || Array.isArray(phaseAverages)) continue;
         for (const [phase, phaseMetric] of Object.entries(/** @type {Record<string, Record<string, unknown>>} */ (phaseAverages))) {
+            const calls = finiteNumber(phaseMetric['calls']);
             rows.push({
                 tool,
                 phase,
-                calls: Number(phaseMetric['calls'] ?? 0),
+                calls,
                 averageMs: nullableNumber(phaseMetric['averageDurationMs']),
                 lastMs: nullableNumber(phaseMetric['lastDurationMs']),
             });
@@ -163,6 +164,53 @@ function summarizeSlowestPhases(tools) {
         .filter((row) => row.calls > 0)
         .sort((left, right) => (right.averageMs ?? 0) - (left.averageMs ?? 0))
         .slice(0, 12);
+}
+
+/**
+ * @param {Record<string, Record<string, unknown>>} tools
+ * @returns {Record<string, { calls: number; averageMs: number | null; totalDurationMs: number }>}
+ */
+function summarizePhaseTotals(tools) {
+    /** @type {Record<string, { calls: number; totalDurationMs: number }>} */
+    const totals = {};
+    for (const metric of Object.values(tools)) {
+        const phaseAverages = metric['phaseAverages'];
+        if (!phaseAverages || typeof phaseAverages !== 'object' || Array.isArray(phaseAverages)) continue;
+        for (const [phase, phaseMetric] of Object.entries(/** @type {Record<string, Record<string, unknown>>} */ (phaseAverages))) {
+            const calls = finiteNumber(phaseMetric['calls']);
+            const totalDurationMs = finiteNumber(phaseMetric['totalDurationMs']);
+            if (calls <= 0 && totalDurationMs <= 0) continue;
+            const current = totals[phase] ?? { calls: 0, totalDurationMs: 0 };
+            current.calls += calls;
+            current.totalDurationMs += totalDurationMs;
+            totals[phase] = current;
+        }
+    }
+    return Object.fromEntries(
+        Object.entries(totals)
+            .sort(
+                ([leftPhase, left], [rightPhase, right]) =>
+                    right.totalDurationMs - left.totalDurationMs || leftPhase.localeCompare(rightPhase),
+            )
+            .map(([phase, metric]) => [
+                phase,
+                {
+                    calls: metric.calls,
+                    totalDurationMs: metric.totalDurationMs,
+                    averageMs: metric.calls > 0 ? Math.round(metric.totalDurationMs / metric.calls) : null,
+                },
+            ]),
+    );
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} [fallback]
+ * @returns {number}
+ */
+function finiteNumber(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 /**
@@ -268,6 +316,7 @@ export const mcpRuntimeHealthTool = {
                     totals: metrics.totals,
                     slowestTools: summarizeSlowestTools(metrics.tools),
                     slowestPhases: summarizeSlowestPhases(metrics.tools),
+                    phaseTotals: summarizePhaseTotals(metrics.tools),
                 },
                 detailsAvailable: true,
             });

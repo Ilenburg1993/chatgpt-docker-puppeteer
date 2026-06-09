@@ -38,8 +38,48 @@ describe('copilot MCP runtime metrics', () => {
         assert.equal(repoStatus.averageDurationMs, 15);
     });
 
+    it('records per-tool phase averages', () => {
+        recordMcpToolMetric('repo_status', {
+            durationMs: 10,
+            isError: false,
+            phases: { authorization: 2, handler: 8 },
+        });
+        recordMcpToolMetric('repo_status', {
+            durationMs: 30,
+            isError: true,
+            phases: { authorization: 4, handler: 26, invalid: Number.NaN },
+        });
+
+        const snapshot = readMcpMetricsSnapshot();
+        const repoStatus = snapshot.tools['repo_status'];
+
+        assert.ok(repoStatus);
+        assert.deepEqual(repoStatus.phaseAverages['authorization'], {
+            calls: 2,
+            totalDurationMs: 6,
+            lastDurationMs: 4,
+            averageDurationMs: 3,
+        });
+        assert.deepEqual(repoStatus.phaseAverages['handler'], {
+            calls: 2,
+            totalDurationMs: 34,
+            lastDurationMs: 26,
+            averageDurationMs: 17,
+        });
+        assert.equal(repoStatus.phaseAverages['invalid'], undefined);
+    });
+
     it('exposes metrics through mcp_runtime_health', async () => {
-        recordMcpToolMetric('git_status', { durationMs: 5, isError: false });
+        recordMcpToolMetric('git_status', {
+            durationMs: 5,
+            isError: false,
+            phases: { authorization: 1, handler: 4 },
+        });
+        recordMcpToolMetric('repo_status', {
+            durationMs: 10,
+            isError: false,
+            phases: { authorization: 2, handler: 8 },
+        });
 
         const result = await mcpRuntimeHealthTool.handler({});
 
@@ -50,7 +90,30 @@ describe('copilot MCP runtime metrics', () => {
         assert.ok(result.structuredContent.operationalSignals);
         assert.ok(result.structuredContent.operationalSignals.indexAutoBuild);
         assert.ok(result.structuredContent.indexStats);
-        assert.equal(/** @type {{ totals: { calls: number } }} */ (result.structuredContent.metrics).totals.calls, 1);
+        const metrics = /** @type {{
+            totals: { calls: number };
+            phaseTotals: Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>;
+            slowestPhases: Array<{ tool: string; phase: string; calls: number; averageMs: number | null }>;
+        }} */ (result.structuredContent.metrics);
+        assert.equal(metrics.totals.calls, 2);
+        assert.deepEqual(Object.keys(metrics.phaseTotals), ['handler', 'authorization']);
+        assert.deepEqual(metrics.phaseTotals['handler'], {
+            calls: 2,
+            totalDurationMs: 12,
+            averageMs: 6,
+        });
+        assert.deepEqual(metrics.phaseTotals['authorization'], {
+            calls: 2,
+            totalDurationMs: 3,
+            averageMs: 2,
+        });
+        assert.deepEqual(metrics.slowestPhases[0], {
+            tool: 'repo_status',
+            phase: 'handler',
+            calls: 1,
+            averageMs: 8,
+            lastMs: 8,
+        });
     });
 
     it('parses MCP index auto-build environment limits', () => {
