@@ -12,6 +12,7 @@ import {
     buildIoIndexForDirectory,
     filterIndexRowsByGlob,
     findIoIndexImports,
+    findIoIndexImportsByPath,
     findIoIndexSymbol,
     formatIndexImportRows,
     formatIndexSearchRows,
@@ -23,7 +24,7 @@ import {
     parseFileForContext,
     searchIoIndex,
 } from '#copilot/infra/public/indexing';
-import { readText, scanDirectory, statPath } from '#copilot/infra/public/io';
+import { readText, statPath } from '#copilot/infra/public/io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { dirname, extname, join, relative, resolve as resolvePath } from 'node:path';
 import { z } from 'zod';
@@ -35,8 +36,8 @@ import {
     readMcpIndexAutoBuildState,
     readOnlyAnnotations,
     resolveReadPath,
-    toWorkspaceRelativePath,
 } from '#copilot/mcp/control-plane';
+import { normalizeIoCacheKey, registerInvalidationHook } from '#copilot/infra/io-cache.js';
 
 const DEFAULT_INDEX_PATH = 'src/copilot';
 const DEFAULT_ORPHAN_IMPORT_SCAN_PATH = 'src/copilot';
@@ -44,6 +45,20 @@ const DEFAULT_ORPHAN_IMPORT_MAX_FILES = 500;
 const MODULE_FILE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.json'];
 const MODULE_INDEX_CANDIDATES = MODULE_FILE_EXTENSIONS.map((extension) => `index${extension}`);
 const LOCAL_IMPORT_ALIAS_PREFIXES = ['#copilot'];
+/** @type {Map<string, boolean>} */
+const importTargetExistsCache = new Map();
+
+registerInvalidationHook((filePath, event) => {
+    try {
+        if (event?.recursive === true) {
+            importTargetExistsCache.clear();
+            return;
+        }
+        importTargetExistsCache.delete(normalizeIoCacheKey(filePath));
+    } catch {
+        // Cache externo jamais deve derrubar ferramentas de leitura.
+    }
+});
 
 /**
  * @param {unknown} value
@@ -65,27 +80,6 @@ function normalizeOptionalRepoPath(value, fallback) {
 function normalizePositiveInteger(value, fallback, max) {
     const parsed = Number(value ?? fallback);
     return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, max) : fallback;
-}
-
-/**
- * @param {Array<{ type: string; absolutePath: string; children?: unknown }>} entries
- * @returns {Array<{ absolutePath: string; relativePath: string }>}
- */
-function flattenScanFiles(entries) {
-    /** @type {Array<{ absolutePath: string; relativePath: string }>} */
-    const files = [];
-    for (const entry of entries) {
-        if (entry.type === 'file') {
-            files.push({
-                absolutePath: entry.absolutePath,
-                relativePath: toWorkspaceRelativePath(entry.absolutePath),
-            });
-        }
-        if (Array.isArray(entry.children)) {
-            files.push(...flattenScanFiles(/** @type {Array<{ type: string; absolutePath: string; children?: unknown }>} */ (entry.children)));
-        }
-    }
-    return files;
 }
 
 /**
@@ -148,12 +142,25 @@ async function fileExists(filePath) {
 }
 
 /**
+ * @param {string} filePath
+ * @returns {Promise<boolean>}
+ */
+async function cachedFileExists(filePath) {
+    const cacheKey = normalizeIoCacheKey(filePath);
+    const cached = importTargetExistsCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+    const exists = await fileExists(filePath);
+    importTargetExistsCache.set(cacheKey, exists);
+    return exists;
+}
+
+/**
  * @param {string[]} candidates
  * @returns {Promise<boolean>}
  */
 async function anyCandidateExists(candidates) {
     for (const candidate of candidates) {
-        if (await fileExists(candidate)) return true;
+        if (await cachedFileExists(candidate)) return true;
     }
     return false;
 }
@@ -443,38 +450,13 @@ export const repoIndexTools = [
             cursor: z.string().optional().describe('Cursor returned by a previous repo_find_orphan_imports call.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, recursive, depth, respectGitignore, includeDynamic, maxFiles, maxResults, cursor }) => {
+        handler: async ({ path, includeDynamic, maxFiles, maxResults, cursor }) => {
             const resolved = await resolveReadPath(
                 normalizeOptionalRepoPath(path, DEFAULT_ORPHAN_IMPORT_SCAN_PATH),
             );
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const stat = await statPath(resolved.resolved);
             const fileLimit = normalizePositiveInteger(maxFiles, DEFAULT_ORPHAN_IMPORT_MAX_FILES, 5000);
-            /** @type {Array<{ absolutePath: string; relativePath: string }>} */
-            let files;
-            let scannedEntries = 1;
-            let blockedEntries = 0;
-            let hardLimitReached = false;
-            if (stat.stats.isFile()) {
-                files = isAnalyzableModuleFile(resolved.resolved)
-                    ? [{ absolutePath: resolved.resolved, relativePath: resolved.relative }]
-                    : [];
-            } else {
-                const scan = await scanDirectory(resolved.resolved, {
-                    workspaceRoot: WORKSPACE_ROOT,
-                    recursive: recursive ?? true,
-                    depth: depth ?? 20,
-                    respectGitignore: respectGitignore ?? true,
-                    include: MODULE_FILE_EXTENSIONS.map((extension) => `*${extension}`),
-                    maxEntries: fileLimit * 3,
-                    fingerprint: false,
-                });
-                scannedEntries = scan.scannedEntries;
-                blockedEntries = scan.blockedEntries;
-                hardLimitReached = scan.io.advisoryLimits?.['hardLimitReached'] === true;
-                files = flattenScanFiles(scan.entries).filter((entry) => isAnalyzableModuleFile(entry.absolutePath));
-            }
-            const limitedFiles = files.slice(0, fileLimit);
             /** @type {Array<{ file: string; line: number; source: string; dynamic: boolean; attemptedTargets: string[] }>} */
             const orphanImports = [];
             /** @type {Array<{ file: string; error: string }>} */
@@ -482,37 +464,92 @@ export const repoIndexTools = [
             let checkedImports = 0;
             let skippedExternalImports = 0;
             let skippedDynamicImports = 0;
-            for (const file of limitedFiles) {
-                try {
-                    const text = await readText(file.absolutePath);
-                    const parsed = await parseFileForContext(file.absolutePath, text.content);
-                    for (const importEntry of parsed.symbols.imports) {
-                        if (importEntry.isDynamic && includeDynamic === false) {
-                            skippedDynamicImports += 1;
-                            continue;
+            let scannedEntries = 1;
+            const blockedEntries = 0;
+            let hardLimitReached = false;
+            let scannedFiles = 0;
+            let totalCandidateFiles = 1;
+
+            if (stat.stats.isFile()) {
+                if (isAnalyzableModuleFile(resolved.resolved)) {
+                    scannedFiles = 1;
+                    try {
+                        const text = await readText(resolved.resolved);
+                        const parsed = await parseFileForContext(resolved.resolved, text.content);
+                        for (const importEntry of parsed.symbols.imports) {
+                            const source = String(importEntry.source ?? '');
+                            const dynamic = importEntry.isDynamic === true;
+                            if (dynamic && includeDynamic !== true) {
+                                skippedDynamicImports += 1;
+                                continue;
+                            }
+                            if (!isLocalImportSource(source)) {
+                                skippedExternalImports += 1;
+                                continue;
+                            }
+                            const basePath = resolveImportBasePath(source, resolved.resolved);
+                            if (!basePath) continue;
+                            const candidates = buildModuleCandidatePaths(basePath);
+                            checkedImports += 1;
+                            if (await anyCandidateExists(candidates)) continue;
+                            orphanImports.push({
+                                file: resolved.relative,
+                                line: Number(importEntry.line ?? 0),
+                                source,
+                                dynamic,
+                                attemptedTargets: candidates.map((candidate) => relative(WORKSPACE_ROOT, candidate)),
+                            });
                         }
-                        const source = String(importEntry.source ?? '');
-                        if (!isLocalImportSource(source)) {
-                            skippedExternalImports += 1;
-                            continue;
-                        }
-                        const basePath = resolveImportBasePath(source, file.absolutePath);
-                        if (!basePath) continue;
-                        const candidates = buildModuleCandidatePaths(basePath);
-                        checkedImports += 1;
-                        if (await anyCandidateExists(candidates)) continue;
-                        orphanImports.push({
-                            file: file.relativePath,
-                            line: Number(importEntry.line ?? 0),
-                            source,
-                            dynamic: importEntry.isDynamic === true,
-                            attemptedTargets: candidates.map((candidate) => relative(WORKSPACE_ROOT, candidate)),
+                    } catch (error) {
+                        parseErrors.push({
+                            file: resolved.relative,
+                            error: error instanceof Error ? error.message : String(error),
                         });
                     }
-                } catch (error) {
-                    parseErrors.push({
-                        file: file.relativePath,
-                        error: error instanceof Error ? error.message : String(error),
+                }
+            } else {
+                const indexStats = getIoIndexStats();
+                if (!indexStats.available) {
+                    return errorResult('MCP IO index is unavailable; build the index before scanning directories.', {
+                        code: 'MCP_IO_INDEX_UNAVAILABLE',
+                        hint: 'Run repo_index_build for src/copilot or enable the local IO index.',
+                        workspaceRoot: getMcpWorkspaceRoot(),
+                    });
+                }
+                const rows = findIoIndexImportsByPath(resolved.resolved);
+                totalCandidateFiles = new Set(rows.map((row) => row.filePath)).size;
+                scannedEntries = rows.length;
+                let currentFilePath = '';
+                for (const row of rows) {
+                    if (row.filePath !== currentFilePath) {
+                        currentFilePath = row.filePath;
+                        scannedFiles += 1;
+                        if (scannedFiles > fileLimit) {
+                            hardLimitReached = true;
+                            break;
+                        }
+                    }
+                    const source = String(row.source ?? '');
+                    const dynamic = row.isDynamic === 1;
+                    if (dynamic && includeDynamic !== true) {
+                        skippedDynamicImports += 1;
+                        continue;
+                    }
+                    if (!isLocalImportSource(source)) {
+                        skippedExternalImports += 1;
+                        continue;
+                    }
+                    const basePath = resolveImportBasePath(source, String(row.filePath ?? ''));
+                    if (!basePath) continue;
+                    const candidates = buildModuleCandidatePaths(basePath);
+                    checkedImports += 1;
+                    if (await anyCandidateExists(candidates)) continue;
+                    orphanImports.push({
+                        file: String(row.relativePath ?? row.filePath),
+                        line: Number(row.line ?? 0),
+                        source,
+                        dynamic,
+                        attemptedTargets: candidates.map((candidate) => relative(WORKSPACE_ROOT, candidate)),
                     });
                 }
             }
@@ -526,15 +563,15 @@ export const repoIndexTools = [
                     workspaceRoot: getMcpWorkspaceRoot(),
                     scannedEntries,
                     blockedEntries,
-                    scannedFiles: limitedFiles.length,
-                    totalCandidateFiles: files.length,
+                    scannedFiles,
+                    totalCandidateFiles,
                     checkedImports,
                     skippedExternalImports,
                     skippedDynamicImports,
                     parseErrors,
                     orphanCount: paged.items.length,
                     totalOrphans: paged.totalItems,
-                    truncated: paged.truncated || files.length > limitedFiles.length || hardLimitReached,
+                    truncated: paged.truncated || hardLimitReached || (stat.stats.isDirectory() && totalCandidateFiles > fileLimit),
                     nextCursor: paged.nextCursor,
                     cursorOffset: paged.cursorOffset,
                     output,

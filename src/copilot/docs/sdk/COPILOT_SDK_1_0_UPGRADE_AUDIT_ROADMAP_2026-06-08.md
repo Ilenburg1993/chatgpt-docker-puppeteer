@@ -3460,6 +3460,37 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
   --live-scenario=canonical`; PASS, com `terminal.started` aparecendo sem o `preflight ok` cru na timeline pública.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quinquagésima Sexta Passada
+
+- [x] A primeira versão de `repo_find_orphan_imports` era funcional, mas o caminho de diretório ainda reabria e parseava
+  muitos arquivos em série, o que tornou a tool pesada demais para uso humano em sessão longa.
+- [x] O caminho de diretório passou a consultar o índice persistido de imports por prefixo de caminho, mantendo parse
+  direto apenas para arquivo único e cacheando a existência dos destinos locais para reduzir `stat` repetido.
+- [x] O comando deixou de travar em recortes reais de `src/copilot/mcp/tools` e passou a responder em dezenas de
+  milissegundos; a ferramenta agora é operacional em vez de apenas correta.
+- [x] A cobertura de `tests/unit/copilot/mcp/test_mcp_tools.spec.js` ganhou caso de diretório, cobrindo o uso indexado,
+  o caminho rápido e a ausência de órfãos no recorte canônico.
+- [x] Validado com `node --check src/copilot/infra/io-index-sqlite.js src/copilot/infra/io-index-registry.js
+  src/copilot/infra/public/indexing.js src/copilot/mcp/tools/repo-index.js tests/unit/copilot/mcp/test_mcp_tools.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/mcp/test_mcp_tools.spec.js --testNamePattern "repo_index tools expose shared IO index build, status, search, symbols and imports"` (1 arquivo, 1 teste).
+- [x] Validado com leitura real do diretório `src/copilot/mcp/tools`: `durationMs=23`, `scannedEntries=122`,
+  `scannedFiles=31`, `checkedImports=70`, `orphanCount=0`.
+
+### Execução Contínua Em 2026-06-09 - Centésima Quinquagésima Sétima Passada
+
+- [x] A investigação da imagem e do live local mostrou um resíduo de UX no fluxo de pergunta/resposta: o título
+  público `Pergunta antes de síntese pública` ainda vazava a heurística interna em vez de manter a fala humana
+  estável como `Pergunta ao operador`.
+- [x] `sdk-session-events.js` foi ajustado para manter `Pergunta ao operador` como label canônico e preservar apenas a
+  pista contextual em `detail`, reduzindo drift entre o estado interno e a superfície pública do terminal.
+- [x] O cache local de existência de alvos em `repo_find_orphan_imports` agora normaliza a chave de path e também
+  responde à invalidação publicada por path relativo/absoluto, fechando uma janela de falsos negativos em sessões
+  longas com edições/moves/deletes.
+- [x] A cobertura de `tests/unit/copilot/mcp/test_mcp_tools.spec.js` ganhou um caso de invalidação, provando que uma
+  importação deixa de parecer viva depois da remoção do alvo e da invalidação do caminho.
+- [x] Validado com `node --check src/copilot/mcp/tools/repo-index.js src/copilot/terminal/events/sdk-session-events.js tests/unit/copilot/mcp/test_mcp_tools.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/mcp/test_mcp_tools.spec.js` (cache de imports e orfandade).
+
 ---
 
 ## Decisões Arquiteturais

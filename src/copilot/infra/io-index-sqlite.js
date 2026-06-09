@@ -260,6 +260,19 @@ export function createIoIndexSqlite(options) {
         ORDER BY i.source ASC, f.relative_path ASC
         LIMIT ?
     `);
+    const stmtImportSearchByPath = db.prepare(`
+        SELECT
+            i.file_path as filePath,
+            f.relative_path as relativePath,
+            i.source as source,
+            i.specifiers_json as specifiersJson,
+            i.is_dynamic as isDynamic,
+            i.line as line
+        FROM copilot_io_index_imports i
+        JOIN copilot_io_index_files f ON f.file_path = i.file_path
+        WHERE i.file_path = ? OR i.file_path LIKE ?
+        ORDER BY i.file_path ASC, i.line ASC
+    `);
 
     /**
      * @param {string} filePath
@@ -656,6 +669,16 @@ export function createIoIndexSqlite(options) {
                 stmtImportSearch.all(safe, `%${safe}%`, normalizeIndexMaxResults(options.maxResults))
             );
             return options.exactSource ? rows.filter((r) => r.source === source) : rows;
+        },
+
+        /**
+         * @param {string} pathPrefix
+         * @returns {IoIndexImportResult[]}
+         */
+        findImportsByPath(pathPrefix) {
+            stats.searches += 1;
+            const safe = normalizeIndexPath(pathPrefix);
+            return /** @type {IoIndexImportResult[]} */ (stmtImportSearchByPath.all(safe, `${safe}/%`));
         },
 
         getStats() {

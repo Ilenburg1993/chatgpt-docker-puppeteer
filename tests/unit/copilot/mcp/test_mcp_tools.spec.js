@@ -4,8 +4,11 @@
  */
 
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import { describe, it } from 'vitest';
 
+import { invalidateIoCachePath } from '#copilot/infra/io-cache.js';
 import { resolveReadPath } from '#copilot/mcp/control-plane';
 import { getCanonicalMcpTools } from '#copilot/mcp';
 
@@ -325,6 +328,53 @@ describe('copilot MCP tools', () => {
         assert.equal(orphanImports.structuredContent?.['success'], true);
         assert.equal(orphanImports.structuredContent?.['totalOrphans'], 0);
         assert.equal(typeof orphanImports.structuredContent?.['checkedImports'], 'number');
+
+        const orphanImportsDir = await orphanImportsTool.handler({
+            path: 'src/copilot/mcp/tools',
+            maxFiles: 30,
+            maxResults: 20,
+        });
+        assert.equal(orphanImportsDir.isError, undefined);
+        assert.equal(orphanImportsDir.structuredContent?.['success'], true);
+        assert.equal(orphanImportsDir.structuredContent?.['totalOrphans'], 0);
+        assert.ok(Number(orphanImportsDir.structuredContent?.['checkedImports'] ?? 0) > 0);
+        assert.ok(Number(orphanImportsDir.structuredContent?.['scannedFiles'] ?? 0) > 1);
+    });
+
+    it('repo_find_orphan_imports clears cached import targets after invalidation', async () => {
+        const orphanImportsTool = findTool('repo_find_orphan_imports');
+        const tempDir = await mkdtemp(join(process.cwd(), '.tmp-copilot-orphan-cache-'));
+        const importerPath = join(tempDir, 'importer.js');
+        const targetPath = join(tempDir, 'target.js');
+        const relativeImporterPath = relative(process.cwd(), importerPath);
+        const relativeTargetPath = relative(process.cwd(), targetPath);
+
+        try {
+            await writeFile(importerPath, "import './target.js';\nexport const value = 1;\n");
+            await writeFile(targetPath, 'export const target = 1;\n');
+
+            const first = await orphanImportsTool.handler({
+                path: relativeImporterPath,
+                maxResults: 20,
+            });
+            assert.equal(first.isError, undefined);
+            assert.equal(first.structuredContent?.['success'], true);
+            assert.equal(first.structuredContent?.['totalOrphans'], 0);
+
+            await rm(targetPath);
+            invalidateIoCachePath(relativeTargetPath);
+
+            const second = await orphanImportsTool.handler({
+                path: relativeImporterPath,
+                maxResults: 20,
+            });
+            assert.equal(second.isError, undefined);
+            assert.equal(second.structuredContent?.['success'], true);
+            assert.equal(second.structuredContent?.['totalOrphans'], 1);
+            assert.equal(second.structuredContent?.['checkedImports'], 1);
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
     });
 
     it('repo_diff_files returns a canonical unified diff', async () => {

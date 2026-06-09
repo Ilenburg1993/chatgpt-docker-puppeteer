@@ -124,6 +124,14 @@ export function findIoIndexImports(source, options = {}) {
 }
 
 /**
+ * @param {string} pathPrefix
+ * @returns {ReturnType<NonNullable<ReturnType<typeof getIoIndex>>['findImportsByPath']>}
+ */
+export function findIoIndexImportsByPath(pathPrefix) {
+    return getIoIndex()?.findImportsByPath(pathPrefix) ?? [];
+}
+
+/**
  * @param {string} filePath
  */
 export function invalidateIoIndexPath(filePath) {

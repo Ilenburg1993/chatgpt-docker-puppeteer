@@ -1180,17 +1180,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             status: 'requested',
             source: 'sdk',
         });
-        recordTerminalActivity(
-            'question',
-            prePublicResponseNote ? 'Pergunta antes de síntese pública' : 'Pergunta ao operador',
-            {
-                detail: `${question.slice(0, 160)}${choices.length > 0 ? ` · opções ${choices.join('|')}` : ''}${
-                    prePublicResponseNote ? ` · ${prePublicResponseNote}` : ''
-                }`,
-                source: 'sdk',
-                severity: prePublicResponseNote ? 'warn' : 'info',
-            },
-        );
+        recordTerminalActivity('question', 'Pergunta ao operador', {
+            detail: `${question.slice(0, 160)}${choices.length > 0 ? ` · opções ${choices.join('|')}` : ''}${
+                prePublicResponseNote ? ` · ${prePublicResponseNote}` : ''
+            }`,
+            source: 'sdk',
+            severity: prePublicResponseNote ? 'warn' : 'info',
+        });
         const requestedEnvelope = withSdkSessionSseEnvelope(
             {
                 requestId: evt?.requestId ?? null,
