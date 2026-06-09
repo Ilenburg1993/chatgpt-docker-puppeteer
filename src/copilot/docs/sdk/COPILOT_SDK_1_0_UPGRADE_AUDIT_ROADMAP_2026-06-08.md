@@ -2871,9 +2871,32 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Trigésima Segunda Passada
 
-- [ ] SDK10-P132-01: no live canônico, logo após `Intervenção   modelo ocioso; encaminhada como novo turno`, o prompt
+- [x] SDK10-P132-01: no live canônico, logo após `Intervenção   modelo ocioso; encaminhada como novo turno`, o prompt
   default reapareceu antes do estado vivo de processamento; investigar renderização/prompt parking nesse caminho para
   evitar uma piscada de prompt ocioso enquanto o turno já foi aceito.
+
+### Execução Contínua Em 2026-06-08 - Centésima Trigésima Terceira Passada
+
+- [x] `repl-lifecycle.js` passou a definir o prompt efetivo como `buildWaitingPrompt()` logo antes de encaminhar uma
+  intervenção com modelo ocioso como novo turno, além de manter `parkTerminalPromptForContinuation()`.
+- [x] A linha durável `Intervenção   modelo ocioso; encaminhada como novo turno` continua sem `redrawPrompt`, mas agora
+  qualquer repaint automático do readline nesse intervalo usa estado de espera, não o prompt default ocioso.
+- [x] Foi adicionada cobertura unitária em `tests/unit/copilot/terminal/test_repl_lifecycle.spec.js`, simulando readline
+  e política zero-PR para garantir que o handoff define `LLM-B pensando` antes de `sendTurn()`.
+- [x] Validado com `node --check src/copilot/terminal/repl/repl-lifecycle.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_repl_lifecycle.spec.js
+  tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js` (2 arquivos, 26 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T03-20-02-965Z/summary.md`, confirmando o handoff sem prompt default entre
+  `Intervenção` e `LLM-B preparando`.
+
+### Achados Novos Da Centésima Trigésima Terceira Passada
+
+- [ ] SDK10-P133-01: após a resposta humana `SIM`, a linha viva em alguns runs mostra `LLM-B finalizando` quase
+  imediatamente, sem passar visivelmente por `LLM-B continuando`; investigar se o evento `Pergunta respondida` está sendo
+  sobreposto rápido demais por `turn`/finalização e se vale um grace label curto para continuidade pós-resposta.
 
 ---
 
