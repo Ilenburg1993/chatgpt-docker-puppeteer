@@ -3513,6 +3513,22 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_file_context.spec.js
   tests/unit/copilot/infra/test_io_search.spec.js` (2 arquivos, 28 testes).
 
+### Execução Contínua Em 2026-06-09 - Centésima Quinquagésima Nona Passada
+
+- [x] A continuação da auditoria local mostrou outro gap em anexos: `readDirectoryContext()` lia todos os arquivos
+  rasos de um diretório anexado sem orçamento explícito, e o truncamento só existia depois, como `MAX_EMBED_BYTES`
+  infinito na montagem da mensagem.
+- [x] Foi criado `readDirectoryContextDetailed()`, preservando `readDirectoryContext()` como API compatível, mas
+  adicionando metadados de `truncated`, `returnedFiles`, `totalCandidateFiles`, `maxFiles` e `scannedEntries`.
+- [x] `attachmentToEmbed({ type: "directory" })` agora usa o caminho detalhado e acrescenta nota humana quando o
+  diretório é truncado, evitando que uma pasta grande pareça ter sido embutida por completo.
+- [x] O scanner é chamado com `maxEntries` e sem fingerprint nesse fluxo de anexo raso, reduzindo custo quando o objetivo
+  é só montar contexto textual imediato.
+- [x] A cobertura de `tests/unit/copilot/terminal/test_file_context.spec.js` ganhou diretório com excesso de arquivos,
+  garantindo truncamento e aviso no texto embutido.
+- [x] Validado com `node --check src/copilot/presentation/files/context.js tests/unit/copilot/terminal/test_file_context.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_file_context.spec.js` (1 arquivo, 22 testes).
+
 ---
 
 ## Decisões Arquiteturais

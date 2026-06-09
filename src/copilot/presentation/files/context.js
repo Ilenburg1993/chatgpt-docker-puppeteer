@@ -19,6 +19,7 @@ export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;
 /** TTL do cache de file-context em ms (30 segundos). */
 const FILE_CACHE_TTL_MS = 30_000;
 const FILE_CACHE_MAX_ENTRIES = Math.max(1, Number(process.env['FILE_CONTEXT_CACHE_MAX_ENTRIES'] ?? 200));
+const DIRECTORY_CONTEXT_MAX_FILES = Math.max(1, Number(process.env['FILE_CONTEXT_DIRECTORY_MAX_FILES'] ?? 50));
 
 /** Mapa de extensão → linguagem para blocos de código markdown. @type {Record<string, string>} */
 const EXT_LANG = {
@@ -68,6 +69,15 @@ const EXT_LANG = {
  * Entrada no cache de file-context.
  *
  * @typedef {{ ctx: FileContext; expiresAt: number }} FileCacheEntry
+ *
+ * @typedef {{
+ *     contexts: FileContext[];
+ *     truncated: boolean;
+ *     scannedEntries: number;
+ *     returnedFiles: number;
+ *     totalCandidateFiles: number;
+ *     maxFiles: number;
+ * }} DirectoryContextResult
  */
 
 /** @type {Map<string, FileCacheEntry>} */
@@ -280,28 +290,40 @@ export function extractAtReferences(message) {
     return { paths, strippedMessage: strippedMessage.trim() };
 }
 /**
- * Lê os arquivos de um diretório (shallow, não recursivo) e retorna seus contextos.
+ * Lê os arquivos de um diretório (shallow, não recursivo) e retorna contextos com metadados de truncamento.
  *
- * Lê todos os arquivos legíveis do diretório. Ignora arquivos binários e sub-diretórios. Lança erro se o diretório não
- * existir.
+ * Lê até `maxFiles` arquivos legíveis do diretório. Ignora arquivos binários e sub-diretórios. Lança erro se o
+ * diretório não existir.
  *
  * @param {string} dirPath - Caminho do diretório (absoluto ou relativo ao cwd)
- * @returns {Promise<FileContext[]>} Lista de contextos dos arquivos lidos
+ * @param {{ maxFiles?: number }} [options]
+ * @returns {Promise<DirectoryContextResult>}
  * @throws {Error} Se o diretório não existir ou não for legível
  */
-export async function readDirectoryContext(dirPath) {
+export async function readDirectoryContextDetailed(dirPath, options = {}) {
     const policy = await evaluateIoPathPolicyAsync(dirPath, { workspaceRoot: process.cwd(), mode: 'read' });
     if (!policy.ok) {
         throw new Error(policy.reason);
     }
     const absPath = pathResolve(policy.realPath);
-    const scan = await scanDirectory(absPath, { showHidden: true, recursive: false });
+    const maxFiles =
+        Number.isFinite(options.maxFiles) && Number(options.maxFiles) > 0
+            ? Math.floor(Number(options.maxFiles))
+            : DIRECTORY_CONTEXT_MAX_FILES;
+    const scan = await scanDirectory(absPath, {
+        showHidden: true,
+        recursive: false,
+        maxEntries: maxFiles + 1,
+        fingerprint: false,
+    });
     const files = scan.entries.filter((entry) => entry.type === 'file');
+    const limitedFiles = files.slice(0, maxFiles);
+    const scanTruncated = scan.io.advisoryLimits?.['hardLimitReached'] === true;
 
     /** @type {FileContext[]} */
     const ctxs = [];
 
-    for (const entry of files) {
+    for (const entry of limitedFiles) {
         if ((entry.size ?? 0) === 0) continue;
         try {
             const file = await readText(entry.absolutePath);
@@ -319,7 +341,24 @@ export async function readDirectoryContext(dirPath) {
         }
     }
 
-    return ctxs;
+    return {
+        contexts: ctxs,
+        truncated: scanTruncated || files.length > limitedFiles.length,
+        scannedEntries: scan.scannedEntries,
+        returnedFiles: ctxs.length,
+        totalCandidateFiles: files.length,
+        maxFiles,
+    };
+}
+/**
+ * Lê os arquivos de um diretório (shallow, não recursivo) e retorna seus contextos.
+ *
+ * @param {string} dirPath - Caminho do diretório (absoluto ou relativo ao cwd)
+ * @returns {Promise<FileContext[]>} Lista de contextos dos arquivos lidos
+ * @throws {Error} Se o diretório não existir ou não for legível
+ */
+export async function readDirectoryContext(dirPath) {
+    return (await readDirectoryContextDetailed(dirPath)).contexts;
 }
 /**
  * @typedef {Object} RawAttachment
@@ -359,9 +398,13 @@ export async function attachmentToEmbed(att) {
 
     if (att.type === 'directory' && typeof att.path === 'string') {
         try {
-            const ctxs = await readDirectoryContext(att.path);
+            const directory = await readDirectoryContextDetailed(att.path);
+            const ctxs = directory.contexts;
             if (ctxs.length === 0) return `*(Diretório \`${att.path}\` está vazio ou sem arquivos legíveis)*`;
-            return `Contexto de diretório: \`${att.path}\`\n\n` + ctxs.map(buildBlock).join('\n\n');
+            const truncationNote = directory.truncated
+                ? `\n\n*(Diretório truncado: ${directory.returnedFiles}/${directory.totalCandidateFiles} arquivos legíveis embutidos; limite ${directory.maxFiles}, entradas escaneadas ${directory.scannedEntries}.)*`
+                : '';
+            return `Contexto de diretório: \`${att.path}\`\n\n` + ctxs.map(buildBlock).join('\n\n') + truncationNote;
         } catch (e) {
             return `*(Diretório \`${att.path}\` não pôde ser lido: ${toError(e).message})*`;
         }

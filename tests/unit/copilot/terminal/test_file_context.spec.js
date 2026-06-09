@@ -17,7 +17,9 @@ import {
     embedMultiple,
     extractAtReferences,
     getFileCacheStats,
+    readDirectoryContextDetailed,
     readFileContext,
+    attachmentToEmbed,
 } from '../../../../src/copilot/presentation/files/context.js';
 
 describe('file-context detectLang', () => {
@@ -146,6 +148,28 @@ describe('file-context readFileContext + cache', () => {
                 await readFileContext(relative(process.cwd(), filePath));
             }
             expect(getFileCacheStats().size).toBeLessThanOrEqual(maxEntries);
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    it('limita contexto de diretório e informa truncamento no embed', async () => {
+        const tempDir = await mkdtemp(join(process.cwd(), '.tmp-file-context-dir-limit-'));
+        try {
+            for (let index = 0; index < 55; index += 1) {
+                await writeFile(join(tempDir, `file-${index}.txt`), `conteudo ${index}\n`);
+            }
+
+            const relativeDir = relative(process.cwd(), tempDir);
+            const detailed = await readDirectoryContextDetailed(relativeDir, { maxFiles: 2 });
+            expect(detailed.contexts).toHaveLength(2);
+            expect(detailed.truncated).toBe(true);
+            expect(detailed.maxFiles).toBe(2);
+
+            const embedded = await attachmentToEmbed({ type: 'directory', path: relativeDir });
+            expect(embedded).toContain('Contexto de diretório');
+            expect(embedded).toContain('file-0.txt');
+            expect(embedded).toContain('Diretório truncado');
         } finally {
             await rm(tempDir, { recursive: true, force: true });
         }
