@@ -27,6 +27,10 @@ const getShowStreaming = vi.fn(() => true);
 const getShowThinking = vi.fn(() => false);
 const getShowIntentActivity = vi.fn(() => true);
 const getShowSessionActivity = vi.fn(() => false);
+const getRl = vi.fn(() => null);
+const getHubSessionId = vi.fn(() => null);
+const getBusy = vi.fn(() => false);
+const getSdkSessionMode = vi.fn(() => 'default');
 const setShowToolActivity = vi.fn();
 const setShowUsage = vi.fn();
 const setShowStreaming = vi.fn();
@@ -64,11 +68,28 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     writeInlineStatus,
 }));
 
+vi.mock('../../../src/copilot/terminal/dialog/io/index.js', () => ({
+    SEPARATOR: '---',
+    broadcastSse,
+    buildUserPrompt,
+    isTerminalRenderLocked,
+    parkTerminalPromptForContinuation,
+    println,
+    printlnBlock,
+    scheduleTerminalPromptRedraw,
+    writeInlineStatus,
+}));
+
 vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity,
 }));
 
 vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
+    CRITICAL_EVENTS: new Set(),
+    getBusy,
+    getHubSessionId,
+    getRl,
+    getSdkSessionMode,
     getShowToolActivity,
     getShowUsage,
     getShowStreaming,
@@ -1257,6 +1278,42 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         );
         expect(broadcastSse).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
         clearTerminalTurnMaterialization();
+    });
+
+    it('humaniza classe e motivo de llm.usage no detalhe técnico com divergência de modelo', async () => {
+        const { setupTerminalAgentRuntimeEventListeners } =
+            await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
+        /** @type {Map<string, Function[]>} */
+        const listeners = new Map();
+        const agent = {
+            on: vi.fn((event, handler) => {
+                const list = listeners.get(event) ?? [];
+                list.push(handler);
+                listeners.set(event, list);
+            }),
+            off: vi.fn(),
+        };
+
+        setupTerminalAgentRuntimeEventListeners({ agent: /** @type {any} */ (agent), rl: null });
+        listeners.get('llm.usage')?.[0]?.({
+            model: 'gpt-5.4',
+            configuredModel: 'gpt-5',
+            effectiveModel: 'gpt-5.4',
+            billedModel: 'gpt-5-mini',
+            modelMismatch: true,
+            cost: 0.0123,
+            classification: 'ask_user_continuation',
+            premiumRequest: false,
+            premiumRequestReason: 'user_input_completed_continuation',
+            inputTokens: 10,
+            outputTokens: 4,
+        });
+
+        const output = println.mock.calls.map((call) => String(call[0] ?? '')).join('\n');
+        expect(output).toContain('classe continuação da pergunta humana');
+        expect(output).toContain('motivo continuação após resposta humana');
+        expect(output).not.toContain('ask_user_continuation');
+        expect(output).not.toContain('user_input_completed_continuation');
     });
 
     it('narra boot recovery quando fallback com PR é bloqueado por política', async () => {

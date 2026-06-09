@@ -3258,6 +3258,23 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   --live-scenario=canonical`; PASS em `artifacts/terminal-live/2026-06-09T05-31-39-375Z/summary.md`, incluindo
   `sse-delta-public-chunk=19/19`, `no-extra-output-after-post-ask-final` e `ux-no-post-answer-turn-processing-copy`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quadragésima Sexta Passada
+
+- [x] A varredura de taxonomia de usage encontrou um fallback cru em `agent-runtime-events.js`: quando `llm.usage` sem PR
+  tinha divergência de modelo, a linha técnica `Uso do modelo` podia incluir `classe ask_user_continuation` e
+  `motivo user_input_completed_continuation`.
+- [x] `formatLlmUsageDetail()` agora usa humanização local para `classification` e `premiumRequestReason`, preservando
+  o valor técnico no SSE raw e no estado estruturado, mas evitando enums crus no stdout humano.
+- [x] Cobertura adicionada para o caminho de divergência de modelo: `ask_user_continuation` vira
+  `continuação da pergunta humana` e `user_input_completed_continuation` vira `continuação após resposta humana`.
+- [x] O teste de `agent-runtime-events` também foi endurecido para mockar o ponto canônico
+  `terminal/dialog/io/index.js`; isso evita que o fixture importe o renderer real e deixe stdout escapar durante unit
+  tests.
+- [x] Validado com `node --check src/copilot/terminal/events/agent-runtime-events.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js` (1 arquivo, 36 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+
 ---
 
 ## Decisões Arquiteturais
