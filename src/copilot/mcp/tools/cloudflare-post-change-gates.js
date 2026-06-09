@@ -5,12 +5,15 @@
  * @module copilot/mcp/tools/cloudflare-post-change-gates
  */
 
+import { z } from 'zod';
 import { auditCloudflareRemoteTunnel, readCloudflaredMetricsSnapshot } from '#copilot/mcp/cloudflare';
 import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import { mcpTunnelStatusTool } from './tunnel-status.js';
 
 const MIN_HA_CONNECTIONS = 4;
 const MAX_ERROR_RATE = 0;
+const MAX_RPC_P95_MS = 2_500;
+const MAX_QUIC_RTT_MS = 5_000;
 
 /** @type {import('../registry.js').McpToolDefinition} */
 export const mcpCloudflarePostChangeGatesTool = {
@@ -18,38 +21,68 @@ export const mcpCloudflarePostChangeGatesTool = {
     title: 'Cloudflare post-change gates',
     description:
         'Run a read-only gate bundle after Cloudflare tunnel/origin/edge changes: tunnel status, remote audit, metrics and pass/fail recommendations.',
-    inputSchema: {},
+    inputSchema: {
+        includeDetails: z.boolean().optional().describe('Include full tunnel, remote audit and metrics objects. Defaults to false for faster compact responses.'),
+    },
     annotations: readOnlyAnnotations(),
-    handler: async () => okResult(await runCloudflarePostChangeGates()),
+    handler: async (input) => okResult(await runCloudflarePostChangeGates({ includeDetails: input['includeDetails'] === true })),
 };
 
 /**
+ * @param {{ includeDetails?: boolean }} [options]
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function runCloudflarePostChangeGates() {
-    const tunnelStatus = await safeTunnelStatus();
-    const remoteAudit = await auditCloudflareRemoteTunnel();
-    const metrics = await safeMetricsSnapshot();
+export async function runCloudflarePostChangeGates(options = {}) {
+    const [tunnelStatus, remoteAudit, metrics] = await Promise.all([
+        safeTunnelStatus(),
+        safeRemoteAudit(),
+        safeMetricsSnapshot(),
+    ]);
     const gateResults = evaluateGates({ tunnelStatus, remoteAudit, metrics });
-    return {
+    const base = {
         ok: gateResults.critical.length === 0,
         success: true,
         mode: 'read-only-post-change-gates',
         appliesChanges: false,
-        tunnelStatus,
-        remoteAudit,
-        metrics,
+        summary: buildPostChangeGateSummary({ tunnelStatus, remoteAudit, metrics }),
         gates: gateResults,
         nextActions:
             gateResults.critical.length === 0
                 ? ['Post-change gates passed. Keep monitoring metrics before promoting the change as default.']
                 : ['Rollback or hold the change until every critical post-change gate passes.'],
     };
+    return options.includeDetails === true
+        ? { ...base, tunnelStatus, remoteAudit, metrics }
+        : base;
 }
 
 /**
  * @returns {Promise<Record<string, unknown>>}
  */
+/**
+ * @param {{ tunnelStatus: Record<string, unknown>; remoteAudit: Record<string, unknown>; metrics: Record<string, unknown> }} input
+ * @returns {Record<string, unknown>}
+ */
+function buildPostChangeGateSummary(input) {
+    const permanentTunnel = asRecord(input.tunnelStatus['permanentTunnel']);
+    const remote = asRecord(input.remoteAudit['remote']);
+    const connections = asRecord(remote['connections']);
+    const operational = asRecord(input.metrics['operational']);
+    const quic = asRecord(input.metrics['quic']);
+    const latency = asRecord(input.metrics['latency']);
+    const rpc = asRecord(latency['rpcClientLatency']);
+    return {
+        transportProtocol: permanentTunnel['transportProtocol'] ?? input.tunnelStatus['transportProtocol'] ?? null,
+        lastSmokeFresh: permanentTunnel['lastSmokeFresh'] ?? null,
+        remoteActiveConnections: connections['active'] ?? null,
+        metricsOk: input.metrics['ok'] ?? null,
+        haConnections: operational['haConnections'] ?? null,
+        requestErrorRate: operational['requestErrorRate'] ?? null,
+        quicPresent: quic['present'] ?? null,
+        rpcClientP95Ms: rpc['p95Ms'] ?? null,
+    };
+}
+
 async function safeTunnelStatus() {
     try {
         return extractStructuredContent(await mcpTunnelStatusTool.handler({}));
@@ -61,6 +94,14 @@ async function safeTunnelStatus() {
 /**
  * @returns {Promise<Record<string, unknown>>}
  */
+async function safeRemoteAudit() {
+    try {
+        return await auditCloudflareRemoteTunnel();
+    } catch (error) {
+        return { ok: false, success: false, error: sanitizeError(error), critical: ['Cloudflare remote audit threw before returning a structured result.'] };
+    }
+}
+
 async function safeMetricsSnapshot() {
     try {
         return await readCloudflaredMetricsSnapshot({ timeoutMs: 3000 });
@@ -73,7 +114,7 @@ async function safeMetricsSnapshot() {
  * @param {{ tunnelStatus: Record<string, unknown>; remoteAudit: Record<string, unknown>; metrics: Record<string, unknown> }} input
  * @returns {{ critical: string[]; warnings: string[]; passed: string[] }}
  */
-function evaluateGates(input) {
+export function evaluateGates(input) {
     /** @type {string[]} */
     const critical = [];
     /** @type {string[]} */
@@ -122,11 +163,25 @@ function evaluateGates(input) {
         critical.push(`metrics haConnections below ${MIN_HA_CONNECTIONS}.`);
     }
 
+    const transportProtocol = String(permanentTunnel['transportProtocol'] ?? input.tunnelStatus['transportProtocol'] ?? '');
+    const quic = asRecord(input.metrics['quic']);
+    if (transportProtocol === 'quic') {
+        if (quic['present'] === true) passed.push('QUIC metrics are present for strict QUIC transport.');
+        else critical.push('strict QUIC transport is configured, but quic_client_* metrics are missing.');
+        const latestRttMs = toNumber(quic['latestRttMs']);
+        const smoothedRttMs = toNumber(quic['smoothedRttMs']);
+        const effectiveRttMs = smoothedRttMs ?? latestRttMs;
+        if (effectiveRttMs === null) warnings.push('QUIC RTT metrics unavailable; collect more samples before final promotion.');
+        else if (effectiveRttMs > MAX_QUIC_RTT_MS) warnings.push(`QUIC RTT appears high: ${effectiveRttMs}ms.`);
+        else passed.push(`QUIC RTT within budget: ${effectiveRttMs}ms.`);
+    }
+
     const latency = asRecord(input.metrics['latency']);
     const rpc = asRecord(latency['rpcClientLatency']);
     const p95 = toNumber(rpc['p95Ms']);
     if (p95 === null) warnings.push('rpcClientLatency.p95Ms unavailable; collect more samples before final promotion.');
-    else passed.push(`rpcClientLatency.p95Ms available: ${p95}.`);
+    else if (p95 > MAX_RPC_P95_MS) warnings.push(`rpcClientLatency.p95Ms above budget: ${p95}ms.`);
+    else passed.push(`rpcClientLatency.p95Ms within budget: ${p95}ms.`);
 
     return { critical, warnings, passed };
 }

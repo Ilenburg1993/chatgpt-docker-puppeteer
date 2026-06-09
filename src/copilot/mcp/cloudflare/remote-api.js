@@ -14,6 +14,17 @@ import {
 } from './origin-request-profile.js';
 
 const DEFAULT_ENV_FILE = '.env.local';
+const DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS = 5_000;
+const DEFAULT_ENV_FILE_CACHE_TTL_MS = 2_000;
+
+/** @type {{ key: string; expiresAt: number; value: Record<string, unknown> & { ok: boolean } } | null} */
+let remoteAuditCache = null;
+/** @type {{ key: string; promise: Promise<Record<string, unknown> & { ok: boolean }> } | null} */
+let remoteAuditInFlight = null;
+/** @type {{ expiresAt: number; value: Record<string, string> } | null} */
+let localEnvFileCache = null;
+/** @type {Map<string, Cloudflare>} */
+const cloudflareClientCache = new Map();
 
 /**
  * @typedef {object} CloudflareRemoteApiConfig
@@ -58,11 +69,37 @@ export async function readCloudflareRemoteApiConfig(env = process.env) {
 }
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv; cacheTtlMs?: number; forceRefresh?: boolean }} [options]
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 export async function auditCloudflareRemoteTunnel(options = {}) {
     const apiConfig = await readCloudflareRemoteApiConfig(options.env ?? process.env);
+    const cacheTtlMs = readCacheTtlMs(options.cacheTtlMs);
+    const cacheKey = buildRemoteAuditCacheKey(apiConfig);
+    const now = Date.now();
+    if (options.forceRefresh !== true && cacheTtlMs > 0 && remoteAuditCache?.key === cacheKey && remoteAuditCache.expiresAt > now) {
+        return remoteAuditCache.value;
+    }
+    if (options.forceRefresh !== true && remoteAuditInFlight?.key === cacheKey) {
+        return remoteAuditInFlight.promise;
+    }
+    const auditPromise = auditCloudflareRemoteTunnelUncached(apiConfig).then((result) => {
+        if (cacheTtlMs > 0) remoteAuditCache = { key: cacheKey, expiresAt: Date.now() + cacheTtlMs, value: result };
+        if (remoteAuditInFlight?.key === cacheKey) remoteAuditInFlight = null;
+        return result;
+    }, (error) => {
+        if (remoteAuditInFlight?.key === cacheKey) remoteAuditInFlight = null;
+        throw error;
+    });
+    remoteAuditInFlight = { key: cacheKey, promise: auditPromise };
+    return auditPromise;
+}
+
+/**
+ * @param {CloudflareRemoteApiConfig} apiConfig
+ * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
+ */
+async function auditCloudflareRemoteTunnelUncached(apiConfig) {
     const missingCredentials = [];
     if (!apiConfig.apiToken) missingCredentials.push('CLOUDFLARE_API_TOKEN');
     if (!apiConfig.accountId) missingCredentials.push('CLOUDFLARE_ACCOUNT_ID');
@@ -87,14 +124,16 @@ export async function auditCloudflareRemoteTunnel(options = {}) {
     try {
         const apiToken = apiConfig.apiToken ?? '';
         const accountId = apiConfig.accountId ?? '';
-        const client = new Cloudflare({ apiToken, maxRetries: 1, timeout: 15000 });
+        const client = getCloudflareClient(apiToken);
         const tunnel = await findRemoteTunnel(client, { ...apiConfig, accountId });
         if (!tunnel.ok) return buildTunnelLookupFailure(apiConfig, tunnel);
-        const configuration = await client.zeroTrust.tunnels.cloudflared.configurations.get(tunnel.id, {
-            account_id: accountId,
-        });
+        const [configuration, dns] = await Promise.all([
+            client.zeroTrust.tunnels.cloudflared.configurations.get(tunnel.id, {
+                account_id: accountId,
+            }),
+            auditDnsRecord(client, apiConfig, tunnel),
+        ]);
         const comparison = compareRemoteConfig(apiConfig, tunnel, configuration);
-        const dns = await auditDnsRecord(client, apiConfig, tunnel);
         const critical = [...comparison.critical, ...(dns.critical ?? [])];
         const warnings = [...comparison.warnings, ...(dns.warnings ?? [])];
         return {
@@ -154,10 +193,63 @@ function buildRemoteAuditNextActions(h2Origin) {
 /**
  * @returns {Promise<Record<string, string>>}
  */
+/**
+ * @param {number | undefined} value
+ * @returns {number}
+ */
+function readCacheTtlMs(value) {
+    if (value === undefined) return DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS;
+    return Number.isFinite(value) && value >= 0 && value <= 60_000 ? Math.floor(value) : DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS;
+}
+
+/**
+ * @param {CloudflareRemoteApiConfig} config
+ * @returns {string}
+ */
+function buildRemoteAuditCacheKey(config) {
+    return JSON.stringify({
+        accountId: config.accountId ?? null,
+        zoneId: config.zoneId ?? null,
+        tunnelId: config.tunnelId ?? null,
+        tunnelName: config.tunnelName,
+        publicHostname: config.publicHostname,
+        expectedOriginUrl: config.expectedOriginUrl,
+        originServerName: config.originServerName ?? null,
+        enableHttp2Origin: config.enableHttp2Origin,
+    });
+}
+
+/**
+ * @param {string} apiToken
+ * @returns {Cloudflare}
+ */
+function getCloudflareClient(apiToken) {
+    const key = createClientCacheKey(apiToken);
+    const cached = cloudflareClientCache.get(key);
+    if (cached) return cached;
+    const client = new Cloudflare({ apiToken, maxRetries: 1, timeout: 15000 });
+    if (cloudflareClientCache.size > 4) cloudflareClientCache.clear();
+    cloudflareClientCache.set(key, client);
+    return client;
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function createClientCacheKey(value) {
+    return `${value.length}:${value.slice(0, 8)}:${value.slice(-8)}`;
+}
+
 async function readLocalEnvFile() {
+    const now = Date.now();
+    if (localEnvFileCache && localEnvFileCache.expiresAt > now) return localEnvFileCache.value;
     try {
-        return parseEnvFile(await readFile(DEFAULT_ENV_FILE, 'utf8'));
+        const value = parseEnvFile(await readFile(DEFAULT_ENV_FILE, 'utf8'));
+        localEnvFileCache = { expiresAt: now + DEFAULT_ENV_FILE_CACHE_TTL_MS, value };
+        return value;
     } catch {
+        localEnvFileCache = { expiresAt: now + DEFAULT_ENV_FILE_CACHE_TTL_MS, value: {} };
         return {};
     }
 }

@@ -51,6 +51,20 @@ describe('copilot MCP tools', () => {
         assert.ok(String(result.content[0]?.text ?? '').includes('Copilot MCP Server'));
     });
 
+    it('repo_read_file returns identical results for repeated same-window reads', async () => {
+        const tool = findTool('repo_read_file');
+        const args = {
+            path: 'src/copilot/mcp/README.md',
+            startLine: 1,
+            endLine: 8,
+        };
+        const first = await tool.handler(args);
+        const second = await tool.handler(args);
+
+        assert.deepEqual(second.structuredContent, first.structuredContent);
+        assert.deepEqual(second.content, first.content);
+    });
+
     it('repo_file_stats returns metadata and optional content hash', async () => {
         const tool = findTool('repo_file_stats');
         const result = await tool.handler({

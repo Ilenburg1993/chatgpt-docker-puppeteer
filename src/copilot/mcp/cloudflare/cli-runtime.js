@@ -142,7 +142,7 @@ function buildMcpHttpEnvironment(config, originTransport, env) {
  * @returns {NodeJS.ProcessEnv}
  */
 function buildCloudflaredEnvironment(config, env) {
-    return { ...env, TUNNEL_TRANSPORT_PROTOCOL: config.transportProtocol ?? env['TUNNEL_TRANSPORT_PROTOCOL'] ?? 'http2' };
+    return { ...env, TUNNEL_TRANSPORT_PROTOCOL: config.transportProtocol ?? env['TUNNEL_TRANSPORT_PROTOCOL'] ?? 'auto' };
 }
 
 export { readPidFileStatus, readProcessMetadata };

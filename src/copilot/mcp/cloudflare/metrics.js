@@ -16,7 +16,7 @@ import {
  */
 
 /**
- * @param {{ url?: string; timeoutMs?: number }} [options]
+ * @param {{ url?: string; timeoutMs?: number; includeMetricNames?: boolean }} [options]
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 export async function readCloudflaredMetricsSnapshot(options = {}) {
@@ -42,7 +42,7 @@ export async function readCloudflaredMetricsSnapshot(options = {}) {
             status: response.status,
             url,
             metricsAddr: config.metricsAddr ?? null,
-            ...summarizeCloudflaredMetrics(parsed),
+            ...summarizeCloudflaredMetrics(parsed, { includeMetricNames: options.includeMetricNames === true }),
             error: response.ok ? null : `HTTP ${response.status}`,
         };
     } catch (error) {
@@ -95,9 +95,10 @@ function parsePrometheusLabels(rawLabels) {
 
 /**
  * @param {PrometheusSample[]} samples
+ * @param {{ includeMetricNames?: boolean }} [options]
  * @returns {Record<string, unknown>}
  */
-export function summarizeCloudflaredMetrics(samples) {
+export function summarizeCloudflaredMetrics(samples, options = {}) {
     const metricNames = [...new Set(samples.map((sample) => sample.name))].sort((left, right) => left.localeCompare(right));
     const buildInfo = samples.find((sample) => sample.name === 'build_info');
     const configVersion = latestValue(samples, 'cloudflared_orchestration_config_version');
@@ -111,7 +112,8 @@ export function summarizeCloudflaredMetrics(samples) {
     return {
         sampleCount: samples.length,
         metricCount: metricNames.length,
-        metricNames,
+        ...(options.includeMetricNames === true ? { metricNames } : {}),
+        metricNamePreview: metricNames.slice(0, 12),
         build: buildInfo
             ? {
                   version: buildInfo.labels['version'] ?? null,
@@ -129,7 +131,36 @@ export function summarizeCloudflaredMetrics(samples) {
         },
         latency: summarizeCloudflaredLatencyHistograms(samples),
         operational: summarizeCloudflaredOperationalCounters(samples),
+        quic: summarizeCloudflaredQuicMetrics(samples, metricNames),
     };
+}
+
+/**
+ * @param {PrometheusSample[]} samples
+ * @param {string[]} metricNames
+ * @returns {{ present: boolean; metricCount: number; totalConnections: number | null; closedConnections: number | null; latestRttMs: number | null; smoothedRttMs: number | null; mtu: number | null; maxUdpPayload: number | null; packetTooBigDropped: number | null }}
+ */
+function summarizeCloudflaredQuicMetrics(samples, metricNames) {
+    const quicMetricNames = metricNames.filter((name) => name.startsWith('quic_client_'));
+    return {
+        present: quicMetricNames.length > 0,
+        metricCount: quicMetricNames.length,
+        totalConnections: latestValue(samples, 'quic_client_total_connections'),
+        closedConnections: latestValue(samples, 'quic_client_closed_connections'),
+        latestRttMs: secondsToMilliseconds(latestValue(samples, 'quic_client_latest_rtt')),
+        smoothedRttMs: secondsToMilliseconds(latestValue(samples, 'quic_client_smoothed_rtt')),
+        mtu: latestValue(samples, 'quic_client_mtu'),
+        maxUdpPayload: latestValue(samples, 'quic_client_max_udp_payload'),
+        packetTooBigDropped: latestValue(samples, 'quic_client_packet_too_big_dropped'),
+    };
+}
+
+/**
+ * @param {number | null} seconds
+ * @returns {number | null}
+ */
+function secondsToMilliseconds(seconds) {
+    return seconds === null ? null : Math.round(seconds * 1000);
 }
 
 /**

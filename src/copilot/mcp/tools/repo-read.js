@@ -29,6 +29,10 @@ import {
 import { repoStatusHandler } from './repo-status.js';
 
 const DEFAULT_REPO_READ_PATH = 'src/copilot';
+const REPO_READ_FILE_CACHE_MAX_ENTRIES = 128;
+
+/** @type {Map<string, { sizeBytes: number; mtimeMs: number; structured: Record<string, unknown>; text: string }>} */
+const repoReadFileResultCache = new Map();
 
 /**
  * @param {unknown} value
@@ -104,6 +108,93 @@ function countEntryTypes(entries) {
  */
 function scanHardLimitReached(scan) {
     return scan.io?.advisoryLimits?.['hardLimitReached'] === true;
+}
+
+/**
+ * @param {{ resolved: string; relative: string }} resolved
+ * @param {number | undefined} startLine
+ * @param {number | undefined} endLine
+ * @returns {Promise<{ structured: Record<string, unknown>; text: string }>}
+ */
+async function readRepoFileWithValidatedResultCache(resolved, startLine, endLine) {
+    const key = buildRepoReadFileCacheKey(resolved.resolved, startLine, endLine);
+    const cached = repoReadFileResultCache.get(key);
+    if (cached) {
+        const current = await statPath(resolved.resolved).catch(() => null);
+        const stats = current?.stats;
+        if (stats?.isFile() && stats.size === cached.sizeBytes && stats.mtimeMs === cached.mtimeMs) {
+            repoReadFileResultCache.delete(key);
+            repoReadFileResultCache.set(key, cached);
+            return { structured: cloneStructuredReadFileResult(cached.structured), text: cached.text };
+        }
+        repoReadFileResultCache.delete(key);
+    }
+
+    const snapshot = await readText(resolved.resolved, {
+        ...(startLine !== undefined ? { startLine } : {}),
+        ...(endLine !== undefined ? { endLine } : {}),
+    });
+    const structured = {
+        success: true,
+        path: resolved.relative,
+        content: snapshot.content,
+        sha256: snapshot.contentHash,
+        returnedSha256: snapshot.returnedContentHash,
+        bytes: snapshot.bytesRead,
+        totalLines: snapshot.totalLines,
+        returnedLines: snapshot.returnedLines,
+    };
+    const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
+    const mtimeMs = Number(snapshot.mtimeMs);
+    if (Number.isFinite(sizeBytes) && Number.isFinite(mtimeMs)) {
+        rememberRepoReadFileCacheEntry(key, {
+            sizeBytes,
+            mtimeMs,
+            structured,
+            text: snapshot.content,
+        });
+    }
+    return { structured, text: snapshot.content };
+}
+
+/**
+ * @param {string} absolutePath
+ * @param {number | undefined} startLine
+ * @param {number | undefined} endLine
+ * @returns {string}
+ */
+function buildRepoReadFileCacheKey(absolutePath, startLine, endLine) {
+    return `${absolutePath}\u0000${startLine ?? ''}\u0000${endLine ?? ''}`;
+}
+
+/**
+ * @param {string} key
+ * @param {{ sizeBytes: number; mtimeMs: number; structured: Record<string, unknown>; text: string }} entry
+ * @returns {void}
+ */
+function rememberRepoReadFileCacheEntry(key, entry) {
+    if (repoReadFileResultCache.has(key)) repoReadFileResultCache.delete(key);
+    repoReadFileResultCache.set(key, entry);
+    while (repoReadFileResultCache.size > REPO_READ_FILE_CACHE_MAX_ENTRIES) {
+        const oldest = repoReadFileResultCache.keys().next().value;
+        if (typeof oldest !== 'string') break;
+        repoReadFileResultCache.delete(oldest);
+    }
+}
+
+/**
+ * @param {Record<string, unknown>} structured
+ * @returns {Record<string, unknown>}
+ */
+function cloneStructuredReadFileResult(structured) {
+    const returnedLines = structured['returnedLines'];
+    return {
+        ...structured,
+        returnedLines:
+            returnedLines && typeof returnedLines === 'object' && !Array.isArray(returnedLines)
+                ? { .../** @type {Record<string, unknown>} */ (returnedLines) }
+                : returnedLines,
+    };
 }
 
 /**
@@ -280,21 +371,8 @@ export const repoReadTools = [
                     hint: 'Use endLine greater than or equal to startLine, or omit endLine.',
                 });
             }
-            const snapshot = await readText(resolved.resolved, {
-                ...(startLine !== undefined ? { startLine } : {}),
-                ...(endLine !== undefined ? { endLine } : {}),
-            });
-            const structured = {
-                success: true,
-                path: resolved.relative,
-                content: snapshot.content,
-                sha256: snapshot.contentHash,
-                returnedSha256: snapshot.returnedContentHash,
-                bytes: snapshot.bytesRead,
-                totalLines: snapshot.totalLines,
-                returnedLines: snapshot.returnedLines,
-            };
-            return okResult(structured, snapshot.content);
+            const { structured, text } = await readRepoFileWithValidatedResultCache(resolved, startLine, endLine);
+            return okResult(structured, text);
         },
     },
     {

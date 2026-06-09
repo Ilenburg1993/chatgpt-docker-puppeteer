@@ -309,31 +309,53 @@ export const jobTools = [
         inputSchema: {
             includeRunning: z.boolean().optional().describe('Include currently running jobs. Default: true.'),
             includeLatest: z.boolean().optional().describe('Include latest compact job per validator. Default: true.'),
+            includeDetails: z.boolean().optional().describe('Include full running/latest job arrays and streamSafety. Default: false for compact responses.'),
+            limit: z.number().int().min(10).max(200).optional().describe('Maximum job manifests to inspect. Default: 80.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ includeRunning, includeLatest }) => {
-            const jobs = await listJobs({ includeCompleted: true, limit: 200 });
+        handler: async (input = {}) => {
+            const options = /** @type {Record<string, unknown>} */ (input);
+            const includeRunning = options['includeRunning'];
+            const includeLatest = options['includeLatest'];
+            const includeDetails = options['includeDetails'] === true;
+            const limit = typeof options['limit'] === 'number' ? options['limit'] : 80;
+            const jobs = await listJobs({ includeCompleted: true, limit });
             const running = jobs.filter((job) => job.status === 'running').map(summarizeJob);
             const latest = Object.values(latestJobsByValidator(jobs)).sort((left, right) =>
                 left.validator.localeCompare(right.validator),
             );
             const effectiveChecks = buildEffectiveValidationChecks(jobs);
-            return okResult({
+            const base = {
                 success: true,
-                runningJobs: includeRunning === false ? [] : running,
-                latestJobs: includeLatest === false ? [] : latest.map(summarizeJob),
+                runningCount: running.length,
+                latestCount: latest.length,
                 effectiveChecks,
                 recommendedNextAction: recommendValidationAction(effectiveChecks),
-                streamSafety: {
-                    preferredFlow: [
-                        'start validation only when needed',
-                        'mcp_validation_dashboard',
-                        'job_get_summary',
-                        'job_get_output tailBytes<=8000 only on failure',
-                    ],
-                    avoid: ['large job_get_output tails', 'multiple validators back-to-back in ChatGPT web'],
-                },
-            });
+                failingJobIds: latest
+                    .map(summarizeJob)
+                    .filter((job) => job['passed'] === false && job['status'] !== 'running')
+                    .map((job) => job['id'])
+                    .slice(0, 5),
+                runningJobIds: running.map((job) => job['id']).slice(0, 5),
+            };
+            return okResult(
+                includeDetails
+                    ? {
+                          ...base,
+                          runningJobs: includeRunning === false ? [] : running,
+                          latestJobs: includeLatest === false ? [] : latest.map(summarizeJob),
+                          streamSafety: {
+                              preferredFlow: [
+                                  'start validation only when needed',
+                                  'mcp_validation_dashboard',
+                                  'job_get_summary',
+                                  'job_get_output tailBytes<=8000 only on failure',
+                              ],
+                              avoid: ['large job_get_output tails', 'multiple validators back-to-back in ChatGPT web'],
+                          },
+                      }
+                    : { ...base, detailsAvailable: true },
+            );
         },
     },
     {

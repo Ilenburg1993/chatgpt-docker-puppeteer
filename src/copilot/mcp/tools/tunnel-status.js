@@ -107,7 +107,7 @@ async function readCloudflaredOriginDiagnostics() {
     }
     const recentOriginErrors = text
         .split(/\r?\n/u)
-        .filter((line) => /origin|localhost:3333|\[::1\]:3333|connection refused|502|1033/iu.test(line))
+        .filter((line) => /\bERR\b|\bWRN\b|connection refused|502|1033|error=/iu.test(line))
         .slice(-8);
     const originUsesLocalhost = /http:\/\/localhost:3333|\[::1\]:3333/iu.test(text);
     const originUsesLoopbackIp = /http:\/\/127\.0\.0\.1:3333/iu.test(text);

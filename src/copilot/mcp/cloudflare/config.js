@@ -12,7 +12,6 @@
  * - Cloudflare named tunnel is the default operating mode.
  * - cloudflared edge transport defaults to Cloudflare auto transport for UDP-first operation with TCP fallback.
  * - MCP origin transport is explicit through COPILOT_MCP_ORIGIN_TRANSPORT and defaults to HTTPS/HTTP2.
- *   service is switched to an HTTPS/HTTP2 origin.
  *
  * @module copilot/mcp/cloudflare/config
  */

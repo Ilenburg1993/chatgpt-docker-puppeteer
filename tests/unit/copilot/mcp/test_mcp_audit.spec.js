@@ -16,7 +16,9 @@ describe('copilot MCP audit', () => {
         const dir = await mkdtemp(path.join(tmpdir(), 'copilot-mcp-audit-'));
         const auditFile = path.join(dir, 'audit.jsonl');
         const previous = process.env['COPILOT_MCP_AUDIT_FILE'];
+        const previousSync = process.env['COPILOT_MCP_AUDIT_SYNC'];
         process.env['COPILOT_MCP_AUDIT_FILE'] = auditFile;
+        process.env['COPILOT_MCP_AUDIT_SYNC'] = 'true';
         try {
             await appendMcpAuditEvent({ event: 'test_event', tool: 'repo_status' });
             const text = await readFile(auditFile, 'utf8');
@@ -29,6 +31,11 @@ describe('copilot MCP audit', () => {
                 delete process.env['COPILOT_MCP_AUDIT_FILE'];
             } else {
                 process.env['COPILOT_MCP_AUDIT_FILE'] = previous;
+            }
+            if (previousSync === undefined) {
+                delete process.env['COPILOT_MCP_AUDIT_SYNC'];
+            } else {
+                process.env['COPILOT_MCP_AUDIT_SYNC'] = previousSync;
             }
             await rm(dir, { recursive: true, force: true });
         }

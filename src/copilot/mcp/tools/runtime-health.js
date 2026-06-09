@@ -5,6 +5,7 @@
  * @module copilot/mcp/tools/runtime-health
  */
 
+import { z } from 'zod';
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import {
     readCloudflareTunnelConfig,
@@ -86,13 +87,79 @@ async function summarizeWorkspaceStatus() {
 /**
  * @type {import('../registry.js').McpToolDefinition}
  */
+/**
+ * @param {Record<string, Record<string, unknown>>} tools
+ * @returns {Array<{ name: string; calls: number; errors: number; averageMs: number | null; maxMs: number | null }>}
+ */
+/**
+ * @param {Record<string, unknown>} indexAutoBuild
+ * @returns {Record<string, unknown>}
+ */
+function summarizeIndexAutoBuild(indexAutoBuild) {
+    return {
+        status: indexAutoBuild['status'] ?? null,
+        reason: indexAutoBuild['reason'] ?? null,
+        startedAt: indexAutoBuild['startedAt'] ?? null,
+        completedAt: indexAutoBuild['completedAt'] ?? null,
+        error: indexAutoBuild['error'] ?? null,
+    };
+}
+
+/**
+ * @param {Record<string, unknown>} stats
+ * @returns {Record<string, unknown>}
+ */
+function summarizeIndexStats(stats) {
+    return {
+        enabled: stats['enabled'] ?? null,
+        available: stats['available'] ?? null,
+        files: stats['files'] ?? null,
+        freshFiles: stats['freshFiles'] ?? null,
+        staleFiles: stats['staleFiles'] ?? null,
+        symbols: stats['symbols'] ?? null,
+        chunks: stats['chunks'] ?? null,
+        freshness: stats['freshness'] ?? null,
+    };
+}
+
+/**
+ * @param {Record<string, Record<string, unknown>>} tools
+ * @returns {Array<{ name: string; calls: number; errors: number; averageMs: number | null; maxMs: number | null }>}
+ */
+function summarizeSlowestTools(tools) {
+    return Object.entries(tools)
+        .map(([name, metric]) => ({
+            name,
+            calls: Number(metric['calls'] ?? 0),
+            errors: Number(metric['errors'] ?? 0),
+            averageMs: nullableNumber(metric['averageDurationMs'] ?? metric['averageMs']),
+            maxMs: nullableNumber(metric['maxMs'] ?? metric['lastDurationMs']),
+        }))
+        .filter((item) => item.calls > 0)
+        .sort((left, right) => (right.averageMs ?? 0) - (left.averageMs ?? 0))
+        .slice(0, 8);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function nullableNumber(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
 export const mcpRuntimeHealthTool = {
     name: 'mcp_runtime_health',
     title: 'MCP runtime health',
     description: 'Return MCP runtime health, workspace root, uptime and per-tool metrics.',
-    inputSchema: {},
+    inputSchema: {
+        includeDetails: z.boolean().optional().describe('Include verbose index, temporary fallback tunnel and full per-tool metrics. Defaults to false.'),
+    },
     annotations: readOnlyAnnotations(),
-    handler: async () => {
+    handler: async (input = {}) => {
+        const options = /** @type {Record<string, unknown>} */ (input);
+        const includeDetails = options['includeDetails'] === true;
         const metrics = readMcpMetricsSnapshot();
         const tunnelConfig = readCloudflareTunnelConfig();
         const tunnelState = await readQuickTunnelState(tunnelConfig.stateFile);
@@ -148,6 +215,37 @@ export const mcpRuntimeHealthTool = {
             }
         }
         const status = critical.length > 0 ? 'failed' : warnings.length > 0 ? 'degraded' : 'ok';
+        if (includeDetails !== true) {
+            return okResult({
+                success: true,
+                ok: true,
+                status,
+                warnings,
+                critical,
+                informational,
+                workspaceRoot: getMcpWorkspaceRoot(),
+                operationalSignals: {
+                    workspace,
+                    index,
+                    indexAutoBuild: summarizeIndexAutoBuild(indexAutoBuild),
+                    tunnel: {
+                        mode: tunnelConfig.mode,
+                        publicMcpUrl: tunnelConfig.publicMcpUrl ?? tunnel.connectorUrl ?? null,
+                        transportProtocol: tunnelConfig.transportProtocol,
+                        lastSmokeOk: connectorSmoke.ok,
+                        lastSmokeAgeMinutes: connectorSmoke.ageMinutes,
+                    },
+                },
+                indexStats: summarizeIndexStats(indexStats),
+                metrics: {
+                    startedAt: metrics.startedAt,
+                    uptimeMs: metrics.uptimeMs,
+                    totals: metrics.totals,
+                    slowestTools: summarizeSlowestTools(metrics.tools),
+                },
+                detailsAvailable: true,
+            });
+        }
         return okResult({
             success: true,
             ok: true,

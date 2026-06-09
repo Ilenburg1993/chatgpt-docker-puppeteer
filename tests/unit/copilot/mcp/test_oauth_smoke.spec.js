@@ -79,7 +79,14 @@ describe('MCP OAuth smoke hardening', () => {
             fetchMock,
         );
 
-        const result = await runMcpOAuthSmoke({ resource: authorizationServer });
+        const result = await runMcpOAuthSmoke({
+            resource: authorizationServer,
+            retryAttempts: 1,
+            retryBaseDelayMs: 0,
+            retryMaxDelayMs: 0,
+            runPrivateKeyJwt: false,
+            runNegativeResourceChecks: false,
+        });
 
         assert.equal(result.ok, false);
         const flow = /** @type {{ token: { ok: boolean; error: string | null } }} */ (result.dcrFlow);
@@ -129,7 +136,14 @@ describe('MCP OAuth smoke hardening', () => {
             }),
         );
 
-        const result = await runMcpOAuthSmoke({ resource: authorizationServer });
+        const result = await runMcpOAuthSmoke({
+            resource: authorizationServer,
+            retryAttempts: 1,
+            retryBaseDelayMs: 0,
+            retryMaxDelayMs: 0,
+            runPrivateKeyJwt: false,
+            runNegativeResourceChecks: false,
+        });
 
         assert.equal(result.ok, false);
         const flow = /** @type {{ token: { ok: boolean; error: string | null } }} */ (result.dcrFlow);

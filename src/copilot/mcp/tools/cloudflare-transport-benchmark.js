@@ -18,7 +18,7 @@ export const mcpCloudflareTransportBenchmarkPlanTool = {
     name: 'mcp_cloudflare_transport_benchmark_plan',
     title: 'Cloudflare transport benchmark plan',
     description:
-        'Build a read-only plan for a controlled Cloudflare Tunnel transport benchmark: current http2 control versus auto/quic candidates.',
+        'Build a read-only plan for a controlled Cloudflare Tunnel transport benchmark across quic, auto and http2 profiles.',
     inputSchema: {
         includeMetricsBaseline: z.boolean().optional().describe('Include a current cloudflared metrics baseline.'),
         timeoutMs: z.number().int().min(500).max(10000).optional().describe('Metrics fetch timeout in milliseconds.'),
@@ -38,7 +38,7 @@ export async function buildCloudflareTransportBenchmarkPlan(input = {}) {
     const currentProtocol = config.transportProtocol;
     const candidates = CANDIDATES.map((candidate) => ({
         protocol: candidate,
-        role: candidate === currentProtocol ? 'control-current' : candidate === 'auto' ? 'primary-candidate' : 'udp-only-candidate',
+        role: roleForProtocol(candidate, currentProtocol),
         recommendation: recommendationForProtocol(candidate, currentProtocol),
         risk: riskForProtocol(candidate),
     }));
@@ -75,37 +75,34 @@ export async function buildCloudflareTransportBenchmarkPlan(input = {}) {
                 'requestErrorRate > 0',
                 'haConnections < 4 after warmup',
                 'repeated connector network errors',
-                'proxy/rpc p95 materially worse than http2 control',
+                'proxy/rpc p95 materially worse than the selected control protocol',
             ],
             manualProtocolSwitch: {
                 note: 'This plan is read-only. Protocol switching must be done by the existing Cloudflare restart/run workflow with explicit review.',
-                env: 'COPILOT_MCP_CLOUDFLARE_TRANSPORT_PROTOCOL or TUNNEL_TRANSPORT_PROTOCOL',
+                env: 'COPILOT_MCP_CLOUDFLARE_PROTOCOL or TUNNEL_TRANSPORT_PROTOCOL',
                 values: CANDIDATES,
             },
         },
         decisionPolicy: {
-            keepHttp2When: [
+            keepOrRollbackToHttp2When: [
                 'auto/quic cannot preserve 4 HA connections',
                 'UDP egress is unreliable in DevContainer or host network',
-                'p95/p99 are similar or worse than http2',
+                'p95/p99 are materially worse than the selected control protocol',
             ],
             promoteAutoWhen: [
+                'strict QUIC is not required but UDP succeeds often enough to improve latency',
                 'smoke and OAuth remain stable',
                 'requestErrorRate remains 0',
                 'haConnections remains 4',
-                'p95 and p99 improve or stay within the regression budget',
             ],
-            avoidQuicWhen: [
-                'auto already falls back to http2',
-                'UDP path is blocked or unstable',
-                'Cloudflare connector reconnects increase',
+            keepQuicWhen: [
+                'strict QUIC canary passes after warmup',
+                'requestErrorRate remains 0',
+                'haConnections remains 4',
+                'Cloudflare QUIC metrics remain present after restart',
             ],
         },
-        nextActions: [
-            'Keep current http2 as the control baseline.',
-            'After restart tooling is available, test auto first; test quic only if auto proves UDP is healthy.',
-            'Record metrics before and after each protocol switch in the roadmap.',
-        ],
+        nextActions: nextActionsForProtocol(currentProtocol),
     };
 }
 
@@ -130,6 +127,45 @@ async function safeMetricsSnapshot(timeoutMs) {
  */
 function buildProtocolOrder(currentProtocol) {
     return [currentProtocol, ...CANDIDATES.filter((candidate) => candidate !== currentProtocol)];
+}
+
+/**
+ * @param {string} candidate
+ * @param {string} currentProtocol
+ * @returns {string}
+ */
+function roleForProtocol(candidate, currentProtocol) {
+    if (candidate === currentProtocol) return 'control-current';
+    if (candidate === 'quic') return 'strict-udp-candidate';
+    if (candidate === 'auto') return 'fallback-capable-candidate';
+    if (candidate === 'http2') return 'tcp-rollback-candidate';
+    return 'unsupported-candidate';
+}
+
+/**
+ * @param {string} currentProtocol
+ * @returns {string[]}
+ */
+function nextActionsForProtocol(currentProtocol) {
+    if (currentProtocol === 'quic') {
+        return [
+            'Keep QUIC as the current control only while smoke, OAuth, haConnections and requestErrorRate gates remain healthy.',
+            'Use npm run copilot:mcp:quic:rollback if UDP or Cloudflare connector stability regresses.',
+            'Record metrics before and after any protocol switch in the roadmap.',
+        ];
+    }
+    if (currentProtocol === 'auto') {
+        return [
+            'Use auto as a safe candidate while UDP quality is still being observed.',
+            'Promote to strict QUIC only after canary and metrics gates pass repeatedly.',
+            'Record metrics before and after any protocol switch in the roadmap.',
+        ];
+    }
+    return [
+        'Keep HTTP/2 as the TCP rollback baseline.',
+        'Test auto before strict QUIC when UDP quality is unknown.',
+        'Record metrics before and after each protocol switch in the roadmap.',
+    ];
 }
 
 /**

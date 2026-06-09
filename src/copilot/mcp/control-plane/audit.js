@@ -11,6 +11,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const MCP_AUDIT_DIR = fileURLToPath(new URL('../../.ai/audit/', import.meta.url));
+const MAX_AUDIT_QUEUE_LINES = 10_000;
+
+/** @type {string[]} */
+const auditQueue = [];
+/** @type {Promise<void>} */
+let auditFlushChain = Promise.resolve();
+/** @type {{ dir: string; promise: Promise<string | undefined> } | null} */
+let auditDirReady = null;
+let auditFlushScheduled = false;
+let auditBeforeExitHookInstalled = false;
 
 /**
  * @returns {string}
@@ -47,13 +57,63 @@ export async function appendMcpAuditEvent(event) {
         component: 'copilot-mcp',
         ...event,
     };
-    try {
-        const auditFile = getMcpAuditFile();
-        await mkdir(path.dirname(auditFile), { recursive: true });
-        await appendFile(auditFile, `${JSON.stringify(payload)}\n`, 'utf8');
-    } catch (error) {
-        logMcp('WARN', 'Failed to append MCP audit event.', {
-            error: error instanceof Error ? error.message : String(error),
-        });
+    const line = `${JSON.stringify(payload)}\n`;
+    if (process.env['COPILOT_MCP_AUDIT_SYNC'] === 'true') {
+        await appendAuditLines([line]);
+        return;
     }
+    enqueueAuditLine(line);
+}
+
+/**
+ * @param {string} line
+ * @returns {void}
+ */
+function enqueueAuditLine(line) {
+    if (auditQueue.length >= MAX_AUDIT_QUEUE_LINES) auditQueue.shift();
+    auditQueue.push(line);
+    installBeforeExitFlushHook();
+    scheduleAuditFlush();
+}
+
+function scheduleAuditFlush() {
+    if (auditFlushScheduled) return;
+    auditFlushScheduled = true;
+    setImmediate(() => {
+        auditFlushScheduled = false;
+        const lines = auditQueue.splice(0);
+        if (lines.length === 0) return;
+        auditFlushChain = auditFlushChain
+            .then(() => appendAuditLines(lines))
+            .catch((error) => {
+                logMcp('WARN', 'Failed to append MCP audit event batch.', {
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            });
+    });
+}
+
+function installBeforeExitFlushHook() {
+    if (auditBeforeExitHookInstalled) return;
+    auditBeforeExitHookInstalled = true;
+    process.once('beforeExit', () => {
+        const lines = auditQueue.splice(0);
+        if (lines.length === 0) return;
+        auditFlushChain = auditFlushChain.then(() => appendAuditLines(lines)).catch(() => undefined);
+    });
+}
+
+/**
+ * @param {string[]} lines
+ * @returns {Promise<void>}
+ */
+async function appendAuditLines(lines) {
+    if (lines.length === 0) return;
+    const auditFile = getMcpAuditFile();
+    const dir = path.dirname(auditFile);
+    if (!auditDirReady || auditDirReady.dir !== dir) {
+        auditDirReady = { dir, promise: mkdir(dir, { recursive: true }) };
+    }
+    await auditDirReady.promise;
+    await appendFile(auditFile, lines.join(''), 'utf8');
 }

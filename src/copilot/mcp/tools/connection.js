@@ -633,8 +633,8 @@ function buildAuthEnvironmentTemplates(config) {
             COPILOT_MCP_PUBLIC_URL: permanentMcpUrl,
             COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: permanentMcpUrl,
             COPILOT_MCP_CLOUDFLARE_MODE: 'named-permanent',
-            COPILOT_MCP_CLOUDFLARE_PROTOCOL: 'http2',
-            TUNNEL_TRANSPORT_PROTOCOL: 'http2',
+            COPILOT_MCP_CLOUDFLARE_PROTOCOL: 'quic',
+            TUNNEL_TRANSPORT_PROTOCOL: 'quic',
             COPILOT_MCP_ORIGIN_TRANSPORT: 'http2',
             COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: 'true',
             COPILOT_MCP_OAUTH_ISSUER: config.resource,
@@ -655,16 +655,16 @@ function buildAuthEnvironmentTemplates(config) {
             COPILOT_MCP_PUBLIC_URL: permanentMcpUrl,
             COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: permanentMcpUrl,
             COPILOT_MCP_CLOUDFLARE_MODE: 'named-permanent',
-            COPILOT_MCP_CLOUDFLARE_PROTOCOL: 'http2',
-            TUNNEL_TRANSPORT_PROTOCOL: 'http2',
+            COPILOT_MCP_CLOUDFLARE_PROTOCOL: 'quic',
+            TUNNEL_TRANSPORT_PROTOCOL: 'quic',
         },
         temporaryTunnelNoAuth: {
             COPILOT_MCP_AUTH_MODE: 'none-dev',
             COPILOT_MCP_AUTH_ENFORCEMENT: 'off',
             COPILOT_MCP_PUBLIC_URL: 'https://<trycloudflare-host>/mcp',
             COPILOT_MCP_CLOUDFLARE_MODE: 'temporary-quick',
-            COPILOT_MCP_CLOUDFLARE_PROTOCOL: 'http2',
-            TUNNEL_TRANSPORT_PROTOCOL: 'http2',
+            COPILOT_MCP_CLOUDFLARE_PROTOCOL: 'auto',
+            TUNNEL_TRANSPORT_PROTOCOL: 'auto',
         },
         mixedAuthWriteTest: {
             COPILOT_MCP_AUTH_MODE: 'mixed-auth',
@@ -728,9 +728,9 @@ function buildHttp2PlusPosture(cloudflareConfig, authConfig, connectorUrl) {
  */
 function buildHttp2PlusRecommendations(cloudflareConfig, originTransport, h2OriginRequested) {
     const recommendations = [];
-    if (cloudflareConfig.transportProtocol !== 'http2') {
+    if (cloudflareConfig.transportProtocol === 'auto') {
         recommendations.push(
-            'Set COPILOT_MCP_CLOUDFLARE_PROTOCOL=http2 or TUNNEL_TRANSPORT_PROTOCOL=http2 for deterministic Cloudflare tunnel transport.',
+            'Cloudflare edge transport is auto; use COPILOT_MCP_CLOUDFLARE_PROTOCOL=quic only after the QUIC canary and metrics gates pass.',
         );
     }
     if (originTransport !== 'http2' && !h2OriginRequested) {

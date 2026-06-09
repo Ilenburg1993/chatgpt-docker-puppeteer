@@ -3,6 +3,12 @@
 import https from 'node:https';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+const localInsecureHttpsAgent = new https.Agent({
+    keepAlive: true,
+    maxSockets: 8,
+    maxFreeSockets: 4,
+    timeout: 10_000,
+});
 
 /**
  * @typedef {{
@@ -100,6 +106,7 @@ function probeInsecureHttpsHealth(url, options) {
             method: 'GET',
             rejectUnauthorized: false,
             servername: options.servername,
+            agent: localInsecureHttpsAgent,
         }, (response) => {
             response.resume();
             response.on('end', () => {
