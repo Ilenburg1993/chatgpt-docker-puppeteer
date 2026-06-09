@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { describe, it } from 'vitest';
 
@@ -372,6 +372,53 @@ describe('copilot MCP tools', () => {
             assert.equal(second.structuredContent?.['success'], true);
             assert.equal(second.structuredContent?.['totalOrphans'], 1);
             assert.equal(second.structuredContent?.['checkedImports'], 1);
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    it('repo_find_orphan_imports respects recursive and depth options for indexed directories', async () => {
+        const buildTool = findTool('repo_index_build');
+        const orphanImportsTool = findTool('repo_find_orphan_imports');
+        const tempDir = await mkdtemp(join(process.cwd(), '.tmp-copilot-orphan-depth-'));
+        const nestedDir = join(tempDir, 'nested');
+        const relativeTempDir = relative(process.cwd(), tempDir);
+
+        try {
+            await mkdir(nestedDir, { recursive: true });
+            await writeFile(join(tempDir, 'root.js'), "import './missing-root.js';\nexport const root = 1;\n");
+            await writeFile(join(nestedDir, 'child.js'), "import './missing-child.js';\nexport const child = 1;\n");
+
+            const build = await buildTool.handler({
+                path: relativeTempDir,
+                include: ['**/*.js'],
+                maxFiles: 10,
+                pruneMissing: false,
+            });
+            assert.equal(build.isError, undefined);
+            assert.equal(build.structuredContent?.['success'], true);
+
+            const shallow = await orphanImportsTool.handler({
+                path: relativeTempDir,
+                recursive: false,
+                maxResults: 10,
+            });
+            assert.equal(shallow.isError, undefined);
+            assert.equal(shallow.structuredContent?.['success'], true);
+            assert.equal(shallow.structuredContent?.['totalOrphans'], 1);
+            assert.equal(shallow.structuredContent?.['skippedByDepth'], 1);
+            assert.ok(String(shallow.structuredContent?.['output'] ?? '').includes('root.js'));
+            assert.ok(!String(shallow.structuredContent?.['output'] ?? '').includes('nested/child.js'));
+
+            const depthTwo = await orphanImportsTool.handler({
+                path: relativeTempDir,
+                depth: 2,
+                maxResults: 10,
+            });
+            assert.equal(depthTwo.isError, undefined);
+            assert.equal(depthTwo.structuredContent?.['success'], true);
+            assert.equal(depthTwo.structuredContent?.['totalOrphans'], 2);
+            assert.ok(String(depthTwo.structuredContent?.['output'] ?? '').includes('nested/child.js'));
         } finally {
             await rm(tempDir, { recursive: true, force: true });
         }

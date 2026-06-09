@@ -3611,6 +3611,22 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js
   tests/unit/copilot/terminal/test_pending_question_answer.spec.js` (2 arquivos, 59 testes).
 
+### Execução Contínua Em 2026-06-09 - Centésima Sexagésima Quinta Passada
+
+- [x] A auditoria de `repo_find_orphan_imports` encontrou um gap de contrato: a tool expunha `recursive`, `depth` e
+  `respectGitignore`, mas o handler de diretório ignorava `recursive`/`depth` e sempre processava todos os imports
+  retornados pelo índice.
+- [x] O handler agora aplica `recursive=false` como profundidade 1 e respeita `depth` para rows indexados antes de
+  computar arquivos, entradas, imports checados e órfãos.
+- [x] A descrição de `respectGitignore` foi corrigida para deixar claro que, em diretórios, o scan usa os rows já
+  indexados; política de gitignore pertence ao build do índice.
+- [x] A resposta estruturada ganhou `skippedByDepth`, `recursive` e `depth`, tornando a varredura auditável pelo operador
+  e pela LLM.
+- [x] A cobertura MCP cria um diretório temporário indexado com órfão na raiz e órfão em subdiretório, validando que
+  `recursive:false` retorna só a raiz e `depth:2` retorna ambos.
+- [x] Validado com `node --check src/copilot/mcp/tools/repo-index.js tests/unit/copilot/mcp/test_mcp_tools.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/mcp/test_mcp_tools.spec.js` (1 arquivo, 39 testes).
+
 ---
 
 ## Decisões Arquiteturais

@@ -83,6 +83,17 @@ function normalizePositiveInteger(value, fallback, max) {
 }
 
 /**
+ * @param {string} rootPath
+ * @param {string} filePath
+ * @returns {number | null}
+ */
+function relativeFileDepth(rootPath, filePath) {
+    const rel = relative(rootPath, filePath).replace(/\\/g, '/');
+    if (!rel || rel === '.' || rel.startsWith('../') || rel === '..') return null;
+    return rel.split('/').filter(Boolean).length;
+}
+
+/**
  * @param {string} filePath
  * @returns {boolean}
  */
@@ -443,14 +454,17 @@ export const repoIndexTools = [
                 .describe('Workspace-relative file or directory path. Default: src/copilot. Empty string uses default.'),
             recursive: z.boolean().optional().describe('Scan directories recursively. Default: true.'),
             depth: z.number().int().positive().max(50).optional().describe('Directory scan depth. Default: 20.'),
-            respectGitignore: z.boolean().optional().describe('Respect .gitignore while scanning directories. Default: true.'),
+            respectGitignore: z
+                .boolean()
+                .optional()
+                .describe('Reserved for compatibility; directory scans use the current indexed rows.'),
             includeDynamic: z.boolean().optional().describe('Also validate dynamic import() sources. Default: true.'),
             maxFiles: z.number().int().positive().max(5000).optional().describe('Maximum files to parse. Default: 500.'),
             maxResults: z.number().int().positive().max(500).optional().describe('Maximum returned rows. Default: 50.'),
             cursor: z.string().optional().describe('Cursor returned by a previous repo_find_orphan_imports call.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, includeDynamic, maxFiles, maxResults, cursor }) => {
+        handler: async ({ path, recursive, depth, includeDynamic, maxFiles, maxResults, cursor }) => {
             const resolved = await resolveReadPath(
                 normalizeOptionalRepoPath(path, DEFAULT_ORPHAN_IMPORT_SCAN_PATH),
             );
@@ -469,6 +483,9 @@ export const repoIndexTools = [
             let hardLimitReached = false;
             let scannedFiles = 0;
             let totalCandidateFiles = 1;
+            let skippedByDepth = 0;
+            const effectiveRecursive = recursive !== false;
+            const effectiveDepth = effectiveRecursive ? normalizePositiveInteger(depth, 20, 50) : 1;
 
             if (stat.stats.isFile()) {
                 if (isAnalyzableModuleFile(resolved.resolved)) {
@@ -517,10 +534,18 @@ export const repoIndexTools = [
                     });
                 }
                 const rows = findIoIndexImportsByPath(resolved.resolved);
-                totalCandidateFiles = new Set(rows.map((row) => row.filePath)).size;
-                scannedEntries = rows.length;
+                const scopedRows = rows.filter((row) => {
+                    const depthFromRoot = relativeFileDepth(resolved.resolved, String(row.filePath ?? ''));
+                    if (depthFromRoot === null || depthFromRoot > effectiveDepth) {
+                        skippedByDepth += 1;
+                        return false;
+                    }
+                    return true;
+                });
+                totalCandidateFiles = new Set(scopedRows.map((row) => row.filePath)).size;
+                scannedEntries = scopedRows.length;
                 let currentFilePath = '';
-                for (const row of rows) {
+                for (const row of scopedRows) {
                     if (row.filePath !== currentFilePath) {
                         currentFilePath = row.filePath;
                         scannedFiles += 1;
@@ -568,6 +593,9 @@ export const repoIndexTools = [
                     checkedImports,
                     skippedExternalImports,
                     skippedDynamicImports,
+                    skippedByDepth,
+                    recursive: stat.stats.isDirectory() ? effectiveRecursive : null,
+                    depth: stat.stats.isDirectory() ? effectiveDepth : null,
                     parseErrors,
                     orphanCount: paged.items.length,
                     totalOrphans: paged.totalItems,
