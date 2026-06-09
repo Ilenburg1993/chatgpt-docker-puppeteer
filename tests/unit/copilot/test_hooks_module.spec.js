@@ -16,6 +16,7 @@
  */
 
 import assert from 'node:assert';
+import { PassThrough } from 'node:stream';
 import { describe, it } from 'vitest';
 
 // ─── Imports diretos dos novos módulos ────────────────────────────────────────
@@ -48,6 +49,7 @@ import {
     createProductionHooks,
     createPromptTransformer,
     createQueuedInputHandler,
+    createReadlineInputHandler,
     createSafeHooks,
     createSafePreset,
     createSensitiveDataRedactor,
@@ -82,6 +84,7 @@ const anyCreatePromptTransformer = /** @type {any} */ (createPromptTransformer);
 const anyCreateProductionHooks = /** @type {any} */ (createProductionHooks);
 const anyCreatePostToolEnricher = /** @type {any} */ (createPostToolEnricher);
 const anyCreateQueuedInputHandler = /** @type {any} */ (createQueuedInputHandler);
+const anyCreateReadlineInputHandler = /** @type {any} */ (createReadlineInputHandler);
 const anyCreateSafeHooks = /** @type {any} */ (createSafeHooks);
 const anyCreateSafePreset = /** @type {any} */ (createSafePreset);
 const anyCreateSessionHooks = /** @type {any} */ (createSessionHooks);
@@ -465,6 +468,28 @@ describe('hooks/user-input (Gap 5)', () => {
         const { answerNext } = anyCreateQueuedInputHandler();
         const result = answerNext({ answer: 'x', wasFreeform: false });
         assert.strictEqual(result, false);
+    });
+
+    it('createReadlineInputHandler: renderiza fallback humano sem ask_user cru', async () => {
+        const input = new PassThrough();
+        const output = new PassThrough();
+        let rendered = '';
+        output.on('data', (chunk) => {
+            rendered += chunk.toString('utf8');
+        });
+        const handler = anyCreateReadlineInputHandler({ input, output, prompt: '› ' });
+        const pending = handler({ question: 'Confirmar fechamento?', choices: ['SIM'] });
+
+        await new Promise((resolve) => setImmediate(resolve));
+        input.write('1\n');
+
+        const result = await pending;
+        assert.strictEqual(result.answer, 'SIM');
+        assert.strictEqual(result.wasFreeform, false);
+        assert.match(rendered, /Pergunta ao operador: Confirmar fechamento\?/u);
+        assert.match(rendered, /Opções: \[1\] SIM/u);
+        assert.match(rendered, /Texto livre também aceito/u);
+        assert.ok(!rendered.includes('[ask_user]'));
     });
 });
 

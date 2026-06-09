@@ -200,13 +200,15 @@ export function createReadlineInputHandler(opts = {}) {
 
         const question = request.question ?? '';
         const choices = normalizeUserInputChoices(request.choices ?? []);
-        resolveEffectiveUserInputAllowFreeform(request.allowFreeform);
+        const allowFreeform = resolveEffectiveUserInputAllowFreeform(request.allowFreeform);
 
-        let displayText = `\n[ask_user] ${question}`;
+        let displayText = `\nPergunta ao operador: ${question || 'Aguardando resposta do operador'}`;
         if (choices.length > 0) {
             displayText += `\nOpções: ${choices.map((c, i) => `[${i + 1}] ${c}`).join(' | ')}`;
         }
-        displayText += '\n(ou texto livre)';
+        if (allowFreeform) {
+            displayText += choices.length > 0 ? '\nTexto livre também aceito' : '\nDigite sua resposta';
+        }
         displayText += `\n${prompt}`;
 
         return new Promise((resolve) => {

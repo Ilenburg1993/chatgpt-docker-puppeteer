@@ -3325,6 +3325,24 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   `no-extra-output-after-post-ask-final`, `sse-delta-public-chunk=24/24` e grep do log público sem
   `Processando mensagem`/`Preparando resposta`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quadragésima Nona Passada
+
+- [x] A varredura do núcleo `ask_user`/`user_input` encontrou um fluxo paralelo de fallback em
+  `sdk/session/user-input.js`: `createReadlineInputHandler()` ainda renderizava `"[ask_user] ..."` e a microcopy
+  `"(ou texto livre)"`, diferente do vocabulário canônico do terminal.
+- [x] O fallback readline agora usa `Pergunta ao operador`, `Opções` e `Texto livre também aceito`/`Digite sua resposta`,
+  mantendo compat com choices numéricas e sem expor o nome cru da tool para operadores.
+- [x] A implementação passou a usar explicitamente `resolveEffectiveUserInputAllowFreeform()` ao montar a superfície,
+  deixando a política canônica de texto livre visível no código em vez de calculada e descartada.
+- [x] Cobertura em `test_hooks_module.spec.js` usa streams em memória para validar que a factory exportada por
+  `hooks/index.js` responde uma opção numérica, renderiza microcopy humana e não contém `[ask_user]`.
+- [x] Validado com `node --check src/copilot/sdk/session/user-input.js tests/unit/copilot/test_hooks_module.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/test_hooks_module.spec.js
+  tests/unit/copilot/test_session_setup.spec.js tests/unit/copilot/test_hook_tools.spec.js
+  tests/unit/copilot/terminal/test_pending_question_answer.spec.js` (4 arquivos, 149 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+
 ---
 
 ## Decisões Arquiteturais
