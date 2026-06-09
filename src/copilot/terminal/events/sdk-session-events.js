@@ -556,7 +556,7 @@ function renderTurnTraceSummary(trace) {
  */
 function renderAssistantMessageProtocolKindLabel(kind) {
     const normalized = String(kind ?? '').trim();
-    if (normalized === 'question') return 'Resposta pós-pergunta';
+    if (normalized === 'question') return 'Resposta da LLM-B';
     if (normalized === 'reply') return 'Resposta';
     if (normalized === 'delta') return 'Trecho de resposta';
     if (normalized === 'reasoning') return 'Raciocínio';
@@ -1240,7 +1240,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             answerPreview,
             source: 'sdk',
         });
-        recordTerminalActivity('question', 'Continuação pós-pergunta', {
+        recordTerminalActivity('question', 'Resposta registrada', {
             detail: summarizeAfterUserInputContinuation({ answerPreview, wasFreeform }),
             source: 'sdk',
             recordHistory: false,

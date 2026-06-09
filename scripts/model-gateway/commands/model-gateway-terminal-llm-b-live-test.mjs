@@ -5091,7 +5091,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const assistantMessageTranscriptHeadingRe =
         /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message|Mensagem da LLM-B\s+(?:LLM-B via SDK|SDK assistant))/u;
     const postAskAssistantTranscriptHeadingRe =
-        /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message|Resposta pós-pergunta\s+(?:sdk\/assistant\.message|LLM-B via SDK))/u;
+        /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message|Resposta (?:da LLM-B|pós-pergunta)\s+(?:sdk\/assistant\.message|LLM-B via SDK))/u;
     const assistantMessageDeltaBlockVisible = terminalBlockContains(
         preEventsPlain,
         assistantMessageTranscriptHeadingRe,
@@ -5502,9 +5502,8 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'ux-activity-detail-route-label',
             pass:
-                /Detalhes\s+\/activity detail mostra origem, auditoria técnica e streaming/iu.test(
-                    beforeRawDiagnosticsPlain,
-                ) && !/^\s*T[eé]cnico\s+Detalhes t[eé]cnicos ficam em \/activity detail/imu.test(beforeRawDiagnosticsPlain),
+                /Mais detalhes\s+\/activity detail/iu.test(beforeRawDiagnosticsPlain) &&
+                !/^\s*T[eé]cnico\s+Detalhes t[eé]cnicos ficam em \/activity detail/imu.test(beforeRawDiagnosticsPlain),
             detail: '/activity default exposed a calm detail route instead of the old technical label',
         },
         {
@@ -5592,7 +5591,9 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-intent-command-default-human',
             pass:
                 /Inten[cç][oõ]es capturadas/iu.test(latestIntentDefaultSection) &&
-                /origem ferramenta de inten[cç][aã]o/iu.test(latestIntentDefaultSection) &&
+                /origem (?:SDK|ferramenta de inten[cç][aã]o|terminal|ferramenta|captura)/iu.test(
+                    latestIntentDefaultSection,
+                ) &&
                 !/report_intent|tool\/|toolu_|chatcmpl-tool|origem bruta|patch_file|call_/iu.test(
                     latestIntentDefaultSection,
                 ),
@@ -5602,10 +5603,10 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-intent-command-detail-human-envelope',
             pass:
                 /detalhe t[eé]cnico/iu.test(latestIntentDetailSection) &&
-                /Envelope\s+origem ferramenta de inten[cç][aã]o/iu.test(latestIntentDetailSection) &&
-                /ferramenta\s+(?:Inten[cç][aã]o capturada|Editar arquivo|Ler arquivo)/iu.test(
+                /Envelope\s+origem (?:SDK|ferramenta de inten[cç][aã]o|terminal|ferramenta|captura)/iu.test(
                     latestIntentDetailSection,
                 ) &&
+                /registro\s+(?:local|id interno|[a-z0-9…-]+)/iu.test(latestIntentDetailSection) &&
                 !/origem bruta|tool\/report_intent|report_intent_local|toolu_|chatcmpl-tool|patch_file|call_/iu.test(
                     latestIntentDetailSection,
                 ),

@@ -568,6 +568,35 @@ function renderWaitingPromptPhaseLabel(phase) {
 }
 
 /**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {boolean}
+ */
+function isGenericTurnProcessingActivity(activity) {
+    const text = `${activity.phase ?? ''} ${activity.label ?? ''} ${activity.detail ?? ''}`
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '');
+    return activity.phase === 'turn' && text.includes('processando mensagem');
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {boolean}
+ */
+function isPostQuestionContinuationActivity(activity) {
+    const text = `${activity.phase ?? ''} ${activity.label ?? ''} ${activity.detail ?? ''}`
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '');
+    return (
+        activity.phase === 'question' &&
+        (text.includes('continuacao pos-pergunta') ||
+            text.includes('resposta registrada') ||
+            text.includes('resposta final da llm-b'))
+    );
+}
+
+/**
  * Constrói o prompt exibido enquanto o terminal está aguardando a resposta da LLM-B.
  *
  * @returns {string}
@@ -594,7 +623,13 @@ export function buildWaitingPrompt() {
     }
     if (runtime.pendingQuestionShadowState === 'expired') tags.push('SHDW:EXP');
     const tagsStr = tags.length > 0 ? ` ${terminalThemeText('muted', `[${tags.join('|')}]`)}` : '';
+    if (isPostQuestionContinuationActivity(activity)) {
+        return `${terminalThemeText('thinking', 'LLM-B continuando')}${tagsStr} `;
+    }
     if (!promptPolicy.showWaitingActivity || compactDetail) {
+        return `${terminalThemeText('thinking', 'LLM-B pensando')}${tagsStr} `;
+    }
+    if (isGenericTurnProcessingActivity(activity)) {
         return `${terminalThemeText('thinking', 'LLM-B pensando')}${tagsStr} `;
     }
     return `${terminalThemeText(sevRole, `LLM-B pensando · ${phase} · ${label}`)}${tagsStr} `;

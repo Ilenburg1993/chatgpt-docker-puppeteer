@@ -62,6 +62,37 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     writeInlineStatus: mocks.writeInlineStatus,
 }));
 
+vi.mock('../../../src/copilot/terminal/dialog/io/index.js', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        broadcastSse: mocks.broadcastSse,
+        println: mocks.println,
+        printlnBlock: mocks.printlnBlock,
+        writeInlineStatus: mocks.writeInlineStatus,
+    };
+});
+
+vi.mock('../../../src/copilot/terminal/state/events/index.js', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return {
+        ...actual,
+        markTerminalActivityIdle: mocks.markTerminalActivityIdle,
+        recordTerminalActivity: mocks.recordTerminalActivity,
+        recordTerminalTurnFileActivity: mocks.recordTerminalTurnFileActivity,
+        recordTerminalTurnToolActivity: mocks.recordTerminalTurnToolActivity,
+        recordTerminalTurnUserInputActivity: mocks.recordTerminalTurnUserInputActivity,
+        recordTerminalUserInputCompleted: mocks.recordTerminalUserInputCompleted,
+        recordTerminalUserInputRequested: mocks.recordTerminalUserInputRequested,
+        shouldSuppressTerminalAssistantMessageAsUserInputEcho:
+            mocks.shouldSuppressTerminalAssistantMessageAsUserInputEcho,
+        beginTerminalTurnTrace: mocks.beginTerminalTurnTrace,
+        completeTerminalTurnTrace: mocks.completeTerminalTurnTrace,
+        readTerminalTurnTraceProjection: mocks.readTerminalTurnTraceProjection,
+        getTerminalDetailLevel: mocks.getTerminalDetailLevel,
+    };
+});
+
 vi.mock('../../../src/copilot/presentation/state/index.js', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
@@ -125,7 +156,7 @@ vi.mock('../../../src/copilot/terminal/events/assistant-transcript-renderer.js',
     renderTerminalAssistantTranscript: mocks.renderTerminalAssistantTranscript,
 }));
 
-vi.mock('../../../src/copilot/terminal/byok/live-model-switch.js', () => ({
+vi.mock('../../../src/copilot/terminal/byok/live/index.js', () => ({
     consumeTerminalLiveByokModelSwitchConfirmation: mocks.consumeTerminalLiveByokModelSwitchConfirmation,
 }));
 
@@ -330,6 +361,34 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
                 source: 'sdk/assistant.message',
                 detail: 'stream_suffix',
             }),
+        );
+        expect(refreshPromptIfIdle).toHaveBeenCalled();
+    });
+
+    it('renderiza assistant.message normal sem vazar rótulo técnico pós-pergunta', async () => {
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+        const refreshPromptIfIdle = vi.fn();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle });
+        agent.emit('assistant.message', { content: 'Mensagem materializada fora do turno ativo.' });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'turn',
+            'Mensagem da LLM-B recebida',
+            expect.objectContaining({ detail: expect.stringContaining('Resposta da LLM-B'), source: 'sdk' }),
+        );
+        expect(mocks.renderTerminalAssistantTranscript).toHaveBeenCalledWith(
+            expect.objectContaining({
+                title: 'Resposta da LLM-B',
+                content: 'Mensagem materializada fora do turno ativo.',
+                source: 'sdk/assistant.message',
+                detail: 'Resposta da LLM-B',
+            }),
+        );
+        expect(mocks.renderTerminalAssistantTranscript).not.toHaveBeenCalledWith(
+            expect.objectContaining({ title: 'Resposta pós-pergunta' }),
         );
         expect(refreshPromptIfIdle).toHaveBeenCalled();
     });
@@ -607,7 +666,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         );
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
-            'Continuação pós-pergunta',
+            'Resposta registrada',
             expect.objectContaining({
                 detail: expect.stringContaining('resposta registrada; aguardando resposta final da LLM-B'),
             }),

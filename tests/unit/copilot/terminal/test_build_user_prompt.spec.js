@@ -241,20 +241,42 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         expect(prompt).toContain('gpt-5-mini');
     });
 
-    it('exporta prompt de espera com fase e label sem repetir modelo/esforço', async () => {
+    it('exporta prompt de espera sem vazar turno genérico nem repetir modelo/esforço', async () => {
         const { buildWaitingPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
         const prompt = buildWaitingPrompt();
 
         expect(prompt).toContain('LLM-B pensando');
-        expect(prompt).toContain('turno');
+        expect(prompt).not.toContain('turno');
         expect(prompt).not.toContain('TURN');
-        expect(prompt).toContain('Processando');
+        expect(prompt).not.toContain('Processando');
         expect(prompt).not.toContain('gpt-5-mini');
         expect(prompt).not.toContain('high');
         expect(prompt).not.toContain('modelo gpt-5-mini');
         expect(prompt).not.toContain('raciocínio high');
         expect(prompt).not.toContain('[gpt-5-mini/high]');
         expect(prompt).not.toContain('⏳');
+    });
+
+    it('mostra continuação humana como estado curto após responder ask_user', async () => {
+        readTerminalActivitySnapshot.mockReturnValueOnce({
+            phase: 'question',
+            label: 'Resposta registrada',
+            detail: 'resposta registrada; aguardando resposta final da LLM-B · resposta SIM',
+            source: 'sdk',
+            severity: 'info',
+            progress: null,
+            toolName: null,
+            startedAt: 1,
+            updatedAt: 2,
+            ageMs: 1000,
+        });
+        const { buildWaitingPrompt } = await import('../../../../src/copilot/terminal/dialog/output.js');
+        const prompt = buildWaitingPrompt();
+
+        expect(prompt).toContain('LLM-B continuando');
+        expect(prompt).not.toContain('pós-pergunta');
+        expect(prompt).not.toContain('aguardando operador');
+        expect(prompt).not.toContain('Processando');
     });
 
     it('reduz prompt de espera quando display está em densidade minimal', async () => {

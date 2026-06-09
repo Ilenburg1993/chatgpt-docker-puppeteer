@@ -33,9 +33,9 @@ describe('terminal/events/assistant-transcript-renderer', () => {
         try {
             expect(
                 renderTerminalAssistantTranscript({
-                    title: 'Resposta pós-pergunta',
+                    title: 'Resposta da LLM-B',
                     source: 'sdk/assistant.message',
-                    detail: 'Resposta pós-pergunta',
+                    detail: 'Resposta da LLM-B',
                     content: 'POST-ASK-CANONICAL-FINAL: usuário confirmou SIM',
                 }),
             ).toBe(true);
@@ -44,9 +44,10 @@ describe('terminal/events/assistant-transcript-renderer', () => {
         }
 
         const output = writes.join('');
-        expect(output).toContain('Resposta pós-pergunta');
+        expect(output).toContain('Resposta da LLM-B');
         expect(output).toContain('LLM-B via SDK');
-        expect(output).not.toContain('LLM-B via SDK · Resposta pós-pergunta');
+        expect(output).not.toContain('pós-pergunta');
+        expect(output).not.toContain('LLM-B via SDK · Resposta da LLM-B');
     });
 
     it('reconhece prefixo truncado como coberto por transcript recente completo', () => {

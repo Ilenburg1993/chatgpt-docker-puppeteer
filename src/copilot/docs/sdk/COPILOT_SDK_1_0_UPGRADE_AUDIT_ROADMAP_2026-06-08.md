@@ -2656,9 +2656,49 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Vigésima Terceira Passada
 
-- [ ] SDK10-P123-01: continuar a investigação além dos comandos, agora revisando barrels amplos restantes em
+- [x] SDK10-P123-01: continuar a investigação além dos comandos, agora revisando barrels amplos restantes em
   `src/copilot/terminal` e procurando oportunidades de UX/hardening que apareçam em `frontend/index.js`,
   `events/index.js` e módulos vizinhos.
+
+### Execução Contínua Em 2026-06-08 - Centésima Vigésima Quarta Passada
+
+- [x] Análise minuciosa da imagem do terminal: o bloco `Resposta pós-pergunta  LLM-B via SDK` era um vazamento do
+  `protocolKind=question` para o operador. Em sessões de muitas horas, quase toda continuação depois de `ask_user`
+  pode ser tecnicamente "pós-pergunta", então o rótulo não separava estado útil de transporte interno e fazia uma
+  resposta normal da LLM-B parecer um modo especial.
+- [x] Causa raiz do status seguinte na imagem: `sendTurn()` registrava `recordTerminalActivity('turn', 'Processando mensagem')`
+  no início do turno, e `buildWaitingPrompt()` renderizava literalmente `LLM-B pensando · turno · Processando mensagem`.
+  Esse texto é correto como marcador interno, mas pobre como UX porque combina duas palavras genéricas e não explica a
+  etapa real quando o humano acabou de responder.
+- [x] `assistant.message` classificado como `question` agora renderiza `Resposta da LLM-B`, preservando a origem
+  `LLM-B via SDK` sem expor "pós-pergunta" no cabeçalho do transcript.
+- [x] O registro após resposta humana de `ask_user` deixou de chamar `Continuação pós-pergunta` e passou a usar
+  `Resposta registrada`, enquanto a linha viva/prompt de espera compacta esse estado para `LLM-B continuando`.
+- [x] O prompt de espera deixou de vazar `turno · Processando mensagem` no caminho comum; quando a atividade atual é
+  apenas o turno genérico, a superfície mostra `LLM-B pensando`, e quando é continuação após resposta humana mostra
+  `LLM-B continuando`.
+- [x] O runner live da LLM-B passou a reconhecer tanto o cabeçalho antigo quanto `Resposta da LLM-B`, permitindo validar
+  a migração sem quebrar artefatos históricos durante a transição.
+- [x] Mantido o vocabulário `continuação pós-pergunta vazia` apenas no fluxo específico de recuperação automática quando
+  a LLM-B encerra uma continuação sem texto público. Esse é um diagnóstico acionável diferente do cabeçalho normal de
+  mensagem, e continua coberto por testes próprios.
+- [x] O validador vivo também foi realinhado para aceitar a superfície atual de `/activity` e `/intent`, com
+  `Mais detalhes /activity detail` e envelope humano `origem SDK` quando a intenção vem do assistente.
+- [x] Validado com `node --check src/copilot/terminal/events/sdk-session-events.js && node --check src/copilot/terminal/dialog/output.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_build_user_prompt.spec.js tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`
+  (7 arquivos, 140 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T02-16-46-462Z/summary.md`, confirmando o cenário canônico completo
+  com `ask_user`, a resposta humana `SIM`, o cabeçalho `Resposta da LLM-B`, os cockpits `/session sdk`,
+  `/session sdk waits`, `/events`, `/metrics`, `/activity` e a saída limpa.
+
+### Achados Novos Da Centésima Vigésima Quarta Passada
+
+- [ ] SDK10-P124-01: revisar as telas `/activity`, `/metrics`, `/usage now` e recovery para separar rigorosamente
+  vocabulário de protocolo, diagnóstico acionável e microcopy de operador; qualquer ocorrência de `pós-pergunta` deve
+  permanecer restrita a recuperação vazia ou ser renomeada para uma ação humana concreta.
 
 ---
 
