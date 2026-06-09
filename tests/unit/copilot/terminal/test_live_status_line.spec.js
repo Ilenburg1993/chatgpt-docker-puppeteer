@@ -540,6 +540,7 @@ describe('terminal/live-status-line', () => {
             toolName: null,
             startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
         };
+        mocks.runtime = { ...mocks.runtime, status: 'idle' };
 
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:02.000-03:00') });
 
@@ -549,6 +550,80 @@ describe('terminal/live-status-line', () => {
         expect(line).not.toContain('concluí');
         expect(line).not.toContain('conversa ativa');
         expect(line.length).toBeLessThan(42);
+    });
+
+    it('trata conclusão intermediária sem resposta pública como continuação', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        const now = Date.parse('2026-05-07T22:00:02.000-03:00');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'turn',
+            label: 'Turno do assistente concluído',
+            detail: 'turno 0',
+            toolName: null,
+            startedAt: now - 500,
+            updatedAt: now - 500,
+        };
+        mocks.activityHistory = [
+            {
+                phase: 'turn',
+                label: 'Turno do assistente concluído',
+                detail: 'turno 0',
+                updatedAt: now - 500,
+                ts: now - 500,
+            },
+            {
+                phase: 'tool',
+                label: 'Leitura concluída',
+                detail: 'package.json',
+                updatedAt: now - 700,
+                ts: now - 700,
+            },
+        ];
+        mocks.runtime = { ...mocks.runtime, status: 'processing', dialogLoopActive: true };
+
+        const line = formatTerminalLiveStatusLine({ now });
+
+        expect(line).toContain('continuando');
+        expect(line).not.toContain('finalizando');
+    });
+
+    it('preserva finalização quando uma resposta pública acabou de materializar', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        const now = Date.parse('2026-05-07T22:00:02.000-03:00');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'turn',
+            label: 'Turno do assistente concluído',
+            detail: 'turno 2',
+            toolName: null,
+            startedAt: now - 500,
+            updatedAt: now - 500,
+        };
+        mocks.activityHistory = [
+            {
+                phase: 'turn',
+                label: 'Turno do assistente concluído',
+                detail: 'turno 2',
+                updatedAt: now - 500,
+                ts: now - 500,
+            },
+            {
+                phase: 'turn',
+                label: 'Mensagem da LLM-B recebida',
+                detail: 'Resposta da LLM-B · ok',
+                updatedAt: now - 700,
+                ts: now - 700,
+            },
+        ];
+        mocks.runtime = { ...mocks.runtime, status: 'processing', dialogLoopActive: true };
+
+        const line = formatTerminalLiveStatusLine({ now });
+
+        expect(line).toContain('finalizando');
+        expect(line).not.toContain('continuando');
     });
 
     it('não mantém linha viva para continuação pós-pergunta vazia já encerrada', async () => {

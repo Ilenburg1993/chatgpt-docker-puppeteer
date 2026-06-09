@@ -301,6 +301,35 @@ function hasRecentPostAnswerContinuationActivity(now) {
 }
 
 /**
+ * @param {number} now
+ * @returns {boolean}
+ */
+function hasRecentPublicAssistantActivity(now) {
+    return readTerminalActivityHistory(8).some((entry) => {
+        const updatedAt = Number(entry.updatedAt ?? entry.ts ?? 0);
+        if (!Number.isFinite(updatedAt) || now - updatedAt > POST_ANSWER_CONTINUATION_GRACE_MS) return false;
+        const text = `${entry.phase ?? ''} ${entry.label ?? ''} ${entry.detail ?? ''}`.toLowerCase();
+        return (
+            entry.phase === 'streaming' ||
+            text.includes('mensagem da llm-b recebida') ||
+            text.includes('resposta conclu') ||
+            text.includes('transmitindo resposta')
+        );
+    });
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalRuntimeState>} runtime
+ * @param {number} now
+ * @returns {boolean}
+ */
+function shouldTreatTurnFinalizationAsContinuation(runtime, now) {
+    if (hasRecentPostAnswerContinuationActivity(now)) return true;
+    if (runtime.status !== 'processing' || !runtime.dialogLoopActive) return false;
+    return !hasRecentPublicAssistantActivity(now);
+}
+
+/**
  * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
  * @param {string} label
  * @returns {{ state: string; label: string | null }}
@@ -491,7 +520,7 @@ function buildTerminalLiveStatusLine(input = {}) {
     }
     if (activity.phase === 'turn') {
         if (isTurnFinalizationActivity(activity)) {
-            if (hasRecentPostAnswerContinuationActivity(now)) {
+            if (shouldTreatTurnFinalizationAsContinuation(runtime, now)) {
                 return (
                     `  ${terminalThemeText('assistant', 'LLM-B')} ` +
                     `${terminalThemeText(severityRole, 'continuando')}` +

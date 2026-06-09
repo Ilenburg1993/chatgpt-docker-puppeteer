@@ -5599,6 +5599,18 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: 'turn live status avoided repeating long intent details',
         },
         {
+            id: 'ux-no-intermediate-finalizing-before-public-output',
+            pass: !/LLM-B\s+finalizando[^\n\r]*(?:\r|\n|\s)+LLM-B\s+pensando\s+·\s+\d+s\s+sem\s+resposta\s+p[uú]blica/iu.test(
+                beforeRawDiagnosticsPlain,
+            ),
+            detail: 'intermediate SDK tool-only turn_end stayed as continuation instead of a finalizing/thinking flicker',
+        },
+        {
+            id: 'ux-no-legacy-post-answer-labels',
+            pass: !/(Resposta p[oó]s-pergunta|turno\s+·\s+Processando mensagem)/iu.test(beforeRawDiagnosticsPlain),
+            detail: 'post-answer public surface avoided legacy question/reply labels and raw turn-processing copy',
+        },
+        {
             id: 'ux-compact-tool-live-status',
             pass: !/tool\/Ferramenta em uso/iu.test(plain) && !/tool\/Executando tool/iu.test(plain),
             detail: 'tool live status used human phase labels instead of raw phase/tool prefixes',

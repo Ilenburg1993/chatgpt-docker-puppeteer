@@ -2975,10 +2975,40 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Trigésima Sexta Passada
 
-- [ ] SDK10-P136-01: auditar a janela pós-`ask_user` no log bruto e nos eventos exportados para garantir que a sequência
+- [x] SDK10-P136-01: auditar a janela pós-`ask_user` no log bruto e nos eventos exportados para garantir que a sequência
   visual e semântica seja sempre `Resposta enviada` -> continuação/ferramentas -> `Resposta da LLM-B` -> prompt pronto,
   sem ressurgimento de rótulos antigos como `Resposta pós-pergunta`, `turno · Processando mensagem` ou status duplicado
   `pensando/processando` após uma resposta já materializada.
+
+### Execução Contínua Em 2026-06-08 - Centésima Trigésima Sétima Passada
+
+- [x] A auditoria do artifact `artifacts/terminal-live/2026-06-09T03-54-53-189Z/summary.md` confirmou que o pós-`ask_user`
+  público já estava correto (`Resposta enviada` -> `LLM-B continuando` -> `Resposta da LLM-B` -> prompt pronto), mas
+  expôs outra piscada real: o `assistant.turn_end` intermediário de um turno só de ferramentas aparecia como
+  `LLM-B finalizando` antes do watchdog `LLM-B pensando · 10s sem resposta pública`.
+- [x] `live-status-line.js` agora trata `Turno do assistente concluído` como `continuando` quando o runtime ainda está
+  processando e não houve resposta pública recente; `finalizando` fica reservado para encerramento real ou para turnos
+  que acabaram de materializar mensagem pública.
+- [x] A regra preserva a janela pós-resposta humana já validada: `Pergunta respondida` seguida de `turn_end` continua
+  mostrando `LLM-B continuando`, sem voltar para o rótulo antigo `Resposta pós-pergunta`.
+- [x] O live harness ganhou os critérios `ux-no-intermediate-finalizing-before-public-output` e
+  `ux-no-legacy-post-answer-labels`, protegendo a imagem original contra regressão no terminal real.
+- [x] Validado com `node --check src/copilot/terminal/repl/live-status-line.js
+  scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js` (1 arquivo, 32 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T04-02-46-641Z/summary.md`, observando
+  `LLM-B continuando · 0s/1s` antes de `LLM-B pensando · 10s sem resposta pública`, sem `finalizando` intermediário e
+  sem `Resposta pós-pergunta`/`turno · Processando mensagem` na superfície pública.
+
+### Achados Novos Da Centésima Trigésima Sétima Passada
+
+- [ ] SDK10-P137-01: revisar o `/events --raw` e os previews do archive SSE, pois eventos internos ainda exibem
+  `Turno do assistente concluído` cru no payload preview. Confirmar se isso deve continuar restrito ao raw técnico ou se
+  há alguma superfície default/detail onde o fechamento intermediário de tool-only turn ainda deveria ser humanizado como
+  continuação do pedido.
 
 ---
 
