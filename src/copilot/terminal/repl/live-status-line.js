@@ -307,6 +307,38 @@ function renderTurnActivityCompact(activity, label) {
 
 /**
  * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @returns {string}
+ */
+function renderQuestionActivityCompact(activity) {
+    const text = `${activity.label ?? ''} ${activity.detail ?? ''}`
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '');
+    if (
+        text.includes('resposta registrada') ||
+        text.includes('resposta humana') ||
+        text.includes('eco de resposta') ||
+        text.includes('aguardando resposta final')
+    ) {
+        return 'continuando';
+    }
+    if (text.includes('fila de intervencao') || text.includes('caixa de entrada') || text.includes('nova mensagem')) {
+        return 'intervenção';
+    }
+    if (text.includes('formulario') || text.includes('permissao')) {
+        return 'decisão';
+    }
+    if (text.includes('oauth') || text.includes('sampling mcp')) {
+        return 'integração';
+    }
+    if (text.includes('pergunta ao operador') || text.includes('pergunta humana')) {
+        return 'pergunta';
+    }
+    return 'interação';
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
  * @returns {boolean}
  */
 function isEmptyAfterUserInputActivity(activity) {
@@ -468,10 +500,9 @@ function buildTerminalLiveStatusLine(input = {}) {
     }
     const label = compactLiveStatusText(activity.label, LIVE_LABEL_MAX_CHARS);
     if (activity.phase === 'question') {
-        const answered = `${activity.label ?? ''} ${activity.detail ?? ''}`.toLowerCase().includes('resposta');
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText(severityRole, answered ? 'continuando' : 'pergunta')}` +
+            `${terminalThemeText(severityRole, renderQuestionActivityCompact(activity))}` +
             `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)}${queue}`)}` +
             '\x1b[K'
         );

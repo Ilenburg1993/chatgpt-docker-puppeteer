@@ -750,4 +750,41 @@ describe('terminal/live-status-line', () => {
         expect(line).not.toContain('conversa ativa');
         expect(line.length).toBeLessThan(32);
     });
+
+    it('classifica atividades question não-humanas como decisão ou intervenção', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'question',
+            label: 'Permissão SDK solicitada',
+            detail: 'editar arquivo src/app.js',
+            toolName: null,
+        };
+        mocks.runtime = { ...mocks.runtime, status: 'processing', pendingQuestion: null, pendingQuestionKind: null };
+
+        const permissionLine = formatTerminalLiveStatusLine({
+            now: Date.parse('2026-05-07T22:00:12.000-03:00'),
+        });
+
+        expect(permissionLine).toContain('decisão');
+        expect(permissionLine).not.toContain('pergunta');
+        expect(permissionLine).not.toContain('Permissão SDK solicitada');
+
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'question',
+            label: 'Nova mensagem na caixa de entrada',
+            detail: 'intervenção aguardando próxima ask_user',
+            toolName: null,
+        };
+
+        const mailboxLine = formatTerminalLiveStatusLine({
+            now: Date.parse('2026-05-07T22:00:12.000-03:00'),
+        });
+
+        expect(mailboxLine).toContain('intervenção');
+        expect(mailboxLine).not.toContain('pergunta');
+        expect(mailboxLine).not.toContain('Nova mensagem');
+    });
 });

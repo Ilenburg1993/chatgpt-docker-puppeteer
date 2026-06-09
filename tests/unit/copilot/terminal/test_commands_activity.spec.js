@@ -742,6 +742,60 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).not.toContain('Pending messages alteradas');
     });
 
+    it('diferencia subestados de question no estado atual', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'question',
+                label: 'Resposta registrada',
+                detail: 'resposta registrada; aguardando resposta final da LLM-B · resposta SIM',
+                source: 'sdk',
+                severity: 'info',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 0,
+            },
+            history: [],
+            turnTrace: {
+                current: null,
+                recent: [],
+            },
+        });
+        const responseCtx = mockCtx();
+
+        cmdActivity({ println: responseCtx.println }, '5');
+
+        expect(responseCtx.output()).toMatch(/Estado\s+continuação/u);
+        expect(responseCtx.output()).not.toMatch(/Estado\s+pergunta/u);
+
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'question',
+                label: 'Permissão SDK solicitada',
+                detail: 'editar arquivo src/app.js',
+                source: 'sdk',
+                severity: 'warn',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 0,
+            },
+            history: [],
+            turnTrace: {
+                current: null,
+                recent: [],
+            },
+        });
+        const permissionCtx = mockCtx();
+
+        cmdActivity({ println: permissionCtx.println }, '5');
+
+        expect(permissionCtx.output()).toMatch(/Estado\s+decisão/u);
+        expect(permissionCtx.output()).not.toMatch(/Estado\s+pergunta/u);
+    });
+
     it('preserva nomes de protocolo em detalhes livres da intenção', () => {
         vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
             current: {

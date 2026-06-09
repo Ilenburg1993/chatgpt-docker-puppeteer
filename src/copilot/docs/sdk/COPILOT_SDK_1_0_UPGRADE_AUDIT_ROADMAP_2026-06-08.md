@@ -2767,6 +2767,29 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   (`pergunta pendente`, `resposta registrada`, formulários, OAuth e mailbox), e decidir se a unificação correta é por
   fase nova ou por presenter comum.
 
+### Execução Contínua Em 2026-06-08 - Centésima Vigésima Nona Passada
+
+- [x] `question` passou a ter apresentação contextualizada por subestado tanto na linha viva quanto em `/activity`:
+  `pergunta` para ask_user humano, `continuando` para resposta registrada, `decisão` para formulário/permissão e
+  `intervenção`/`integração` para os fluxos auxiliares.
+- [x] O estado interno permaneceu estável, mas a UX agora evita tratar OAuth, mailbox e formulário como se fossem a
+  mesma coisa que a pergunta humana direta.
+- [x] A timeline de `/activity` também ganhou cobertura para impedir a regressão do rótulo genérico `pergunta` quando
+  o subestado já é claramente outra ação operacional.
+- [x] Validado com `node --check src/copilot/terminal/repl/live-status-line.js && node --check src/copilot/terminal/commands/activity.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`
+  (2 arquivos, 42 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T02-48-15-604Z/summary.md`, confirmando o fluxo canônico, a linha viva
+  humana e o painel `/activity` sem regressão.
+
+### Achados Novos Da Centésima Vigésima Nona Passada
+
+- [ ] SDK10-P129-01: continuar revisando os outros subestados `question` e decidir se vale extrair um presenter
+  compartilhado entre linha viva, `/activity` e `/status`, ou se a variedade atual já está suficientemente estável.
+
 ---
 
 ## Decisões Arquiteturais

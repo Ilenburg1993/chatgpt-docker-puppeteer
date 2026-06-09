@@ -70,15 +70,16 @@ function renderStatusRole(status) {
 
 /**
  * @param {string} phase
+ * @param {{ label?: string | null; detail?: string | null }} [entry]
  * @returns {string}
  */
-function renderActivityPhaseLabel(phase) {
+function renderActivityPhaseLabel(phase, entry = {}) {
     if (phase === 'idle') return 'pronto';
     if (phase === 'tool') return 'ferramenta';
     if (phase === 'turn') return 'conversa';
     if (phase === 'thinking') return 'pensando';
     if (phase === 'streaming') return 'streaming';
-    if (phase === 'question') return 'pergunta';
+    if (phase === 'question') return renderQuestionActivityPhaseLabel(entry);
     if (phase === 'task') return 'tarefa';
     if (phase === 'boot') return 'inicialização';
     if (phase === 'system') return 'sistema';
@@ -87,6 +88,32 @@ function renderActivityPhaseLabel(phase) {
     if (phase === 'model') return 'modelo';
     if (phase === 'error') return 'erro';
     return phase;
+}
+
+/**
+ * @param {{ label?: string | null; detail?: string | null }} entry
+ * @returns {string}
+ */
+function renderQuestionActivityPhaseLabel(entry) {
+    const text = `${entry.label ?? ''} ${entry.detail ?? ''}`
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '');
+    if (
+        text.includes('resposta registrada') ||
+        text.includes('resposta humana') ||
+        text.includes('eco de resposta') ||
+        text.includes('aguardando resposta final')
+    ) {
+        return 'continuação';
+    }
+    if (text.includes('fila de intervencao') || text.includes('caixa de entrada') || text.includes('nova mensagem')) {
+        return 'intervenção';
+    }
+    if (text.includes('formulario') || text.includes('permissao')) return 'decisão';
+    if (text.includes('oauth') || text.includes('sampling mcp')) return 'integração';
+    if (text.includes('pergunta ao operador') || text.includes('pergunta humana')) return 'pergunta';
+    return 'interação';
 }
 
 /**
@@ -231,7 +258,7 @@ function compactActivityLabel(value) {
  * @returns {string}
  */
 function renderTimelineEntryHeading(entry) {
-    const phase = renderActivityPhaseLabel(entry.phase);
+    const phase = renderActivityPhaseLabel(entry.phase, entry);
     const label = compactActivityLabel(entry.label);
     const progress = typeof entry.progress === 'number' ? ` (${entry.progress}%)` : '';
     const lowerLabel = label.toLowerCase();
@@ -542,7 +569,7 @@ export function cmdActivity({ println }, arg) {
     println(terminalThemeHeadline('assistant', 'Atividade Atual da LLM-B'));
     println(terminalThemeDivider(37));
     println(
-        terminalThemeRow('Estado', renderActivityPhaseLabel(current.phase), {
+        terminalThemeRow('Estado', renderActivityPhaseLabel(current.phase, current), {
             role: renderActivitySeverityRole(current.severity),
         }),
     );
