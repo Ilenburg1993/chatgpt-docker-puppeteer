@@ -1791,6 +1791,56 @@ describe('terminal/commands/events', () => {
         expect(parsed.entries[0]).not.toHaveProperty('payload');
     });
 
+    it('usa publicChunk seguro no preview de JSON compacto de delta', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 1,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 5,
+                event: 'delta',
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    timestamp: 1710000000000,
+                    eventId: 43,
+                    event: 'delta',
+                    source: 'terminal-dialog/delta',
+                    eventSource: null,
+                    traceId: 'turn:abc',
+                    turnId: 'turn-1',
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        chunk: '<thinking>segredo</thinking>\nDELTA-CANONICAL-1',
+                        publicChunk: 'DELTA-CANONICAL-1',
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '3 --json compact event=delta');
+
+        const parsed = JSON.parse(ctx.output());
+        expect(parsed.entries[0]).toMatchObject({
+            eventId: 43,
+            event: 'delta',
+            payloadKeys: expect.arrayContaining(['chunk', 'publicChunk']),
+            payloadPreview: 'DELTA-CANONICAL-1',
+        });
+        expect(JSON.stringify(parsed.entries[0])).not.toContain('segredo');
+        expect(parsed.entries[0]).not.toHaveProperty('payload');
+    });
+
     it('emite preview JSONL raw compacto para comparacao visual com artefatos SSE', async () => {
         const ctx = mockCtx();
 

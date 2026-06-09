@@ -1348,12 +1348,20 @@ function summarizePayload(payload, opts = {}) {
 /**
  * @param {Record<string, unknown> | null | undefined} payload
  * @param {string} event
+ * @param {{ preferPublicPayload?: boolean }} [opts]
  * @returns {{ payloadKeys: string[]; payloadPreview: string | null }}
  */
-function summarizeRawPreviewPayload(payload, event) {
+function summarizeRawPreviewPayload(payload, event, opts = {}) {
     if (!payload || typeof payload !== 'object') return { payloadKeys: [], payloadPreview: null };
     const redactedPayload = redactSecretRecord(payload);
     const payloadKeys = Object.keys(redactedPayload).slice(0, 12);
+    if (opts.preferPublicPayload === true && event === 'delta' && typeof redactedPayload['publicChunk'] === 'string') {
+        const publicChunk = redactedPayload['publicChunk'];
+        return {
+            payloadKeys,
+            payloadPreview: publicChunk.trim() ? compact(publicChunk, 180) : '(delta público vazio)',
+        };
+    }
     const summary = summarizePayload(redactedPayload, { showIds: true, event });
     const payloadPreview = summary || compact(JSON.stringify(redactedPayload), 180);
     return { payloadKeys, payloadPreview: payloadPreview || null };
@@ -1389,12 +1397,13 @@ function findCompactPayloadString(value, fieldNames, depth = 0) {
 
 /**
  * @param {Record<string, unknown>} entry
+ * @param {{ preferPublicPayload?: boolean }} [opts]
  * @returns {Record<string, unknown>}
  */
-function createRawPreviewEntry(entry) {
+function createRawPreviewEntry(entry, opts = {}) {
     const event = typeof entry['event'] === 'string' ? entry['event'] : 'event';
     const payload = /** @type {Record<string, unknown> | null | undefined} */ (entry['payload']);
-    const payloadSummary = summarizeRawPreviewPayload(payload, event);
+    const payloadSummary = summarizeRawPreviewPayload(payload, event, opts);
     const toolCallId = findCompactPayloadString(payload, ['toolCallId', 'tool_call_id', 'callId']);
     const requestId = findCompactPayloadString(payload, ['requestId', 'request_id', 'pendingRequestId']);
     return {
@@ -1590,7 +1599,10 @@ export async function cmdEvents({ println }, arg = '') {
     const filters = defaultHumanTail ? { ...projection.filters, limit: query.limit } : projection.filters;
 
     if (format === 'json') {
-        const jsonEntries = jsonMode === 'compact' ? entries.map(createRawPreviewEntry) : entries;
+        const jsonEntries =
+            jsonMode === 'compact'
+                ? entries.map((entry) => createRawPreviewEntry(entry, { preferPublicPayload: true }))
+                : entries;
         println(JSON.stringify(redactSecretRecord({ state, filters, entries: jsonEntries }), null, 2));
         return;
     }

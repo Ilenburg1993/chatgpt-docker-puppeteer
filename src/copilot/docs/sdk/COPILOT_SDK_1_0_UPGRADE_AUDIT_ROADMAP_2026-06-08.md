@@ -3164,7 +3164,7 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Quadragésima Primeira Passada
 
-- [ ] SDK10-P141-01: após o live com `sse-delta-public-chunk`, avaliar se comandos `/events --json compact` devem
+- [x] SDK10-P141-01: após o live com `sse-delta-public-chunk`, avaliar se comandos `/events --json compact` devem
   privilegiar `publicChunk` nos previews compactos de `delta`, mantendo `chunk` cru apenas no modo full/raw.
 
 ### Execução Contínua Em 2026-06-08 - Centésima Quadragésima Segunda Passada
@@ -3178,6 +3178,19 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   canônico `tools -> deltas públicos -> ask_user`.
 - [x] Validado com `node --check src/copilot/terminal/events/sdk-session-events.js`.
 - [x] Validado com `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js` (1 arquivo, 29 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+
+### Execução Contínua Em 2026-06-08 - Centésima Quadragésima Terceira Passada
+
+- [x] `/events --json compact event=delta` agora usa `publicChunk` como `payloadPreview` quando ele existe, evitando que
+  automações e dashboards compactos vejam `chunk` cru com tags de raciocínio ou HTML bruto.
+- [x] `/events --raw preview` e `/events --raw full` permanecem forenses: o payload cru continua acessível apenas nas
+  superfícies explicitamente raw/full.
+- [x] A cobertura unitária adiciona um delta com `chunk` contendo `<thinking>segredo</thinking>` e `publicChunk` seguro,
+  validando que o JSON compacto expõe `DELTA-CANONICAL-1` e não contém o segredo bruto.
+- [x] Validado com `node --check src/copilot/terminal/commands/events.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js` (1 arquivo, 31 testes).
 - [x] Validado com `npm run lint:copilot`.
 - [x] Validado com `npm run typecheck:strict:src.copilot`.
 
