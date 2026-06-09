@@ -315,6 +315,16 @@ describe('copilot MCP tools', () => {
         assert.equal(imports.isError, undefined);
         assert.equal(imports.structuredContent?.['success'], true);
         assert.ok(String(imports.structuredContent?.['output'] ?? '').includes("from 'zod'"));
+
+        const orphanImportsTool = findTool('repo_find_orphan_imports');
+        const orphanImports = await orphanImportsTool.handler({
+            path: 'src/copilot/mcp/tools/repo-index.js',
+            maxResults: 5,
+        });
+        assert.equal(orphanImports.isError, undefined);
+        assert.equal(orphanImports.structuredContent?.['success'], true);
+        assert.equal(orphanImports.structuredContent?.['totalOrphans'], 0);
+        assert.equal(typeof orphanImports.structuredContent?.['checkedImports'], 'number');
     });
 
     it('repo_diff_files returns a canonical unified diff', async () => {

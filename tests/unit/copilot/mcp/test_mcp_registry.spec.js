@@ -80,6 +80,7 @@ describe('copilot MCP registry', () => {
             'repo_file_outline',
             'repo_file_stats',
             'repo_find_imports',
+            'repo_find_orphan_imports',
             'repo_find_symbol_usages',
             'repo_index_build',
             'repo_index_find_symbol',

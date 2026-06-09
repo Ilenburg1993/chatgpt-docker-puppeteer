@@ -20,9 +20,12 @@ import {
     invalidateIoIndexPath,
     normalizeSearchWindow,
     paginateSearchItems,
+    parseFileForContext,
     searchIoIndex,
 } from '#copilot/infra/public/indexing';
+import { readText, scanDirectory, statPath } from '#copilot/infra/public/io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
+import { dirname, extname, join, relative, resolve as resolvePath } from 'node:path';
 import { z } from 'zod';
 import {
     boundedWriteAnnotations,
@@ -32,9 +35,15 @@ import {
     readMcpIndexAutoBuildState,
     readOnlyAnnotations,
     resolveReadPath,
+    toWorkspaceRelativePath,
 } from '#copilot/mcp/control-plane';
 
 const DEFAULT_INDEX_PATH = 'src/copilot';
+const DEFAULT_ORPHAN_IMPORT_SCAN_PATH = 'src/copilot';
+const DEFAULT_ORPHAN_IMPORT_MAX_FILES = 500;
+const MODULE_FILE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.json'];
+const MODULE_INDEX_CANDIDATES = MODULE_FILE_EXTENSIONS.map((extension) => `index${extension}`);
+const LOCAL_IMPORT_ALIAS_PREFIXES = ['#copilot'];
 
 /**
  * @param {unknown} value
@@ -45,6 +54,122 @@ function normalizeOptionalRepoPath(value, fallback) {
     if (value === undefined || value === null) return fallback;
     const text = String(value).trim();
     return text === '' ? fallback : text;
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @param {number} max
+ * @returns {number}
+ */
+function normalizePositiveInteger(value, fallback, max) {
+    const parsed = Number(value ?? fallback);
+    return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, max) : fallback;
+}
+
+/**
+ * @param {Array<{ type: string; absolutePath: string; children?: unknown }>} entries
+ * @returns {Array<{ absolutePath: string; relativePath: string }>}
+ */
+function flattenScanFiles(entries) {
+    /** @type {Array<{ absolutePath: string; relativePath: string }>} */
+    const files = [];
+    for (const entry of entries) {
+        if (entry.type === 'file') {
+            files.push({
+                absolutePath: entry.absolutePath,
+                relativePath: toWorkspaceRelativePath(entry.absolutePath),
+            });
+        }
+        if (Array.isArray(entry.children)) {
+            files.push(...flattenScanFiles(/** @type {Array<{ type: string; absolutePath: string; children?: unknown }>} */ (entry.children)));
+        }
+    }
+    return files;
+}
+
+/**
+ * @param {string} filePath
+ * @returns {boolean}
+ */
+function isAnalyzableModuleFile(filePath) {
+    return MODULE_FILE_EXTENSIONS.includes(extname(filePath).toLowerCase());
+}
+
+/**
+ * @param {string} source
+ * @returns {boolean}
+ */
+function isLocalImportSource(source) {
+    return source.startsWith('.') || LOCAL_IMPORT_ALIAS_PREFIXES.some((prefix) => source === prefix || source.startsWith(`${prefix}/`));
+}
+
+/**
+ * @param {string} source
+ * @param {string} importerPath
+ * @returns {string | null}
+ */
+function resolveImportBasePath(source, importerPath) {
+    if (source.startsWith('.')) return resolvePath(dirname(importerPath), source);
+    if (source === '#copilot') return join(WORKSPACE_ROOT, 'src/copilot');
+    if (source.startsWith('#copilot/')) return join(WORKSPACE_ROOT, 'src/copilot', source.slice('#copilot/'.length));
+    return null;
+}
+
+/**
+ * @param {string} basePath
+ * @returns {string[]}
+ */
+function buildModuleCandidatePaths(basePath) {
+    const candidates = new Set([basePath]);
+    const hasExtension = extname(basePath) !== '';
+    if (!hasExtension) {
+        for (const extension of MODULE_FILE_EXTENSIONS) {
+            candidates.add(`${basePath}${extension}`);
+        }
+        for (const fileName of MODULE_INDEX_CANDIDATES) {
+            candidates.add(join(basePath, fileName));
+        }
+    }
+    return [...candidates];
+}
+
+/**
+ * @param {string} filePath
+ * @returns {Promise<boolean>}
+ */
+async function fileExists(filePath) {
+    try {
+        const result = await statPath(filePath);
+        return result.stats.isFile();
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * @param {string[]} candidates
+ * @returns {Promise<boolean>}
+ */
+async function anyCandidateExists(candidates) {
+    for (const candidate of candidates) {
+        if (await fileExists(candidate)) return true;
+    }
+    return false;
+}
+
+/**
+ * @param {Array<{ file: string; line: number; source: string; dynamic: boolean; attemptedTargets: string[] }>} rows
+ * @returns {string}
+ */
+function formatOrphanImportRows(rows) {
+    return rows
+        .map((row) => {
+            const dynamic = row.dynamic ? ' dynamic' : '';
+            const attempted = row.attemptedTargets.slice(0, 3).join(', ');
+            return `${row.file}:${row.line}: import${dynamic} from '${row.source}' -> alvo local não encontrado (${attempted})`;
+        })
+        .join('\n');
 }
 
 /**
@@ -294,6 +419,126 @@ export const repoIndexTools = [
                     cursorOffset: paged.cursorOffset,
                     engine: 'fts5-index',
                     stats,
+                },
+                output,
+            );
+        },
+    },
+    {
+        name: 'repo_find_orphan_imports',
+        title: 'Find orphan repository imports',
+        description:
+            'Parse a workspace file or directory and report local relative or #copilot imports whose target file cannot be found.',
+        inputSchema: {
+            path: z
+                .string()
+                .optional()
+                .describe('Workspace-relative file or directory path. Default: src/copilot. Empty string uses default.'),
+            recursive: z.boolean().optional().describe('Scan directories recursively. Default: true.'),
+            depth: z.number().int().positive().max(50).optional().describe('Directory scan depth. Default: 20.'),
+            respectGitignore: z.boolean().optional().describe('Respect .gitignore while scanning directories. Default: true.'),
+            includeDynamic: z.boolean().optional().describe('Also validate dynamic import() sources. Default: true.'),
+            maxFiles: z.number().int().positive().max(5000).optional().describe('Maximum files to parse. Default: 500.'),
+            maxResults: z.number().int().positive().max(500).optional().describe('Maximum returned rows. Default: 50.'),
+            cursor: z.string().optional().describe('Cursor returned by a previous repo_find_orphan_imports call.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ path, recursive, depth, respectGitignore, includeDynamic, maxFiles, maxResults, cursor }) => {
+            const resolved = await resolveReadPath(
+                normalizeOptionalRepoPath(path, DEFAULT_ORPHAN_IMPORT_SCAN_PATH),
+            );
+            if (!resolved.ok) return errorResult(resolved.reason, resolved);
+            const stat = await statPath(resolved.resolved);
+            const fileLimit = normalizePositiveInteger(maxFiles, DEFAULT_ORPHAN_IMPORT_MAX_FILES, 5000);
+            /** @type {Array<{ absolutePath: string; relativePath: string }>} */
+            let files;
+            let scannedEntries = 1;
+            let blockedEntries = 0;
+            let hardLimitReached = false;
+            if (stat.stats.isFile()) {
+                files = isAnalyzableModuleFile(resolved.resolved)
+                    ? [{ absolutePath: resolved.resolved, relativePath: resolved.relative }]
+                    : [];
+            } else {
+                const scan = await scanDirectory(resolved.resolved, {
+                    workspaceRoot: WORKSPACE_ROOT,
+                    recursive: recursive ?? true,
+                    depth: depth ?? 20,
+                    respectGitignore: respectGitignore ?? true,
+                    include: MODULE_FILE_EXTENSIONS.map((extension) => `*${extension}`),
+                    maxEntries: fileLimit * 3,
+                    fingerprint: false,
+                });
+                scannedEntries = scan.scannedEntries;
+                blockedEntries = scan.blockedEntries;
+                hardLimitReached = scan.io.advisoryLimits?.['hardLimitReached'] === true;
+                files = flattenScanFiles(scan.entries).filter((entry) => isAnalyzableModuleFile(entry.absolutePath));
+            }
+            const limitedFiles = files.slice(0, fileLimit);
+            /** @type {Array<{ file: string; line: number; source: string; dynamic: boolean; attemptedTargets: string[] }>} */
+            const orphanImports = [];
+            /** @type {Array<{ file: string; error: string }>} */
+            const parseErrors = [];
+            let checkedImports = 0;
+            let skippedExternalImports = 0;
+            let skippedDynamicImports = 0;
+            for (const file of limitedFiles) {
+                try {
+                    const text = await readText(file.absolutePath);
+                    const parsed = await parseFileForContext(file.absolutePath, text.content);
+                    for (const importEntry of parsed.symbols.imports) {
+                        if (importEntry.isDynamic && includeDynamic === false) {
+                            skippedDynamicImports += 1;
+                            continue;
+                        }
+                        const source = String(importEntry.source ?? '');
+                        if (!isLocalImportSource(source)) {
+                            skippedExternalImports += 1;
+                            continue;
+                        }
+                        const basePath = resolveImportBasePath(source, file.absolutePath);
+                        if (!basePath) continue;
+                        const candidates = buildModuleCandidatePaths(basePath);
+                        checkedImports += 1;
+                        if (await anyCandidateExists(candidates)) continue;
+                        orphanImports.push({
+                            file: file.relativePath,
+                            line: Number(importEntry.line ?? 0),
+                            source,
+                            dynamic: importEntry.isDynamic === true,
+                            attemptedTargets: candidates.map((candidate) => relative(WORKSPACE_ROOT, candidate)),
+                        });
+                    }
+                } catch (error) {
+                    parseErrors.push({
+                        file: file.relativePath,
+                        error: error instanceof Error ? error.message : String(error),
+                    });
+                }
+            }
+            const window = normalizeSearchWindow({ maxResults, cursor });
+            const paged = paginateSearchItems(orphanImports, window);
+            const output = formatOrphanImportRows(paged.items);
+            return okResult(
+                {
+                    success: true,
+                    path: resolved.relative,
+                    workspaceRoot: getMcpWorkspaceRoot(),
+                    scannedEntries,
+                    blockedEntries,
+                    scannedFiles: limitedFiles.length,
+                    totalCandidateFiles: files.length,
+                    checkedImports,
+                    skippedExternalImports,
+                    skippedDynamicImports,
+                    parseErrors,
+                    orphanCount: paged.items.length,
+                    totalOrphans: paged.totalItems,
+                    truncated: paged.truncated || files.length > limitedFiles.length || hardLimitReached,
+                    nextCursor: paged.nextCursor,
+                    cursorOffset: paged.cursorOffset,
+                    output,
+                    orphans: paged.items,
                 },
                 output,
             );

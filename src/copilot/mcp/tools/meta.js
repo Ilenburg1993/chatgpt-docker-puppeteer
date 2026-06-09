@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 34;
+const CAPABILITIES_VERSION = 35;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -46,6 +46,7 @@ const INDEX_TOOLS = [
     'repo_index_search',
     'repo_index_find_symbol',
     'repo_find_imports',
+    'repo_find_orphan_imports',
     'repo_index_invalidate',
 ];
 
@@ -167,6 +168,7 @@ const IO_GUIDANCE = [
     'Use repo_search_text.contextLines for investigation and cursor/nextCursor for pagination.',
     'Use repo_find_symbol_usages for impact analysis before refactors.',
     'Use repo_index_build then repo_index_search/repo_index_find_symbol/repo_find_imports for indexed navigation.',
+    'Use repo_find_orphan_imports before or after file moves to detect broken local imports.',
     'COPILOT_MCP_INDEX_AUTO_BUILD defaults to true so indexed navigation is warmed outside ChatGPT host calls.',
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
     'Use mcp_run_safe_validation_suite suite="mcp-full" before separate validator calls when ChatGPT needs one canonical verification step.',

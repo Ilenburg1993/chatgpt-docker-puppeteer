@@ -3424,6 +3424,26 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `npm run lint:copilot`.
 - [x] Validado com `npm run typecheck:strict:src.copilot`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quinquagésima Quarta Passada
+
+- [x] A análise de gaps do toolkit apontou a ausência de uma tool canônica para importações órfãs; a família existente
+  de índice só buscava imports por `source`, mas não percorria dependências quebradas de forma direta.
+- [x] `repo_find_orphan_imports` foi adicionada como tool read-only, aceita arquivo ou diretório, usa o parser canônico
+  de `parseFileForContext()` e resolve imports locais `.`/`#copilot` com candidatos explícitos de arquivo e `index.*`.
+- [x] A tool é paginada, respeita `maxFiles`, `maxResults`, `cursor` e relata `checkedImports`, `skippedExternalImports`,
+  `skippedDynamicImports`, `parseErrors` e os alvos tentados, para deixar claro o que foi analisado e o que foi ignorado.
+- [x] O catálogo canônico foi atualizado em `mcp/tools/meta.js`, `mcp/tool-surface.js`, `mcp/README.md` e nos testes de
+  registry/tool surface, evitando que a nova capability ficasse invisível ou fora da surface de baixa latência.
+- [x] O live test LLM-B confirmou o fluxo canônico de `report_intent -> read_file_content -> ask_user -> pós-resposta`,
+  e também expôs um resíduo UX novo: a linha “Terminal iniciado” ainda carrega `preflight ok` no `/events` default.
+- [x] Validado com `node --check src/copilot/mcp/tools/repo-index.js src/copilot/mcp/tools/meta.js tests/unit/copilot/mcp/test_mcp_tools.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/mcp/test_mcp_tools.spec.js
+  tests/unit/copilot/mcp/test_mcp_registry.spec.js` (2 arquivos, 44 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
+  --live-scenario=canonical`; PASS em `artifacts/terminal-live/2026-06-09T16-36-15-925Z/summary.md`.
+
 ---
 
 ## Decisões Arquiteturais

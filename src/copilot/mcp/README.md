@@ -125,6 +125,7 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `repo_index_search`
 - `repo_index_find_symbol`
 - `repo_find_imports`
+- `repo_find_orphan_imports`
 - `repo_index_invalidate`
 - `git_status`
 - `git_diff`
@@ -199,7 +200,7 @@ As tools MCP de leitura espelham o plano de IO usado pelas tools locais da LLM-B
 - `repo_file_outline` espelha `workspace_parse_file` para symbols/imports/exports/outline sem expor
   runtime da LLM-B.
 - `repo_index_status`, `repo_index_build`, `repo_index_search`, `repo_index_find_symbol`,
-  `repo_find_imports` e `repo_index_invalidate` espelham a familia
+  `repo_find_imports`, `repo_find_orphan_imports` e `repo_index_invalidate` espelham a familia
   `workspace_index_*`/`workspace_find_imports` usando a mesma engine FTS5/simbolica compartilhada.
 
 Erros recuperaveis usam contratos estaveis em `structuredContent`:

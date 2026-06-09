@@ -36,6 +36,7 @@ const LATENCY_SURFACE_TOOL_NAMES = new Set([
     'repo_file_outline',
     'repo_file_stats',
     'repo_symbol_search',
+    'repo_find_orphan_imports',
     'repo_patch_plan',
     'repo_apply_patch',
     'repo_create_file',
