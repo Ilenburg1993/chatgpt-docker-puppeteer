@@ -36,7 +36,7 @@ export const DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 export const DEFAULT_CLOUDFLARE_METRICS_ADDR = '127.0.0.1:60123';
 export const DEFAULT_CLOUDFLARE_LOGLEVEL = 'info';
 export const DEFAULT_CLOUDFLARE_TRANSPORT_PROTOCOL = 'http2';
-export const DEFAULT_MCP_ORIGIN_TRANSPORT = 'http';
+export const DEFAULT_MCP_ORIGIN_TRANSPORT = 'http2';
 
 /**
  * Matches trycloudflare URLs in stdout/stderr without capturing path, query or fragment.

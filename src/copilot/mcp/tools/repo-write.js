@@ -252,22 +252,25 @@ async function sha256File(filePath) {
 /**
  * @param {unknown} operation
  * @param {number} index
+ * @param {{ virtualFiles: Map<string, { relative: string; bytes: number }> }} [context]
  * @returns {Promise<Record<string, unknown>>}
  */
-async function previewBatchFileOperation(operation, index) {
+async function previewBatchFileOperation(operation, index, context = { virtualFiles: new Map() }) {
     const item = /** @type {Record<string, unknown>} */ (operation);
     const type = String(item['type'] ?? '');
     if (type === 'create_file') {
         const resolved = await resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
         const exists = await pathExists(resolved.resolved);
+        const bytes = Buffer.byteLength(String(item['content'] ?? ''), 'utf8');
+        if (!exists) context.virtualFiles.set(resolved.resolved, { relative: resolved.relative, bytes });
         return {
             index,
             type,
             path: resolved.relative,
             wouldCreate: !exists,
             destinationExists: exists,
-            bytes: Buffer.byteLength(String(item['content'] ?? ''), 'utf8'),
+            bytes,
         };
     }
     if (type === 'move_file') {
@@ -275,22 +278,29 @@ async function previewBatchFileOperation(operation, index) {
         if (!source.ok) throw new Error(`operation ${index}: ${source.reason}`);
         const destination = await resolveWritePath(String(item['destination'] ?? ''));
         if (!destination.ok) throw new Error(`operation ${index}: ${destination.reason}`);
-        const stats = await fs.stat(source.resolved);
+        const virtualSource = context.virtualFiles.get(source.resolved);
+        const stats = virtualSource ? null : await fs.stat(source.resolved);
         const destinationExists = await pathExists(destination.resolved);
-        if (destinationExists && item['overwrite'] !== true) {
+        const virtualDestinationExists = context.virtualFiles.has(destination.resolved);
+        if ((destinationExists || virtualDestinationExists) && item['overwrite'] !== true) {
             throw new Error(`operation ${index}: destination already exists: ${destination.relative}`);
         }
         if (item['overwrite'] === true && item['confirmOverwrite'] !== true) {
             throw new Error(`operation ${index}: confirmOverwrite must be true when overwrite=true`);
+        }
+        if (virtualSource) {
+            context.virtualFiles.delete(source.resolved);
+            context.virtualFiles.set(destination.resolved, { relative: destination.relative, bytes: virtualSource.bytes });
         }
         return {
             index,
             type,
             source: source.relative,
             destination: destination.relative,
-            sourceBytes: stats.size,
-            destinationExists,
+            sourceBytes: virtualSource?.bytes ?? stats?.size ?? 0,
+            destinationExists: destinationExists || virtualDestinationExists,
             overwrite: item['overwrite'] === true,
+            virtualSource: Boolean(virtualSource),
         };
     }
     if (type === 'quarantine_file' || type === 'remove_file') {
@@ -426,8 +436,9 @@ export const repoWriteTools = [
         handler: async ({ operations }) => {
             try {
                 const previews = [];
+                const previewContext = { virtualFiles: new Map() };
                 for (const [index, operation] of operations.entries()) {
-                    previews.push(await previewBatchFileOperation(operation, index));
+                    previews.push(await previewBatchFileOperation(operation, index, previewContext));
                 }
                 await appendMcpAuditEvent({
                     event: 'repo_apply_file_batch_plan',
@@ -485,8 +496,9 @@ export const repoWriteTools = [
             }
             try {
                 const previews = [];
+                const previewContext = { virtualFiles: new Map() };
                 for (const [index, operation] of operations.entries()) {
-                    previews.push(await previewBatchFileOperation(operation, index));
+                    previews.push(await previewBatchFileOperation(operation, index, previewContext));
                 }
                 if (isDryRun) {
                     await appendMcpAuditEvent({

@@ -7,6 +7,9 @@ import path from 'node:path';
 import process from 'node:process';
 
 export const CLOUDFLARED_TOKEN_FILE_MIN_VERSION = '2025.4.0';
+const DEFAULT_STOP_TIMEOUT_MS = 5_000;
+const DEFAULT_KILL_TIMEOUT_MS = 2_000;
+const STOP_POLL_INTERVAL_MS = 100;
 
 /**
  * @typedef {{ ok: true; version: string; parsedVersion?: string } | { ok: false; error: string }} CloudflaredVersion
@@ -111,23 +114,124 @@ export async function ensureDetachedProcess(options) {
 
 /**
  * @param {string} pidFile
- * @returns {Promise<{ pidFile: string; pid: number | null; wasAlive: boolean; stopped: boolean; error: string | null; processGroupSignalled: boolean }>}
+ * @returns {Promise<{ pidFile: string; pid: number | null; wasAlive: boolean; stopped: boolean; error: string | null; processGroupSignalled: boolean; forcedKilled: boolean; stopWaitMs: number }>}
  */
 export async function stopPidFileProcess(pidFile) {
     const status = await readPidFileStatus(pidFile);
-    if (!status.pid) return { pidFile, pid: null, wasAlive: false, stopped: true, error: null, processGroupSignalled: false };
+    if (!status.pid) {
+        return {
+            pidFile,
+            pid: null,
+            wasAlive: false,
+            stopped: true,
+            error: null,
+            processGroupSignalled: false,
+            forcedKilled: false,
+            stopWaitMs: 0,
+        };
+    }
     let processGroupSignalled = false;
+    let forcedKilled = false;
+    const startedAt = Date.now();
     if (status.alive) {
         try {
             process.kill(-status.pid, 'SIGTERM');
             processGroupSignalled = true;
         } catch {
-            try { process.kill(status.pid, 'SIGTERM'); } catch (error) { return { pidFile, pid: status.pid, wasAlive: true, stopped: false, error: error instanceof Error ? error.message : String(error), processGroupSignalled }; }
+            try {
+                process.kill(status.pid, 'SIGTERM');
+            } catch (error) {
+                return {
+                    pidFile,
+                    pid: status.pid,
+                    wasAlive: true,
+                    stopped: false,
+                    error: error instanceof Error ? error.message : String(error),
+                    processGroupSignalled,
+                    forcedKilled,
+                    stopWaitMs: Date.now() - startedAt,
+                };
+            }
+        }
+        let stopped = await waitForPidExit(status.pid, readStopTimeoutMs(process.env));
+        if (!stopped) {
+            forcedKilled = true;
+            try {
+                process.kill(processGroupSignalled ? -status.pid : status.pid, 'SIGKILL');
+            } catch {
+                // Process may have exited between the timeout and SIGKILL.
+            }
+            stopped = await waitForPidExit(status.pid, DEFAULT_KILL_TIMEOUT_MS);
+        }
+        if (!stopped) {
+            return {
+                pidFile,
+                pid: status.pid,
+                wasAlive: true,
+                stopped: false,
+                error: 'process-still-alive-after-stop-timeout',
+                processGroupSignalled,
+                forcedKilled,
+                stopWaitMs: Date.now() - startedAt,
+            };
         }
     }
     await rm(pidFile, { force: true });
     await rm(`${pidFile}.json`, { force: true });
-    return { pidFile, pid: status.pid, wasAlive: status.alive, stopped: true, error: null, processGroupSignalled };
+    return {
+        pidFile,
+        pid: status.pid,
+        wasAlive: status.alive,
+        stopped: true,
+        error: null,
+        processGroupSignalled,
+        forcedKilled,
+        stopWaitMs: Date.now() - startedAt,
+    };
+}
+
+/**
+ * @param {number} pid
+ * @param {number} timeoutMs
+ * @returns {Promise<boolean>}
+ */
+async function waitForPidExit(pid, timeoutMs) {
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+    while (isPidAlive(pid)) {
+        if (Date.now() >= deadline) return false;
+        await sleep(STOP_POLL_INTERVAL_MS);
+    }
+    return true;
+}
+
+/**
+ * @param {number} pid
+ * @returns {boolean}
+ */
+function isPidAlive(pid) {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {number}
+ */
+function readStopTimeoutMs(env) {
+    const parsed = Number(env['COPILOT_MCP_PROCESS_STOP_TIMEOUT_MS'] ?? DEFAULT_STOP_TIMEOUT_MS);
+    return Number.isFinite(parsed) && parsed >= 500 ? Math.floor(parsed) : DEFAULT_STOP_TIMEOUT_MS;
 }
 
 /** @param {string} metadataFile @returns {Promise<unknown | null>} */

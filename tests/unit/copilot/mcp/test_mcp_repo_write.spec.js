@@ -183,6 +183,36 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(await fs.readFile(moved, 'utf8'), 'move in batch\n');
     });
 
+    it('supports dependent create then move operations in one file batch', async () => {
+        assert.ok(applyFileBatchPlanTool);
+        assert.ok(applyFileBatchTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const created = path.join(dir, 'batch-created-then-moved.txt');
+        const moved = path.join(dir, 'batch-created-then-moved.final.txt');
+
+        const operations = [
+            { type: 'create_file', path: created, content: 'created then moved\\n' },
+            { type: 'move_file', source: created, destination: moved },
+        ];
+        const plan = await applyFileBatchPlanTool.handler({ operations });
+        assert.equal(plan.isError, undefined);
+        assert.equal(plan.structuredContent.success, true);
+        assert.equal(plan.structuredContent.operations[1].virtualSource, true);
+
+        const dryRun = await applyFileBatchTool.handler({ operations });
+        assert.equal(dryRun.isError, undefined);
+        assert.equal(dryRun.structuredContent.success, true);
+        assert.equal(dryRun.structuredContent.operations[1].virtualSource, true);
+        await assert.rejects(() => fs.access(created));
+        await assert.rejects(() => fs.access(moved));
+
+        const applied = await applyFileBatchTool.handler({ operations, dryRun: false, confirmBatch: true });
+        assert.equal(applied.isError, undefined);
+        assert.equal(applied.structuredContent.success, true);
+        assert.equal(await pathExists(created), false);
+        assert.equal(await fs.readFile(moved, 'utf8'), 'created then moved\\n');
+    });
+
     it('quarantines and restores files through a reversible workspace flow', async () => {
         assert.ok(listQuarantineTool);
         assert.ok(inspectQuarantinedFileTool);

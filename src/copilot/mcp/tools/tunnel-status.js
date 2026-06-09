@@ -366,25 +366,30 @@ export const mcpPostRestartReadinessTool = {
             connectorSmoke.ok === true &&
             typeof connectorSmoke.ageMinutes === 'number' &&
             connectorSmoke.ageMinutes <= CONNECTOR_SMOKE_STALE_AFTER_MINUTES;
-        const [mcpHttpProcess, cloudflaredProcess, localHealth] = await Promise.all([
+        const publicHealthUrl = config.publicMcpUrl ? new URL('/health', config.publicMcpUrl).toString() : null;
+        const [mcpHttpProcess, cloudflaredProcess, localHealth, publicHealth] = await Promise.all([
             readPidFileStatus(config.mcpHttpPidFile),
             readPidFileStatus(config.managedTunnelPidFile),
             probeHealth(config.healthUrl),
+            publicHealthUrl ? probeHealth(publicHealthUrl) : Promise.resolve({ ok: false, error: 'public MCP URL not configured' }),
         ]);
         const originDiagnostics = await readCloudflaredOriginDiagnostics();
         const permanentUrlReady =
             config.mode === 'named-permanent' && Boolean(config.publicMcpUrl) && publicUrlValidation?.ok === true;
+        const healthReady = localHealth.ok || publicHealth.ok;
         const ready =
             permanentUrlReady &&
             mcpHttpProcess.alive &&
             cloudflaredProcess.alive &&
-            localHealth.ok &&
+            healthReady &&
             connectorSmokeFresh;
         const nextActions = [];
         if (!permanentUrlReady)
             nextActions.push('Fix COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or public hostname configuration.');
-        if (!mcpHttpProcess.alive || !cloudflaredProcess.alive || !localHealth.ok) {
+        if (!mcpHttpProcess.alive || !cloudflaredProcess.alive || !healthReady) {
             nextActions.push('Run make copilot-mcp-restart.');
+        } else if (!localHealth.ok && publicHealth.ok) {
+            nextActions.push('Local HTTPS health probe failed, but public connector health is OK; inspect SNI/local TLS only if origin debugging is needed.');
         }
         if (!connectorSmokeFresh)
             nextActions.push('Run mcp_connector_smoke_refresh or make copilot-mcp-smoke-refresh.');
@@ -402,6 +407,8 @@ export const mcpPostRestartReadinessTool = {
                 cloudflared: cloudflaredProcess,
             },
             localHealth,
+            publicHealth,
+            healthReady,
             originDiagnostics,
             connectorSmoke: {
                 ...connectorSmoke,

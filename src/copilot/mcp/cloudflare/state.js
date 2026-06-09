@@ -25,6 +25,7 @@ import path from 'node:path';
  *   missingCriticalTools: string[];
  *   missingLocalTools: string[];
  *   unexpectedRemoteTools: string[];
+ *   authChallenge?: boolean;
  * }} toolsList
  */
 

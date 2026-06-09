@@ -7,10 +7,9 @@
 
 import { readCloudflareRemoteApiConfig } from './remote-api.js';
 import {
-    buildCloudflareAnonymousMcpExpression,
     buildCloudflareCacheBypassRoutesExpression,
     buildCloudflareMcpCompressionBypassExpression,
-    buildCloudflareOAuthTokenExpression,
+    buildCloudflareOAuthTokenOrAnonymousMcpExpression,
     buildCloudflarePublicMetadataCacheExpression,
 } from './routes.js';
 
@@ -24,8 +23,7 @@ export async function buildCloudflareEdgePolicyPlan(options = {}) {
     const cacheBypassExpression = buildCloudflareCacheBypassRoutesExpression(hostname);
     const publicMetadataCacheExpression = buildCloudflarePublicMetadataCacheExpression(hostname);
     const mcpCompressionBypassExpression = buildCloudflareMcpCompressionBypassExpression(hostname);
-    const anonymousMcpExpression = buildCloudflareAnonymousMcpExpression(hostname);
-    const oauthTokenExpression = buildCloudflareOAuthTokenExpression(hostname);
+    const constrainedRateLimitExpression = buildCloudflareOAuthTokenOrAnonymousMcpExpression(hostname);
 
     return {
         ok: true,
@@ -90,43 +88,22 @@ export async function buildCloudflareEdgePolicyPlan(options = {}) {
             },
             {
                 phase: 'http_ratelimit',
-                name: 'MCP OAuth token endpoint protection',
+                name: 'MCP constrained rate limit policy',
                 rationale:
-                    'The token endpoint should be protected from bursts without creating friction for already-authenticated MCP calls.',
+                    'Cloudflare plan capacity allows one http_ratelimit rule here; protect /oauth/token and anonymous /mcp while authenticated MCP sessions stay high-capacity.',
                 rules: [
                     {
-                        description: 'Moderate /oauth/token burst control',
-                        expression: oauthTokenExpression,
+                        description: 'Moderate /oauth/token and anonymous /mcp burst control',
+                        expression: constrainedRateLimitExpression,
                         action: 'block',
                         manualReviewRequired: true,
                         ref: 'copilot-mcp-oauth-token-rate-limit-v1',
+                        covers: ['/oauth/token', 'anonymous /mcp without Authorization header'],
                         rateLimitDraft: {
                             periodSeconds: 10,
                             requestsPerPeriod: 20,
                             mitigationTimeoutSeconds: 10,
                             equivalentPerMinute: 120,
-                            characteristics: ['cf.colo.id', 'ip.src'],
-                        },
-                    },
-                ],
-            },
-            {
-                phase: 'http_ratelimit',
-                name: 'MCP anonymous request protection',
-                rationale:
-                    'Authenticated ChatGPT/Claude sessions should stay high-capacity; anonymous /mcp traffic can be bounded.',
-                rules: [
-                    {
-                        description: 'Bound anonymous /mcp traffic',
-                        expression: anonymousMcpExpression,
-                        action: 'block',
-                        manualReviewRequired: true,
-                        ref: 'copilot-mcp-anonymous-rate-limit-v1',
-                        rateLimitDraft: {
-                            periodSeconds: 10,
-                            requestsPerPeriod: 40,
-                            mitigationTimeoutSeconds: 10,
-                            equivalentPerMinute: 240,
                             characteristics: ['cf.colo.id', 'ip.src'],
                         },
                     },
@@ -155,7 +132,7 @@ export async function buildCloudflareEdgePolicyPlan(options = {}) {
         recommendedSequence: [
             'Run make copilot-mcp-edge-audit and keep the JSON output as the actual state snapshot.',
             'Create or edit Cloudflare rules manually in dashboard/API only after confirming expressions against the current Cloudflare Ruleset syntax.',
-            'Apply one ruleset phase at a time: cache bypass first, then token endpoint rate limit, then anonymous /mcp protection.',
+            'Apply one ruleset phase at a time: cache bypass first, then the single constrained rate-limit rule covering /oauth/token plus anonymous /mcp.',
             'After each phase, run make copilot-mcp-remote-audit, make copilot-mcp-edge-audit and make copilot-mcp-smoke-refresh.',
             'Keep this command plan-only until backup/diff/rollback tooling exists.',
         ],

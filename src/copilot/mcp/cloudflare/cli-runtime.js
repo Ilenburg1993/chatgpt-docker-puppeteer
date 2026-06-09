@@ -15,7 +15,7 @@ export function selectMcpOriginTransport(config, env = process.env) {
     const explicit = String(env['COPILOT_MCP_ORIGIN_TRANSPORT'] ?? '').trim().toLowerCase();
     if (['http', 'http1', 'http1.1'].includes(explicit)) return 'http';
     if (['http2', 'h2', 'https-h2'].includes(explicit)) return 'http2';
-    return config.originTransport ?? 'http';
+    return config.originTransport ?? 'http2';
 }
 
 /**
@@ -24,7 +24,12 @@ export function selectMcpOriginTransport(config, env = process.env) {
  */
 export async function startManagedStack({ config, env = process.env, restart = false }) {
     const originTransport = selectMcpOriginTransport(config, env);
-    if (restart) await stopManagedStack(config);
+    if (restart) {
+        const stopResult = await stopManagedStack(config);
+        if (stopResult['ok'] !== true) {
+            return { ok: false, mode: config.mode, publicMcpUrl: config.publicMcpUrl, originTransport, stopped: stopResult, error: 'managed-stack-stop-failed' };
+        }
+    }
     const mcpHttp = await ensureDetachedProcess({ name: 'mcp-http', command: process.execPath, args: ['src/copilot/mcp/cli.js', '--transport', originTransport], pidFile: config.mcpHttpPidFile, logFile: 'src/copilot/.ai/cloudflare/mcp-http.log', env: buildMcpHttpEnvironment(config, originTransport, env) });
     const cloudflared = await ensureDetachedProcess({ name: 'cloudflared', command: 'cloudflared', args: buildManagedTunnelArgs(env['CLOUDFLARE_TUNNEL_TOKEN'], config.tunnelTokenFile, config), pidFile: config.managedTunnelPidFile, logFile: 'src/copilot/.ai/cloudflare/cloudflared.log', env: buildCloudflaredEnvironment(config, env) });
     return { ok: true, mode: config.mode, publicMcpUrl: config.publicMcpUrl, originTransport, mcpHttp, cloudflared, runtime: buildRuntimeReport(config, originTransport, env) };
@@ -35,7 +40,9 @@ export async function startManagedStack({ config, env = process.env, restart = f
  * @returns {Promise<Record<string, unknown>>}
  */
 export async function stopManagedStack(config) {
-    return { ok: true, cloudflared: await stopPidFileProcess(config.managedTunnelPidFile), mcpHttp: await stopPidFileProcess(config.mcpHttpPidFile) };
+    const cloudflared = await stopPidFileProcess(config.managedTunnelPidFile);
+    const mcpHttp = await stopPidFileProcess(config.mcpHttpPidFile);
+    return { ok: cloudflared.stopped && mcpHttp.stopped, cloudflared, mcpHttp };
 }
 
 /**

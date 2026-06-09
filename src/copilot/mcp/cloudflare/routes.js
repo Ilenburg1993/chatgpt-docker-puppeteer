@@ -126,6 +126,17 @@ export function buildCloudflareOAuthTokenExpression(hostname) {
 }
 
 /**
+ * Single-rule fallback for Cloudflare plans that allow only one http_ratelimit rule.
+ * It protects the OAuth token endpoint and anonymous /mcp probes without throttling authenticated MCP traffic.
+ *
+ * @param {string} hostname
+ * @returns {string}
+ */
+export function buildCloudflareOAuthTokenOrAnonymousMcpExpression(hostname) {
+    return `(${buildCloudflareHostExpression(hostname)} and (http.request.uri.path eq "/oauth/token" or (${buildCloudflareMcpPathExpression()} and not any(http.request.headers.names[*] eq "authorization"))))`;
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */

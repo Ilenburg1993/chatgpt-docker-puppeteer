@@ -86,13 +86,14 @@ function evaluateGates(input) {
 
     const permanentTunnel = asRecord(input.tunnelStatus['permanentTunnel']);
     const originDiagnostics = asRecord(permanentTunnel['originDiagnostics']);
-    const recentOriginErrors = Array.isArray(originDiagnostics['recentOriginErrors'])
-        ? originDiagnostics['recentOriginErrors']
-        : [];
+    const recentOriginErrors = filterActionableOriginErrors(
+        Array.isArray(originDiagnostics['recentOriginErrors']) ? originDiagnostics['recentOriginErrors'] : [],
+        asRecord(permanentTunnel['lastSmoke'])['checkedAt'],
+    );
     if (permanentTunnel['lastSmokeFresh'] === true) passed.push('permanent tunnel smoke is fresh.');
     else critical.push('permanent tunnel smoke is not fresh.');
-    if (recentOriginErrors.length === 0) passed.push('no recent origin errors reported.');
-    else critical.push(`recent origin errors reported: ${recentOriginErrors.length}.`);
+    if (recentOriginErrors.length === 0) passed.push('no actionable origin errors after the latest smoke.');
+    else critical.push(`actionable origin errors after latest smoke: ${recentOriginErrors.length}.`);
 
     if (input.remoteAudit['ok'] === true) passed.push('Cloudflare remote audit ok=true.');
     else critical.push('Cloudflare remote audit did not return ok=true.');
@@ -147,6 +148,21 @@ function extractStructuredContent(result) {
     } catch (error) {
         return { success: false, error: sanitizeError(error) };
     }
+}
+
+/**
+ * @param {unknown[]} lines
+ * @param {unknown} checkedAt
+ * @returns {string[]}
+ */
+function filterActionableOriginErrors(lines, checkedAt) {
+    const checkedAtMs = Date.parse(String(checkedAt ?? ''));
+    return lines.map(String).filter((line) => {
+        if (!/\bERR\b|error=/iu.test(line)) return false;
+        if (!Number.isFinite(checkedAtMs)) return true;
+        const lineTime = Date.parse(line.slice(0, 20));
+        return !Number.isFinite(lineTime) || lineTime >= checkedAtMs;
+    });
 }
 
 /**

@@ -9,6 +9,7 @@ import Cloudflare from 'cloudflare';
 import { createCloudflareEdgeBackup } from './edge-backup.js';
 import { auditCloudflareEdgeRulesets } from './edge-audit.js';
 import { diffCloudflareEdgePolicy } from './edge-policy-diff.js';
+import { buildCloudflareOAuthTokenOrAnonymousMcpExpression } from './routes.js';
 import { readCloudflareRemoteApiConfig } from './remote-api.js';
 
 const CACHE_PHASE = 'http_request_cache_settings';
@@ -119,6 +120,7 @@ export function buildCloudflareEdgeDesiredApiRules(hostname) {
     const hostExpression = `http.host eq "${safeHostname}"`;
     const mcpPathExpression = 'starts_with(http.request.uri.path, "/mcp")';
     const dynamicExpression = `(${hostExpression} and (${mcpPathExpression} or starts_with(http.request.uri.path, "/oauth/") or starts_with(http.request.uri.path, "/.well-known/") or http.request.uri.path eq "/health"))`;
+    const constrainedRateLimitExpression = buildCloudflareOAuthTokenOrAnonymousMcpExpression(safeHostname);
     return [
         {
             phase: CACHE_PHASE,
@@ -139,31 +141,13 @@ export function buildCloudflareEdgeDesiredApiRules(hostname) {
             ref: 'copilot-mcp-oauth-token-rate-limit-v1',
             rule: {
                 ref: 'copilot-mcp-oauth-token-rate-limit-v1',
-                description: 'Moderate /oauth/token burst control',
-                expression: `(${hostExpression} and http.request.uri.path eq "/oauth/token")`,
+                description: 'Moderate /oauth/token and anonymous /mcp burst control',
+                expression: constrainedRateLimitExpression,
                 action: 'block',
                 ratelimit: {
                     characteristics: ['cf.colo.id', 'ip.src'],
                     period: 10,
                     requests_per_period: 20,
-                    mitigation_timeout: 10,
-                },
-                enabled: true,
-            },
-        },
-        {
-            phase: RATE_LIMIT_PHASE,
-            name: 'MCP anonymous request protection',
-            ref: 'copilot-mcp-anonymous-rate-limit-v1',
-            rule: {
-                ref: 'copilot-mcp-anonymous-rate-limit-v1',
-                description: 'Bound anonymous /mcp traffic',
-                expression: `(${hostExpression} and ${mcpPathExpression} and not any(http.request.headers.names[*] eq "authorization"))`,
-                action: 'block',
-                ratelimit: {
-                    characteristics: ['cf.colo.id', 'ip.src'],
-                    period: 10,
-                    requests_per_period: 40,
                     mitigation_timeout: 10,
                 },
                 enabled: true,
@@ -189,6 +173,7 @@ export function buildCloudflareEdgeApplyPlan(actualRulesets, desiredRules, optio
         const ruleset = actualRulesets.find((item) => asString(item['phase']) === desired.phase) ?? null;
         const rules = Array.isArray(ruleset?.['rules']) ? /** @type {unknown[]} */ (ruleset['rules']) : [];
         const existing = rules.find((rule) => asRecord(rule)['ref'] === desired.ref);
+        const existingMatchesDesired = existing ? cloudflareRuleMatchesDesired(asRecord(existing), desired.rule) : false;
         const missingRulesetStatus = plannedCreatedPhases.has(desired.phase)
             ? 'append-rule-after-entrypoint-create'
             : 'create-entrypoint-ruleset';
@@ -197,7 +182,7 @@ export function buildCloudflareEdgeApplyPlan(actualRulesets, desiredRules, optio
             phase: desired.phase,
             ref: desired.ref,
             name: desired.name,
-            status: existing ? 'present' : ruleset ? 'append-rule' : missingRulesetStatus,
+            status: existing ? (existingMatchesDesired ? 'present' : 'update-rule') : ruleset ? 'append-rule' : missingRulesetStatus,
             rulesetId: asString(ruleset?.['id']) || null,
             preservesExistingRules: true,
             rateLimitRuleMustRemainLast: desired.phase === RATE_LIMIT_PHASE,
@@ -213,6 +198,7 @@ export function buildCloudflareEdgeApplyPlan(actualRulesets, desiredRules, optio
             appendRules: actions.filter(
                 (action) => action['status'] === 'append-rule' || action['status'] === 'append-rule-after-entrypoint-create',
             ).length,
+            updateRules: actions.filter((action) => action['status'] === 'update-rule').length,
             alreadyPresent: actions.filter((action) => action['status'] === 'present').length,
         },
         recommendedSequence: [
@@ -221,6 +207,21 @@ export function buildCloudflareEdgeApplyPlan(actualRulesets, desiredRules, optio
             'Run edge audit, policy diff and connector smoke after applying.',
         ],
     };
+}
+
+/**
+ * @param {Record<string, unknown>} actual
+ * @param {Record<string, unknown>} desired
+ * @returns {boolean}
+ */
+function cloudflareRuleMatchesDesired(actual, desired) {
+    const actualExpression = asString(actual['expression']);
+    const desiredExpression = asString(desired['expression']);
+    if (actualExpression !== desiredExpression) return false;
+    if (asString(actual['action']) !== asString(desired['action'])) return false;
+    const actualEnabled = typeof actual['enabled'] === 'boolean' ? actual['enabled'] : true;
+    const desiredEnabled = typeof desired['enabled'] === 'boolean' ? desired['enabled'] : true;
+    return actualEnabled === desiredEnabled;
 }
 
 /**

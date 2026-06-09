@@ -25,12 +25,14 @@ import {
 
 describe('copilot MCP Cloudflare Tunnel config', () => {
     it('normalizes the MCP origin to a root HTTP URL', () => {
-        assert.equal(normalizeOriginUrl('http://127.0.0.1:3333/mcp/'), 'http://127.0.0.1:3333');
+        assert.equal(
+            normalizeOriginUrl('http://127.0.0.1:3333/mcp/', { originTransport: 'http' }),
+            'http://127.0.0.1:3333',
+        );
     });
 
     it('builds quick and remotely-managed cloudflared commands', () => {
         const config = readCloudflareTunnelConfig({
-            COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'http://127.0.0.1:3333',
             CLOUDFLARE_TUNNEL_TOKEN: 'secret-token',
         });
         assert.equal(config.mode, 'named-permanent');
@@ -50,8 +52,10 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
             'http2',
             '--metrics',
             '127.0.0.1:60123',
+            '--origin-server-name',
+            'mcp.aurelin.org',
             '--url',
-            'http://127.0.0.1:3333',
+            'https://127.0.0.1:3333',
         ]);
         assert.equal(config.transportProtocol, 'http2');
         assert.deepEqual(buildManagedTunnelArgs('secret-token', undefined, config), [
@@ -63,6 +67,8 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
             'http2',
             '--metrics',
             '127.0.0.1:60123',
+            '--origin-server-name',
+            'mcp.aurelin.org',
             'run',
             '--token',
             'secret-token',
@@ -78,6 +84,8 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
                 'http2',
                 '--metrics',
                 '127.0.0.1:60123',
+                '--origin-server-name',
+                'mcp.aurelin.org',
                 'run',
                 '--token-file',
                 'src/copilot/.ai/cloudflare/workspace-mcp-dev.token',

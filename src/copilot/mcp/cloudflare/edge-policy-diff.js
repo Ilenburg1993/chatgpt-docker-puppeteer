@@ -17,15 +17,17 @@ export async function diffCloudflareEdgePolicy(options = {}) {
         auditCloudflareEdgeRulesets(options),
         buildCloudflareEdgePolicyPlan(options),
     ]);
-    return buildEdgePolicyDiff(actual, desired);
+    return buildEdgePolicyDiff(actual, desired, { env: options.env ?? process.env });
 }
 
 /**
  * @param {Record<string, unknown> & { ok?: boolean }} actual
  * @param {Record<string, unknown> & { ok?: boolean }} desired
+ * @param {{ env?: NodeJS.ProcessEnv }} [options]
  * @returns {Record<string, unknown> & { ok: boolean }}
  */
-export function buildEdgePolicyDiff(actual, desired) {
+export function buildEdgePolicyDiff(actual, desired, options = {}) {
+    const originAnonymousRateLimit = readOriginAnonymousMcpRateLimitPolicy(options.env ?? process.env);
     const findings = asRecord(actual['findings']);
     const critical = normalizeStringArray(actual['critical']);
     const permissionGaps = normalizeStringArray(actual['permissionGaps']);
@@ -65,7 +67,7 @@ export function buildEdgePolicyDiff(actual, desired) {
             status: 'missing',
             phase: 'http_ratelimit',
             summary: 'No explicit /oauth/token rate limit was detected.',
-            desired: findDesiredRule(desired, 'MCP OAuth token endpoint protection'),
+            desired: findDesiredRule(desired, 'MCP constrained rate limit policy'),
             actual: 'No matching /oauth/token rate-limit rule found in actual edge audit.',
             recommendedAction: 'Add moderate /oauth/token protection after cache bypass is confirmed.',
         });
@@ -73,15 +75,23 @@ export function buildEdgePolicyDiff(actual, desired) {
 
     if (numberValue(findings['mcpRateLimitCount']) === 0) {
         diffs.push({
-            id: 'anonymous-mcp-rate-limit-missing',
-            severity: 'advisory',
-            status: 'missing',
+            id: originAnonymousRateLimit.enabled
+                ? 'anonymous-mcp-rate-limit-mitigated-at-origin'
+                : 'anonymous-mcp-rate-limit-missing',
+            severity: originAnonymousRateLimit.enabled ? 'informational' : 'advisory',
+            status: originAnonymousRateLimit.enabled ? 'mitigated' : 'missing',
             phase: 'http_ratelimit',
-            summary: 'No explicit anonymous /mcp rate limit was detected.',
-            desired: findDesiredRule(desired, 'MCP anonymous request protection'),
-            actual: 'No matching anonymous /mcp rate-limit rule found in actual edge audit.',
-            recommendedAction:
-                'Only bound anonymous /mcp traffic; avoid throttling authenticated ChatGPT/Claude MCP sessions.',
+            summary: originAnonymousRateLimit.enabled
+                ? 'No explicit anonymous /mcp edge rate limit was detected, but the MCP origin fallback is enabled.'
+                : 'No explicit anonymous /mcp rate limit was detected.',
+            desired: findDesiredRule(desired, 'MCP constrained rate limit policy'),
+            actual: {
+                edge: 'No matching anonymous /mcp rate-limit rule found in actual edge audit.',
+                originFallback: originAnonymousRateLimit,
+            },
+            recommendedAction: originAnonymousRateLimit.enabled
+                ? 'Keep the origin fallback enabled unless the Cloudflare plan supports header-aware edge rate limiting.'
+                : 'Only bound anonymous /mcp traffic; avoid throttling authenticated ChatGPT/Claude MCP sessions.',
         });
     }
 
@@ -140,6 +150,7 @@ export function buildEdgePolicyDiff(actual, desired) {
             critical,
             warnings,
             permissionGaps,
+            originAnonymousRateLimit,
         },
         desired: {
             desiredRulesets: desired['desiredRulesets'] ?? [],
@@ -188,4 +199,44 @@ function normalizeStringArray(value) {
  */
 function numberValue(value) {
     return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {{ enabled: boolean; windowMs: number; requestsPerWindow: number; maxBuckets: number; source: 'origin' }}
+ */
+function readOriginAnonymousMcpRateLimitPolicy(env) {
+    return {
+        enabled: readBooleanEnv(env, 'COPILOT_MCP_ANONYMOUS_RATE_LIMIT_ENABLED', true),
+        windowMs: readPositiveIntegerEnv(env, 'COPILOT_MCP_ANONYMOUS_RATE_LIMIT_WINDOW_MS', 10_000, 1_000),
+        requestsPerWindow: readPositiveIntegerEnv(env, 'COPILOT_MCP_ANONYMOUS_RATE_LIMIT_REQUESTS', 40, 1),
+        maxBuckets: readPositiveIntegerEnv(env, 'COPILOT_MCP_ANONYMOUS_RATE_LIMIT_MAX_BUCKETS', 10_000, 16),
+        source: 'origin',
+    };
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} env
+ * @param {string} name
+ * @param {number} fallback
+ * @param {number} minimum
+ * @returns {number}
+ */
+function readPositiveIntegerEnv(env, name, fallback, minimum) {
+    const parsed = Number(env[name] ?? fallback);
+    return Number.isFinite(parsed) && parsed >= minimum ? Math.floor(parsed) : fallback;
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} env
+ * @param {string} name
+ * @param {boolean} fallback
+ * @returns {boolean}
+ */
+function readBooleanEnv(env, name, fallback) {
+    const raw = String(env[name] ?? '').trim().toLowerCase();
+    if (!raw) return fallback;
+    if (['1', 'true', 'yes', 'on'].includes(raw)) return true;
+    if (['0', 'false', 'no', 'off'].includes(raw)) return false;
+    return fallback;
 }

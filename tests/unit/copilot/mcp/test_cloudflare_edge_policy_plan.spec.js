@@ -28,15 +28,16 @@ describe('mcp/cloudflare/edge-policy-plan', () => {
         const desiredRulesets = /** @type {{ name?: string; rules?: { expression?: string; rateLimitDraft?: Record<string, unknown> }[] }[]} */ (
             result.desiredRulesets
         );
-        const anonymousRule = desiredRulesets
-            .find((ruleset) => ruleset.name === 'MCP anonymous request protection')
+        const constrainedRule = desiredRulesets
+            .find((ruleset) => ruleset.name === 'MCP constrained rate limit policy')
             ?.rules?.[0];
-        expect(anonymousRule?.expression).toContain('not any(http.request.headers.names[*] eq "authorization")');
-        expect(anonymousRule?.rateLimitDraft).toMatchObject({
+        expect(constrainedRule?.expression).toContain('/oauth/token');
+        expect(constrainedRule?.expression).toContain('not any(http.request.headers.names[*] eq "authorization")');
+        expect(constrainedRule?.rateLimitDraft).toMatchObject({
             periodSeconds: 10,
-            requestsPerPeriod: 40,
+            requestsPerPeriod: 20,
             mitigationTimeoutSeconds: 10,
-            equivalentPerMinute: 240,
+            equivalentPerMinute: 120,
             characteristics: ['cf.colo.id', 'ip.src'],
         });
     });

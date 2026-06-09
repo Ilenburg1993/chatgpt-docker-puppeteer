@@ -50,7 +50,7 @@ export async function readCloudflareRemoteApiConfig(env = process.env) {
         publicHostname: tunnelConfig.publicHostname,
         expectedOriginUrl: tunnelConfig.originUrl,
         originServerName: tunnelConfig.originServerName,
-        enableHttp2Origin: readBooleanEnv(merged['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'], false),
+        enableHttp2Origin: readBooleanEnv(merged['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'], tunnelConfig.http2OriginRequested),
         expectedPublicMcpUrl: tunnelConfig.publicMcpUrl ?? `https://${tunnelConfig.publicHostname}/mcp`,
         zone: tunnelConfig.zone,
         credentialSources: buildCredentialSources(env, fileEnv),

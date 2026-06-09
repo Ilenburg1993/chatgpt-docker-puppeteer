@@ -46,7 +46,11 @@ describe('mcp/cloudflare/edge-policy-diff', () => {
             expect.arrayContaining([
                 expect.objectContaining({ id: 'cache-bypass-missing', severity: 'warning' }),
                 expect.objectContaining({ id: 'oauth-token-rate-limit-missing', severity: 'advisory' }),
-                expect.objectContaining({ id: 'anonymous-mcp-rate-limit-missing', severity: 'advisory' }),
+                expect.objectContaining({
+                    id: 'anonymous-mcp-rate-limit-mitigated-at-origin',
+                    severity: 'informational',
+                    status: 'mitigated',
+                }),
             ]),
         );
     });

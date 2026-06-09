@@ -67,6 +67,9 @@ const DEFAULT_MCP_SESSION_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_MAX_MCP_SESSIONS = 32;
 const DEFAULT_HSTS_MAX_AGE_SECONDS = 31_536_000;
 const DEFAULT_MAX_MCP_REQUEST_BODY_BYTES = 2 * 1024 * 1024;
+const DEFAULT_ANONYMOUS_MCP_RATE_LIMIT_WINDOW_MS = 10_000;
+const DEFAULT_ANONYMOUS_MCP_RATE_LIMIT_REQUESTS = 40;
+const DEFAULT_ANONYMOUS_MCP_RATE_LIMIT_MAX_BUCKETS = 10_000;
 const MAX_REQUEST_TARGET_LENGTH = 4096;
 const MAX_AUTHORITY_LENGTH = 255;
 const PUBLIC_METADATA_CACHE_CONTROL = 'public, max-age=60, s-maxage=300, stale-while-revalidate=300';
@@ -77,6 +80,9 @@ const MCP_PROTOCOL_VERSION = '2025-11-25';
 const MCP_PROTOCOL_MISSING_HEADER_FALLBACK_VERSION = '2025-03-26';
 const DEFAULT_SUPPORTED_MCP_PROTOCOL_VERSIONS = /** @type {const} */ (['2025-11-25', '2025-06-18', '2025-03-26']);
 const PROTOCOL_VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+
+/** @type {Map<string, { windowStartMs: number; count: number }>} */
+const anonymousMcpRateLimitBuckets = new Map();
 
 /**
  * @typedef {import('node:http').IncomingMessage | import('node:http2').Http2ServerRequest} McpHttpRequest
@@ -255,6 +261,35 @@ export function readMcpHttpCorsPolicy(env = process.env) {
 }
 
 /**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {{ enabled: boolean; windowMs: number; requestsPerWindow: number; maxBuckets: number; activeBuckets: number }}
+ */
+export function readMcpAnonymousRateLimitPolicy(env = process.env) {
+    return {
+        enabled: readBooleanEnv(env, 'COPILOT_MCP_ANONYMOUS_RATE_LIMIT_ENABLED', true),
+        windowMs: readPositiveIntegerEnv(
+            env,
+            'COPILOT_MCP_ANONYMOUS_RATE_LIMIT_WINDOW_MS',
+            DEFAULT_ANONYMOUS_MCP_RATE_LIMIT_WINDOW_MS,
+            1_000,
+        ),
+        requestsPerWindow: readPositiveIntegerEnv(
+            env,
+            'COPILOT_MCP_ANONYMOUS_RATE_LIMIT_REQUESTS',
+            DEFAULT_ANONYMOUS_MCP_RATE_LIMIT_REQUESTS,
+            1,
+        ),
+        maxBuckets: readPositiveIntegerEnv(
+            env,
+            'COPILOT_MCP_ANONYMOUS_RATE_LIMIT_MAX_BUCKETS',
+            DEFAULT_ANONYMOUS_MCP_RATE_LIMIT_MAX_BUCKETS,
+            16,
+        ),
+        activeBuckets: anonymousMcpRateLimitBuckets.size,
+    };
+}
+
+/**
  * @param {NodeJS.ProcessEnv} env
  * @param {string} name
  * @param {number} fallback
@@ -402,6 +437,12 @@ export function createMcpHttpRequestHandler(options) {
                     return;
                 }
                 if (rejectAccessTokenInUri(url, res)) return;
+
+                const anonymousRateLimit = consumeAnonymousMcpRateLimit(req);
+                if (!anonymousRateLimit.allowed) {
+                    writeMcpRateLimited(res, anonymousRateLimit.retryAfterSeconds);
+                    return;
+                }
 
                 const authConfig = readMcpAuthConfig();
                 if (shouldIssueMcpUnauthorizedChallenge(req, authConfig)) {
@@ -923,6 +964,77 @@ function rejectAccessTokenInUri(url, res) {
         error_description: 'Bearer tokens must be sent with the Authorization header, not in the URI.',
     });
     return true;
+}
+
+/**
+ * @param {McpHttpRequest} req
+ * @returns {{ allowed: true; retryAfterSeconds: 0 } | { allowed: false; retryAfterSeconds: number }}
+ */
+function consumeAnonymousMcpRateLimit(req) {
+    const policy = readMcpAnonymousRateLimitPolicy();
+    if (!policy.enabled) return { allowed: true, retryAfterSeconds: 0 };
+    if (parseBearerToken(readHeader(req, 'authorization'))) return { allowed: true, retryAfterSeconds: 0 };
+
+    const nowMs = Date.now();
+    const key = buildAnonymousRateLimitKey(req);
+    const existing = anonymousMcpRateLimitBuckets.get(key);
+    if (!existing || nowMs - existing.windowStartMs >= policy.windowMs) {
+        anonymousMcpRateLimitBuckets.set(key, { windowStartMs: nowMs, count: 1 });
+        sweepAnonymousMcpRateLimitBuckets(nowMs, policy);
+        return { allowed: true, retryAfterSeconds: 0 };
+    }
+    if (existing.count >= policy.requestsPerWindow) {
+        const retryAfterSeconds = Math.max(1, Math.ceil((policy.windowMs - (nowMs - existing.windowStartMs)) / 1000));
+        logMcp('WARN', 'Anonymous MCP request rate limit exceeded.', {
+            retryAfterSeconds,
+            windowMs: policy.windowMs,
+            requestsPerWindow: policy.requestsPerWindow,
+        });
+        return { allowed: false, retryAfterSeconds };
+    }
+    existing.count += 1;
+    return { allowed: true, retryAfterSeconds: 0 };
+}
+
+/**
+ * @param {McpHttpRequest} req
+ * @returns {string}
+ */
+function buildAnonymousRateLimitKey(req) {
+    const cfConnectingIp = readHeader(req, 'cf-connecting-ip');
+    const forwardedFor = readHeader(req, 'x-forwarded-for')?.split(',')[0]?.trim();
+    const fallbackRemote = typeof req.socket?.remoteAddress === 'string' ? req.socket.remoteAddress : 'unknown';
+    const value = cfConnectingIp || forwardedFor || fallbackRemote;
+    return createHash('sha256').update(value).digest('hex').slice(0, 32);
+}
+
+/**
+ * @param {number} nowMs
+ * @param {{ windowMs: number; maxBuckets: number }} policy
+ * @returns {void}
+ */
+function sweepAnonymousMcpRateLimitBuckets(nowMs, policy) {
+    if (anonymousMcpRateLimitBuckets.size <= policy.maxBuckets) return;
+    for (const [key, bucket] of anonymousMcpRateLimitBuckets) {
+        if (nowMs - bucket.windowStartMs >= policy.windowMs) anonymousMcpRateLimitBuckets.delete(key);
+        if (anonymousMcpRateLimitBuckets.size <= policy.maxBuckets) break;
+    }
+}
+
+/**
+ * @param {McpHttpResponse} res
+ * @param {number} retryAfterSeconds
+ * @returns {void}
+ */
+function writeMcpRateLimited(res, retryAfterSeconds) {
+    res.setHeader('Retry-After', String(retryAfterSeconds));
+    writeJson(res, 429, {
+        jsonrpc: '2.0',
+        error: {
+            code: -32000,
+            message: 'Too many anonymous MCP requests. Retry after the indicated delay.',
+        },
+    });
 }
 
 /**

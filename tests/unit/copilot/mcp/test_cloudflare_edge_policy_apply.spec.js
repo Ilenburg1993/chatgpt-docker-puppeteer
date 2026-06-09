@@ -11,7 +11,6 @@ describe('mcp/cloudflare/edge-policy-apply', () => {
         expect(rules.map((rule) => rule.ref)).toEqual([
             'copilot-mcp-cache-bypass-v1',
             'copilot-mcp-oauth-token-rate-limit-v1',
-            'copilot-mcp-anonymous-rate-limit-v1',
         ]);
         expect(rules[0]?.rule).toMatchObject({
             action: 'set_cache_settings',
@@ -25,7 +24,7 @@ describe('mcp/cloudflare/edge-policy-apply', () => {
         });
     });
 
-    it('plans create/append/present actions without losing existing rules', () => {
+    it('plans create/append/update actions without losing existing rules', () => {
         const desired = buildCloudflareEdgeDesiredApiRules('mcp.aurelin.org');
         const plan = buildCloudflareEdgeApplyPlan(
             [
@@ -44,10 +43,11 @@ describe('mcp/cloudflare/edge-policy-apply', () => {
         );
 
         expect(plan.summary).toMatchObject({
-            actionCount: 3,
+            actionCount: 2,
             createEntrypointRulesets: 0,
-            appendRules: 2,
-            alreadyPresent: 1,
+            appendRules: 1,
+            updateRules: 1,
+            alreadyPresent: 0,
         });
         expect(plan.actions).toEqual(
             expect.arrayContaining([
@@ -58,12 +58,7 @@ describe('mcp/cloudflare/edge-policy-apply', () => {
                 }),
                 expect.objectContaining({
                     ref: 'copilot-mcp-oauth-token-rate-limit-v1',
-                    status: 'present',
-                }),
-                expect.objectContaining({
-                    ref: 'copilot-mcp-anonymous-rate-limit-v1',
-                    status: 'append-rule',
-                    rateLimitRuleMustRemainLast: true,
+                    status: 'update-rule',
                 }),
             ]),
         );
@@ -95,9 +90,9 @@ describe('mcp/cloudflare/edge-policy-apply', () => {
         const plan = buildCloudflareEdgeApplyPlan([], desired);
 
         expect(plan.summary).toMatchObject({
-            actionCount: 3,
+            actionCount: 2,
             createEntrypointRulesets: 2,
-            appendRules: 1,
+            appendRules: 0,
             alreadyPresent: 0,
         });
         expect(plan.actions).toEqual(
@@ -105,10 +100,6 @@ describe('mcp/cloudflare/edge-policy-apply', () => {
                 expect.objectContaining({
                     ref: 'copilot-mcp-oauth-token-rate-limit-v1',
                     status: 'create-entrypoint-ruleset',
-                }),
-                expect.objectContaining({
-                    ref: 'copilot-mcp-anonymous-rate-limit-v1',
-                    status: 'append-rule-after-entrypoint-create',
                 }),
             ]),
         );

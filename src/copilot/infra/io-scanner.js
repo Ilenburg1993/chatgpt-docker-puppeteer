@@ -78,6 +78,7 @@ function assertValidScannerPath(candidate, label) {
  *     batchSize?: number;
  *     fingerprint?: boolean;
  *     redactProtectedPaths?: boolean;
+ *     maxEntries?: number;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -107,7 +108,11 @@ export async function scanDirectory(rootPath, options = {}) {
             ? Math.floor(Number(options.concurrency))
             : 16;
     const batchSize = normalizeBatchSize(Number(options.batchSize), DEFAULT_SCAN_BATCH_SIZE);
-    const hardMaxEntries = DEFAULT_SCAN_HARD_MAX_ENTRIES;
+    const requestedMaxEntries = Number(options.maxEntries);
+    const hardMaxEntries =
+        Number.isInteger(requestedMaxEntries) && requestedMaxEntries > 0
+            ? Math.min(requestedMaxEntries, DEFAULT_SCAN_HARD_MAX_ENTRIES)
+            : DEFAULT_SCAN_HARD_MAX_ENTRIES;
     const limit = pLimit(concurrency);
     const gitignore = respectGitignore ? await loadGitignoreMatcher(workspaceRoot) : ignore();
     const blockedSegments = new Set(

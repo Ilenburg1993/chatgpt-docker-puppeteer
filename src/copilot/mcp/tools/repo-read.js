@@ -99,6 +99,14 @@ function countEntryTypes(entries) {
 }
 
 /**
+ * @param {{ io?: { advisoryLimits?: Record<string, unknown> } }} scan
+ * @returns {boolean}
+ */
+function scanHardLimitReached(scan) {
+    return scan.io?.advisoryLimits?.['hardLimitReached'] === true;
+}
+
+/**
  * @type {import('../registry.js').McpToolDefinition[]}
  */
 export const repoReadTools = [
@@ -130,13 +138,17 @@ export const repoReadTools = [
         handler: async ({ path, recursive, depth, maxEntries, showHidden }) => {
             const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
+            const effectiveMaxEntries = maxEntries ?? 2000;
             const scan = await scanDirectory(resolved.resolved, {
                 workspaceRoot: WORKSPACE_ROOT,
                 recursive: recursive === true,
                 depth: depth ?? 2,
                 showHidden: showHidden === true,
+                maxEntries: effectiveMaxEntries,
+                fingerprint: false,
+                respectGitignore: recursive === true,
             });
-            const entries = scan.entries.slice(0, maxEntries ?? 2000);
+            const entries = scan.entries.slice(0, effectiveMaxEntries);
             const structured = {
                 success: true,
                 workspaceRoot: getMcpWorkspaceRoot(),
@@ -144,7 +156,7 @@ export const repoReadTools = [
                 count: entries.length,
                 totalScanned: scan.scannedEntries,
                 blockedEntriesCount: scan.blockedEntries,
-                truncated: entries.length < scan.entries.length,
+                truncated: entries.length < scan.entries.length || scanHardLimitReached(scan),
                 securityPolicy: {
                     readProtectedPaths: 'blocked',
                     listProtectedPaths: 'redacted',
@@ -169,13 +181,17 @@ export const repoReadTools = [
         handler: async ({ recursive, depth, maxEntries, showHidden }) => {
             const resolved = await resolveReadPath('.');
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
+            const effectiveMaxEntries = maxEntries ?? 2000;
             const scan = await scanDirectory(resolved.resolved, {
                 workspaceRoot: WORKSPACE_ROOT,
                 recursive: recursive === true,
                 depth: depth ?? 2,
                 showHidden: showHidden === true,
+                maxEntries: effectiveMaxEntries,
+                fingerprint: false,
+                respectGitignore: recursive === true,
             });
-            const entries = scan.entries.slice(0, maxEntries ?? 2000);
+            const entries = scan.entries.slice(0, effectiveMaxEntries);
             return okResult({
                 success: true,
                 workspaceRoot: getMcpWorkspaceRoot(),
@@ -183,7 +199,7 @@ export const repoReadTools = [
                 count: entries.length,
                 totalScanned: scan.scannedEntries,
                 blockedEntriesCount: scan.blockedEntries,
-                truncated: entries.length < scan.entries.length,
+                truncated: entries.length < scan.entries.length || scanHardLimitReached(scan),
                 securityPolicy: {
                     readProtectedPaths: 'blocked',
                     listProtectedPaths: 'redacted',
