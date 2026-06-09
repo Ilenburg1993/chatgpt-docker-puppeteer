@@ -1198,6 +1198,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 choices,
                 allowFreeform,
                 toolCallId: evt?.toolCallId ?? null,
+                prePublicResponse: Boolean(prePublicResponseNote),
+                prePublicResponseReason: prePublicResponseNote,
             },
             'sdk/user_input.requested',
         );

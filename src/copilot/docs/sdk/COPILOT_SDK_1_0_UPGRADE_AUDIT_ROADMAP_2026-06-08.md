@@ -3124,7 +3124,7 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Quadragésima Passada
 
-- [ ] SDK10-P140-01: após a correção de observabilidade de pergunta antes de síntese pública, executar live canônico e
+- [x] SDK10-P140-01: após a correção de observabilidade de pergunta antes de síntese pública, executar live canônico e
   revisar se o warning deve aparecer apenas em `/activity`/card ou também no archive SSE como campo estruturado
   `prePublicResponse: true`, para permitir dashboards detectarem esse padrão sem parsing textual.
 
@@ -3166,6 +3166,20 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 - [ ] SDK10-P141-01: após o live com `sse-delta-public-chunk`, avaliar se comandos `/events --json compact` devem
   privilegiar `publicChunk` nos previews compactos de `delta`, mantendo `chunk` cru apenas no modo full/raw.
+
+### Execução Contínua Em 2026-06-08 - Centésima Quadragésima Segunda Passada
+
+- [x] `user_input.requested` passou a carregar `prePublicResponse` e `prePublicResponseReason` no envelope SSE. A
+  superfície humana continua com card/atividade, mas dashboards e `/events --json` deixam de depender de parsing textual
+  para detectar pergunta humana antes de síntese pública.
+- [x] O campo fica explícito também no fluxo normal: `prePublicResponse: false` e `prePublicResponseReason: null` quando
+  a pergunta veio depois de materialização pública recente.
+- [x] A cobertura unitária em `test_terminal_sdk_session_events.spec.js` valida tanto o caso suspeito quanto o fluxo
+  canônico `tools -> deltas públicos -> ask_user`.
+- [x] Validado com `node --check src/copilot/terminal/events/sdk-session-events.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js` (1 arquivo, 29 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
 
 ---
 

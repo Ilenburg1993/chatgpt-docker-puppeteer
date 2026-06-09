@@ -868,6 +868,14 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
                 detail: expect.stringContaining('síntese pública'),
             }),
         );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'user_input.requested',
+            expect.objectContaining({
+                requestId: 'ui-before-public',
+                prePublicResponse: true,
+                prePublicResponseReason: expect.stringContaining('síntese pública'),
+            }),
+        );
         const rendered = mocks.println.mock.calls.map(([line]) => String(line)).join('\n');
         expect(rendered).toContain('Contexto');
         expect(rendered).toContain('antes de escrever uma síntese pública');
@@ -921,6 +929,14 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             expect.objectContaining({
                 severity: 'info',
                 detail: expect.not.stringContaining('síntese pública'),
+            }),
+        );
+        expect(mocks.broadcastSse).toHaveBeenCalledWith(
+            'user_input.requested',
+            expect.objectContaining({
+                requestId: 'ui-after-public',
+                prePublicResponse: false,
+                prePublicResponseReason: null,
             }),
         );
         const rendered = mocks.println.mock.calls.map(([line]) => String(line)).join('\n');
