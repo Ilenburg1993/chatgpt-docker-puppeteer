@@ -3597,6 +3597,20 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`
   (3 arquivos, 76 testes).
 
+### Execução Contínua Em 2026-06-09 - Centésima Sexagésima Quarta Passada
+
+- [x] A auditoria de `/answer` encontrou um bug de feedback: quando a resposta era roteada para uma pergunta pendente,
+  mas o runtime recusava a entrega (`answer_failed`), o comando caía na mensagem genérica `Texto livre permitido`,
+  sugerindo erro de escolha em vez de falha operacional.
+- [x] `cmdAnswer()` agora diferencia `answer_failed` e orienta o operador a conferir `/status` e tentar novamente apenas
+  se a pergunta ainda estiver ativa.
+- [x] A cobertura de `tests/unit/copilot/terminal/test_commands_session.spec.js` simula `answerPendingQuestion=false` e
+  garante que a mensagem não contenha `Texto livre permitido`.
+- [x] Validado com `node --check src/copilot/terminal/commands/session.js
+  tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js
+  tests/unit/copilot/terminal/test_pending_question_answer.spec.js` (2 arquivos, 59 testes).
+
 ---
 
 ## Decisões Arquiteturais

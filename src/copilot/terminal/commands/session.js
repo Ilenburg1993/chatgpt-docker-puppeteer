@@ -1775,6 +1775,16 @@ export function cmdAnswer({ println }, arg) {
         println(terminalThemeRow('/answer', 'A conversa aguarda uma mensagem. Digite o texto normalmente, sem /answer.', { role: 'warn' }));
         return;
     }
+    if (result.reason === 'answer_failed') {
+        println(
+            terminalThemeRow(
+                '/answer',
+                'A resposta não pôde ser entregue à pergunta pendente. Use /status para conferir o estado e tente novamente se a pergunta ainda estiver ativa.',
+                { role: 'error' },
+            ),
+        );
+        return;
+    }
     if (shouldConsumeTerminalPendingAnswerInput(result)) {
         const choices =
             result.pendingQuestionChoices.length > 0 ? ` Opções: ${result.pendingQuestionChoices.join(' | ')}.` : '';

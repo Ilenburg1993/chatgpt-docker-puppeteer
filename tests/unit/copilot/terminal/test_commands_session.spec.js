@@ -789,6 +789,27 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).not.toContain('runtime alt');
     });
 
+    it('cmdAnswer diferencia falha de entrega de resposta inválida', () => {
+        answerPendingQuestion.mockReturnValue(false);
+        defaultRuntime.pendingQuestion = {
+            question: 'Responder default?',
+            kind: 'question',
+            allowFreeform: true,
+            askedAt: 1,
+            protocolControlled: false,
+        };
+        defaultRuntime.pendingQuestionKind = 'question';
+        defaultRuntime.pendingQuestionShadowExpired = false;
+        defaultRuntime.pendingQuestionShadowState = null;
+
+        const ctx = mockCtx();
+        cmdAnswer({ println: ctx.println }, 'sim');
+
+        expect(ctx.output()).toContain('não pôde ser entregue');
+        expect(ctx.output()).toContain('/status');
+        expect(ctx.output()).not.toContain('Texto livre permitido');
+    });
+
     it('cmdAnswer explica quando só resta shadow expirada', () => {
         defaultRuntime.pendingQuestion = null;
         defaultRuntime.pendingQuestionKind = null;
