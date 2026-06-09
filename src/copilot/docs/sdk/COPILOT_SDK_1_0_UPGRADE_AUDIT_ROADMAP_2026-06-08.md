@@ -3529,6 +3529,19 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `node --check src/copilot/presentation/files/context.js tests/unit/copilot/terminal/test_file_context.spec.js`.
 - [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_file_context.spec.js` (1 arquivo, 22 testes).
 
+### Execução Contínua Em 2026-06-09 - Centésima Sexagésima Passada
+
+- [x] A auditoria de parsing de `@refs` confirmou um bug de UX/local IO: `extractAtReferences()` tratava
+  `@user@host.com` como anexo `user`, removendo parte do texto humano e tentando resolver um caminho inexistente.
+- [x] O parser de referências agora preserva fragmentos de email e menções simples (`@alice`) e só consome referências
+  que parecem paths reais, como `@src/file.js`, `@./config.json`, `@package.json` ou paths quoted.
+- [x] A cobertura de `tests/unit/copilot/terminal/test_file_context.spec.js` agora exige que email/menção não virem
+  attachment e que `@config.json` continue sendo reconhecido como path.
+- [x] Validado manualmente com `extractAtReferences("contato @user@host.com e @src/file.js")` retornando apenas
+  `src/file.js` como path e preservando o email no texto.
+- [x] Validado com `node --check src/copilot/presentation/files/context.js tests/unit/copilot/terminal/test_file_context.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_file_context.spec.js` (1 arquivo, 23 testes).
+
 ---
 
 ## Decisões Arquiteturais

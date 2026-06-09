@@ -279,11 +279,20 @@ export function extractAtReferences(message) {
     /** @type {string[]} */
     const paths = [];
     const pattern = /@"([^"]+)"|@([\w./\-_]+)/g;
-    const strippedMessage = message.replace(pattern, (_match, quoted, plain) => {
+    const strippedMessage = message.replace(pattern, (match, quoted, plain, offset, fullText) => {
         const p = quoted ?? plain;
         if (p) {
-            const isLikelyEmail = /^[^/]+\.[a-z]{2,}$/i.test(p);
-            if (!isLikelyEmail) paths.push(p);
+            const previousChar = offset > 0 ? fullText[offset - 1] : '';
+            const nextChar = fullText[offset + match.length] ?? '';
+            const isEmailFragment = /[\w.-]/u.test(previousChar) || previousChar === '@' || nextChar === '@';
+            const isPathLike =
+                quoted !== undefined ||
+                p.startsWith('.') ||
+                p.startsWith('/') ||
+                p.includes('/') ||
+                p.includes('.');
+            if (isEmailFragment || !isPathLike) return match;
+            paths.push(p);
         }
         return '';
     });

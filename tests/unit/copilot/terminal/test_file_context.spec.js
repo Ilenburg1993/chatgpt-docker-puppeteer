@@ -52,9 +52,17 @@ describe('file-context extractAtReferences', () => {
     });
 
     it('ignora emails (@user@domain.com)', () => {
-        const { paths } = extractAtReferences('contato @user@host.com e @src/file.js');
+        const { paths, strippedMessage } = extractAtReferences('contato @user@host.com e @src/file.js');
         // T-11: rejeita patterns que parecem emails/domínios
-        expect(paths).toContain('src/file.js');
+        expect(paths).toEqual(['src/file.js']);
+        expect(strippedMessage).toContain('@user@host.com');
+    });
+
+    it('ignora menções simples que não parecem path', () => {
+        const { paths, strippedMessage } = extractAtReferences('fale com @alice e leia @config.json');
+        expect(paths).toEqual(['config.json']);
+        expect(strippedMessage).toContain('@alice');
+        expect(strippedMessage).not.toContain('@config.json');
     });
 
     it('retorna vazio se sem referências', () => {
