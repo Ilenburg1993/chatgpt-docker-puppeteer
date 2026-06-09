@@ -415,6 +415,7 @@ function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]
         'Não invoque ask_user antes dessas 8 linhas públicas aparecerem no transcript.',
         scenario.askToolInstruction,
         scenario.finalInstruction,
+        'Depois do marcador final, pare imediatamente: não chame outra ferramenta, não escreva outra mensagem e aguarde o próximo comando humano.',
         `Antes da resposta humana final, não escreva, cite nem antecipe o marcador ${scenario.finalMarker}.`,
         `A pergunta ${scenario.askQuestion.split(':')[0]} deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.`,
         'Nunca escreva um objeto tool_calls, uma chave function/args, nem diga que ações foram executadas sem a tool real aparecer no terminal.',
@@ -430,6 +431,7 @@ function buildMissingRequiredAskRecoveryPrompt(scenario = LIVE_SCENARIOS[DEFAULT
         'Não repita report_intent, read_file_content, exec_command nem as linhas de delta.',
         scenario.askToolInstruction,
         scenario.finalInstruction,
+        'Depois do marcador final, pare imediatamente: não chame outra ferramenta, não escreva outra mensagem e aguarde o próximo comando humano.',
         `Antes da resposta humana final, não escreva, cite nem antecipe o marcador ${scenario.finalMarker}.`,
         `A pergunta ${scenario.askQuestion.split(':')[0]} deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.`,
         'Neste turno de recuperação, use somente a tool real ask_user antes da resposta humana.',
@@ -4983,6 +4985,8 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                   answerPromptIndex > questionIndex ? answerPromptIndex : beforeRawDiagnosticsPlain.length,
               )
             : '';
+    const postAnswerPublicPlain =
+        answerPromptIndex >= 0 ? beforeRawDiagnosticsPlain.slice(answerPromptIndex) : beforeRawDiagnosticsPlain;
     const activity40Sections = beforeRawDiagnosticsPlain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/activity\s+40\b[^\n\r]*/iu).slice(1);
     const latestActivity40Section =
         activity40Sections
@@ -5068,6 +5072,22 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const exportSseAskRequested = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.askRequested);
     const exportSseAskCompleted = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.askCompleted);
     const exportSsePostAsk = exportEnvelopeMatchesEvent(exportSummary, canonicalTranscriptEvents.postAskAssistant);
+    const postAskEventId = canonicalTranscriptEvents.postAskAssistant?.eventId ?? null;
+    const postAskSseIndex =
+        postAskEventId === null ? -1 : sseSummary.events.findIndex((evt) => eventPublicId(evt) === postAskEventId);
+    const unexpectedPostAskContinuation =
+        postAskSseIndex >= 0
+            ? (sseSummary.events.slice(postAskSseIndex + 1).find((evt) => {
+                  const payload = eventPayload(evt);
+                  if (!payload) return false;
+                  if (evt?.event === 'assistant.intent') return true;
+                  if (evt?.event === 'assistant.message') {
+                      return !scenario.postAskFinalRe.test(String(payload.content ?? ''));
+                  }
+                  if (evt?.event !== 'tool.lifecycle') return false;
+                  return isLifecycleStartType(String(payload.type ?? ''));
+              }) ?? null)
+            : null;
     const sseIds = summarizeSseEvents(sseSummary.events).ids;
     const archiveIds = archiveRawEvents.map((evt) => evt.eventId).filter((id) => Number.isFinite(id));
     const archiveSseOverlap = archiveIds.filter((id) => sseIds.includes(id));
@@ -5107,7 +5127,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         liveCanonicalDeltaMarkerCount,
         assistantMessageCanonicalDeltaMarkerCount,
     );
-    const sseDeltaEvents = canonicalEvents.filter((evt) => evt?.event === 'delta');
+    const sseDeltaEvents = sseSummary.events.filter((evt) => evt?.event === 'delta');
     const sseDeltaEventsWithPublicChunk = sseDeltaEvents.filter((evt) => {
         const payload = eventPayload(evt);
         return typeof payload?.publicChunk === 'string';
@@ -5407,6 +5427,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             detail: `post-ask final visible live=${finalRenderedByLiveTurn ? 'yes' : 'no'} assistant.message=${finalRenderedByAssistantMessage ? 'yes' : 'no'}`,
         },
         {
+            id: 'no-extra-output-after-post-ask-final',
+            pass: !unexpectedPostAskContinuation,
+            detail: unexpectedPostAskContinuation
+                ? `assistant continued after the final marker · event=${unexpectedPostAskContinuation.event ?? '-'} #${eventPublicId(unexpectedPostAskContinuation) ?? '-'}`
+                : 'assistant stopped after the final marker until diagnostic commands',
+        },
+        {
             id: 'sse-canonical-transcript-events',
             pass:
                 Boolean(canonicalTranscriptEvents.deltaAssistant) &&
@@ -5655,6 +5682,15 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'ux-no-legacy-post-answer-labels',
             pass: !/(Resposta p[oó]s-pergunta|turno\s+·\s+Processando mensagem)/iu.test(beforeRawDiagnosticsPlain),
             detail: 'post-answer public surface avoided legacy question/reply labels and raw turn-processing copy',
+        },
+        {
+            id: 'ux-no-post-answer-turn-processing-copy',
+            pass:
+                answerPromptIndex < 0 ||
+                !/(Resposta p[oó]s-pergunta|p[oó]s-pergunta|turno\s+·\s+Processando mensagem|Processando mensagem)/iu.test(
+                    postAnswerPublicPlain,
+                ),
+            detail: 'surface after the human answer avoided legacy post-question and raw turn-processing copy',
         },
         {
             id: 'ux-compact-tool-live-status',

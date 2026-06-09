@@ -3231,6 +3231,33 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   contrato visual. A regra operacional passa a ser: termos de protocolo podem ficar em raw/export explícito; stdout,
   linha viva, cards e `/events` default devem falar em estados humanos acionáveis.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quadragésima Quinta Passada
+
+- [x] A revisão do live PASS mostrou que `ux-no-legacy-post-answer-labels` protegia a superfície pública antes dos
+  diagnósticos raw, mas não isolava explicitamente a janela depois da resposta humana. Isso era bom o bastante para
+  detectar `Resposta pós-pergunta`, porém pouco preciso para a regressão visual da captura.
+- [x] O harness `model-gateway-terminal-llm-b-live-test.mjs` agora calcula `postAnswerPublicPlain` a partir do prompt
+  `[PERG]› SIM` e adiciona o critério `ux-no-post-answer-turn-processing-copy`, reprovando especificamente o trecho
+  pós-resposta se aparecer `pós-pergunta`, `Resposta pós-pergunta` ou `Processando mensagem`.
+- [x] A regra mantém SSE raw/arquivo como superfície forense: o bloqueio novo mira apenas o stdout público antes dos
+  diagnósticos raw, onde o operador humano realmente percebe a fluidez do turno.
+- [x] O live seguinte (`artifacts/terminal-live/2026-06-09T05-27-53-039Z/summary.md`) falhou de forma útil: a LLM-B
+  gerou `POST-ASK-CANONICAL-FINAL`, mas continuou no mesmo fluxo com `report_intent ... follow-up` e uma mensagem extra
+  sobre `task_complete`/`vscode_askQuestions`. Isso não violava o critério novo de rótulos, mas violava o contrato de
+  fechamento do cenário.
+- [x] O prompt canônico do harness agora instrui explicitamente: depois do marcador final, parar imediatamente, não
+  chamar outra ferramenta e não escrever outra mensagem. O mesmo aperto foi aplicado ao prompt de recuperação de
+  `ask_user` ausente.
+- [x] O validador passou a incluir `no-extra-output-after-post-ask-final`, procurando em SSE completo qualquer
+  `assistant.intent`, `tool.lifecycle` start ou `assistant.message` adicional depois do `assistant.message` que contém o
+  marcador final.
+- [x] `sse-delta-public-chunk` foi ajustado para avaliar apenas os eventos SSE completos coletados pelo harness. A prévia
+  humana de `/events --raw` pode conter apenas `payloadPreview` e não deve ser contada como envelope completo de `delta`.
+- [x] Validado com `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Validado live final com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
+  --live-scenario=canonical`; PASS em `artifacts/terminal-live/2026-06-09T05-31-39-375Z/summary.md`, incluindo
+  `sse-delta-public-chunk=19/19`, `no-extra-output-after-post-ask-final` e `ux-no-post-answer-turn-processing-copy`.
+
 ---
 
 ## Decisões Arquiteturais
