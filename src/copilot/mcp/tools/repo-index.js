@@ -37,7 +37,7 @@ import {
     readOnlyAnnotations,
     resolveReadPath,
 } from '#copilot/mcp/control-plane';
-import { normalizeIoCacheKey, registerInvalidationHook } from '#copilot/infra/io-cache.js';
+import { normalizeIoCacheKey, registerInvalidationHook } from '#copilot/infra/io-cache';
 
 const DEFAULT_INDEX_PATH = 'src/copilot';
 const DEFAULT_ORPHAN_IMPORT_SCAN_PATH = 'src/copilot';

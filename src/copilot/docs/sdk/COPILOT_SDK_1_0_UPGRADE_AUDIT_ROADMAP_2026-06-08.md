@@ -3542,6 +3542,24 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `node --check src/copilot/presentation/files/context.js tests/unit/copilot/terminal/test_file_context.spec.js`.
 - [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_file_context.spec.js` (1 arquivo, 23 testes).
 
+### Execução Contínua Em 2026-06-09 - Centésima Sexagésima Primeira Passada
+
+- [x] A investigação de busca/MCP encontrou um bug mascarado pelo alias resolver do Vitest: `repo-index.js` importava
+  `#copilot/infra/io-cache.js`, mas o `package.json#imports` wildcard `#copilot/infra/*` já acrescenta `.js`, então
+  Node puro tentava carregar `src/copilot/infra/io-cache.js.js`.
+- [x] O import runtime foi normalizado para `#copilot/infra/io-cache`, preservando compatibilidade com Node ESM e com o
+  caminho usado por live tools/LLM-B ao carregar a superfície MCP canônica.
+- [x] A suíte de aliases ganhou guarda estática para bloquear imports executáveis em `src/copilot` que terminem em `.js`
+  quando passam por aliases wildcard `#copilot/*`, evitando regressões que o Vite poderia esconder.
+- [x] Validado com `node --check src/copilot/mcp/tools/repo-index.js tests/unit/copilot/sdk/test_sdk_package_imports.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/sdk/test_sdk_package_imports.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js`
+  (2 arquivos, 40 testes).
+- [x] Validado manualmente com Node puro importando `./src/copilot/mcp/index.js` e executando
+  `repo_find_symbol_usages`, retornando match relativo em `src/copilot/mcp/tools/repo-read.js`.
+- [x] Validado em live test LLM-B canônico via `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
+  --live-scenario=canonical`; resumo PASS em `artifacts/terminal-live/2026-06-09T19-02-21-232Z/summary.md`, com
+  `ask_user`, resposta humana, retomada pós-resposta e marcador final público sem erros.
+
 ---
 
 ## Decisões Arquiteturais
