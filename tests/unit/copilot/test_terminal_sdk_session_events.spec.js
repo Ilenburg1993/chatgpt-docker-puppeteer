@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
+    completeTerminalTurnMaterialization,
     recordTerminalTurnDelta,
 } from '../../../src/copilot/terminal/state/turn-materialization-state.js';
 
@@ -821,6 +822,109 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
                 turnId: 'turn-ui-1',
             }),
         );
+    });
+
+    it('marca pergunta após ação sem síntese pública como contexto operacional', async () => {
+        mocks.getShowSessionActivity.mockReturnValue(true);
+        const now = Date.now();
+        mocks.readTerminalTurnTraceProjection.mockReturnValue({
+            current: null,
+            recent: [
+                {
+                    traceId: 'turn:prior',
+                    turnId: 'prior',
+                    source: 'assistant',
+                    status: 'completed',
+                    startedAt: now - 1_000,
+                    updatedAt: now - 500,
+                    finishedAt: now - 400,
+                    toolCount: 1,
+                    fileCount: 1,
+                    userInputCount: 0,
+                    tools: [],
+                    files: [],
+                    userInputs: [],
+                },
+            ],
+        });
+        beginTerminalTurnMaterialization({ turnId: 'turn-question', source: 'sdk/assistant.turn_start' });
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('user_input.requested', {
+            requestId: 'ui-before-public',
+            question: 'ASK-CANONICAL: responda SIM para fechar o teste',
+            choices: ['SIM'],
+            allowFreeform: false,
+        });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'question',
+            'Pergunta antes de síntese pública',
+            expect.objectContaining({
+                severity: 'warn',
+                detail: expect.stringContaining('síntese pública'),
+            }),
+        );
+        const rendered = mocks.println.mock.calls.map(([line]) => String(line)).join('\n');
+        expect(rendered).toContain('Contexto');
+        expect(rendered).toContain('antes de escrever uma síntese pública');
+    });
+
+    it('não marca pergunta após síntese pública materializada depois das ações', async () => {
+        mocks.getShowSessionActivity.mockReturnValue(true);
+        const now = Date.now();
+        mocks.readTerminalTurnTraceProjection.mockReturnValue({
+            current: null,
+            recent: [
+                {
+                    traceId: 'turn:tools',
+                    turnId: 'tools',
+                    source: 'assistant',
+                    status: 'completed',
+                    startedAt: now - 2_000,
+                    updatedAt: now - 1_000,
+                    finishedAt: now - 900,
+                    toolCount: 2,
+                    fileCount: 1,
+                    userInputCount: 0,
+                    tools: [],
+                    files: [],
+                    userInputs: [],
+                },
+            ],
+        });
+        beginTerminalTurnMaterialization({ turnId: 'public-after-tools', timestamp: now - 800 });
+        recordTerminalTurnDelta({ chunk: 'DELTA-CANONICAL-1\n', timestamp: now - 700 });
+        completeTerminalTurnMaterialization({
+            directReply: null,
+            directSource: 'sdk/assistant.message',
+            timestamp: now - 600,
+        });
+        const { setupTerminalSdkSessionEventListeners } =
+            await import('../../../src/copilot/terminal/events/sdk-session-events.js');
+        const agent = createAgentHost();
+
+        setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfIdle: vi.fn() });
+        agent.emit('user_input.requested', {
+            requestId: 'ui-after-public',
+            question: 'ASK-CANONICAL: responda SIM para fechar o teste',
+            choices: ['SIM'],
+            allowFreeform: false,
+        });
+
+        expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
+            'question',
+            'Pergunta ao operador',
+            expect.objectContaining({
+                severity: 'info',
+                detail: expect.not.stringContaining('síntese pública'),
+            }),
+        );
+        const rendered = mocks.println.mock.calls.map(([line]) => String(line)).join('\n');
+        expect(rendered).not.toContain('antes de escrever uma síntese pública');
     });
 
     it('suprime READY/REPLY protocolar de ask_user da narrativa terminal', async () => {

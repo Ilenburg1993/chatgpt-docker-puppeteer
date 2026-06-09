@@ -7,6 +7,7 @@ import {
     clearTerminalTurnMaterialization,
     completeTerminalTurnMaterialization,
     getTerminalAssistantMessageMaterializationDecision,
+    hasRecentTerminalTurnPublicMaterialization,
     readTerminalTurnMaterialization,
     recordTerminalTurnAssistantMessage,
     recordTerminalTurnDelta,
@@ -221,6 +222,21 @@ describe('terminal/state/turn-materialization-state', () => {
                 now: 1003,
             }),
         ).toBe(false);
+    });
+
+    it('expõe existência temporal de materialização pública recém-concluída sem vazar conteúdo', () => {
+        clearTerminalTurnMaterialization();
+        beginTerminalTurnMaterialization({ turnId: 'done-public', timestamp: 1000 });
+        recordTerminalTurnDelta({ chunk: 'resposta pública', timestamp: 1100 });
+        completeTerminalTurnMaterialization({
+            directReply: null,
+            directSource: 'sdk/assistant.message',
+            timestamp: 1200,
+        });
+
+        expect(hasRecentTerminalTurnPublicMaterialization({ since: 1050, now: 1300, windowMs: 15_000 })).toBe(true);
+        expect(hasRecentTerminalTurnPublicMaterialization({ since: 1250, now: 1300, windowMs: 15_000 })).toBe(false);
+        expect(hasRecentTerminalTurnPublicMaterialization({ since: 1050, now: 20_000, windowMs: 1_000 })).toBe(false);
     });
 
     it('renderiza assistant.message pós-ask de outro turno mesmo após deltas canônicos anteriores', () => {

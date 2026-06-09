@@ -104,6 +104,7 @@ import {
     createToolCallRegistry,
     getTerminalAssistantMessageMaterializationDecision,
     getTerminalDetailLevel,
+    hasRecentTerminalTurnPublicMaterialization,
     markTerminalActivityIdle,
     recordTerminalActivity,
     recordTerminalElicitationCompleted,
@@ -113,6 +114,8 @@ import {
     recordTerminalPermissionRequested,
     recordTerminalTurnAssistantMessage,
     recordTerminalTurnFileActivity,
+    readTerminalTurnMaterialization,
+    readTerminalTurnTraceProjection,
     recordTerminalTurnUserInputActivity,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
@@ -144,6 +147,8 @@ import {
     reconcileTerminalPostToolUseResult,
 } from './tool-lifecycle-runtime.js';
 
+const QUESTION_BEFORE_PUBLIC_RESPONSE_TRACE_WINDOW_MS = 15_000;
+
 /**
  * @param {string | undefined | null} source
  * @returns {string}
@@ -161,6 +166,46 @@ function renderInterventionSourceLabel(source) {
         default:
             return 'operador';
     }
+}
+
+/**
+ * @returns {boolean}
+ */
+function hasCurrentPublicAssistantMaterialization() {
+    const materialization = readTerminalTurnMaterialization();
+    if (!materialization) return false;
+    if (materialization.deltaChars > 0) return true;
+    return materialization.assistantMessages.some((entry) => entry.content.trim().length > 0);
+}
+
+/**
+ * @param {number} [now]
+ * @returns {string | null}
+ */
+function readQuestionBeforePublicResponseNote(now = Date.now()) {
+    const traceProjection = readTerminalTurnTraceProjection(2);
+    const candidates = [traceProjection.current, ...traceProjection.recent].filter(Boolean);
+    const operationalTrace = candidates.find((trace) => {
+        if (!trace) return false;
+        const touchedSomething = trace.toolCount > 0 || trace.fileCount > 0;
+        return (
+            touchedSomething &&
+            now - trace.updatedAt >= 0 &&
+            now - trace.updatedAt <= QUESTION_BEFORE_PUBLIC_RESPONSE_TRACE_WINDOW_MS
+        );
+    });
+    if (!operationalTrace) return null;
+    if (hasCurrentPublicAssistantMaterialization()) return null;
+    if (
+        hasRecentTerminalTurnPublicMaterialization({
+            since: operationalTrace.updatedAt,
+            windowMs: QUESTION_BEFORE_PUBLIC_RESPONSE_TRACE_WINDOW_MS,
+            now,
+        })
+    ) {
+        return null;
+    }
+    return 'A LLM-B pediu esta resposta antes de escrever uma síntese pública deste turno.';
 }
 
 /**
@@ -1125,6 +1170,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             refreshPromptIfIdle();
             return;
         }
+        const prePublicResponseNote = readQuestionBeforePublicResponseNote();
         recordTerminalTurnUserInputActivity({
             requestId,
             kind,
@@ -1134,11 +1180,17 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             status: 'requested',
             source: 'sdk',
         });
-        recordTerminalActivity('question', 'Pergunta ao operador', {
-            detail: `${question.slice(0, 160)}${choices.length > 0 ? ` · opções ${choices.join('|')}` : ''}`,
-            source: 'sdk',
-            severity: 'info',
-        });
+        recordTerminalActivity(
+            'question',
+            prePublicResponseNote ? 'Pergunta antes de síntese pública' : 'Pergunta ao operador',
+            {
+                detail: `${question.slice(0, 160)}${choices.length > 0 ? ` · opções ${choices.join('|')}` : ''}${
+                    prePublicResponseNote ? ` · ${prePublicResponseNote}` : ''
+                }`,
+                source: 'sdk',
+                severity: prePublicResponseNote ? 'warn' : 'info',
+            },
+        );
         const requestedEnvelope = withSdkSessionSseEnvelope(
             {
                 requestId: evt?.requestId ?? null,
@@ -1166,6 +1218,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 allowFreeform,
                 source: 'sdk',
                 state: 'aguardando resposta',
+                note: prePublicResponseNote,
                 includeDivider: true,
             });
         }

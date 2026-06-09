@@ -55,4 +55,21 @@ describe('terminal/human-question-renderer', () => {
         expect(output).toContain('... +1');
         expect(output).not.toContain('Atalhos');
     });
+
+    it('exibe contexto operacional opcional sem trocar a ação principal', () => {
+        const output = plain(
+            buildTerminalHumanQuestionCard({
+                question: 'ASK-CANONICAL: responda SIM para fechar o teste',
+                choices: ['SIM'],
+                source: 'sdk',
+                state: 'aguardando resposta',
+                note: 'A LLM-B pediu esta resposta antes de escrever uma síntese pública deste turno.',
+                now: Date.parse('2026-06-03T16:31:50.000-03:00'),
+            }),
+        );
+
+        expect(output).toContain('Contexto');
+        expect(output).toContain('antes de escrever uma síntese pública');
+        expect(output).toContain('Digite o número, o texto da opção ou qualquer texto livre.');
+    });
 });

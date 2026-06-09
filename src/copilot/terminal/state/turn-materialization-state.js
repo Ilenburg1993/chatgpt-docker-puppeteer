@@ -253,6 +253,19 @@ export function readTerminalTurnMaterialization() {
 }
 
 /**
+ * @param {{ since?: number | null; windowMs?: number; now?: number }} [input]
+ * @returns {boolean}
+ */
+export function hasRecentTerminalTurnPublicMaterialization({ since = null, windowMs = 15_000, now = Date.now() } = {}) {
+    pruneRecentCompletedTurnMaterializations(now);
+    return _recentCompletedTurnMaterializations.some((entry) => {
+        const completedAfterBoundary =
+            typeof since === 'number' && Number.isFinite(since) ? entry.completedAt >= since : true;
+        return completedAfterBoundary && now - entry.completedAt >= 0 && now - entry.completedAt <= windowMs;
+    });
+}
+
+/**
  * @param {{ content: string; kind?: string; source?: string; timestamp?: number }} input
  * @returns {TerminalTurnMaterializedAssistantMessage | null}
  */

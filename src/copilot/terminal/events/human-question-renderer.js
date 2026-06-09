@@ -26,6 +26,7 @@ import { compactTerminalToolText } from './tool-activity-presenter.js';
  *     title?: string;
  *     state?: string;
  *     action?: string;
+ *     note?: string | null;
  *     compact?: boolean;
  *     now?: number;
  *     includeDivider?: boolean;
@@ -90,6 +91,11 @@ export function buildTerminalHumanQuestionCard(input = {}) {
     lines.push(terminalThemeRow('[PERGUNTA]', questionText, { role: 'question' }));
     if (choicesLine) {
         lines.push(terminalThemeRow('Opções', choicesLine, { role: 'info' }));
+    }
+    if (input.note && input.note.trim()) {
+        lines.push(
+            terminalThemeRow('Contexto', compactTerminalToolText(input.note, compact ? 96 : 180), { role: 'warn' }),
+        );
     }
     lines.push(terminalThemeRow('Ação', action, { role: 'command' }));
     if (input.includeShortcuts !== false && !compact) {

@@ -3052,7 +3052,7 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   dos deltas incluiu `&lt;thinking&gt;`, uma frase em chinês e `&lt;/thinking&gt;`. O HTML foi escapado, mas a semântica
   de "thinking" vazou para o operador; adicionar critério live e decidir se o terminal deve filtrar tags de raciocínio
   conhecidas ou apenas reprovar o provider/modelo.
-- [ ] SDK10-P138-02: o live `artifacts/terminal-live/2026-06-09T04-31-51-726Z/summary.md` confirmou que a LLM-B pode
+- [x] SDK10-P138-02: o live `artifacts/terminal-live/2026-06-09T04-31-51-726Z/summary.md` confirmou que a LLM-B pode
   chamar `ask_user` antes de materializar a resposta pública obrigatória, mesmo com instrução explícita. Investigar se o
   terminal deve oferecer uma política opcional de guarda para fluxos que exigem "resposta pública antes da pergunta", ou
   se isso deve ficar como contrato/validador de harness.
@@ -3089,6 +3089,44 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   passa a receber conteúdo sem blocos iniciais de raciocínio, mas os eventos `delta` ainda preservam chunks crus para
   diagnóstico. Decidir se `/events --raw full` deve continuar como evidência forense crua ou também carregar um campo
   público sanitizado paralelo.
+
+### Execução Contínua Em 2026-06-08 - Centésima Quadragésima Passada
+
+- [x] A análise da imagem e do live bloqueado confirmou que "resposta pós-pergunta" não deve ser um estado nominal de
+  produto: em sessões longas há respostas comuns, perguntas humanas e continuações após resposta humana; o rótulo antigo
+  induzia a leitura de um fluxo paralelo permanente.
+- [x] A decisão de UX foi não bloquear globalmente `ask_user` antes de resposta pública: uma pergunta clarificadora no
+  começo do turno é legítima. O terminal agora marca apenas o caso suspeito: pergunta humana emitida logo após atividade
+  operacional recente de tool/arquivo e sem materialização pública do assistente.
+- [x] `sdk-session-events.js` passou a observar a materialização pública do turno e a projeção curta de trace; se houver
+  tool/arquivo recente sem delta/mensagem pública, a atividade vira `Pergunta antes de síntese pública` com severidade
+  `warn`.
+- [x] O primeiro live após a mudança expôs um falso positivo no fluxo correto `tools -> deltas públicos -> ask_user`.
+  `turn-materialization-state.js` agora oferece uma leitura booleana temporal de materialização pública recém-concluída,
+  sem expor conteúdo, e o warning só dispara quando não houve fala pública ativa ou concluída após a atividade
+  operacional suspeita.
+- [x] `human-question-renderer.js` ganhou o campo opcional `Contexto`, preservando a ação principal da pergunta e
+  explicando discretamente que a LLM-B pediu resposta antes de escrever uma síntese pública.
+- [x] A cobertura unitária reproduz os dois lados do fluxo: trace operacional recente com materialização pública vazia
+  renderiza `Contexto`; trace operacional seguido por deltas públicos materializados não renderiza o alerta.
+- [x] Validado com `node --check src/copilot/terminal/state/turn-materialization-state.js &&
+  node --check src/copilot/terminal/state/events/index.js &&
+  node --check src/copilot/terminal/events/sdk-session-events.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_turn_materialization_state.spec.js
+  tests/unit/copilot/terminal/test_human_question_renderer.spec.js
+  tests/unit/copilot/test_terminal_sdk_session_events.spec.js` (3 arquivos, 49 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T04-56-31-438Z/summary.md`, confirmando o card canônico sem `Contexto`
+  indevido depois dos oito deltas públicos e `/activity 40` com `Pergunta ao operador`, não
+  `Pergunta antes de síntese pública`.
+
+### Achados Novos Da Centésima Quadragésima Passada
+
+- [ ] SDK10-P140-01: após a correção de observabilidade de pergunta antes de síntese pública, executar live canônico e
+  revisar se o warning deve aparecer apenas em `/activity`/card ou também no archive SSE como campo estruturado
+  `prePublicResponse: true`, para permitir dashboards detectarem esse padrão sem parsing textual.
 
 ---
 
