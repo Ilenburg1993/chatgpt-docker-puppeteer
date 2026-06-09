@@ -2700,6 +2700,12 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   vocabulário de protocolo, diagnóstico acionável e microcopy de operador; qualquer ocorrência de `pós-pergunta` deve
   permanecer restrita a recuperação vazia ou ser renomeada para uma ação humana concreta.
 
+### Achados Novos Da Centésima Vigésima Quinta Passada
+
+- [ ] SDK10-P125-01: a linha viva ainda pode mostrar `turno · Contexto atualizado` durante bursts de processamento;
+  investigar se dá para trocar esse pulso residual por um verbo mais operacional, sem perder a distinção entre
+  waiting, question e turn.
+
 ---
 
 ## Decisões Arquiteturais
