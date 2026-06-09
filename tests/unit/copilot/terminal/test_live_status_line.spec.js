@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
         reasoningEffort: 'xhigh',
     },
     structuredInputs: /** @type {Record<string, unknown>[]} */ ([]),
+    activityHistory: /** @type {Record<string, unknown>[]} */ ([]),
     busy: false,
     clearInlineStatus: vi.fn(),
     writeInlineStatus: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock('#copilot/config', async (importOriginal) => {
     };
 });
 vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
+    readTerminalActivityHistory: vi.fn(() => mocks.activityHistory),
     readTerminalActivitySnapshot: vi.fn(() => mocks.activity),
 }));
 vi.mock('../../../../src/copilot/terminal/dialog/index.js', () => ({
@@ -97,6 +99,7 @@ describe('terminal/live-status-line', () => {
             reasoningEffort: 'xhigh',
         };
         mocks.structuredInputs = [];
+        mocks.activityHistory = [];
     });
 
     afterEach(() => {
@@ -749,6 +752,36 @@ describe('terminal/live-status-line', () => {
         expect(line).not.toContain('modelo auto');
         expect(line).not.toContain('conversa ativa');
         expect(line.length).toBeLessThan(32);
+    });
+
+    it('preserva continuação pós-resposta durante finalização imediata do turno', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        const now = Date.parse('2026-05-07T22:00:12.000-03:00');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'turn',
+            label: 'Turno do assistente concluído',
+            detail: 'turno 2',
+            toolName: null,
+            startedAt: now - 1_000,
+            updatedAt: now - 1_000,
+        };
+        mocks.activityHistory = [
+            {
+                phase: 'question',
+                label: 'Pergunta respondida',
+                detail: 'resposta do operador SIM encaminhada',
+                updatedAt: now - 1_500,
+                ts: now - 1_500,
+            },
+        ];
+        mocks.runtime = { ...mocks.runtime, status: 'processing', pendingQuestion: null, pendingQuestionKind: null };
+
+        const line = formatTerminalLiveStatusLine({ now });
+
+        expect(line).toContain('continuando');
+        expect(line).not.toContain('finalizando');
     });
 
     it('classifica atividades question não-humanas como decisão ou intervenção', async () => {

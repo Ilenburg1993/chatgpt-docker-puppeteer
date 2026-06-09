@@ -2894,9 +2894,34 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Trigésima Terceira Passada
 
-- [ ] SDK10-P133-01: após a resposta humana `SIM`, a linha viva em alguns runs mostra `LLM-B finalizando` quase
+- [x] SDK10-P133-01: após a resposta humana `SIM`, a linha viva em alguns runs mostra `LLM-B finalizando` quase
   imediatamente, sem passar visivelmente por `LLM-B continuando`; investigar se o evento `Pergunta respondida` está sendo
   sobreposto rápido demais por `turn`/finalização e se vale um grace label curto para continuidade pós-resposta.
+
+### Execução Contínua Em 2026-06-08 - Centésima Trigésima Quarta Passada
+
+- [x] A linha viva ganhou uma janela curta de continuidade pós-resposta: quando uma finalização de turno acontece até
+  5s depois de uma atividade `question` classificada como `continuando`, o pulso mostra `LLM-B continuando` em vez de
+  saltar imediatamente para `finalizando`.
+- [x] A heurística ficou local em `live-status-line.js` e usa `readTerminalActivityHistory(8)`, evitando alterar a
+  semântica global de foco/atividade do terminal.
+- [x] `src/copilot/terminal/state/repl/index.js` passou a reexportar `readTerminalActivityHistory` para a superfície REPL.
+- [x] A cobertura unitária adicionada em `test_live_status_line.spec.js` protege o caso de `Pergunta respondida` seguida
+  de `Turno do assistente concluído`, garantindo `continuando` e ausência de `finalizando` nessa janela.
+- [x] Validado com `node --check src/copilot/terminal/repl/live-status-line.js &&
+  node --check src/copilot/terminal/state/repl/index.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js` (1 arquivo, 30 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T03-25-13-712Z/summary.md`, observando `LLM-B continuando` por 1s, 2s e 3s
+  após o `SIM` antes da resposta final.
+
+### Achados Novos Da Centésima Trigésima Quarta Passada
+
+- [ ] SDK10-P134-01: em um live run apareceu uma pintura breve do comando `/activity 12` na linha do prompt antes da
+  saída do comando; investigar se comandos rápidos ainda podem ecoar/repintar input de forma visualmente irregular sob
+  PTY e linha viva ativa.
 
 ---
 

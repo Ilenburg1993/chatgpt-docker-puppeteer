@@ -19,7 +19,7 @@ import {
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
 import { renderTerminalQuestionActivityLiveLabel } from '../events/presenters/question/index.js';
-import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/index.js';
+import { readTerminalActivityHistory, readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/index.js';
 
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
 const MIN_LIVE_STATUS_HEARTBEAT_MS = 1_000;
@@ -28,6 +28,7 @@ const LIVE_LABEL_MAX_CHARS = 28;
 const LIVE_DETAIL_MAX_CHARS = 48;
 const LIVE_STATUS_FALLBACK_COLUMNS = 120;
 const LIVE_STATUS_MIN_COLUMNS = 48;
+const POST_ANSWER_CONTINUATION_GRACE_MS = 5_000;
 const ANSI_CLEAR_TO_END_OF_LINE = '\x1b[K';
 const ANSI_RESET = '\x1b[0m';
 const ANSI_ESCAPE = String.fromCharCode(27);
@@ -288,6 +289,18 @@ function isTurnFinalizationActivity(activity) {
 }
 
 /**
+ * @param {number} now
+ * @returns {boolean}
+ */
+function hasRecentPostAnswerContinuationActivity(now) {
+    return readTerminalActivityHistory(8).some((entry) => {
+        const updatedAt = Number(entry.updatedAt ?? entry.ts ?? 0);
+        if (!Number.isFinite(updatedAt) || now - updatedAt > POST_ANSWER_CONTINUATION_GRACE_MS) return false;
+        return entry.phase === 'question' && renderTerminalQuestionActivityLiveLabel(entry) === 'continuando';
+    });
+}
+
+/**
  * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
  * @param {string} label
  * @returns {{ state: string; label: string | null }}
@@ -478,6 +491,14 @@ function buildTerminalLiveStatusLine(input = {}) {
     }
     if (activity.phase === 'turn') {
         if (isTurnFinalizationActivity(activity)) {
+            if (hasRecentPostAnswerContinuationActivity(now)) {
+                return (
+                    `  ${terminalThemeText('assistant', 'LLM-B')} ` +
+                    `${terminalThemeText(severityRole, 'continuando')}` +
+                    `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)}${queue}`)}` +
+                    '\x1b[K'
+                );
+            }
             return (
                 `  ${terminalThemeText('assistant', 'LLM-B')} ` +
                 `${terminalThemeText(severityRole, 'finalizando')}` +

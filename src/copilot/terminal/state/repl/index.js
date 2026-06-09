@@ -1,6 +1,6 @@
 // @ts-check
 
-export { readTerminalActivitySnapshot } from '../activity-state.js';
+export { readTerminalActivityHistory, readTerminalActivitySnapshot } from '../activity-state.js';
 export {
     renderTerminalPendingQuestionKindLabel,
     renderTerminalPendingQuestionPromptTag,
