@@ -2849,9 +2849,31 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Trigésima Primeira Passada
 
-- [ ] SDK10-P131-01: o resumo de último turno ainda lista `Pergunta ao operador` dentro da seção `Ferramentas` e depois
+- [x] SDK10-P131-01: o resumo de último turno ainda lista `Pergunta ao operador` dentro da seção `Ferramentas` e depois
   novamente em `Interações humanas`; investigar o turn trace/projection para separar action/tool técnica de interação
   humana na superfície resumida, sem perder a contagem operacional do SDK.
+
+### Execução Contínua Em 2026-06-08 - Centésima Trigésima Segunda Passada
+
+- [x] `/activity` passou a filtrar tools humanas (`ask_user`/`request_user_input`/`operation=ask`) da seção
+  `Ferramentas` quando o mesmo trace já possui `Interações humanas`.
+- [x] A contagem default agora reflete a superfície humana (`Ferramentas 0`, `Operador 1` para turno só de pergunta),
+  enquanto o modo `detail` preserva a pista de contagem bruta do SDK em `SDK bruto`.
+- [x] A cobertura unitária reproduz o cenário canônico do live: `ask_user` concluído com resposta `SIM` aparece apenas
+  em `Interações humanas`, sem linha duplicada `Ferramenta Pergunta ao operador`.
+- [x] Validado com `node --check src/copilot/terminal/commands/activity.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js` (1 arquivo, 14 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T03-13-40-835Z/summary.md`, confirmando `/activity 40` com
+  `Ferramentas 0`, `Operador 1` e a pergunta canônica somente em `Interações humanas`.
+
+### Achados Novos Da Centésima Trigésima Segunda Passada
+
+- [ ] SDK10-P132-01: no live canônico, logo após `Intervenção   modelo ocioso; encaminhada como novo turno`, o prompt
+  default reapareceu antes do estado vivo de processamento; investigar renderização/prompt parking nesse caminho para
+  evitar uma piscada de prompt ocioso enquanto o turno já foi aceito.
 
 ---
 

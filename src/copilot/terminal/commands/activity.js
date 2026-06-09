@@ -332,6 +332,21 @@ function selectDefaultTimelineEntries(history, limit) {
 }
 
 /**
+ * @param {{ toolName?: string | null; operation?: string | null }} tool
+ * @returns {boolean}
+ */
+function isHumanInteractionTurnTool(tool) {
+    const name = String(tool.toolName ?? '').toLowerCase();
+    return (
+        tool.operation === 'ask' ||
+        name === 'ask_user' ||
+        name === 'request_user_input' ||
+        name.endsWith('.ask_user') ||
+        name.endsWith('.request_user_input')
+    );
+}
+
+/**
  * @param {ActivityContext['println']} println
  * @param {string} title
  * @param {any} trace
@@ -339,6 +354,12 @@ function selectDefaultTimelineEntries(history, limit) {
  * @returns {void}
  */
 function printTurnTraceSummary(println, title, trace, opts) {
+    const tools = /** @type {any[]} */ (Array.isArray(trace.tools) ? trace.tools : []);
+    const userInputs = /** @type {any[]} */ (Array.isArray(trace.userInputs) ? trace.userInputs : []);
+    const visibleTools =
+        userInputs.length > 0 ? tools.filter((tool) => !isHumanInteractionTurnTool(tool)) : tools;
+    const rawToolCount = Math.max(Number(trace.toolCount ?? 0), tools.length);
+    const hiddenHumanToolCount = Math.max(0, tools.length - visibleTools.length);
     const aggregatedFiles = aggregateTurnTraceFiles(Array.isArray(trace.files) ? trace.files : []);
     const rawFileCount = Math.max(Number(trace.fileCount ?? 0), Array.isArray(trace.files) ? trace.files.length : 0);
     const uniqueFileCount = aggregatedFiles.length;
@@ -346,12 +367,24 @@ function printTurnTraceSummary(println, title, trace, opts) {
         opts.detail && rawFileCount > uniqueFileCount
             ? `${pluralPt(uniqueFileCount, 'arquivo único', 'arquivos únicos')} · ${pluralPt(rawFileCount, 'registro', 'registros')}`
             : String(uniqueFileCount || rawFileCount);
+    const toolCountLabel =
+        opts.detail && hiddenHumanToolCount > 0
+            ? `${visibleTools.length} exibidas · ${pluralPt(rawToolCount, 'ação SDK', 'ações SDK')}`
+            : String(visibleTools.length);
     println(terminalThemeHeadline('assistant', title));
     println(terminalThemeDivider(37));
     println(terminalThemeRow('Estado', renderStatusLabel(trace.status), { role: renderStatusRole(trace.status) }));
-    println(terminalThemeRow('Ferramentas', String(trace.toolCount)));
+    println(terminalThemeRow('Ferramentas', toolCountLabel));
     println(terminalThemeRow('Arquivos', fileCountLabel));
-    println(terminalThemeRow('Operador', String(trace.userInputCount ?? trace.userInputs?.length ?? 0)));
+    println(terminalThemeRow('Operador', String(trace.userInputCount ?? userInputs.length)));
+    if (opts.detail && hiddenHumanToolCount > 0) {
+        println(
+            terminalThemeRow(
+                'SDK bruto',
+                `${pluralPt(hiddenHumanToolCount, 'interação humana contabilizada como tool', 'interações humanas contabilizadas como tools')}`,
+            ),
+        );
+    }
     if (opts.detail) {
         println(terminalThemeRow('Trace', compactTerminalDiagnosticId(trace.traceId) ?? String(trace.traceId ?? 'sem trace')));
     }
@@ -370,9 +403,9 @@ function printTurnTraceSummary(println, title, trace, opts) {
         }
     }
 
-    if (trace.tools.length > 0) {
+    if (visibleTools.length > 0) {
         println(terminalThemeHeadline('assistant', 'Ferramentas'));
-        for (const tool of trace.tools.slice(0, 5)) {
+        for (const tool of visibleTools.slice(0, 5)) {
             const rendered = renderToolSummary(tool, opts);
             const status = tool.status ? ` · ${renderStatusLabel(tool.status)}` : '';
             const source = opts.detail ? ` · ${renderSourceLabel(tool.source)}` : '';
@@ -385,7 +418,6 @@ function printTurnTraceSummary(println, title, trace, opts) {
         }
     }
 
-    const userInputs = Array.isArray(trace.userInputs) ? trace.userInputs : [];
     if (userInputs.length > 0) {
         println(terminalThemeHeadline('assistant', 'Interações humanas'));
         for (const userInput of userInputs.slice(0, 5)) {
