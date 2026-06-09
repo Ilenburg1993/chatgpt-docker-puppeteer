@@ -2723,6 +2723,26 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [ ] SDK10-P126-01: revisar se há outras atividades de pulso periódico que ainda merecem compressão semelhante à
   linha viva de contexto, sem sacrificar o detalhe útil nos comandos de diagnóstico.
 
+### Execução Contínua Em 2026-06-08 - Centésima Vigésima Sétima Passada
+
+- [x] A linha viva de fase `turn` deixou de exibir o prefixo abstrato `turno ·` no caminho comum e passou a usar
+  estados operacionais curtos: `preparando · Conversa atualizada`, `planejando · Intenção da LLM-B`, `pensando` e
+  `finalizando` conforme o contexto.
+- [x] O comportamento novo foi validado na superfície real do terminal com o cenário canônico, onde a linha viva
+  exibiu `LLM-B preparando · Conversa atualizada` durante a retomada e manteve `LLM-B continuando` após `ask_user`.
+- [x] A cobertura unitária da linha viva passou a proteger também o caso genérico `Processando mensagem`, evitando
+  o retorno do prefixo `turno` em bursts de processamento.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js` (1 arquivo, 28 testes).
+- [x] Validado com `node --check src/copilot/terminal/repl/live-status-line.js`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T02-35-25-284Z/summary.md`, confirmando o pulso humano compacto e o
+  fechamento canônico limpo.
+
+### Achados Novos Da Centésima Vigésima Sétima Passada
+
+- [ ] SDK10-P127-01: seguir caçando outras superfícies periódicas em `src/copilot/terminal` que ainda falem em fase de
+  runtime em vez de ação humana, sobretudo em status compactos que o operador vê de relance.
+
 ---
 
 ## Decisões Arquiteturais

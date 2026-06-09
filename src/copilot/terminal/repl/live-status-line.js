@@ -288,6 +288,25 @@ function isTurnFinalizationActivity(activity) {
 
 /**
  * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
+ * @param {string} label
+ * @returns {{ state: string; label: string | null }}
+ */
+function renderTurnActivityCompact(activity, label) {
+    const text = `${activity.label ?? ''} ${activity.detail ?? ''} ${label}`.toLowerCase();
+    if (text.includes('pending messages alteradas') || text.includes('conversa atualizada')) {
+        return { state: 'preparando', label: 'Conversa atualizada' };
+    }
+    if (text.includes('intenção da llm-b') || text.includes('intencao da llm-b')) {
+        return { state: 'planejando', label };
+    }
+    if (text.includes('processando mensagem')) {
+        return { state: 'pensando', label: null };
+    }
+    return { state: 'trabalhando', label };
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
  * @returns {boolean}
  */
 function isEmptyAfterUserInputActivity(activity) {
@@ -466,9 +485,11 @@ function buildTerminalLiveStatusLine(input = {}) {
                 '\x1b[K'
             );
         }
+        const turnActivity = renderTurnActivityCompact(activity, label);
+        const turnLabel = turnActivity.label ? ` · ${turnActivity.label}` : '';
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText(severityRole, `turno · ${label}`)}` +
+            `${terminalThemeText(severityRole, `${turnActivity.state}${turnLabel}`)}` +
             `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)}${queue}`)}` +
             '\x1b[K'
         );

@@ -456,7 +456,9 @@ describe('terminal/live-status-line', () => {
 
         const line = formatTerminalLiveStatusLine();
 
+        expect(line).toContain('preparando');
         expect(line).toContain('Conversa atualizada');
+        expect(line).not.toContain('turno ·');
         expect(line).not.toContain('Pending messages alteradas');
     });
 
@@ -497,11 +499,31 @@ describe('terminal/live-status-line', () => {
 
         const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
 
-        expect(line).toContain('turno · Intenção da LLM-B');
+        expect(line).toContain('planejando · Intenção da LLM-B');
         expect(line).toContain('12s');
+        expect(line).not.toContain('turno ·');
         expect(line).not.toContain('terminal live canonical');
         expect(line).not.toContain('conversa ativa');
         expect(line.length).toBeLessThan(72);
+    });
+
+    it('compacta processamento genérico de turno como pensamento humano', async () => {
+        const { formatTerminalLiveStatusLine } =
+            await import('../../../../src/copilot/terminal/repl/live-status-line.js');
+        mocks.activity = {
+            ...mocks.activity,
+            phase: 'turn',
+            label: 'Processando mensagem',
+            detail: null,
+            toolName: null,
+        };
+
+        const line = formatTerminalLiveStatusLine({ now: Date.parse('2026-05-07T22:00:12.000-03:00') });
+
+        expect(line).toContain('LLM-B pensando');
+        expect(line).toContain('12s');
+        expect(line).not.toContain('turno');
+        expect(line).not.toContain('Processando mensagem');
     });
 
     it('compacta finalização de turno sem rótulo truncado longo', async () => {
