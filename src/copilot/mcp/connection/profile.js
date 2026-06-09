@@ -691,7 +691,7 @@ function resolveOriginTransport() {
  */
 function resolveCloudflareTunnelTransport() {
     const raw = String(
-        process.env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'] ?? process.env['TUNNEL_TRANSPORT_PROTOCOL'] ?? 'http2',
+        process.env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'] ?? process.env['TUNNEL_TRANSPORT_PROTOCOL'] ?? 'auto',
     )
         .trim()
         .toLowerCase();

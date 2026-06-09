@@ -6,6 +6,8 @@ import { writeConnectorSmokeState } from './state.js';
 import { buildToolsListSmokeHeaders, extractAuthorizationServer, probeJsonWithRetry, readSmokeBearerToken, summarizeOAuthReadiness, summarizeProbeEnvelope, summarizeToolsListProbe } from './cli-probe.js';
 
 const DEFAULT_MCP_PROTOCOL_VERSION = '2025-06-18';
+const DEFAULT_SMOKE_ATTEMPTS = 3;
+const DEFAULT_SMOKE_DELAY_MS = 1_000;
 const DEFAULT_CRITICAL_TOOL_NAMES = ['repo_status', 'repo_tree', 'repo_read_file', 'repo_search_text', 'repo_apply_file_batch', 'mcp_runtime_health', 'mcp_tunnel_status'];
 
 /**
@@ -16,12 +18,15 @@ export async function runCloudflareSmoke({ config, authenticated = false, env = 
     if (!config) throw new Error('Cloudflare smoke requires a resolved tunnel config.');
     const connectorUrl = resolveConnectorUrl(config, env);
     const protocolVersion = String(env['COPILOT_MCP_PROTOCOL_VERSION'] ?? DEFAULT_MCP_PROTOCOL_VERSION).trim();
+    const smokeAttempts = readPositiveIntegerEnv(env, 'COPILOT_MCP_SMOKE_ATTEMPTS', DEFAULT_SMOKE_ATTEMPTS, 1, 20);
+    const smokeDelayMs = readPositiveIntegerEnv(env, 'COPILOT_MCP_SMOKE_DELAY_MS', DEFAULT_SMOKE_DELAY_MS, 100, 30_000);
+    const probeOptions = { attempts: smokeAttempts, delayMs: smokeDelayMs };
     const bearerToken = authenticated ? readSmokeBearerToken() : null;
-    const health = await probeJsonWithRetry(new URL('/health', connectorUrl).toString(), { attempts: 2 });
-    const protectedResource = await probeJsonWithRetry(new URL('/.well-known/oauth-protected-resource', connectorUrl).toString(), { attempts: 2 });
+    const health = await probeJsonWithRetry(new URL('/health', connectorUrl).toString(), probeOptions);
+    const protectedResource = await probeJsonWithRetry(new URL('/.well-known/oauth-protected-resource', connectorUrl).toString(), probeOptions);
     const authorizationServer = extractAuthorizationServer(protectedResource);
-    const authorization = authorizationServer ? await probeJsonWithRetry(new URL('/.well-known/oauth-authorization-server', authorizationServer).toString(), { attempts: 2 }) : { ok: false, error: 'missing-authorization-server' };
-    const toolsList = await probeJsonWithRetry(connectorUrl, { method: 'POST', headers: buildToolsListSmokeHeaders(bearerToken, { protocolVersion }), body: JSON.stringify({ jsonrpc: '2.0', id: 'cloudflare-smoke-tools-list', method: 'tools/list', params: {} }), attempts: 3 });
+    const authorization = authorizationServer ? await probeJsonWithRetry(new URL('/.well-known/oauth-authorization-server', authorizationServer).toString(), probeOptions) : { ok: false, error: 'missing-authorization-server' };
+    const toolsList = await probeJsonWithRetry(connectorUrl, { method: 'POST', headers: buildToolsListSmokeHeaders(bearerToken, { protocolVersion }), body: JSON.stringify({ jsonrpc: '2.0', id: 'cloudflare-smoke-tools-list', method: 'tools/list', params: {} }), ...probeOptions });
     const tools = summarizeToolsListProbe(toolsList);
     const oauth = summarizeOAuthReadiness(protectedResource, authorization);
     const authConfig = readMcpAuthConfig(env);
@@ -34,6 +39,7 @@ export async function runCloudflareSmoke({ config, authenticated = false, env = 
         protocolVersion,
         authenticated,
         authMode: authConfig.mode,
+        probePolicy: { attempts: smokeAttempts, delayMs: smokeDelayMs },
         health: summarizeProbeEnvelope(health),
         oauth,
         tools,
@@ -64,6 +70,24 @@ export async function runCloudflareSmoke({ config, authenticated = false, env = 
         /* smoke state persistence is best-effort */
     }
     return report;
+}
+
+/**
+ * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string}
+ */
+/**
+ * @param {NodeJS.ProcessEnv} env
+ * @param {string} name
+ * @param {number} fallback
+ * @param {number} minimum
+ * @param {number} maximum
+ * @returns {number}
+ */
+function readPositiveIntegerEnv(env, name, fallback, minimum, maximum) {
+    const parsed = Number(env[name] ?? fallback);
+    return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? Math.floor(parsed) : fallback;
 }
 
 /**

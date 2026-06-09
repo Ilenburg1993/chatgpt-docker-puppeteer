@@ -93,7 +93,7 @@ async function runDoctor({ env }) {
     const config = readCloudflareTunnelConfig(env);
     const cloudflared = readCloudflaredVersion();
     const compatibility = assessCloudflaredCompatibility(cloudflared, config);
-    const health = await probeHealth(config.healthUrl);
+    const health = await probeHealth(config.healthUrl, config.originUrl.startsWith('https://127.0.0.1') || config.originUrl.startsWith('https://localhost') ? { allowInsecureHttps: true, servername: config.originServerName ?? config.publicHostname } : {});
     const publicUrlValidation = validateConfiguredPublicUrl(config) ?? { ok: false, reason: 'missing-public-url' };
     const token = tokenPosture(config);
     await writeJsonAndSetExit({ ok: Boolean(cloudflared.ok && compatibility.ok && publicUrlValidation.ok && (config.mode !== 'named-permanent' || token.ok)), version: CLOUDFLARE_CLI_VERSION, config: publicConfig(config), cloudflared, compatibility, token, health, publicUrlValidation, hints: commandHints(config) });

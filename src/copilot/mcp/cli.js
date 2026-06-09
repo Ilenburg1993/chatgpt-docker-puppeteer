@@ -26,13 +26,13 @@ const SHUTDOWN_GRACE_MS = 5000;
  * @param {string[]} argv
  * @returns {McpCliTransport}
  */
-function parseTransport(argv) {
+export function parseTransport(argv) {
     const explicitTransport = readTransportArgument(argv);
     if (explicitTransport) return normalizeTransport(explicitTransport);
     if (argv.includes('--stdio')) return 'stdio';
     if (argv.includes('--http2') || argv.includes('--h2')) return 'http2';
     if (argv.includes('--http')) return 'http';
-    return 'http';
+    return 'http2';
 }
 
 /**

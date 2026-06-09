@@ -7,6 +7,7 @@
 
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import https from 'node:https';
 import { z } from 'zod';
 import {
     readCloudflareTunnelConfig,
@@ -58,6 +59,9 @@ async function readPidFileStatus(pidFile) {
  */
 async function probeHealth(url) {
     try {
+        if (String(url).startsWith('https://127.0.0.1') || String(url).startsWith('https://localhost')) {
+            return await probeLocalInsecureHttpsHealth(url);
+        }
         const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
         return { ok: response.ok, status: response.status };
     } catch (error) {
@@ -66,14 +70,28 @@ async function probeHealth(url) {
 }
 
 /**
- * @returns {Promise<{
- *     logFile: string;
- *     originUsesLocalhost: boolean;
- *     originUsesLoopbackIp: boolean;
- *     recentOriginErrors: string[];
- *     recommendation: string | null;
- * }>}
+ * @param {string} url
+ * @returns {Promise<{ ok: boolean; status?: number; error?: string; tlsVerification: string }>}
  */
+function probeLocalInsecureHttpsHealth(url) {
+    return new Promise((resolve) => {
+        const request = https.request(url, { method: 'GET', rejectUnauthorized: false }, (response) => {
+            response.resume();
+            response.on('end', () => {
+                resolve({
+                    ok: Boolean(response.statusCode && response.statusCode >= 200 && response.statusCode < 300),
+                    tlsVerification: 'disabled-local-origin-diagnostic',
+                    ...(response.statusCode === undefined ? {} : { status: response.statusCode }),
+                });
+            });
+        });
+        request.setTimeout(3000, () => request.destroy(new Error('health probe timed out')));
+        request.on('error', (error) => resolve({ ok: false, error: error.message, tlsVerification: 'disabled-local-origin-diagnostic' }));
+        request.end();
+    });
+}
+
+/** @returns {Promise<Record<string, unknown>>} */
 async function readCloudflaredOriginDiagnostics() {
     let text;
     try {

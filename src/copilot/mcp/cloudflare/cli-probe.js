@@ -1,5 +1,7 @@
 // @ts-check
 /** HTTP, OAuth and MCP probe helpers for Cloudflare MCP CLI. */
+import https from 'node:https';
+
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 /**
@@ -12,6 +14,12 @@ const DEFAULT_TIMEOUT_MS = 10_000;
  *   delayMs?: number;
  *   protocolVersion?: string;
  * }} ProbeJsonOptions
+ *
+ * @typedef {{
+ *   timeoutMs?: number;
+ *   allowInsecureHttps?: boolean;
+ *   servername?: string;
+ * }} ProbeHealthOptions
  *
  * @typedef {{
  *   ok: boolean;
@@ -66,15 +74,49 @@ export function buildToolsListSmokeHeaders(bearerToken, options = {}) {
 
 /**
  * @param {string} url
- * @returns {Promise<{ ok: boolean; status?: number; error?: string }>}
+ * @param {ProbeHealthOptions} [options]
+ * @returns {Promise<{ ok: boolean; status?: number; error?: string; tlsVerification?: string }>}
  */
-export async function probeHealth(url) {
+export async function probeHealth(url, options = {}) {
     try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        if (options.allowInsecureHttps === true && String(url).startsWith('https://')) {
+            return await probeInsecureHttpsHealth(url, options);
+        }
+        const response = await fetch(url, { signal: AbortSignal.timeout(Number(options.timeoutMs ?? 3000)) });
         return { ok: response.ok, status: response.status };
     } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
+}
+
+/**
+ * @param {string} url
+ * @param {ProbeHealthOptions} options
+ * @returns {Promise<{ ok: boolean; status?: number; error?: string; tlsVerification: string }>}
+ */
+function probeInsecureHttpsHealth(url, options) {
+    return new Promise((resolve) => {
+        const request = https.request(url, {
+            method: 'GET',
+            rejectUnauthorized: false,
+            servername: options.servername,
+        }, (response) => {
+            response.resume();
+            response.on('end', () => {
+                const result = {
+                    ok: Boolean(response.statusCode && response.statusCode >= 200 && response.statusCode < 300),
+                    tlsVerification: 'disabled-local-origin-diagnostic',
+                    ...(response.statusCode === undefined ? {} : { status: response.statusCode }),
+                };
+                resolve(result);
+            });
+        });
+        request.setTimeout(Number(options.timeoutMs ?? 3000), () => request.destroy(new Error('health probe timed out')));
+        request.on('error', (error) => {
+            resolve({ ok: false, error: error.message, tlsVerification: 'disabled-local-origin-diagnostic' });
+        });
+        request.end();
+    });
 }
 
 /**
@@ -89,7 +131,7 @@ export async function probeJsonWithRetry(url, options = {}) {
     for (let i = 1; i <= attempts; i += 1) {
         last = await probeJson(url, options);
         last.attempts = i;
-        if (last.ok || ![0, 408, 425, 429, 500, 502, 503, 504].includes(last.status ?? 0)) return last;
+        if (last.ok || ![0, 408, 425, 429, 500, 502, 503, 504, 530].includes(last.status ?? 0)) return last;
         await new Promise((resolve) => setTimeout(resolve, Number(options.delayMs ?? 1000)));
     }
     return last ?? { ok: false, status: 0, error: 'probe-not-run', attempts: 0 };

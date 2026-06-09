@@ -79,7 +79,7 @@ export function runQuickTunnel(config, env = process.env) {
  */
 export async function readRuntimeOriginSummary(config, env = process.env) {
     const originTransport = selectMcpOriginTransport(config, env);
-    const health = await probeHealth(config.healthUrl);
+    const health = await probeHealth(config.healthUrl, buildLocalOriginHealthProbeOptions(config));
     return { ok: health.ok, originTransport, health, report: buildRuntimeReport(config, originTransport, env) };
 }
 
@@ -104,6 +104,16 @@ export function buildCloudflareLogReport() {
  */
 export function buildCloudflareMetricsReport(config) {
     return { enabled: Boolean(config.metricsAddr), address: config.metricsAddr ?? null, url: config.metricsAddr ? `http://${config.metricsAddr}/metrics` : null };
+}
+
+/**
+ * @param {import('./config.js').CloudflareTunnelConfig} config
+ * @returns {{ allowInsecureHttps?: true; servername?: string }}
+ */
+function buildLocalOriginHealthProbeOptions(config) {
+    return config.originUrl.startsWith('https://127.0.0.1') || config.originUrl.startsWith('https://localhost')
+        ? { allowInsecureHttps: true, servername: config.originServerName ?? config.publicHostname }
+        : {};
 }
 
 /**
