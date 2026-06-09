@@ -354,8 +354,8 @@ function humanEventLabel(event, payload = null) {
     if (event === 'terminal.turn.empty_output') return 'Turno sem saída';
     if (event === 'terminal.turn.non_text_outcome') return 'Turno sem transcript';
     if (event === 'dialog.empty_after_user_input') return 'Continuação vazia';
-    if (event === 'dialog.empty_after_user_input.auto_recovery') return 'Retomada automática';
-    if (event === 'dialog.empty_after_user_input.auto_recovery_failed') return 'Retomada falhou';
+    if (event === 'dialog.empty_after_user_input.auto_recovery') return 'Continuação automática';
+    if (event === 'dialog.empty_after_user_input.auto_recovery_failed') return 'Continuação falhou';
     if (event === 'byok.provider.config') return 'Configuração BYOK';
     if (event === 'dialog.ready') return 'Conversa pronta';
     if (event === 'dialog.stopped') return 'Conversa parada';
@@ -686,7 +686,7 @@ function summarizeEmptyAfterUserInputAutoRecoveryPayload(payload) {
     const detail = typeof payload['detail'] === 'string' ? humanEventMessage(payload['detail']) : '';
     return [
         detail ? compact(detail, 120) : EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL,
-        'retomada automática enviada uma vez',
+        'continuação automática enviada uma vez',
         'sem repetir a pergunta humana',
     ]
         .filter(Boolean)

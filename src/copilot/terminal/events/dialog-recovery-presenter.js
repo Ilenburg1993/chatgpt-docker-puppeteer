@@ -45,7 +45,7 @@ export function buildEmptyAfterUserInputRecoveryRows(input = {}) {
     const rows = [
         {
             label: 'Estado',
-            value: 'resposta humana registrada; a LLM-B encerrou sem texto publico',
+            value: 'resposta humana registrada; a LLM-B encerrou sem texto público',
             role: 'warn',
         },
         answerPreview ? { label: 'Resposta', value: answerPreview, role: 'muted' } : null,
@@ -103,7 +103,7 @@ export function buildEmptyAfterUserInputAutoRecoveryRows(input = {}) {
             value: 'resposta humana registrada; a continuação voltou sem texto público',
             role: 'warn',
         },
-        { label: 'Ação', value: 'retomada automática enviada uma vez', role: 'command' },
+        { label: 'Ação', value: 'continuação automática enviada uma vez', role: 'command' },
         { label: 'Retomar', value: EMPTY_AFTER_USER_INPUT_RESUME_COMMAND, role: 'command' },
         answerPreview ? { label: 'Resposta', value: answerPreview, role: 'muted' } : null,
         turnId ? { label: 'Turno', value: `turno ${turnId}`, role: 'muted' } : null,

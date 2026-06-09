@@ -4055,7 +4055,9 @@ function detectLiveBlocker(plain, runtime = {}) {
         const recoveredAfterUserInput =
             id === 'assistant-empty-after-user-input' &&
             scenario.postAskFinalRe.test(plain) &&
-            /Retomada automática|Continuação vazia|RECUPERANDO|dialog\.empty_after_user_input\.auto_recovery/iu.test(plain);
+            /Continuação automática|Retomada automática|Continuação vazia|RECUPERANDO|dialog\.empty_after_user_input\.auto_recovery/iu.test(
+                plain,
+            );
         if (recoveredAfterUserInput) return null;
         const phaseDetail = answered
             ? 'after the operator answered the required ask_user prompt'

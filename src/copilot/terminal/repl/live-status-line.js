@@ -358,6 +358,8 @@ function isEmptyAfterUserInputActivity(activity) {
         activity.phase === 'turn' &&
         (text.includes('continuação sem resposta pública') ||
             text.includes('continuacao sem resposta publica') ||
+            text.includes('continuando resposta final sem texto público') ||
+            text.includes('continuando resposta final sem texto publico') ||
             text.includes('retomando resposta final sem texto público') ||
             text.includes('retomando resposta final sem texto publico') ||
             text.includes('continuação após resposta humana sem texto público') ||

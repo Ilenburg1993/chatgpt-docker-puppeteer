@@ -1298,8 +1298,8 @@ describe('terminal/commands/events', () => {
             'retomar /turn Continue a partir da ultima resposta humana e entregue a resposta final em texto publico.',
         );
         expect(ctx.output()).toContain('diagnóstico /activity 40 · /events 60 · /byok health');
-        expect(ctx.output()).toContain('Retomada automática');
-        expect(ctx.output()).toContain('retomada automática enviada uma vez');
+        expect(ctx.output()).toContain('Continuação automática');
+        expect(ctx.output()).toContain('continuação automática enviada uma vez');
         expect(ctx.output()).toContain('sem repetir a pergunta humana');
         expect(ctx.output()).toContain('Tarefa iniciada');
         expect(ctx.output()).toContain('Tarefa enfileirada');

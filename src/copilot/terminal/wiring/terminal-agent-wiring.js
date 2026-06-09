@@ -597,7 +597,7 @@ export function registerAgentEventListeners(printBanner) {
                         println(
                             [
                                 '',
-                                terminalThemeHeadline('warn', 'Retomada automática', [
+                                terminalThemeHeadline('warn', 'Continuação automática', [
                                     'após resposta humana sem texto público',
                                 ]),
                                 ...buildEmptyAfterUserInputAutoRecoveryRows({
@@ -607,7 +607,7 @@ export function registerAgentEventListeners(printBanner) {
                                 }).map((row) => terminalThemeRow(row.label, row.value, { role: row.role, width: 11 })),
                             ].join('\n'),
                         );
-                        recordTerminalActivity('turn', 'Retomando resposta final sem texto público', {
+                        recordTerminalActivity('turn', 'Continuando resposta final sem texto público', {
                             detail,
                             severity: 'warn',
                             source: 'dialog.turn_end',
@@ -627,7 +627,7 @@ export function registerAgentEventListeners(printBanner) {
                             ),
                         );
                         const reportAutoRecoveryFailure = (/** @type {string} */ message) => {
-                            recordTerminalActivity('error', 'Retomada após resposta humana falhou ao enfileirar', {
+                            recordTerminalActivity('error', 'Continuação após resposta humana falhou ao enfileirar', {
                                 detail: message,
                                 severity: 'error',
                                 source: 'dialog.turn_end',

@@ -24,7 +24,7 @@ describe('terminal/events/dialog-recovery-presenter', () => {
 
         const text = rows.map((row) => `${row.label}: ${row.value}`).join('\n');
 
-        expect(text).toContain('Estado: resposta humana registrada; a LLM-B encerrou sem texto publico');
+        expect(text).toContain('Estado: resposta humana registrada; a LLM-B encerrou sem texto público');
         expect(text).toContain('Resposta: SIM');
         expect(EMPTY_AFTER_USER_INPUT_RESUME_COMMAND).toBe(`/turn ${EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE}`);
         expect(text).toContain(`Retomar: ${EMPTY_AFTER_USER_INPUT_RESUME_COMMAND}`);
@@ -74,7 +74,7 @@ describe('terminal/events/dialog-recovery-presenter', () => {
         const text = rows.map((row) => `${row.label}: ${row.value}`).join('\n');
 
         expect(text).toContain('Estado: resposta humana registrada; a continuação voltou sem texto público');
-        expect(text).toContain('Ação: retomada automática enviada uma vez');
+        expect(text).toContain('Ação: continuação automática enviada uma vez');
         expect(text).toContain(`Retomar: ${EMPTY_AFTER_USER_INPUT_RESUME_COMMAND}`);
         expect(text).toContain('Resposta: SIM');
         expect(text).toContain('Turno: turno 3');

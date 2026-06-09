@@ -3560,6 +3560,27 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   --live-scenario=canonical`; resumo PASS em `artifacts/terminal-live/2026-06-09T19-02-21-232Z/summary.md`, com
   `ask_user`, resposta humana, retomada pós-resposta e marcador final público sem erros.
 
+### Execução Contínua Em 2026-06-09 - Centésima Sexagésima Segunda Passada
+
+- [x] A auditoria do fluxo pós-`ask_user`, motivada pela captura visual, confirmou que o rótulo público legado
+  `Resposta pós-pergunta` já foi removido da superfície principal e permanece apenas como asserção negativa em teste.
+- [x] O fluxo de recuperação após resposta humana foi padronizado para o vocabulário `continuação`, evitando que o
+  operador interprete o caminho normal pós-resposta como uma nova pergunta, um turno paralelo ou uma retomada de sessão.
+- [x] `dialog.empty_after_user_input.auto_recovery` agora aparece como `Continuação automática`, com ação
+  `continuação automática enviada uma vez`; a linha viva reconhece `Continuando resposta final sem texto público`.
+- [x] Corrigido texto humano sem acento em `sem texto público` nos cards de recuperação.
+- [x] O live-test canônico foi atualizado para aceitar `Continuação automática` como evidência de recuperação pós-resposta,
+  preservando compatibilidade com logs antigos que ainda tenham `Retomada automática`.
+- [x] Validado com `node --check` nos presenters/wiring/events/live-test afetados.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_dialog_recovery_presenter.spec.js
+  tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_build_user_prompt.spec.js
+  tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js`
+  (5 arquivos, 113 testes).
+- [x] Validado com live test LLM-B canônico em `artifacts/terminal-live/2026-06-09T19-08-06-774Z/summary.md`
+  (PASS): o cenário cobriu deltas públicos, continuação controlada para `ask_user`, resposta humana `SIM`,
+  pós-resposta com `LLM-B continuando`, `/events` sem rótulos `Resposta pós-pergunta`/`Processando mensagem` e final
+  `POST-ASK-CANONICAL-FINAL`.
+
 ---
 
 ## Decisões Arquiteturais

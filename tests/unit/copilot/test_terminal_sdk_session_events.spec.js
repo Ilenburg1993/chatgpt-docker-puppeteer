@@ -862,7 +862,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
 
         expect(mocks.recordTerminalActivity).toHaveBeenCalledWith(
             'question',
-            'Pergunta antes de síntese pública',
+            'Pergunta ao operador',
             expect.objectContaining({
                 severity: 'warn',
                 detail: expect.stringContaining('síntese pública'),
