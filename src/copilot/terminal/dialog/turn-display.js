@@ -54,6 +54,7 @@ const PUBLIC_REASONING_OPEN_RE = /^\s*(?:<|&lt;)(?:thinking|analysis|reasoning)(
  * @property {boolean} streamingStarted
  * @property {number} streamingChars
  * @property {string} streamingContent
+ * @property {string} streamingPublicContent
  * @property {string} streamingBuffer
  * @property {boolean} streamingLineOpen
  * @property {number} streamingVisibleChars
@@ -160,6 +161,7 @@ export function createDisplayState({ model, effort, turnStartTime, showStreaming
         streamingStarted: false,
         streamingChars: 0,
         streamingContent: '',
+        streamingPublicContent: '',
         streamingBuffer: '',
         streamingLineOpen: false,
         streamingVisibleChars: 0,
@@ -352,8 +354,14 @@ export function createDeltaCallback(state) {
         state.streamingChars += chunk.length;
         state.streamingContent += chunk;
         const correlation = readTerminalTurnCorrelation();
+        const publicContent = sanitizeTerminalRenderText(state.streamingContent);
+        const publicChunk = publicContent.startsWith(state.streamingPublicContent)
+            ? publicContent.slice(state.streamingPublicContent.length)
+            : publicContent;
+        state.streamingPublicContent = publicContent;
         broadcastSse('delta', {
             chunk,
+            publicChunk,
             ...(correlation.traceId ? { traceId: correlation.traceId } : {}),
             ...(correlation.turnId ? { turnId: correlation.turnId } : {}),
             source: typeof envelope['source'] === 'string' ? envelope['source'] : 'terminal-turn-display/delta',

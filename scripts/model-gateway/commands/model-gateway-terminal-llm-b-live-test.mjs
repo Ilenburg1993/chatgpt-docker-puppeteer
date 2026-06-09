@@ -5107,6 +5107,15 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         liveCanonicalDeltaMarkerCount,
         assistantMessageCanonicalDeltaMarkerCount,
     );
+    const sseDeltaEvents = canonicalEvents.filter((evt) => evt?.event === 'delta');
+    const sseDeltaEventsWithPublicChunk = sseDeltaEvents.filter((evt) => {
+        const payload = eventPayload(evt);
+        return typeof payload?.publicChunk === 'string';
+    });
+    const ssePublicChunkReasoningLeak = sseDeltaEvents.some((evt) => {
+        const payload = eventPayload(evt);
+        return /(?:<|&lt;)\/?(?:thinking|analysis|reasoning)(?:>|&gt;)/iu.test(String(payload?.publicChunk ?? ''));
+    });
     const exactCanonicalDeltaLineCount = Math.max(
         liveExactCanonicalDeltaLineCount,
         assistantMessageExactCanonicalDeltaLineCount,
@@ -5227,6 +5236,16 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                 exactCanonicalDeltaLineCount >= 8
                     ? 'assistant rendered the eight DELTA-CANONICAL lines as exact marker-only lines'
                     : `assistant rendered extra text or missing exact canonical delta lines · exact=${exactCanonicalDeltaLineCount}/8`,
+        },
+        {
+            id: 'sse-delta-public-chunk',
+            pass:
+                sseDeltaEvents.length === 0 ||
+                (sseDeltaEventsWithPublicChunk.length === sseDeltaEvents.length && !ssePublicChunkReasoningLeak),
+            detail:
+                sseDeltaEvents.length === 0
+                    ? 'scenario did not expose raw delta SSE events; assistant.message carried the public transcript'
+                    : `delta events publicChunk=${sseDeltaEventsWithPublicChunk.length}/${sseDeltaEvents.length} · reasoningLeak=${ssePublicChunkReasoningLeak ? 'yes' : 'no'}`,
         },
         {
             id: 'final-delta-block',

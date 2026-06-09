@@ -3085,7 +3085,7 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Trigésima Nona Passada
 
-- [ ] SDK10-P139-01: auditar o contrato de `assistant.message` sanitizado versus SSE raw: hoje o canal público canônico
+- [x] SDK10-P139-01: auditar o contrato de `assistant.message` sanitizado versus SSE raw: hoje o canal público canônico
   passa a receber conteúdo sem blocos iniciais de raciocínio, mas os eventos `delta` ainda preservam chunks crus para
   diagnóstico. Decidir se `/events --raw full` deve continuar como evidência forense crua ou também carregar um campo
   público sanitizado paralelo.
@@ -3127,6 +3127,45 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [ ] SDK10-P140-01: após a correção de observabilidade de pergunta antes de síntese pública, executar live canônico e
   revisar se o warning deve aparecer apenas em `/activity`/card ou também no archive SSE como campo estruturado
   `prePublicResponse: true`, para permitir dashboards detectarem esse padrão sem parsing textual.
+
+### Execução Contínua Em 2026-06-08 - Centésima Quadragésima Primeira Passada
+
+- [x] A decisão do P139 foi preservar `chunk` cru em eventos SSE `delta` como evidência forense, sem rebaixar
+  `/events --raw full` a uma superfície apenas sanitizada.
+- [x] `turn-display.js` passou a adicionar `publicChunk` ao envelope `delta`, calculado pela mesma sanitização pública do
+  terminal. Clientes, replay e dashboards passam a ter um campo seguro sem precisar reinterpretar HTML, ANSI ou tags de
+  raciocínio.
+- [x] O cálculo de `publicChunk` é acumulativo: se `<thinking>`/`</thinking>` vier dividido em múltiplos deltas, o
+  primeiro evento público seguro fica vazio e o segundo entrega apenas o texto realmente público, evitando vazamento por
+  fronteira de chunk.
+- [x] `assistant.message` continua com `content` já sanitizado no canal público canônico; a retenção forense crua fica
+  concentrada em `delta.chunk` e nas superfícies raw explícitas.
+- [x] O live harness ganhou o critério `sse-delta-public-chunk`, exigindo que todos os eventos SSE `delta` carreguem
+  `publicChunk` e que esse campo não contenha tags `thinking/analysis/reasoning`.
+- [x] O primeiro live com o critério novo passou em `sse-delta-public-chunk` (`22/22`, sem reasoning leak), mas falhou
+  em `no-prompt-double-render`: no fluxo de recuperação canônico, o modelo escreveu os deltas, voltou ao prompt, o
+  harness pediu continuação e, depois do `POST-ASK-CANONICAL-FINAL`, apareceram dois prompts adjacentes antes de
+  `/usage now`.
+- [x] `output.js` ampliou a janela de dedupe de prompt idêntico para cobrir a cauda real de `assistant.turn_end`/
+  `sessionend` pós-streaming final, mantendo repaint `{ force: true }` para comandos explícitos.
+- [x] Validado com `node --check src/copilot/terminal/dialog/turn-display.js
+  src/copilot/terminal/dialog/output.js
+  scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js
+  tests/unit/copilot/terminal/test_turn_display.spec.js` (2 arquivos, 53 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Live bloqueado diagnóstico: `artifacts/terminal-live/2026-06-09T05-04-59-064Z/summary.md` confirmou
+  `sse-delta-public-chunk`, mas falhou `no-prompt-double-render`, expondo a necessidade do dedupe pós-turno ampliado.
+- [x] Validado live final com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
+  --live-scenario=canonical`; PASS em `artifacts/terminal-live/2026-06-09T05-09-51-796Z/summary.md`, confirmando
+  `sse-delta-public-chunk` (`23/23`, sem reasoning leak), `no-prompt-double-render` e o fluxo de recuperação
+  canônico sem duplicar prompt depois do `POST-ASK-CANONICAL-FINAL`.
+
+### Achados Novos Da Centésima Quadragésima Primeira Passada
+
+- [ ] SDK10-P141-01: após o live com `sse-delta-public-chunk`, avaliar se comandos `/events --json compact` devem
+  privilegiar `publicChunk` nos previews compactos de `delta`, mantendo `chunk` cru apenas no modo full/raw.
 
 ---
 

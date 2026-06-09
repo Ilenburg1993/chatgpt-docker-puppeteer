@@ -417,6 +417,24 @@ describe('terminal/dialog/output inline status', () => {
         expect(mocks.rl.prompt).toHaveBeenCalledTimes(1);
     });
 
+    it('não duplica prompt final idêntico atrasado pela cauda de turn_end', async () => {
+        const rl = {
+            closed: false,
+            line: '',
+            setPrompt: vi.fn(),
+            prompt: vi.fn(),
+        };
+
+        redrawTerminalPrompt(rl, 'você› ');
+        await new Promise((resolve) => setTimeout(resolve, 350));
+
+        scheduleTerminalPromptRedraw(rl, 'você› ', { finalizeTurn: true });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(rl.setPrompt).toHaveBeenCalledTimes(1);
+        expect(rl.prompt).toHaveBeenCalledTimes(1);
+    });
+
     it('separa prompt final de linha viva residual antes de devolver controle ao operador', async () => {
         writeInlineStatus('LLM-B trabalhando · Mensagem da LLM-B recebida…');
         writeSpy.mockClear();

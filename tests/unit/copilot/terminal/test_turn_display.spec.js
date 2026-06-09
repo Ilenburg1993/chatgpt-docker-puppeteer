@@ -232,11 +232,64 @@ describe('terminal/dialog/turn-display', () => {
             'delta',
             expect.objectContaining({
                 chunk: 'abc',
+                publicChunk: 'abc',
                 traceId: 'turn:turn-123',
                 turnId: 'turn-123',
                 streamId: 'stream-1',
                 chunkSeq: 1,
                 eventId: 'event-1',
+            }),
+        );
+    });
+
+    it('preserva chunk cru e publica publicChunk sanitizado no SSE de delta', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: false,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('<thinking>\nsegredo\n</thinking>\n\n<a>DELTA</a>');
+
+        expect(broadcastSse).toHaveBeenCalledWith(
+            'delta',
+            expect.objectContaining({
+                chunk: '<thinking>\nsegredo\n</thinking>\n\n<a>DELTA</a>',
+                publicChunk: '&lt;a&gt;DELTA&lt;/a&gt;',
+            }),
+        );
+    });
+
+    it('calcula publicChunk sanitizado a partir do acumulado para raciocínio dividido em deltas', () => {
+        const state = createDisplayState({
+            model: 'gpt-5-mini',
+            effort: 'high',
+            turnStartTime: Date.now(),
+            showStreaming: false,
+            showThinking: false,
+        });
+
+        const onDelta = createDeltaCallback(state);
+        onDelta('<thinking>\nseg');
+        onDelta('redo\n</thinking>\n\nDELTA-CANONICAL-1');
+
+        expect(broadcastSse).toHaveBeenNthCalledWith(
+            1,
+            'delta',
+            expect.objectContaining({
+                chunk: '<thinking>\nseg',
+                publicChunk: '',
+            }),
+        );
+        expect(broadcastSse).toHaveBeenNthCalledWith(
+            2,
+            'delta',
+            expect.objectContaining({
+                chunk: 'redo\n</thinking>\n\nDELTA-CANONICAL-1',
+                publicChunk: 'DELTA-CANONICAL-1',
             }),
         );
     });
