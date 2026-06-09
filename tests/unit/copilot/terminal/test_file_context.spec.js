@@ -6,7 +6,10 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 
+import { invalidateIoCachePath } from '../../../../src/copilot/infra/public/cache.js';
 import {
     clearFileCache,
     detectLang,
@@ -112,5 +115,39 @@ describe('file-context readFileContext + cache', () => {
         await readFileContext('package.json');
         const after = getFileCacheStats();
         expect(after.hits).toBe(before.hits + 1);
+    });
+
+    it('invalida cache por path após mutação de IO', async () => {
+        const tempDir = await mkdtemp(join(process.cwd(), '.tmp-file-context-cache-'));
+        const filePath = join(tempDir, 'context.js');
+        const relativePath = relative(process.cwd(), filePath);
+        try {
+            await writeFile(filePath, 'export const value = 1;\n');
+            const first = await readFileContext(relativePath);
+            expect(first.content).toContain('value = 1');
+
+            await writeFile(filePath, 'export const value = 2;\n');
+            invalidateIoCachePath(relativePath);
+
+            const second = await readFileContext(relativePath);
+            expect(second.content).toContain('value = 2');
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    it('mantém limite efetivo de entradas frescas no cache', async () => {
+        const tempDir = await mkdtemp(join(process.cwd(), '.tmp-file-context-cache-limit-'));
+        try {
+            const maxEntries = getFileCacheStats().maxEntries;
+            for (let index = 0; index < maxEntries + 5; index += 1) {
+                const filePath = join(tempDir, `file-${index}.txt`);
+                await writeFile(filePath, `file ${index}\n`);
+                await readFileContext(relative(process.cwd(), filePath));
+            }
+            expect(getFileCacheStats().size).toBeLessThanOrEqual(maxEntries);
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
     });
 });

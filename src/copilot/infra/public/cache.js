@@ -14,6 +14,7 @@ export {
     makeBytesKey,
     makeTextKey,
     normalizeIoCacheKey,
+    registerInvalidationHook,
 } from '../io-cache.js';
 
 export { getIoL2CacheHealth, getIoL2CacheStats } from '../io-cache-l2-registry.js';

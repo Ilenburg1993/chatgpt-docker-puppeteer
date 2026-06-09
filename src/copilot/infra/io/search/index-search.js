@@ -48,11 +48,13 @@ export function filterIndexRowsByGlob(rows, includePattern, excludePattern) {
      * @param {string} pattern
      * @returns {boolean}
      */
-    const matchesSegmentPattern = (target, pattern) => {
+    const matchesPlainPathPattern = (target, pattern) => {
         const hasSlash = pattern.includes('/');
         const hasGlobMeta = /[*?[\]{}()!+@]/u.test(pattern);
-        if (hasSlash || hasGlobMeta) return false;
-        return target === pattern || target.startsWith(`${pattern}/`) || target.includes(`/${pattern}/`);
+        if (hasGlobMeta) return false;
+        if (target === pattern || target.startsWith(`${pattern}/`)) return true;
+        if (hasSlash) return false;
+        return target.includes(`/${pattern}/`);
     };
 
     return rows.filter((row) => {
@@ -60,14 +62,19 @@ export function filterIndexRowsByGlob(rows, includePattern, excludePattern) {
 
         if (includePattern) {
             const matchBase = !includePattern.includes('/');
-            if (!minimatch(target, includePattern, { matchBase, dot: true })) return false;
+            if (
+                !minimatch(target, includePattern, { matchBase, dot: true }) &&
+                !matchesPlainPathPattern(target, includePattern)
+            ) {
+                return false;
+            }
         }
 
         if (excludePattern) {
             const matchBase = !excludePattern.includes('/');
             if (
                 minimatch(target, excludePattern, { matchBase, dot: true }) ||
-                matchesSegmentPattern(target, excludePattern)
+                matchesPlainPathPattern(target, excludePattern)
             ) {
                 return false;
             }

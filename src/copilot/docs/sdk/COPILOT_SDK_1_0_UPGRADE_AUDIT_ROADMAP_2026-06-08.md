@@ -3491,6 +3491,28 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `node --check src/copilot/mcp/tools/repo-index.js src/copilot/terminal/events/sdk-session-events.js tests/unit/copilot/mcp/test_mcp_tools.spec.js`.
 - [x] Validado com `npx vitest run tests/unit/copilot/mcp/test_mcp_tools.spec.js` (cache de imports e orfandade).
 
+### Execução Contínua Em 2026-06-09 - Centésima Quinquagésima Oitava Passada
+
+- [x] A varredura grep-first da frente local de IO apontou um bug de sessão longa em
+  `presentation/files/context.js`: `_fileCache` tinha TTL, mas não tinha invalidação por mutação real de IO e o limite
+  de 200 entradas era apenas parcial, pois entradas frescas podiam continuar crescendo sem teto.
+- [x] O cache de contexto de arquivos agora usa chave normalizada pela porta pública de cache, reordena hits como LRU
+  simples, poda expirados e aplica limite efetivo de entradas mesmo quando todas estão frescas.
+- [x] `infra/public/cache.js` passou a expor `registerInvalidationHook`, permitindo que a camada de contexto local
+  responda ao mesmo bus de escrita/delete/move usado pelo restante do IO, sem importar módulos internos.
+- [x] A busca indexada também teve um gap de ergonomia corrigido: `includePattern=src/copilot` agora funciona como
+  recorte de diretório simples, alinhando include/exclude para operadores que pensam em pastas e não apenas em globs
+  de basename.
+- [x] A cobertura de `tests/unit/copilot/terminal/test_file_context.spec.js` prova que o cache retorna conteúdo novo
+  após invalidação e que muitas leituras frescas não ultrapassam `maxEntries`.
+- [x] A cobertura de `tests/unit/copilot/infra/test_io_search.spec.js` prova include/exclude por diretório simples no
+  filtro do índice.
+- [x] Validado com `node --check src/copilot/presentation/files/context.js src/copilot/infra/public/cache.js
+  src/copilot/infra/io/search/index-search.js tests/unit/copilot/terminal/test_file_context.spec.js
+  tests/unit/copilot/infra/test_io_search.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_file_context.spec.js
+  tests/unit/copilot/infra/test_io_search.spec.js` (2 arquivos, 28 testes).
+
 ---
 
 ## Decisões Arquiteturais

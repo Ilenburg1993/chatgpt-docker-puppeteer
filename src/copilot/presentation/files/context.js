@@ -6,10 +6,11 @@
  *   Esta camada retira de `terminal/` a propriedade semântica sobre leitura, embedding e cache de arquivos.
  */
 
-import { extname, resolve as pathResolve } from 'node:path';
+import { extname, sep, resolve as pathResolve } from 'node:path';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { evaluateIoPathPolicyAsync } from '../../core/io-policy.js';
 import { decodeBase64ToOwnedBuffer } from '../../infra/public/buffer.js';
+import { normalizeIoCacheKey, registerInvalidationHook } from '../../infra/public/cache.js';
 import { readText, scanDirectory } from '../../infra/public/io.js';
 
 /** Limite informativo histórico. Não bloqueia embedding em operações da LLM-B. */
@@ -17,6 +18,7 @@ export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;
 
 /** TTL do cache de file-context em ms (30 segundos). */
 const FILE_CACHE_TTL_MS = 30_000;
+const FILE_CACHE_MAX_ENTRIES = Math.max(1, Number(process.env['FILE_CONTEXT_CACHE_MAX_ENTRIES'] ?? 200));
 
 /** Mapa de extensão → linguagem para blocos de código markdown. @type {Record<string, string>} */
 const EXT_LANG = {
@@ -76,14 +78,83 @@ let _fileCacheHits = 0;
 
 /** Contador de cache misses (para `cacheStats` no /health). */
 let _fileCacheMisses = 0;
+let _fileCacheInvalidations = 0;
+
+/**
+ * @param {string} filePath
+ * @returns {string}
+ */
+function fileContextCacheKey(filePath) {
+    return normalizeIoCacheKey(filePath);
+}
+
+/**
+ * @param {number} now
+ * @returns {void}
+ */
+function pruneExpiredFileCacheEntries(now = Date.now()) {
+    for (const [key, entry] of _fileCache) {
+        if (entry.expiresAt <= now) _fileCache.delete(key);
+    }
+}
+
+/**
+ * @returns {void}
+ */
+function enforceFileCacheEntryLimit() {
+    while (_fileCache.size > FILE_CACHE_MAX_ENTRIES) {
+        const oldestKey = _fileCache.keys().next().value;
+        if (typeof oldestKey !== 'string') return;
+        _fileCache.delete(oldestKey);
+    }
+}
+
+/**
+ * @param {string} filePath
+ * @param {{ recursive?: boolean }} [options]
+ * @returns {number}
+ */
+function invalidateFileContextCachePath(filePath, options = {}) {
+    const normalized = fileContextCacheKey(filePath);
+    let removed = 0;
+    if (options.recursive === true) {
+        const subtreePrefix = `${normalized}${sep}`;
+        for (const key of [..._fileCache.keys()]) {
+            if (key === normalized || key.startsWith(subtreePrefix)) {
+                _fileCache.delete(key);
+                removed += 1;
+            }
+        }
+    } else if (_fileCache.delete(normalized)) {
+        removed = 1;
+    }
+    _fileCacheInvalidations += removed;
+    return removed;
+}
+
+registerInvalidationHook((filePath, event) => {
+    try {
+        invalidateFileContextCachePath(filePath, { recursive: event?.recursive === true });
+    } catch {
+        /* cache de contexto nunca deve derrubar a mutação canônica de IO */
+    }
+});
 
 /**
  * Retorna estatísticas de uso do cache de file-context.
  *
- * @returns {{ hits: number; misses: number; size: number }}
+ * @returns {{ hits: number; misses: number; invalidations: number; size: number; maxEntries: number; ttlMs: number }}
  */
 export function getFileCacheStats() {
-    return { hits: _fileCacheHits, misses: _fileCacheMisses, size: _fileCache.size };
+    pruneExpiredFileCacheEntries();
+    return {
+        hits: _fileCacheHits,
+        misses: _fileCacheMisses,
+        invalidations: _fileCacheInvalidations,
+        size: _fileCache.size,
+        maxEntries: FILE_CACHE_MAX_ENTRIES,
+        ttlMs: FILE_CACHE_TTL_MS,
+    };
 }
 /**
  * Invalida todas as entradas do cache de file-context.
@@ -119,19 +190,19 @@ export async function readFileContext(filePath) {
         throw new Error(policy.reason);
     }
     const absPath = pathResolve(policy.realPath);
+    const cacheKey = fileContextCacheKey(absPath);
 
     const now = Date.now();
-    const cached = _fileCache.get(absPath);
+    const cached = _fileCache.get(cacheKey);
     if (cached && cached.expiresAt > now) {
+        _fileCache.delete(cacheKey);
+        _fileCache.set(cacheKey, cached);
         _fileCacheHits++;
         return cached.ctx;
     }
-    if (cached) _fileCache.delete(absPath);
-    if (_fileCache.size > 200) {
-        for (const [key, entry] of _fileCache) {
-            if (entry.expiresAt <= now) _fileCache.delete(key);
-        }
-    }
+    if (cached) _fileCache.delete(cacheKey);
+    pruneExpiredFileCacheEntries(now);
+    enforceFileCacheEntryLimit();
     _fileCacheMisses++;
 
     const file = await readText(absPath);
@@ -141,7 +212,8 @@ export async function readFileContext(filePath) {
         size: file.bytesRead,
         lang: detectLang(filePath),
     };
-    _fileCache.set(absPath, { ctx, expiresAt: now + FILE_CACHE_TTL_MS });
+    _fileCache.set(cacheKey, { ctx, expiresAt: now + FILE_CACHE_TTL_MS });
+    enforceFileCacheEntryLimit();
     return ctx;
 }
 /**

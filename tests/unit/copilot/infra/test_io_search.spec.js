@@ -6,6 +6,7 @@ import {
     buildGrepArgs,
     buildSymbolPattern,
     canUseIndexSearch,
+    filterIndexRowsByGlob,
     formatIndexSearchRows,
     formatIndexSymbolRows,
     kindToGlobs,
@@ -25,6 +26,22 @@ describe('infra/io/search', () => {
         expect(formatIndexSearchRows([{ filePath: '/x/a.md', relativePath: 'a.md', snippet: '[alpha] token' }])).toBe(
             'a.md: **alpha** token',
         );
+    });
+
+    it('filtra índice por diretório simples em includePattern e excludePattern', () => {
+        const rows = [
+            { filePath: '/ws/src/copilot/a.js', relativePath: 'src/copilot/a.js' },
+            { filePath: '/ws/src/server/b.js', relativePath: 'src/server/b.js' },
+            { filePath: '/ws/node_modules/pkg/c.js', relativePath: 'node_modules/pkg/c.js' },
+        ];
+
+        expect(filterIndexRowsByGlob(rows, 'src/copilot', undefined).map((row) => row.relativePath)).toEqual([
+            'src/copilot/a.js',
+        ]);
+        expect(filterIndexRowsByGlob(rows, 'src', 'node_modules').map((row) => row.relativePath)).toEqual([
+            'src/copilot/a.js',
+            'src/server/b.js',
+        ]);
     });
 
     it('monta argumentos de grep fallback', () => {
