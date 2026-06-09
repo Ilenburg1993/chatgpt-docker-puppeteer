@@ -825,7 +825,13 @@ function summarizeTerminalStartedPayload(payload) {
     const tools = typeof payload['mcpToolCount'] === 'number' ? `${payload['mcpToolCount']} MCP` : '';
     const dialog = payload['dialogLoopActive'] === true ? 'diálogo ativo' : payload['dialogLoopActive'] === false ? 'diálogo inativo' : '';
     const preflight = isRecord(payload['bootPreflight']) ? payload['bootPreflight'] : null;
-    const preflightStatus = preflight?.['ok'] === true ? 'preflight ok' : preflight?.['ok'] === false ? 'preflight falhou' : '';
+    const preflightLabel = humanPayloadKind('preflight');
+    const preflightStatus =
+        preflight?.['ok'] === true
+            ? `${preflightLabel} ok`
+            : preflight?.['ok'] === false
+              ? `${preflightLabel} falhou`
+              : '';
     return [
         mode || null,
         model ? `modelo ${compact(model, 48)}` : null,

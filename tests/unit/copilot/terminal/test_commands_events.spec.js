@@ -213,6 +213,23 @@ describe('terminal/commands/events', () => {
                     payload: { phase: 'runtime-config' },
                 },
                 {
+                    timestamp: 1710000001500,
+                    eventId: 5,
+                    event: 'terminal.started',
+                    source: 'terminal-boot/terminal.started',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        operationMode: 'standalone',
+                        model: 'auto',
+                        mcpToolCount: 0,
+                        dialogLoopActive: false,
+                        bootPreflight: { ok: true },
+                    },
+                },
+                {
                     timestamp: 1710000002000,
                     eventId: 3,
                     event: 'quota.warning',
@@ -243,6 +260,7 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Conversa alterada');
         expect(ctx.output()).toContain('há 5s');
         expect(ctx.output()).toContain('Sessão pronta');
+        expect(ctx.output()).toContain('checagem ok');
         expect(ctx.output()).toContain('Aviso de quota');
         expect(ctx.output()).toContain('Modelo alterado');
         expect(ctx.output()).toContain('modelo auto → gpt-4.1-mini · raciocínio high');
@@ -251,6 +269,7 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).not.toContain('terminal runtime wired');
         expect(ctx.output()).not.toContain('quota warning');
         expect(ctx.output()).not.toContain('session model changed');
+        expect(ctx.output()).not.toContain('preflight ok');
     });
 
     it('humaniza eventos SDK 1.0 novos no resumo default', async () => {

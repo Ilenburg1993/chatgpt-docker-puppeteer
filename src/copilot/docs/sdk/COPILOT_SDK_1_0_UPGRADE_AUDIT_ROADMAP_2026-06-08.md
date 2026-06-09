@@ -3444,6 +3444,22 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
   --live-scenario=canonical`; PASS em `artifacts/terminal-live/2026-06-09T16-36-15-925Z/summary.md`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quinquagésima Quinta Passada
+
+- [x] O live voltou a apontar um detalhe de UX na timeline default: `terminal.started` ainda podia renderizar
+  `preflight ok` cru na linha de resumo, mesmo depois de `terminal.runtime.wired` já traduzir `preflightOk` como
+  `checagem ok`.
+- [x] `summarizeTerminalStartedPayload()` passou a reutilizar `humanPayloadKind('preflight')`, trocando o resíduo cru por
+  `checagem ok` / `checagem falhou` e deixando o label consistente com o restante do terminal.
+- [x] A cobertura de `tests/unit/copilot/terminal/test_commands_events.spec.js` agora força um `terminal.started`
+  canônico na timeline e garante que `preflight ok` não volte à superfície pública.
+- [x] Validado com `node --check src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js` (1 arquivo, 31 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
+  --live-scenario=canonical`; PASS, com `terminal.started` aparecendo sem o `preflight ok` cru na timeline pública.
+
 ---
 
 ## Decisões Arquiteturais
