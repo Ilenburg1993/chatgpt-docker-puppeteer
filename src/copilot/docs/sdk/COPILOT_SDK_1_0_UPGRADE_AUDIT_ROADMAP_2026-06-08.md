@@ -2787,8 +2787,40 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Vigésima Nona Passada
 
-- [ ] SDK10-P129-01: continuar revisando os outros subestados `question` e decidir se vale extrair um presenter
+- [x] SDK10-P129-01: continuar revisando os outros subestados `question` e decidir se vale extrair um presenter
   compartilhado entre linha viva, `/activity` e `/status`, ou se a variedade atual já está suficientemente estável.
+
+### Execução Contínua Em 2026-06-08 - Centésima Trigésima Passada
+
+- [x] A classificação dos subestados internos de `question` foi extraída para
+  `src/copilot/terminal/events/question-activity-presenter.js`, com reexport dedicado em
+  `src/copilot/terminal/events/presenters/question/index.js`.
+- [x] Linha viva e `/activity` deixaram de manter tabelas paralelas para `resposta registrada`, mailbox/intervenção,
+  permissão/formulário, OAuth/Sampling MCP, pergunta humana e fallback de interação.
+- [x] O presenter canônico expõe rótulos separados para cada superfície: `continuando` na linha viva pós-resposta e
+  `continuação` no estado histórico de `/activity`, preservando a semântica visual já validada.
+- [x] A cobertura direta foi adicionada em `tests/unit/copilot/terminal/test_question_activity_presenter.spec.js`,
+  protegendo o glossário compartilhado contra regressões futuras.
+- [x] Validado com `node --check src/copilot/terminal/events/question-activity-presenter.js &&
+  node --check src/copilot/terminal/events/presenters/question/index.js &&
+  node --check src/copilot/terminal/repl/live-status-line.js &&
+  node --check src/copilot/terminal/commands/activity.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_question_activity_presenter.spec.js
+  tests/unit/copilot/terminal/test_live_status_line.spec.js
+  tests/unit/copilot/terminal/test_commands_activity.spec.js` (3 arquivos, 50 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T02-58-58-442Z/summary.md`, confirmando `LLM-B continuando` após o SIM,
+  `Resposta da LLM-B` no transcript final e ausência dos vazamentos antigos `Resposta pós-pergunta`/`turno ·
+  Processando mensagem`.
+
+### Achados Novos Da Centésima Trigésima Passada
+
+- [ ] SDK10-P130-01: o live canônico ainda mostrou no `/activity 40` linhas de conclusão como `Integração externa
+  concluída — aguardando decisão humana concluído` e `Integração externa concluída — lendo arquivo concluído`; investigar
+  `tool-lifecycle-runtime.js`/`tool-activity-presenter.js` para trocar o fallback genérico por conclusão semântica da
+  própria ferramenta (`Pergunta ao operador concluída`, `Leitura concluída`, etc.) sem perder o diagnóstico de integração.
 
 ---
 

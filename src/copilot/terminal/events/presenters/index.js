@@ -14,6 +14,11 @@ export {
     renderTerminalModelTransitionSourceLabel,
 } from '../model-transition-presentation.js';
 export {
+    classifyTerminalQuestionActivity,
+    renderTerminalQuestionActivityLiveLabel,
+    renderTerminalQuestionActivityPhaseLabel,
+} from '../question-activity-presenter.js';
+export {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
     compactTerminalOperatorToolText,

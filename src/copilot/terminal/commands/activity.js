@@ -1,6 +1,7 @@
 // @ts-check
 
 import { readTerminalIoActivityProjection } from '../events/projections/index.js';
+import { renderTerminalQuestionActivityPhaseLabel } from '../events/presenters/question/index.js';
 import { renderTerminalTraceSummaryTitle } from '../events/turn-trace-presentation.js';
 import { readTerminalActivityProjection } from '../frontend/projections/now.js';
 import {
@@ -79,7 +80,7 @@ function renderActivityPhaseLabel(phase, entry = {}) {
     if (phase === 'turn') return 'conversa';
     if (phase === 'thinking') return 'pensando';
     if (phase === 'streaming') return 'streaming';
-    if (phase === 'question') return renderQuestionActivityPhaseLabel(entry);
+    if (phase === 'question') return renderTerminalQuestionActivityPhaseLabel(entry);
     if (phase === 'task') return 'tarefa';
     if (phase === 'boot') return 'inicialização';
     if (phase === 'system') return 'sistema';
@@ -88,32 +89,6 @@ function renderActivityPhaseLabel(phase, entry = {}) {
     if (phase === 'model') return 'modelo';
     if (phase === 'error') return 'erro';
     return phase;
-}
-
-/**
- * @param {{ label?: string | null; detail?: string | null }} entry
- * @returns {string}
- */
-function renderQuestionActivityPhaseLabel(entry) {
-    const text = `${entry.label ?? ''} ${entry.detail ?? ''}`
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '');
-    if (
-        text.includes('resposta registrada') ||
-        text.includes('resposta humana') ||
-        text.includes('eco de resposta') ||
-        text.includes('aguardando resposta final')
-    ) {
-        return 'continuação';
-    }
-    if (text.includes('fila de intervencao') || text.includes('caixa de entrada') || text.includes('nova mensagem')) {
-        return 'intervenção';
-    }
-    if (text.includes('formulario') || text.includes('permissao')) return 'decisão';
-    if (text.includes('oauth') || text.includes('sampling mcp')) return 'integração';
-    if (text.includes('pergunta ao operador') || text.includes('pergunta humana')) return 'pergunta';
-    return 'interação';
 }
 
 /**

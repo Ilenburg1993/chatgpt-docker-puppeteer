@@ -18,6 +18,7 @@ import {
     readTerminalDialogStreamMeta,
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
+import { renderTerminalQuestionActivityLiveLabel } from '../events/presenters/question/index.js';
 import { readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/index.js';
 
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
@@ -307,38 +308,6 @@ function renderTurnActivityCompact(activity, label) {
 
 /**
  * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
- * @returns {string}
- */
-function renderQuestionActivityCompact(activity) {
-    const text = `${activity.label ?? ''} ${activity.detail ?? ''}`
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '');
-    if (
-        text.includes('resposta registrada') ||
-        text.includes('resposta humana') ||
-        text.includes('eco de resposta') ||
-        text.includes('aguardando resposta final')
-    ) {
-        return 'continuando';
-    }
-    if (text.includes('fila de intervencao') || text.includes('caixa de entrada') || text.includes('nova mensagem')) {
-        return 'intervenção';
-    }
-    if (text.includes('formulario') || text.includes('permissao')) {
-        return 'decisão';
-    }
-    if (text.includes('oauth') || text.includes('sampling mcp')) {
-        return 'integração';
-    }
-    if (text.includes('pergunta ao operador') || text.includes('pergunta humana')) {
-        return 'pergunta';
-    }
-    return 'interação';
-}
-
-/**
- * @param {ReturnType<typeof readTerminalActivitySnapshot>} activity
  * @returns {boolean}
  */
 function isEmptyAfterUserInputActivity(activity) {
@@ -502,7 +471,7 @@ function buildTerminalLiveStatusLine(input = {}) {
     if (activity.phase === 'question') {
         return (
             `  ${terminalThemeText('assistant', 'LLM-B')} ` +
-            `${terminalThemeText(severityRole, renderQuestionActivityCompact(activity))}` +
+            `${terminalThemeText(severityRole, renderTerminalQuestionActivityLiveLabel(activity))}` +
             `${terminalThemeText('muted', ` · ${formatLiveDuration(ageMs)}${queue}`)}` +
             '\x1b[K'
         );
