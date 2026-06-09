@@ -13,6 +13,10 @@ import {
     getTerminalHumanToolName,
 } from '../events/presenters/tools/index.js';
 import {
+    renderTerminalLlmUsageClassification,
+    renderTerminalLlmUsageReason,
+} from '../events/presenters/index.js';
+import {
     EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL,
     summarizeEmptyAfterUserInputRecovery,
 } from '../events/dialog-recovery-presenter.js';
@@ -430,10 +434,8 @@ function humanStatus(value) {
     if (text === 'failed' || text === 'failure' || text === 'error') return 'falhou';
     if (text === 'active' || text === 'running' || text === 'started') return 'em andamento';
     if (text === 'requested' || text === 'pending') return 'pendente';
-    if (text === 'ask_user_continuation') return 'continuação da pergunta humana';
-    if (text === 'non_user_initiated') return 'iniciado pelo agente';
-    if (text === 'byok_user_message') return 'mensagem BYOK do operador';
-    if (text === 'user_input_completed_continuation') return 'continuação após resposta humana';
+    const usageLabel = renderTerminalLlmUsageClassification(text) || renderTerminalLlmUsageReason(text);
+    if (usageLabel) return usageLabel;
     if (text === 'model_call') return 'chamada do modelo';
     if (text === 'recoverable_model_call') return 'erro recuperável do modelo';
     if (text === 'erroroccurred' || text === 'error_occurred') return 'erro capturado';
@@ -540,10 +542,8 @@ function humanPayloadKind(value) {
     if (text === 'terminal') return 'terminal';
     if (text === 'github_reference') return 'referência GitHub';
     if (text === 'background' || text === 'background_task') return 'tarefa em segundo plano';
-    if (text === 'ask_user_continuation') return 'continuação da pergunta humana';
-    if (text === 'non_user_initiated') return 'iniciado pelo agente';
-    if (text === 'byok_user_message') return 'mensagem BYOK do operador';
-    if (text === 'user_input_completed_continuation') return 'continuação após resposta humana';
+    const usageLabel = renderTerminalLlmUsageClassification(text) || renderTerminalLlmUsageReason(text);
+    if (usageLabel) return usageLabel;
     if (text === 'session.created') return 'sessão criada';
     if (text === 'session.deleted') return 'sessão removida';
     if (text === 'session.updated') return 'sessão atualizada';

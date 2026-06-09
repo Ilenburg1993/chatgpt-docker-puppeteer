@@ -11,6 +11,7 @@
  */
 
 import { getShowUsage, setShowUsage } from '../../presentation/state/index.js';
+import { renderTerminalLlmUsageKind } from '../events/presenters/index.js';
 import { compactTerminalDiagnosticId } from '../events/presenters/tools/index.js';
 import { readTerminalConfigProjection } from '../frontend/projections/config.js';
 import { readTerminalUsageNowProjection } from '../frontend/projections/usage.js';
@@ -21,21 +22,6 @@ import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js
  * @typedef {object} UsageContext
  * @property {(text: string) => void} println - Função de output do terminal
  */
-
-/**
- * @param {string} llmClass
- * @param {string} llmReason
- * @returns {string}
- */
-function humanLlmUsageKind(llmClass, llmReason) {
-    if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
-        return 'continuação da pergunta humana';
-    }
-    if (/tool/iu.test(llmClass) || /tool/iu.test(llmReason)) return 'ferramenta/automação';
-    if (/stream|delta/iu.test(llmClass) || /stream|delta/iu.test(llmReason)) return 'streaming';
-    if (llmClass === 'unknown' && llmReason === 'n/d') return 'sem classificação';
-    return llmClass.replace(/[_-]+/gu, ' ');
-}
 
 /**
  * @param {unknown} value
@@ -179,7 +165,7 @@ export function cmdUsage({ println }, arg) {
                 projection.llmUsage['premiumRequest'] === true
                     ? 'com pedido premium nesta telemetria'
                     : 'sem pedido premium';
-            const llmUsageKind = humanLlmUsageKind(llmClass, llmReason);
+            const llmUsageKind = renderTerminalLlmUsageKind(llmClass, llmReason);
             if (detail) {
                 println(
                     terminalThemeRow(

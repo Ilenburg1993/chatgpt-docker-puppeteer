@@ -33,3 +33,8 @@ export {
     mapTerminalToolOperationRole,
     normalizeTerminalToolArgsPayload,
 } from '../tool-activity-presenter.js';
+export {
+    renderTerminalLlmUsageClassification,
+    renderTerminalLlmUsageKind,
+    renderTerminalLlmUsageReason,
+} from '../usage-presenter.js';

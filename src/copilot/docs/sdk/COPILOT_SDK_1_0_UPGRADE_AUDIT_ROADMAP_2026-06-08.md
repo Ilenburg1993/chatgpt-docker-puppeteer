@@ -3275,6 +3275,30 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `npm run lint:copilot`.
 - [x] Validado com `npm run typecheck:strict:src.copilot`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quadragésima Sétima Passada
+
+- [x] A humanização de usage LLM foi centralizada em `terminal/events/usage-presenter.js`, removendo traduções paralelas
+  de `agent-runtime-events.js`, `/usage` e `/events`.
+- [x] O contrato ficou explícito: `classification` e `premiumRequestReason` reconhecem apenas enums de usage conhecidos;
+  eles não fazem fallback livre. Isso evita que `/events` deixe de aplicar suas traduções próprias para tokens genéricos
+  como `session.updated`, `configuration`, `recoverable_model_call` ou `pre_action_empty_output`.
+- [x] `/usage now` segue com fallback legível em `renderTerminalLlmUsageKind()`, porque ali a categoria agregada precisa
+  degradar para texto humano mesmo quando o runtime trouxer uma classificação nova.
+- [x] A bateria de `/events` capturou a regressão antes do commit: o presenter amplo demais transformava
+  `recoverable_model_call` em `recoverable model call`, pulando o label humano `erro recuperável do modelo`.
+- [x] Validado com `node --check src/copilot/terminal/events/usage-presenter.js
+  src/copilot/terminal/events/agent-runtime-events.js src/copilot/terminal/commands/events.js
+  src/copilot/terminal/commands/usage.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js
+  tests/unit/copilot/terminal/test_commands_events.spec.js
+  tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js` (3 arquivos, 77 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
+  --live-scenario=canonical`; PASS em `artifacts/terminal-live/2026-06-09T05-46-18-161Z/summary.md`, incluindo
+  `ux-no-post-answer-turn-processing-copy`, `no-extra-output-after-post-ask-final`, `/events` default com
+  `tipo continuação da pergunta humana` e `sse-delta-public-chunk=22/22`.
+
 ---
 
 ## Decisões Arquiteturais

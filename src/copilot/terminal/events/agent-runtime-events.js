@@ -48,6 +48,10 @@ import {
 import { defaultErrorTracker } from '#copilot/observability';
 import { getShowSessionActivity, getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
 import {
+    renderTerminalLlmUsageClassification,
+    renderTerminalLlmUsageReason,
+} from './usage-presenter.js';
+import {
     broadcastSse,
     buildUserPrompt,
     isTerminalRenderLocked,
@@ -590,45 +594,14 @@ function formatUsageDetail(billing) {
 }
 
 /**
- * @param {unknown} value
- * @returns {string}
- */
-function humanLlmUsageClassification(value) {
-    const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (text === 'ask_user_continuation') return 'continuação da pergunta humana';
-    if (text === 'non_user_initiated') return 'iniciado pelo agente';
-    if (text === 'byok_user_message') return 'mensagem BYOK do operador';
-    if (text === 'premium_request') return 'pedido premium';
-    if (text === 'tool_originated') return 'originado por ferramenta';
-    if (text === 'unattributed_llm_usage') return 'uso LLM sem atribuição';
-    return text ? text.replace(/[_-]+/gu, ' ') : '';
-}
-
-/**
- * @param {unknown} value
- * @returns {string}
- */
-function humanLlmUsageReason(value) {
-    const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (text === 'user_input_completed_continuation') return 'continuação após resposta humana';
-    if (text === 'pending_user_input_request_continuation') return 'continuação de pergunta pendente';
-    if (text === 'pending_user_input_request_without_id') return 'pergunta pendente sem vínculo';
-    if (text === 'pending_user_input_request') return 'pergunta pendente';
-    if (text === 'parent_tool_call') return 'chamada originada por ferramenta';
-    if (text === 'no_user_message') return 'sem mensagem do operador';
-    if (text.startsWith('initiator:')) return `iniciador ${text.slice('initiator:'.length).replace(/[_-]+/gu, ' ')}`;
-    return text ? text.replace(/[_-]+/gu, ' ') : '';
-}
-
-/**
  * @param {Record<string, unknown>} evt
  * @param {ReturnType<typeof normalizeUsageBilling>} billing
  * @returns {string}
  */
 function formatLlmUsageDetail(evt, billing) {
     const parts = [formatUsageDetail(billing)];
-    const classification = humanLlmUsageClassification(evt?.['classification']);
-    const reason = humanLlmUsageReason(evt?.['premiumRequestReason']);
+    const classification = renderTerminalLlmUsageClassification(evt?.['classification']);
+    const reason = renderTerminalLlmUsageReason(evt?.['premiumRequestReason']);
     const inputTokens = typeof evt?.['inputTokens'] === 'number' ? evt['inputTokens'] : null;
     const outputTokens = typeof evt?.['outputTokens'] === 'number' ? evt['outputTokens'] : null;
     if (classification) parts.push(`classe ${classification}`);
