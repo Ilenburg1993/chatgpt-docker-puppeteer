@@ -114,7 +114,7 @@ export function createTerminalPendingStructuredUserInput(input) {
         typeof input.requestId === 'string' && input.requestId.trim().length > 0
             ? input.requestId.trim()
             : nextStructuredUserInputRequestId();
-    const question = input.question.trim() || 'Pergunta de diagnostico request_user_input';
+    const question = input.question.trim() || 'Pergunta de diagnostico do operador';
     const choices = Array.isArray(input.choices)
         ? input.choices.map((choice) => choice.trim()).filter((choice) => choice.length > 0)
         : [];

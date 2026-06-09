@@ -529,7 +529,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('/sdk doctor');
     });
 
-    it('cmdStatus e cmdNow distinguem conversa ativa em standby sem ask_user vivo', () => {
+    it('cmdStatus e cmdNow distinguem conversa ativa em standby sem prontidão viva', () => {
         defaultRuntime.dialogLoopActive = true;
         defaultRuntime.pendingQuestion = null;
         defaultRuntime.pendingQuestionKind = null;
@@ -542,12 +542,12 @@ describe('commands/session — sync commands', () => {
         cmdStatus({ hubSessionId: 'hub-1', injectPort: 3009, println: statusCtx.println }, 'full');
         cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: nowCtx.println });
 
-        expect(statusCtx.output()).toContain('standby sem READY vivo');
-        expect(statusCtx.output()).toContain('recuperação sob demanda');
+        expect(statusCtx.output()).toContain('standby sem prontidão viva');
+        expect(statusCtx.output()).toContain('recuperação/envio direto sob demanda');
         expect(nowCtx.output()).toContain('Agora');
         expect(nowCtx.output()).toContain('Conversa');
         expect(nowCtx.output()).toContain('ativa');
-        expect(nowCtx.output()).toContain('standby sem READY vivo');
+        expect(nowCtx.output()).toContain('standby sem prontidão viva');
         expect(nowCtx.output()).not.toContain('entrada=');
     });
 

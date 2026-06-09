@@ -3343,6 +3343,26 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `npm run lint:copilot`.
 - [x] Validado com `npm run typecheck:strict:src.copilot`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quinquagésima Passada
+
+- [x] A varredura de comandos/projeções encontrou resíduos de protocolo em superfícies de status: `READY vivo`,
+  `ask_user humano`, `ask_user ausente`, `shadow persistida de ask_user` e `recovery/direct dispatch`.
+- [x] `readTerminalStatusProjection()` agora descreve esses estados como `pronto protocolar`, `pergunta ao operador`,
+  `pergunta ausente`, `sombra persistida de pergunta` e `recuperação/envio direto`, mantendo o detalhe operacional sem
+  expor nomes internos da tool.
+- [x] O fallback diagnóstico de `createTerminalPendingStructuredUserInput()` deixou de usar
+  `Pergunta de diagnostico request_user_input` e passou para `Pergunta de diagnostico do operador`.
+- [x] `/status full` e `/now` tiveram expectativas atualizadas para `standby sem prontidão viva`, alinhando status,
+  terminal e fallback SDK ao mesmo vocabulário humano.
+- [x] Validado com `node --check src/copilot/terminal/frontend/gateways/sdk-session.js
+  src/copilot/terminal/frontend/projections/status.js tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js
+  tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js
+  tests/unit/copilot/terminal/test_build_user_prompt.spec.js
+  tests/unit/copilot/terminal/test_pending_question_answer.spec.js` (5 arquivos, 128 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+
 ---
 
 ## Decisões Arquiteturais

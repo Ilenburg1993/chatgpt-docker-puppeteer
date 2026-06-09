@@ -310,8 +310,8 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
 /**
  * Projeta a diferença entre a sessão SDK viva, a conversa ativa e o canal `ask_user` materializado.
  *
- * Uma conversa ativa e idle sem READY vivo não é necessariamente falha: no modo de sessão retomada, o próximo turno pode
- * usar recovery/direct dispatch sob demanda. O estado `missing` fica reservado para o caso mais suspeito: runtime
+ * Uma conversa ativa e idle sem prontidão viva não é necessariamente falha: no modo de sessão retomada, o próximo turno
+ * pode usar recuperação/envio direto sob demanda. O estado `missing` fica reservado para o caso mais suspeito: runtime
  * `waiting_for_input` sem pergunta viva.
  *
  * @param {{
@@ -355,8 +355,8 @@ function buildDialogInputChannelProjection(input) {
         if (input.pendingQuestionKind === 'ready') {
             return {
                 state: 'ready',
-                label: 'READY vivo',
-                detail: 'ask_user protocolar READY está aguardando a próxima mensagem',
+                label: 'pronto protocolar',
+                detail: 'pergunta protocolar de prontidão está aguardando a próxima mensagem',
                 canAcceptTurn: true,
                 recoveryExpected: false,
             };
@@ -365,7 +365,7 @@ function buildDialogInputChannelProjection(input) {
             return {
                 state: 'waiting-human',
                 label: 'pergunta humana',
-                detail: 'ask_user humano está pendente; a próxima linha responde a pergunta',
+                detail: 'pergunta ao operador está pendente; a próxima linha responde a pergunta',
                 canAcceptTurn: false,
                 recoveryExpected: false,
             };
@@ -385,7 +385,7 @@ function buildDialogInputChannelProjection(input) {
                 input.pendingQuestionShadowKind,
                 'sem tipo',
             )}`,
-            detail: 'há shadow persistida de ask_user sem pergunta viva; recovery pode reaproveitar ou limpar',
+            detail: 'há sombra persistida de pergunta sem pergunta viva; recuperação pode reaproveitar ou limpar',
             canAcceptTurn: input.pendingQuestionShadowKind === 'ready',
             recoveryExpected: true,
         };
@@ -393,8 +393,8 @@ function buildDialogInputChannelProjection(input) {
     if (input.runtimeStatus === 'idle') {
         return {
             state: 'standby',
-            label: 'standby sem READY vivo',
-            detail: 'sessão e conversa estão ativas; próximo turno usa recovery/direct dispatch sob demanda',
+            label: 'standby sem prontidão viva',
+            detail: 'sessão e conversa estão ativas; próximo turno usa recuperação/envio direto sob demanda',
             canAcceptTurn: true,
             recoveryExpected: true,
         };
@@ -402,8 +402,8 @@ function buildDialogInputChannelProjection(input) {
     if (input.runtimeStatus === 'waiting_for_input') {
         return {
             state: 'missing',
-            label: 'ask_user ausente',
-            detail: 'runtime aguarda input, mas não há pergunta viva materializada no terminal',
+            label: 'pergunta ausente',
+            detail: 'ambiente aguarda input, mas não há pergunta viva materializada no terminal',
             canAcceptTurn: false,
             recoveryExpected: true,
         };
