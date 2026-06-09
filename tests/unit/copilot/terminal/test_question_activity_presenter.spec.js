@@ -17,6 +17,12 @@ describe('terminal/question-activity-presenter', () => {
             'continuação',
         ],
         [
+            'response',
+            { label: 'Pergunta respondida', detail: 'resposta do operador SIM encaminhada' },
+            'continuando',
+            'continuação',
+        ],
+        [
             'intervention',
             { label: 'Nova mensagem na caixa de entrada', detail: 'intervenção aguardando próxima ask_user' },
             'intervenção',

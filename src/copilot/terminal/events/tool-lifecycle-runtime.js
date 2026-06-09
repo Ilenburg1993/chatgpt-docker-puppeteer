@@ -142,6 +142,23 @@ function terminalActivityPhaseForPresentation(presentation) {
 }
 
 /**
+ * @param {import('./tool-activity-presenter.js').TerminalToolOperation} operation
+ * @returns {{ completed: string; failed: string }}
+ */
+function terminalToolOperationCompletionLabels(operation) {
+    if (operation === 'read') return { completed: 'Leitura concluída', failed: 'Leitura falhou' };
+    if (operation === 'write') return { completed: 'Escrita concluída', failed: 'Escrita falhou' };
+    if (operation === 'edit') return { completed: 'Edição concluída', failed: 'Edição falhou' };
+    if (operation === 'copy') return { completed: 'Cópia concluída', failed: 'Cópia falhou' };
+    if (operation === 'move') return { completed: 'Movimentação concluída', failed: 'Movimentação falhou' };
+    if (operation === 'delete') return { completed: 'Exclusão concluída', failed: 'Exclusão falhou' };
+    if (operation === 'list') return { completed: 'Listagem concluída', failed: 'Listagem falhou' };
+    if (operation === 'run') return { completed: 'Execução concluída', failed: 'Execução falhou' };
+    if (operation === 'inspect') return { completed: 'Inspeção concluída', failed: 'Inspeção falhou' };
+    return { completed: 'Ferramenta concluída', failed: 'Ferramenta falhou' };
+}
+
+/**
  * @param {import('./tool-activity-presenter.js').TerminalToolActivityPresentation} presentation
  * @param {'start' | 'progress' | 'partial' | 'complete' | 'user_requested'} stage
  * @param {boolean | null} [success=null]
@@ -159,7 +176,10 @@ function terminalActivityLabelForPresentation(presentation, stage, success = nul
     }
     if (stage === 'progress') return 'Progresso da ferramenta';
     if (stage === 'partial') return 'Resultado parcial da ferramenta';
-    if (stage === 'complete') return success === false ? 'Ferramenta falhou' : 'Ferramenta concluída';
+    if (stage === 'complete') {
+        const labels = terminalToolOperationCompletionLabels(presentation.operation);
+        return success === false ? labels.failed : labels.completed;
+    }
     if (stage === 'user_requested') return 'Ferramenta aguarda operador';
     return 'Ferramenta em uso';
 }
@@ -1195,15 +1215,19 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
         inferredResult.exitCode,
     );
     recordToolTurnProjection(presentation, success ? 'completed' : 'failed', resolvedToolCallId, success);
-    recordTerminalActivity('tool', success ? 'Integração externa concluída' : 'Integração externa falhou', {
-        detail:
-            presentation.completeLine(success, durationLabel) ||
-            `${displayToolName}${renderOptionalToolRequestDetail(requestId)}`,
-        toolName: displayToolName,
-        toolTarget: presentation.target,
-        source: 'sdk',
-        severity: success ? 'info' : 'error',
-    });
+    recordTerminalActivity(
+        terminalActivityPhaseForPresentation(presentation),
+        terminalActivityLabelForPresentation(presentation, 'complete', success),
+        {
+            detail:
+                presentation.completeLine(success, durationLabel) ||
+                `${displayToolName}${renderOptionalToolRequestDetail(requestId)}`,
+            toolName: terminalActivityToolNameForPresentation(presentation),
+            toolTarget: presentation.target,
+            source: 'sdk',
+            severity: success ? 'info' : 'error',
+        },
+    );
     const canPrintExternalComplete = shouldPrintToolNarration(completedEntry ?? resolvedEntry, resolvedToolCallId, registry);
     if (canPrintExternalComplete) {
         printToolComplete(presentation, success, durationLabel, resolvedToolCallId);
@@ -1292,13 +1316,17 @@ export function reconcileTerminalPostToolUseResult({ registry, evt }) {
     recordTerminalDiagnosticToolStats(canonicalName, durationMs, result.success);
     recordToolTurnProjection(presentation, result.success ? 'completed' : 'failed', toolCallId || null, result.success);
     if (toolCallId) completeTerminalTurnToolCall({ toolCallId, success: result.success });
-    recordTerminalActivity('tool', result.success ? 'Integração externa concluída' : 'Integração externa falhou', {
-        detail: presentation.completeLine(result.success, durationLabel),
-        toolName: presentation.displayToolName,
-        toolTarget: presentation.target,
-        source: 'sdk',
-        severity: result.success ? 'info' : 'error',
-    });
+    recordTerminalActivity(
+        terminalActivityPhaseForPresentation(presentation),
+        terminalActivityLabelForPresentation(presentation, 'complete', result.success),
+        {
+            detail: presentation.completeLine(result.success, durationLabel),
+            toolName: terminalActivityToolNameForPresentation(presentation),
+            toolTarget: presentation.target,
+            source: 'sdk',
+            severity: result.success ? 'info' : 'error',
+        },
+    );
     printToolComplete(presentation, result.success, durationLabel, toolCallId || null);
     broadcastToolLifecycle(
         buildToolLifecycleComplete({

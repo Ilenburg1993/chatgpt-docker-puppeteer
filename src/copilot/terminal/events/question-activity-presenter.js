@@ -34,7 +34,9 @@ export function classifyTerminalQuestionActivity(entry = {}) {
         text.includes('resposta registrada') ||
         text.includes('resposta humana') ||
         text.includes('eco de resposta') ||
-        text.includes('aguardando resposta final')
+        text.includes('aguardando resposta final') ||
+        text.includes('pergunta respondida') ||
+        text.includes('resposta do operador')
     ) {
         return 'response';
     }

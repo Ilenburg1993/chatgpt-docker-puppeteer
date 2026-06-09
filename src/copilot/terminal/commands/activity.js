@@ -239,7 +239,10 @@ function renderTimelineEntryHeading(entry) {
     const lowerLabel = label.toLowerCase();
     const labelAlreadyCarriesPhase =
         lowerLabel.startsWith(`${phase} `) ||
-        (entry.phase === 'tool' && /^(ferramenta|integra[cç][aã]o|arquivo|i\/o)\b/iu.test(label)) ||
+        (entry.phase === 'tool' &&
+            /^(ferramenta|integra[cç][aã]o|arquivo|i\/o|leitura|escrita|edi[cç][aã]o|c[oó]pia|movimenta[cç][aã]o|exclus[aã]o|listagem|execu[cç][aã]o|inspe[cç][aã]o)\b/iu.test(
+                label,
+            )) ||
         (entry.phase === 'question' && /^(pergunta|resposta)\b/iu.test(label)) ||
         (entry.phase === 'turn' && /^(turno|inten[cç][aã]o|mensagem|resposta)\b/iu.test(label)) ||
         (entry.phase === 'system' && /^(uso|configura[cç][aã]o|warning|erro|modelo|resposta)\b/iu.test(label));

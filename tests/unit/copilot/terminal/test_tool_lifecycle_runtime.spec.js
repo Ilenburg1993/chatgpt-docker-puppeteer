@@ -153,6 +153,58 @@ describe('terminal/tool-lifecycle-runtime', () => {
         });
     });
 
+    it('mantém completion externo de ask_user como pergunta respondida em vez de integração genérica', async () => {
+        const { createToolCallRegistry } = await import(
+            '../../../../src/copilot/terminal/state/tool-call-registry.js'
+        );
+        const { buildTerminalToolActivityPresentation } = await import(
+            '../../../../src/copilot/terminal/events/tool-activity-presenter.js'
+        );
+        const { handleTerminalExternalToolCompleted } = await import(
+            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
+        );
+
+        const registry = createToolCallRegistry();
+        const args = { question: 'ASK-CANONICAL: responda SIM para fechar o teste' };
+        const presentation = buildTerminalToolActivityPresentation({
+            toolName: 'ask_user',
+            args,
+            toolCallId: 'chatcmpl-tool-ask',
+        });
+        registry.register('chatcmpl-tool-ask', 'ask_user', 'external', {
+            requestId: 'req-ask',
+            canonicalName: presentation.canonicalToolName ?? 'ask_user',
+            rawArgs: args,
+            presentation,
+        });
+
+        handleTerminalExternalToolCompleted({
+            registry,
+            evt: {
+                toolName: 'external_tool',
+                requestId: 'req-ask',
+                toolCallId: 'chatcmpl-tool-ask',
+                success: true,
+                data: { toolName: 'ask_user' },
+            },
+        });
+
+        expect(recordTerminalActivity).toHaveBeenCalledWith(
+            'question',
+            'Pergunta respondida',
+            expect.objectContaining({
+                detail: expect.stringContaining('aguardando decisão humana concluído'),
+                severity: 'info',
+                toolName: 'Pergunta ao operador',
+            }),
+        );
+        expect(recordTerminalActivity).not.toHaveBeenCalledWith(
+            'tool',
+            'Integração externa concluída',
+            expect.anything(),
+        );
+    });
+
     it('renderiza tool.user_requested de request_user_input como pergunta humana sem linha Tool crua', async () => {
         const { handleTerminalToolUserRequested } = await import(
             '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
@@ -393,7 +445,7 @@ describe('terminal/tool-lifecycle-runtime', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'tool',
-            'Integração externa falhou',
+            'Execução falhou',
             expect.objectContaining({
                 detail: expect.stringContaining('executando comando falhou'),
                 severity: 'error',
@@ -402,7 +454,7 @@ describe('terminal/tool-lifecycle-runtime', () => {
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'tool',
-            'Integração externa falhou',
+            'Execução falhou',
             expect.objectContaining({
                 detail: expect.stringContaining('saída 7'),
             }),
@@ -543,7 +595,7 @@ describe('terminal/tool-lifecycle-runtime', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'tool',
-            'Integração externa concluída',
+            'Edição concluída',
             expect.objectContaining({
                 detail: expect.stringContaining('editando arquivo concluído'),
                 severity: 'info',

@@ -2817,10 +2817,41 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Trigésima Passada
 
-- [ ] SDK10-P130-01: o live canônico ainda mostrou no `/activity 40` linhas de conclusão como `Integração externa
+- [x] SDK10-P130-01: o live canônico ainda mostrou no `/activity 40` linhas de conclusão como `Integração externa
   concluída — aguardando decisão humana concluído` e `Integração externa concluída — lendo arquivo concluído`; investigar
   `tool-lifecycle-runtime.js`/`tool-activity-presenter.js` para trocar o fallback genérico por conclusão semântica da
   própria ferramenta (`Pergunta ao operador concluída`, `Leitura concluída`, etc.) sem perder o diagnóstico de integração.
+
+### Execução Contínua Em 2026-06-08 - Centésima Trigésima Primeira Passada
+
+- [x] `tool-lifecycle-runtime.js` deixou de registrar completions externos/pós-tool-use com o label genérico
+  `Integração externa concluída/falhou` no `activity-state`.
+- [x] O mesmo helper de fase/rótulo já usado pelo caminho nativo agora cobre completions externos: `ask_user` volta para
+  `phase=question` com `Pergunta respondida`, intents usam `Intenção registrada`, leitura usa `Leitura concluída` e
+  execuções com erro usam `Execução falhou`.
+- [x] `/activity` foi ajustado para reconhecer rótulos operacionais (`Leitura`, `Edição`, `Execução`, etc.) como títulos
+  já humanos, evitando o retorno de prefixos redundantes como `ferramenta · Leitura concluída`.
+- [x] O presenter compartilhado de `question` também passou a classificar `Pergunta respondida`/`Resposta do operador`
+  como fluxo de continuação, preservando `LLM-B continuando` quando esse estado aparecer na linha viva entre resposta
+  humana e próxima fala da LLM-B.
+- [x] Validado com `node --check src/copilot/terminal/events/tool-lifecycle-runtime.js &&
+  node --check src/copilot/terminal/events/question-activity-presenter.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_question_activity_presenter.spec.js
+  tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js
+  tests/unit/copilot/terminal/test_commands_activity.spec.js
+  tests/unit/copilot/terminal/test_commands_events.spec.js
+  tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js` (5 arquivos, 85 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T03-05-32-879Z/summary.md`, confirmando `/activity 40` com
+  `Pergunta respondida`, `Leitura concluída` e `Intenção registrada`, sem o fallback genérico de integração externa.
+
+### Achados Novos Da Centésima Trigésima Primeira Passada
+
+- [ ] SDK10-P131-01: o resumo de último turno ainda lista `Pergunta ao operador` dentro da seção `Ferramentas` e depois
+  novamente em `Interações humanas`; investigar o turn trace/projection para separar action/tool técnica de interação
+  humana na superfície resumida, sem perder a contagem operacional do SDK.
 
 ---
 
