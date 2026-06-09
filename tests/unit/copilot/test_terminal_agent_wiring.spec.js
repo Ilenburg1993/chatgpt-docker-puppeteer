@@ -109,6 +109,18 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
         clearTerminalTurnMaterialization();
     });
 
+    it('humaniza activity de turn_end já materializado sem rótulo cru de evento', async () => {
+        const src = await readFile(
+            new URL('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js', import.meta.url),
+            'utf8',
+        );
+
+        expect(src).toContain("'Saída pública já exibida'");
+        expect(src).toContain("'sem novo bloco visual'");
+        expect(src).not.toContain("'dialog.turn_end reconciliado sem novo bloco visual'");
+        expect(src).not.toContain('turn=${turnId}');
+    });
+
     it('sinaliza turno vazio apenas quando ocorre logo após input humano', async () => {
         const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
 

@@ -3581,6 +3581,22 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   pós-resposta com `LLM-B continuando`, `/events` sem rótulos `Resposta pós-pergunta`/`Processando mensagem` e final
   `POST-ASK-CANONICAL-FINAL`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Sexagésima Terceira Passada
+
+- [x] A investigação de materialização confirmou que `dialog.turn_end` vazio depois de `assistant.message`/delta já
+  materializado é lifecycle reconciliado, não falha de saída pública.
+- [x] A activity interna desse caminho foi humanizada de `dialog.turn_end reconciliado sem novo bloco visual` para
+  `Saída pública já exibida`, com detalhe `turno ... · sem novo bloco visual`, evitando vazamento de nome cru de evento
+  e `turn=...` em superfícies de detalhe.
+- [x] O fallback de `dialog.turn_end` com reply textual também passou a usar `turno ...` no detalhe do transcript, em vez
+  de `turn=...`.
+- [x] A cobertura de `tests/unit/copilot/test_terminal_agent_wiring.spec.js` agora bloqueia a volta do rótulo cru.
+- [x] Validado com `node --check src/copilot/terminal/wiring/terminal-agent-wiring.js
+  tests/unit/copilot/test_terminal_agent_wiring.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/test_terminal_agent_wiring.spec.js
+  tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`
+  (3 arquivos, 76 testes).
+
 ---
 
 ## Decisões Arquiteturais

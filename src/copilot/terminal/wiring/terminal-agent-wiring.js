@@ -91,6 +91,16 @@ function scheduleMaterializedTurnEndPromptRedraw() {
 }
 
 /**
+ * @param {string | number | null | undefined} turnId
+ * @returns {string | null}
+ */
+function renderOperatorTurnLabel(turnId) {
+    if (turnId === null || turnId === undefined) return null;
+    const text = String(turnId).trim();
+    return text ? `turno ${text}` : null;
+}
+
+/**
  * @template {Record<string, unknown>} T
  * @param {T} payload
  * @param {string} source
@@ -697,8 +707,8 @@ export function registerAgentEventListeners(printBanner) {
                 return;
             }
             if (replyAlreadyMaterialized) {
-                recordTerminalActivity('turn', 'dialog.turn_end reconciliado sem novo bloco visual', {
-                    detail: turnId ? `turn=${turnId} · conteúdo já materializado` : 'conteúdo já materializado',
+                recordTerminalActivity('turn', 'Saída pública já exibida', {
+                    detail: [renderOperatorTurnLabel(turnId), 'sem novo bloco visual'].filter(Boolean).join(' · '),
                     source: 'dialog.turn_end',
                     recordHistory: false,
                     updateCurrent: false,
@@ -707,7 +717,7 @@ export function registerAgentEventListeners(printBanner) {
                 return;
             }
             recordTerminalActivity('turn', 'Mensagem final da conversa recebida', {
-                detail: turnId ? `turn=${turnId}` : 'turno sem id',
+                detail: renderOperatorTurnLabel(turnId) ?? 'turno sem id',
                 source: 'dialog.turn_end',
                 recordHistory: false,
                 updateCurrent: false,
@@ -719,7 +729,7 @@ export function registerAgentEventListeners(printBanner) {
                 status: 'completed',
                 suppressIfCoveredByRecent: true,
                 detail: [
-                    turnId ? `turn=${turnId}` : null,
+                    renderOperatorTurnLabel(turnId),
                     typeof evt.durationMs === 'number' ? `${(evt.durationMs / 1000).toFixed(1)}s` : null,
                 ]
                     .filter(Boolean)
