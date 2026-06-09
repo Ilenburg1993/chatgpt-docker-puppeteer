@@ -5147,6 +5147,14 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         /(?:^|\n)\/(?:usage now|activity \d+|intent(?: detail)? \d+|tools diag|events \d+(?: --raw)?|errors \d+|health full|export \S+|quit)\s*(?:\r?\n|$)/iu.test(
             plain,
         );
+    const rawPreviewHasIntermediateTurnCompletion =
+        /"event":"activity\.changed"[^\n]*"payloadPreview":"fase turn · (?:Turno do assistente concluído|continuação do pedido)/iu.test(
+            plain,
+        );
+    const rawPreviewHasLegacyIntermediateTurnCompletion =
+        /"event":"activity\.changed"[^\n]*"payloadPreview":"fase turn · Turno do assistente concluído/iu.test(plain);
+    const rawPreviewHasHumanIntermediateTurnContinuation =
+        /"event":"activity\.changed"[^\n]*"payloadPreview":"fase turn · continuação do pedido/iu.test(plain);
     const duplicatePathologies = [/__anonymous__/, /hook:error_occurred/];
     const beforeRawWithoutExpectedScenarioMarkers = scenario.expectedOutputMarkers.reduce(
         (text, marker) => text.replaceAll(marker, 'EXPECTED_SCENARIO_MARKER'),
@@ -5453,6 +5461,15 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'sse-archive-raw-visible',
             pass: archiveRawEvents.length > 0,
             detail: `/events --raw expôs ${archiveRawEvents.length} evento(s) do arquivo SSE`,
+        },
+        {
+            id: 'sse-archive-raw-preview-humanized-intermediate-turn',
+            pass:
+                !rawPreviewHasLegacyIntermediateTurnCompletion &&
+                (!rawPreviewHasIntermediateTurnCompletion || rawPreviewHasHumanIntermediateTurnContinuation),
+            detail: rawPreviewHasIntermediateTurnCompletion
+                ? '/events --raw preview humanized intermediate SDK tool-only turn_end as request continuation'
+                : '/events --raw preview window did not include the intermediate tool-only turn_end',
         },
         {
             id: 'sse-archive-http-overlap',

@@ -379,6 +379,59 @@ describe('terminal/dialog/output inline status', () => {
         expect(mocks.rl.prompt).toHaveBeenCalledTimes(1);
     });
 
+    it('devolve prompt final mesmo quando a materialização visual ainda esta ativa', async () => {
+        beginTerminalTurnMaterialization({ turnId: '2', source: 'sdk/assistant.turn_start' });
+        mocks.activitySnapshot = {
+            phase: 'idle',
+            label: 'Pronto',
+            detail: 'Turno concluído; aguardando próxima mensagem',
+            source: 'dialog',
+            severity: 'info',
+            progress: null,
+            toolName: null,
+            startedAt: 1,
+            updatedAt: 2,
+            ageMs: 0,
+        };
+
+        scheduleTerminalPromptRedraw(mocks.rl, 'você-fim› ');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(mocks.rl.setPrompt).not.toHaveBeenCalled();
+
+        scheduleTerminalPromptRedraw(mocks.rl, 'você-fim› ', { finalizeTurn: true });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(mocks.rl.setPrompt).toHaveBeenCalledWith('você-fim› ');
+        expect(mocks.rl.prompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('não duplica prompt final idêntico logo após repaint normal recente', async () => {
+        scheduleTerminalPromptRedraw(mocks.rl, 'você› ');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        scheduleTerminalPromptRedraw(mocks.rl, 'você› ', { finalizeTurn: true });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(mocks.rl.setPrompt).toHaveBeenCalledTimes(1);
+        expect(mocks.rl.prompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('separa prompt final de linha viva residual antes de devolver controle ao operador', async () => {
+        writeInlineStatus('LLM-B trabalhando · Mensagem da LLM-B recebida…');
+        writeSpy.mockClear();
+        mocks.rl.setPrompt.mockClear();
+        mocks.rl.prompt.mockClear();
+
+        scheduleTerminalPromptRedraw(mocks.rl, 'você› ', { finalizeTurn: true });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
+        expect(output).toContain('\n');
+        expect(mocks.rl.setPrompt).toHaveBeenCalledWith('você› ');
+        expect(mocks.rl.prompt).toHaveBeenCalledTimes(1);
+    });
+
     it('mantém prompt suprimido durante resumo de resposta humana em fase question', async () => {
         parkTerminalPromptForContinuation(1_000);
         mocks.activitySnapshot = {

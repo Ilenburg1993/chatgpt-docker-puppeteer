@@ -1970,6 +1970,82 @@ describe('terminal/commands/events', () => {
         expect(previewLines[1].payloadPreview).not.toContain('{"hookType"');
     });
 
+    it('humaniza conclusão interna de turno no payloadPreview raw sem sugerir fim final', async () => {
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+            state: {
+                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                events: 2,
+                queueDepth: 0,
+                error: null,
+            },
+            filters: {
+                limit: 20,
+                event: null,
+                traceId: null,
+                turnId: null,
+                source: null,
+                toolCallId: null,
+                requestId: null,
+                hubSessionId: null,
+            },
+            entries: [
+                {
+                    schemaVersion: 1,
+                    timestamp: 1710000001000,
+                    eventId: 86,
+                    event: 'activity.changed',
+                    source: 'terminal',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        current: {
+                            phase: 'turn',
+                            label: 'Turno do assistente concluído',
+                            detail: 'turno 0',
+                        },
+                        previous: {
+                            phase: 'tool',
+                            label: 'Leitura concluída',
+                            detail: 'package.json',
+                        },
+                    },
+                },
+                {
+                    schemaVersion: 1,
+                    timestamp: 1710000002000,
+                    eventId: 87,
+                    event: 'terminal.activity',
+                    source: 'sdk',
+                    eventSource: null,
+                    traceId: null,
+                    turnId: null,
+                    hubSessionId: 'hub-1',
+                    payload: {
+                        phase: 'turn',
+                        label: 'Turno do assistente concluído',
+                        detail: 'turno 0',
+                    },
+                },
+            ],
+        });
+        const ctx = mockCtx();
+
+        await cmdEvents({ println: ctx.println }, '20 --raw');
+
+        const previews = ctx
+            .output()
+            .trim()
+            .split('\n')
+            .filter((line) => line.trim().startsWith('{'))
+            .map((line) => JSON.parse(line).payloadPreview);
+        expect(previews[0]).toContain('continuação do pedido');
+        expect(previews[0]).not.toContain('Turno do assistente concluído');
+        expect(previews[1]).toContain('etapa da LLM-B encerrada');
+        expect(previews[1]).not.toContain('Turno do assistente concluído');
+    });
+
     it('humaniza payloadPreview de boot, quota e background no preview raw', async () => {
         readTerminalSseEventArchiveTail.mockResolvedValueOnce({
             state: {

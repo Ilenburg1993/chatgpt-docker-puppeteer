@@ -235,6 +235,6 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
         expect(src).toContain('if (replyAlreadyMaterialized)');
         expect(src).toContain('scheduleMaterializedTurnEndPromptRedraw()');
         expect(src).toContain("if (phase !== 'idle') return");
-        expect(src).toContain('scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { force: true })');
+        expect(src).toContain('scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { finalizeTurn: true })');
     });
 });

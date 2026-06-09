@@ -694,6 +694,42 @@ function isRecord(value) {
 }
 
 /**
+ * @param {Record<string, unknown>} activity
+ * @returns {boolean}
+ */
+function isAssistantTurnCompletionActivity(activity) {
+    const label = normalizeEventSummaryText(activity['label']).toLowerCase();
+    return label.includes('turno do assistente conclu');
+}
+
+/**
+ * @param {Record<string, unknown> | null} previous
+ * @returns {boolean}
+ */
+function isPublicAssistantActivity(previous) {
+    if (!previous) return false;
+    const text = `${previous['phase'] ?? ''} ${previous['label'] ?? ''} ${previous['detail'] ?? ''}`.toLowerCase();
+    return (
+        text.includes('streaming') ||
+        text.includes('mensagem da llm-b recebida') ||
+        text.includes('resposta conclu') ||
+        text.includes('transmitindo resposta')
+    );
+}
+
+/**
+ * @param {Record<string, unknown>} current
+ * @param {Record<string, unknown> | null} previous
+ * @returns {string}
+ */
+function humanActivityLabel(current, previous) {
+    if (!isAssistantTurnCompletionActivity(current)) return humanEventMessage(current['label']);
+    if (isPublicAssistantActivity(previous)) return 'resposta pública finalizada';
+    if (previous) return 'continuação do pedido';
+    return 'etapa da LLM-B encerrada';
+}
+
+/**
  * @param {Record<string, unknown>} payload
  * @param {{ nested?: boolean }} [opts]
  * @returns {string}
@@ -702,7 +738,7 @@ function summarizeActivityPayload(payload, opts = {}) {
     const current = opts.nested && isRecord(payload['current']) ? payload['current'] : payload;
     const previous = opts.nested && isRecord(payload['previous']) ? payload['previous'] : null;
     const phase = humanPayloadKind(current['phase']);
-    const label = humanEventMessage(current['label']);
+    const label = humanActivityLabel(current, previous);
     const detail = humanEventMessage(current['detail']);
     const tool = typeof current['toolName'] === 'string' ? getTerminalHumanToolName(current['toolName']) : '';
     const progress = typeof current['progress'] === 'number' ? `${Math.round(current['progress'])}%` : '';

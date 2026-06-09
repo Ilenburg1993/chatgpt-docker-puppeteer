@@ -85,7 +85,7 @@ function scheduleMaterializedTurnEndPromptRedraw() {
                 ? /** @type {{ phase: string }} */ (activity).phase
                 : '';
         if (phase !== 'idle') return;
-        scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { force: true });
+        scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { finalizeTurn: true });
     }, MATERIALIZED_TURN_END_PROMPT_REDRAW_DELAY_MS);
     if (typeof timer.unref === 'function') timer.unref();
 }

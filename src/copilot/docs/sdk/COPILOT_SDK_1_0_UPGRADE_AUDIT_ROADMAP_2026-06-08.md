@@ -3005,10 +3005,57 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 
 ### Achados Novos Da Centésima Trigésima Sétima Passada
 
-- [ ] SDK10-P137-01: revisar o `/events --raw` e os previews do archive SSE, pois eventos internos ainda exibem
+- [x] SDK10-P137-01: revisar o `/events --raw` e os previews do archive SSE, pois eventos internos ainda exibem
   `Turno do assistente concluído` cru no payload preview. Confirmar se isso deve continuar restrito ao raw técnico ou se
   há alguma superfície default/detail onde o fechamento intermediário de tool-only turn ainda deveria ser humanizado como
   continuação do pedido.
+
+### Execução Contínua Em 2026-06-08 - Centésima Trigésima Oitava Passada
+
+- [x] `/events --raw` agora humaniza `activity.changed` de `Turno do assistente concluído` quando o evento anterior ainda
+  era operacional: o preview passa a dizer `continuação do pedido` em vez de sugerir conclusão final da conversa.
+- [x] `terminal.activity` isolado com o mesmo evento técnico passa a aparecer como `etapa da LLM-B encerrada`, mantendo o
+  raw útil para diagnóstico sem contaminar a leitura do operador com linguagem interna do SDK.
+- [x] O live harness ganhou o critério `sse-archive-raw-preview-humanized-intermediate-turn`, condicional à janela do
+  preview: quando o turno intermediário aparece no raw preview, ele precisa estar humanizado.
+- [x] A investigação dos timeouts pós-`POST-ASK-CANONICAL-FINAL` mostrou que remover `force` do redraw final evitava
+  alguns prompts duplicados, mas podia deixar o runner e o operador sem prompt de comando quando a materialização ainda
+  estava marcada como ativa.
+- [x] `scheduleTerminalPromptRedraw()` ganhou a opção `finalizeTurn`: ela atravessa janelas de estacionamento/supressão
+  pós-resposta e materialização visual ainda ativa, mas continua respeitando input humano parcial e dedupe de prompt
+  idêntico recente.
+- [x] O repaint final pós-`dialog.turn_end` materializado agora usa `{ finalizeTurn: true }`; comandos explícitos
+  continuam usando `{ force: true }`, separando "devolver controle ao operador" de "repintar imediatamente por comando".
+- [x] O prompt final também limpa a linha viva reservada e abre uma linha própria quando havia status residual; isso
+  elimina a colagem `LLM-B trabalhando · Mensagem da LLM-B recebida…você[…]›` vista em live e permite diagnósticos
+  começarem sempre em prompt visível.
+- [x] Validado com `node --check src/copilot/terminal/dialog/output.js
+  src/copilot/terminal/wiring/terminal-agent-wiring.js src/copilot/terminal/commands/events.js
+  scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js
+  tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/test_terminal_agent_wiring.spec.js
+  tests/unit/copilot/test_terminal_dialog_output.spec.js` (4 arquivos, 83 testes).
+- [x] Live bloqueado diagnóstico: `artifacts/terminal-live/2026-06-09T04-20-59-779Z/summary.md` e
+  `artifacts/terminal-live/2026-06-09T04-28-06-262Z/summary.md` mostraram `postAsk=observed` mas timeout em diagnósticos,
+  confirmando que a falha era devolução/limpeza do prompt final, não boot nem SSE.
+- [x] Live bloqueado de contrato do modelo: `artifacts/terminal-live/2026-06-09T04-31-51-726Z/summary.md` registrou
+  `assistant-asked-before-required-deltas` com `deltasBeforeAsk=0`; o terminal coletou diagnósticos corretamente, mas a
+  LLM-B chamou `ask_user` antes da resposta pública exigida pelo cenário.
+- [x] Validado live final com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000
+  --live-scenario=canonical`; PASS em `artifacts/terminal-live/2026-06-09T04-32-50-896Z/summary.md`, incluindo
+  `sse-archive-raw-preview-humanized-intermediate-turn`, `ux-diagnostic-commands-start-at-prompt`,
+  `no-prompt-double-render` e `ux-no-intermediate-finalizing-before-public-output`.
+
+### Achados Novos Da Centésima Trigésima Oitava Passada
+
+- [ ] SDK10-P138-01: em `artifacts/terminal-live/2026-06-09T04-20-59-779Z/terminal.plain.log`, a resposta pública antes
+  dos deltas incluiu `&lt;thinking&gt;`, uma frase em chinês e `&lt;/thinking&gt;`. O HTML foi escapado, mas a semântica
+  de "thinking" vazou para o operador; adicionar critério live e decidir se o terminal deve filtrar tags de raciocínio
+  conhecidas ou apenas reprovar o provider/modelo.
+- [ ] SDK10-P138-02: o live `artifacts/terminal-live/2026-06-09T04-31-51-726Z/summary.md` confirmou que a LLM-B pode
+  chamar `ask_user` antes de materializar a resposta pública obrigatória, mesmo com instrução explícita. Investigar se o
+  terminal deve oferecer uma política opcional de guarda para fluxos que exigem "resposta pública antes da pergunta", ou
+  se isso deve ficar como contrato/validador de harness.
 
 ---
 

@@ -42,7 +42,7 @@ export const PROMPT_WAITING = '     ';
 /** @type {number} */
 let _terminalRenderLockDepth = 0;
 /** @typedef {string | (() => string)} ScheduledPrompt */
-/** @typedef {{ force?: boolean }} TerminalPromptRedrawOptions */
+/** @typedef {{ force?: boolean; finalizeTurn?: boolean }} TerminalPromptRedrawOptions */
 
 /**
  * @typedef {{
@@ -68,7 +68,7 @@ let _terminalRenderLockDepth = 0;
  * }} TerminalExclusiveTtyResult
  */
 
-/** @type {WeakMap<object, { prompt: ScheduledPrompt; force: boolean; immediate: NodeJS.Immediate }>} */
+/** @type {WeakMap<object, { prompt: ScheduledPrompt; force: boolean; finalizeTurn: boolean; immediate: NodeJS.Immediate }>} */
 const _scheduledPromptRedraws = new WeakMap();
 /** @type {WeakMap<object, { prompt: string; at: number }>} */
 const _lastPromptPaints = new WeakMap();
@@ -724,9 +724,11 @@ function shouldSuppressInlineStatusForSubmit() {
 }
 
 /**
+ * @param {TerminalPromptRedrawOptions} [options]
  * @returns {boolean}
  */
-function shouldUseParkedTerminalPrompt() {
+function shouldUseParkedTerminalPrompt(options = {}) {
+    if (options.force === true || options.finalizeTurn === true) return false;
     if (shouldKeepHumanPromptWithInlineStatus()) return false;
     if (_terminalPromptParkedUntil <= 0) return false;
     if (Date.now() > _terminalPromptParkedUntil) {
@@ -747,8 +749,8 @@ function shouldUseParkedTerminalPrompt() {
  * @param {string} prompt
  * @returns {string}
  */
-function resolvePromptForPaint(prompt) {
-    return shouldUseParkedTerminalPrompt() ? buildWaitingPrompt() : prompt;
+function resolvePromptForPaint(prompt, options = {}) {
+    return shouldUseParkedTerminalPrompt(options) ? buildWaitingPrompt() : prompt;
 }
 
 /**
@@ -757,6 +759,7 @@ function resolvePromptForPaint(prompt) {
  */
 function shouldSuppressPromptRedrawForContinuation(options = {}) {
     if (options.force === true) return false;
+    if (options.finalizeTurn === true) return false;
     if (!shouldKeepHumanPromptWithInlineStatus()) return false;
     if (_terminalPromptRedrawSuppressedUntil <= 0) return false;
     if (Date.now() > _terminalPromptRedrawSuppressedUntil) {
@@ -818,12 +821,12 @@ function isTerminalOperationalActivityActiveForPromptRedraw() {
 /**
  * @param {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} rl
  * @param {string} prompt
- * @param {{ force?: boolean }} [options]
+ * @param {TerminalPromptRedrawOptions} [options]
  * @returns {void}
  */
 function paintTerminalPrompt(rl, prompt, options = {}) {
     if (!isTerminalReadlineOpen(rl)) return;
-    const resolvedPrompt = resolvePromptForPaint(prompt);
+    const resolvedPrompt = resolvePromptForPaint(prompt, options);
     if (options.force !== true) {
         _lastPromptPaints.set(/** @type {object} */ (rl), { prompt: resolvedPrompt, at: Date.now() });
     }
@@ -865,6 +868,7 @@ function redrawPromptIfInteractive() {
  */
 function shouldDeferTerminalIdlePromptRedraw(options = {}) {
     if (options.force === true) return false;
+    if (options.finalizeTurn === true) return false;
     if (_terminalIdlePromptDeferredUntil <= 0 || Date.now() >= _terminalIdlePromptDeferredUntil) return false;
     if (getBusy() || hasActiveHumanInputPromptState()) return false;
     return true;
@@ -950,8 +954,15 @@ function breakPromptLineBeforeDurableOutput() {
 export function redrawTerminalPrompt(rl, prompt = buildUserPrompt(), options = {}) {
     if (!rl || !isTerminalReadlineOpen(rl)) return;
     if (options.force !== true && shouldSkipDuplicatePromptPaint(rl, prompt)) return;
+    const hadReservedInlineStatus = options.finalizeTurn === true && _statusRowsReserved > 0;
+    if (options.finalizeTurn === true) {
+        clearReservedInlineStatus();
+    }
+    if (hadReservedInlineStatus && process.stdout.isTTY) {
+        process.stdout.write('\n');
+    }
     clearTerminalLine();
-    paintTerminalPrompt(rl, prompt, { force: options.force === true });
+    paintTerminalPrompt(rl, prompt, { force: options.force === true, finalizeTurn: options.finalizeTurn === true });
 }
 
 /**
@@ -980,11 +991,13 @@ export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(
     if (current) {
         current.prompt = prompt;
         current.force = current.force || options.force === true;
+        current.finalizeTurn = current.finalizeTurn || options.finalizeTurn === true;
         return;
     }
     const state = {
         prompt,
         force: options.force === true,
+        finalizeTurn: options.finalizeTurn === true,
         immediate: setImmediate(() => {
             _scheduledPromptRedraws.delete(key);
             if (_terminalRenderLockDepth > 0 || !isTerminalReadlineOpen(openReadline)) return;
@@ -994,6 +1007,7 @@ export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(
             const activeTurn = isTerminalTurnPresentationActive();
             if (
                 state.force !== true &&
+                state.finalizeTurn !== true &&
                 activeTurn &&
                 shouldKeepHumanPromptWithInlineStatus() &&
                 !hasActiveHumanInputPromptState()
@@ -1001,7 +1015,7 @@ export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(
                 return;
             }
             const prompt = activeTurn && !shouldKeepHumanPromptWithInlineStatus() ? buildWaitingPrompt() : nextPrompt;
-            redrawTerminalPrompt(openReadline, prompt, { force: state.force });
+            redrawTerminalPrompt(openReadline, prompt, { force: state.force, finalizeTurn: state.finalizeTurn });
         }),
     };
     if (typeof state.immediate.unref === 'function') state.immediate.unref();
