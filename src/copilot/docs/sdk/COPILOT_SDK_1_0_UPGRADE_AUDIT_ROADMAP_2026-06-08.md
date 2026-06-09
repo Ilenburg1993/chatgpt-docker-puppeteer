@@ -2706,6 +2706,23 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
   investigar se dá para trocar esse pulso residual por um verbo mais operacional, sem perder a distinção entre
   waiting, question e turn.
 
+### Execução Contínua Em 2026-06-08 - Centésima Vigésima Sexta Passada
+
+- [x] `Pending messages alteradas` passou a se humanizar como `Contexto da conversa atualizado` nas superfícies de
+  diagnóstico e sessão, alinhando o vocabulário com o restante do terminal.
+- [x] A linha viva periódica comprime essa mesma atividade para `Conversa atualizada`, evitando truncamento na largura
+  estreita do PTY sem perder a noção de que o contexto foi recalculado.
+- [x] O teste da linha viva foi ajustado para proteger a forma compacta renderizada no pulso contínuo.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js` (1 arquivo, 27 testes).
+- [x] Validado com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T02-30-10-503Z/summary.md`, confirmando a linha viva compacta, o
+  cenário canônico completo e a saída limpa.
+
+### Achados Novos Da Centésima Vigésima Sexta Passada
+
+- [ ] SDK10-P126-01: revisar se há outras atividades de pulso periódico que ainda merecem compressão semelhante à
+  linha viva de contexto, sem sacrificar o detalhe útil nos comandos de diagnóstico.
+
 ---
 
 ## Decisões Arquiteturais

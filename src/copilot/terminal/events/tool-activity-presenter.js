@@ -821,7 +821,7 @@ export function humanizeTerminalToolSurfaceText(value, opts = {}) {
         .replace(/^I\/O write concluído\b/iu, 'I/O escrita concluída')
         .replace(/^ask_user SDK solicitado\b/iu, 'Pergunta ao operador solicitada')
         .replace(/^request_user_input\b/iu, 'Pergunta ao operador')
-        .replace(/^Pending messages alteradas$/iu, 'Contexto atualizado')
+        .replace(/^Pending messages alteradas$/iu, 'Contexto da conversa atualizado')
         .replace(/^LLM-B trabalhando$/iu, 'Aguardando resposta')
         .trim();
 }

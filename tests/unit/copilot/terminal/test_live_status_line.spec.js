@@ -456,7 +456,7 @@ describe('terminal/live-status-line', () => {
 
         const line = formatTerminalLiveStatusLine();
 
-        expect(line).toContain('Contexto atualizado');
+        expect(line).toContain('Conversa atualizada');
         expect(line).not.toContain('Pending messages alteradas');
     });
 

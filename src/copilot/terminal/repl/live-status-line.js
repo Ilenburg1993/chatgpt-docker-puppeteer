@@ -153,6 +153,7 @@ function isHumanQuestionToolActivity(activity) {
  */
 function compactLiveStatusText(value, max) {
     const text = humanizeTerminalToolSurfaceText(value)
+        .replace(/^Contexto da conversa atualizado$/iu, 'Conversa atualizada')
         .replace(/\bturnId=\d+\b/giu, 'turno concluído')
         .replace(/\s+/g, ' ')
         .trim();
