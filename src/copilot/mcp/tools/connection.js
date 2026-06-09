@@ -30,6 +30,7 @@ import {
 import {
     buildProtectedResourceMetadata,
     buildWwwAuthenticateChallenge,
+    mcpFetchText,
     okResult,
     readMcpAuthConfig,
     readOnlyAnnotations,
@@ -223,25 +224,24 @@ async function fetchOAuthMetadata(url, timeoutMs) {
         };
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        const response = await fetch(url, {
+        const result = await mcpFetchText(url, {
             cache: 'no-store',
             redirect: 'manual',
             headers: {
                 accept: 'application/json, application/oauth-authz-server+json, application/json; q=0.9',
                 'user-agent': 'copilot-mcp-oauth-diagnostics/1.0',
             },
-            signal: controller.signal,
+            timeoutMs,
+            maxBytes: MAX_DIAGNOSTIC_RESPONSE_BYTES,
         });
-        const contentType = response.headers.get('content-type') ?? '';
-        const contentLength = Number(response.headers.get('content-length') ?? '0');
-        if (response.status >= 300 && response.status < 400) {
+        const contentType = result.headers['content-type'] ?? '';
+        const contentLength = Number(result.headers['content-length'] ?? '0');
+        if (result.status >= 300 && result.status < 400) {
             return {
                 ok: false,
                 url,
-                status: response.status,
+                status: result.status,
                 contentType,
                 redirected: true,
                 error: 'Redirects are not followed during OAuth metadata diagnostics.',
@@ -251,31 +251,39 @@ async function fetchOAuthMetadata(url, timeoutMs) {
             return {
                 ok: false,
                 url,
-                status: response.status,
+                status: result.status,
                 contentType,
                 error: `Response is too large (${contentLength} bytes).`,
+            };
+        }
+        if (result.error) {
+            return {
+                ok: false,
+                url,
+                status: result.status,
+                contentType,
+                error: result.error,
             };
         }
         if (!isJsonContentType(contentType)) {
             return {
                 ok: false,
                 url,
-                status: response.status,
+                status: result.status,
                 contentType,
                 error: 'Response content-type is not JSON.',
             };
         }
-        const { text, bytesRead } = await readResponseTextLimited(response, MAX_DIAGNOSTIC_RESPONSE_BYTES);
-        const body = asObject(JSON.parse(text));
+        const body = asObject(JSON.parse(result.rawBody));
         return {
-            ok: response.ok && body !== null,
+            ok: result.ok && body !== null,
             url,
-            status: response.status,
+            status: result.status,
             contentType,
-            bytesRead,
+            bytesRead: Buffer.byteLength(result.rawBody, 'utf8'),
             ...(body ? { metadata: body } : {}),
-            ...(!response.ok ? { error: `HTTP ${response.status}` } : {}),
-            ...(response.ok && body === null ? { error: 'Response is not a JSON object.' } : {}),
+            ...(!result.ok ? { error: `HTTP ${result.status}` } : {}),
+            ...(result.ok && body === null ? { error: 'Response is not a JSON object.' } : {}),
         };
     } catch (error) {
         return {
@@ -283,41 +291,7 @@ async function fetchOAuthMetadata(url, timeoutMs) {
             url,
             error: error instanceof Error ? error.message : String(error),
         };
-    } finally {
-        clearTimeout(timeout);
     }
-}
-
-/**
- * @param {Response} response
- * @param {number} maxBytes
- * @returns {Promise<{ text: string; bytesRead: number }>}
- */
-async function readResponseTextLimited(response, maxBytes) {
-    const body =
-        /** @type {{ getReader?: () => { read: () => Promise<{ done?: boolean; value?: Uint8Array }> } } | null} */ (
-            /** @type {unknown} */ (response.body)
-        );
-    if (!body?.getReader) {
-        const text = await response.text();
-        const bytesRead = Buffer.byteLength(text, 'utf8');
-        if (bytesRead > maxBytes) throw new Error(`Response exceeds ${maxBytes} bytes.`);
-        return { text, bytesRead };
-    }
-
-    const reader = body.getReader();
-    const chunks = [];
-    let bytesRead = 0;
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!value) continue;
-        const buffer = Buffer.from(value);
-        bytesRead += buffer.length;
-        if (bytesRead > maxBytes) throw new Error(`Response exceeds ${maxBytes} bytes.`);
-        chunks.push(buffer);
-    }
-    return { text: Buffer.concat(chunks).toString('utf8'), bytesRead };
 }
 
 /**

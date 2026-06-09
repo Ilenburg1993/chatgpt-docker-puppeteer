@@ -1,6 +1,7 @@
 // @ts-check
 import { calculateJwkThumbprint, createRemoteJWKSet, importJWK, jwtVerify } from 'jose';
 import { timingSafeEqual } from 'node:crypto';
+import { createTtlCache } from './ttl-cache.js';
 
 /**
  * Canonical MCP auth metadata, tool-scope planning and resource-server token verification.
@@ -106,8 +107,12 @@ const DPOP_CLOCK_TOLERANCE_SECONDS = 30;
 const DPOP_REPLAY_CACHE_MAX_ENTRIES = 2000;
 const MAX_DPOP_PROOF_LENGTH = 16 * 1024;
 
-/** @type {Map<string, ReturnType<typeof createRemoteJWKSet>>} */
-const REMOTE_JWKS_CACHE = new Map();
+/** @type {import('./ttl-cache.js').TtlCache<ReturnType<typeof createRemoteJWKSet>>} */
+const REMOTE_JWKS_CACHE = createTtlCache({
+    name: 'oauth-remote-jwks',
+    ttlMs: JWKS_CACHE_MAX_AGE_MS,
+    maxEntries: MAX_JWKS_CACHE_ENTRIES,
+});
 
 /** @type {Map<string, number>} */
 const DPOP_REPLAY_CACHE = new Map();
@@ -823,27 +828,16 @@ function safeEqualString(left, right) {
  * @returns {ReturnType<typeof createRemoteJWKSet>}
  */
 function getRemoteJwks(jwksUri) {
-    let jwks = REMOTE_JWKS_CACHE.get(jwksUri);
-    if (jwks) return jwks;
-    pruneRemoteJwksCache();
-    jwks = createRemoteJWKSet(new URL(jwksUri), {
-        timeoutDuration: JWKS_TIMEOUT_MS,
-        cooldownDuration: JWKS_COOLDOWN_MS,
-        cacheMaxAge: JWKS_CACHE_MAX_AGE_MS,
-    });
-    REMOTE_JWKS_CACHE.set(jwksUri, jwks);
-    return jwks;
-}
-
-/**
- * @returns {void}
- */
-function pruneRemoteJwksCache() {
-    while (REMOTE_JWKS_CACHE.size >= MAX_JWKS_CACHE_ENTRIES) {
-        const oldestKey = REMOTE_JWKS_CACHE.keys().next().value;
-        if (typeof oldestKey !== 'string') return;
-        REMOTE_JWKS_CACHE.delete(oldestKey);
-    }
+    const cached = REMOTE_JWKS_CACHE.get(jwksUri);
+    if (cached) return cached;
+    return REMOTE_JWKS_CACHE.set(
+        jwksUri,
+        createRemoteJWKSet(new URL(jwksUri), {
+            timeoutDuration: JWKS_TIMEOUT_MS,
+            cooldownDuration: JWKS_COOLDOWN_MS,
+            cacheMaxAge: JWKS_CACHE_MAX_AGE_MS,
+        }),
+    );
 }
 
 /**

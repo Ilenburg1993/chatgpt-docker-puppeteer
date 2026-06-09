@@ -42,8 +42,25 @@ quic_client_packet_too_big_dropped 0
                 totalConnections: 4,
                 latestRttMs: 18,
                 smoothedRttMs: 20,
+                rttUnit: 'seconds',
                 mtu: 1350,
                 packetTooBigDropped: 0,
+            },
+        });
+    });
+
+    it('normalizes live QUIC RTT metrics that are exposed as integer milliseconds', () => {
+        const samples = parsePrometheusMetrics(`
+quic_client_latest_rtt 42
+quic_client_smoothed_rtt 37
+`);
+
+        expect(summarizeCloudflaredMetrics(samples)).toMatchObject({
+            quic: {
+                present: true,
+                latestRttMs: 42,
+                smoothedRttMs: 37,
+                rttUnit: 'milliseconds',
             },
         });
     });

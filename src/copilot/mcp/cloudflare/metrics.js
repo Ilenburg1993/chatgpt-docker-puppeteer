@@ -138,17 +138,20 @@ export function summarizeCloudflaredMetrics(samples, options = {}) {
 /**
  * @param {PrometheusSample[]} samples
  * @param {string[]} metricNames
- * @returns {{ present: boolean; metricCount: number; totalConnections: number | null; closedConnections: number | null; latestRttMs: number | null; smoothedRttMs: number | null; mtu: number | null; maxUdpPayload: number | null; packetTooBigDropped: number | null }}
+ * @returns {{ present: boolean; metricCount: number; totalConnections: number | null; closedConnections: number | null; latestRttMs: number | null; smoothedRttMs: number | null; rttUnit: string; mtu: number | null; maxUdpPayload: number | null; packetTooBigDropped: number | null }}
  */
 function summarizeCloudflaredQuicMetrics(samples, metricNames) {
     const quicMetricNames = metricNames.filter((name) => name.startsWith('quic_client_'));
+    const latestRtt = normalizeQuicRttMetric(latestValue(samples, 'quic_client_latest_rtt'));
+    const smoothedRtt = normalizeQuicRttMetric(latestValue(samples, 'quic_client_smoothed_rtt'));
     return {
         present: quicMetricNames.length > 0,
         metricCount: quicMetricNames.length,
         totalConnections: latestValue(samples, 'quic_client_total_connections'),
         closedConnections: latestValue(samples, 'quic_client_closed_connections'),
-        latestRttMs: secondsToMilliseconds(latestValue(samples, 'quic_client_latest_rtt')),
-        smoothedRttMs: secondsToMilliseconds(latestValue(samples, 'quic_client_smoothed_rtt')),
+        latestRttMs: latestRtt.ms,
+        smoothedRttMs: smoothedRtt.ms,
+        rttUnit: smoothedRtt.unit !== 'unknown' ? smoothedRtt.unit : latestRtt.unit,
         mtu: latestValue(samples, 'quic_client_mtu'),
         maxUdpPayload: latestValue(samples, 'quic_client_max_udp_payload'),
         packetTooBigDropped: latestValue(samples, 'quic_client_packet_too_big_dropped'),
@@ -156,11 +159,17 @@ function summarizeCloudflaredQuicMetrics(samples, metricNames) {
 }
 
 /**
- * @param {number | null} seconds
- * @returns {number | null}
+ * Cloudflared QUIC RTT metrics have appeared as fractional seconds in fixtures and as integer milliseconds
+ * in live Prometheus snapshots. Normalize both forms without weakening the operational gates.
+ *
+ * @param {number | null} value
+ * @returns {{ ms: number | null; unit: 'seconds' | 'milliseconds' | 'unknown' }}
  */
-function secondsToMilliseconds(seconds) {
-    return seconds === null ? null : Math.round(seconds * 1000);
+function normalizeQuicRttMetric(value) {
+    if (value === null) return { ms: null, unit: 'unknown' };
+    if (!Number.isFinite(value) || value < 0) return { ms: null, unit: 'unknown' };
+    if (value > 10) return { ms: Math.round(value), unit: 'milliseconds' };
+    return { ms: Math.round(value * 1000), unit: 'seconds' };
 }
 
 /**

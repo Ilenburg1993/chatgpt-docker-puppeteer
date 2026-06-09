@@ -7,6 +7,7 @@
 
 import Cloudflare from 'cloudflare';
 import { readFile } from 'node:fs/promises';
+import { createTtlCache } from '#copilot/mcp/control-plane';
 import { readCloudflareTunnelConfig } from './config.js';
 import {
     auditOriginRequestProfile as auditOriginRequestProfileBase,
@@ -17,12 +18,18 @@ const DEFAULT_ENV_FILE = '.env.local';
 const DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS = 5_000;
 const DEFAULT_ENV_FILE_CACHE_TTL_MS = 2_000;
 
-/** @type {{ key: string; expiresAt: number; value: Record<string, unknown> & { ok: boolean } } | null} */
-let remoteAuditCache = null;
-/** @type {{ key: string; promise: Promise<Record<string, unknown> & { ok: boolean }> } | null} */
-let remoteAuditInFlight = null;
-/** @type {{ expiresAt: number; value: Record<string, string> } | null} */
-let localEnvFileCache = null;
+/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
+const remoteAuditCache = createTtlCache({
+    name: 'cloudflare-remote-audit',
+    ttlMs: DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS,
+    maxEntries: 32,
+});
+/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, string>>} */
+const localEnvFileCache = createTtlCache({
+    name: 'cloudflare-env-file',
+    ttlMs: DEFAULT_ENV_FILE_CACHE_TTL_MS,
+    maxEntries: 2,
+});
 /** @type {Map<string, Cloudflare>} */
 const cloudflareClientCache = new Map();
 
@@ -76,23 +83,11 @@ export async function auditCloudflareRemoteTunnel(options = {}) {
     const apiConfig = await readCloudflareRemoteApiConfig(options.env ?? process.env);
     const cacheTtlMs = readCacheTtlMs(options.cacheTtlMs);
     const cacheKey = buildRemoteAuditCacheKey(apiConfig);
-    const now = Date.now();
-    if (options.forceRefresh !== true && cacheTtlMs > 0 && remoteAuditCache?.key === cacheKey && remoteAuditCache.expiresAt > now) {
-        return remoteAuditCache.value;
-    }
-    if (options.forceRefresh !== true && remoteAuditInFlight?.key === cacheKey) {
-        return remoteAuditInFlight.promise;
-    }
-    const auditPromise = auditCloudflareRemoteTunnelUncached(apiConfig).then((result) => {
-        if (cacheTtlMs > 0) remoteAuditCache = { key: cacheKey, expiresAt: Date.now() + cacheTtlMs, value: result };
-        if (remoteAuditInFlight?.key === cacheKey) remoteAuditInFlight = null;
-        return result;
-    }, (error) => {
-        if (remoteAuditInFlight?.key === cacheKey) remoteAuditInFlight = null;
-        throw error;
-    });
-    remoteAuditInFlight = { key: cacheKey, promise: auditPromise };
-    return auditPromise;
+    return remoteAuditCache.getOrLoad(
+        cacheKey,
+        () => auditCloudflareRemoteTunnelUncached(apiConfig),
+        { forceRefresh: options.forceRefresh === true, ttlMs: cacheTtlMs },
+    );
 }
 
 /**
@@ -242,16 +237,13 @@ function createClientCacheKey(value) {
 }
 
 async function readLocalEnvFile() {
-    const now = Date.now();
-    if (localEnvFileCache && localEnvFileCache.expiresAt > now) return localEnvFileCache.value;
-    try {
-        const value = parseEnvFile(await readFile(DEFAULT_ENV_FILE, 'utf8'));
-        localEnvFileCache = { expiresAt: now + DEFAULT_ENV_FILE_CACHE_TTL_MS, value };
-        return value;
-    } catch {
-        localEnvFileCache = { expiresAt: now + DEFAULT_ENV_FILE_CACHE_TTL_MS, value: {} };
-        return {};
-    }
+    return localEnvFileCache.getOrLoad(DEFAULT_ENV_FILE, async () => {
+        try {
+            return parseEnvFile(await readFile(DEFAULT_ENV_FILE, 'utf8'));
+        } catch {
+            return {};
+        }
+    });
 }
 
 /**

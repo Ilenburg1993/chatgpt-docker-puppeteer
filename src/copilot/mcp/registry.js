@@ -444,6 +444,8 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
     const callId = randomUUID();
     const risk = classifyMcpToolRisk(tool);
     const requiredScopes = collectToolSecurityScopes(tool);
+    /** @type {Record<string, number>} */
+    const phases = {};
     await safeAppendMcpAuditEvent({
         event: 'tool_call_started',
         callId,
@@ -455,7 +457,9 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
         requiredScopes,
     });
     try {
+        const rateLimitStartedAt = Date.now();
         const rateLimit = consumeToolInvocationBudget(tool, options, registryPolicy);
+        phases['rateLimit'] = elapsedMs(rateLimitStartedAt);
         if (!rateLimit.allowed) {
             const durationMs = elapsedMs(startedAt);
             await safeAppendMcpAuditEvent({
@@ -474,7 +478,9 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             });
         }
 
+        const authorizationStartedAt = Date.now();
         const authorization = await authorizeMcpToolCall(tool, options.authContext);
+        phases['authorization'] = elapsedMs(authorizationStartedAt);
         if (!authorization.allowed) {
             const durationMs = elapsedMs(startedAt);
             await safeAppendMcpAuditEvent({
@@ -504,8 +510,12 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             );
         }
 
+        const handlerStartedAt = Date.now();
         const result = await runToolHandlerWithTimeout(tool, args, registryPolicy);
+        phases['handler'] = elapsedMs(handlerStartedAt);
+        const resultSizeStartedAt = Date.now();
         const resultSizeError = validateToolResultSize(result, registryPolicy);
+        phases['resultSize'] = elapsedMs(resultSizeStartedAt);
         if (resultSizeError) {
             const durationMs = elapsedMs(startedAt);
             await safeAppendMcpAuditEvent({
@@ -524,9 +534,11 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             });
         }
 
+        const outputValidationStartedAt = Date.now();
         const outputValidation = registryPolicy.validateStructuredOutput
             ? validateToolStructuredOutput(tool, result)
             : [];
+        phases['outputValidation'] = elapsedMs(outputValidationStartedAt);
         if (outputValidation.length > 0) {
             await safeAppendMcpAuditEvent({
                 event: 'tool_call_output_validation_warning',
@@ -537,6 +549,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             });
         }
         const durationMs = elapsedMs(startedAt);
+        const auditCompletionStartedAt = Date.now();
         await safeAppendMcpAuditEvent({
             event: 'tool_call_completed',
             callId,
@@ -545,7 +558,8 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             isError: result.isError === true,
             risk,
         });
-        safeRecordMcpToolMetric(tool.name, { durationMs, isError: result.isError === true });
+        phases['auditCompletion'] = elapsedMs(auditCompletionStartedAt);
+        safeRecordMcpToolMetric(tool.name, { durationMs, isError: result.isError === true, phases });
         return result;
     } catch (error) {
         const durationMs = elapsedMs(startedAt);

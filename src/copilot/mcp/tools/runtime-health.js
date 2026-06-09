@@ -141,6 +141,31 @@ function summarizeSlowestTools(tools) {
 }
 
 /**
+ * @param {Record<string, Record<string, unknown>>} tools
+ * @returns {Array<{ tool: string; phase: string; calls: number; averageMs: number | null; lastMs: number | null }>}
+ */
+function summarizeSlowestPhases(tools) {
+    const rows = [];
+    for (const [tool, metric] of Object.entries(tools)) {
+        const phaseAverages = metric['phaseAverages'];
+        if (!phaseAverages || typeof phaseAverages !== 'object' || Array.isArray(phaseAverages)) continue;
+        for (const [phase, phaseMetric] of Object.entries(/** @type {Record<string, Record<string, unknown>>} */ (phaseAverages))) {
+            rows.push({
+                tool,
+                phase,
+                calls: Number(phaseMetric['calls'] ?? 0),
+                averageMs: nullableNumber(phaseMetric['averageDurationMs']),
+                lastMs: nullableNumber(phaseMetric['lastDurationMs']),
+            });
+        }
+    }
+    return rows
+        .filter((row) => row.calls > 0)
+        .sort((left, right) => (right.averageMs ?? 0) - (left.averageMs ?? 0))
+        .slice(0, 12);
+}
+
+/**
  * @param {unknown} value
  * @returns {number | null}
  */
@@ -242,6 +267,7 @@ export const mcpRuntimeHealthTool = {
                     uptimeMs: metrics.uptimeMs,
                     totals: metrics.totals,
                     slowestTools: summarizeSlowestTools(metrics.tools),
+                    slowestPhases: summarizeSlowestPhases(metrics.tools),
                 },
                 detailsAvailable: true,
             });

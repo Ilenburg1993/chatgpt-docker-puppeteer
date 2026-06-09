@@ -1,6 +1,7 @@
 // @ts-check
 /** HTTP, OAuth and MCP probe helpers for Cloudflare MCP CLI. */
 import https from 'node:https';
+import { mcpFetchStatus, mcpFetchText, mcpFetchTextWithRetry } from '#copilot/mcp/control-plane';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const localInsecureHttpsAgent = new https.Agent({
@@ -88,8 +89,7 @@ export async function probeHealth(url, options = {}) {
         if (options.allowInsecureHttps === true && String(url).startsWith('https://')) {
             return await probeInsecureHttpsHealth(url, options);
         }
-        const response = await fetch(url, { signal: AbortSignal.timeout(Number(options.timeoutMs ?? 3000)) });
-        return { ok: response.ok, status: response.status };
+        return await mcpFetchStatus(url, { timeoutMs: Number(options.timeoutMs ?? 3000) });
     } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -132,16 +132,25 @@ function probeInsecureHttpsHealth(url, options) {
  * @returns {Promise<ProbeJsonResult>}
  */
 export async function probeJsonWithRetry(url, options = {}) {
-    const attempts = Number(options.attempts ?? 3);
-    /** @type {ProbeJsonResult | undefined} */
-    let last;
-    for (let i = 1; i <= attempts; i += 1) {
-        last = await probeJson(url, options);
-        last.attempts = i;
-        if (last.ok || ![0, 408, 425, 429, 500, 502, 503, 504, 530].includes(last.status ?? 0)) return last;
-        await new Promise((resolve) => setTimeout(resolve, Number(options.delayMs ?? 1000)));
-    }
-    return last ?? { ok: false, status: 0, error: 'probe-not-run', attempts: 0 };
+    const result = await mcpFetchTextWithRetry(url, {
+        method: options.method ?? 'GET',
+        ...(options.headers !== undefined ? { headers: options.headers } : {}),
+        ...(options.body !== undefined ? { body: options.body } : {}),
+        timeoutMs: Number(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+        attempts: Number(options.attempts ?? 3),
+        delayMs: Number(options.delayMs ?? 1000),
+    });
+    const contentType = result.headers['content-type'] ?? '';
+    const parsed = parseJsonOrMcpEventStream(result.rawBody, contentType);
+    return {
+        ok: result.ok,
+        status: result.status,
+        body: parsed.body,
+        rawBody: result.rawBody,
+        headers: result.headers,
+        ...(result.error !== undefined ? { error: result.error } : {}),
+        attempts: result.attempts,
+    };
 }
 
 /**
@@ -150,22 +159,22 @@ export async function probeJsonWithRetry(url, options = {}) {
  * @returns {Promise<ProbeJsonResult>}
  */
 export async function probeJson(url, options = {}) {
-    try {
-        /** @type {RequestInit} */
-        const init = {
-            method: options.method ?? 'GET',
-            signal: AbortSignal.timeout(Number(options.timeoutMs ?? DEFAULT_TIMEOUT_MS)),
-        };
-        if (options.headers !== undefined) init.headers = options.headers;
-        if (options.body !== undefined) init.body = options.body;
-        const response = await fetch(url, init);
-        const rawBody = await response.text();
-        const contentType = response.headers.get('content-type') ?? '';
-        const parsed = parseJsonOrMcpEventStream(rawBody, contentType);
-        return { ok: response.ok, status: response.status, body: parsed.body, rawBody, headers: Object.fromEntries(response.headers.entries()) };
-    } catch (error) {
-        return { ok: false, status: 0, error: error instanceof Error ? error.message : String(error) };
-    }
+    const result = await mcpFetchText(url, {
+        method: options.method ?? 'GET',
+        ...(options.headers !== undefined ? { headers: options.headers } : {}),
+        ...(options.body !== undefined ? { body: options.body } : {}),
+        timeoutMs: Number(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+    });
+    const contentType = result.headers['content-type'] ?? '';
+    const parsed = parseJsonOrMcpEventStream(result.rawBody, contentType);
+    return {
+        ok: result.ok,
+        status: result.status,
+        body: parsed.body,
+        rawBody: result.rawBody,
+        headers: result.headers,
+        ...(result.error !== undefined ? { error: result.error } : {}),
+    };
 }
 
 /**
