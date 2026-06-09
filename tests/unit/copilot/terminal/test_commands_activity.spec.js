@@ -700,14 +700,46 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Tarefa em segundo plano concluída');
         expect(ctx.output()).not.toContain('tarefa · Tarefa em segundo plano concluída');
         expect(ctx.output()).not.toContain('turno · Processando mensagem');
+        expect(ctx.output()).not.toContain('conversa · Processando mensagem');
         expect(ctx.output()).toContain('Intenção da LLM-B');
         expect(ctx.output()).not.toContain('turno · Intenção da LLM-B');
+        expect(ctx.output()).not.toContain('conversa · Intenção da LLM-B');
         expect(ctx.output()).toContain('Resposta concluída');
         expect(ctx.output()).not.toContain('sistema · Resposta concluída');
         expect(ctx.output()).not.toContain('inicialização · Inicializando terminal');
         expect(ctx.output()).not.toContain('system · Uso BYOK');
         expect(ctx.output()).not.toContain('task · Tarefa');
         expect(ctx.output()).not.toContain('boot · Inicializando');
+    });
+
+    it('mostra fase de conversa como estado humano em vez de turno cru', () => {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+            current: {
+                phase: 'turn',
+                label: 'Pending messages alteradas',
+                detail: '0 mensagens pendentes',
+                source: 'sdk',
+                severity: 'info',
+                progress: null,
+                toolName: null,
+                startedAt: 1,
+                updatedAt: 2,
+                ageMs: 0,
+            },
+            history: [],
+            turnTrace: {
+                current: null,
+                recent: [],
+            },
+        });
+        const ctx = mockCtx();
+
+        cmdActivity({ println: ctx.println }, '5');
+
+        expect(ctx.output()).toMatch(/Estado\s+conversa/u);
+        expect(ctx.output()).toContain('Contexto da conversa atualizado');
+        expect(ctx.output()).not.toMatch(/Estado\s+turno/u);
+        expect(ctx.output()).not.toContain('Pending messages alteradas');
     });
 
     it('preserva nomes de protocolo em detalhes livres da intenção', () => {

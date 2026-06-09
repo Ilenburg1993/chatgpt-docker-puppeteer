@@ -2743,6 +2743,30 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [ ] SDK10-P127-01: seguir caçando outras superfícies periódicas em `src/copilot/terminal` que ainda falem em fase de
   runtime em vez de ação humana, sobretudo em status compactos que o operador vê de relance.
 
+### Execução Contínua Em 2026-06-08 - Centésima Vigésima Oitava Passada
+
+- [x] `/activity` passou a renderizar `phase=turn` como `Estado conversa`, mantendo `turn` apenas como semântica interna
+  e preservando os títulos históricos de trace (`Resumo do turno atual`, `Último turno concluído`) onde o termo é
+  diagnóstico útil.
+- [x] `/status` e superfícies de sessão passaram a usar `conversa` para a fase viva equivalente, alinhando comando e
+  linha viva sem alterar o estado armazenado nem os eventos SSE.
+- [x] A timeline operacional ganhou cobertura contra os prefixos `turno ·` e `conversa ·` em eventos que já carregam o
+  rótulo humano, como `Intenção da LLM-B`.
+- [x] Validado com `node --check src/copilot/terminal/commands/activity.js && node --check src/copilot/terminal/commands/session.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`
+  (2 arquivos, 63 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+- [x] Validado live com `node scripts/model-gateway/run.mjs llmBLiveTest --timeout-ms=300000 --live-scenario=canonical`;
+  PASS em `artifacts/terminal-live/2026-06-09T02-41-59-628Z/summary.md`, confirmando `/activity`, `/usage now`,
+  `/events`, `ask_user` e pós-resposta sem regressão.
+
+### Achados Novos Da Centésima Vigésima Oitava Passada
+
+- [ ] SDK10-P128-01: revisar se `question` ainda cobre mais de uma semântica interna em `recordTerminalActivity`
+  (`pergunta pendente`, `resposta registrada`, formulários, OAuth e mailbox), e decidir se a unificação correta é por
+  fase nova ou por presenter comum.
+
 ---
 
 ## Decisões Arquiteturais

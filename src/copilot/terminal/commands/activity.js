@@ -75,7 +75,7 @@ function renderStatusRole(status) {
 function renderActivityPhaseLabel(phase) {
     if (phase === 'idle') return 'pronto';
     if (phase === 'tool') return 'ferramenta';
-    if (phase === 'turn') return 'turno';
+    if (phase === 'turn') return 'conversa';
     if (phase === 'thinking') return 'pensando';
     if (phase === 'streaming') return 'streaming';
     if (phase === 'question') return 'pergunta';

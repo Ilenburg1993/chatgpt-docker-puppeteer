@@ -477,7 +477,7 @@ function renderLiveFlowStateLabelForTrace(value, trace) {
 function renderLivePhaseLabel(value) {
     const phase = String(value ?? '');
     if (phase === 'idle') return 'pronto';
-    if (phase === 'turn') return 'turno';
+    if (phase === 'turn') return 'conversa';
     if (phase === 'thinking') return 'pensando';
     if (phase === 'streaming') return 'respondendo';
     if (phase === 'tool') return 'ferramenta';
