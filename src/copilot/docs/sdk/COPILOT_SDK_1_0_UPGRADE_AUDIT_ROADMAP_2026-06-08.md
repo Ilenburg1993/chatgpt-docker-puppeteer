@@ -3363,6 +3363,28 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `npm run lint:copilot`.
 - [x] Validado com `npm run typecheck:strict:src.copilot`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quinquagésima Primeira Passada
+
+- [x] O renderer compartilhado de pergunta humana deixou de mapear sources técnicas literalmente: `runtime` agora aparece
+  como `conversa`, `tool` como `ferramenta` e `headless` como `sem interface`.
+- [x] A cobertura de `test_human_question_renderer.spec.js` passou a validar sources técnicas humanizadas, evitando que
+  cards de pergunta/replay voltem a exibir `runtime`/`headless` na superfície pública.
+- [x] A bateria do registry revelou uma fragilidade de teste importante: `test_terminal_sdk_session_events_registry` mockava
+  `terminal/dialog/index.js`, mas a implementação real importa `terminal/dialog/io/index.js`; com isso, stdout real vazava
+  durante o teste e os mocks de `println`/`broadcastSse` ficavam vazios.
+- [x] O teste do registry agora mocka o ponto canônico `terminal/dialog/io/index.js`, cobrindo `println`, `broadcastSse`,
+  `writeInlineStatus`, `clearInlineStatus` e `parkTerminalPromptForContinuation`. Isso elimina um fluxo paralelo nos
+  fixtures e protege melhor regressões de UX em lifecycle de tool/pergunta.
+- [x] Validado com `node --check src/copilot/terminal/events/human-question-renderer.js
+  tests/unit/copilot/terminal/test_human_question_renderer.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events_registry.spec.js` (1 arquivo,
+  8 testes).
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_human_question_renderer.spec.js
+  tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js
+  tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js` (3 arquivos, 40 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+
 ---
 
 ## Decisões Arquiteturais

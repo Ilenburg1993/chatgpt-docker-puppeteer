@@ -51,9 +51,24 @@ describe('terminal/human-question-renderer', () => {
         );
 
         expect(output).toContain('[PERGUNTA]');
+        expect(output).toContain('ferramenta');
         expect(output).toContain('[1] seguir');
         expect(output).toContain('... +1');
         expect(output).not.toContain('Atalhos');
+    });
+
+    it('humaniza sources de pergunta que nascem técnicos', () => {
+        const output = plain(
+            [
+                ...buildTerminalHumanQuestionCard({ question: 'Continuar?', source: 'runtime', compact: true }),
+                ...buildTerminalHumanQuestionCard({ question: 'Continuar?', source: 'headless', compact: true }),
+            ],
+        );
+
+        expect(output).toContain('conversa');
+        expect(output).toContain('sem interface');
+        expect(output).not.toContain('runtime');
+        expect(output).not.toContain('headless');
     });
 
     it('exibe contexto operacional opcional sem trocar a ação principal', () => {

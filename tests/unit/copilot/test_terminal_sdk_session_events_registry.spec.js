@@ -58,6 +58,15 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     println: mocks.println,
     printlnBlock: mocks.printlnBlock,
 }));
+vi.mock('../../../src/copilot/terminal/dialog/io/index.js', () => ({
+    SEPARATOR: '---',
+    broadcastSse: mocks.broadcastSse,
+    clearInlineStatus: vi.fn(),
+    parkTerminalPromptForContinuation: vi.fn(),
+    println: mocks.println,
+    printlnBlock: mocks.printlnBlock,
+    writeInlineStatus: vi.fn(),
+}));
 vi.mock('../../../src/copilot/presentation/state/index.js', async (importOriginal) => {
     const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {

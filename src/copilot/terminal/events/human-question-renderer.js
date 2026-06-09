@@ -41,10 +41,10 @@ import { compactTerminalToolText } from './tool-activity-presenter.js';
  */
 function renderQuestionSource(source) {
     if (source === 'sdk') return 'SDK';
-    if (source === 'runtime') return 'runtime';
-    if (source === 'tool') return 'tool';
+    if (source === 'runtime') return 'conversa';
+    if (source === 'tool') return 'ferramenta';
     if (source === 'replay') return 'restaurada';
-    if (source === 'headless') return 'headless';
+    if (source === 'headless') return 'sem interface';
     return source && source.trim() ? source.trim() : 'terminal';
 }
 
