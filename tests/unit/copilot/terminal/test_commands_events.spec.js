@@ -2189,8 +2189,10 @@ describe('terminal/commands/events', () => {
             .split('\n')
             .filter((line) => line.trim().startsWith('{'))
             .map((line) => JSON.parse(line).payloadPreview);
-        expect(previews[0]).toContain('fase runtime config');
-        expect(previews[0]).toContain('preflight ok');
+        expect(previews[0]).toContain('fase configuração do ambiente');
+        expect(previews[0]).toContain('checagem ok');
+        expect(previews[0]).not.toContain('runtime config');
+        expect(previews[0]).not.toContain('preflight');
         expect(previews[0]).not.toContain('{"phase"');
         expect(previews[1]).toContain('standalone');
         expect(previews[1]).toContain('modelo auto');

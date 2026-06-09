@@ -3385,6 +3385,23 @@ a wrapper local precisa falar o contrato correto do SDK 1.0.
 - [x] Validado com `npm run lint:copilot`.
 - [x] Validado com `npm run typecheck:strict:src.copilot`.
 
+### Execução Contínua Em 2026-06-09 - Centésima Quinquagésima Segunda Passada
+
+- [x] A revisão do live encontrou um resíduo técnico em `/events` default: o evento `terminal.runtime.wired` aparecia como
+  `fase runtime config · preflight ok`, mesmo na superfície humana do arquivo SSE.
+- [x] `humanPayloadKind()` agora traduz `runtime-config`/`runtime_config`/`runtime config` para
+  `configuração do ambiente`, e `summarizeTerminalRuntimePayload()` troca `preflight ok/falhou` por
+  `checagem ok/falhou`.
+- [x] O raw continua preservado nas superfícies forenses; a mudança afeta o preview humano/default e o preview raw leve
+  que já era intencionalmente resumido.
+- [x] Cobertura de `/events --raw` foi atualizada para exigir `fase configuração do ambiente · checagem ok` e rejeitar
+  `runtime config`/`preflight` no `payloadPreview` resumido.
+- [x] Validado com `node --check src/copilot/terminal/commands/events.js
+  tests/unit/copilot/terminal/test_commands_events.spec.js`.
+- [x] Validado com `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js` (1 arquivo, 31 testes).
+- [x] Validado com `npm run lint:copilot`.
+- [x] Validado com `npm run typecheck:strict:src.copilot`.
+
 ---
 
 ## Decisões Arquiteturais

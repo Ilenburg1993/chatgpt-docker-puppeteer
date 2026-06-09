@@ -542,6 +542,11 @@ function humanPayloadKind(value) {
     if (text === 'terminal') return 'terminal';
     if (text === 'github_reference') return 'referência GitHub';
     if (text === 'background' || text === 'background_task') return 'tarefa em segundo plano';
+    if (text === 'runtime' || text === 'runtime_root') return 'ambiente';
+    if (text === 'runtime_config' || text === 'runtime.config' || text === 'runtime config' || text === 'runtime-config') {
+        return 'configuração do ambiente';
+    }
+    if (text === 'preflight') return 'checagem';
     const usageLabel = renderTerminalLlmUsageClassification(text) || renderTerminalLlmUsageReason(text);
     if (usageLabel) return usageLabel;
     if (text === 'session.created') return 'sessão criada';
@@ -806,7 +811,7 @@ function summarizeSdkLifecyclePayload(payload) {
 function summarizeTerminalRuntimePayload(payload) {
     const phase = humanPayloadKind(payload['phase']);
     const duration = typeof payload['durationMs'] === 'number' ? `${Math.round(payload['durationMs'])}ms` : '';
-    const ok = payload['preflightOk'] === true ? 'preflight ok' : payload['preflightOk'] === false ? 'preflight falhou' : '';
+    const ok = payload['preflightOk'] === true ? 'checagem ok' : payload['preflightOk'] === false ? 'checagem falhou' : '';
     return [phase ? `fase ${compact(phase, 48)}` : null, ok || null, duration || null].filter(Boolean).join(' · ');
 }
 
