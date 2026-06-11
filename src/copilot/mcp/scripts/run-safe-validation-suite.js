@@ -7,6 +7,9 @@
 
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { enableCopilotNodeCompileCache, withCopilotNodeCompileCacheEnv } from '../runtime/node-compile-cache.js';
+
+const nodeCompileCache = enableCopilotNodeCompileCache();
 
 /**
  * @typedef {'mcp-fast' | 'mcp-full' | 'copilot-fast'} SafeValidationSuiteName
@@ -129,10 +132,13 @@ async function runStep(step) {
     const startedAt = Date.now();
     const commandLine = [step.command, ...step.args].join(' ');
     process.stdout.write(`\n[safe-suite:step:start] ${step.name}\n$ ${commandLine}\n`);
+    if (nodeCompileCache.attempted && nodeCompileCache.directory) {
+        process.stdout.write(`[safe-suite:node-compile-cache] status=${nodeCompileCache.status} statusName=${nodeCompileCache.statusName ?? 'unknown'} enabled=${nodeCompileCache.enabled} dir=${nodeCompileCache.directory} error=${nodeCompileCache.error ?? 'none'}\n`);
+    }
     const result = await new Promise((resolve) => {
         const child = spawn(step.command, step.args, {
             cwd: process.cwd(),
-            env: { ...process.env, NO_COLOR: '' },
+            env: withCopilotNodeCompileCacheEnv({ ...process.env, NO_COLOR: '' }),
             stdio: ['ignore', 'inherit', 'inherit'],
         });
         child.on('error', (error) => {

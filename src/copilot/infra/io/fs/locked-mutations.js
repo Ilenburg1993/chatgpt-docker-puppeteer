@@ -493,6 +493,7 @@ export async function moveFileLocked(source, destination, options = {}) {
  *     diffContextLines?: number;
  *     maxDiffLines?: number;
  *     maxDiffBytes?: number;
+ *     computeDiff?: boolean;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
  */
@@ -511,13 +512,17 @@ export async function patchTextLocked(filePath, options) {
                     const { updated, replacedOccurrences, bytesWritten } = patch;
                     const contentHash = sha256(updated);
                     const previousSnapshot = buildRollbackSnapshot(toOwnedBuffer(content));
-                    const diff = buildSimpleTextDiff(content, updated, {
-                        contextLines: options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES,
-                    });
-                    const diffPreview = windowTextPreview(diff.diff, {
-                        maxLines: options.maxDiffLines ?? DEFAULT_PATCH_DIFF_MAX_LINES,
-                        maxBytes: options.maxDiffBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES,
-                    });
+                    const diffContextLines = options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
+                    const shouldComputeDiff = options.computeDiff !== false;
+                    const diff = shouldComputeDiff
+                        ? buildSimpleTextDiff(content, updated, { contextLines: diffContextLines })
+                        : { diff: '', contextLines: diffContextLines };
+                    const diffPreview = shouldComputeDiff
+                        ? windowTextPreview(diff.diff, {
+                              maxLines: options.maxDiffLines ?? DEFAULT_PATCH_DIFF_MAX_LINES,
+                              maxBytes: options.maxDiffBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES,
+                          })
+                        : { text: '', truncated: false, lines: 0, bytes: 0 };
                     if (!options.dryRun) {
                         await writeAtomicFileUnlocked(filePath, updated);
                     }
@@ -540,6 +545,7 @@ export async function patchTextLocked(filePath, options) {
                         diffPreviewLines: diffPreview.lines,
                         diffPreviewBytes: diffPreview.bytes,
                         diffContextLines: diff.contextLines,
+                        computeDiff: shouldComputeDiff,
                         previousHash,
                         contentHash,
                         dryRun: Boolean(options.dryRun),
@@ -569,6 +575,7 @@ export async function patchTextLocked(filePath, options) {
                     expectedHash: options.expectedHash ?? null,
                     contentHash: value.contentHash,
                     dryRun: Boolean(options.dryRun),
+                    computeDiff: value.computeDiff,
                     occurrenceIndex: options.occurrenceIndex ?? null,
                     replaceAll: Boolean(options.replaceAll),
                     occurrences: value.occurrences,

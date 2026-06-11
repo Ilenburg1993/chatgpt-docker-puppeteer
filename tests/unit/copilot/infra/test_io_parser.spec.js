@@ -7,7 +7,7 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
 import {
     buildOutline,
     extractJsonSchema,
@@ -18,6 +18,7 @@ import {
     parseAndCacheSymbols,
     parseFileForContext,
     parseFileSymbols,
+    resetParserCacheForTest,
 } from '../../../../src/copilot/infra/io-parser.js';
 
 let tmpDir = '';
@@ -55,6 +56,11 @@ export async function handleRequest(cfg: Config): Promise<void> {
 `;
 
 const JSON_CONTENT = JSON.stringify({ name: 'test', version: '1.0.0', keywords: ['a', 'b'] });
+
+afterEach(() => {
+    process.env['IO_PARSER_FILE_CONTEXT_CACHE_ENABLED'] = '1';
+    resetParserCacheForTest();
+});
 
 const MD_CONTENT = `# Título
 
@@ -237,6 +243,49 @@ describe('parseFileForContext', () => {
         assert.ok(result !== null);
         assert.ok(Array.isArray(result.outline));
         assert.ok(result.outline.length > 0, `outline=${JSON.stringify(result.outline)}`);
+    });
+
+    it('cacheia FileContext por path e conteúdo', async () => {
+        const filePath = path.join(tmpDir, 'module.js');
+        resetParserCacheForTest();
+
+        const first = await parseFileForContext(filePath, JS_CONTENT);
+        const afterFirst = getParserCacheStats();
+        const second = await parseFileForContext(filePath, JS_CONTENT);
+        const afterSecond = getParserCacheStats();
+
+        assert.equal(second, first);
+        assert.equal(afterFirst.fileContext.misses, 1);
+        assert.equal(afterFirst.fileContext.sets, 1);
+        assert.equal(afterSecond.fileContext.hits, 1);
+        assert.equal(afterSecond.fileContext.size, 1);
+    });
+
+    it('invalida FileContext quando invalidateParserCache é chamado', async () => {
+        const filePath = path.join(tmpDir, 'module.js');
+        resetParserCacheForTest();
+
+        await parseFileForContext(filePath, JS_CONTENT);
+        assert.equal(getParserCacheStats().fileContext.size, 1);
+        invalidateParserCache(filePath);
+
+        assert.equal(getParserCacheStats().fileContext.size, 0);
+        assert.equal(getParserCacheStats().fileContext.clears, 1);
+    });
+
+    it('suporta kill-switch do FileContext cache', async () => {
+        const filePath = path.join(tmpDir, 'module.js');
+        process.env['IO_PARSER_FILE_CONTEXT_CACHE_ENABLED'] = '0';
+        resetParserCacheForTest();
+
+        const first = await parseFileForContext(filePath, JS_CONTENT);
+        const second = await parseFileForContext(filePath, JS_CONTENT);
+        const stats = getParserCacheStats();
+
+        assert.notEqual(second, first);
+        assert.equal(stats.fileContext.enabled, false);
+        assert.equal(stats.fileContext.bypasses, 2);
+        assert.equal(stats.fileContext.size, 0);
     });
 
     it('preserva linha real dos headings markdown no parse simbólico', async () => {

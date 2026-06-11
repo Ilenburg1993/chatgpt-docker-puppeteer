@@ -27,6 +27,7 @@
  */
 
 import { LRUCache } from 'lru-cache';
+import { createHash } from 'node:crypto';
 import * as nodePath from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Worker } from 'node:worker_threads';
@@ -57,6 +58,7 @@ const MAX_PARSE_LINE_GUARD = Number(process.env['IO_PARSER_MAX_LINES'] ?? 30_000
 const PARSER_WORKER_ENABLED = String(process.env['IO_PARSER_WORKER_ENABLED'] ?? '1').trim() !== '0';
 /** Tamanho do pool leve de worker threads para parsing. */
 const PARSER_WORKER_POOL_SIZE = Math.max(1, Number(process.env['IO_PARSER_WORKER_POOL_SIZE'] ?? 2));
+const FILE_CONTEXT_CACHE_DISABLED_VALUES = new Set(['0', 'false', 'off', 'disabled']);
 /** Timeout máximo por request no worker (ms). */
 const PARSER_WORKER_REQUEST_TIMEOUT_MS = Math.max(
     MAX_PARSE_DURATION_MS,
@@ -68,6 +70,15 @@ const _symbolCache = new LRUCache(
     /** @type {any} */ ({
         max: 500,
         ttl: 5 * 60_000,
+        updateAgeOnGet: true,
+    }),
+);
+
+/** Cache de contexto completo de arquivo: symbols + outline + top comments, keyado por path+hash de conteúdo. */
+const _fileContextCache = new LRUCache(
+    /** @type {any} */ ({
+        max: Number(process.env['IO_PARSER_FILE_CONTEXT_CACHE_MAX_ENTRIES'] ?? 256),
+        ttl: Number(process.env['IO_PARSER_FILE_CONTEXT_CACHE_TTL_MS'] ?? 5 * 60_000),
         updateAgeOnGet: true,
     }),
 );
@@ -94,6 +105,14 @@ const _parserRuntimeStats = {
     workerTimeouts: 0,
     workerFailures: 0,
     workerFallbacks: 0,
+};
+
+const _fileContextCacheStats = {
+    hits: 0,
+    misses: 0,
+    sets: 0,
+    clears: 0,
+    bypasses: 0,
 };
 
 /** @type {number} */
@@ -136,6 +155,7 @@ function ensureInvalidationHook() {
     _parserInvalidationUnregister = registerInvalidationHook((filePath, event) => {
         const normalized = normalizeParserPath(filePath);
         _symbolCache.delete(normalized);
+        clearFileContextCacheForNormalizedPath(normalized, event?.recursive === true);
         if (event?.recursive === true) {
             const prefix = `${normalized}${nodePath.sep}`;
             for (const key of _symbolCache.keys()) {
@@ -755,7 +775,9 @@ export async function parseAndCacheSymbols(filePath) {
  * @returns {void}
  */
 export function invalidateParserCache(filePath) {
-    _symbolCache.delete(normalizeParserPath(filePath));
+    const normalized = normalizeParserPath(filePath);
+    _symbolCache.delete(normalized);
+    clearFileContextCacheForNormalizedPath(normalized, false);
 }
 
 /**
@@ -766,10 +788,27 @@ export function invalidateParserCache(filePath) {
  * @returns {Promise<FileContext>}
  */
 export async function parseFileForContext(filePath, content) {
+    ensureInvalidationHook();
+    const cacheKey = buildFileContextCacheKey(filePath, content);
+    if (cacheKey) {
+        const cached = /** @type {FileContext | undefined} */ (_fileContextCache.get(cacheKey));
+        if (cached) {
+            _fileContextCacheStats.hits += 1;
+            return cached;
+        }
+        _fileContextCacheStats.misses += 1;
+    } else {
+        _fileContextCacheStats.bypasses += 1;
+    }
     const symbols = await parseFileSymbols(filePath, content);
     const outline = buildOutline(symbols);
     const topComments = extractTopComments(content);
-    return { symbols, outline, topComments };
+    const context = { symbols, outline, topComments };
+    if (cacheKey) {
+        _fileContextCache.set(cacheKey, context);
+        _fileContextCacheStats.sets += 1;
+    }
+    return context;
 }
 
 /**
@@ -795,10 +834,59 @@ export async function parseFileForContext(filePath, content) {
  *     workerFallbacks: number;
  * }}
  */
+/**
+ * @param {string} normalizedPath
+ * @param {boolean} recursive
+ * @returns {number}
+ */
+function clearFileContextCacheForNormalizedPath(normalizedPath, recursive) {
+    let removed = 0;
+    const exactPrefix = `${normalizedPath}\u0000`;
+    const recursivePrefix = `${normalizedPath}${nodePath.sep}`;
+    for (const key of [..._fileContextCache.keys()]) {
+        const textKey = String(key);
+        if (!textKey.startsWith(exactPrefix) && !(recursive && textKey.startsWith(recursivePrefix))) continue;
+        _fileContextCache.delete(key);
+        removed += 1;
+    }
+    _fileContextCacheStats.clears += removed;
+    return removed;
+}
+
+/**
+ * @param {string} filePath
+ * @param {string} content
+ * @returns {string | null}
+ */
+function buildFileContextCacheKey(filePath, content) {
+    if (!isFileContextCacheEnabled()) return null;
+    const normalized = normalizeParserPath(filePath);
+    const hash = createHash('sha256').update(content).digest('hex');
+    return `${normalized}\u0000${content.length}\u0000${hash}`;
+}
+
+/**
+ * @returns {boolean}
+ */
+function isFileContextCacheEnabled() {
+    const value = String(process.env['IO_PARSER_FILE_CONTEXT_CACHE_ENABLED'] ?? '1').trim().toLowerCase();
+    return !FILE_CONTEXT_CACHE_DISABLED_VALUES.has(value);
+}
+
 export function getParserCacheStats() {
     return {
         size: _symbolCache.size,
         maxSize: 500,
+        fileContext: {
+            enabled: isFileContextCacheEnabled(),
+            size: _fileContextCache.size,
+            maxSize: Number(process.env['IO_PARSER_FILE_CONTEXT_CACHE_MAX_ENTRIES'] ?? 256),
+            hits: _fileContextCacheStats.hits,
+            misses: _fileContextCacheStats.misses,
+            sets: _fileContextCacheStats.sets,
+            clears: _fileContextCacheStats.clears,
+            bypasses: _fileContextCacheStats.bypasses,
+        },
         maxParseDurationMs: MAX_PARSE_DURATION_MS,
         maxParseLines: MAX_PARSE_LINE_GUARD,
         workerEnabled: PARSER_WORKER_ENABLED,
@@ -824,6 +912,12 @@ export function getParserCacheStats() {
  */
 export function resetParserCacheForTest() {
     _symbolCache.clear();
+    _fileContextCache.clear();
+    _fileContextCacheStats.hits = 0;
+    _fileContextCacheStats.misses = 0;
+    _fileContextCacheStats.sets = 0;
+    _fileContextCacheStats.clears = 0;
+    _fileContextCacheStats.bypasses = 0;
     _parserRuntimeStats.budgetExceeded = 0;
     _parserRuntimeStats.skippedByLineGuard = 0;
     _parserRuntimeStats.lastParseDurationMs = 0;

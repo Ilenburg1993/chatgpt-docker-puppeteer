@@ -55,6 +55,7 @@ function buildApprovalFrictionProfile(summaries) {
         firstRememberApprovalWave: remember.filter((name) =>
             [
                 'repo_apply_patch',
+                'repo_apply_patch_batch',
                 'repo_write_file',
                 'repo_create_file',
                 'repo_move_file',
@@ -67,6 +68,7 @@ function buildApprovalFrictionProfile(summaries) {
         neverRememberApproval: manual,
         planFirstWorkflows: [
             ['repo_patch_plan', 'repo_apply_patch'],
+            ['repo_patch_batch_plan', 'repo_apply_patch_batch'],
             ['repo_create_file_plan', 'repo_create_file'],
             ['repo_move_file_plan', 'repo_move_file'],
             ['repo_quarantine_file_plan', 'repo_quarantine_file'],

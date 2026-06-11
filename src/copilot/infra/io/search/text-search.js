@@ -65,6 +65,18 @@ function sanitizeSearchOutput(stdout) {
 }
 
 /**
+ * @param {string} pattern
+ * @returns {string[] | null}
+ */
+function parseSimpleRegexAlternation(pattern) {
+    const trimmed = pattern.trim();
+    if (!trimmed.includes('|')) return null;
+    if (!/^[A-Za-z0-9_./:-]+(?:\|[A-Za-z0-9_./:-]+)+$/u.test(trimmed)) return null;
+    const terms = [...new Set(trimmed.split('|').map((part) => part.trim()).filter(Boolean))];
+    return terms.length >= 2 && terms.length <= 12 ? terms : null;
+}
+
+/**
  * @param {import('#copilot/core/io-contracts').IoMeta} io
  * @param {boolean} success
  * @param {unknown} [error]
@@ -255,6 +267,68 @@ export async function searchText(targetPath, options) {
                         ? 'index-no-matches'
                         : 'index-unavailable-or-stale'
                     : 'index-filtered-out-by-glob';
+        } else if (options.isRegex === true && options.caseSensitive !== true && (options.contextLines ?? 0) === 0) {
+            const terms = parseSimpleRegexAlternation(options.pattern);
+            const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
+            const perTermRows = terms && Boolean(indexStats?.available) && freshFiles > 0
+                ? terms.map((term) =>
+                      searchIoIndex(term, {
+                          pathPrefix: targetPath,
+                          ...(searchWindow.commandMaxCount === null
+                              ? {}
+                              : { maxResults: Math.min(Math.max(searchWindow.commandMaxCount, 100), 500) }),
+                      }),
+                  )
+                : [];
+            const hasCompleteTermCoverage = Array.isArray(terms) && perTermRows.length === terms.length && perTermRows.every((termRows) => termRows.length > 0);
+            const rows = hasCompleteTermCoverage ? perTermRows.flat() : [];
+            const seenRows = new Set();
+            const uniqueRows = rows.filter((row) => {
+                const key = `${row.relativePath || row.filePath}\u0000${row.snippet}`;
+                if (seenRows.has(key)) return false;
+                seenRows.add(key);
+                return true;
+            });
+            const filteredRows = filterIndexRowsByGlob(uniqueRows, options.includePattern, options.excludePattern);
+            if (filteredRows.length > 0) {
+                const windowed = paginateSearchItems(filteredRows, searchWindow);
+                const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(windowed.items));
+                const io = publishAndReturn(
+                    buildSearchIo('io-engine.index.regex-alternation-search', utf8ByteLength(filteredOutput.text, 'search output'), {
+                        redactions: filteredOutput.redactions,
+                        fallback: 'rg-on-index-miss-or-complex-query',
+                        truncated: windowed.truncated,
+                        originalResultCount: windowed.totalItems,
+                        nextCursor: windowed.nextCursor,
+                    }),
+                    true,
+                );
+                return {
+                    targetPath,
+                    pattern: options.pattern,
+                    output: filteredOutput.text,
+                    matchCount: windowed.items.length,
+                    returnedMatchCount: windowed.items.length,
+                    returnedLineCount: countOutputLines(filteredOutput.text),
+                    engine: 'fts5-index-regex-alternation',
+                    sanitized: filteredOutput.sanitized,
+                    redactions: filteredOutput.redactions,
+                    truncated: windowed.truncated,
+                    nextCursor: windowed.nextCursor,
+                    cursorOffset: windowed.cursorOffset,
+                    totalMatches: windowed.totalItems,
+                    totalMatchCount: windowed.totalItems,
+                    indexFallback: false,
+                    indexFallbackReason: null,
+                    io: { ...io, truncated: windowed.truncated, policyVersion: filteredOutput.policyVersion },
+                };
+            }
+            indexFallback = true;
+            indexFallbackReason = terms
+                ? hasCompleteTermCoverage
+                    ? 'index-no-matches-for-regex-alternation'
+                    : 'index-incomplete-term-coverage-for-regex-alternation'
+                : 'query-not-index-compatible';
         } else {
             indexFallback = true;
             indexFallbackReason = 'query-not-index-compatible';

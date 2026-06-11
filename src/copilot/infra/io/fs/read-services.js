@@ -14,6 +14,7 @@ import { bufferIsUtf8, isBufferValue, toOwnedBuffer } from '../../shared/buffer.
 import { fingerprintMatches } from '../../shared/fingerprint-match.js';
 import { sha256 } from '../../shared/hash.js';
 import { readBytesFileSnapshot } from './read-bytes.js';
+import { sliceTextByCachedLineOffsets } from './line-offset-cache.js';
 import { readTextLineChunks, readTextLineChunksStream } from './read-chunks.js';
 import { statPathSnapshot } from './stat.js';
 
@@ -295,12 +296,19 @@ export async function readText(filePath, options = {}) {
             _cacheState = 'l1-hit';
             const cachedContent = _cachedText.content;
             const contentHash = _cachedText.contentHash ?? sha256(cachedContent);
-            const cachedLines = cachedContent.split('\n');
-            totalLines = cachedLines.length;
-            const requestedStart = Math.max(1, options.startLine ?? 1);
-            sliceStart = Math.min(requestedStart, totalLines + 1);
-            sliceEnd = sliceStart > totalLines ? totalLines : Math.min(options.endLine ?? totalLines, totalLines);
-            content = sliceStart > totalLines ? '' : cachedLines.slice(sliceStart - 1, sliceEnd).join('\n');
+            const sliced = sliceTextByCachedLineOffsets(
+                filePath,
+                cachedContent,
+                {
+                    sizeBytes: Number.isFinite(_cachedText.size) ? Number(_cachedText.size) : _cachedText.bytes,
+                    mtimeMs: Number.isFinite(_cachedText.mtime) ? Number(_cachedText.mtime) : null,
+                },
+                { startLine: options.startLine, endLine: options.endLine },
+            );
+            totalLines = sliced.totalLines;
+            sliceStart = sliced.returnedLines.start;
+            sliceEnd = sliced.returnedLines.end;
+            content = sliced.content;
             const io = publishAndReturn(
                 buildIoMeta({
                     operation: 'read',
@@ -345,13 +353,19 @@ export async function readText(filePath, options = {}) {
                 if (l2EntryMatchesStat(l2Entry, metadata)) {
                     const text = l2Entry.payload.toString('utf8');
                     const contentHash = l2ContentHash ?? sha256(text);
-                    const lines = text.split('\n');
-                    const totalLines = lines.length;
-                    const requestedStart = Math.max(1, options.startLine ?? 1);
-                    const sliceStart = Math.min(requestedStart, totalLines + 1);
-                    const sliceEnd =
-                        sliceStart > totalLines ? totalLines : Math.min(options.endLine ?? totalLines, totalLines);
-                    const content = sliceStart > totalLines ? '' : lines.slice(sliceStart - 1, sliceEnd).join('\n');
+                    const sliced = sliceTextByCachedLineOffsets(
+                        filePath,
+                        text,
+                        {
+                            sizeBytes: Number(metadata?.size ?? l2Entry.sizeBytes),
+                            mtimeMs: Number.isFinite(Number(metadata?.mtimeMs)) ? Number(metadata?.mtimeMs) : null,
+                        },
+                        { startLine: options.startLine, endLine: options.endLine },
+                    );
+                    const totalLines = sliced.totalLines;
+                    const sliceStart = sliced.returnedLines.start;
+                    const sliceEnd = sliced.returnedLines.end;
+                    const content = sliced.content;
 
                     const _now = Date.now();
                     _l1.set(_textKey, {
@@ -430,12 +444,16 @@ export async function readText(filePath, options = {}) {
         }
         const text = raw.toString('utf8');
         const contentHash = sha256(text);
-        const lines = text.split('\n');
-        totalLines = lines.length;
-        const requestedStart = Math.max(1, options.startLine ?? 1);
-        sliceStart = Math.min(requestedStart, totalLines + 1);
-        sliceEnd = sliceStart > totalLines ? totalLines : Math.min(options.endLine ?? totalLines, totalLines);
-        content = sliceStart > totalLines ? '' : lines.slice(sliceStart - 1, sliceEnd).join('\n');
+        const sliced = sliceTextByCachedLineOffsets(
+            filePath,
+            text,
+            { sizeBytes: textSnapshot.sizeBytes, mtimeMs: textSnapshot.mtimeMs },
+            { startLine: options.startLine, endLine: options.endLine },
+        );
+        totalLines = sliced.totalLines;
+        sliceStart = sliced.returnedLines.start;
+        sliceEnd = sliced.returnedLines.end;
+        content = sliced.content;
         const _textNow = Date.now();
         /** @type {import('../../io-cache.js').IoCacheEntry} */
         const _textEntry = {

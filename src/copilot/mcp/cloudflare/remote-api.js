@@ -218,7 +218,7 @@ function buildRemoteAuditCacheKey(config) {
  * @param {string} apiToken
  * @returns {Cloudflare}
  */
-function getCloudflareClient(apiToken) {
+export function getCloudflareClient(apiToken) {
     const key = createClientCacheKey(apiToken);
     const cached = cloudflareClientCache.get(key);
     if (cached) return cached;

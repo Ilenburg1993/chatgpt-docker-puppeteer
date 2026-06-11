@@ -5,8 +5,10 @@
  * @module copilot/mcp/cloudflare/edge-audit
  */
 
-import Cloudflare from 'cloudflare';
-import { readCloudflareRemoteApiConfig } from './remote-api.js';
+import { createTtlCache } from '#copilot/mcp/control-plane';
+import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
+
+/** @typedef {import('cloudflare').default} CloudflareEdgeAuditClient */
 
 export const CLOUDFLARE_EDGE_PHASES = [
     'http_request_cache_settings',
@@ -31,6 +33,14 @@ const SENSITIVE_HEADER_NAMES = [
 ];
 
 const INTERACTIVE_OR_BLOCKING_ACTIONS = ['managed_challenge', 'js_challenge', 'challenge', 'block'];
+const DEFAULT_EDGE_AUDIT_CACHE_TTL_MS = 5_000;
+
+/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
+const edgeAuditCache = createTtlCache({
+    name: 'cloudflare-edge-audit',
+    ttlMs: DEFAULT_EDGE_AUDIT_CACHE_TTL_MS,
+    maxEntries: 32,
+});
 
 /**
  * @typedef {object} EdgeAuditConfig
@@ -68,7 +78,7 @@ const INTERACTIVE_OR_BLOCKING_ACTIONS = ['managed_challenge', 'js_challenge', 'c
  */
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv; cacheTtlMs?: number; forceRefresh?: boolean }} [options]
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 export async function auditCloudflareEdgeRulesets(options = {}) {
@@ -102,8 +112,20 @@ export async function auditCloudflareEdgeRulesets(options = {}) {
             ],
         };
     }
+    const cacheKey = buildEdgeAuditCacheKey(edgeConfig);
+    return edgeAuditCache.getOrLoad(
+        cacheKey,
+        () => auditCloudflareEdgeRulesetsUncached(edgeConfig),
+        { forceRefresh: options.forceRefresh === true, ttlMs: readEdgeAuditCacheTtlMs(options.cacheTtlMs) },
+    );
+}
 
-    const client = new Cloudflare({ apiToken: edgeConfig.apiToken ?? '', maxRetries: 1, timeout: 15000 });
+/**
+ * @param {EdgeAuditConfig} edgeConfig
+ * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
+ */
+async function auditCloudflareEdgeRulesetsUncached(edgeConfig) {
+    const client = getCloudflareClient(edgeConfig.apiToken ?? '');
     const zoneResolution = await resolveZoneId(client, edgeConfig);
     if (!zoneResolution.zoneId) {
         return {
@@ -180,7 +202,30 @@ export async function auditCloudflareEdgeRulesets(options = {}) {
 }
 
 /**
- * @param {Cloudflare} client
+ * @param {number | undefined} value
+ * @returns {number}
+ */
+function readEdgeAuditCacheTtlMs(value) {
+    if (value === undefined) return DEFAULT_EDGE_AUDIT_CACHE_TTL_MS;
+    return Number.isFinite(value) && value >= 0 && value <= 60_000 ? Math.floor(value) : DEFAULT_EDGE_AUDIT_CACHE_TTL_MS;
+}
+
+/**
+ * @param {EdgeAuditConfig} config
+ * @returns {string}
+ */
+function buildEdgeAuditCacheKey(config) {
+    return JSON.stringify({
+        accountId: config.accountId ?? null,
+        zoneId: config.zoneId ?? null,
+        zone: config.zone,
+        publicHostname: config.publicHostname,
+        expectedPublicMcpUrl: config.expectedPublicMcpUrl,
+    });
+}
+
+/**
+ * @param {CloudflareEdgeAuditClient} client
  * @param {EdgeAuditConfig} config
  * @returns {Promise<{ zoneId: string | null; source: string | null; zoneName: string; zoneIdRedaction: string | null; warnings: string[] }>}
  */
@@ -232,7 +277,7 @@ async function resolveZoneId(client, config) {
 }
 
 /**
- * @param {Cloudflare} client
+ * @param {CloudflareEdgeAuditClient} client
  * @param {string} zoneId
  * @returns {Promise<SimplifiedRuleset[]>}
  */

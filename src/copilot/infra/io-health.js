@@ -12,6 +12,7 @@ import { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tier
 import { getIoCacheStats } from './io-cache.js';
 import { getIoIndexStats } from './io-index-registry.js';
 import { getIoLatencyStats } from './io-observability.js';
+import { getLineOffsetCacheStats } from './io/fs/line-offset-cache.js';
 import { getParserCacheStats } from './io-parser.js';
 import { getScopeStats, listScopes } from './io-session-scope.js';
 
@@ -56,6 +57,7 @@ function safeCall(fn, fallback) {
  *             lastInitErrorAtMs: number | null;
  *         };
  *         l3: Record<string, unknown>;
+ *         lineOffsets: ReturnType<typeof getLineOffsetCacheStats>;
  *         aggregate: ReturnType<typeof aggregateIoCacheTierStats>;
  *         plan: ReturnType<typeof buildIoCacheTierPlan>;
  *     };
@@ -135,6 +137,21 @@ export function readIoRuntimeHealthSnapshot() {
             l2,
             l2State,
             l3,
+            lineOffsets: safeCall(getLineOffsetCacheStats, {
+                hits: 0,
+                misses: 0,
+                sets: 0,
+                stale: 0,
+                evictions: 0,
+                clears: 0,
+                bypasses: 0,
+                busInvalidations: 0,
+                enabled: true,
+                recursiveInvalidations: 0,
+                size: 0,
+                maxEntries: 0,
+                maxTextChars: 0,
+            }),
             aggregate,
             plan: buildIoCacheTierPlan({
                 l1Enabled: true,
@@ -151,6 +168,16 @@ export function readIoRuntimeHealthSnapshot() {
         parser: safeCall(getParserCacheStats, {
             size: 0,
             maxSize: 500,
+            fileContext: {
+                enabled: false,
+                size: 0,
+                maxSize: 0,
+                hits: 0,
+                misses: 0,
+                sets: 0,
+                clears: 0,
+                bypasses: 0,
+            },
             maxParseDurationMs: 0,
             maxParseLines: 0,
             workerEnabled: false,

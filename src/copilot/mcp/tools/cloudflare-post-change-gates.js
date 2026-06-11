@@ -127,14 +127,25 @@ export function evaluateGates(input) {
 
     const permanentTunnel = asRecord(input.tunnelStatus['permanentTunnel']);
     const originDiagnostics = asRecord(permanentTunnel['originDiagnostics']);
+    const lastSmokeCheckedAt = asRecord(permanentTunnel['lastSmoke'])['checkedAt'];
     const recentOriginErrors = filterActionableOriginErrors(
         Array.isArray(originDiagnostics['recentOriginErrors']) ? originDiagnostics['recentOriginErrors'] : [],
-        asRecord(permanentTunnel['lastSmoke'])['checkedAt'],
+        lastSmokeCheckedAt,
+    );
+    const recentTunnelTransportErrors = filterRecentLogLines(
+        Array.isArray(originDiagnostics['recentTunnelTransportErrors']) ? originDiagnostics['recentTunnelTransportErrors'] : [],
+        lastSmokeCheckedAt,
+    );
+    const recentMetricsBindErrors = filterRecentLogLines(
+        Array.isArray(originDiagnostics['recentMetricsBindErrors']) ? originDiagnostics['recentMetricsBindErrors'] : [],
+        lastSmokeCheckedAt,
     );
     if (permanentTunnel['lastSmokeFresh'] === true) passed.push('permanent tunnel smoke is fresh.');
     else critical.push('permanent tunnel smoke is not fresh.');
     if (recentOriginErrors.length === 0) passed.push('no actionable origin errors after the latest smoke.');
     else critical.push(`actionable origin errors after latest smoke: ${recentOriginErrors.length}.`);
+    if (recentTunnelTransportErrors.length > 0) warnings.push(`recent tunnel transport errors after latest smoke: ${recentTunnelTransportErrors.length}; recovered state is judged by HA connections, smoke and metrics.`);
+    if (recentMetricsBindErrors.length > 0) warnings.push(`recent cloudflared metrics bind errors after latest smoke: ${recentMetricsBindErrors.length}; ensure restart serialization remains enabled.`);
 
     if (input.remoteAudit['ok'] === true) passed.push('Cloudflare remote audit ok=true.');
     else critical.push('Cloudflare remote audit did not return ok=true.');
@@ -211,9 +222,19 @@ function extractStructuredContent(result) {
  * @returns {string[]}
  */
 function filterActionableOriginErrors(lines, checkedAt) {
+    return filterRecentLogLines(lines, checkedAt).filter((line) =>
+        /origin service|originService=|first record does not look like a TLS handshake|connection refused|502|1033/iu.test(line),
+    );
+}
+
+/**
+ * @param {unknown[]} lines
+ * @param {unknown} checkedAt
+ * @returns {string[]}
+ */
+function filterRecentLogLines(lines, checkedAt) {
     const checkedAtMs = Date.parse(String(checkedAt ?? ''));
     return lines.map(String).filter((line) => {
-        if (!/\bERR\b|error=/iu.test(line)) return false;
         if (!Number.isFinite(checkedAtMs)) return true;
         const lineTime = Date.parse(line.slice(0, 20));
         return !Number.isFinite(lineTime) || lineTime >= checkedAtMs;

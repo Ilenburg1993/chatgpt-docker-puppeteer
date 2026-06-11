@@ -20,6 +20,7 @@ import {
     appendMcpAuditEvent,
     authorizeMcpToolCall,
     errorResult,
+    getResultSizeHint,
     normalizeMcpToolDefinitions,
     recordMcpToolMetric,
 } from '#copilot/mcp/control-plane';
@@ -31,6 +32,7 @@ import {
     delegateToRepoAutonomyRunnerTool,
     gitReadTools,
     jobTools,
+    mcpLatencyDashboardTool,
     maintenanceTools,
     mcpAppsSdkReadinessTool,
     mcpAutonomyPowerScoreTool,
@@ -81,6 +83,9 @@ export const COPILOT_MCP_REGISTRY_IMPLEMENTATION_NAME = 'copilot-mcp-registry';
 export const COPILOT_MCP_REGISTRY_IMPLEMENTATION_VERSION = '1.1.0';
 
 const devcontainerNetworkTools = [mcpDevcontainerNetworkPostureAuditTool];
+
+/** @type {WeakMap<McpToolDefinition, { risk: ReturnType<typeof classifyMcpToolRisk>; requiredScopes: string[] }>} */
+const TOOL_RUNTIME_CONTEXT_CACHE = new WeakMap();
 
 const TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]{1,128}$/u;
 const MAX_TOOL_TITLE_LENGTH = 120;
@@ -154,6 +159,7 @@ let canonicalMcpRegistryState = null;
 
 /** @type {Map<string, { count: number; resetAt: number }>} */
 const toolInvocationBudgets = new Map();
+const toolInvocationBudgetSubjects = new Map();
 
 /**
  * @typedef {object} McpToolDefinition
@@ -308,6 +314,7 @@ function buildCanonicalMcpToolList() {
         ...gitReadTools,
         projectDoctorTool,
         ...jobTools,
+        mcpLatencyDashboardTool,
         ...maintenanceTools,
         delegateToRepoAutonomyRunnerTool,
         mcpGoldenPromptsTool,
@@ -391,6 +398,7 @@ export function resetCanonicalMcpToolsCacheForTests() {
     canonicalMcpToolSurfaceState = null;
     canonicalMcpRegistryState = null;
     toolInvocationBudgets.clear();
+    toolInvocationBudgetSubjects.clear();
 }
 
 /**
@@ -442,8 +450,9 @@ function buildMcpRegisterToolOptions(tool) {
 async function guardedToolHandler(tool, args, options, registryPolicy) {
     const startedAt = Date.now();
     const callId = randomUUID();
-    const risk = classifyMcpToolRisk(tool);
-    const requiredScopes = collectToolSecurityScopes(tool);
+    const runtimeContext = getMcpToolRuntimeContext(tool);
+    const risk = runtimeContext.risk;
+    const requiredScopes = runtimeContext.requiredScopes;
     /** @type {Record<string, number>} */
     const phases = {};
     let activePhase = 'auditStart';
@@ -535,7 +544,9 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
         const result = await runToolHandlerWithTimeout(tool, args, registryPolicy);
         finishPhase('handler', handlerStartedAt);
         const resultSizeStartedAt = startPhase('resultSize');
-        const resultSizeError = validateToolResultSize(result, registryPolicy);
+        const resultSizeValidation = validateToolResultSize(result, registryPolicy);
+        const resultSizeError = typeof resultSizeValidation === 'string' ? resultSizeValidation : resultSizeValidation.error;
+        const resultSizeMetric = typeof resultSizeValidation === 'string' ? undefined : resultSizeValidation;
         finishPhase('resultSize', resultSizeStartedAt);
         if (resultSizeError) {
             const durationMs = elapsedMs(startedAt);
@@ -547,7 +558,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
                 reason: resultSizeError,
                 risk,
             });
-            safeRecordMcpToolMetric(tool.name, { durationMs, isError: true, phases });
+            safeRecordMcpToolMetric(tool.name, { durationMs, isError: true, phases, resultSize: { ...resultSizeMetric, rejected: true } });
             return errorResult('MCP tool result rejected by registry policy.', {
                 code: 'MCP_TOOL_RESULT_REJECTED',
                 hint: resultSizeError,
@@ -580,7 +591,12 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             risk,
         });
         finishPhase('auditCompletion', auditCompletionStartedAt);
-        safeRecordMcpToolMetric(tool.name, { durationMs, isError: result.isError === true, phases });
+        safeRecordMcpToolMetric(tool.name, {
+            durationMs,
+            isError: result.isError === true,
+            phases,
+            ...(resultSizeMetric ? { resultSize: resultSizeMetric } : {}),
+        });
         return result;
     } catch (error) {
         const durationMs = elapsedMs(startedAt);
@@ -635,7 +651,15 @@ function consumeToolInvocationBudget(tool, options, policy) {
  */
 function buildToolInvocationBudgetSubject(options) {
     const token = String(options.authContext?.bearerToken ?? 'anonymous');
-    return sha256String(token).slice(0, 24);
+    const cached = toolInvocationBudgetSubjects.get(token);
+    if (cached) return cached;
+    const subject = sha256String(token).slice(0, 24);
+    toolInvocationBudgetSubjects.set(token, subject);
+    if (toolInvocationBudgetSubjects.size > 2048) {
+        const oldest = toolInvocationBudgetSubjects.keys().next().value;
+        if (typeof oldest === 'string') toolInvocationBudgetSubjects.delete(oldest);
+    }
+    return subject;
 }
 
 /**
@@ -681,16 +705,28 @@ async function runToolHandlerWithTimeout(tool, args, policy) {
 /**
  * @param {unknown} result
  * @param {McpRegistryPolicy} policy
- * @returns {string | null}
+ * @returns {{ error: string | null; strategy: string; bytes: number | null }}
  */
 function validateToolResultSize(result, policy) {
+    const hint = getResultSizeHint(result);
+    if (hint) {
+        return {
+            error: hint.bytes > policy.maxToolResultBytes
+                ? `Tool result is ${hint.bytes} bytes by ${hint.source}; limit is ${policy.maxToolResultBytes} bytes.`
+                : null,
+            strategy: 'hint',
+            bytes: hint.bytes,
+        };
+    }
     try {
         const bytes = Buffer.byteLength(stableJsonStringify(result));
-        return bytes > policy.maxToolResultBytes
-            ? `Tool result is ${bytes} bytes; limit is ${policy.maxToolResultBytes} bytes.`
-            : null;
+        return {
+            error: bytes > policy.maxToolResultBytes ? `Tool result is ${bytes} bytes; limit is ${policy.maxToolResultBytes} bytes.` : null,
+            strategy: 'stringify',
+            bytes,
+        };
     } catch {
-        return null;
+        return { error: null, strategy: 'unknown', bytes: null };
     }
 }
 
@@ -1072,6 +1108,21 @@ function summarizeRegistryPolicy(policy) {
  */
 function registryPolicyCacheKey(policy) {
     return stableJsonStringify(summarizeRegistryPolicy(policy));
+}
+
+/**
+ * @param {McpToolDefinition} tool
+ * @returns {{ risk: ReturnType<typeof classifyMcpToolRisk>; requiredScopes: string[] }}
+ */
+function getMcpToolRuntimeContext(tool) {
+    const cached = TOOL_RUNTIME_CONTEXT_CACHE.get(tool);
+    if (cached) return cached;
+    const context = {
+        risk: classifyMcpToolRisk(tool),
+        requiredScopes: collectToolSecurityScopes(tool),
+    };
+    TOOL_RUNTIME_CONTEXT_CACHE.set(tool, context);
+    return context;
 }
 
 /**

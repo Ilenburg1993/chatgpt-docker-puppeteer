@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { parseConnectorSmokeJsonOutput } from '#copilot/mcp/tools';
+import {
+    isCloudflaredOriginErrorLine,
+    isCloudflaredTunnelTransportErrorLine,
+    parseConnectorSmokeJsonOutput,
+} from '#copilot/mcp/tools';
 
 describe('cloudflare connector smoke compact mode', () => {
     it('uses compact smoke output when the MCP tool refreshes connector smoke', async () => {
@@ -20,5 +24,15 @@ describe('cloudflare connector smoke compact mode', () => {
         const parsed = parseConnectorSmokeJsonOutput('[db][INFO] ready\n{"ok":true,"toolsList":{"tools":85}}');
 
         expect(parsed).toMatchObject({ ok: true, toolsList: { tools: 85 } });
+    });
+
+    it('classifies origin errors separately from recovered tunnel transport errors', () => {
+        const originLine = '2026-06-10T16:14:19Z ERR failed to serve incoming request error="Failed to proxy HTTP: Unable to reach the origin service: tls: first record does not look like a TLS handshake"';
+        const transportLine = '2026-06-10T16:14:19Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: timeout: no recent network activity" connIndex=0';
+
+        expect(isCloudflaredOriginErrorLine(originLine)).toBe(true);
+        expect(isCloudflaredTunnelTransportErrorLine(originLine)).toBe(false);
+        expect(isCloudflaredOriginErrorLine(transportLine)).toBe(false);
+        expect(isCloudflaredTunnelTransportErrorLine(transportLine)).toBe(true);
     });
 });

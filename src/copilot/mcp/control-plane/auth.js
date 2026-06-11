@@ -1,6 +1,12 @@
 // @ts-check
 import { calculateJwkThumbprint, createRemoteJWKSet, importJWK, jwtVerify } from 'jose';
 import { timingSafeEqual } from 'node:crypto';
+import {
+    getMcpAuthDecisionCacheStats,
+    readCachedMcpAuthorizationDecision,
+    rememberMcpAuthorizationDecision,
+    resetMcpAuthDecisionCache,
+} from './auth-decision-cache.js';
 import { createTtlCache } from './ttl-cache.js';
 
 /**
@@ -106,7 +112,6 @@ const DPOP_MAX_TTL_SECONDS = 5 * 60;
 const DPOP_CLOCK_TOLERANCE_SECONDS = 30;
 const DPOP_REPLAY_CACHE_MAX_ENTRIES = 2000;
 const MAX_DPOP_PROOF_LENGTH = 16 * 1024;
-
 /** @type {import('./ttl-cache.js').TtlCache<ReturnType<typeof createRemoteJWKSet>>} */
 const REMOTE_JWKS_CACHE = createTtlCache({
     name: 'oauth-remote-jwks',
@@ -118,6 +123,41 @@ const REMOTE_JWKS_CACHE = createTtlCache({
 const DPOP_REPLAY_CACHE = new Map();
 
 const PUBLIC_OAUTH_DIAGNOSTIC_TOOLS = new Set(['mcp_oauth_friction_audit', 'mcp_oauth_issuer_diagnostics']);
+
+const AUTH_CONFIG_ENV_KEYS = /** @type {const} */ ([
+    'COPILOT_MCP_AUTH_MODE',
+    'COPILOT_MCP_CHATGPT_AUTH_MODE',
+    'COPILOT_MCP_PUBLIC_URL',
+    'COPILOT_MCP_CLOUDFLARE_PUBLIC_URL',
+    'COPILOT_MCP_OAUTH_AUTHORIZATION_SERVERS',
+    'COPILOT_MCP_OAUTH_ISSUER',
+    'COPILOT_MCP_OAUTH_EXPECTED_ISSUER',
+    'COPILOT_MCP_OAUTH_AUDIENCE',
+    'COPILOT_MCP_OAUTH_ACCEPTED_AUDIENCES',
+    'COPILOT_MCP_OAUTH_JWKS_URI',
+    'COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED',
+    'COPILOT_MCP_STATIC_BEARER_TOKEN',
+    'COPILOT_MCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED',
+    'COPILOT_MCP_OAUTH_INITIAL_SCOPES',
+    'COPILOT_MCP_RESOURCE_DOCUMENTATION',
+    'COPILOT_MCP_RESOURCE_NAME',
+    'COPILOT_MCP_RESOURCE_POLICY_URI',
+    'COPILOT_MCP_RESOURCE_TOS_URI',
+    'COPILOT_MCP_AUTH_ENFORCEMENT',
+    'COPILOT_MCP_OAUTH_JWT_ALGORITHMS',
+    'COPILOT_MCP_OAUTH_REQUIRE_RESOURCE_CLAIM',
+    'COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS',
+]);
+
+/** @type {{ fingerprint: string; config: McpAuthConfig } | null} */
+let _mcpAuthConfigCache = null;
+const _mcpAuthConfigCacheStats = {
+    hits: 0,
+    misses: 0,
+    sets: 0,
+    bypasses: 0,
+    clears: 0,
+};
 
 const ADMIN_TOOL_NAMES = new Set([
     'job_cancel',
@@ -133,6 +173,14 @@ const ADMIN_TOOL_NAMES = new Set([
  */
 function publicOauthDiagnosticsEnabled(env = process.env) {
     return readBooleanEnv(env, 'COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS', true);
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string}
+ */
+function buildMcpAuthConfigEnvFingerprint(env) {
+    return AUTH_CONFIG_ENV_KEYS.map((key) => `${key}\u0000${String(env[key] ?? '')}`).join('\u0001');
 }
 
 /**
@@ -184,6 +232,15 @@ export function normalizeMcpAuthEnforcement(value, mode) {
  * @returns {McpAuthConfig}
  */
 export function readMcpAuthConfig(env = process.env) {
+    const cacheable = env === process.env;
+    if (!cacheable) _mcpAuthConfigCacheStats.bypasses += 1;
+    const fingerprint = cacheable ? buildMcpAuthConfigEnvFingerprint(env) : '';
+    if (cacheable && _mcpAuthConfigCache?.fingerprint === fingerprint) {
+        _mcpAuthConfigCacheStats.hits += 1;
+        return _mcpAuthConfigCache.config;
+    }
+    if (cacheable) _mcpAuthConfigCacheStats.misses += 1;
+
     const mode = normalizeMcpAuthMode(env['COPILOT_MCP_AUTH_MODE'] ?? env['COPILOT_MCP_CHATGPT_AUTH_MODE']);
     const resource = normalizeResourceBaseUrl(
         env['COPILOT_MCP_PUBLIC_URL'] ?? env['COPILOT_MCP_CLOUDFLARE_PUBLIC_URL'],
@@ -217,7 +274,7 @@ export function readMcpAuthConfig(env = process.env) {
     const tokenEndpointAuthMethodsSupported = normalizeTokenEndpointAuthMethods(
         env['COPILOT_MCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED'],
     );
-    return {
+    const config = {
         mode,
         resource,
         protectedResourceMetadataUrl: `${resource}/.well-known/oauth-protected-resource`,
@@ -255,6 +312,21 @@ export function readMcpAuthConfig(env = process.env) {
         staticBearerEnabled,
         requireResourceClaim: readBooleanEnv(env, 'COPILOT_MCP_OAUTH_REQUIRE_RESOURCE_CLAIM', true),
         publicOauthDiagnosticsEnabled: publicOauthDiagnosticsEnabled(env),
+    };
+    if (cacheable) {
+        _mcpAuthConfigCache = { fingerprint, config };
+        _mcpAuthConfigCacheStats.sets += 1;
+    }
+    return config;
+}
+
+/**
+ * @returns {Record<string, unknown>}
+ */
+export function readMcpAuthConfigCacheStats() {
+    return {
+        ..._mcpAuthConfigCacheStats,
+        size: _mcpAuthConfigCache ? 1 : 0,
     };
 }
 
@@ -848,6 +920,16 @@ function getRemoteJwks(jwksUri) {
 export function resetMcpAuthRuntimeForTests() {
     REMOTE_JWKS_CACHE.clear();
     DPOP_REPLAY_CACHE.clear();
+    _mcpAuthConfigCache = null;
+    _mcpAuthConfigCacheStats.clears += 1;
+    resetMcpAuthDecisionCache();
+}
+
+/**
+ * @returns {Record<string, unknown>}
+ */
+export function readMcpAuthDecisionCacheStats() {
+    return getMcpAuthDecisionCacheStats();
 }
 
 /**
@@ -1029,6 +1111,8 @@ async function verifyBearerToken(token, requiredScopes, config, env, context = {
             method: 'static-bearer',
         };
     }
+    const cachedDecision = readCachedMcpAuthorizationDecision(token, requiredScopes, config, context);
+    if (cachedDecision) return cachedDecision;
     if (
         !config.jwksUri ||
         !config.expectedIssuer ||
@@ -1104,13 +1188,15 @@ async function verifyBearerToken(token, requiredScopes, config, env, context = {
                 }),
             };
         }
-        return {
+        const decision = {
             allowed: true,
             required: true,
             enforcement: config.enforcement,
             requiredScopes,
             method: 'oauth-jwks',
         };
+        rememberMcpAuthorizationDecision(token, requiredScopes, config, context, payload, decision);
+        return decision;
     } catch (error) {
         const classification = classifyBearerVerificationError(error);
         return {

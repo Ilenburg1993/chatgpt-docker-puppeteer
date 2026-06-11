@@ -15,6 +15,7 @@ const startedAt = Date.now();
  * @property {number | null} lastDurationMs
  * @property {number | null} lastCalledAt
  * @property {boolean | null} lastIsError
+ * @property {{ hint: number; stringify: number; unknown: number; rejected: number; totalBytes: number; lastBytes: number | null; lastStrategy: string | null }} resultSize
  * @property {Record<string, { calls: number; totalDurationMs: number; lastDurationMs: number | null }>} phases
  */
 
@@ -23,7 +24,7 @@ const TOOL_METRICS = new Map();
 
 /**
  * @param {string} tool
- * @param {{ durationMs: number; isError: boolean; phases?: Record<string, number> }} event
+ * @param {{ durationMs: number; isError: boolean; phases?: Record<string, number>; resultSize?: { strategy?: string; bytes?: number | null; rejected?: boolean } }} event
  * @returns {void}
  */
 export function recordMcpToolMetric(tool, event) {
@@ -36,6 +37,7 @@ export function recordMcpToolMetric(tool, event) {
             lastDurationMs: null,
             lastCalledAt: null,
             lastIsError: null,
+            resultSize: { hint: 0, stringify: 0, unknown: 0, rejected: 0, totalBytes: 0, lastBytes: null, lastStrategy: null },
             phases: {},
         });
     current.calls += 1;
@@ -44,6 +46,19 @@ export function recordMcpToolMetric(tool, event) {
     current.lastDurationMs = event.durationMs;
     current.lastCalledAt = Date.now();
     current.lastIsError = event.isError;
+    if (event.resultSize) {
+        const strategy = event.resultSize.strategy === 'stringify' || event.resultSize.strategy === 'hint' ? event.resultSize.strategy : 'unknown';
+        if (strategy === 'hint') current.resultSize.hint += 1;
+        else if (strategy === 'stringify') current.resultSize.stringify += 1;
+        else current.resultSize.unknown += 1;
+        current.resultSize.lastStrategy = strategy;
+        const bytes = Number(event.resultSize.bytes);
+        if (Number.isFinite(bytes) && bytes >= 0) {
+            current.resultSize.totalBytes += bytes;
+            current.resultSize.lastBytes = bytes;
+        }
+        if (event.resultSize.rejected === true) current.resultSize.rejected += 1;
+    }
     for (const [phase, durationMs] of Object.entries(event.phases ?? {})) {
         if (!Number.isFinite(durationMs) || durationMs < 0) continue;
         const phaseMetric = current.phases[phase] ?? { calls: 0, totalDurationMs: 0, lastDurationMs: null };

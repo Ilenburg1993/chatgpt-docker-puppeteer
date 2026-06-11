@@ -6,7 +6,7 @@
  *
  * Environment:
  *
- * - COPILOT_MCP_TOOL_SURFACE=full|latency|minimal|cloudflare|readonly
+ * - COPILOT_MCP_TOOL_SURFACE=full|latency|minimal|cloudflare|readonly|claude|safe|research
  * - COPILOT_MCP_TOOL_SURFACE_INCLUDE=tool_a,tool_b
  * - COPILOT_MCP_TOOL_SURFACE_EXCLUDE=tool_c,tool_d
  * - COPILOT_MCP_TOOL_SURFACE_ALLOW_EMPTY=true|false
@@ -15,7 +15,7 @@
  */
 
 /**
- * @typedef {'full' | 'latency' | 'minimal' | 'cloudflare' | 'readonly'} McpToolSurfaceMode
+ * @typedef {'full' | 'latency' | 'minimal' | 'cloudflare' | 'readonly' | 'claude' | 'safe' | 'research'} McpToolSurfaceMode
  *
  * @typedef {object} McpToolSurfacePolicy
  * @property {McpToolSurfaceMode} mode
@@ -56,6 +56,7 @@ const LATENCY_SURFACE_TOOL_NAMES = new Set([
     'job_get_summary',
     'job_get_output',
     'job_cancel',
+    'mcp_latency_dashboard',
     'mcp_runtime_health',
     'mcp_tunnel_status',
     'mcp_connector_smoke_refresh',
@@ -89,6 +90,7 @@ const MINIMAL_SURFACE_TOOL_NAMES = new Set([
     'repo_apply_patch',
     'git_status',
     'git_diff',
+    'mcp_latency_dashboard',
     'mcp_runtime_health',
     'mcp_tunnel_status',
     'mcp_connector_smoke_refresh',
@@ -100,6 +102,7 @@ const MINIMAL_SURFACE_TOOL_NAMES = new Set([
 ]);
 
 const CLOUDFLARE_SURFACE_TOOL_NAMES = new Set([
+    'mcp_latency_dashboard',
     'mcp_runtime_health',
     'mcp_tunnel_status',
     'mcp_connector_smoke_refresh',
@@ -125,6 +128,46 @@ const CLOUDFLARE_SURFACE_TOOL_NAMES = new Set([
     'repo_status',
     'git_status',
     'git_diff',
+]);
+
+const SAFE_RESEARCH_SURFACE_TOOL_NAMES = new Set([
+    'repo_status',
+    'repo_tree',
+    'repo_search_text',
+    'repo_read_file',
+    'repo_read_file_chunks',
+    'repo_file_outline',
+    'repo_file_stats',
+    'repo_symbol_search',
+    'repo_index_status',
+    'repo_index_search',
+    'repo_index_find_symbol',
+    'repo_find_imports',
+    'repo_find_orphan_imports',
+    'git_status',
+    'git_branch_info',
+    'git_diff',
+    'git_log',
+    'mcp_latency_dashboard',
+    'mcp_runtime_health',
+    'mcp_session_profile',
+    'mcp_tools_status',
+    'mcp_capabilities_summary',
+    'mcp_validation_plan',
+    'mcp_validation_dashboard',
+    'mcp_last_validation_summary',
+    'job_list',
+    'job_get_summary',
+    'job_get_output',
+    'mcp_auth_profile',
+    'mcp_connection_readiness',
+    'mcp_oauth_issuer_diagnostics',
+    'mcp_oauth_friction_audit',
+    'claude_connector_profile',
+    'chatgpt_connector_profile',
+    'mcp_cloudflare_metrics_snapshot',
+    'mcp_tunnel_status',
+    'mcp_post_restart_readiness',
 ]);
 
 /**
@@ -208,6 +251,7 @@ function matchesToolSurfaceMode(tool, mode) {
     if (mode === 'latency') return LATENCY_SURFACE_TOOL_NAMES.has(tool.name);
     if (mode === 'minimal') return MINIMAL_SURFACE_TOOL_NAMES.has(tool.name);
     if (mode === 'cloudflare') return CLOUDFLARE_SURFACE_TOOL_NAMES.has(tool.name);
+    if (mode === 'claude' || mode === 'safe' || mode === 'research') return SAFE_RESEARCH_SURFACE_TOOL_NAMES.has(tool.name);
     if (mode === 'readonly') return tool.annotations?.readOnlyHint === true;
     return true;
 }
@@ -223,6 +267,9 @@ function normalizeMode(value) {
     if (raw === 'latency' || raw === 'fast' || raw === 'turbo') return 'latency';
     if (raw === 'minimal' || raw === 'tiny') return 'minimal';
     if (raw === 'cloudflare' || raw === 'edge' || raw === 'transport') return 'cloudflare';
+    if (raw === 'claude') return 'claude';
+    if (raw === 'safe' || raw === 'safety') return 'safe';
+    if (raw === 'research' || raw === 'read-validate' || raw === 'read_validate') return 'research';
     if (raw === 'readonly' || raw === 'read-only' || raw === 'read_only') return 'readonly';
     return 'full';
 }

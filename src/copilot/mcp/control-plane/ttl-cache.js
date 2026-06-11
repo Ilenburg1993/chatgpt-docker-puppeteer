@@ -10,6 +10,9 @@
  * @module copilot/mcp/control-plane/ttl-cache
  */
 
+/** @type {Set<TtlCache<unknown>>} */
+const ttlCacheRegistry = new Set();
+
 /**
  * @template T
  * @typedef {object} TtlCacheEntry
@@ -195,7 +198,18 @@ export class TtlCache {
  * @returns {TtlCache<T>}
  */
 export function createTtlCache(options) {
-    return new TtlCache(options);
+    const cache = new TtlCache(options);
+    ttlCacheRegistry.add(/** @type {TtlCache<unknown>} */ (cache));
+    return cache;
+}
+
+/**
+ * @returns {Array<{ name: string; ttlMs: number; maxEntries: number; size: number; inFlight: number; hits: number; misses: number; inFlightHits: number; sets: number; evictions: number }>}
+ */
+export function getTtlCacheStats() {
+    return Array.from(ttlCacheRegistry, (cache) => cache.stats()).sort((left, right) =>
+        left.name.localeCompare(right.name),
+    );
 }
 
 /**

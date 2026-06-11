@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 35;
+const CAPABILITIES_VERSION = 36;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -27,6 +27,7 @@ const READ_TOOLS = [
     'repo_diff_files',
     'repo_list_quarantine',
     'repo_inspect_quarantined_file',
+    'repo_patch_batch_plan',
     'repo_patch_plan',
     'repo_create_file_plan',
     'repo_quarantine_file_plan',
@@ -52,6 +53,7 @@ const INDEX_TOOLS = [
 
 const WRITE_TOOLS = [
     'repo_apply_file_batch',
+    'repo_apply_patch_batch',
     'repo_write_file',
     'repo_create_file',
     'repo_apply_patch',
@@ -101,6 +103,7 @@ const RUNTIME_TOOLS = [
     'mcp_maintenance_plan',
     'mcp_maintenance_apply_safe_fixes',
     'project_doctor',
+    'mcp_latency_dashboard',
     'mcp_runtime_health',
     'mcp_session_profile',
     'mcp_smoke_workspace',
@@ -161,6 +164,8 @@ const IO_GUIDANCE = [
     'Use mcp_host_block_diagnostics after any ChatGPT host-side block to classify it and select a lower-friction replacement.',
     'Use plan-only tools such as repo_patch_plan includeDiffPreview=false, repo_quarantine_file_plan and repo_apply_file_batch_plan before write or destructive apply tools.',
     'Keep includeDiffPreview=false by default for repo_patch_plan, repo_create_file_plan, repo_apply_patch, repo_write_file, repo_create_file and repo_diff_files; request textual diffs only when explicitly needed.',
+    'Use repo_patch_batch_plan before several exact-string repo_apply_patch calls to validate all patch preconditions in one read-only planning step.',
+    'Use repo_apply_patch_batch dryRun=true first, then dryRun=false with confirmBatch=true only for trusted unique-path patch batches.',
     'Use repo_apply_file_batch_plan first, then repo_apply_file_batch when several trusted file operations should be applied in one ChatGPT write confirmation.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
     'Use repo_quarantine_file before repo_remove_file when reversible cleanup is acceptable.',

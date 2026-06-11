@@ -8,21 +8,28 @@
 import { buildIoIndexForDirectory, getIoIndexStats } from '#copilot/infra/public/indexing';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
-import { boundedWriteAnnotations, okResult, readMcpMetricsSnapshot, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import {
+    boundedWriteAnnotations,
+    buildAiArtifactsReport,
+    okResult,
+    readMcpMetricsSnapshot,
+    readOnlyAnnotations,
+} from '#copilot/mcp/control-plane';
 import { buildMcpCapabilitiesSummary } from './meta.js';
 import { repoStatusHandler } from './repo-status.js';
 import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';
 
-const maintenanceFixSchema = z.enum(['refresh-index', 'run-mcp-smoke', 'summarize-tools', 'workspace-status']);
+const maintenanceFixSchema = z.enum(['ai-artifacts-report', 'refresh-index', 'run-mcp-smoke', 'summarize-tools', 'workspace-status']);
 
-const DEFAULT_FIXES = ['workspace-status', 'summarize-tools', 'run-mcp-smoke'];
+const DEFAULT_FIXES = ['workspace-status', 'summarize-tools', 'ai-artifacts-report', 'run-mcp-smoke'];
 
 /**
- * @returns {Record<string, unknown>[]}
+ * @returns {Promise<Record<string, unknown>[]>}
  */
-function buildMaintenancePlanItems() {
+async function buildMaintenancePlanItems() {
     const indexStats = getIoIndexStats();
     const metrics = readMcpMetricsSnapshot();
+    const aiArtifactsReport = await buildAiArtifactsReport();
     return [
         {
             fix: 'workspace-status',
@@ -44,6 +51,14 @@ function buildMaintenancePlanItems() {
             defaultIncluded: true,
             effect: 'Runs the read-only MCP workspace smoke suite.',
             recommendedWhen: 'After tunnel/server restart or tool registry changes.',
+        },
+        {
+            fix: 'ai-artifacts-report',
+            risk: 'read-only',
+            defaultIncluded: true,
+            effect: 'Reports src/copilot/.ai growth, job artifact retention candidates, and protected state categories without deleting anything.',
+            recommendedWhen: 'After long ChatGPT/MCP sessions that run many validator jobs.',
+            currentReport: aiArtifactsReport,
         },
         {
             fix: 'refresh-index',
@@ -89,7 +104,7 @@ export const maintenanceTools = [
                 success: true,
                 defaultDryRun: true,
                 defaultFixes: [...DEFAULT_FIXES],
-                items: buildMaintenancePlanItems(),
+                items: await buildMaintenancePlanItems(),
                 note: 'Use mcp_maintenance_apply_safe_fixes with dryRun=true first. No arbitrary shell or arbitrary paths are accepted.',
             }),
     },
@@ -132,6 +147,15 @@ export const maintenanceTools = [
                         success: true,
                         advertisedToolCount: summary['advertisedToolCount'],
                         ioGuidance: summary['ioGuidance'],
+                    });
+                    continue;
+                }
+                if (fix === 'ai-artifacts-report') {
+                    results.push({
+                        fix,
+                        dryRun: isDryRun,
+                        success: true,
+                        report: await buildAiArtifactsReport(),
                     });
                     continue;
                 }

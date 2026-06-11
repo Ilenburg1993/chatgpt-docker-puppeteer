@@ -11,7 +11,6 @@ import {
     diffText,
     readBytes,
     readText,
-    readTextChunks,
     scanDirectory,
     searchText,
     searchWorkspaceSymbols,
@@ -22,17 +21,19 @@ import { z } from 'zod';
 import {
     errorResult,
     getMcpWorkspaceRoot,
+    estimateStructuredTextResultBytes,
     okResult,
     readOnlyAnnotations,
+    withResultSizeHint,
     resolveReadPath,
 } from '#copilot/mcp/control-plane';
+import {
+    readRepoFileChunksWithValidatedResultCache,
+    readRepoFileWithValidatedResultCache,
+} from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
 
 const DEFAULT_REPO_READ_PATH = 'src/copilot';
-const REPO_READ_FILE_CACHE_MAX_ENTRIES = 128;
-
-/** @type {Map<string, { sizeBytes: number; mtimeMs: number; structured: Record<string, unknown>; text: string }>} */
-const repoReadFileResultCache = new Map();
 
 /**
  * @param {unknown} value
@@ -111,90 +112,16 @@ function scanHardLimitReached(scan) {
 }
 
 /**
- * @param {{ resolved: string; relative: string }} resolved
- * @param {number | undefined} startLine
- * @param {number | undefined} endLine
- * @returns {Promise<{ structured: Record<string, unknown>; text: string }>}
- */
-async function readRepoFileWithValidatedResultCache(resolved, startLine, endLine) {
-    const key = buildRepoReadFileCacheKey(resolved.resolved, startLine, endLine);
-    const cached = repoReadFileResultCache.get(key);
-    if (cached) {
-        const current = await statPath(resolved.resolved).catch(() => null);
-        const stats = current?.stats;
-        if (stats?.isFile() && stats.size === cached.sizeBytes && stats.mtimeMs === cached.mtimeMs) {
-            repoReadFileResultCache.delete(key);
-            repoReadFileResultCache.set(key, cached);
-            return { structured: cloneStructuredReadFileResult(cached.structured), text: cached.text };
-        }
-        repoReadFileResultCache.delete(key);
-    }
-
-    const snapshot = await readText(resolved.resolved, {
-        ...(startLine !== undefined ? { startLine } : {}),
-        ...(endLine !== undefined ? { endLine } : {}),
-    });
-    const structured = {
-        success: true,
-        path: resolved.relative,
-        content: snapshot.content,
-        sha256: snapshot.contentHash,
-        returnedSha256: snapshot.returnedContentHash,
-        bytes: snapshot.bytesRead,
-        totalLines: snapshot.totalLines,
-        returnedLines: snapshot.returnedLines,
-    };
-    const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
-    const mtimeMs = Number(snapshot.mtimeMs);
-    if (Number.isFinite(sizeBytes) && Number.isFinite(mtimeMs)) {
-        rememberRepoReadFileCacheEntry(key, {
-            sizeBytes,
-            mtimeMs,
-            structured,
-            text: snapshot.content,
-        });
-    }
-    return { structured, text: snapshot.content };
-}
-
-/**
- * @param {string} absolutePath
- * @param {number | undefined} startLine
- * @param {number | undefined} endLine
- * @returns {string}
- */
-function buildRepoReadFileCacheKey(absolutePath, startLine, endLine) {
-    return `${absolutePath}\u0000${startLine ?? ''}\u0000${endLine ?? ''}`;
-}
-
-/**
- * @param {string} key
- * @param {{ sizeBytes: number; mtimeMs: number; structured: Record<string, unknown>; text: string }} entry
- * @returns {void}
- */
-function rememberRepoReadFileCacheEntry(key, entry) {
-    if (repoReadFileResultCache.has(key)) repoReadFileResultCache.delete(key);
-    repoReadFileResultCache.set(key, entry);
-    while (repoReadFileResultCache.size > REPO_READ_FILE_CACHE_MAX_ENTRIES) {
-        const oldest = repoReadFileResultCache.keys().next().value;
-        if (typeof oldest !== 'string') break;
-        repoReadFileResultCache.delete(oldest);
-    }
-}
-
-/**
  * @param {Record<string, unknown>} structured
+ * @param {'full' | 'returned' | 'none'} hashMode
  * @returns {Record<string, unknown>}
  */
-function cloneStructuredReadFileResult(structured) {
-    const returnedLines = structured['returnedLines'];
-    return {
-        ...structured,
-        returnedLines:
-            returnedLines && typeof returnedLines === 'object' && !Array.isArray(returnedLines)
-                ? { .../** @type {Record<string, unknown>} */ (returnedLines) }
-                : returnedLines,
-    };
+export function applyRepoReadHashMode(structured, hashMode) {
+    if (hashMode === 'full') return structured;
+    const output = { ...structured, hashMode };
+    Reflect.deleteProperty(output, 'sha256');
+    if (hashMode === 'none') Reflect.deleteProperty(output, 'returnedSha256');
+    return output;
 }
 
 /**
@@ -360,9 +287,10 @@ export const repoReadTools = [
             path: z.string().min(1).describe('Workspace-relative file path.'),
             startLine: z.number().int().min(1).optional().describe('Optional 1-based first line.'),
             endLine: z.number().int().min(1).optional().describe('Optional 1-based last line.'),
+            hashMode: z.enum(['full', 'returned', 'none']).optional().describe('Hash fields to return. Default full.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, startLine, endLine }) => {
+        handler: async ({ path, startLine, endLine, hashMode }) => {
             const resolved = await resolveReadPath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             if (startLine !== undefined && endLine !== undefined && endLine < startLine) {
@@ -372,7 +300,12 @@ export const repoReadTools = [
                 });
             }
             const { structured, text } = await readRepoFileWithValidatedResultCache(resolved, startLine, endLine);
-            return okResult(structured, text);
+            const outputStructured = applyRepoReadHashMode(structured, hashMode ?? 'full');
+            return withResultSizeHint(okResult(outputStructured, text), {
+                bytes: estimateStructuredTextResultBytes(outputStructured, text),
+                strategy: 'conservative-estimate',
+                source: 'repo_read_file',
+            });
         },
     },
     {
@@ -467,43 +400,19 @@ export const repoReadTools = [
                     hint: 'Use endLine greater than or equal to cursor/startLine, or omit endLine.',
                 });
             }
-            const snapshot = await readTextChunks(resolved.resolved, {
-                startLine: effectiveStartLine,
-                ...(endLine !== undefined ? { endLine } : {}),
-                chunkLines: chunkLines ?? 200,
-                ...(highWaterMark !== undefined ? { highWaterMark } : {}),
-            });
-            const lastChunk = snapshot.chunks[snapshot.chunks.length - 1];
-            const lastReturnedLine = lastChunk?.endLine ?? effectiveStartLine - 1;
-            const nextCursor =
-                snapshot.totalLinesKnown && lastReturnedLine < snapshot.totalLines
-                    ? String(lastReturnedLine + 1)
-                    : null;
-            const text = snapshot.chunks.map((chunk) => chunk.content).join('\n');
-            return okResult(
-                {
-                    success: true,
-                    path: resolved.relative,
-                    chunks: snapshot.chunks,
-                    chunkCount: snapshot.chunks.length,
-                    returnedChunkCount: snapshot.returnedChunkCount ?? snapshot.chunks.length,
-                    returnedLineCount: snapshot.returnedLineCount ?? 0,
-                    chunkLines: chunkLines ?? 200,
-                    startLine: effectiveStartLine,
-                    endLine: endLine ?? null,
-                    totalLines: snapshot.totalLines,
-                    totalLinesKnown: snapshot.totalLinesKnown,
-                    lastScannedLine: snapshot.lastScannedLine ?? snapshot.totalLines,
-                    fileTotalLines: snapshot.fileTotalLines ?? (snapshot.totalLinesKnown ? snapshot.totalLines : null),
-                    fileTotalLinesKnown: snapshot.fileTotalLinesKnown ?? snapshot.totalLinesKnown,
-                    bytes: snapshot.bytesRead,
-                    sizeBytes: snapshot.sizeBytes,
-                    nextCursor,
-                    cursor: cursor ?? null,
-                    engine: snapshot.io.engine,
-                },
-                text,
+            const { structured, text } = await readRepoFileChunksWithValidatedResultCache(
+                resolved,
+                effectiveStartLine,
+                endLine,
+                chunkLines ?? 200,
+                highWaterMark,
+                cursor,
             );
+            return withResultSizeHint(okResult(structured, text), {
+                bytes: estimateStructuredTextResultBytes(structured, text),
+                strategy: 'conservative-estimate',
+                source: 'repo_read_file_chunks',
+            });
         },
     },
     {
@@ -620,7 +529,11 @@ export const repoReadTools = [
                 cursorOffset: result.cursorOffset ?? 0,
                 engine: result.engine,
             };
-            return okResult(structured, result.output);
+            return withResultSizeHint(okResult(structured, result.output), {
+                bytes: estimateStructuredTextResultBytes(structured, result.output),
+                strategy: 'conservative-estimate',
+                source: 'repo_search_text',
+            });
         },
     },
     {

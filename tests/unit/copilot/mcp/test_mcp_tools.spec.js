@@ -11,6 +11,10 @@ import { describe, it } from 'vitest';
 import { invalidateIoCachePath } from '#copilot/infra/io-cache.js';
 import { resolveReadPath } from '#copilot/mcp/control-plane';
 import { getCanonicalMcpTools } from '#copilot/mcp';
+import {
+    readRepoReadFileResultCacheStats,
+    resetRepoReadResponseCacheForTest,
+} from '../../../../src/copilot/mcp/tools/repo-read-cache.js';
 
 /** @param {string} name */
 function findTool(name) {
@@ -54,7 +58,33 @@ describe('copilot MCP tools', () => {
         assert.ok(String(result.content[0]?.text ?? '').includes('Copilot MCP Server'));
     });
 
-    it('repo_read_file returns identical results for repeated same-window reads', async () => {
+    it('repo_read_file supports reduced hash payload modes', async () => {
+        const tool = findTool('repo_read_file');
+        const returnedOnly = await tool.handler({
+            path: 'src/copilot/mcp/README.md',
+            startLine: 1,
+            endLine: 8,
+            hashMode: 'returned',
+        });
+        assert.equal(returnedOnly.isError, undefined);
+        assert.equal(returnedOnly.structuredContent?.['hashMode'], 'returned');
+        assert.equal(returnedOnly.structuredContent?.['sha256'], undefined);
+        assert.equal(typeof returnedOnly.structuredContent?.['returnedSha256'], 'string');
+
+        const noHashes = await tool.handler({
+            path: 'src/copilot/mcp/README.md',
+            startLine: 1,
+            endLine: 8,
+            hashMode: 'none',
+        });
+        assert.equal(noHashes.isError, undefined);
+        assert.equal(noHashes.structuredContent?.['hashMode'], 'none');
+        assert.equal(noHashes.structuredContent?.['sha256'], undefined);
+        assert.equal(noHashes.structuredContent?.['returnedSha256'], undefined);
+    });
+
+    it('repo_read_file returns identical results for repeated same-window reads through the extracted cache module', async () => {
+        resetRepoReadResponseCacheForTest();
         const tool = findTool('repo_read_file');
         const args = {
             path: 'src/copilot/mcp/README.md',
@@ -62,10 +92,23 @@ describe('copilot MCP tools', () => {
             endLine: 8,
         };
         const first = await tool.handler(args);
+        const afterFirst = readRepoReadFileResultCacheStats();
         const second = await tool.handler(args);
+        const afterSecond = readRepoReadFileResultCacheStats();
 
         assert.deepEqual(second.structuredContent, first.structuredContent);
         assert.deepEqual(second.content, first.content);
+        assert.equal(afterFirst.misses, 1);
+        assert.equal(afterFirst.sets, 1);
+        assert.equal(afterSecond.hits, 1);
+        assert.equal(afterSecond.size, 1);
+        const resolved = await resolveReadPath(args.path);
+        assert.equal(resolved.ok, true);
+        if (resolved.ok) invalidateIoCachePath(resolved.resolved);
+        const afterInvalidation = readRepoReadFileResultCacheStats();
+        assert.equal(afterInvalidation.busInvalidations, 1);
+        assert.equal(afterInvalidation.clears, 1);
+        assert.equal(afterInvalidation.size, 0);
     });
 
     it('repo_file_stats returns metadata and optional content hash', async () => {
@@ -231,6 +274,35 @@ describe('copilot MCP tools', () => {
         assert.ok(Array.isArray(structured['chunks']));
         assert.equal(structured['chunkLines'], 20);
         assert.ok('nextCursor' in structured);
+    });
+
+    it('repo_read_file_chunks returns identical results for repeated same-window chunk reads through the extracted cache module', async () => {
+        resetRepoReadResponseCacheForTest();
+        const tool = findTool('repo_read_file_chunks');
+        const args = {
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            chunkLines: 10,
+            startLine: 1,
+            endLine: 20,
+        };
+        const first = await tool.handler(args);
+        const afterFirst = readRepoReadFileResultCacheStats();
+        const second = await tool.handler(args);
+        const afterSecond = readRepoReadFileResultCacheStats();
+        assert.equal(first.isError, undefined);
+        assert.deepEqual(second.structuredContent, first.structuredContent);
+        assert.deepEqual(second.content, first.content);
+        assert.equal(afterFirst.chunkMisses, 1);
+        assert.equal(afterFirst.chunkSets, 1);
+        assert.equal(afterSecond.chunkHits, 1);
+        assert.equal(afterSecond.chunkSize, 1);
+        const resolved = await resolveReadPath(args.path);
+        assert.equal(resolved.ok, true);
+        if (resolved.ok) invalidateIoCachePath(resolved.resolved);
+        const afterInvalidation = readRepoReadFileResultCacheStats();
+        assert.equal(afterInvalidation.busInvalidations, 1);
+        assert.equal(afterInvalidation.chunkClears, 1);
+        assert.equal(afterInvalidation.chunkSize, 0);
     });
 
     it('repo_read_file_chunks separates returned lines from scanned line metadata', async () => {
@@ -476,6 +548,7 @@ describe('copilot MCP tools', () => {
         assert.ok(Number(structured['boundedWriteCount'] ?? 0) > 0);
         assert.ok(Number(structured['destructiveCount'] ?? 0) > 0);
         assert.ok(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('repo_apply_patch'));
+        assert.ok(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('repo_apply_patch_batch'));
         assert.equal(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('job_cancel'), false);
         assert.ok(/** @type {string[]} */ (structured['destructiveTools']).includes('repo_remove_file'));
         const approvalFrictionProfile = /** @type {Record<string, unknown>} */ (structured['approvalFrictionProfile']);
@@ -484,6 +557,11 @@ describe('copilot MCP tools', () => {
             false,
         );
         assert.ok(/** @type {string[]} */ (approvalFrictionProfile['neverRememberApproval']).includes('job_cancel'));
+        assert.ok(
+            /** @type {string[][]} */ (approvalFrictionProfile['planFirstWorkflows']).some(
+                (workflow) => workflow[0] === 'repo_patch_batch_plan' && workflow[1] === 'repo_apply_patch_batch',
+            ),
+        );
         const tools = /**
          * @type {{
          *     name?: string;
@@ -537,10 +615,12 @@ describe('copilot MCP tools', () => {
         assert.equal(plan.structuredContent?.['success'], true);
         assert.equal(plan.structuredContent?.['defaultDryRun'], true);
         assert.ok(Array.isArray(plan.structuredContent?.['items']));
+        const items = /** @type {{ fix?: string; risk?: string }[]} */ (plan.structuredContent?.['items']);
+        assert.ok(items.some((item) => item.fix === 'ai-artifacts-report' && item.risk === 'read-only'));
 
         const applyTool = findTool('mcp_maintenance_apply_safe_fixes');
         const dryRun = await applyTool.handler({
-            fixes: ['workspace-status', 'summarize-tools', 'run-mcp-smoke', 'refresh-index'],
+            fixes: ['workspace-status', 'summarize-tools', 'ai-artifacts-report', 'run-mcp-smoke', 'refresh-index'],
             dryRun: true,
         });
         assert.equal(dryRun.isError, undefined);
@@ -550,6 +630,7 @@ describe('copilot MCP tools', () => {
             dryRun.structuredContent?.['results']
         );
         assert.ok(results.some((result) => result.fix === 'refresh-index' && result.plannedPath === 'src/copilot'));
+        assert.ok(results.some((result) => result.fix === 'ai-artifacts-report'));
         assert.ok(results.every((result) => result.dryRun === true));
     });
 
@@ -684,6 +765,54 @@ describe('copilot MCP tools', () => {
         assert.equal(patchPlan.structuredContent?.['success'], true);
         assert.equal(patchPlan.structuredContent?.['plannedTool'], 'repo_apply_patch');
         assert.equal(typeof patchPlan.structuredContent?.['sha256'], 'string');
+
+        const patchBatchPlanTool = findTool('repo_patch_batch_plan');
+        const patchBatchPlan = await patchBatchPlanTool.handler({
+            operations: [
+                {
+                    path: 'src/copilot/mcp/README.md',
+                    old_string: 'Copilot MCP Server',
+                    new_string: 'Copilot MCP Server',
+                    allowNoop: true,
+                },
+            ],
+        });
+        assert.equal(patchBatchPlan.isError, undefined);
+        assert.equal(patchBatchPlan.structuredContent?.['success'], true);
+        assert.equal(patchBatchPlan.structuredContent?.['plannedTool'], 'repo_apply_patch');
+        assert.equal(patchBatchPlan.structuredContent?.['operationCount'], 1);
+        assert.ok(Array.isArray(patchBatchPlan.structuredContent?.['nextCalls']));
+
+        const applyPatchBatchTool = findTool('repo_apply_patch_batch');
+        const applyPatchBatchDryRun = await applyPatchBatchTool.handler({
+            operations: [
+                {
+                    path: 'src/copilot/mcp/README.md',
+                    old_string: 'Copilot MCP Server',
+                    new_string: 'Copilot MCP Server',
+                    allowNoop: true,
+                },
+            ],
+        });
+        assert.equal(applyPatchBatchDryRun.isError, undefined);
+        assert.equal(applyPatchBatchDryRun.structuredContent?.['success'], true);
+        assert.equal(applyPatchBatchDryRun.structuredContent?.['dryRun'], true);
+        assert.equal(applyPatchBatchDryRun.structuredContent?.['operationCount'], 1);
+        assert.deepEqual(applyPatchBatchDryRun.structuredContent?.['applied'], []);
+
+        const applyPatchBatchWithoutConfirm = await applyPatchBatchTool.handler({
+            operations: [
+                {
+                    path: 'src/copilot/mcp/README.md',
+                    old_string: 'Copilot MCP Server',
+                    new_string: 'Copilot MCP Server',
+                    allowNoop: true,
+                },
+            ],
+            dryRun: false,
+        });
+        assert.equal(applyPatchBatchWithoutConfirm.isError, true);
+        assert.equal(applyPatchBatchWithoutConfirm.structuredContent?.['code'], 'ERR_PATCH_BATCH_CONFIRM_REQUIRED');
 
         const createPlanTool = findTool('repo_create_file_plan');
         const createPlan = await createPlanTool.handler({

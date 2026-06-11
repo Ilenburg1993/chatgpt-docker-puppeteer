@@ -9,13 +9,23 @@
  * @module copilot/mcp/cloudflare/config-audit
  */
 
-import Cloudflare from 'cloudflare';
-import { readCloudflareRemoteApiConfig } from './remote-api.js';
+import { createTtlCache } from '#copilot/mcp/control-plane';
+import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
+
+/** @typedef {import('cloudflare').default} CloudflareConfigAuditClient */
 
 const CONFIG_PHASE = 'http_config_settings';
 const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com/client/v4';
 
 const DYNAMIC_MCP_PATHS = ['/mcp', '/oauth/', '/.well-known/', '/health'];
+const DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS = 5_000;
+
+/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
+const configAuditCache = createTtlCache({
+    name: 'cloudflare-config-audit',
+    ttlMs: DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS,
+    maxEntries: 32,
+});
 
 const ZONE_SETTINGS = [
     {
@@ -121,7 +131,7 @@ const ZONE_SETTINGS = [
  */
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv; cacheTtlMs?: number; forceRefresh?: boolean }} [options]
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 export async function auditCloudflareConfigPosture(options = {}) {
@@ -156,8 +166,20 @@ export async function auditCloudflareConfigPosture(options = {}) {
             ],
         };
     }
+    const cacheKey = buildConfigAuditCacheKey(auditConfig);
+    return configAuditCache.getOrLoad(
+        cacheKey,
+        () => auditCloudflareConfigPostureUncached(auditConfig),
+        { forceRefresh: options.forceRefresh === true, ttlMs: readConfigAuditCacheTtlMs(options.cacheTtlMs) },
+    );
+}
 
-    const client = new Cloudflare({ apiToken: auditConfig.apiToken ?? '', maxRetries: 1, timeout: 15000 });
+/**
+ * @param {ConfigAuditConfig} auditConfig
+ * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
+ */
+async function auditCloudflareConfigPostureUncached(auditConfig) {
+    const client = getCloudflareClient(auditConfig.apiToken ?? '');
     const zoneResolution = await resolveZoneId(client, auditConfig);
     if (!zoneResolution.zoneId) {
         return {
@@ -297,16 +319,12 @@ export function analyzeConfigPosture(zoneSettings, configRules, context) {
  * @returns {Promise<{ settings: ZoneSettingSummary[]; warnings: string[]; permissionGaps: string[] }>}
  */
 async function readZoneSettings(apiToken, zoneId) {
-    const settings = [];
-    const warnings = [];
-    const permissionGaps = [];
-    for (const setting of ZONE_SETTINGS) {
-        const result = await readZoneSetting(apiToken, zoneId, setting);
-        settings.push(result.summary);
-        if (result.permissionGap) permissionGaps.push(result.permissionGap);
-        if (result.warning) warnings.push(result.warning);
-    }
-    return { settings, warnings, permissionGaps };
+    const results = await Promise.all(ZONE_SETTINGS.map((setting) => readZoneSetting(apiToken, zoneId, setting)));
+    return {
+        settings: results.map((result) => result.summary),
+        warnings: results.flatMap((result) => (result.warning ? [result.warning] : [])),
+        permissionGaps: results.flatMap((result) => (result.permissionGap ? [result.permissionGap] : [])),
+    };
 }
 
 /**
@@ -358,7 +376,7 @@ async function readZoneSetting(apiToken, zoneId, setting) {
 }
 
 /**
- * @param {Cloudflare} client
+ * @param {CloudflareConfigAuditClient} client
  * @param {string} zoneId
  * @param {string} publicHostname
  * @returns {Promise<{ rulesets: ConfigRuleSummary[]; warnings: string[]; permissionGaps: string[] }>}
@@ -410,7 +428,30 @@ function simplifyConfigRule(rule, publicHostname) {
 }
 
 /**
- * @param {Cloudflare} client
+ * @param {number | undefined} value
+ * @returns {number}
+ */
+function readConfigAuditCacheTtlMs(value) {
+    if (value === undefined) return DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS;
+    return Number.isFinite(value) && value >= 0 && value <= 60_000 ? Math.floor(value) : DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS;
+}
+
+/**
+ * @param {ConfigAuditConfig} config
+ * @returns {string}
+ */
+function buildConfigAuditCacheKey(config) {
+    return JSON.stringify({
+        accountId: config.accountId ?? null,
+        zoneId: config.zoneId ?? null,
+        zone: config.zone,
+        publicHostname: config.publicHostname,
+        expectedPublicMcpUrl: config.expectedPublicMcpUrl,
+    });
+}
+
+/**
+ * @param {CloudflareConfigAuditClient} client
  * @param {ConfigAuditConfig} config
  * @returns {Promise<{ zoneId: string | null; source: string | null; zoneName: string; zoneIdRedaction: string | null; warnings: string[] }>}
  */

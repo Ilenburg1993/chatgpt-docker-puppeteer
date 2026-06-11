@@ -57,6 +57,7 @@ describe('copilot MCP registry', () => {
             'mcp_golden_prompts',
             'mcp_host_block_diagnostics',
             'mcp_last_validation_summary',
+            'mcp_latency_dashboard',
             'mcp_maintenance_apply_safe_fixes',
             'mcp_maintenance_plan',
             'mcp_oauth_friction_audit',
@@ -74,6 +75,7 @@ describe('copilot MCP registry', () => {
             'repo_apply_file_batch',
             'repo_apply_file_batch_plan',
             'repo_apply_patch',
+            'repo_apply_patch_batch',
             'repo_create_file',
             'repo_create_file_plan',
             'repo_diff_files',
@@ -92,6 +94,7 @@ describe('copilot MCP registry', () => {
             'repo_list_quarantine',
             'repo_move_file',
             'repo_move_file_plan',
+            'repo_patch_batch_plan',
             'repo_patch_plan',
             'repo_quarantine_file',
             'repo_quarantine_file_plan',
@@ -112,6 +115,21 @@ describe('copilot MCP registry', () => {
             'run_typecheck_copilot',
             'run_unit_copilot',
         ]);
+    });
+
+    it('supports a safe Claude/research tool surface without write tools', () => {
+        const tools = getCanonicalMcpTools({
+            toolSurfacePolicy: { mode: 'safe', include: new Set(), exclude: new Set(), allowEmpty: false },
+        });
+        const names = new Set(tools.map((tool) => tool.name));
+
+        assert.equal(names.has('mcp_latency_dashboard'), true);
+        assert.equal(names.has('claude_connector_profile'), true);
+        assert.equal(names.has('repo_read_file'), true);
+        assert.equal(names.has('repo_apply_patch'), false);
+        assert.equal(names.has('repo_create_file'), false);
+        assert.equal(names.has('repo_remove_file'), false);
+        assert.ok(tools.every((tool) => tool.annotations.destructiveHint !== true));
     });
 
     it('uses explicit annotations on every initial tool', () => {

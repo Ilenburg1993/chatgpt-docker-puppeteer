@@ -11,7 +11,15 @@
  *     content: { type: 'text'; text: string }[];
  *     structuredContent: Record<string, any>;
  * }} StructuredCallToolResult
+ *
+ * @typedef {{
+ *     bytes: number;
+ *     strategy: 'exact' | 'conservative-estimate';
+ *     source: string;
+ * }} ResultSizeHint
  */
+
+const RESULT_SIZE_HINT_SYMBOL = Symbol.for('copilot.mcp.resultSizeHint');
 
 /**
  * @param {unknown} value
@@ -35,6 +43,99 @@ export function okResult(structuredContent, text, meta) {
         structuredContent: normalizedStructuredContent,
         ...(meta ? { _meta: meta } : {}),
     };
+}
+
+/**
+ * Attach an internal result-size hint used by the registry to avoid expensive full JSON stringification when a tool can
+ * already account for its own result size. The symbol property is non-enumerable and is not part of the MCP payload.
+ *
+ * @template {StructuredCallToolResult} T
+ * @param {T} result
+ * @param {ResultSizeHint} hint
+ * @returns {T}
+ */
+export function withResultSizeHint(result, hint) {
+    if (!Number.isFinite(hint.bytes) || hint.bytes < 0) return result;
+    Object.defineProperty(result, RESULT_SIZE_HINT_SYMBOL, {
+        value: {
+            bytes: Math.ceil(hint.bytes),
+            strategy: hint.strategy,
+            source: hint.source,
+        },
+        enumerable: false,
+        configurable: true,
+    });
+    return result;
+}
+
+/**
+ * @param {unknown} result
+ * @returns {ResultSizeHint | null}
+ */
+export function getResultSizeHint(result) {
+    if (!result || typeof result !== 'object') return null;
+    const hint = /** @type {Record<PropertyKey, unknown>} */ (result)[RESULT_SIZE_HINT_SYMBOL];
+    if (!hint || typeof hint !== 'object' || Array.isArray(hint)) return null;
+    const record = /** @type {Record<string, unknown>} */ (hint);
+    const bytes = Number(record['bytes']);
+    const strategy = record['strategy'];
+    const source = record['source'];
+    if (!Number.isFinite(bytes) || bytes < 0) return null;
+    if (strategy !== 'exact' && strategy !== 'conservative-estimate') return null;
+    return {
+        bytes,
+        strategy,
+        source: typeof source === 'string' ? source : 'unknown',
+    };
+}
+
+/**
+ * Estimate JSON bytes without materializing the whole result string. This preserves the result-size guard while avoiding
+ * the large temporary allocation that `stableJsonStringify(result)` creates for hot read/search/patch tools.
+ *
+ * @param {unknown} value
+ * @param {WeakSet<object>} [seen]
+ * @returns {number}
+ */
+function estimateJsonBytes(value, seen = new WeakSet()) {
+    if (value === null) return 4;
+    if (typeof value === 'string') return Buffer.byteLength(JSON.stringify(value), 'utf8');
+    if (typeof value === 'number') return Buffer.byteLength(JSON.stringify(Number.isFinite(value) ? value : null), 'utf8');
+    if (typeof value === 'boolean') return value ? 4 : 5;
+    if (typeof value === 'bigint') return Buffer.byteLength(JSON.stringify(String(value)), 'utf8');
+    if (typeof value === 'undefined' || typeof value === 'function' || typeof value === 'symbol') return 0;
+    if (typeof value !== 'object') return Buffer.byteLength(JSON.stringify(String(value)), 'utf8');
+    if (seen.has(value)) return 6;
+    seen.add(value);
+    if (Array.isArray(value)) {
+        let total = 2;
+        for (let index = 0; index < value.length; index += 1) {
+            if (index > 0) total += 1;
+            const item = value[index];
+            total += item === undefined || typeof item === 'function' || typeof item === 'symbol' ? 4 : estimateJsonBytes(item, seen);
+        }
+        return total;
+    }
+    let total = 2;
+    let count = 0;
+    for (const [key, item] of Object.entries(value)) {
+        if (item === undefined || typeof item === 'function' || typeof item === 'symbol') continue;
+        if (count > 0) total += 1;
+        total += Buffer.byteLength(JSON.stringify(key), 'utf8') + 1 + estimateJsonBytes(item, seen);
+        count += 1;
+    }
+    return total;
+}
+
+/**
+ * @param {unknown} structuredContent
+ * @param {string | undefined} text
+ * @returns {number}
+ */
+export function estimateStructuredTextResultBytes(structuredContent, text) {
+    const structured = asRecord(structuredContent);
+    const contentText = text ?? stringifyForModel(structured);
+    return estimateJsonBytes({ content: [{ type: 'text', text: contentText }], structuredContent: structured }) + 512;
 }
 
 /**

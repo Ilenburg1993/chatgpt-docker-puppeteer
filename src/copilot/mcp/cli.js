@@ -13,6 +13,9 @@
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { logMcp } from '#copilot/mcp/control-plane';
+import { enableCopilotNodeCompileCache } from './runtime/node-compile-cache.js';
+
+enableCopilotNodeCompileCache();
 
 const VALID_TRANSPORTS = /** @type {const} */ (['http', 'http2', 'stdio']);
 const SHUTDOWN_GRACE_MS = 5000;

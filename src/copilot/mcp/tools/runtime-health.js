@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/io';
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import {
     readCloudflareTunnelConfig,
@@ -15,13 +16,18 @@ import {
     summarizeQuickTunnelState,
 } from '#copilot/mcp/cloudflare';
 import {
+    buildAiArtifactsReport,
     getMcpWorkspaceRoot,
+    getTtlCacheStats,
     okResult,
+    readMcpAuthConfigCacheStats,
+    readMcpAuthDecisionCacheStats,
     readMcpIndexAutoBuildState,
     readMcpMetricsSnapshot,
     readMcpWorkspaceSmokeSummary,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
+import { readRepoReadFileResultCacheStats } from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
@@ -234,6 +240,12 @@ export const mcpRuntimeHealthTool = {
         const options = /** @type {Record<string, unknown>} */ (input);
         const includeDetails = options['includeDetails'] === true;
         const metrics = readMcpMetricsSnapshot();
+        const ttlCaches = getTtlCacheStats();
+        const authConfigCache = readMcpAuthConfigCacheStats();
+        const authDecisionCache = readMcpAuthDecisionCacheStats();
+        const repoReadFileCache = readRepoReadFileResultCacheStats();
+        const ioRuntime = readIoRuntimeHealthSnapshot();
+        const aiArtifacts = await buildAiArtifactsReport();
         const tunnelConfig = readCloudflareTunnelConfig();
         const tunnelState = await readQuickTunnelState(tunnelConfig.stateFile);
         const tunnel = summarizeQuickTunnelState(tunnelState, Date.now(), tunnelConfig.staleAfterMs);
@@ -280,6 +292,14 @@ export const mcpRuntimeHealthTool = {
         }
         if (!lastWorkspaceSmoke) warnings.push('No in-process mcp_smoke_workspace result has been recorded.');
         if (lastWorkspaceSmoke?.success === false) critical.push('Last mcp_smoke_workspace failed.');
+        const aiJobs = aiArtifacts['jobs'];
+        const aiJobsExtraCount =
+            aiJobs && typeof aiJobs === 'object' && !Array.isArray(aiJobs)
+                ? Number(/** @type {Record<string, unknown>} */ (aiJobs)['cleanupCandidateCount'] ?? 0)
+                : 0;
+        if (Number.isFinite(aiJobsExtraCount) && aiJobsExtraCount > 0) {
+            informational.push(`src/copilot/.ai/jobs has ${aiJobsExtraCount} artifacts beyond retention.`);
+        }
         for (const [toolName, metric] of Object.entries(metrics.tools)) {
             const calls = Number(metric.calls ?? 0);
             const errors = Number(metric.errors ?? 0);
@@ -317,6 +337,13 @@ export const mcpRuntimeHealthTool = {
                     slowestTools: summarizeSlowestTools(metrics.tools),
                     slowestPhases: summarizeSlowestPhases(metrics.tools),
                     phaseTotals: summarizePhaseTotals(metrics.tools),
+                    ttlCaches,
+                    authorizationConfigCache: authConfigCache,
+                    authorizationCache: authDecisionCache,
+                    repoReadFileCache,
+                    ioCache: ioRuntime.cache,
+                    ioParser: ioRuntime.parser,
+                    aiArtifacts,
                 },
                 detailsAvailable: true,
             });
@@ -354,7 +381,16 @@ export const mcpRuntimeHealthTool = {
                 },
             },
             indexStats,
-            metrics,
+            metrics: {
+                ...metrics,
+                ttlCaches,
+                authorizationConfigCache: authConfigCache,
+                authorizationCache: authDecisionCache,
+                repoReadFileCache,
+                ioCache: ioRuntime.cache,
+                ioParser: ioRuntime.parser,
+                aiArtifacts,
+            },
             tunnel: permanentMode
                 ? {
                       mode: 'named-permanent',

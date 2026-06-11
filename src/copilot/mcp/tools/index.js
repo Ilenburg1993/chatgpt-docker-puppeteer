@@ -27,6 +27,7 @@ export * from './git-read.js';
 export * from './golden-prompts.js';
 export * from './host-blocks.js';
 export * from './jobs.js';
+export * from './latency-dashboard.js';
 export * from './maintenance.js';
 export * from './meta.js';
 export * from './oauth-friction-audit.js';
