@@ -1,6 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
+**Baseline reinvestigado:** `main` em `34fd96cc` (`origin/main` sincronizada em 2026-06-12)
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -9,24 +10,24 @@
 
 ## 1. Sumário executivo
 
-A infra IO de `src/copilot` já é substancialmente superior a um uso ingênuo de `fs/promises`: há fachada pública, locks assíncronos por recurso, escrita por temp+rename, `expectedHash`, cache L1 com fingerprint, L2/índice SQLite preparados, scanner com denylist/gitignore, parser em workers e observabilidade por `diagnostics_channel`.
+A infra IO de `src/copilot` evoluiu materialmente desde a abertura deste documento. As Faixas 0, 1 e 2.1 já entregaram validação UTF-8 compartilhada, criação/cópia exclusiva, writer com `flush`, sync de diretório best-effort, move `EXDEV` verificado e lockfile L1 opcional. Portanto, os dez achados originais não continuam todos abertos.
 
-Ainda assim, para a ambição declarada de ser a camada canônica e segura de mutação do workspace, há lacunas importantes. A maior diferença entre o estado atual e o estado ideal está em **durabilidade de crash**, **garantia multiprocess**, **snapshot consistente**, **bypass de bordas**, e **edge cases de cache/UTF-8**.
+No baseline `34fd96cc`, a descrição correta é: **atomicidade durável configurável para replace, lock L0 maduro e L1 ainda experimental, mas snapshots/cópias/append e coordenação derivada ainda não formam uma transação coerente de ponta a ponta**.
 
-Os achados mais críticos desta auditoria são:
+Prioridades reais após a reinvestigação:
 
-1. **Escrita atômica não é crash-durable:** `write-atomic.js` usa `writeFile(tmp)` + `rename`, mas não faz `flush`, `fsync`/`filehandle.sync()` nem sync do diretório.
-2. **Locks são apenas intra-processo:** `io-locks.js` serializa chamadas dentro do processo Node atual, mas não impede concorrência de outro processo Node, terminal, editor, Git ou ferramenta externa.
-3. **`io-prefetch` pode envenenar cache textual com bytes inválidos:** `warmSinglePath()` usa `Buffer.toString('utf8')` sem validação, enquanto `readText()` valida UTF-8 quando lê do disco. Isso permite que uma leitura textual futura sirva string cacheada com U+FFFD, pulando a barreira binária.
-4. **`patchTextLocked` lê com `fs.readFile(..., 'utf8')`:** arquivos binários ou UTF-8 inválidos podem ser decodificados com substituição silenciosa e depois regravados.
-5. **Move cross-device (`EXDEV`) é frágil:** fallback `copyFile` + `unlink` não verifica hash/tamanho pós-cópia, não fsynca, e não tem rollback robusto.
-6. **TOCTOU em create/copy:** `failIfExists` e `overwrite=false` dependem de `access()` antes de escrever/copiar, sem `O_EXCL`/`COPYFILE_EXCL`; proteção atual é só intra-processo.
-7. **Snapshots de leitura misturam `readFile` e `stat` em paralelo:** conteúdo e metadados podem vir de versões diferentes do arquivo.
-8. **Há bypasses reais fora da fachada IO:** audit logs, SSE archive, export terminal e store usam `appendFile`, `rename`, `writeFile` ou `readFile` diretamente.
-9. **Invalidação derivada pode ser atrasada:** bus debounced pode deixar parser/line-offset/index derivados em janela curta de stale read-after-write.
-10. **O rollback de patch é limitado:** snapshot base64 só é retido até orçamento; arquivos grandes ficam sem rollback material completo.
+1. **P0 — stale recovery inseguro no lock L1:** um lock local pode ser roubado apenas por ultrapassar TTL mesmo quando o PID dono continua vivo; metadata ainda não gravada também pode ser tratada como stale imediatamente.
+2. **P0 — move sem overwrite ainda tem TOCTOU:** o caminho same-device faz precheck por `access()` e depois `rename()`, que pode sobrescrever destino criado externamente entre as duas operações.
+3. **P0 — copy com overwrite não é staged:** `copyFile()` escreve diretamente no destino final; erro parcial pode destruir o destino anterior.
+4. **P1 — release L1 não é determinístico:** `release()` dispara remoção assíncrona sem await e sem observar rejeição; `Symbol.asyncDispose` não espera o lockfile desaparecer.
+5. **P1 — snapshots continuam inconsistentes:** `readBytesFileSnapshot()` e `readTextFileSnapshot()` ainda combinam `readFile` e `stat` em paralelo.
+6. **P1 — snapshot de mutação ainda materializa o stream inteiro:** `Array.fromAsync(stream)` elimina o benefício de memória do streaming.
+7. **P1 — invalidação derivada retorna atrasada:** parser, line-offset, índice e caches de borda recebem invalidação por bus debounced depois de a mutação já ter retornado.
+8. **P1 — append/JSONL permanece fragmentado:** audit, observability, MCP e SSE duplicam append/rotação; há caminhos de duplicação de registros e perda de lote em erro.
+9. **P1 — política workspace-bound ainda não está na fachada:** a engine pública valida string/null-byte, mas containment e symlink policy continuam responsabilidade dos adapters.
+10. **P2 — scanner ainda faz `lstat` por entrada:** `Dirent` não foi adotado, mantendo custo de syscall evitável em árvores grandes.
 
-Conclusão: o projeto está em boa posição para evoluir para uma camada IO de alta confiabilidade, mas a situação atual ainda é melhor descrita como **atomicidade lógica intra-processo + cache inteligente**, não como **durabilidade transacional contra crash ou concorrência externa**.
+Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade” nem como “somente lock intra-processo”. Porém, ainda não deve ser chamada de transacional ou plenamente multiprocess até corrigir stale recovery, publicação exclusiva de move, cópia staged, snapshot consistente e append canônico.
 
 ### 1.1 Status de implementação — Faixa 0 aplicada em 2026-06-12
 
@@ -120,6 +121,38 @@ Riscos ainda não encerrados pela Faixa 2.1:
 - A divisão `workspaceIo` versus `trustedPortableIo` permanece para a Fase 2.2.
 - Observabilidade avançada de p95/histograma de espera de locks permanece para a Fase 2.3.
 
+### 1.4 Reinvestigação pós-sincronização — baseline `34fd96cc`
+
+Antes desta rodada, toda a situação local foi organizada em cinco commits e publicada diretamente em `origin/main`:
+
+- `92d145b7` — Company Knowledge e Apps SDK widget.
+- `883889f7` — atualização da auditoria arquitetural geral.
+- `c6be21c1` — parser preserva símbolos quando o orçamento é excedido.
+- `eece2e3f` — hardening IO, durabilidade e lockfile L1.
+- `34fd96cc` — inclusão desta auditoria.
+
+Inventário objetivo do escopo:
+
+- 1.358 arquivos rastreados em `src/copilot`.
+- 1.246 arquivos JS/TS.
+- aproximadamente 269 mil linhas JS/TS.
+- 116 arquivos sob `src/copilot/infra`.
+- 11.219 linhas no núcleo `infra/io`, `io-*`, locks, policy, shared e scan.
+- 74 arquivos de teste diretamente relacionados a IO, cache, scanner, parser, locks, filesystem e auditoria foram identificados.
+
+Novas constatações de implementação:
+
+- existem dois gerenciadores de lockfile: `infra/lockfile.js` e `infra/locks/file-resource-lock.js`, com contratos e stale recovery diferentes;
+- o L1 novo cria o arquivo com `open('wx')`, mas leitores concorrentes podem observar metadata vazia/parcial e removê-la imediatamente;
+- o TTL do L1 prevalece sobre PID vivo, o que torna operações longas inseguras;
+- `moveFileUnlocked()` ignora `overwrite=false` no caminho same-device e chama `rename()` diretamente;
+- `copyFileLocked(..., { overwrite:true })` captura rollback, mas publica com `copyFile()` direto no destino;
+- `syncFileBestEffort()` no caminho `EXDEV` tem o resultado ignorado;
+- line-offset cache ainda usa o path recebido como chave, enquanto L1/parser/índice normalizam;
+- `invalidateIoCacheTiers()` não força `flushIoInvalidationQueue()`;
+- `createAuditLog().flush()` reapenda todo o ring buffer em toda chamada sem cursor de persistência;
+- SSE remove o batch da fila antes de confirmar append e não o recoloca quando a escrita falha.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -188,6 +221,19 @@ Foi feita busca textual em `src/copilot` por chamadas diretas a `writeFile`, `ap
 - `src/copilot/plugins/plugin-registry.js`: `readdir` direto, aceitável para descoberta, mas fora da fachada.
 
 Esse ponto é particularmente importante porque `src/copilot/infra/README.md` orienta que novas leituras/escritas em tools/bordas passem por fachada pública, não por `fs.readFile`/`fs.writeFile` direto.
+
+Na reinvestigação, a busca foi refeita sobre todos os 1.246 arquivos JS/TS. Além dos callsites acima, há writers diretos relevantes em:
+
+- `src/copilot/observability/event-collector.js`;
+- `src/copilot/observability/metrics.js`;
+- `src/copilot/mcp/control-plane/audit.js`;
+- `src/copilot/mcp/control-plane/jobs.js`;
+- `src/copilot/mcp/control-plane/dev-oauth.js`;
+- `src/copilot/config/declarative-runtime-config.js`;
+- `src/copilot/terminal/commands/byok.js`;
+- stores e snapshots de agent/session.
+
+Nem todo acesso direto é um defeito: bootstrap, configuração, SQLite, descoberta e readers especializados podem justificar portas baixas. O problema atual é a ausência de uma allowlist formal que diferencie exceção intencional de bypass acidental.
 
 ---
 
@@ -353,6 +399,26 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-028 | P2 | Statfs | Sem preflight de espaço livre | Não há uso de `statfs` | ENOSPC parcial em copy/write grande | Adicionar preflight opcional para payloads acima de limiar |
 | IO-029 | P2 | Durable append | Logs e JSONL não têm recovery de linha parcial | audit/SSE | JSONL pode quebrar parsing | Na leitura, truncar/ignorar última linha inválida; na escrita, flush configurável |
 | IO-030 | P3 | L3 cache | L3 reservado, mas sem contrato | `io-cache-tiering.js` | Sem problema atual | Só planejar se houver múltiplos runtimes/processos reais |
+| IO-031 | P0 | Lock L1 | TTL pode roubar lock de PID local vivo | `file-resource-lock.js:isStaleLock` | Duas operações multiprocess podem executar simultaneamente após TTL | Para mesmo hostname, PID vivo deve prevalecer; para host remoto, usar heartbeat/mtime antes de TTL |
+| IO-032 | P0 | Lock L1 | Metadata vazia/parcial é stale imediatamente | `readLockMetadata()` retorna `null`; `isStaleLock(null)` retorna `true` | Segundo processo pode remover lock entre `open('wx')` e gravação da metadata | Observar `stat/mtime`; só recuperar metadata inválida após grace/TTL |
+| IO-033 | P1 | Lock release | Release assíncrono não é aguardado nem observado | `io-locks.js`: `void fileLock.release()` | Cleanup não determinístico e possível rejection não observada | Adicionar `releaseAsync`, aguardar em wrappers e `asyncDispose`, manter `release` compatível |
+| IO-034 | P0 | Move | `overwrite=false` não é exclusivo same-device | precheck + `rename(source,destination)` | Destino externo pode ser sobrescrito por corrida | Publicar com `link+unlink` para arquivo ou outra primitiva exclusiva |
+| IO-035 | P0 | Copy | Overwrite copia direto no destino final | `copyFileLocked` -> `copyFile` | Erro parcial pode destruir destino anterior | Copiar para temp, verificar hash/tamanho, flush e rename final |
+| IO-036 | P1 | Snapshot | Snapshot baixo ainda mistura versões | `read-bytes.js`, `read-text.js` | Cache associa bytes e metadata divergentes | `open` + `stat/read/stat` + verificação do path e retry limitado |
+| IO-037 | P1 | Invalidation | Mutação retorna antes dos derivados | bus debounce de 50ms | Read-after-write pode usar parser/line-offset/index stale | Flush explícito no fim da mutação canônica |
+| IO-038 | P1 | JSONL | Append/rotação duplicados têm perda/duplicação | audit, observability, SSE, MCP | Auditoria inconsistente após falha/reflush | Wrapper canônico de append/rotate/flush e cursor de persistência |
+| IO-039 | P2 | Lock governance | Dois lockfile managers coexistem | `infra/lockfile.js` e `infra/locks/file-resource-lock.js` | Semânticas divergentes e manutenção duplicada | Definir SSOT e migrar o legado gradualmente |
+| IO-040 | P2 | Scanner | `lstat` por entrada continua ativo | `io-scanner.js` | Syscalls extras em árvores grandes | Usar `Dirent`; fazer `lstat/stat` apenas quando metadata exigir |
+
+### 5.1 Reclassificação dos achados originais no baseline atual
+
+| Estado | IDs |
+| --- | --- |
+| Concluído | IO-003, IO-004, IO-008, IO-019, IO-020 |
+| Concluído com limite documentado | IO-001, IO-005 |
+| Parcial | IO-002, IO-006, IO-009, IO-012, IO-013, IO-016, IO-023, IO-025 |
+| Aberto | IO-007, IO-010, IO-011, IO-014, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-029, IO-030 |
+| Novos | IO-031 a IO-040 |
 
 ---
 
@@ -362,26 +428,29 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 **Bom:**
 
-- Mutação canônica usa locks intra-processo.
+- Mutação canônica usa locks intra-processo e pode compor lockfile L1 opt-in.
 - Patch e write podem usar `expectedHash`.
-- Rename no mesmo diretório evita estados parcialmente escritos em muitos cenários normais.
+- Atomic replace usa temp exclusivo, `flush:true`, rename/link e directory sync best-effort.
+- Move `EXDEV` verifica hash/tamanho antes de publicar e remover a origem.
+- Create e copy sem overwrite têm exclusividade real.
 - Cache é invalidado após mutações canônicas.
 
 **Insuficiente:**
 
-- Não há garantia de durabilidade em crash/power loss.
-- Não há lock multiprocess.
-- Alguns call sites burlam a fachada.
+- Stale recovery do L1 ainda pode roubar lock legítimo por TTL ou metadata parcial.
+- Move sem overwrite same-device ainda pode sobrescrever por TOCTOU.
+- Copy com overwrite ainda publica direto no destino.
+- Muitos callsites de append e alguns writers de configuração burlam a fachada.
 - Reads podem misturar conteúdo e stat de versões diferentes.
-- Prefetch textual pode burlar validação UTF-8.
+- Invalidação derivada ainda pode chegar depois do retorno da mutação.
 
-**Diagnóstico:** a camada atual protege bem contra concorrência cooperativa dentro do mesmo processo. Não deve ser vendida como transacional ou crash-safe.
+**Diagnóstico:** a camada protege bem o replace canônico e boa parte da concorrência cooperativa. Ainda não deve ser vendida como transacional ou multiprocess segura enquanto IO-031 a IO-038 estiverem abertos.
 
 ### 6.2 Locks e concorrência
 
-O design de `io-locks.js` é correto para single-process async concurrency. A reentrância com `AsyncLocalStorage` evita deadlocks quando um fluxo já protegido chama outra função protegida do mesmo recurso. Multi-lock ordenado lexicograficamente é boa prática.
+O design L0 de `io-locks.js` continua correto para single-process async concurrency. A reentrância com `AsyncLocalStorage` evita deadlocks e multi-lock ordenado lexicograficamente evita inversão.
 
-Limite estrutural: `Map` em memória não coordena com outro processo. Em devcontainer isso importa, porque o mesmo workspace pode ser alterado por:
+O L1 novo coordena processos cooperativos por `open('wx')`, mas ainda não pode ser promovido a default porque stale recovery e release precisam de correção. Em devcontainer, concorrência externa continua incluindo:
 
 - VS Code/editor;
 - Git;
@@ -390,11 +459,11 @@ Limite estrutural: `Map` em memória não coordena com outro processo. Em devcon
 - validações/testes;
 - ferramentas externas de format/lint.
 
-Estado ideal: manter o lock atual como L0 rápido e adicionar L1 opcional de lockfile para mutações de alto risco.
+Estado ideal: manter L0 rápido, corrigir L1, consolidar o lockfile legado e só então ativar L1 por perfil para mutações P0/P1.
 
 ### 6.3 Atomicidade e durabilidade
 
-Temp+rename resolve atomicidade de troca visível, mas não resolve persistência. A sequência ideal para arquivo crítico é:
+O writer atual já executa a maior parte da sequência durável para replace. O que falta é propagar o resultado da durabilidade, tratar falhas de sync conforme política e aplicar publicação staged às outras mutações. A sequência de referência permanece:
 
 1. abrir tmp no mesmo diretório com flags exclusivas;
 2. escrever payload completo;
@@ -415,10 +484,10 @@ L1 é bem pensado: TTL, max bytes, mtime+size, hash revalidation para arquivos p
 
 A prioridade é corrigir:
 
-- prefetch textual sem UTF-8 validation;
 - line-offset key normalizada;
 - flush da invalidation queue após mutações críticas;
-- read snapshot com retry.
+- read snapshot com retry;
+- freshness do índice para mudanças externas same-size.
 
 ### 6.5 Scanner, busca e index
 
@@ -479,164 +548,149 @@ A situação ideal é uma infra IO em camadas:
 
 ---
 
-## 8. Roadmap por faixas, fases e subfases
+## 8. Roadmap revisado por estado e ordem de execução
 
-### Faixa 0 — Contenção imediata de riscos P0
+### Faixa 0 — Contenção original
 
 #### Fase 0.1 — UTF-8 e patch seguro
 
-- [ ] Em `io-prefetch.js`, trocar `Buffer.toString('utf8')` por `decodeUtf8Buffer()`.
-- [ ] Se bytes não forem UTF-8, primar apenas bytes cache, nunca text cache.
-- [ ] Em `patchTextLocked`, ler Buffer, validar UTF-8, só então `toString('utf8')`.
-- [ ] Adicionar testes com bytes inválidos e garantir que `readText`/`patchText` recusam binário.
+- [x] Prefetch usa validação UTF-8 canônica.
+- [x] Cache textual não é primado com bytes inválidos.
+- [x] Patch lê bytes e recusa UTF-8 inválido.
+- [x] Testes cobrem prefetch e patch binário.
 
 #### Fase 0.2 — Bypass governance
 
-- [ ] Criar lint rule/local script: proibir `fs.writeFile`, `appendFile`, `rename`, `unlink`, `rm`, `copyFile` fora de allowlist.
-- [ ] Migrar `terminal/commands/export.js` para fachada pública.
-- [ ] Migrar audit/SSE append para wrapper canônico de append/log.
-- [ ] Revisar `storage/json-store.js` para não chamar `writeAtomicFileUnlocked` direto sem lock.
+- [ ] Criar regra de governança/allowlist para writers diretos.
+- [x] Migrar `/export` para atomic portable.
+- [ ] Migrar audit/SSE/observability para append canônico.
+- [x] Migrar `storage/json-store.js` para atomic portable.
 
-#### Fase 0.3 — TOCTOU básico
+#### Fase 0.3 — Exclusividade básica
 
-- [ ] `copyFileLocked` com `overwrite=false` deve usar `COPYFILE_EXCL`.
-- [ ] `writeFileAtomic` com `failIfExists` deve usar criação exclusiva ou rename condicionado.
-- [ ] Adicionar testes com concorrência externa simulada.
+- [x] Copy sem overwrite usa `COPYFILE_EXCL`.
+- [x] Create exclusivo usa `link`/`wx`.
+- [ ] Move sem overwrite deve ser exclusivo também no caminho same-device.
+- [ ] Adicionar prova multiprocess real de create/copy/move.
 
-### Faixa 1 — Durabilidade de escrita e move seguro
+### Faixa 1 — Durabilidade e publicação segura
 
 #### Fase 1.1 — Writer durável
 
-- [ ] Implementar `writeAtomicFileUnlockedDurable(filePath, payload, { mode, durability })`.
-- [ ] Usar `fsPromises.open(tmp, 'wx')` para evitar colisão.
-- [ ] Escrever payload via FileHandle.
-- [ ] Executar `filehandle.sync()` ou `writeFile(..., { flush:true })`.
-- [ ] Fechar handle antes de rename.
-- [ ] Renomear tmp para destino.
-- [ ] Tentar fsync do diretório quando suportado.
-- [ ] Garantir cleanup de tmp em erro.
+- [x] Temp exclusivo com random de 96 bits.
+- [x] `flush:true` configurável por modo de durabilidade.
+- [x] Rename/link final e cleanup de temp.
+- [x] Directory sync best-effort.
+- [ ] Propagar metadata de durabilidade para resultados públicos/health.
 
-#### Fase 1.2 — Move EXDEV transacional
+#### Fase 1.2 — Move seguro
 
-- [ ] Para `EXDEV`, copiar origem para temp no diretório destino.
-- [ ] Calcular hash/tamanho da origem antes/depois.
-- [ ] Verificar destino temp.
-- [ ] Flush/sync temp.
-- [ ] Rename temp para destino.
-- [ ] Só então unlink origem.
-- [ ] Se unlink origem falhar, reportar `duplicatedAfterCrossDeviceMove=true`.
+- [x] `EXDEV` copia para temp, verifica hash/tamanho e publica antes de unlink.
+- [x] Duplication state é exposto quando unlink da origem falha.
+- [ ] Same-device `overwrite=false` deve usar publicação exclusiva.
+- [ ] Falha de `syncFileBestEffort` deve impedir remoção da origem quando a durabilidade foi exigida.
+- [ ] Sync dos diretórios source/destination no caminho same-device.
 
-#### Fase 1.3 — Append confiável
+#### Fase 1.3 — Copy staged
 
-- [ ] Criar `appendRecordLocked(file, record, { format:'jsonl', flush })`.
-- [ ] Rotação sob o mesmo lock.
-- [ ] Recovery de última linha inválida em leitura.
-- [ ] Classificar audit logs como `best-effort` ou `durable`.
+- [ ] Copy com overwrite deve copiar para temp no destino.
+- [ ] Verificar hash/tamanho do temp.
+- [ ] Flush e rename final.
+- [ ] Preservar destino anterior quando copy/verify falhar.
 
-### Faixa 2 — Locks multiprocess e política de path
+#### Fase 1.4 — Append confiável
+
+- [ ] Criar wrapper canônico de append/rotate sob o mesmo lock.
+- [ ] Suportar `flush` explícito e classificação `best-effort`/`durable`.
+- [ ] Corrigir cursor de persistência do audit ring buffer.
+- [ ] Reenfileirar lote SSE/audit em falha recuperável.
+- [ ] Recovery de última linha JSONL parcial na leitura.
+
+### Faixa 2 — Lock multiprocess correto
 
 #### Fase 2.1 — Lockfile opcional
 
-- [ ] Criar `infra/locks/file-resource-lock.js` com `open('wx')`.
-- [ ] Metadata do lock com PID, hostname, operação, target, startedAt.
-- [ ] Stale detection por PID/process alive e idade máxima.
-- [ ] Timeout e abort integrados.
-- [ ] Ativar por env para mutações P0/P1.
+- [x] `open('wx')`, metadata, timeout e abort.
+- [x] Integração L0+L1 e ativação por env/opção.
+- [ ] PID local vivo deve prevalecer sobre TTL.
+- [ ] Metadata inválida recente não pode ser recuperada imediatamente.
+- [ ] Heartbeat/mtime para locks em filesystem compartilhado.
+- [ ] `releaseAsync` determinístico e `asyncDispose` real.
 
-#### Fase 2.2 — Workspace-bound IO
+#### Fase 2.2 — Consolidação de lock managers
+
+- [ ] Definir `file-resource-lock.js` como SSOT.
+- [ ] Adaptar `infra/lockfile.js` como compat facade ou migrar callsites.
+- [ ] Unificar symlink policy, metadata e stale recovery.
+
+#### Fase 2.3 — Workspace-bound IO
 
 - [ ] Dividir fachada em `workspaceIo` e `trustedPortableIo`.
-- [ ] `workspaceIo` exige `workspaceRoot` e chama `isPathInsideWorkspace`.
-- [ ] `trustedPortableIo` exige allowlist de caller ou root configurado.
-- [ ] Adicionar testes de `../`, symlink, path absoluto fora do workspace e null byte.
+- [ ] `workspaceIo` exige `workspaceRoot` e policy async.
+- [ ] `trustedPortableIo` exige root/caller explícito.
+- [ ] Testar traversal, symlink externo, absoluto externo e null-byte.
 
-#### Fase 2.3 — Observabilidade de locks
+#### Fase 2.4 — Observabilidade
 
-- [ ] Histograma de `lockWaitMs` por prefixo de recurso.
-- [ ] Contador de timeouts/aborts.
-- [ ] Snapshot de active leases.
-- [ ] Alertas quando p95 de lock > limiar.
+- [ ] Histograma/p95 de espera L0 e L1.
+- [ ] Contadores de timeout, abort, stale recovery e heartbeat failure.
+- [ ] Snapshot de leases com idade e operação, sem vazar path sensível.
 
-### Faixa 3 — Snapshot, cache e index coerentes
+### Faixa 3 — Snapshot e coerência derivada
 
 #### Fase 3.1 — Snapshot consistente
 
-- [ ] Reimplementar `readBytesFileSnapshot` com `open` + `stat/read/stat` + retry.
-- [ ] Retornar `ino`, `dev`, `mtimeNs` quando possível.
-- [ ] Só popular cache com snapshot consistente.
-- [ ] Testar mudança externa durante read.
+- [ ] `open` + `stat/read/stat` + verificação do path.
+- [ ] Retry limitado quando inode/fingerprint muda.
+- [ ] Retornar `dev`, `ino`, `ctimeMs`, tentativas e `consistent`.
+- [ ] Cachear somente snapshot consistente.
 
-#### Fase 3.2 — Normalização universal de cache keys
+#### Fase 3.2 — Snapshot de mutação incremental
 
-- [ ] Line-offset cache deve normalizar paths.
-- [ ] Parser cache deve usar a mesma normalização da L1.
-- [ ] Invalidação recursive deve apagar entradas relativas/absolutas equivalentes.
-- [ ] Teste: ler mesmo arquivo via path relativo e absoluto, escrever por um deles, garantir invalidação dos dois.
+- [ ] Remover `Array.fromAsync(stream)`.
+- [ ] Hash e orçamento de rollback em `for await`.
+- [ ] Adicionar teste de arquivo grande sem retenção integral.
 
-#### Fase 3.3 — L2 e índice
+#### Fase 3.3 — Invalidação read-after-write
 
-- [ ] Definir perfil experimental `IO_L2_CACHE_ENABLED=1` em CI opcional.
-- [ ] Auditar config SQLite: WAL, busy_timeout, synchronous.
-- [ ] Medir hit ratio e latência cold/warm.
-- [ ] Para índice, usar hash em arquivos pequenos para evitar stale por mtime+size.
+- [ ] Normalizar line-offset keys.
+- [ ] Forçar flush dos hooks derivados antes de retornar mutação canônica.
+- [ ] Testar path relativo/absoluto e mudança same-size/same-length.
 
-### Faixa 4 — Performance de scan/search/parser
+#### Fase 3.4 — L2 e índice
+
+- [ ] Perfil experimental L2 em CI.
+- [ ] Auditar WAL, `busy_timeout` e `synchronous`.
+- [ ] Hash/ctime/inode para freshness de arquivos pequenos.
+- [ ] Medir hit ratio e cold/warm.
+
+### Faixa 4 — Performance
 
 #### Fase 4.1 — Scanner com Dirent
 
-- [ ] Trocar `readdir(dir)` + `lstat` por `readdir(dir, { withFileTypes:true })` quando possível.
-- [ ] Lstat apenas quando fingerprint/symlink/policy exigir.
-- [ ] Medir antes/depois em `src/copilot` completo.
+- [ ] `readdir({ withFileTypes:true })`.
+- [ ] `lstat` apenas para arquivo/fingerprint ou caso ambíguo.
+- [ ] Benchmark em `src/copilot` completo.
 
-#### Fase 4.2 — Glob Node 24.5-safe
+#### Fase 4.2 — Search streaming
 
-- [ ] Avaliar `fsPromises.glob` para include/exclude simples.
-- [ ] Não depender de `followSymlinks`, pois opção é posterior a 24.5.
-- [ ] Comparar resultados com scanner atual em fixtures.
+- [ ] Parser incremental de stdout.
+- [ ] Early stop real em `maxResults`.
+- [ ] Totais calculados pós-redação ou marcados como raw.
 
-#### Fase 4.3 — Search streaming
+#### Fase 4.3 — Parser workers
 
-- [ ] Parsear stdout de `rg` incrementalmente e abortar ao atingir `maxResults`.
-- [ ] Reduzir `maxBuffer` default depois de streaming.
-- [ ] Evitar contagem bruta de matches em linhas redigidas.
+- [x] Reset async interno existe e shutdown público aguarda.
+- [ ] Backpressure/limite de fila.
+- [ ] Queue length e timeout por arquivo no health.
 
-#### Fase 4.4 — Parser workers
+### Faixa 5 — Provas
 
-- [ ] Transformar reset de workers em operação async explícita nos testes.
-- [ ] Adicionar backpressure para fila de parse.
-- [ ] Expor queue length e timeout por arquivo.
-
-### Faixa 5 — Provas, fuzz e chaos engineering
-
-#### Fase 5.1 — Fuzz textual
-
-- [ ] Patch com CRLF/LF misto.
-- [ ] Unicode multibyte e surrogate pairs.
-- [ ] Arquivos sem newline final.
-- [ ] Arquivos vazios.
-- [ ] `oldString` com múltiplas ocorrências.
-
-#### Fase 5.2 — Fuzz binário
-
-- [ ] Bytes inválidos UTF-8.
-- [ ] Arquivos muito grandes.
-- [ ] NUL no conteúdo e no path.
-- [ ] Snapshot truncado.
-
-#### Fase 5.3 — Crash injection
-
-- [ ] Falhar entre write tmp e sync.
-- [ ] Falhar entre sync e rename.
-- [ ] Falhar após rename antes de directory fsync.
-- [ ] Falhar durante EXDEV copy.
-- [ ] Falhar durante append de JSONL.
-
-#### Fase 5.4 — Multiprocess
-
-- [ ] Dois processos escrevendo mesmo arquivo.
-- [ ] Processo externo modificando arquivo durante read.
-- [ ] Git checkout enquanto índice roda.
-- [ ] Editor salvando arquivo enquanto patch aplica.
+- [ ] Fuzz textual e binário.
+- [ ] Crash injection em write, rename, directory sync, EXDEV e append.
+- [ ] Dois processos concorrendo por create/copy/move/write.
+- [ ] Modificação externa durante snapshot e index.
+- [ ] Git checkout/editor save durante patch.
 
 ---
 
@@ -662,18 +716,18 @@ A situação ideal é uma infra IO em camadas:
 
 ---
 
-## 10. Recomendação de implementação inicial
+## 10. Onda de implementação selecionada após a reinvestigação
 
-A primeira onda deve ser pequena e cirúrgica:
+Ordem de ataque sobre `34fd96cc`:
 
-1. **Corrigir UTF-8 cache poisoning** em `io-prefetch.js`.
-2. **Corrigir patch binário** em `locked-mutations.js`.
-3. **Trocar `copyFile` sem exclusividade** por `COPYFILE_EXCL` quando `overwrite=false`.
-4. **Criar writer durável experimental** sem trocar todos os callsites ainda.
-5. **Migrar bypasses evidentes** (`export.js`, audit append, SSE archive) para wrappers canônicos.
-6. **Adicionar testes de edge cases** antes de ativar durabilidade global.
+1. corrigir stale recovery e release determinístico do lock L1;
+2. tornar move sem overwrite exclusivo no caminho same-device;
+3. tornar snapshot de leitura consistente e snapshot de mutação incremental;
+4. normalizar line-offset e forçar invalidação derivada antes do retorno;
+5. adotar `Dirent` no scanner e medir;
+6. iniciar copy staged e append canônico em commits separados, pois ambos alteram contratos de falha e rotação.
 
-Essa onda reduz risco real sem reescrever toda a arquitetura.
+Essa ordem fecha primeiro riscos de concorrência/corrupção e depois reduz custo operacional.
 
 ---
 
@@ -681,27 +735,27 @@ Essa onda reduz risco real sem reescrever toda a arquitetura.
 
 ### `io/fs/write-atomic.js`
 
-Bom ponto de centralização. Deve virar a única primitiva baixa de replace, mas precisa receber estratégia de durabilidade. O nome atual promete atomicidade; deve documentar que hoje é atomicidade por rename, não durabilidade contra crash.
+É a primitiva baixa canônica de replace e já possui estratégia de durabilidade. Falta expor o resultado de file flush/directory sync aos callers e decidir quando uma falha best-effort deve virar erro.
 
 ### `io/fs/locked-writes.js`
 
-Bom encapsulamento. `expectedHash` está no lugar certo. Deve chamar writer durável e corrigir `failIfExists` para semântica exclusiva real.
+Bom encapsulamento. `expectedHash` e create exclusivo estão no lugar certo. Deve aguardar release L1 determinístico, propagar durabilidade e evoluir append para flush/rotação canônicos.
 
 ### `io/fs/locked-mutations.js`
 
-Deve validar UTF-8 antes de patch. Também deve elevar rollback para arquivos grandes via sidecar.
+Patch já valida UTF-8. Permanecem copy staged, move exclusivo same-device, release determinístico e rollback sidecar para arquivos grandes.
 
 ### `io/fs/move.js`
 
-É o ponto mais frágil de mutação não-trivial. O fallback EXDEV atual deve ser considerado best-effort, não seguro.
+O fallback EXDEV foi endurecido, mas o caminho same-device sem overwrite ainda é o ponto mais frágil por usar `rename()` após precheck.
 
 ### `io/fs/snapshot.js`
 
-A intenção é excelente, mas a implementação precisa ser incremental. `Array.fromAsync(stream)` contradiz o objetivo de snapshot orçamentado.
+A intenção é correta, mas `Array.fromAsync(stream)` ainda contradiz o objetivo de snapshot orçamentado e deve ser substituído por consumo incremental.
 
 ### `io-prefetch.js`
 
-Grande oportunidade de performance, mas precisa respeitar exatamente as mesmas invariantes de `readText`. Prefetch não pode ser uma via lateral que cria estados impossíveis pela API normal.
+Agora respeita a validação UTF-8 de `readText`. O risco remanescente vem do snapshot baixo inconsistente e da invalidação derivada atrasada.
 
 ### `io-cache.js`
 
@@ -717,7 +771,7 @@ Boa base de navegação e performance. A fragilidade é derivada: se qualquer wr
 
 ### `io-locks.js`
 
-Sólido para processo único. A documentação do módulo deveria dizer explicitamente: “não é lock interprocesso”. A evolução correta é compor com lockfile, não substituir.
+Sólido no L0 e já composto com L1. A próxima evolução é tornar release realmente assíncrono/determinístico e impedir stale recovery inseguro antes de ampliar o enablement.
 
 ---
 
@@ -750,15 +804,12 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ---
 
-## 14. Próxima ação recomendada
+## 14. Próxima ação executável
 
-Abrir uma sequência de patches pequena, nesta ordem:
+Implementar a onda da seção 10 e registrar, a cada commit:
 
-1. `io-prefetch` UTF-8 safety.
-2. `patchTextLocked` binary safety.
-3. `snapshot.js` streaming incremental.
-4. `copyFileLocked`/`failIfExists` exclusividade real.
-5. `write-atomic` durable mode atrás de flag.
-6. migração dos bypasses de `appendFile`/`writeFile` diretos.
-
-Essa sequência entrega redução de risco sem depender de uma reescrita ampla e cria base para ativar durabilidade progressiva por tipo de arquivo.
+- arquivos alterados;
+- invariantes fechadas;
+- testes focados executados;
+- validadores globais usados;
+- riscos remanescentes e mudança de status dos IDs IO-031 a IO-040.
