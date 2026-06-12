@@ -1,34 +1,38 @@
 # Auditoria Profunda — Repo DevContainer MCP
 
-**Data:** 2026-06-10 / 2026-06-11 **Auditor:** Claude Sonnet 4.6 (Anthropic) — sessão externa,
-acesso via MCP **Workspace:** `/workspaces/chatgpt-docker-puppeteer` **Branch/HEAD:** `main` @
-`8b540591` **Escopo:** `src/copilot` inteiro — MCP server, OAuth, infra, tools, terminal, agent,
-hooks, observabilidade, CI/CD, estrutura do repo
+**Data:** 2026-06-10 a 2026-06-12 **Auditoria externa:** Claude Sonnet 4.6 (Anthropic), acesso via
+MCP **Revalidação e remediação:** Codex **Workspace:** `/workspaces/chatgpt-docker-puppeteer`
+**Base publicada antes desta revisão:** `main` @ `45f74116` **Escopo efetivo:** `src/copilot`
+inteiro, seu MCP e os testes/validadores que provam esse código
 
 ---
 
 ## 1. Sumário Executivo
 
-O Repo DevContainer MCP está num estado **funcionalmente avançado e estruturalmente sólido**. Possui
-URL permanente (`https://mcp.aurelin.org/mcp`), OAuth 2.1 completo com PKCE/DPoP/PAR/DCR, Cloudflare
-Named Tunnel com QUIC, superfície de 95 ferramentas anotadas por risco, cache L1 ativo, índice
-FTS/símbolo local, auditoria por tool, e um suite de testes com 178 testes MCP 100% passando.
+O baseline externo encontrou um sistema avançado, mas com duas falhas de barrel, gate unitário
+incompleto, replay OAuth somente em memória, manutenção de startup ausente e várias classes de
+persistência/cardinalidade sem garantias suficientes.
 
-O runtime atual reporta status **`degraded`** — não por falha de protocolo, mas por três razões
-técnicas menores: ausência de `smoke_workspace` em memória (sem startup trigger), 513 artefatos de
-job além da retenção, e workspace sujo (changes não commitadas).
+Após revalidação integral do escopo, foram confirmados ou invalidados todos os itens externos e
+corrigidos **48 achados adicionais**. O gate `test:copilot:unit` agora descobre recursivamente 535
+arquivos e fechou em `6389/6417` testes, `1946/1946` suites, zero falhas e 28 pendências esperadas.
+Typecheck strict e lint Copilot também estão em PASS.
 
-Existem **2 testes com falha** no suite `unit-copilot` (de 3.882 testes), ambos relacionados à
-governança de barrels no subsistema `terminal`. Typecheck, lint e unit-mcp passam 100%.
+As causas de `degraded` controláveis por `src/copilot` foram tratadas: smoke de workspace agendado no
+startup, cleanup bounded executado sobre 513 artefatos, quick-tunnel stale reconciliável e worktree
+publicado/limpo. A confirmação do status do processo permanente após carregar o novo HEAD ainda
+depende de restart/smoke live e permanece requisito operacional, não dívida de implementação.
 
-Os gaps e oportunidades mais relevantes — por impacto — são: cleanup de artefatos AI, warmup de
-autorização na sessão fria, ativação do L2 cache SQLite, profiles de superfície MCP, replay-cache
-persistente para OAuth (DPoP/private_key_jwt), latência Cloudflare QUIC p99 (1314ms), e o path de
-migração para MCP SDK v2.
+Persistem como trabalho relevante: benchmark controlado de transporte, decisão medida sobre ativar
+L2 por perfil, plano de rotação de chaves OAuth com grace period e futuras avaliações de SDK v2
+somente após release estável.
 
 ---
 
-## 2. Estado Atual (Situação Observada)
+## 2. Baseline Externo Histórico e Estado Atual
+
+> As subseções 2.1, 2.3 e 2.4 preservam a fotografia observada pela auditoria externa antes das
+> remediações. O estado autoritativo pós-transformações está em 2.2 e no roadmap 5.0.
 
 ### 2.1 Runtime MCP
 
@@ -42,18 +46,17 @@ migração para MCP SDK v2.
 | Túnel permanente | `named-permanent`, último smoke: OK há 5 min                          |
 | Túnel temporário | stale (morto há 26.823 min); processo não existe; state file persiste |
 
-### 2.2 Validação (última execução)
+### 2.2 Validação pós-remediação
 
-| Suite            | Status  | Detalhes                    |
-| ---------------- | ------- | --------------------------- |
-| `typecheck`      | ✅ PASS | `tsc` strict — 0 erros      |
-| `lint`           | ✅ PASS | ESLint — 0 erros            |
-| `unit-mcp`       | ✅ PASS | 37 suites, 178 testes       |
-| `suite-mcp-fast` | ✅ PASS | typecheck + unit-mcp        |
-| `suite-mcp-full` | ✅ PASS | typecheck + lint + unit-mcp |
-| `unit-copilot`   | ❌ FAIL | 2/3.882 testes falhando     |
+| Suite                                  | Status  | Detalhes                                                                 |
+| -------------------------------------- | ------- | ------------------------------------------------------------------------ |
+| `npm run typecheck:strict:src.copilot` | ✅ PASS | Última execução após CDEX-048, 0 erros                                  |
+| `npm run lint:copilot`                 | ✅ PASS | Gate espaçado pós-transformações                                         |
+| `npm run test:copilot:unit`            | ✅ PASS | 535 arquivos; `6389/6417`; `1946/1946` suites; 28 pendências esperadas |
+| Testes focados finais                  | ✅ PASS | `25/25` sobre turn trace e error alerter após o lote `80/80`             |
+| Git                                    | ✅ PASS | Base anterior sincronizada em `45f74116`; revisão corrente a publicar   |
 
-#### Falhas unit-copilot
+#### Falhas unit-copilot do baseline externo, já corrigidas
 
 **W114.5 — Terminal barrel governance**
 
@@ -197,7 +200,7 @@ Problemas estruturais detectados:
 - Arquitetura REPL modular com commands, frontend, stores, events, state separados.
 - Frontend projetions/gateways desacoplados via barrels.
 
-**Bugs ativos (2 testes falhando):**
+**Bugs observados no baseline externo e já corrigidos:**
 
 - `commands/activity.js`, `commands/byok.js`, `commands/config.js`, `commands/context.js` violam a
   governance de barrels W114.5: importam diretamente dos subdiretórios internos de `../events/` e
@@ -302,7 +305,7 @@ O estado ideal é o servidor iniciando sem `degraded`:
 > **Formato das subfases:** `[ ]` = pendente, `[x]` = concluído, `[~]` = parcial/em andamento
 > **Severidade:** 🔴 crítico/bug, 🟠 gap importante, 🟡 melhoria, 🟢 upgrade/oportunidade
 
-## 5.0 Revalidação independente Codex — 2026-06-11
+## 5.0 Revalidação independente Codex — 2026-06-11/12
 
 ### Escopo efetivo
 
@@ -311,13 +314,13 @@ O estado ideal é o servidor iniciando sem `degraded`:
   `analysis/`, workflows e scripts fora de `src/copilot` são **N/A nesta execução**.
 - Validadores canônicos: `typecheck:strict:src.copilot`, `lint:copilot` e `test:copilot:unit`.
 
-### Baseline reproduzido
+### Baseline reproduzido e fechamento
 
-| Validador                              | Resultado em 2026-06-11                           |
-| -------------------------------------- | ------------------------------------------------- |
-| `npm run typecheck:strict:src.copilot` | PASS                                              |
-| `npm run lint:copilot`                 | PASS                                              |
-| `npm run test:copilot:unit`            | FAIL esperado: 3.880/3.882; somente W114.5 e F151 |
+| Validador                              | Baseline inicial                         | Fechamento publicado                                      |
+| -------------------------------------- | ---------------------------------------- | --------------------------------------------------------- |
+| `npm run typecheck:strict:src.copilot` | PASS                                     | PASS após CDEX-046                                        |
+| `npm run lint:copilot`                 | PASS                                     | PASS no gate espaçado                                     |
+| `npm run test:copilot:unit`            | FAIL 3.880/3.882 no gate raso            | PASS 6.389/6.417 no gate recursivo, 28 pendências esperadas |
 
 O runtime permanente também foi verificado: `named-permanent`, URL `https://mcp.aurelin.org/mcp`,
 origin HTTP/2, edge QUIC, health 200, processos MCP e `cloudflared` vivos. O quick tunnel salvo está
@@ -327,18 +330,18 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 
 | ID externo                     | Veredito                            | Evidência atual                                                                                                                                                                                                          |
 | ------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1.1 barrels do terminal        | **CONFIRMADO**                      | As sete importações listadas ainda atravessam fronteiras internas; os barrels já exportam os símbolos necessários.                                                                                                       |
+| 1.1 barrels do terminal        | **CONFIRMADO E RESOLVIDO**          | Imports migrados aos barrels públicos e gate recursivo em PASS.                                                                                                                                                          |
 | 1.2 workspace/root cleanup     | **N/A**                             | Fora de `src/copilot`; o worktree contém alterações intencionais em OAuth/docs que devem ser preservadas.                                                                                                                |
-| 1.3 artefatos AI               | **CONFIRMADO**                      | 754 arquivos em `.ai/jobs`; 753 seguem o padrão de artefato e 513 excedem retenção 240.                                                                                                                                  |
-| 1.4 quick tunnel stale         | **CONFIRMADO PARCIAL**              | State legado existe, PID morto e stale; o runtime permanente ignora isso para readiness, mas não há auto-cleanup do arquivo.                                                                                             |
+| 1.3 artefatos AI               | **CONFIRMADO E RESOLVIDO**          | Cleanup bounded removeu 513 candidatos e preservou 240 recentes, stores e arquivos não UUID.                                                                                                                            |
+| 1.4 quick tunnel stale         | **CONFIRMADO E RESOLVIDO**          | Startup maintenance remove state apenas quando válido, stale e com PID comprovadamente morto.                                                                                                                          |
 | 1.5/1.6 organização da raiz    | **N/A**                             | Fora do escopo solicitado.                                                                                                                                                                                               |
-| 2.1 smoke no startup           | **CONFIRMADO**                      | O resultado é apenas process-local e só é preenchido quando a tool é chamada.                                                                                                                                            |
+| 2.1 smoke no startup           | **CONFIRMADO E RESOLVIDO**          | Smoke read-only é agendado uma vez por processo, não bloqueante e configurável.                                                                                                                                          |
 | 2.2 JWKS warmup                | **CONFIRMADO PARCIAL**              | Existe cache remoto, mas `createRemoteJWKSet` é lazy e não há warmup explícito no boot. A meta fixa `<30ms` não tem baseline controlado suficiente.                                                                      |
 | 2.3 L2 SQLite                  | **CONFIRMADO PARCIAL**              | Implementação, invalidação, pruning, circuit breaker e métricas existem; default está off. `IO_L2_CACHE_PATH` não existe: o L2 usa `copilot.sqlite`.                                                                     |
 | 2.4/5.6 QUIC p99               | **PENDENTE DE EXPERIMENTO**         | O p99 1.314ms é histórico e não prova causalidade do transporte; QUIC atual tem health/smoke OK.                                                                                                                         |
-| 2.5 rate limit anônimo         | **PARCIALMENTE IMPLEMENTADO**       | Origin já limita anônimos por default; edge Cloudflare é operação externa ao código. O origin confia em forwarded headers sem política equivalente à do OAuth.                                                           |
-| 2.6 cleanup bounded            | **CONFIRMADO**                      | Há relatório read-only e plano, mas nenhuma aplicação bounded.                                                                                                                                                           |
-| 3.1 replay persistente         | **CONFIRMADO**                      | DPoP de resource, DPoP do issuer e `private_key_jwt` usam `Map` em memória.                                                                                                                                              |
+| 2.5 rate limit anônimo         | **ORIGIN RESOLVIDO; EDGE PENDENTE** | Origin valida confiança de proxy/IP e aplica teto real de buckets; regra Cloudflare continua operação externa.                                                                                                          |
+| 2.6 cleanup bounded            | **CONFIRMADO E RESOLVIDO**          | Tool destructive/admin, dry-run por default, retenção e lote máximos implementados/testados.                                                                                                                            |
+| 3.1 replay persistente         | **CONFIRMADO E RESOLVIDO**          | DPoP resource/issuer e `private_key_jwt` usam replay store SQLite, hash-only e resistente a restart/processos.                                                                                                           |
 | 3.2 expiração/rotação OAuth    | **INVALIDADO**                      | DCR já tem TTL, pruning e persistência; refresh tokens já são one-time rotating, persistidos como hash e revogam família em reuse.                                                                                       |
 | 3.3 surface profiles           | **INVALIDADO COMO AUSENTE**         | Já existem `full`, `latency`, `minimal`, `cloudflare`, `readonly`, `claude`, `safe`, `research`; 99 tools full e 37 no perfil safe/claude/research. Falta apenas nomenclatura/contrato `dev` e `ci`, se ainda desejados. |
 | 3.4/3.5 docs/bundles           | **N/A**                             | Fora de `src/copilot`.                                                                                                                                                                                                   |
@@ -348,17 +351,17 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 | 4.3 worker pool dinâmico       | **MAJORITARIAMENTE INVALIDADO**     | `IO_PARSER_WORKER_POOL_SIZE` e métricas já existem; somente o default continua 2.                                                                                                                                        |
 | 4.6 AbortSignal global         | **NÃO ACEITO COMO REGRA GLOBAL**    | Vários timers representam debounce, shutdown, socket timeout ou retry e não são substituíveis mecanicamente.                                                                                                             |
 | 5.1 prefetch                   | **INVALIDADO COMO AUSENTE**         | `io-prefetch.js` e `io-session-scope.js` já fazem warmup; falta apenas provar hotset específico do MCP.                                                                                                                  |
-| 5.2 alertas de latência        | **CONFIRMADO PARCIAL**              | Métricas por fase existem; thresholds/log WARN dedicados ainda não.                                                                                                                                                      |
+| 5.2 alertas de latência        | **INVALIDADO COMO AUSENTE**         | Dashboard já possui budgets configuráveis por fase/tool/error rate e warnings; não foi criada duplicação.                                                                                                               |
 | 5.3 Apps SDK/Company Knowledge | **BACKLOG DE PRODUTO**              | Não é correção operacional e `ai-plugin.json` não deve ser presumido requisito MCP atual.                                                                                                                                |
 | 5.4 compressão/paginação       | **INVALIDADO PARCIAL**              | Edge desabilita compressão por benchmark anterior; `repo_tree` já limita depth 8 e 2.000 entries.                                                                                                                        |
 | 5.5 OTEL                       | **INVALIDADO COMO AUSENTE**         | Export file/OTLP, spans e correlation tracing já existem; instrumentação MCP por fase pode ser ampliada.                                                                                                                 |
-| 6.1 write schemas/path safety  | **MAJORITARIAMENTE INVALIDADO**     | Todas as 23 tools não-read-only têm schema não vazio; paths usam política canônica com realpath/symlink containment. Faltam testes MCP específicos de bypass.                                                            |
-| 6.2 SSRF DCR/CIMD              | **PARCIALMENTE INVALIDADO**         | Timeout, redirect cap, HTTPS-only, DNS público e pin de lookup existem; foi encontrado bypass de classificação IPv6, descrito abaixo.                                                                                    |
+| 6.1 write schemas/path safety  | **INVALIDADO E ENDURECIDO**         | Schemas e containment já existiam; testes MCP agora cobrem traversal, manifesto/path forjado, symlink e divergência de hash.                                                                                            |
+| 6.2 SSRF DCR/CIMD              | **CONFIRMADO PARCIAL E RESOLVIDO**  | Timeout/redirect/HTTPS/DNS pin existentes foram complementados com classificação IPv4/IPv6 robusta e testes focados.                                                                                                    |
 | 6.3 key rotation               | **CONFIRMADO COMO BACKLOG**         | Não há rotação periódica/grace window documentada no módulo.                                                                                                                                                             |
-| 6.4 DNS rebinding              | **MAJORITARIAMENTE INVALIDADO**     | O fetch usa lookup customizado e conecta ao endereço público validado; cobertura IPv6 precisa correção.                                                                                                                  |
+| 6.4 DNS rebinding              | **INVALIDADO E COBERTO**            | Lookup pinado conecta ao endereço público validado; classificação IPv6 e self-SSRF estão cobertas.                                                                                                                      |
 | 7.1 hooks tests                | **INVALIDADO**                      | Existem múltiplas suítes dedicadas para factory, registry, bus, presets, elicitation e otimizações.                                                                                                                      |
-| 7.2 agent lifecycle tests      | **INVALIDADO COMO AUSENTE**         | Há suites de lifecycle, reconnect, always-alive, session core e handoff; `HandoffManager` realmente não expira pendências.                                                                                               |
-| 7.3 surface contracts          | **PARCIAL**                         | Registry e annotations têm contratos; faltam contratos explícitos por todos os perfis existentes.                                                                                                                        |
+| 7.2 agent lifecycle tests      | **INVALIDADO E ENDURECIDO**         | Suites já existiam; handoff recebeu TTL/pruning e cobertura com relógio injetável.                                                                                                                                       |
+| 7.3 surface contracts          | **RESOLVIDO PARA MODOS ATUAIS**     | `full`, `latency`, `minimal`, `cloudflare`, `readonly`, `claude`, `safe` e `research` possuem contratos.                                                                                                                 |
 | 7.4 JSDoc thresholds           | **BACKLOG DE GOVERNANÇA**           | Não foi demonstrado como causa de bug; prioridade inferior a segurança e operação.                                                                                                                                       |
 
 ### Novos achados confirmados
@@ -411,6 +414,8 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 | CDEX-044 | 🟠 médio   | [x]    | O correlation tracer limitava o número de correlation IDs, mas uma única correlação podia acumular eventos indefinidamente. Cada correlação agora retém no máximo 100 eventos recentes, configurável por instância.                                                                                                         |
 | CDEX-045 | 🟠 médio   | [x]    | O archive SSE calculava o filename diário apenas na primeira gravação; processos atravessando UTC midnight continuavam escrevendo no arquivo do dia anterior. A resolução agora reavalia o dia e rotaciona automaticamente sem reiniciar o terminal.                                                                        |
 | CDEX-046 | 🟠 médio   | [x]    | A projeção diagnóstica de lifecycle de tools mantinha toda entrada sem completion para sempre. Entradas ativas agora expiram após 10 minutos e são limitadas às 128 mais recentes, sem alterar o registry operacional session-scoped.                                                                                         |
+| CDEX-047 | 🟠 médio   | [x]    | Um único turn trace podia acumular tools, arquivos, user inputs, escolhas e `dedupeKeys` sem teto até `turn_end`. Agora preserva apenas os eventos recentes sob limites explícitos (128/256/64), limita listas/campos variáveis e clona arrays internos ao produzir snapshots públicos.                                      |
+| CDEX-048 | 🟡 baixo   | [x]    | O throttle de alertas recuperáveis guardava mensagens/contextos distintos indefinidamente. Agora o dedupe vale para qualquer callback, remove chaves após 30s e impõe teto de 512 assinaturas, com evicção determinística da mais antiga.                                                                                    |
 
 ### Roadmap booleano revisado e autoritativo
 
@@ -497,6 +502,8 @@ Execução de `R1.2` em 2026-06-11:
 - [x] R2.19 — Limitar tools/aliases da telemetria geral e proteger snapshots contra chaves especiais.
 - [x] R2.20 — Limitar eventos por correlation ID no tracer.
 - [x] R2.21 — Expirar e limitar a projeção diagnóstica de lifecycle de tools.
+- [x] R2.22 — Limitar cardinalidade, listas internas e tamanho dos campos de um único turn trace.
+- [x] R2.23 — Aplicar TTL de 30s e teto de 512 chaves ao dedupe de alertas recuperáveis.
 
 Transformações consolidadas nesta rodada:
 
@@ -580,6 +587,10 @@ Validação focada adicional de `R1.22`/`R2.19`/`R2.20`/`R2.21`: telemetria gera
 tracer, archive SSE diário, lifecycle diagnóstico e recorte MCP relacionado `80/80`, com
 `typecheck:strict:src.copilot` em PASS.
 
+Validação focada adicional de `R2.22`/`R2.23`: turn trace e error alerter `25/25`, sem
+warnings/errors, com `typecheck:strict:src.copilot` em PASS. Resumo:
+`artifacts/test-runs/copilot/2026-06-12T03-06-43-387Z/summary.md`.
+
 Validação canônica pós-transformações em 2026-06-11:
 
 | Gate                                   | Resultado final                                                        |
@@ -602,6 +613,14 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 - [ ] R3.3 — Planejar rotação de chaves OAuth com grace period e runbook.
 - [ ] R3.4 — Reavaliar SDK v2 apenas quando houver release estável.
 
+#### Publicação
+
+- [x] Seis commits temáticos publicados diretamente em `main`.
+- [x] `main` local e `origin/main` confirmados no mesmo SHA de remediação `45f74116`.
+- [x] Worktree confirmado limpo imediatamente após o push.
+- [ ] Publicar o lote CDEX-047/CDEX-048 e esta reconciliação final do roadmap.
+- [ ] Restart/smoke live do runtime permanente carregando o novo HEAD.
+
 #### Fora do escopo desta execução
 
 - [x] N/A — Limpeza/renomeação de arquivos na raiz, `.codex`, `.vscode` e diretórios globais de
@@ -618,75 +637,71 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 1.1 Corrigir terminal barrel governance (W114.5 + F151) 🔴
 
-- [ ] 1.1.1 — `commands/activity.js`: substituir imports diretos de
+- [x] 1.1.1 — `commands/activity.js`: substituir imports diretos de
       `../events/turn-trace-presentation.js` e `../frontend/projections/now.js` pelos equivalentes
       via barrels `../events/index.js` e `../frontend/index.js`
-- [ ] 1.1.2 — `commands/byok.js`: substituir imports diretos de
+- [x] 1.1.2 — `commands/byok.js`: substituir imports diretos de
       `../frontend/gateways/agent-runtime.js` e `../frontend/projections/config.js` por
       `../frontend/index.js`
-- [ ] 1.1.3 — `commands/config.js`: migrar para `from '../frontend/index.js'` (F151) — garantir que
+- [x] 1.1.3 — `commands/config.js`: migrar para `from '../frontend/index.js'` (F151) — garantir que
       `readTerminalConfigProjection`, `listTerminalAvailableModelsProjection`,
       `readTerminalModelStatsProjection`, `setTerminalModelProjection`,
       `setTerminalReasoningProjection`, `readTerminalRuntimeState` todos exportados pelo barrel
-- [ ] 1.1.4 — `commands/context.js`: substituir import direto de
+- [x] 1.1.4 — `commands/context.js`: substituir import direto de
       `../frontend/projections/timeline.js` por `../frontend/index.js`
-- [ ] 1.1.5 — Verificar demais arquivos em `commands/` (byok, outros) para imports restantes fora de
+- [x] 1.1.5 — Verificar demais arquivos em `commands/` (byok, outros) para imports restantes fora de
       barrels
-- [ ] 1.1.6 — Garantir que `src/copilot/terminal/frontend/index.js` re-exporte todos os itens
+- [x] 1.1.6 — Garantir que `src/copilot/terminal/frontend/index.js` re-exporte todos os itens
       necessários
-- [ ] 1.1.7 — Garantir que `src/copilot/terminal/events/index.js` re-exporte
+- [x] 1.1.7 — Garantir que `src/copilot/terminal/events/index.js` re-exporte
       `turn-trace-presentation`
-- [ ] 1.1.8 — Executar `unit-copilot` e confirmar 0 falhas
+- [x] 1.1.8 — Executar `unit-copilot` e confirmar 0 falhas
 
-#### 1.2 Limpar workspace sujo 🟠
+#### 1.2 Limpar workspace sujo 🟠 — N/A fora de `src/copilot`; publicação concluída
 
-- [ ] 1.2.1 — Classificar `.codex/config.toml` (intencional ou acidental?) e commitar se necessário
-- [ ] 1.2.2 — Mover `conversa-2026-06-08T15-52-41.md` para `DOCUMENTAÇÃO/RELATORIOS/` ou
-      `.gitignore`
-- [ ] 1.2.3 — Mover `src/copilot/ANALISE-FERRAMENTAS-FALTANTES.md` para `src/copilot/docs/` ou
-      `DOCUMENTAÇÃO/`
-- [ ] 1.2.4 — Executar `repo_status` pós-cleanup e confirmar workspace limpo
+- [x] 1.2.1 — N/A: `.codex/config.toml` pertence à configuração global fora do escopo desta
+      auditoria
+- [x] 1.2.2 — N/A: organização de conversa/relatório na raiz não altera o produto `src/copilot`
+- [x] 1.2.3 — N/A: movimentação documental sem impacto funcional foi deliberadamente evitada
+- [x] 1.2.4 — Executar `repo_status` pós-cleanup e confirmar workspace limpo (`45f74116`)
 
 #### 1.3 Remover artefatos AI além da retenção 🟠
 
-- [ ] 1.3.1 — Criar script `scripts/maintenance/cleanup-ai-artifacts.cjs` (já referenciado no plano
-      interno)
-- [ ] 1.3.2 — Executar cleanup para os 513 artefatos candidatos (UUID .json/.log) preservando OAuth
+- [x] 1.3.1 — Substituído dentro do escopo por `control-plane/ai-artifacts.js` e tool MCP bounded;
+      script global fora de `src/copilot` não foi necessário
+- [x] 1.3.2 — Executar cleanup para os 513 artefatos candidatos (UUID .json/.log) preservando OAuth
       stores, tunnel token, pid files
-- [ ] 1.3.3 — Verificar que `src/copilot/.ai/jobs/` contém ≤ 240 artefatos (retenção configurada)
-- [ ] 1.3.4 — Documentar script e adicionar ao `package.json` como
-      `scripts.copilot:cleanup:ai-artifacts`
+- [x] 1.3.3 — Verificar que `src/copilot/.ai/jobs/` contém ≤ 240 artefatos (retenção configurada)
+- [x] 1.3.4 — N/A: operação documentada/exposta pela tool `mcp_cleanup_ai_artifacts`, sem criar
+      script global fora do escopo
 
 #### 1.4 Limpar state file do túnel temporário stale 🟡
 
-- [ ] 1.4.1 — Identificar o arquivo de state do quick-tunnel
+- [x] 1.4.1 — Identificar o arquivo de state do quick-tunnel
       (`src/copilot/.ai/cloudflare/quick-tunnel.json`)
-- [ ] 1.4.2 — Verificar se processo com PID registrado está vivo
-- [ ] 1.4.3 — Se morto, remover ou zerar o state file para evitar falsos `stale: true` perpétuos
-- [ ] 1.4.4 — Adicionar lógica de auto-cleanup de state stale no boot do MCP (`bootstrap.js` ou
+- [x] 1.4.2 — Verificar se processo com PID registrado está vivo
+- [x] 1.4.3 — Se morto, remover ou zerar o state file para evitar falsos `stale: true` perpétuos
+- [x] 1.4.4 — Adicionar lógica de auto-cleanup de state stale no boot do MCP (`bootstrap.js` ou
       `runtime-bootstrap.js`)
 
-#### 1.5 Corrigir nomes problemáticos na raiz 🟡
+#### 1.5 Corrigir nomes problemáticos na raiz 🟡 — N/A fora de `src/copilot`
 
-- [ ] 1.5.1 — Renomear `# Guia focado — Conexão do ChatGPT ao VS.md` para
-      `DOCUMENTAÇÃO/GUIAS/GUIA-CONEXAO-CHATGPT-VSCODE.md`
-- [ ] 1.5.2 — Renomear `# Relatório de Checagem Geral — MCP WOR.md` para
-      `DOCUMENTAÇÃO/RELATORIOS/RELATORIO-CHECAGEM-MCP.md`
-- [ ] 1.5.3 — Verificar cópia em `DOCUMENTAÇÃO/` do mesmo arquivo e deduplá-las
-- [ ] 1.5.4 — Investigar e remover `${containerUserHome}/` (diretório fantasma da raiz)
-- [ ] 1.5.5 — Remover ou mover `.vscode/tasks.json.old`
+- [x] 1.5.1 — N/A: renomeação de guia na raiz
+- [x] 1.5.2 — N/A: renomeação de relatório na raiz
+- [x] 1.5.3 — N/A: deduplicação documental global
+- [x] 1.5.4 — N/A: limpeza de diretório da raiz
+- [x] 1.5.5 — N/A: limpeza de configuração histórica do VS Code
 
-#### 1.6 Consolidar relatórios de auditoria na raiz 🟡
+#### 1.6 Consolidar relatórios de auditoria na raiz 🟡 — N/A fora de `src/copilot`
 
-- [ ] 1.6.1 — Mover `DIAGNOSTICO-MCP-WORKSPACE-2026-06-09.md` → `DOCUMENTAÇÃO/AUDITORIAS/`
-- [ ] 1.6.2 — Mover `AUDITORIA_FASE2_INVESTIGACAO.md` → `DOCUMENTAÇÃO/AUDITORIAS/`
-- [ ] 1.6.3 — Mover `AUDITORIA_FINAL_CHECKPOINT.md` → `DOCUMENTAÇÃO/AUDITORIAS/`
-- [ ] 1.6.4 — Mover `AUDITORIA_FINAL_CONSOLIDACION_COMPLETA.md` → `DOCUMENTAÇÃO/AUDITORIAS/`
-- [ ] 1.6.5 — Mover `AUDITORIA_TOOLS_READ_COMPLETA.md` → `DOCUMENTAÇÃO/AUDITORIAS/`
-- [ ] 1.6.6 — Mover `CUSTOM-AGENTS-ARCHITECTURE-AUDIT.md` → `DOCUMENTAÇÃO/AUDITORIAS/`
-- [ ] 1.6.7 — Mover este arquivo `AUDITORIA-CLAUDE-2026-06-10.md` → `DOCUMENTAÇÃO/AUDITORIAS/` após
-      revisão
-- [ ] 1.6.8 — Atualizar `DOCUMENTAÇÃO/INDEX.md` com novas localizações
+- [x] 1.6.1 — N/A: movimentação de relatório global
+- [x] 1.6.2 — N/A: movimentação de relatório global
+- [x] 1.6.3 — N/A: movimentação de relatório global
+- [x] 1.6.4 — N/A: movimentação de relatório global
+- [x] 1.6.5 — N/A: movimentação de relatório global
+- [x] 1.6.6 — N/A: movimentação de relatório global
+- [x] 1.6.7 — N/A: este arquivo permanece na localização solicitada pelo operador
+- [x] 1.6.8 — N/A: índice documental global fora do escopo
 
 ---
 
@@ -696,12 +711,13 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 2.1 Auto-trigger de smoke_workspace no startup 🟠
 
-- [ ] 2.1.1 — Identificar o ponto de boot do MCP server (`mcp/server.js` ou adaptador HTTP)
-- [ ] 2.1.2 — Adicionar trigger assíncrono de `mcp_smoke_workspace` após 30s de uptime (não
+- [x] 2.1.1 — Identificar o ponto de boot do MCP server (`mcp/server.js` ou adaptador HTTP)
+- [x] 2.1.2 — Adicionar trigger assíncrono de `mcp_smoke_workspace` após 15s por default (não
       bloqueante)
-- [ ] 2.1.3 — Registrar resultado no estado em memória para eliminar o warning de `degraded`
-- [ ] 2.1.4 — Adicionar env `MCP_SMOKE_ON_STARTUP_DELAY_MS` (default: 30000, 0 = desativado)
-- [ ] 2.1.5 — Documentar comportamento em `src/copilot/mcp/README.md`
+- [x] 2.1.3 — Registrar resultado no estado em memória para eliminar o warning de `degraded`
+- [x] 2.1.4 — Adicionar envs `COPILOT_MCP_STARTUP_SMOKE_ENABLED` e
+      `COPILOT_MCP_STARTUP_SMOKE_DELAY_MS` (0 = imediato)
+- [x] 2.1.5 — Documentar comportamento em `src/copilot/mcp/README.md`
 
 #### 2.2 Pre-aquecimento de autorização (JWKS warmup) 🟠
 
@@ -714,12 +730,12 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 2.3 Ativar L2 cache SQLite 🟠
 
-- [ ] 2.3.1 — Revisar `io-cache-l2-sqlite.js`: verificar que schema, circuit breaker e TTL estão
+- [x] 2.3.1 — Revisar `io-cache-l2-sqlite.js`: verificar que schema, circuit breaker e TTL estão
       corretos
-- [ ] 2.3.2 — Ativar via env `IO_L2_CACHE_ENABLED=true` no `.devcontainer/devcontainer.json`
-- [ ] 2.3.3 — Configurar `IO_L2_CACHE_PATH` para `src/copilot/.ai/io-cache-l2.db` (não rastreado
-      pelo git)
-- [ ] 2.3.4 — Adicionar `src/copilot/.ai/io-cache-l2.db` ao `.gitignore`
+- [x] 2.3.2 — N/A: ativação global em `.devcontainer/devcontainer.json` fica fora do escopo;
+      habilitação permanece opt-in por ambiente
+- [x] 2.3.3 — N/A: caminho operacional deve ser escolhido pelo ambiente que habilitar o L2
+- [x] 2.3.4 — N/A: alteração de `.gitignore` global não é necessária enquanto o L2 seguir opt-in
 - [ ] 2.3.5 — Monitorar `ioCache.l2.hits` no `mcp_latency_dashboard` para validar impacto
 - [ ] 2.3.6 — Estabelecer threshold de hit ratio mínimo de 40% em sessões quentes
 
@@ -733,27 +749,26 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 - [ ] 2.4.5 — Documentar decisão de transporte em `src/copilot/docs/`
 - [ ] 2.4.6 — Adicionar alerta no `mcp_latency_dashboard` quando p99 > 800ms
 
-#### 2.5 Implementar rate-limit anônimo na edge Cloudflare 🟡
+#### 2.5 Implementar rate-limit anônimo na edge Cloudflare 🟡 — N/A operacional externo
 
-- [ ] 2.5.1 — Revisar diff `anonymous-mcp-rate-limit-mitigated-at-origin` no
-      `mcp_cloudflare_edge_policy_diff`
-- [ ] 2.5.2 — Avaliar criação de Cloudflare Rate Limiting Rule para tráfego não autenticado em
-      `/mcp`
-- [ ] 2.5.3 — Limitar a 60 req/min para IPs anônimos na edge (antes de chegar ao origin)
-- [ ] 2.5.4 — Atualizar `mcp_cloudflare_edge_policy_plan` com a nova rule
-- [ ] 2.5.5 — Aplicar via `mcp_cloudflare_edge_policy_apply` com dry-run primeiro
-- [ ] 2.5.6 — Verificar que clientes autenticados não são afetados pelo rate limit
+- [x] 2.5.1 — N/A: política externa; o rate limit no origin já foi endurecido em `src/copilot`
+- [x] 2.5.2 — N/A: criação de regra na conta Cloudflare exige decisão operacional externa
+- [x] 2.5.3 — N/A: limite na edge não pode ser aplicado apenas por alteração em `src/copilot`
+- [x] 2.5.4 — N/A: atualização do plano externo não é transformação do produto
+- [x] 2.5.5 — N/A: aplicação em conta Cloudflare está fora do escopo autorizado
+- [x] 2.5.6 — N/A: verificação depende da regra externa não aplicada
 
 #### 2.6 Ferramenta bounded de cleanup de artefatos AI 🟡
 
-- [ ] 2.6.1 — Criar `mcp_cleanup_ai_artifacts` tool (allowlisted, bounded, dryRun por padrão)
-- [ ] 2.6.2 — Parâmetros: `dryRun: boolean`, `retainNewest: number` (default 240),
+- [x] 2.6.1 — Criar `mcp_cleanup_ai_artifacts` tool (allowlisted, bounded, dryRun por padrão)
+- [x] 2.6.2 — Parâmetros: `dryRun: boolean`, `retainNewest: number` (default 240),
       `maxDeleteCount: number` (default 100 por chamada)
-- [ ] 2.6.3 — Proteger: `oauth-*.json`, `*.token`, `connector-smoke.json`, `quick-tunnel.json`,
+- [x] 2.6.3 — Proteger: `oauth-*.json`, `*.token`, `connector-smoke.json`, `quick-tunnel.json`,
       `*.pid`
-- [ ] 2.6.4 — Adicionar ao registry com scope `repo:admin` e `destructiveHint: true`
-- [ ] 2.6.5 — Adicionar testes unitários em `tests/unit/copilot/mcp/`
-- [ ] 2.6.6 — Adicionar ao allowlist do `mcp_run_safe_validation_suite`
+- [x] 2.6.4 — Adicionar ao registry com scope `repo:admin` e `destructiveHint: true`
+- [x] 2.6.5 — Adicionar testes unitários em `tests/unit/copilot/mcp/`
+- [x] 2.6.6 — N/A: a tool entrou no allowlist de metadata/maintenance; não é uma suite de
+      validação executável
 
 ---
 
@@ -763,61 +778,62 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 3.1 Replay cache persistente OAuth 🔴
 
-- [ ] 3.1.1 — Analisar impacto de restart na janela de replay para DPoP e `private_key_jwt`
-- [ ] 3.1.2 — Criar módulo `control-plane/replay-store.js` com backend SQLite (reutilizando L2 ou
+- [x] 3.1.1 — Analisar impacto de restart na janela de replay para DPoP e `private_key_jwt`
+- [x] 3.1.2 — Criar módulo `control-plane/oauth-replay-store.js` com backend SQLite
       banco dedicado)
-- [ ] 3.1.3 — Migrar `DPOP_REPLAY_CACHE` de Map em memória para store persistido com TTL automático
-- [ ] 3.1.4 — Migrar `PRIVATE_KEY_JWT_REPLAY_CACHE` idem
-- [ ] 3.1.5 — Ao inicializar: purgar entradas expiradas do banco
-- [ ] 3.1.6 — Garantir que operações de store são async e não bloqueiam o event loop
-- [ ] 3.1.7 — Adicionar testes de rejeição de replay após restart simulado
+- [x] 3.1.3 — Migrar replay DPoP para store persistido com TTL automático
+- [x] 3.1.4 — Migrar `private_key_jwt` idem
+- [x] 3.1.5 — Ao inicializar/operação: purgar entradas expiradas do banco
+- [x] 3.1.6 — Isolar a API persistente e serializar operações críticas
+- [x] 3.1.7 — Adicionar testes de rejeição de replay após restart simulado
 
 #### 3.2 Política de expiração/rotação OAuth clients e refresh tokens 🟠
 
-- [ ] 3.2.1 — Implementar `pruneExpiredClients()` em `dev-oauth.js` — remover clientes com
+- [x] 3.2.1 — Confirmado existente: `pruneRegisteredClients()` remove clientes expirados
       `client_secret_expires_at < now`
-- [ ] 3.2.2 — Implementar `pruneExpiredRefreshTokenFamilies()` — remover famílias com todos os
+- [x] 3.2.2 — Confirmado existente: stores removem tokens/famílias expirados e revogam família em
+      reuse
       tokens expirados
-- [ ] 3.2.3 — Disparar pruning assíncrono no startup e a cada 24h via `setInterval`
-- [ ] 3.2.4 — Adicionar env `OAUTH_PRUNE_ON_STARTUP=true` (default: true)
-- [ ] 3.2.5 — Expor métricas de pruning em `mcp_auth_profile`
+- [x] 3.2.3 — Premissa ajustada: pruning ocorre no load e oportunisticamente nas operações, sem
+      timer global adicional
+- [x] 3.2.4 — N/A: load/pruning é comportamento canônico, sem opt-out inseguro
+- [x] 3.2.5 — Estado de persistência/pruning é exposto no profile OAuth
 
 #### 3.3 Profiles de superfície MCP por audiência 🟠
 
-- [ ] 3.3.1 — Definir perfis no `tool-surface.js`: `read-only`, `dev`, `cloudflare-admin`, `ci`
-- [ ] 3.3.2 — Perfil `read-only`: apenas tools com `readOnlyHint: true` (repo_read, repo_status,
+- [x] 3.3.1 — Premissa invalidada: já existem oito modos canônicos; não criar aliases sem caso de
+      uso comprovado
+- [x] 3.3.2 — Perfil `readonly`: apenas tools com `readOnlyHint: true` (repo_read, repo_status,
       repo_tree, etc.)
-- [ ] 3.3.3 — Perfil `dev`: read-only + write bounded + validation (sem cloudflare-admin)
-- [ ] 3.3.4 — Perfil `cloudflare-admin`: inclui tools cloudflare edge/config/tunnel
-- [ ] 3.3.5 — Perfil `ci`: apenas validation tools + repo read
-- [ ] 3.3.6 — Configurar via env `MCP_SURFACE_PROFILE=dev` (default: `dev`)
-- [ ] 3.3.7 — Expor perfil ativo em `mcp_tools_status` e `mcp_session_profile`
-- [ ] 3.3.8 — Adicionar testes de perfil em `test_mcp_registry.spec.js`
+- [x] 3.3.3 — Equivalentes atuais: `full`/`safe`/`research`; alias `dev` rejeitado sem necessidade
+- [x] 3.3.4 — Modo `cloudflare` cobre edge/config/tunnel
+- [x] 3.3.5 — Modos `minimal`/`safe` cobrem superfícies reduzidas; alias `ci` permanece dispensável
+- [x] 3.3.6 — Configuração canônica via `COPILOT_MCP_TOOL_SURFACE`
+- [x] 3.3.7 — Expor perfil ativo em `mcp_tools_status` e `mcp_session_profile`
+- [x] 3.3.8 — Adicionar contratos dos oito modos em `test_mcp_registry.spec.js`
 
-#### 3.4 Consolidar diretórios de documentação 🟡
+#### 3.4 Consolidar diretórios de documentação 🟡 — N/A fora de `src/copilot`
 
-- [ ] 3.4.1 — Confirmar quais arquivos existem apenas em `DOCUMENTACAO/` (ASCII) e não em
-      `DOCUMENTAÇÃO/` (UTF-8)
-- [ ] 3.4.2 — Mover conteúdo único de `DOCUMENTACAO/` para `DOCUMENTAÇÃO/` com mesmo path
-- [ ] 3.4.3 — Remover `DOCUMENTACAO/` após verificação de 0 duplicatas perdidas
-- [ ] 3.4.4 — Atualizar todas as referências internas a `DOCUMENTACAO/` para `DOCUMENTAÇÃO/`
-- [ ] 3.4.5 — Verificar que não há hardcoded paths no código-fonte
+- [x] 3.4.1 — N/A: inventário documental global
+- [x] 3.4.2 — N/A: movimentação documental global
+- [x] 3.4.3 — N/A: remoção de diretório documental global
+- [x] 3.4.4 — N/A: reescrita de referências globais
+- [x] 3.4.5 — N/A: nenhuma alteração funcional em `src/copilot` depende dessa consolidação
 
-#### 3.5 Remover git bundles do histórico rastreado 🟡
+#### 3.5 Remover git bundles do histórico rastreado 🟡 — N/A fora de `src/copilot`
 
-- [ ] 3.5.1 — Adicionar `analysis/backups/*.bundle` ao `.gitignore`
-- [ ] 3.5.2 — Avaliar remoção dos bundles do histórico via `git filter-repo` (11MB+)
-- [ ] 3.5.3 — Documentar política: backups binários não entram no git, vão para armazenamento
-      externo
+- [x] 3.5.1 — N/A: política de ignore global
+- [x] 3.5.2 — N/A: reescrita destrutiva do histórico é incompatível com o escopo
+- [x] 3.5.3 — N/A: política de armazenamento global
 
 #### 3.6 Verificar MCP Protocol Version 🟠
 
-- [ ] 3.6.1 — Revisar spec `2025-06-18` vs `2025-11-25` (versão atual declarada) para mudanças
+- [x] 3.6.1 — Revisar spec `2025-06-18` vs `2025-11-25`; `2025-11-25` é posterior/corrente
       breaking
-- [ ] 3.6.2 — Checar `@modelcontextprotocol/sdk` changelog para `^1.29.0` vs versão mais recente do
+- [x] 3.6.2 — Checar `@modelcontextprotocol/sdk` v1.29.x e estado ainda não estável do v2
       branch v1.x
-- [ ] 3.6.3 — Atualizar `COPILOT_MCP_PROTOCOL_VERSION` se necessário
-- [ ] 3.6.4 — Documentar decisão de versão em `src/copilot/mcp/README.md`
+- [x] 3.6.3 — Manter `COPILOT_MCP_PROTOCOL_VERSION=2025-11-25`
+- [x] 3.6.4 — Documentar decisão de versão em `src/copilot/mcp/README.md`
 
 ---
 
@@ -827,38 +843,39 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 4.1 `node:sqlite` built-in para L2 cache 🟢
 
-- [ ] 4.1.1 — Avaliar `node:sqlite` (stable desde Node 24.0.0) como alternativa a `better-sqlite3`
+- [x] 4.1.1 — Avaliado: `node:sqlite` ainda é release candidate no Node usado; não substituir
+      `better-sqlite3` agora
       no L2
-- [ ] 4.1.2 — Comparar API: `new DatabaseSync()` vs `better-sqlite3` — verificar compatibilidade com
+- [x] 4.1.2 — Comparar API: `DatabaseSync` não oferece ganho que justifique migração imediata
       uso assíncrono
-- [ ] 4.1.3 — Se viável: criar `io-cache-l2-node-sqlite.js` como alternativa ao atual
+- [x] 4.1.3 — Decisão: não criar backend alternativo enquanto a API permanecer experimental
       `io-cache-l2-sqlite.js`
-- [ ] 4.1.4 — Testar com worker threads (importante: `node:sqlite` é sync; usar worker para não
+- [x] 4.1.4 — N/A nesta decisão: manter backend atual e reavaliar após estabilização
       bloquear)
-- [ ] 4.1.5 — Manter `better-sqlite3` como fallback se `node:sqlite` não suprir necessidades async
+- [x] 4.1.5 — `better-sqlite3` permanece backend canônico
 
 #### 4.2 `await using` para cleanup de recursos 🟢
 
-- [ ] 4.2.1 — Identificar todos os recursos com `finally {}` de teardown em `io-locks.js`,
+- [x] 4.2.1 — Migração global rejeitada: recursos têm semânticas distintas e teardown já
+      centralizado
       `io-session-scope.js`, session lifecycle
-- [ ] 4.2.2 — Implementar `Symbol.asyncDispose` nos recursos elegíveis
-- [ ] 4.2.3 — Substituir padrão `try/finally` por `await using` onde aplicável
-- [ ] 4.2.4 — Adicionar `"lib": ["ES2025"]` ao tsconfig se necessário para `Symbol.asyncDispose`
+- [x] 4.2.2 — N/A sem recurso concreto com ganho comprovado
+- [x] 4.2.3 — N/A; preservar `try/finally` explícito
+- [x] 4.2.4 — N/A; não ampliar target/lib sem necessidade de produto
 
 #### 4.3 Worker pool dinâmico no io-parser 🟡
 
-- [ ] 4.3.1 — Adicionar env `IO_PARSER_WORKER_POOL_SIZE` (default: 2)
+- [x] 4.3.1 — Confirmado existente: `IO_PARSER_WORKER_POOL_SIZE`
 - [ ] 4.3.2 — Implementar ajuste dinâmico baseado em `os.cpus().length` (ex:
       `Math.min(4, cpus - 1)`)
-- [ ] 4.3.3 — Expor `workerPoolSize` em `ioParser` nas métricas de saúde
+- [x] 4.3.3 — `workerPoolSize` já é exposto nas métricas
 
 #### 4.6 AbortSignal.timeout() em todos os ops async críticos 🟡
 
-- [ ] 4.6.1 — Auditar uso atual de `AbortSignal.timeout()` vs `setTimeout` manual
-- [ ] 4.6.2 — Substituir patterns `new Promise((_, rej) => setTimeout(rej, ms))` por
-      `AbortSignal.timeout(ms)`
-- [ ] 4.6.3 — Aplicar especialmente em: JWKS fetch, client metadata fetch, worker requests,
-      filesystem ops
+- [x] 4.6.1 — Auditado: timers incluem debounce, shutdown, socket timeout, retry e deadline
+      semânticos
+- [x] 4.6.2 — Regra global rejeitada; substituir apenas quando `AbortSignal` fizer parte do contrato
+- [x] 4.6.3 — Fetches críticos já possuem timeout/budget; não aplicar mecanicamente a filesystem
 
 ---
 
@@ -870,7 +887,7 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 - [ ] 5.1.1 — Identificar os 20 arquivos mais lidos (barrels, package.json, tsconfig, arquivos de
       config)
-- [ ] 5.1.2 — Implementar `io-prefetch.js` (já existe no tree!) para pré-carregar esses arquivos no
+- [x] 5.1.2 — Confirmado existente: `io-prefetch.js` já pré-carrega arquivos no L1
       L1
 - [ ] 5.1.3 — Adicionar lista de prefetch em `src/copilot/infra/io-prefetch.js` via env ou config
 - [ ] 5.1.4 — Disparar prefetch assíncrono no startup do MCP (após index build)
@@ -878,11 +895,10 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 5.2 Alertas de threshold de latência por fase 🟡
 
-- [ ] 5.2.1 — Definir thresholds: `authorization > 50ms`, `handler > 2000ms`, `resultSize > 500ms`
-- [ ] 5.2.2 — Emitir log WARN com `component: 'copilot-mcp:latency-alert'` quando threshold excedido
-- [ ] 5.2.3 — Expor contagem de alertas por fase em `mcp_latency_dashboard`
-- [ ] 5.2.4 — Adicionar env `MCP_LATENCY_WARN_AUTH_MS`, `MCP_LATENCY_WARN_HANDLER_MS` para
-      configuração
+- [x] 5.2.1 — Confirmados budgets de autorização, handler, result size, média por tool e error rate
+- [x] 5.2.2 — Dashboard produz warnings estruturados quando budgets são excedidos
+- [x] 5.2.3 — Warnings/fases são expostos no `mcp_latency_dashboard`
+- [x] 5.2.4 — Configuração existente via `COPILOT_MCP_LATENCY_*_WARN_MS`
 
 #### 5.3 Apps SDK widget / Company Knowledge 🟢
 
@@ -895,19 +911,17 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 - [ ] 5.4.1 — Identificar tools que retornam > 50KB frequentemente (`repo_root_tree`,
       `repo_search_text`)
-- [ ] 5.4.2 — Implementar compressão gzip/deflate no resultado JSON quando `Accept-Encoding: gzip`
-      presente
-- [ ] 5.4.3 — Verificar se Cloudflare já comprime a resposta (se sim, comprimir na origin é
-      contraproducente)
-- [ ] 5.4.4 — Adicionar paginação obrigatória em `repo_tree` para profundidade > 3
+- [x] 5.4.2 — Não implementar compressão duplicada na tool; decisão depende do transporte/edge
+- [x] 5.4.3 — Benchmark anterior desabilitou compressão no edge; preservar decisão até nova medição
+- [x] 5.4.4 — `repo_tree` já aplica limites de profundidade e 2.000 entradas
 
 #### 5.5 Telemetria OTEL exportável 🟢
 
-- [ ] 5.5.1 — `observability/otel.js` já existe — verificar se exporter está configurado
-- [ ] 5.5.2 — Ativar export para endpoint OTLP local (ex: Jaeger, Grafana) via env
+- [x] 5.5.1 — Verificado: exporter file/OTLP já existe
+- [x] 5.5.2 — Export OTLP já é configurável por env
       `OTEL_EXPORTER_OTLP_ENDPOINT`
 - [ ] 5.5.3 — Instrumentar spans para fases de autorização, handler, resultSize no MCP registry
-- [ ] 5.5.4 — Adicionar trace correlation entre requests ChatGPT e execução de tools
+- [x] 5.5.4 — Correlation tracing já existe e agora é bounded por correlação
 
 #### 5.6 Benchmark automatizado QUIC vs HTTP/2 🟡
 
@@ -925,22 +939,22 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 6.1 Auditoria de input schemas dos tools de escrita 🟠
 
-- [ ] 6.1.1 — Auditar `repo_write_file`, `repo_create_file`, `repo_apply_patch`,
+- [x] 6.1.1 — Auditar `repo_write_file`, `repo_create_file`, `repo_apply_patch`,
       `repo_apply_file_batch`: verificar validação de paths (null byte, path traversal, symlinks)
-- [ ] 6.1.2 — Verificar que `normalizePathResourceKey` é chamado em todos os paths antes de qualquer
-      I/O
-- [ ] 6.1.3 — Adicionar schema Zod forte em todos os tools `repo_write_*` e `repo_apply_*`
-- [ ] 6.1.4 — Testar bypass por path relativo (`../../../etc/passwd`) e confirmá-lo rejeitado
+- [x] 6.1.2 — Verificado confinement canônico por realpath/path policy antes de I/O; não exigir uma
+      função nominal única
+- [x] 6.1.3 — Schemas fortes já existiam e foram preservados
+- [x] 6.1.4 — Testar traversal, path/manifesto forjado e symlinks; todos rejeitados
 
 #### 6.2 Hardening do dev-oauth contra SSRF em DCR 🟠
 
-- [ ] 6.2.1 — Verificar que `CLIENT_METADATA_TIMEOUT_MS = 5000` e
+- [x] 6.2.1 — Verificar que `CLIENT_METADATA_TIMEOUT_MS = 5000` e
       `CLIENT_METADATA_MAX_REDIRECTS = 3` são enforced
-- [ ] 6.2.2 — Verificar que `client_uri` e `logo_uri` são validados contra lista de hosts permitidos
-- [ ] 6.2.3 — Garantir que requests de `client_metadata` não alcançam IPs privados (169.254.x.x,
+- [x] 6.2.2 — Verificar validação HTTPS/host e lookup pinado para metadata
+- [x] 6.2.3 — Garantir que requests de `client_metadata` não alcançam IPs privados (169.254.x.x,
       10.x, 172.16-31.x, 192.168.x)
-- [ ] 6.2.4 — Testar com URL apontando para `localhost:3333` (self-SSRF) e confirmar bloqueio
-- [ ] 6.2.5 — Adicionar teste `test_dev_oauth_ssrf_protection.spec.js`
+- [x] 6.2.4 — Testar self-SSRF/loopback e confirmar bloqueio
+- [x] 6.2.5 — Adicionar teste `test_dev_oauth_ssrf_protection.spec.js`
 
 #### 6.3 Política de expiração de chaves OAuth 🟠
 
@@ -951,10 +965,10 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 6.4 DNS rebinding protection no dev-oauth 🟡
 
-- [ ] 6.4.1 — Verificar que `lookupDns` já implementado em `dev-oauth.js` é chamado na validação de
+- [x] 6.4.1 — Verificar que `lookupDns` é usado e o fetch conecta ao endereço validado
       `redirect_uri`
-- [ ] 6.4.2 — Confirmar que resolução DNS de `redirect_uri` não resulta em IP privado
-- [ ] 6.4.3 — Adicionar testes de DNS rebinding em `test_dev_oauth_dns_rebinding.spec.js`
+- [x] 6.4.2 — Confirmar bloqueio de resolução privada IPv4/IPv6
+- [x] 6.4.3 — Cobertura integrada à suíte SSRF; arquivo separado não é necessário
 
 ---
 
@@ -964,24 +978,24 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 7.1 Cobertura de testes para hooks system 🟡
 
-- [ ] 7.1.1 — Criar `tests/unit/copilot/hooks/test_hooks_lifecycle.spec.js`
-- [ ] 7.1.2 — Testar `factory.js`, `composer.js`, `registry.js`, `error-handler.js` com presets
-- [ ] 7.1.3 — Testar `tool-filter.js` com e sem scope de permissão
+- [x] 7.1.1 — Suites dedicadas de hooks já existem; não duplicar por nome de arquivo
+- [x] 7.1.2 — Factory, composer, registry, error-handler e presets cobertos
+- [x] 7.1.3 — Tool filter/permission paths cobertos
 - [ ] 7.1.4 — Meta: cobertura > 80% no módulo `src/copilot/hooks/`
 
 #### 7.2 Testes de integração para ciclo de vida do agent 🟡
 
-- [ ] 7.2.1 — Criar `tests/unit/copilot/agent/test_agent_lifecycle.spec.js`
-- [ ] 7.2.2 — Testar `always-alive.js` com simulated restart
-- [ ] 7.2.3 — Testar `handoff-manager.js` com timeout simulado
-- [ ] 7.2.4 — Testar session lifecycle (boot → active → teardown)
+- [x] 7.2.1 — Suites de lifecycle já existentes foram incluídas pelo gate recursivo
+- [x] 7.2.2 — Always-Alive/state clear concorrente coberto
+- [x] 7.2.3 — `handoff-manager.js` coberto com relógio/TTL
+- [x] 7.2.4 — Session lifecycle possui suites de boot, reconnect e teardown
 
 #### 7.3 Contract tests para tool surface 🟡
 
-- [ ] 7.3.1 — Criar `tests/unit/copilot/mcp/test_mcp_surface_profiles.spec.js`
-- [ ] 7.3.2 — Verificar que profile `read-only` não contém tools com `destructiveHint`
-- [ ] 7.3.3 — Verificar que profile `ci` contém apenas validation + read tools
-- [ ] 7.3.4 — Verificar que todos os tools registrados têm `readOnlyHint` explícito
+- [x] 7.3.1 — Contratos adicionados ao `test_mcp_registry.spec.js`, sem arquivo redundante
+- [x] 7.3.2 — `readonly` não contém tools destrutivas
+- [x] 7.3.3 — Alias `ci` invalidado; `minimal`/`safe` têm contratos explícitos
+- [x] 7.3.4 — Todos os tools registrados têm annotations explícitas
 
 #### 7.4 JSDoc coverage mínima 🟡
 
@@ -992,26 +1006,18 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 ---
 
-## 6. Prioridade de Execução Recomendada
+## 6. Prioridade de Execução Atualizada
 
-| Prioridade | Item                                | Fase      | Impacto           | Esforço |
-| ---------- | ----------------------------------- | --------- | ----------------- | ------- |
-| P0         | Fix W114.5 + F151 (testes falhando) | 1.1       | Alto              | Baixo   |
-| P0         | Replay cache persistente OAuth      | 3.1       | Alto (segurança)  | Médio   |
-| P1         | JWKS warmup no startup              | 2.2       | Alto (latência)   | Baixo   |
-| P1         | Cleanup AI artifacts                | 1.3 + 2.6 | Médio (ops)       | Baixo   |
-| P1         | Limpar workspace sujo               | 1.2       | Médio             | Baixo   |
-| P1         | Auto-trigger smoke_workspace        | 2.1       | Médio (ops)       | Baixo   |
-| P2         | L2 cache SQLite                     | 2.3       | Alto (perf)       | Médio   |
-| P2         | Stale tunnel cleanup                | 1.4       | Médio (ops)       | Baixo   |
-| P2         | Surface profiles MCP                | 3.3       | Médio (gov)       | Médio   |
-| P2         | MCP Protocol version review         | 3.6       | Alto (compat)     | Baixo   |
-| P3         | Consolidar docs DOCUMENTACAO        | 3.4       | Médio (estrutura) | Médio   |
-| P3         | Latência QUIC p99                   | 2.4 + 5.6 | Médio (perf)      | Médio   |
-| P3         | `node:sqlite` para L2               | 4.1       | Baixo-Médio       | Alto    |
-| P3         | Apps SDK widget                     | 5.3       | Médio (produto)   | Alto    |
-| P4         | `await using`                       | 4.2       | Baixo             | Médio   |
-| P4         | OTEL exportável                     | 5.5       | Médio (obs)       | Médio   |
+| Prioridade | Item                                                 | Estado         | Próxima evidência necessária                       |
+| ---------- | ---------------------------------------------------- | -------------- | -------------------------------------------------- |
+| P1         | Restart/smoke live do runtime permanente no novo HEAD | Em aberto    | Health, smoke workspace e processos no HEAD atual |
+| P1         | JWKS warmup não bloqueante                          | Em aberto      | Benchmark cold-start antes/depois                  |
+| P2         | Decisão medida sobre ativação do L2 por perfil      | Em aberto      | Hit ratio, latência e custo no `copilot.sqlite`    |
+| P2         | Benchmark QUIC vs auto/http2                        | Em aberto      | p50/p95/p99 controlados                            |
+| P2         | Rotação de chaves OAuth com grace period            | Em aberto      | Design, runbook e testes de rollover               |
+| P3         | Instrumentar spans MCP por fase                     | Parcial        | Traces authorization/handler/resultSize            |
+| P3         | Hotset de prefetch MCP                              | Parcial        | Top arquivos e ganho medido de L1                  |
+| P4         | SDK v2                                              | Bloqueado upstream | Release estável oficial                         |
 
 ---
 
@@ -1021,13 +1027,13 @@ Para cada fase, os critérios de conclusão são:
 
 | Fase | Critério de Sucesso                                                                       |
 | ---- | ----------------------------------------------------------------------------------------- |
-| 1    | `unit-copilot` 0 falhas; workspace limpo; runtime não `degraded`                          |
+| 1    | `unit-copilot` 0 falhas e workspace limpo concluídos; runtime live aguarda restart/smoke   |
 | 2    | Autorização cold-start < 30ms; L1 hit ratio > 50% em sessão quente; smoke OK no startup   |
-| 3    | 0 barrels violados; 1 diretório de docs; surface profiles funcionais                      |
-| 4    | `node:sqlite` em uso ou decisão documentada; Lane MCP SDK v2 ativa                        |
+| 3    | 0 barrels violados e surface profiles funcionais; docs globais são N/A neste escopo       |
+| 4    | Decisão de manter `better-sqlite3` documentada; SDK v2 aguarda release estável            |
 | 5    | L2 hit ratio > 40% em sessão quente; p99 QUIC < 500ms ou decisão de transport documentada |
-| 6    | 0 SSRF no DCR; replay cache survives restart; test de DNS rebinding passando              |
-| 7    | Coverage hooks > 80%; contract tests de surface passando                                  |
+| 6    | SSRF/DNS privado bloqueados e replay cache sobrevive restart; rotação de chaves pendente   |
+| 7    | Contract tests de surface passando; percentual de coverage hooks ainda não medido          |
 
 ---
 
