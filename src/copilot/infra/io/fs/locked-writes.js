@@ -40,6 +40,20 @@ function publishAndReturn(io, success, error) {
 }
 
 /**
+ * @param {string} filePath
+ * @param {unknown} error
+ * @returns {Error}
+ */
+function normalizeCreateExclusiveError(filePath, error) {
+    const code = /** @type {{ code?: unknown }} */ (error)?.code;
+    if (code !== 'EEXIST') return /** @type {Error} */ (error);
+    const err = new Error(`Destino já existe: ${filePath}`);
+    /** @type {{ code?: string; cause?: unknown }} */ (err).code = 'EEXIST';
+    /** @type {{ code?: string; cause?: unknown }} */ (err).cause = error;
+    return err;
+}
+
+/**
  * Escrita atômica central: tmp no mesmo diretório + rename. Usa lock por path real para evitar corrida intra-processo.
  *
  * @param {string} filePath
@@ -99,9 +113,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                             throw err;
                         } catch (accessError) {
                             const code = /** @type {{ code?: unknown }} */ (accessError)?.code;
-                            if (code !== 'ENOENT') {
-                                throw accessError;
-                            }
+                            if (code !== 'ENOENT' && code !== 'ENOTDIR') throw accessError;
                         }
                     }
 
@@ -109,11 +121,10 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                         previousHash = assertExpectedSha256(await fs.readFile(filePath), options.expectedHash);
                     }
 
-                    await writeAtomicFileUnlocked(
-                        filePath,
-                        payload,
-                        options.mode === undefined ? {} : { mode: options.mode },
-                    );
+                    await writeAtomicFileUnlocked(filePath, payload, {
+                        ...(options.mode === undefined ? {} : { mode: options.mode }),
+                        exclusive: Boolean(options.failIfExists),
+                    });
                     return { path: filePath, bytesWritten: bytes, previousHash, contentHash };
                 });
             } finally {
@@ -143,6 +154,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
         );
         return { ...value, lockWaitMs: waitMs, io };
     } catch (error) {
+        const finalError = options.failIfExists ? normalizeCreateExclusiveError(filePath, error) : error;
         publishAndReturn(
             buildIoMeta({
                 operation: 'write',
@@ -154,9 +166,9 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                 traceId,
             }),
             false,
-            error,
+            finalError,
         );
-        throw error;
+        throw finalError;
     }
 }
 

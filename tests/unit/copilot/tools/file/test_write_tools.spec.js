@@ -46,6 +46,8 @@ vi.mock('../../../../../src/copilot/tools/infra/logger.js', () => ({
  *     unlink: import('vitest').Mock;
  *     copyFile: import('vitest').Mock;
  *     readFile: import('vitest').Mock;
+ *     link: import('vitest').Mock;
+ *     open: import('vitest').Mock;
  * }}
  */
 const fsMock = {
@@ -57,6 +59,10 @@ const fsMock = {
     unlink: vi.fn(),
     copyFile: vi.fn(),
     readFile: vi.fn(),
+    link: vi.fn(),
+    open: vi.fn(async () => {
+        throw Object.assign(new Error('ENOTSUP'), { code: 'ENOTSUP' });
+    }),
 };
 
 vi.mock('node:fs/promises', () => fsMock);
@@ -120,6 +126,11 @@ function pathFail(reason = 'Caminho inválido') {
 /** @returns {Error & { code: string }} */
 function enoent() {
     return /** @type {Error & { code: string }} */ (Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+}
+
+/** @returns {Error & { code: string }} */
+function exdev() {
+    return /** @type {Error & { code: string }} */ (Object.assign(new Error('EXDEV'), { code: 'EXDEV' }));
 }
 
 beforeEach(() => {
@@ -220,7 +231,7 @@ describe('F35 — write_file_content (F181-F182)', () => {
         expect(result.error).toContain('ENOSPC');
     });
 
-    it('usa atomicWrite (writeFile + rename)', async () => {
+    it('usa atomicWrite durável por temp exclusivo + rename', async () => {
         pathOk('/workspace/f.txt');
         fsMock.access.mockResolvedValue(undefined);
         fsMock.writeFile.mockResolvedValue(undefined);
@@ -229,7 +240,9 @@ describe('F35 — write_file_content (F181-F182)', () => {
         await handler({ path: 'f.txt', content: 'ok', encoding: 'utf8' });
 
         const tmpPath = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[0]);
+        const writeOptions = /** @type {Record<string, unknown>} */ (fsMock.writeFile.mock.calls[0]?.[2]);
         expect(tmpPath).toContain('.tmp');
+        expect(writeOptions).toMatchObject({ flag: 'wx', flush: true });
         expect(fsMock.rename).toHaveBeenCalledWith(tmpPath, '/workspace/f.txt');
     });
 
@@ -448,7 +461,7 @@ describe('F35 — copy_file (F186)', () => {
         expect(result.sourceHash).toBe('mock-sha256');
         expect(result.sourceBytes).toBe(6);
         expect(result.io?.operation).toBe('copy');
-        expect(fsMock.copyFile).toHaveBeenCalledWith('/workspace/src.txt', '/workspace/dst.txt');
+        expect(fsMock.copyFile).toHaveBeenCalledWith('/workspace/src.txt', '/workspace/dst.txt', expect.any(Number));
         expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write' });
     });
 
@@ -545,6 +558,30 @@ describe('F35 — move_file (F186)', () => {
         expect(result.sourceHash).toBe('mock-sha256');
         expect(result.operation).toMatchObject({ capability: 'file.move', status: 'applied' });
         expect(result.changeSet?.rollback?.stepCount).toBe(2);
+    });
+
+    it('move EXDEV publica via temp verificado antes de remover origem', async () => {
+        mockValidatePath
+            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/a.txt', reason: undefined })
+            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/b.txt', reason: undefined });
+        fsMock.access.mockRejectedValue(enoent());
+        fsMock.mkdir.mockResolvedValue(undefined);
+        fsMock.rename.mockRejectedValueOnce(exdev());
+        fsMock.copyFile.mockResolvedValue(undefined);
+        fsMock.link.mockResolvedValue(undefined);
+        fsMock.unlink.mockResolvedValue(undefined);
+        fsMock.readFile.mockResolvedValue(Buffer.from('move', 'utf8'));
+        fsMock.stat.mockResolvedValue({ size: 4 });
+        streamPayload('/workspace/a.txt', 'move');
+
+        const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: false });
+
+        expect(result.success).toBe(true);
+        expect(result.crossDevice).toBe(true);
+        expect(result.duplicatedAfterCrossDeviceMove).toBe(false);
+        expect(fsMock.copyFile).toHaveBeenCalledWith('/workspace/a.txt', expect.stringContaining('.b.txt.'));
+        expect(fsMock.link).toHaveBeenCalledWith(expect.stringContaining('.b.txt.'), '/workspace/b.txt');
+        expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/a.txt');
     });
 });
 

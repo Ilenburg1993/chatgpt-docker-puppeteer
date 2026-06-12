@@ -1,6 +1,6 @@
 // @ts-check
 
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -23,6 +23,8 @@ import {
     writeFileAtomic,
 } from '../../../../src/copilot/infra/io-engine.js';
 import { scanDirectory } from '../../../../src/copilot/infra/io-scanner.js';
+import { acquireIoResourceLock, getIoLockStats } from '../../../../src/copilot/infra/io-locks.js';
+import { getFileResourceLockPath } from '../../../../src/copilot/infra/locks/file-resource-lock.js';
 import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 
 /** @type {string[]} */
@@ -41,6 +43,30 @@ async function createTempDir() {
     const dir = await mkdtemp(join(tmpdir(), 'copilot-io-engine-'));
     TEMP_DIRS.push(dir);
     return dir;
+}
+
+/**
+ * @param {() => Promise<void>} operation
+ */
+async function withFileLockEnv(operation) {
+    const previous = {
+        enabled: process.env['COPILOT_IO_FILE_LOCKS_ENABLED'],
+        dir: process.env['COPILOT_IO_FILE_LOCK_DIR'],
+        staleMs: process.env['COPILOT_IO_FILE_LOCK_STALE_MS'],
+        timeoutMs: process.env['COPILOT_IO_FILE_LOCK_TIMEOUT_MS'],
+    };
+    try {
+        await operation();
+    } finally {
+        if (previous.enabled === undefined) delete process.env['COPILOT_IO_FILE_LOCKS_ENABLED'];
+        else process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = previous.enabled;
+        if (previous.dir === undefined) delete process.env['COPILOT_IO_FILE_LOCK_DIR'];
+        else process.env['COPILOT_IO_FILE_LOCK_DIR'] = previous.dir;
+        if (previous.staleMs === undefined) delete process.env['COPILOT_IO_FILE_LOCK_STALE_MS'];
+        else process.env['COPILOT_IO_FILE_LOCK_STALE_MS'] = previous.staleMs;
+        if (previous.timeoutMs === undefined) delete process.env['COPILOT_IO_FILE_LOCK_TIMEOUT_MS'];
+        else process.env['COPILOT_IO_FILE_LOCK_TIMEOUT_MS'] = previous.timeoutMs;
+    }
 }
 
 describe('infra/io-engine', () => {
@@ -332,6 +358,17 @@ describe('infra/io-engine', () => {
         await expect(readFile(file, 'utf8')).resolves.toBe('after');
     });
 
+    it('writeFileAtomic com failIfExists não sobrescreve destino existente', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'exclusive-create.txt');
+        await writeFile(file, 'existing', 'utf8');
+
+        await expect(writeFileAtomic(file, 'incoming', { failIfExists: true })).rejects.toMatchObject({
+            code: 'EEXIST',
+        });
+        await expect(readFile(file, 'utf8')).resolves.toBe('existing');
+    });
+
     it('patchTextLocked respeita expectedHash antes de aplicar patch', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'expected-hash-patch.txt');
@@ -373,6 +410,21 @@ describe('infra/io-engine', () => {
         expect(result.diffPreview).toContain('+alpha gamma');
         expect(result.diffPreviewTruncated).toBe(false);
         await expect(readFile(file, 'utf8')).resolves.toBe('alpha beta');
+    });
+
+    it('patchTextLocked rejeita bytes inválidos para UTF-8 sem regravar arquivo', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'binary-patch.bin');
+        const original = Buffer.from([0xff, 0x00, 0x61]);
+        await writeFile(file, original);
+
+        await expect(
+            patchTextLocked(file, {
+                oldString: 'a',
+                newString: 'b',
+            }),
+        ).rejects.toMatchObject({ name: 'BinaryFileError' });
+        await expect(readFile(file)).resolves.toEqual(original);
     });
 
     it('patchTextLocked aplica occurrenceIndex para conteúdo repetido', async () => {
@@ -598,6 +650,68 @@ describe('infra/io-engine', () => {
             release();
             await holder;
         }
+    });
+
+    it('acquireIoResourceLock cria lockfile L1 quando habilitado por env', async () => {
+        await withFileLockEnv(async () => {
+            const dir = await createTempDir();
+            const lockDir = join(dir, '.locks');
+            const resource = join(dir, 'locked.txt');
+            process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = '1';
+            process.env['COPILOT_IO_FILE_LOCK_DIR'] = lockDir;
+
+            const lease = await acquireIoResourceLock(resource, { operation: 'unit-test', target: resource, timeoutMs: 500 });
+            try {
+                expect(lease.fileLockEnabled).toBe(true);
+                expect(lease.fileLockPath).toBe(getFileResourceLockPath(resource, lockDir));
+                expect(await readdir(lockDir)).toHaveLength(1);
+                expect(getIoLockStats().fileLocks.activeLeases).toBeGreaterThanOrEqual(1);
+            } finally {
+                lease.release();
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            expect(await readdir(lockDir)).toEqual([]);
+        });
+    });
+
+    it('acquireIoResourceLock recupera lockfile stale por PID morto', async () => {
+        await withFileLockEnv(async () => {
+            const dir = await createTempDir();
+            const lockDir = join(dir, '.locks');
+            const resource = join(dir, 'stale.txt');
+            process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = '1';
+            process.env['COPILOT_IO_FILE_LOCK_DIR'] = lockDir;
+            await mkdir(lockDir, { recursive: true });
+            const lockPath = getFileResourceLockPath(resource, lockDir);
+            await writeFile(
+                lockPath,
+                `${JSON.stringify({
+                    schemaVersion: 1,
+                    token: 'stale-token',
+                    pid: 999_999_999,
+                    hostname: 'stale-host',
+                    resourceKey: resource,
+                    resourceHash: 'stale-hash',
+                    operation: 'stale-test',
+                    target: resource,
+                    startedAt: new Date(Date.now() - 60_000).toISOString(),
+                    startedAtMs: Date.now() - 60_000,
+                })}\n`,
+                'utf8',
+            );
+
+            const lease = await acquireIoResourceLock(resource, { operation: 'unit-test', target: resource, timeoutMs: 500 });
+            try {
+                expect(lease.fileLockEnabled).toBe(true);
+                expect(lease.staleFileLockRecovered).toBe(true);
+                const metadata = JSON.parse(await readFile(lockPath, 'utf8'));
+                expect(metadata.token).not.toBe('stale-token');
+                expect(metadata.pid).toBe(process.pid);
+            } finally {
+                lease.release();
+            }
+        });
     });
 
     it('scanDirectory centraliza listagem, filtro, hidden e metadata de scan', async () => {

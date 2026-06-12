@@ -6,10 +6,8 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { writeFileAtomicPortable } from '../io/fs/portable-atomic.js';
 import { readTextFileSnapshot } from '../io/fs/read-text.js';
-import { writeAtomicFileUnlocked } from '../io/fs/write-atomic.js';
 
 /**
  * @template T
@@ -32,11 +30,7 @@ export async function readJson(filePath, defaultValue) {
  * @returns {Promise<void>}
  */
 export async function writeJson(filePath, data) {
-    const dir = dirname(filePath);
-    if (!existsSync(dir)) {
-        await mkdir(dir, { recursive: true });
-    }
-    await writeAtomicFileUnlocked(filePath, JSON.stringify(data, null, 2) + '\n');
+    await writeFileAtomicPortable(filePath, JSON.stringify(data, null, 2) + '\n');
 }
 
 /**

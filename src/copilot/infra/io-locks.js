@@ -9,6 +9,11 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import {
+    acquireFileResourceLock,
+    getFileResourceLockStats,
+    isFileResourceLockEnabledByEnv,
+} from './locks/file-resource-lock.js';
 import { normalizePathResourceKey } from './policy/path-resource.js';
 
 const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
@@ -130,6 +135,9 @@ function waitForPrevious(previous, key, options) {
  * @typedef {object} IoResourceLockLease
  * @property {string} key
  * @property {number} waitMs
+ * @property {boolean} fileLockEnabled
+ * @property {string | null} fileLockPath
+ * @property {boolean} staleFileLockRecovered
  * @property {<T>(operation: () => Promise<T>) => Promise<T>} run
  * @property {() => void} release
  */
@@ -148,7 +156,14 @@ function waitForPrevious(previous, key, options) {
  * Compatível com `await using` via `Symbol.asyncDispose`.
  *
  * @param {string} resourceKey
- * @param {{ timeoutMs?: number; signal?: AbortSignal }} [options]
+ * @param {{
+ *     timeoutMs?: number;
+ *     signal?: AbortSignal;
+ *     fileLock?: boolean;
+ *     fileLockStaleMs?: number;
+ *     operation?: string;
+ *     target?: string;
+ * }} [options]
  * @returns {Promise<IoResourceLockLease>}
  */
 export async function acquireIoResourceLock(resourceKey, options = {}) {
@@ -161,6 +176,9 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
         return /** @type {IoResourceLockLease & { [Symbol.asyncDispose]: () => Promise<void> }} */ ({
             key,
             waitMs: 0,
+            fileLockEnabled: false,
+            fileLockPath: null,
+            staleFileLockRecovered: false,
             run: (operation) => operation(),
             release: () => {},
             [Symbol.asyncDispose]: async () => {},
@@ -195,6 +213,27 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
         throw createLockError('Abort', key);
     }
 
+    /** @type {Awaited<ReturnType<typeof acquireFileResourceLock>> | null} */
+    let fileLockLease = null;
+    const shouldAcquireFileLock = options.fileLock === true || isFileResourceLockEnabledByEnv();
+    if (shouldAcquireFileLock) {
+        try {
+            fileLockLease = await acquireFileResourceLock(key, {
+                ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+                ...(options.fileLockStaleMs === undefined ? {} : { staleMs: options.fileLockStaleMs }),
+                ...(options.signal === undefined ? {} : { signal: options.signal }),
+                ...(options.operation === undefined ? {} : { operation: options.operation }),
+                target: options.target ?? key,
+            });
+        } catch (error) {
+            releaseCurrent(undefined);
+            if (tails.get(key) === tail) {
+                tails.delete(key);
+            }
+            throw error;
+        }
+    }
+
     const nextHeldLocks = new Set(heldLocks ?? []);
     nextHeldLocks.add(key);
 
@@ -202,6 +241,9 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
     const release = () => {
         if (released) return;
         released = true;
+        const fileLock = fileLockLease;
+        fileLockLease = null;
+        if (fileLock) void fileLock.release();
         releaseCurrent(undefined);
         if (tails.get(key) === tail) {
             tails.delete(key);
@@ -211,6 +253,9 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
     return /** @type {IoResourceLockLease & { [Symbol.asyncDispose]: () => Promise<void> }} */ ({
         key,
         waitMs: Date.now() - startedWait,
+        fileLockEnabled: Boolean(fileLockLease),
+        fileLockPath: fileLockLease?.lockPath ?? null,
+        staleFileLockRecovered: Boolean(fileLockLease?.staleRecovered),
         run: (operation) => heldLocksStorage.run(nextHeldLocks, () => operation()),
         release,
         [Symbol.asyncDispose]: async () => {
@@ -324,8 +369,12 @@ export async function withIoResourceLocks(resourceKeys, operation, options = {})
 /**
  * Snapshot leve para health/tests.
  *
- * @returns {{ pendingResources: number; resources: string[] }}
+ * @returns {{
+ *     pendingResources: number;
+ *     resources: string[];
+ *     fileLocks: ReturnType<typeof getFileResourceLockStats>;
+ * }}
  */
 export function getIoLockStats() {
-    return { pendingResources: tails.size, resources: [...tails.keys()] };
+    return { pendingResources: tails.size, resources: [...tails.keys()], fileLocks: getFileResourceLockStats() };
 }

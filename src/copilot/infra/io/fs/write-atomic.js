@@ -6,8 +6,14 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { rename, unlink, writeFile } from 'node:fs/promises';
+import * as fs from 'node:fs/promises';
 import { toOwnedBuffer } from '../../shared/buffer.js';
+import {
+    normalizeIoDurability,
+    shouldFlushFile,
+    shouldSyncDirectory,
+    syncParentDirectoryBestEffort,
+} from './durability.js';
 
 /**
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} content
@@ -38,20 +44,63 @@ export function normalizeWritePayload(filePath, content, encoding) {
  *
  * @param {string} filePath
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} payload
- * @param {{ mode?: number }} [options]
- * @returns {Promise<void>}
+ * @param {{ mode?: number; exclusive?: boolean; durability?: import('./durability.js').IoDurabilityMode }} [options]
+ * @returns {Promise<{
+ *     durability: import('./durability.js').IoDurabilityMode;
+ *     tempPath: string | null;
+ *     fileFlushRequested: boolean;
+ *     directorySync: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
+ * }>}
  */
 export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
-    const tmpPath = `${filePath}.${randomBytes(4).toString('hex')}.tmp`;
+    const tmpPath = `${filePath}.${randomBytes(12).toString('hex')}.tmp`;
     const writePayload = toOwnedBuffer(payload);
+    const durability = normalizeIoDurability(options.durability);
+    const fileFlushRequested = shouldFlushFile(durability);
+    /** @type {Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null} */
+    let directorySync = null;
+    let tmpCreated = false;
     try {
-        await writeFile(tmpPath, writePayload, options.mode === undefined ? undefined : { mode: options.mode });
-        await rename(tmpPath, filePath);
+        if (options.exclusive && typeof fs.link !== 'function') {
+            await fs.writeFile(
+                filePath,
+                writePayload,
+                {
+                    flag: 'wx',
+                    ...(options.mode === undefined ? {} : { mode: options.mode }),
+                    ...(fileFlushRequested ? { flush: true } : {}),
+                },
+            );
+            if (shouldSyncDirectory(durability)) directorySync = await syncParentDirectoryBestEffort(filePath);
+            return { durability, tempPath: null, fileFlushRequested, directorySync };
+        }
+
+        await fs.writeFile(tmpPath, writePayload, {
+            flag: 'wx',
+            ...(options.mode === undefined ? {} : { mode: options.mode }),
+            ...(fileFlushRequested ? { flush: true } : {}),
+        });
+        tmpCreated = true;
+
+        if (options.exclusive) {
+            await fs.link(tmpPath, filePath);
+            await fs.unlink(tmpPath);
+            tmpCreated = false;
+            if (shouldSyncDirectory(durability)) directorySync = await syncParentDirectoryBestEffort(filePath);
+            return { durability, tempPath: tmpPath, fileFlushRequested, directorySync };
+        }
+
+        await fs.rename(tmpPath, filePath);
+        tmpCreated = false;
+        if (shouldSyncDirectory(durability)) directorySync = await syncParentDirectoryBestEffort(filePath);
+        return { durability, tempPath: tmpPath, fileFlushRequested, directorySync };
     } catch (error) {
-        try {
-            await unlink(tmpPath);
-        } catch {
-            // best-effort cleanup
+        if (tmpCreated) {
+            try {
+                await fs.unlink(tmpPath);
+            } catch {
+                // best-effort cleanup
+            }
         }
         throw error;
     }

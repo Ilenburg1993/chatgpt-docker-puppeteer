@@ -559,6 +559,11 @@ const moveFileTool = buildTool({
                     destinationPreviousHash: moveResult.destinationPreviousHash,
                     destinationPreviousBytes: moveResult.destinationPreviousBytes,
                     destinationPreviousSnapshotTruncated: moveResult.destinationPreviousSnapshotTruncated,
+                    crossDevice: moveResult.crossDevice,
+                    duplicatedAfterCrossDeviceMove: moveResult.duplicatedAfterCrossDeviceMove,
+                    sourceUnlinkErrorCode: moveResult.sourceUnlinkErrorCode,
+                    destinationHash: moveResult.destinationHash,
+                    destinationBytes: moveResult.destinationBytes,
                     lockWaitMs: moveResult.lockWaitMs,
                     operation: await completeAndAuditMutation(
                         operation,

@@ -14,7 +14,7 @@ import { acquireIoResourceLock, acquireIoResourceLocks } from '../../io-locks.js
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
 import { assertExpectedSha256 } from '../../policy/preconditions.js';
-import { toOwnedBuffer, utf8ByteLength } from '../../shared/buffer.js';
+import { decodeUtf8Buffer, toOwnedBuffer, utf8ByteLength } from '../../shared/buffer.js';
 import { sha256 } from '../../shared/hash.js';
 import { invalidateIoCacheTiers, invalidateIoCacheTierSubtrees } from '../invalidation/cache-tiers.js';
 import { buildSimpleTextDiff, computeTextPatch } from '../patch/index.js';
@@ -310,7 +310,11 @@ export async function copyFileLocked(source, destination, options = {}) {
                     }
                     const sourceSnapshot = await readMutationSnapshot(source);
                     await mkdirPathUnlocked(dirname(destination), { recursive: true });
-                    await copyFileUnlocked(source, destination);
+                    await copyFileUnlocked(
+                        source,
+                        destination,
+                        options.overwrite ? {} : { exclusive: true },
+                    );
                     const stats = await statPathSnapshot(destination);
                     return {
                         bytesWritten: stats.size,
@@ -412,9 +416,18 @@ export async function moveFileLocked(source, destination, options = {}) {
                     }
                     const sourceSnapshot = await readMutationSnapshot(source);
                     await mkdirPathUnlocked(dirname(destination), { recursive: true });
-                    await moveFileUnlocked(source, destination);
+                    const moveResult = await moveFileUnlocked(source, destination, {
+                        overwrite: Boolean(options.overwrite),
+                        expectedSourceHash: sourceSnapshot.contentHash,
+                        expectedSourceBytes: sourceSnapshot.bytesRead,
+                    });
                     return {
                         ...sourceSnapshot,
+                        crossDevice: moveResult.crossDevice,
+                        duplicatedAfterCrossDeviceMove: moveResult.duplicatedAfterCrossDeviceMove,
+                        sourceUnlinkErrorCode: moveResult.sourceUnlinkErrorCode,
+                        destinationHash: moveResult.destinationHash,
+                        destinationBytes: moveResult.destinationBytes,
                         destinationPreviousHash: destinationSnapshot?.contentHash ?? null,
                         destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
                         destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
@@ -443,6 +456,11 @@ export async function moveFileLocked(source, destination, options = {}) {
                     sourceHash: value.contentHash,
                     overwrite: Boolean(options.overwrite),
                     destinationPreviousHash: value.destinationPreviousHash,
+                    crossDevice: value.crossDevice,
+                    duplicatedAfterCrossDeviceMove: value.duplicatedAfterCrossDeviceMove,
+                    sourceUnlinkErrorCode: value.sourceUnlinkErrorCode,
+                    destinationHash: value.destinationHash,
+                    destinationBytes: value.destinationBytes,
                 },
             }),
             true,
@@ -456,6 +474,11 @@ export async function moveFileLocked(source, destination, options = {}) {
             destinationPreviousBytes: value.destinationPreviousBytes,
             destinationPreviousSnapshotBase64: value.destinationPreviousSnapshotBase64,
             destinationPreviousSnapshotTruncated: value.destinationPreviousSnapshotTruncated,
+            crossDevice: value.crossDevice,
+            duplicatedAfterCrossDeviceMove: value.duplicatedAfterCrossDeviceMove,
+            sourceUnlinkErrorCode: value.sourceUnlinkErrorCode,
+            destinationHash: value.destinationHash,
+            destinationBytes: value.destinationBytes,
             lockWaitMs: waitMs,
             io,
         };
@@ -506,12 +529,14 @@ export async function patchTextLocked(filePath, options) {
         const value = await (async () => {
             try {
                 return await lease.run(async () => {
-                    const content = await fs.readFile(filePath, 'utf8');
-                    const previousHash = assertExpectedSha256(content, options.expectedHash);
+                    const rawContent = await fs.readFile(filePath);
+                    const rawBuffer = typeof rawContent === 'string' ? toOwnedBuffer(rawContent) : rawContent;
+                    const content = typeof rawContent === 'string' ? rawContent : decodeUtf8Buffer(rawContent);
+                    const previousHash = assertExpectedSha256(rawBuffer, options.expectedHash);
                     const patch = computeTextPatch(content, options);
                     const { updated, replacedOccurrences, bytesWritten } = patch;
                     const contentHash = sha256(updated);
-                    const previousSnapshot = buildRollbackSnapshot(toOwnedBuffer(content));
+                    const previousSnapshot = buildRollbackSnapshot(rawBuffer);
                     const diffContextLines = options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
                     const shouldComputeDiff = options.computeDiff !== false;
                     const diff = shouldComputeDiff

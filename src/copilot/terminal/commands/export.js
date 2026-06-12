@@ -9,8 +9,8 @@
  */
 
 import { WORKSPACE_ROOT } from '#copilot/boot';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+import { writeFileAtomicPortable } from '../../infra/io/fs/portable-atomic.js';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretText } from '../../core/security/redaction.js';
 import { sanitizeTerminalExternalToolText } from '../capabilities/index.js';
@@ -99,8 +99,7 @@ export async function cmdExport({ println }, arg) {
     }
 
     try {
-        await mkdir(dirname(filePath), { recursive: true });
-        await writeFile(filePath, lines.join('\n'), 'utf-8');
+        await writeFileAtomicPortable(filePath, lines.join('\n'));
         println(terminalThemeRow('Exportado', formatTerminalToolPathForOperator(filePath), { role: 'success' }));
         println(
             terminalThemeRow(

@@ -17,7 +17,7 @@ import { scanDirectory } from './io-scanner.js';
 import { readBytesFileSnapshot } from './io/fs/read-bytes.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { matchesAnyPattern } from './scan/glob.js';
-import { toOwnedBuffer, utf8ByteLength } from './shared/buffer.js';
+import { decodeUtf8Buffer, toOwnedBuffer, utf8ByteLength } from './shared/buffer.js';
 import { sha256 } from './shared/hash.js';
 
 /**
@@ -102,7 +102,7 @@ async function warmSinglePath(filePath, textMode, cachedBytes, cachedText, signa
         warmed = true;
 
         if (textMode && cachedText === null) {
-            const text = bytesSnapshot.content.toString('utf8');
+            const text = decodeUtf8Buffer(bytesSnapshot.content);
             primeIoL1Entry(textKey, text, {
                 sizeBytes: bytesSnapshot.sizeBytes,
                 mtimeMs: bytesSnapshot.mtimeMs,

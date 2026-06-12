@@ -94,6 +94,18 @@ describe('warmCacheForPaths', () => {
         assert.strictEqual(text.io.cache, 'l1-hit');
     });
 
+    it('não cria cache textual para bytes inválidos em UTF-8', async () => {
+        resetIoL1CacheForTest();
+        const filePath = path.join(tmpDir, 'invalid-utf8.bin');
+        await fs.writeFile(filePath, Buffer.from([0xff, 0xfe, 0xfd]));
+
+        const result = await warmCacheForPaths([filePath], { textMode: true, silent: true });
+
+        assert.strictEqual(result.preloaded, 0);
+        assert.strictEqual(result.failed, 1);
+        await assert.rejects(() => readText(filePath), /Arquivo binário detectado|bytes inválidos para UTF-8/);
+    });
+
     it('warmReadThroughContext indexa arquivo lido e aquece import relativo direto', async () => {
         resetIoL1CacheForTest();
         const dep = path.join(tmpDir, 'dep.js');
