@@ -10,7 +10,7 @@
  * @see EventBus
  */
 
-import { readTerminalErrorsProjection } from '../frontend/projections/metrics.js';
+import { readTerminalErrorsProjection } from '../frontend/index.js';
 import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 
 /**

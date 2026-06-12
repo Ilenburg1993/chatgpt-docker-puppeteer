@@ -18,6 +18,7 @@ export {
 export { buildTerminalHumanQuestionCard, printTerminalHumanQuestionCard } from './human-question-renderer.js';
 export {
     EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS,
+    EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL,
     EMPTY_AFTER_USER_INPUT_MODEL_COMMAND,
     EMPTY_AFTER_USER_INPUT_RESUME_COMMAND,
     EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,

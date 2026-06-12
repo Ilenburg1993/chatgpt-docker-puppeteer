@@ -15,7 +15,7 @@ import { toError } from '../../core/error-handlers.js';
 import { redactSecretText } from '../../core/security/redaction.js';
 import { sanitizeTerminalExternalToolText } from '../capabilities/index.js';
 import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
-import { readTerminalTimelineProjection } from '../frontend/projections/timeline.js';
+import { readTerminalTimelineProjection } from '../frontend/index.js';
 import { formatTerminalIsoTimestamp, terminalThemeRow } from '../state/index.js';
 
 /**

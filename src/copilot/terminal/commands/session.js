@@ -42,7 +42,7 @@ import {
     isTerminalImplicitOperationalTrace,
     renderTerminalTraceFlowSummary,
     renderTerminalTraceSummaryTitle,
-} from '../events/turn-trace-presentation.js';
+} from '../events/index.js';
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
@@ -70,7 +70,7 @@ import {
 import {
     deleteTerminalSdkSession,
     readTerminalSdkSessionBootSelection,
-} from '../frontend/gateways/sdk-session.js';
+} from '../frontend/gateways/sdk-session/index.js';
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
     enabled: false,

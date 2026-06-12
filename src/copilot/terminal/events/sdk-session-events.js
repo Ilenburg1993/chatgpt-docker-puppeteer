@@ -84,7 +84,7 @@ import {
     setSdkSessionMode,
 } from '../../presentation/state/index.js';
 import { broadcastSse, println } from '../dialog/io/index.js';
-import { sanitizeTerminalRenderText } from '../dialog/turn-display.js';
+import { sanitizeTerminalRenderText } from '../dialog/index.js';
 import {
     answerTerminalPendingQuestion,
     classifyTerminalPermissionDecision,

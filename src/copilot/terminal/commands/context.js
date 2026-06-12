@@ -11,7 +11,7 @@
  * @see EventBus
  */
 
-import { readTerminalContextProjection, requestTerminalCompactionProjection } from '../frontend/projections/timeline.js';
+import { readTerminalContextProjection, requestTerminalCompactionProjection } from '../frontend/index.js';
 import {
     formatTerminalTimeLabel,
     terminalThemeHeadline,

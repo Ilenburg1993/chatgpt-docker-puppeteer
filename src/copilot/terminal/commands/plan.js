@@ -23,7 +23,7 @@ import {
     readTerminalSdkSessionProjection,
     setTerminalSdkModeProjection,
     updateTerminalSdkPlanProjection,
-} from '../frontend/projections/sdk-session-vanilla.js';
+} from '../frontend/index.js';
 import {
     formatTerminalTimeLabel,
     terminalThemeDivider,

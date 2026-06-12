@@ -274,6 +274,34 @@ for (const arg of process.argv.slice(2)) {
     passthroughArgs.push(arg);
 }
 
+/**
+ * Expande globs dentro do processo para evitar que a semântica de `**` dependa da configuração do shell.
+ *
+ * @param {string[]} args
+ * @returns {Promise<string[]>}
+ */
+async function expandGlobArguments(args) {
+    const expanded = [];
+    for (const arg of args) {
+        if (arg.startsWith('-') || !/[*?[\]{}]/u.test(arg)) {
+            expanded.push(arg);
+            continue;
+        }
+        const matches = [];
+        for await (const match of fsGlob(arg, { cwd })) {
+            matches.push(String(match));
+        }
+        if (matches.length === 0) {
+            expanded.push(arg);
+            continue;
+        }
+        expanded.push(...matches.sort((left, right) => left.localeCompare(right)));
+    }
+    return [...new Set(expanded)];
+}
+
+const expandedPassthroughArgs = await expandGlobArguments(passthroughArgs);
+
 const artifactRoot = path.join(cwd, process.env.COPILOT_TEST_ARTIFACT_DIR || 'artifacts', 'test-runs', 'copilot');
 const runId = new Date().toISOString().replace(/[.:]/gu, '-');
 const runDir = path.join(artifactRoot, runId);
@@ -357,6 +385,9 @@ function handleChunk(text, stream) {
 }
 
 process.stdout.write(`[copilot:test] Vitest compacto iniciado · artifacts=${rel(runDir)}\n`);
+process.stdout.write(
+    `[copilot:test] seleção de arquivos: ${expandedPassthroughArgs.filter((arg) => arg.endsWith('.spec.js')).length}\n`,
+);
 if (!fullOutput) {
     process.stdout.write(
         '[copilot:test] modo compacto: exibindo WARN/ERROR/FAIL e resumo final; use --full-output para log completo ao vivo.\n',
@@ -370,7 +401,7 @@ const childArgs = [
     'vitest.copilot.config.js',
     '--reporter=json',
     `--outputFile.json=${rel(jsonReportPath)}`,
-    ...passthroughArgs,
+    ...expandedPassthroughArgs,
 ];
 
 const child = spawn(npxCommand, childArgs, {
@@ -415,7 +446,8 @@ const reportClean =
     counts.success &&
     failures.length === 0 &&
     suiteFailures.length === 0;
-const success = reportClean || (exitCode === 0 && counts.success && failures.length === 0 && suiteFailures.length === 0);
+const success =
+    reportClean || (exitCode === 0 && counts.success && failures.length === 0 && suiteFailures.length === 0);
 const effectiveExitCode = success ? 0 : exitCode;
 
 const summary = {

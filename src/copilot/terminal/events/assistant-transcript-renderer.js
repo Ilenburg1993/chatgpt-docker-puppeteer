@@ -11,7 +11,7 @@
 
 import { createHash } from 'node:crypto';
 import { SEPARATOR, printlnBlock } from '../dialog/io/index.js';
-import { sanitizeTerminalRenderText } from '../dialog/turn-display.js';
+import { sanitizeTerminalRenderText } from '../dialog/index.js';
 import { appendTerminalTranscriptTurn, terminalThemeRow, terminalThemeText } from '../state/events/index.js';
 
 const RECENT_TRANSCRIPT_TTL_MS = 5 * 60_000;

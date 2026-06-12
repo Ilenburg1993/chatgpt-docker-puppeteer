@@ -34,7 +34,12 @@ export {
     writeInlineStatus,
 } from './output.js';
 export { broadcastSse, CRITICAL_EVENTS, nextSseEventId } from './sse.js';
-export { createDeltaCallback, createDisplayState, renderStreamingFooter } from './turn-display.js';
+export {
+    createDeltaCallback,
+    createDisplayState,
+    renderStreamingFooter,
+    sanitizeTerminalRenderText,
+} from './turn-display.js';
 export {
     buildTerminalEmptyOutputDiagnosis,
     classifyTerminalEmptyOutput,

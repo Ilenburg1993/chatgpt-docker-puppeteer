@@ -2,8 +2,8 @@
 
 import { readTerminalIoActivityProjection } from '../events/projections/index.js';
 import { renderTerminalQuestionActivityPhaseLabel } from '../events/presenters/question/index.js';
-import { renderTerminalTraceSummaryTitle } from '../events/turn-trace-presentation.js';
-import { readTerminalActivityProjection } from '../frontend/projections/now.js';
+import { renderTerminalTraceSummaryTitle } from '../events/index.js';
+import { readTerminalActivityProjection } from '../frontend/index.js';
 import {
     formatTerminalElapsedDuration,
     formatTerminalTimeLabel,

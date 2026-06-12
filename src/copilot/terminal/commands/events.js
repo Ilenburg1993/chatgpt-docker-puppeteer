@@ -18,9 +18,9 @@ import {
 } from '../events/presenters/index.js';
 import {
     EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL,
+    listTerminalPublicStreamSourcePolicies,
     summarizeEmptyAfterUserInputRecovery,
-} from '../events/dialog-recovery-presenter.js';
-import { listTerminalPublicStreamSourcePolicies } from '../events/event-adapter-events.js';
+} from '../events/index.js';
 import { classifyRuntimeSdkRateLimitScope, describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk/index.js';
 import {
     formatTerminalTimeLabel,
