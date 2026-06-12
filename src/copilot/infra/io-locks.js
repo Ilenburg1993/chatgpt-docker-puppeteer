@@ -113,7 +113,6 @@ function waitForPrevious(previous, key, options) {
                 },
                 Math.max(0, options.timeoutMs),
             );
-            timeout.unref?.();
         }
 
         previous

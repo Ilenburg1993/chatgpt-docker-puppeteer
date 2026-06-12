@@ -139,7 +139,6 @@ function sleep(ms, signal) {
             cleanup();
             resolve(undefined);
         }, Math.max(0, ms));
-        timeout.unref?.();
         const cleanup = () => {
             clearTimeout(timeout);
             signal?.removeEventListener('abort', onAbort);
