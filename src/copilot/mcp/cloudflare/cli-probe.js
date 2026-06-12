@@ -47,9 +47,12 @@ export function asRecord(value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
 }
 
-/** @returns {string | null} */
-export function readSmokeBearerToken() {
-    const token = String(process.env['COPILOT_MCP_SMOKE_BEARER_TOKEN'] ?? '').trim();
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string | null}
+ */
+export function readSmokeBearerToken(env = process.env) {
+    const token = String(env['COPILOT_MCP_SMOKE_BEARER_TOKEN'] ?? '').trim();
     return token && !hasControlCharacters(token) ? token : null;
 }
 

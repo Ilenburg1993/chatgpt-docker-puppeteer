@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { afterEach, describe, it } from 'vitest';
 
-import { probeJsonWithRetry } from '#copilot/mcp/cloudflare/cli-probe.js';
+import { probeJsonWithRetry, readSmokeBearerToken } from '#copilot/mcp/cloudflare/cli-probe.js';
+import { runCloudflareSmoke } from '#copilot/mcp/cloudflare/cli-smoke.js';
 
 /** @type {http.Server[]} */
 const servers = [];
@@ -42,5 +43,22 @@ describe('Cloudflare CLI probe retry', () => {
         assert.equal(result.status, 200);
         assert.equal(result.attempts, 2);
         assert.equal(calls, 2);
+    });
+
+    it('reads the smoke bearer token from the injected environment', () => {
+        assert.equal(readSmokeBearerToken({ COPILOT_MCP_SMOKE_BEARER_TOKEN: ' token-value ' }), 'token-value');
+        assert.equal(readSmokeBearerToken({ COPILOT_MCP_SMOKE_BEARER_TOKEN: 'bad\nvalue' }), null);
+        assert.equal(readSmokeBearerToken({}), null);
+    });
+
+    it('fails authenticated smoke before network access when the bearer token is missing', async () => {
+        await assert.rejects(
+            runCloudflareSmoke({
+                config: /** @type {any} */ ({ publicMcpUrl: 'https://example.invalid/mcp' }),
+                authenticated: true,
+                env: {},
+            }),
+            /COPILOT_MCP_SMOKE_BEARER_TOKEN/u,
+        );
     });
 });

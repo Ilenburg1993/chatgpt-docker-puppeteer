@@ -21,7 +21,12 @@ export async function runCloudflareSmoke({ config, authenticated = false, env = 
     const smokeAttempts = readPositiveIntegerEnv(env, 'COPILOT_MCP_SMOKE_ATTEMPTS', DEFAULT_SMOKE_ATTEMPTS, 1, 20);
     const smokeDelayMs = readPositiveIntegerEnv(env, 'COPILOT_MCP_SMOKE_DELAY_MS', DEFAULT_SMOKE_DELAY_MS, 100, 30_000);
     const probeOptions = { attempts: smokeAttempts, delayMs: smokeDelayMs };
-    const bearerToken = authenticated ? readSmokeBearerToken() : null;
+    const bearerToken = authenticated ? readSmokeBearerToken(env) : null;
+    if (authenticated && !bearerToken) {
+        throw new Error(
+            'Authenticated Cloudflare smoke requires a valid COPILOT_MCP_SMOKE_BEARER_TOKEN.',
+        );
+    }
     const health = await probeJsonWithRetry(new URL('/health', connectorUrl).toString(), probeOptions);
     const protectedResource = await probeJsonWithRetry(new URL('/.well-known/oauth-protected-resource', connectorUrl).toString(), probeOptions);
     const authorizationServer = extractAuthorizationServer(protectedResource);
