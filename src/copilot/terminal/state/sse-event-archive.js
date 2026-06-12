@@ -8,10 +8,11 @@
  * @module copilot/terminal/state/sse-event-archive
  */
 
-import { appendFile, mkdir, open } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretRecord } from '../../core/security/redaction.js';
+import { createJsonlFileWriter } from '../../infra/io/jsonl-file-writer.js';
 
 const DEFAULT_TERMINAL_SSE_EVENT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'sse-events');
 const TERMINAL_SSE_EVENT_ARCHIVE_SOFT_QUEUE = 10_000;
@@ -40,16 +41,8 @@ let _terminalSseEventArchivePath = null;
 let _terminalSseEventArchiveDay = null;
 /** @type {string | null} */
 let _terminalSseEventArchiveError = null;
-/** @type {string[]} */
-let _terminalSseEventArchiveQueue = [];
-let _terminalSseEventArchiveFlushScheduled = false;
-let _terminalSseEventArchiveFlushInFlight = false;
-/** @type {Promise<void> | null} */
-let _terminalSseEventArchiveFlushPromise = null;
 let _terminalSseEventArchiveEvents = 0;
-let _terminalSseEventArchiveBytes = 0;
-let _terminalSseEventArchiveFailedEvents = 0;
-let _terminalSseEventArchiveDroppedEvents = 0;
+let _terminalSseEventArchiveRejectedEvents = 0;
 let _terminalSseEventArchiveLastEventId = /** @type {number | null} */ (null);
 
 /**
@@ -77,6 +70,19 @@ function resolveTerminalSseEventArchivePath() {
     _terminalSseEventArchivePath = join(resolveTerminalSseEventArchiveDir(), `terminal-sse-events-${day}.jsonl`);
     return _terminalSseEventArchivePath;
 }
+
+const terminalSseEventArchiveWriter = createJsonlFileWriter({
+    filePath: resolveTerminalSseEventArchivePath,
+    batchLines: TERMINAL_SSE_EVENT_ARCHIVE_BATCH_LINES,
+    maxQueueLines: TERMINAL_SSE_EVENT_ARCHIVE_CATASTROPHIC_QUEUE,
+    softQueueLines: TERMINAL_SSE_EVENT_ARCHIVE_SOFT_QUEUE,
+    onError: (error) => {
+        _terminalSseEventArchiveError = toError(error).message;
+    },
+    onSuccess: () => {
+        _terminalSseEventArchiveError = null;
+    },
+});
 
 /**
  * @param {string} filePath
@@ -173,53 +179,14 @@ function projectTerminalSseEventEnvelope(data) {
 }
 
 /**
- * @returns {void}
- */
-function scheduleTerminalSseEventArchiveFlush() {
-    if (_terminalSseEventArchiveFlushScheduled || _terminalSseEventArchiveFlushInFlight) return;
-    _terminalSseEventArchiveFlushScheduled = true;
-    setImmediate(() => {
-        _terminalSseEventArchiveFlushScheduled = false;
-        void flushTerminalSseEventArchive();
-    });
-}
-
-/**
  * @returns {Promise<void>}
  */
 export async function flushTerminalSseEventArchive() {
-    if (_terminalSseEventArchiveFlushInFlight) {
-        await _terminalSseEventArchiveFlushPromise;
-        if (_terminalSseEventArchiveQueue.length === 0) return;
-    }
-    if (_terminalSseEventArchiveQueue.length === 0) return;
-    _terminalSseEventArchiveFlushInFlight = true;
-    const flushPromise = (async () => {
-        try {
-            await mkdir(resolveTerminalSseEventArchiveDir(), { recursive: true });
-            while (_terminalSseEventArchiveQueue.length > 0) {
-                const batch = _terminalSseEventArchiveQueue.splice(0, TERMINAL_SSE_EVENT_ARCHIVE_BATCH_LINES);
-                if (batch.length === 0) break;
-                const content = batch.join('');
-                await appendFile(resolveTerminalSseEventArchivePath(), content, 'utf8');
-                _terminalSseEventArchiveBytes += Buffer.byteLength(content, 'utf8');
-            }
-            _terminalSseEventArchiveError = null;
-        } catch (error) {
-            _terminalSseEventArchiveError = toError(error).message;
-            _terminalSseEventArchiveFailedEvents += 1;
-        } finally {
-            _terminalSseEventArchiveFlushInFlight = false;
-            if (_terminalSseEventArchiveQueue.length > 0) scheduleTerminalSseEventArchiveFlush();
-        }
-    })();
-    _terminalSseEventArchiveFlushPromise = flushPromise;
     try {
-        await flushPromise;
-    } finally {
-        if (_terminalSseEventArchiveFlushPromise === flushPromise) {
-            _terminalSseEventArchiveFlushPromise = null;
-        }
+        await terminalSseEventArchiveWriter.flush();
+        _terminalSseEventArchiveError = null;
+    } catch (error) {
+        _terminalSseEventArchiveError = toError(error).message;
     }
 }
 
@@ -250,21 +217,13 @@ export function recordTerminalSseEventArchive(input) {
             payload: safeData,
         };
         const line = `${JSON.stringify(record)}\n`;
-        _terminalSseEventArchiveQueue.push(line);
+        terminalSseEventArchiveWriter.enqueueLine(line);
         _terminalSseEventArchiveEvents += 1;
         _terminalSseEventArchiveLastEventId = input.eventId;
-
-        if (_terminalSseEventArchiveQueue.length > TERMINAL_SSE_EVENT_ARCHIVE_CATASTROPHIC_QUEUE) {
-            const overflow = _terminalSseEventArchiveQueue.length - TERMINAL_SSE_EVENT_ARCHIVE_SOFT_QUEUE;
-            _terminalSseEventArchiveQueue.splice(0, Math.max(0, overflow));
-            _terminalSseEventArchiveDroppedEvents += Math.max(0, overflow);
-        }
-
-        scheduleTerminalSseEventArchiveFlush();
         return { queued: true, path: resolveTerminalSseEventArchivePath(), error: null };
     } catch (error) {
         _terminalSseEventArchiveError = toError(error).message;
-        _terminalSseEventArchiveFailedEvents += 1;
+        _terminalSseEventArchiveRejectedEvents += 1;
         return { queued: false, path: _terminalSseEventArchivePath, error: _terminalSseEventArchiveError };
     }
 }
@@ -285,17 +244,18 @@ export function recordTerminalSseEventArchive(input) {
  * }}
  */
 export function readTerminalSseEventArchiveState() {
+    const writerState = terminalSseEventArchiveWriter.getState();
     return {
         enabled: isTerminalSseEventArchiveEnabled(),
         path: _terminalSseEventArchivePath,
         error: _terminalSseEventArchiveError,
         events: _terminalSseEventArchiveEvents,
-        bytes: _terminalSseEventArchiveBytes,
-        queueDepth: _terminalSseEventArchiveQueue.length,
-        flushScheduled: _terminalSseEventArchiveFlushScheduled,
-        flushInFlight: _terminalSseEventArchiveFlushInFlight,
-        failedEvents: _terminalSseEventArchiveFailedEvents,
-        droppedEvents: _terminalSseEventArchiveDroppedEvents,
+        bytes: writerState.persistedBytes,
+        queueDepth: writerState.queueDepth,
+        flushScheduled: writerState.scheduled,
+        flushInFlight: writerState.inFlight,
+        failedEvents: writerState.failedBatches + _terminalSseEventArchiveRejectedEvents,
+        droppedEvents: writerState.droppedLines,
         lastEventId: _terminalSseEventArchiveLastEventId,
     };
 }
@@ -397,13 +357,8 @@ export function resetTerminalSseEventArchiveForTests() {
     _terminalSseEventArchivePath = null;
     _terminalSseEventArchiveDay = null;
     _terminalSseEventArchiveError = null;
-    _terminalSseEventArchiveQueue = [];
-    _terminalSseEventArchiveFlushScheduled = false;
-    _terminalSseEventArchiveFlushInFlight = false;
-    _terminalSseEventArchiveFlushPromise = null;
+    terminalSseEventArchiveWriter.reset();
     _terminalSseEventArchiveEvents = 0;
-    _terminalSseEventArchiveBytes = 0;
-    _terminalSseEventArchiveFailedEvents = 0;
-    _terminalSseEventArchiveDroppedEvents = 0;
+    _terminalSseEventArchiveRejectedEvents = 0;
     _terminalSseEventArchiveLastEventId = null;
 }

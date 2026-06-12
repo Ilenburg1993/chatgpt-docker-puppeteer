@@ -10,10 +10,9 @@
  */
 
 import { SHUTDOWN_PRIORITY, logSwallowed, registerShutdownHandler, toError } from '#copilot/core';
-import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk/constants';
-import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
 import { getLogDir, log } from './logger.js';
 
 /** @param {string} key @param {number} def @returns {number} */
@@ -50,12 +49,15 @@ const TOOL_PERMISSIONS_LOG = COPILOT_TOOL_PERMISSIONS_LOG
     : COPILOT_AUDIT_LOG_PATH
       ? resolve(COPILOT_AUDIT_LOG_PATH)
       : join(resolve(getLogDir()), 'tool-permissions-audit.jsonl');
-const PERMISSIONS_ROTATE_LOG = TOOL_PERMISSIONS_LOG + '.1';
 const MAX_LOG_BYTES = TOOL_AUDIT_MAX_LOG_BYTES;
-
-let _permLogBytes = -1;
-/** @type {Promise<void>} */
-let _permLogChain = Promise.resolve();
+const permissionAuditWriter = createJsonlFileWriter({
+    filePath: TOOL_PERMISSIONS_LOG,
+    maxBytes: MAX_LOG_BYTES,
+    maxQueueLines: 10_000,
+    softQueueLines: 8_000,
+    flushToDisk: true,
+    onError: (error) => logSwallowed(error, 'audit.pipeline.logPermission'),
+});
 
 /**
  * Nomes de ferramentas consideradas de alto risco.
@@ -100,36 +102,17 @@ export function isHighRiskTool(toolName) {
  */
 export function logToolAudit(entry) {
     const line = JSON.stringify({ type: 'tool.permission', ...entry, ts: new Date().toISOString() }) + '\n';
-    const lineBytes = utf8ByteLength(line, 'permission audit line');
-
-    _permLogChain = _permLogChain
-        .catch(() => undefined)
-        .then(async () => {
-            await mkdir(dirname(TOOL_PERMISSIONS_LOG), { recursive: true });
-            if (_permLogBytes < 0) {
-                try {
-                    const { size } = await stat(TOOL_PERMISSIONS_LOG);
-                    _permLogBytes = size;
-                } catch {
-                    _permLogBytes = 0;
-                }
-            }
-            if (_permLogBytes + lineBytes >= MAX_LOG_BYTES) {
-                await rename(TOOL_PERMISSIONS_LOG, PERMISSIONS_ROTATE_LOG);
-                _permLogBytes = 0;
-            }
-            await appendFile(TOOL_PERMISSIONS_LOG, line, 'utf8');
-            _permLogBytes += lineBytes;
-        })
-        .catch((e) => {
-            logSwallowed(e, 'audit.pipeline.logPermission');
-        });
+    permissionAuditWriter.enqueueLine(line);
 }
 
 registerShutdownHandler(
     'audit.permission.flush',
     async () => {
-        await _permLogChain;
+        try {
+            await permissionAuditWriter.flush();
+        } catch (error) {
+            logSwallowed(error, 'audit.pipeline.flushPermission');
+        }
     },
     SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
 );

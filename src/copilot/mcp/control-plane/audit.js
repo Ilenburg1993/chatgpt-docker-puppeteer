@@ -5,20 +5,13 @@
  * @module copilot/mcp/control-plane/audit
  */
 
-import { appendFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createJsonlFileWriter } from '../../infra/io/jsonl-file-writer.js';
 
 const MCP_AUDIT_DIR = fileURLToPath(new URL('../../.ai/audit/', import.meta.url));
 const MAX_AUDIT_QUEUE_LINES = 10_000;
 
-/** @type {string[]} */
-const auditQueue = [];
-/** @type {Promise<void>} */
-let auditFlushChain = Promise.resolve();
-/** @type {{ dir: string; promise: Promise<string | undefined> } | null} */
-let auditDirReady = null;
-let auditFlushScheduled = false;
 let auditBeforeExitHookInstalled = false;
 
 /**
@@ -27,6 +20,17 @@ let auditBeforeExitHookInstalled = false;
 function getMcpAuditFile() {
     return process.env['COPILOT_MCP_AUDIT_FILE'] ?? path.join(MCP_AUDIT_DIR, 'mcp-tool-calls.jsonl');
 }
+
+const mcpAuditWriter = createJsonlFileWriter({
+    filePath: getMcpAuditFile,
+    maxQueueLines: MAX_AUDIT_QUEUE_LINES,
+    softQueueLines: MAX_AUDIT_QUEUE_LINES - 1,
+    onError: (error) => {
+        logMcp('WARN', 'Failed to append MCP audit event batch.', {
+            error: error instanceof Error ? error.message : String(error),
+        });
+    },
+});
 
 /**
  * @param {'DEBUG' | 'INFO' | 'WARN' | 'ERROR'} level
@@ -57,12 +61,12 @@ export async function appendMcpAuditEvent(event) {
         ...event,
     };
     const line = `${JSON.stringify(payload)}\n`;
+    mcpAuditWriter.enqueueLine(line);
+    installBeforeExitFlushHook();
     if (process.env['COPILOT_MCP_AUDIT_SYNC'] === 'true') {
-        const queued = auditQueue.splice(0);
-        await appendAuditLinesSerialized([...queued, line], false);
+        await mcpAuditWriter.flush();
         return;
     }
-    enqueueAuditLine(line);
 }
 
 /**
@@ -71,34 +75,7 @@ export async function appendMcpAuditEvent(event) {
  * @returns {Promise<void>}
  */
 export async function flushMcpAuditEvents() {
-    const lines = auditQueue.splice(0);
-    if (lines.length > 0) {
-        await appendAuditLinesSerialized(lines, false);
-    } else {
-        await auditFlushChain;
-    }
-}
-
-/**
- * @param {string} line
- * @returns {void}
- */
-function enqueueAuditLine(line) {
-    if (auditQueue.length >= MAX_AUDIT_QUEUE_LINES) auditQueue.shift();
-    auditQueue.push(line);
-    installBeforeExitFlushHook();
-    scheduleAuditFlush();
-}
-
-function scheduleAuditFlush() {
-    if (auditFlushScheduled) return;
-    auditFlushScheduled = true;
-    setImmediate(() => {
-        auditFlushScheduled = false;
-        const lines = auditQueue.splice(0);
-        if (lines.length === 0) return;
-        void appendAuditLinesSerialized(lines, true);
-    });
+    await mcpAuditWriter.flush();
 }
 
 function installBeforeExitFlushHook() {
@@ -107,36 +84,4 @@ function installBeforeExitFlushHook() {
     process.once('beforeExit', () => {
         void flushMcpAuditEvents().catch(() => undefined);
     });
-}
-
-/**
- * @param {string[]} lines
- * @param {boolean} logFailure
- * @returns {Promise<void>}
- */
-function appendAuditLinesSerialized(lines, logFailure) {
-    const operation = auditFlushChain.then(() => appendAuditLines(lines));
-    auditFlushChain = operation.catch((error) => {
-        if (logFailure) {
-            logMcp('WARN', 'Failed to append MCP audit event batch.', {
-                error: error instanceof Error ? error.message : String(error),
-            });
-        }
-    });
-    return operation;
-}
-
-/**
- * @param {string[]} lines
- * @returns {Promise<void>}
- */
-async function appendAuditLines(lines) {
-    if (lines.length === 0) return;
-    const auditFile = getMcpAuditFile();
-    const dir = path.dirname(auditFile);
-    if (!auditDirReady || auditDirReady.dir !== dir) {
-        auditDirReady = { dir, promise: mkdir(dir, { recursive: true }) };
-    }
-    await auditDirReady.promise;
-    await appendFile(auditFile, lines.join(''), 'utf8');
 }

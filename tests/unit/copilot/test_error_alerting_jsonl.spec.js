@@ -184,7 +184,11 @@ describe('F49 — createJsonlWriter', () => {
     });
 
     beforeEach(() => {
-        Object.values(mockFs).forEach((fn) => fn.mockClear());
+        Object.values(mockFs).forEach((fn) => fn.mockReset());
+        mockFs.appendFile.mockResolvedValue(undefined);
+        mockFs.mkdir.mockResolvedValue(undefined);
+        mockFs.rename.mockResolvedValue(undefined);
+        mockFs.stat.mockResolvedValue({ size: 100 });
     });
 
     it('write() enfileira e flush escreve JSON line', async () => {
@@ -255,5 +259,19 @@ describe('F49 — createJsonlWriter', () => {
         await writer.flush();
         expect(mockFs.appendFile).toHaveBeenCalledTimes(2);
         expect(String(mockFs.appendFile.mock.calls[1]?.[1])).toContain('"sequence":2');
+    });
+
+    it('recoloca o lote na fila quando append falha', async () => {
+        mockFs.appendFile.mockRejectedValueOnce(new Error('disk unavailable')).mockResolvedValue(undefined);
+        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/requeue.jsonl' });
+
+        writer.write({ sequence: 1 });
+        await expect(writer.flush()).rejects.toThrow('disk unavailable');
+        expect(writer.getState()).toMatchObject({ queueDepth: 1, failedBatches: 1, persistedLines: 0 });
+
+        await writer.flush();
+        expect(mockFs.appendFile).toHaveBeenCalledTimes(2);
+        expect(String(mockFs.appendFile.mock.calls[1]?.[1])).toContain('"sequence":1');
+        expect(writer.getState()).toMatchObject({ queueDepth: 0, persistedLines: 1 });
     });
 });

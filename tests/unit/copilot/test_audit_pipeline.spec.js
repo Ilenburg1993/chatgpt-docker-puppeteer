@@ -12,6 +12,9 @@
  * - buildAuditingPermissionHandler: delegação ao base handler + fallback approveAll
  */
 
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildAuditingPermissionHandler, createAuditLog, isHighRiskTool } from '../../../src/copilot/audit/pipeline.js';
 
@@ -155,6 +158,27 @@ describe('audit/pipeline › createAuditLog', () => {
         expect(serialized).not.toContain(byokToken);
         expect(serialized).toContain('[redacted]');
         expect(auditLog.getEntries()[0]?.data?.['tokens']).toBe(42);
+    });
+
+    it('flush persiste cada entrada uma única vez', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-audit-pipeline-'));
+        const auditFile = join(dir, 'audit.jsonl');
+        const toolAuditFile = join(dir, 'tool-audit.jsonl');
+        const log = createAuditLog({ maxEntries: 5, auditFile, toolAuditFile });
+        try {
+            log.record({ type: 'one' });
+            log.record({ type: 'two' });
+            await log.flush();
+            await log.flush();
+
+            const rows = (await readFile(auditFile, 'utf8'))
+                .trim()
+                .split('\n')
+                .map((line) => JSON.parse(line));
+            expect(rows.map((row) => row.type)).toEqual(['one', 'two']);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
     });
 });
 

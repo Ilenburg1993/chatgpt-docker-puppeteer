@@ -9,11 +9,29 @@
  */
 
 import { toError } from '#copilot/core';
-import { dirname } from 'node:path';
-import { appendFileUnlocked } from '../io/fs/append.js';
-import { mkdirPathUnlocked } from '../io/fs/mkdir.js';
+import { createJsonlFileWriter } from '../io/jsonl-file-writer.js';
 
 const IO_MUTATION_AUDIT_SCHEMA_VERSION = 1;
+/** @type {Map<string, ReturnType<typeof createJsonlFileWriter>>} */
+const mutationAuditWriters = new Map();
+
+/**
+ * @param {string} filePath
+ */
+function getMutationAuditWriter(filePath) {
+    let writer = mutationAuditWriters.get(filePath);
+    if (!writer) {
+        writer = createJsonlFileWriter({
+            filePath,
+            autoFlush: false,
+            flushToDisk: true,
+            maxQueueLines: 10_000,
+            softQueueLines: 8_000,
+        });
+        mutationAuditWriters.set(filePath, writer);
+    }
+    return writer;
+}
 
 /**
  * @returns {string | null}
@@ -76,9 +94,10 @@ export async function recordIoMutationAudit(envelope, context = {}) {
     const filePath = getIoMutationAuditLogPath();
     if (!filePath) return { enabled: false, path: null, written: false };
     try {
-        await mkdirPathUnlocked(dirname(filePath), { recursive: true });
         const record = buildIoMutationAuditRecord(envelope, context);
-        await appendFileUnlocked(filePath, `${JSON.stringify(record)}\n`);
+        const writer = getMutationAuditWriter(filePath);
+        writer.enqueueLine(JSON.stringify(record));
+        await writer.flush();
         return { enabled: true, path: filePath, written: true };
     } catch (error) {
         return {

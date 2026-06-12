@@ -18,8 +18,9 @@ import {
     toError,
 } from '#copilot/core';
 import fs from 'node:fs';
-import { appendFile, mkdir, open, rename, stat } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { open } from 'node:fs/promises';
+import { join } from 'node:path';
+import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
 import { getLogDir, log } from './logger.js';
 
 /** @param {string} key @param {number} def @returns {number} */
@@ -149,54 +150,26 @@ export function createAuditLog(opts = {}) {
     const maxEntries = opts.maxEntries ?? MAX_AUDIT_ENTRIES;
     const auditFile = opts.auditFile ?? AUDIT_FILE;
     const toolAuditFile = opts.toolAuditFile ?? TOOL_AUDIT_FILE;
-    const toolAuditRotate = toolAuditFile + '.1';
 
     /** @type {AuditEntry[]} */
     const _buffer = [];
+    const auditWriter = createJsonlFileWriter({
+        filePath: auditFile,
+        autoFlush: false,
+        batchLines: maxEntries,
+        maxQueueLines: maxEntries,
+        softQueueLines: maxEntries,
+    });
+    const toolAuditWriter = createJsonlFileWriter({
+        filePath: toolAuditFile,
+        maxBytes: MAX_TOOL_AUDIT_BYTES,
+        maxQueueLines: 10_000,
+        softQueueLines: 8_000,
+        onError: (error) => logSwallowed(error, 'audit.pipeline.flushToolAudit'),
+    });
 
     /** @type {Map<string, { toolName: string; mcpServerName: string | null; args: object; ts: number }>} */
     const _pending = new Map();
-
-    /** @type {string[]} */
-    const _toolWriteQueue = [];
-    let _flushScheduled = false;
-    /** @type {Promise<void>} */
-    let _toolFlushChain = Promise.resolve();
-
-    /** @returns {Promise<void>} */
-    function flushToolQueue() {
-        const batch = _toolWriteQueue.splice(0);
-        if (!batch.length) return _toolFlushChain;
-        _toolFlushChain = _toolFlushChain
-            .catch(() => undefined)
-            .then(async () => {
-                await mkdir(dirname(/** @type {string} */ (toolAuditFile)), { recursive: true });
-                try {
-                    const { size } = await stat(toolAuditFile);
-                    if (size >= MAX_TOOL_AUDIT_BYTES) await rename(toolAuditFile, toolAuditRotate);
-                } catch (e) {
-                    logSwallowed(e, 'audit.pipeline.statToolAudit');
-                }
-                await appendFile(toolAuditFile, batch.join(''), 'utf8');
-            })
-            .catch((e) => {
-                logSwallowed(e, 'audit.pipeline.flushToolAudit');
-            })
-            .finally(() => {
-                if (_toolWriteQueue.length > 0) scheduleFlushTool();
-            });
-        return _toolFlushChain;
-    }
-
-    /** @returns {void} */
-    function scheduleFlushTool() {
-        if (_flushScheduled) return;
-        _flushScheduled = true;
-        setImmediate(() => {
-            _flushScheduled = false;
-            void flushToolQueue();
-        });
-    }
 
     /**
      * @param {Omit<AuditEntry, 'ts'>} entry
@@ -218,6 +191,7 @@ export function createAuditLog(opts = {}) {
         const full = redactAuditEntry(/** @type {AuditEntry} */ ({ ...entry, ts: new Date().toISOString() }));
         _buffer.push(full);
         if (_buffer.length > maxEntries) _buffer.shift();
+        auditWriter.enqueueLine(JSON.stringify(full));
     }
 
     /** @returns {AuditEntry[]} */
@@ -235,24 +209,23 @@ export function createAuditLog(opts = {}) {
 
     /** @returns {Promise<void>} */
     async function flush() {
-        if (_buffer.length > 0) {
-            try {
-                await mkdir(dirname(/** @type {string} */ (auditFile)), { recursive: true });
-                const lines = _buffer.map((e) => JSON.stringify(redactAuditEntry(e))).join('\n') + '\n';
-                await appendFile(auditFile, lines, 'utf8');
-            } catch (err) {
-                log('WARN', `[audit/pipeline] flush failed: ${toError(err).message ?? err}`);
-            }
+        try {
+            await auditWriter.flush();
+        } catch (err) {
+            log('WARN', `[audit/pipeline] flush failed: ${toError(err).message ?? err}`);
         }
-        _flushScheduled = false;
-        await flushToolQueue();
-        await _toolFlushChain;
+        try {
+            await toolAuditWriter.flush();
+        } catch (error) {
+            logSwallowed(error, 'audit.pipeline.flushToolAudit');
+        }
     }
 
     /** @returns {void} */
     function clear() {
         _buffer.length = 0;
         _pending.clear();
+        auditWriter.clearQueue();
     }
 
     /** @returns {Promise<void>} */
@@ -308,8 +281,7 @@ export function createAuditLog(opts = {}) {
             data: { toolName: jsonRecord.toolName, durationMs, success: entry.success },
         });
 
-        _toolWriteQueue.push(JSON.stringify(redactSecretRecord(jsonRecord)) + '\n');
-        scheduleFlushTool();
+        toolAuditWriter.enqueueLine(JSON.stringify(redactSecretRecord(jsonRecord)));
     }
 
     /**

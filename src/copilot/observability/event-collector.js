@@ -11,9 +11,9 @@
 import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config';
 import { SHUTDOWN_PRIORITY, logSwallowed, redactSecretRecord, registerShutdownHandler } from '#copilot/core';
 import { onSessionEvent } from '#copilot/events';
-import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
 import {
     attachAssistantHandlers,
     attachInteractionHandlers,
@@ -85,47 +85,24 @@ export function getCompactionHistory(sessionId) {
     return _compactionHistory.get(sessionId) ?? [];
 }
 
-/** @type {string[]} */
-const _writeQueue = [];
-let _flushScheduled = false;
-/** @type {Promise<void>} */
-let _flushChain = Promise.resolve();
-
-/** @returns {Promise<void>} */
-function flushEventQueue() {
-    const batch = _writeQueue.splice(0);
-    if (!batch.length) return _flushChain;
-    _flushChain = _flushChain
-        .catch(() => undefined)
-        .then(async () => {
-            await mkdir(LOGS_DIR, { recursive: true });
-            try {
-                const { size } = await stat(EVENTS_FILE);
-                if (size >= MAX_EVENTS_BYTES) {
-                    await rename(EVENTS_FILE, EVENTS_FILE + '.1');
-                }
-            } catch (e) {
-                logSwallowed(e, 'event-collector.stat');
-            }
-            await appendFile(EVENTS_FILE, batch.join(''), 'utf8');
-        })
-        .catch((e) => {
-            logSwallowed(e, 'event-collector.persist');
-        })
-        .finally(() => {
-            if (_writeQueue.length > 0) scheduleFlush();
-        });
-    return _flushChain;
-}
+const eventWriter = createJsonlFileWriter({
+    filePath: EVENTS_FILE,
+    maxBytes: MAX_EVENTS_BYTES,
+    maxQueueLines: 10_000,
+    softQueueLines: 8_000,
+    onError: (error) => logSwallowed(error, 'event-collector.persist'),
+});
 
 /**
  * FINDING-P4-3 fix: flush síncrono dos eventos pendentes antes do processo encerrar. Registrado uma única vez como
  * beforeExit handler para não duplicar em múltiplos reloads.
  */
 async function _flushOnExit() {
-    _flushScheduled = false;
-    await flushEventQueue();
-    await _flushChain;
+    try {
+        await eventWriter.flush();
+    } catch (error) {
+        logSwallowed(error, 'event-collector.flush');
+    }
 }
 
 registerShutdownHandler(
@@ -137,27 +114,13 @@ registerShutdownHandler(
 );
 
 /**
- * Agenda flush assíncrono de eventos para disco.
- *
- * @returns {void}
- */
-function scheduleFlush() {
-    if (_flushScheduled) return;
-    _flushScheduled = true;
-    setImmediate(() => {
-        _flushScheduled = false;
-        void flushEventQueue();
-    });
-}
-/**
  * Persiste um evento em events.jsonl (filtragem por max bytes é simplificada — sem rotação aqui).
  *
  * @param {Record<string, unknown>} entry
  * @returns {void}
  */
 function persistEvent(entry) {
-    _writeQueue.push(JSON.stringify(redactSecretRecord({ _collected: new Date().toISOString(), ...entry })) + '\n');
-    scheduleFlush();
+    eventWriter.enqueueLine(JSON.stringify(redactSecretRecord({ _collected: new Date().toISOString(), ...entry })));
 }
 /**
  * @typedef {import('./metrics.js').MetricsStore} TelemetryStore
