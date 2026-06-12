@@ -23,6 +23,10 @@ import { isIP } from 'node:net';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
 import { logMcp } from '../control-plane/audit.js';
 import { buildProtectedResourceMetadata, parseBearerToken, readMcpAuthConfig } from '../control-plane/auth.js';
+import {
+    readMcpAuthJwksWarmupState,
+    scheduleMcpAuthJwksWarmup,
+} from '../control-plane/auth-jwks-warmup.js';
 import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
@@ -494,6 +498,7 @@ export function createMcpHttpRequestHandler(options) {
  */
 export function notifyMcpHttpStarted() {
     startMcpIndexAutoBuildInBackground({ reason: 'mcp-http-start' });
+    scheduleMcpAuthJwksWarmup();
     scheduleMcpStartupMaintenance();
 }
 
@@ -508,6 +513,7 @@ function buildHealthPayload(protocolState) {
         mcpPath: MCP_PATH,
         metrics: readMcpMetricsSnapshot(),
         indexAutoBuild: readMcpIndexAutoBuildState(),
+        authJwksWarmup: readMcpAuthJwksWarmupState(),
         startupMaintenance: readMcpStartupMaintenanceState(),
         http: {
             implementationVersion: MCP_HTTP_SHARED_IMPLEMENTATION_VERSION,

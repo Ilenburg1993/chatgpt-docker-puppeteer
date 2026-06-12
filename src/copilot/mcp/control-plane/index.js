@@ -9,6 +9,7 @@ export * from './ai-artifacts.js';
 export * from './annotations.js';
 export * from './audit.js';
 export * from './auth.js';
+export * from './auth-jwks-warmup.js';
 export * from './dev-oauth.js';
 export * from './http-client.js';
 export * from './index-auto-build.js';

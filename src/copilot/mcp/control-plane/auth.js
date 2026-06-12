@@ -914,6 +914,64 @@ function getRemoteJwks(jwksUri) {
 }
 
 /**
+ * Preloads the configured remote JWKS without requiring a bearer token.
+ *
+ * `jose` de-duplicates concurrent reloads internally, while `REMOTE_JWKS_CACHE` keeps a single
+ * resolver per URI for subsequent authorization calls.
+ *
+ * @param {{ env?: NodeJS.ProcessEnv }} [options]
+ * @returns {Promise<{
+ *     ok: true;
+ *     skipped: boolean;
+ *     reason: string | null;
+ *     jwksUri: string | null;
+ *     source: 'disabled' | 'cache' | 'remote';
+ *     keyCount: number | null;
+ *     durationMs: number;
+ * }>}
+ */
+export async function warmMcpRemoteJwks({ env = process.env } = {}) {
+    const startedAt = performance.now();
+    const config = readMcpAuthConfig(env);
+    if (config.mode === 'none-dev' || config.enforcement === 'off') {
+        return {
+            ok: true,
+            skipped: true,
+            reason: 'auth-not-enforced',
+            jwksUri: config.jwksUri || null,
+            source: 'disabled',
+            keyCount: null,
+            durationMs: Math.round(performance.now() - startedAt),
+        };
+    }
+    if (!config.jwksUri) {
+        return {
+            ok: true,
+            skipped: true,
+            reason: 'jwks-uri-not-configured',
+            jwksUri: null,
+            source: 'disabled',
+            keyCount: null,
+            durationMs: Math.round(performance.now() - startedAt),
+        };
+    }
+
+    const jwks = getRemoteJwks(config.jwksUri);
+    const alreadyFresh = jwks.fresh;
+    if (!alreadyFresh) await jwks.reload();
+    const keyCount = jwks.jwks()?.keys.length ?? null;
+    return {
+        ok: true,
+        skipped: false,
+        reason: null,
+        jwksUri: config.jwksUri,
+        source: alreadyFresh ? 'cache' : 'remote',
+        keyCount,
+        durationMs: Math.round(performance.now() - startedAt),
+    };
+}
+
+/**
  * Clear in-memory auth caches. Intended for focused tests and local diagnostics.
  *
  * @returns {void}
