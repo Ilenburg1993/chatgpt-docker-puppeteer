@@ -6,6 +6,8 @@
  */
 
 const startedAt = Date.now();
+const MAX_TOOL_METRICS = 1000;
+const MAX_PHASE_METRICS_PER_TOOL = 64;
 
 /**
  * @typedef {object} ToolMetric
@@ -15,7 +17,15 @@ const startedAt = Date.now();
  * @property {number | null} lastDurationMs
  * @property {number | null} lastCalledAt
  * @property {boolean | null} lastIsError
- * @property {{ hint: number; stringify: number; unknown: number; rejected: number; totalBytes: number; lastBytes: number | null; lastStrategy: string | null }} resultSize
+ * @property {{
+ *     hint: number;
+ *     stringify: number;
+ *     unknown: number;
+ *     rejected: number;
+ *     totalBytes: number;
+ *     lastBytes: number | null;
+ *     lastStrategy: string | null;
+ * }} resultSize
  * @property {Record<string, { calls: number; totalDurationMs: number; lastDurationMs: number | null }>} phases
  */
 
@@ -24,22 +34,33 @@ const TOOL_METRICS = new Map();
 
 /**
  * @param {string} tool
- * @param {{ durationMs: number; isError: boolean; phases?: Record<string, number>; resultSize?: { strategy?: string; bytes?: number | null; rejected?: boolean } }} event
+ * @param {{
+ *     durationMs: number;
+ *     isError: boolean;
+ *     phases?: Record<string, number>;
+ *     resultSize?: { strategy?: string; bytes?: number | null; rejected?: boolean };
+ * }} event
  * @returns {void}
  */
 export function recordMcpToolMetric(tool, event) {
-    const current =
-        TOOL_METRICS.get(tool) ??
-        ({
-            calls: 0,
-            errors: 0,
-            totalDurationMs: 0,
-            lastDurationMs: null,
-            lastCalledAt: null,
-            lastIsError: null,
-            resultSize: { hint: 0, stringify: 0, unknown: 0, rejected: 0, totalBytes: 0, lastBytes: null, lastStrategy: null },
-            phases: {},
-        });
+    const current = TOOL_METRICS.get(tool) ?? {
+        calls: 0,
+        errors: 0,
+        totalDurationMs: 0,
+        lastDurationMs: null,
+        lastCalledAt: null,
+        lastIsError: null,
+        resultSize: {
+            hint: 0,
+            stringify: 0,
+            unknown: 0,
+            rejected: 0,
+            totalBytes: 0,
+            lastBytes: null,
+            lastStrategy: null,
+        },
+        phases: Object.create(null),
+    };
     current.calls += 1;
     current.errors += event.isError ? 1 : 0;
     current.totalDurationMs += event.durationMs;
@@ -47,7 +68,10 @@ export function recordMcpToolMetric(tool, event) {
     current.lastCalledAt = Date.now();
     current.lastIsError = event.isError;
     if (event.resultSize) {
-        const strategy = event.resultSize.strategy === 'stringify' || event.resultSize.strategy === 'hint' ? event.resultSize.strategy : 'unknown';
+        const strategy =
+            event.resultSize.strategy === 'stringify' || event.resultSize.strategy === 'hint'
+                ? event.resultSize.strategy
+                : 'unknown';
         if (strategy === 'hint') current.resultSize.hint += 1;
         else if (strategy === 'stringify') current.resultSize.stringify += 1;
         else current.resultSize.unknown += 1;
@@ -61,11 +85,19 @@ export function recordMcpToolMetric(tool, event) {
     }
     for (const [phase, durationMs] of Object.entries(event.phases ?? {})) {
         if (!Number.isFinite(durationMs) || durationMs < 0) continue;
+        if (!(phase in current.phases) && Object.keys(current.phases).length >= MAX_PHASE_METRICS_PER_TOOL) {
+            const oldest = Object.keys(current.phases)[0];
+            if (oldest !== undefined) delete current.phases[oldest];
+        }
         const phaseMetric = current.phases[phase] ?? { calls: 0, totalDurationMs: 0, lastDurationMs: null };
         phaseMetric.calls += 1;
         phaseMetric.totalDurationMs += durationMs;
         phaseMetric.lastDurationMs = durationMs;
         current.phases[phase] = phaseMetric;
+    }
+    if (!TOOL_METRICS.has(tool) && TOOL_METRICS.size >= MAX_TOOL_METRICS) {
+        const oldest = TOOL_METRICS.keys().next().value;
+        if (typeof oldest === 'string') TOOL_METRICS.delete(oldest);
     }
     TOOL_METRICS.set(tool, current);
 }
@@ -75,12 +107,30 @@ export function recordMcpToolMetric(tool, event) {
  *     startedAt: number;
  *     uptimeMs: number;
  *     totals: { calls: number; errors: number; tools: number };
- *     tools: Record<string, ToolMetric & { averageDurationMs: number; phaseAverages: Record<string, { calls: number; totalDurationMs: number; lastDurationMs: number | null; averageDurationMs: number }> }>;
+ *     tools: Record<
+ *         string,
+ *         ToolMetric & {
+ *             averageDurationMs: number;
+ *             phaseAverages: Record<
+ *                 string,
+ *                 { calls: number; totalDurationMs: number; lastDurationMs: number | null; averageDurationMs: number }
+ *             >;
+ *         }
+ *     >;
  * }}
  */
 export function readMcpMetricsSnapshot() {
-    /** @type {Record<string, ToolMetric & { averageDurationMs: number; phaseAverages: Record<string, { calls: number; totalDurationMs: number; lastDurationMs: number | null; averageDurationMs: number }> }>} */
-    const tools = {};
+    /** @type {Record<
+    string,
+    ToolMetric & {
+        averageDurationMs: number;
+        phaseAverages: Record<
+            string,
+            { calls: number; totalDurationMs: number; lastDurationMs: number | null; averageDurationMs: number }
+        >;
+    }
+>} */
+    const tools = Object.create(null);
     let calls = 0;
     let errors = 0;
     for (const [name, metric] of TOOL_METRICS.entries()) {
@@ -89,15 +139,18 @@ export function readMcpMetricsSnapshot() {
         tools[name] = {
             ...metric,
             averageDurationMs: metric.calls > 0 ? Math.round(metric.totalDurationMs / metric.calls) : 0,
-            phaseAverages: Object.fromEntries(
-                Object.entries(metric.phases).map(([phase, phaseMetric]) => [
-                    phase,
-                    {
-                        ...phaseMetric,
-                        averageDurationMs:
-                            phaseMetric.calls > 0 ? Math.round(phaseMetric.totalDurationMs / phaseMetric.calls) : 0,
-                    },
-                ]),
+            phaseAverages: Object.assign(
+                Object.create(null),
+                Object.fromEntries(
+                    Object.entries(metric.phases).map(([phase, phaseMetric]) => [
+                        phase,
+                        {
+                            ...phaseMetric,
+                            averageDurationMs:
+                                phaseMetric.calls > 0 ? Math.round(phaseMetric.totalDurationMs / phaseMetric.calls) : 0,
+                        },
+                    ]),
+                ),
             ),
         };
     }

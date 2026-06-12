@@ -65,6 +65,8 @@ Os refresh tokens rotativos tambem persistem, mas somente como hashes SHA-256, e
 sem gravar refresh token em claro.
 Clientes DCR publicos ficam em `src/copilot/.ai/mcp/oauth-clients.json`, tambem ignorado por git, para que
 um `client_id` emitido antes do restart continue valido quando o ChatGPT repetir o fluxo OAuth.
+Replay de DPoP e `private_key_jwt` também sobrevive a restart no `copilot.sqlite`: somente SHA-256 da
+chave de replay é persistido, separado por namespace e com expiração/limite por namespace.
 Use `COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true` apenas quando quiser forçar rotação da chave.
 Use `npm run copilot:mcp:cloudflare:remote-audit` para comparar a config remota Cloudflare contra o estado
 canonico local sem imprimir tokens. O serviço de origem remoto deve permanecer `http://127.0.0.1:3333`.
@@ -103,11 +105,14 @@ OAuth Client Secret: deixar vazio
 ```
 
 O servidor publica metadata OAuth raiz e path-specific em `/.well-known/oauth-protected-resource/mcp`.
-Veja `src/copilot/docs/CLAUDE_MCP_CONNECTOR_RUNBOOK.md`.
+Veja também:
+
+- `src/copilot/docs/CLAUDE_MCP_CONNECTOR_RUNBOOK.md`
+- `src/copilot/docs/INVESTIGACAO-CLAUDE-MCP-OAUTH-CLOUDFLARE-STDIO-2026-06-11.md`
 
 ## Primeira superfície
 
-Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
+Esta primeira faixa expõe leitura, escrita controlada, Git read-only, manutenção e diagnóstico:
 
 - `repo_status`
 - `repo_tree`
@@ -150,12 +155,30 @@ Esta primeira faixa expõe somente leitura, Git read-only e diagnóstico:
 - `repo_move_file`
 - `repo_remove_file`
 - `mcp_capabilities_summary`
+- `mcp_cleanup_ai_artifacts`
 - `mcp_smoke_workspace`
 - `mcp_tunnel_status`
 - `mcp_runtime_health`
 
 Validator job tools accept optional `timeoutMs` between 1000 and 3600000. Job records include the
 command, args, timeout, exit code, signal and `timedOut` flag.
+
+## Operação automática e limites
+
+- `mcp_smoke_workspace` é agendado uma vez após o HTTP subir, sem bloquear startup. Configure com
+  `COPILOT_MCP_STARTUP_SMOKE_ENABLED` e `COPILOT_MCP_STARTUP_SMOKE_DELAY_MS`; o estado aparece em
+  `/health`.
+- State de quick tunnel só é removido automaticamente quando o JSON é válido, o PID está morto e a
+  idade excede `COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS`.
+- `mcp_cleanup_ai_artifacts` aceita apenas artefatos `.json/.log` com nome UUID estrito em
+  `src/copilot/.ai/jobs`, usa dry-run por default e limita cada aplicação a 500 arquivos.
+- Headers de proxy são confiados apenas de peer loopback por default. Use
+  `COPILOT_MCP_HTTP_TRUST_PROXY_HEADERS=true|false|loopback`; `X-Forwarded-For` requer ainda
+  `COPILOT_MCP_HTTP_TRUST_X_FORWARDED_FOR=true`.
+- O registry avisa antes do teto de tools por
+  `COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT` (default 80%).
+- Handoffs pendentes expiram por default em cinco minutos; ajuste com
+  `COPILOT_HANDOFF_PENDING_TTL_MS`.
 
 ## Copilot SDK / LLM-B
 

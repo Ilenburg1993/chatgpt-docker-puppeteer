@@ -4,9 +4,17 @@
  */
 
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, it } from 'vitest';
 
-import { resolveJobTimeoutMs, resolveValidatorCommand } from '#copilot/mcp/control-plane';
+import {
+    pruneCompletedJobRecords,
+    readJobOutput,
+    resolveJobTimeoutMs,
+    resolveValidatorCommand,
+} from '#copilot/mcp/control-plane';
 import { resolveSafeValidationSuite } from '#copilot/mcp/scripts';
 import { jobTools } from '#copilot/mcp/tools';
 
@@ -70,6 +78,96 @@ describe('copilot MCP jobs', () => {
         assert.equal(resolveJobTimeoutMs(10), 1_000);
         assert.equal(resolveJobTimeoutMs(2_500), 2_500);
         assert.equal(resolveJobTimeoutMs(9_999_999), 3_600_000);
+    });
+
+    it('prunes only the oldest completed in-memory jobs', () => {
+        /** @type {Map<string, any>} */
+        const records = new Map([
+            ['old', { id: 'old', status: 'completed', process: null, startedAt: 1, endedAt: 2 }],
+            ['running', { id: 'running', status: 'running', process: {}, startedAt: 3, endedAt: null }],
+            ['failed', { id: 'failed', status: 'failed', process: null, startedAt: 4, endedAt: 5 }],
+            ['new', { id: 'new', status: 'completed', process: null, startedAt: 6, endedAt: 7 }],
+        ]);
+
+        assert.equal(pruneCompletedJobRecords(records, 2), 2);
+        assert.deepEqual([...records.keys()], ['running', 'new']);
+    });
+
+    it('rejects non-UUID job ids before resolving artifact paths', async () => {
+        assert.deepEqual(await readJobOutput('../../package'), { job: null, output: '' });
+    });
+
+    it('ignores persisted logFile paths and reads only the canonical bounded job log', async () => {
+        const id = randomUUID();
+        const jobsDir = join(process.cwd(), 'src/copilot/.ai/jobs');
+        const manifestFile = join(jobsDir, `${id}.json`);
+        const logFile = join(jobsDir, `${id}.log`);
+        await mkdir(jobsDir, { recursive: true });
+        try {
+            await writeFile(
+                manifestFile,
+                JSON.stringify({
+                    id,
+                    validator: 'typecheck',
+                    status: 'completed',
+                    startedAt: 1,
+                    endedAt: 2,
+                    exitCode: 0,
+                    signal: null,
+                    command: 'npm',
+                    args: [],
+                    timeoutMs: 1000,
+                    timedOut: false,
+                    logFile: '/etc/hosts',
+                    manifestFile: '/tmp/forged.json',
+                }),
+            );
+            await writeFile(logFile, 'prefix-safe-log-tail');
+
+            const result = await readJobOutput(id, 13);
+
+            assert.equal(result.job?.logFile, logFile);
+            assert.equal(result.job?.manifestFile, manifestFile);
+            assert.equal(result.output, 'safe-log-tail');
+        } finally {
+            await rm(manifestFile, { force: true });
+            await rm(logFile, { force: true });
+        }
+    });
+
+    it('refuses symbolic-link job logs', async () => {
+        const id = randomUUID();
+        const jobsDir = join(process.cwd(), 'src/copilot/.ai/jobs');
+        const manifestFile = join(jobsDir, `${id}.json`);
+        const logFile = join(jobsDir, `${id}.log`);
+        await mkdir(jobsDir, { recursive: true });
+        try {
+            await writeFile(
+                manifestFile,
+                JSON.stringify({
+                    id,
+                    validator: 'typecheck',
+                    status: 'completed',
+                    startedAt: 1,
+                    endedAt: 2,
+                    exitCode: 0,
+                    signal: null,
+                    command: 'npm',
+                    args: [],
+                    timeoutMs: 1000,
+                    timedOut: false,
+                }),
+            );
+            await symlink(join(process.cwd(), 'package.json'), logFile);
+
+            const result = await readJobOutput(id);
+
+            assert.equal(result.job?.id, id);
+            assert.equal(result.output, '');
+        } finally {
+            await rm(manifestFile, { force: true });
+            await rm(logFile, { force: true });
+        }
     });
 
     it('exposes canonical validator alias tools', () => {

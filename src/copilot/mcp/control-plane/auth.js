@@ -7,6 +7,7 @@ import {
     rememberMcpAuthorizationDecision,
     resetMcpAuthDecisionCache,
 } from './auth-decision-cache.js';
+import { OAUTH_REPLAY_NAMESPACES, rememberPersistentOAuthReplay } from './oauth-replay-store.js';
 import { createTtlCache } from './ttl-cache.js';
 
 /**
@@ -90,7 +91,7 @@ const DEFAULT_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED = /** @type {const} */ (['no
 
 const DEFAULT_RESOURCE = 'https://mcp.aurelin.org';
 const DEFAULT_RESOURCE_NAME = 'Copilot Workspace MCP';
-const DEFAULT_RESOURCE_DOCUMENTATION = 'https://developers.openai.com/apps-sdk/build/auth';
+const DEFAULT_RESOURCE_DOCUMENTATION = 'https://mcp.aurelin.org/oauth/status';
 const MAX_AUTHORIZATION_SERVERS = 5;
 const MAX_AUDIENCES = 12;
 const MAX_JWKS_CACHE_ENTRIES = 16;
@@ -1010,6 +1011,15 @@ async function verifyResourceDpopProof(proof, expectedJkt, context) {
         const expMs = Number(verified.payload.exp)
             ? Number(verified.payload.exp) * 1000
             : Date.now() + DPOP_MAX_TTL_SECONDS * 1000;
+        const persistentReplay = rememberPersistentOAuthReplay(
+            OAUTH_REPLAY_NAMESPACES.resourceDpop,
+            replayKey,
+            expMs,
+        );
+        if (!persistentReplay.available) {
+            return { ok: false, error: 'Persistent DPoP replay protection is unavailable.' };
+        }
+        if (persistentReplay.replay) return { ok: false, error: 'DPoP proof replay detected.' };
         DPOP_REPLAY_CACHE.set(replayKey, expMs);
         trimDpopReplayCache(DPOP_REPLAY_CACHE_MAX_ENTRIES);
         return { ok: true };

@@ -30,7 +30,20 @@ const MAX_INIT_FAILURES = 3;
 const CIRCUIT_BACKOFF_MS = [1000, 5000, 30000];
 
 function isEnabled() {
-    return String(process.env['IO_L2_CACHE_ENABLED'] || '0').trim() === '1';
+    return readBooleanEnv('IO_L2_CACHE_ENABLED', false);
+}
+
+/**
+ * @param {string} name
+ * @param {boolean} fallback
+ * @returns {boolean}
+ */
+function readBooleanEnv(name, fallback) {
+    const raw = String(process.env[name] ?? '')
+        .trim()
+        .toLowerCase();
+    if (!raw) return fallback;
+    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
 
 function startPruneTimer() {
@@ -134,7 +147,7 @@ export function getIoL2CacheStats() {
 }
 
 export function getIoL2CacheHealth() {
-    const enabled = String(process.env['IO_L2_CACHE_ENABLED'] || '0').trim() === '1';
+    const enabled = isEnabled();
     if (!enabled) {
         return { available: false, reason: 'disabled' };
     }

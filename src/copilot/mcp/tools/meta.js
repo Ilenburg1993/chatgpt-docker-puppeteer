@@ -100,6 +100,7 @@ const RUNTIME_TOOLS = [
     'mcp_cloudflare_post_change_gates',
     'mcp_cloudflare_transport_benchmark_plan',
     'mcp_host_block_diagnostics',
+    'mcp_cleanup_ai_artifacts',
     'mcp_maintenance_plan',
     'mcp_maintenance_apply_safe_fixes',
     'project_doctor',

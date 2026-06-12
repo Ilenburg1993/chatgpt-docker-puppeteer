@@ -5,8 +5,8 @@
  * @module copilot/mcp/cloudflare/state
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile, rm } from 'node:fs/promises';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 
 /**
  * @typedef {object} QuickTunnelSmokeState
@@ -69,7 +69,7 @@ export async function readQuickTunnelState(stateFile) {
  * @returns {Promise<void>}
  */
 export async function saveQuickTunnelState(stateFile, state) {
-    await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+    await writeFileAtomicPortable(stateFile, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
 }
 
 /**
@@ -82,6 +82,29 @@ export async function updateQuickTunnelLastSmoke(stateFile, state, lastSmoke) {
     if (!isQuickTunnelState(state)) return false;
     await saveQuickTunnelState(stateFile, { ...state, lastSmoke });
     return true;
+}
+
+/**
+ * Remove only a valid quick-tunnel state whose process is dead and whose age exceeds the configured stale window.
+ * Live, recent and malformed state is preserved for operator inspection.
+ *
+ * @param {string} stateFile
+ * @param {{ nowMs?: number; staleAfterMs?: number }} [options]
+ * @returns {Promise<{ removed: boolean; reason: string; summary: ReturnType<typeof summarizeQuickTunnelState> }>}
+ */
+export async function cleanupStaleQuickTunnelState(stateFile, options = {}) {
+    const state = await readQuickTunnelState(stateFile);
+    const summary = summarizeQuickTunnelState(
+        state,
+        options.nowMs ?? Date.now(),
+        options.staleAfterMs ?? 6 * 60 * 60 * 1000,
+    );
+    if (!summary.configured) return { removed: false, reason: 'missing', summary };
+    if (!summary.stateValid) return { removed: false, reason: 'invalid', summary };
+    if (summary.processAlive) return { removed: false, reason: 'process-alive', summary };
+    if (!summary.stale) return { removed: false, reason: 'not-stale', summary };
+    await rm(stateFile, { force: true });
+    return { removed: true, reason: 'stale-dead-state', summary };
 }
 
 /**
@@ -104,8 +127,7 @@ export async function readConnectorSmokeState(smokeFile) {
  * @returns {Promise<void>}
  */
 export async function writeConnectorSmokeState(smokeFile, lastSmoke) {
-    await mkdir(path.dirname(smokeFile), { recursive: true });
-    await writeFile(smokeFile, `${JSON.stringify(lastSmoke, null, 2)}\n`, 'utf8');
+    await writeFileAtomicPortable(smokeFile, `${JSON.stringify(lastSmoke, null, 2)}\n`, { mode: 0o600 });
 }
 
 /**

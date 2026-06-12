@@ -17,6 +17,7 @@ export {
 export { appendTextLocked, createOrReplaceFileAtomic, mkdirPathLocked, writeFileAtomic } from './locked-writes.js';
 export { mkdirPathUnlocked } from './mkdir.js';
 export { moveFileUnlocked } from './move.js';
+export { writeFileAtomicPortable } from './portable-atomic.js';
 export { readBytesFileSnapshot } from './read-bytes.js';
 export { readTextLineChunks, readTextLineChunksStream } from './read-chunks.js';
 export { readTextLinesSnapshot } from './read-lines.js';
@@ -26,3 +27,4 @@ export { deleteFileUnlocked, removePathUnlocked } from './remove.js';
 export { readBinaryMutationSnapshot } from './snapshot.js';
 export { statPathSnapshot } from './stat.js';
 export { normalizeWritePayload, toWriteBuffer, writeAtomicFileUnlocked } from './write-atomic.js';
+export { withIoResourceLock } from '../../io-locks.js';

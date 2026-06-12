@@ -6,7 +6,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { getCanonicalMcpTools } from '#copilot/mcp';
+import {
+    getCanonicalMcpToolSurfaceState,
+    getCanonicalMcpTools,
+    readMcpRegistryRuntimeState,
+    resetCanonicalMcpToolsCacheForTests,
+} from '#copilot/mcp';
 import { getAdvertisedMcpToolNames } from '#copilot/mcp/tools';
 
 describe('copilot MCP registry', () => {
@@ -34,6 +39,7 @@ describe('copilot MCP registry', () => {
             'mcp_auth_profile',
             'mcp_autonomy_power_score',
             'mcp_capabilities_summary',
+            'mcp_cleanup_ai_artifacts',
             'mcp_cloudflare_config_audit',
             'mcp_cloudflare_edge_audit',
             'mcp_cloudflare_edge_backup_create',
@@ -132,6 +138,50 @@ describe('copilot MCP registry', () => {
         assert.ok(tools.every((tool) => tool.annotations.destructiveHint !== true));
     });
 
+    it.each(['full', 'latency', 'minimal', 'cloudflare', 'readonly', 'claude', 'safe', 'research'])(
+        'keeps the %s tool surface non-empty, unique and within registry limits',
+        (mode) => {
+            const tools = getCanonicalMcpTools({
+                toolSurfacePolicy: {
+                    mode: /** @type {any} */ (mode),
+                    include: new Set(),
+                    exclude: new Set(),
+                    allowEmpty: false,
+                },
+            });
+            const names = tools.map((tool) => tool.name);
+            assert.ok(names.length > 0);
+            assert.equal(new Set(names).size, names.length);
+            assert.ok(tools.every((tool) => tool.outputSchema && tool._meta));
+        },
+    );
+
+    it('warns before the configured tool-count limit is exhausted', () => {
+        const oldMax = process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'];
+        const oldPercent = process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'];
+        try {
+            process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'] = '120';
+            process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'] = '80';
+            resetCanonicalMcpToolsCacheForTests();
+            getCanonicalMcpTools();
+            const state = getCanonicalMcpToolSurfaceState();
+            const validation = /** @type {Record<string, unknown>} */ (
+                /** @type {Record<string, unknown>} */ (state['registry'])['validation']
+            );
+            assert.ok(
+                /** @type {string[]} */ (validation['warnings']).some((warning) =>
+                    warning.includes('80% warning threshold'),
+                ),
+            );
+        } finally {
+            if (oldMax === undefined) delete process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'];
+            else process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'] = oldMax;
+            if (oldPercent === undefined) delete process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'];
+            else process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'] = oldPercent;
+            resetCanonicalMcpToolsCacheForTests();
+        }
+    });
+
     it('uses explicit annotations on every initial tool', () => {
         const tools = getCanonicalMcpTools();
 
@@ -188,6 +238,19 @@ describe('copilot MCP registry', () => {
         const first = getCanonicalMcpTools();
         const second = getCanonicalMcpTools();
         assert.equal(first, second);
+    });
+
+    it('exposes bounded rate-limit diagnostics without subjects or credentials', () => {
+        const state = readMcpRegistryRuntimeState();
+
+        assert.deepEqual(state, {
+            toolInvocationBudgets: {
+                size: 0,
+                maxSize: 4096,
+            },
+        });
+        assert.equal(JSON.stringify(state).includes('subject'), false);
+        assert.equal(JSON.stringify(state).includes('token'), false);
     });
 
     it('keeps capability metadata in parity with the canonical registry', () => {

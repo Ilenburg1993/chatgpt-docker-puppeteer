@@ -9,8 +9,8 @@ import { join, relative } from 'node:path';
 import { describe, it } from 'vitest';
 
 import { invalidateIoCachePath } from '#copilot/infra/io-cache.js';
-import { resolveReadPath } from '#copilot/mcp/control-plane';
 import { getCanonicalMcpTools } from '#copilot/mcp';
+import { getTtlCacheStats, resolveReadPath } from '#copilot/mcp/control-plane';
 import {
     readRepoReadFileResultCacheStats,
     resetRepoReadResponseCacheForTest,
@@ -411,6 +411,11 @@ describe('copilot MCP tools', () => {
         assert.equal(orphanImportsDir.structuredContent?.['totalOrphans'], 0);
         assert.ok(Number(orphanImportsDir.structuredContent?.['checkedImports'] ?? 0) > 0);
         assert.ok(Number(orphanImportsDir.structuredContent?.['scannedFiles'] ?? 0) > 1);
+
+        const importTargetCache = getTtlCacheStats().find((entry) => entry.name === 'repo-index-import-target-exists');
+        assert.equal(importTargetCache?.ttlMs, 5 * 60 * 1000);
+        assert.equal(importTargetCache?.maxEntries, 10_000);
+        assert.ok(Number(importTargetCache?.size ?? 0) <= Number(importTargetCache?.maxEntries ?? 0));
     });
 
     it('repo_find_orphan_imports clears cached import targets after invalidation', async () => {
@@ -548,7 +553,9 @@ describe('copilot MCP tools', () => {
         assert.ok(Number(structured['boundedWriteCount'] ?? 0) > 0);
         assert.ok(Number(structured['destructiveCount'] ?? 0) > 0);
         assert.ok(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('repo_apply_patch'));
-        assert.ok(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('repo_apply_patch_batch'));
+        assert.ok(
+            /** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('repo_apply_patch_batch'),
+        );
         assert.equal(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('job_cancel'), false);
         assert.ok(/** @type {string[]} */ (structured['destructiveTools']).includes('repo_remove_file'));
         const approvalFrictionProfile = /** @type {Record<string, unknown>} */ (structured['approvalFrictionProfile']);

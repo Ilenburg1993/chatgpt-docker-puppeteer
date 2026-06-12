@@ -6,6 +6,7 @@
  */
 
 import Cloudflare from 'cloudflare';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createTtlCache } from '#copilot/mcp/control-plane';
 import { readCloudflareTunnelConfig } from './config.js';
@@ -221,9 +222,17 @@ function buildRemoteAuditCacheKey(config) {
 export function getCloudflareClient(apiToken) {
     const key = createClientCacheKey(apiToken);
     const cached = cloudflareClientCache.get(key);
-    if (cached) return cached;
+    if (cached) {
+        cloudflareClientCache.delete(key);
+        cloudflareClientCache.set(key, cached);
+        return cached;
+    }
     const client = new Cloudflare({ apiToken, maxRetries: 1, timeout: 15000 });
-    if (cloudflareClientCache.size > 4) cloudflareClientCache.clear();
+    while (cloudflareClientCache.size >= 4) {
+        const oldest = cloudflareClientCache.keys().next().value;
+        if (typeof oldest !== 'string') break;
+        cloudflareClientCache.delete(oldest);
+    }
     cloudflareClientCache.set(key, client);
     return client;
 }
@@ -233,7 +242,7 @@ export function getCloudflareClient(apiToken) {
  * @returns {string}
  */
 function createClientCacheKey(value) {
-    return `${value.length}:${value.slice(0, 8)}:${value.slice(-8)}`;
+    return createHash('sha256').update(value).digest('hex');
 }
 
 async function readLocalEnvFile() {

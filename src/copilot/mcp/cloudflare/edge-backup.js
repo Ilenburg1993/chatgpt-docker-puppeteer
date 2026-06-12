@@ -5,8 +5,9 @@
  * @module copilot/mcp/cloudflare/edge-backup
  */
 
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 import { createHash } from 'node:crypto';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR } from './config.js';
 import { buildCloudflareEdgeSnapshot } from './edge-snapshot.js';
@@ -76,8 +77,7 @@ export async function writeCloudflareEdgeBackup(snapshot, options = {}) {
     };
     const content = `${JSON.stringify(payload, null, 2)}\n`;
     const contentSha256 = sha256(content);
-    await mkdir(path.dirname(absolutePath), { recursive: true });
-    await writeFile(absolutePath, content, 'utf8');
+    await writeFileAtomicPortable(absolutePath, content, { mode: 0o600 });
 
     const readiness = asRecord(snapshot['readiness']);
     const policyDiff = asRecord(snapshot['policyDiff']);
@@ -179,9 +179,14 @@ function normalizeBackupDir(dir) {
  * @returns {string | null}
  */
 function normalizeBackupLabel(label) {
-    const value = String(label ?? '').trim().toLowerCase();
+    const value = String(label ?? '')
+        .trim()
+        .toLowerCase();
     if (!value) return null;
-    const normalized = value.replace(/[^a-z0-9._-]+/gu, '-').replace(/^-+|-+$/gu, '').slice(0, 48);
+    const normalized = value
+        .replace(/[^a-z0-9._-]+/gu, '-')
+        .replace(/^-+|-+$/gu, '')
+        .slice(0, 48);
     return normalized || null;
 }
 

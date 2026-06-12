@@ -9,6 +9,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { appendTextLocked, withIoResourceLock, writeFileAtomic } from '#copilot/infra/public/io';
 import { getMcpWorkspaceRoot, toWorkspaceRelativePath } from './paths.js';
 
 export const DEFAULT_MCP_LATENCY_HISTORY_RELATIVE_PATH = 'src/copilot/.ai/mcp/latency-dashboard.jsonl';
@@ -37,11 +38,11 @@ const MAX_LATENCY_HISTORY_READ_BYTES = 2 * 1024 * 1024;
 
 /**
  * @param {McpLatencyDashboardSnapshot} snapshot
- * @param {{ maxSnapshots?: number }} [options]
+ * @param {{ maxSnapshots?: number; filePath?: string }} [options]
  * @returns {Promise<{ persisted: true; path: string; maxSnapshots: number; retainedSnapshots: number } | { persisted: false; error: string; path: string | null }>}
  */
 export async function appendMcpLatencyDashboardSnapshot(snapshot, options = {}) {
-    const filePath = getLatencyHistoryPath();
+    const filePath = getLatencyHistoryPath(options.filePath);
     const maxSnapshots = readMaxSnapshots(options.maxSnapshots);
     const entry = {
         schemaVersion: 1,
@@ -49,9 +50,14 @@ export async function appendMcpLatencyDashboardSnapshot(snapshot, options = {}) 
         snapshot: compactSnapshot(snapshot),
     };
     try {
-        await fs.mkdir(path.dirname(filePath), { recursive: true });
-        await fs.appendFile(filePath, `${JSON.stringify(entry)}\n`, 'utf8');
-        const retainedSnapshots = await trimLatencyHistoryFile(filePath, maxSnapshots);
+        const { value: retainedSnapshots } = await withIoResourceLock(filePath, async () => {
+            await fs.mkdir(path.dirname(filePath), { recursive: true });
+            await appendTextLocked(filePath, `${JSON.stringify(entry)}\n`, {
+                encoding: 'utf8',
+                advisoryLimits: { domain: 'mcp-latency-history' },
+            });
+            return trimLatencyHistoryFile(filePath, maxSnapshots);
+        });
         return {
             persisted: true,
             path: toWorkspaceRelativePath(filePath),
@@ -64,11 +70,11 @@ export async function appendMcpLatencyDashboardSnapshot(snapshot, options = {}) 
 }
 
 /**
- * @param {{ limit?: number }} [options]
+ * @param {{ limit?: number; filePath?: string }} [options]
  * @returns {Promise<{ ok: true; path: string; entries: McpLatencyHistoryEntry[] } | { ok: false; path: string; error: string; entries: [] }>}
  */
 export async function readMcpLatencyDashboardHistory(options = {}) {
-    const filePath = getLatencyHistoryPath();
+    const filePath = getLatencyHistoryPath(options.filePath);
     const limit = readBoundedInteger(options.limit, 20, 1, 500);
     try {
         const stats = await fs.stat(filePath);
@@ -114,10 +120,11 @@ export function compareMcpLatencyDashboardSnapshots(current, previous) {
 }
 
 /**
+ * @param {string | undefined} overridePath
  * @returns {string}
  */
-function getLatencyHistoryPath() {
-    return path.join(getMcpWorkspaceRoot(), DEFAULT_MCP_LATENCY_HISTORY_RELATIVE_PATH);
+function getLatencyHistoryPath(overridePath) {
+    return overridePath ?? path.join(getMcpWorkspaceRoot(), DEFAULT_MCP_LATENCY_HISTORY_RELATIVE_PATH);
 }
 
 /**
@@ -149,7 +156,12 @@ async function trimLatencyHistoryFile(filePath, maxSnapshots) {
     const lines = raw.split('\n').filter((line) => line.trim());
     if (lines.length <= maxSnapshots) return lines.length;
     const retained = lines.slice(-maxSnapshots);
-    await fs.writeFile(filePath, `${retained.join('\n')}\n`, 'utf8');
+    await writeFileAtomic(filePath, `${retained.join('\n')}\n`, {
+        encoding: 'utf8',
+        mode: 0o600,
+        riskClass: 'low',
+        advisoryLimits: { domain: 'mcp-latency-history-trim', maxSnapshots },
+    });
     return retained.length;
 }
 

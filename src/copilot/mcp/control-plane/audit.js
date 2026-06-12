@@ -1,12 +1,11 @@
 // @ts-check
 /**
- * MCP audit helpers. Stdout is intentionally never used because stdio transport
- * reserves stdout for JSON-RPC frames.
+ * MCP audit helpers. Stdout is intentionally never used because stdio transport reserves stdout for JSON-RPC frames.
  *
  * @module copilot/mcp/control-plane/audit
  */
 
-import { mkdir, appendFile } from 'node:fs/promises';
+import { appendFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -59,10 +58,25 @@ export async function appendMcpAuditEvent(event) {
     };
     const line = `${JSON.stringify(payload)}\n`;
     if (process.env['COPILOT_MCP_AUDIT_SYNC'] === 'true') {
-        await appendAuditLines([line]);
+        const queued = auditQueue.splice(0);
+        await appendAuditLinesSerialized([...queued, line], false);
         return;
     }
     enqueueAuditLine(line);
+}
+
+/**
+ * Flush all queued MCP audit events and wait for prior persistence.
+ *
+ * @returns {Promise<void>}
+ */
+export async function flushMcpAuditEvents() {
+    const lines = auditQueue.splice(0);
+    if (lines.length > 0) {
+        await appendAuditLinesSerialized(lines, false);
+    } else {
+        await auditFlushChain;
+    }
 }
 
 /**
@@ -83,13 +97,7 @@ function scheduleAuditFlush() {
         auditFlushScheduled = false;
         const lines = auditQueue.splice(0);
         if (lines.length === 0) return;
-        auditFlushChain = auditFlushChain
-            .then(() => appendAuditLines(lines))
-            .catch((error) => {
-                logMcp('WARN', 'Failed to append MCP audit event batch.', {
-                    error: error instanceof Error ? error.message : String(error),
-                });
-            });
+        void appendAuditLinesSerialized(lines, true);
     });
 }
 
@@ -97,10 +105,25 @@ function installBeforeExitFlushHook() {
     if (auditBeforeExitHookInstalled) return;
     auditBeforeExitHookInstalled = true;
     process.once('beforeExit', () => {
-        const lines = auditQueue.splice(0);
-        if (lines.length === 0) return;
-        auditFlushChain = auditFlushChain.then(() => appendAuditLines(lines)).catch(() => undefined);
+        void flushMcpAuditEvents().catch(() => undefined);
     });
+}
+
+/**
+ * @param {string[]} lines
+ * @param {boolean} logFailure
+ * @returns {Promise<void>}
+ */
+function appendAuditLinesSerialized(lines, logFailure) {
+    const operation = auditFlushChain.then(() => appendAuditLines(lines));
+    auditFlushChain = operation.catch((error) => {
+        if (logFailure) {
+            logMcp('WARN', 'Failed to append MCP audit event batch.', {
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
+    });
+    return operation;
 }
 
 /**

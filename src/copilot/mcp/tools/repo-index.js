@@ -8,6 +8,7 @@
  * @module copilot/mcp/tools/repo-index
  */
 
+import { normalizeIoCacheKey, registerInvalidationHook } from '#copilot/infra/io-cache';
 import {
     buildIoIndexForDirectory,
     filterIndexRowsByGlob,
@@ -25,11 +26,9 @@ import {
     searchIoIndex,
 } from '#copilot/infra/public/indexing';
 import { readText, statPath } from '#copilot/infra/public/io';
-import { WORKSPACE_ROOT } from '#copilot/tools';
-import { dirname, extname, join, relative, resolve as resolvePath } from 'node:path';
-import { z } from 'zod';
 import {
     boundedWriteAnnotations,
+    createTtlCache,
     errorResult,
     getMcpWorkspaceRoot,
     okResult,
@@ -37,7 +36,9 @@ import {
     readOnlyAnnotations,
     resolveReadPath,
 } from '#copilot/mcp/control-plane';
-import { normalizeIoCacheKey, registerInvalidationHook } from '#copilot/infra/io-cache';
+import { WORKSPACE_ROOT } from '#copilot/tools';
+import { dirname, extname, join, relative, resolve as resolvePath } from 'node:path';
+import { z } from 'zod';
 
 const DEFAULT_INDEX_PATH = 'src/copilot';
 const DEFAULT_ORPHAN_IMPORT_SCAN_PATH = 'src/copilot';
@@ -45,8 +46,14 @@ const DEFAULT_ORPHAN_IMPORT_MAX_FILES = 500;
 const MODULE_FILE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.json'];
 const MODULE_INDEX_CANDIDATES = MODULE_FILE_EXTENSIONS.map((extension) => `index${extension}`);
 const LOCAL_IMPORT_ALIAS_PREFIXES = ['#copilot'];
-/** @type {Map<string, boolean>} */
-const importTargetExistsCache = new Map();
+const IMPORT_TARGET_EXISTS_CACHE_TTL_MS = 5 * 60 * 1000;
+const IMPORT_TARGET_EXISTS_CACHE_MAX_ENTRIES = 10_000;
+/** @type {import('#copilot/mcp/control-plane').TtlCache<boolean>} */
+const importTargetExistsCache = createTtlCache({
+    name: 'repo-index-import-target-exists',
+    ttlMs: IMPORT_TARGET_EXISTS_CACHE_TTL_MS,
+    maxEntries: IMPORT_TARGET_EXISTS_CACHE_MAX_ENTRIES,
+});
 
 registerInvalidationHook((filePath, event) => {
     try {
@@ -106,7 +113,10 @@ function isAnalyzableModuleFile(filePath) {
  * @returns {boolean}
  */
 function isLocalImportSource(source) {
-    return source.startsWith('.') || LOCAL_IMPORT_ALIAS_PREFIXES.some((prefix) => source === prefix || source.startsWith(`${prefix}/`));
+    return (
+        source.startsWith('.') ||
+        LOCAL_IMPORT_ALIAS_PREFIXES.some((prefix) => source === prefix || source.startsWith(`${prefix}/`))
+    );
 }
 
 /**
@@ -159,7 +169,7 @@ async function fileExists(filePath) {
 async function cachedFileExists(filePath) {
     const cacheKey = normalizeIoCacheKey(filePath);
     const cached = importTargetExistsCache.get(cacheKey);
-    if (cached !== undefined) return cached;
+    if (cached !== null) return cached;
     const exists = await fileExists(filePath);
     importTargetExistsCache.set(cacheKey, exists);
     return exists;
@@ -177,7 +187,7 @@ async function anyCandidateExists(candidates) {
 }
 
 /**
- * @param {Array<{ file: string; line: number; source: string; dynamic: boolean; attemptedTargets: string[] }>} rows
+ * @param {{ file: string; line: number; source: string; dynamic: boolean; attemptedTargets: string[] }[]} rows
  * @returns {string}
  */
 function formatOrphanImportRows(rows) {
@@ -451,7 +461,9 @@ export const repoIndexTools = [
             path: z
                 .string()
                 .optional()
-                .describe('Workspace-relative file or directory path. Default: src/copilot. Empty string uses default.'),
+                .describe(
+                    'Workspace-relative file or directory path. Default: src/copilot. Empty string uses default.',
+                ),
             recursive: z.boolean().optional().describe('Scan directories recursively. Default: true.'),
             depth: z.number().int().positive().max(50).optional().describe('Directory scan depth. Default: 20.'),
             respectGitignore: z
@@ -459,21 +471,31 @@ export const repoIndexTools = [
                 .optional()
                 .describe('Reserved for compatibility; directory scans use the current indexed rows.'),
             includeDynamic: z.boolean().optional().describe('Also validate dynamic import() sources. Default: true.'),
-            maxFiles: z.number().int().positive().max(5000).optional().describe('Maximum files to parse. Default: 500.'),
+            maxFiles: z
+                .number()
+                .int()
+                .positive()
+                .max(5000)
+                .optional()
+                .describe('Maximum files to parse. Default: 500.'),
             maxResults: z.number().int().positive().max(500).optional().describe('Maximum returned rows. Default: 50.'),
             cursor: z.string().optional().describe('Cursor returned by a previous repo_find_orphan_imports call.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, recursive, depth, includeDynamic, maxFiles, maxResults, cursor }) => {
-            const resolved = await resolveReadPath(
-                normalizeOptionalRepoPath(path, DEFAULT_ORPHAN_IMPORT_SCAN_PATH),
-            );
+            const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_ORPHAN_IMPORT_SCAN_PATH));
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const stat = await statPath(resolved.resolved);
             const fileLimit = normalizePositiveInteger(maxFiles, DEFAULT_ORPHAN_IMPORT_MAX_FILES, 5000);
-            /** @type {Array<{ file: string; line: number; source: string; dynamic: boolean; attemptedTargets: string[] }>} */
+            /** @type {{
+    file: string;
+    line: number;
+    source: string;
+    dynamic: boolean;
+    attemptedTargets: string[];
+}[]} */
             const orphanImports = [];
-            /** @type {Array<{ file: string; error: string }>} */
+            /** @type {{ file: string; error: string }[]} */
             const parseErrors = [];
             let checkedImports = 0;
             let skippedExternalImports = 0;
@@ -599,7 +621,10 @@ export const repoIndexTools = [
                     parseErrors,
                     orphanCount: paged.items.length,
                     totalOrphans: paged.totalItems,
-                    truncated: paged.truncated || hardLimitReached || (stat.stats.isDirectory() && totalCandidateFiles > fileLimit),
+                    truncated:
+                        paged.truncated ||
+                        hardLimitReached ||
+                        (stat.stats.isDirectory() && totalCandidateFiles > fileLimit),
                     nextCursor: paged.nextCursor,
                     cursorOffset: paged.cursorOffset,
                     output,

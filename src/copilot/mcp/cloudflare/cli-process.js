@@ -2,9 +2,10 @@
 /** Process supervision helpers for Cloudflare MCP CLI. */
 import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, openSync } from 'node:fs';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 
 export const CLOUDFLARED_TOKEN_FILE_MIN_VERSION = '2025.4.0';
 const DEFAULT_STOP_TIMEOUT_MS = 5_000;
@@ -21,6 +22,7 @@ const STOP_POLL_INTERVAL_MS = 100;
  *   pidFile: string;
  *   logFile: string;
  *   env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
+ *   stateWriter?: (filePath: string, content: string) => Promise<void>;
  * }} DetachedProcessOptions
  */
 
@@ -107,9 +109,59 @@ export async function ensureDetachedProcess(options) {
     }
     if (!child.pid) throw new Error(`Could not start ${options.name}`);
     child.unref();
-    await writeFile(options.pidFile, `${child.pid}\n`, 'utf8');
-    await writeFile(metadataFile, `${JSON.stringify({ schemaVersion: 2, name: options.name, pid: child.pid, startedAt: new Date().toISOString(), signature }, null, 2)}\n`, 'utf8');
+    const stateWriter =
+        options.stateWriter ??
+        ((filePath, content) => writeFileAtomicPortable(filePath, content, { mode: 0o600 }));
+    try {
+        await stateWriter(
+            metadataFile,
+            `${JSON.stringify(
+                {
+                    schemaVersion: 2,
+                    name: options.name,
+                    pid: child.pid,
+                    startedAt: new Date().toISOString(),
+                    signature,
+                },
+                null,
+                2,
+            )}\n`,
+        );
+        // PID is the readiness marker and must be published only after metadata is durable.
+        await stateWriter(options.pidFile, `${child.pid}\n`);
+    } catch (error) {
+        await terminateDetachedProcess(child.pid);
+        await Promise.all([rm(options.pidFile, { force: true }), rm(metadataFile, { force: true })]);
+        throw error;
+    }
     return { name: options.name, pidFile: options.pidFile, logFile: options.logFile, metadataFile, pid: child.pid, alreadyRunning: false, restarted: existing.state === 'dead' };
+}
+
+/**
+ * @param {number} pid
+ * @returns {Promise<void>}
+ */
+async function terminateDetachedProcess(pid) {
+    try {
+        process.kill(-pid, 'SIGTERM');
+    } catch {
+        try {
+            process.kill(pid, 'SIGTERM');
+        } catch {
+            return;
+        }
+    }
+    if (await waitForPidExit(pid, DEFAULT_KILL_TIMEOUT_MS)) return;
+    try {
+        process.kill(-pid, 'SIGKILL');
+    } catch {
+        try {
+            process.kill(pid, 'SIGKILL');
+        } catch {
+            // Process exited between the wait and the forced kill.
+        }
+    }
+    await waitForPidExit(pid, DEFAULT_KILL_TIMEOUT_MS);
 }
 
 /**

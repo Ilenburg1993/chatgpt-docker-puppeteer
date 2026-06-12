@@ -32,7 +32,6 @@ import {
     delegateToRepoAutonomyRunnerTool,
     gitReadTools,
     jobTools,
-    mcpLatencyDashboardTool,
     maintenanceTools,
     mcpAppsSdkReadinessTool,
     mcpAutonomyPowerScoreTool,
@@ -57,6 +56,7 @@ import {
     mcpDevcontainerNetworkPostureAuditTool,
     mcpGoldenPromptsTool,
     mcpHostBlockDiagnosticsTool,
+    mcpLatencyDashboardTool,
     mcpOAuthFrictionAuditTool,
     mcpPostRestartReadinessTool,
     mcpRuntimeHealthTool,
@@ -98,6 +98,7 @@ const DEFAULT_TOOL_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_TOOL_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const DEFAULT_TOOL_RATE_LIMIT_PER_WINDOW = 120;
 const DEFAULT_MAX_TOOL_RESULT_BYTES = 2 * 1024 * 1024;
+const MAX_TOOL_INVOCATION_BUDGETS = 4096;
 const SUSPICIOUS_DESCRIPTOR_PATTERNS = [
     /ignore\s+(all\s+)?previous\s+instructions/iu,
     /do\s+not\s+tell\s+the\s+user/iu,
@@ -159,7 +160,6 @@ let canonicalMcpRegistryState = null;
 
 /** @type {Map<string, { count: number; resetAt: number }>} */
 const toolInvocationBudgets = new Map();
-const toolInvocationBudgetSubjects = new Map();
 
 /**
  * @typedef {object} McpToolDefinition
@@ -189,6 +189,7 @@ const toolInvocationBudgetSubjects = new Map();
  *     handlerExceptionMode: 'throw' | 'tool-result';
  *     validateStructuredOutput: boolean;
  *     maxRegisteredTools: number;
+ *     toolCountWarnPercent: number;
  *     expectedToolCount: number;
  *     toolTimeoutMs: number;
  *     toolRateLimitWindowMs: number;
@@ -227,6 +228,7 @@ export function readMcpRegistryPolicy(env = process.env) {
             1,
             1000,
         ),
+        toolCountWarnPercent: readIntegerEnv(env, 'COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT', 80, 1, 100),
         expectedToolCount: readIntegerEnv(env, 'COPILOT_MCP_REGISTRY_EXPECTED_TOOL_COUNT', 0, 0, 1000),
         toolTimeoutMs: readIntegerEnv(
             env,
@@ -375,6 +377,21 @@ export function getCanonicalMcpRegistryState() {
 }
 
 /**
+ * Returns bounded runtime registry diagnostics without exposing subjects or credentials.
+ *
+ * @returns {{ toolInvocationBudgets: { size: number; maxSize: number } }}
+ */
+export function readMcpRegistryRuntimeState() {
+    pruneToolInvocationBudgets();
+    return {
+        toolInvocationBudgets: {
+            size: toolInvocationBudgets.size,
+            maxSize: MAX_TOOL_INVOCATION_BUDGETS,
+        },
+    };
+}
+
+/**
  * @param {{ includeDescriptors?: boolean; toolSurfacePolicy?: import('./tool-surface.js').McpToolSurfacePolicy }} [options]
  * @returns {Record<string, unknown>}
  */
@@ -398,7 +415,6 @@ export function resetCanonicalMcpToolsCacheForTests() {
     canonicalMcpToolSurfaceState = null;
     canonicalMcpRegistryState = null;
     toolInvocationBudgets.clear();
-    toolInvocationBudgetSubjects.clear();
 }
 
 /**
@@ -430,9 +446,11 @@ function buildMcpRegisterToolOptions(tool) {
     return /** @type {Parameters<import('@modelcontextprotocol/sdk/server/mcp.js').McpServer['registerTool']>[1]} */ ({
         title: tool.title,
         description: tool.description,
-        inputSchema: /** @type {Parameters<
-    import('@modelcontextprotocol/sdk/server/mcp.js').McpServer['registerTool']
->[1]['inputSchema']} */ (/** @type {unknown} */ (tool.inputSchema)),
+        inputSchema: /**
+         * @type {Parameters<
+         *     import('@modelcontextprotocol/sdk/server/mcp.js').McpServer['registerTool']
+         * >[1]['inputSchema']}
+         */ (/** @type {unknown} */ (tool.inputSchema)),
         annotations: tool.annotations,
         ...(tool.outputSchema !== undefined ? { outputSchema: tool.outputSchema } : {}),
         ...(tool.securitySchemes !== undefined ? { securitySchemes: tool.securitySchemes } : {}),
@@ -545,7 +563,8 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
         finishPhase('handler', handlerStartedAt);
         const resultSizeStartedAt = startPhase('resultSize');
         const resultSizeValidation = validateToolResultSize(result, registryPolicy);
-        const resultSizeError = typeof resultSizeValidation === 'string' ? resultSizeValidation : resultSizeValidation.error;
+        const resultSizeError =
+            typeof resultSizeValidation === 'string' ? resultSizeValidation : resultSizeValidation.error;
         const resultSizeMetric = typeof resultSizeValidation === 'string' ? undefined : resultSizeValidation;
         finishPhase('resultSize', resultSizeStartedAt);
         if (resultSizeError) {
@@ -558,7 +577,12 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
                 reason: resultSizeError,
                 risk,
             });
-            safeRecordMcpToolMetric(tool.name, { durationMs, isError: true, phases, resultSize: { ...resultSizeMetric, rejected: true } });
+            safeRecordMcpToolMetric(tool.name, {
+                durationMs,
+                isError: true,
+                phases,
+                resultSize: { ...resultSizeMetric, rejected: true },
+            });
             return errorResult('MCP tool result rejected by registry policy.', {
                 code: 'MCP_TOOL_RESULT_REJECTED',
                 hint: resultSizeError,
@@ -638,6 +662,7 @@ function consumeToolInvocationBudget(tool, options, policy) {
     const current = toolInvocationBudgets.get(key);
     if (!current || current.resetAt <= now) {
         toolInvocationBudgets.set(key, { count: 1, resetAt: now + policy.toolRateLimitWindowMs });
+        enforceToolInvocationBudgetLimit();
         return { allowed: true, retryAfterMs: 0 };
     }
     current.count += 1;
@@ -651,15 +676,21 @@ function consumeToolInvocationBudget(tool, options, policy) {
  */
 function buildToolInvocationBudgetSubject(options) {
     const token = String(options.authContext?.bearerToken ?? 'anonymous');
-    const cached = toolInvocationBudgetSubjects.get(token);
-    if (cached) return cached;
-    const subject = sha256String(token).slice(0, 24);
-    toolInvocationBudgetSubjects.set(token, subject);
-    if (toolInvocationBudgetSubjects.size > 2048) {
-        const oldest = toolInvocationBudgetSubjects.keys().next().value;
-        if (typeof oldest === 'string') toolInvocationBudgetSubjects.delete(oldest);
+    return sha256String(token).slice(0, 24);
+}
+
+/**
+ * @returns {number}
+ */
+function enforceToolInvocationBudgetLimit() {
+    let removed = 0;
+    while (toolInvocationBudgets.size > MAX_TOOL_INVOCATION_BUDGETS) {
+        const oldest = toolInvocationBudgets.keys().next().value;
+        if (typeof oldest !== 'string') break;
+        toolInvocationBudgets.delete(oldest);
+        removed += 1;
     }
-    return subject;
+    return removed;
 }
 
 /**
@@ -711,9 +742,10 @@ function validateToolResultSize(result, policy) {
     const hint = getResultSizeHint(result);
     if (hint) {
         return {
-            error: hint.bytes > policy.maxToolResultBytes
-                ? `Tool result is ${hint.bytes} bytes by ${hint.source}; limit is ${policy.maxToolResultBytes} bytes.`
-                : null,
+            error:
+                hint.bytes > policy.maxToolResultBytes
+                    ? `Tool result is ${hint.bytes} bytes by ${hint.source}; limit is ${policy.maxToolResultBytes} bytes.`
+                    : null,
             strategy: 'hint',
             bytes: hint.bytes,
         };
@@ -721,7 +753,10 @@ function validateToolResultSize(result, policy) {
     try {
         const bytes = Buffer.byteLength(stableJsonStringify(result));
         return {
-            error: bytes > policy.maxToolResultBytes ? `Tool result is ${bytes} bytes; limit is ${policy.maxToolResultBytes} bytes.` : null,
+            error:
+                bytes > policy.maxToolResultBytes
+                    ? `Tool result is ${bytes} bytes; limit is ${policy.maxToolResultBytes} bytes.`
+                    : null,
             strategy: 'stringify',
             bytes,
         };
@@ -752,6 +787,13 @@ export function validateMcpToolDefinitions(tools, policy = readMcpRegistryPolicy
     if (tools.length === 0) errors.push(`${scope}: no tools are registered.`);
     if (tools.length > policy.maxRegisteredTools) {
         errors.push(`${scope}: ${tools.length} tools exceeds maxRegisteredTools=${policy.maxRegisteredTools}.`);
+    } else {
+        const warningCount = Math.ceil((policy.maxRegisteredTools * policy.toolCountWarnPercent) / 100);
+        if (tools.length >= warningCount) {
+            warnings.push(
+                `${scope}: tool count ${tools.length} reached ${policy.toolCountWarnPercent}% warning threshold for maxRegisteredTools=${policy.maxRegisteredTools}.`,
+            );
+        }
     }
     if (policy.expectedToolCount > 0 && tools.length !== policy.expectedToolCount) {
         warnings.push(`${scope}: tool count ${tools.length} differs from expected ${policy.expectedToolCount}.`);
@@ -1094,6 +1136,7 @@ function summarizeRegistryPolicy(policy) {
         handlerExceptionMode: policy.handlerExceptionMode,
         validateStructuredOutput: policy.validateStructuredOutput,
         maxRegisteredTools: policy.maxRegisteredTools,
+        toolCountWarnPercent: policy.toolCountWarnPercent,
         expectedToolCount: policy.expectedToolCount || null,
         toolTimeoutMs: policy.toolTimeoutMs,
         toolRateLimitWindowMs: policy.toolRateLimitWindowMs,

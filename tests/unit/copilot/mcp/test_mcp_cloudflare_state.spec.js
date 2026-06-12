@@ -11,6 +11,7 @@ import { describe, it } from 'vitest';
 
 import {
     readQuickTunnelState,
+    saveQuickTunnelState,
     summarizeQuickTunnelState,
     updateQuickTunnelLastSmoke,
 } from '#copilot/mcp/cloudflare';
@@ -122,6 +123,34 @@ describe('copilot MCP Cloudflare quick tunnel state', () => {
         assert.equal(summary.lastSmokeAt, '2026-05-22T12:02:00.000Z');
         assert.equal(summary.lastSmokeAgeMinutes, 3);
         assert.equal(summary.lastSmokeConnectorUrl, baseState.connectorUrl);
+    });
+
+    it('atomically serializes concurrent state writes with private permissions', async () => {
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-cloudflare-state-atomic-'));
+        const stateFile = path.join(dir, 'quick-tunnel.json');
+        try {
+            await Promise.all(
+                Array.from({ length: 20 }, (_, index) =>
+                    saveQuickTunnelState(stateFile, {
+                        ...baseState,
+                        connectorUrl: `${baseState.connectorUrl}?writer=${index}`,
+                    }),
+                ),
+            );
+
+            const persisted = await readQuickTunnelState(stateFile);
+            assert.ok(persisted && !('error' in persisted));
+            assert.match(persisted.connectorUrl, /\?writer=\d+$/u);
+            assert.equal((await fs.stat(stateFile)).mode & 0o777, 0o600);
+            assert.equal(
+                (await fs.readdir(dir)).some(
+                    (name) => name.startsWith('quick-tunnel.json.') && name.endsWith('.tmp'),
+                ),
+                false,
+            );
+        } finally {
+            await fs.rm(dir, { recursive: true, force: true });
+        }
     });
 
     it('ignores last smoke metadata from a different connector URL', () => {

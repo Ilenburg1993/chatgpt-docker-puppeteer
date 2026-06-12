@@ -1,12 +1,12 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
 import {
     buildCloudflareEdgeBackupFileName,
     listCloudflareEdgeBackups,
     writeCloudflareEdgeBackup,
 } from '#copilot/mcp/cloudflare';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 
 /** @type {string | undefined} */
 let tempDir;
@@ -18,10 +18,7 @@ afterEach(async () => {
 
 describe('mcp/cloudflare/edge-backup', () => {
     it('normalizes deterministic backup filenames', () => {
-        const fileName = buildCloudflareEdgeBackupFileName(
-            new Date('2026-05-24T17:45:01.123Z'),
-            'before-rate-limit',
-        );
+        const fileName = buildCloudflareEdgeBackupFileName(new Date('2026-05-24T17:45:01.123Z'), 'before-rate-limit');
 
         expect(fileName).toBe('cloudflare-edge-snapshot-2026-05-24T17-45-01-123Z-before-rate-limit.json');
     });
@@ -54,6 +51,7 @@ describe('mcp/cloudflare/edge-backup', () => {
         const persisted = JSON.parse(await readFile(String(backup.relativePath), 'utf8'));
         expect(persisted.kind).toBe('cloudflare-edge-snapshot-backup');
         expect(persisted.snapshot.readiness.mutationReady).toBe(true);
+        expect((await stat(String(backup.relativePath))).mode & 0o777).toBe(0o600);
 
         const listed = await listCloudflareEdgeBackups({ dir: tempDir, limit: 10 });
         expect(listed.ok).toBe(true);

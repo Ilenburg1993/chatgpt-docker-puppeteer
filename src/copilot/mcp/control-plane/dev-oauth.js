@@ -10,6 +10,7 @@
  * @module copilot/mcp/control-plane/dev-oauth
  */
 
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 import {
     calculateJwkThumbprint,
     createLocalJWKSet,
@@ -25,8 +26,13 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { lookup as lookupDns } from 'node:dns/promises';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { request as httpsRequest } from 'node:https';
-import { isIP } from 'node:net';
+import { BlockList, isIP } from 'node:net';
 import path from 'node:path';
+import {
+    OAUTH_REPLAY_NAMESPACES,
+    readPersistentOAuthReplayStatus,
+    rememberPersistentOAuthReplay,
+} from './oauth-replay-store.js';
 
 export const DEV_OAUTH_IMPLEMENTATION_VERSION = '1.6.0';
 export const DEV_OAUTH_IMPLEMENTATION_NAME = 'copilot-mcp-dev-oauth';
@@ -99,6 +105,9 @@ const CHATGPT_CIMD_ORIGIN = 'https://chatgpt.com';
 const CHATGPT_CIMD_CLIENT_PATH_PATTERN = /^\/oauth\/([A-Za-z0-9_-]{6,128})\/client\.json$/u;
 const CHATGPT_CONNECTOR_REDIRECT_PATH_PREFIX = '/connector/oauth/';
 const CHATGPT_LEGACY_REDIRECT_URI = 'https://chatgpt.com/connector_platform_oauth_redirect';
+const CLAUDE_CIMD_ORIGIN = 'https://claude.ai';
+const CLAUDE_CIMD_CLIENT_PATH = '/oauth/mcp-oauth-client-metadata';
+const CLAUDE_CONNECTOR_REDIRECT_URI = 'https://claude.ai/api/mcp/auth_callback';
 const PRIVATE_KEY_JWT_MAX_TTL_SECONDS = 5 * 60;
 const PRIVATE_KEY_JWT_CLOCK_TOLERANCE_SECONDS = 30;
 const PRIVATE_KEY_JWT_REPLAY_CACHE_MAX_ENTRIES = 2000;
@@ -111,6 +120,7 @@ const MAX_DPOP_NONCE_LENGTH = 256;
 const MAX_DPOP_PROOF_LENGTH = 16 * 1024;
 const MAX_DPOP_JKT_LENGTH = 256;
 const DPOP_SIGNING_ALGORITHMS = /** @type {const} */ (['ES256', 'RS256']);
+const PRIVATE_NETWORK_BLOCK_LIST = createPrivateNetworkBlockList();
 const OIDC_SCOPES = /** @type {const} */ (['openid', 'profile', 'email']);
 const REFRESH_TOKEN_GRANT = 'refresh_token';
 const REFRESH_TOKEN_PREFIX = 'rt_';
@@ -633,6 +643,7 @@ async function buildDevOAuthStatus(config) {
         cimdEnabled: isDevOAuthCimdEnabled(),
         trustedChatGptCimdFallbackEnabled: isTrustedChatGptCimdFallbackEnabled(),
         trustedChatGptCimdFastPathEnabled: isTrustedChatGptCimdFastPathEnabled(),
+        trustedClaudeCimdFallbackEnabled: isTrustedClaudeCimdFallbackEnabled(),
         resourceParameterRequired: isResourceParameterRequired(),
         dpopEnabled: isDevOAuthDpopEnabled(),
         dpopAuthorizationCodeBindingEnabled: true,
@@ -647,6 +658,7 @@ async function buildDevOAuthStatus(config) {
         privateKeyJwtReplayCacheEntries: privateKeyJwtReplayCache.size,
         dpopReplayCacheEntries: dpopReplayCache.size,
         dpopNonceEntries: dpopNonces.size,
+        oauthReplayPersistence: readPersistentOAuthReplayStatus(),
         pushedAuthorizationRequests: pushedAuthorizationRequests.size,
         parEnabled: true,
         pushedAuthorizationRequestTtlMs: PAR_REQUEST_TTL_MS,
@@ -823,9 +835,8 @@ async function exportPublicJwk(privateKey) {
  */
 async function persistPrivateKey(keyFile, privateKey) {
     try {
-        await mkdir(path.dirname(keyFile), { recursive: true });
         const pem = await exportPKCS8(privateKey);
-        await writeFile(keyFile, pem, { encoding: 'utf8', mode: 0o600 });
+        await writeFileAtomicPortable(keyFile, pem, { mode: 0o600 });
     } catch {
         // The dev issuer can still operate with an in-memory key; persistence is a stability upgrade, not a hard dependency.
     }
@@ -1541,7 +1552,25 @@ function acceptPrivateKeyJwtClaims(payload, client) {
         });
         return false;
     }
-    privateKeyJwtReplayCache.set(replayKey, exp * 1000);
+    const expiresAtMs = exp * 1000;
+    const persistentReplay = rememberPersistentOAuthReplay(
+        OAUTH_REPLAY_NAMESPACES.privateKeyJwt,
+        replayKey,
+        expiresAtMs,
+    );
+    if (!persistentReplay.available) {
+        logDevOAuthEvent('ERROR', 'OAuth private_key_jwt replay protection is unavailable.', {
+            clientId: summarizeClientIdForLog(client.clientId),
+        });
+        return false;
+    }
+    if (persistentReplay.replay) {
+        logDevOAuthEvent('WARN', 'OAuth private_key_jwt persistent replay rejected.', {
+            clientId: summarizeClientIdForLog(client.clientId),
+        });
+        return false;
+    }
+    privateKeyJwtReplayCache.set(replayKey, expiresAtMs);
     trimPrivateKeyJwtReplayCache(PRIVATE_KEY_JWT_REPLAY_CACHE_MAX_ENTRIES);
     return true;
 }
@@ -1649,6 +1678,15 @@ async function verifyDpopProof(proof, expected) {
         const replayKey = `${jkt}:${jti}`;
         if (dpopReplayCache.has(replayKey)) return { ok: false, error: 'DPoP proof replay detected.' };
         const expMs = Number(payload.exp) ? Number(payload.exp) * 1000 : Date.now() + DPOP_MAX_TTL_SECONDS * 1000;
+        const persistentReplay = rememberPersistentOAuthReplay(
+            OAUTH_REPLAY_NAMESPACES.issuerDpop,
+            replayKey,
+            expMs,
+        );
+        if (!persistentReplay.available) {
+            return { ok: false, error: 'Persistent DPoP replay protection is unavailable.' };
+        }
+        if (persistentReplay.replay) return { ok: false, error: 'DPoP proof replay detected.' };
         dpopReplayCache.set(replayKey, expMs);
         trimDpopReplayCache(DPOP_REPLAY_CACHE_MAX_ENTRIES);
         return { ok: true, jkt };
@@ -3282,6 +3320,43 @@ function isTrustedChatGptCimdFallbackEnabled(env = process.env) {
 }
 
 /**
+ * @param {string} clientId
+ * @returns {DevOAuthClient | undefined}
+ */
+function resolveTrustedClaudeClientMetadataDocument(clientId) {
+    if (!isTrustedClaudeCimdFallbackEnabled()) return undefined;
+    if (!clientId || clientId.length > MAX_CLIENT_ID_LENGTH || hasControlCharacters(clientId)) return undefined;
+    try {
+        const url = new URL(clientId);
+        if (url.origin !== CLAUDE_CIMD_ORIGIN || url.pathname !== CLAUDE_CIMD_CLIENT_PATH) return undefined;
+        if (url.search || url.hash || url.username || url.password || url.port) return undefined;
+        return {
+            clientId,
+            clientName: 'Claude Custom Connector CIMD client',
+            redirectUris: [CLAUDE_CONNECTOR_REDIRECT_URI],
+            createdAt: Date.now(),
+            source: 'cimd',
+            tokenEndpointAuthMethod: 'none',
+            trustedFallback: true,
+            trustedFallbackReason: 'claude-cimd-fetch-unavailable',
+        };
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+function isTrustedClaudeCimdFallbackEnabled(env = process.env) {
+    const raw = String(env['COPILOT_MCP_DEV_OAUTH_TRUST_CLAUDE_CIMD_FALLBACK'] ?? 'true')
+        .trim()
+        .toLowerCase();
+    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
+
+/**
  * Use the hardened ChatGPT CIMD trust policy before remote metadata fetch. The observed ChatGPT metadata endpoint can
  * be unreachable from the dev container, and waiting for that fetch on every authorization request causes connector
  * friction while not adding security for this specific allowlisted host/path/redirect tuple. Set this env to false to
@@ -3331,8 +3406,17 @@ async function resolveClientMetadataDocument(clientId) {
         });
         return cacheClientMetadataDocument(clientId, trustedChatGptFallback);
     }
+    const trustedClaudeFallback = resolveTrustedClaudeClientMetadataDocument(clientId);
+    if (trustedClaudeFallback && isTrustedClaudeCimdFallbackEnabled()) {
+        logDevOAuthEvent('INFO', 'Using trusted Claude CIMD fast-path.', {
+            clientId: summarizeClientIdForLog(clientId),
+            redirectUris: trustedClaudeFallback.redirectUris.map(summarizeUrlForLog),
+        });
+        return cacheClientMetadataDocument(clientId, trustedClaudeFallback);
+    }
+    const trustedFallback = trustedChatGptFallback ?? trustedClaudeFallback;
     if (!isAllowedClientMetadataUrl(clientId)) {
-        return trustedChatGptFallback ? cacheClientMetadataDocument(clientId, trustedChatGptFallback) : undefined;
+        return trustedFallback ? cacheClientMetadataDocument(clientId, trustedFallback) : undefined;
     }
 
     try {
@@ -3844,19 +3928,74 @@ function isPrivateIpAddress(address) {
         );
     }
     if (ipVersion === 6) {
-        return (
-            normalized === '::1' ||
-            normalized === '::' ||
-            normalized.startsWith('fc') ||
-            normalized.startsWith('fd') ||
-            normalized.startsWith('fe80:') ||
-            normalized.startsWith('::ffff:127.') ||
-            normalized.startsWith('::ffff:10.') ||
-            normalized.startsWith('::ffff:192.168.')
-        );
+        const mappedIpv4 = parseIpv4MappedAddress(normalized);
+        if (mappedIpv4) return isPrivateIpAddress(mappedIpv4);
+        return PRIVATE_NETWORK_BLOCK_LIST.check(normalized, 'ipv6');
     }
     return false;
 }
+
+/**
+ * Block non-public IP ranges before any outbound OAuth metadata connection.
+ *
+ * @returns {BlockList}
+ */
+function createPrivateNetworkBlockList() {
+    const blockList = new BlockList();
+    for (const [network, prefix] of /** @type {[string, number][]} */ ([
+        ['0.0.0.0', 8],
+        ['10.0.0.0', 8],
+        ['100.64.0.0', 10],
+        ['127.0.0.0', 8],
+        ['169.254.0.0', 16],
+        ['172.16.0.0', 12],
+        ['192.0.0.0', 24],
+        ['192.0.2.0', 24],
+        ['192.168.0.0', 16],
+        ['198.18.0.0', 15],
+        ['198.51.100.0', 24],
+        ['203.0.113.0', 24],
+        ['224.0.0.0', 4],
+        ['240.0.0.0', 4],
+    ])) {
+        blockList.addSubnet(network, prefix, 'ipv4');
+    }
+    for (const [network, prefix] of /** @type {[string, number][]} */ ([
+        ['::', 128],
+        ['::1', 128],
+        ['64:ff9b:1::', 48],
+        ['100::', 64],
+        ['2001:db8::', 32],
+        ['fc00::', 7],
+        ['fe80::', 10],
+        ['ff00::', 8],
+    ])) {
+        blockList.addSubnet(network, prefix, 'ipv6');
+    }
+    return blockList;
+}
+
+/**
+ * @param {string} address
+ * @returns {string | null}
+ */
+function parseIpv4MappedAddress(address) {
+    const lower = address.toLowerCase();
+    if (!lower.startsWith('::ffff:')) return null;
+    const tail = lower.slice('::ffff:'.length);
+    if (isIP(tail) === 4) return tail;
+    const parts = tail.split(':');
+    if (parts.length !== 2 || parts.some((part) => !/^[0-9a-f]{1,4}$/u.test(part))) return null;
+    const [highPart = '', lowPart = ''] = parts;
+    const high = Number.parseInt(highPart, 16);
+    const low = Number.parseInt(lowPart, 16);
+    return [high >> 8, high & 0xff, low >> 8, low & 0xff].join('.');
+}
+
+export const devOAuthTestHarness = Object.freeze({
+    isAllowedClientMetadataUrl,
+    isPrivateIpAddress,
+});
 
 /**
  * @param {string} value

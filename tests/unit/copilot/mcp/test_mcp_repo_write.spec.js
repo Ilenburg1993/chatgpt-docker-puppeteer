@@ -7,9 +7,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it } from 'vitest';
+import { afterEach, describe, it } from 'vitest';
 
-import { repoWriteTools } from '#copilot/mcp/tools';
+import { repoWriteTestHarness, repoWriteTools } from '#copilot/mcp/tools';
 
 const applyPatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_patch');
 const applyFileBatchPlanTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch_plan');
@@ -24,6 +24,10 @@ const restoreQuarantinedFileTool = repoWriteTools.find((tool) => tool.name === '
 const removeFileTool = repoWriteTools.find((tool) => tool.name === 'repo_remove_file');
 
 describe('copilot MCP repo write tools', () => {
+    afterEach(() => {
+        repoWriteTestHarness.resetQuarantineMetadataWriter();
+    });
+
     it('writes existing files with diff previews', async () => {
         assert.ok(writeFileTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
@@ -227,6 +231,8 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(quarantined.structuredContent.success, true);
         assert.equal(quarantined.structuredContent.status, 'quarantined');
         assert.equal(await pathExists(filePath), false);
+        const metadataPath = path.resolve(String(quarantined.structuredContent.metadataPath));
+        assert.equal((await fs.stat(metadataPath)).mode & 0o777, 0o600);
 
         const quarantineId = String(quarantined.structuredContent.quarantineId);
         const listed = await listQuarantineTool.handler({ status: 'quarantined', limit: 20 });
@@ -248,6 +254,217 @@ describe('copilot MCP repo write tools', () => {
         const secondRestore = await restoreQuarantinedFileTool.handler({ quarantineId });
         assert.equal(secondRestore.isError, true);
         assert.equal(secondRestore.structuredContent.code, 'ERR_QUARANTINE_NOT_RESTORABLE');
+    });
+
+    it('rolls a quarantine move back when the final metadata commit fails', async () => {
+        assert.ok(quarantineFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const filePath = path.join(dir, 'quarantine-commit-rollback.txt');
+        await fs.writeFile(filePath, 'still here\n', 'utf8');
+
+        let writeCount = 0;
+        repoWriteTestHarness.setQuarantineMetadataWriter(async (metadata, metadataPath) => {
+            writeCount += 1;
+            if (writeCount === 2) {
+                const error = /** @type {Error & { code?: string }} */ (new Error('simulated metadata failure'));
+                error.code = 'EIO';
+                throw error;
+            }
+            await repoWriteTestHarness.writeQuarantineMetadataDefault(metadata, metadataPath);
+        });
+
+        const result = await quarantineFileTool.handler({ path: filePath });
+        assert.equal(result.isError, true);
+        assert.equal(result.structuredContent.code, 'EIO');
+        assert.equal(await fs.readFile(filePath, 'utf8'), 'still here\n');
+
+        const quarantineEntries = await fs.readdir(path.join(process.cwd(), 'src/copilot/.ai/quarantine'));
+        assert.equal(
+            quarantineEntries.some((entry) => entry.includes('quarantine-commit-rollback.txt')),
+            false,
+        );
+    });
+
+    it('restores the previous destination when restore metadata commit fails', async () => {
+        assert.ok(inspectQuarantinedFileTool);
+        assert.ok(quarantineFileTool);
+        assert.ok(restoreQuarantinedFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const source = path.join(dir, 'restore-commit-source.txt');
+        const destination = path.join(dir, 'restore-commit-destination.txt');
+        await fs.writeFile(source, 'quarantined content\n', 'utf8');
+        await fs.writeFile(destination, 'previous destination\n', 'utf8');
+
+        const quarantined = await quarantineFileTool.handler({ path: source });
+        assert.equal(quarantined.isError, undefined);
+        const quarantineId = String(quarantined.structuredContent.quarantineId);
+
+        let writeCount = 0;
+        repoWriteTestHarness.setQuarantineMetadataWriter(async (metadata, metadataPath) => {
+            writeCount += 1;
+            if (writeCount === 2) {
+                const error = /** @type {Error & { code?: string }} */ (new Error('simulated restore commit failure'));
+                error.code = 'EIO';
+                throw error;
+            }
+            await repoWriteTestHarness.writeQuarantineMetadataDefault(metadata, metadataPath);
+        });
+
+        const result = await restoreQuarantinedFileTool.handler({
+            quarantineId,
+            destinationPath: destination,
+            overwrite: true,
+            confirmOverwrite: true,
+        });
+        assert.equal(result.isError, true);
+        assert.equal(result.structuredContent.code, 'EIO');
+        assert.equal(await fs.readFile(destination, 'utf8'), 'previous destination\n');
+
+        repoWriteTestHarness.resetQuarantineMetadataWriter();
+        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        assert.equal(inspected.isError, undefined);
+        assert.equal(inspected.structuredContent.restorable, true);
+        assert.equal(inspected.structuredContent.metadata.status, 'quarantined');
+        const quarantineEntries = await fs.readdir(path.join(process.cwd(), 'src/copilot/.ai/quarantine'));
+        assert.equal(
+            quarantineEntries.some((entry) => entry.includes(`${quarantineId}.restore-backup-`)),
+            false,
+        );
+    });
+
+    it('serializes concurrent restores for the same quarantine item', async () => {
+        assert.ok(quarantineFileTool);
+        assert.ok(restoreQuarantinedFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const source = path.join(dir, 'concurrent-restore.txt');
+        await fs.writeFile(source, 'restore once\n', 'utf8');
+
+        const quarantined = await quarantineFileTool.handler({ path: source });
+        const quarantineId = String(quarantined.structuredContent.quarantineId);
+        const results = await Promise.all([
+            restoreQuarantinedFileTool.handler({ quarantineId }),
+            restoreQuarantinedFileTool.handler({ quarantineId }),
+        ]);
+
+        assert.equal(results.filter((result) => result.isError !== true).length, 1);
+        const failed = results.find((result) => result.isError === true);
+        assert.equal(failed?.structuredContent.code, 'ERR_QUARANTINE_NOT_RESTORABLE');
+        assert.equal(await fs.readFile(source, 'utf8'), 'restore once\n');
+    });
+
+    it('rejects non-canonical quarantine identifiers before resolving paths', async () => {
+        assert.ok(inspectQuarantinedFileTool);
+        const result = await inspectQuarantinedFileTool.handler({ quarantineId: '../quarantine-item' });
+        assert.equal(result.isError, true);
+        assert.equal(result.structuredContent.code, 'ERR_QUARANTINE_NOT_FOUND');
+    });
+
+    it('rejects forged quarantine backup paths without deleting their target', async () => {
+        assert.ok(inspectQuarantinedFileTool);
+        assert.ok(quarantineFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const source = path.join(dir, 'forged-backup-source.txt');
+        const protectedFile = path.join(dir, 'must-survive.txt');
+        await fs.writeFile(source, 'quarantine me\n', 'utf8');
+        await fs.writeFile(protectedFile, 'protected\n', 'utf8');
+
+        const quarantined = await quarantineFileTool.handler({ path: source });
+        const quarantineId = String(quarantined.structuredContent.quarantineId);
+        const metadataPath = path.resolve(String(quarantined.structuredContent.metadataPath));
+        const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'));
+        metadata.status = 'restored';
+        metadata.restoredAt = new Date().toISOString();
+        metadata.restoredPath = path.relative(process.cwd(), source);
+        metadata.transaction = {
+            kind: 'restore',
+            destinationPath: metadata.restoredPath,
+            backupPath: path.relative(process.cwd(), protectedFile),
+            destinationExisted: true,
+        };
+        await fs.writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
+
+        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        assert.equal(inspected.isError, true);
+        assert.equal(inspected.structuredContent.code, 'ERR_QUARANTINE_NOT_FOUND');
+        assert.equal(await fs.readFile(protectedFile, 'utf8'), 'protected\n');
+    });
+
+    it('does not inspect or restore a quarantined data symlink', async () => {
+        assert.ok(inspectQuarantinedFileTool);
+        assert.ok(quarantineFileTool);
+        assert.ok(restoreQuarantinedFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const source = path.join(dir, 'symlink-quarantine-source.txt');
+        const target = path.join(dir, 'symlink-target.txt');
+        await fs.writeFile(source, 'original\n', 'utf8');
+        await fs.writeFile(target, 'target\n', 'utf8');
+
+        const quarantined = await quarantineFileTool.handler({ path: source });
+        const quarantineId = String(quarantined.structuredContent.quarantineId);
+        const quarantinePath = path.resolve(String(quarantined.structuredContent.quarantinePath));
+        await fs.rm(quarantinePath);
+        await fs.symlink(target, quarantinePath);
+
+        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        assert.equal(inspected.isError, undefined);
+        assert.equal(inspected.structuredContent.dataExists, false);
+        assert.equal(inspected.structuredContent.restorable, false);
+
+        const restored = await restoreQuarantinedFileTool.handler({ quarantineId });
+        assert.equal(restored.isError, true);
+        assert.equal(restored.structuredContent.code, 'ERR_QUARANTINE_DATA_INVALID');
+        assert.equal(await fs.readFile(target, 'utf8'), 'target\n');
+    });
+
+    it('rejects quarantined data that no longer matches its manifest', async () => {
+        assert.ok(quarantineFileTool);
+        assert.ok(restoreQuarantinedFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const source = path.join(dir, 'tampered-quarantine-source.txt');
+        await fs.writeFile(source, 'original\n', 'utf8');
+
+        const quarantined = await quarantineFileTool.handler({ path: source });
+        const quarantineId = String(quarantined.structuredContent.quarantineId);
+        const quarantinePath = path.resolve(String(quarantined.structuredContent.quarantinePath));
+        await fs.writeFile(quarantinePath, 'tampered\n', 'utf8');
+
+        const restored = await restoreQuarantinedFileTool.handler({ quarantineId });
+        assert.equal(restored.isError, true);
+        assert.equal(restored.structuredContent.code, 'ERR_QUARANTINE_DATA_INVALID');
+        assert.equal(await pathExists(source), false);
+    });
+
+    it('reconciles a restore journal after the data move completed', async () => {
+        assert.ok(inspectQuarantinedFileTool);
+        assert.ok(quarantineFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const source = path.join(dir, 'journal-source.txt');
+        const destination = path.join(dir, 'journal-destination.txt');
+        await fs.writeFile(source, 'journal content\n', 'utf8');
+
+        const quarantined = await quarantineFileTool.handler({ path: source });
+        const quarantineId = String(quarantined.structuredContent.quarantineId);
+        const quarantinePath = path.resolve(String(quarantined.structuredContent.quarantinePath));
+        const metadataPath = path.resolve(String(quarantined.structuredContent.metadataPath));
+        const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'));
+        metadata.status = 'restoring';
+        metadata.restoredAt = new Date().toISOString();
+        metadata.restoredPath = path.relative(process.cwd(), destination);
+        metadata.transaction = {
+            kind: 'restore',
+            destinationPath: metadata.restoredPath,
+            backupPath: null,
+            destinationExisted: false,
+        };
+        await fs.writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
+        await fs.rename(quarantinePath, destination);
+
+        const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
+        assert.equal(inspected.isError, undefined);
+        assert.equal(inspected.structuredContent.metadata.status, 'restored');
+        assert.equal(inspected.structuredContent.metadata.transaction, null);
+        assert.equal(inspected.structuredContent.dataExists, false);
+        assert.equal(await fs.readFile(destination, 'utf8'), 'journal content\n');
     });
 
     it('requires explicit overwrite confirmation when restoring quarantine over an existing file', async () => {

@@ -307,6 +307,67 @@ describe('copilot MCP ChatGPT connection profile', () => {
             await rm(tempDir, { recursive: true, force: true });
         }
     });
+
+    it('authorizes the exact Claude CIMD client through the trusted fast-path', async () => {
+        const tempDir = await mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-claude-oauth-'));
+        const oldEnv = snapshotEnv([
+            'COPILOT_MCP_AUTH_MODE',
+            'COPILOT_MCP_AUTH_ENFORCEMENT',
+            'COPILOT_MCP_PUBLIC_URL',
+            'COPILOT_MCP_DEV_OAUTH_KEY_FILE',
+            'COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE',
+            'COPILOT_MCP_DEV_OAUTH_CLIENT_FILE',
+            'COPILOT_MCP_DEV_OAUTH_DIAGNOSTICS_ENABLED',
+            'COPILOT_MCP_DEV_OAUTH_TRUST_CLAUDE_CIMD_FALLBACK',
+            'COPILOT_MCP_ALLOWED_ORIGINS',
+        ]);
+        const server = await startHttpMcpServer({ host: '127.0.0.1', port: 0 });
+        try {
+            const address = server.address();
+            assert.ok(address && typeof address === 'object');
+            const resource = `http://127.0.0.1:${address.port}`;
+            process.env['COPILOT_MCP_AUTH_MODE'] = 'oauth';
+            process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] = 'all';
+            process.env['COPILOT_MCP_PUBLIC_URL'] = `${resource}/mcp`;
+            process.env['COPILOT_MCP_DEV_OAUTH_KEY_FILE'] = path.join(tempDir, 'oauth-key.pem');
+            process.env['COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE'] = path.join(tempDir, 'refresh-tokens.json');
+            process.env['COPILOT_MCP_DEV_OAUTH_CLIENT_FILE'] = path.join(tempDir, 'oauth-clients.json');
+            process.env['COPILOT_MCP_DEV_OAUTH_DIAGNOSTICS_ENABLED'] = 'true';
+            process.env['COPILOT_MCP_DEV_OAUTH_TRUST_CLAUDE_CIMD_FALLBACK'] = 'true';
+            process.env['COPILOT_MCP_ALLOWED_ORIGINS'] = 'https://claude.ai,http://127.0.0.1';
+            resetDevOAuthRuntimeForTests();
+
+            const codeVerifier = base64Url(randomBytes(32));
+            const codeChallenge = base64Url(createHash('sha256').update(codeVerifier).digest());
+            const authorize = new URL(`${resource}/oauth/authorize`);
+            authorize.searchParams.set('response_type', 'code');
+            authorize.searchParams.set('client_id', 'https://claude.ai/oauth/mcp-oauth-client-metadata');
+            authorize.searchParams.set('redirect_uri', 'https://claude.ai/api/mcp/auth_callback');
+            authorize.searchParams.set('scope', 'repo:read');
+            authorize.searchParams.set('resource', resource);
+            authorize.searchParams.set('code_challenge', codeChallenge);
+            authorize.searchParams.set('code_challenge_method', 'S256');
+
+            const authorizationResponse = await fetch(authorize, { redirect: 'manual' });
+            assert.equal(authorizationResponse.status, 302);
+            const location = authorizationResponse.headers.get('location');
+            assert.ok(location);
+            const callback = new URL(location);
+            assert.equal(callback.origin, 'https://claude.ai');
+            assert.equal(callback.pathname, '/api/mcp/auth_callback');
+            assert.ok(callback.searchParams.get('code'));
+
+            const statusResponse = await fetch(`${resource}/oauth/status`);
+            assert.equal(statusResponse.status, 200);
+            const status = /** @type {Record<string, unknown>} */ (await statusResponse.json());
+            assert.equal(status['trustedClaudeCimdFallbackEnabled'], true);
+        } finally {
+            server.close();
+            resetDevOAuthRuntimeForTests();
+            restoreEnv(oldEnv);
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
 });
 
 /**

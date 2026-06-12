@@ -23,7 +23,9 @@ export {
     readTextChunksStream,
     removePathLocked,
     statPath,
-    writeFileAtomic
+    withIoResourceLock,
+    writeFileAtomic,
+    writeFileAtomicPortable,
 } from '../io/fs/index.js';
 
 export { diffText } from '../io/patch/index.js';

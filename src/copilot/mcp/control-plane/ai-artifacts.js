@@ -1,14 +1,14 @@
 // @ts-check
 /**
- * Read-only diagnostics for transient MCP/ChatGPT artifacts under src/copilot/.ai.
+ * Diagnostics and bounded cleanup for transient MCP/ChatGPT artifacts under src/copilot/.ai.
  *
- * This module intentionally reports only; it never deletes files. The report distinguishes cleanup candidates from
- * protected state such as OAuth stores, tunnel tokens, pid files and quarantine data.
+ * Cleanup is structurally restricted to strict UUID-named files under `.ai/jobs`, defaults to dry-run and preserves
+ * OAuth stores, tunnel tokens, pid files, quarantine data and unknown names.
  *
  * @module copilot/mcp/control-plane/ai-artifacts
  */
 
-import { readdir, stat } from 'node:fs/promises';
+import { readdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { getMcpWorkspaceRoot } from './paths.js';
 
@@ -20,6 +20,7 @@ const DEFAULT_CLOUDFLARE_LOG_THRESHOLD_BYTES = 2 * 1024 * 1024;
  * @typedef {object} AiArtifactsReportOptions
  * @property {number} [retainNewest]
  * @property {number} [cloudflareLogThresholdBytes]
+ * @property {string} [workspaceRoot]
  *
  * @typedef {object} JobArtifactSummary
  * @property {string} name
@@ -57,7 +58,7 @@ async function statSafe(filePath) {
  * @returns {Promise<Record<string, unknown>>}
  */
 export async function buildAiArtifactsReport(options = {}) {
-    const workspaceRoot = getMcpWorkspaceRoot();
+    const workspaceRoot = options.workspaceRoot ?? getMcpWorkspaceRoot();
     const aiDir = path.join(workspaceRoot, 'src/copilot/.ai');
     const jobsDir = path.join(aiDir, 'jobs');
     const cloudflareDir = path.join(aiDir, 'cloudflare');
@@ -126,16 +127,87 @@ export async function buildAiArtifactsReport(options = {}) {
             appendOnlyHistories: ['latency-dashboard.jsonl'],
         },
         cleanupPlan: {
-            applyInsideMcp: false,
-            reason: 'MCP runtime reports candidates but does not delete artifacts; cleanup should be operator-initiated or implemented via a separately reviewed bounded tool.',
-            manualScriptPath: 'scripts/maintenance/cleanup-ai-artifacts.cjs',
-            scriptStatus: 'not-created-by-mcp-host; use an operator-reviewed local script if applying cleanup',
+            applyInsideMcp: true,
+            tool: 'mcp_cleanup_ai_artifacts',
+            defaultDryRun: true,
+            maxDeleteCountPerCall: 500,
+            deletionDomain: 'strict UUID-named .json/.log files under src/copilot/.ai/jobs only',
         },
         safety: {
-            defaultAction: 'report-only',
-            recommendedManualCleanup:
+            defaultAction: 'dry-run',
+            cleanupPolicy:
                 'delete only strict UUID-named .json/.log validator artifacts beyond retention; never delete OAuth stores, tunnel token, pid files, quarantine, or unknown names',
         },
+    };
+}
+
+/**
+ * Delete only strict UUID-named validator artifacts beyond retention. Unknown names and all state outside `.ai/jobs`
+ * are structurally unreachable from this operation.
+ *
+ * @param {AiArtifactsReportOptions & { dryRun?: boolean; maxDeleteCount?: number }} [options]
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export async function cleanupAiArtifacts(options = {}) {
+    const workspaceRoot = options.workspaceRoot ?? getMcpWorkspaceRoot();
+    const retainNewest = normalizePositiveInteger(options.retainNewest, DEFAULT_RETAIN_NEWEST, 20, 10_000);
+    const maxDeleteCount = normalizePositiveInteger(options.maxDeleteCount, 100, 1, 500);
+    const dryRun = options.dryRun !== false;
+    const jobsDir = path.join(workspaceRoot, 'src/copilot/.ai/jobs');
+    const entries = await readdirSafe(jobsDir);
+    const artifacts = [];
+    for (const entry of entries) {
+        if (!entry.isFile() || !STRICT_UUID_JOB_ARTIFACT_RE.test(entry.name)) continue;
+        const stats = await statSafe(path.join(jobsDir, entry.name));
+        if (!stats) continue;
+        artifacts.push({ name: entry.name, bytes: stats.size, mtimeMs: stats.mtimeMs });
+    }
+    artifacts.sort((left, right) => right.mtimeMs - left.mtimeMs || left.name.localeCompare(right.name));
+    const candidates = artifacts
+        .slice(retainNewest)
+        .sort((left, right) => left.mtimeMs - right.mtimeMs || left.name.localeCompare(right.name));
+    const selected = candidates.slice(0, maxDeleteCount);
+    const deleted = [];
+    const failures = [];
+
+    if (!dryRun) {
+        for (const artifact of selected) {
+            if (!STRICT_UUID_JOB_ARTIFACT_RE.test(artifact.name)) continue;
+            try {
+                await unlink(path.join(jobsDir, artifact.name));
+                deleted.push(artifact);
+            } catch (error) {
+                failures.push({
+                    name: artifact.name,
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
+        }
+    }
+
+    const after = await buildAiArtifactsReport({ ...options, workspaceRoot, retainNewest });
+    return {
+        success: failures.length === 0,
+        dryRun,
+        retainNewest,
+        maxDeleteCount,
+        candidateCount: candidates.length,
+        selectedCount: selected.length,
+        selectedBytes: selected.reduce((sum, artifact) => sum + artifact.bytes, 0),
+        selected: selected.map((artifact) => artifact.name),
+        deletedCount: deleted.length,
+        deletedBytes: deleted.reduce((sum, artifact) => sum + artifact.bytes, 0),
+        failures,
+        remainingCandidateCount:
+            /** @type {Record<string, unknown>} */ (after['jobs'] ?? {})['cleanupCandidateCount'] ?? null,
+        protectedByDesign: [
+            'non-UUID job filenames',
+            'OAuth stores',
+            'tunnel tokens and state',
+            'pid files',
+            'quarantine data',
+            'all paths outside src/copilot/.ai/jobs',
+        ],
     };
 }
 

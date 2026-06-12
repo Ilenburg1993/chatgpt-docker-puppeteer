@@ -5,7 +5,7 @@ import { getCanonicalMcpTools } from '../registry.js';
 import { writeConnectorSmokeState } from './state.js';
 import { buildToolsListSmokeHeaders, extractAuthorizationServer, probeJsonWithRetry, readSmokeBearerToken, summarizeOAuthReadiness, summarizeProbeEnvelope, summarizeToolsListProbe } from './cli-probe.js';
 
-const DEFAULT_MCP_PROTOCOL_VERSION = '2025-06-18';
+const DEFAULT_MCP_PROTOCOL_VERSION = '2025-11-25';
 const DEFAULT_SMOKE_ATTEMPTS = 3;
 const DEFAULT_SMOKE_DELAY_MS = 1_000;
 const DEFAULT_CRITICAL_TOOL_NAMES = ['repo_status', 'repo_tree', 'repo_read_file', 'repo_search_text', 'repo_apply_file_batch', 'mcp_runtime_health', 'mcp_tunnel_status'];

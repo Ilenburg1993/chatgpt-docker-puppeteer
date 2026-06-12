@@ -19,12 +19,17 @@
 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createHash } from 'node:crypto';
+import { isIP } from 'node:net';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
 import { logMcp } from '../control-plane/audit.js';
 import { buildProtectedResourceMetadata, parseBearerToken, readMcpAuthConfig } from '../control-plane/auth.js';
 import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
+import {
+    readMcpStartupMaintenanceState,
+    scheduleMcpStartupMaintenance,
+} from '../control-plane/startup-maintenance.js';
 import { createCopilotMcpServer } from '../server.js';
 import { buildMcpHttpProtocolReport, setMcpHttpProtocolResponseHeaders } from './http-protocol.js';
 
@@ -489,6 +494,7 @@ export function createMcpHttpRequestHandler(options) {
  */
 export function notifyMcpHttpStarted() {
     startMcpIndexAutoBuildInBackground({ reason: 'mcp-http-start' });
+    scheduleMcpStartupMaintenance();
 }
 
 /**
@@ -502,6 +508,7 @@ function buildHealthPayload(protocolState) {
         mcpPath: MCP_PATH,
         metrics: readMcpMetricsSnapshot(),
         indexAutoBuild: readMcpIndexAutoBuildState(),
+        startupMaintenance: readMcpStartupMaintenanceState(),
         http: {
             implementationVersion: MCP_HTTP_SHARED_IMPLEMENTATION_VERSION,
             timingPolicy: readMcpHttpServerTimingPolicy(),
@@ -937,6 +944,7 @@ function readBooleanEnv(env, name, fallback) {
  * @returns {string | undefined}
  */
 function firstForwardedProto(req) {
+    if (!isTrustedProxyHeaderRequest(req)) return undefined;
     const value = readHeader(req, 'x-forwarded-proto');
     return value?.split(',')[0]?.trim().toLowerCase() || undefined;
 }
@@ -979,6 +987,7 @@ function consumeAnonymousMcpRateLimit(req) {
     const key = buildAnonymousRateLimitKey(req);
     const existing = anonymousMcpRateLimitBuckets.get(key);
     if (!existing || nowMs - existing.windowStartMs >= policy.windowMs) {
+        if (existing) anonymousMcpRateLimitBuckets.delete(key);
         anonymousMcpRateLimitBuckets.set(key, { windowStartMs: nowMs, count: 1 });
         sweepAnonymousMcpRateLimitBuckets(nowMs, policy);
         return { allowed: true, retryAfterSeconds: 0 };
@@ -1001,11 +1010,66 @@ function consumeAnonymousMcpRateLimit(req) {
  * @returns {string}
  */
 function buildAnonymousRateLimitKey(req) {
-    const cfConnectingIp = readHeader(req, 'cf-connecting-ip');
-    const forwardedFor = readHeader(req, 'x-forwarded-for')?.split(',')[0]?.trim();
     const fallbackRemote = typeof req.socket?.remoteAddress === 'string' ? req.socket.remoteAddress : 'unknown';
-    const value = cfConnectingIp || forwardedFor || fallbackRemote;
-    return createHash('sha256').update(value).digest('hex').slice(0, 32);
+    let source = 'socket';
+    let value = normalizeClientIp(fallbackRemote) ?? fallbackRemote.slice(0, 128);
+    if (isTrustedProxyHeaderRequest(req)) {
+        const cfConnectingIp = normalizeClientIp(readHeader(req, 'cf-connecting-ip'));
+        if (cfConnectingIp) {
+            source = 'cloudflare';
+            value = cfConnectingIp;
+        } else if (readBooleanEnv(process.env, 'COPILOT_MCP_HTTP_TRUST_X_FORWARDED_FOR', false)) {
+            const forwardedFor = normalizeClientIp(readHeader(req, 'x-forwarded-for')?.split(',')[0]?.trim());
+            if (forwardedFor) {
+                source = 'forwarded';
+                value = forwardedFor;
+            }
+        }
+    }
+    return createHash('sha256').update(source).update('\0').update(value || 'unknown').digest('hex').slice(0, 32);
+}
+
+/**
+ * @param {McpHttpRequest} req
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+function isTrustedProxyHeaderRequest(req, env = process.env) {
+    const raw = String(env['COPILOT_MCP_HTTP_TRUST_PROXY_HEADERS'] ?? 'loopback')
+        .trim()
+        .toLowerCase();
+    if (raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on') return true;
+    if (raw === '0' || raw === 'false' || raw === 'no' || raw === 'off') return false;
+    return isLoopbackSocketAddress(String(req.socket?.remoteAddress ?? ''));
+}
+
+/**
+ * @param {string} address
+ * @returns {boolean}
+ */
+function isLoopbackSocketAddress(address) {
+    const normalized = String(address ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/^\[|\]$/gu, '');
+    return (
+        normalized === 'localhost' ||
+        normalized === '127.0.0.1' ||
+        normalized === '::1' ||
+        normalized === '::ffff:127.0.0.1'
+    );
+}
+
+/**
+ * @param {string | undefined} address
+ * @returns {string | null}
+ */
+function normalizeClientIp(address) {
+    const normalized = String(address ?? '')
+        .trim()
+        .replace(/^\[|\]$/gu, '');
+    if (!normalized || normalized.length > 64 || isIP(normalized) === 0) return null;
+    return normalized.toLowerCase();
 }
 
 /**
@@ -1017,9 +1081,32 @@ function sweepAnonymousMcpRateLimitBuckets(nowMs, policy) {
     if (anonymousMcpRateLimitBuckets.size <= policy.maxBuckets) return;
     for (const [key, bucket] of anonymousMcpRateLimitBuckets) {
         if (nowMs - bucket.windowStartMs >= policy.windowMs) anonymousMcpRateLimitBuckets.delete(key);
-        if (anonymousMcpRateLimitBuckets.size <= policy.maxBuckets) break;
+    }
+    while (anonymousMcpRateLimitBuckets.size > policy.maxBuckets) {
+        const oldestKey = anonymousMcpRateLimitBuckets.keys().next().value;
+        if (typeof oldestKey !== 'string') break;
+        anonymousMcpRateLimitBuckets.delete(oldestKey);
     }
 }
+
+export const mcpHttpSharedTestHarness = Object.freeze({
+    buildAnonymousRateLimitKey,
+    firstForwardedProto,
+    isTrustedProxyHeaderRequest,
+    resetAnonymousRateLimitBuckets: () => anonymousMcpRateLimitBuckets.clear(),
+    seedAnonymousRateLimitBucket: (
+        /** @type {string} */ key,
+        /** @type {number} */ windowStartMs,
+        /** @type {number} */ count = 1,
+    ) => {
+        anonymousMcpRateLimitBuckets.set(key, { windowStartMs, count });
+    },
+    snapshotAnonymousRateLimitBuckets: () => ({
+        keys: [...anonymousMcpRateLimitBuckets.keys()],
+        size: anonymousMcpRateLimitBuckets.size,
+    }),
+    sweepAnonymousRateLimitBuckets: sweepAnonymousMcpRateLimitBuckets,
+});
 
 /**
  * @param {McpHttpResponse} res

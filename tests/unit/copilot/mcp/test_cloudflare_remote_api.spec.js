@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compareRemoteConfig, parseEnvFile } from '#copilot/mcp/cloudflare';
+import { getCloudflareClient } from '../../../../src/copilot/mcp/cloudflare/remote-api.js';
 
 /**
  * @returns {import('#copilot/mcp/cloudflare').CloudflareRemoteApiConfig}
@@ -22,6 +23,14 @@ function testRemoteConfig() {
 }
 
 describe('mcp/cloudflare/remote-api', () => {
+    it('não colide clientes para tokens com mesmo tamanho, prefixo e sufixo', () => {
+        const first = getCloudflareClient('same-edge-aaaaaaaa-different-middle-same-tail');
+        const second = getCloudflareClient('same-edge-bbbbbbbb-different-middle-same-tail');
+
+        expect(first).not.toBe(second);
+        expect(getCloudflareClient('same-edge-aaaaaaaa-different-middle-same-tail')).toBe(first);
+    });
+
     it('parses local env files without exposing comments', () => {
         expect(
             parseEnvFile(`

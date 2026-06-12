@@ -7,15 +7,20 @@
 
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeFileAtomic } from '#copilot/infra/public/io';
 import { getMcpWorkspaceRoot } from './paths.js';
 
 const MCP_JOBS_DIR = fileURLToPath(new URL('../../.ai/jobs/', import.meta.url));
 const DEFAULT_JOB_TIMEOUT_MS = 20 * 60 * 1000;
 const MIN_JOB_TIMEOUT_MS = 1_000;
 const MAX_JOB_TIMEOUT_MS = 60 * 60 * 1000;
+const MAX_IN_MEMORY_JOB_RECORDS = 200;
+const MAX_JOB_MANIFEST_BYTES = 128 * 1024;
+const MAX_JOB_OUTPUT_TAIL_BYTES = 1024 * 1024;
+const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 /**
  * @typedef {'typecheck'
@@ -46,6 +51,70 @@ const MAX_JOB_TIMEOUT_MS = 60 * 60 * 1000;
 
 /** @type {Map<string, JobRecord>} */
 const JOBS = new Map();
+/** @type {Map<string, Promise<void>>} */
+const JOB_IO_QUEUES = new Map();
+
+/**
+ * @param {string} id
+ * @returns {{ logFile: string; manifestFile: string } | null}
+ */
+function resolveJobArtifactPaths(id) {
+    if (!JOB_ID_PATTERN.test(id)) return null;
+    return {
+        logFile: path.join(MCP_JOBS_DIR, `${id}.log`),
+        manifestFile: path.join(MCP_JOBS_DIR, `${id}.json`),
+    };
+}
+
+/**
+ * Serializa I/O por job, preserva ordem de chunks/status e transforma falhas em warning observado.
+ *
+ * @param {JobRecord} record
+ * @param {string} operation
+ * @param {() => Promise<void>} task
+ * @returns {Promise<void>}
+ */
+function enqueueJobIo(record, operation, task) {
+    const previous = JOB_IO_QUEUES.get(record.id) ?? Promise.resolve();
+    const next = previous.then(task).catch((error) => {
+        process.emitWarning(
+            `[copilot/mcp/jobs] ${operation} failed for job ${record.id}: ${
+                error instanceof Error ? error.message : String(error)
+            }`,
+            { code: 'COPILOT_MCP_JOB_IO' },
+        );
+    });
+    JOB_IO_QUEUES.set(record.id, next);
+    void next.then(() => {
+        if (JOB_IO_QUEUES.get(record.id) === next) JOB_IO_QUEUES.delete(record.id);
+    });
+    return next;
+}
+
+/**
+ * Limita somente jobs não ativos; manifests e logs persistidos continuam disponíveis para reload.
+ *
+ * @param {Map<string, JobRecord>} records
+ * @param {number} [maxEntries]
+ * @returns {number}
+ */
+export function pruneCompletedJobRecords(records, maxEntries = MAX_IN_MEMORY_JOB_RECORDS) {
+    const normalizedMaxEntries =
+        Number.isInteger(maxEntries) && maxEntries > 0
+            ? Math.min(maxEntries, MAX_IN_MEMORY_JOB_RECORDS)
+            : MAX_IN_MEMORY_JOB_RECORDS;
+    if (records.size <= normalizedMaxEntries) return 0;
+
+    const removable = [...records.values()]
+        .filter((record) => record.status !== 'running' && record.process === null)
+        .sort((left, right) => (left.endedAt ?? left.startedAt) - (right.endedAt ?? right.startedAt));
+    let removed = 0;
+    for (const record of removable) {
+        if (records.size <= normalizedMaxEntries) break;
+        if (records.delete(record.id)) removed += 1;
+    }
+    return removed;
+}
 
 /**
  * @param {CopilotValidatorName} validator
@@ -104,8 +173,9 @@ export async function spawnValidatorJob(validator, options = {}) {
     const id = randomUUID();
     const command = resolveValidatorCommand(validator);
     const timeoutMs = resolveJobTimeoutMs(options.timeoutMs);
-    const logFile = path.join(MCP_JOBS_DIR, `${id}.log`);
-    const manifestFile = path.join(MCP_JOBS_DIR, `${id}.json`);
+    const artifacts = resolveJobArtifactPaths(id);
+    if (!artifacts) throw new Error('Generated validator job id is invalid.');
+    const { logFile, manifestFile } = artifacts;
     await mkdir(MCP_JOBS_DIR, { recursive: true });
     await writeFile(
         logFile,
@@ -137,6 +207,7 @@ export async function spawnValidatorJob(validator, options = {}) {
         process: child,
     };
     JOBS.set(id, record);
+    pruneCompletedJobRecords(JOBS);
     await persistJobRecord(record);
 
     const timeout = setTimeout(() => {
@@ -144,17 +215,19 @@ export async function spawnValidatorJob(validator, options = {}) {
         record.status = 'failed';
         record.timedOut = true;
         record.endedAt = Date.now();
-        void appendJobLog(record.logFile, `\n[job:timeout] timeoutMs=${timeoutMs}\n`);
-        void persistJobRecord(record);
+        void enqueueJobIo(record, 'persist timeout', async () => {
+            await appendJobLog(record.logFile, `\n[job:timeout] timeoutMs=${timeoutMs}\n`);
+            await persistJobRecord(record);
+        });
         record.process.kill('SIGTERM');
     }, timeoutMs);
     timeout.unref();
 
     child.stdout.on('data', (chunk) => {
-        void appendJobLog(logFile, chunk);
+        void enqueueJobIo(record, 'append stdout', () => appendJobLog(logFile, chunk));
     });
     child.stderr.on('data', (chunk) => {
-        void appendJobLog(logFile, chunk);
+        void enqueueJobIo(record, 'append stderr', () => appendJobLog(logFile, chunk));
     });
     child.on('exit', (code, signal) => {
         clearTimeout(timeout);
@@ -162,11 +235,22 @@ export async function spawnValidatorJob(validator, options = {}) {
         record.exitCode = code;
         record.signal = signal;
         record.process = null;
-        if (record.status === 'cancelled') return;
-        if (record.timedOut) return;
+        if (record.status === 'cancelled' || record.timedOut) {
+            void enqueueJobIo(record, 'finalize interrupted job', async () => {
+                await persistJobRecord(record);
+                pruneCompletedJobRecords(JOBS);
+            });
+            return;
+        }
         record.status = code === 0 ? 'completed' : 'failed';
-        void appendJobLog(logFile, `\n[job:${record.status}] exitCode=${String(code)} signal=${String(signal)}\n`);
-        void persistJobRecord(record);
+        void enqueueJobIo(record, 'finalize job', async () => {
+            await appendJobLog(
+                logFile,
+                `\n[job:${record.status}] exitCode=${String(code)} signal=${String(signal)}\n`,
+            );
+            await persistJobRecord(record);
+            pruneCompletedJobRecords(JOBS);
+        });
     });
 
     return publicJobRecord(record);
@@ -178,16 +262,10 @@ export async function spawnValidatorJob(validator, options = {}) {
  * @returns {Promise<{ job: Omit<JobRecord, 'process'> | null; output: string }>}
  */
 export async function readJobOutput(id, tailBytes = 24_000) {
+    if (!resolveJobArtifactPaths(id)) return { job: null, output: '' };
     const record = JOBS.get(id) ?? (await readJobManifest(id));
     if (!record) return { job: null, output: '' };
-    /** @type {string} */
-    let output;
-    try {
-        const content = await readFile(record.logFile, 'utf8');
-        output = content.length > tailBytes ? content.slice(content.length - tailBytes) : content;
-    } catch {
-        output = '';
-    }
+    const output = await readJobLogTail(id, tailBytes);
     return { job: publicJobRecord(record), output };
 }
 
@@ -196,6 +274,7 @@ export async function readJobOutput(id, tailBytes = 24_000) {
  * @returns {{ ok: boolean; job: Omit<JobRecord, 'process'> | null; message: string }}
  */
 export function cancelJob(id) {
+    if (!resolveJobArtifactPaths(id)) return { ok: false, job: null, message: 'Job not found.' };
     const record = JOBS.get(id);
     if (!record) return { ok: false, job: null, message: 'Job not found.' };
     if (!record.process || record.status !== 'running') {
@@ -204,8 +283,10 @@ export function cancelJob(id) {
     record.status = 'cancelled';
     record.endedAt = Date.now();
     record.process.kill('SIGTERM');
-    void appendJobLog(record.logFile, '\n[job:cancelled]\n');
-    void persistJobRecord(record);
+    void enqueueJobIo(record, 'persist cancellation', async () => {
+        await appendJobLog(record.logFile, '\n[job:cancelled]\n');
+        await persistJobRecord(record);
+    });
     return { ok: true, job: publicJobRecord(record), message: 'Job cancelled.' };
 }
 
@@ -257,7 +338,12 @@ function publicJobRecord(record) {
  */
 async function persistJobRecord(record) {
     await mkdir(MCP_JOBS_DIR, { recursive: true });
-    await writeFile(record.manifestFile, `${JSON.stringify(publicJobRecord(record), null, 2)}\n`, 'utf8');
+    await writeFileAtomic(record.manifestFile, `${JSON.stringify(publicJobRecord(record), null, 2)}\n`, {
+        encoding: 'utf8',
+        mode: 0o600,
+        riskClass: 'medium',
+        advisoryLimits: { domain: 'mcp-validator-job-manifest' },
+    });
 }
 
 /**
@@ -265,14 +351,61 @@ async function persistJobRecord(record) {
  * @returns {Promise<JobRecord | null>}
  */
 async function readJobManifest(id) {
-    const manifestFile = path.join(MCP_JOBS_DIR, `${id}.json`);
+    const artifacts = resolveJobArtifactPaths(id);
+    if (!artifacts) return null;
+    const { logFile, manifestFile } = artifacts;
     try {
+        const stats = await lstat(manifestFile);
+        if (stats.isSymbolicLink() || !stats.isFile() || stats.size > MAX_JOB_MANIFEST_BYTES) return null;
         const parsed = JSON.parse(await readFile(manifestFile, 'utf8'));
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
         if (!('id' in parsed) || parsed.id !== id) return null;
-        return /** @type {JobRecord} */ ({ ...parsed, manifestFile, process: null });
+        return /** @type {JobRecord} */ ({ ...parsed, logFile, manifestFile, process: null });
     } catch {
         return null;
+    }
+}
+
+/**
+ * @param {string} id
+ * @param {number} requestedTailBytes
+ * @returns {Promise<string>}
+ */
+async function readJobLogTail(id, requestedTailBytes) {
+    const artifacts = resolveJobArtifactPaths(id);
+    if (!artifacts) return '';
+    const tailBytes = Math.max(
+        1,
+        Math.min(
+            MAX_JOB_OUTPUT_TAIL_BYTES,
+            Number.isFinite(requestedTailBytes) ? Math.floor(requestedTailBytes) : 24_000,
+        ),
+    );
+    try {
+        const stats = await lstat(artifacts.logFile);
+        if (stats.isSymbolicLink() || !stats.isFile()) return '';
+        const bytesToRead = Math.min(stats.size, tailBytes);
+        if (bytesToRead <= 0) return '';
+        const buffer = Buffer.allocUnsafe(bytesToRead);
+        const handle = await open(artifacts.logFile, 'r');
+        try {
+            let offset = 0;
+            while (offset < bytesToRead) {
+                const { bytesRead } = await handle.read(
+                    buffer,
+                    offset,
+                    bytesToRead - offset,
+                    stats.size - bytesToRead + offset,
+                );
+                if (bytesRead <= 0) break;
+                offset += bytesRead;
+            }
+            return buffer.subarray(0, offset).toString('utf8');
+        } finally {
+            await handle.close();
+        }
+    } catch {
+        return '';
     }
 }
 

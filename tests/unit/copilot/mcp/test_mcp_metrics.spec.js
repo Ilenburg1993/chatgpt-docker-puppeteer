@@ -40,4 +40,28 @@ describe('MCP runtime metrics', () => {
         assert.equal(metric.phaseAverages['handler'].averageDurationMs, 23);
         assert.equal(metric.phaseAverages['auditCompletion'].averageDurationMs, 2);
     });
+
+    it('bounds dynamic tool and phase cardinality and safely handles special keys', () => {
+        for (let index = 0; index < 1100; index += 1) {
+            recordMcpToolMetric(`dynamic_${index}`, {
+                durationMs: index,
+                isError: false,
+            });
+        }
+        recordMcpToolMetric('__proto__', {
+            durationMs: 1,
+            isError: false,
+            phases: Object.fromEntries([
+                ...Array.from({ length: 70 }, (_, index) => [`phase_${index}`, index]),
+                ['__proto__', 1],
+            ]),
+        });
+
+        const snapshot = readMcpMetricsSnapshot();
+        assert.equal(snapshot.totals.tools, 1000);
+        assert.equal(snapshot.tools['dynamic_0'], undefined);
+        assert.equal(snapshot.tools['__proto__'].calls, 1);
+        assert.equal(Object.keys(snapshot.tools['__proto__'].phaseAverages).length, 64);
+        assert.equal(snapshot.tools['__proto__'].phaseAverages['__proto__'].calls, 1);
+    });
 });
