@@ -19,8 +19,9 @@
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { safeJsonParse } from '#copilot/core/safe-json';
 import { CustomToolsFileSchema } from '#copilot/core/schemas';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 import { readFileSync } from 'node:fs';
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -43,6 +44,9 @@ let _loadPromise = null;
 
 /** @type {boolean} */
 let _loaded = false;
+
+/** @type {Promise<void>} */
+let _persistQueue = Promise.resolve();
 
 /**
  * Injeta a factory `buildTool` de `tools/tool-factory`. Chamado uma vez durante o bootstrap.
@@ -291,14 +295,18 @@ export function initCustomTools(opts = {}) {
  *
  * @returns {Promise<void>}
  */
-async function _persistCustomToolsAsync() {
-    try {
-        const tmpPath = `${CUSTOM_TOOLS_PATH}.tmp`;
-        await writeFile(tmpPath, JSON.stringify([..._registry.values()], null, 2), 'utf8');
-        await rename(tmpPath, CUSTOM_TOOLS_PATH);
-    } catch (err) {
-        log('WARN', `[custom-tools-registry] Falha ao persistir custom-tools.json (async): ${toError(err).message}`);
-    }
+function _persistCustomToolsAsync() {
+    const content = `${JSON.stringify([..._registry.values()], null, 2)}\n`;
+    _persistQueue = _persistQueue
+        .catch(() => undefined)
+        .then(() => writeFileAtomicPortable(CUSTOM_TOOLS_PATH, content, { mode: 0o600 }))
+        .catch((err) => {
+            log(
+                'WARN',
+                `[custom-tools-registry] Falha ao persistir custom-tools.json (async): ${toError(err).message}`,
+            );
+        });
+    return _persistQueue;
 }
 
 /**

@@ -3,10 +3,14 @@
  * Non-mutating selection decision trace helpers.
  */
 
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { readFile, readdir, rm, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 export const DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR = 'data/copilot/model-gateway/selection-traces';
+
+/** @type {Promise<void>} */
+let selectionTracePersistQueue = Promise.resolve();
 
 /**
  * @param {unknown} value
@@ -21,7 +25,9 @@ function optionalString(value) {
  * @returns {Record<string, unknown> | null}
  */
 function optionalRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**
@@ -48,7 +54,12 @@ function optionalRouteBoolean(record, field) {
  */
 function normalizeTraceId(value) {
     const raw = optionalString(value) ?? `selection-${new Date().toISOString()}`;
-    return raw.replace(/[^A-Za-z0-9_.-]+/gu, '-').replace(/^-+|-+$/gu, '').slice(0, 120) || 'selection-trace';
+    return (
+        raw
+            .replace(/[^A-Za-z0-9_.-]+/gu, '-')
+            .replace(/^-+|-+$/gu, '')
+            .slice(0, 120) || 'selection-trace'
+    );
 }
 
 /**
@@ -78,7 +89,12 @@ function summarizeSelectedRoute(route) {
         canonicalModelId: optionalString(record['canonicalModelId']),
         routeProfile: optionalString(record['routeProfile']),
         routeOptionRef: optionalString(record['routeOptionRef']),
-        routeOptionRefs: Array.isArray(record['routeOptionRefs']) ? record['routeOptionRefs'].map(optionalString).filter((item) => item !== null).slice(0, 8) : [],
+        routeOptionRefs: Array.isArray(record['routeOptionRefs'])
+            ? record['routeOptionRefs']
+                  .map(optionalString)
+                  .filter((item) => item !== null)
+                  .slice(0, 8)
+            : [],
         selectorKind: optionalString(record['selectorKind']),
         routeLayer: optionalString(record['routeLayer']),
         wireApi: optionalString(record['wireApi']),
@@ -100,16 +116,25 @@ function summarizeSelectedRoute(route) {
             ? {
                   status: optionalString(accountAccess['status']),
                   canAttempt: accountAccess['canAttempt'] === true,
-                  secretConfigured: typeof accountAccess['secretConfigured'] === 'boolean' ? accountAccess['secretConfigured'] : null,
+                  secretConfigured:
+                      typeof accountAccess['secretConfigured'] === 'boolean' ? accountAccess['secretConfigured'] : null,
                   modelVisible: accountAccess['modelVisible'] === true,
                   failureClass: optionalString(accountAccess['failureClass']),
                   accessConfidence: optionalString(accountAccess['accessConfidence']),
-                  resetWindows: Array.isArray(accountAccess['resetWindows']) ? accountAccess['resetWindows'].filter(optionalRecord).slice(0, 4) : [],
+                  resetWindows: Array.isArray(accountAccess['resetWindows'])
+                      ? accountAccess['resetWindows'].filter(optionalRecord).slice(0, 4)
+                      : [],
                   hardReasons: Array.isArray(accountAccess['hardReasons'])
-                      ? accountAccess['hardReasons'].map(optionalString).filter((item) => item !== null).slice(0, 8)
+                      ? accountAccess['hardReasons']
+                            .map(optionalString)
+                            .filter((item) => item !== null)
+                            .slice(0, 8)
                       : [],
                   softReasons: Array.isArray(accountAccess['softReasons'])
-                      ? accountAccess['softReasons'].map(optionalString).filter((item) => item !== null).slice(0, 8)
+                      ? accountAccess['softReasons']
+                            .map(optionalString)
+                            .filter((item) => item !== null)
+                            .slice(0, 8)
                       : [],
               }
             : null,
@@ -181,26 +206,28 @@ function normalizeTraceRow(row) {
 function traceRowsByProfile(trace) {
     const record = optionalRecord(trace) ?? {};
     const rows = Array.isArray(record['rows']) ? record['rows'] : [];
-    return new Map(rows.map((row) => {
-        const normalized = normalizeTraceRow(row);
-        return [String(normalized['profileId']), normalized];
-    }));
+    return new Map(
+        rows.map((row) => {
+            const normalized = normalizeTraceRow(row);
+            return [String(normalized['profileId']), normalized];
+        }),
+    );
 }
 
 /**
  * @param {{
- *   snapshot?: Record<string, unknown>;
- *   integrity?: Record<string, unknown>;
- *   selection: Record<string, unknown>;
- *   postRuntimeSelection: Record<string, unknown>;
- *   selectionComparison: Record<string, unknown>;
- *   policyResolution: Record<string, unknown>;
- *   runtimeSource?: string;
- *   runtimeHealthRecordCount?: number;
- *   runtimeAccountOverlaySummary?: Record<string, unknown>;
- *   traceId?: string;
- *   generatedAt?: string | Date;
- *   source?: string;
+ *     snapshot?: Record<string, unknown>;
+ *     integrity?: Record<string, unknown>;
+ *     selection: Record<string, unknown>;
+ *     postRuntimeSelection: Record<string, unknown>;
+ *     selectionComparison: Record<string, unknown>;
+ *     policyResolution: Record<string, unknown>;
+ *     runtimeSource?: string;
+ *     runtimeHealthRecordCount?: number;
+ *     runtimeAccountOverlaySummary?: Record<string, unknown>;
+ *     traceId?: string;
+ *     generatedAt?: string | Date;
+ *     source?: string;
  * }} input
  * @returns {Record<string, unknown>}
  */
@@ -208,7 +235,7 @@ export function buildModelGatewaySelectionDecisionTrace(input) {
     const generatedAt =
         input.generatedAt instanceof Date
             ? input.generatedAt.toISOString()
-            : optionalString(input.generatedAt) ?? new Date().toISOString();
+            : (optionalString(input.generatedAt) ?? new Date().toISOString());
     const comparisonSummary = optionalRecord(input.selectionComparison['summary']) ?? {};
     const policySummary = optionalRecord(input.policyResolution['summary']) ?? {};
     const rows = Array.isArray(input.policyResolution['rows']) ? input.policyResolution['rows'] : [];
@@ -265,13 +292,13 @@ export function buildModelGatewaySelectionDecisionTrace(input) {
  * @param {Record<string, unknown>} trace
  * @param {{ directory?: string; fileName?: string; writeLatest?: boolean }} [options]
  * @returns {Promise<{
- *   schema: 'model-gateway-selection-decision-trace-persistence';
- *   ok: boolean;
- *   written: boolean;
- *   traceId: string;
- *   filePath: string | null;
- *   latestPath: string | null;
- *   error: string | null;
+ *     schema: 'model-gateway-selection-decision-trace-persistence';
+ *     ok: boolean;
+ *     written: boolean;
+ *     traceId: string;
+ *     filePath: string | null;
+ *     latestPath: string | null;
+ *     error: string | null;
  * }>}
  */
 export async function persistModelGatewaySelectionDecisionTrace(trace, options = {}) {
@@ -280,37 +307,41 @@ export async function persistModelGatewaySelectionDecisionTrace(trace, options =
     const fileName = `${normalizeTraceId(options.fileName ?? traceId)}.json`;
     const filePath = resolve(directory, fileName);
     const latestPath = options.writeLatest === false ? null : resolve(directory, 'latest.json');
-    try {
-        await mkdir(dirname(filePath), { recursive: true });
-        const payload = `${JSON.stringify(trace, null, 2)}\n`;
-        const temp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-        await writeFile(temp, payload, { encoding: 'utf8', mode: 0o600 });
-        await rename(temp, filePath);
-        if (latestPath) {
-            const latestTemp = `${latestPath}.tmp-${process.pid}-${Date.now()}`;
-            await writeFile(latestTemp, payload, { encoding: 'utf8', mode: 0o600 });
-            await rename(latestTemp, latestPath);
-        }
-        return {
-            schema: 'model-gateway-selection-decision-trace-persistence',
-            ok: true,
-            written: true,
-            traceId,
-            filePath,
-            latestPath,
-            error: null,
-        };
-    } catch (error) {
-        return {
-            schema: 'model-gateway-selection-decision-trace-persistence',
-            ok: false,
-            written: false,
-            traceId,
-            filePath: null,
-            latestPath: null,
-            error: error instanceof Error ? error.message : String(error),
-        };
-    }
+    const operation = selectionTracePersistQueue
+        .catch(() => undefined)
+        .then(async () => {
+            try {
+                const payload = `${JSON.stringify(trace, null, 2)}\n`;
+                await writeFileAtomicPortable(filePath, payload, { mode: 0o600 });
+                if (latestPath) {
+                    await writeFileAtomicPortable(latestPath, payload, { mode: 0o600 });
+                }
+                return {
+                    schema: /** @type {const} */ ('model-gateway-selection-decision-trace-persistence'),
+                    ok: true,
+                    written: true,
+                    traceId,
+                    filePath,
+                    latestPath,
+                    error: null,
+                };
+            } catch (error) {
+                return {
+                    schema: /** @type {const} */ ('model-gateway-selection-decision-trace-persistence'),
+                    ok: false,
+                    written: false,
+                    traceId,
+                    filePath: null,
+                    latestPath: null,
+                    error: error instanceof Error ? error.message : String(error),
+                };
+            }
+        });
+    selectionTracePersistQueue = operation.then(
+        () => undefined,
+        () => undefined,
+    );
+    return operation;
 }
 
 /**
@@ -326,29 +357,29 @@ export async function readModelGatewaySelectionDecisionTrace(filePath) {
  * @param {Record<string, unknown>} leftTrace
  * @param {Record<string, unknown>} rightTrace
  * @returns {{
- *   schema: 'model-gateway-selection-trace-diff';
- *   ok: boolean;
- *   left: { traceId: string | null; generatedAt: string | null; policyMode: string | null };
- *   right: { traceId: string | null; generatedAt: string | null; policyMode: string | null };
- *   summary: {
- *     profileCount: number;
- *     addedProfileCount: number;
- *     removedProfileCount: number;
- *     changedProfileCount: number;
- *     unchangedProfileCount: number;
- *     selectedRouteChangedCount: number;
- *     sourceChangedCount: number;
- *     runtimeProofChangedCount: number;
- *   };
- *   rows: Array<{
- *     profileId: string;
- *     status: 'added' | 'removed' | 'changed' | 'unchanged';
- *     selectedRouteChanged: boolean;
- *     sourceChanged: boolean;
- *     runtimeProofChanged: boolean;
- *     left: Record<string, unknown> | null;
- *     right: Record<string, unknown> | null;
- *   }>;
+ *     schema: 'model-gateway-selection-trace-diff';
+ *     ok: boolean;
+ *     left: { traceId: string | null; generatedAt: string | null; policyMode: string | null };
+ *     right: { traceId: string | null; generatedAt: string | null; policyMode: string | null };
+ *     summary: {
+ *         profileCount: number;
+ *         addedProfileCount: number;
+ *         removedProfileCount: number;
+ *         changedProfileCount: number;
+ *         unchangedProfileCount: number;
+ *         selectedRouteChangedCount: number;
+ *         sourceChangedCount: number;
+ *         runtimeProofChangedCount: number;
+ *     };
+ *     rows: {
+ *         profileId: string;
+ *         status: 'added' | 'removed' | 'changed' | 'unchanged';
+ *         selectedRouteChanged: boolean;
+ *         sourceChanged: boolean;
+ *         runtimeProofChanged: boolean;
+ *         left: Record<string, unknown> | null;
+ *         right: Record<string, unknown> | null;
+ *     }[];
  * }}
  */
 export function compareModelGatewaySelectionDecisionTraces(leftTrace, rightTrace) {
@@ -407,7 +438,7 @@ export function compareModelGatewaySelectionDecisionTraces(leftTrace, rightTrace
 
 /**
  * @param {{ directory?: string; limit?: number }} [options]
- * @returns {Promise<Array<{ name: string; filePath: string; mtimeMs: number; size: number }>>}
+ * @returns {Promise<{ name: string; filePath: string; mtimeMs: number; size: number }[]>}
  */
 export async function listModelGatewaySelectionDecisionTraceFiles(options = {}) {
     const directory = resolve(optionalString(options.directory) ?? DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR);
@@ -430,24 +461,26 @@ export async function listModelGatewaySelectionDecisionTraceFiles(options = {}) 
                 };
             }),
     );
-    return files.sort((left, right) => right.mtimeMs - left.mtimeMs || right.name.localeCompare(left.name)).slice(0, limit);
+    return files
+        .sort((left, right) => right.mtimeMs - left.mtimeMs || right.name.localeCompare(left.name))
+        .slice(0, limit);
 }
 
 /**
  * @param {{ directory?: string; maxFiles?: number; dryRun?: boolean }} [options]
  * @returns {Promise<{
- *   schema: 'model-gateway-selection-trace-retention';
- *   ok: boolean;
- *   directory: string;
- *   dryRun: boolean;
- *   maxFiles: number;
- *   candidateCount: number;
- *   retainedCount: number;
- *   prunedCount: number;
- *   deletedCount: number;
- *   retained: Array<{ name: string; filePath: string; mtimeMs: number; size: number }>;
- *   pruned: Array<{ name: string; filePath: string; mtimeMs: number; size: number }>;
- *   error: string | null;
+ *     schema: 'model-gateway-selection-trace-retention';
+ *     ok: boolean;
+ *     directory: string;
+ *     dryRun: boolean;
+ *     maxFiles: number;
+ *     candidateCount: number;
+ *     retainedCount: number;
+ *     prunedCount: number;
+ *     deletedCount: number;
+ *     retained: { name: string; filePath: string; mtimeMs: number; size: number }[];
+ *     pruned: { name: string; filePath: string; mtimeMs: number; size: number }[];
+ *     error: string | null;
  * }>}
  */
 export async function applyModelGatewaySelectionTraceRetention(options = {}) {

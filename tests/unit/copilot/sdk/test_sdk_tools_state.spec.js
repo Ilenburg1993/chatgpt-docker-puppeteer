@@ -1,10 +1,11 @@
 // @ts-check
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     readFile: vi.fn(),
     writeFile: vi.fn(),
+    writeFileAtomicPortable: vi.fn(),
     log: vi.fn(),
     logSwallowed: vi.fn(),
 }));
@@ -12,6 +13,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('node:fs/promises', () => ({
     readFile: mocks.readFile,
     writeFile: mocks.writeFile,
+}));
+
+vi.mock('#copilot/infra/public/io', () => ({
+    writeFileAtomicPortable: mocks.writeFileAtomicPortable,
 }));
 
 vi.mock('../../../../src/copilot/core/error-handlers.js', () => ({
@@ -40,6 +45,10 @@ vi.mock('../../../../src/copilot/sdk/logger.js', () => ({
 }));
 
 describe('sdk/tools/state', () => {
+    beforeEach(() => {
+        mocks.writeFileAtomicPortable.mockResolvedValue(undefined);
+    });
+
     afterEach(() => {
         vi.clearAllMocks();
     });
@@ -52,5 +61,36 @@ describe('sdk/tools/state', () => {
 
         expect(mocks.log).toHaveBeenCalledWith('DEBUG', expect.stringContaining('tools-config.json ausente'));
         expect(mocks.logSwallowed).not.toHaveBeenCalled();
+    });
+
+    it('serializa patches concorrentes e persiste o estado final por último', async () => {
+        const mod = await import('../../../../src/copilot/sdk/tools/state.js');
+        mod.resetToolsConfigForTests();
+        /** @type {(() => void) | undefined} */
+        let releaseFirst;
+        mocks.writeFileAtomicPortable
+            .mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        releaseFirst = resolve;
+                    }),
+            )
+            .mockResolvedValueOnce(undefined);
+
+        const first = mod.patchToolsConfig({ allowlist: ['read_file'] });
+        await Promise.resolve();
+        const second = mod.patchToolsConfig({ denylist: ['shell'] });
+        await Promise.resolve();
+
+        expect(mocks.writeFileAtomicPortable).toHaveBeenCalledTimes(1);
+        releaseFirst?.();
+        await Promise.all([first, second]);
+
+        expect(mocks.writeFileAtomicPortable).toHaveBeenCalledTimes(2);
+        const firstPayload = JSON.parse(String(mocks.writeFileAtomicPortable.mock.calls[0]?.[1]));
+        const secondPayload = JSON.parse(String(mocks.writeFileAtomicPortable.mock.calls[1]?.[1]));
+        expect(firstPayload).toEqual({ allowlist: ['read_file'], denylist: [] });
+        expect(secondPayload).toEqual({ allowlist: ['read_file'], denylist: ['shell'] });
+        expect(mocks.writeFileAtomicPortable.mock.calls[1]?.[2]).toEqual({ mode: 0o600 });
     });
 });

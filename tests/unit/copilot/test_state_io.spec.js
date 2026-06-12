@@ -14,9 +14,9 @@
 
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
 
 // Configurar AGENT_STATE_FILE antes de importar state-io para usar um diretório temporário
 const TEST_STATE_DIR = join(import.meta.dirname, '.tmp-state-io-test');
@@ -25,7 +25,8 @@ process.env.AGENT_STATE_FILE = TEST_STATE_FILE;
 
 // Importar após definir env
 const { readState, readStateAsync, writeState, writeStateAsync, clearState, clearStateAsync, persistStateWithPolicy } =
-    await import('#copilot/agent/lifecycle/state/state-io');
+    await import('../../../src/copilot/agent/lifecycle/state/state-io.js');
+const { stateFileIoTestHarness } = await import('../../../src/copilot/agent/lifecycle/state/state-file-io.js');
 
 describe('state-io', () => {
     beforeAll(() => {
@@ -37,6 +38,10 @@ describe('state-io', () => {
         if (existsSync(TEST_STATE_DIR)) {
             rmSync(TEST_STATE_DIR, { recursive: true, force: true });
         }
+    });
+
+    afterEach(() => {
+        stateFileIoTestHarness.resetStateFileWriter();
     });
 
     // ---------------------------------------------------------------------------
@@ -119,6 +124,16 @@ describe('state-io', () => {
                 assert.equal(result.value.sendCount, 7);
             }
         });
+
+        it('cria o diretório configurado e persiste o snapshot atomicamente com modo 0600', async () => {
+            await clearStateAsync();
+            rmSync(TEST_STATE_DIR, { recursive: true, force: true });
+
+            await writeStateAsync({ sessionId: 'private-state', sendCount: 1 });
+
+            assert.equal(existsSync(TEST_STATE_FILE), true);
+            assert.equal((await stat(TEST_STATE_FILE)).mode & 0o777, 0o600);
+        });
     });
 
     // ---------------------------------------------------------------------------
@@ -192,6 +207,47 @@ describe('state-io', () => {
             await clearStateAsync();
             assert.ok(!existsSync(TEST_STATE_FILE), 'arquivo deve ter sido removido');
             assert.equal(readState(), null, 'cache deve estar invalidado');
+        });
+
+        it('aguarda write em voo e impede que ele recrie o arquivo após clear', async () => {
+            await clearStateAsync();
+            const writerStarted = Promise.withResolvers();
+            const releaseWriter = Promise.withResolvers();
+            stateFileIoTestHarness.setStateFileWriter(async (filePath, content, options) => {
+                writerStarted.resolve(undefined);
+                await releaseWriter.promise;
+                await stateFileIoTestHarness.writeFileAtomicPortable(filePath, content, options);
+            });
+
+            const writePromise = writeStateAsync({ sessionId: 'stale-write', sendCount: 77 });
+            await writerStarted.promise;
+            const clearPromise = clearStateAsync();
+            releaseWriter.resolve(undefined);
+
+            await Promise.all([writePromise, clearPromise]);
+            assert.equal(existsSync(TEST_STATE_FILE), false);
+            assert.equal(await readStateAsync(), null);
+        });
+
+        it('não segue symlink ao ler o arquivo de estado', async () => {
+            await clearStateAsync();
+            const target = join(TEST_STATE_DIR, 'symlink-target.json');
+            await writeFile(
+                target,
+                JSON.stringify({
+                    sessionId: 'forged',
+                    startedAt: 1,
+                    resumedAt: 1,
+                    resumeCount: 0,
+                    sendCount: 0,
+                    model: 'auto',
+                    pendingQuestion: null,
+                }),
+                'utf8',
+            );
+            await symlink(target, TEST_STATE_FILE);
+
+            assert.equal(await readStateAsync(), null);
         });
     });
 });

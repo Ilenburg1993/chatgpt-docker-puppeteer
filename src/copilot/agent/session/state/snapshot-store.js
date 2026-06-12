@@ -5,16 +5,26 @@
  */
 
 import { resolveHooksStateDir } from '#copilot/boot';
-import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '#copilot/config/agent';
 import { safeJsonParse } from '#copilot/core';
-import { SessionSnapshotDataSchema, SnapshotListItemSchema } from '#copilot/core';
+import { SessionSnapshotDataSchema, SnapshotIdSchema, SnapshotListItemSchema } from '#copilot/core';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 import { logSwallowed } from '../../ports/core-runtime-port.js';
 import { log } from '../../ports/logging/index.js';
 import { startSpan } from '../../ports/tracing-port.js';
 
 const SNAPSHOT_DIR = _SNAPSHOT_DIR_ENV ? resolve(_SNAPSHOT_DIR_ENV) : resolve(resolveHooksStateDir(), 'snapshots');
+
+/**
+ * @param {unknown} snapshotId
+ * @returns {string | null}
+ */
+function normalizeSnapshotId(snapshotId) {
+    const parsed = SnapshotIdSchema.safeParse(snapshotId);
+    return parsed.success ? parsed.data : null;
+}
 
 /**
  * @typedef {import('./snapshot.js').SessionSnapshotData} SessionSnapshotData
@@ -50,12 +60,14 @@ export async function saveSnapshotFileAsync(snapshot) {
         'copilot.snapshot.save',
         { extra: { snapshotId: snapshot.snapshotId, reason: snapshot.reason ?? 'manual' } },
         async () => {
+            const snapshotId = normalizeSnapshotId(snapshot.snapshotId);
+            if (!snapshotId) throw new TypeError('Snapshot ID inválido para persistência.');
             await mkdir(SNAPSHOT_DIR, { recursive: true });
 
-            const filename = `${snapshot.snapshotId}.json`;
+            const filename = `${snapshotId}.json`;
             const filepath = join(SNAPSHOT_DIR, filename);
 
-            await writeFile(filepath, JSON.stringify(snapshot, null, 4), 'utf8');
+            await writeFileAtomicPortable(filepath, JSON.stringify(snapshot, null, 4), { mode: 0o600 });
             log('INFO', `[SessionSnapshot] Snapshot salvo (async): ${filepath}`);
 
             await pruneSnapshotFilesAsync();
@@ -79,6 +91,8 @@ export async function listSnapshotFilesAsync() {
     const result = [];
     for (const f of await readdir(SNAPSHOT_DIR)) {
         if (!f.endsWith('.json')) continue;
+        const fileSnapshotId = normalizeSnapshotId(f.slice(0, -'.json'.length));
+        if (!fileSnapshotId) continue;
         const filepath = join(SNAPSHOT_DIR, f);
         try {
             const text = await readFile(filepath, 'utf8');
@@ -90,8 +104,12 @@ export async function listSnapshotFilesAsync() {
                 continue;
             }
             const data = parsed.data;
+            if (data.snapshotId !== fileSnapshotId) {
+                log('WARN', `[SessionSnapshot] Snapshot inválido (${f}): snapshotId diverge do filename`);
+                continue;
+            }
             result.push({
-                snapshotId: String(data.snapshotId ?? f.replace('.json', '')),
+                snapshotId: fileSnapshotId,
                 createdAt: Number(data.createdAt ?? 0),
                 sessionId: data.sessionId ?? null,
                 model: String(data.model ?? 'unknown'),
@@ -112,41 +130,23 @@ export async function listSnapshotFilesAsync() {
  */
 export async function loadSnapshotFileAsync(snapshotId) {
     return startSpan('copilot.snapshot.load', { extra: { snapshotId } }, async () => {
+        const normalizedSnapshotId = normalizeSnapshotId(snapshotId);
+        if (!normalizedSnapshotId) return null;
         try {
             await access(SNAPSHOT_DIR);
         } catch {
             return null;
         }
 
-        const filepath = join(SNAPSHOT_DIR, `${snapshotId}.json`);
-        let fileExists = true;
-        try {
-            await access(filepath);
-        } catch {
-            fileExists = false;
-        }
-        if (!fileExists) {
-            const files = (await readdir(SNAPSHOT_DIR)).filter((f) => f.startsWith(snapshotId) && f.endsWith('.json'));
-            if (files.length === 0) return null;
-            const first = files[0];
-            if (!first) return null;
-            try {
-                const text = await readFile(join(SNAPSHOT_DIR, first), 'utf8');
-                const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${first}]`);
-                if (!jsonResult.ok) return null;
-                const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
-                return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
-            } catch {
-                return null;
-            }
-        }
+        const filepath = join(SNAPSHOT_DIR, `${normalizedSnapshotId}.json`);
 
         try {
             const text = await readFile(filepath, 'utf8');
             const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${filepath}]`);
             if (!jsonResult.ok) return null;
             const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
-            return parsed.success ? /** @type {SessionSnapshotData} */ (parsed.data) : null;
+            if (!parsed.success || parsed.data.snapshotId !== normalizedSnapshotId) return null;
+            return /** @type {SessionSnapshotData} */ (parsed.data);
         } catch {
             return null;
         }

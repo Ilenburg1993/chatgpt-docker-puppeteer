@@ -9,7 +9,14 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { writeFileAtomicPortable } = vi.hoisted(() => ({
+    writeFileAtomicPortable: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('#copilot/infra/public/io', () => ({ writeFileAtomicPortable }));
+
 import {
+    flushAliasPersistence,
     formatAliases,
     getAliases,
     removeAlias,
@@ -84,6 +91,35 @@ describe('alias-store setAlias', () => {
         const r = setAlias('/b', '/a');
         expect(r.ok).toBe(false);
         expect(r.error).toContain('Loop');
+    });
+
+    it('serializa snapshots fire-and-forget e persiste o estado mais novo por último', async () => {
+        await flushAliasPersistence();
+        writeFileAtomicPortable.mockClear();
+        let releaseFirst = () => {};
+        writeFileAtomicPortable.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    releaseFirst = resolve;
+                }),
+        );
+
+        setAlias('/first', '/echo first');
+        setAlias('/second', '/echo second');
+        await vi.waitFor(() => expect(writeFileAtomicPortable).toHaveBeenCalledTimes(1));
+        releaseFirst();
+        await flushAliasPersistence();
+
+        expect(writeFileAtomicPortable).toHaveBeenCalledTimes(2);
+        const firstSnapshot = String(writeFileAtomicPortable.mock.calls[0]?.[1]);
+        const secondSnapshot = String(writeFileAtomicPortable.mock.calls[1]?.[1]);
+        expect(firstSnapshot).toContain('/first');
+        expect(firstSnapshot).not.toContain('/second');
+        expect(secondSnapshot).toContain('/first');
+        expect(secondSnapshot).toContain('/second');
+        expect(writeFileAtomicPortable).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), {
+            mode: 0o600,
+        });
     });
 });
 

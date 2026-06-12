@@ -110,7 +110,7 @@ describe('always-alive.js › delegação para módulos extraídos', () => {
     });
 
     it('delegação de sessionId/shadow agora passa pela StateQueryFacade', () => {
-        assert.ok(src.includes("from './facades/index.js'"));
+        assert.ok(src.includes("from './facades/state-query-facade.js'"));
         assert.ok(src.includes('StateQueryFacade'));
         assert.ok(src.includes('this.#stateQueryFacade = new StateQueryFacade(this.ctx)'));
         assert.ok(src.includes('return this.#stateQueryFacade.sessionId'));

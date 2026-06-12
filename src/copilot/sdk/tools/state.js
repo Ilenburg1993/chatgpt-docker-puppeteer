@@ -12,10 +12,11 @@
  * @see EventBus
  */
 
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { safeJsonParse } from '#copilot/core/safe-json';
 import { ToolsConfigSchema } from '#copilot/core/schemas';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -28,6 +29,8 @@ const TOOLS_CONFIG_PATH = resolvePersistentConfigFile('tools-config.json');
  * @type {{ allowlist: string[] | null; denylist: string[] }}
  */
 let _toolsConfig = { allowlist: null, denylist: [] };
+/** @type {Promise<void>} */
+let _toolsConfigWriteQueue = Promise.resolve();
 
 /**
  * Reseta o estado em memória da configuração de tools para defaults.
@@ -38,6 +41,7 @@ let _toolsConfig = { allowlist: null, denylist: [] };
  */
 export function resetToolsConfigForTests() {
     _toolsConfig = { allowlist: null, denylist: [] };
+    _toolsConfigWriteQueue = Promise.resolve();
 }
 
 /**
@@ -83,11 +87,14 @@ export async function loadToolsConfigAsync() {
  * @returns {Promise<void>}
  */
 async function _persistToolsConfigAsync() {
-    try {
-        await writeFile(TOOLS_CONFIG_PATH, JSON.stringify(_toolsConfig, null, 2), 'utf8');
-    } catch (err) {
+    const payload = `${JSON.stringify(getToolsConfig(), null, 2)}\n`;
+    const write = _toolsConfigWriteQueue.then(() =>
+        writeFileAtomicPortable(TOOLS_CONFIG_PATH, payload, { mode: 0o600 }),
+    );
+    _toolsConfigWriteQueue = write.catch((err) => {
         log('WARN', `[tools-state] Falha ao persistir tools-config.json (async): ${toError(err).message}`);
-    }
+    });
+    await _toolsConfigWriteQueue;
 }
 
 /**

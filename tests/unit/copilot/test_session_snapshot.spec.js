@@ -1,6 +1,6 @@
 // @ts-check
 import assert from 'node:assert/strict';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
@@ -129,11 +129,51 @@ describe('session-snapshot', async () => {
             assert.ok(loaded);
             assert.equal(loaded.snapshotId, snap.snapshotId);
             assert.equal(loaded.sessionId, 'sess-abc');
+            assert.equal(statSync(path).mode & 0o777, 0o600);
         });
 
         it('retorna null para snapshot inexistente', async () => {
             const loaded = await mod.loadSnapshotAsync('nonexistent-id');
             assert.equal(loaded, null);
+        });
+
+        it('rejeita snapshotId com traversal no save e no load', async () => {
+            const snap = mod.createSnapshot({
+                sessionId: 'sess-safe',
+                model: 'gpt-4.1',
+                status: 'idle',
+                sendCount: 0,
+                dialogLoopActive: false,
+                dialogPaused: false,
+                pendingQuestion: null,
+            });
+            snap.snapshotId = '../snapshot-traversal-target';
+            const outsidePath = join(TEST_SNAPSHOT_DIR, '..', 'snapshot-traversal-target.json');
+            writeFileSync(outsidePath, JSON.stringify(snap), 'utf8');
+            try {
+                await assert.rejects(mod.saveSnapshotAsync(snap), /Snapshot ID inválido/u);
+                assert.equal(await mod.loadSnapshotAsync('../snapshot-traversal-target'), null);
+                assert.equal(existsSync(outsidePath), true);
+            } finally {
+                rmSync(outsidePath, { force: true });
+            }
+        });
+
+        it('ignora payload cujo snapshotId diverge do filename', async () => {
+            const snap = mod.createSnapshot({
+                sessionId: 'sess-safe',
+                model: 'gpt-4.1',
+                status: 'idle',
+                sendCount: 0,
+                dialogLoopActive: false,
+                dialogPaused: false,
+                pendingQuestion: null,
+            });
+            mkdirSync(TEST_SNAPSHOT_DIR, { recursive: true });
+            writeFileSync(join(TEST_SNAPSHOT_DIR, 'snap-safe-name.json'), JSON.stringify(snap), 'utf8');
+
+            assert.equal((await mod.listSnapshotsAsync()).length, 0);
+            assert.equal(await mod.loadSnapshotAsync('snap-safe-name'), null);
         });
     });
 

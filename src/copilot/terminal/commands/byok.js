@@ -11,55 +11,60 @@
 import fs from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-import { config as loadDotenv } from 'dotenv';
 import {
-    buildCatalogRefreshEventBatch,
-    buildCatalogRefreshStartedEvent,
-    buildModelGatewaySelectionDecisionTrace,
-    buildModelGatewayRuntimeProofCommands,
-    buildModelGatewayRuntimeStandbyPlan,
-    buildModelGatewayRuntimeSelectorPlan,
-    compareModelGatewaySelectionAudits,
-    buildEligibilityEvaluatedEvent,
-    buildModelGatewayPreBuildReadinessReport,
-    buildModelGatewayRouteCandidates,
-    buildModelGatewayPreKCompatibilityReport,
-    buildRouteDecisionEvent,
-    buildProbeCompletedEvent,
+    applyModelGatewayEligibilityToSnapshot,
     auditCatalogImporterSet,
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
+    buildCatalogRefreshEventBatch,
+    buildCatalogRefreshStartedEvent,
+    buildEligibilityEvaluatedEvent,
+    buildModelGatewayPreBuildReadinessReport,
+    buildModelGatewayPreKCompatibilityReport,
+    buildModelGatewayRouteCandidates,
+    buildModelGatewayRuntimeProofCommands,
+    buildModelGatewayRuntimeSelectorPlan,
+    buildModelGatewayRuntimeStandbyPlan,
+    buildModelGatewaySelectionDecisionTrace,
+    buildProbeCompletedEvent,
+    buildRouteDecisionEvent,
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
+    compareModelGatewaySelectionAudits,
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
-    applyModelGatewayEligibilityToSnapshot,
     evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayProviderEnvRequirements,
-    explainModelGatewayRuntimeAutomationPolicySources,
     explainModelGatewayAccountLimitOverlays,
     explainModelGatewayCatalogEntry,
-    explainModelGatewayProviderEntry,
     explainModelGatewayEligibilityDecision,
+    explainModelGatewayProviderEntry,
+    explainModelGatewayRuntimeAutomationPolicySources,
     explainModelGatewaySelectionComparison,
     flushAndMirrorByokProviderHealthToSqlite,
     flushByokProviderHealth,
     JsonModelGatewayCatalogStore,
     listByokProviderModelHealth,
     listModelGatewayCanonicalCommands,
-    listProviderGatewayTraits,
+    listModelGatewayRuntimeAutomationPolicyPresets,
     listProviderEndpointInventory,
+    listProviderGatewayTraits,
     listProviderWireProbeMatrix,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
+    persistModelGatewaySelectionDecisionTrace,
     planModelGatewayCatalogRefresh,
     planModelGatewayProbeBackoff,
     readByokProviderHealthState,
     readByokProviderModelHealth,
+    readModelGatewayRuntimeAutomationEffectivePolicy,
+    readModelGatewayRuntimeAutomationPolicy,
+    readModelGatewayRuntimeAutomationPolicyFile,
     recommendCatalogDiffProbes,
     recordByokProviderModelAgentProbeFailure,
     recordByokProviderModelAgentProbeSuccess,
@@ -67,13 +72,13 @@ import {
     recordByokProviderModelCallSuccess,
     recordByokProviderModelProbeResult,
     recordModelGatewayRouteDecision,
-    persistModelGatewaySelectionDecisionTrace,
     refreshModelGatewayCatalog,
-    resolveProviderGatewayTraits,
-    resolveProviderEndpointInventory,
-    renderModelGatewayLocalProviderOptInGuidance,
     renderModelGatewayCanonicalCommandLines,
+    renderModelGatewayLocalProviderOptInGuidance,
+    resolveModelGatewayRuntimeAutomationPolicyPreset,
     resolveModelGatewaySelectionPolicy,
+    resolveProviderEndpointInventory,
+    resolveProviderGatewayTraits,
     routeGatewayModels,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
@@ -82,38 +87,27 @@ import {
     runConfiguredByokVisionProbe,
     searchModelGatewayCatalogEntries,
     SqliteModelGatewayCatalogStore,
-    summarizeModelGatewayAccountOverlays,
-    summarizeModelGatewayLocalProviderOptInBlocks,
-    summarizeModelGatewayProviderQuotaCapabilities,
-    summarizeModelGatewayRuntimeAccountOverlays,
-    summarizeModelGatewayRefreshLogText,
-    summarizeModelGatewayProviderEnvRequirements,
-    summarizeProviderWireProbeMatrix,
     summarizeCanonicalModelProjectionDiff,
+    summarizeModelGatewayAccountOverlays,
     summarizeModelGatewayEligibilityDiff,
+    summarizeModelGatewayLocalProviderOptInBlocks,
+    summarizeModelGatewayProviderEnvRequirements,
+    summarizeModelGatewayProviderQuotaCapabilities,
+    summarizeModelGatewayRefreshLogText,
+    summarizeModelGatewayRuntimeAccountOverlays,
+    summarizeProviderWireProbeMatrix,
     toOpenAIModelCatalogList,
-    DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
-    listModelGatewayRuntimeAutomationPolicyPresets,
-    readModelGatewayRuntimeAutomationEffectivePolicy,
-    readModelGatewayRuntimeAutomationPolicy,
-    readModelGatewayRuntimeAutomationPolicyFile,
-    resolveModelGatewayRuntimeAutomationPolicyPreset,
     validateModelGatewayRuntimeAutomationPolicy,
     writeModelGatewayRuntimeAutomationPolicyFile,
 } from '#copilot/model-gateway';
+import { config as loadDotenv } from 'dotenv';
 
 import {
     discoverConfiguredByokModelsFromEnv,
     readConfiguredByokModelDiscoveryCacheFromEnv,
     readConfiguredByokProfilesFromEnv,
 } from '#copilot/config';
-import { listTerminalSdkSessionInventory } from '../frontend/gateways/session/index.js';
-import { readTerminalRuntimeState } from '../frontend/gateways/agent-runtime.js';
-import {
-    readTerminalByokGatewayProjectionFromEnv,
-    readTerminalByokProjection,
-    readTerminalConfigProjection,
-} from '../frontend/projections/config.js';
+import { classifyTerminalByokSdkBinding, isSameTerminalByokProviderBoundary } from '../byok/binding/index.js';
 import {
     applyTerminalByokGatewayAutoEffects,
     buildTerminalByokGatewayAutoStatus,
@@ -122,15 +116,16 @@ import {
     persistTerminalByokGatewayAutoEffectApplications,
     runTerminalByokGatewayPostTurnAutomation,
 } from '../byok/gateway/index.js';
+import { recordTerminalLiveByokModelSwitchDeferred, requestTerminalLiveByokModelSwitch } from '../byok/live/index.js';
 import { evaluateTerminalByokProbeBudget } from '../byok/policy/index.js';
+import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 import {
-    classifyTerminalByokSdkBinding,
-    isSameTerminalByokProviderBoundary,
-} from '../byok/binding/index.js';
-import {
-    recordTerminalLiveByokModelSwitchDeferred,
-    requestTerminalLiveByokModelSwitch,
-} from '../byok/live/index.js';
+    listTerminalSdkSessionInventory,
+    readTerminalByokGatewayProjectionFromEnv,
+    readTerminalByokProjection,
+    readTerminalConfigProjection,
+    readTerminalRuntimeState,
+} from '../frontend/index.js';
 import {
     terminalThemeDivider,
     terminalThemeHeadline,
@@ -138,7 +133,6 @@ import {
     terminalThemeRows,
     terminalThemeWrappedRow,
 } from '../state/theme/index.js';
-import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
@@ -174,7 +168,12 @@ const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
  */
 
 /**
- * @typedef {Awaited<ReturnType<typeof runConfiguredByokChatProbe>> | Awaited<ReturnType<typeof runConfiguredByokAgentProbe>> | Awaited<ReturnType<typeof runConfiguredByokStreamingProbe>> | Awaited<ReturnType<typeof runConfiguredByokJsonProbe>> | Awaited<ReturnType<typeof runConfiguredByokVisionProbe>>} ByokProbeResult
+ * @typedef {Awaited<ReturnType<typeof runConfiguredByokChatProbe>>
+ *     | Awaited<ReturnType<typeof runConfiguredByokAgentProbe>>
+ *     | Awaited<ReturnType<typeof runConfiguredByokStreamingProbe>>
+ *     | Awaited<ReturnType<typeof runConfiguredByokJsonProbe>>
+ *     | Awaited<ReturnType<typeof runConfiguredByokVisionProbe>>} ByokProbeResult
+ *
  * @typedef {'chat' | 'agent' | 'streaming' | 'json' | 'vision'} ByokProbeMode
  */
 
@@ -210,11 +209,17 @@ function renderByokAuthLine(auth) {
 }
 
 /**
- * @param {{ reasoningEffort?: boolean | null; sdkReasoningEffort?: boolean | null; vision?: boolean | null; contextWindowTokens?: number | null }} capabilities
+ * @param {{
+ *     reasoningEffort?: boolean | null;
+ *     sdkReasoningEffort?: boolean | null;
+ *     vision?: boolean | null;
+ *     contextWindowTokens?: number | null;
+ * }} capabilities
  * @returns {string}
  */
 function renderByokCapabilityLine(capabilities) {
-    const context = capabilities.contextWindowTokens == null ? 'contexto n/d' : `contexto ${capabilities.contextWindowTokens}`;
+    const context =
+        capabilities.contextWindowTokens == null ? 'contexto n/d' : `contexto ${capabilities.contextWindowTokens}`;
     return [
         `raciocínio ${yesNo(Boolean(capabilities.reasoningEffort))}`,
         `SDK ${yesNo(Boolean(capabilities.sdkReasoningEffort))}`,
@@ -242,7 +247,7 @@ function valueOrDash(value) {
 }
 
 /**
- * @param {Array<string | null | undefined | false>} parts
+ * @param {(string | null | undefined | false)[]} parts
  * @returns {string}
  */
 function joinTerminalSummary(parts) {
@@ -544,17 +549,12 @@ function printByokSdkSessionBoundaryHint(println, options = {}) {
         ? 'A seleção persistida será aplicada por uma nova sessão SDK.'
         : 'A seleção BYOK foi preparada no processo atual.';
     println(
-        terminalThemeRow(
-            'Próximo',
-            `${prefix} Troca de provedor/perfil entra no próximo boot: /session sdk next new.`,
-        ),
+        terminalThemeRow('Próximo', `${prefix} Troca de provedor/perfil entra no próximo boot: /session sdk next new.`),
     );
     println(
-        terminalThemeRow(
-            'Conversa',
-            '/restart reinicia só a conversa; não troca o provedor da sessão viva.',
-            { role: 'command' },
-        ),
+        terminalThemeRow('Conversa', '/restart reinicia só a conversa; não troca o provedor da sessão viva.', {
+            role: 'command',
+        }),
     );
     println(
         terminalThemeRow('Modelo vivo', '/byok model <id> só atua na sessão viva se o provedor/perfil já coincidem.', {
@@ -584,7 +584,11 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
             reason: `sessão viva não inspecionada: ${message}; seleção fica para o próximo boot`,
             source: 'terminal.byok_model',
         });
-        println(terminalThemeRow('Sessão viva', `não inspecionada · ${message}; seleção fica para o próximo boot`, { role: 'warn' }));
+        println(
+            terminalThemeRow('Sessão viva', `não inspecionada · ${message}; seleção fica para o próximo boot`, {
+                role: 'warn',
+            }),
+        );
         return;
     }
     if (!inventory.currentSessionId || !isSameTerminalByokProviderBoundary(summary, inventory.persistedByokBinding)) {
@@ -620,7 +624,11 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
             ),
         );
         if (request.reasoningAdjusted) {
-            println(terminalThemeRow('Raciocínio', `ajustado para ${request.currentReasoningEffort ?? 'off'}`, { role: 'warn' }));
+            println(
+                terminalThemeRow('Raciocínio', `ajustado para ${request.currentReasoningEffort ?? 'off'}`, {
+                    role: 'warn',
+                }),
+            );
         }
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -642,27 +650,58 @@ async function tryApplyLiveByokModelSwitch(summary, model, println) {
 /**
  * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {{
- *   freeTier?: boolean | null;
- *   pricing?: { prompt?: number | null; completion?: number | null; request?: number | null };
- *   rateLimits?: { maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null };
- *   provider?: string | null;
- *   profile?: string | null;
- *   source?: string;
- *   profileFreeTier?: boolean | null;
- *   profileCostSource?: string | null;
- *   profileCostDetail?: string | null;
- *   inputModalities?: string[];
- *   outputModalities?: string[];
- *   supportsReasoning?: boolean;
- *   capabilities?: Record<string, unknown>;
- *   gatewayId?: string | null;
- *   providerModel?: string | null;
- *   confidence?: string | null;
- *   providerOwner?: string | null;
- * } | undefined}
+ *           freeTier?: boolean | null;
+ *           pricing?: { prompt?: number | null; completion?: number | null; request?: number | null };
+ *           rateLimits?: {
+ *               maxRequestTokens?: number | null;
+ *               tokensPerMinute?: number | null;
+ *               requestsPerMinute?: number | null;
+ *               dailyRequests?: number | null;
+ *           };
+ *           provider?: string | null;
+ *           profile?: string | null;
+ *           source?: string;
+ *           profileFreeTier?: boolean | null;
+ *           profileCostSource?: string | null;
+ *           profileCostDetail?: string | null;
+ *           inputModalities?: string[];
+ *           outputModalities?: string[];
+ *           supportsReasoning?: boolean;
+ *           capabilities?: Record<string, unknown>;
+ *           gatewayId?: string | null;
+ *           providerModel?: string | null;
+ *           confidence?: string | null;
+ *           providerOwner?: string | null;
+ *       }
+ *     | undefined}
  */
 function getByokModelMetadata(model) {
-    return /** @type {{ byok?: { freeTier?: boolean | null; pricing?: { prompt?: number | null; completion?: number | null; request?: number | null }; rateLimits?: { maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }; provider?: string | null; profile?: string | null; source?: string; profileFreeTier?: boolean | null; profileCostSource?: string | null; profileCostDetail?: string | null; inputModalities?: string[]; outputModalities?: string[]; supportsReasoning?: boolean; capabilities?: Record<string, unknown>; gatewayId?: string | null; providerModel?: string | null; confidence?: string | null; providerOwner?: string | null } }} */ (model).byok;
+    return (/** @type {{
+    byok?: {
+        freeTier?: boolean | null;
+        pricing?: { prompt?: number | null; completion?: number | null; request?: number | null };
+        rateLimits?: {
+            maxRequestTokens?: number | null;
+            tokensPerMinute?: number | null;
+            requestsPerMinute?: number | null;
+            dailyRequests?: number | null;
+        };
+        provider?: string | null;
+        profile?: string | null;
+        source?: string;
+        profileFreeTier?: boolean | null;
+        profileCostSource?: string | null;
+        profileCostDetail?: string | null;
+        inputModalities?: string[];
+        outputModalities?: string[];
+        supportsReasoning?: boolean;
+        capabilities?: Record<string, unknown>;
+        gatewayId?: string | null;
+        providerModel?: string | null;
+        confidence?: string | null;
+        providerOwner?: string | null;
+    };
+}} */ (model)).byok;
 }
 
 /**
@@ -680,7 +719,11 @@ function supportsByokReasoning(model) {
  */
 function supportsByokTools(model) {
     const meta = getByokModelMetadata(model);
-    return booleanField(asRecord(meta?.capabilities), 'tools', booleanField(asRecord(model.capabilities?.supports), 'tools', true));
+    return booleanField(
+        asRecord(meta?.capabilities),
+        'tools',
+        booleanField(asRecord(model.capabilities?.supports), 'tools', true),
+    );
 }
 
 /**
@@ -689,7 +732,11 @@ function supportsByokTools(model) {
  */
 function supportsByokStreaming(model) {
     const meta = getByokModelMetadata(model);
-    return booleanField(asRecord(meta?.capabilities), 'streaming', booleanField(asRecord(model.capabilities?.supports), 'streaming', true));
+    return booleanField(
+        asRecord(meta?.capabilities),
+        'streaming',
+        booleanField(asRecord(model.capabilities?.supports), 'streaming', true),
+    );
 }
 
 /**
@@ -737,7 +784,9 @@ function optionalScalarString(value) {
  * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /**
@@ -752,9 +801,9 @@ function booleanField(record, key, fallback) {
 
 /**
  * O catálogo terminal vem do SDK/provedores como `RuntimeModelInfo`; o policy engine trabalha com registros do
- * model-gateway. Esta ponte mantém a decisão inicial auditável sem exigir que cada provider exponha metadados perfeitos.
- * Para BYOK OpenAI-compatible, tools ficam habilitadas por padrão salvo negação explícita, porque a probe agent é a
- * etapa que deve derrubar um falso positivo antes da promoção para a sessão viva.
+ * model-gateway. Esta ponte mantém a decisão inicial auditável sem exigir que cada provider exponha metadados
+ * perfeitos. Para BYOK OpenAI-compatible, tools ficam habilitadas por padrão salvo negação explícita, porque a probe
+ * agent é a etapa que deve derrubar um falso positivo antes da promoção para a sessão viva.
  *
  * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {Record<string, any>}
@@ -840,10 +889,17 @@ function toGatewayRouteCandidate(model) {
                 : freeCost
                   ? { outputUsdPerMillion: 0 }
                   : {}),
-            ...(finitePositiveNumber(meta?.pricing?.request) !== null ? { requestUsd: finitePositiveNumber(meta?.pricing?.request) } : {}),
+            ...(finitePositiveNumber(meta?.pricing?.request) !== null
+                ? { requestUsd: finitePositiveNumber(meta?.pricing?.request) }
+                : {}),
         },
         routing: {
-            tier: cost.kind === 'free' || cost.kind === 'profile-free' ? 'free' : cost.kind === 'metered' ? 'paid' : 'balanced',
+            tier:
+                cost.kind === 'free' || cost.kind === 'profile-free'
+                    ? 'free'
+                    : cost.kind === 'metered'
+                      ? 'paid'
+                      : 'balanced',
             useCases: [],
         },
         verification: {
@@ -891,25 +947,27 @@ function enrichGatewayRouteCandidatesWithRouteOptions(candidates, catalogSnapsho
     return candidates.flatMap((candidate) => {
         const matches = routeCandidatesByModel.get(gatewayRouteCandidateModelKey(candidate)) ?? [];
         if (matches.length === 0) return [candidate];
-        return matches.map(/** @param {Record<string, any>} routeCandidate */ (routeCandidate) => ({
-            ...candidate,
-            routeProfile: routeCandidate['routeProfile'],
-            selectorKind: routeCandidate['selectorKind'],
-            selectorSyntax: routeCandidate['selectorSyntax'],
-            routeOptionRef: routeCandidate['routeOptionRef'],
-            routeOptionRefs: routeCandidate['routeOptionRefs'],
-            normalizedPolicy: routeCandidate['normalizedPolicy'],
-            routeTraits: routeCandidate['routeTraits'],
-            routing: {
-                ...(asRecord(candidate['routing'])),
-                ...(asRecord(routeCandidate['routing'])),
-            },
-            provenance: {
-                ...(asRecord(candidate['provenance'])),
-                ...(asRecord(routeCandidate['provenance'])),
-                candidateSource: 'terminal_catalog_route_option',
-            },
-        }));
+        return matches.map(
+            /** @param {Record<string, any>} routeCandidate */ (routeCandidate) => ({
+                ...candidate,
+                routeProfile: routeCandidate['routeProfile'],
+                selectorKind: routeCandidate['selectorKind'],
+                selectorSyntax: routeCandidate['selectorSyntax'],
+                routeOptionRef: routeCandidate['routeOptionRef'],
+                routeOptionRefs: routeCandidate['routeOptionRefs'],
+                normalizedPolicy: routeCandidate['normalizedPolicy'],
+                routeTraits: routeCandidate['routeTraits'],
+                routing: {
+                    ...asRecord(candidate['routing']),
+                    ...asRecord(routeCandidate['routing']),
+                },
+                provenance: {
+                    ...asRecord(candidate['provenance']),
+                    ...asRecord(routeCandidate['provenance']),
+                    candidateSource: 'terminal_catalog_route_option',
+                },
+            }),
+        );
     });
 }
 
@@ -933,8 +991,8 @@ function textSuggestsFreeProfile(value) {
 }
 
 /**
- * Perfis BYOK podem declarar que a conta/plano atual tem cota gratuita mesmo quando o catálogo remoto não marca preço por
- * modelo. Isso não transforma o modelo em "free confirmado"; a UI mostra `profile-free` para preservar a origem da
+ * Perfis BYOK podem declarar que a conta/plano atual tem cota gratuita mesmo quando o catálogo remoto não marca preço
+ * por modelo. Isso não transforma o modelo em "free confirmado"; a UI mostra `profile-free` para preservar a origem da
  * inferência.
  *
  * @param {string | null | undefined} profileName
@@ -1012,7 +1070,12 @@ function renderByokProfileCostTag(profileName) {
 
 /**
  * @param {ReturnType<typeof readTerminalRuntimeState> | null} runtimeState
- * @returns {{ estimatedRequestTokens: number; contextTokens: number; tokenLimit: number | null; utilization: number | null } | null}
+ * @returns {{
+ *     estimatedRequestTokens: number;
+ *     contextTokens: number;
+ *     tokenLimit: number | null;
+ *     utilization: number | null;
+ * } | null}
  */
 function estimateCurrentByokRequestBudget(runtimeState) {
     const contextState = runtimeState?.contextWindow ?? null;
@@ -1117,7 +1180,25 @@ function classifyByokModelBudget(model, runtimeBudget = null) {
 
 /**
  * @param {string[]} rest
- * @returns {{ limit: number; activeOnly: boolean; freeOnly: boolean; meteredOnly: boolean; unknownCostOnly: boolean; provider: string | null; vision: boolean; reasoning: boolean; tools: boolean; streaming: boolean; probeVerified: boolean; minContext: number | null; minRequest: number | null; avoidLowLimit: boolean; forceRefresh: boolean; allProviders: boolean; grouped: boolean }}
+ * @returns {{
+ *     limit: number;
+ *     activeOnly: boolean;
+ *     freeOnly: boolean;
+ *     meteredOnly: boolean;
+ *     unknownCostOnly: boolean;
+ *     provider: string | null;
+ *     vision: boolean;
+ *     reasoning: boolean;
+ *     tools: boolean;
+ *     streaming: boolean;
+ *     probeVerified: boolean;
+ *     minContext: number | null;
+ *     minRequest: number | null;
+ *     avoidLowLimit: boolean;
+ *     forceRefresh: boolean;
+ *     allProviders: boolean;
+ *     grouped: boolean;
+ * }}
  */
 function parseRecommendArgs(rest) {
     const state = {
@@ -1166,7 +1247,18 @@ function parseRecommendArgs(rest) {
             state.tools = true;
         } else if (['streaming', 'stream', '--streaming', '--stream'].includes(item)) {
             state.streaming = true;
-        } else if (['probed', 'verified', 'probe-ok', 'agent-ok', '--probed', '--verified', '--probe-ok', '--agent-ok'].includes(item)) {
+        } else if (
+            [
+                'probed',
+                'verified',
+                'probe-ok',
+                'agent-ok',
+                '--probed',
+                '--verified',
+                '--probe-ok',
+                '--agent-ok',
+            ].includes(item)
+        ) {
             state.probeVerified = true;
         } else if (['safe', 'no-low-limit', '--safe', '--no-low-limit'].includes(item)) {
             state.avoidLowLimit = true;
@@ -1325,8 +1417,8 @@ function renderSafeRecommendationEvidenceDiagnostics(println, budgetSafeModels) 
 }
 
 /**
- * A shortlist agregada e uma mesa de admissao, não um segundo catalogo. Quando varios perfis entram no mesmo
- * ranking, o operador precisa ver por que um profile desapareceu antes de sondar o top-N.
+ * A shortlist agregada e uma mesa de admissao, não um segundo catalogo. Quando varios perfis entram no mesmo ranking, o
+ * operador precisa ver por que um profile desapareceu antes de sondar o top-N.
  *
  * @param {(text: string) => void} println
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
@@ -1378,7 +1470,9 @@ function renderByokShortlistProfileCoverage(
                 : shortlistCount === 0
                   ? ` · ação=/byok probe shortlist all-providers provider:${profile.name} 1`
                   : '';
-        println(terminalThemeWrappedRow(profile.name, `${coverage}${action}`, { role: 'muted', columns: 112, width: 24 }));
+        println(
+            terminalThemeWrappedRow(profile.name, `${coverage}${action}`, { role: 'muted', columns: 112, width: 24 }),
+        );
     }
     if (profiles.length > 12) {
         println(
@@ -1542,11 +1636,16 @@ function activeByokProjectionModelList(projection) {
 }
 
 /**
- * @param {{ rejected?: Array<{ rejectedReasons?: string[] }> }} route
+ * @param {{ rejected?: { rejectedReasons?: string[] }[] }} route
  * @returns {boolean}
  */
 function hasLocalProviderExplicitRequestRejection(route) {
-    return Array.isArray(route.rejected) && route.rejected.some((item) => item.rejectedReasons?.includes(MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON));
+    return (
+        Array.isArray(route.rejected) &&
+        route.rejected.some((item) =>
+            item.rejectedReasons?.includes(MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON),
+        )
+    );
 }
 
 /**
@@ -1578,14 +1677,18 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     const showRejected = routeArgs.some((item) => /^(rejected|show-rejected|--rejected|--show-rejected)$/iu.test(item));
     const strict = routeArgs.some((item) => /^(strict|verified|--strict|--verified)$/iu.test(item));
     const filters = normalizeRouteDiscoveryFilters(parseRecommendArgs(routeArgs), routeArgs, projection);
-    const activeLocalOptIn = routeArgsRequestActiveProjection(routeArgs) && activeProjectionSuggestsLocalProvider(projection);
+    const activeLocalOptIn =
+        routeArgsRequestActiveProjection(routeArgs) && activeProjectionSuggestsLocalProvider(projection);
     const runtimeBudget = readCurrentByokRequestBudget();
     const discovered = await discoverByokCatalogForCommand(projection, filters);
     const catalogSnapshot = await readByokGatewayCatalogSnapshotForRouting();
-    const modelList = rankByokModels(discovered.models.length > 0 ? discovered.models : projection.models).filter((model) =>
-        matchesRecommendFilters(model, filters, runtimeBudget),
+    const modelList = rankByokModels(discovered.models.length > 0 ? discovered.models : projection.models).filter(
+        (model) => matchesRecommendFilters(model, filters, runtimeBudget),
     );
-    const candidates = enrichGatewayRouteCandidatesWithRouteOptions(modelList.map(toGatewayRouteCandidate), catalogSnapshot);
+    const candidates = enrichGatewayRouteCandidatesWithRouteOptions(
+        modelList.map(toGatewayRouteCandidate),
+        catalogSnapshot,
+    );
     const filterLabel = renderByokFilterLabel(filters);
 
     println('');
@@ -1598,11 +1701,22 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
         ),
     );
     for (const error of discovered.errors.slice(0, 6)) {
-        println(terminalThemeWrappedRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
     }
     renderByokCatalogWarnings(println, discovered.warnings);
     if (candidates.length === 0) {
-        println(terminalThemeWrappedRow('Resultado', 'nenhum candidato encontrado para roteamento; remova filtros, use active/current ou rode /byok models refresh', { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Resultado',
+                'nenhum candidato encontrado para roteamento; remova filtros, use active/current ou rode /byok models refresh',
+                { role: 'warn', columns: 112 },
+            ),
+        );
         println('');
         return;
     }
@@ -1625,7 +1739,9 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        println(terminalThemeWrappedRow('Erro', `perfil de rota inválido: ${message}`, { role: 'error', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Erro', `perfil de rota inválido: ${message}`, { role: 'error', columns: 112 }),
+        );
         println(
             terminalThemeWrappedRow(
                 'Perfis conhecidos',
@@ -1694,7 +1810,13 @@ async function renderByokModelRoute(println, projection, rest, eventBus = null) 
     }
 
     if (route.fallbackChain.length > 0) {
-        println(terminalThemeWrappedRow('Cadeia de alternativas', `${route.fallbackChain.slice(0, 8).join(' -> ')}${route.fallbackChain.length > 8 ? ' -> ...' : ''}`, { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Cadeia de alternativas',
+                `${route.fallbackChain.slice(0, 8).join(' -> ')}${route.fallbackChain.length > 8 ? ' -> ...' : ''}`,
+                { role: 'muted', columns: 112 },
+            ),
+        );
     }
     if (showRejected && route.rejected.length > 0) {
         for (const rejected of route.rejected.slice(0, 8)) {
@@ -1735,7 +1857,11 @@ function isByokHealthCurrentlyFailed(health) {
 }
 
 /**
- * @param {{ agentProbeStatus?: 'failed' | 'ok' | null; lastAgentProbeFailureAt?: number | null; lastAgentProbeSuccessAt?: number | null }} health
+ * @param {{
+ *     agentProbeStatus?: 'failed' | 'ok' | null;
+ *     lastAgentProbeFailureAt?: number | null;
+ *     lastAgentProbeSuccessAt?: number | null;
+ * }} health
  * @returns {boolean}
  */
 function isByokAgentProbeCurrentlyFailed(health) {
@@ -1754,11 +1880,7 @@ function renderByokChatHealthEvidence(context) {
     if (!normalized) return 'histórico';
     if (normalized === 'byok_probe') return 'probe';
     if (normalized === 'llm.usage' || normalized === 'live_turn') return 'turno';
-    if (
-        normalized === 'model_call' ||
-        normalized.startsWith('session.') ||
-        normalized.startsWith('dialog.')
-    ) {
+    if (normalized === 'model_call' || normalized.startsWith('session.') || normalized.startsWith('dialog.')) {
         return 'turno';
     }
     return normalized.length > 24 ? `${normalized.slice(0, 21)}...` : normalized;
@@ -1796,8 +1918,8 @@ function isByokModelKnownFailed(model) {
 }
 
 /**
- * "safe" em recomendacao não pode significar apenas "não falhou ainda". O terminal opera como agente: para uma
- * selecao promovida ao operador, precisamos de evidencia positiva de tools + `ask_user` na sonda descartavel.
+ * "safe" em recomendacao não pode significar apenas "não falhou ainda". O terminal opera como agente: para uma selecao
+ * promovida ao operador, precisamos de evidencia positiva de tools + `ask_user` na sonda descartavel.
  *
  * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @returns {boolean}
@@ -1821,13 +1943,12 @@ function readHealthForByokProfile(profile) {
     });
     if (exact) return exact;
     return (
-        listByokProviderModelHealth().find(
-            (health) =>
-                Boolean(
-                    profile.model &&
-                        health.providerModel === profile.model &&
-                        (health.routeProfile === profile.name || providerCandidates.includes(health.providerId)),
-                ),
+        listByokProviderModelHealth().find((health) =>
+            Boolean(
+                profile.model &&
+                health.providerModel === profile.model &&
+                (health.routeProfile === profile.name || providerCandidates.includes(health.providerId)),
+            ),
         ) ?? null
     );
 }
@@ -1883,7 +2004,9 @@ function renderByokProbeHealthSummaries(health) {
     const protocolKinds = new Set(['live_ask_user', 'live_tool_protocol']);
     const capabilities = sorted.filter((probe) => capabilityKinds.has(String(probe.kind)));
     const protocol = sorted.filter((probe) => protocolKinds.has(String(probe.kind)));
-    const other = sorted.filter((probe) => !capabilityKinds.has(String(probe.kind)) && !protocolKinds.has(String(probe.kind)));
+    const other = sorted.filter(
+        (probe) => !capabilityKinds.has(String(probe.kind)) && !protocolKinds.has(String(probe.kind)),
+    );
     return [
         capabilities.length > 0 ? `capacidades ${capabilities.map(renderByokProbeHealthItem).join(' · ')}` : null,
         protocol.length > 0 ? `protocolo ${protocol.map(renderByokProbeHealthItem).join(' · ')}` : null,
@@ -1902,13 +2025,13 @@ function withByokCatalogSource(model, source) {
     const sourceProvider = source.preset ?? source.providerType ?? source.profileName ?? null;
     const providerScopedDiscoveryModel = ['remote', 'static'].includes(String(meta.source ?? ''));
     const shouldUseOperationalProvider = providerScopedDiscoveryModel && sourceProvider && !source.profileName;
-    const provider = shouldUseOperationalProvider ? sourceProvider : meta.provider ?? sourceProvider;
+    const provider = shouldUseOperationalProvider ? sourceProvider : (meta.provider ?? sourceProvider);
     return /** @type {import('../../presentation/contracts/index.js').RuntimeModelInfo} */ ({
         ...model,
         byok: {
             ...meta,
             provider,
-            providerOwner: shouldUseOperationalProvider ? meta.provider ?? null : meta.providerOwner ?? null,
+            providerOwner: shouldUseOperationalProvider ? (meta.provider ?? null) : (meta.providerOwner ?? null),
             profile: meta.profile ?? source.profileName ?? null,
             source: meta.source ?? source.preset ?? source.providerType ?? source.profileName ?? undefined,
             profileFreeTier: meta.profileFreeTier ?? profileCostHint.profileFreeTier,
@@ -1962,7 +2085,7 @@ function appendUniqueByokCatalogModels(models, additions) {
 /**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {ReturnType<typeof parseRecommendArgs>} filters
- * @returns {Array<ReturnType<typeof readTerminalByokProjection>['profiles'][number]>}
+ * @returns {ReturnType<typeof readTerminalByokProjection>['profiles'][number][]}
  */
 function selectProfilesForDiscovery(projection, filters) {
     const providerNeedle = filters.provider?.toLowerCase() ?? null;
@@ -1979,11 +2102,20 @@ function selectProfilesForDiscovery(projection, filters) {
 /**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {ReturnType<typeof parseRecommendArgs>} filters
- * @returns {Promise<{ models: import('../../presentation/contracts/index.js').RuntimeModelInfo[]; sourceLabel: string; endpoint: string | null; errors: string[]; warnings: string[]; profileCount: number }>}
+ * @returns {Promise<{
+ *     models: import('../../presentation/contracts/index.js').RuntimeModelInfo[];
+ *     sourceLabel: string;
+ *     endpoint: string | null;
+ *     errors: string[];
+ *     warnings: string[];
+ *     profileCount: number;
+ * }>}
  */
 async function discoverByokCatalogForCommand(projection, filters) {
     if (!filters.allProviders) {
-        const discovered = await discoverConfiguredByokModelsFromEnv(process.env, { forceRefresh: filters.forceRefresh });
+        const discovered = await discoverConfiguredByokModelsFromEnv(process.env, {
+            forceRefresh: filters.forceRefresh,
+        });
         const remoteAuthoritative = discovered.source === 'remote' || discovered.source === 'remote-cache';
         const gatewayModels = chooseByokCatalogModels(projection.gatewayModels, projection.models);
         const selectedModels = remoteAuthoritative
@@ -2042,7 +2174,12 @@ async function discoverByokCatalogForCommand(projection, filters) {
         sourceCounts.set(discovered.source, (sourceCounts.get(discovered.source) ?? 0) + 1);
         if (!endpoint && discovered.endpoint) endpoint = discovered.endpoint;
         if (discovered.error) errors.push(`${profile.name}: ${discovered.error}`);
-        warnings.push(...renderConfiguredByokCatalogWarnings(discovered, { profile: profile.name, provider: profile.preset ?? profile.providerType }));
+        warnings.push(
+            ...renderConfiguredByokCatalogWarnings(discovered, {
+                profile: profile.name,
+                provider: profile.preset ?? profile.providerType,
+            }),
+        );
         for (const model of profileModels) {
             models.push(
                 withByokCatalogSource(model, {
@@ -2064,7 +2201,8 @@ async function discoverByokCatalogForCommand(projection, filters) {
             )
             .filter((model) => matchesByokProviderFilter(model, filters.provider));
         const added = appendUniqueByokCatalogModels(models, gatewayFallbackModels);
-        if (added > 0) sourceCounts.set('model-gateway-static', (sourceCounts.get('model-gateway-static') ?? 0) + added);
+        if (added > 0)
+            sourceCounts.set('model-gateway-static', (sourceCounts.get('model-gateway-static') ?? 0) + added);
     }
     if (filters.activeOnly) {
         const added = appendUniqueByokCatalogModels(models, activeByokProjectionModelList(projection));
@@ -2135,7 +2273,11 @@ function buildByokProbeRecommendationInput(snapshot, diff, limit) {
 function renderConfiguredByokCatalogWarnings(discovered, source) {
     const configuredModel = discovered.configuredModel;
     if (!configuredModel?.authoritative || configuredModel.inCatalog !== false || !configuredModel.id) return [];
-    const owner = source.profile ? `perfil ${source.profile}` : source.provider ? `provedor ${source.provider}` : 'seleção ativa';
+    const owner = source.profile
+        ? `perfil ${source.profile}`
+        : source.provider
+          ? `provedor ${source.provider}`
+          : 'seleção ativa';
     const selector = source.profile ? ` profile:${source.profile}` : '';
     return [
         `${owner}: modelo configurado '${configuredModel.id}' não apareceu no catálogo remoto atual. O terminal não troca seletor silenciosamente; explore /byok models${selector ? ` all-providers${selector}` : ''} e valide um candidato com /byok probe agent${selector} model:<id> antes de /byok model <id>.`,
@@ -2172,7 +2314,9 @@ function renderModelTags(model) {
     const tags = [];
     tags.push(cost.label);
     if (cost.kind === 'profile-free') {
-        const detail = meta?.profileCostDetail ? String(meta.profileCostDetail).slice(0, 48) : meta?.profileCostSource ?? 'profile';
+        const detail = meta?.profileCostDetail
+            ? String(meta.profileCostDetail).slice(0, 48)
+            : (meta?.profileCostSource ?? 'profile');
         tags.push(`hint gratuito ${detail}`);
     }
     tags.push(supportsByokReasoning(model) ? 'raciocínio' : 'raciocínio n/d');
@@ -2181,7 +2325,10 @@ function renderModelTags(model) {
     }
     tags.push(model.capabilities?.supports?.vision ? 'visão' : 'visão n/d');
     tags.push(`contexto ${model.capabilities?.limits?.max_context_window_tokens ?? 'n/a'}`);
-    if (meta?.pricing && (meta.pricing.prompt !== null || meta.pricing.completion !== null || meta.pricing.request !== null)) {
+    if (
+        meta?.pricing &&
+        (meta.pricing.prompt !== null || meta.pricing.completion !== null || meta.pricing.request !== null)
+    ) {
         tags.push(`preço ${compactNumber(meta.pricing.prompt)}/${compactNumber(meta.pricing.completion)}`);
     }
     if (meta?.rateLimits?.maxRequestTokens) tags.push(`max req ${meta.rateLimits.maxRequestTokens}`);
@@ -2208,16 +2355,14 @@ function renderByokRecommendationActionHint(model) {
     const profile = meta?.profile ?? null;
     const profileSelector = profile ? ` profile:${profile}` : '';
     const probe = `/byok probe agent${profileSelector} model:${model.id}`;
-    const selection = profile
-        ? `/byok use ${profile} -> /byok model ${model.id}`
-        : `/byok model ${model.id}`;
+    const selection = profile ? `/byok use ${profile} -> /byok model ${model.id}` : `/byok model ${model.id}`;
     return `teste ${probe} · seleção ${selection}`;
 }
 
 /**
  * @param {(text: string) => void} println
  * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
- * @param {string} [variantLabel='']
+ * @param {string} [variantLabel=''] Default is `''`
  * @returns {void}
  */
 function renderByokModelCatalogRow(println, model, variantLabel = '') {
@@ -2230,7 +2375,7 @@ function renderByokModelCatalogRow(println, model, variantLabel = '') {
  * @param {number} index
  * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
  * @param {{ level: 'ok' | 'caution' | 'blocked'; label: string }} budget
- * @param {string} [variantLabel='']
+ * @param {string} [variantLabel=''] Default is `''`
  * @returns {void}
  */
 function renderByokRecommendationRow(println, index, model, budget, variantLabel = '') {
@@ -2471,7 +2616,9 @@ async function renderStatus(projection, println) {
         }),
     );
     println(terminalThemeRow('Perfil', `${valueOrDash(summary.profile)} · preset ${valueOrDash(summary.preset)}`));
-    println(terminalThemeRow('Provedor', `${valueOrDash(summary.providerType)} · base ${valueOrDash(summary.baseUrl)}`));
+    println(
+        terminalThemeRow('Provedor', `${valueOrDash(summary.providerType)} · base ${valueOrDash(summary.baseUrl)}`),
+    );
     const modelParts = [
         valueOrDash(summary.model),
         summary.wireApi ? `protocolo ${renderByokWireLabel(summary.wireApi)}` : null,
@@ -2521,18 +2668,20 @@ async function renderStatus(projection, println) {
         println(terminalThemeRow('Custo', costTag.replace(/^ · /u, '')));
     }
     println(
-        terminalThemeRow('Catálogo', `${summary.modelList.count} ${summary.modelList.count === 1 ? 'modelo' : 'modelos'}`),
+        terminalThemeRow(
+            'Catálogo',
+            `${summary.modelList.count} ${summary.modelList.count === 1 ? 'modelo' : 'modelos'}`,
+        ),
     );
-    const gateway =
-        projection.modelGateway ?? {
-            source: 'unavailable',
-            active: { modelId: null },
-            diagnostics: {
-                providerCount: 0,
-                modelCount: projection.models.length,
-                enabledModelCount: projection.models.length,
-            },
-        };
+    const gateway = projection.modelGateway ?? {
+        source: 'unavailable',
+        active: { modelId: null },
+        diagnostics: {
+            providerCount: 0,
+            modelCount: projection.models.length,
+            enabledModelCount: projection.models.length,
+        },
+    };
     println(
         terminalThemeRow(
             'Gateway',
@@ -2554,11 +2703,17 @@ async function renderStatus(projection, println) {
         );
         println(terminalThemeRow('Preparada', binding.preparedLabel));
         println(
-            terminalThemeRow('Sessão viva', `${inventory.currentSessionId ? 'ativa' : 'sem sessão viva'} · ${binding.liveLabel}`),
+            terminalThemeRow(
+                'Sessão viva',
+                `${inventory.currentSessionId ? 'ativa' : 'sem sessão viva'} · ${binding.liveLabel}`,
+            ),
         );
         println(
             terminalThemeRow('Fronteira', binding.headline, {
-                role: binding.state === 'next-boot-required' || binding.state === 'selection-incomplete' ? 'warn' : 'muted',
+                role:
+                    binding.state === 'next-boot-required' || binding.state === 'selection-incomplete'
+                        ? 'warn'
+                        : 'muted',
             }),
         );
         if (binding.action) println(terminalThemeRow('Ação', binding.action, { role: 'command' }));
@@ -2580,10 +2735,22 @@ async function renderStatus(projection, println) {
         ),
     );
     printByokSdkSessionBoundaryHint(println);
-    println(terminalThemeRow('Rotina', '/byok providers · /byok profiles · /byok models · /byok recommend', { role: 'command' }));
-    println(terminalThemeRow('Trocar', '/byok use <perfil|sdk> · /byok model <id> · /byok provider <preset>', { role: 'command' }));
-    println(terminalThemeRow('Provar', '/byok probe chat · /byok probe agent · /byok probe shortlist', { role: 'command' }));
-    println(terminalThemeRow('Avançado', '/byok gateway commands · /byok auto policy · /byok env', { role: 'command' }));
+    println(
+        terminalThemeRow('Rotina', '/byok providers · /byok profiles · /byok models · /byok recommend', {
+            role: 'command',
+        }),
+    );
+    println(
+        terminalThemeRow('Trocar', '/byok use <perfil|sdk> · /byok model <id> · /byok provider <preset>', {
+            role: 'command',
+        }),
+    );
+    println(
+        terminalThemeRow('Provar', '/byok probe chat · /byok probe agent · /byok probe shortlist', { role: 'command' }),
+    );
+    println(
+        terminalThemeRow('Avançado', '/byok gateway commands · /byok auto policy · /byok env', { role: 'command' }),
+    );
     println(terminalThemeDivider(66));
     println('');
 }
@@ -2623,14 +2790,21 @@ async function renderByokModelSwitchSummary(projection, println) {
         );
         println(
             terminalThemeRow('Fronteira', binding.headline, {
-                role: binding.state === 'next-boot-required' || binding.state === 'selection-incomplete' ? 'warn' : 'muted',
+                role:
+                    binding.state === 'next-boot-required' || binding.state === 'selection-incomplete'
+                        ? 'warn'
+                        : 'muted',
             }),
         );
         const compactAction = compactByokModelAction(binding.action);
         if (compactAction) println(terminalThemeRow('Ação', compactAction, { role: 'command' }));
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        println(terminalThemeRow('Sessão viva', `indisponível · ${message}; seleção fica preparada para o próximo boot`, { role: 'warn' }));
+        println(
+            terminalThemeRow('Sessão viva', `indisponível · ${message}; seleção fica preparada para o próximo boot`, {
+                role: 'warn',
+            }),
+        );
     }
 }
 
@@ -2648,7 +2822,9 @@ function renderByokHealth(println, scope = {}) {
         return true;
     });
     println('');
-    println(terminalThemeHeadline('tool', 'Saúde operacional BYOK', [countLabel(records.length, 'registro', 'registros')]));
+    println(
+        terminalThemeHeadline('tool', 'Saúde operacional BYOK', [countLabel(records.length, 'registro', 'registros')]),
+    );
     println(
         terminalThemeWrappedRow(
             'Persistência',
@@ -2667,7 +2843,11 @@ function renderByokHealth(println, scope = {}) {
     }
     if (state.error) println(terminalThemeWrappedRow('Erro', state.error, { role: 'error', columns: 112 }));
     if (records.length === 0) {
-        println(terminalThemeRow('Resultado', 'nenhum turno BYOK real registrou sucesso ou falha neste estado ainda', { role: 'muted' }));
+        println(
+            terminalThemeRow('Resultado', 'nenhum turno BYOK real registrou sucesso ou falha neste estado ainda', {
+                role: 'muted',
+            }),
+        );
         println('');
         return;
     }
@@ -2684,9 +2864,15 @@ function renderByokHealth(println, scope = {}) {
         ].filter(Boolean);
         println(terminalThemeWrappedRow('Registro', record.key, { role: 'warn', columns: 112 }));
         println(terminalThemeWrappedRow('Estado', parts.join(' · '), { role: 'muted', columns: 112 }));
-        if (record.lastMessage) println(terminalThemeWrappedRow('Último erro', record.lastMessage, { role: 'muted', columns: 112 }));
+        if (record.lastMessage)
+            println(terminalThemeWrappedRow('Último erro', record.lastMessage, { role: 'muted', columns: 112 }));
         if (record.lastErrorContext) println(terminalThemeRow('Contexto', record.lastErrorContext, { role: 'muted' }));
-        if (record.lastFailureKind || record.lastFailureStatusCode || record.lastRetryAfterSeconds || record.lastResetAt) {
+        if (
+            record.lastFailureKind ||
+            record.lastFailureStatusCode ||
+            record.lastRetryAfterSeconds ||
+            record.lastResetAt
+        ) {
             const failureBits = [
                 record.lastFailureKind ? `tipo ${record.lastFailureKind}` : null,
                 record.lastFailureStatusCode ? `http ${record.lastFailureStatusCode}` : null,
@@ -2696,9 +2882,12 @@ function renderByokHealth(println, scope = {}) {
             println(terminalThemeWrappedRow('Limite/falha', failureBits.join(' · '), { role: 'warn', columns: 112 }));
         }
         if (record.lastAgentProbeMessage) {
-            println(terminalThemeWrappedRow('Erro agente', record.lastAgentProbeMessage, { role: 'muted', columns: 112 }));
+            println(
+                terminalThemeWrappedRow('Erro agente', record.lastAgentProbeMessage, { role: 'muted', columns: 112 }),
+            );
         }
-        if (record.lastAgentProbeErrorContext) println(terminalThemeRow('Contexto agente', record.lastAgentProbeErrorContext, { role: 'muted' }));
+        if (record.lastAgentProbeErrorContext)
+            println(terminalThemeRow('Contexto agente', record.lastAgentProbeErrorContext, { role: 'muted' }));
     }
     if (records.length > visibleLimit) {
         println(
@@ -2747,7 +2936,11 @@ function renderByokProviderEndpointInventory(println, rest) {
         : listProviderEndpointInventory();
 
     println('');
-    println(terminalThemeHeadline('tool', 'BYOK endpoints de provedores', [countLabel(inventories.length, 'provedor', 'provedores')]));
+    println(
+        terminalThemeHeadline('tool', 'BYOK endpoints de provedores', [
+            countLabel(inventories.length, 'provedor', 'provedores'),
+        ]),
+    );
     println(
         terminalThemeWrappedRow(
             'Escopo',
@@ -2757,7 +2950,12 @@ function renderByokProviderEndpointInventory(println, rest) {
     );
 
     if (inventories.length === 0) {
-        println(terminalThemeWrappedRow('Estado', `provedor não encontrado no inventário: ${selector ?? '-'}`, { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Estado', `provedor não encontrado no inventário: ${selector ?? '-'}`, {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -2770,18 +2968,45 @@ function renderByokProviderEndpointInventory(println, rest) {
                 { role: 'warn', columns: 112 },
             ),
         );
-        println(terminalThemeWrappedRow('Bases', `${inventory.baseUrls.slice(0, 3).join(' · ')}${inventory.baseUrls.length > 3 ? ' · ...' : ''}`, { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Bases',
+                `${inventory.baseUrls.slice(0, 3).join(' · ')}${inventory.baseUrls.length > 3 ? ' · ...' : ''}`,
+                { role: 'muted', columns: 112 },
+            ),
+        );
         const sources = inventory.modelCatalogSources
             .slice(0, 3)
             .map((source) => `${source.method} ${source.url} (${renderByokTokenLabel(source.richness)})`);
-        println(terminalThemeWrappedRow('Catálogo', `${sources.join(' · ')}${inventory.modelCatalogSources.length > 3 ? ' · ...' : ''}`, { role: 'muted', columns: 112 }));
-        const runtime = inventory.runtimeEndpoints
-            .slice(0, 4)
-            .map((endpoint) => `${endpoint.method} ${endpoint.path}`);
-        println(terminalThemeWrappedRow('Execução', `${runtime.join(' · ')}${inventory.runtimeEndpoints.length > 4 ? ' · ...' : ''}`, { role: 'muted', columns: 112 }));
-        println(terminalThemeWrappedRow('Seletores', renderByokTokenList(inventory.routeSelectors.map(String)), { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Catálogo',
+                `${sources.join(' · ')}${inventory.modelCatalogSources.length > 3 ? ' · ...' : ''}`,
+                { role: 'muted', columns: 112 },
+            ),
+        );
+        const runtime = inventory.runtimeEndpoints.slice(0, 4).map((endpoint) => `${endpoint.method} ${endpoint.path}`);
+        println(
+            terminalThemeWrappedRow(
+                'Execução',
+                `${runtime.join(' · ')}${inventory.runtimeEndpoints.length > 4 ? ' · ...' : ''}`,
+                { role: 'muted', columns: 112 },
+            ),
+        );
+        println(
+            terminalThemeWrappedRow('Seletores', renderByokTokenList(inventory.routeSelectors.map(String)), {
+                role: 'muted',
+                columns: 112,
+            }),
+        );
     }
-    println(terminalThemeWrappedRow('Próximo', 'importadores de catálogo usam este mapa antes de elegibilidade, sondas e seleção de execução', { role: 'command', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Próximo',
+            'importadores de catálogo usam este mapa antes de elegibilidade, sondas e seleção de execução',
+            { role: 'command', columns: 112 },
+        ),
+    );
     println('');
 }
 
@@ -2803,7 +3028,9 @@ function matchesByokImporterSelector(importer, selector) {
  * @returns {void}
  */
 function renderByokGatewayImporterAudit(println, rest) {
-    const selector = optionalScalarString(rest.find((item) => !/^(importers|importer|audit|auditoria|coverage|cobertura)$/iu.test(item)));
+    const selector = optionalScalarString(
+        rest.find((item) => !/^(importers|importer|audit|auditoria|coverage|cobertura)$/iu.test(item)),
+    );
     const allImporters = createDefaultModelGatewayCatalogImporters({ env: process.env });
     const importers = allImporters.filter((importer) => matchesByokImporterSelector(importer, selector));
     const inventories = selector
@@ -2830,16 +3057,31 @@ function renderByokGatewayImporterAudit(println, rest) {
             { role: 'muted', columns: 112 },
         ),
     );
-    println(terminalThemeWrappedRow('Escopo', 'auditoria local e pré-execução · sem rede · sem runtime · sem segredos', { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow('Escopo', 'auditoria local e pré-execução · sem rede · sem runtime · sem segredos', {
+            role: 'muted',
+            columns: 112,
+        }),
+    );
 
     if (selector && inventories.length === 0) {
-        println(terminalThemeWrappedRow('Estado', `provedor não encontrado no inventário: ${selector}`, { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Estado', `provedor não encontrado no inventário: ${selector}`, {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
 
     if (audit.descriptors.length === 0) {
-        println(terminalThemeWrappedRow('Estado', `nenhum importer configurado para ${selector ?? 'o ambiente atual'}`, { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Estado', `nenhum importer configurado para ${selector ?? 'o ambiente atual'}`, {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
     } else {
         for (const descriptor of audit.descriptors.slice(0, 32)) {
             const hookTags = Object.entries(descriptor.hooks)
@@ -2854,18 +3096,50 @@ function renderByokGatewayImporterAudit(println, rest) {
                     { role: 'warn', columns: 112 },
                 ),
             );
-            println(terminalThemeWrappedRow('Etapas', `${hookTags || '-'} · env ${envRequirements}`, { role: 'muted', columns: 112 }));
+            println(
+                terminalThemeWrappedRow('Etapas', `${hookTags || '-'} · env ${envRequirements}`, {
+                    role: 'muted',
+                    columns: 112,
+                }),
+            );
         }
-        if (audit.descriptors.length > 32) println(terminalThemeWrappedRow('Omitidos', `exibindo 32/${audit.descriptors.length}; filtre com provider id`, { role: 'muted', columns: 112 }));
+        if (audit.descriptors.length > 32)
+            println(
+                terminalThemeWrappedRow('Omitidos', `exibindo 32/${audit.descriptors.length}; filtre com provider id`, {
+                    role: 'muted',
+                    columns: 112,
+                }),
+            );
     }
 
     const uncovered = audit.uncoveredCatalogSourceIds.slice(0, 12).join(', ');
     const missingHooks = audit.missingRequiredHooks.slice(0, 12).join(', ');
     const providersWithoutImporters = audit.providersWithoutImporters.slice(0, 12).join(', ');
-    println(terminalThemeWrappedRow('Sem cobertura', uncovered || '-', { role: uncovered ? 'warn' : 'success', columns: 112 }));
-    println(terminalThemeWrappedRow('Sem importador', providersWithoutImporters || '-', { role: providersWithoutImporters ? 'warn' : 'success', columns: 112 }));
-    println(terminalThemeWrappedRow('Etapas ausentes', missingHooks || '-', { role: missingHooks ? 'warn' : 'success', columns: 112 }));
-    println(terminalThemeWrappedRow('Próximo', 'use antes de atualizar catálogo para priorizar importers, docs e overlays de conta', { role: 'command', columns: 112 }));
+    println(
+        terminalThemeWrappedRow('Sem cobertura', uncovered || '-', {
+            role: uncovered ? 'warn' : 'success',
+            columns: 112,
+        }),
+    );
+    println(
+        terminalThemeWrappedRow('Sem importador', providersWithoutImporters || '-', {
+            role: providersWithoutImporters ? 'warn' : 'success',
+            columns: 112,
+        }),
+    );
+    println(
+        terminalThemeWrappedRow('Etapas ausentes', missingHooks || '-', {
+            role: missingHooks ? 'warn' : 'success',
+            columns: 112,
+        }),
+    );
+    println(
+        terminalThemeWrappedRow(
+            'Próximo',
+            'use antes de atualizar catálogo para priorizar importers, docs e overlays de conta',
+            { role: 'command', columns: 112 },
+        ),
+    );
     println('');
 }
 
@@ -2875,13 +3149,19 @@ function renderByokGatewayImporterAudit(println, rest) {
  * @returns {void}
  */
 function renderByokProviderGatewayTraits(println, rest) {
-    const selector = optionalScalarString(rest.find((item) => !/^(traits|trait|caracteristicas|características)$/iu.test(item)));
+    const selector = optionalScalarString(
+        rest.find((item) => !/^(traits|trait|caracteristicas|características)$/iu.test(item)),
+    );
     const traits = selector
         ? [resolveProviderGatewayTraits(selector)].filter((item) => item !== null)
         : listProviderGatewayTraits();
 
     println('');
-    println(terminalThemeHeadline('tool', 'BYOK características de provedores', [countLabel(traits.length, 'provedor', 'provedores')]));
+    println(
+        terminalThemeHeadline('tool', 'BYOK características de provedores', [
+            countLabel(traits.length, 'provedor', 'provedores'),
+        ]),
+    );
     println(
         terminalThemeWrappedRow(
             'Escopo',
@@ -2891,7 +3171,12 @@ function renderByokProviderGatewayTraits(println, rest) {
     );
 
     if (traits.length === 0) {
-        println(terminalThemeWrappedRow('Estado', `provedor não encontrado para características: ${selector ?? '-'}`, { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Estado', `provedor não encontrado para características: ${selector ?? '-'}`, {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -2900,9 +3185,15 @@ function renderByokProviderGatewayTraits(println, rest) {
         const capabilities = asRecord(item['capabilities']);
         const routing = asRecord(item['routing']);
         const metadata = asRecord(item['metadata']);
-        const routeSelectors = Array.isArray(item['routeSelectors']) ? renderByokTokenList(item['routeSelectors'].slice(0, 6).map(String)) : '-';
-        const richnessTags = Array.isArray(item['richnessTags']) ? renderByokTokenList(item['richnessTags'].slice(0, 8).map(String)) : '-';
-        const richnessCategories = Array.isArray(item['richnessCategories']) ? renderByokTokenList(item['richnessCategories'].slice(0, 8).map(String)) : '-';
+        const routeSelectors = Array.isArray(item['routeSelectors'])
+            ? renderByokTokenList(item['routeSelectors'].slice(0, 6).map(String))
+            : '-';
+        const richnessTags = Array.isArray(item['richnessTags'])
+            ? renderByokTokenList(item['richnessTags'].slice(0, 8).map(String))
+            : '-';
+        const richnessCategories = Array.isArray(item['richnessCategories'])
+            ? renderByokTokenList(item['richnessCategories'].slice(0, 8).map(String))
+            : '-';
         println(
             terminalThemeWrappedRow(
                 'Provedor',
@@ -2918,7 +3209,11 @@ function renderByokProviderGatewayTraits(println, rest) {
             ),
         );
         println(
-            terminalThemeWrappedRow('Execução', `tipos ${Array.isArray(item['runtimeKinds']) ? renderByokTokenList(item['runtimeKinds'].map(String)) || '-' : '-'} · seletores ${routeSelectors}`, { role: 'muted', columns: 112 }),
+            terminalThemeWrappedRow(
+                'Execução',
+                `tipos ${Array.isArray(item['runtimeKinds']) ? renderByokTokenList(item['runtimeKinds'].map(String)) || '-' : '-'} · seletores ${routeSelectors}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
         println(
             terminalThemeWrappedRow(
@@ -2934,9 +3229,20 @@ function renderByokProviderGatewayTraits(println, rest) {
                 { role: 'muted', columns: 112 },
             ),
         );
-        println(terminalThemeWrappedRow('Riqueza', `${richnessTags} · categorias ${richnessCategories}`, { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Riqueza', `${richnessTags} · categorias ${richnessCategories}`, {
+                role: 'muted',
+                columns: 112,
+            }),
+        );
     }
-    println(terminalThemeWrappedRow('Próximo', 'usar como filtro inicial; elegibilidade e sondas continuam em fases separadas', { role: 'command', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Próximo',
+            'usar como filtro inicial; elegibilidade e sondas continuam em fases separadas',
+            { role: 'command', columns: 112 },
+        ),
+    );
     println('');
 }
 
@@ -2947,14 +3253,52 @@ function renderByokProviderGatewayTraits(println, rest) {
 function renderByokGatewayLocalGuidance(println) {
     println('');
     println(terminalThemeHeadline('tool', 'BYOK local/Ollama'));
-    println(terminalThemeWrappedRow('Padrão', 'excluído · daemon não iniciado · sem runtime · opt-in obrigatório', { role: 'warn', columns: 112 }));
-    println(terminalThemeWrappedRow('Motivo', renderByokTokenLabel(MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON), { role: 'muted', columns: 112 }));
-    println(terminalThemeWrappedRow('Política', 'excluir providers locais por padrão', { role: 'muted', columns: 112 }));
-    println(terminalThemeWrappedRow('Opt-in provider', '/byok gateway selection audit provider:ollama', { role: 'command', columns: 112 }));
-    println(terminalThemeWrappedRow('Opt-in perfil', '/byok gateway selection audit local_private', { role: 'command', columns: 112 }));
-    println(terminalThemeWrappedRow('Modelo ativo', '/byok provider ollama-local <modelo> http://127.0.0.1:11434/v1', { role: 'command', columns: 112 }));
-    println(terminalThemeWrappedRow('Checagem', '/byok gateway selection audit strict local_private_strict', { role: 'command', columns: 112 }));
-    println(terminalThemeWrappedRow('Garantia', 'não inicia Ollama, não faz probe e não altera env; apenas mostra o caminho explícito', { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow('Padrão', 'excluído · daemon não iniciado · sem runtime · opt-in obrigatório', {
+            role: 'warn',
+            columns: 112,
+        }),
+    );
+    println(
+        terminalThemeWrappedRow('Motivo', renderByokTokenLabel(MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON), {
+            role: 'muted',
+            columns: 112,
+        }),
+    );
+    println(
+        terminalThemeWrappedRow('Política', 'excluir providers locais por padrão', { role: 'muted', columns: 112 }),
+    );
+    println(
+        terminalThemeWrappedRow('Opt-in provider', '/byok gateway selection audit provider:ollama', {
+            role: 'command',
+            columns: 112,
+        }),
+    );
+    println(
+        terminalThemeWrappedRow('Opt-in perfil', '/byok gateway selection audit local_private', {
+            role: 'command',
+            columns: 112,
+        }),
+    );
+    println(
+        terminalThemeWrappedRow('Modelo ativo', '/byok provider ollama-local <modelo> http://127.0.0.1:11434/v1', {
+            role: 'command',
+            columns: 112,
+        }),
+    );
+    println(
+        terminalThemeWrappedRow('Checagem', '/byok gateway selection audit strict local_private_strict', {
+            role: 'command',
+            columns: 112,
+        }),
+    );
+    println(
+        terminalThemeWrappedRow(
+            'Garantia',
+            'não inicia Ollama, não faz probe e não altera env; apenas mostra o caminho explícito',
+            { role: 'muted', columns: 112 },
+        ),
+    );
     println('');
 }
 
@@ -2979,15 +3323,27 @@ function renderByokGatewayProbeMatrix(println, rest) {
     );
 
     if (rows.length === 0) {
-        println(terminalThemeWrappedRow('Estado', `nenhuma linha de matriz encontrada para ${selector ?? 'inventário atual'}`, { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Estado',
+                `nenhuma linha de matriz encontrada para ${selector ?? 'inventário atual'}`,
+                { role: 'warn', columns: 112 },
+            ),
+        );
         println('');
         return;
     }
 
     for (const row of rows.slice(0, 24)) {
-        const implemented = Array.isArray(row['implementedProbeKinds']) ? renderByokTokenList(row['implementedProbeKinds'].map(String)) : '-';
-        const pending = Array.isArray(row['pendingProbeKinds']) ? renderByokTokenList(row['pendingProbeKinds'].map(String)) : '-';
-        const notes = Array.isArray(row['notes']) ? row['notes'].map((note) => renderByokTokenLabel(String(note))).join(',') : '-';
+        const implemented = Array.isArray(row['implementedProbeKinds'])
+            ? renderByokTokenList(row['implementedProbeKinds'].map(String))
+            : '-';
+        const pending = Array.isArray(row['pendingProbeKinds'])
+            ? renderByokTokenList(row['pendingProbeKinds'].map(String))
+            : '-';
+        const notes = Array.isArray(row['notes'])
+            ? row['notes'].map((note) => renderByokTokenLabel(String(note))).join(',')
+            : '-';
         println(
             terminalThemeWrappedRow(
                 'Provedor',
@@ -2995,16 +3351,39 @@ function renderByokGatewayProbeMatrix(println, rest) {
                 { role: 'warn', columns: 112 },
             ),
         );
-        println(terminalThemeWrappedRow('Sondas', `implementados ${implemented || '-'} · pendentes ${pending || '-'} · notas ${notes || '-'}`, { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Sondas',
+                `implementados ${implemented || '-'} · pendentes ${pending || '-'} · notas ${notes || '-'}`,
+                { role: 'muted', columns: 112 },
+            ),
+        );
     }
-    if (rows.length > 24) println(terminalThemeWrappedRow('Omitidos', `exibindo 24/${rows.length}; filtre com provider id`, { role: 'muted', columns: 112 }));
+    if (rows.length > 24)
+        println(
+            terminalThemeWrappedRow('Omitidos', `exibindo 24/${rows.length}; filtre com provider id`, {
+                role: 'muted',
+                columns: 112,
+            }),
+        );
 
     const pendingKinds = Object.entries(summary.pendingProbeKindCounts)
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([kind, count]) => `${renderByokTokenLabel(kind)}:${count}`)
         .join(', ');
-    println(terminalThemeWrappedRow('Sondas pendentes', pendingKinds || '-', { role: pendingKinds ? 'warn' : 'success', columns: 112 }));
-    println(terminalThemeWrappedRow('Escopo', 'não executa provedor/modelo; orienta sondas futuras e seleção por política', { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow('Sondas pendentes', pendingKinds || '-', {
+            role: pendingKinds ? 'warn' : 'success',
+            columns: 112,
+        }),
+    );
+    println(
+        terminalThemeWrappedRow(
+            'Escopo',
+            'não executa provedor/modelo; orienta sondas futuras e seleção por política',
+            { role: 'muted', columns: 112 },
+        ),
+    );
     println('');
 }
 
@@ -3018,7 +3397,9 @@ async function renderByokGatewayProbeBackoff(println, rest) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await store.readSnapshot();
     const latestRun = findLatestCatalogRefreshRun(snapshot);
-    const diff = latestRun ? normalizeCatalogDiffForDisplay(latestRun['diff']) : { added: [], removed: [], changed: [] };
+    const diff = latestRun
+        ? normalizeCatalogDiffForDisplay(latestRun['diff'])
+        : { added: [], removed: [], changed: [] };
     const recommendations = recommendCatalogDiffProbes(buildByokProbeRecommendationInput(snapshot, diff, args.limit));
     const filteredRecommendations = recommendations.filter((recommendation) =>
         matchesGatewayCatalogRecordSelector(/** @type {Record<string, unknown>} */ (recommendation), args.selector),
@@ -3042,29 +3423,52 @@ async function renderByokGatewayProbeBackoff(println, rest) {
         ),
     );
     if (filteredRecommendations.length === 0) {
-        println(terminalThemeWrappedRow('Estado', 'nenhuma recomendação de probe disponível no último diff persistido', { role: 'warn', columns: 112 }));
-        println('');
-        return;
-    }
-    for (const item of plan.deferred.slice(0, args.limit)) {
-        const retry = item.resetAt ? `reset ${item.resetAt}` : item.retryAfterSeconds ? `retentar em ${item.retryAfterSeconds}s` : 'reset -';
-        const probe = item.probeKind ? ` · sonda ${renderByokTokenLabel(item.probeKind)}` : '';
         println(
-            terminalThemeWrappedRow('Adiar', `${item.key} · motivo ${renderByokTokenLabel(item.reason)}${probe} · ${retry} · provedor ${item.providerId}`, {
+            terminalThemeWrappedRow('Estado', 'nenhuma recomendação de probe disponível no último diff persistido', {
                 role: 'warn',
                 columns: 112,
             }),
         );
+        println('');
+        return;
+    }
+    for (const item of plan.deferred.slice(0, args.limit)) {
+        const retry = item.resetAt
+            ? `reset ${item.resetAt}`
+            : item.retryAfterSeconds
+              ? `retentar em ${item.retryAfterSeconds}s`
+              : 'reset -';
+        const probe = item.probeKind ? ` · sonda ${renderByokTokenLabel(item.probeKind)}` : '';
+        println(
+            terminalThemeWrappedRow(
+                'Adiar',
+                `${item.key} · motivo ${renderByokTokenLabel(item.reason)}${probe} · ${retry} · provedor ${item.providerId}`,
+                {
+                    role: 'warn',
+                    columns: 112,
+                },
+            ),
+        );
     }
     for (const item of plan.ready.slice(0, Math.max(0, args.limit - plan.deferred.length))) {
         println(
-            terminalThemeWrappedRow('Pronto', `${item.key} · sondas ${renderByokTokenList(item.probeKinds) || '-'} · motivos ${renderByokTokenList(item.reasons.slice(0, 3)) || '-'}`, {
-                role: 'success',
-                columns: 112,
-            }),
+            terminalThemeWrappedRow(
+                'Pronto',
+                `${item.key} · sondas ${renderByokTokenList(item.probeKinds) || '-'} · motivos ${renderByokTokenList(item.reasons.slice(0, 3)) || '-'}`,
+                {
+                    role: 'success',
+                    columns: 112,
+                },
+            ),
         );
     }
-    println(terminalThemeWrappedRow('Escopo', 'não executa provedor/modelo; evita sondas durante janelas dinâmicas conhecidas', { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Escopo',
+            'não executa provedor/modelo; evita sondas durante janelas dinâmicas conhecidas',
+            { role: 'muted', columns: 112 },
+        ),
+    );
     println('');
 }
 
@@ -3074,7 +3478,9 @@ async function renderByokGatewayProbeBackoff(println, rest) {
  * @returns {void}
  */
 function renderByokGatewayEnvRequirements(println, rest) {
-    const selector = optionalScalarString(rest.find((item) => !/^(secrets|secret|env|requirements|requisitos|missing)$/iu.test(item)));
+    const selector = optionalScalarString(
+        rest.find((item) => !/^(secrets|secret|env|requirements|requisitos|missing)$/iu.test(item)),
+    );
     const rows = evaluateModelGatewayProviderEnvRequirements({ env: process.env, providerId: selector ?? undefined });
     const summary = summarizeModelGatewayProviderEnvRequirements(rows);
 
@@ -3089,7 +3495,12 @@ function renderByokGatewayEnvRequirements(println, rest) {
     );
 
     if (rows.length === 0) {
-        println(terminalThemeWrappedRow('Estado', `nenhum provedor encontrado para requisitos: ${selector ?? '-'}`, { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Estado', `nenhum provedor encontrado para requisitos: ${selector ?? '-'}`, {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -3098,7 +3509,10 @@ function renderByokGatewayEnvRequirements(println, rest) {
         const configured = row.configuredKeys.length > 0 ? row.configuredKeys.join(',') : '-';
         const missing = row.missingRequiredKeys.length > 0 ? row.missingRequiredKeys.join(',') : '-';
         const recommended = row.missingRecommendedKeys.length > 0 ? row.missingRecommendedKeys.join(',') : '-';
-        const aliases = Array.isArray(row.providerAliases) && row.providerAliases.length > 0 ? ` · aliases ${row.providerAliases.join(',')}` : '';
+        const aliases =
+            Array.isArray(row.providerAliases) && row.providerAliases.length > 0
+                ? ` · aliases ${row.providerAliases.join(',')}`
+                : '';
         println(
             terminalThemeWrappedRow(
                 'Provedor',
@@ -3106,10 +3520,27 @@ function renderByokGatewayEnvRequirements(println, rest) {
                 { role: row.status === 'ready' ? 'success' : 'warn', columns: 112 },
             ),
         );
-        println(terminalThemeWrappedRow('Variáveis', `configuradas ${configured} · obrigatórias ausentes ${missing} · recomendadas ausentes ${recommended}`, { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Variáveis',
+                `configuradas ${configured} · obrigatórias ausentes ${missing} · recomendadas ausentes ${recommended}`,
+                { role: 'muted', columns: 112 },
+            ),
+        );
     }
-    if (rows.length > 24) println(terminalThemeWrappedRow('Omitidos', `exibindo 24/${rows.length}; filtre com provider id`, { role: 'muted', columns: 112 }));
-    println(terminalThemeWrappedRow('Segurança', 'lista apenas nomes de variáveis; nenhum valor de segredo é impresso', { role: 'muted', columns: 112 }));
+    if (rows.length > 24)
+        println(
+            terminalThemeWrappedRow('Omitidos', `exibindo 24/${rows.length}; filtre com provider id`, {
+                role: 'muted',
+                columns: 112,
+            }),
+        );
+    println(
+        terminalThemeWrappedRow('Segurança', 'lista apenas nomes de variáveis; nenhum valor de segredo é impresso', {
+            role: 'muted',
+            columns: 112,
+        }),
+    );
     println('');
 }
 
@@ -3188,7 +3619,9 @@ function renderByokGatewayPreBuildReadiness(println) {
  */
 function renderByokGatewayCanonicalCommands(println, rest) {
     const surface = rest.find((item) => /^(package|make|terminal)$/iu.test(item))?.toLowerCase();
-    const phase = rest.find((item) => /^(orientation|metadata|pre-runtime|selection|validate|prebuild|live-readiness)$/iu.test(item))?.toLowerCase();
+    const phase = rest
+        .find((item) => /^(orientation|metadata|pre-runtime|selection|validate|prebuild|live-readiness)$/iu.test(item))
+        ?.toLowerCase();
     const full = rest.some((item) => /^(full|all|completo|todos|--full|--all)$/iu.test(item));
     const commands = listModelGatewayCanonicalCommands({ surface, phase });
     const renderedLines = renderModelGatewayCanonicalCommandLines({ surface, phase });
@@ -3207,8 +3640,18 @@ function renderByokGatewayCanonicalCommands(println, rest) {
         const commandText = optionalScalarString(command['command']) ?? renderedLines[index]?.split(' :: ')[0] ?? '-';
         const commandSurface = optionalScalarString(command['surface']) ?? '-';
         const commandPhase = renderModelGatewayCommandPhaseLabel(optionalScalarString(command['phase']));
-        println(terminalThemeWrappedRow('Comando', `${commandSurface} · ${commandPhase} · ${commandText}`, { role: 'command', columns: 112 }));
-        println(terminalThemeWrappedRow('Descrição', renderTerminalModelGatewayCommandSummary(command, fallbackSummary), { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Comando', `${commandSurface} · ${commandPhase} · ${commandText}`, {
+                role: 'command',
+                columns: 112,
+            }),
+        );
+        println(
+            terminalThemeWrappedRow('Descrição', renderTerminalModelGatewayCommandSummary(command, fallbackSummary), {
+                role: 'muted',
+                columns: 112,
+            }),
+        );
     }
     if (visibleCommands.length < renderedLines.length) {
         println(
@@ -3236,9 +3679,7 @@ function renderByokGatewayCanonicalCommands(println, rest) {
  */
 function renderByokGatewayAutoExplainIntro(println, rest) {
     const profile =
-        rest
-            .map((item) => item.match(/^profile[:=](.+)$/iu)?.[1]?.trim())
-            .find((value) => value) ?? 'repo_agent';
+        rest.map((item) => item.match(/^profile[:=](.+)$/iu)?.[1]?.trim()).find((value) => value) ?? 'repo_agent';
     println('');
     println(terminalThemeHeadline('accent', 'Explicação BYOK auto', ['model-gateway']));
     println(
@@ -3275,7 +3716,9 @@ async function renderByokGatewayOperatorReady(println, rest) {
     const latestPersistedStandby = diagnostics.latestStandbyPlan ?? {};
     const liveRunRows = Math.max(finitePositiveNumber(diagnostics.liveScenarioRunRows) ?? 0, liveRuns.length);
     const diagnosticLatestLiveRun = diagnostics.latestLiveScenarioRun ?? {};
-    const latestLiveRun = optionalScalarString(diagnosticLatestLiveRun.summaryPath) ? diagnosticLatestLiveRun : (liveRuns[0] ?? {});
+    const latestLiveRun = optionalScalarString(diagnosticLatestLiveRun.summaryPath)
+        ? diagnosticLatestLiveRun
+        : (liveRuns[0] ?? {});
     const activeSnapshot = diagnostics.activeSnapshot?.exists === true;
     const policy = await readModelGatewayRuntimeAutomationEffectivePolicy();
     const checks = [
@@ -3372,7 +3815,13 @@ async function renderByokGatewayOperatorReady(println, rest) {
         );
         println(terminalThemeWrappedRow('Provar', row.commands.probeAgent ?? '-', { role: 'command', columns: 112 }));
         println(terminalThemeWrappedRow('Usar', row.commands.liveModel ?? '-', { role: 'command', columns: 112 }));
-        println(terminalThemeWrappedRow('Novo boot', `${row.commands.newSession ?? '-'} && ${row.commands.provider ?? '-'}`, { role: 'command', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Novo boot',
+                `${row.commands.newSession ?? '-'} && ${row.commands.provider ?? '-'}`,
+                { role: 'command', columns: 112 },
+            ),
+        );
         if (row.providerId && row.providerModel) {
             println(
                 terminalThemeWrappedRow(
@@ -3407,10 +3856,20 @@ async function renderByokGatewayOperatorReady(println, rest) {
         );
     }
     if (status.decision.blockers.length > 0) {
-        println(terminalThemeWrappedRow('Bloqueios', renderByokTokenList(status.decision.blockers), { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Bloqueios', renderByokTokenList(status.decision.blockers), {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
     }
     println(terminalThemeWrappedRow('Operador', status.decision.operatorSummary, { role: 'muted', columns: 112 }));
-    println(terminalThemeWrappedRow('Próximo', [...new Set(nextCommands)].slice(0, 5).join(' && '), { role: 'command', columns: 112 }));
+    println(
+        terminalThemeWrappedRow('Próximo', [...new Set(nextCommands)].slice(0, 5).join(' && '), {
+            role: 'command',
+            columns: 112,
+        }),
+    );
     println('');
 }
 
@@ -3426,7 +3885,11 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
     const normalizedSelector = optionalScalarString(selector)?.toLowerCase() ?? null;
     const importers = normalizedSelector
         ? allImporters.filter((importer) =>
-              [importer.id, importer.providerId].some((value) => String(value ?? '').toLowerCase().includes(normalizedSelector)),
+              [importer.id, importer.providerId].some((value) =>
+                  String(value ?? '')
+                      .toLowerCase()
+                      .includes(normalizedSelector),
+              ),
           )
         : allImporters;
     const refreshContext = {
@@ -3474,7 +3937,8 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
             lockKey: store.filePath,
             onProgress: (event) => {
                 const progressPct = typeof event.progressPct === 'number' ? event.progressPct : lastProgressPct;
-                const shouldPrint = event.phase === 'refresh_plan_ready' ||
+                const shouldPrint =
+                    event.phase === 'refresh_plan_ready' ||
                     event.phase === 'refresh_completed' ||
                     event.phase === 'eligibility_evaluated' ||
                     event.phase === 'snapshot_written' ||
@@ -3485,7 +3949,8 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
                     progressPct - lastProgressPct >= 15;
                 if (!shouldPrint) return;
                 lastProgressPct = Math.max(lastProgressPct, progressPct);
-                const importer = event.importer && typeof event.importer === 'object' ? event.importer['importerId'] : null;
+                const importer =
+                    event.importer && typeof event.importer === 'object' ? event.importer['importerId'] : null;
                 /** @type {Record<string, string>} */
                 const phaseLabels = {
                     refresh_plan_ready: 'plano pronto',
@@ -3494,21 +3959,31 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
                     snapshot_written: 'snapshot gravado',
                     snapshot_previewed: 'snapshot pré-visualizado',
                 };
-                const phase = phaseLabels[event.phase] ?? event.phase
-                    .replace(/:importer_started$/u, ': importer iniciado')
-                    .replace(/:importer_completed$/u, ': importer concluído')
-                    .replace(/:importer_failed$/u, ': importer falhou')
-                    .replaceAll('_', ' ');
+                const phase =
+                    phaseLabels[event.phase] ??
+                    event.phase
+                        .replace(/:importer_started$/u, ': importer iniciado')
+                        .replace(/:importer_completed$/u, ': importer concluído')
+                        .replace(/:importer_failed$/u, ': importer falhou')
+                        .replaceAll('_', ' ');
                 const counts = joinTerminalSummary([
                     typeof event.selectedCount === 'number' ? `selecionados ${event.selectedCount}` : '',
                     typeof event.skippedCount === 'number' ? `adiados ${event.skippedCount}` : '',
                     typeof event.rowCount === 'number' ? `linhas ${event.rowCount}` : '',
                     typeof event.evidenceCount === 'number' ? `evidências ${event.evidenceCount}` : '',
                     typeof event.projectionCount === 'number' ? `projeções ${event.projectionCount}` : '',
-                    typeof event.eligibilityDecisionCount === 'number' ? `decisões ${event.eligibilityDecisionCount}` : '',
-                    typeof event.eligibilityAddedCount === 'number' ? `elegibilidade +${event.eligibilityAddedCount}` : '',
-                    typeof event.eligibilityRemovedCount === 'number' ? `elegibilidade -${event.eligibilityRemovedCount}` : '',
-                    typeof event.eligibilityChangedCount === 'number' ? `elegibilidade ~${event.eligibilityChangedCount}` : '',
+                    typeof event.eligibilityDecisionCount === 'number'
+                        ? `decisões ${event.eligibilityDecisionCount}`
+                        : '',
+                    typeof event.eligibilityAddedCount === 'number'
+                        ? `elegibilidade +${event.eligibilityAddedCount}`
+                        : '',
+                    typeof event.eligibilityRemovedCount === 'number'
+                        ? `elegibilidade -${event.eligibilityRemovedCount}`
+                        : '',
+                    typeof event.eligibilityChangedCount === 'number'
+                        ? `elegibilidade ~${event.eligibilityChangedCount}`
+                        : '',
                     typeof event.addedCount === 'number' ? `novos ${event.addedCount}` : '',
                     typeof event.removedCount === 'number' ? `removidos ${event.removedCount}` : '',
                     typeof event.changedCount === 'number' ? `alterados ${event.changedCount}` : '',
@@ -3546,7 +4021,13 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
             terminalThemeWrappedRow(
                 'Diferença do catálogo',
                 `novos ${result.diff.added.length} · removidos ${result.diff.removed.length} · alterados ${result.diff.changed.length}`,
-                { role: result.diff.added.length > 0 || result.diff.removed.length > 0 || result.diff.changed.length > 0 ? 'warn' : 'success', columns: 112 },
+                {
+                    role:
+                        result.diff.added.length > 0 || result.diff.removed.length > 0 || result.diff.changed.length > 0
+                            ? 'warn'
+                            : 'success',
+                    columns: 112,
+                },
             ),
         );
         println(
@@ -3562,19 +4043,46 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
                 terminalThemeWrappedRow(
                     'Diferença de elegibilidade',
                     `novas ${eligibilityDiffSummary.addedCount} · removidas ${eligibilityDiffSummary.removedCount} · alteradas ${eligibilityDiffSummary.changedCount} · ficaram elegíveis ${eligibilityDiffSummary.becameEligibleCount} · ficaram excluídas ${eligibilityDiffSummary.becameExcludedCount}`,
-                    { role: eligibilityDiffSummary.addedCount > 0 || eligibilityDiffSummary.removedCount > 0 || eligibilityDiffSummary.changedCount > 0 ? 'warn' : 'muted', columns: 112 },
+                    {
+                        role:
+                            eligibilityDiffSummary.addedCount > 0 ||
+                            eligibilityDiffSummary.removedCount > 0 ||
+                            eligibilityDiffSummary.changedCount > 0
+                                ? 'warn'
+                                : 'muted',
+                        columns: 112,
+                    },
                 ),
             );
             if (eligibilityDiffSummary.changedKinds.length > 0) {
-                println(terminalThemeWrappedRow('Tipos de elegibilidade', renderByokTokenList(eligibilityDiffSummary.changedKinds), { role: 'muted', columns: 112 }));
+                println(
+                    terminalThemeWrappedRow(
+                        'Tipos de elegibilidade',
+                        renderByokTokenList(eligibilityDiffSummary.changedKinds),
+                        { role: 'muted', columns: 112 },
+                    ),
+                );
             }
         }
         if (refreshEvents.completedEvent.changedKinds.length > 0) {
-            println(terminalThemeWrappedRow('Tipos de catálogo', renderByokTokenList(refreshEvents.completedEvent.changedKinds), { role: 'muted', columns: 112 }));
+            println(
+                terminalThemeWrappedRow(
+                    'Tipos de catálogo',
+                    renderByokTokenList(refreshEvents.completedEvent.changedKinds),
+                    { role: 'muted', columns: 112 },
+                ),
+            );
         }
-        const probeRecommendations = recommendCatalogDiffProbes(buildByokProbeRecommendationInput(result.snapshot, result.diff, 5));
+        const probeRecommendations = recommendCatalogDiffProbes(
+            buildByokProbeRecommendationInput(result.snapshot, result.diff, 5),
+        );
         if (probeRecommendations.length > 0) {
-            println(terminalThemeWrappedRow('Sugestões de prova runtime', String(probeRecommendations.length), { role: 'warn', columns: 112 }));
+            println(
+                terminalThemeWrappedRow('Sugestões de prova runtime', String(probeRecommendations.length), {
+                    role: 'warn',
+                    columns: 112,
+                }),
+            );
             for (const recommendation of probeRecommendations) {
                 println(
                     terminalThemeWrappedRow(
@@ -3583,14 +4091,29 @@ async function renderByokGatewayCatalogRefresh(println, eventBus = null, selecto
                         { role: 'warn', columns: 112 },
                     ),
                 );
-                println(terminalThemeWrappedRow('Comando', recommendation.commands[0] ?? '-', { role: 'command', columns: 112 }));
+                println(
+                    terminalThemeWrappedRow('Comando', recommendation.commands[0] ?? '-', {
+                        role: 'command',
+                        columns: 112,
+                    }),
+                );
             }
         }
-        for (const id of result.diff.added.slice(0, 5)) println(terminalThemeWrappedRow('Novo', id, { role: 'success', columns: 112 }));
-        for (const id of result.diff.removed.slice(0, 5)) println(terminalThemeWrappedRow('Removido', id, { role: 'error', columns: 112 }));
+        for (const id of result.diff.added.slice(0, 5))
+            println(terminalThemeWrappedRow('Novo', id, { role: 'success', columns: 112 }));
+        for (const id of result.diff.removed.slice(0, 5))
+            println(terminalThemeWrappedRow('Removido', id, { role: 'error', columns: 112 }));
         for (const item of result.diff.changed.slice(0, 5)) {
-            const kinds = Array.isArray(item.changedKinds) && item.changedKinds.length > 0 ? ` · ${renderByokTokenList(item.changedKinds)}` : '';
-            println(terminalThemeWrappedRow('Alterado', `${item.key} (${item.changedFields.join(',')}${kinds})`, { role: 'warn', columns: 112 }));
+            const kinds =
+                Array.isArray(item.changedKinds) && item.changedKinds.length > 0
+                    ? ` · ${renderByokTokenList(item.changedKinds)}`
+                    : '';
+            println(
+                terminalThemeWrappedRow('Alterado', `${item.key} (${item.changedFields.join(',')}${kinds})`, {
+                    role: 'warn',
+                    columns: 112,
+                }),
+            );
         }
         println(
             terminalThemeWrappedRow(
@@ -3618,7 +4141,11 @@ async function renderByokGatewayCatalogRefreshPlan(println, selector = null) {
     const normalizedSelector = optionalScalarString(selector)?.toLowerCase() ?? null;
     const importers = normalizedSelector
         ? allImporters.filter((importer) =>
-              [importer.id, importer.providerId].some((value) => String(value ?? '').toLowerCase().includes(normalizedSelector)),
+              [importer.id, importer.providerId].some((value) =>
+                  String(value ?? '')
+                      .toLowerCase()
+                      .includes(normalizedSelector),
+              ),
           )
         : allImporters;
     println('');
@@ -3631,7 +4158,12 @@ async function renderByokGatewayCatalogRefreshPlan(println, selector = null) {
         ),
     );
     if (importers.length === 0) {
-        println(terminalThemeWrappedRow('Estado', 'nenhum importer habilitado para este seletor', { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Estado', 'nenhum importer habilitado para este seletor', {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -3679,7 +4211,7 @@ async function findLatestModelGatewayRefreshLogPath() {
     } catch {
         return null;
     }
-    /** @type {Array<{ path: string; mtimeMs: number }>} */
+    /** @type {{ path: string; mtimeMs: number }[]} */
     const candidates = [];
     for (const entry of entries.filter((item) => item.endsWith('.jsonl'))) {
         const filePath = join(dir, entry);
@@ -3737,7 +4269,13 @@ async function renderByokGatewayCatalogRefreshLog(println) {
         ),
     );
     const importerEntries = Object.entries(summary.importers);
-    println(terminalThemeWrappedRow('Importers', `com eventos ${importerEntries.length} · falhas ${summary.failures.length}`, { role: summary.failures.length === 0 ? 'success' : 'warn', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Importers',
+            `com eventos ${importerEntries.length} · falhas ${summary.failures.length}`,
+            { role: summary.failures.length === 0 ? 'success' : 'warn', columns: 112 },
+        ),
+    );
     for (const [importerId, importer] of importerEntries.slice(0, 12)) {
         println(
             terminalThemeWrappedRow(
@@ -3760,34 +4298,46 @@ async function renderByokGatewayCatalogRefreshLog(println) {
 }
 
 /**
- * @param {ReturnType<InstanceType<typeof JsonModelGatewayCatalogStore>['readSnapshot']> extends Promise<infer T> ? T : never} snapshot
+ * @param {ReturnType<InstanceType<typeof JsonModelGatewayCatalogStore>['readSnapshot']> extends Promise<infer T>
+ *         ? T
+ *         : never} snapshot
  * @returns {Record<string, any> | null}
  */
 function findLatestCatalogRefreshRun(snapshot) {
-    return [...snapshot.importRuns]
-        .reverse()
-        .find((run) => run['providerId'] === 'model-gateway' && run['sourceId'] === 'catalog-refresh' && run['diff']) ?? null;
+    return (
+        [...snapshot.importRuns]
+            .reverse()
+            .find(
+                (run) => run['providerId'] === 'model-gateway' && run['sourceId'] === 'catalog-refresh' && run['diff'],
+            ) ?? null
+    );
 }
 
 /**
  * @param {unknown} value
- * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedFields: string[]; changedKinds: string[] }> }}
+ * @returns {{
+ *     added: string[];
+ *     removed: string[];
+ *     changed: { key: string; changedFields: string[]; changedKinds: string[] }[];
+ * }}
  */
 function normalizeCatalogDiffForDisplay(value) {
     const record = asRecord(value);
     const changed = Array.isArray(record['changed'])
-        ? record['changed'].filter((item) => item && typeof item === 'object').map((item) => {
-              const changedRecord = /** @type {Record<string, any>} */ (item);
-              return {
-                  key: optionalScalarString(changedRecord['key']) ?? 'unknown',
-                  changedFields: Array.isArray(changedRecord['changedFields'])
-                      ? changedRecord['changedFields'].map(String)
-                      : [],
-                  changedKinds: Array.isArray(changedRecord['changedKinds'])
-                      ? changedRecord['changedKinds'].map(String)
-                      : [],
-              };
-          })
+        ? record['changed']
+              .filter((item) => item && typeof item === 'object')
+              .map((item) => {
+                  const changedRecord = /** @type {Record<string, any>} */ (item);
+                  return {
+                      key: optionalScalarString(changedRecord['key']) ?? 'unknown',
+                      changedFields: Array.isArray(changedRecord['changedFields'])
+                          ? changedRecord['changedFields'].map(String)
+                          : [],
+                      changedKinds: Array.isArray(changedRecord['changedKinds'])
+                          ? changedRecord['changedKinds'].map(String)
+                          : [],
+                  };
+              })
         : [];
     return {
         added: Array.isArray(record['added']) ? record['added'].map(String) : [],
@@ -3798,25 +4348,41 @@ function normalizeCatalogDiffForDisplay(value) {
 
 /**
  * @param {unknown} value
- * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedFields: string[]; changedKinds: string[]; previousInclude?: boolean | null; nextInclude?: boolean | null }> }}
+ * @returns {{
+ *     added: string[];
+ *     removed: string[];
+ *     changed: {
+ *         key: string;
+ *         changedFields: string[];
+ *         changedKinds: string[];
+ *         previousInclude?: boolean | null;
+ *         nextInclude?: boolean | null;
+ *     }[];
+ * }}
  */
 function normalizeEligibilityDiffForDisplay(value) {
     const record = asRecord(value);
     const changed = Array.isArray(record['changed'])
-        ? record['changed'].filter((item) => item && typeof item === 'object').map((item) => {
-              const changedRecord = /** @type {Record<string, any>} */ (item);
-              return {
-                  key: optionalScalarString(changedRecord['key']) ?? 'unknown',
-                  changedFields: Array.isArray(changedRecord['changedFields'])
-                      ? changedRecord['changedFields'].map(String)
-                      : [],
-                  changedKinds: Array.isArray(changedRecord['changedKinds'])
-                      ? changedRecord['changedKinds'].map(String)
-                      : [],
-                  previousInclude: typeof changedRecord['previousInclude'] === 'boolean' ? changedRecord['previousInclude'] : null,
-                  nextInclude: typeof changedRecord['nextInclude'] === 'boolean' ? changedRecord['nextInclude'] : null,
-              };
-          })
+        ? record['changed']
+              .filter((item) => item && typeof item === 'object')
+              .map((item) => {
+                  const changedRecord = /** @type {Record<string, any>} */ (item);
+                  return {
+                      key: optionalScalarString(changedRecord['key']) ?? 'unknown',
+                      changedFields: Array.isArray(changedRecord['changedFields'])
+                          ? changedRecord['changedFields'].map(String)
+                          : [],
+                      changedKinds: Array.isArray(changedRecord['changedKinds'])
+                          ? changedRecord['changedKinds'].map(String)
+                          : [],
+                      previousInclude:
+                          typeof changedRecord['previousInclude'] === 'boolean'
+                              ? changedRecord['previousInclude']
+                              : null,
+                      nextInclude:
+                          typeof changedRecord['nextInclude'] === 'boolean' ? changedRecord['nextInclude'] : null,
+                  };
+              })
         : [];
     return {
         added: Array.isArray(record['added']) ? record['added'].map(String) : [],
@@ -3826,14 +4392,16 @@ function normalizeEligibilityDiffForDisplay(value) {
 }
 
 /**
- * @param {ReturnType<InstanceType<typeof JsonModelGatewayCatalogStore>['readSnapshot']> extends Promise<infer T> ? T : never} snapshot
+ * @param {ReturnType<InstanceType<typeof JsonModelGatewayCatalogStore>['readSnapshot']> extends Promise<infer T>
+ *         ? T
+ *         : never} snapshot
  * @returns {Record<string, any> | null}
  */
 function findLatestEligibilityRun(snapshot) {
     const runs = Array.isArray(snapshot.modelEligibilityRuns) ? snapshot.modelEligibilityRuns : [];
-    return [...runs]
-        .reverse()
-        .find((run) => run && typeof run === 'object' && (run['diff'] || run['diffSummary'])) ?? null;
+    return (
+        [...runs].reverse().find((run) => run && typeof run === 'object' && (run['diff'] || run['diffSummary'])) ?? null
+    );
 }
 
 /**
@@ -3860,10 +4428,14 @@ async function renderByokGatewayEligibilityRuns(println, rest) {
     );
     if (runs.length === 0) {
         println(
-            terminalThemeWrappedRow('Estado', 'nenhum run de eligibility persistido; rode /byok gateway catalog refresh primeiro', {
-                role: 'warn',
-                columns: 112,
-            }),
+            terminalThemeWrappedRow(
+                'Estado',
+                'nenhum run de eligibility persistido; rode /byok gateway catalog refresh primeiro',
+                {
+                    role: 'warn',
+                    columns: 112,
+                },
+            ),
         );
         println('');
         return;
@@ -3888,11 +4460,22 @@ async function renderByokGatewayEligibilityRuns(println, rest) {
             terminalThemeWrappedRow(
                 'Diferença',
                 `novas ${summary.addedCount} · removidas ${summary.removedCount} · alteradas ${summary.changedCount} · ficaram elegíveis ${summary.becameEligibleCount} · ficaram excluídas ${summary.becameExcludedCount}`,
-                { role: summary.addedCount > 0 || summary.removedCount > 0 || summary.changedCount > 0 ? 'warn' : 'muted', columns: 112 },
+                {
+                    role:
+                        summary.addedCount > 0 || summary.removedCount > 0 || summary.changedCount > 0
+                            ? 'warn'
+                            : 'muted',
+                    columns: 112,
+                },
             ),
         );
         if (summary.changedKinds.length > 0) {
-            println(terminalThemeWrappedRow('Tipos de mudança', renderByokTokenList(summary.changedKinds), { role: 'muted', columns: 112 }));
+            println(
+                terminalThemeWrappedRow('Tipos de mudança', renderByokTokenList(summary.changedKinds), {
+                    role: 'muted',
+                    columns: 112,
+                }),
+            );
         }
     }
     println('');
@@ -3908,13 +4491,23 @@ async function renderByokGatewayEligibilityDiff(println) {
     const run = findLatestEligibilityRun(snapshot);
     println('');
     println(terminalThemeHeadline('tool', 'BYOK diff de elegibilidade'));
-    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · fonte último run de elegibilidade persistido · sem runtime`, { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · fonte último run de elegibilidade persistido · sem runtime`,
+            { role: 'muted', columns: 112 },
+        ),
+    );
     if (!run) {
         println(
-            terminalThemeWrappedRow('Estado', 'nenhum diff de eligibility persistido; rode /byok gateway catalog refresh primeiro', {
-                role: 'warn',
-                columns: 112,
-            }),
+            terminalThemeWrappedRow(
+                'Estado',
+                'nenhum diff de eligibility persistido; rode /byok gateway catalog refresh primeiro',
+                {
+                    role: 'warn',
+                    columns: 112,
+                },
+            ),
         );
         println('');
         return;
@@ -3925,14 +4518,25 @@ async function renderByokGatewayEligibilityDiff(println) {
         terminalThemeWrappedRow(
             'Run',
             `${run['runId'] ?? '-'} · novas ${summary.addedCount} · removidas ${summary.removedCount} · alteradas ${summary.changedCount} · ficaram elegíveis ${summary.becameEligibleCount} · ficaram excluídas ${summary.becameExcludedCount}`,
-            { role: summary.addedCount > 0 || summary.removedCount > 0 || summary.changedCount > 0 ? 'warn' : 'success', columns: 112 },
+            {
+                role:
+                    summary.addedCount > 0 || summary.removedCount > 0 || summary.changedCount > 0 ? 'warn' : 'success',
+                columns: 112,
+            },
         ),
     );
     if (summary.changedKinds.length > 0) {
-        println(terminalThemeWrappedRow('Tipos de mudança', renderByokTokenList(summary.changedKinds), { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Tipos de mudança', renderByokTokenList(summary.changedKinds), {
+                role: 'muted',
+                columns: 112,
+            }),
+        );
     }
-    for (const id of diff.added.slice(0, 8)) println(terminalThemeWrappedRow('Novo elegível', id, { role: 'success', columns: 112 }));
-    for (const id of diff.removed.slice(0, 8)) println(terminalThemeWrappedRow('Removido', id, { role: 'error', columns: 112 }));
+    for (const id of diff.added.slice(0, 8))
+        println(terminalThemeWrappedRow('Novo elegível', id, { role: 'success', columns: 112 }));
+    for (const id of diff.removed.slice(0, 8))
+        println(terminalThemeWrappedRow('Removido', id, { role: 'error', columns: 112 }));
     for (const item of diff.changed.slice(0, 8)) {
         const kinds = item.changedKinds.length > 0 ? ` · ${renderByokTokenList(item.changedKinds)}` : '';
         println(terminalThemeWrappedRow('Alterado', `${item.key}${kinds}`, { role: 'warn', columns: 112 }));
@@ -3948,11 +4552,22 @@ async function renderByokGatewayCatalogDiff(println) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     println('');
     println(terminalThemeHeadline('tool', 'BYOK diff do catálogo'));
-    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · fonte último refresh persistido · sem rede`, { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · fonte último refresh persistido · sem rede`, {
+            role: 'muted',
+            columns: 112,
+        }),
+    );
     const snapshot = await store.readSnapshot();
     const latestRun = findLatestCatalogRefreshRun(snapshot);
     if (!latestRun) {
-        println(terminalThemeWrappedRow('Estado', 'nenhum diff persistido encontrado; rode /byok gateway catalog refresh primeiro', { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Estado',
+                'nenhum diff persistido encontrado; rode /byok gateway catalog refresh primeiro',
+                { role: 'warn', columns: 112 },
+            ),
+        );
         println('');
         return;
     }
@@ -3963,20 +4578,41 @@ async function renderByokGatewayCatalogDiff(println) {
         terminalThemeWrappedRow(
             'Run',
             `${latestRun['runId'] ?? '-'} · novos ${summary.addedCount} · removidos ${summary.removedCount} · alterados ${summary.changedCount} · conflitos ${snapshot.conflicts.length}`,
-            { role: summary.changedCount > 0 || summary.addedCount > 0 || summary.removedCount > 0 ? 'warn' : 'success', columns: 112 },
+            {
+                role:
+                    summary.changedCount > 0 || summary.addedCount > 0 || summary.removedCount > 0 ? 'warn' : 'success',
+                columns: 112,
+            },
         ),
     );
     if (summary.changedKinds.length > 0) {
-        println(terminalThemeWrappedRow('Tipos de mudança', summary.changedKinds.join(','), { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Tipos de mudança', summary.changedKinds.join(','), {
+                role: 'muted',
+                columns: 112,
+            }),
+        );
     }
-    for (const id of diff.added.slice(0, 8)) println(terminalThemeWrappedRow('Novo', id, { role: 'success', columns: 112 }));
-    for (const id of diff.removed.slice(0, 8)) println(terminalThemeWrappedRow('Removido', id, { role: 'error', columns: 112 }));
+    for (const id of diff.added.slice(0, 8))
+        println(terminalThemeWrappedRow('Novo', id, { role: 'success', columns: 112 }));
+    for (const id of diff.removed.slice(0, 8))
+        println(terminalThemeWrappedRow('Removido', id, { role: 'error', columns: 112 }));
     for (const item of diff.changed.slice(0, 8)) {
         const kinds = item.changedKinds.length > 0 ? ` · ${item.changedKinds.join(',')}` : '';
-        println(terminalThemeWrappedRow('Alterado', `${item.key} (${item.changedFields.join(',')}${kinds})`, { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Alterado', `${item.key} (${item.changedFields.join(',')}${kinds})`, {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
     }
     if (recommendations.length > 0) {
-        println(terminalThemeWrappedRow('Sugestões de prova runtime', String(recommendations.length), { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Sugestões de prova runtime', String(recommendations.length), {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         for (const recommendation of recommendations.slice(0, 5)) {
             println(
                 terminalThemeWrappedRow(
@@ -3985,7 +4621,12 @@ async function renderByokGatewayCatalogDiff(println) {
                     { role: 'warn', columns: 112 },
                 ),
             );
-            println(terminalThemeWrappedRow('Comando', recommendation.commands[0] ?? '-', { role: 'command', columns: 112 }));
+            println(
+                terminalThemeWrappedRow('Comando', recommendation.commands[0] ?? '-', {
+                    role: 'command',
+                    columns: 112,
+                }),
+            );
         }
     }
     println('');
@@ -4031,7 +4672,16 @@ async function renderByokGatewayCatalogIntegrity(println) {
 
 /**
  * @param {string[]} rest
- * @returns {{ strict: boolean; effective: boolean; requireRuntimeProof: boolean; writeTrace: boolean; traceDir: string; traceId: string; selectionPolicy: string; profiles: string[] }}
+ * @returns {{
+ *     strict: boolean;
+ *     effective: boolean;
+ *     requireRuntimeProof: boolean;
+ *     writeTrace: boolean;
+ *     traceDir: string;
+ *     traceId: string;
+ *     selectionPolicy: string;
+ *     profiles: string[];
+ * }}
  */
 function parseByokGatewaySelectionAuditArgs(rest) {
     const requireRuntimeProof = rest.some((item) =>
@@ -4041,16 +4691,20 @@ function parseByokGatewaySelectionAuditArgs(rest) {
         /^(trace|write-trace|persist-trace|decision-trace|--write-trace|--persist-trace)$/iu.test(item),
     );
     const traceDir =
-        rest
-            .map((item) => item.match(/^--?trace-dir[:=](.+)$/iu)?.[1] ?? null)
-            .find((item) => item !== null) ?? DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR;
+        rest.map((item) => item.match(/^--?trace-dir[:=](.+)$/iu)?.[1] ?? null).find((item) => item !== null) ??
+        DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR;
     const traceId =
         rest
-            .map((item) => item.match(/^--?trace-id[:=](.+)$/iu)?.[1] ?? item.match(/^trace-id[:=](.+)$/iu)?.[1] ?? null)
+            .map(
+                (item) => item.match(/^--?trace-id[:=](.+)$/iu)?.[1] ?? item.match(/^trace-id[:=](.+)$/iu)?.[1] ?? null,
+            )
             .find((item) => item !== null) ?? '';
     const selectionPolicy =
         rest
-            .map((item) => item.match(/^--?selection-policy[:=](.+)$/iu)?.[1] ?? item.match(/^policy[:=](.+)$/iu)?.[1] ?? null)
+            .map(
+                (item) =>
+                    item.match(/^--?selection-policy[:=](.+)$/iu)?.[1] ?? item.match(/^policy[:=](.+)$/iu)?.[1] ?? null,
+            )
             .find((item) => item !== null) ?? (requireRuntimeProof ? 'require_runtime_proof' : 'metadata_first');
     const effective =
         requireRuntimeProof ||
@@ -4121,7 +4775,9 @@ async function renderByokGatewaySelectionAudit(println, rest) {
               now: () => evaluationNow,
               policy: {
                   unknownAccessPolicy: args.strict ? 'block' : 'allow_probe',
-                  policyProfile: args.strict ? 'terminal-effective-strict-no-runtime' : 'terminal-effective-allow-probe-no-runtime',
+                  policyProfile: args.strict
+                      ? 'terminal-effective-strict-no-runtime'
+                      : 'terminal-effective-allow-probe-no-runtime',
               },
           })
         : null;
@@ -4150,8 +4806,12 @@ async function renderByokGatewaySelectionAudit(println, rest) {
               requireRuntimeProof: args.requireRuntimeProof,
           })
         : null;
-    const selectionComparison = postRuntimeSelection ? compareModelGatewaySelectionAudits(selection, postRuntimeSelection) : null;
-    const selectionComparisonExplanation = selectionComparison ? explainModelGatewaySelectionComparison(selectionComparison) : null;
+    const selectionComparison = postRuntimeSelection
+        ? compareModelGatewaySelectionAudits(selection, postRuntimeSelection)
+        : null;
+    const selectionComparisonExplanation = selectionComparison
+        ? explainModelGatewaySelectionComparison(selectionComparison)
+        : null;
     const policyResolution = selectionComparison
         ? resolveModelGatewaySelectionPolicy(selectionComparison, { mode: args.selectionPolicy })
         : null;
@@ -4279,12 +4939,20 @@ async function renderByokGatewaySelectionAudit(println, rest) {
                 ),
             );
             if (profile.topRejectedReasons.length > 0) {
-                println(terminalThemeWrappedRow('Rejeições', renderByokTokenList(profile.topRejectedReasons.slice(0, 5).map(String)), { role: 'warn', columns: 112 }));
+                println(
+                    terminalThemeWrappedRow(
+                        'Rejeições',
+                        renderByokTokenList(profile.topRejectedReasons.slice(0, 5).map(String)),
+                        { role: 'warn', columns: 112 },
+                    ),
+                );
             }
         }
         if (supplyLine) println(terminalThemeWrappedRow('Supply', supplyLine, { role: 'muted', columns: 112 }));
         const comparisonRow = selectionComparison?.rows.find((row) => row.profileId === profile.profileId);
-        const comparisonExplanation = selectionComparisonExplanation?.rows.find((row) => row.profileId === profile.profileId);
+        const comparisonExplanation = selectionComparisonExplanation?.rows.find(
+            (row) => row.profileId === profile.profileId,
+        );
         if (comparisonRow?.changed || (args.effective && comparisonRow?.postSelected)) {
             const postSelected = comparisonRow.postSelected;
             const postLabel = postSelected
@@ -4308,12 +4976,23 @@ async function renderByokGatewaySelectionAudit(println, rest) {
             );
         }
         if (Array.isArray(profile.supplyWarnings) && profile.supplyWarnings.length > 0) {
-            println(terminalThemeWrappedRow('Avisos', renderByokTokenList(profile.supplyWarnings.slice(0, 6).map(String)), { role: 'warn', columns: 112 }));
+            println(
+                terminalThemeWrappedRow('Avisos', renderByokTokenList(profile.supplyWarnings.slice(0, 6).map(String)), {
+                    role: 'warn',
+                    columns: 112,
+                }),
+            );
         }
     }
     const localProviderBlocks = summarizeModelGatewayLocalProviderOptInBlocks(selection);
     if (localProviderBlocks.hasBlocks) {
-        println(terminalThemeWrappedRow('Local/Ollama', renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderBlocks.blockedProfileIds }), { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Local/Ollama',
+                renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderBlocks.blockedProfileIds }),
+                { role: 'warn', columns: 112 },
+            ),
+        );
     }
     println(
         terminalThemeWrappedRow(
@@ -4334,7 +5013,13 @@ async function renderByokGatewayCatalogSqliteMirror(println) {
     const sqliteStore = new SqliteModelGatewayCatalogStore();
     println('');
     println(terminalThemeHeadline('tool', 'BYOK espelho SQLite do catálogo'));
-    println(terminalThemeWrappedRow('Resumo', `JSON ${jsonStore.filePath} · SQLite copilot.sqlite · modo espelho redigido · sem rede`, { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Resumo',
+            `JSON ${jsonStore.filePath} · SQLite copilot.sqlite · modo espelho redigido · sem rede`,
+            { role: 'muted', columns: 112 },
+        ),
+    );
     const result = await mirrorModelGatewayCatalogSnapshotToSqlite({
         sourceStore: jsonStore,
         sqliteStore,
@@ -4370,7 +5055,13 @@ async function renderByokGatewayCatalogSqliteMirror(println) {
             { role: parity.ok ? 'success' : 'error', columns: 112 },
         ),
     );
-    println(terminalThemeWrappedRow('Fronteira', 'JSON permanece como export/debug; SQLite materializa camadas normalizadas para consultas futuras', { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Fronteira',
+            'JSON permanece como export/debug; SQLite materializa camadas normalizadas para consultas futuras',
+            { role: 'muted', columns: 112 },
+        ),
+    );
     println('');
 }
 
@@ -4382,7 +5073,13 @@ async function renderByokGatewayHealthSqliteMirror(println) {
     const sqliteStore = new SqliteModelGatewayCatalogStore();
     println('');
     println(terminalThemeHeadline('tool', 'BYOK espelho SQLite da saúde runtime'));
-    println(terminalThemeWrappedRow('Resumo', 'fonte byok-provider-health · destino copilot.sqlite · fatos de execução separados do catálogo', { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Resumo',
+            'fonte byok-provider-health · destino copilot.sqlite · fatos de execução separados do catálogo',
+            { role: 'muted', columns: 112 },
+        ),
+    );
     const result = await flushAndMirrorByokProviderHealthToSqlite({ sqliteStore });
     println(
         terminalThemeWrappedRow(
@@ -4409,7 +5106,7 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
               providerProjections: snapshot?.providerProjections ?? [],
               eligibilityDecisions: snapshot?.modelEligibilityDecisions ?? [],
               routeOptions: snapshot?.routeOptions ?? [],
-    });
+          });
     println('');
     println(terminalThemeHeadline('tool', 'BYOK schema OpenAI normalizado'));
     println(
@@ -4435,7 +5132,13 @@ async function renderByokGatewayCatalogOpenAISchema(println, options = {}) {
         );
     }
     if (openaiList.data.length > 12) {
-        println(terminalThemeWrappedRow('Omitidos', `exibindo 12/${openaiList.data.length}; use JSON/SQLite store para export completo`, { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Omitidos',
+                `exibindo 12/${openaiList.data.length}; use JSON/SQLite store para export completo`,
+                { role: 'muted', columns: 112 },
+            ),
+        );
     }
     println('');
 }
@@ -4450,9 +5153,20 @@ async function renderByokGatewayCatalogExplain(println, selector) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     println('');
     println(terminalThemeHeadline('tool', 'BYOK explicação do catálogo'));
-    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · filtro ${normalizedSelector ?? '-'} · sem runtime novo`, { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · filtro ${normalizedSelector ?? '-'} · sem runtime novo`,
+            { role: 'muted', columns: 112 },
+        ),
+    );
     if (!normalizedSelector) {
-        println(terminalThemeWrappedRow('Estado', 'informe um modelo, provedor:modelo ou trecho do nome exibido', { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Estado', 'informe um modelo, provedor:modelo ou trecho do nome exibido', {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -4484,7 +5198,12 @@ async function renderByokGatewayCatalogExplain(println, selector) {
     }
     const projection = explanation.projection;
     if (!projection) {
-        println(terminalThemeWrappedRow('Estado', 'modelo não encontrado após juntar saúde runtime', { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Estado', 'modelo não encontrado após juntar saúde runtime', {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -4505,7 +5224,11 @@ async function renderByokGatewayCatalogExplain(println, selector) {
         ),
     );
     println(
-        terminalThemeWrappedRow('Saúde runtime', `${renderByokTokenLabel(explanation.runtimeHealth?.status)} · sondas runtime ${explanation.runtimeProbes.length}`, { role: 'muted', columns: 112 }),
+        terminalThemeWrappedRow(
+            'Saúde runtime',
+            `${renderByokTokenLabel(explanation.runtimeHealth?.status)} · sondas runtime ${explanation.runtimeProbes.length}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     println(
         terminalThemeWrappedRow(
@@ -4542,7 +5265,13 @@ async function renderByokGatewayCatalogExplain(println, selector) {
             ),
         );
     }
-    println(terminalThemeWrappedRow('Próximo', renderByokTokenList(explanation.nextActions.slice(0, 6).map(String)) || '-', { role: 'command', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Próximo',
+            renderByokTokenList(explanation.nextActions.slice(0, 6).map(String)) || '-',
+            { role: 'command', columns: 112 },
+        ),
+    );
     println('');
 }
 
@@ -4556,9 +5285,20 @@ async function renderByokGatewayProviderExplain(println, selector) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     println('');
     println(terminalThemeHeadline('tool', 'BYOK explicação do provedor'));
-    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · filtro ${normalizedSelector ?? '-'} · sem runtime`, { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · filtro ${normalizedSelector ?? '-'} · sem runtime`,
+            { role: 'muted', columns: 112 },
+        ),
+    );
     if (!normalizedSelector) {
-        println(terminalThemeWrappedRow('Estado', 'informe um id de provedor ou nome exibido', { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Estado', 'informe um id de provedor ou nome exibido', {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -4574,7 +5314,12 @@ async function renderByokGatewayProviderExplain(println, selector) {
         println('');
         return;
     }
-    println(terminalThemeWrappedRow('Provedor', explanation.providerId ?? normalizedSelector, { role: 'warn', columns: 112 }));
+    println(
+        terminalThemeWrappedRow('Provedor', explanation.providerId ?? normalizedSelector, {
+            role: 'warn',
+            columns: 112,
+        }),
+    );
     println(
         terminalThemeWrappedRow(
             'Camadas',
@@ -4583,7 +5328,11 @@ async function renderByokGatewayProviderExplain(println, selector) {
         ),
     );
     println(
-        terminalThemeWrappedRow('Frescor', `mais novo ${explanation.freshness.newestSourceAt ?? '-'} · mais antigo ${explanation.freshness.oldestSourceAt ?? '-'}`, { role: 'muted', columns: 112 }),
+        terminalThemeWrappedRow(
+            'Frescor',
+            `mais novo ${explanation.freshness.newestSourceAt ?? '-'} · mais antigo ${explanation.freshness.oldestSourceAt ?? '-'}`,
+            { role: 'muted', columns: 112 },
+        ),
     );
     if (explanation.providerProjection) {
         println(
@@ -4613,18 +5362,34 @@ async function renderByokGatewayProviderExplain(println, selector) {
             ),
         );
     }
-    println(terminalThemeWrappedRow('Próximo', renderByokTokenList(explanation.nextActions.slice(0, 6).map(String)) || '-', { role: 'command', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Próximo',
+            renderByokTokenList(explanation.nextActions.slice(0, 6).map(String)) || '-',
+            { role: 'command', columns: 112 },
+        ),
+    );
     println('');
 }
 
 /**
  * @param {string[]} rest
- * @returns {{ query: string; providerId: string | undefined; onlyEligible: boolean; requireTools: boolean; requireStreaming: boolean; requireReasoning: boolean; limit: number }}
+ * @returns {{
+ *     query: string;
+ *     providerId: string | undefined;
+ *     onlyEligible: boolean;
+ *     requireTools: boolean;
+ *     requireStreaming: boolean;
+ *     requireReasoning: boolean;
+ *     limit: number;
+ * }}
  */
 function parseByokGatewayCatalogSearchArgs(rest) {
     const numeric = rest.map((item) => Number(item)).find((value) => Number.isFinite(value) && value > 0);
     const providerToken = rest.find((item) => /^(?:provider|providerId)[:=]/iu.test(item));
-    const providerId = providerToken ? providerToken.slice(providerToken.search(/[:=]/u) + 1).trim() || undefined : undefined;
+    const providerId = providerToken
+        ? providerToken.slice(providerToken.search(/[:=]/u) + 1).trim() || undefined
+        : undefined;
     const query = rest
         .filter((item) => Number.isNaN(Number(item)))
         .filter((item) => !/^(eligible|tools|streaming|reasoning|provider[:=]|providerId[:=])/iu.test(item))
@@ -4671,10 +5436,7 @@ function matchesGatewayCatalogRecordSelector(item, selector) {
  */
 function parseGatewayCatalogListArgs(rest) {
     const numeric = rest.map((item) => Number(item)).find((value) => Number.isFinite(value) && value > 0);
-    const selector =
-        rest
-            .map(optionalScalarString)
-            .find((item) => item && Number.isNaN(Number(item))) ?? null;
+    const selector = rest.map(optionalScalarString).find((item) => item && Number.isNaN(Number(item))) ?? null;
     return {
         selector,
         limit: Math.min(Math.floor(numeric ?? 30), 150),
@@ -4695,7 +5457,9 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
     });
     const { args, controllerStep, decision, inventory, persistence, runtimeSelectorPlan } = status;
     const activeRoute =
-        runtimeSelectorPlan.routes.find((route) => route.profileId === args.profileId) ?? runtimeSelectorPlan.routes[0] ?? null;
+        runtimeSelectorPlan.routes.find((route) => route.profileId === args.profileId) ??
+        runtimeSelectorPlan.routes[0] ??
+        null;
     const alternativeSummary = activeRoute?.alternativeSummary ?? null;
     println('');
     println(terminalThemeHeadline('tool', 'BYOK automação do gateway'));
@@ -4723,15 +5487,26 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
             ),
         );
     }
-    println(terminalThemeRow('Alvo', `${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}`, { role: 'warn' }));
+    println(
+        terminalThemeRow('Alvo', `${decision.targetBoundary.preset ?? '-'} · ${decision.targetBoundary.model ?? '-'}`, {
+            role: 'warn',
+        }),
+    );
     println(terminalThemeRow('Sessão viva', inventory.currentSessionId ?? '(sem sessão viva)', { role: 'warn' }));
-    println(terminalThemeRow('Atual', `${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}`, { role: 'warn' }));
+    println(
+        terminalThemeRow(
+            'Atual',
+            `${decision.currentBoundary.preset ?? '-'} · ${decision.currentBoundary.model ?? '-'}`,
+            { role: 'warn' },
+        ),
+    );
     println(terminalThemeRow('Troca viva', yesNo(decision.canApplyLiveModel), { role: 'warn' }));
     println(terminalThemeRow('Nova sessão', yesNo(decision.requiresNewSession), { role: 'warn' }));
     if (decision.blockerClass && decision.blockerClass !== 'none') {
         println(terminalThemeRow('Classe', renderByokTokenLabel(decision.blockerClass), { role: 'warn' }));
     }
-    if (decision.nonActionReason) println(terminalThemeRow('Sem ação', renderByokTokenLabel(decision.nonActionReason), { role: 'warn' }));
+    if (decision.nonActionReason)
+        println(terminalThemeRow('Sem ação', renderByokTokenLabel(decision.nonActionReason), { role: 'warn' }));
     if (decision.cooldown?.active === true) {
         println(
             terminalThemeWrappedRow(
@@ -4755,39 +5530,67 @@ async function renderByokGatewayAutoStatus(println, rest, options = {}) {
                 { role: 'warn', columns: 112 },
             ),
         );
-        const topBlocked = Array.isArray(alternativeSummary.topBlockedRoutes) ? alternativeSummary.topBlockedRoutes.slice(0, 3) : [];
+        const topBlocked = Array.isArray(alternativeSummary.topBlockedRoutes)
+            ? alternativeSummary.topBlockedRoutes.slice(0, 3)
+            : [];
         for (const blocked of topBlocked) {
             const providerId = optionalScalarString(blocked?.providerId) ?? '-';
             const providerModel = optionalScalarString(blocked?.providerModel) ?? '-';
             const reasons = Array.isArray(blocked?.reasons)
-                ? blocked.reasons.map(optionalScalarString).filter((item) => item !== null).slice(0, 3).join('+')
+                ? blocked.reasons
+                      .map(optionalScalarString)
+                      .filter((item) => item !== null)
+                      .slice(0, 3)
+                      .join('+')
                 : '-';
             println(
-                terminalThemeWrappedRow('Bloqueada', `${providerId}:${providerModel} · ${renderByokTokenList((reasons || '-').split('+'))}`, {
-                    role: 'muted',
-                    columns: 112,
-                }),
+                terminalThemeWrappedRow(
+                    'Bloqueada',
+                    `${providerId}:${providerModel} · ${renderByokTokenList((reasons || '-').split('+'))}`,
+                    {
+                        role: 'muted',
+                        columns: 112,
+                    },
+                ),
             );
         }
         for (const proof of buildModelGatewayRuntimeProofCommands(alternativeSummary)) {
             println(terminalThemeWrappedRow('Provar', proof.command, { role: 'command', columns: 112 }));
         }
     }
-    if (decision.blockers.length > 0) println(terminalThemeWrappedRow('Bloqueios', renderByokTokenList(decision.blockers), { role: 'warn', columns: 112 }));
+    if (decision.blockers.length > 0)
+        println(
+            terminalThemeWrappedRow('Bloqueios', renderByokTokenList(decision.blockers), {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
     if (persistence) {
-        println(terminalThemeRow('Persistência', `${countLabel(persistence.automationDecisions, 'decisão gravada', 'decisões gravadas')}`, { role: 'success' }));
+        println(
+            terminalThemeRow(
+                'Persistência',
+                `${countLabel(persistence.automationDecisions, 'decisão gravada', 'decisões gravadas')}`,
+                { role: 'success' },
+            ),
+        );
     }
     if (controllerStep.effects.length > 0) {
         println(
-            terminalThemeWrappedRow('Efeitos', `${controllerStep.effects.map((effect) => {
-                const kind = renderByokTokenLabel(optionalScalarString(effect['kind']));
-                const mode =
-                    effect['execute'] === true
-                        ? 'executar'
-                        : renderByokTokenLabel(optionalScalarString(effect['authorization']) ?? 'simular');
-                const blockedReason = optionalScalarString(effect['blockedReason']);
-                return `${kind} · ${mode}${blockedReason ? ` · bloqueio ${renderByokTokenLabel(blockedReason)}` : ''}`;
-            }).join(', ')}`, { role: 'muted', columns: 112 }),
+            terminalThemeWrappedRow(
+                'Efeitos',
+                `${controllerStep.effects
+                    .map((effect) => {
+                        const kind = renderByokTokenLabel(optionalScalarString(effect['kind']));
+                        const mode =
+                            effect['execute'] === true
+                                ? 'executar'
+                                : renderByokTokenLabel(optionalScalarString(effect['authorization']) ?? 'simular');
+                        const blockedReason = optionalScalarString(effect['blockedReason']);
+                        return `${kind} · ${mode}${blockedReason ? ` · bloqueio ${renderByokTokenLabel(blockedReason)}` : ''}`;
+                    })
+                    .join(', ')}`,
+                { role: 'muted', columns: 112 },
+            ),
         );
     }
     println(terminalThemeWrappedRow('Resumo', decision.operatorSummary, { role: 'muted', columns: 112 }));
@@ -4831,8 +5634,14 @@ async function renderByokGatewayAutoProofPlan(println, rest) {
         })),
     );
     const visibleRows = rows.slice(0, limit);
-    const evaluated = status.runtimeSelectorPlan.routes.reduce((sum, route) => sum + route.alternativeSummary.evaluatedCount, 0);
-    const usable = status.runtimeSelectorPlan.routes.reduce((sum, route) => sum + route.alternativeSummary.usableCount, 0);
+    const evaluated = status.runtimeSelectorPlan.routes.reduce(
+        (sum, route) => sum + route.alternativeSummary.evaluatedCount,
+        0,
+    );
+    const usable = status.runtimeSelectorPlan.routes.reduce(
+        (sum, route) => sum + route.alternativeSummary.usableCount,
+        0,
+    );
     println('');
     println(terminalThemeHeadline('accent', 'Plano de provas BYOK', ['automação']));
     println(
@@ -4887,9 +5696,7 @@ async function renderByokGatewayAutoStandby(println, rest) {
     const limit = parseByokGatewayAutoHistoryLimit(rest);
     if (rest.some((item) => /^(persisted|persistido|read-sqlite|sqlite|db)$/iu.test(item))) {
         const profile =
-            rest
-                .map((item) => item.match(/^profile[:=](.+)$/iu)?.[1]?.trim())
-                .find((value) => value) ?? 'repo_agent';
+            rest.map((item) => item.match(/^profile[:=](.+)$/iu)?.[1]?.trim()).find((value) => value) ?? 'repo_agent';
         const plans = await new SqliteModelGatewayCatalogStore().readStandbyPlanRecords({ limit, profileId: profile });
         const latest = plans[0] ?? null;
         const latestSummary = asRecord(latest?.['summary']);
@@ -4951,11 +5758,10 @@ async function renderByokGatewayAutoStandby(println, rest) {
     );
     if (visibleRows.length === 0) {
         println(
-            terminalThemeWrappedRow(
-                'Estado',
-                'nenhuma rota de prontidão foi derivada do seletor atual',
-                { role: 'muted', columns: 112 },
-            ),
+            terminalThemeWrappedRow('Estado', 'nenhuma rota de prontidão foi derivada do seletor atual', {
+                role: 'muted',
+                columns: 112,
+            }),
         );
         println('');
         return;
@@ -4969,9 +5775,21 @@ async function renderByokGatewayAutoStandby(println, rest) {
             ),
         );
         println(terminalThemeWrappedRow('Provar', row.commands.probeAgent ?? '-', { role: 'command', columns: 112 }));
-        println(terminalThemeWrappedRow('Mesmo provedor', row.commands.liveModel ?? '-', { role: 'command', columns: 112 }));
-        println(terminalThemeWrappedRow('Novo boot', `${row.commands.newSession} && ${row.commands.provider ?? '-'}`, { role: 'command', columns: 112 }));
-        println(terminalThemeWrappedRow('Persistir', row.commands.persistProvider ?? '-', { role: 'command', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Mesmo provedor', row.commands.liveModel ?? '-', { role: 'command', columns: 112 }),
+        );
+        println(
+            terminalThemeWrappedRow('Novo boot', `${row.commands.newSession} && ${row.commands.provider ?? '-'}`, {
+                role: 'command',
+                columns: 112,
+            }),
+        );
+        println(
+            terminalThemeWrappedRow('Persistir', row.commands.persistProvider ?? '-', {
+                role: 'command',
+                columns: 112,
+            }),
+        );
     }
     println(
         terminalThemeWrappedRow(
@@ -4988,7 +5806,9 @@ async function renderByokGatewayAutoStandby(println, rest) {
  * @returns {string}
  */
 function resolveByokGatewayAutoOnPresetId(rest) {
-    const presetToken = rest.find((item) => /^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu.test(item));
+    const presetToken = rest.find((item) =>
+        /^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu.test(item),
+    );
     return (
         optionalScalarString(
             presetToken?.replace(/^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu, ''),
@@ -5003,7 +5823,9 @@ function resolveByokGatewayAutoOnPresetId(rest) {
  */
 async function renderByokGatewayAutoOn(println, rest) {
     const presetId = resolveByokGatewayAutoOnPresetId(rest);
-    const autoOnRest = rest.some((item) => /^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu.test(item))
+    const autoOnRest = rest.some((item) =>
+        /^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu.test(item),
+    )
         ? rest
         : [...rest, `preset:${presetId}`];
     const args = parseTerminalByokGatewayAutoArgs(autoOnRest);
@@ -5021,8 +5843,18 @@ async function renderByokGatewayAutoOn(println, rest) {
         println('');
         println(terminalThemeHeadline('tool', 'BYOK automação ativada'));
         println(terminalThemeRow('Preset', args.presetId, { role: 'warn' }));
-        println(terminalThemeWrappedRow('Validação', renderByokTokenList(policyValidation.issues), { role: 'error', columns: 112 }));
-        println(terminalThemeWrappedRow('Presets', policyValidation.allowedPresets.join(', '), { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Validação', renderByokTokenList(policyValidation.issues), {
+                role: 'error',
+                columns: 112,
+            }),
+        );
+        println(
+            terminalThemeWrappedRow('Presets', policyValidation.allowedPresets.join(', '), {
+                role: 'muted',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -5112,7 +5944,8 @@ async function renderByokGatewayAutoHistory(println, rest) {
         const action = optionalScalarString(row['action']) ?? '-';
         const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
         const profile = optionalScalarString(row['routeProfile']) ?? '-';
-        const ok = row['ok'] === true ? 'ok' : row['ok'] === false ? 'blocked' : optionalScalarString(row['status']) ?? '-';
+        const ok =
+            row['ok'] === true ? 'ok' : row['ok'] === false ? 'blocked' : (optionalScalarString(row['status']) ?? '-');
         println(
             terminalThemeWrappedRow(
                 `${index + 1}. Decisão`,
@@ -5173,7 +6006,8 @@ async function renderByokGatewayAutoConfirmations(println, rest) {
     rows.slice(0, limit).forEach((row, index) => {
         const status = optionalScalarString(row['status']) ?? '-';
         const previousModel = optionalScalarString(row['previousModel']) ?? '-';
-        const confirmedModel = optionalScalarString(row['confirmedModel']) ?? optionalScalarString(row['newModel']) ?? '-';
+        const confirmedModel =
+            optionalScalarString(row['confirmedModel']) ?? optionalScalarString(row['newModel']) ?? '-';
         const observedAt = optionalScalarString(row['observedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
         println(
             terminalThemeWrappedRow(
@@ -5228,15 +6062,21 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
         rest.filter(
             (item) =>
                 !/^(?:recovery-fixture|fixture-recovery|fixture|simulate|simular)$/iu.test(item) &&
-                !/^(?:failure|kind|failureKind|failure-kind|provider|providerId|provider-id|model|providerModel|provider-model)[:=]/iu.test(item),
+                !/^(?:failure|kind|failureKind|failure-kind|provider|providerId|provider-id|model|providerModel|provider-model)[:=]/iu.test(
+                    item,
+                ),
         ),
     );
     const failureKindToken = rest.find((item) => /^(?:failure|kind|failureKind|failure-kind)[:=]/iu.test(item));
-    const failureKind = optionalScalarString(failureKindToken?.replace(/^(?:failure|kind|failureKind|failure-kind)[:=]/iu, '')) ?? 'rate-limit';
+    const failureKind =
+        optionalScalarString(failureKindToken?.replace(/^(?:failure|kind|failureKind|failure-kind)[:=]/iu, '')) ??
+        'rate-limit';
     const providerToken = rest.find((item) => /^(?:provider|providerId|provider-id)[:=]/iu.test(item));
     const modelToken = rest.find((item) => /^(?:model|providerModel|provider-model)[:=]/iu.test(item));
     const providerId = optionalScalarString(providerToken?.replace(/^(?:provider|providerId|provider-id)[:=]/iu, ''));
-    const providerModel = optionalScalarString(modelToken?.replace(/^(?:model|providerModel|provider-model)[:=]/iu, ''));
+    const providerModel = optionalScalarString(
+        modelToken?.replace(/^(?:model|providerModel|provider-model)[:=]/iu, ''),
+    );
     const writeRealHealth = rest.some((item) => /^(?:real-health|real-route|write-real-health)$/iu.test(item));
     const healthProviderId = writeRealHealth ? providerId : 'model-gateway-fixture';
     const healthProviderModel = writeRealHealth
@@ -5274,11 +6114,10 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     );
     if (result.ran !== true || !result.status) {
         println(
-            terminalThemeWrappedRow(
-                'Estado',
-                'fixture não executou; verifique policy e snapshot ativo',
-                { role: 'warn', columns: 112 },
-            ),
+            terminalThemeWrappedRow('Estado', 'fixture não executou; verifique policy e snapshot ativo', {
+                role: 'warn',
+                columns: 112,
+            }),
         );
         println('');
         return;
@@ -5316,7 +6155,12 @@ async function renderByokGatewayAutoRecoveryFixture(println, rest) {
     if (details.length > 0) {
         println(terminalThemeWrappedRow('Detalhe', details.join('; '), { role: 'muted', columns: 112 }));
     }
-    println(terminalThemeWrappedRow('Próximo', 'use /byok auto recoveries 10 para ler o ledger persistido', { role: 'command', columns: 112 }));
+    println(
+        terminalThemeWrappedRow('Próximo', 'use /byok auto recoveries 10 para ler o ledger persistido', {
+            role: 'command',
+            columns: 112,
+        }),
+    );
     println('');
 }
 
@@ -5360,66 +6204,68 @@ function renderModelGatewayCommandPhaseLabel(phase) {
     return labels[normalized] ?? renderByokTokenLabel(normalized);
 }
 
-const TERMINAL_MODEL_GATEWAY_COMMAND_SUMMARIES = /** @type {Readonly<Record<string, string>>} */ (Object.freeze({
-    'commands.text': 'Lista os comandos canônicos para operador humano e LLM.',
-    'commands.json': 'Emite o inventário canônico como JSON estruturado.',
-    'scripts.manifest': 'Mostra o manifesto dos runners e barrels do model-gateway.',
-    'ops.status': 'Abre cockpit operacional read-only de banco, readiness, automação e comandos.',
-    'operator.ready': 'Mostra readiness do operador com checks, rotas standby e próximos comandos seguros.',
-    'lint.scoped': 'Roda ESLint no model-gateway, comando BYOK terminal e testes focados.',
-    'typecheck.strict': 'Roda typecheck strict do escopo src/copilot.',
-    'test.contracts': 'Roda a suíte unitária de contratos do model-gateway.',
-    'test.terminal': 'Roda a suíte unitária do comando terminal BYOK.',
-    'validate.prebuild': 'Roda validações canônicas escopadas antes do build do banco.',
-    'refresh.incremental': 'Atualiza metadados incrementalmente com log JSONL vivo.',
-    'refresh.provider': 'Atualiza apenas um provedor/família sem rebuild completo.',
-    'refresh.preview': 'Simula refresh de provedor e grava log sem commitar snapshot.',
-    'refresh.log': 'Resume o último log JSONL de refresh sem tocar no catálogo.',
-    'refresh.log-sqlite': 'Espelha eventos operacionais de refresh no SQLite sem mutar metadados.',
-    'refresh.plan': 'Planeja fontes selecionadas/puladas antes de buscar provedores.',
-    'sqlite.diagnostics': 'Inspeciona tabelas SQLite e camadas operacionais sem buscar rede.',
-    'runtime-health.mirror': 'Espelha saúde BYOK já observada para tabelas runtime no SQLite.',
-    'sqlite.retention': 'Pré-visualiza retenção de quota, rate limit, gasto, rotas, refresh e saúde.',
-    'sqlite.retention-apply': 'Aplica retenção operacional SQLite para histórico volátil.',
-    'prebuild.all': 'Mostra inventário e roda validadores escopados de pré-build.',
-    'prebuild.first-build': 'Roda pré-build e materializa o banco de metadados.',
-    'metadata-build.plan': 'Planeja o build completo sem buscar provedores nem gravar stores.',
-    'metadata-build.preview': 'Executa preview do build completo sem commitar JSON/SQLite.',
-    'metadata-build.commit': 'Materializa catálogo, espelha SQLite e aplica retenção operacional.',
-    'catalog.integrity': 'Audita duplicidades e identidades redigidas do catálogo persistido.',
-    'redaction.audit': 'Audita JSON/SQLite contra vazamento de strings com aparência de segredo.',
-    'selection.audit': 'Audita seleção metadata-first sem executar probes runtime.',
-    'selection.audit.local-strict': 'Bloqueia remoto no perfil local/private estrito sem runtime.',
-    'selection.effective': 'Avalia seleção efetiva usando overlays de conta e saúde já observada.',
-    'selection.effective.supply-gate': 'Falha quando perfil local/private não tem oferta local suficiente.',
-    'selection.effective.runtime-proof': 'Inspeciona seleção exigindo prova runtime já observada.',
-    'selection.effective.trace': 'Persiste trace não-mutante de decisão para auditoria e handoff.',
-    'selection.trace-diff': 'Compara os dois traces de seleção mais recentes.',
-    'selection.trace-retention': 'Pré-visualiza retenção de traces de seleção sem apagar por padrão.',
-    'runtime.selector': 'Monta plano final do seletor runtime sem chamar provider.',
-    'automation.status': 'Calcula decisão pura de automação sem mutar terminal.',
-    'automation.plan': 'Inspeciona a próxima ação automática por perfil de rota.',
-    'automation.ready': 'Roda gate read-only antes de usar auto mode ao vivo.',
-    'automation.doctor': 'Explica política auto, bloqueios, ledgers e próximos passos.',
-    'automation.explain': 'Combina status e doctor em uma explicação read-only.',
-    'automation.handoffs': 'Lê handoffs SDK persistidos pela automação.',
-    'automation.confirmations': 'Lê confirmações de modelo correlacionadas à automação.',
-    'automation.recoveries': 'Lê tentativas de recuperação pós-turno persistidas.',
-    'automation.proof-plan': 'Cria fila read-only de comandos explícitos de prova runtime.',
-    'automation.standby': 'Lista rotas standby com comandos seguros para o operador.',
-    'automation.standby-write-sqlite': 'Persiste plano standby no SQLite sem chamar providers.',
-    'automation.standby-read-sqlite': 'Lê planos standby persistidos sem recalcular selector.',
-    'automation.scenarios': 'Monta roteiro canônico read-only para auto mode e live tests.',
-    'runtime-health.diff': 'Snapshot/diff de saúde runtime já observada sem chamadas externas.',
-    'runtime-health.clear': 'Limpa saúde operacional escopada após reset ou contaminação de fixture.',
-    'live.readiness': 'Checa integridade, paridade SQLite e seleção antes de live tests.',
-    'live.plan': 'Materializa plano de live test sem runtime adicional.',
-    'live.plan.local-strict': 'Materializa plano live com pré-requisito local/private explícito.',
-    'live.terminal.control-no-pr': 'Roda controle LLM-B sem abrir turno de modelo.',
-    'live.terminal.byok-fixture': 'Roda controle BYOK contra fixture OpenAI-compatible local.',
-    'live.terminal.auto-probe': 'Roda probe do cockpit auto sem turno de modelo nem providers.',
-    'live.runs': 'Lê summaries de live persistidos no SQLite.',
-}));
+const TERMINAL_MODEL_GATEWAY_COMMAND_SUMMARIES = /** @type {Readonly<Record<string, string>>} */ (
+    Object.freeze({
+        'commands.text': 'Lista os comandos canônicos para operador humano e LLM.',
+        'commands.json': 'Emite o inventário canônico como JSON estruturado.',
+        'scripts.manifest': 'Mostra o manifesto dos runners e barrels do model-gateway.',
+        'ops.status': 'Abre cockpit operacional read-only de banco, readiness, automação e comandos.',
+        'operator.ready': 'Mostra readiness do operador com checks, rotas standby e próximos comandos seguros.',
+        'lint.scoped': 'Roda ESLint no model-gateway, comando BYOK terminal e testes focados.',
+        'typecheck.strict': 'Roda typecheck strict do escopo src/copilot.',
+        'test.contracts': 'Roda a suíte unitária de contratos do model-gateway.',
+        'test.terminal': 'Roda a suíte unitária do comando terminal BYOK.',
+        'validate.prebuild': 'Roda validações canônicas escopadas antes do build do banco.',
+        'refresh.incremental': 'Atualiza metadados incrementalmente com log JSONL vivo.',
+        'refresh.provider': 'Atualiza apenas um provedor/família sem rebuild completo.',
+        'refresh.preview': 'Simula refresh de provedor e grava log sem commitar snapshot.',
+        'refresh.log': 'Resume o último log JSONL de refresh sem tocar no catálogo.',
+        'refresh.log-sqlite': 'Espelha eventos operacionais de refresh no SQLite sem mutar metadados.',
+        'refresh.plan': 'Planeja fontes selecionadas/puladas antes de buscar provedores.',
+        'sqlite.diagnostics': 'Inspeciona tabelas SQLite e camadas operacionais sem buscar rede.',
+        'runtime-health.mirror': 'Espelha saúde BYOK já observada para tabelas runtime no SQLite.',
+        'sqlite.retention': 'Pré-visualiza retenção de quota, rate limit, gasto, rotas, refresh e saúde.',
+        'sqlite.retention-apply': 'Aplica retenção operacional SQLite para histórico volátil.',
+        'prebuild.all': 'Mostra inventário e roda validadores escopados de pré-build.',
+        'prebuild.first-build': 'Roda pré-build e materializa o banco de metadados.',
+        'metadata-build.plan': 'Planeja o build completo sem buscar provedores nem gravar stores.',
+        'metadata-build.preview': 'Executa preview do build completo sem commitar JSON/SQLite.',
+        'metadata-build.commit': 'Materializa catálogo, espelha SQLite e aplica retenção operacional.',
+        'catalog.integrity': 'Audita duplicidades e identidades redigidas do catálogo persistido.',
+        'redaction.audit': 'Audita JSON/SQLite contra vazamento de strings com aparência de segredo.',
+        'selection.audit': 'Audita seleção metadata-first sem executar probes runtime.',
+        'selection.audit.local-strict': 'Bloqueia remoto no perfil local/private estrito sem runtime.',
+        'selection.effective': 'Avalia seleção efetiva usando overlays de conta e saúde já observada.',
+        'selection.effective.supply-gate': 'Falha quando perfil local/private não tem oferta local suficiente.',
+        'selection.effective.runtime-proof': 'Inspeciona seleção exigindo prova runtime já observada.',
+        'selection.effective.trace': 'Persiste trace não-mutante de decisão para auditoria e handoff.',
+        'selection.trace-diff': 'Compara os dois traces de seleção mais recentes.',
+        'selection.trace-retention': 'Pré-visualiza retenção de traces de seleção sem apagar por padrão.',
+        'runtime.selector': 'Monta plano final do seletor runtime sem chamar provider.',
+        'automation.status': 'Calcula decisão pura de automação sem mutar terminal.',
+        'automation.plan': 'Inspeciona a próxima ação automática por perfil de rota.',
+        'automation.ready': 'Roda gate read-only antes de usar auto mode ao vivo.',
+        'automation.doctor': 'Explica política auto, bloqueios, ledgers e próximos passos.',
+        'automation.explain': 'Combina status e doctor em uma explicação read-only.',
+        'automation.handoffs': 'Lê handoffs SDK persistidos pela automação.',
+        'automation.confirmations': 'Lê confirmações de modelo correlacionadas à automação.',
+        'automation.recoveries': 'Lê tentativas de recuperação pós-turno persistidas.',
+        'automation.proof-plan': 'Cria fila read-only de comandos explícitos de prova runtime.',
+        'automation.standby': 'Lista rotas standby com comandos seguros para o operador.',
+        'automation.standby-write-sqlite': 'Persiste plano standby no SQLite sem chamar providers.',
+        'automation.standby-read-sqlite': 'Lê planos standby persistidos sem recalcular selector.',
+        'automation.scenarios': 'Monta roteiro canônico read-only para auto mode e live tests.',
+        'runtime-health.diff': 'Snapshot/diff de saúde runtime já observada sem chamadas externas.',
+        'runtime-health.clear': 'Limpa saúde operacional escopada após reset ou contaminação de fixture.',
+        'live.readiness': 'Checa integridade, paridade SQLite e seleção antes de live tests.',
+        'live.plan': 'Materializa plano de live test sem runtime adicional.',
+        'live.plan.local-strict': 'Materializa plano live com pré-requisito local/private explícito.',
+        'live.terminal.control-no-pr': 'Roda controle LLM-B sem abrir turno de modelo.',
+        'live.terminal.byok-fixture': 'Roda controle BYOK contra fixture OpenAI-compatible local.',
+        'live.terminal.auto-probe': 'Roda probe do cockpit auto sem turno de modelo nem providers.',
+        'live.runs': 'Lê summaries de live persistidos no SQLite.',
+    })
+);
 
 /**
  * @param {Record<string, unknown>} command
@@ -5453,9 +6299,15 @@ async function renderByokGatewayAutoPolicy(println) {
     println('');
     println(terminalThemeHeadline('tool', 'BYOK política da automação'));
     println(terminalThemeRow('Arquivo', DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, { role: 'command' }));
-    println(terminalThemeRow('Arquivo cfg', fileConfigured ? 'sim' : 'não', { role: fileConfigured ? 'success' : 'muted' }));
+    println(
+        terminalThemeRow('Arquivo cfg', fileConfigured ? 'sim' : 'não', { role: fileConfigured ? 'success' : 'muted' }),
+    );
     println(terminalThemeRow('Env cfg', envConfigured ? 'sim' : 'não', { role: envConfigured ? 'warn' : 'muted' }));
-    println(terminalThemeRow('Efetivo', enabledDisabled(effectivePolicy.enabled), { role: effectivePolicy.enabled ? 'success' : 'warn' }));
+    println(
+        terminalThemeRow('Efetivo', enabledDisabled(effectivePolicy.enabled), {
+            role: effectivePolicy.enabled ? 'success' : 'warn',
+        }),
+    );
     println(
         terminalThemeWrappedRow(
             'Política',
@@ -5615,7 +6467,12 @@ async function renderByokGatewayAutoDoctor(println, rest) {
         ),
     );
     if (decision.blockers.length > 0) {
-        println(terminalThemeWrappedRow('Bloqueios', renderByokTokenList(decision.blockers), { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Bloqueios', renderByokTokenList(decision.blockers), {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
     }
     if (warnings.length > 0) {
         println(terminalThemeWrappedRow('Avisos', renderByokTokenList(warnings), { role: 'warn', columns: 112 }));
@@ -5624,7 +6481,9 @@ async function renderByokGatewayAutoDoctor(println, rest) {
     println(
         terminalThemeWrappedRow(
             'Próximo',
-            warnings.includes('policy_disabled') ? `/byok auto on profile:${status.args.profileId}` : decision.nextCommands.join(' && '),
+            warnings.includes('policy_disabled')
+                ? `/byok auto on profile:${status.args.profileId}`
+                : decision.nextCommands.join(' && '),
             { role: 'command', columns: 112 },
         ),
     );
@@ -5661,9 +6520,9 @@ async function renderByokGatewayAutoOff(println) {
     println('');
 }
 
- /**
+/**
  * @param {(text: string) => void} println
- * @param {{ effects: Array<Record<string, unknown>> }} controllerStep
+ * @param {{ effects: Record<string, unknown>[] }} controllerStep
  * @returns {ReturnType<typeof applyTerminalByokGatewayAutoEffects>}
  */
 async function applyByokGatewayAutoEffects(println, controllerStep) {
@@ -5684,13 +6543,17 @@ async function applyByokGatewayAutoEffects(println, controllerStep) {
             .map((effect) => describeTerminalByokGatewayAutoEffect(effect))
             .slice(0, 4)
             .join('; ');
-        println(terminalThemeRow('Aplicação', `nenhum efeito aplicado · ${reasons || 'revise bloqueios e próxima ação acima'}`, { role: 'warn' }));
         println(
             terminalThemeRow(
-                'Próximo',
-                'use /byok auto status para revisar bloqueios, política e seleção atual',
-                { role: 'muted' },
+                'Aplicação',
+                `nenhum efeito aplicado · ${reasons || 'revise bloqueios e próxima ação acima'}`,
+                { role: 'warn' },
             ),
+        );
+        println(
+            terminalThemeRow('Próximo', 'use /byok auto status para revisar bloqueios, política e seleção atual', {
+                role: 'muted',
+            }),
         );
         println('');
         return application;
@@ -5736,7 +6599,12 @@ async function renderByokGatewayCatalogSearch(println, rest) {
         ),
     );
     if (results.length === 0) {
-        println(terminalThemeWrappedRow('Resultado', 'nenhum modelo encontrado para os filtros informados', { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Resultado', 'nenhum modelo encontrado para os filtros informados', {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -5813,9 +6681,15 @@ async function renderByokGatewayRoutes(println, rest) {
         );
     }
     if (routes.length > displayLimit) {
-        println(terminalThemeRow('Mais', `exibindo ${displayLimit}/${routes.length}; use filtro ou limite numérico.`, { role: 'muted' }));
+        println(
+            terminalThemeRow('Mais', `exibindo ${displayLimit}/${routes.length}; use filtro ou limite numérico.`, {
+                role: 'muted',
+            }),
+        );
     }
-    println(terminalThemeRow('Nota', 'rotas são metadados de seleção; esta tela não executa modelo.', { role: 'muted' }));
+    println(
+        terminalThemeRow('Nota', 'rotas são metadados de seleção; esta tela não executa modelo.', { role: 'muted' }),
+    );
     println('');
 }
 
@@ -5841,7 +6715,11 @@ async function renderByokGatewayOverlays(println, rest) {
         ),
     );
     if (overlays.length === 0) {
-        println(terminalThemeRow('Resultado', 'nenhum overlay de conta encontrado para o filtro informado.', { role: 'warn' }));
+        println(
+            terminalThemeRow('Resultado', 'nenhum overlay de conta encontrado para o filtro informado.', {
+                role: 'warn',
+            }),
+        );
         println('');
         return;
     }
@@ -5877,9 +6755,19 @@ async function renderByokGatewayOverlays(println, rest) {
         );
     }
     if (overlays.length > args.limit) {
-        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${overlays.length}; use filtro ou limite numérico.`, { role: 'muted' }));
+        println(
+            terminalThemeRow('Mais', `exibindo ${args.limit}/${overlays.length}; use filtro ou limite numérico.`, {
+                role: 'muted',
+            }),
+        );
     }
-    println(terminalThemeRow('Nota', 'overlays complementam o catálogo; a tela não executa modelo nem revela valores de segredo.', { role: 'muted' }));
+    println(
+        terminalThemeRow(
+            'Nota',
+            'overlays complementam o catálogo; a tela não executa modelo nem revela valores de segredo.',
+            { role: 'muted' },
+        ),
+    );
     println('');
 }
 
@@ -5912,7 +6800,11 @@ async function renderByokGatewayAccounts(println, rest) {
         }),
     );
     if (accountSummary.rows.length === 0) {
-        println(terminalThemeRow('Resultado', 'nenhuma conta/key overlay encontrada para o filtro informado.', { role: 'warn' }));
+        println(
+            terminalThemeRow('Resultado', 'nenhuma conta/key overlay encontrada para o filtro informado.', {
+                role: 'warn',
+            }),
+        );
         println('');
         return;
     }
@@ -5955,9 +6847,21 @@ async function renderByokGatewayAccounts(println, rest) {
         );
     }
     if (accountSummary.rows.length > args.limit) {
-        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${accountSummary.rows.length}; use filtro ou limite numérico.`, { role: 'muted' }));
+        println(
+            terminalThemeRow(
+                'Mais',
+                `exibindo ${args.limit}/${accountSummary.rows.length}; use filtro ou limite numérico.`,
+                { role: 'muted' },
+            ),
+        );
     }
-    println(terminalThemeRow('Nota', 'esta visão é da conta/key e não executa modelo; saúde runtime continua em /byok health.', { role: 'muted' }));
+    println(
+        terminalThemeRow(
+            'Nota',
+            'esta visão é da conta/key e não executa modelo; saúde runtime continua em /byok health.',
+            { role: 'muted' },
+        ),
+    );
     println('');
 }
 
@@ -5967,10 +6871,12 @@ async function renderByokGatewayAccounts(println, rest) {
  * @returns {string}
  */
 function renderGatewayCountMap(counts, labeler = (key) => key) {
-    return Object.entries(counts)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, count]) => `${labeler(key)}:${count}`)
-        .join(',') || '-';
+    return (
+        Object.entries(counts)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([key, count]) => `${labeler(key)}:${count}`)
+            .join(',') || '-'
+    );
 }
 
 /**
@@ -5985,7 +6891,9 @@ async function renderByokGatewayLimits(println, rest) {
     const catalogOverlays = Array.isArray(snapshot.accountOverlays) ? snapshot.accountOverlays : [];
     const runtimeOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(listByokProviderModelHealth());
     const runtimeSummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeOverlays);
-    const explanation = explainModelGatewayAccountLimitOverlays([...catalogOverlays, ...runtimeOverlays], { selector: args.selector });
+    const explanation = explainModelGatewayAccountLimitOverlays([...catalogOverlays, ...runtimeOverlays], {
+        selector: args.selector,
+    });
     println('');
     println(terminalThemeHeadline('accent', 'BYOK limites de conta'));
     println(
@@ -5995,20 +6903,38 @@ async function renderByokGatewayLimits(println, rest) {
             { role: explanation.summary.activeBlockers > 0 ? 'warn' : 'muted' },
         ),
     );
-    println(terminalThemeRow('Estados', renderGatewayCountMap(explanation.summary.byStatus, renderByokTokenLabel), { role: 'muted' }));
-    println(terminalThemeRow('Fontes', renderGatewayCountMap(explanation.summary.bySourceLayer, renderByokTokenLabel), { role: 'muted' }));
+    println(
+        terminalThemeRow('Estados', renderGatewayCountMap(explanation.summary.byStatus, renderByokTokenLabel), {
+            role: 'muted',
+        }),
+    );
+    println(
+        terminalThemeRow('Fontes', renderGatewayCountMap(explanation.summary.bySourceLayer, renderByokTokenLabel), {
+            role: 'muted',
+        }),
+    );
     if (explanation.rows.length === 0) {
-        println(terminalThemeRow('Resultado', 'nenhum limite account/key encontrado para o filtro informado.', { role: 'warn' }));
+        println(
+            terminalThemeRow('Resultado', 'nenhum limite account/key encontrado para o filtro informado.', {
+                role: 'warn',
+            }),
+        );
         println('');
         return;
     }
     for (const row of explanation.rows.slice(0, args.limit)) {
         const state = row.activeBlocker ? 'ativo' : row.expiredSignal ? 'expirado' : 'livre';
-        const reset = row.resetAt ? `reset ${row.resetAt}` : row.retryAfterSeconds ? `retentar em ${row.retryAfterSeconds}s` : 'reset -';
+        const reset = row.resetAt
+            ? `reset ${row.resetAt}`
+            : row.retryAfterSeconds
+              ? `retentar em ${row.retryAfterSeconds}s`
+              : 'reset -';
         const money = [
             row.remainingUsd !== null ? `USD restante ${row.remainingUsd}` : null,
             row.remainingCreditsUsd !== null ? `créditos USD ${row.remainingCreditsUsd}` : null,
-        ].filter(Boolean).join(' · ');
+        ]
+            .filter(Boolean)
+            .join(' · ');
         println(terminalThemeRow('Provedor', row.providerId, { role: row.activeBlocker ? 'warn' : 'accent' }));
         println(
             terminalThemeRow(
@@ -6024,12 +6950,28 @@ async function renderByokGatewayLimits(println, rest) {
                 { role: 'muted' },
             ),
         );
-        println(terminalThemeRow('Ação', renderByokTokenLabel(row.nextAction), { role: row.activeBlocker ? 'command' : 'muted' }));
+        println(
+            terminalThemeRow('Ação', renderByokTokenLabel(row.nextAction), {
+                role: row.activeBlocker ? 'command' : 'muted',
+            }),
+        );
     }
     if (explanation.rows.length > args.limit) {
-        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${explanation.rows.length}; use filtro ou limite numérico.`, { role: 'muted' }));
+        println(
+            terminalThemeRow(
+                'Mais',
+                `exibindo ${args.limit}/${explanation.rows.length}; use filtro ou limite numérico.`,
+                { role: 'muted' },
+            ),
+        );
     }
-    println(terminalThemeRow('Nota', 'limites provider/account podem bloquear pré-runtime; AssistantUsageQuotaSnapshot é quota SDK/Copilot e não substitui overlay BYOK externo.', { role: 'muted' }));
+    println(
+        terminalThemeRow(
+            'Nota',
+            'limites provider/account podem bloquear pré-runtime; AssistantUsageQuotaSnapshot é quota SDK/Copilot e não substitui overlay BYOK externo.',
+            { role: 'muted' },
+        ),
+    );
     println('');
 }
 
@@ -6050,7 +6992,13 @@ function renderByokGatewayQuotaMatrix(println, rest) {
             { role: 'muted' },
         ),
     );
-    println(terminalThemeRow('Tipos de quota', renderGatewayCountMap(matrix.summary.byQuotaSnapshot, renderByokTokenLabel), { role: 'muted' }));
+    println(
+        terminalThemeRow(
+            'Tipos de quota',
+            renderGatewayCountMap(matrix.summary.byQuotaSnapshot, renderByokTokenLabel),
+            { role: 'muted' },
+        ),
+    );
     if (matrix.rows.length === 0) {
         println(terminalThemeRow('Resultado', 'nenhum provedor encontrado para o filtro informado.', { role: 'warn' }));
         println('');
@@ -6074,9 +7022,19 @@ function renderByokGatewayQuotaMatrix(println, rest) {
         println(terminalThemeRow('Endpoints', row.endpoints.slice(0, 4).join(', ') || '-', { role: 'muted' }));
     }
     if (matrix.rows.length > args.limit) {
-        println(terminalThemeRow('Mais', `exibindo ${args.limit}/${matrix.rows.length}; use filtro ou limite numérico.`, { role: 'muted' }));
+        println(
+            terminalThemeRow('Mais', `exibindo ${args.limit}/${matrix.rows.length}; use filtro ou limite numérico.`, {
+                role: 'muted',
+            }),
+        );
     }
-    println(terminalThemeRow('Nota', 'a matriz descreve fontes pré-runtime possíveis; ela não prova acesso runtime nem altera catálogo.', { role: 'muted' }));
+    println(
+        terminalThemeRow(
+            'Nota',
+            'a matriz descreve fontes pré-runtime possíveis; ela não prova acesso runtime nem altera catálogo.',
+            { role: 'muted' },
+        ),
+    );
     println('');
 }
 
@@ -6088,10 +7046,20 @@ async function renderByokGatewayCatalogConflicts(println) {
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     println('');
     println(terminalThemeHeadline('tool', 'BYOK conflitos do catálogo'));
-    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · fonte snapshot persistido · sem rede`, { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · fonte snapshot persistido · sem rede`, {
+            role: 'muted',
+            columns: 112,
+        }),
+    );
     const snapshot = await store.readSnapshot();
     if (snapshot.conflicts.length === 0) {
-        println(terminalThemeWrappedRow('Resultado', 'nenhum conflito de evidência no snapshot atual', { role: 'success', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Resultado', 'nenhum conflito de evidência no snapshot atual', {
+                role: 'success',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -6112,7 +7080,13 @@ async function renderByokGatewayCatalogConflicts(println) {
         );
     }
     if (snapshot.conflicts.length > 20) {
-        println(terminalThemeWrappedRow('Omitidos', `exibindo 20/${snapshot.conflicts.length}; refine depois com /models explain <provider:model>`, { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Omitidos',
+                `exibindo 20/${snapshot.conflicts.length}; refine depois com /models explain <provider:model>`,
+                { role: 'muted', columns: 112 },
+            ),
+        );
     }
     println('');
 }
@@ -6135,9 +7109,20 @@ async function renderByokGatewayCatalogFreshness(println, rest) {
         .sort((a, b) => b.at.localeCompare(a.at));
     println('');
     println(terminalThemeHeadline('tool', 'BYOK frescor do catálogo'));
-    println(terminalThemeWrappedRow('Resumo', `catálogo ${store.filePath} · filtro ${args.selector ?? '-'} · fontes ${sources.length}/${snapshot.sources.length}`, { role: 'muted', columns: 112 }));
+    println(
+        terminalThemeWrappedRow(
+            'Resumo',
+            `catálogo ${store.filePath} · filtro ${args.selector ?? '-'} · fontes ${sources.length}/${snapshot.sources.length}`,
+            { role: 'muted', columns: 112 },
+        ),
+    );
     if (sources.length === 0) {
-        println(terminalThemeWrappedRow('Resultado', 'nenhuma source encontrada para o filtro informado', { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Resultado', 'nenhuma source encontrada para o filtro informado', {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
@@ -6151,7 +7136,14 @@ async function renderByokGatewayCatalogFreshness(println, rest) {
             ),
         );
     }
-    if (sources.length > args.limit) println(terminalThemeWrappedRow('Omitidos', `exibindo ${args.limit}/${sources.length}; use filtro ou limite numérico`, { role: 'muted', columns: 112 }));
+    if (sources.length > args.limit)
+        println(
+            terminalThemeWrappedRow(
+                'Omitidos',
+                `exibindo ${args.limit}/${sources.length}; use filtro ou limite numérico`,
+                { role: 'muted', columns: 112 },
+            ),
+        );
     println('');
 }
 
@@ -6265,30 +7257,50 @@ async function renderByokGatewayEligibility(println, rest, eventBus = null) {
         ),
     );
     if (snapshot.projections.length === 0) {
-        println(terminalThemeWrappedRow('Estado', 'nenhum snapshot de catálogo encontrado; rode /byok gateway catalog refresh primeiro', { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Estado',
+                'nenhum snapshot de catálogo encontrado; rode /byok gateway catalog refresh primeiro',
+                { role: 'warn', columns: 112 },
+            ),
+        );
         println('');
         return;
     }
     if (explained.length === 0) {
-        println(terminalThemeWrappedRow('Resultado', 'nenhum modelo encontrado para o filtro informado', { role: 'warn', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Resultado', 'nenhum modelo encontrado para o filtro informado', {
+                role: 'warn',
+                columns: 112,
+            }),
+        );
         println('');
         return;
     }
     if (args.persist) {
         const run = asRecord(evaluated.run);
         println(
-            terminalThemeWrappedRow('Persistência', `elegibilidade persistida · run ${optionalScalarString(run['runId']) ?? '-'} · decisões ${evaluated.decisions.length}`, { role: 'success', columns: 112 }),
+            terminalThemeWrappedRow(
+                'Persistência',
+                `elegibilidade persistida · run ${optionalScalarString(run['runId']) ?? '-'} · decisões ${evaluated.decisions.length}`,
+                { role: 'success', columns: 112 },
+            ),
         );
     }
     for (const item of explained.slice(0, args.limit)) {
         println(
+            terminalThemeWrappedRow('Modelo', `${renderByokTokenLabel(item.status)} · ${item.key}`, {
+                role: item.status === 'eligible' ? 'success' : item.status === 'unknown' ? 'warn' : 'error',
+                columns: 112,
+            }),
+        );
+        println(
             terminalThemeWrappedRow(
-                'Modelo',
-                `${renderByokTokenLabel(item.status)} · ${item.key}`,
-                { role: item.status === 'eligible' ? 'success' : item.status === 'unknown' ? 'warn' : 'error', columns: 112 },
+                'Decisão',
+                `${renderByokTokenLabel(item.summary)} · disposição ${renderByokTokenLabel(item.disposition)}`,
+                { role: 'muted', columns: 112 },
             ),
         );
-        println(terminalThemeWrappedRow('Decisão', `${renderByokTokenLabel(item.summary)} · disposição ${renderByokTokenLabel(item.disposition)}`, { role: 'muted', columns: 112 }));
         println(
             terminalThemeWrappedRow(
                 'Ação',
@@ -6296,12 +7308,38 @@ async function renderByokGatewayEligibility(println, rest, eventBus = null) {
                 { role: item.actionable?.probeSafe ? 'command' : 'muted', columns: 112 },
             ),
         );
-        if (item.hardExclusions.length > 0) println(terminalThemeWrappedRow('Exclusões fortes', renderByokTokenList(item.hardExclusions.slice(0, 4).map(String)), { role: 'error', columns: 112 }));
-        if (item.softPenalties.length > 0) println(terminalThemeWrappedRow('Penalidades leves', renderByokTokenList(item.softPenalties.slice(0, 4).map(String)), { role: 'warn', columns: 112 }));
-        if (item.nextActions.length > 0) println(terminalThemeWrappedRow('Próximo', renderByokTokenList(item.nextActions.slice(0, 4).map(String)), { role: 'command', columns: 112 }));
+        if (item.hardExclusions.length > 0)
+            println(
+                terminalThemeWrappedRow(
+                    'Exclusões fortes',
+                    renderByokTokenList(item.hardExclusions.slice(0, 4).map(String)),
+                    { role: 'error', columns: 112 },
+                ),
+            );
+        if (item.softPenalties.length > 0)
+            println(
+                terminalThemeWrappedRow(
+                    'Penalidades leves',
+                    renderByokTokenList(item.softPenalties.slice(0, 4).map(String)),
+                    { role: 'warn', columns: 112 },
+                ),
+            );
+        if (item.nextActions.length > 0)
+            println(
+                terminalThemeWrappedRow('Próximo', renderByokTokenList(item.nextActions.slice(0, 4).map(String)), {
+                    role: 'command',
+                    columns: 112,
+                }),
+            );
     }
     if (explained.length > args.limit) {
-        println(terminalThemeWrappedRow('Omitidos', `exibindo ${args.limit}/${explained.length}; use filtro ou limite numérico para reduzir`, { role: 'muted', columns: 112 }));
+        println(
+            terminalThemeWrappedRow(
+                'Omitidos',
+                `exibindo ${args.limit}/${explained.length}; use filtro ou limite numérico para reduzir`,
+                { role: 'muted', columns: 112 },
+            ),
+        );
     }
     println('');
 }
@@ -6329,7 +7367,15 @@ function clearRuntimeSelectors(except = []) {
 
 /**
  * @param {string[]} rest
- * @returns {{ env: Record<string, string | undefined>; model: string | null; profile: string | null; provider: string | null; baseUrl: string | null; wireApi: string | null; timeoutMs: number | undefined }}
+ * @returns {{
+ *     env: Record<string, string | undefined>;
+ *     model: string | null;
+ *     profile: string | null;
+ *     provider: string | null;
+ *     baseUrl: string | null;
+ *     wireApi: string | null;
+ *     timeoutMs: number | undefined;
+ * }}
  */
 function buildByokProbeSelection(rest) {
     /** @type {Record<string, string | undefined>} */
@@ -6395,10 +7441,7 @@ function buildByokProbeSelection(rest) {
             continue;
         }
         if (lower.startsWith('timeout:') || lower.startsWith('timeout=')) {
-            const value = Number.parseInt(
-                item.slice(item.indexOf(lower.startsWith('timeout:') ? ':' : '=') + 1),
-                10,
-            );
+            const value = Number.parseInt(item.slice(item.indexOf(lower.startsWith('timeout:') ? ':' : '=') + 1), 10);
             if (Number.isFinite(value) && value > 0) timeoutMs = value;
             continue;
         }
@@ -6566,7 +7609,7 @@ async function runByokProbe(mode, selection, eventBus = null) {
                 ? runConfiguredByokJsonProbe
                 : mode === 'vision'
                   ? runConfiguredByokVisionProbe
-                : runConfiguredByokChatProbe;
+                  : runConfiguredByokChatProbe;
     const probe = await probeRunner({
         env: selection.env,
         ...(selection.model ? { model: selection.model } : {}),
@@ -6650,24 +7693,36 @@ function deleteEnvLine(text, key) {
     return text.replace(re, '');
 }
 
+/** @type {Promise<void>} */
+let envLocalMutationQueue = Promise.resolve();
+
 /**
  * @param {(text: string) => string} mutate
  * @returns {Promise<void>}
  */
-async function mutateEnvLocal(mutate) {
-    const path = '.env.local';
-    let text = '';
-    try {
-        text = await fs.readFile(path, 'utf8');
-    } catch (error) {
-        if (/** @type {{ code?: string }} */ (error).code !== 'ENOENT') throw error;
-    }
-    const next = mutate(text);
-    const normalized = next.endsWith('\n') ? next : `${next}\n`;
-    const temp = `${path}.tmp-${process.pid}-${Date.now()}`;
-    await fs.writeFile(temp, normalized, { encoding: 'utf8', mode: 0o600 });
-    await fs.rename(temp, path);
-    await Promise.resolve(fs.chmod(path, 0o600)).catch(() => undefined);
+function mutateEnvLocal(mutate) {
+    const operation = envLocalMutationQueue
+        .catch(() => undefined)
+        .then(async () => {
+            const path = '.env.local';
+            let text = '';
+            try {
+                text = await fs.readFile(path, 'utf8');
+            } catch (error) {
+                if (/** @type {{ code?: string }} */ (error).code !== 'ENOENT') throw error;
+            }
+            const next = mutate(text);
+            const normalized = next.endsWith('\n') ? next : `${next}\n`;
+            const temp = `${path}.tmp-${process.pid}-${Date.now()}`;
+            await fs.writeFile(temp, normalized, { encoding: 'utf8', mode: 0o600 });
+            await fs.rename(temp, path);
+            await Promise.resolve(fs.chmod(path, 0o600)).catch(() => undefined);
+        });
+    envLocalMutationQueue = operation.then(
+        () => undefined,
+        () => undefined,
+    );
+    return operation;
 }
 
 /**
@@ -6737,7 +7792,9 @@ async function persistByokSelection(rest, projection) {
             next = deleteEnvLine(next, 'COPILOT_BYOK_PROFILE');
             next = setEnvLine(next, 'COPILOT_BYOK_PROVIDER_PRESET', preset);
             next = model ? setEnvLine(next, 'COPILOT_BYOK_MODEL', model) : deleteEnvLine(next, 'COPILOT_BYOK_MODEL');
-            next = baseUrl ? setEnvLine(next, 'COPILOT_BYOK_BASE_URL', baseUrl) : deleteEnvLine(next, 'COPILOT_BYOK_BASE_URL');
+            next = baseUrl
+                ? setEnvLine(next, 'COPILOT_BYOK_BASE_URL', baseUrl)
+                : deleteEnvLine(next, 'COPILOT_BYOK_BASE_URL');
             return next;
         });
         process.env['COPILOT_BYOK_ENABLED'] = 'true';
@@ -6780,7 +7837,12 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 'COPILOT_BYOK_PROFILES_JSON define perfis; COPILOT_BYOK_PROFILE escolhe o ativo',
             ),
         );
-        println(terminalThemeRows('Uso', ['/byok', '/byok providers', '/byok profiles', '/byok models', '/byok env'], { role: 'command', width: 12 }));
+        println(
+            terminalThemeRows('Uso', ['/byok', '/byok providers', '/byok profiles', '/byok models', '/byok env'], {
+                role: 'command',
+                width: 12,
+            }),
+        );
         println(terminalThemeDivider(60));
         println('');
         return;
@@ -6851,7 +7913,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayAutoProofPlan(println, rest);
             return;
         }
-        if (rest.some((item) => /^(standby|alternatives|alternativas|substitutes|substitutos|prontidao|prontidão)$/iu.test(item))) {
+        if (
+            rest.some((item) =>
+                /^(standby|alternatives|alternativas|substitutes|substitutos|prontidao|prontidão)$/iu.test(item),
+            )
+        ) {
             await renderByokGatewayAutoStandby(println, rest);
             return;
         }
@@ -6867,11 +7933,15 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayAutoHandoffs(println, rest);
             return;
         }
-        if (rest.some((item) => /^(confirmations|confirmation|confirmacoes|confirmações|model-changed)$/iu.test(item))) {
+        if (
+            rest.some((item) => /^(confirmations|confirmation|confirmacoes|confirmações|model-changed)$/iu.test(item))
+        ) {
             await renderByokGatewayAutoConfirmations(println, rest);
             return;
         }
-        if (rest.some((item) => /^(recovery-fixture|fixture-recovery|simulate-recovery|simular-recovery)$/iu.test(item))) {
+        if (
+            rest.some((item) => /^(recovery-fixture|fixture-recovery|simulate-recovery|simular-recovery)$/iu.test(item))
+        ) {
             await renderByokGatewayAutoRecoveryFixture(println, rest);
             return;
         }
@@ -6901,7 +7971,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 await renderByokGatewayAutoPolicy(println);
                 return;
             }
-            if (autoRest.some((item) => /^(doctor|diagnostic|diagnostico|diagnóstico|check|ready|readiness)$/iu.test(item))) {
+            if (
+                autoRest.some((item) =>
+                    /^(doctor|diagnostic|diagnostico|diagnóstico|check|ready|readiness)$/iu.test(item),
+                )
+            ) {
                 await renderByokGatewayAutoDoctor(println, autoRest);
                 return;
             }
@@ -6911,11 +7985,19 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 await renderByokGatewayAutoDoctor(println, autoRest);
                 return;
             }
-            if (autoRest.some((item) => /^(plan|plano|proof-plan|proofs|runtime-proofs|provas|plano-provas)$/iu.test(item))) {
+            if (
+                autoRest.some((item) =>
+                    /^(plan|plano|proof-plan|proofs|runtime-proofs|provas|plano-provas)$/iu.test(item),
+                )
+            ) {
                 await renderByokGatewayAutoProofPlan(println, autoRest);
                 return;
             }
-            if (autoRest.some((item) => /^(standby|alternatives|alternativas|substitutes|substitutos|prontidao|prontidão)$/iu.test(item))) {
+            if (
+                autoRest.some((item) =>
+                    /^(standby|alternatives|alternativas|substitutes|substitutos|prontidao|prontidão)$/iu.test(item),
+                )
+            ) {
                 await renderByokGatewayAutoStandby(println, autoRest);
                 return;
             }
@@ -6931,11 +8013,19 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 await renderByokGatewayAutoHandoffs(println, autoRest);
                 return;
             }
-            if (autoRest.some((item) => /^(confirmations|confirmation|confirmacoes|confirmações|model-changed)$/iu.test(item))) {
+            if (
+                autoRest.some((item) =>
+                    /^(confirmations|confirmation|confirmacoes|confirmações|model-changed)$/iu.test(item),
+                )
+            ) {
                 await renderByokGatewayAutoConfirmations(println, autoRest);
                 return;
             }
-            if (autoRest.some((item) => /^(recovery-fixture|fixture-recovery|simulate-recovery|simular-recovery)$/iu.test(item))) {
+            if (
+                autoRest.some((item) =>
+                    /^(recovery-fixture|fixture-recovery|simulate-recovery|simular-recovery)$/iu.test(item),
+                )
+            ) {
                 await renderByokGatewayAutoRecoveryFixture(println, autoRest);
                 return;
             }
@@ -6965,15 +8055,24 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayCatalogRefresh(println, eventBus, rest[2] ?? null);
             return;
         }
-        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh-plan|plan|dry-run|dryrun)$/iu.test(rest[1] ?? '')) {
+        if (
+            /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
+            /^(refresh-plan|plan|dry-run|dryrun)$/iu.test(rest[1] ?? '')
+        ) {
             await renderByokGatewayCatalogRefreshPlan(println, rest[2] ?? null);
             return;
         }
-        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(refresh-log|refreshlog|log|logs)$/iu.test(rest[1] ?? '')) {
+        if (
+            /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
+            /^(refresh-log|refreshlog|log|logs)$/iu.test(rest[1] ?? '')
+        ) {
             await renderByokGatewayCatalogRefreshLog(println);
             return;
         }
-        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')) {
+        if (
+            /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
+            /^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')
+        ) {
             await renderByokGatewayCatalogDiff(println);
             return;
         }
@@ -6981,11 +8080,17 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayCatalogConflicts(println);
             return;
         }
-        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(freshness|fresh|fontes|sources)$/iu.test(rest[1] ?? '')) {
+        if (
+            /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
+            /^(freshness|fresh|fontes|sources)$/iu.test(rest[1] ?? '')
+        ) {
             await renderByokGatewayCatalogFreshness(println, rest.slice(2));
             return;
         }
-        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(integrity|integridade|audit|auditoria)$/iu.test(rest[1] ?? '')) {
+        if (
+            /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
+            /^(integrity|integridade|audit|auditoria)$/iu.test(rest[1] ?? '')
+        ) {
             await renderByokGatewayCatalogIntegrity(println);
             return;
         }
@@ -7019,7 +8124,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayCatalogSearch(println, rest.slice(2));
             return;
         }
-        if (/^(health|runtime-health|probes)$/iu.test(rest[0] ?? '') && /^(sqlite|sql|mirror|sync)$/iu.test(rest[1] ?? '')) {
+        if (
+            /^(health|runtime-health|probes)$/iu.test(rest[0] ?? '') &&
+            /^(sqlite|sql|mirror|sync)$/iu.test(rest[1] ?? '')
+        ) {
             await renderByokGatewayHealthSqliteMirror(println);
             return;
         }
@@ -7118,7 +8226,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             );
             const candidates = eligibleModels.slice(0, filters.limit);
             println('');
-            println(terminalThemeHeadline('tool', 'BYOK shortlist com sonda agente', [`${candidates.length}/${modelList.length}`]));
+            println(
+                terminalThemeHeadline('tool', 'BYOK shortlist com sonda agente', [
+                    `${candidates.length}/${modelList.length}`,
+                ]),
+            );
             println(
                 terminalThemeRow(
                     'Escopo',
@@ -7126,7 +8238,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 ),
             );
             for (const error of discovered.errors.slice(0, 6)) {
-                println(terminalThemeRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, { role: 'warn' }));
+                println(
+                    terminalThemeRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, {
+                        role: 'warn',
+                    }),
+                );
             }
             renderByokCatalogWarnings(println, discovered.warnings);
             renderByokShortlistProfileCoverage(
@@ -7140,7 +8256,13 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             );
             if (candidates.length === 0) {
                 println(terminalThemeRow('Shortlist', 'nenhum candidato cabe nos filtros atuais', { role: 'warn' }));
-                println(terminalThemeRow('Próximo', 'ajuste provider/filtros, remova safe para inspeção ou rode /byok models', { role: 'command' }));
+                println(
+                    terminalThemeRow(
+                        'Próximo',
+                        'ajuste provider/filtros, remova safe para inspeção ou rode /byok models',
+                        { role: 'command' },
+                    ),
+                );
                 println('');
                 renderEmptyByokFilterDiagnostics(println, modelList, filters, runtimeBudget);
                 return;
@@ -7148,7 +8270,12 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             let passed = 0;
             let attempted = 0;
             for (const [index, model] of candidates.entries()) {
-                println(terminalThemeWrappedRow(`${index + 1}. Modelo`, `${model.id} · ${renderModelTags(model)}`, { role: 'warn', columns: 112 }));
+                println(
+                    terminalThemeWrappedRow(`${index + 1}. Modelo`, `${model.id} · ${renderModelTags(model)}`, {
+                        role: 'warn',
+                        columns: 112,
+                    }),
+                );
                 const result = await runByokProbe('agent', buildByokModelProbeSelection(model, timeoutMs), eventBus);
                 renderByokProbeResult(println, 'agent', result.probe, {
                     indent: '       ',
@@ -7178,10 +8305,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 ? 'json'
                 : /^(vision|image|imagem|vlm)$/iu.test(rest[0] ?? '')
                   ? 'vision'
-                : 'chat';
-        const explicitMode = /^(chat|canary|agent|runtime|full|streaming|stream|delta|deltas|json|structured|vision|image|imagem|vlm)$/iu.test(
-            rest[0] ?? '',
-        );
+                  : 'chat';
+        const explicitMode =
+            /^(chat|canary|agent|runtime|full|streaming|stream|delta|deltas|json|structured|vision|image|imagem|vlm)$/iu.test(
+                rest[0] ?? '',
+            );
         const selection = buildByokProbeSelection(explicitMode ? rest.slice(1) : rest);
         println('');
         println(terminalThemeHeadline('tool', `BYOK sonda ${renderByokTokenLabel(mode)}`));
@@ -7211,15 +8339,25 @@ export async function cmdByok({ println, eventBus = null }, arg) {
     }
 
     if (sub === 'reload') {
-        const skipStatus = rest.some((item) => /^(quiet|--quiet|no-status|--no-status|statusless|--statusless)$/iu.test(item));
+        const skipStatus = rest.some((item) =>
+            /^(quiet|--quiet|no-status|--no-status|statusless|--statusless)$/iu.test(item),
+        );
         clearRuntimeSelectors();
         const result = loadDotenv({ path: '.env.local', override: true, quiet: true });
         if (result.error) {
-            println(terminalThemeRow('BYOK', `não foi possível recarregar .env.local: ${result.error.message}`, { role: 'error' }));
+            println(
+                terminalThemeRow('BYOK', `não foi possível recarregar .env.local: ${result.error.message}`, {
+                    role: 'error',
+                }),
+            );
             println('');
             return;
         }
-        println(terminalThemeRow('BYOK', '.env.local recarregado no processo atual · segredos não exibidos', { role: 'success' }));
+        println(
+            terminalThemeRow('BYOK', '.env.local recarregado no processo atual · segredos não exibidos', {
+                role: 'success',
+            }),
+        );
         if (skipStatus) {
             println(terminalThemeRow('Status', 'omitido por solicitação; rode /byok para o cockpit final'));
             println('');
@@ -7251,7 +8389,9 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             .map(([preset, count]) => `${preset} ${count}`)
             .join(' · ');
         const omittedPresetCount = Math.max(0, configuredPresetEntries.length - 6);
-        const readyProfileCount = profiles.filter((profile) => classifyByokProfileReadiness(profile).label === 'pronto').length;
+        const readyProfileCount = profiles.filter(
+            (profile) => classifyByokProfileReadiness(profile).label === 'pronto',
+        ).length;
         const presetSummary = configuredPresets
             ? `${countLabel(configuredPresetEntries.length, 'tipo', 'tipos')} · ${configuredPresets}${omittedPresetCount > 0 ? ` · +${omittedPresetCount}` : ''}`
             : '-';
@@ -7266,7 +8406,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         );
         if (profiles.length === 0) {
             println(terminalThemeRow('Provedores', 'nenhum configurado', { role: 'warn' }));
-            println(terminalThemeRow('Próximo', 'adicione perfis em COPILOT_BYOK_PROFILES_JSON no .env.local', { role: 'command' }));
+            println(
+                terminalThemeRow('Próximo', 'adicione perfis em COPILOT_BYOK_PROFILES_JSON no .env.local', {
+                    role: 'command',
+                }),
+            );
             println('');
             return;
         }
@@ -7277,7 +8421,9 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             const health = readHealthForByokProfile(profile);
             const healthLabel = ` · ${renderByokHealthTag(health)} · ${renderByokAgentProbeHealthTag(health)}`;
             const readiness = classifyByokProfileReadiness(profile);
-            println(terminalThemeRow(profile.name, `${active} · ${readiness.label}`, { role: readiness.role, width: 24 }));
+            println(
+                terminalThemeRow(profile.name, `${active} · ${readiness.label}`, { role: readiness.role, width: 24 }),
+            );
             println(
                 terminalThemeRow(
                     'Configuração',
@@ -7297,7 +8443,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 ),
             );
         }
-        println(terminalThemeRow('Comparar', '/byok models all-providers free reasoning safe · filtro provider:<nome>', { role: 'command' }));
+        println(
+            terminalThemeRow('Comparar', '/byok models all-providers free reasoning safe · filtro provider:<nome>', {
+                role: 'command',
+            }),
+        );
         println(terminalThemeDivider(64));
         println('');
         return;
@@ -7308,7 +8458,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         println(terminalThemeHeadline('tool', 'BYOK perfis', [countLabel(profiles.length, 'perfil', 'perfis')]));
         println(terminalThemeDivider(60));
         if (profiles.length === 0) {
-            println(terminalThemeRow('Perfis', 'nenhum configurado em COPILOT_BYOK_PROFILES_JSON no .env.local', { role: 'warn' }));
+            println(
+                terminalThemeRow('Perfis', 'nenhum configurado em COPILOT_BYOK_PROFILES_JSON no .env.local', {
+                    role: 'warn',
+                }),
+            );
             println('');
             return;
         }
@@ -7317,7 +8471,9 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             const metadata = profile.metadataKeys.length ? ` · metadados ${profile.metadataKeys.join(',')}` : '';
             const cost = renderByokProfileCostTag(profile.name);
             const readiness = classifyByokProfileReadiness(profile);
-            println(terminalThemeRow(profile.name, `${active} · ${readiness.label}`, { role: readiness.role, width: 24 }));
+            println(
+                terminalThemeRow(profile.name, `${active} · ${readiness.label}`, { role: readiness.role, width: 24 }),
+            );
             println(
                 terminalThemeRow(
                     'Configuração',
@@ -7338,7 +8494,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokGatewayCatalogRefresh(println, eventBus, rest[2] ?? null);
             return;
         }
-        if (/^(catalog|catalogo)$/iu.test(rest[0] ?? '') && /^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')) {
+        if (
+            /^(catalog|catalogo)$/iu.test(rest[0] ?? '') &&
+            /^(diff|changes|mudancas|mudanças)$/iu.test(rest[1] ?? '')
+        ) {
             await renderByokGatewayCatalogDiff(println);
             return;
         }
@@ -7353,10 +8512,16 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             await renderByokModelRoute(println, projection, rest, eventBus);
             return;
         }
-        const forceRefresh = rest.some((item) => ['refresh', 'force', '--refresh', '--force'].includes(item.toLowerCase()));
+        const forceRefresh = rest.some((item) =>
+            ['refresh', 'force', '--refresh', '--force'].includes(item.toLowerCase()),
+        );
         const showAll = rest.some((item) => ['all', '--all'].includes(item.toLowerCase()));
         const filters = parseRecommendArgs(rest);
-        const limit = showAll ? Number.POSITIVE_INFINITY : filters.limit === DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT ? DEFAULT_BYOK_MODELS_DISPLAY_LIMIT : filters.limit;
+        const limit = showAll
+            ? Number.POSITIVE_INFINITY
+            : filters.limit === DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT
+              ? DEFAULT_BYOK_MODELS_DISPLAY_LIMIT
+              : filters.limit;
         filters.forceRefresh = filters.forceRefresh || forceRefresh;
         const discovered = await discoverByokCatalogForCommand(projection, filters);
         const runtimeBudget = readCurrentByokRequestBudget();
@@ -7382,7 +8547,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         );
         println(terminalThemeRow('Ordenação', `free/capability/context · filtros ${filterLabel || '-'}`));
         for (const error of discovered.errors.slice(0, 6)) {
-            println(terminalThemeRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, { role: 'warn' }));
+            println(
+                terminalThemeRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, {
+                    role: 'warn',
+                }),
+            );
         }
         if (discovered.errors.length > 6) {
             println(
@@ -7396,9 +8565,20 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         renderByokCatalogWarnings(println, discovered.warnings);
         if (modelList.length === 0) {
             println(terminalThemeRow('Modelos', 'nenhum encontrado para os filtros atuais', { role: 'warn' }));
-            println(terminalThemeRow('Próximo', 'remova filtros, use provider:<nome> ou rode /byok models all-providers refresh', { role: 'command' }));
+            println(
+                terminalThemeRow(
+                    'Próximo',
+                    'remova filtros, use provider:<nome> ou rode /byok models all-providers refresh',
+                    { role: 'command' },
+                ),
+            );
             println('');
-            renderEmptyByokFilterDiagnostics(println, discovered.models.length > 0 ? discovered.models : models, filters, runtimeBudget);
+            renderEmptyByokFilterDiagnostics(
+                println,
+                discovered.models.length > 0 ? discovered.models : models,
+                filters,
+                runtimeBudget,
+            );
             return;
         }
         for (const entry of visibleEntries) {
@@ -7430,9 +8610,10 @@ export async function cmdByok({ println, eventBus = null }, arg) {
         const rankedRecommended = filters.avoidLowLimit
             ? budgetSafeRecommendations.filter((model) => isByokModelAgentProbeVerified(model))
             : budgetSafeRecommendations;
-        const recommendedEntries = (filters.grouped
-            ? groupByokModelVariants(rankedRecommended)
-            : rankedRecommended.map((model) => ({ model, variants: [] }))
+        const recommendedEntries = (
+            filters.grouped
+                ? groupByokModelVariants(rankedRecommended)
+                : rankedRecommended.map((model) => ({ model, variants: [] }))
         ).slice(0, filters.limit);
         const filterLabel = renderByokFilterLabel(filters);
         println('');
@@ -7461,7 +8642,11 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             );
         }
         for (const error of discovered.errors.slice(0, 6)) {
-            println(terminalThemeRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, { role: 'warn' }));
+            println(
+                terminalThemeRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, {
+                    role: 'warn',
+                }),
+            );
         }
         if (discovered.errors.length > 6) {
             println(
@@ -7495,7 +8680,13 @@ export async function cmdByok({ println, eventBus = null }, arg) {
                 'live descartável do terminal: valida streaming/tool/ask_user antes de trocar a sessão viva',
             ),
         );
-        println(terminalThemeRow('Troca viva', '/byok use <perfil> troca provedor; /byok model <id> troca só modelo ativo', { role: 'command' }));
+        println(
+            terminalThemeRow(
+                'Troca viva',
+                '/byok use <perfil> troca provedor; /byok model <id> troca só modelo ativo',
+                { role: 'command' },
+            ),
+        );
         println('');
         return;
     }
@@ -7511,13 +8702,19 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             process.env['COPILOT_BYOK_ENABLED'] = 'false';
             clearRuntimeSelectors();
             println('');
-            println(terminalThemeRow('BYOK', 'desativado no processo atual; SDK Copilot governa a próxima sessão', { role: 'success' }));
+            println(
+                terminalThemeRow('BYOK', 'desativado no processo atual; SDK Copilot governa a próxima sessão', {
+                    role: 'success',
+                }),
+            );
             printByokSdkSessionBoundaryHint(println);
             println('');
             return;
         }
         if (!profiles.some((profile) => profile.name === target)) {
-            println(terminalThemeRow('Perfil BYOK', `não encontrado: ${target} · veja /byok profiles`, { role: 'error' }));
+            println(
+                terminalThemeRow('Perfil BYOK', `não encontrado: ${target} · veja /byok profiles`, { role: 'error' }),
+            );
             println('');
             return;
         }
@@ -7547,15 +8744,24 @@ export async function cmdByok({ println, eventBus = null }, arg) {
 
     if (sub === 'provider') {
         const [preset, ...providerArgs] = rest;
-        const wireApi = providerArgs.find((item) => /^wire:/iu.test(item))?.replace(/^wire:/iu, '').trim();
+        const wireApi = providerArgs
+            .find((item) => /^wire:/iu.test(item))
+            ?.replace(/^wire:/iu, '')
+            .trim();
         const [model, baseUrl] = providerArgs.filter((item) => !/^wire:/iu.test(item));
         if (!preset) {
-            println(terminalThemeRow('Uso', '/byok provider <preset> [model] [baseUrl] [wire:<completions|responses>]', { role: 'error' }));
+            println(
+                terminalThemeRow('Uso', '/byok provider <preset> [model] [baseUrl] [wire:<completions|responses>]', {
+                    role: 'error',
+                }),
+            );
             println('');
             return;
         }
         if (wireApi && wireApi !== 'completions' && wireApi !== 'responses') {
-            println(terminalThemeRow('wireApi', 'inválido · use wire:completions ou wire:responses', { role: 'error' }));
+            println(
+                terminalThemeRow('wireApi', 'inválido · use wire:completions ou wire:responses', { role: 'error' }),
+            );
             println('');
             return;
         }

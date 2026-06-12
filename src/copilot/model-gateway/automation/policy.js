@@ -8,8 +8,9 @@
  * @module copilot/model-gateway/automation/policy
  */
 
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 export const DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH =
     'data/copilot/model-gateway/runtime-automation-policy.json';
@@ -162,7 +163,9 @@ function optionalStringList(value) {
  * @returns {Record<string, unknown>}
  */
 function record(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /**
@@ -247,11 +250,13 @@ function expandPolicyPatchPreset(patch) {
 }
 
 /**
- * @returns {Array<Record<string, unknown>>}
+ * @returns {Record<string, unknown>[]}
  */
 export function listModelGatewayRuntimeAutomationPolicyPresets() {
     return MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESET_IDS.map((presetId) => ({
-        .../** @type {Record<string, unknown>} */ (Reflect.get(MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESETS, presetId)),
+        .../** @type {Record<string, unknown>} */ (
+            Reflect.get(MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESETS, presetId)
+        ),
     }));
 }
 
@@ -262,7 +267,10 @@ export function listModelGatewayRuntimeAutomationPolicyPresets() {
  */
 export function resolveModelGatewayRuntimeAutomationPolicyPreset(presetId, overrides = {}) {
     const normalizedPresetId = optionalPresetId(presetId) ?? 'operator_manual';
-    return mergeModelGatewayRuntimeAutomationPolicy({ preset: normalizedPresetId }, { ...overrides, preset: normalizedPresetId });
+    return mergeModelGatewayRuntimeAutomationPolicy(
+        { preset: normalizedPresetId },
+        { ...overrides, preset: normalizedPresetId },
+    );
 }
 
 /**
@@ -287,15 +295,15 @@ export function mergeModelGatewayRuntimeAutomationPolicy(...patches) {
 /**
  * @param {Record<string, string | undefined>} [env]
  * @returns {{
- *   enabled: boolean;
- *   preset: string;
- *   policy: string;
- *   profiles: string[];
- *   allowLiveSetModel: boolean;
- *   allowNewSession: boolean;
- *   allowProviderProbes: boolean;
- *   allowLocalPrivate: boolean;
- *   accountWideFailureKinds: string[];
+ *     enabled: boolean;
+ *     preset: string;
+ *     policy: string;
+ *     profiles: string[];
+ *     allowLiveSetModel: boolean;
+ *     allowNewSession: boolean;
+ *     allowProviderProbes: boolean;
+ *     allowLocalPrivate: boolean;
+ *     accountWideFailureKinds: string[];
  * }}
  */
 export function readModelGatewayRuntimeAutomationPolicy(env = process.env) {
@@ -360,7 +368,10 @@ export function validateModelGatewayRuntimeAutomationPolicy(policy) {
     if (!MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_MODES.includes(normalized.policy)) {
         issues.push(`invalid_policy_mode:${normalized.policy}`);
     }
-    if (!Array.isArray(normalized.profiles) || normalized.profiles.some((profile) => optionalString(profile) === null)) {
+    if (
+        !Array.isArray(normalized.profiles) ||
+        normalized.profiles.some((profile) => optionalString(profile) === null)
+    ) {
         issues.push('invalid_profiles');
     }
     if (
@@ -385,9 +396,6 @@ export function validateModelGatewayRuntimeAutomationPolicy(policy) {
 export async function writeModelGatewayRuntimeAutomationPolicyFile(policy, options = {}) {
     const filePath = resolve(options.filePath ?? DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH);
     const normalized = mergeModelGatewayRuntimeAutomationPolicy(policy);
-    const temp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-    await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(temp, `${JSON.stringify(normalized, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
-    await rename(temp, filePath);
+    await writeFileAtomicPortable(filePath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 });
     return { filePath, policy: normalized };
 }

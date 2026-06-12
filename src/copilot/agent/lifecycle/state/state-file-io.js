@@ -7,14 +7,15 @@
  */
 
 import { resolveHooksStateDir, resolveHooksStateFile } from '#copilot/boot';
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { STATE_FILE as _STATE_FILE_ENV } from '#copilot/config/agent';
+import { withIoResourceLock, writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { lstat, mkdir, readFile, rm } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 
 /** @type {string} */
-export const STATE_DIR = resolveHooksStateDir();
-/** @type {string} */
 export const STATE_FILE = _STATE_FILE_ENV ? resolve(_STATE_FILE_ENV) : resolveHooksStateFile('sdk-always-alive.json');
+/** @type {string} */
+export const STATE_DIR = _STATE_FILE_ENV ? dirname(STATE_FILE) : resolveHooksStateDir();
 
 /** @type {boolean} */
 let _stateDirReady = false;
@@ -39,12 +40,31 @@ export async function ensureStateDirReady() {
  */
 export async function readStateFileIfExists() {
     try {
-        await stat(STATE_FILE);
-    } catch {
+        const stats = await lstat(STATE_FILE);
+        if (!stats.isFile() || stats.isSymbolicLink()) return null;
+    } catch (error) {
+        const code = /** @type {{ code?: unknown }} */ (error)?.code;
+        if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
         return null;
     }
     return readFile(STATE_FILE, 'utf8');
 }
+
+/** @type {(filePath: string, content: string, options: { mode: number }) => Promise<void>} */
+let stateFileWriter = writeFileAtomicPortable;
+
+export const stateFileIoTestHarness = Object.freeze({
+    /**
+     * @param {(filePath: string, content: string, options: { mode: number }) => Promise<void>} writer
+     */
+    setStateFileWriter(writer) {
+        stateFileWriter = writer;
+    },
+    resetStateFileWriter() {
+        stateFileWriter = writeFileAtomicPortable;
+    },
+    writeFileAtomicPortable,
+});
 
 /**
  * Persiste payload JSON no arquivo de estado.
@@ -54,7 +74,7 @@ export async function readStateFileIfExists() {
  */
 export async function writeStateFileJson(payload) {
     await ensureStateDirReady();
-    await writeFile(STATE_FILE, JSON.stringify(payload, null, 4), 'utf8');
+    await stateFileWriter(STATE_FILE, `${JSON.stringify(payload, null, 4)}\n`, { mode: 0o600 });
 }
 
 /**
@@ -63,7 +83,9 @@ export async function writeStateFileJson(payload) {
  * @returns {Promise<void>}
  */
 export async function removeStateFileIfExists() {
-    await rm(STATE_FILE, { force: true });
+    await withIoResourceLock(STATE_FILE, async () => {
+        await rm(STATE_FILE, { force: true });
+    });
 }
 
 /**

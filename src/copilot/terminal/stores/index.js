@@ -1,6 +1,7 @@
 // @ts-check
 
 export {
+    flushAliasPersistence,
     formatAliases,
     getAliases,
     loadAliasesAsync,

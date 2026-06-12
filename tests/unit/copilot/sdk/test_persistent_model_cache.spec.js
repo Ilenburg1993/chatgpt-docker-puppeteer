@@ -7,6 +7,15 @@
 
 import { promises as fs } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const ioMocks = vi.hoisted(() => ({
+    writeFileAtomicPortable: vi.fn(),
+}));
+
+vi.mock('#copilot/infra/public/io', () => ({
+    writeFileAtomicPortable: ioMocks.writeFileAtomicPortable,
+}));
+
 import {
     clearPersistentModelCache,
     evaluatePersistentCache,
@@ -21,6 +30,8 @@ describe('persistent-model-cache', () => {
 
     beforeEach(async () => {
         vi.restoreAllMocks();
+        ioMocks.writeFileAtomicPortable.mockReset();
+        ioMocks.writeFileAtomicPortable.mockResolvedValue(undefined);
         originalPersistentCacheFile = process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'];
         process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'] =
             `data/copilot/test/persistent-model-cache-${process.pid}-${Date.now()}-${Math.random()
@@ -110,19 +121,12 @@ describe('persistent-model-cache', () => {
 
     describe('writePersistentModelCacheAsync', () => {
         it('ignora modelos não-array', async () => {
-            const spyWrite = vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
-
             writePersistentModelCacheAsync(/** @type {any} */ ('not-an-array'));
-
-            // Wait para async operation completar
-            await new Promise((resolve) => setTimeout(resolve, 100));
-
-            expect(spyWrite).not.toHaveBeenCalled();
+            await clearPersistentModelCache();
+            expect(ioMocks.writeFileAtomicPortable).not.toHaveBeenCalled();
         });
 
         it('escreve models válidos de forma async', async () => {
-            const spyWrite = vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
-
             const models = [
                 /** @type {any} */ ({
                     modelId: 'gpt-4',
@@ -132,20 +136,65 @@ describe('persistent-model-cache', () => {
                 }),
             ];
             writePersistentModelCacheAsync(models);
+            await clearPersistentModelCache();
 
-            // Wait para async operation completar
-            await new Promise((resolve) => setTimeout(resolve, 100));
-
-            expect(spyWrite).toHaveBeenCalled();
-            const call = spyWrite.mock.calls[0];
+            expect(ioMocks.writeFileAtomicPortable).toHaveBeenCalled();
+            const call = ioMocks.writeFileAtomicPortable.mock.calls[0];
             if (!call) {
-                throw new Error('writeFile deveria ter sido chamado ao persistir models válidos');
+                throw new Error('writeFileAtomicPortable deveria ter sido chamado ao persistir models válidos');
             }
             expect(String(call[0])).toContain('data/copilot/test/persistent-model-cache-');
             const payload = call[1];
             const written = JSON.parse(/** @type {string} */ (payload));
             expect(written.version).toBe(2);
             expect(written.models).toHaveLength(1);
+            expect(call[2]).toEqual({ mode: 0o600 });
+        });
+
+        it('serializa writes concorrentes na ordem de chamada', async () => {
+            /** @type {(() => void) | undefined} */
+            let releaseFirst;
+            ioMocks.writeFileAtomicPortable
+                .mockImplementationOnce(
+                    () =>
+                        new Promise((resolve) => {
+                            releaseFirst = resolve;
+                        }),
+                )
+                .mockResolvedValueOnce(undefined);
+
+            writePersistentModelCacheAsync([/** @type {any} */ ({ modelId: 'first' })]);
+            writePersistentModelCacheAsync([/** @type {any} */ ({ modelId: 'second' })]);
+            await Promise.resolve();
+
+            expect(ioMocks.writeFileAtomicPortable).toHaveBeenCalledTimes(1);
+            releaseFirst?.();
+            await clearPersistentModelCache();
+
+            expect(ioMocks.writeFileAtomicPortable).toHaveBeenCalledTimes(2);
+            const secondPayload = JSON.parse(String(ioMocks.writeFileAtomicPortable.mock.calls[1]?.[1]));
+            expect(secondPayload.models[0].modelId).toBe('second');
+        });
+
+        it('ordena clear depois de todos os writes já enfileirados', async () => {
+            /** @type {(() => void) | undefined} */
+            let releaseWrite;
+            ioMocks.writeFileAtomicPortable.mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        releaseWrite = resolve;
+                    }),
+            );
+            const unlink = vi.spyOn(fs, 'unlink').mockResolvedValue(undefined);
+
+            writePersistentModelCacheAsync([/** @type {any} */ ({ modelId: 'pending' })]);
+            const clear = clearPersistentModelCache();
+            await Promise.resolve();
+            expect(unlink).not.toHaveBeenCalled();
+
+            releaseWrite?.();
+            await clear;
+            expect(unlink).toHaveBeenCalled();
         });
     });
 

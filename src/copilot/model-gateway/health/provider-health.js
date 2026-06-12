@@ -10,10 +10,10 @@
  * @module copilot/model-gateway/health/provider-health
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 import { redactSecretText } from '#copilot/core';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const MAX_BYOK_PROVIDER_HEALTH_RECORDS = 200;
 const BYOK_PROVIDER_HEALTH_SCHEMA_VERSION = 3;
@@ -72,7 +72,12 @@ const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-t
 
 /**
  * @typedef {object} ByokProviderHealthChangeEvent
- * @property {'call_failure' | 'call_success' | 'agent_probe_failure' | 'agent_probe_success' | 'probe_result' | 'clear'} reason
+ * @property {'call_failure'
+ *     | 'call_success'
+ *     | 'agent_probe_failure'
+ *     | 'agent_probe_success'
+ *     | 'probe_result'
+ *     | 'clear'} reason
  * @property {number} observedAt
  * @property {string | null} key
  * @property {ByokProviderHealthRecord | null} record
@@ -138,7 +143,14 @@ function normalizePart(value) {
  */
 
 /**
- * @param {{ routeProfile?: string | null | undefined; providerId?: string | null | undefined; providerModel?: string | null | undefined; profile?: string | null | undefined; provider?: string | null | undefined; model?: string | null | undefined }} input
+ * @param {{
+ *     routeProfile?: string | null | undefined;
+ *     providerId?: string | null | undefined;
+ *     providerModel?: string | null | undefined;
+ *     profile?: string | null | undefined;
+ *     provider?: string | null | undefined;
+ *     model?: string | null | undefined;
+ * }} input
  * @returns {ByokProviderHealthIdentity}
  */
 function normalizeHealthIdentity(input) {
@@ -156,7 +168,14 @@ function normalizeHealthIdentity(input) {
 }
 
 /**
- * @param {{ routeProfile?: string | null | undefined; providerId?: string | null | undefined; providerModel?: string | null | undefined; profile?: string | null | undefined; provider?: string | null | undefined; model?: string | null | undefined }} input
+ * @param {{
+ *     routeProfile?: string | null | undefined;
+ *     providerId?: string | null | undefined;
+ *     providerModel?: string | null | undefined;
+ *     profile?: string | null | undefined;
+ *     provider?: string | null | undefined;
+ *     model?: string | null | undefined;
+ * }} input
  * @returns {string}
  */
 function healthKey(input) {
@@ -261,7 +280,18 @@ function normalizeProbeRecords(value) {
 
 /**
  * @param {ByokProviderProbeHealthRecord | null | undefined} previousProbe
- * @param {{ kind: string; status: string; ok: boolean; providerAttempted?: boolean; message?: string | null | undefined; errorContext?: string | null | undefined; failureKind?: string | null | undefined; failureStatusCode?: number | null | undefined; retryAfterSeconds?: number | null | undefined; resetAt?: string | number | Date | null | undefined }} input
+ * @param {{
+ *     kind: string;
+ *     status: string;
+ *     ok: boolean;
+ *     providerAttempted?: boolean;
+ *     message?: string | null | undefined;
+ *     errorContext?: string | null | undefined;
+ *     failureKind?: string | null | undefined;
+ *     failureStatusCode?: number | null | undefined;
+ *     retryAfterSeconds?: number | null | undefined;
+ *     resetAt?: string | number | Date | null | undefined;
+ * }} input
  * @param {number} now
  * @returns {ByokProviderProbeHealthRecord}
  */
@@ -277,14 +307,16 @@ function createUpdatedProbeRecord(previousProbe, input, now) {
         lastAt: now,
         lastMessage: sanitizeHealthText(input.message) ?? previousProbe?.lastMessage ?? null,
         lastErrorContext: sanitizeHealthText(input.errorContext) ?? previousProbe?.lastErrorContext ?? null,
-        lastFailureKind: input.ok ? null : sanitizeHealthText(input.failureKind) ?? previousProbe?.lastFailureKind ?? null,
+        lastFailureKind: input.ok
+            ? null
+            : (sanitizeHealthText(input.failureKind) ?? previousProbe?.lastFailureKind ?? null),
         lastFailureStatusCode: input.ok
             ? null
-            : normalizeOptionalNumber(input.failureStatusCode) ?? previousProbe?.lastFailureStatusCode ?? null,
+            : (normalizeOptionalNumber(input.failureStatusCode) ?? previousProbe?.lastFailureStatusCode ?? null),
         lastRetryAfterSeconds: input.ok
             ? null
-            : normalizeOptionalNumber(input.retryAfterSeconds) ?? previousProbe?.lastRetryAfterSeconds ?? null,
-        lastResetAt: input.ok ? null : normalizeIsoTimestamp(input.resetAt) ?? previousProbe?.lastResetAt ?? null,
+            : (normalizeOptionalNumber(input.retryAfterSeconds) ?? previousProbe?.lastRetryAfterSeconds ?? null),
+        lastResetAt: input.ok ? null : (normalizeIsoTimestamp(input.resetAt) ?? previousProbe?.lastResetAt ?? null),
     };
 }
 
@@ -324,8 +356,8 @@ function normalizeRecord(value) {
             failureCount: agentProbeFailureCount,
             lastAt:
                 agentProbeStatus === 'ok'
-                    ? lastAgentProbeSuccessAt ?? lastAgentProbeFailureAt
-                    : lastAgentProbeFailureAt ?? lastAgentProbeSuccessAt,
+                    ? (lastAgentProbeSuccessAt ?? lastAgentProbeFailureAt)
+                    : (lastAgentProbeFailureAt ?? lastAgentProbeSuccessAt),
             lastMessage: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastAgentProbeMessage'])),
             lastErrorContext: sanitizeHealthText(
                 /** @type {string | null | undefined} */ (value['lastAgentProbeErrorContext']),
@@ -361,9 +393,7 @@ function normalizeRecord(value) {
         lastFailureStatusCode: normalizeOptionalNumber(value['lastFailureStatusCode']),
         lastRetryAfterSeconds: normalizeOptionalNumber(value['lastRetryAfterSeconds']),
         lastResetAt: normalizeIsoTimestamp(value['lastResetAt']),
-        lastSuccessContext: sanitizeHealthText(
-            /** @type {string | null | undefined} */ (value['lastSuccessContext']),
-        ),
+        lastSuccessContext: sanitizeHealthText(/** @type {string | null | undefined} */ (value['lastSuccessContext'])),
         agentProbeStatus,
         agentProbeFailureCount,
         agentProbeSuccessCount,
@@ -482,9 +512,11 @@ function hydrateByokProviderHealthFromDisk() {
         const parsed = JSON.parse(raw);
         if (
             !isRecord(parsed) ||
-            ![BYOK_PROVIDER_HEALTH_SCHEMA_VERSION, PREVIOUS_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION, LEGACY_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION].includes(
-                /** @type {number} */ (parsed['schemaVersion']),
-            )
+            ![
+                BYOK_PROVIDER_HEALTH_SCHEMA_VERSION,
+                PREVIOUS_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION,
+                LEGACY_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION,
+            ].includes(/** @type {number} */ (parsed['schemaVersion']))
         ) {
             return;
         }
@@ -526,7 +558,6 @@ export async function flushByokProviderHealth() {
     const filePath = resolveByokProviderHealthPath();
     const flushPromise = (async () => {
         try {
-            await mkdir(dirname(filePath), { recursive: true });
             _byokProviderHealthDirty = false;
             const records = listByokProviderModelHealth();
             const payload = {
@@ -534,9 +565,7 @@ export async function flushByokProviderHealth() {
                 updatedAt: new Date().toISOString(),
                 records,
             };
-            const temp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-            await writeFile(temp, `${JSON.stringify(payload, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
-            await rename(temp, filePath);
+            await writeFileAtomicPortable(filePath, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
             _byokProviderHealthPersistedRecords = records.length;
             _byokProviderHealthLastError = null;
         } catch (error) {
@@ -573,7 +602,21 @@ export function subscribeByokProviderHealthChanges(listener) {
 }
 
 /**
- * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; message?: string | null; errorContext?: string | null; failureKind?: string | null; failureStatusCode?: number | null; retryAfterSeconds?: number | null; resetAt?: string | number | Date | null; timestamp?: number }} input
+ * @param {{
+ *     routeProfile?: string | null;
+ *     providerId?: string | null;
+ *     providerModel?: string | null;
+ *     profile?: string | null;
+ *     provider?: string | null;
+ *     model?: string | null;
+ *     message?: string | null;
+ *     errorContext?: string | null;
+ *     failureKind?: string | null;
+ *     failureStatusCode?: number | null;
+ *     retryAfterSeconds?: number | null;
+ *     resetAt?: string | number | Date | null;
+ *     timestamp?: number;
+ * }} input
  * @returns {void}
  */
 export function recordByokProviderModelCallFailure(input) {
@@ -594,8 +637,10 @@ export function recordByokProviderModelCallFailure(input) {
         lastMessage: sanitizeHealthText(input.message) ?? previous?.lastMessage ?? null,
         lastErrorContext: sanitizeHealthText(input.errorContext) ?? previous?.lastErrorContext ?? null,
         lastFailureKind: sanitizeHealthText(input.failureKind) ?? previous?.lastFailureKind ?? null,
-        lastFailureStatusCode: normalizeOptionalNumber(input.failureStatusCode) ?? previous?.lastFailureStatusCode ?? null,
-        lastRetryAfterSeconds: normalizeOptionalNumber(input.retryAfterSeconds) ?? previous?.lastRetryAfterSeconds ?? null,
+        lastFailureStatusCode:
+            normalizeOptionalNumber(input.failureStatusCode) ?? previous?.lastFailureStatusCode ?? null,
+        lastRetryAfterSeconds:
+            normalizeOptionalNumber(input.retryAfterSeconds) ?? previous?.lastRetryAfterSeconds ?? null,
         lastResetAt: normalizeIsoTimestamp(input.resetAt) ?? previous?.lastResetAt ?? null,
         lastSuccessContext: previous?.lastSuccessContext ?? null,
         agentProbeStatus: previous?.agentProbeStatus ?? null,
@@ -613,7 +658,16 @@ export function recordByokProviderModelCallFailure(input) {
 }
 
 /**
- * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; successContext?: string | null; timestamp?: number }} input
+ * @param {{
+ *     routeProfile?: string | null;
+ *     providerId?: string | null;
+ *     providerModel?: string | null;
+ *     profile?: string | null;
+ *     provider?: string | null;
+ *     model?: string | null;
+ *     successContext?: string | null;
+ *     timestamp?: number;
+ * }} input
  * @returns {void}
  */
 export function recordByokProviderModelCallSuccess(input) {
@@ -653,7 +707,17 @@ export function recordByokProviderModelCallSuccess(input) {
 }
 
 /**
- * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; message?: string | null; errorContext?: string | null; timestamp?: number }} input
+ * @param {{
+ *     routeProfile?: string | null;
+ *     providerId?: string | null;
+ *     providerModel?: string | null;
+ *     profile?: string | null;
+ *     provider?: string | null;
+ *     model?: string | null;
+ *     message?: string | null;
+ *     errorContext?: string | null;
+ *     timestamp?: number;
+ * }} input
  * @returns {void}
  */
 export function recordByokProviderModelAgentProbeFailure(input) {
@@ -710,7 +774,15 @@ export function recordByokProviderModelAgentProbeFailure(input) {
 }
 
 /**
- * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; timestamp?: number }} input
+ * @param {{
+ *     routeProfile?: string | null;
+ *     providerId?: string | null;
+ *     providerModel?: string | null;
+ *     profile?: string | null;
+ *     provider?: string | null;
+ *     model?: string | null;
+ *     timestamp?: number;
+ * }} input
  * @returns {void}
  */
 export function recordByokProviderModelAgentProbeSuccess(input) {
@@ -763,7 +835,25 @@ export function recordByokProviderModelAgentProbeSuccess(input) {
 }
 
 /**
- * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null; probeKind: string; status: string; ok?: boolean; providerAttempted?: boolean; message?: string | null; errorContext?: string | null; failureKind?: string | null; failureStatusCode?: number | null; retryAfterSeconds?: number | null; resetAt?: string | number | Date | null; timestamp?: number }} input
+ * @param {{
+ *     routeProfile?: string | null;
+ *     providerId?: string | null;
+ *     providerModel?: string | null;
+ *     profile?: string | null;
+ *     provider?: string | null;
+ *     model?: string | null;
+ *     probeKind: string;
+ *     status: string;
+ *     ok?: boolean;
+ *     providerAttempted?: boolean;
+ *     message?: string | null;
+ *     errorContext?: string | null;
+ *     failureKind?: string | null;
+ *     failureStatusCode?: number | null;
+ *     retryAfterSeconds?: number | null;
+ *     resetAt?: string | number | Date | null;
+ *     timestamp?: number;
+ * }} input
  * @returns {void}
  */
 export function recordByokProviderModelProbeResult(input) {
@@ -825,7 +915,14 @@ export function recordByokProviderModelProbeResult(input) {
 }
 
 /**
- * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null }} input
+ * @param {{
+ *     routeProfile?: string | null;
+ *     providerId?: string | null;
+ *     providerModel?: string | null;
+ *     profile?: string | null;
+ *     provider?: string | null;
+ *     model?: string | null;
+ * }} input
  * @returns {ByokProviderHealthRecord | null}
  */
 export function readByokProviderModelHealth(input) {
@@ -856,7 +953,14 @@ export function listByokProviderModelHealth() {
 }
 
 /**
- * @param {{ routeProfile?: string | null; providerId?: string | null; providerModel?: string | null; profile?: string | null; provider?: string | null; model?: string | null }} [input]
+ * @param {{
+ *     routeProfile?: string | null;
+ *     providerId?: string | null;
+ *     providerModel?: string | null;
+ *     profile?: string | null;
+ *     provider?: string | null;
+ *     model?: string | null;
+ * }} [input]
  * @returns {void}
  */
 export function clearByokProviderModelHealth(input = {}) {
@@ -877,7 +981,18 @@ export function clearByokProviderModelHealth(input = {}) {
 }
 
 /**
- * @returns {{ enabled: boolean; path: string | null; loaded: boolean; records: number; persistedRecords: number; flushScheduled: boolean; flushInFlight: boolean; dirty: boolean; error: string | null; changeListenerCount: number }}
+ * @returns {{
+ *     enabled: boolean;
+ *     path: string | null;
+ *     loaded: boolean;
+ *     records: number;
+ *     persistedRecords: number;
+ *     flushScheduled: boolean;
+ *     flushInFlight: boolean;
+ *     dirty: boolean;
+ *     error: string | null;
+ *     changeListenerCount: number;
+ * }}
  */
 export function readByokProviderHealthState() {
     hydrateByokProviderHealthFromDisk();

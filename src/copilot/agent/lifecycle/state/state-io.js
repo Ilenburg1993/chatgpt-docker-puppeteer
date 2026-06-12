@@ -14,10 +14,8 @@
  * @see module:copilot/agent/session/initializer
  */
 
-import { logSwallowed, toError } from '#copilot/core';
 import { DRAIN_WRITES_TIMEOUT_MS } from '#copilot/config/agent';
-import { safeJsonParse } from '#copilot/core';
-import { AliveAgentStateSchema } from '#copilot/core';
+import { AliveAgentStateSchema, logSwallowed, safeJsonParse, toError } from '#copilot/core';
 import { withAgentErrorPolicy } from '../../error/index.js';
 import { log } from '../../ports/logging/index.js';
 import {
@@ -56,7 +54,8 @@ import {
  * @property {number} [pausedAt] - Timestamp do pause (ms)
  * @property {string | null} [pendingTurnMessage] - Última mensagem enviada sem resposta confirmada
  * @property {number | null} [pendingTurnTs] - Timestamp do envio pendente (ms)
- * @property {boolean} [pendingTurnConsumedPR] - Se o turno já teve `assistant.usage` classificado como `premium_request`
+ * @property {boolean} [pendingTurnConsumedPR] - Se o turno já teve `assistant.usage` classificado como
+ *   `premium_request`
  * @property {number} [lastPrConsumedAt] - Timestamp do último PR consumido (ms)
  * @property {string} [lastPrModel] - Modelo que consumiu o último PR
  * @property {string} [lastPrConfiguredModel] - Modelo configurado no runtime no momento do consumo
@@ -90,10 +89,11 @@ import {
  * } | null} [sdkSessionBootDecision]
  *   Decisão redigida do initializer para a sessão SDK atual. Explica por que houve resume ou criação sem guardar
  *   credenciais/provider headers.
- * @property {Record<string, Record<string, unknown>>} [sdkSessionLocalMetadata]
- *   Metadata local, redigida e por sessionId, para enriquecer o cockpit sem depender de APIs inexistentes como
- *   `session.updateMetadata`.
- * @property {{ mode: 'new'; requestedAt?: number } | { mode: 'resume'; sessionId: string; requestedAt?: number } | null} [nextSdkSessionBoot]
+ * @property {Record<string, Record<string, unknown>>} [sdkSessionLocalMetadata] Metadata local, redigida e por
+ *   sessionId, para enriquecer o cockpit sem depender de APIs inexistentes como `session.updateMetadata`.
+ * @property {{ mode: 'new'; requestedAt?: number }
+ *     | { mode: 'resume'; sessionId: string; requestedAt?: number }
+ *     | null} [nextSdkSessionBoot]
  *   Diretiva efêmera do operador para o próximo boot da sessão SDK; consumida pelo initializer.
  */
 
@@ -124,6 +124,50 @@ let _writeQueue = Promise.resolve();
 
 /** FIX state-io Bug 1: contador de geração — detecta clearState() chamado durante write em voo. */
 let _clearGen = 0;
+let _pendingClearCount = 0;
+
+/**
+ * Enfileira toda mutação persistente para preservar uma ordem total entre write e clear.
+ *
+ * @template T
+ * @param {() => Promise<T>} operation
+ * @returns {Promise<T>}
+ */
+function enqueueStateMutation(operation) {
+    const result = _writeQueue.then(operation);
+    _writeQueue = result.then(
+        () => undefined,
+        () => undefined,
+    );
+    return result;
+}
+
+function beginStateClear() {
+    _stateCache = null;
+    _readStatePromise = null;
+    resetStateFileIoCache();
+    _clearGen += 1;
+    _pendingClearCount += 1;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+function enqueueStateClear() {
+    return enqueueStateMutation(async () => {
+        try {
+            await removeStateFileIfExists();
+            log('INFO', '[PersistentSession] Estado removido (async) — próxima inicialização criará nova sessão.');
+        } catch (e) {
+            logSwallowed(e, 'stateIo.clearStateAsync.rm');
+        } finally {
+            _stateCache = null;
+            _readStatePromise = null;
+            resetStateFileIoCache();
+            _pendingClearCount = Math.max(0, _pendingClearCount - 1);
+        }
+    });
+}
 
 // ─── API pública ─────────────────────────────────────────────────────────────
 
@@ -184,7 +228,7 @@ export function writeState(updates) {
 export async function writeStateAsync(updates) {
     // FIX state-io Bug 2: retry original executava FORA do chain da fila serial (concorrente com próxima escrita).
     // Solução: mover try/retry para dentro do .then() — permanece serializado.
-    const resultPromise = _writeQueue.then(async () => {
+    return enqueueStateMutation(async () => {
         try {
             return await _doWriteState(updates);
         } catch (err) {
@@ -192,13 +236,6 @@ export async function writeStateAsync(updates) {
             return _doWriteState(updates);
         }
     });
-
-    _writeQueue = resultPromise.then(
-        () => undefined,
-        () => undefined,
-    );
-
-    return resultPromise;
 }
 
 /**
@@ -241,12 +278,8 @@ async function _doWriteState(updates) {
  * @returns {void}
  */
 export function clearState() {
-    _stateCache = null;
-    _readStatePromise = null;
-    resetStateFileIoCache();
-    _clearGen++; // FIX Bug 1: invalidar writes em voo
-    _writeQueue = Promise.resolve();
-    clearStateAsync().catch((e) => logSwallowed(e, 'stateIo.clearState.asyncFallback'));
+    beginStateClear();
+    enqueueStateClear().catch((e) => logSwallowed(e, 'stateIo.clearState.asyncFallback'));
 }
 
 /**
@@ -258,6 +291,7 @@ export function clearState() {
  */
 export async function readStateAsync() {
     if (_stateCache !== null) return _stateCache;
+    if (_pendingClearCount > 0) return null;
     if (_readStatePromise) return _readStatePromise;
 
     _readStatePromise = (async () => {
@@ -312,16 +346,8 @@ export async function readStateAsync() {
  * @returns {Promise<void>}
  */
 export async function clearStateAsync() {
-    try {
-        await removeStateFileIfExists();
-        log('INFO', '[PersistentSession] Estado removido (async) — próxima inicialização criará nova sessão.');
-    } catch (e) {
-        logSwallowed(e, 'stateIo.clearStateAsync.rm');
-    }
-    _stateCache = null;
-    _readStatePromise = null;
-    resetStateFileIoCache();
-    _writeQueue = Promise.resolve();
+    beginStateClear();
+    await enqueueStateClear();
 }
 
 /**

@@ -12,8 +12,9 @@
 
 import { toError } from '#copilot/core/error-handlers';
 import { resolveBootWorkspaceRoot } from '#copilot/boot';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 import { promises as fs } from 'node:fs';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -37,8 +38,18 @@ const CACHE_FILE_NAME = 'modellist-cache.json';
 const CACHE_DEFAULT_RELATIVE_PATH = `data/copilot/sdk/models/${CACHE_FILE_NAME}`;
 const CACHE_STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24h
 
-/** @type {Promise<void> | null} */
-let _pendingPersistentModelCacheWrite = null;
+/** @type {Promise<void>} */
+let _persistentModelCacheMutationQueue = Promise.resolve();
+
+/**
+ * @param {() => Promise<void>} mutation
+ * @returns {Promise<void>}
+ */
+function enqueuePersistentModelCacheMutation(mutation) {
+    const queued = _persistentModelCacheMutationQueue.then(mutation);
+    _persistentModelCacheMutationQueue = queued.catch(() => undefined);
+    return queued;
+}
 
 /**
  * @returns {string}
@@ -161,9 +172,8 @@ export function writePersistentModelCacheAsync(models) {
         return;
     }
 
-    // Fire-and-forget: não await, não bloqueia
-    // Use void para indicar Promise ignorada intencionalmente
-    const writePromise = Promise.resolve().then(async () => {
+    const modelsSnapshot = [...models];
+    const writePromise = enqueuePersistentModelCacheMutation(async () => {
         try {
             const cachePath = resolvePersistentModelCacheFile();
             const now = Date.now();
@@ -172,24 +182,18 @@ export function writePersistentModelCacheAsync(models) {
                 schema: 'ModelInfo[]',
                 version: CACHE_SCHEMA_VERSION,
                 fetchedAt: now,
-                models,
+                models: modelsSnapshot,
             });
 
             const json = JSON.stringify(data, null, 2);
-            await fs.mkdir(dirname(cachePath), { recursive: true });
-            await fs.writeFile(cachePath, json, 'utf8');
-            log('DEBUG', `[model-cache] Cache persistido: ${models.length} modelos`);
+            await writeFileAtomicPortable(cachePath, json, { mode: 0o600 });
+            log('DEBUG', `[model-cache] Cache persistido: ${modelsSnapshot.length} modelos`);
         } catch (error) {
             // Não re-lançar — graceful degrade para L1-only cache
             const err = toError(error);
             log('WARN', `[model-cache] Persistência falhou: ${err.message}`);
-        } finally {
-            if (_pendingPersistentModelCacheWrite === writePromise) {
-                _pendingPersistentModelCacheWrite = null;
-            }
         }
     });
-    _pendingPersistentModelCacheWrite = writePromise;
     void writePromise;
 }
 
@@ -204,19 +208,20 @@ export function writePersistentModelCacheAsync(models) {
  * @returns {Promise<void>}
  */
 export async function clearPersistentModelCache() {
-    await _pendingPersistentModelCacheWrite;
-    for (const cachePath of resolvePersistentModelCacheReadPaths()) {
-        try {
-            await fs.unlink(cachePath);
-            log('DEBUG', '[model-cache] Cache persistido deletado');
-        } catch (error) {
-            const err = /** @type {NodeJS.ErrnoException} */ (error);
-            if (!(err && typeof err === 'object' && err.code === 'ENOENT')) {
-                const errMsg = toError(error);
-                log('DEBUG', `[model-cache] Clear persistência: ${errMsg.message}`);
+    await enqueuePersistentModelCacheMutation(async () => {
+        for (const cachePath of resolvePersistentModelCacheReadPaths()) {
+            try {
+                await fs.unlink(cachePath);
+                log('DEBUG', '[model-cache] Cache persistido deletado');
+            } catch (error) {
+                const err = /** @type {NodeJS.ErrnoException} */ (error);
+                if (!(err && typeof err === 'object' && err.code === 'ENOENT')) {
+                    const errMsg = toError(error);
+                    log('DEBUG', `[model-cache] Clear persistência: ${errMsg.message}`);
+                }
             }
         }
-    }
+    });
 }
 
 /**

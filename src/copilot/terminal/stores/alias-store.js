@@ -8,8 +8,9 @@
  */
 
 import { LLM_B_ALIASES_FILE } from '#copilot/config';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 import { log } from '#copilot/observability';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { logSwallowed } from '../../core/error-handlers.js';
@@ -36,19 +37,27 @@ const ALIASES_FILE = LLM_B_ALIASES_FILE ?? path.join(os.homedir(), '.copilot-ali
 /** Cache em memória dos aliases (builtin + custom). @type {Record<string, string>} */
 let _aliases = /** @type {Record<string, string>} */ ({ ...BUILTIN_ALIASES });
 
+/** @type {Promise<void>} */
+let _saveQueue = Promise.resolve();
+
 // ---------------------------------------------------------------------------
 // Persistência
 // ---------------------------------------------------------------------------
 
 /**
- * Salva aliases customizados (fire-and-forget). Delega para {@link _saveCustomAliasesAsync}.
+ * Salva um snapshot dos aliases customizados em uma fila fire-and-forget observada.
  *
  * @returns {void}
  */
 function _saveCustomAliases() {
-    _saveCustomAliasesAsync().catch((e) => {
-        log('WARN', `[alias-store] Falha ao salvar aliases: ${e?.message ?? e}`);
-    });
+    const content = serializeCustomAliases();
+    _saveQueue = _saveQueue
+        .catch(() => undefined)
+        .then(() => writeFileAtomicPortable(ALIASES_FILE, content, { mode: 0o600 }))
+        .catch((e) => {
+            logSwallowed(e, 'terminal.aliasStore.write');
+            log('WARN', `[alias-store] Falha ao salvar aliases: ${e?.message ?? e}`);
+        });
 }
 
 /**
@@ -58,6 +67,7 @@ function _saveCustomAliases() {
  */
 export async function loadAliasesAsync() {
     try {
+        await _saveQueue;
         const raw = await readFile(ALIASES_FILE, 'utf8');
         const jsonResult = safeJsonParse(raw, '[alias-store/loadAliasesAsync]');
         if (!jsonResult.ok) {
@@ -77,11 +87,11 @@ export async function loadAliasesAsync() {
 }
 
 /**
- * F93: Versão async de saveCustomAliases — usa fs/promises.
+ * Serializa somente aliases customizados e overrides de built-ins.
  *
- * @returns {Promise<void>}
+ * @returns {string}
  */
-async function _saveCustomAliasesAsync() {
+function serializeCustomAliases() {
     /** @type {Record<string, string>} */
     const custom = {};
     for (const [k, v] of Object.entries(_aliases)) {
@@ -89,11 +99,17 @@ async function _saveCustomAliasesAsync() {
             custom[k] = v;
         }
     }
-    try {
-        await writeFile(ALIASES_FILE, JSON.stringify(custom, null, 2));
-    } catch (e) {
-        logSwallowed(e, 'terminal.aliasStore.write');
-    }
+    return `${JSON.stringify(custom, null, 2)}\n`;
+}
+
+/**
+ * Aguarda persistências disparadas pela API síncrona. Exclusivo para testes e shutdown ordenado.
+ *
+ * @returns {Promise<void>}
+ * @internal
+ */
+export function flushAliasPersistence() {
+    return _saveQueue;
 }
 
 // ---------------------------------------------------------------------------

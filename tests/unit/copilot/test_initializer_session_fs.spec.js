@@ -106,6 +106,20 @@ vi.mock('../../../src/copilot/agent/facades/agent-sdk-access.js', () => ({
     resumeOrCreateAgentSdkSession: mocks.resumeOrCreateAgentSdkSession,
     validateAgentContracts: mocks.validateAgentContracts,
 }));
+vi.mock('../../../src/copilot/agent/facades/agent-sdk-runtime.js', () => ({
+    canReadAgentSdkSessionMessages: mocks.canReadAgentSdkSessionMessages,
+    readAgentSdkSessionMessages: mocks.readAgentSdkSessionMessages,
+}));
+vi.mock('../../../src/copilot/agent/facades/sdk-access.js', () => ({
+    AGENT_SDK_DEFAULT_MODEL: 'auto',
+    createAgentSdkSessionByClient: mocks.createAgentSdkSessionByClient,
+    formatValidationResult: mocks.formatValidationResult,
+    getAgentConfiguredSessionFsHandler: mocks.getAgentConfiguredSessionFsHandler,
+    loadAgentSdkToolsConfigAsync: mocks.loadAgentSdkToolsConfigAsync,
+    pickDefinedAgentSdkOptions: mocks.pickDefinedAgentSdkOptions,
+    resumeOrCreateAgentSdkSession: mocks.resumeOrCreateAgentSdkSession,
+    validateAgentContracts: mocks.validateAgentContracts,
+}));
 vi.mock('../../../src/copilot/agent/facades/index.js', () => ({
     AGENT_SDK_DEFAULT_MODEL: 'auto',
     canReadAgentSdkSessionMessages: mocks.canReadAgentSdkSessionMessages,
@@ -352,11 +366,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
 
         await initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' });
 
-        expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledWith(
-            expect.anything(),
-            null,
-            expect.any(Object),
-        );
+        expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledWith(expect.anything(), null, expect.any(Object));
         expect(mocks.persistState).toHaveBeenCalledWith(
             expect.objectContaining({
                 byokSessionBinding: null,

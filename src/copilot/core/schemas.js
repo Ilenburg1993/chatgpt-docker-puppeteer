@@ -45,8 +45,14 @@ export const SystemPromptBindingSnapshotSchema = z.object({
 /**
  * Schema para itens listados via listSnapshots/listSnapshotsAsync.
  */
+export const SnapshotIdSchema = z
+    .string()
+    .min(1)
+    .max(128)
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/u, 'snapshotId must be a safe file basename');
+
 export const SnapshotListItemSchema = z.object({
-    snapshotId: z.string(),
+    snapshotId: SnapshotIdSchema,
     createdAt: z.number(),
     sessionId: z.string().nullable().optional(),
     model: z.string().optional(),
@@ -57,7 +63,7 @@ export const SnapshotListItemSchema = z.object({
  * Schema completo do SessionSnapshotData persistido em disco.
  */
 export const SessionSnapshotDataSchema = z.object({
-    snapshotId: z.string(),
+    snapshotId: SnapshotIdSchema,
     createdAt: z.number(),
     sessionId: z.string().nullable(),
     model: z.string(),
