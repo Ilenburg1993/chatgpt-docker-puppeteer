@@ -246,6 +246,31 @@ Status:
 - **IO-039 concluído:** há um SSOT de lockfile; a API legado é somente facade de compatibilidade.
 - **IO-038 permanece parcial:** escrita assíncrona e leitura tolerante estão centralizadas, mas writers síncronos e truncamento físico opcional ainda não.
 
+### 1.8 Status de implementação — provas multiprocess reais aplicadas em 2026-06-12
+
+Foi adicionado um harness que executa módulos de produção em processos Node independentes, com L1 habilitado e verificação do estado final no filesystem.
+
+Provas cobertas:
+
+- dois processos tentando create exclusivo: exatamente um vence, o outro recebe `EEXIST`;
+- dois processos copiando origens diferentes para o mesmo destino exclusivo: exatamente um vence e o destino contém uma versão completa;
+- dois processos movendo origens diferentes para o mesmo destino exclusivo: exatamente um vence e a origem perdedora permanece intacta;
+- dois processos escrevendo payloads grandes no mesmo destino: ambos concluem serializados e o arquivo final é uma das versões completas;
+- processo holder morto por `SIGKILL`: o próximo processo recupera o L1 órfão e remove o lock ao concluir.
+
+Achado adicional fechado durante a prova:
+
+- **IO-041 P0 — timer aguardado com `unref()` encerrava processo durante contenção.**
+- O polling L1 e o timeout L0 usavam timers sem referência; um processo cuja única atividade era aguardar o lock podia encerrar com top-level await pendente e código 13.
+- Os timers de espera aguardada agora mantêm o processo vivo; heartbeat continua `unref()`, pois não deve impedir shutdown.
+
+Validação:
+
+- prova multiprocess: **2 testes passados, 0 falhas**;
+- `typecheck:strict:src.copilot`: **PASS**;
+- `lint:copilot`: **PASS**;
+- testes de locks/engine após a correção: **39 passados, 0 falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -502,12 +527,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-038 | P1 | JSONL | **Parcial:** writer canônico cobre audit, event collector, SSE e MCP | `infra/io/jsonl-file-writer.js`; cursor/requeue corrigidos | Writers síncronos e linha parcial ainda têm semântica própria | Migrar logger/metrics/transcript e centralizar recovery de última linha |
 | IO-039 | P2 | Lock governance | **Concluído:** `file-resource-lock.js` é SSOT | `infra/lockfile.js` delega aquisição ao L1 canônico e preserva API legado | Remove semânticas concorrentes | Manter facade até callers antigos desaparecerem |
 | IO-040 | P2 | Scanner | **Concluído:** tipo básico vem de `Dirent` | `readdir({ withFileTypes:true })`; `lstat` só para arquivo/ambíguo | Reduz syscalls de classificação | Preservar benchmark e testar DT_UNKNOWN |
+| IO-041 | P0 | Lock wait | **Concluído:** timer aguardado não usa `unref()` | prova multiprocess reproduziu exit 13 durante espera L1 | Processo podia encerrar antes de adquirir/rejeitar lock | Manter `unref()` apenas em heartbeat/background |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041 |
 | Concluído com limite documentado | IO-001, IO-005 |
 | Parcial | IO-002, IO-006, IO-009, IO-023, IO-025, IO-038 |
 | Aberto | IO-010, IO-014, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-029, IO-030 |
@@ -662,7 +688,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Copy sem overwrite usa `COPYFILE_EXCL`.
 - [x] Create exclusivo usa `link`/`wx`.
 - [x] Move sem overwrite é exclusivo também no caminho same-device.
-- [ ] Adicionar prova multiprocess real de create/copy/move.
+- [x] Adicionar prova multiprocess real de create/copy/move.
 
 ### Faixa 1 — Durabilidade e publicação segura
 
@@ -784,7 +810,8 @@ A situação ideal é uma infra IO em camadas:
 
 - [ ] Fuzz textual e binário.
 - [ ] Crash injection em write, rename, directory sync, EXDEV e append.
-- [ ] Dois processos concorrendo por create/copy/move/write.
+- [x] Dois processos concorrendo por create/copy/move/write.
+- [x] Crash de holder L1 seguido de stale recovery real.
 - [ ] Modificação externa durante snapshot e index.
 - [ ] Git checkout/editor save durante patch.
 
@@ -827,7 +854,8 @@ Foram concluídos stale recovery/release do L1, move exclusivo, copy staged, sna
 5. [ ] adicionar truncamento físico opcional da cauda parcial;
 6. [ ] migrar ou allowlistar writers síncronos restantes;
 7. [x] consolidar `infra/lockfile.js` sobre o L1 canônico;
-8. [ ] executar provas multiprocess de create/copy/move/write e crash injection nos pontos de publish/sync.
+8. [x] executar provas multiprocess de create/copy/move/write e crash de holder L1;
+9. [ ] executar crash injection nos pontos de publish/sync e rotate+append.
 
 ---
 
@@ -906,4 +934,4 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Iniciar as provas multiprocess/crash-injection de create/copy/move/write e rotate+append. Em paralelo, decidir explicitamente entre migração e allowlist best-effort para logger/metrics/transcript síncronos.
+Implementar crash injection nos pontos de publish/sync e rotate+append. Em paralelo, decidir explicitamente entre migração e allowlist best-effort para logger/metrics/transcript síncronos.
