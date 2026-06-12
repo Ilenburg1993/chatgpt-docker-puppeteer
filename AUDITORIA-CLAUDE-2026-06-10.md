@@ -14,7 +14,7 @@ incompleto, replay OAuth somente em memória, manutenção de startup ausente e 
 persistência/cardinalidade sem garantias suficientes.
 
 Após revalidação integral do escopo, foram confirmados ou invalidados todos os itens externos e
-corrigidos **49 achados adicionais**. O gate `test:copilot:unit` agora descobre recursivamente 535
+corrigidos **50 achados adicionais**. O gate `test:copilot:unit` agora descobre recursivamente 535
 arquivos e fechou em `6389/6417` testes, `1946/1946` suites, zero falhas e 28 pendências esperadas.
 Typecheck strict e lint Copilot também estão em PASS.
 
@@ -418,6 +418,8 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 | CDEX-047 | 🟠 médio   | [x]    | Um único turn trace podia acumular tools, arquivos, user inputs, escolhas e `dedupeKeys` sem teto até `turn_end`. Agora preserva apenas os eventos recentes sob limites explícitos (128/256/64), limita listas/campos variáveis e clona arrays internos ao produzir snapshots públicos.                                      |
 | CDEX-048 | 🟡 baixo   | [x]    | O throttle de alertas recuperáveis guardava mensagens/contextos distintos indefinidamente. Agora o dedupe vale para qualquer callback, remove chaves após 30s e impõe teto de 512 assinaturas, com evicção determinística da mais antiga.                                                                                    |
 | CDEX-049 | 🟡 baixo   | [x]    | `cloudflare oauth-smoke` entrava em modo autenticado sem validar `COPILOT_MCP_SMOKE_BEARER_TOKEN`, enviava `tools/list` sem bearer e reportava um falso negativo 401. Agora usa o env injetado e falha antes da rede com diagnóstico explícito, preservando o último smoke válido.                                               |
+| CDEX-050 | 🟠 médio   | [x]    | O pool do parser tinha default fixo 2 e `IO_PARSER_WORKER_POOL_SIZE` inválido virava `NaN`, inicializando zero workers silenciosamente. Agora o default deriva de `availableParallelism()` (1–4), override é limitado a 16 e métricas expõem tamanho, origem e paralelismo detectado.                                           |
+| CDEX-051 | 🟠 médio   | [ ]    | O envelope `tools/list` atual mede 159.861 bytes; `inputSchema` responde por 78.542 bytes e os quatro descriptors batch somam ~28,9KB. Nenhuma tool individual passa de 8,4KB, portanto a otimização deve compactar schemas compartilhados sem confundir descriptors com payloads de execução.                                    |
 
 ### Roadmap booleano revisado e autoritativo
 
@@ -509,6 +511,7 @@ Execução de `R1.2` em 2026-06-11:
 - [x] R2.22 — Limitar cardinalidade, listas internas e tamanho dos campos de um único turn trace.
 - [x] R2.23 — Aplicar TTL de 30s e teto de 512 chaves ao dedupe de alertas recuperáveis.
 - [x] R2.24 — Fazer o smoke Cloudflare autenticado rejeitar credencial ausente antes de tocar rede.
+- [ ] R2.25 — Reduzir o envelope `tools/list` preservando validação e contratos dos schemas batch.
 
 Transformações consolidadas nesta rodada:
 
@@ -609,6 +612,11 @@ O contrato de layout mais o warmup fecharam adicionalmente em `59/59`:
 Após publicar `0c604a7d` e reiniciar o runtime, `/health.authJwksWarmup` confirmou `success=true`,
 `source=remote`, `keyCount=2`, `durationMs=614`; o OAuth smoke completo passou com `100/100` tools e
 a primeira chamada autenticada registrou `authorization.lastDurationMs=2`.
+
+Validação focada adicional de `CDEX-050`: parser + governança do barrel infra `27/27`, zero
+warnings/errors, com `typecheck:strict:src.copilot` e ESLint focado em PASS. No runtime atual,
+`availableParallelism=5`, `workerPoolSize=4` e `workerPoolSizeSource=adaptive`. Resumo:
+`artifacts/test-runs/copilot/2026-06-12T03-19-20-469Z/summary.md`.
 
 Validação canônica pós-transformações em 2026-06-11:
 
@@ -888,9 +896,9 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 #### 4.3 Worker pool dinâmico no io-parser 🟡
 
 - [x] 4.3.1 — Confirmado existente: `IO_PARSER_WORKER_POOL_SIZE`
-- [ ] 4.3.2 — Implementar ajuste dinâmico baseado em `os.cpus().length` (ex:
-      `Math.min(4, cpus - 1)`)
-- [x] 4.3.3 — `workerPoolSize` já é exposto nas métricas
+- [x] 4.3.2 — Default adaptativo usa `availableParallelism()` e `min(4, parallelism - 1)`, com
+      mínimo 1; override explícito permanece disponível e limitado a 16
+- [x] 4.3.3 — Métricas expõem `workerPoolSize`, `workerPoolSizeSource` e `availableParallelism`
 
 #### 4.6 AbortSignal.timeout() em todos os ops async críticos 🟡
 
@@ -1035,6 +1043,7 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 | P1         | JWKS warmup não bloqueante                          | Validado live  | 2 chaves; warmup 614ms; primeira auth 2ms          |
 | P2         | Decisão medida sobre ativação do L2 por perfil      | Em aberto      | Hit ratio, latência e custo no `copilot.sqlite`    |
 | P2         | Benchmark QUIC vs auto/http2                        | Em aberto      | p50/p95/p99 controlados                            |
+| P2         | Compactar envelope `tools/list`                     | Em aberto      | Reduzir 159.861 bytes sem perder contratos         |
 | P2         | Rotação de chaves OAuth com grace period            | Em aberto      | Design, runbook e testes de rollover               |
 | P3         | Instrumentar spans MCP por fase                     | Parcial        | Traces authorization/handler/resultSize            |
 | P3         | Hotset de prefetch MCP                              | Parcial        | Top arquivos e ganho medido de L1                  |
