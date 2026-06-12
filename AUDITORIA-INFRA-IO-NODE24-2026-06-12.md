@@ -16,7 +16,7 @@ No estado implementado após `7b83becd`, a descrição correta é: **replace/cop
 
 Prioridades reais remanescentes:
 
-1. **P1 — append/JSONL permanece fragmentado:** audit, observability, MCP e SSE duplicam append/rotação; há caminhos de duplicação de registros e perda de lote em erro.
+1. **P1 — append/JSONL foi consolidado no caminho assíncrono principal, mas ainda é parcial:** audit, mutation audit, event collector, MCP e SSE compartilham writer; logger/metrics/transcript síncronos e recovery de linha parcial permanecem.
 2. **P1 — política workspace-bound ainda não está na fachada:** a engine pública valida string/null-byte, mas containment e symlink policy continuam responsabilidade dos adapters.
 3. **P1 — provas de falha ainda são insuficientes:** faltam dois processos reais e crash injection nos pontos de publish/sync/append.
 4. **P1 — freshness do índice ainda depende demais de mtime+size:** mudanças externas same-size/same-mtime podem escapar.
@@ -177,6 +177,46 @@ Status dos novos achados:
 
 - **Concluídos:** IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037 e IO-040.
 - **Abertos:** IO-038 e IO-039.
+
+### 1.6 Status de implementação — append/JSONL canônico aplicado em 2026-06-12
+
+Foi criada `infra/io/jsonl-file-writer.js` como primitiva compartilhada para writers JSONL assíncronos:
+
+- apenas um lote fica em voo por writer;
+- falha de append recoloca o lote na cabeça da fila, preservando ordem;
+- `mkdir`, verificação de tamanho, rotação e append executam sob o mesmo lock por path;
+- `flushToDisk` classifica writers duráveis sem impor fsync a telemetria best-effort;
+- limites soft/catastrófico, contadores de drop/falha e último erro são observáveis;
+- path pode ser dinâmico, preservando archive SSE diário e configuração MCP por env.
+
+Migrações concluídas:
+
+- `audit/jsonl-writer`;
+- audit geral e tool execution em `pipeline-audit-log`;
+- audit de permissões em modo durável;
+- mutation audit da infra em modo durável;
+- `observability/event-collector`;
+- terminal SSE archive;
+- MCP control-plane audit.
+
+Correções comportamentais:
+
+- `createAuditLog().flush()` não reapenda mais todo o ring buffer; cada entrada pendente é persistida uma única vez.
+- SSE, event collector, audit e MCP não perdem definitivamente o lote removido da fila quando append falha.
+- Rotação e append deixaram de ser operações independentes suscetíveis a interleaving entre writers cooperativos.
+
+Validação desta onda:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- `lint:copilot`: **PASS**.
+- Testes focados e contratos arquiteturais: **187 passados, 0 falhas**.
+- Provas novas: requeue após falha e dois flushes consecutivos sem duplicação do audit ring.
+
+Limites remanescentes de IO-038:
+
+- `observability/logger.js`, `observability/metrics.js` e transcript archive ainda usam append síncrono/direto.
+- Recovery/truncamento explícito da última linha JSONL parcial ainda não é uma primitiva compartilhada.
+- Ainda faltam crash injection e prova multiprocess durante rotate+append.
 
 ---
 
@@ -431,7 +471,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-035 | P0 | Copy | **Concluído:** copy staged e verificado | temp exclusivo, hash/tamanho incremental, sync, `link`/`rename` | Preserva destino anterior até publish | Adicionar crash injection e ENOSPC real |
 | IO-036 | P1 | Snapshot | **Concluído:** snapshot baixo consistente | `FileHandle.stat/read/stat`, confirmação do path e retry | Cache recebe bytes e metadata do mesmo inode/versão | Testar modificação externa durante read |
 | IO-037 | P1 | Invalidation | **Concluído:** derivados são drenados antes do retorno | `invalidateIoCacheTiers*()` chama `flushIoInvalidationQueue()` | Read-after-write não espera debounce | Medir custo sob bursts de mutação |
-| IO-038 | P1 | JSONL | Append/rotação duplicados têm perda/duplicação | audit, observability, SSE, MCP | Auditoria inconsistente após falha/reflush | Wrapper canônico de append/rotate/flush e cursor de persistência |
+| IO-038 | P1 | JSONL | **Parcial:** writer canônico cobre audit, event collector, SSE e MCP | `infra/io/jsonl-file-writer.js`; cursor/requeue corrigidos | Writers síncronos e linha parcial ainda têm semântica própria | Migrar logger/metrics/transcript e centralizar recovery de última linha |
 | IO-039 | P2 | Lock governance | Dois lockfile managers coexistem | `infra/lockfile.js` e `infra/locks/file-resource-lock.js` | Semânticas divergentes e manutenção duplicada | Definir SSOT e migrar o legado gradualmente |
 | IO-040 | P2 | Scanner | **Concluído:** tipo básico vem de `Dirent` | `readdir({ withFileTypes:true })`; `lstat` só para arquivo/ambíguo | Reduz syscalls de classificação | Preservar benchmark e testar DT_UNKNOWN |
 
@@ -441,8 +481,8 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | --- | --- |
 | Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-040 |
 | Concluído com limite documentado | IO-001, IO-005 |
-| Parcial | IO-002, IO-006, IO-009, IO-023, IO-025 |
-| Aberto | IO-010, IO-014, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-029, IO-030, IO-038, IO-039 |
+| Parcial | IO-002, IO-006, IO-009, IO-023, IO-025, IO-038 |
+| Aberto | IO-010, IO-014, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-029, IO-030, IO-039 |
 
 ---
 
@@ -623,11 +663,12 @@ A situação ideal é uma infra IO em camadas:
 
 #### Fase 1.4 — Append confiável
 
-- [ ] Criar wrapper canônico de append/rotate sob o mesmo lock.
-- [ ] Suportar `flush` explícito e classificação `best-effort`/`durable`.
-- [ ] Corrigir cursor de persistência do audit ring buffer.
-- [ ] Reenfileirar lote SSE/audit em falha recuperável.
+- [x] Criar wrapper canônico de append/rotate sob o mesmo lock.
+- [x] Suportar `flush` explícito e classificação `best-effort`/`durable`.
+- [x] Corrigir cursor de persistência do audit ring buffer.
+- [x] Reenfileirar lote SSE/audit/MCP/event collector em falha recuperável.
 - [ ] Recovery de última linha JSONL parcial na leitura.
+- [ ] Migrar logger/metrics/transcript síncronos ou formalizar allowlist best-effort.
 
 ### Faixa 2 — Lock multiprocess correto
 
@@ -748,14 +789,15 @@ A situação ideal é uma infra IO em camadas:
 
 Foram concluídos stale recovery/release do L1, move exclusivo, copy staged, snapshot coerente e incremental, invalidação imediata e scanner com `Dirent`. O escopo fechou IO-031 a IO-037 e IO-040.
 
-### 10.2 Próxima onda — append, governança e provas
+### 10.2 Onda de append canônico — parcial aplicada
 
-1. criar append canônico com framing, flush configurável e lock único;
-2. corrigir cursor de persistência do audit ring buffer;
-3. reenfileirar lotes SSE/observability em falha recuperável;
-4. adicionar recovery de última linha JSONL parcial;
-5. consolidar `infra/lockfile.js` sobre o L1 canônico;
-6. executar provas multiprocess de create/copy/move/write e crash injection nos pontos de publish/sync.
+1. [x] criar append canônico com framing, flush configurável e lock único;
+2. [x] corrigir cursor de persistência do audit ring buffer;
+3. [x] reenfileirar lotes SSE/observability/MCP em falha recuperável;
+4. [ ] adicionar recovery de última linha JSONL parcial;
+5. [ ] migrar ou allowlistar writers síncronos restantes;
+6. [ ] consolidar `infra/lockfile.js` sobre o L1 canônico;
+7. [ ] executar provas multiprocess de create/copy/move/write e crash injection nos pontos de publish/sync.
 
 ---
 
@@ -834,4 +876,4 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Implementar a onda 10.2 começando pelo append canônico. O primeiro corte deve migrar audit e SSE sem alterar o formato JSONL, adicionar cursor/requeue e cobrir falha recuperável antes de consolidar os demais writers.
+Completar a onda 10.2 com recovery compartilhado da última linha JSONL parcial e decisão explícita sobre logger/metrics/transcript. Em seguida, consolidar `infra/lockfile.js` e iniciar as provas multiprocess/crash-injection.
