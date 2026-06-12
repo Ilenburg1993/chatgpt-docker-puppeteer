@@ -606,6 +606,9 @@ Validação focada adicional de `R1.23`: warmup JWKS, auth hardening, startup ma
 `artifacts/test-runs/copilot/2026-06-12T03-14-21-813Z/summary.md`.
 O contrato de layout mais o warmup fecharam adicionalmente em `59/59`:
 `artifacts/test-runs/copilot/2026-06-12T03-16-02-677Z/summary.md`.
+Após publicar `0c604a7d` e reiniciar o runtime, `/health.authJwksWarmup` confirmou `success=true`,
+`source=remote`, `keyCount=2`, `durationMs=614`; o OAuth smoke completo passou com `100/100` tools e
+a primeira chamada autenticada registrou `authorization.lastDurationMs=2`.
 
 Validação canônica pós-transformações em 2026-06-11:
 
@@ -744,7 +747,8 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
       real está em `/health.authJwksWarmup` e o cache `oauth-remote-jwks` nas métricas TTL
 - [x] 2.2.3 — Log DEBUG registra source, keyCount e durationMs do warmup
 - [x] 2.2.4 — Scheduler fire-and-forget captura falhas, registra WARN/estado e não rejeita startup
-- [ ] 2.2.5 — Testar que autorização cold-start fica < 30ms com warmup
+- [x] 2.2.5 — Restart live: warmup remoto carregou 2 chaves em 614ms fora do caminho crítico; a
+      primeira tool OAuth autenticada registrou fase `authorization=2ms` (< 30ms)
 
 #### 2.3 Ativar L2 cache SQLite 🟠
 
@@ -1028,7 +1032,7 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 | Prioridade | Item                                                 | Estado         | Próxima evidência necessária                       |
 | ---------- | ---------------------------------------------------- | -------------- | -------------------------------------------------- |
-| P1         | JWKS warmup não bloqueante                          | Implementado   | Benchmark cold-start antes/depois                  |
+| P1         | JWKS warmup não bloqueante                          | Validado live  | 2 chaves; warmup 614ms; primeira auth 2ms          |
 | P2         | Decisão medida sobre ativação do L2 por perfil      | Em aberto      | Hit ratio, latência e custo no `copilot.sqlite`    |
 | P2         | Benchmark QUIC vs auto/http2                        | Em aberto      | p50/p95/p99 controlados                            |
 | P2         | Rotação de chaves OAuth com grace period            | Em aberto      | Design, runbook e testes de rollover               |
