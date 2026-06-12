@@ -1,6 +1,7 @@
 // @ts-check
 
 import { strict as assert } from 'node:assert';
+import path from 'node:path';
 import { afterEach, describe, it } from 'vitest';
 
 import { invalidateIoCachePath } from '../../../../src/copilot/infra/io-cache.js';
@@ -55,6 +56,23 @@ describe('infra/io/fs line-offset cache', () => {
         assert.equal(stats.busInvalidations, 1);
         assert.equal(stats.clears, 1);
         assert.equal(stats.size, 0);
+    });
+
+    it('normaliza paths relativos e absolutos para a mesma entrada', () => {
+        resetLineOffsetCacheForTest();
+        const text = 'alpha\nbeta\ngamma';
+        const fingerprint = { sizeBytes: Buffer.byteLength(text, 'utf8'), mtimeMs: 6789 };
+        const relativeFile = path.relative(process.cwd(), FILE);
+
+        const first = sliceTextByCachedLineOffsets(relativeFile, text, fingerprint, { startLine: 1 });
+        const second = sliceTextByCachedLineOffsets(FILE, text, fingerprint, { startLine: 2 });
+
+        assert.equal(first.cache, 'line-offset-miss');
+        assert.equal(second.cache, 'line-offset-hit');
+        assert.equal(getLineOffsetCacheStats().size, 1);
+
+        invalidateIoCachePath(relativeFile);
+        assert.equal(getLineOffsetCacheStats().size, 0);
     });
 
     it('bypasses caching when fingerprint is not finite', () => {

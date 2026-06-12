@@ -21,6 +21,16 @@ function positiveIntegerOr(value, fallback) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @returns {number}
+ */
+function nonNegativeIntegerOr(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : fallback;
+}
+
+/**
  * Lê um arquivo por stream, calculando hash e guardando snapshot base64 apenas se couber no orçamento.
  *
  * @param {string} filePath
@@ -37,7 +47,7 @@ function positiveIntegerOr(value, fallback) {
  * }>}
  */
 export async function readBinaryMutationSnapshot(filePath, options = {}) {
-    const snapshotMaxBytes = Math.max(0, positiveIntegerOr(options.snapshotMaxBytes, 256 * 1024));
+    const snapshotMaxBytes = nonNegativeIntegerOr(options.snapshotMaxBytes, 256 * 1024);
     const highWaterMark = positiveIntegerOr(options.highWaterMark, 64 * 1024);
     const hash = createHash('sha256');
     /** @type {Buffer[]} */
@@ -50,13 +60,8 @@ export async function readBinaryMutationSnapshot(filePath, options = {}) {
     const stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
 
     try {
-        const arrayCtor = /** @type {any} */ (Array);
-        /** @type {Buffer[]} */
-        const bufferViews = await arrayCtor.fromAsync(
-            stream,
-            /** @param {Buffer | Uint8Array} chunk */ (chunk) => toBufferView(chunk),
-        );
-        for (const buf of bufferViews) {
+        for await (const chunk of stream) {
+            const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
             bytesRead += buf.byteLength;
             hash.update(buf);
 

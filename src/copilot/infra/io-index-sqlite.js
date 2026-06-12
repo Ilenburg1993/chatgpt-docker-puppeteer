@@ -627,7 +627,7 @@ export function createIoIndexSqlite(options) {
 
                 return value;
             } finally {
-                lease.release();
+                await lease.releaseAsync();
             }
         },
 

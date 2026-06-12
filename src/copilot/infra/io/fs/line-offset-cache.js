@@ -9,8 +9,9 @@
  * @module copilot/infra/io/fs/line-offset-cache
  */
 
-import { registerIoInvalidationHook } from '../invalidation/bus.js';
 import path from 'node:path';
+import { normalizePathResourceKey } from '../../policy/path-resource.js';
+import { registerIoInvalidationHook } from '../invalidation/bus.js';
 
 const MAX_LINE_OFFSET_CACHE_ENTRIES = Number(process.env['IO_LINE_OFFSET_CACHE_MAX_ENTRIES'] ?? 256);
 const DEFAULT_MAX_TEXT_CHARS = Number(process.env['IO_LINE_OFFSET_CACHE_MAX_TEXT_CHARS'] ?? 2_000_000);
@@ -92,7 +93,8 @@ export function ensureLineOffsetCacheInvalidationHook() {
  * @returns {number}
  */
 export function invalidateLineOffsetCachePath(filePath) {
-    const removed = clearLineOffsetCacheByPrefixes([`${filePath}\u0000`]);
+    const normalizedPath = normalizePathResourceKey(filePath);
+    const removed = clearLineOffsetCacheByPrefixes([`${normalizedPath}\u0000`]);
     lineOffsetCacheStats.clears += removed;
     return removed;
 }
@@ -102,7 +104,11 @@ export function invalidateLineOffsetCachePath(filePath) {
  * @returns {number}
  */
 export function invalidateLineOffsetCacheSubtree(filePath) {
-    const removed = clearLineOffsetCacheByPrefixes([`${filePath}\u0000`, `${filePath}${path.sep}`]);
+    const normalizedPath = normalizePathResourceKey(filePath);
+    const removed = clearLineOffsetCacheByPrefixes([
+        `${normalizedPath}\u0000`,
+        `${normalizedPath}${path.sep}`,
+    ]);
     lineOffsetCacheStats.clears += removed;
     return removed;
 }
@@ -143,7 +149,8 @@ export function sliceTextByCachedLineOffsets(filePath, text, fingerprint, window
         return { ...sliceTextBySplit(text, window), cache: 'line-offset-bypass' };
     }
 
-    const key = buildLineOffsetCacheKey(filePath, sizeBytes, mtimeMs, text.length);
+    const normalizedPath = normalizePathResourceKey(filePath);
+    const key = buildLineOffsetCacheKey(normalizedPath, sizeBytes, mtimeMs, text.length);
     let entry = lineOffsetCache.get(key);
     /** @type {'line-offset-hit' | 'line-offset-miss'} */
     let cacheState = 'line-offset-miss';
@@ -159,7 +166,7 @@ export function sliceTextByCachedLineOffsets(filePath, text, fingerprint, window
         }
         lineOffsetCacheStats.misses += 1;
         entry = {
-            path: filePath,
+            path: normalizedPath,
             sizeBytes,
             mtimeMs,
             textLength: text.length,

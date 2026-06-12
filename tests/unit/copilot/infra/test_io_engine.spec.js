@@ -1,7 +1,7 @@
 // @ts-check
 
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,30 +43,6 @@ async function createTempDir() {
     const dir = await mkdtemp(join(tmpdir(), 'copilot-io-engine-'));
     TEMP_DIRS.push(dir);
     return dir;
-}
-
-/**
- * @param {() => Promise<void>} operation
- */
-async function withFileLockEnv(operation) {
-    const previous = {
-        enabled: process.env['COPILOT_IO_FILE_LOCKS_ENABLED'],
-        dir: process.env['COPILOT_IO_FILE_LOCK_DIR'],
-        staleMs: process.env['COPILOT_IO_FILE_LOCK_STALE_MS'],
-        timeoutMs: process.env['COPILOT_IO_FILE_LOCK_TIMEOUT_MS'],
-    };
-    try {
-        await operation();
-    } finally {
-        if (previous.enabled === undefined) delete process.env['COPILOT_IO_FILE_LOCKS_ENABLED'];
-        else process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = previous.enabled;
-        if (previous.dir === undefined) delete process.env['COPILOT_IO_FILE_LOCK_DIR'];
-        else process.env['COPILOT_IO_FILE_LOCK_DIR'] = previous.dir;
-        if (previous.staleMs === undefined) delete process.env['COPILOT_IO_FILE_LOCK_STALE_MS'];
-        else process.env['COPILOT_IO_FILE_LOCK_STALE_MS'] = previous.staleMs;
-        if (previous.timeoutMs === undefined) delete process.env['COPILOT_IO_FILE_LOCK_TIMEOUT_MS'];
-        else process.env['COPILOT_IO_FILE_LOCK_TIMEOUT_MS'] = previous.timeoutMs;
-    }
 }
 
 describe('infra/io-engine', () => {
@@ -652,66 +628,126 @@ describe('infra/io-engine', () => {
         }
     });
 
-    it('acquireIoResourceLock cria lockfile L1 quando habilitado por env', async () => {
-        await withFileLockEnv(async () => {
-            const dir = await createTempDir();
-            const lockDir = join(dir, '.locks');
-            const resource = join(dir, 'locked.txt');
-            process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = '1';
-            process.env['COPILOT_IO_FILE_LOCK_DIR'] = lockDir;
+    it('acquireIoResourceLock cria lockfile L1 quando habilitado explicitamente', async () => {
+        const dir = await createTempDir();
+        const lockDir = join(dir, '.locks');
+        const resource = join(dir, 'locked.txt');
 
-            const lease = await acquireIoResourceLock(resource, { operation: 'unit-test', target: resource, timeoutMs: 500 });
-            try {
-                expect(lease.fileLockEnabled).toBe(true);
-                expect(lease.fileLockPath).toBe(getFileResourceLockPath(resource, lockDir));
-                expect(await readdir(lockDir)).toHaveLength(1);
-                expect(getIoLockStats().fileLocks.activeLeases).toBeGreaterThanOrEqual(1);
-            } finally {
-                lease.release();
-            }
-
-            await new Promise((resolve) => setTimeout(resolve, 20));
-            expect(await readdir(lockDir)).toEqual([]);
+        const lease = await acquireIoResourceLock(resource, {
+            fileLock: true,
+            fileLockDir: lockDir,
+            operation: 'unit-test',
+            target: resource,
+            timeoutMs: 500,
         });
+        try {
+            expect(lease.fileLockEnabled).toBe(true);
+            expect(lease.fileLockPath).toBe(getFileResourceLockPath(resource, lockDir));
+            expect(await readdir(lockDir)).toHaveLength(1);
+            expect(getIoLockStats().fileLocks.activeLeases).toBeGreaterThanOrEqual(1);
+        } finally {
+            await lease.releaseAsync();
+        }
+
+        expect(await readdir(lockDir)).toEqual([]);
     });
 
     it('acquireIoResourceLock recupera lockfile stale por PID morto', async () => {
-        await withFileLockEnv(async () => {
-            const dir = await createTempDir();
-            const lockDir = join(dir, '.locks');
-            const resource = join(dir, 'stale.txt');
-            process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = '1';
-            process.env['COPILOT_IO_FILE_LOCK_DIR'] = lockDir;
-            await mkdir(lockDir, { recursive: true });
-            const lockPath = getFileResourceLockPath(resource, lockDir);
-            await writeFile(
-                lockPath,
-                `${JSON.stringify({
-                    schemaVersion: 1,
-                    token: 'stale-token',
-                    pid: 999_999_999,
-                    hostname: 'stale-host',
-                    resourceKey: resource,
-                    resourceHash: 'stale-hash',
-                    operation: 'stale-test',
-                    target: resource,
-                    startedAt: new Date(Date.now() - 60_000).toISOString(),
-                    startedAtMs: Date.now() - 60_000,
-                })}\n`,
-                'utf8',
-            );
+        const dir = await createTempDir();
+        const lockDir = join(dir, '.locks');
+        const resource = join(dir, 'stale.txt');
+        await mkdir(lockDir, { recursive: true });
+        const lockPath = getFileResourceLockPath(resource, lockDir);
+        await writeFile(
+            lockPath,
+            `${JSON.stringify({
+                schemaVersion: 1,
+                token: 'stale-token',
+                pid: 999_999_999,
+                hostname: hostname(),
+                resourceKey: resource,
+                resourceHash: 'stale-hash',
+                operation: 'stale-test',
+                target: resource,
+                startedAt: new Date(Date.now() - 60_000).toISOString(),
+                startedAtMs: Date.now() - 60_000,
+            })}\n`,
+            'utf8',
+        );
 
-            const lease = await acquireIoResourceLock(resource, { operation: 'unit-test', target: resource, timeoutMs: 500 });
-            try {
-                expect(lease.fileLockEnabled).toBe(true);
-                expect(lease.staleFileLockRecovered).toBe(true);
-                const metadata = JSON.parse(await readFile(lockPath, 'utf8'));
-                expect(metadata.token).not.toBe('stale-token');
-                expect(metadata.pid).toBe(process.pid);
-            } finally {
-                lease.release();
-            }
+        const lease = await acquireIoResourceLock(resource, {
+            fileLock: true,
+            fileLockDir: lockDir,
+            operation: 'unit-test',
+            target: resource,
+            timeoutMs: 500,
         });
+        try {
+            expect(lease.fileLockEnabled).toBe(true);
+            expect(lease.staleFileLockRecovered).toBe(true);
+            const metadata = JSON.parse(await readFile(lockPath, 'utf8'));
+            expect(metadata.token).not.toBe('stale-token');
+            expect(metadata.pid).toBe(process.pid);
+        } finally {
+            await lease.releaseAsync();
+        }
+    });
+
+    it('acquireIoResourceLock não rouba lock local antigo de PID vivo', async () => {
+        const dir = await createTempDir();
+        const lockDir = join(dir, '.locks');
+        const resource = join(dir, 'live-old.txt');
+        await mkdir(lockDir, { recursive: true });
+        const lockPath = getFileResourceLockPath(resource, lockDir);
+        await writeFile(
+            lockPath,
+            `${JSON.stringify({
+                schemaVersion: 1,
+                token: 'live-token',
+                pid: process.pid,
+                hostname: hostname(),
+                resourceKey: resource,
+                resourceHash: 'live-hash',
+                operation: 'long-running-test',
+                target: resource,
+                startedAt: new Date(Date.now() - 60_000).toISOString(),
+                startedAtMs: Date.now() - 60_000,
+            })}\n`,
+            'utf8',
+        );
+
+        await expect(
+            acquireIoResourceLock(resource, {
+                fileLock: true,
+                fileLockDir: lockDir,
+                operation: 'contender',
+                target: resource,
+                timeoutMs: 30,
+                fileLockStaleMs: 10,
+            }),
+        ).rejects.toMatchObject({ code: 'ETIMEDOUT', name: 'TimeoutError' });
+        expect(JSON.parse(await readFile(lockPath, 'utf8')).token).toBe('live-token');
+    });
+
+    it('acquireIoResourceLock não remove metadata inválida recente', async () => {
+        const dir = await createTempDir();
+        const lockDir = join(dir, '.locks');
+        const resource = join(dir, 'partial-metadata.txt');
+        await mkdir(lockDir, { recursive: true });
+        const lockPath = getFileResourceLockPath(resource, lockDir);
+        await writeFile(lockPath, '', 'utf8');
+
+        await expect(
+            acquireIoResourceLock(resource, {
+                fileLock: true,
+                fileLockDir: lockDir,
+                operation: 'contender',
+                target: resource,
+                timeoutMs: 30,
+                fileLockStaleMs: 1_000,
+            }),
+        ).rejects.toMatchObject({ code: 'ETIMEDOUT', name: 'TimeoutError' });
+        expect(await readFile(lockPath, 'utf8')).toBe('');
     });
 
     it('scanDirectory centraliza listagem, filtro, hidden e metadata de scan', async () => {

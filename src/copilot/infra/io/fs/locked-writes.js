@@ -128,7 +128,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                     return { path: filePath, bytesWritten: bytes, previousHash, contentHash };
                 });
             } finally {
-                lease.release();
+                await lease.releaseAsync();
             }
         })();
         const waitMs = lease.waitMs;
@@ -221,7 +221,7 @@ export async function appendTextLocked(filePath, content, options = {}) {
                 appendFileUnlocked(filePath, payload, options.mode === undefined ? {} : { mode: options.mode }),
             );
         } finally {
-            lease.release();
+            await lease.releaseAsync();
         }
         const waitMs = lease.waitMs;
         invalidateIoCacheTiers(filePath);

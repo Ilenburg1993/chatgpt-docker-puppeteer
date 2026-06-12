@@ -8,8 +8,8 @@
  * @module copilot/infra/io/fs/read-text
  */
 
-import * as fs from 'node:fs/promises';
 import { decodeUtf8Buffer } from '../../shared/buffer.js';
+import { readBytesFileSnapshot } from './read-bytes.js';
 
 /**
  * @typedef {object} TextFileSnapshot
@@ -19,23 +19,32 @@ import { decodeUtf8Buffer } from '../../shared/buffer.js';
  * @property {number} sizeBytes
  * @property {number} mtimeMs
  * @property {number} ctimeMs
+ * @property {number} dev
+ * @property {number} ino
+ * @property {number} attempts
+ * @property {true} consistent
  */
 
 /**
  * Lê um arquivo como UTF-8 validado e retorna metadados do mesmo snapshot operacional.
  *
  * @param {string} filePath
+ * @param {{ signal?: AbortSignal; maxRetries?: number }} [options]
  * @returns {Promise<TextFileSnapshot>}
  */
-export async function readTextFileSnapshot(filePath) {
-    const [content, stats] = await Promise.all([fs.readFile(filePath), fs.stat(filePath)]);
-    const text = decodeUtf8Buffer(content);
+export async function readTextFileSnapshot(filePath, options = {}) {
+    const snapshot = await readBytesFileSnapshot(filePath, options);
+    const text = decodeUtf8Buffer(snapshot.content);
     return {
         path: filePath,
         content: text,
-        bytesRead: content.byteLength,
-        sizeBytes: stats.size,
-        mtimeMs: stats.mtimeMs,
-        ctimeMs: stats.ctimeMs,
+        bytesRead: snapshot.content.byteLength,
+        sizeBytes: snapshot.sizeBytes,
+        mtimeMs: snapshot.mtimeMs,
+        ctimeMs: snapshot.ctimeMs,
+        dev: snapshot.dev,
+        ino: snapshot.ino,
+        attempts: snapshot.attempts,
+        consistent: true,
     };
 }

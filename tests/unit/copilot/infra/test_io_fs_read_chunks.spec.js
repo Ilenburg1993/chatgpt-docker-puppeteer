@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
     readBinaryMutationSnapshot,
+    readBytesFileSnapshot,
     readTextLineChunks,
     readTextLineChunksStream,
     readTextLinesSnapshot,
@@ -30,6 +31,23 @@ async function createTempDir() {
 }
 
 describe('infra/io/fs read line ports', () => {
+    it('readBytesFileSnapshot retorna conteúdo e metadata do mesmo inode', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'stable-snapshot.txt');
+        await writeFile(file, 'stable', 'utf8');
+
+        const result = await readBytesFileSnapshot(file);
+
+        expect(result.content.toString('utf8')).toBe('stable');
+        expect(result.bytesRead).toBe(6);
+        expect(result.sizeBytes).toBe(6);
+        expect(result.consistent).toBe(true);
+        expect(result.attempts).toBe(1);
+        expect(Number.isFinite(result.dev)).toBe(true);
+        expect(Number.isFinite(result.ino)).toBe(true);
+        expect(Number.isFinite(result.ctimeMs)).toBe(true);
+    });
+
     it('readTextLineChunks aborta quando signal já está cancelado', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'abort.txt');

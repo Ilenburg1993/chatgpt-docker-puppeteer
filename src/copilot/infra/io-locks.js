@@ -140,6 +140,7 @@ function waitForPrevious(previous, key, options) {
  * @property {boolean} staleFileLockRecovered
  * @property {<T>(operation: () => Promise<T>) => Promise<T>} run
  * @property {() => void} release
+ * @property {() => Promise<void>} releaseAsync
  */
 
 /**
@@ -148,6 +149,7 @@ function waitForPrevious(previous, key, options) {
  * @property {number} waitMs
  * @property {<T>(operation: () => Promise<T>) => Promise<T>} run
  * @property {() => void} release
+ * @property {() => Promise<void>} releaseAsync
  */
 
 /**
@@ -160,6 +162,7 @@ function waitForPrevious(previous, key, options) {
  *     timeoutMs?: number;
  *     signal?: AbortSignal;
  *     fileLock?: boolean;
+ *     fileLockDir?: string;
  *     fileLockStaleMs?: number;
  *     operation?: string;
  *     target?: string;
@@ -181,6 +184,7 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
             staleFileLockRecovered: false,
             run: (operation) => operation(),
             release: () => {},
+            releaseAsync: async () => {},
             [Symbol.asyncDispose]: async () => {},
         });
     }
@@ -220,6 +224,7 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
         try {
             fileLockLease = await acquireFileResourceLock(key, {
                 ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+                ...(options.fileLockDir === undefined ? {} : { lockDir: options.fileLockDir }),
                 ...(options.fileLockStaleMs === undefined ? {} : { staleMs: options.fileLockStaleMs }),
                 ...(options.signal === undefined ? {} : { signal: options.signal }),
                 ...(options.operation === undefined ? {} : { operation: options.operation }),
@@ -237,17 +242,25 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
     const nextHeldLocks = new Set(heldLocks ?? []);
     nextHeldLocks.add(key);
 
-    let released = false;
-    const release = () => {
-        if (released) return;
-        released = true;
+    let releasePromise = /** @type {Promise<void> | null} */ (null);
+    const releaseAsync = () => {
+        if (releasePromise) return releasePromise;
         const fileLock = fileLockLease;
         fileLockLease = null;
-        if (fileLock) void fileLock.release();
-        releaseCurrent(undefined);
-        if (tails.get(key) === tail) {
-            tails.delete(key);
-        }
+        releasePromise = (async () => {
+            try {
+                if (fileLock) await fileLock.release();
+            } finally {
+                releaseCurrent(undefined);
+                if (tails.get(key) === tail) {
+                    tails.delete(key);
+                }
+            }
+        })();
+        return releasePromise;
+    };
+    const release = () => {
+        void releaseAsync().catch(() => undefined);
     };
 
     return /** @type {IoResourceLockLease & { [Symbol.asyncDispose]: () => Promise<void> }} */ ({
@@ -258,9 +271,8 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
         staleFileLockRecovered: Boolean(fileLockLease?.staleRecovered),
         run: (operation) => heldLocksStorage.run(nextHeldLocks, () => operation()),
         release,
-        [Symbol.asyncDispose]: async () => {
-            release();
-        },
+        releaseAsync,
+        [Symbol.asyncDispose]: releaseAsync,
     });
 }
 
@@ -284,6 +296,7 @@ export async function acquireIoResourceLocks(resourceKeys, options = {}) {
             waitMs: 0,
             run: (operation) => operation(),
             release: () => {},
+            releaseAsync: async () => {},
             [Symbol.asyncDispose]: async () => {},
         });
     }
@@ -300,18 +313,23 @@ export async function acquireIoResourceLocks(resourceKeys, options = {}) {
         }
     } catch (error) {
         for (const lease of leases.reverse()) {
-            lease.release();
+            await lease.releaseAsync();
         }
         throw error;
     }
 
-    let released = false;
+    let releasePromise = /** @type {Promise<void> | null} */ (null);
+    const releaseAsync = () => {
+        if (releasePromise) return releasePromise;
+        releasePromise = (async () => {
+            for (const lease of [...leases].reverse()) {
+                await lease.releaseAsync();
+            }
+        })();
+        return releasePromise;
+    };
     const release = () => {
-        if (released) return;
-        released = true;
-        for (const lease of [...leases].reverse()) {
-            lease.release();
-        }
+        void releaseAsync().catch(() => undefined);
     };
 
     return /** @type {IoResourceLocksLease & { [Symbol.asyncDispose]: () => Promise<void> }} */ ({
@@ -319,9 +337,8 @@ export async function acquireIoResourceLocks(resourceKeys, options = {}) {
         waitMs: totalWaitMs,
         run: (operation) => heldLocksStorage.run(new Set([...(heldLocks ?? []), ...keys]), () => operation()),
         release,
-        [Symbol.asyncDispose]: async () => {
-            release();
-        },
+        releaseAsync,
+        [Symbol.asyncDispose]: releaseAsync,
     });
 }
 
@@ -340,7 +357,7 @@ export async function withIoResourceLock(resourceKey, operation, options = {}) {
         const value = await lease.run(operation);
         return { value, waitMs: lease.waitMs };
     } finally {
-        lease.release();
+        await lease.releaseAsync();
     }
 }
 
@@ -362,7 +379,7 @@ export async function withIoResourceLocks(resourceKeys, operation, options = {})
         const value = await lease.run(operation);
         return { value, waitMs: lease.waitMs };
     } finally {
-        lease.release();
+        await lease.releaseAsync();
     }
 }
 

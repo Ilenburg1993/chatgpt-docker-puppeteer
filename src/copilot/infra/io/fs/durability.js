@@ -14,6 +14,7 @@ import path from 'node:path';
 /** @typedef {'none' | 'file' | 'file-and-directory'} IoDurabilityMode */
 
 const DIRECTORY_SYNC_UNSUPPORTED_CODES = new Set(['EACCES', 'EBADF', 'EINVAL', 'EISDIR', 'ENOSYS', 'ENOTSUP', 'EPERM']);
+const FILE_SYNC_UNSUPPORTED_CODES = new Set(['EINVAL', 'ENOSYS', 'ENOTSUP']);
 
 /**
  * @param {unknown} value
@@ -53,6 +54,9 @@ export async function syncFileBestEffort(filePath) {
         return { attempted: true, ok: true };
     } catch (error) {
         const code = String(/** @type {{ code?: unknown }} */ (error)?.code ?? 'UNKNOWN');
+        if (FILE_SYNC_UNSUPPORTED_CODES.has(code)) {
+            return { attempted: true, ok: false, skippedReason: 'file-sync-unsupported', errorCode: code };
+        }
         return { attempted: true, ok: false, errorCode: code };
     } finally {
         if (handle) await handle.close().catch(() => undefined);

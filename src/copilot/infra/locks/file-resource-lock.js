@@ -18,6 +18,8 @@ import { normalizePathResourceKey } from '../policy/path-resource.js';
 const DEFAULT_STALE_MS = 10 * 60 * 1000;
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_MS = 25;
+const MIN_HEARTBEAT_MS = 10;
+const MAX_HEARTBEAT_MS = 30_000;
 const LOCK_SCHEMA_VERSION = 1;
 
 /** @typedef {'none' | 'file' | 'file-and-directory'} IoDurabilityMode */
@@ -48,6 +50,8 @@ const LOCK_SCHEMA_VERSION = 1;
 
 /** @type {Set<string>} */
 const activeFileLockPaths = new Set();
+let staleRecoveries = 0;
+let heartbeatFailures = 0;
 
 /**
  * @param {unknown} value
@@ -106,13 +110,21 @@ export function getFileResourceLockPath(resourceKey, lockDir = getFileResourceLo
 }
 
 /**
- * @returns {{ enabledByEnv: boolean; activeLeases: number; lockDir: string }}
+ * @returns {{
+ *     enabledByEnv: boolean;
+ *     activeLeases: number;
+ *     lockDir: string;
+ *     staleRecoveries: number;
+ *     heartbeatFailures: number;
+ * }}
  */
 export function getFileResourceLockStats() {
     return {
         enabledByEnv: isFileResourceLockEnabledByEnv(),
         activeLeases: activeFileLockPaths.size,
         lockDir: getFileResourceLockDir(),
+        staleRecoveries,
+        heartbeatFailures,
     };
 }
 
@@ -123,7 +135,10 @@ export function getFileResourceLockStats() {
 function sleep(ms, signal) {
     if (signal?.aborted) return Promise.reject(createAbortError());
     return new Promise((resolve, reject) => {
-        const timeout = setTimeout(resolve, Math.max(0, ms));
+        const timeout = setTimeout(() => {
+            cleanup();
+            resolve(undefined);
+        }, Math.max(0, ms));
         timeout.unref?.();
         const cleanup = () => {
             clearTimeout(timeout);
@@ -215,32 +230,99 @@ async function readLockMetadata(lockPath) {
 }
 
 /**
- * @param {FileResourceLockMetadata | null} metadata
+ * @typedef {{
+ *     metadata: FileResourceLockMetadata | null;
+ *     dev: number | null;
+ *     ino: number | null;
+ *     mtimeMs: number | null;
+ *     size: number | null;
+ * }} FileResourceLockObservation
+ */
+
+/**
+ * @param {string} lockPath
+ * @returns {Promise<FileResourceLockObservation>}
+ */
+async function observeLock(lockPath) {
+    const [metadataResult, statResult] = await Promise.allSettled([readLockMetadata(lockPath), fs.stat(lockPath)]);
+    const stats = statResult.status === 'fulfilled' ? statResult.value : null;
+    return {
+        metadata: metadataResult.status === 'fulfilled' ? metadataResult.value : null,
+        dev: stats ? Number(stats.dev) : null,
+        ino: stats ? Number(stats.ino) : null,
+        mtimeMs: stats ? Number(stats.mtimeMs) : null,
+        size: stats ? Number(stats.size) : null,
+    };
+}
+
+/**
+ * @param {FileResourceLockObservation} left
+ * @param {FileResourceLockObservation} right
+ * @returns {boolean}
+ */
+function sameObservedLock(left, right) {
+    if (left.metadata?.token || right.metadata?.token) {
+        return Boolean(left.metadata?.token && left.metadata.token === right.metadata?.token);
+    }
+    return (
+        left.dev !== null &&
+        left.dev === right.dev &&
+        left.ino !== null &&
+        left.ino === right.ino &&
+        left.mtimeMs !== null &&
+        left.mtimeMs === right.mtimeMs &&
+        left.size !== null &&
+        left.size === right.size
+    );
+}
+
+/**
+ * @param {FileResourceLockObservation} observation
  * @param {number} nowMs
  * @param {number} staleMs
  * @returns {boolean}
  */
-function isStaleLock(metadata, nowMs, staleMs) {
-    if (!metadata) return true;
-    const ageMs = Math.max(0, nowMs - metadata.startedAtMs);
-    if (ageMs >= staleMs) return true;
-    return !isProcessAlive(metadata.pid);
+function isStaleLock(observation, nowMs, staleMs) {
+    const metadata = observation.metadata;
+    const observedAtMs = observation.mtimeMs ?? metadata?.startedAtMs ?? nowMs;
+    const ageMs = Math.max(0, nowMs - observedAtMs);
+    if (!metadata) return ageMs >= staleMs;
+    if (metadata.hostname === hostname()) return !isProcessAlive(metadata.pid);
+    return ageMs >= staleMs;
 }
 
 /**
  * @param {string} lockPath
- * @param {FileResourceLockMetadata | null} expectedMetadata
+ * @param {FileResourceLockObservation} expectedObservation
  * @param {import('../io/fs/durability.js').IoDurabilityMode} durability
  * @returns {Promise<boolean>}
  */
-async function reclaimStaleLock(lockPath, expectedMetadata, durability) {
-    const observed = await readLockMetadata(lockPath);
-    if (expectedMetadata?.token && observed?.token !== expectedMetadata.token) return false;
+async function reclaimStaleLock(lockPath, expectedObservation, durability) {
+    const observed = await observeLock(lockPath);
+    if (!sameObservedLock(expectedObservation, observed)) return false;
     await fs.unlink(lockPath).catch((error) => {
         if (errorCode(error) !== 'ENOENT') throw error;
     });
     if (shouldSyncDirectory(durability)) await syncParentDirectoryBestEffort(lockPath);
+    staleRecoveries += 1;
     return true;
+}
+
+/**
+ * @param {import('node:fs/promises').FileHandle} handle
+ * @param {number} staleMs
+ * @returns {NodeJS.Timeout}
+ */
+function startLockHeartbeat(handle, staleMs) {
+    const heartbeatMs = Math.max(MIN_HEARTBEAT_MS, Math.min(MAX_HEARTBEAT_MS, Math.floor(staleMs / 3)));
+    const timer = setInterval(() => {
+        const now = new Date();
+        void handle.utimes(now, now).catch(() => {
+            heartbeatFailures += 1;
+        });
+    }, heartbeatMs);
+    timer.unref?.();
+    return timer;
 }
 
 /**
@@ -255,12 +337,12 @@ async function writeLockMetadata(handle, metadata, durability) {
 
 /**
  * @param {string} resourceKey
- * @param {{ operation?: string; target?: string; staleMs?: number; timeoutMs?: number; pollMs?: number; signal?: AbortSignal; durability?: IoDurabilityMode }} [options]
+ * @param {{ operation?: string; target?: string; lockDir?: string; staleMs?: number; timeoutMs?: number; pollMs?: number; signal?: AbortSignal; durability?: IoDurabilityMode }} [options]
  * @returns {Promise<FileResourceLockLease>}
  */
 export async function acquireFileResourceLock(resourceKey, options = {}) {
     const normalizedKey = normalizePathResourceKey(resourceKey);
-    const lockDir = getFileResourceLockDir();
+    const lockDir = options.lockDir ? path.resolve(options.lockDir) : getFileResourceLockDir();
     const lockPath = getFileResourceLockPath(normalizedKey, lockDir);
     const timeoutMs = options.timeoutMs ?? defaultAcquireTimeoutMs();
     const staleMs = options.staleMs ?? defaultStaleMs();
@@ -294,31 +376,40 @@ export async function acquireFileResourceLock(resourceKey, options = {}) {
         try {
             handle = await fs.open(lockPath, 'wx');
             await writeLockMetadata(handle, metadata, durability);
-            await handle.close();
-            handle = null;
             if (shouldSyncDirectory(durability)) await syncParentDirectoryBestEffort(lockPath);
             activeFileLockPaths.add(lockPath);
+            const lockHandle = handle;
+            handle = null;
+            const heartbeat = startLockHeartbeat(lockHandle, staleMs);
+            let releasePromise = /** @type {Promise<void> | null} */ (null);
             return {
                 resourceKey: normalizedKey,
                 lockPath,
                 token,
                 waitMs: Date.now() - startedWait,
                 staleRecovered,
-                release: async () => {
-                    const current = await readLockMetadata(lockPath);
-                    if (current?.token !== token) return;
-                    await fs.unlink(lockPath).catch((error) => {
-                        if (errorCode(error) !== 'ENOENT') throw error;
+                release: () => {
+                    if (releasePromise) return releasePromise;
+                    releasePromise = (async () => {
+                        clearInterval(heartbeat);
+                        await lockHandle.close().catch(() => undefined);
+                        const current = await readLockMetadata(lockPath);
+                        if (current?.token !== token) return;
+                        await fs.unlink(lockPath).catch((error) => {
+                            if (errorCode(error) !== 'ENOENT') throw error;
+                        });
+                        if (shouldSyncDirectory(durability)) await syncParentDirectoryBestEffort(lockPath);
+                    })().finally(() => {
+                        activeFileLockPaths.delete(lockPath);
                     });
-                    activeFileLockPaths.delete(lockPath);
-                    if (shouldSyncDirectory(durability)) await syncParentDirectoryBestEffort(lockPath);
+                    return releasePromise;
                 },
             };
         } catch (error) {
             if (handle) await handle.close().catch(() => undefined);
             if (errorCode(error) !== 'EEXIST') throw error;
 
-            const existing = await readLockMetadata(lockPath);
+            const existing = await observeLock(lockPath);
             if (isStaleLock(existing, Date.now(), staleMs)) {
                 const reclaimed = await reclaimStaleLock(lockPath, existing, durability);
                 staleRecovered = staleRecovered || reclaimed;

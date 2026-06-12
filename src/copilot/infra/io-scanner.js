@@ -138,9 +138,10 @@ export async function scanDirectory(rootPath, options = {}) {
      * @returns {Promise<IoScanEntry[]>}
      */
     async function scan(dir, currentDepth) {
-        const names = await readdir(dir);
-        names.sort((a, b) => a.localeCompare(b));
-        const entries = await mapInBatches(names, batchSize, async (name) => {
+        const dirents = await readdir(dir, { withFileTypes: true });
+        dirents.sort((a, b) => a.name.localeCompare(b.name));
+        const entries = await mapInBatches(dirents, batchSize, async (dirent) => {
+            const name = dirent.name;
             if (hardLimitReached || scannedEntries >= hardMaxEntries) {
                 hardLimitReached = true;
                 return null;
@@ -162,13 +163,23 @@ export async function scanDirectory(rootPath, options = {}) {
                     return null;
                 }
             }
-            let stats;
-            try {
-                stats = await limit(() => lstat(absolutePath));
-            } catch {
-                return null;
+            let type = dirent.isFile()
+                ? /** @type {const} */ ('file')
+                : dirent.isDirectory()
+                  ? /** @type {const} */ ('directory')
+                  : dirent.isSymbolicLink()
+                    ? /** @type {const} */ ('symlink')
+                    : /** @type {const} */ ('other');
+            /** @type {import('node:fs').Stats | null} */
+            let stats = null;
+            if (type === 'file' || type === 'other') {
+                try {
+                    stats = await limit(() => lstat(absolutePath));
+                    type = classifyStats(stats);
+                } catch {
+                    return null;
+                }
             }
-            const type = classifyStats(stats);
             const isDirectory = type === 'directory';
             const includeByPattern =
                 includePatterns.length === 0 || matchesAnyPattern(absolutePath, workspaceRoot, includePatterns);
@@ -181,8 +192,8 @@ export async function scanDirectory(rootPath, options = {}) {
                 path: options.workspaceRoot ? relative(options.workspaceRoot, absolutePath) : absolutePath,
                 absolutePath,
             });
-            if (type === 'file') entry.size = stats.size;
-            if (includeFingerprint && type === 'file') {
+            if (type === 'file' && stats) entry.size = stats.size;
+            if (includeFingerprint && type === 'file' && stats) {
                 entry.fingerprint = await buildFileFingerprint(absolutePath, stats, limit);
             }
             scannedEntries += 1;

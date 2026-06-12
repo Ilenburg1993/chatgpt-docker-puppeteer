@@ -23,7 +23,6 @@ import { mkdirPathUnlocked } from './mkdir.js';
 import { moveFileUnlocked } from './move.js';
 import { deleteFileUnlocked, removePathUnlocked } from './remove.js';
 import { readBinaryMutationSnapshot } from './snapshot.js';
-import { statPathSnapshot } from './stat.js';
 import { writeAtomicFileUnlocked } from './write-atomic.js';
 
 const ROLLBACK_SNAPSHOT_MAX_BYTES = 256 * 1024;
@@ -165,7 +164,7 @@ export async function deleteFileLocked(filePath) {
                     return snapshot;
                 });
             } finally {
-                lease.release();
+                await lease.releaseAsync();
             }
         })();
         const waitMs = lease.waitMs;
@@ -237,7 +236,7 @@ export async function removePathLocked(filePath, options = {}) {
                 removePathUnlocked(filePath, { recursive: Boolean(options.recursive), force: Boolean(options.force) }),
             );
         } finally {
-            lease.release();
+            await lease.releaseAsync();
         }
         const waitMs = lease.waitMs;
         invalidateIoCacheTierSubtrees(filePath);
@@ -310,16 +309,21 @@ export async function copyFileLocked(source, destination, options = {}) {
                     }
                     const sourceSnapshot = await readMutationSnapshot(source);
                     await mkdirPathUnlocked(dirname(destination), { recursive: true });
-                    await copyFileUnlocked(
+                    const copyResult = await copyFileUnlocked(
                         source,
                         destination,
-                        options.overwrite ? {} : { exclusive: true },
+                        {
+                            exclusive: !options.overwrite,
+                            expectedSourceHash: sourceSnapshot.contentHash,
+                            expectedSourceBytes: sourceSnapshot.bytesRead,
+                        },
                     );
-                    const stats = await statPathSnapshot(destination);
                     return {
-                        bytesWritten: stats.size,
+                        bytesWritten: copyResult.destinationBytes,
                         sourceHash: sourceSnapshot.contentHash,
                         sourceBytes: sourceSnapshot.bytesRead,
+                        destinationHash: copyResult.destinationHash,
+                        staged: copyResult.staged,
                         destinationPreviousHash: destinationSnapshot?.contentHash ?? null,
                         destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
                         destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
@@ -327,7 +331,7 @@ export async function copyFileLocked(source, destination, options = {}) {
                     };
                 });
             } finally {
-                lease.release();
+                await lease.releaseAsync();
             }
         })();
         const waitMs = lease.waitMs;
@@ -346,6 +350,8 @@ export async function copyFileLocked(source, destination, options = {}) {
                 advisoryLimits: {
                     lockWaitMs: waitMs,
                     sourceHash: value.sourceHash,
+                    destinationHash: value.destinationHash,
+                    staged: value.staged,
                     overwrite: Boolean(options.overwrite),
                     destinationPreviousHash: value.destinationPreviousHash,
                 },
@@ -358,6 +364,8 @@ export async function copyFileLocked(source, destination, options = {}) {
             bytesWritten: value.bytesWritten,
             sourceBytes: value.sourceBytes,
             sourceHash: value.sourceHash,
+            destinationHash: value.destinationHash,
+            staged: value.staged,
             destinationPreviousHash: value.destinationPreviousHash,
             destinationPreviousBytes: value.destinationPreviousBytes,
             destinationPreviousSnapshotBase64: value.destinationPreviousSnapshotBase64,
@@ -435,7 +443,7 @@ export async function moveFileLocked(source, destination, options = {}) {
                     };
                 });
             } finally {
-                lease.release();
+                await lease.releaseAsync();
             }
         })();
         const waitMs = lease.waitMs;
@@ -579,7 +587,7 @@ export async function patchTextLocked(filePath, options) {
                     };
                 });
             } finally {
-                lease.release();
+                await lease.releaseAsync();
             }
         })();
         const waitMs = lease.waitMs;

@@ -5,20 +5,89 @@
  * @module copilot/infra/io/fs/read-bytes
  */
 
-import { readFile, stat } from 'node:fs/promises';
+import * as fs from 'node:fs/promises';
+
+const DEFAULT_SNAPSHOT_RETRIES = 2;
+
+/**
+ * @param {import('node:fs').Stats} left
+ * @param {import('node:fs').Stats} right
+ * @returns {boolean}
+ */
+function sameFileSnapshot(left, right) {
+    return (
+        Number(left.dev) === Number(right.dev) &&
+        Number(left.ino) === Number(right.ino) &&
+        left.size === right.size &&
+        left.mtimeMs === right.mtimeMs &&
+        left.ctimeMs === right.ctimeMs
+    );
+}
 
 /**
  * @param {string} filePath
- * @param {{ signal?: AbortSignal }} [options]
- * @returns {Promise<{ path: string; content: Buffer; bytesRead: number; sizeBytes: number; mtimeMs: number }>}
+ * @param {number} attempts
+ * @returns {Error & { code?: string; attempts?: number }}
+ */
+function createStaleSnapshotError(filePath, attempts) {
+    const error = /** @type {Error & { code?: string; attempts?: number }} */ (
+        new Error(`Arquivo mudou durante snapshot consistente: ${filePath}`)
+    );
+    error.code = 'ESTALESNAPSHOT';
+    error.attempts = attempts;
+    return error;
+}
+
+/**
+ * @param {string} filePath
+ * @param {{ signal?: AbortSignal; maxRetries?: number }} [options]
+ * @returns {Promise<{
+ *     path: string;
+ *     content: Buffer;
+ *     bytesRead: number;
+ *     sizeBytes: number;
+ *     mtimeMs: number;
+ *     ctimeMs: number;
+ *     dev: number;
+ *     ino: number;
+ *     attempts: number;
+ *     consistent: true;
+ * }>}
  */
 export async function readBytesFileSnapshot(filePath, options = {}) {
-    const [content, stats] = await Promise.all([readFile(filePath, { signal: options.signal }), stat(filePath)]);
-    return {
-        path: filePath,
-        content,
-        bytesRead: content.byteLength,
-        sizeBytes: stats.size,
-        mtimeMs: stats.mtimeMs,
-    };
+    const maxRetries =
+        Number.isInteger(options.maxRetries) && Number(options.maxRetries) >= 0
+            ? Math.min(10, Number(options.maxRetries))
+            : DEFAULT_SNAPSHOT_RETRIES;
+
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt += 1) {
+        options.signal?.throwIfAborted();
+        const handle = await fs.open(filePath, 'r');
+        try {
+            const before = await handle.stat();
+            const content = await handle.readFile(options.signal ? { signal: options.signal } : undefined);
+            const after = await handle.stat();
+            const pathAfter = await fs.stat(filePath);
+            if (!sameFileSnapshot(before, after) || !sameFileSnapshot(after, pathAfter)) {
+                if (attempt <= maxRetries) continue;
+                throw createStaleSnapshotError(filePath, attempt);
+            }
+            return {
+                path: filePath,
+                content,
+                bytesRead: content.byteLength,
+                sizeBytes: after.size,
+                mtimeMs: after.mtimeMs,
+                ctimeMs: after.ctimeMs,
+                dev: Number(after.dev),
+                ino: Number(after.ino),
+                attempts: attempt,
+                consistent: true,
+            };
+        } finally {
+            await handle.close().catch(() => undefined);
+        }
+    }
+
+    throw createStaleSnapshotError(filePath, maxRetries + 1);
 }

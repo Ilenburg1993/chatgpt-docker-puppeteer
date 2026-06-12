@@ -427,6 +427,8 @@ const copyFileTool = buildTool({
                     bytesWritten: copyResult.bytesWritten,
                     sourceBytes: copyResult.sourceBytes,
                     sourceHash: copyResult.sourceHash,
+                    destinationHash: copyResult.destinationHash,
+                    staged: copyResult.staged,
                     destinationPreviousHash: copyResult.destinationPreviousHash,
                     destinationPreviousBytes: copyResult.destinationPreviousBytes,
                     destinationPreviousSnapshotTruncated: copyResult.destinationPreviousSnapshotTruncated,
@@ -439,6 +441,8 @@ const copyFileTool = buildTool({
                                 bytesWritten: copyResult.bytesWritten,
                                 sourceBytes: copyResult.sourceBytes,
                                 sourceHash: copyResult.sourceHash,
+                                destinationHash: copyResult.destinationHash,
+                                staged: copyResult.staged,
                             },
                         },
                         {

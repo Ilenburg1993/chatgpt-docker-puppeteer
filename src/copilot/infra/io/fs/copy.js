@@ -5,18 +5,64 @@
  * @module copilot/infra/io/fs/copy
  */
 
+import { randomBytes } from 'node:crypto';
 import * as nodeFs from 'node:fs';
-import { copyFile } from 'node:fs/promises';
+import { copyFile, link, rename, unlink } from 'node:fs/promises';
+import path from 'node:path';
+import { syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
+import { readBinaryMutationSnapshot } from './snapshot.js';
 
 /**
  * @param {string} source
  * @param {string} destination
- * @param {{ exclusive?: boolean }} [options]
+ * @param {{ exclusive?: boolean; expectedSourceHash?: string; expectedSourceBytes?: number }} [options]
+ * @returns {Promise<{ destinationHash: string; destinationBytes: number; staged: true }>}
  */
 export async function copyFileUnlocked(source, destination, options = {}) {
-    if (options.exclusive) {
-        await copyFile(source, destination, nodeFs.constants.COPYFILE_EXCL);
-        return;
+    const tmpDestination = path.join(
+        path.dirname(destination),
+        `.${path.basename(destination)}.${randomBytes(12).toString('hex')}.copy-tmp`,
+    );
+    let tmpCreated = false;
+    try {
+        await copyFile(source, tmpDestination, nodeFs.constants.COPYFILE_EXCL);
+        tmpCreated = true;
+        const [sourceAfter, tempAfter] = await Promise.all([
+            readBinaryMutationSnapshot(source, { snapshotMaxBytes: 0 }),
+            readBinaryMutationSnapshot(tmpDestination, { snapshotMaxBytes: 0 }),
+        ]);
+        const sourceHash = sourceAfter.contentHash;
+        const tempHash = tempAfter.contentHash;
+        const expectedHash = options.expectedSourceHash ?? sourceHash;
+        const expectedBytes = options.expectedSourceBytes ?? sourceAfter.bytesRead;
+        if (sourceHash !== expectedHash || sourceAfter.bytesRead !== expectedBytes) {
+            const error = new Error(`Origem mudou durante copy staged: ${source}`);
+            /** @type {{ code?: string }} */ (error).code = 'ESOURCECHANGED';
+            throw error;
+        }
+        if (tempHash !== expectedHash || tempAfter.bytesRead !== expectedBytes) {
+            const error = new Error(`Cópia staged divergente: ${source} -> ${destination}`);
+            /** @type {{ code?: string }} */ (error).code = 'ECOPYMISMATCH';
+            throw error;
+        }
+        const syncResult = await syncFileBestEffort(tmpDestination);
+        if (syncResult.attempted && !syncResult.ok && !syncResult.skippedReason) {
+            const error = new Error(`Falha ao sincronizar cópia staged: ${tmpDestination}`);
+            /** @type {{ code?: string; cause?: unknown }} */ (error).code = 'EFILESYNC';
+            /** @type {{ code?: string; cause?: unknown }} */ (error).cause = syncResult.errorCode;
+            throw error;
+        }
+        if (options.exclusive) {
+            await link(tmpDestination, destination);
+            await unlink(tmpDestination);
+        } else {
+            await rename(tmpDestination, destination);
+        }
+        tmpCreated = false;
+        await syncParentDirectoryBestEffort(destination);
+        return { destinationHash: tempHash, destinationBytes: tempAfter.bytesRead, staged: true };
+    } catch (error) {
+        if (tmpCreated) await unlink(tmpDestination).catch(() => undefined);
+        throw error;
     }
-    await copyFile(source, destination);
 }

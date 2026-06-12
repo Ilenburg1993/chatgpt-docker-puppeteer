@@ -60,9 +60,12 @@ const fsMock = {
     copyFile: vi.fn(),
     readFile: vi.fn(),
     link: vi.fn(),
-    open: vi.fn(async () => {
-        throw Object.assign(new Error('ENOTSUP'), { code: 'ENOTSUP' });
-    }),
+    open: vi.fn(async (filePath) => ({
+        stat: async () => fsMock.stat(filePath),
+        readFile: async () => fsMock.readFile(filePath),
+        sync: async () => undefined,
+        close: async () => undefined,
+    })),
 };
 
 vi.mock('node:fs/promises', () => fsMock);
@@ -133,8 +136,20 @@ function exdev() {
     return /** @type {Error & { code: string }} */ (Object.assign(new Error('EXDEV'), { code: 'EXDEV' }));
 }
 
+/** @param {number} size */
+function stableStats(size) {
+    return { size, dev: 1, ino: 1, mtimeMs: 1, ctimeMs: 1 };
+}
+
 beforeEach(() => {
     vi.clearAllMocks();
+    for (const mock of Object.values(fsMock)) mock.mockReset();
+    fsMock.open.mockImplementation(async (filePath) => ({
+        stat: async () => fsMock.stat(filePath),
+        readFile: async () => fsMock.readFile(filePath),
+        sync: async () => undefined,
+        close: async () => undefined,
+    }));
     mocks.streamPayloads.clear();
 });
 
@@ -144,6 +159,14 @@ beforeEach(() => {
  */
 function streamPayload(filePath, content) {
     mocks.streamPayloads.set(filePath, Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8'));
+}
+
+/**
+ * @param {unknown} source
+ * @param {unknown} destination
+ */
+function copyStreamPayload(source, destination) {
+    mocks.streamPayloads.set(String(destination), mocks.streamPayloads.get(String(source)) ?? Buffer.alloc(0));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -452,16 +475,22 @@ describe('F35 — copy_file (F186)', () => {
         fsMock.readFile.mockResolvedValue(Buffer.from('source', 'utf8'));
         streamPayload('/workspace/src.txt', 'source');
         fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.copyFile.mockResolvedValue(undefined);
-        fsMock.stat.mockResolvedValue({ size: 42 });
+        fsMock.copyFile.mockImplementation(async (source, destination) => copyStreamPayload(source, destination));
+        fsMock.stat.mockResolvedValue(stableStats(6));
 
         const result = await handler({ source: 'src.txt', destination: 'dst.txt', overwrite: false });
 
-        expect(result).toMatchObject({ success: true, bytesWritten: 42 });
+        expect(result, JSON.stringify(result)).toMatchObject({ success: true, bytesWritten: 6, staged: true });
         expect(result.sourceHash).toBe('mock-sha256');
+        expect(result.destinationHash).toBe('mock-sha256');
         expect(result.sourceBytes).toBe(6);
         expect(result.io?.operation).toBe('copy');
-        expect(fsMock.copyFile).toHaveBeenCalledWith('/workspace/src.txt', '/workspace/dst.txt', expect.any(Number));
+        expect(fsMock.copyFile).toHaveBeenCalledWith(
+            '/workspace/src.txt',
+            expect.stringContaining('.dst.txt.'),
+            expect.any(Number),
+        );
+        expect(fsMock.link).toHaveBeenCalledWith(expect.stringContaining('.dst.txt.'), '/workspace/dst.txt');
         expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write' });
     });
 
@@ -485,13 +514,16 @@ describe('F35 — copy_file (F186)', () => {
         fsMock.readFile.mockResolvedValue(Buffer.from('copy', 'utf8'));
         streamPayload('/workspace/a.txt', 'copy');
         streamPayload('/workspace/b.txt', 'copy');
-        fsMock.copyFile.mockResolvedValue(undefined);
-        fsMock.stat.mockResolvedValue({ size: 10 });
+        fsMock.copyFile.mockImplementation(async (source, destination) => copyStreamPayload(source, destination));
+        fsMock.stat.mockResolvedValue(stableStats(4));
 
         const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: true });
 
         expect(result.success).toBe(true);
         expect(result.sourceHash).toBe('mock-sha256');
+        expect(result.destinationHash).toBe('mock-sha256');
+        expect(result.staged).toBe(true);
+        expect(fsMock.rename).toHaveBeenCalledWith(expect.stringContaining('.b.txt.'), '/workspace/b.txt');
         expect(result.operation).toMatchObject({ capability: 'file.copy', status: 'applied' });
         expect(result.changeSet?.rollback?.stepCount).toBeGreaterThanOrEqual(1);
         expect(result.changeSet?.rollback?.steps?.[0]?.action).toBe('write');
@@ -528,6 +560,9 @@ describe('F35 — move_file (F186)', () => {
             sourceHash: 'mock-sha256',
             sourceBytes: 4,
         });
+        expect(fsMock.link).toHaveBeenCalledWith('/workspace/old.txt', '/workspace/new.txt');
+        expect(fsMock.rename).not.toHaveBeenCalled();
+        expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/old.txt');
         expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write' });
     });
 
@@ -566,9 +601,8 @@ describe('F35 — move_file (F186)', () => {
             .mockResolvedValueOnce({ ok: true, resolved: '/workspace/b.txt', reason: undefined });
         fsMock.access.mockRejectedValue(enoent());
         fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.rename.mockRejectedValueOnce(exdev());
+        fsMock.link.mockRejectedValueOnce(exdev()).mockResolvedValueOnce(undefined);
         fsMock.copyFile.mockResolvedValue(undefined);
-        fsMock.link.mockResolvedValue(undefined);
         fsMock.unlink.mockResolvedValue(undefined);
         fsMock.readFile.mockResolvedValue(Buffer.from('move', 'utf8'));
         fsMock.stat.mockResolvedValue({ size: 4 });
@@ -775,7 +809,8 @@ describe('F35 — patch_file (F187)', () => {
 
     it('falha se arquivo não existe', async () => {
         pathOk('/workspace/nope.txt');
-        fsMock.access.mockRejectedValue(new Error('ENOENT'));
+        fsMock.access.mockRejectedValue(enoent());
+        fsMock.readFile.mockRejectedValue(enoent());
 
         const result = await handler({
             path: 'nope.txt',
@@ -783,8 +818,11 @@ describe('F35 — patch_file (F187)', () => {
             new_string: 'y',
         });
 
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('não encontrado');
+        expect(result).toMatchObject({
+            success: false,
+            code: 'ENOENT',
+            toolFeedback: { category: 'not-found' },
+        });
     });
 
     it('falha se validatePath rejeita', async () => {

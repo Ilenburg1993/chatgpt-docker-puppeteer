@@ -37,14 +37,50 @@ async function readFileIntegrity(filePath) {
  * }>}
  */
 export async function moveFileUnlocked(source, destination, options = {}) {
+    if (!options.overwrite) {
+        try {
+            await link(source, destination);
+            await syncParentDirectoryBestEffort(destination);
+            try {
+                await unlink(source);
+                await syncParentDirectoryBestEffort(source);
+            } catch (unlinkError) {
+                return {
+                    crossDevice: false,
+                    duplicatedAfterCrossDeviceMove: true,
+                    sourceUnlinkErrorCode: String(
+                        /** @type {{ code?: unknown }} */ (unlinkError)?.code ?? 'UNKNOWN',
+                    ),
+                    destinationHash: options.expectedSourceHash ?? null,
+                    destinationBytes: options.expectedSourceBytes ?? null,
+                };
+            }
+            return {
+                crossDevice: false,
+                duplicatedAfterCrossDeviceMove: false,
+                sourceUnlinkErrorCode: null,
+                destinationHash: options.expectedSourceHash ?? null,
+                destinationBytes: options.expectedSourceBytes ?? null,
+            };
+        } catch (error) {
+            const errCode = /** @type {{ code?: unknown }} */ (error)?.code;
+            if (errCode !== 'EXDEV') throw error;
+            return moveFileAcrossDevices(source, destination, options);
+        }
+    }
+
     try {
         await rename(source, destination);
+        await syncParentDirectoryBestEffort(destination);
+        if (path.dirname(source) !== path.dirname(destination)) {
+            await syncParentDirectoryBestEffort(source);
+        }
         return {
             crossDevice: false,
             duplicatedAfterCrossDeviceMove: false,
             sourceUnlinkErrorCode: null,
-            destinationHash: null,
-            destinationBytes: null,
+            destinationHash: options.expectedSourceHash ?? null,
+            destinationBytes: options.expectedSourceBytes ?? null,
         };
     } catch (error) {
         const errCode = /** @type {{ code?: unknown }} */ (error)?.code;
@@ -84,7 +120,13 @@ async function moveFileAcrossDevices(source, destination, options) {
             /** @type {{ code?: string }} */ (err).code = 'ECOPYMISMATCH';
             throw err;
         }
-        await syncFileBestEffort(tmpDestination);
+        const syncResult = await syncFileBestEffort(tmpDestination);
+        if (syncResult.attempted && !syncResult.ok && !syncResult.skippedReason) {
+            const error = new Error(`Falha ao sincronizar move cross-device: ${tmpDestination}`);
+            /** @type {{ code?: string; cause?: unknown }} */ (error).code = 'EFILESYNC';
+            /** @type {{ code?: string; cause?: unknown }} */ (error).cause = syncResult.errorCode;
+            throw error;
+        }
         if (options.overwrite) {
             await rename(tmpDestination, destination);
         } else {
