@@ -180,6 +180,32 @@ describe('bus-actions (FAIXA-L15)', () => {
             assert.equal(tracked.length, 0);
             ea.unsub();
         });
+
+        it('deduplica alertas recuperáveis e limita a cardinalidade do throttle', () => {
+            /** @type {any[]} */
+            const alerts = [];
+            const ea = createErrorAlerterAction({ bus, onAlert: (evt) => alerts.push(evt) });
+            const baseEvent = {
+                type: 'hook:error_occurred',
+                timestamp: Date.now(),
+                errorContext: 'model_call',
+                recoverable: true,
+                errorMessage: 'recoverable-0',
+            };
+
+            bus.emit(baseEvent);
+            bus.emit(baseEvent);
+            assert.equal(alerts.length, 1);
+
+            for (let index = 1; index <= 512; index += 1) {
+                bus.emit({ ...baseEvent, errorMessage: `recoverable-${index}` });
+            }
+            assert.equal(alerts.length, 513);
+
+            bus.emit(baseEvent);
+            assert.equal(alerts.length, 514);
+            ea.unsub();
+        });
     });
 
     describe('hasAction contract', () => {

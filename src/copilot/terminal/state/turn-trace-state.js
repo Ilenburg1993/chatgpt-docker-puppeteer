@@ -1,6 +1,16 @@
 // @ts-check
 
 const MAX_RECENT_TURN_TRACES = 20;
+const MAX_TURN_TRACE_TOOLS = 128;
+const MAX_TURN_TRACE_FILES = 256;
+const MAX_TURN_TRACE_USER_INPUTS = 64;
+const MAX_FILE_DEDUPE_KEYS = 32;
+const MAX_USER_INPUT_CHOICES = 32;
+const MAX_TRACE_LABEL_LENGTH = 512;
+const MAX_TRACE_PATH_LENGTH = 4096;
+const MAX_TRACE_QUESTION_LENGTH = 4096;
+const MAX_TRACE_PREVIEW_LENGTH = 2048;
+const MAX_DEDUPE_KEY_LENGTH = 1024;
 
 /** @typedef {'assistant' | 'implicit'} TerminalTurnTraceSource */
 /** @typedef {'active' | 'completed' | 'failed' | 'interrupted'} TerminalTurnTraceStatus */
@@ -88,7 +98,9 @@ let _activeToolCalls = new Map();
  * @returns {string | null}
  */
 function normalizeTurnId(value) {
-    if (typeof value === 'string' && value.length > 0) return value;
+    if (typeof value === 'string' && value.length > 0) {
+        return value.length <= MAX_TRACE_LABEL_LENGTH ? value : value.slice(0, MAX_TRACE_LABEL_LENGTH);
+    }
     if (typeof value === 'number' && Number.isFinite(value)) return String(value);
     return null;
 }
@@ -98,7 +110,52 @@ function normalizeTurnId(value) {
  * @returns {string | null}
  */
 function normalizeToolCallId(value) {
-    return typeof value === 'string' && value.length > 0 ? value : null;
+    return normalizeBoundedString(value, MAX_TRACE_LABEL_LENGTH);
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} maxLength
+ * @returns {string | null}
+ */
+function normalizeBoundedString(value, maxLength) {
+    if (typeof value !== 'string' || value.length === 0) return null;
+    return value.length <= maxLength ? value : value.slice(0, maxLength);
+}
+
+/**
+ * Removes the oldest retained entry and keeps the index map aligned with the shifted array.
+ *
+ * @template T
+ * @param {T[]} entries
+ * @param {Map<string, number>} index
+ * @returns {string | null}
+ */
+function evictOldestIndexedEntry(entries, index) {
+    if (entries.length === 0) return null;
+    entries.shift();
+    let removedKey = null;
+    for (const [key, position] of index) {
+        if (position === 0) {
+            removedKey = key;
+            index.delete(key);
+        } else {
+            index.set(key, position - 1);
+        }
+    }
+    return removedKey;
+}
+
+/**
+ * @param {string} actionKey
+ * @returns {void}
+ */
+function forgetActiveToolCallsForAction(actionKey) {
+    for (const [toolCallId, activeActionKey] of _activeToolCalls) {
+        if (activeActionKey === actionKey) {
+            _activeToolCalls.delete(toolCallId);
+        }
+    }
 }
 
 /**
@@ -146,7 +203,10 @@ function toSnapshot(trace) {
         fileCount: trace.files.length,
         userInputCount: trace.userInputs.length,
         tools: trace.tools.map((entry) => ({ ...entry })),
-        files: trace.files.map((entry) => ({ ...entry })),
+        files: trace.files.map((entry) => ({
+            ...entry,
+            ...(entry.dedupeKeys ? { dedupeKeys: [...entry.dedupeKeys] } : {}),
+        })),
         userInputs: trace.userInputs.map((entry) => ({ ...entry, choices: [...entry.choices] })),
     };
 }
@@ -293,35 +353,44 @@ export function recordTerminalTurnToolActivity({
     const normalizedTurnId = normalizeTurnId(turnId);
     const normalizedToolCallId = normalizeToolCallId(toolCallId);
     const trace = ensureCurrentTurnTrace(timestamp, normalizedTurnId, normalizedTurnId ? 'assistant' : 'implicit');
-    const effectiveTarget = target ?? path ?? null;
+    const normalizedToolName = normalizeBoundedString(toolName, MAX_TRACE_LABEL_LENGTH) ?? '(unknown)';
+    const normalizedPath = normalizeBoundedString(path, MAX_TRACE_PATH_LENGTH);
+    const normalizedTarget = normalizeBoundedString(target, MAX_TRACE_PATH_LENGTH);
+    const normalizedSource = normalizeBoundedString(source, MAX_TRACE_LABEL_LENGTH) ?? 'sdk';
+    const effectiveTarget = normalizedTarget ?? normalizedPath ?? null;
     const actionKey =
-        normalizedToolCallId ?? `${toolName}\u241f${operation}\u241f${effectiveTarget ?? ''}\u241f${source}`;
+        normalizedToolCallId ??
+        `${normalizedToolName}\u241f${operation}\u241f${effectiveTarget ?? ''}\u241f${normalizedSource}`;
     const existingIndex = trace.toolIndex.get(actionKey);
     let shouldRecordPrimaryFile = false;
 
     if (existingIndex == null) {
+        if (trace.tools.length >= MAX_TURN_TRACE_TOOLS) {
+            const evictedActionKey = evictOldestIndexedEntry(trace.tools, trace.toolIndex);
+            if (evictedActionKey) forgetActiveToolCallsForAction(evictedActionKey);
+        }
         trace.toolIndex.set(actionKey, trace.tools.length);
         trace.tools.push({
-            toolName,
+            toolName: normalizedToolName,
             operation,
-            path,
+            path: normalizedPath,
             target: effectiveTarget,
-            source,
+            source: normalizedSource,
             status,
             success,
             count: 1,
             updatedAt: timestamp,
         });
-        shouldRecordPrimaryFile = Boolean(path);
+        shouldRecordPrimaryFile = Boolean(normalizedPath);
     } else {
         const existing = trace.tools[existingIndex];
         if (existing) {
-            shouldRecordPrimaryFile = Boolean(path && !existing.path);
+            shouldRecordPrimaryFile = Boolean(normalizedPath && !existing.path);
             existing.status = status;
             existing.success = success;
             existing.updatedAt = timestamp;
             existing.count += 1;
-            existing.path = existing.path ?? path;
+            existing.path = existing.path ?? normalizedPath;
             existing.target = existing.target ?? effectiveTarget;
         }
     }
@@ -335,12 +404,14 @@ export function recordTerminalTurnToolActivity({
         }
     }
 
-    if (path && shouldRecordPrimaryFile) {
+    if (normalizedPath && shouldRecordPrimaryFile) {
         recordTerminalTurnFileActivity({
-            path,
+            path: normalizedPath,
             operation,
-            source,
-            dedupeKey: normalizedToolCallId ? `${normalizedToolCallId}\u241fprimary\u241f${path}` : null,
+            source: normalizedSource,
+            dedupeKey: normalizedToolCallId
+                ? `${normalizedToolCallId}\u241fprimary\u241f${normalizedPath}`
+                : null,
             turnId: trace.turnId,
             timestamp,
         });
@@ -400,7 +471,8 @@ function normalizeChoices(value) {
     if (!Array.isArray(value)) return [];
     return value
         .filter((choice) => typeof choice === 'string' && choice.trim().length > 0)
-        .map((choice) => choice.trim());
+        .slice(0, MAX_USER_INPUT_CHOICES)
+        .map((choice) => choice.trim().slice(0, MAX_TRACE_LABEL_LENGTH));
 }
 
 /**
@@ -433,14 +505,24 @@ export function recordTerminalTurnUserInputActivity({
     const normalizedTurnId = normalizeTurnId(turnId);
     const trace = ensureCurrentTurnTrace(timestamp, normalizedTurnId, normalizedTurnId ? 'assistant' : 'implicit');
     const normalizedRequestId = normalizeToolCallId(requestId);
-    const normalizedQuestion = typeof question === 'string' && question.trim() ? question.trim() : '(sem pergunta)';
+    const normalizedQuestion =
+        normalizeBoundedString(typeof question === 'string' ? question.trim() : null, MAX_TRACE_QUESTION_LENGTH) ??
+        '(sem pergunta)';
+    const normalizedSource = normalizeBoundedString(source, MAX_TRACE_LABEL_LENGTH) ?? 'sdk';
     const key =
         normalizedRequestId ??
-        `${normalizeUserInputKind(kind)}\u241f${normalizedQuestion}\u241f${source}\u241f${trace.userInputs.length}`;
+        `${normalizeUserInputKind(kind)}\u241f${normalizedQuestion}\u241f${normalizedSource}\u241f${trace.userInputs.length}`;
     const existingIndex = trace.userInputIndex.get(key);
     const normalizedStatus = normalizeUserInputStatus(status);
+    const normalizedAnswerPreview = normalizeBoundedString(
+        typeof answerPreview === 'string' ? answerPreview.trim() : null,
+        MAX_TRACE_PREVIEW_LENGTH,
+    );
 
     if (existingIndex == null) {
+        if (trace.userInputs.length >= MAX_TURN_TRACE_USER_INPUTS) {
+            evictOldestIndexedEntry(trace.userInputs, trace.userInputIndex);
+        }
         trace.userInputIndex.set(key, trace.userInputs.length);
         trace.userInputs.push({
             requestId: normalizedRequestId,
@@ -449,9 +531,8 @@ export function recordTerminalTurnUserInputActivity({
             choices: normalizeChoices(choices),
             allowFreeform: true,
             status: normalizedStatus,
-            answerPreview:
-                typeof answerPreview === 'string' && answerPreview.trim().length > 0 ? answerPreview.trim() : null,
-            source,
+            answerPreview: normalizedAnswerPreview,
+            source: normalizedSource,
             count: 1,
             updatedAt: timestamp,
         });
@@ -459,10 +540,7 @@ export function recordTerminalTurnUserInputActivity({
         const existing = trace.userInputs[existingIndex];
         if (existing) {
             existing.status = normalizedStatus;
-            existing.answerPreview =
-                typeof answerPreview === 'string' && answerPreview.trim().length > 0
-                    ? answerPreview.trim()
-                    : existing.answerPreview;
+            existing.answerPreview = normalizedAnswerPreview ?? existing.answerPreview;
             existing.choices = existing.choices.length > 0 ? existing.choices : normalizeChoices(choices);
             existing.allowFreeform = true;
             existing.count += 1;
@@ -495,29 +573,37 @@ export function recordTerminalTurnFileActivity({
 }) {
     const normalizedTurnId = normalizeTurnId(turnId);
     const trace = ensureCurrentTurnTrace(timestamp, normalizedTurnId, normalizedTurnId ? 'assistant' : 'implicit');
-    const fileKey = `${operation}\u241f${path}\u241f${source}`;
+    const normalizedPath = normalizeBoundedString(path, MAX_TRACE_PATH_LENGTH) ?? '(unknown)';
+    const normalizedSource = normalizeBoundedString(source, MAX_TRACE_LABEL_LENGTH) ?? 'sdk';
+    const normalizedDedupeKey = normalizeBoundedString(dedupeKey, MAX_DEDUPE_KEY_LENGTH);
+    const fileKey = `${operation}\u241f${normalizedPath}\u241f${normalizedSource}`;
     const existingIndex = trace.fileIndex.get(fileKey);
     if (existingIndex == null) {
+        if (trace.files.length >= MAX_TURN_TRACE_FILES) {
+            evictOldestIndexedEntry(trace.files, trace.fileIndex);
+        }
         trace.fileIndex.set(fileKey, trace.files.length);
         trace.files.push({
-            path,
+            path: normalizedPath,
             operation,
-            source,
+            source: normalizedSource,
             count: 1,
             updatedAt: timestamp,
-            ...(dedupeKey ? { dedupeKeys: [dedupeKey] } : {}),
+            ...(normalizedDedupeKey ? { dedupeKeys: [normalizedDedupeKey] } : {}),
         });
     } else {
         const existing = trace.files[existingIndex];
         if (existing) {
-            if (dedupeKey && existing.dedupeKeys?.includes(dedupeKey)) {
+            if (normalizedDedupeKey && existing.dedupeKeys?.includes(normalizedDedupeKey)) {
                 existing.updatedAt = timestamp;
                 return toSnapshot(trace);
             }
             existing.count += 1;
             existing.updatedAt = timestamp;
-            if (dedupeKey) {
-                existing.dedupeKeys = [...(existing.dedupeKeys ?? []), dedupeKey];
+            if (normalizedDedupeKey) {
+                existing.dedupeKeys = [...(existing.dedupeKeys ?? []), normalizedDedupeKey].slice(
+                    -MAX_FILE_DEDUPE_KEYS,
+                );
             }
         }
     }
@@ -539,7 +625,10 @@ export function readTerminalTurnTraceProjection(limit = 3) {
             .map((entry) => ({
                 ...entry,
                 tools: entry.tools.map((tool) => ({ ...tool })),
-                files: entry.files.map((file) => ({ ...file })),
+                files: entry.files.map((file) => ({
+                    ...file,
+                    ...(file.dedupeKeys ? { dedupeKeys: [...file.dedupeKeys] } : {}),
+                })),
                 userInputs: (entry.userInputs ?? []).map((userInput) => ({
                     ...userInput,
                     choices: [...userInput.choices],

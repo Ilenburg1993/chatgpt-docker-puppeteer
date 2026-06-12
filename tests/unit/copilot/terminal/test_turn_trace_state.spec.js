@@ -191,4 +191,81 @@ describe('terminal/turn-trace-state', () => {
             answerPreview: 'prod',
         });
     });
+
+    it('limita cardinalidade e mantém os eventos mais recentes de um turno anormalmente longo', () => {
+        beginTerminalTurnTrace({ turnId: 'turn-bounded', timestamp: 1 });
+
+        for (let index = 0; index < 300; index += 1) {
+            recordTerminalTurnToolActivity({
+                toolName: `tool-${index}`,
+                toolCallId: `call-${index}`,
+                operation: 'read',
+                path: `/tmp/file-${index}.txt`,
+                timestamp: index + 2,
+            });
+            recordTerminalTurnUserInputActivity({
+                requestId: `request-${index}`,
+                question: `question-${index}`,
+                timestamp: index + 2,
+            });
+        }
+
+        const trace = readTerminalTurnTraceProjection(3).current;
+
+        expect(trace?.toolCount).toBe(128);
+        expect(trace?.tools[0]?.toolName).toBe('tool-172');
+        expect(trace?.tools.at(-1)?.toolName).toBe('tool-299');
+        expect(trace?.fileCount).toBe(256);
+        expect(trace?.files[0]?.path).toBe('/tmp/file-44.txt');
+        expect(trace?.files.at(-1)?.path).toBe('/tmp/file-299.txt');
+        expect(trace?.userInputCount).toBe(64);
+        expect(trace?.userInputs[0]?.requestId).toBe('request-236');
+        expect(trace?.userInputs.at(-1)?.requestId).toBe('request-299');
+    });
+
+    it('limita payloads variáveis e chaves de dedupe retidas por arquivo', () => {
+        beginTerminalTurnTrace({ turnId: 'turn-payload', timestamp: 1 });
+        for (let index = 0; index < 40; index += 1) {
+            recordTerminalTurnFileActivity({
+                path: 'a'.repeat(5000),
+                operation: 'read',
+                dedupeKey: `${index}-${'d'.repeat(2000)}`,
+                timestamp: index + 2,
+            });
+        }
+        recordTerminalTurnUserInputActivity({
+            requestId: 'request-payload',
+            question: 'q'.repeat(5000),
+            choices: Array.from({ length: 50 }, (_, index) => `${index}-${'c'.repeat(1000)}`),
+            answerPreview: 'p'.repeat(3000),
+            timestamp: 50,
+        });
+
+        const trace = readTerminalTurnTraceProjection(3).current;
+
+        expect(trace?.files[0]?.path).toHaveLength(4096);
+        expect(trace?.files[0]?.dedupeKeys).toHaveLength(32);
+        expect(trace?.files[0]?.dedupeKeys?.[0]?.startsWith('8-')).toBe(true);
+        expect(trace?.files[0]?.dedupeKeys?.every((key) => key.length <= 1024)).toBe(true);
+        expect(trace?.userInputs[0]?.question).toHaveLength(4096);
+        expect(trace?.userInputs[0]?.choices).toHaveLength(32);
+        expect(trace?.userInputs[0]?.choices.every((choice) => choice.length <= 512)).toBe(true);
+        expect(trace?.userInputs[0]?.answerPreview).toHaveLength(2048);
+    });
+
+    it('não expõe a lista interna de dedupeKeys por referência nos snapshots', () => {
+        beginTerminalTurnTrace({ turnId: 'turn-snapshot', timestamp: 1 });
+        recordTerminalTurnFileActivity({
+            path: '/tmp/snapshot.txt',
+            operation: 'read',
+            dedupeKey: 'internal-key',
+            timestamp: 2,
+        });
+
+        const first = readTerminalTurnTraceProjection(3).current;
+        first?.files[0]?.dedupeKeys?.push('external-mutation');
+        const second = readTerminalTurnTraceProjection(3).current;
+
+        expect(second?.files[0]?.dedupeKeys).toEqual(['internal-key']);
+    });
 });
