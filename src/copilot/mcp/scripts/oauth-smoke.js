@@ -48,6 +48,7 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     attempts?: number;
  *     transient?: boolean;
  *     durationMs?: number;
+ *     responseBytes?: number;
  *     skipped?: boolean;
  * }} ProbeResult
  *
@@ -1396,6 +1397,7 @@ async function probeRawOnce(url, init, runtime) {
             status: response.status,
             body: text,
             headers,
+            responseBytes: Buffer.byteLength(text),
             transient: isTransientHttpStatus(response.status) || isCloudflareTunnelErrorBody(text),
             durationMs: Date.now() - startedAtMs,
         };
@@ -1681,6 +1683,7 @@ function summarizeAuthenticatedToolsList(probe, runtime) {
         ok: Boolean(probe.ok && remoteToolNames.length > 0 && toolsMatchLocalRegistry),
         status: probe.status ?? null,
         attempts: probe.attempts ?? null,
+        responseBytes: probe.responseBytes ?? null,
         tools: remoteToolNames.length,
         expectedLocalTools: localToolNames.length,
         toolsMatchLocalRegistry,

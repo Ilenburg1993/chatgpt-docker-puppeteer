@@ -1,36 +1,48 @@
 // @ts-check
 /**
- * Analyze MCP tools/list payload size without making network calls.
+ * Analyze the MCP tools/list wire payload without making network calls.
  *
- * This is intentionally read-only. It helps decide which descriptor fields dominate tools/list latency before changing
- * the public tool surface.
+ * This is intentionally read-only. It connects the real SDK server and client through an in-memory transport so Zod
+ * schemas are measured only after the same JSON Schema conversion used on the wire.
  *
  * @module copilot/mcp/scripts/tool-payload-audit
  */
 
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { pathToFileURL } from 'node:url';
-import { getCanonicalMcpTools } from '../registry.js';
+import { registerCanonicalMcpTools } from '../registry.js';
 
 const DEFAULT_TOP = 20;
+const DEFAULT_MAX_ENVELOPE_BYTES = 128 * 1024;
 
 /**
- * @param {{ top?: number }} [options]
- * @returns {Record<string, unknown>}
+ * @param {{ top?: number; maxEnvelopeBytes?: number }} [options]
+ * @returns {Promise<Record<string, unknown>>}
  */
-export function buildToolPayloadAudit(options = {}) {
+export async function buildToolPayloadAudit(options = {}) {
     const top = readPositiveInteger(options.top ?? process.env['COPILOT_MCP_TOOL_PAYLOAD_TOP'], DEFAULT_TOP, 1, 200);
-    const tools = getCanonicalMcpTools();
+    const maxEnvelopeBytes = readPositiveInteger(
+        options.maxEnvelopeBytes ?? process.env['COPILOT_MCP_TOOL_PAYLOAD_MAX_BYTES'],
+        DEFAULT_MAX_ENVELOPE_BYTES,
+        1024,
+        16 * 1024 * 1024,
+    );
+    const tools = await listWireMcpTools();
     const toolRows = tools
         .map((tool) => {
             const totalBytes = jsonBytes(tool);
             return {
                 name: tool.name,
                 totalBytes,
+                nameBytes: stringBytes(tool.name),
+                titleBytes: stringBytes(tool.title ?? ''),
                 descriptionBytes: stringBytes(tool.description ?? ''),
                 inputSchemaBytes: jsonBytes(tool.inputSchema ?? null),
                 outputSchemaBytes: jsonBytes(tool.outputSchema ?? null),
                 annotationsBytes: jsonBytes(tool.annotations ?? null),
-                securitySchemesBytes: jsonBytes(tool.securitySchemes ?? null),
+                executionBytes: jsonBytes(tool.execution ?? null),
                 metaBytes: jsonBytes(tool._meta ?? null),
             };
         })
@@ -39,21 +51,25 @@ export function buildToolPayloadAudit(options = {}) {
     const totals = toolRows.reduce(
         (acc, row) => {
             acc.totalBytes += row.totalBytes;
+            acc.nameBytes += row.nameBytes;
+            acc.titleBytes += row.titleBytes;
             acc.descriptionBytes += row.descriptionBytes;
             acc.inputSchemaBytes += row.inputSchemaBytes;
             acc.outputSchemaBytes += row.outputSchemaBytes;
             acc.annotationsBytes += row.annotationsBytes;
-            acc.securitySchemesBytes += row.securitySchemesBytes;
+            acc.executionBytes += row.executionBytes;
             acc.metaBytes += row.metaBytes;
             return acc;
         },
         {
             totalBytes: 0,
+            nameBytes: 0,
+            titleBytes: 0,
             descriptionBytes: 0,
             inputSchemaBytes: 0,
             outputSchemaBytes: 0,
             annotationsBytes: 0,
-            securitySchemesBytes: 0,
+            executionBytes: 0,
             metaBytes: 0,
         },
     );
@@ -64,11 +80,16 @@ export function buildToolPayloadAudit(options = {}) {
         result: { tools },
     };
     const totalEnvelopeBytes = jsonBytes(listEnvelope);
+    const budgetHeadroomBytes = maxEnvelopeBytes - totalEnvelopeBytes;
 
     return {
         ok: true,
+        measurement: 'sdk-in-memory-tools/list',
         toolCount: tools.length,
         totalEnvelopeBytes,
+        maxEnvelopeBytes,
+        withinEnvelopeBudget: budgetHeadroomBytes >= 0,
+        budgetHeadroomBytes,
         totalToolsBytes: totals.totalBytes,
         fieldTotals: totals,
         averageToolBytes: tools.length > 0 ? Math.round(totals.totalBytes / tools.length) : 0,
@@ -77,6 +98,25 @@ export function buildToolPayloadAudit(options = {}) {
         topTools: toolRows.slice(0, top),
         recommendations: buildRecommendations(totals, totalEnvelopeBytes),
     };
+}
+
+/**
+ * Ask the real MCP SDK for tools/list through an in-memory transport. This avoids serializing internal Zod state and
+ * stays aligned with the SDK's schema conversion, omitted fields, and execution metadata.
+ *
+ * @returns {Promise<Awaited<ReturnType<Client['listTools']>>['tools']>}
+ */
+async function listWireMcpTools() {
+    const server = new McpServer({ name: 'copilot-mcp-tool-payload-audit', version: '1.0.0' });
+    registerCanonicalMcpTools(server);
+    const client = new Client({ name: 'copilot-mcp-tool-payload-audit-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    try {
+        await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+        return (await client.listTools()).tools;
+    } finally {
+        await Promise.allSettled([client.close(), server.close()]);
+    }
 }
 
 /**
@@ -93,9 +133,9 @@ function buildRecommendations(totals, totalEnvelopeBytes) {
     if (largestBytes > totalEnvelopeBytes * 0.25) {
         recommendations.push(`Largest field family is ${largestField}; prioritize it for compact descriptors.`);
     }
-    if ((totals['metaBytes'] ?? 0) + (totals['securitySchemesBytes'] ?? 0) > totalEnvelopeBytes * 0.2) {
+    if ((totals['metaBytes'] ?? 0) > totalEnvelopeBytes * 0.15) {
         recommendations.push(
-            'Repeated MCP security metadata is large; keep mirrors for compatibility, but test whether compact mode can be gated by client capability.',
+            'Repeated MCP metadata is large; keep compatibility mirrors, but test compact metadata only behind an explicit client capability.',
         );
     }
     if ((totals['descriptionBytes'] ?? 0) > totalEnvelopeBytes * 0.15) {
@@ -150,5 +190,5 @@ function readPositiveInteger(value, fallback, minimum, maximum) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-    process.stdout.write(`${JSON.stringify(buildToolPayloadAudit(), null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(await buildToolPayloadAudit(), null, 2)}\n`);
 }

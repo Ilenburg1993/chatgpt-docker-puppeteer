@@ -419,7 +419,7 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 | CDEX-048 | 🟡 baixo   | [x]    | O throttle de alertas recuperáveis guardava mensagens/contextos distintos indefinidamente. Agora o dedupe vale para qualquer callback, remove chaves após 30s e impõe teto de 512 assinaturas, com evicção determinística da mais antiga.                                                                                    |
 | CDEX-049 | 🟡 baixo   | [x]    | `cloudflare oauth-smoke` entrava em modo autenticado sem validar `COPILOT_MCP_SMOKE_BEARER_TOKEN`, enviava `tools/list` sem bearer e reportava um falso negativo 401. Agora usa o env injetado e falha antes da rede com diagnóstico explícito, preservando o último smoke válido.                                               |
 | CDEX-050 | 🟠 médio   | [x]    | O pool do parser tinha default fixo 2 e `IO_PARSER_WORKER_POOL_SIZE` inválido virava `NaN`, inicializando zero workers silenciosamente. Agora o default deriva de `availableParallelism()` (1–4), override é limitado a 16 e métricas expõem tamanho, origem e paralelismo detectado.                                           |
-| CDEX-051 | 🟠 médio   | [ ]    | O envelope `tools/list` atual mede 159.861 bytes; `inputSchema` responde por 78.542 bytes e os quatro descriptors batch somam ~28,9KB. Nenhuma tool individual passa de 8,4KB, portanto a otimização deve compactar schemas compartilhados sem confundir descriptors com payloads de execução.                                    |
+| CDEX-051 | 🟠 médio   | [x]    | O auditor de `tools/list` serializava objetos Zod internos e superestimava o envelope em 159.861 bytes. Agora conecta `McpServer` e `Client` pelo transporte em memória e mede o descriptor wire real: 113.236 bytes, `inputSchema` 42.008, maior tool 2.770 e folga de 17.836 sob budget regressivo de 128KiB; smoke OAuth também registra bytes remotos. |
 
 ### Roadmap booleano revisado e autoritativo
 
@@ -511,7 +511,8 @@ Execução de `R1.2` em 2026-06-11:
 - [x] R2.22 — Limitar cardinalidade, listas internas e tamanho dos campos de um único turn trace.
 - [x] R2.23 — Aplicar TTL de 30s e teto de 512 chaves ao dedupe de alertas recuperáveis.
 - [x] R2.24 — Fazer o smoke Cloudflare autenticado rejeitar credencial ausente antes de tocar rede.
-- [ ] R2.25 — Reduzir o envelope `tools/list` preservando validação e contratos dos schemas batch.
+- [x] R2.25 — Substituir a medição Zod incorreta pelo envelope wire real, impor budget regressivo
+      de 128KiB e preservar integralmente validação/contratos dos schemas batch.
 
 Transformações consolidadas nesta rodada:
 
@@ -617,6 +618,13 @@ Validação focada adicional de `CDEX-050`: parser + governança do barrel infra
 warnings/errors, com `typecheck:strict:src.copilot` e ESLint focado em PASS. No runtime atual,
 `availableParallelism=5`, `workerPoolSize=4` e `workerPoolSizeSource=adaptive`. Resumo:
 `artifacts/test-runs/copilot/2026-06-12T03-19-20-469Z/summary.md`.
+
+Validação focada adicional de `CDEX-051`: o novo auditor executa `tools/list` pelo SDK real em
+memória, mede `113.236/131.072` bytes e `17.836` bytes de headroom; os dois testes regressivos,
+ESLint focado e `typecheck:strict:src.copilot` passaram. A medição anterior de `159.861` bytes era
+41% maior por incluir estado interno do Zod, e os quatro descriptors batch reais somam ~10,1KB em
+vez de ~28,9KB. O smoke OAuth agora inclui `authenticatedTools.responseBytes` para confirmação
+live após restart.
 
 Validação canônica pós-transformações em 2026-06-11:
 
