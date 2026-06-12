@@ -8,11 +8,11 @@
  * @module copilot/terminal/state/sse-event-archive
  */
 
-import { open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretRecord } from '../../core/security/redaction.js';
 import { createJsonlFileWriter } from '../../infra/io/jsonl-file-writer.js';
+import { readJsonlTail } from '../../infra/io/jsonl-reader.js';
 
 const DEFAULT_TERMINAL_SSE_EVENT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'sse-events');
 const TERMINAL_SSE_EVENT_ARCHIVE_SOFT_QUEUE = 10_000;
@@ -83,44 +83,6 @@ const terminalSseEventArchiveWriter = createJsonlFileWriter({
         _terminalSseEventArchiveError = null;
     },
 });
-
-/**
- * @param {string} filePath
- * @param {number} [n=50] Default is `50`
- * @returns {Promise<string[]>}
- */
-async function readLastNLines(filePath, n = 50) {
-    const blockSize = 65_536;
-    let fileHandle;
-    try {
-        fileHandle = await open(filePath, 'r');
-        const { size } = await fileHandle.stat();
-        if (size === 0) return [];
-        let remaining = size;
-        let tail = '';
-        /** @type {string[]} */
-        const lines = [];
-        while (remaining > 0 && lines.length < n) {
-            const readSize = Math.min(blockSize, remaining);
-            remaining -= readSize;
-            const buffer = Buffer.alloc(readSize);
-            await fileHandle.read(buffer, 0, readSize, remaining);
-            tail = buffer.toString('utf8') + tail;
-            const split = tail.split('\n');
-            for (let index = split.length - 1; index >= 1 && lines.length < n; index -= 1) {
-                const line = split[index];
-                if (line?.trim()) lines.unshift(line);
-            }
-            tail = split[0] ?? '';
-        }
-        if (tail.trim() && lines.length < n) lines.unshift(tail);
-        return lines.slice(-n);
-    } catch {
-        return [];
-    } finally {
-        await fileHandle?.close();
-    }
-}
 
 /**
  * @param {unknown} value
@@ -306,41 +268,37 @@ export async function readTerminalSseEventArchiveTail(input = {}) {
     }
     const hasFilter = Object.entries(filters).some(([key, value]) => key !== 'limit' && Boolean(value));
     const fetchCount = hasFilter ? limit * 20 : limit;
-    const lines = await readLastNLines(path, fetchCount);
+    const { records } = await readJsonlTail(path, { maxLines: fetchCount });
     /** @type {TerminalSseEventArchiveEntry[]} */
     const matchedEntries = [];
-    for (const line of lines) {
-        try {
-            const entry = /** @type {TerminalSseEventArchiveEntry} */ (JSON.parse(line));
-            if (filters.event && entry.event !== filters.event) continue;
-            if (filters.traceId && entry.traceId !== filters.traceId) continue;
-            if (filters.turnId && entry.turnId !== filters.turnId) continue;
-            if (filters.source && entry.source !== filters.source && entry.eventSource !== filters.source) continue;
-            if (
-                filters.hubSessionId &&
-                entry.hubSessionId !== filters.hubSessionId &&
-                findNestedStringField(entry.payload, ['hubSessionId', 'hub_session_id', 'sessionId']) !==
-                    filters.hubSessionId
-            ) {
-                continue;
-            }
-            if (
-                filters.toolCallId &&
-                findNestedStringField(entry.payload, ['toolCallId', 'tool_call_id', 'callId']) !== filters.toolCallId
-            ) {
-                continue;
-            }
-            if (
-                filters.requestId &&
-                findNestedStringField(entry.payload, ['requestId', 'request_id', 'pendingRequestId']) !==
-                    filters.requestId
-            ) {
-                continue;
-            }
-            matchedEntries.push(entry);
-        } catch {
-            // JSONL truncado/corrompido não deve quebrar a UX do terminal.
+    for (const record of records) {
+        if (!isRecord(record)) continue;
+        const entry = /** @type {TerminalSseEventArchiveEntry} */ (record);
+        if (filters.event && entry.event !== filters.event) continue;
+        if (filters.traceId && entry.traceId !== filters.traceId) continue;
+        if (filters.turnId && entry.turnId !== filters.turnId) continue;
+        if (filters.source && entry.source !== filters.source && entry.eventSource !== filters.source) continue;
+        if (
+            filters.hubSessionId &&
+            entry.hubSessionId !== filters.hubSessionId &&
+            findNestedStringField(entry.payload, ['hubSessionId', 'hub_session_id', 'sessionId']) !==
+                filters.hubSessionId
+        ) {
+            continue;
         }
+        if (
+            filters.toolCallId &&
+            findNestedStringField(entry.payload, ['toolCallId', 'tool_call_id', 'callId']) !== filters.toolCallId
+        ) {
+            continue;
+        }
+        if (
+            filters.requestId &&
+            findNestedStringField(entry.payload, ['requestId', 'request_id', 'pendingRequestId']) !== filters.requestId
+        ) {
+            continue;
+        }
+        matchedEntries.push(entry);
     }
     const entries = matchedEntries.slice(-limit);
     return {

@@ -1,132 +1,98 @@
 // @ts-check
 /**
- * src/copilot/infra/lockfile.js — Lockfile manager para exclusão mútua entre processos.
- *
- * Usa lockfiles baseados em PID para evitar execuções concorrentes do mesmo recurso.
+ * Facade de compatibilidade para o lockfile L1 canônico.
  *
  * @module copilot/infra/lockfile
  */
 
 import { existsSync, lstatSync, readFileSync, unlinkSync } from 'node:fs';
-import { lstat, mkdir, open, readFile, unlink } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { lstat, readFile, unlink } from 'node:fs/promises';
+import path from 'node:path';
+import { acquireFileResourceLock } from './locks/file-resource-lock.js';
+
+/** @type {Map<string, Awaited<ReturnType<typeof acquireFileResourceLock>>>} */
+const legacyLeases = new Map();
 
 /**
- * @param {string} targetPath
- * @returns {Promise<void>}
+ * Tenta adquirir o lock físico informado sem aguardar.
+ *
+ * @param {string} lockPath
+ * @returns {Promise<boolean>}
  */
-async function assertPathIsNotSymlink(targetPath) {
+export async function acquireLock(lockPath) {
+    const normalizedPath = path.resolve(lockPath);
+    if (legacyLeases.has(normalizedPath)) return false;
     try {
-        const stats = await lstat(targetPath);
-        if (stats.isSymbolicLink()) {
-            const error = new Error(`Lock path inválido (symlink detectado): ${targetPath}`);
-            /** @type {{ code?: string }} */ (error).code = 'ERR_LOCKFILE_SYMLINK';
-            throw error;
-        }
+        const lease = await acquireFileResourceLock(normalizedPath, {
+            lockPath: normalizedPath,
+            timeoutMs: 0,
+            operation: 'legacy.acquireLock',
+            target: normalizedPath,
+        });
+        legacyLeases.set(normalizedPath, lease);
+        return true;
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
-        if (code === 'ENOENT') return;
+        if (code === 'ETIMEDOUT') return false;
         throw error;
     }
 }
 
 /**
- * Tenta adquirir um lockfile. Retorna `true` se adquirido, `false` se já existe um lock válido.
+ * Libera de forma síncrona para preservar o contrato legado.
  *
- * O lockfile contém o PID do processo que o criou. Se o processo dono não estiver mais rodando (stale lock), o lock é
- * removido e re-adquirido automaticamente.
- *
- * @param {string} lockPath - Caminho absoluto do lockfile.
- * @returns {Promise<boolean>}
- */
-export async function acquireLock(lockPath) {
-    const dir = dirname(lockPath);
-    if (!existsSync(dir)) {
-        await mkdir(dir, { recursive: true });
-    }
-
-    await assertPathIsNotSymlink(lockPath);
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-            const handle = await open(lockPath, 'wx');
-            try {
-                await handle.writeFile(JSON.stringify({ pid: process.pid, createdAt: Date.now() }), 'utf-8');
-            } finally {
-                await handle.close();
-            }
-            return true;
-        } catch (error) {
-            const code = /** @type {{ code?: unknown }} */ (error)?.code;
-            if (code !== 'EEXIST') throw error;
-
-            await assertPathIsNotSymlink(lockPath);
-
-            try {
-                const raw = await readFile(lockPath, 'utf-8');
-                const pid = readLockOwnerPid(raw);
-                if (pid !== null && isProcessAlive(pid)) {
-                    return false;
-                }
-            } catch {
-                // arquivo corrompido ou ilegível: tenta remover como stale
-            }
-
-            try {
-                await unlink(lockPath);
-            } catch (unlinkError) {
-                const unlinkCode = /** @type {{ code?: unknown }} */ (unlinkError)?.code;
-                if (unlinkCode !== 'ENOENT') return false;
-            }
-        }
-    }
-
-    return false;
-}
-
-/**
- * Libera um lockfile previamente adquirido.
- *
- * @param {string} lockPath - Caminho absoluto do lockfile.
+ * @param {string} lockPath
  * @returns {void}
  */
 export function releaseLock(lockPath) {
+    const normalizedPath = path.resolve(lockPath);
+    const lease = legacyLeases.get(normalizedPath);
     try {
-        if (!existsSync(lockPath)) return;
-        if (lstatSync(lockPath).isSymbolicLink()) return;
-        const pid = readLockOwnerPid(readFileSync(lockPath, 'utf-8'));
-        if (pid === process.pid) {
-            unlinkSync(lockPath);
-        }
+        if (!existsSync(normalizedPath)) return;
+        if (lstatSync(normalizedPath).isSymbolicLink()) return;
+        const pid = readLockOwnerPid(readFileSync(normalizedPath, 'utf8'));
+        if (pid === process.pid) unlinkSync(normalizedPath);
     } catch {
-        // best-effort
+        // compatibilidade best-effort
+    } finally {
+        if (lease) {
+            legacyLeases.delete(normalizedPath);
+            void lease.release().catch(() => undefined);
+        }
     }
 }
 
 /**
- * Libera lockfile de forma assíncrona (preferível em caminhos quentes de runtime).
+ * Libera o lease canônico e aguarda remoção do lock físico.
  *
- * @param {string} lockPath - Caminho absoluto do lockfile.
+ * @param {string} lockPath
  * @returns {Promise<void>}
  */
 export async function releaseLockAsync(lockPath) {
+    const normalizedPath = path.resolve(lockPath);
+    const lease = legacyLeases.get(normalizedPath);
+    if (lease) {
+        legacyLeases.delete(normalizedPath);
+        await lease.release().catch(() => undefined);
+        return;
+    }
+
     try {
-        const stats = await lstat(lockPath).catch((error) => {
+        const stats = await lstat(normalizedPath).catch((error) => {
             const code = /** @type {{ code?: unknown }} */ (error)?.code;
             if (code === 'ENOENT') return null;
             throw error;
         });
         if (!stats || stats.isSymbolicLink()) return;
-        const pid = readLockOwnerPid(await readFile(lockPath, 'utf-8'));
+        const pid = readLockOwnerPid(await readFile(normalizedPath, 'utf8'));
         if (pid === process.pid) {
-            await unlink(lockPath).catch((error) => {
+            await unlink(normalizedPath).catch((error) => {
                 const code = /** @type {{ code?: unknown }} */ (error)?.code;
-                if (code === 'ENOENT') return;
-                throw error;
+                if (code !== 'ENOENT') throw error;
             });
         }
     } catch {
-        // best-effort
+        // compatibilidade best-effort para locks criados por versões antigas
     }
 }
 
@@ -144,20 +110,5 @@ function readLockOwnerPid(raw) {
     } catch {
         const pid = Number.parseInt(trimmed, 10);
         return Number.isInteger(pid) && pid > 0 ? pid : null;
-    }
-}
-
-/**
- * Verifica se um processo com o PID dado está vivo.
- *
- * @param {number} pid
- * @returns {boolean}
- */
-function isProcessAlive(pid) {
-    try {
-        process.kill(pid, 0);
-        return true;
-    } catch {
-        return false;
     }
 }

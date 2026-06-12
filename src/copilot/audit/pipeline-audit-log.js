@@ -18,9 +18,9 @@ import {
     toError,
 } from '#copilot/core';
 import fs from 'node:fs';
-import { open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
+import { readJsonlTail } from '../infra/io/jsonl-reader.js';
 import { getLogDir, log } from './logger.js';
 
 /** @param {string} key @param {number} def @returns {number} */
@@ -40,46 +40,6 @@ const AUDIT_FILE = join(getLogDir(), 'audit.jsonl');
 /** Path do arquivo JSONL de tool calls (execuções). */
 const TOOL_AUDIT_FILE = join(getLogDir(), 'tool-execution-audit.jsonl');
 const MAX_TOOL_AUDIT_BYTES = 10 * 1024 * 1024; // 10 MB
-
-/**
- * Lê as últimas N linhas de um arquivo JSONL sem carregar o arquivo inteiro em memória.
- *
- * @param {string} filePath
- * @param {number} [n=50] Default is `50`
- * @returns {Promise<string[]>}
- */
-async function readLastNLines(filePath, n = 50) {
-    const BLOCK = 65_536;
-    let fh;
-    try {
-        fh = await open(filePath, 'r');
-        const { size } = await fh.stat();
-        if (size === 0) return [];
-        let remaining = size;
-        let tail = '';
-        /** @type {string[]} */
-        const lines = [];
-        while (remaining > 0 && lines.length < n) {
-            const readSize = Math.min(BLOCK, remaining);
-            remaining -= readSize;
-            const buf = Buffer.alloc(readSize);
-            await fh.read(buf, 0, readSize, remaining);
-            tail = buf.toString('utf8') + tail;
-            const split = tail.split('\n');
-            for (let i = split.length - 1; i >= 1 && lines.length < n; i--) {
-                const line = split[i];
-                if (line && line.trim()) lines.unshift(line);
-            }
-            tail = split[0] ?? '';
-        }
-        if (tail.trim() && lines.length < n) lines.unshift(tail);
-        return lines.slice(-n);
-    } catch {
-        return [];
-    } finally {
-        await fh?.close();
-    }
-}
 
 /**
  * @typedef {object} AuditEntry
@@ -293,17 +253,11 @@ export function createAuditLog(opts = {}) {
         try {
             if (!fs.existsSync(toolAuditFile)) return [];
             const fetchCount = sessionId ? limit * 10 : limit;
-            const lines = await readLastNLines(toolAuditFile, fetchCount);
-            const entries = lines
-                .map((l) => {
-                    try {
-                        return JSON.parse(l);
-                    } catch {
-                        return null;
-                    }
-                })
-                .filter(Boolean);
-            const filtered = sessionId ? entries.filter((e) => e.sessionId === sessionId) : entries;
+            const { records } = await readJsonlTail(toolAuditFile, { maxLines: fetchCount });
+            const entries = /** @type {Record<string, unknown>[]} */ (
+                records.filter((entry) => entry && typeof entry === 'object')
+            );
+            const filtered = sessionId ? entries.filter((entry) => entry['sessionId'] === sessionId) : entries;
             return filtered
                 .slice(-limit)
                 .map((entry) => redactSecretRecord(/** @type {Record<string, unknown>} */ (entry)));

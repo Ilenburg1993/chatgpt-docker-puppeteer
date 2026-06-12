@@ -256,6 +256,24 @@ async function observeLock(lockPath) {
 }
 
 /**
+ * @param {string} lockPath
+ * @returns {Promise<void>}
+ */
+async function assertLockPathIsNotSymlink(lockPath) {
+    try {
+        const stats = await fs.lstat(lockPath);
+        if (stats.isSymbolicLink()) {
+            const error = new Error(`Lock path inválido (symlink detectado): ${lockPath}`);
+            /** @type {{ code?: string }} */ (error).code = 'ERR_LOCKFILE_SYMLINK';
+            throw error;
+        }
+    } catch (error) {
+        if (errorCode(error) === 'ENOENT') return;
+        throw error;
+    }
+}
+
+/**
  * @param {FileResourceLockObservation} left
  * @param {FileResourceLockObservation} right
  * @returns {boolean}
@@ -298,6 +316,7 @@ function isStaleLock(observation, nowMs, staleMs) {
  * @returns {Promise<boolean>}
  */
 async function reclaimStaleLock(lockPath, expectedObservation, durability) {
+    await assertLockPathIsNotSymlink(lockPath);
     const observed = await observeLock(lockPath);
     if (!sameObservedLock(expectedObservation, observed)) return false;
     await fs.unlink(lockPath).catch((error) => {
@@ -337,13 +356,18 @@ async function writeLockMetadata(handle, metadata, durability) {
 
 /**
  * @param {string} resourceKey
- * @param {{ operation?: string; target?: string; lockDir?: string; staleMs?: number; timeoutMs?: number; pollMs?: number; signal?: AbortSignal; durability?: IoDurabilityMode }} [options]
+ * @param {{ operation?: string; target?: string; lockDir?: string; lockPath?: string; staleMs?: number; timeoutMs?: number; pollMs?: number; signal?: AbortSignal; durability?: IoDurabilityMode }} [options]
  * @returns {Promise<FileResourceLockLease>}
  */
 export async function acquireFileResourceLock(resourceKey, options = {}) {
     const normalizedKey = normalizePathResourceKey(resourceKey);
-    const lockDir = options.lockDir ? path.resolve(options.lockDir) : getFileResourceLockDir();
-    const lockPath = getFileResourceLockPath(normalizedKey, lockDir);
+    const explicitLockPath = options.lockPath ? path.resolve(options.lockPath) : null;
+    const lockDir = explicitLockPath
+        ? path.dirname(explicitLockPath)
+        : options.lockDir
+          ? path.resolve(options.lockDir)
+          : getFileResourceLockDir();
+    const lockPath = explicitLockPath ?? getFileResourceLockPath(normalizedKey, lockDir);
     const timeoutMs = options.timeoutMs ?? defaultAcquireTimeoutMs();
     const staleMs = options.staleMs ?? defaultStaleMs();
     const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
@@ -352,6 +376,7 @@ export async function acquireFileResourceLock(resourceKey, options = {}) {
     let staleRecovered = false;
 
     await fs.mkdir(lockDir, { recursive: true });
+    await assertLockPathIsNotSymlink(lockPath);
 
     while (true) {
         if (options.signal?.aborted) throw createAbortError();
@@ -409,6 +434,7 @@ export async function acquireFileResourceLock(resourceKey, options = {}) {
             if (handle) await handle.close().catch(() => undefined);
             if (errorCode(error) !== 'EEXIST') throw error;
 
+            await assertLockPathIsNotSymlink(lockPath);
             const existing = await observeLock(lockPath);
             if (isStaleLock(existing, Date.now(), staleMs)) {
                 const reclaimed = await reclaimStaleLock(lockPath, existing, durability);

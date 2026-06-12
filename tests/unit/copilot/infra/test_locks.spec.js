@@ -1,7 +1,7 @@
 // @ts-check
 
 import { existsSync, writeFileSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -106,6 +106,34 @@ describe('infra locks', () => {
 
         await releaseLockAsync(lockPath);
         expect(existsSync(lockPath)).toBe(false);
+    });
+
+    it('acquireLock usa metadata do L1 canônico no path legado', async () => {
+        const dir = await createTempDir();
+        const lockPath = join(dir, 'canonical.lock');
+
+        expect(await acquireLock(lockPath)).toBe(true);
+        const metadata = JSON.parse(await readFile(lockPath, 'utf8'));
+        expect(metadata).toMatchObject({
+            schemaVersion: 1,
+            pid: process.pid,
+            resourceKey: lockPath,
+            target: lockPath,
+        });
+        expect(metadata.token).toEqual(expect.any(String));
+
+        await releaseLockAsync(lockPath);
+    });
+
+    it('acquireLock recusa lock path simbólico', async () => {
+        const dir = await createTempDir();
+        const target = join(dir, 'target.lock');
+        const lockPath = join(dir, 'symlink.lock');
+        await writeFile(target, '{}', 'utf8');
+        await symlink(target, lockPath);
+
+        await expect(acquireLock(lockPath)).rejects.toMatchObject({ code: 'ERR_LOCKFILE_SYMLINK' });
+        expect(existsSync(target)).toBe(true);
     });
 
     it('acquireIoResourceLock expõe lease com run e liberação por asyncDispose', async () => {
