@@ -1047,6 +1047,91 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 ---
 
+## 5-B. Reinvestigação GPT-5.5 — 2026-06-12 — `src/copilot`, Node 24.5+
+
+**Escopo desta rodada:** reabrir a auditoria a partir do estado real do workspace, restringindo a análise a `src/copilot`, `package.json`, validators MCP/Copilot e documentação oficial atualizada de MCP, GitHub Copilot SDK, GitHub MCP/Copilot e Node SQLite. Estado local observado: branch `main`, `HEAD 403252ca`, worktree limpo.
+
+### 5-B.1 Baseline técnico atual
+
+| Eixo | Estado observado em 2026-06-12 | Implicação |
+| ---- | ------------------------------ | ---------- |
+| SDK GitHub Copilot | `@github/copilot-sdk` está em `^1.0.0` no `package.json` | Tratar 0.3.0 como baseline histórico de migração, não como estado corrente |
+| MCP TypeScript SDK | `@modelcontextprotocol/sdk` está em `^1.29.0` | Compatível com o ciclo 1.x; SDK v2 upstream ainda não é alvo produtivo |
+| Runtime | `engines.node >=24.0.0`; Volta aponta Node 24.13.0; validação rodou em cache Node 24.15.0 | O alvo “Node 24.5+” está atendido; cuidado com APIs que mudaram dentro da linha 24.x |
+| SQLite | Projeto mantém `better-sqlite3 ^12.10.0` | Decisão continua defensável: `node:sqlite` só virou release candidate em Node 25.7.0; em Node 24.x deve permanecer tratado como API experimental/instável para produção |
+| Superfície MCP | `mcp_tools_status`: 100 tools; 76 read-only; 21 bounded-write; 3 destructive; 0 open-world | Boa postura de autonomia, mas há risco de contexto/tool selection por excesso de superfície |
+| Apps SDK/CK | `mcp_apps_sdk_readiness`: sem widget resource, sem CSP aplicável, sem Company Knowledge `search/fetch` | Gap de produto; não é fonte atual de prompts, mas limita UX rica e integração CK |
+| Validação | `suite-copilot-fast` job `f9a9dcfa-790a-40a3-a750-c6d0ce9040f6`: PASS | Novo baseline canônico para `src/copilot` no HEAD atual |
+
+**Resultado de validação desta rodada:**
+
+- `npm run typecheck:strict:src.copilot`: PASS em 5.068ms.
+- `npm run lint:copilot`: PASS em 34.300ms.
+- `npm run test:copilot:unit`: PASS em 137.637ms.
+- Vitest compacto: 539 arquivos selecionados; 6.450 testes totais; 6.422 passed; 0 failed; 28 pending; 1.956 suítes passed; 0 warnings/errors únicos.
+
+### 5-B.2 Atualização por documentação oficial
+
+- **MCP:** a especificação oficial mais recente observada é `2025-11-25`, que define MCP como protocolo JSON-RPC 2.0 e enfatiza consentimento, controle do usuário, privacidade de dados, segurança de tools e descrições/annotations como material não confiável. Referência: https://modelcontextprotocol.io/specification/2025-11-25
+- **MCP TypeScript SDK:** o repositório oficial indica que o branch principal contém v2 em desenvolvimento/pre-alpha, enquanto v1.x continua a recomendação produtiva até a estabilização upstream. Referência: https://github.com/modelcontextprotocol/typescript-sdk
+- **GitHub Copilot SDK:** a documentação oficial de Getting Started exige Node.js 20+ para TypeScript e instala `@github/copilot-sdk`; a documentação também expõe streaming, tools, MCP e telemetria/OpenTelemetry como trilhas nativas. Referências: https://docs.github.com/en/copilot/how-tos/copilot-sdk/getting-started e https://docs.github.com/en/copilot/how-tos/copilot-sdk/observability/opentelemetry
+- **GitHub Copilot + MCP:** MCP é agora documentado como integração transversal para IDEs, Copilot CLI, Copilot app, cloud agent e code review; a própria documentação recomenda toolsets menores para performance, segurança, acurácia de seleção e economia de tokens. Referência: https://docs.github.com/en/copilot/concepts/context/mcp
+- **Node SQLite:** a documentação oficial atual mostra `node:sqlite` como release candidate somente a partir de Node 25.7.0 e lista histórico de opções dentro de 24.x; para Node 24.5+ a decisão de não migrar automaticamente de `better-sqlite3` permanece correta até benchmark e contrato de estabilidade. Referência: https://nodejs.org/api/sqlite.html
+
+### 5-B.3 Novos achados CDEX adicionados
+
+| ID | Severidade | Achado | Evidência local | Recomendação |
+| -- | ---------- | ------ | --------------- | ------------ |
+| CDEX-052 | 🟠 Alta | O documento ainda referencia MCP 2025-06-18, enquanto o código e a documentação atual já apontam para MCP 2025-11-25 | `dev-oauth.js` menciona MCP 2025-11-25 em comentários de `CIMD` e resource indicators; refs finais ainda listavam 2025-06-18 | Atualizar matriz de compatibilidade para 2025-11-25; manter testes de OAuth/resource indicator contra esse baseline |
+| CDEX-053 | 🟡 Média | Baseline histórico do relatório cita SHAs anteriores; estado atual real é `HEAD 403252ca` | `repo_status`: branch `main`, worktree limpo, head `403252ca` | Toda revalidação futura deve registrar HEAD, job id e data absoluta antes de marcar PASS |
+| CDEX-054 | 🟠 Alta | Dashboard de validação pode induzir leitura errada quando há jobs antigos falhos | Antes do novo run, `unit-copilot` efetivo apontava job antigo `97959911...` com falha; após `suite-copilot-fast`, efetivo passou | Manter política de “rodar dashboard + job novo” antes de decisões; opcional: ocultar falhas históricas quando há job mais novo e efetivo verde |
+| CDEX-055 | 🟡 Média | Arquivos com `#` existem dentro do escopo `src/copilot/docs`, não apenas na raiz | `src/copilot/docs/# Auditoria Cloudflare — MCP externo.md`; `src/copilot/docs/# Plano completo de patches OAuth.md` | Renomear para nomes ASCII/slug sem `#` e atualizar links; mitiga glob/shell/markdown tooling bugs |
+| CDEX-056 | 🟠 Alta | Monólito crítico de OAuth concentra issuer, PAR, DCR/CIMD, PKCE, DPoP, refresh rotation, JWKS, SSRF e logs no mesmo arquivo | `src/copilot/mcp/control-plane/dev-oauth.js`: ~157KB, versão interna 1.6.0, mais de 4.200 linhas, 12 exports | Dividir por módulos: issuer metadata, request parsing, client metadata fetch, token service, refresh store, DPoP/private_key_jwt, diagnostics/logging |
+| CDEX-057 | 🟠 Alta | Comando BYOK/model-gateway virou macroarquivo de altíssima entropia | `src/copilot/terminal/commands/byok.js`: 376.989 bytes, modificado em 2026-06-12 | Separar parser, renderers, provider commands, sqlite/catalog actions, live-test commands e redaction; manter façade compatível |
+| CDEX-058 | 🟡 Média | Outros arquivos de terminal ainda excedem orçamento saudável de manutenção | `session.js` ~127KB; `sdk.js` ~113KB; `events/sdk-session-events.js` ~106KB | Adotar budget por arquivo (ex: soft 40KB, hard 80KB) com exceções documentadas; refatorar por subdomínio |
+| CDEX-059 | 🟠 Alta | Store SQLite do model-gateway é monolítica e security/performance-critical | `src/copilot/model-gateway/catalog/sqlite-catalog-store.js`: 141.743 bytes; depende de decisões L2/cache/catalog | Separar migrations/schema, prepared statements, retention, query/search, refresh log e diagnostics; adicionar contract tests de lock/busy timeout |
+| CDEX-060 | 🟡 Média | `src/copilot/docs` contém documentos gigantes dentro do hot path de árvore/índice | Docs em `terminal` e `model-gateway` passam de centenas de KB; um roadmap terminal passa de 695KB | Mover docs históricas para archive fora do hot path ou marcar exclusões no índice; manter docs operacionais curtas no escopo ativo |
+| CDEX-061 | 🟠 Alta | Superfície de 100 tools é poderosa, mas pode degradar tool selection e custo de contexto | `mcp_tools_status`: 100 tools; GitHub recomenda toolsets menores por performance/segurança/acurácia | Criar perfis por host: `chatgpt-default`, `chatgpt-maintenance`, `claude-audit`, `local-admin`; medir envelope `tools/list` por perfil |
+| CDEX-062 | 🟡 Média | Apps SDK widget/CSP e Company Knowledge ainda não existem | `mcp_apps_sdk_readiness`: `hasWidgetResource=false`, `searchFetchToolsDetected=false` | Não gastar tempo com CSP antes de widget; planejar resource widget só se houver UX concreta; para CK, criar ferramentas `search/fetch` exatas quando o corpus justificar |
+| CDEX-063 | 🟠 Alta | OTEL existe, mas os spans de fases MCP continuam pendentes | Roadmap 5.5.3 permanece aberto; docs oficiais do Copilot SDK tratam OTEL como trilha nativa | Instrumentar `authorization`, `handler`, `resultSize`, `cloudflareEdge`, `toolPayloadAudit`, propagando `traceparent` em tool invocations |
+| CDEX-064 | 🟡 Média | Prefetch L1 ainda não é orientado por telemetria real | Roadmap 5.1.3/5.1.4 abertos | Derivar hotset dos últimos jobs/sessões, invalidar por mtime/hash e medir L1 hit ratio antes/depois |
+| CDEX-065 | 🟠 Alta | Benchmark QUIC vs auto/http2 segue como decisão aberta apesar de scripts prontos | Scripts `copilot:mcp:quic:*`, `h2:*` e `mcp_cloudflare_transport_benchmark_plan` existem; roadmap 5.6 aberto | Executar benchmark controlado com p50/p95/p99 e registrar artefato canônico em docs Cloudflare |
+| CDEX-066 | 🟠 Alta | Rotação de chaves OAuth continua sem runbook final | Roadmap 6.3 aberto; `dev-oauth.js` já tem ES256, legacy overlap, `kid`, key file e key rotation flag | Criar `MCP-OAUTH-KEY-ROTATION.md`, tool plan-only e testes de rollover com JWKS overlap/grace period |
+| CDEX-067 | 🟡 Média | Node 24.5+ permite estudar `node:sqlite`, mas migração imediata seria prematura | `better-sqlite3` em produção; Node docs indicam release candidate só em Node 25.7 | Manter `better-sqlite3`; criar branch experimental de compat layer para `node:sqlite` somente com benchmark e feature flag |
+| CDEX-068 | 🟡 Média | Exports/import maps do SDK interno já são amplos e podem cristalizar APIs experimentais | `package.json` exporta `./copilot/sdk/rpc/experimental` e vários aliases `#copilot/sdk/*` | Definir semver interno: `experimental` sempre feature-gated; gerar API report para evitar vazamento de contrato instável |
+| CDEX-069 | 🟡 Média | O pacote usa `@types/node ^25.9.2` enquanto runtime alvo declarado é Node 24+ | `package.json`: engines Node >=24; devDependency `@types/node ^25.9.2` | Avaliar pin para tipos Node 24 LTS ou matriz dupla; evita usar tipos/APIs Node 25 por acidente no código Node 24.5+ |
+| CDEX-070 | 🟢 Oportunidade | GitHub Copilot SDK 1.0 já tem trilhas oficiais de MCP, BYOK, streaming events e OTEL | `package.json` em `@github/copilot-sdk ^1.0.0`; docs oficiais confirmam trilhas | Transformar o wrapper `src/copilot/sdk` em camada de compat/observabilidade, não em fork conceitual do SDK oficial |
+
+### 5-B.4 Roadmap incremental desta rodada
+
+#### P0 — Baseline e segurança documental
+
+- [ ] Atualizar todas as referências MCP 2025-06-18 para 2025-11-25 onde a semântica realmente mudou.
+- [ ] Renomear os dois arquivos `src/copilot/docs/# ...md` para slugs sem `#` e corrigir links internos.
+- [ ] Adicionar cabeçalho “validated at HEAD/job id” em futuras auditorias.
+
+#### P1 — Manutenibilidade dos monólitos críticos
+
+- [ ] Refatorar `dev-oauth.js` em módulos de OAuth sem mudar superfície pública.
+- [ ] Refatorar `terminal/commands/byok.js` por subcomandos e renderers.
+- [ ] Refatorar `model-gateway/catalog/sqlite-catalog-store.js` por store/migrations/retention/queries.
+- [ ] Criar gate de filesize por `src/copilot` com allowlist explícita para exceções.
+
+#### P2 — Observabilidade e performance
+
+- [ ] Instrumentar spans OTEL MCP por fase e correlacionar com Copilot SDK trace context.
+- [ ] Gerar hotset de prefetch a partir de telemetry/jobs e medir L1 hit ratio.
+- [ ] Executar benchmark QUIC vs auto/http2 e publicar artefato com p50/p95/p99.
+- [ ] Medir envelope `tools/list` por perfil e reduzir default ChatGPT quando possível.
+
+#### P3 — Produto e integração rica
+
+- [ ] Planejar Apps SDK widget apenas após caso de uso concreto; antes disso, manter CSP fora da prioridade.
+- [ ] Implementar Company Knowledge `search/fetch` somente se houver corpus indexável com benefício claro.
+- [ ] Transformar `src/copilot/sdk` em façade explícita do `@github/copilot-sdk` 1.0, com API report e testes de compatibilidade.
+
+---
+
 ## 6. Prioridade de Execução Atualizada
 
 | Prioridade | Item                                                 | Estado         | Próxima evidência necessária                       |
@@ -1080,8 +1165,12 @@ Para cada fase, os critérios de conclusão são:
 
 ## 8. Referências Consultadas
 
-- MCP Specification 2025-06-18: https://modelcontextprotocol.io/specification/2025-06-18
-- @modelcontextprotocol/sdk v1.29.x: https://github.com/modelcontextprotocol/typescript-sdk
+- MCP Specification 2025-11-25: https://modelcontextprotocol.io/specification/2025-11-25
+- @modelcontextprotocol/sdk v1.29.x / v2 pre-alpha: https://github.com/modelcontextprotocol/typescript-sdk
+- GitHub Copilot SDK Getting Started: https://docs.github.com/en/copilot/how-tos/copilot-sdk/getting-started
+- GitHub Copilot SDK MCP: https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/mcp
+- GitHub Copilot SDK OpenTelemetry: https://docs.github.com/en/copilot/how-tos/copilot-sdk/observability/opentelemetry
+- GitHub Copilot MCP overview/toolsets: https://docs.github.com/en/copilot/concepts/context/mcp
 - OpenAI Apps SDK: https://developers.openai.com/apps-sdk/reference
 - RFC 9728 (PRM): https://www.rfc-editor.org/rfc/rfc9728.html
 - RFC 9449 (DPoP): https://www.rfc-editor.org/rfc/rfc9449.html
