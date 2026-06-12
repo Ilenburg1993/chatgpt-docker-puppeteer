@@ -744,18 +744,17 @@ export async function parseFileSymbols(filePath, content) {
         base.parseDurationMs = parseDurationMs;
         _parserRuntimeStats.lastParseDurationMs = parseDurationMs;
 
-        if (parseDurationMs > MAX_PARSE_DURATION_MS) {
-            _parserRuntimeStats.budgetExceeded += 1;
-            base.parseError = `parser budget exceeded (${parseDurationMs}ms > ${MAX_PARSE_DURATION_MS}ms)`;
-            return base;
-        }
-
         if (!ast) {
             base.parseError = 'babel parse returned null';
             return base;
         }
+        if (parseDurationMs > MAX_PARSE_DURATION_MS) {
+            _parserRuntimeStats.budgetExceeded += 1;
+            base.parseError = `parser budget exceeded (${parseDurationMs}ms > ${MAX_PARSE_DURATION_MS}ms)`;
+        }
         if (ast.errors?.length) {
-            base.parseError = ast.errors.map((/** @type {any} */ e) => e.reasonCode ?? String(e)).join('; ');
+            const astError = ast.errors.map((/** @type {any} */ e) => e.reasonCode ?? String(e)).join('; ');
+            base.parseError = base.parseError ? `${base.parseError}; ${astError}` : astError;
         }
         const extracted = extractSymbolsFromAst(ast);
         base.symbols = extracted.symbols;

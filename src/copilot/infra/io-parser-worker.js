@@ -207,21 +207,16 @@ function parseSymbols(payload) {
         };
     }
 
-    if (parseDurationMs > payload.maxParseDurationMs) {
-        return {
-            symbols: [],
-            imports: [],
-            exports: [],
-            parseError: `parser budget exceeded (${parseDurationMs}ms > ${payload.maxParseDurationMs}ms)`,
-            parseDurationMs,
-        };
-    }
-
     const extracted = extractSymbolsFromAst(ast);
-    const parseError =
+    const budgetError =
+        parseDurationMs > payload.maxParseDurationMs
+            ? `parser budget exceeded (${parseDurationMs}ms > ${payload.maxParseDurationMs}ms)`
+            : null;
+    const astError =
         Array.isArray(ast.errors) && ast.errors.length > 0
             ? ast.errors.map((/** @type {any} */ e) => e.reasonCode ?? String(e)).join('; ')
             : null;
+    const parseError = budgetError && astError ? `${budgetError}; ${astError}` : (budgetError ?? astError);
 
     return {
         symbols: extracted.symbols,
