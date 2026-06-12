@@ -28,6 +28,7 @@
 
 import { LRUCache } from 'lru-cache';
 import { createHash } from 'node:crypto';
+import { availableParallelism } from 'node:os';
 import * as nodePath from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Worker } from 'node:worker_threads';
@@ -56,14 +57,47 @@ const MAX_PARSE_DURATION_MS = Number(process.env['IO_PARSER_MAX_DURATION_MS'] ??
 const MAX_PARSE_LINE_GUARD = Number(process.env['IO_PARSER_MAX_LINES'] ?? 30_000);
 /** Parsing off-main-thread habilitado por padrão. */
 const PARSER_WORKER_ENABLED = String(process.env['IO_PARSER_WORKER_ENABLED'] ?? '1').trim() !== '0';
+const PARSER_WORKER_POOL_POLICY = resolveParserWorkerPoolPolicy();
 /** Tamanho do pool leve de worker threads para parsing. */
-const PARSER_WORKER_POOL_SIZE = Math.max(1, Number(process.env['IO_PARSER_WORKER_POOL_SIZE'] ?? 2));
+const PARSER_WORKER_POOL_SIZE = PARSER_WORKER_POOL_POLICY.size;
 const FILE_CONTEXT_CACHE_DISABLED_VALUES = new Set(['0', 'false', 'off', 'disabled']);
 /** Timeout máximo por request no worker (ms). */
 const PARSER_WORKER_REQUEST_TIMEOUT_MS = Math.max(
     MAX_PARSE_DURATION_MS,
     Number(process.env['IO_PARSER_WORKER_REQUEST_TIMEOUT_MS'] ?? 500),
 );
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {number} [parallelism]
+ * @returns {{ size: number; source: 'adaptive' | 'configured'; availableParallelism: number }}
+ */
+export function resolveParserWorkerPoolPolicy(env = process.env, parallelism = availableParallelism()) {
+    const normalizedParallelism =
+        Number.isFinite(parallelism) && parallelism >= 1 ? Math.floor(parallelism) : 1;
+    const adaptiveSize = Math.max(1, Math.min(4, normalizedParallelism - 1));
+    const configured = String(env['IO_PARSER_WORKER_POOL_SIZE'] ?? '').trim();
+    if (!configured) {
+        return {
+            size: adaptiveSize,
+            source: 'adaptive',
+            availableParallelism: normalizedParallelism,
+        };
+    }
+    const parsed = Number(configured);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+        return {
+            size: adaptiveSize,
+            source: 'adaptive',
+            availableParallelism: normalizedParallelism,
+        };
+    }
+    return {
+        size: Math.min(16, Math.floor(parsed)),
+        source: 'configured',
+        availableParallelism: normalizedParallelism,
+    };
+}
 
 /** Cache de símbolos parseados: max 500 entradas, TTL 5 min. */
 const _symbolCache = new LRUCache(
@@ -891,6 +925,8 @@ export function getParserCacheStats() {
         maxParseLines: MAX_PARSE_LINE_GUARD,
         workerEnabled: PARSER_WORKER_ENABLED,
         workerPoolSize: PARSER_WORKER_POOL_SIZE,
+        workerPoolSizeSource: PARSER_WORKER_POOL_POLICY.source,
+        availableParallelism: PARSER_WORKER_POOL_POLICY.availableParallelism,
         workerRequestTimeoutMs: PARSER_WORKER_REQUEST_TIMEOUT_MS,
         workerPoolInitialized: _workerPoolInitialized,
         workerPoolDisabledByError: _workerPoolDisabledByError,

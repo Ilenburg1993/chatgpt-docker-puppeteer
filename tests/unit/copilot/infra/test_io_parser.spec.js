@@ -19,6 +19,7 @@ import {
     parseFileForContext,
     parseFileSymbols,
     resetParserCacheForTest,
+    resolveParserWorkerPoolPolicy,
 } from '../../../../src/copilot/infra/io-parser.js';
 
 let tmpDir = '';
@@ -112,6 +113,39 @@ describe('parseFileSymbols - JavaScript', () => {
         const result = await parseFileSymbols(path.join(tmpDir, 'module.js'), JS_CONTENT);
         assert.ok(result.lines > 0);
         assert.ok(result.bytes > 0);
+    });
+});
+
+describe('parser worker pool policy', () => {
+    it('deriva um default adaptativo e preserva ao menos um worker', () => {
+        assert.deepEqual(resolveParserWorkerPoolPolicy({}, 1), {
+            size: 1,
+            source: 'adaptive',
+            availableParallelism: 1,
+        });
+        assert.deepEqual(resolveParserWorkerPoolPolicy({}, 8), {
+            size: 4,
+            source: 'adaptive',
+            availableParallelism: 8,
+        });
+    });
+
+    it('respeita override válido e recupera valores inválidos sem produzir NaN', () => {
+        assert.deepEqual(resolveParserWorkerPoolPolicy({ IO_PARSER_WORKER_POOL_SIZE: '6.9' }, 8), {
+            size: 6,
+            source: 'configured',
+            availableParallelism: 8,
+        });
+        assert.deepEqual(resolveParserWorkerPoolPolicy({ IO_PARSER_WORKER_POOL_SIZE: '999' }, 8), {
+            size: 16,
+            source: 'configured',
+            availableParallelism: 8,
+        });
+        assert.deepEqual(resolveParserWorkerPoolPolicy({ IO_PARSER_WORKER_POOL_SIZE: 'invalid' }, 3), {
+            size: 2,
+            source: 'adaptive',
+            availableParallelism: 3,
+        });
     });
 });
 

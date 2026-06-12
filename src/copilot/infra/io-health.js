@@ -182,6 +182,8 @@ export function readIoRuntimeHealthSnapshot() {
             maxParseLines: 0,
             workerEnabled: false,
             workerPoolSize: 0,
+            workerPoolSizeSource: 'adaptive',
+            availableParallelism: 1,
             workerRequestTimeoutMs: 0,
             workerPoolInitialized: false,
             workerPoolDisabledByError: false,
