@@ -337,7 +337,7 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 | 1.4 quick tunnel stale         | **CONFIRMADO E RESOLVIDO**          | Startup maintenance remove state apenas quando válido, stale e com PID comprovadamente morto.                                                                                                                          |
 | 1.5/1.6 organização da raiz    | **N/A**                             | Fora do escopo solicitado.                                                                                                                                                                                               |
 | 2.1 smoke no startup           | **CONFIRMADO E RESOLVIDO**          | Smoke read-only é agendado uma vez por processo, não bloqueante e configurável.                                                                                                                                          |
-| 2.2 JWKS warmup                | **CONFIRMADO PARCIAL**              | Existe cache remoto, mas `createRemoteJWKSet` é lazy e não há warmup explícito no boot. A meta fixa `<30ms` não tem baseline controlado suficiente.                                                                      |
+| 2.2 JWKS warmup                | **CONFIRMADO E IMPLEMENTADO**       | `createRemoteJWKSet` era lazy. O HTTP startup agora agenda `reload()` deduplicado, expõe estado/tempo/chaves em health e usa o cache TTL existente; a meta fixa `<30ms` ainda exige benchmark live controlado.                                                                          |
 | 2.3 L2 SQLite                  | **CONFIRMADO PARCIAL**              | Implementação, invalidação, pruning, circuit breaker e métricas existem; default está off. `IO_L2_CACHE_PATH` não existe: o L2 usa `copilot.sqlite`.                                                                     |
 | 2.4/5.6 QUIC p99               | **PENDENTE DE EXPERIMENTO**         | O p99 1.314ms é histórico e não prova causalidade do transporte; QUIC atual tem health/smoke OK.                                                                                                                         |
 | 2.5 rate limit anônimo         | **ORIGIN RESOLVIDO; EDGE PENDENTE** | Origin valida confiança de proxy/IP e aplica teto real de buckets; regra Cloudflare continua operação externa.                                                                                                          |
@@ -466,6 +466,8 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 - [x] R1.20 — Serializar o ciclo read/mutate/write de `.env.local` usado por `/byok persist`.
 - [x] R1.21 — Preservar ordem entre audit events MCP sync/async e expor flush coordenado.
 - [x] R1.22 — Rotacionar diariamente o archive SSE também em processos que atravessam UTC midnight.
+- [x] R1.23 — Pré-aquecer o JWKS remoto de forma deduplicada e não bloqueante, com estado em health,
+      métricas do cache e configuração de enable/delay.
 
 Execução de `R1.2` em 2026-06-11:
 
@@ -599,6 +601,12 @@ Validação focada adicional de `R2.24`: Cloudflare CLI probe `3/3`, ESLint foca
 diagnóstico explícito. Resumo:
 `artifacts/test-runs/copilot/2026-06-12T03-09-40-428Z/summary.md`.
 
+Validação focada adicional de `R1.23`: warmup JWKS, auth hardening, startup maintenance e HTTP smoke
+`18/18`, zero warnings/errors, com `typecheck:strict:src.copilot` e ESLint focado em PASS. Resumo:
+`artifacts/test-runs/copilot/2026-06-12T03-14-21-813Z/summary.md`.
+O contrato de layout mais o warmup fecharam adicionalmente em `59/59`:
+`artifacts/test-runs/copilot/2026-06-12T03-16-02-677Z/summary.md`.
+
 Validação canônica pós-transformações em 2026-06-11:
 
 | Gate                                   | Resultado final                                                        |
@@ -730,11 +738,12 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 2.2 Pre-aquecimento de autorização (JWKS warmup) 🟠
 
-- [ ] 2.2.1 — No startup do adaptador HTTP, disparar `fetchRemoteJwks()` assincronamente para
-      pré-popular `REMOTE_JWKS_CACHE`
-- [ ] 2.2.2 — Monitorar via métrica `authorizationConfigCache.misses` — deve cair para 0 após warmup
-- [ ] 2.2.3 — Adicionar log `[mcp:auth] JWKS pre-warmed in Xms` no nível DEBUG
-- [ ] 2.2.4 — Garantir que falha no warmup não bloqueia o startup (fire-and-forget com catch)
+- [x] 2.2.1 — Startup HTTP agenda `jose.remoteJWKSet.reload()` sem token e sem bloquear o listener,
+      pré-populando o resolver em `REMOTE_JWKS_CACHE`
+- [x] 2.2.2 — Premissa corrigida: `authorizationConfigCache` mede parsing de configuração; o estado
+      real está em `/health.authJwksWarmup` e o cache `oauth-remote-jwks` nas métricas TTL
+- [x] 2.2.3 — Log DEBUG registra source, keyCount e durationMs do warmup
+- [x] 2.2.4 — Scheduler fire-and-forget captura falhas, registra WARN/estado e não rejeita startup
 - [ ] 2.2.5 — Testar que autorização cold-start fica < 30ms com warmup
 
 #### 2.3 Ativar L2 cache SQLite 🟠
@@ -1019,7 +1028,7 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 | Prioridade | Item                                                 | Estado         | Próxima evidência necessária                       |
 | ---------- | ---------------------------------------------------- | -------------- | -------------------------------------------------- |
-| P1         | JWKS warmup não bloqueante                          | Em aberto      | Benchmark cold-start antes/depois                  |
+| P1         | JWKS warmup não bloqueante                          | Implementado   | Benchmark cold-start antes/depois                  |
 | P2         | Decisão medida sobre ativação do L2 por perfil      | Em aberto      | Hit ratio, latência e custo no `copilot.sqlite`    |
 | P2         | Benchmark QUIC vs auto/http2                        | Em aberto      | p50/p95/p99 controlados                            |
 | P2         | Rotação de chaves OAuth com grace period            | Em aberto      | Design, runbook e testes de rollover               |

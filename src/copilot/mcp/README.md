@@ -168,6 +168,10 @@ command, args, timeout, exit code, signal and `timedOut` flag.
 - `mcp_smoke_workspace` é agendado uma vez após o HTTP subir, sem bloquear startup. Configure com
   `COPILOT_MCP_STARTUP_SMOKE_ENABLED` e `COPILOT_MCP_STARTUP_SMOKE_DELAY_MS`; o estado aparece em
   `/health`.
+- O JWKS remoto de autorização é pré-aquecido sem fabricar token, dois segundos após o listener
+  subir por default. Configure com `COPILOT_MCP_JWKS_WARMUP_ENABLED` e
+  `COPILOT_MCP_JWKS_WARMUP_DELAY_MS`; o estado aparece em `/health.authJwksWarmup` e o cache
+  `oauth-remote-jwks` aparece nas métricas TTL de `mcp_runtime_health`.
 - State de quick tunnel só é removido automaticamente quando o JSON é válido, o PID está morto e a
   idade excede `COPILOT_MCP_CLOUDFLARE_STALE_AFTER_MS`.
 - `mcp_cleanup_ai_artifacts` aceita apenas artefatos `.json/.log` com nome UUID estrito em
