@@ -627,11 +627,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         await vi.advanceTimersByTimeAsync(10_000);
 
-        expect(recordTerminalActivity).not.toHaveBeenCalledWith(
-            'tool',
-            'Ferramenta em andamento',
-            expect.anything(),
-        );
+        expect(recordTerminalActivity).not.toHaveBeenCalledWith('tool', 'Ferramenta em andamento', expect.anything());
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('ainda trabalhando'));
         expect(writeInlineStatus).not.toHaveBeenCalledWith(expect.stringContaining('ainda trabalhando'));
         expect(writeInlineStatus).not.toHaveBeenCalledWith(expect.stringContaining('chatcmpl-tool'));
@@ -1052,15 +1048,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'Shell concluído',
             expect.objectContaining({ detail: 'npm run lint:copilot · saída 0', source: 'agent' }),
         );
-        expect(println).toHaveBeenCalledWith(
-            expect.stringMatching(/Tarefa\s+conclu[ií]da · investigar sessão SDK/u),
-        );
-        expect(println).toHaveBeenCalledWith(
-            expect.stringContaining('Shell'),
-        );
-        expect(println).toHaveBeenCalledWith(
-            expect.stringContaining('concluído · npm run lint:copilot · saída 0'),
-        );
+        expect(println).toHaveBeenCalledWith(expect.stringMatching(/Tarefa\s+conclu[ií]da · investigar sessão SDK/u));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Shell'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('concluído · npm run lint:copilot · saída 0'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('exit='));
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.background.completed',
@@ -1525,7 +1515,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         expect(rendered).toContain('Recuperação');
         expect(rendered).toContain('provedor gemini · perfil gemini-free · modelo gemini-2.5-flash');
         expect(rendered).not.toContain('Modelo       Provider returned 403 · erro de provider BYOK');
-        expect(rendered).not.toContain('retry automático bloqueado para não prender o terminal; troque provider/modelo');
+        expect(rendered).not.toContain(
+            'retry automático bloqueado para não prender o terminal; troque provider/modelo',
+        );
         expect(broadcastSse).toHaveBeenCalledWith(
             'agent.error',
             expect.objectContaining({

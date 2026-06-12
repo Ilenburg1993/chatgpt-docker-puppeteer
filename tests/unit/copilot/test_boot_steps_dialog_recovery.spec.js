@@ -23,6 +23,12 @@ vi.mock('../../../src/copilot/agent/facades/index.js', () => ({
     getAgentSdkModelStatsTracker: facadeMocks.getAgentSdkModelStatsTracker,
     isAgentSdkExperimentalEnabled: facadeMocks.isAgentSdkExperimentalEnabled,
 }));
+vi.mock('../../../src/copilot/agent/facades/agent-runtime-state.js', () => ({
+    clearAgentRuntimePendingQuestionShadow: facadeMocks.clearAgentRuntimePendingQuestionShadow,
+    markAgentRuntimeDialogPausedForRecovery: facadeMocks.markAgentRuntimeDialogPausedForRecovery,
+    shouldReapAgentRuntimePendingQuestionShadow: vi.fn(() => false),
+    shouldScheduleAgentRuntimeDialogBootRecovery: facadeMocks.shouldScheduleAgentRuntimeDialogBootRecovery,
+}));
 
 import {
     createBootWiringState,

@@ -197,14 +197,26 @@ describe('sdk observability health sdkFsRouting', () => {
                     getStats: () => ({
                         buffered: 1,
                         total: 1,
-                        last: { message: `gitHubToken=${githubToken}`, metadata: { Authorization: `Bearer ${byokToken}` } },
+                        last: {
+                            message: `gitHubToken=${githubToken}`,
+                            metadata: { Authorization: `Bearer ${byokToken}` },
+                        },
                     }),
-                    getErrors: () => [{ message: `gitHubToken=${githubToken}`, metadata: { Authorization: `Bearer ${byokToken}` } }],
+                    getErrors: () => [
+                        { message: `gitHubToken=${githubToken}`, metadata: { Authorization: `Bearer ${byokToken}` } },
+                    ],
                     clearErrors: () => {},
                 },
-                getRecentLogs: () => [{ level: 'INFO', msg: `Authorization: Bearer ${byokToken}`, taskId: githubToken }],
+                getRecentLogs: () => [
+                    { level: 'INFO', msg: `Authorization: Bearer ${byokToken}`, taskId: githubToken },
+                ],
                 defaultAuditLog: {
-                    getLast: () => [{ type: 'audit', data: { gitHubToken: githubToken, headers: { Authorization: `Bearer ${byokToken}` } } }],
+                    getLast: () => [
+                        {
+                            type: 'audit',
+                            data: { gitHubToken: githubToken, headers: { Authorization: `Bearer ${byokToken}` } },
+                        },
+                    ],
                     flush: async () => {},
                 },
                 getAuditTail: () => [{ toolName: `tool_${byokToken}`, toolArgs: { gitHubToken: githubToken } }],

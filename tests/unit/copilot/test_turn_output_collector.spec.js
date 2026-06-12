@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { createDialogTurnOutputCollector } from '../../../src/copilot/agent/dialog/seams/turn-output-collector.js';
 
 /**
- * @param {EventEmitter & { pending?: { kind: 'reply' | 'ready' | 'stopped'; question: string; reply?: string } | null }} host
+ * @param {EventEmitter & {
+ *     pending?: { kind: 'reply' | 'ready' | 'stopped'; question: string; reply?: string } | null;
+ * }} host
  */
 function createCollector(host) {
     return createDialogTurnOutputCollector(host, {

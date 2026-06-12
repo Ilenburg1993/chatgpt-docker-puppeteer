@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
     setupTerminalAgentRuntimeEventListeners: vi.fn(() => vi.fn()),
     /** @type {import('vitest').Mock<(...args: any[]) => () => void>} */
     setupTerminalSdkSessionEventListeners: vi.fn(() => vi.fn()),
+    setupTerminalIoActivityEvents: vi.fn(() => vi.fn()),
+    createToolCallRegistry: vi.fn(() => new Map()),
     buildUserPrompt: vi.fn(() => 'prompt> '),
     scheduleTerminalPromptRedraw: vi.fn((rl, prompt) => {
         rl.setPrompt(prompt);
@@ -26,7 +28,8 @@ const mocks = vi.hoisted(() => ({
     })),
 }));
 
-vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
+vi.mock('../../../src/copilot/presentation/state/index.js', async (importOriginal) => ({
+    .../** @type {any} */ (await importOriginal()),
     getBusy: mocks.getBusy,
 }));
 
@@ -42,10 +45,24 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     buildUserPrompt: mocks.buildUserPrompt,
     scheduleTerminalPromptRedraw: mocks.scheduleTerminalPromptRedraw,
 }));
+vi.mock('../../../src/copilot/terminal/dialog/io/index.js', () => ({
+    buildUserPrompt: mocks.buildUserPrompt,
+    scheduleTerminalPromptRedraw: mocks.scheduleTerminalPromptRedraw,
+}));
 
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
     readTerminalAgentRuntimeEventHost: mocks.readTerminalAgentRuntimeEventHost,
     readTerminalRuntimeState: mocks.readTerminalRuntimeState,
+}));
+vi.mock('../../../src/copilot/terminal/frontend/gateways/index.js', () => ({
+    readTerminalAgentRuntimeEventHost: mocks.readTerminalAgentRuntimeEventHost,
+    readTerminalRuntimeState: mocks.readTerminalRuntimeState,
+}));
+vi.mock('../../../src/copilot/terminal/events/io-activity-events.js', () => ({
+    setupTerminalIoActivityEvents: mocks.setupTerminalIoActivityEvents,
+}));
+vi.mock('../../../src/copilot/terminal/state/events/index.js', () => ({
+    createToolCallRegistry: mocks.createToolCallRegistry,
 }));
 
 describe('terminal/event-adapters.js — contrato', () => {

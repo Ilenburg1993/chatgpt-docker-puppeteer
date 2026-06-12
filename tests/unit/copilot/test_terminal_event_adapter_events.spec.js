@@ -5,9 +5,9 @@
  * Contrato: terminal/event-adapter-events.js
  */
 
-import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 /**
  * @param {string} dir
@@ -82,7 +82,9 @@ describe('terminal/event-adapter-events.js — contrato', () => {
         );
         expect(new Set(sourcePolicies.map((policy) => policy.id)).size).toBe(sourcePolicies.length);
         for (const policy of sourcePolicies) {
-            expect(policy.class).toMatch(/^(content|interaction|tool|state|telemetry|diagnostic|lifecycle|provider|extension)$/u);
+            expect(policy.class).toMatch(
+                /^(content|interaction|tool|state|telemetry|diagnostic|lifecycle|provider|extension)$/u,
+            );
             expect(policy.canonicalEmitter).toBeTruthy();
             expect(policy.owner).toBeTruthy();
             expect(policy.publicEvents.length).toBeGreaterThan(0);
@@ -135,7 +137,10 @@ describe('terminal/event-adapter-events.js — contrato', () => {
 
     it('impede bypass do fanout publico duravel fora de dialog/sse.js', () => {
         const terminalRoot = join(process.cwd(), 'src/copilot/terminal');
-        const allowed = new Set([join(terminalRoot, 'dialog/sse.js'), join(terminalRoot, 'state/sse-event-archive.js')]);
+        const allowed = new Set([
+            join(terminalRoot, 'dialog/sse.js'),
+            join(terminalRoot, 'state/sse-event-archive.js'),
+        ]);
         const offenders = listJsFiles(terminalRoot)
             .filter((file) => !allowed.has(file))
             .flatMap((file) => {

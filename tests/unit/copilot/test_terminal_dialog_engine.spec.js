@@ -21,6 +21,47 @@ const configMocks = vi.hoisted(() => ({
         capabilities: null,
     })),
 }));
+const gatewayMocks = vi.hoisted(() => ({
+    readTerminalDialogStreamMeta: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'medium' })),
+    readTerminalRuntimeControlState: vi.fn(() => ({
+        status: 'idle',
+        model: 'gpt-5-mini',
+        reasoningEffort: 'medium',
+        sessionId: null,
+        dialogLoopActive: true,
+        dialogPaused: false,
+        queueSize: 0,
+    })),
+    readTerminalRuntimeState: vi.fn(() => ({
+        runtimeId: 'default',
+        model: 'gpt-5-mini',
+        reasoningEffort: 'medium',
+        status: 'idle',
+        sessionId: null,
+        dialogLoopActive: true,
+        dialogPaused: false,
+        queueSize: 0,
+        pendingQuestion: null,
+        pendingQuestionKind: null,
+        pendingQuestionShadow: null,
+        pendingQuestionShadowKind: null,
+        pendingQuestionShadowState: null,
+        pendingQuestionShadowExpired: false,
+        pendingQuestionShadowAgeMs: null,
+        pendingQuestionShadowExpiresAt: null,
+        pendingQuestionShadowRemainingMs: null,
+        contextWindow: null,
+        lastPrInfo: null,
+    })),
+    runTerminalDialogTurn: vi.fn(async () => 'ok'),
+    runTerminalDialogTurnDetailed: vi.fn(async () => ({
+        reply: 'ok',
+        channel: 'dialog',
+        replySource: 'runtime_return',
+    })),
+    startTerminalAgentRuntime: vi.fn(async () => undefined),
+    startTerminalDialogMode: vi.fn(async () => undefined),
+}));
 
 vi.mock('#copilot/bridges', () => ({ emitNerv: vi.fn() }));
 vi.mock('#copilot/config', async (importOriginal) => {
@@ -89,47 +130,24 @@ vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity: vi.fn(),
 }));
 vi.mock('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
-    readTerminalDialogStreamMeta: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'medium' })),
-    readTerminalRuntimeControlState: vi.fn(() => ({
-        status: 'idle',
-        model: 'gpt-5-mini',
-        reasoningEffort: 'medium',
-        sessionId: null,
-        dialogLoopActive: true,
-        dialogPaused: false,
-        queueSize: 0,
-    })),
-    readTerminalRuntimeState: vi.fn(() => ({
-        runtimeId: 'default',
-        model: 'gpt-5-mini',
-        reasoningEffort: 'medium',
-        status: 'idle',
-        sessionId: null,
-        dialogLoopActive: true,
-        dialogPaused: false,
-        queueSize: 0,
-        pendingQuestion: null,
-        pendingQuestionKind: null,
-        pendingQuestionShadow: null,
-        pendingQuestionShadowKind: null,
-        pendingQuestionShadowState: null,
-        pendingQuestionShadowExpired: false,
-        pendingQuestionShadowAgeMs: null,
-        pendingQuestionShadowExpiresAt: null,
-        pendingQuestionShadowRemainingMs: null,
-        contextWindow: null,
-        lastPrInfo: null,
-    })),
-    startTerminalAgentRuntime: vi.fn(async () => undefined),
+    readTerminalDialogStreamMeta: gatewayMocks.readTerminalDialogStreamMeta,
+    readTerminalRuntimeControlState: gatewayMocks.readTerminalRuntimeControlState,
+    readTerminalRuntimeState: gatewayMocks.readTerminalRuntimeState,
+    startTerminalAgentRuntime: gatewayMocks.startTerminalAgentRuntime,
 }));
 vi.mock('../../../src/copilot/terminal/frontend/gateways/dialog.js', () => ({
-    runTerminalDialogTurn: vi.fn(async () => 'ok'),
-    runTerminalDialogTurnDetailed: vi.fn(async () => ({
-        reply: 'ok',
-        channel: 'dialog',
-        replySource: 'runtime_return',
-    })),
-    startTerminalDialogMode: vi.fn(async () => undefined),
+    runTerminalDialogTurn: gatewayMocks.runTerminalDialogTurn,
+    runTerminalDialogTurnDetailed: gatewayMocks.runTerminalDialogTurnDetailed,
+    startTerminalDialogMode: gatewayMocks.startTerminalDialogMode,
+}));
+vi.mock('../../../src/copilot/terminal/frontend/gateways/index.js', () => ({
+    readTerminalDialogStreamMeta: gatewayMocks.readTerminalDialogStreamMeta,
+    readTerminalRuntimeControlState: gatewayMocks.readTerminalRuntimeControlState,
+    readTerminalRuntimeState: gatewayMocks.readTerminalRuntimeState,
+    runTerminalDialogTurn: gatewayMocks.runTerminalDialogTurn,
+    runTerminalDialogTurnDetailed: gatewayMocks.runTerminalDialogTurnDetailed,
+    startTerminalAgentRuntime: gatewayMocks.startTerminalAgentRuntime,
+    startTerminalDialogMode: gatewayMocks.startTerminalDialogMode,
 }));
 vi.mock('../../../src/copilot/terminal/dialog/engine-persistence.js', () => ({
     drainPendingNotifications: vi.fn(() => []),
@@ -149,6 +167,7 @@ vi.mock('../../../src/copilot/terminal/dialog/turn-display.js', () => ({
     normalizeTerminalTranscriptText: vi.fn((text) => String(text ?? '').trim()),
     releaseDisplayState: vi.fn(),
     renderStreamingFooter: vi.fn(),
+    sanitizeTerminalRenderText: vi.fn((text) => String(text ?? '')),
 }));
 
 /** @type {any} */
@@ -741,10 +760,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
                 maxAttempts: 1,
             }),
         );
-        expect(vi.mocked(sse.broadcastSse)).not.toHaveBeenCalledWith(
-            'terminal.turn.empty_output',
-            expect.any(Object),
-        );
+        expect(vi.mocked(sse.broadcastSse)).not.toHaveBeenCalledWith('terminal.turn.empty_output', expect.any(Object));
 
         configMocks.readConfiguredByokSummary.mockReturnValue({
             enabled: false,
@@ -814,10 +830,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
         await expect(mod.sendTurn('forçar ask_user vazio', 'user')).resolves.toBe('');
 
         expect(vi.mocked(health.recordByokProviderModelCallFailure)).not.toHaveBeenCalled();
-        expect(vi.mocked(sse.broadcastSse)).not.toHaveBeenCalledWith(
-            'terminal.turn.empty_output',
-            expect.any(Object),
-        );
+        expect(vi.mocked(sse.broadcastSse)).not.toHaveBeenCalledWith('terminal.turn.empty_output', expect.any(Object));
 
         vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue({
             runtimeId: 'default',

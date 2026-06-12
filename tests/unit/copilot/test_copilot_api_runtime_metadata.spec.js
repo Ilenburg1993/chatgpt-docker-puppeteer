@@ -25,23 +25,22 @@ function createApp(register, deps) {
 
 describe('copilot-api runtime metadata propagation', () => {
     it('control routes incluem runtime metadata em start/stop/permissions/steer/compliance', async () => {
-        const deps =
-            /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
-                runtimeId: 'default',
-                requestedRuntimeId: 'missing',
-                runtimeFound: false,
-                usedDefaultRuntimeFallback: true,
-                agent: /** @type {any} */ ({
-                    status: 'stopped',
-                    sessionId: 's-1',
-                    dialogLoopActive: false,
-                    start: async () => {},
-                    stop: async () => {},
-                    getPermissionMode: () => 'approve_all',
-                    setPermissionMode: () => {},
-                    steerMessage: async () => 'm-1',
-                }),
-            });
+        const deps = /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
+            runtimeId: 'default',
+            requestedRuntimeId: 'missing',
+            runtimeFound: false,
+            usedDefaultRuntimeFallback: true,
+            agent: /** @type {any} */ ({
+                status: 'stopped',
+                sessionId: 's-1',
+                dialogLoopActive: false,
+                start: async () => {},
+                stop: async () => {},
+                getPermissionMode: () => 'approve_all',
+                setPermissionMode: () => {},
+                steerMessage: async () => 'm-1',
+            }),
+        });
 
         const app = createApp(registerControlRoutes, deps);
 
@@ -78,22 +77,21 @@ describe('copilot-api runtime metadata propagation', () => {
     });
 
     it('task routes incluem runtime metadata em success e validações', async () => {
-        const deps =
-            /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
-                runtimeId: 'default',
-                requestedRuntimeId: 'missing',
-                runtimeFound: false,
-                usedDefaultRuntimeFallback: true,
-                agent: /** @type {any} */ ({
-                    status: 'idle',
-                    sendMessage: async () => 'ok',
-                    answerPendingQuestion: () => true,
-                    clearPendingQuestionShadow: () => true,
-                    listPendingSdkElicitations: () => [],
-                    getPendingSdkElicitation: () => null,
-                    resolvePendingSdkElicitation: () => false,
-                }),
-            });
+        const deps = /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
+            runtimeId: 'default',
+            requestedRuntimeId: 'missing',
+            runtimeFound: false,
+            usedDefaultRuntimeFallback: true,
+            agent: /** @type {any} */ ({
+                status: 'idle',
+                sendMessage: async () => 'ok',
+                answerPendingQuestion: () => true,
+                clearPendingQuestionShadow: () => true,
+                listPendingSdkElicitations: () => [],
+                getPendingSdkElicitation: () => null,
+                resolvePendingSdkElicitation: () => false,
+            }),
+        });
 
         const app = createApp(registerTaskRoutes, deps);
 
@@ -119,41 +117,40 @@ describe('copilot-api runtime metadata propagation', () => {
     it('task route /elicitation/:id/respond aplica validação/schema defaults antes de resolver', async () => {
         /** @type {import('../../../src/copilot/presentation/contracts/index.js').RuntimeElicitationResult[]} */
         const resolved = [];
-        const deps =
-            /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
-                runtimeId: 'default',
-                requestedRuntimeId: 'missing',
-                runtimeFound: false,
-                usedDefaultRuntimeFallback: true,
-                agent: /** @type {any} */ ({
-                    getPendingSdkElicitation: () => ({
-                        id: 'el-1',
-                        requestedSchema: {
-                            type: 'object',
-                            properties: {
-                                env: { type: 'string', default: 'dev', enum: ['dev', 'prod'] },
-                                tags: {
-                                    type: 'array',
-                                    items: {
-                                        anyOf: [
-                                            { const: 'fast', title: 'fast' },
-                                            { const: 'safe', title: 'safe' },
-                                        ],
-                                    },
+        const deps = /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
+            runtimeId: 'default',
+            requestedRuntimeId: 'missing',
+            runtimeFound: false,
+            usedDefaultRuntimeFallback: true,
+            agent: /** @type {any} */ ({
+                getPendingSdkElicitation: () => ({
+                    id: 'el-1',
+                    requestedSchema: {
+                        type: 'object',
+                        properties: {
+                            env: { type: 'string', default: 'dev', enum: ['dev', 'prod'] },
+                            tags: {
+                                type: 'array',
+                                items: {
+                                    anyOf: [
+                                        { const: 'fast', title: 'fast' },
+                                        { const: 'safe', title: 'safe' },
+                                    ],
                                 },
                             },
-                            required: ['env'],
                         },
-                    }),
-                    resolvePendingSdkElicitation: (
-                        /** @type {string} */ _id,
-                        /** @type {import('../../../src/copilot/presentation/contracts/index.js').RuntimeElicitationResult} */ result,
-                    ) => {
-                        resolved.push(result);
-                        return true;
+                        required: ['env'],
                     },
                 }),
-            });
+                resolvePendingSdkElicitation: (
+                    /** @type {string} */ _id,
+                    /** @type {import('../../../src/copilot/presentation/contracts/index.js').RuntimeElicitationResult} */ result,
+                ) => {
+                    resolved.push(result);
+                    return true;
+                },
+            }),
+        });
 
         const app = createApp(registerTaskRoutes, deps);
 
@@ -175,20 +172,19 @@ describe('copilot-api runtime metadata propagation', () => {
     });
 
     it('dialog routes incluem runtime metadata em start/turn/stop', async () => {
-        const deps =
-            /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
-                runtimeId: 'default',
-                requestedRuntimeId: 'missing',
-                runtimeFound: false,
-                usedDefaultRuntimeFallback: true,
-                agent: /** @type {any} */ ({
-                    status: 'idle',
-                    dialogLoopActive: true,
-                    startDialogLoop: async () => {},
-                    sendDialogTurn: async () => 'reply',
-                    stopDialogLoop: async () => {},
-                }),
-            });
+        const deps = /** @type {import('../../../src/copilot/presentation/routing/index.js').CopilotApiRouteDeps} */ ({
+            runtimeId: 'default',
+            requestedRuntimeId: 'missing',
+            runtimeFound: false,
+            usedDefaultRuntimeFallback: true,
+            agent: /** @type {any} */ ({
+                status: 'idle',
+                dialogLoopActive: true,
+                startDialogLoop: async () => {},
+                sendDialogTurn: async () => 'reply',
+                stopDialogLoop: async () => {},
+            }),
+        });
 
         const app = createApp(registerDialogRoutes, deps);
 

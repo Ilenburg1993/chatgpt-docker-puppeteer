@@ -95,7 +95,10 @@ describe('registerTool', () => {
         const reg = createRegistry();
         const tool = /** @type {any} */ ({ ...mkTool('custom'), instructions: 'Use esta tool somente para teste.' });
         registerTool(reg, tool, { category: 'custom', tags: ['test'] });
-        assert.equal(/** @type {any} */ (reg.entries.get('custom')?.tool)?.instructions, 'Use esta tool somente para teste.');
+        assert.equal(
+            /** @type {any} */ (reg.entries.get('custom')?.tool)?.instructions,
+            'Use esta tool somente para teste.',
+        );
     });
 
     it('deve substituir ferramenta com mesmo nome', () => {

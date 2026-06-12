@@ -12,6 +12,9 @@ const broadcastSse = vi.fn();
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     broadcastSse,
 }));
+vi.mock('../../../src/copilot/terminal/dialog/io/index.js', () => ({
+    broadcastSse,
+}));
 
 describe('terminal/agent-sse-passthrough.js — contrato', () => {
     it('importa sem erros', async () => {

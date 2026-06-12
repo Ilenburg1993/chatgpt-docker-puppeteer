@@ -31,8 +31,8 @@ import {
     indexTools,
     scopeTools,
 } from '../../../src/copilot/tools/file/index.js';
-import { searchTools } from '../../../src/copilot/tools/search/index.js';
 import { allTools } from '../../../src/copilot/tools/index.js';
+import { searchTools } from '../../../src/copilot/tools/search/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

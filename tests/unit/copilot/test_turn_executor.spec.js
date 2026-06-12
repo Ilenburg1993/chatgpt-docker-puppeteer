@@ -625,7 +625,7 @@ describe('turn-executor', () => {
             emitter.emit('reply', { reply: 'answer!' });
             await tick();
 
-            await expect(p).resolves.toBe('answer!');
+            await expect(p).resolves.toEqual(expect.objectContaining({ reply: 'answer!', replySource: 'loop.reply' }));
             expect(sendCountRef.sendCount).toBe(1);
         });
 
@@ -649,7 +649,7 @@ describe('turn-executor', () => {
             emitter.emit('reply', { reply: 'answer!' });
             await tick();
 
-            await expect(p).resolves.toBe('answer!');
+            await expect(p).resolves.toEqual(expect.objectContaining({ reply: 'answer!', replySource: 'loop.reply' }));
             expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
         });
 
@@ -672,7 +672,9 @@ describe('turn-executor', () => {
             await vi.advanceTimersByTimeAsync(5100);
             await tick();
 
-            await expect(p).resolves.toBe('OK');
+            await expect(p).resolves.toEqual(
+                expect.objectContaining({ reply: 'OK', replySource: 'assistant.message' }),
+            );
         });
 
         it('normaliza assistant.message contendo REPLY: como fallback do turno', async () => {
@@ -694,7 +696,9 @@ describe('turn-executor', () => {
             await vi.advanceTimersByTimeAsync(5100);
             await tick();
 
-            await expect(p).resolves.toBe('resposta por fallback');
+            await expect(p).resolves.toEqual(
+                expect.objectContaining({ reply: 'resposta por fallback', replySource: 'assistant.message' }),
+            );
         });
 
         it('aceita assistant.message em formato nested data.content no fallback semântico', async () => {
@@ -716,7 +720,9 @@ describe('turn-executor', () => {
             await vi.advanceTimersByTimeAsync(5100);
             await tick();
 
-            await expect(p).resolves.toBe('nested fallback');
+            await expect(p).resolves.toEqual(
+                expect.objectContaining({ reply: 'nested fallback', replySource: 'assistant.message' }),
+            );
         });
 
         it('usa dialog.delta como fallback semântico quando o loop ativo só expõe streaming', async () => {
@@ -739,7 +745,9 @@ describe('turn-executor', () => {
             await vi.advanceTimersByTimeAsync(5100);
             await tick();
 
-            await expect(p).resolves.toBe('resposta por delta');
+            await expect(p).resolves.toEqual(
+                expect.objectContaining({ reply: 'resposta por delta', replySource: 'delta' }),
+            );
         });
 
         it('resolve fallback no assistant.turn_end mesmo quando timeout local está desabilitado', async () => {
@@ -761,7 +769,9 @@ describe('turn-executor', () => {
             host.emit('assistant.turn_end', { turnId: 'turn-1' });
             await tick();
 
-            await expect(p).resolves.toBe('fallback sem timeout');
+            await expect(p).resolves.toEqual(
+                expect.objectContaining({ reply: 'fallback sem timeout', replySource: 'delta' }),
+            );
         });
 
         it('não resolve delta pré-tool como resposta final quando há assistant.message posterior', async () => {
@@ -794,7 +804,12 @@ describe('turn-executor', () => {
             host.emit('assistant.message', { content: 'O nome do pacote é chatgpt-docker-puppeteer.' });
             await tick();
 
-            await expect(p).resolves.toBe('O nome do pacote é chatgpt-docker-puppeteer.');
+            await expect(p).resolves.toEqual(
+                expect.objectContaining({
+                    reply: 'O nome do pacote é chatgpt-docker-puppeteer.',
+                    replySource: 'assistant.message',
+                }),
+            );
         });
 
         it('remove listeners externos após timeout para evitar reply tardio contabilizado', async () => {
@@ -851,7 +866,7 @@ describe('turn-executor', () => {
             emitter.emit('question.pending', {});
             await tick();
 
-            await expect(p).resolves.toBe('OK');
+            await expect(p).resolves.toEqual(expect.objectContaining({ reply: 'OK', replySource: 'loop.reply' }));
             expect(host.answerPendingQuestion).not.toHaveBeenCalled();
         });
     });

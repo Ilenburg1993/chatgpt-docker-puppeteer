@@ -371,7 +371,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/session/index.js', a
     scheduleTerminalSdkSessionBootSelection,
 }));
 
-vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js', async (importOriginal) => ({
+vi.mock('../../../../src/copilot/terminal/frontend/gateways/sdk-session/index.js', async (importOriginal) => ({
     ...(await importOriginal()),
     readTerminalSdkSessionBootSelection,
     deleteTerminalSdkSession,

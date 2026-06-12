@@ -367,7 +367,7 @@ describe('sdk-access facade', () => {
             setModel: vi.fn(),
             abort: vi.fn(),
             log: vi.fn(),
-            getMessages: vi.fn(async () => []),
+            getEvents: vi.fn(async () => []),
         };
 
         ctx = {
@@ -442,7 +442,7 @@ describe('sdk-access facade', () => {
         expect(snapshot.resources.fleetAvailable).toBe(true);
     });
 
-    it('canReadAgentSdkSessionMessages reflete a disponibilidade de getMessages na sessão ativa', () => {
+    it('canReadAgentSdkSessionMessages reflete a disponibilidade de getEvents na sessão ativa', () => {
         expect(canReadAgentSdkSessionMessages(session)).toBe(true);
         expect(canReadAgentSdkSessionMessages(/** @type {any} */ ({ sessionId: 'no-history' }))).toBe(false);
     });

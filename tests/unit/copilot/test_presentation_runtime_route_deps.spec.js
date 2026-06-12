@@ -112,6 +112,7 @@ vi.mock('#copilot/sdk', () => ({
     commandsHandlePending: vi.fn(),
     compactionCompact: vi.fn(),
     createClientSession: vi.fn(),
+    createToolSessionContext: vi.fn(() => ({})),
     createTool: vi.fn(() => ({})),
     createToolSync: vi.fn(() => ({})),
     getToolsConfig: vi.fn(() => ({})),
@@ -177,9 +178,15 @@ vi.mock('#copilot/sdk/rpc', () => ({
 }));
 
 vi.mock('#copilot/sdk/session', () => ({
+    PermissionController: class PermissionController {
+        handler = vi.fn();
+        getMode = vi.fn(() => 'approve_all');
+        setMode = vi.fn();
+    },
     abortSession: vi.fn(),
     approveAll: vi.fn(),
     createClientSession: vi.fn(),
+    createToolSessionContext: vi.fn(() => ({})),
     defaultBus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
     disconnectClientSession: vi.fn(),
     forceStopClient: mocks.forceStopClient,
@@ -242,6 +249,24 @@ vi.mock('../../../src/copilot/presentation/agent/index.js', () => ({
             defaultRuntimeId: 'default',
         };
     },
+}));
+vi.mock('../../../src/copilot/presentation/agent/runtime/runtime-selection.js', () => ({
+    resolveAgentRuntimeSelection: (/** @type {string | null | undefined} */ runtimeId) => ({
+        requestedRuntimeId: runtimeId ?? null,
+        runtimeId: runtimeId === 'alt' ? 'default' : (runtimeId ?? 'default'),
+        runtime: mocks.agent,
+        runtimeFound: runtimeId !== 'alt',
+        usedDefaultRuntimeFallback: runtimeId === 'alt',
+        defaultRuntimeId: 'default',
+    }),
+    requireAgentRuntimeSelection: (/** @type {string | null | undefined} */ runtimeId) => ({
+        requestedRuntimeId: runtimeId ?? null,
+        runtimeId: runtimeId ?? 'default',
+        runtime: mocks.agent,
+        runtimeFound: true,
+        usedDefaultRuntimeFallback: false,
+        defaultRuntimeId: 'default',
+    }),
 }));
 
 vi.mock('../../../src/copilot/presentation/runtime/sdk-session.js', () => ({

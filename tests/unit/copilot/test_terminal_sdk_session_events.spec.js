@@ -55,7 +55,8 @@ vi.mock('../../../src/copilot/terminal/state/activity-state.js', () => ({
     recordTerminalActivity: mocks.recordTerminalActivity,
 }));
 
-vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
+vi.mock('../../../src/copilot/terminal/dialog/index.js', async (importOriginal) => ({
+    .../** @type {any} */ (await importOriginal()),
     SEPARATOR: '---',
     broadcastSse: mocks.broadcastSse,
     println: mocks.println,
@@ -149,7 +150,8 @@ vi.mock('../../../src/copilot/terminal/state/sdk-interactions.js', async () => {
         ...actual,
         recordTerminalUserInputRequested: mocks.recordTerminalUserInputRequested,
         recordTerminalUserInputCompleted: mocks.recordTerminalUserInputCompleted,
-        shouldSuppressTerminalAssistantMessageAsUserInputEcho: mocks.shouldSuppressTerminalAssistantMessageAsUserInputEcho,
+        shouldSuppressTerminalAssistantMessageAsUserInputEcho:
+            mocks.shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     };
 });
 
@@ -190,9 +192,8 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         mocks.runtimePermissionMode = 'approve_all';
-        const { setTerminalRuntimePermissionMode } = await import(
-            '../../../src/copilot/terminal/frontend/gateways/index.js'
-        );
+        const { setTerminalRuntimePermissionMode } =
+            await import('../../../src/copilot/terminal/frontend/gateways/index.js');
         setTerminalRuntimePermissionMode('approve_all');
         mocks.printlnBlock.mockImplementation((/** @type {string[]} */ lines) => mocks.println(lines.join('\n')));
         mocks.getBusy.mockReturnValue(false);
@@ -461,7 +462,9 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         mocks.getShowSessionActivity.mockReturnValue(true);
         agent.emit('session.model_changed', { previousModel: 'gpt-5.4', newModel: 'gpt-5.4', reasoningEffort: 'high' });
 
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('confirmado sem troca: gpt-5.4 (sem troca)'));
+        expect(mocks.println).toHaveBeenCalledWith(
+            expect.stringContaining('confirmado sem troca: gpt-5.4 (sem troca)'),
+        );
     });
 
     it('narra confirmação SDK casada com pedido vivo de modelo BYOK', async () => {
@@ -597,9 +600,8 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
     });
 
     it('surfa elicitation, permission e sidechannel SDK como narrativa operacional', async () => {
-        const { setTerminalRuntimePermissionMode } = await import(
-            '../../../src/copilot/terminal/frontend/gateways/index.js'
-        );
+        const { setTerminalRuntimePermissionMode } =
+            await import('../../../src/copilot/terminal/frontend/gateways/index.js');
         const { setupTerminalSdkSessionEventListeners } =
             await import('../../../src/copilot/terminal/events/sdk-session-events.js');
         const agent = createAgentHost();
@@ -1084,7 +1086,9 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             expect.objectContaining({ count: 4 }),
         );
         expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Skills SDK'));
-        expect(mocks.println).not.toHaveBeenCalledWith(expect.stringContaining('Ferramentas dinâmicas do SDK atualizadas'));
+        expect(mocks.println).not.toHaveBeenCalledWith(
+            expect.stringContaining('Ferramentas dinâmicas do SDK atualizadas'),
+        );
     });
 
     it('renderiza session.task_complete como tarefa em segundo plano sem print ANSI manual', async () => {

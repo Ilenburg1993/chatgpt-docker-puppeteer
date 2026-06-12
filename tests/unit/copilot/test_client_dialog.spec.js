@@ -280,7 +280,7 @@ describe('client-dialog › dialogTurn', () => {
 
     it('encaminha envelope causal para consumidores que aceitam segundo argumento', async () => {
         const agent = createMockAgent();
-        /** @type {Array<{ chunk: string; meta: Record<string, unknown> | undefined }>} */
+        /** @type {{ chunk: string; meta: Record<string, unknown> | undefined }[]} */
         const calls = [];
         function onDelta(/** @type {string} */ chunk, /** @type {Record<string, unknown> | undefined} */ meta) {
             calls.push({ chunk, meta });

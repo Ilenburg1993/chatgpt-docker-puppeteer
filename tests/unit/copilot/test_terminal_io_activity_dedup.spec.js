@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     writeInlineStatus: vi.fn(),
     clearInlineStatus: vi.fn(),
     terminalThemeBadge: vi.fn((_, label) => `[${label}]`),
+    terminalThemeDivider: vi.fn((width) => '-'.repeat(width)),
     terminalThemeText: vi.fn((_, text) => text),
     getTerminalDetailLevel: vi.fn(() => 'detailed'),
     readTerminalTurnTraceProjection: vi.fn(() => ({ current: null, recent: [] })),
@@ -34,7 +35,8 @@ vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     clearInlineStatus: mocks.clearInlineStatus,
 }));
 
-vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
+vi.mock('../../../src/copilot/presentation/state/index.js', async (importOriginal) => ({
+    .../** @type {any} */ (await importOriginal()),
     getShowToolActivity: mocks.getShowToolActivity,
 }));
 
@@ -45,11 +47,18 @@ vi.mock('../../../src/copilot/terminal/state/turn-trace-state.js', () => ({
 
 vi.mock('../../../src/copilot/terminal/state/ui-theme.js', () => ({
     terminalThemeBadge: mocks.terminalThemeBadge,
+    terminalThemeDivider: mocks.terminalThemeDivider,
     terminalThemeText: mocks.terminalThemeText,
 }));
 
 vi.mock('../../../src/copilot/terminal/state/ui-preferences.js', () => ({
     getTerminalDetailLevel: mocks.getTerminalDetailLevel,
+}));
+
+vi.mock('../../../src/copilot/terminal/events/tool-lifecycle-runtime.js', () => ({
+    handleTerminalIoToolLifecycle: ({ entry }) => {
+        mocks.broadcastSse('tool.lifecycle', { type: 'io_op', operation: entry.operation });
+    },
 }));
 
 /**

@@ -39,6 +39,7 @@ vi.mock('#copilot/config/env', () => ({
     COPILOT_WORKING_DIRECTORY: '/tmp',
     LLM_B_BOOT_TIMEOUT_MS: 30000,
     LLM_B_DIALOG_QUEUE_MAX: 5,
+    LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK: false,
     LLM_B_WATCHDOG_MS: 60000,
     LLM_B_WATCHDOG_STALL_MS: 120000,
     MAX_WEBHOOKS: 10,
@@ -79,6 +80,11 @@ vi.mock('../../../src/copilot/agent/facades/index.js', async (importOriginal) =>
     readAgentRuntimeDialogPersistedState: vi.fn(async () => ({ dialogPaused: false })),
     readAgentRuntimeDialogBootstrapState: vi.fn(() => ({ dialogPaused: false, prMetrics: null })),
 }));
+vi.mock('../../../src/copilot/agent/facades/agent-runtime-state.js', () => ({
+    persistAgentRuntimeDialogState: vi.fn(async () => ({ ok: true, value: /** @type {any} */ ({}) })),
+    readAgentRuntimeDialogPersistedState: vi.fn(async () => ({ dialogPaused: false })),
+    readAgentRuntimeDialogBootstrapState: vi.fn(() => ({ dialogPaused: false, prMetrics: null })),
+}));
 
 vi.mock('../../../src/copilot/agent/dialog/executors/index.js', () => ({
     executeTurnImpl: vi.fn(async () => 'REPLY: ok'),
@@ -108,7 +114,7 @@ import {
     persistAgentRuntimeDialogState,
     readAgentRuntimeDialogBootstrapState,
     readAgentRuntimeDialogPersistedState,
-} from '../../../src/copilot/agent/facades/index.js';
+} from '../../../src/copilot/agent/facades/agent-runtime-state.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 

@@ -5,8 +5,8 @@
  * Contrato: terminal/wiring/terminal-agent-wiring.js
  */
 
-import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
+import { describe, expect, it } from 'vitest';
 import {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
@@ -66,15 +66,15 @@ describe('terminal/wiring/terminal-agent-wiring.js — contrato', () => {
         const mod = await import('../../../src/copilot/terminal/wiring/terminal-agent-wiring.js');
 
         expect(mod.shouldSuppressDialogLoopChangedSse(null, { active: true, at: 1000 })).toBe(false);
-        expect(
-            mod.shouldSuppressDialogLoopChangedSse({ active: true, at: 1000 }, { active: true, at: 1100 }),
-        ).toBe(true);
-        expect(
-            mod.shouldSuppressDialogLoopChangedSse({ active: true, at: 1000 }, { active: false, at: 1100 }),
-        ).toBe(false);
-        expect(
-            mod.shouldSuppressDialogLoopChangedSse({ active: true, at: 1000 }, { active: true, at: 1500 }),
-        ).toBe(false);
+        expect(mod.shouldSuppressDialogLoopChangedSse({ active: true, at: 1000 }, { active: true, at: 1100 })).toBe(
+            true,
+        );
+        expect(mod.shouldSuppressDialogLoopChangedSse({ active: true, at: 1000 }, { active: false, at: 1100 })).toBe(
+            false,
+        );
+        expect(mod.shouldSuppressDialogLoopChangedSse({ active: true, at: 1000 }, { active: true, at: 1500 })).toBe(
+            false,
+        );
     });
 
     it('preserva dialog.turn_end como lifecycle sem arquivar reply ja materializado', async () => {
