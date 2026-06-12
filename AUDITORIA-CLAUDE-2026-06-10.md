@@ -624,7 +624,10 @@ memória, mede `113.236/131.072` bytes e `17.836` bytes de headroom; os dois tes
 ESLint focado e `typecheck:strict:src.copilot` passaram. A medição anterior de `159.861` bytes era
 41% maior por incluir estado interno do Zod, e os quatro descriptors batch reais somam ~10,1KB em
 vez de ~28,9KB. O smoke OAuth agora inclui `authenticatedTools.responseBytes` para confirmação
-live após restart.
+live após restart. Publicado em `7d783bf2`; o runtime reiniciado nos PIDs `71127`/`71133`
+confirmou health 200, warmup JWKS remoto de 2 chaves em 275ms, quatro conexões QUIC e OAuth smoke
+completo em PASS. O `tools/list` remoto mediu exatamente os mesmos `113.236` bytes e `100/100`
+tools, eliminando diferença entre a medição local e a resposta Cloudflare.
 
 Validação canônica pós-transformações em 2026-06-11:
 
@@ -1051,7 +1054,7 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 | P1         | JWKS warmup não bloqueante                          | Validado live  | 2 chaves; warmup 614ms; primeira auth 2ms          |
 | P2         | Decisão medida sobre ativação do L2 por perfil      | Em aberto      | Hit ratio, latência e custo no `copilot.sqlite`    |
 | P2         | Benchmark QUIC vs auto/http2                        | Em aberto      | p50/p95/p99 controlados                            |
-| P2         | Compactar envelope `tools/list`                     | Em aberto      | Reduzir 159.861 bytes sem perder contratos         |
+| P2         | Orçamento do envelope `tools/list`                  | Validado live  | 113.236/131.072 bytes local e remoto                |
 | P2         | Rotação de chaves OAuth com grace period            | Em aberto      | Design, runbook e testes de rollover               |
 | P3         | Instrumentar spans MCP por fase                     | Parcial        | Traces authorization/handler/resultSize            |
 | P3         | Hotset de prefetch MCP                              | Parcial        | Top arquivos e ganho medido de L1                  |
