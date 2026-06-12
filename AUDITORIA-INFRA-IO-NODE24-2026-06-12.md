@@ -271,6 +271,29 @@ Validação:
 - `lint:copilot`: **PASS**;
 - testes de locks/engine após a correção: **39 passados, 0 falhas**.
 
+### 1.9 Status de implementação — fault injection determinístico aplicado em 2026-06-12
+
+As primitivas baixas de write/copy/move e o writer JSONL agora aceitam callback interno opcional de fase. Callers normais não mudam; testes podem lançar falhas em pontos exatos sem depender de timing ou mocks de módulos inteiros.
+
+Fases e invariantes provadas:
+
+- write antes de publish: destino antigo permanece e temp é removido;
+- write depois de publish: destino novo já está aplicado, mesmo quando a operação rejeita;
+- copy staged antes de publish: destino anterior permanece e temp é removido;
+- move depois de publish e antes de remover origem: estado de duplicação é retornado e ambos os arquivos permanecem íntegros;
+- JSONL depois de rotate e antes de append: lote volta à fila, archive `.1` preserva conteúdo antigo e retry publica o lote novo.
+
+Validação inicial:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- Testes focados de fault injection, multiprocess, engine, tools e JSONL: **96 passados, 0 falhas**.
+
+Limites:
+
+- Ainda falta forçar o caminho `EXDEV` real em processo isolado.
+- Directory sync é best-effort por desenho; falta uma política explícita para promover falha suportada a erro em perfis duráveis estritos.
+- Fault injection é determinístico por callback; kill real já está coberto para holder L1, mas não em cada fase de publish.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -809,7 +832,8 @@ A situação ideal é uma infra IO em camadas:
 ### Faixa 5 — Provas
 
 - [ ] Fuzz textual e binário.
-- [ ] Crash injection em write, rename, directory sync, EXDEV e append.
+- [x] Fault injection determinístico em write, publish, move e rotate+append.
+- [ ] Crash/fault injection em directory sync e EXDEV.
 - [x] Dois processos concorrendo por create/copy/move/write.
 - [x] Crash de holder L1 seguido de stale recovery real.
 - [ ] Modificação externa durante snapshot e index.
@@ -855,7 +879,8 @@ Foram concluídos stale recovery/release do L1, move exclusivo, copy staged, sna
 6. [ ] migrar ou allowlistar writers síncronos restantes;
 7. [x] consolidar `infra/lockfile.js` sobre o L1 canônico;
 8. [x] executar provas multiprocess de create/copy/move/write e crash de holder L1;
-9. [ ] executar crash injection nos pontos de publish/sync e rotate+append.
+9. [x] executar fault injection determinístico em publish e rotate+append;
+10. [ ] executar crash/fault injection em directory sync e EXDEV.
 
 ---
 
@@ -934,4 +959,4 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Implementar crash injection nos pontos de publish/sync e rotate+append. Em paralelo, decidir explicitamente entre migração e allowlist best-effort para logger/metrics/transcript síncronos.
+Implementar fault injection em directory sync e EXDEV e decidir explicitamente entre migração e allowlist best-effort para logger/metrics/transcript síncronos.
