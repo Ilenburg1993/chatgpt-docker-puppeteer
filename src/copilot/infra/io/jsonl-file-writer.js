@@ -22,6 +22,7 @@ import { utf8ByteLength } from '../shared/buffer.js';
  * @property {(filePath: string) => string} [resolveRotatedPath]
  * @property {(error: unknown) => void} [onError]
  * @property {() => void} [onSuccess]
+ * @property {(phase: string, details: Record<string, unknown>) => void | Promise<void>} [onPhase]
  */
 
 /**
@@ -87,10 +88,14 @@ export function createJsonlFileWriter(options) {
 
             const dataBytes = utf8ByteLength(data, 'jsonl batch');
             if (maxBytes !== null && currentSize > 0 && currentSize + dataBytes >= maxBytes) {
+                await options.onPhase?.('before-rotate', { filePath, currentSize, dataBytes });
                 await rename(filePath, resolveRotatedPath(filePath));
                 currentSize = 0;
+                await options.onPhase?.('after-rotate', { filePath, dataBytes });
             }
+            await options.onPhase?.('before-append', { filePath, dataBytes });
             await appendFile(filePath, data, { encoding: 'utf8', flush: flushToDisk });
+            await options.onPhase?.('after-append', { filePath, dataBytes });
             sizes.set(filePath, currentSize + dataBytes);
         });
     }

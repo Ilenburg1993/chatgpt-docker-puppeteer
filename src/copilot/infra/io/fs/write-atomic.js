@@ -14,6 +14,7 @@ import {
     shouldSyncDirectory,
     syncParentDirectoryBestEffort,
 } from './durability.js';
+import { emitMutationPhase } from './mutation-phase.js';
 
 /**
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} content
@@ -44,7 +45,12 @@ export function normalizeWritePayload(filePath, content, encoding) {
  *
  * @param {string} filePath
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} payload
- * @param {{ mode?: number; exclusive?: boolean; durability?: import('./durability.js').IoDurabilityMode }} [options]
+ * @param {{
+ *     mode?: number;
+ *     exclusive?: boolean;
+ *     durability?: import('./durability.js').IoDurabilityMode;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ * }} [options]
  * @returns {Promise<{
  *     durability: import('./durability.js').IoDurabilityMode;
  *     tempPath: string | null;
@@ -81,17 +87,22 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
             ...(fileFlushRequested ? { flush: true } : {}),
         });
         tmpCreated = true;
+        await emitMutationPhase(options, 'temp-written', { filePath, tmpPath, bytes: writePayload.byteLength });
 
         if (options.exclusive) {
+            await emitMutationPhase(options, 'before-publish', { filePath, tmpPath, exclusive: true });
             await fs.link(tmpPath, filePath);
+            await emitMutationPhase(options, 'after-publish', { filePath, tmpPath, exclusive: true });
             await fs.unlink(tmpPath);
             tmpCreated = false;
             if (shouldSyncDirectory(durability)) directorySync = await syncParentDirectoryBestEffort(filePath);
             return { durability, tempPath: tmpPath, fileFlushRequested, directorySync };
         }
 
+        await emitMutationPhase(options, 'before-publish', { filePath, tmpPath, exclusive: false });
         await fs.rename(tmpPath, filePath);
         tmpCreated = false;
+        await emitMutationPhase(options, 'after-publish', { filePath, tmpPath, exclusive: false });
         if (shouldSyncDirectory(durability)) directorySync = await syncParentDirectoryBestEffort(filePath);
         return { durability, tempPath: tmpPath, fileFlushRequested, directorySync };
     } catch (error) {

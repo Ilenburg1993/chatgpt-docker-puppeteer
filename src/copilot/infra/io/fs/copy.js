@@ -10,12 +10,18 @@ import * as nodeFs from 'node:fs';
 import { copyFile, link, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
+import { emitMutationPhase } from './mutation-phase.js';
 import { readBinaryMutationSnapshot } from './snapshot.js';
 
 /**
  * @param {string} source
  * @param {string} destination
- * @param {{ exclusive?: boolean; expectedSourceHash?: string; expectedSourceBytes?: number }} [options]
+ * @param {{
+ *     exclusive?: boolean;
+ *     expectedSourceHash?: string;
+ *     expectedSourceBytes?: number;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ * }} [options]
  * @returns {Promise<{ destinationHash: string; destinationBytes: number; staged: true }>}
  */
 export async function copyFileUnlocked(source, destination, options = {}) {
@@ -27,6 +33,7 @@ export async function copyFileUnlocked(source, destination, options = {}) {
     try {
         await copyFile(source, tmpDestination, nodeFs.constants.COPYFILE_EXCL);
         tmpCreated = true;
+        await emitMutationPhase(options, 'temp-written', { source, destination, tmpDestination });
         const [sourceAfter, tempAfter] = await Promise.all([
             readBinaryMutationSnapshot(source, { snapshotMaxBytes: 0 }),
             readBinaryMutationSnapshot(tmpDestination, { snapshotMaxBytes: 0 }),
@@ -53,10 +60,14 @@ export async function copyFileUnlocked(source, destination, options = {}) {
             throw error;
         }
         if (options.exclusive) {
+            await emitMutationPhase(options, 'before-publish', { source, destination, tmpDestination, exclusive: true });
             await link(tmpDestination, destination);
+            await emitMutationPhase(options, 'after-publish', { source, destination, tmpDestination, exclusive: true });
             await unlink(tmpDestination);
         } else {
+            await emitMutationPhase(options, 'before-publish', { source, destination, tmpDestination, exclusive: false });
             await rename(tmpDestination, destination);
+            await emitMutationPhase(options, 'after-publish', { source, destination, tmpDestination, exclusive: false });
         }
         tmpCreated = false;
         await syncParentDirectoryBestEffort(destination);

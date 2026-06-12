@@ -10,6 +10,7 @@ import { copyFile, link, readFile, rename, stat, unlink } from 'node:fs/promises
 import path from 'node:path';
 import { sha256 } from '../../shared/hash.js';
 import { syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
+import { emitMutationPhase } from './mutation-phase.js';
 
 /**
  * @param {string} filePath
@@ -27,6 +28,7 @@ async function readFileIntegrity(filePath) {
  *     overwrite?: boolean;
  *     expectedSourceHash?: string;
  *     expectedSourceBytes?: number;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]
  * @returns {Promise<{
  *     crossDevice: boolean;
@@ -39,9 +41,12 @@ async function readFileIntegrity(filePath) {
 export async function moveFileUnlocked(source, destination, options = {}) {
     if (!options.overwrite) {
         try {
+            await emitMutationPhase(options, 'before-publish', { source, destination, exclusive: true });
             await link(source, destination);
+            await emitMutationPhase(options, 'after-publish', { source, destination, exclusive: true });
             await syncParentDirectoryBestEffort(destination);
             try {
+                await emitMutationPhase(options, 'before-source-unlink', { source, destination, crossDevice: false });
                 await unlink(source);
                 await syncParentDirectoryBestEffort(source);
             } catch (unlinkError) {
@@ -70,7 +75,9 @@ export async function moveFileUnlocked(source, destination, options = {}) {
     }
 
     try {
+        await emitMutationPhase(options, 'before-publish', { source, destination, exclusive: false });
         await rename(source, destination);
+        await emitMutationPhase(options, 'after-publish', { source, destination, exclusive: false });
         await syncParentDirectoryBestEffort(destination);
         if (path.dirname(source) !== path.dirname(destination)) {
             await syncParentDirectoryBestEffort(source);
@@ -92,7 +99,12 @@ export async function moveFileUnlocked(source, destination, options = {}) {
 /**
  * @param {string} source
  * @param {string} destination
- * @param {{ overwrite?: boolean; expectedSourceHash?: string; expectedSourceBytes?: number }} options
+ * @param {{
+ *     overwrite?: boolean;
+ *     expectedSourceHash?: string;
+ *     expectedSourceBytes?: number;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ * }} options
  * @returns {ReturnType<typeof moveFileUnlocked>}
  */
 async function moveFileAcrossDevices(source, destination, options) {
@@ -109,6 +121,7 @@ async function moveFileAcrossDevices(source, destination, options) {
                 : await readFileIntegrity(source);
         await copyFile(source, tmpDestination);
         tmpCreated = true;
+        await emitMutationPhase(options, 'temp-written', { source, destination, tmpDestination, crossDevice: true });
         const [sourceAfter, tempAfter] = await Promise.all([readFileIntegrity(source), readFileIntegrity(tmpDestination)]);
         if (sourceAfter.contentHash !== sourceBefore.contentHash || sourceAfter.bytes !== sourceBefore.bytes) {
             const err = new Error(`Origem mudou durante move cross-device: ${source}`);
@@ -128,14 +141,19 @@ async function moveFileAcrossDevices(source, destination, options) {
             throw error;
         }
         if (options.overwrite) {
+            await emitMutationPhase(options, 'before-publish', { source, destination, tmpDestination, exclusive: false });
             await rename(tmpDestination, destination);
+            await emitMutationPhase(options, 'after-publish', { source, destination, tmpDestination, exclusive: false });
         } else {
+            await emitMutationPhase(options, 'before-publish', { source, destination, tmpDestination, exclusive: true });
             await link(tmpDestination, destination);
+            await emitMutationPhase(options, 'after-publish', { source, destination, tmpDestination, exclusive: true });
             await unlink(tmpDestination);
         }
         tmpCreated = false;
         await syncParentDirectoryBestEffort(destination);
         try {
+            await emitMutationPhase(options, 'before-source-unlink', { source, destination, crossDevice: true });
             await unlink(source);
             await syncParentDirectoryBestEffort(source);
         } catch (unlinkError) {
