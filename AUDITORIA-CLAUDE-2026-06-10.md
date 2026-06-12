@@ -14,14 +14,14 @@ incompleto, replay OAuth somente em memória, manutenção de startup ausente e 
 persistência/cardinalidade sem garantias suficientes.
 
 Após revalidação integral do escopo, foram confirmados ou invalidados todos os itens externos e
-corrigidos **48 achados adicionais**. O gate `test:copilot:unit` agora descobre recursivamente 535
+corrigidos **49 achados adicionais**. O gate `test:copilot:unit` agora descobre recursivamente 535
 arquivos e fechou em `6389/6417` testes, `1946/1946` suites, zero falhas e 28 pendências esperadas.
 Typecheck strict e lint Copilot também estão em PASS.
 
 As causas de `degraded` controláveis por `src/copilot` foram tratadas: smoke de workspace agendado no
-startup, cleanup bounded executado sobre 513 artefatos, quick-tunnel stale reconciliável e worktree
-publicado/limpo. A confirmação do status do processo permanente após carregar o novo HEAD ainda
-depende de restart/smoke live e permanece requisito operacional, não dívida de implementação.
+startup, cleanup bounded executado sobre 513 artefatos, quick-tunnel stale reconciliado e worktree
+publicado. Em 2026-06-12, o processo permanente foi reiniciado no novo HEAD: origin HTTP/2 saudável,
+quatro conexões HA Cloudflare, startup maintenance concluída e OAuth completo com `100/100` tools.
 
 Persistem como trabalho relevante: benchmark controlado de transporte, decisão medida sobre ativar
 L2 por perfil, plano de rotação de chaves OAuth com grace period e futuras avaliações de SDK v2
@@ -50,11 +50,12 @@ somente após release estável.
 
 | Suite                                  | Status  | Detalhes                                                                 |
 | -------------------------------------- | ------- | ------------------------------------------------------------------------ |
-| `npm run typecheck:strict:src.copilot` | ✅ PASS | Última execução após CDEX-048, 0 erros                                  |
+| `npm run typecheck:strict:src.copilot` | ✅ PASS | Última execução após CDEX-049, 0 erros                                  |
 | `npm run lint:copilot`                 | ✅ PASS | Gate espaçado pós-transformações                                         |
 | `npm run test:copilot:unit`            | ✅ PASS | 535 arquivos; `6389/6417`; `1946/1946` suites; 28 pendências esperadas |
-| Testes focados finais                  | ✅ PASS | `25/25` sobre turn trace e error alerter após o lote `80/80`             |
-| Git                                    | ✅ PASS | Base anterior sincronizada em `45f74116`; revisão corrente a publicar   |
+| Testes focados finais                  | ✅ PASS | `3/3` no smoke autenticado após `25/25` de turn trace/error alerter      |
+| Runtime live                           | ✅ PASS | HTTP/2 200; 2 processos vivos; 4 HA; startup maintenance e OAuth OK       |
+| Git                                    | ✅ PASS | `main` publicada e sincronizada após cada lote                           |
 
 #### Falhas unit-copilot do baseline externo, já corrigidas
 
@@ -416,6 +417,7 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 | CDEX-046 | 🟠 médio   | [x]    | A projeção diagnóstica de lifecycle de tools mantinha toda entrada sem completion para sempre. Entradas ativas agora expiram após 10 minutos e são limitadas às 128 mais recentes, sem alterar o registry operacional session-scoped.                                                                                         |
 | CDEX-047 | 🟠 médio   | [x]    | Um único turn trace podia acumular tools, arquivos, user inputs, escolhas e `dedupeKeys` sem teto até `turn_end`. Agora preserva apenas os eventos recentes sob limites explícitos (128/256/64), limita listas/campos variáveis e clona arrays internos ao produzir snapshots públicos.                                      |
 | CDEX-048 | 🟡 baixo   | [x]    | O throttle de alertas recuperáveis guardava mensagens/contextos distintos indefinidamente. Agora o dedupe vale para qualquer callback, remove chaves após 30s e impõe teto de 512 assinaturas, com evicção determinística da mais antiga.                                                                                    |
+| CDEX-049 | 🟡 baixo   | [x]    | `cloudflare oauth-smoke` entrava em modo autenticado sem validar `COPILOT_MCP_SMOKE_BEARER_TOKEN`, enviava `tools/list` sem bearer e reportava um falso negativo 401. Agora usa o env injetado e falha antes da rede com diagnóstico explícito, preservando o último smoke válido.                                               |
 
 ### Roadmap booleano revisado e autoritativo
 
@@ -504,6 +506,7 @@ Execução de `R1.2` em 2026-06-11:
 - [x] R2.21 — Expirar e limitar a projeção diagnóstica de lifecycle de tools.
 - [x] R2.22 — Limitar cardinalidade, listas internas e tamanho dos campos de um único turn trace.
 - [x] R2.23 — Aplicar TTL de 30s e teto de 512 chaves ao dedupe de alertas recuperáveis.
+- [x] R2.24 — Fazer o smoke Cloudflare autenticado rejeitar credencial ausente antes de tocar rede.
 
 Transformações consolidadas nesta rodada:
 
@@ -591,6 +594,11 @@ Validação focada adicional de `R2.22`/`R2.23`: turn trace e error alerter `25/
 warnings/errors, com `typecheck:strict:src.copilot` em PASS. Resumo:
 `artifacts/test-runs/copilot/2026-06-12T03-06-43-387Z/summary.md`.
 
+Validação focada adicional de `R2.24`: Cloudflare CLI probe `3/3`, ESLint focado e
+`typecheck:strict:src.copilot` em PASS. O comando real sem token agora falha antes da rede com
+diagnóstico explícito. Resumo:
+`artifacts/test-runs/copilot/2026-06-12T03-09-40-428Z/summary.md`.
+
 Validação canônica pós-transformações em 2026-06-11:
 
 | Gate                                   | Resultado final                                                        |
@@ -618,8 +626,9 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 - [x] Seis commits temáticos publicados diretamente em `main`.
 - [x] `main` local e `origin/main` confirmados no mesmo SHA de remediação `45f74116`.
 - [x] Worktree confirmado limpo imediatamente após o push.
-- [ ] Publicar o lote CDEX-047/CDEX-048 e esta reconciliação final do roadmap.
-- [ ] Restart/smoke live do runtime permanente carregando o novo HEAD.
+- [x] Lote CDEX-047/CDEX-049 e reconciliação integral publicados em `main`.
+- [x] Restart/smoke live no novo HEAD: PIDs `60149`/`60155`, health 200, quatro conexões HA,
+      `startupMaintenance.success=true`, stale quick-tunnel removido e OAuth smoke completo em PASS.
 
 #### Fora do escopo desta execução
 
@@ -1010,7 +1019,6 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 | Prioridade | Item                                                 | Estado         | Próxima evidência necessária                       |
 | ---------- | ---------------------------------------------------- | -------------- | -------------------------------------------------- |
-| P1         | Restart/smoke live do runtime permanente no novo HEAD | Em aberto    | Health, smoke workspace e processos no HEAD atual |
 | P1         | JWKS warmup não bloqueante                          | Em aberto      | Benchmark cold-start antes/depois                  |
 | P2         | Decisão medida sobre ativação do L2 por perfil      | Em aberto      | Hit ratio, latência e custo no `copilot.sqlite`    |
 | P2         | Benchmark QUIC vs auto/http2                        | Em aberto      | p50/p95/p99 controlados                            |
@@ -1027,7 +1035,7 @@ Para cada fase, os critérios de conclusão são:
 
 | Fase | Critério de Sucesso                                                                       |
 | ---- | ----------------------------------------------------------------------------------------- |
-| 1    | `unit-copilot` 0 falhas e workspace limpo concluídos; runtime live aguarda restart/smoke   |
+| 1    | `unit-copilot` 0 falhas, workspace publicado e runtime live saudável                       |
 | 2    | Autorização cold-start < 30ms; L1 hit ratio > 50% em sessão quente; smoke OK no startup   |
 | 3    | 0 barrels violados e surface profiles funcionais; docs globais são N/A neste escopo       |
 | 4    | Decisão de manter `better-sqlite3` documentada; SDK v2 aguarda release estável            |
