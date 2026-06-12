@@ -134,6 +134,23 @@ describe('createToolCallRegistry', () => {
             expect(registry.resolveNameByRequestId('req-999')).toBe('my_mcp_tool');
         });
 
+        it('remove índices por requestId quando a tool ativa expira', () => {
+            registry.register('call-expired', 'external_tool', 'external', { requestId: 'req-expired' });
+            registry.touch('call-expired', { lastSignalAt: Date.now() - 3 * 60_000 });
+
+            expect(registry.resolveByRequestId('req-expired')).toBeNull();
+            expect(registry.resolveNameByRequestId('req-expired')).toBeNull();
+        });
+
+        it('limita aliases externos de requestId sem lifecycle completo', () => {
+            for (let idx = 0; idx < 1100; idx += 1) {
+                registry.markRequestIdForExternalTool(`req-${idx}`, `tool-${idx}`);
+            }
+
+            expect(registry.resolveNameByRequestId('req-0')).toBeNull();
+            expect(registry.resolveNameByRequestId('req-1099')).toBe('tool-1099');
+        });
+
         it('resolveNameByRequestId retorna null para requestId nulo', () => {
             expect(registry.resolveNameByRequestId(null)).toBeNull();
         });

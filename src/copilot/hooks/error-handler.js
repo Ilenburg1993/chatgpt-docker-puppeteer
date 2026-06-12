@@ -37,6 +37,9 @@ import { log } from './logger.js';
  * @property {string[]} [abortContexts] - Contextos de erro que devem abortar imediatamente
  * @property {(input: ErrorOccurredHookInput, invocation?: InvocationContext) => void} [onError] - Callback chamado para
  *   cada erro
+ * @property {number} [stateTtlMs] - TTL do estado por sessão/contexto. Padrão: 30 minutos
+ * @property {number} [maxTrackedContexts] - Máximo de sessões/contextos retidos. Padrão: 1000
+ * @property {() => number} [now] - Relógio injetável para testes
  */
 
 /**
@@ -50,13 +53,69 @@ import { log } from './logger.js';
  * @property {string[]} [fatalPatterns] - Substrings no campo `error` que forçam abort imediato
  * @property {string[]} [transientPatterns] - Substrings no campo `error` que tratam como recuperável mesmo quando
  *   `recoverable=false`
+ * @property {number} [stateTtlMs] - TTL do estado por sessão/contexto. Padrão: 30 minutos
+ * @property {number} [maxTrackedContexts] - Máximo de circuitos retidos. Padrão: 1000
+ * @property {() => number} [now] - Relógio injetável para testes
  */
 
 /**
  * @typedef {object} CircuitBreakerState
  * @property {number} failures - Número de falhas consecutivas
  * @property {number | null} openedAt - Timestamp de quando o circuito foi aberto, ou null se fechado
+ * @property {number} lastTouchedAt - Último acesso para expiração oportunista
  */
+
+/**
+ * @typedef {object} RetryState
+ * @property {number} count
+ * @property {number} lastTouchedAt
+ */
+
+const DEFAULT_HOOK_STATE_TTL_MS = 30 * 60 * 1000;
+const DEFAULT_MAX_TRACKED_CONTEXTS = 1000;
+
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @param {number} max
+ * @returns {number}
+ */
+function normalizePositiveInteger(value, fallback, max) {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 && parsed <= max ? parsed : fallback;
+}
+
+/**
+ * Remove estados expirados. Como o mapa é mantido em ordem LRU, a varredura termina no primeiro item ainda válido.
+ *
+ * @template {{ lastTouchedAt: number }} T
+ * @param {Map<string, T>} states
+ * @param {number} now
+ * @param {number} ttlMs
+ */
+function pruneExpiredStates(states, now, ttlMs) {
+    for (const [key, state] of states) {
+        if (now - state.lastTouchedAt < ttlMs) break;
+        states.delete(key);
+    }
+}
+
+/**
+ * @template {{ lastTouchedAt: number }} T
+ * @param {Map<string, T>} states
+ * @param {string} key
+ * @param {T} state
+ * @param {number} maxEntries
+ */
+function setBoundedState(states, key, state, maxEntries) {
+    states.delete(key);
+    while (states.size >= maxEntries) {
+        const oldestKey = states.keys().next().value;
+        if (typeof oldestKey !== 'string') break;
+        states.delete(oldestKey);
+    }
+    states.set(key, state);
+}
 
 /**
  * @param {string} contextKey
@@ -90,14 +149,19 @@ function buildScopedContextKey(contextKey, invocation) {
 export function createErrorHandler(opts = {}) {
     const { maxRetries = 3, recoverableContexts = [], abortContexts = [], onError } = opts;
     const strategy = opts.strategy ?? null;
+    const stateTtlMs = normalizePositiveInteger(opts.stateTtlMs, DEFAULT_HOOK_STATE_TTL_MS, 24 * 60 * 60 * 1000);
+    const maxTrackedContexts = normalizePositiveInteger(opts.maxTrackedContexts, DEFAULT_MAX_TRACKED_CONTEXTS, 10_000);
+    const now = opts.now ?? Date.now;
 
-    /** @type {Map<string, number>} */
+    /** @type {Map<string, RetryState>} */
     const retryCounts = new Map();
 
     return function onErrorOccurred(input, invocation) {
         const { error, errorContext, recoverable } = input;
         const contextKey = errorContext ?? 'unknown';
         const scopedContextKey = buildScopedContextKey(contextKey, invocation);
+        const nowMs = now();
+        pruneExpiredStates(retryCounts, nowMs, stateTtlMs);
 
         if (onError) {
             try {
@@ -108,7 +172,8 @@ export function createErrorHandler(opts = {}) {
         }
 
         // Verificar se atingiu o limite de retries para este contexto
-        const currentRetries = retryCounts.get(scopedContextKey) ?? 0;
+        const currentState = retryCounts.get(scopedContextKey);
+        const currentRetries = currentState?.count ?? 0;
 
         if (strategy !== null) {
             /** @type {ErrorStrategy} */
@@ -128,7 +193,12 @@ export function createErrorHandler(opts = {}) {
                     retryCounts.delete(scopedContextKey);
                     return { errorHandling: 'abort' };
                 }
-                retryCounts.set(scopedContextKey, currentRetries + 1);
+                setBoundedState(
+                    retryCounts,
+                    scopedContextKey,
+                    { count: currentRetries + 1, lastTouchedAt: nowMs },
+                    maxTrackedContexts,
+                );
                 log(
                     'DEBUG',
                     `[hooks/error-handler] retry ${currentRetries + 1}/${maxRetries} para '${contextKey}' (session=${invocation?.sessionId ?? 'global'})`,
@@ -146,6 +216,7 @@ export function createErrorHandler(opts = {}) {
 
         // Estratégia padrão — contextual por recoverable + listas
         if (abortContexts.includes(contextKey)) {
+            retryCounts.delete(scopedContextKey);
             log('WARN', `[hooks/error-handler] abort forçado para contexto '${contextKey}': ${error}`);
             return { errorHandling: 'abort' };
         }
@@ -160,7 +231,12 @@ export function createErrorHandler(opts = {}) {
                 retryCounts.delete(scopedContextKey);
                 return { errorHandling: 'abort' };
             }
-            retryCounts.set(scopedContextKey, currentRetries + 1);
+            setBoundedState(
+                retryCounts,
+                scopedContextKey,
+                { count: currentRetries + 1, lastTouchedAt: nowMs },
+                maxTrackedContexts,
+            );
             log(
                 'DEBUG',
                 `[hooks/error-handler] recuperável: retry ${currentRetries + 1}/${maxRetries} para '${contextKey}' (session=${invocation?.sessionId ?? 'global'})`,
@@ -168,6 +244,7 @@ export function createErrorHandler(opts = {}) {
             return { errorHandling: 'retry', retryCount: currentRetries + 1 };
         }
 
+        retryCounts.delete(scopedContextKey);
         log('WARN', `[hooks/error-handler] irrecuperável '${contextKey}': ${error} — abort`);
         return { errorHandling: 'abort' };
     };
@@ -200,19 +277,29 @@ export function createCircuitBreakerHandler(opts = {}) {
         fatalPatterns = [],
         transientPatterns = [],
     } = opts;
+    const stateTtlMs = normalizePositiveInteger(opts.stateTtlMs, DEFAULT_HOOK_STATE_TTL_MS, 24 * 60 * 60 * 1000);
+    const maxTrackedContexts = normalizePositiveInteger(opts.maxTrackedContexts, DEFAULT_MAX_TRACKED_CONTEXTS, 10_000);
+    const now = opts.now ?? Date.now;
 
     /** @type {Map<string, CircuitBreakerState>} */
     const circuits = new Map();
 
     /**
      * @param {string} contextKey
+     * @param {number} nowMs
      * @returns {CircuitBreakerState}
      */
-    function getState(contextKey) {
-        if (!circuits.has(contextKey)) {
-            circuits.set(contextKey, { failures: 0, openedAt: null });
+    function getState(contextKey, nowMs) {
+        pruneExpiredStates(circuits, nowMs, stateTtlMs);
+        const existing = circuits.get(contextKey);
+        if (existing) {
+            existing.lastTouchedAt = nowMs;
+            setBoundedState(circuits, contextKey, existing, maxTrackedContexts);
+            return existing;
         }
-        return /** @type {CircuitBreakerState} */ (circuits.get(contextKey));
+        const state = { failures: 0, openedAt: null, lastTouchedAt: nowMs };
+        setBoundedState(circuits, contextKey, state, maxTrackedContexts);
+        return state;
     }
 
     /**
@@ -229,8 +316,7 @@ export function createCircuitBreakerHandler(opts = {}) {
         const { error, errorContext, recoverable } = input;
         const contextKey = errorContext ?? 'unknown';
         const scopedContextKey = buildScopedContextKey(contextKey, invocation);
-        const state = getState(scopedContextKey);
-        const now = Date.now();
+        const nowMs = now();
 
         // Notificar callback de tracking (ErrorTracker, etc.)
         if (onError) {
@@ -243,13 +329,16 @@ export function createCircuitBreakerHandler(opts = {}) {
 
         // Fatal pattern → abort imediato sem retry
         if (fatalPatterns.length > 0 && matchesAny(error, fatalPatterns)) {
+            circuits.delete(scopedContextKey);
             log('WARN', `[hooks/circuit-breaker] padrão fatal detectado em '${contextKey}': ${error} — abort`);
             return { errorHandling: 'abort' };
         }
 
+        const state = getState(scopedContextKey, nowMs);
+
         // Circuito aberto?
         if (state.openedAt !== null) {
-            const elapsed = now - state.openedAt;
+            const elapsed = nowMs - state.openedAt;
             if (elapsed < resetAfterMs) {
                 log(
                     'WARN',
@@ -285,14 +374,16 @@ export function createCircuitBreakerHandler(opts = {}) {
                     'WARN',
                     `[hooks/circuit-breaker] irrecuperável '${contextKey}' (session=${invocation?.sessionId ?? 'global'}): ${error} — abort`,
                 );
+                circuits.delete(scopedContextKey);
                 return { errorHandling: 'abort' };
             }
         }
 
         state.failures++;
+        state.lastTouchedAt = nowMs;
 
         if (state.failures >= maxRetries) {
-            state.openedAt = now;
+            state.openedAt = nowMs;
             log(
                 'WARN',
                 `[hooks/circuit-breaker] circuito ABRINDO para '${contextKey}' (session=${invocation?.sessionId ?? 'global'}) após ${state.failures} falhas`,

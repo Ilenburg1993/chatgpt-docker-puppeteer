@@ -112,6 +112,23 @@ function inferToolHandlerSuccess(result) {
 
 const SPECIAL_OPERATION_SCOPES = new Set(['bridge', 'io', 'channel']);
 const LEGACY_TOOL_SCOPES = new Set(['sdk', 'shell']);
+const MAX_TOOL_TELEMETRY_ENTRIES = 1000;
+const MAX_TOOL_TELEMETRY_ALIASES = 32;
+
+/**
+ * @param {Record<string, unknown>} target
+ * @param {string} key
+ * @param {unknown} value
+ * @returns {void}
+ */
+function setOwnEnumerable(target, key, value) {
+    Object.defineProperty(target, key, {
+        value,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+    });
+}
 
 /**
  * @param {string} observedName
@@ -181,9 +198,21 @@ export function createToolTelemetryStore() {
                 lastOk: true,
             };
             stats.set(identity.key, current);
+            while (stats.size > MAX_TOOL_TELEMETRY_ENTRIES) {
+                const oldest = stats.keys().next().value;
+                if (typeof oldest !== 'string') break;
+                stats.delete(oldest);
+            }
             return current;
         }
+        stats.delete(identity.key);
+        stats.set(identity.key, current);
         current.aliases.add(identity.observedName);
+        while (current.aliases.size > MAX_TOOL_TELEMETRY_ALIASES) {
+            const oldest = current.aliases.values().next().value;
+            if (typeof oldest !== 'string') break;
+            current.aliases.delete(oldest);
+        }
         return current;
     }
 
@@ -212,7 +241,7 @@ export function createToolTelemetryStore() {
         /** @type {ReturnType<ToolTelemetryStore['getToolStats']>} */
         const result = {};
         for (const [name, current] of stats) {
-            result[name] = {
+            setOwnEnumerable(result, name, {
                 name,
                 kind: current.kind,
                 canonicalName: current.canonicalName,
@@ -227,7 +256,7 @@ export function createToolTelemetryStore() {
                 lastCallIso: current.lastCallMs > 0 ? new Date(current.lastCallMs).toISOString() : null,
                 lastBlockedIso: current.lastBlockedMs > 0 ? new Date(current.lastBlockedMs).toISOString() : null,
                 lastOk: current.lastOk,
-            };
+            });
         }
         return result;
     }
@@ -237,7 +266,7 @@ export function createToolTelemetryStore() {
         /** @type {ReturnType<ToolTelemetryStore['getToolMetricsSummary']>} */
         const summary = {};
         for (const [name, current] of stats) {
-            summary[name] = {
+            setOwnEnumerable(summary, name, {
                 totalCalls: current.calls,
                 successCount: current.calls - current.errors,
                 errorCount: current.errors,
@@ -245,42 +274,52 @@ export function createToolTelemetryStore() {
                 kind: current.kind,
                 aliases: [...current.aliases].sort(),
                 latency: current.histogram.snapshot(),
-            };
+            });
         }
         return summary;
     }
 
     /** @type {ToolTelemetryStore['getStatsByCategory']} */
     function getStatsByCategory() {
-        /** @type {Record<
-    string,
-    { totalCalls: number; totalErrors: number; totalBlocked: number; totalMs: number; tools: string[] }
->} */
+        /**
+         * @type {Record<
+         *     string,
+         *     { totalCalls: number; totalErrors: number; totalBlocked: number; totalMs: number; tools: string[] }
+         * >}
+         */
         const categories = {};
         for (const [name, current] of stats) {
             const category = current.kind || 'tool';
-            if (!categories[category]) {
-                categories[category] = { totalCalls: 0, totalErrors: 0, totalBlocked: 0, totalMs: 0, tools: [] };
+            let aggregate = categories[category];
+            if (!aggregate) {
+                aggregate = {
+                    totalCalls: 0,
+                    totalErrors: 0,
+                    totalBlocked: 0,
+                    totalMs: 0,
+                    tools: [],
+                };
+                setOwnEnumerable(categories, category, aggregate);
             }
-            categories[category].totalCalls += current.calls;
-            categories[category].totalErrors += current.errors;
-            categories[category].totalBlocked += current.blocked;
-            categories[category].totalMs += current.totalMs;
-            if (!categories[category].tools.includes(name)) {
-                categories[category].tools.push(name);
+            aggregate.totalCalls += current.calls;
+            aggregate.totalErrors += current.errors;
+            aggregate.totalBlocked += current.blocked;
+            aggregate.totalMs += current.totalMs;
+            if (!aggregate.tools.includes(name)) {
+                aggregate.tools.push(name);
             }
         }
 
         /** @type {ReturnType<ToolTelemetryStore['getStatsByCategory']>} */
         const result = {};
         for (const [category, aggregate] of Object.entries(categories)) {
-            result[category] = {
+            setOwnEnumerable(result, category, {
                 totalCalls: aggregate.totalCalls,
                 totalErrors: aggregate.totalErrors,
                 totalBlocked: aggregate.totalBlocked,
                 avgLatencyMs: aggregate.totalCalls > 0 ? Math.round(aggregate.totalMs / aggregate.totalCalls) : 0,
                 tools: aggregate.tools.sort(),
-            };
+            });
         }
         return result;
     }

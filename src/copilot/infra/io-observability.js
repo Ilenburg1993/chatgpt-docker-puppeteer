@@ -25,6 +25,8 @@ const lifecycleChannels = {
     scan: ioScanChannel,
 };
 
+const MAX_IO_LATENCY_HISTOGRAMS = 64;
+
 /** @type {Map<string, ReturnType<typeof createHistogram>>} */
 const _latencyHistograms = new Map();
 
@@ -35,6 +37,10 @@ const _latencyHistograms = new Map();
 function getOrCreateHistogram(operation) {
     let histogram = _latencyHistograms.get(operation);
     if (!histogram) {
+        if (_latencyHistograms.size >= MAX_IO_LATENCY_HISTOGRAMS) {
+            const oldest = _latencyHistograms.keys().next().value;
+            if (typeof oldest === 'string') _latencyHistograms.delete(oldest);
+        }
         histogram = createHistogram();
         _latencyHistograms.set(operation, histogram);
     }

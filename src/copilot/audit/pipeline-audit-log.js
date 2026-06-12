@@ -160,16 +160,16 @@ export function createAuditLog(opts = {}) {
     /** @type {string[]} */
     const _toolWriteQueue = [];
     let _flushScheduled = false;
+    /** @type {Promise<void>} */
+    let _toolFlushChain = Promise.resolve();
 
-    /** @returns {void} */
-    function scheduleFlushTool() {
-        if (_flushScheduled) return;
-        _flushScheduled = true;
-        setImmediate(async () => {
-            _flushScheduled = false;
-            const batch = _toolWriteQueue.splice(0);
-            if (!batch.length) return;
-            try {
+    /** @returns {Promise<void>} */
+    function flushToolQueue() {
+        const batch = _toolWriteQueue.splice(0);
+        if (!batch.length) return _toolFlushChain;
+        _toolFlushChain = _toolFlushChain
+            .catch(() => undefined)
+            .then(async () => {
                 await mkdir(dirname(/** @type {string} */ (toolAuditFile)), { recursive: true });
                 try {
                     const { size } = await stat(toolAuditFile);
@@ -178,9 +178,23 @@ export function createAuditLog(opts = {}) {
                     logSwallowed(e, 'audit.pipeline.statToolAudit');
                 }
                 await appendFile(toolAuditFile, batch.join(''), 'utf8');
-            } catch (e) {
+            })
+            .catch((e) => {
                 logSwallowed(e, 'audit.pipeline.flushToolAudit');
-            }
+            })
+            .finally(() => {
+                if (_toolWriteQueue.length > 0) scheduleFlushTool();
+            });
+        return _toolFlushChain;
+    }
+
+    /** @returns {void} */
+    function scheduleFlushTool() {
+        if (_flushScheduled) return;
+        _flushScheduled = true;
+        setImmediate(() => {
+            _flushScheduled = false;
+            void flushToolQueue();
         });
     }
 
@@ -221,14 +235,18 @@ export function createAuditLog(opts = {}) {
 
     /** @returns {Promise<void>} */
     async function flush() {
-        if (_buffer.length === 0) return;
-        try {
-            await mkdir(dirname(/** @type {string} */ (auditFile)), { recursive: true });
-            const lines = _buffer.map((e) => JSON.stringify(redactAuditEntry(e))).join('\n') + '\n';
-            await appendFile(auditFile, lines, 'utf8');
-        } catch (err) {
-            log('WARN', `[audit/pipeline] flush failed: ${toError(err).message ?? err}`);
+        if (_buffer.length > 0) {
+            try {
+                await mkdir(dirname(/** @type {string} */ (auditFile)), { recursive: true });
+                const lines = _buffer.map((e) => JSON.stringify(redactAuditEntry(e))).join('\n') + '\n';
+                await appendFile(auditFile, lines, 'utf8');
+            } catch (err) {
+                log('WARN', `[audit/pipeline] flush failed: ${toError(err).message ?? err}`);
+            }
         }
+        _flushScheduled = false;
+        await flushToolQueue();
+        await _toolFlushChain;
     }
 
     /** @returns {void} */

@@ -71,6 +71,24 @@ describe('terminal/sdk-interactions', () => {
         expect(listTerminalElicitations()).toHaveLength(2);
     });
 
+    it('limita pendências abandonadas e remove pendências expiradas', () => {
+        const base = Date.now();
+        for (let idx = 0; idx < 140; idx += 1) {
+            recordTerminalElicitationPending({
+                requestId: `pending-${idx}`,
+                message: `Pergunta ${idx}`,
+                mode: 'form',
+                timestamp: base + idx,
+            });
+        }
+
+        expect(listTerminalElicitations()).toHaveLength(128);
+        expect(getTerminalElicitation('pending-0')).toBeNull();
+
+        pruneTerminalSdkInteractions(base + 25 * 60 * 60_000);
+        expect(listTerminalElicitations()).toHaveLength(0);
+    });
+
     it('identifica eco imediato de resposta humana de ask_user em assistant.message', () => {
         const base = Date.now();
         recordTerminalUserInputRequested({

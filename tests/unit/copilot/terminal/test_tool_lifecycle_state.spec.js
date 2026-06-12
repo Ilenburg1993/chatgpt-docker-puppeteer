@@ -169,4 +169,57 @@ describe('terminal/state/tool-lifecycle-state', () => {
         expect(projection.active[0]?.toolName).toBe('ask_user');
         expect(projection.active[0]?.requestId).toBe('ask-1');
     });
+
+    it('limita e expira diagnostics ativos abandonados', () => {
+        const base = Date.now();
+        /**
+         * @param {number} index
+         * @param {number} timestamp
+         */
+        const event = (index, timestamp) => ({
+            type: /** @type {const} */ ('start'),
+            source: /** @type {const} */ ('sdk'),
+            timestamp,
+            traceId: `turn:${index}`,
+            turnId: String(index),
+            toolCallId: `call-${index}`,
+            toolName: 'read_file_content',
+            rawToolName: null,
+            requestId: `req-${index}`,
+            operation: 'read',
+            path: `file-${index}.js`,
+            target: `file-${index}.js`,
+            fileTargets: [`file-${index}.js`],
+            urlTargets: [],
+            searchTerms: [],
+            lineRange: null,
+            patchFiles: [],
+            progress: null,
+            progressMessage: null,
+            partialOutput: null,
+            success: null,
+            durationMs: null,
+            ioEngine: null,
+            ioTargetKind: null,
+            ioBytesRead: null,
+            ioBytesWritten: null,
+            ioRiskClass: null,
+            ioTargets: [],
+            ioError: null,
+            correlatedToolCallId: null,
+            correlatedToolName: null,
+        });
+
+        recordTerminalToolLifecycleDiagnostic(event(0, base));
+        recordTerminalToolLifecycleDiagnostic(event(1, base + 11 * 60_000));
+        expect(readTerminalToolLifecycleProjection().active.map((entry) => entry.toolCallId)).toEqual(['call-1']);
+
+        for (let index = 2; index < 140; index += 1) {
+            recordTerminalToolLifecycleDiagnostic(event(index, base + 11 * 60_000 + index));
+        }
+        const projection = readTerminalToolLifecycleProjection(200);
+        expect(projection.summary.active).toBe(128);
+        expect(projection.active.some((entry) => entry.toolCallId === 'call-1')).toBe(false);
+        expect(projection.active.some((entry) => entry.toolCallId === 'call-139')).toBe(true);
+    });
 });

@@ -8,7 +8,7 @@
  * @module copilot/terminal/state/sse-event-archive
  */
 
-import { mkdir, appendFile, open } from 'node:fs/promises';
+import { appendFile, mkdir, open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretRecord } from '../../core/security/redaction.js';
@@ -36,6 +36,8 @@ const TERMINAL_SSE_EVENT_ARCHIVE_BATCH_LINES = 256;
 
 /** @type {string | null} */
 let _terminalSseEventArchivePath = null;
+/** @type {string | null} */
+let _terminalSseEventArchiveDay = null;
 /** @type {string | null} */
 let _terminalSseEventArchiveError = null;
 /** @type {string[]} */
@@ -69,15 +71,16 @@ function resolveTerminalSseEventArchiveDir() {
  * @returns {string}
  */
 function resolveTerminalSseEventArchivePath() {
-    if (_terminalSseEventArchivePath) return _terminalSseEventArchivePath;
     const day = new Date().toISOString().slice(0, 10);
+    if (_terminalSseEventArchivePath && _terminalSseEventArchiveDay === day) return _terminalSseEventArchivePath;
+    _terminalSseEventArchiveDay = day;
     _terminalSseEventArchivePath = join(resolveTerminalSseEventArchiveDir(), `terminal-sse-events-${day}.jsonl`);
     return _terminalSseEventArchivePath;
 }
 
 /**
  * @param {string} filePath
- * @param {number} [n=50]
+ * @param {number} [n=50] Default is `50`
  * @returns {Promise<string[]>}
  */
 async function readLastNLines(filePath, n = 50) {
@@ -132,7 +135,7 @@ function isRecord(value) {
 /**
  * @param {unknown} value
  * @param {string[]} fieldNames
- * @param {number} [depth=0]
+ * @param {number} [depth=0] Default is `0`
  * @returns {string | null}
  */
 function findNestedStringField(value, fieldNames, depth = 0) {
@@ -151,7 +154,13 @@ function findNestedStringField(value, fieldNames, depth = 0) {
 
 /**
  * @param {Record<string, unknown>} data
- * @returns {{ source: string | null; eventSource: string | null; traceId: string | null; turnId: string | null; hubSessionId: string | null }}
+ * @returns {{
+ *     source: string | null;
+ *     eventSource: string | null;
+ *     traceId: string | null;
+ *     turnId: string | null;
+ *     hubSessionId: string | null;
+ * }}
  */
 function projectTerminalSseEventEnvelope(data) {
     return {
@@ -225,7 +234,8 @@ export async function flushTerminalSseEventArchive() {
  */
 export function recordTerminalSseEventArchive(input) {
     if (!isTerminalSseEventArchiveEnabled()) return { queued: false, path: null, error: null };
-    const data = input.data && typeof input.data === 'object' ? /** @type {Record<string, unknown>} */ (input.data) : {};
+    const data =
+        input.data && typeof input.data === 'object' ? /** @type {Record<string, unknown>} */ (input.data) : {};
     const safeData = redactSecretRecord(data);
     const timestamp = input.timestamp ?? Date.now();
     const envelope = projectTerminalSseEventEnvelope(safeData);
@@ -301,11 +311,25 @@ export function readTerminalSseEventArchiveState() {
  *     requestId?: string | null;
  *     hubSessionId?: string | null;
  * }} [input]
- * @returns {Promise<{ entries: TerminalSseEventArchiveEntry[]; state: ReturnType<typeof readTerminalSseEventArchiveState>; filters: { limit: number; event: string | null; traceId: string | null; turnId: string | null; source: string | null; toolCallId: string | null; requestId: string | null; hubSessionId: string | null } }>}
+ * @returns {Promise<{
+ *     entries: TerminalSseEventArchiveEntry[];
+ *     state: ReturnType<typeof readTerminalSseEventArchiveState>;
+ *     filters: {
+ *         limit: number;
+ *         event: string | null;
+ *         traceId: string | null;
+ *         turnId: string | null;
+ *         source: string | null;
+ *         toolCallId: string | null;
+ *         requestId: string | null;
+ *         hubSessionId: string | null;
+ *     };
+ * }>}
  */
 export async function readTerminalSseEventArchiveTail(input = {}) {
     await flushTerminalSseEventArchive();
-    const limit = Number.isFinite(input.limit) && Number(input.limit) > 0 ? Math.min(500, Math.floor(Number(input.limit))) : 20;
+    const limit =
+        Number.isFinite(input.limit) && Number(input.limit) > 0 ? Math.min(500, Math.floor(Number(input.limit))) : 20;
     const filters = {
         limit,
         event: readOptionalString(input.event),
@@ -348,7 +372,8 @@ export async function readTerminalSseEventArchiveTail(input = {}) {
             }
             if (
                 filters.requestId &&
-                findNestedStringField(entry.payload, ['requestId', 'request_id', 'pendingRequestId']) !== filters.requestId
+                findNestedStringField(entry.payload, ['requestId', 'request_id', 'pendingRequestId']) !==
+                    filters.requestId
             ) {
                 continue;
             }
@@ -370,6 +395,7 @@ export async function readTerminalSseEventArchiveTail(input = {}) {
  */
 export function resetTerminalSseEventArchiveForTests() {
     _terminalSseEventArchivePath = null;
+    _terminalSseEventArchiveDay = null;
     _terminalSseEventArchiveError = null;
     _terminalSseEventArchiveQueue = [];
     _terminalSseEventArchiveFlushScheduled = false;

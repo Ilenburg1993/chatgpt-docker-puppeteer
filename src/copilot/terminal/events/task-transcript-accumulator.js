@@ -13,6 +13,8 @@ import { getBusy } from '../../presentation/state/index.js';
 import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
 
 const DEFAULT_TASK_TRANSCRIPT_CATASTROPHIC_CHARS = 32 * 1024 * 1024;
+const DEFAULT_TASK_TRANSCRIPT_MAX_ENTRIES = 64;
+const DEFAULT_TASK_TRANSCRIPT_TOTAL_CHARS = 64 * 1024 * 1024;
 const INTERNAL_TASK_KEY = 'internal-task';
 
 /**
@@ -51,6 +53,8 @@ function taskKeyToId(taskKey) {
 /**
  * @param {{
  *     maxChars?: number;
+ *     maxEntries?: number;
+ *     maxTotalChars?: number;
  *     isBusy?: () => boolean;
  *     renderTranscript?: typeof renderTerminalAssistantTranscript;
  * }} [options]
@@ -65,10 +69,29 @@ function taskKeyToId(taskKey) {
  */
 export function createTaskTranscriptAccumulator(options = {}) {
     const maxChars = Math.max(1, Math.floor(options.maxChars ?? DEFAULT_TASK_TRANSCRIPT_CATASTROPHIC_CHARS));
+    const maxEntries = Math.max(1, Math.floor(options.maxEntries ?? DEFAULT_TASK_TRANSCRIPT_MAX_ENTRIES));
+    const maxTotalChars = Math.max(1, Math.floor(options.maxTotalChars ?? DEFAULT_TASK_TRANSCRIPT_TOTAL_CHARS));
     const isBusy = options.isBusy ?? getBusy;
     const renderTranscript = options.renderTranscript ?? renderTerminalAssistantTranscript;
     /** @type {Map<string, TaskTranscriptEntry>} */
     const entries = new Map();
+
+    /**
+     * @param {string} taskKey
+     * @returns {void}
+     */
+    function makeRoomFor(taskKey) {
+        while (!entries.has(taskKey) && entries.size >= maxEntries) {
+            const oldest = entries.keys().next().value;
+            if (typeof oldest !== 'string') break;
+            entries.delete(oldest);
+        }
+        while ([...entries.values()].reduce((sum, entry) => sum + entry.content.length, 0) >= maxTotalChars) {
+            const oldest = entries.keys().next().value;
+            if (typeof oldest !== 'string' || (oldest === taskKey && entries.size === 1)) break;
+            entries.delete(oldest);
+        }
+    }
 
     /**
      * @param {string | null | undefined} taskId
@@ -77,15 +100,27 @@ export function createTaskTranscriptAccumulator(options = {}) {
      */
     function record(taskId, chunk) {
         const taskKey = getTaskTranscriptKey(taskId);
-        const entry = entries.get(taskKey) ?? { content: '', truncated: false, seenWhileBusy: false, liveRendered: false };
+        makeRoomFor(taskKey);
+        const entry = entries.get(taskKey) ?? {
+            content: '',
+            truncated: false,
+            seenWhileBusy: false,
+            liveRendered: false,
+        };
         entry.seenWhileBusy = entry.seenWhileBusy || isBusy();
         if (entry.content.length < maxChars) {
-            const remaining = maxChars - entry.content.length;
+            const totalWithoutEntry =
+                [...entries.values()].reduce((sum, item) => sum + item.content.length, 0) - entry.content.length;
+            const remaining = Math.max(
+                0,
+                Math.min(maxChars - entry.content.length, maxTotalChars - totalWithoutEntry - entry.content.length),
+            );
             entry.content += chunk.slice(0, remaining);
             if (chunk.length > remaining) entry.truncated = true;
         } else {
             entry.truncated = true;
         }
+        entries.delete(taskKey);
         entries.set(taskKey, entry);
     }
 
@@ -95,8 +130,15 @@ export function createTaskTranscriptAccumulator(options = {}) {
      */
     function markLiveRendered(taskId) {
         const taskKey = getTaskTranscriptKey(taskId);
-        const entry = entries.get(taskKey) ?? { content: '', truncated: false, seenWhileBusy: false, liveRendered: false };
+        makeRoomFor(taskKey);
+        const entry = entries.get(taskKey) ?? {
+            content: '',
+            truncated: false,
+            seenWhileBusy: false,
+            liveRendered: false,
+        };
         entry.liveRendered = true;
+        entries.delete(taskKey);
         entries.set(taskKey, entry);
     }
 

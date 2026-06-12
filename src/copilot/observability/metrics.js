@@ -357,6 +357,8 @@ export function createMetricsStore(options = {}) {
     let _snapshotTimer = null;
     /** @type {string | null} */
     let _snapshotTimerId = null;
+    /** @type {Promise<void>} */
+    let _snapshotWriteChain = Promise.resolve();
 
     /**
      * Inicia snapshot periódico de métricas em arquivo.
@@ -371,18 +373,23 @@ export function createMetricsStore(options = {}) {
         if (ms <= 0) return;
         const resolvedDir = logDir ?? (COPILOT_LOG_DIR || './var/logs/copilot');
         _snapshotTimerId = `metrics.snapshot:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-        _snapshotTimer = registerInterval(_snapshotTimerId, () => {
-            void (async () => {
-                try {
-                    // FINDING-P5-3: usar imports estáticos em vez de dynamic import a cada tick
-                    await _mkdir(resolvedDir, { recursive: true });
-                    const line = JSON.stringify({ _snapshot: new Date().toISOString(), ...getSummary() }) + '\n';
-                    await _appendFile(_join(resolvedDir, 'metrics.jsonl'), line, 'utf8');
-                } catch (e) {
-                    logSwallowed(e, 'metrics.snapshot');
-                }
-            })();
-        }, ms);
+        _snapshotTimer = registerInterval(
+            _snapshotTimerId,
+            () => {
+                const line = JSON.stringify({ _snapshot: new Date().toISOString(), ...getSummary() }) + '\n';
+                _snapshotWriteChain = _snapshotWriteChain
+                    .catch(() => undefined)
+                    .then(async () => {
+                        // FINDING-P5-3: usar imports estáticos em vez de dynamic import a cada tick
+                        await _mkdir(resolvedDir, { recursive: true });
+                        await _appendFile(_join(resolvedDir, 'metrics.jsonl'), line, 'utf8');
+                    })
+                    .catch((e) => {
+                        logSwallowed(e, 'metrics.snapshot');
+                    });
+            },
+            ms,
+        );
         if (_snapshotTimer.unref) _snapshotTimer.unref();
     }
 

@@ -87,6 +87,19 @@ describe('bus-actions (FAIXA-L15)', () => {
             assert.equal(recent.length, 3);
             ct.unsub();
         });
+
+        it('limita eventos retidos dentro de uma única correlação', () => {
+            const ct = createCorrelationTracer({ bus, maxEventsPerCorrelation: 3 });
+            for (let i = 0; i < 5; i++) {
+                bus.emit({ type: `test:event:${i}`, timestamp: Date.now(), correlationId: 'same-correlation' });
+            }
+
+            assert.deepEqual(
+                ct.getTraces('same-correlation').map((entry) => entry.type),
+                ['test:event:2', 'test:event:3', 'test:event:4'],
+            );
+            ct.unsub();
+        });
     });
 
     describe('ErrorAlerter', () => {

@@ -68,6 +68,21 @@ describe('tool-stats', () => {
         });
     });
 
+    describe('cardinality bounds', () => {
+        it('limita tools dinâmicas e preserva chaves especiais como propriedades próprias', () => {
+            for (let index = 0; index < 1100; index += 1) {
+                recordToolCall(`dynamic_${index}`, index, true);
+            }
+            recordToolCall('__proto__', 1, true);
+
+            const stats = /** @type {any} */ (getToolStats());
+            expect(Object.keys(stats)).toHaveLength(1000);
+            expect(stats.dynamic_0).toBeUndefined();
+            expect(stats.__proto__.calls).toBe(1);
+            expect(Object.prototype.hasOwnProperty.call(stats, '__proto__')).toBe(true);
+        });
+    });
+
     // ── getToolStats ──────────────────────────────────────────────────────
 
     describe('getToolStats', () => {

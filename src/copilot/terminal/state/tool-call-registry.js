@@ -23,6 +23,7 @@
 const IN_FLIGHT_TTL_MS = 2 * 60_000;
 /** TTL para entries de completion recente (janela de dedup cross-path). */
 const RECENTLY_COMPLETED_TTL_MS = 2 * 60_000;
+const REQUEST_ID_ALIAS_MAX = 1024;
 
 /**
  * @typedef {'native' | 'external' | 'mcp'} ToolCallKind
@@ -134,6 +135,8 @@ export function createToolCallRegistry() {
 
     /** @type {Map<string, string>} requestId → toolName (para external tools sem toolCallId explícito) */
     const _requestIdToName = new Map();
+    /** @type {Map<string, number>} requestId → registration timestamp */
+    const _requestIdRecordedAt = new Map();
 
     /** @type {Map<string, ToolCallEntry>} requestId → ToolCallEntry */
     const _requestIdToEntry = new Map();
@@ -146,6 +149,11 @@ export function createToolCallRegistry() {
         for (const [id, entry] of _active.entries()) {
             if (now - entry.lastSignalAt > IN_FLIGHT_TTL_MS) {
                 _active.delete(id);
+                if (entry.requestId) {
+                    _requestIdToEntry.delete(entry.requestId);
+                    _requestIdToName.delete(entry.requestId);
+                    _requestIdRecordedAt.delete(entry.requestId);
+                }
             }
         }
         for (const [id, entry] of _recentlyCompleted.entries()) {
@@ -162,6 +170,20 @@ export function createToolCallRegistry() {
             if (now - ts > IN_FLIGHT_TTL_MS) {
                 _liveNarrationSuppressedIds.delete(id);
             }
+        }
+        for (const [requestId, ts] of _requestIdRecordedAt.entries()) {
+            if (now - ts > IN_FLIGHT_TTL_MS) {
+                _requestIdRecordedAt.delete(requestId);
+                _requestIdToName.delete(requestId);
+                _requestIdToEntry.delete(requestId);
+            }
+        }
+        while (_requestIdRecordedAt.size > REQUEST_ID_ALIAS_MAX) {
+            const oldest = _requestIdRecordedAt.keys().next().value;
+            if (typeof oldest !== 'string') break;
+            _requestIdRecordedAt.delete(oldest);
+            _requestIdToName.delete(oldest);
+            _requestIdToEntry.delete(oldest);
         }
     }
 
@@ -299,6 +321,7 @@ export function createToolCallRegistry() {
         if (opts.requestId) {
             _requestIdToEntry.set(opts.requestId, entry);
             _requestIdToName.set(opts.requestId, toolName);
+            _requestIdRecordedAt.set(opts.requestId, now);
         }
         return entry;
     }
@@ -412,6 +435,7 @@ export function createToolCallRegistry() {
         if (entry.requestId) {
             _requestIdToEntry.delete(entry.requestId);
             _requestIdToName.delete(entry.requestId);
+            _requestIdRecordedAt.delete(entry.requestId);
         }
         return entry;
     }
@@ -422,6 +446,7 @@ export function createToolCallRegistry() {
      */
     function resolveByRequestId(requestId) {
         if (!requestId) return null;
+        pruneStale();
         return _requestIdToEntry.get(requestId) ?? null;
     }
 
@@ -547,7 +572,10 @@ export function createToolCallRegistry() {
      * @returns {void}
      */
     function markRequestIdForExternalTool(requestId, toolName) {
+        pruneStale();
         _requestIdToName.set(requestId, toolName);
+        _requestIdRecordedAt.set(requestId, Date.now());
+        pruneStale();
     }
 
     /**
@@ -556,6 +584,7 @@ export function createToolCallRegistry() {
      */
     function resolveNameByRequestId(requestId) {
         if (!requestId) return null;
+        pruneStale();
         return _requestIdToName.get(requestId) ?? null;
     }
 
@@ -605,6 +634,7 @@ export function createToolCallRegistry() {
         _recentCompletionKeys.clear();
         _liveNarrationSuppressedIds.clear();
         _requestIdToName.clear();
+        _requestIdRecordedAt.clear();
         _requestIdToEntry.clear();
     }
 

@@ -234,4 +234,26 @@ describe('F49 — createJsonlWriter', () => {
         expect(written).toContain('[redacted]');
         expect(written).toContain('"tokens":42');
     });
+
+    it('serializa ciclos append/rotate e flush aguarda a cadeia ativa', async () => {
+        let releaseFirst = () => {};
+        mockFs.appendFile.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    releaseFirst = resolve;
+                }),
+        );
+        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/serialized.jsonl' });
+
+        writer.write({ sequence: 1 });
+        await vi.waitFor(() => expect(mockFs.appendFile).toHaveBeenCalledTimes(1));
+        writer.write({ sequence: 2 });
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(mockFs.appendFile).toHaveBeenCalledTimes(1);
+
+        releaseFirst();
+        await writer.flush();
+        expect(mockFs.appendFile).toHaveBeenCalledTimes(2);
+        expect(String(mockFs.appendFile.mock.calls[1]?.[1])).toContain('"sequence":2');
+    });
 });

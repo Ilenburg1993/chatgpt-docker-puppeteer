@@ -60,4 +60,36 @@ describe('observability/event-collector redaction', () => {
         assert.match(persisted, /\[redacted\]/);
         assert.match(persisted, /"type":"session.error"/);
     });
+
+    it('não sobrepõe ciclos de flush enquanto um append está em voo', async () => {
+        let releaseFirst = () => {};
+        fsMocks.appendFile.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    releaseFirst = resolve;
+                }),
+        );
+        const { createEventCollector } = await import('../../../../src/copilot/observability/event-collector.js');
+        /** @type {Record<string, ((event: any) => void)[]>} */
+        const handlers = {};
+        const session = {
+            on: (/** @type {string} */ type, /** @type {(event: any) => void} */ handler) => {
+                (handlers[type] ??= []).push(handler);
+                return () => {};
+            },
+        };
+        createEventCollector({ persist: true, persistTypes: ['session.error'] }).attach(
+            /** @type {any} */ (session),
+            'sdk-serialized',
+        );
+
+        handlers['session.error']?.[0]?.({ type: 'session.error', data: { message: 'first' } });
+        await vi.waitFor(() => assert.equal(fsMocks.appendFile.mock.calls.length, 1));
+        handlers['session.error']?.[0]?.({ type: 'session.error', data: { message: 'second' } });
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(fsMocks.appendFile.mock.calls.length, 1);
+
+        releaseFirst();
+        await vi.waitFor(() => assert.equal(fsMocks.appendFile.mock.calls.length, 2));
+    });
 });

@@ -9,11 +9,11 @@ import assert from 'node:assert/strict';
 import { beforeAll, describe, it } from 'vitest';
 
 describe('HandoffManager', async () => {
-    /** @type {typeof import('#copilot/agent/infra/handoff-manager').HandoffManager} */
+    /** @type {typeof import('../../../src/copilot/agent/infra/handoff-manager.js').HandoffManager} */
     let HandoffManager;
 
     beforeAll(async () => {
-        ({ HandoffManager } = await import('#copilot/agent/infra/handoff-manager'));
+        ({ HandoffManager } = await import('../../../src/copilot/agent/infra/handoff-manager.js'));
     });
 
     describe('receive()', () => {
@@ -26,6 +26,7 @@ describe('HandoffManager', async () => {
             assert.equal(request.reason, 'test');
             assert.equal(request.status, 'pending');
             assert.ok(request.receivedAt > 0);
+            assert.ok(request.expiresAt > request.receivedAt);
         });
 
         it('deve emitir evento handoff.received', () => {
@@ -126,6 +127,24 @@ describe('HandoffManager', async () => {
                 mgr.accept(req.id);
             }
             assert.equal(mgr.getHistory().length, 3);
+        });
+
+        it('deve expirar e podar handoffs pendentes sem timer por item', () => {
+            let nowMs = 10_000;
+            const mgr = new HandoffManager({ pendingTtlMs: 1000, now: () => nowMs });
+            const request = mgr.receive({ fromAgent: 'a', toAgent: 'b' });
+            let rejectedReason = '';
+            mgr.on('handoff.rejected', (event) => {
+                rejectedReason = event.rejectReason;
+            });
+
+            nowMs = request.expiresAt;
+            assert.equal(mgr.getPending().length, 0);
+            const [expired] = mgr.getHistory();
+            assert.equal(expired.status, 'expired');
+            assert.equal(expired.expirationReason, 'pending-ttl-exceeded');
+            assert.equal(rejectedReason, 'pending-ttl-exceeded');
+            assert.equal(mgr.accept(request.id).accepted, false);
         });
     });
 });

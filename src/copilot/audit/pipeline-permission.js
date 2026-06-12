@@ -9,7 +9,7 @@
  * @see EventBus
  */
 
-import { logSwallowed, toError } from '#copilot/core';
+import { SHUTDOWN_PRIORITY, logSwallowed, registerShutdownHandler, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk/constants';
 import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
@@ -54,6 +54,8 @@ const PERMISSIONS_ROTATE_LOG = TOOL_PERMISSIONS_LOG + '.1';
 const MAX_LOG_BYTES = TOOL_AUDIT_MAX_LOG_BYTES;
 
 let _permLogBytes = -1;
+/** @type {Promise<void>} */
+let _permLogChain = Promise.resolve();
 
 /**
  * Nomes de ferramentas consideradas de alto risco.
@@ -100,8 +102,9 @@ export function logToolAudit(entry) {
     const line = JSON.stringify({ type: 'tool.permission', ...entry, ts: new Date().toISOString() }) + '\n';
     const lineBytes = utf8ByteLength(line, 'permission audit line');
 
-    void (async () => {
-        try {
+    _permLogChain = _permLogChain
+        .catch(() => undefined)
+        .then(async () => {
             await mkdir(dirname(TOOL_PERMISSIONS_LOG), { recursive: true });
             if (_permLogBytes < 0) {
                 try {
@@ -117,11 +120,19 @@ export function logToolAudit(entry) {
             }
             await appendFile(TOOL_PERMISSIONS_LOG, line, 'utf8');
             _permLogBytes += lineBytes;
-        } catch (e) {
+        })
+        .catch((e) => {
             logSwallowed(e, 'audit.pipeline.logPermission');
-        }
-    })();
+        });
 }
+
+registerShutdownHandler(
+    'audit.permission.flush',
+    async () => {
+        await _permLogChain;
+    },
+    SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
+);
 
 /**
  * @param {unknown} kind

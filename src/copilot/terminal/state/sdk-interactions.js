@@ -9,6 +9,7 @@
  * @module copilot/terminal/sdk-interactions
  */
 
+import { summarizeModelGatewaySdkQuotaSnapshots } from '#copilot/model-gateway';
 import {
     classifyTerminalUserInputQuestionKind,
     normalizeTerminalElicitationCompletedEvent,
@@ -18,7 +19,6 @@ import {
     normalizeTerminalUserInputCompletedEvent,
     normalizeTerminalUserInputRequestedEvent,
 } from '../frontend/gateways/sdk-events/index.js';
-import { summarizeModelGatewaySdkQuotaSnapshots } from '#copilot/model-gateway';
 
 /** @typedef {'pending' | 'completed' | 'cleared'} SdkInteractionStatus */
 
@@ -28,6 +28,8 @@ import { summarizeModelGatewaySdkQuotaSnapshots } from '#copilot/model-gateway';
 
 const MAX_COMPLETED_INTERACTIONS_PER_KIND = 100;
 const COMPLETED_INTERACTION_TTL_MS = 30 * 60_000;
+const MAX_PENDING_INTERACTIONS_PER_KIND = 128;
+const PENDING_INTERACTION_TTL_MS = 24 * 60 * 60_000;
 const USER_INPUT_ECHO_SUPPRESSION_TTL_MS = 10_000;
 
 let _syntheticInteractionSeq = 0;
@@ -151,6 +153,8 @@ function nextSyntheticInteractionId(prefix) {
 function pruneCompletedInteractionMap(map, latestId, now = Date.now()) {
     /** @type {{ id: string; status: SdkInteractionStatus; createdAt: number; completedAt: number | null }[]} */
     const completed = [];
+    /** @type {{ id: string; status: SdkInteractionStatus; createdAt: number; completedAt: number | null }[]} */
+    const pending = [];
     /** @type {{ id: string; status: SdkInteractionStatus; createdAt: number; completedAt: number | null } | null} */
     let latestRemaining = null;
     for (const entry of map.values()) {
@@ -159,6 +163,8 @@ function pruneCompletedInteractionMap(map, latestId, now = Date.now()) {
         }
         if (entry.status !== 'pending') {
             completed.push(entry);
+        } else {
+            pending.push(entry);
         }
     }
     completed.sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
@@ -170,6 +176,15 @@ function pruneCompletedInteractionMap(map, latestId, now = Date.now()) {
         }
     }
     for (const entry of completed.slice(MAX_COMPLETED_INTERACTIONS_PER_KIND)) {
+        toDelete.add(entry.id);
+    }
+    pending.sort((a, b) => b.createdAt - a.createdAt);
+    for (const entry of pending) {
+        if (now - entry.createdAt > PENDING_INTERACTION_TTL_MS) {
+            toDelete.add(entry.id);
+        }
+    }
+    for (const entry of pending.slice(MAX_PENDING_INTERACTIONS_PER_KIND)) {
         toDelete.add(entry.id);
     }
     for (const id of toDelete) {
@@ -559,7 +574,12 @@ export function recordTerminalUserInputCompleted(evt) {
  * @param {{ answer: string; runtimeId?: string | null; requestId?: string | null; ts?: number }} input
  * @returns {void}
  */
-export function recordTerminalUserInputAnswerEchoGuard({ answer, runtimeId = null, requestId = null, ts = Date.now() }) {
+export function recordTerminalUserInputAnswerEchoGuard({
+    answer,
+    runtimeId = null,
+    requestId = null,
+    ts = Date.now(),
+}) {
     const normalizedAnswer = normalizeEchoComparableText(answer);
     if (!normalizedAnswer) return;
     _recentUserInputAnswerEchoGuards.unshift({

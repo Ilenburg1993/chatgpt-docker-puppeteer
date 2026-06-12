@@ -9,6 +9,8 @@
  */
 
 const MAX_RECENT_TOOL_LIFECYCLE = 48;
+const MAX_ACTIVE_TOOL_LIFECYCLE = 128;
+const ACTIVE_TOOL_LIFECYCLE_TTL_MS = 10 * 60_000;
 
 /**
  * @typedef {{
@@ -75,7 +77,7 @@ function buildLifecycleKey(event) {
 function buildDiagnostic(event, previous) {
     const now = Number.isFinite(event.timestamp) ? event.timestamp : Date.now();
     const completed = event.type === 'complete' || event.type === 'external_completed';
-    const success = typeof event.success === 'boolean' ? event.success : previous?.success ?? null;
+    const success = typeof event.success === 'boolean' ? event.success : (previous?.success ?? null);
     return {
         key: buildLifecycleKey(event),
         type: event.type,
@@ -105,13 +107,13 @@ function buildDiagnostic(event, previous) {
                 : (previous?.directoryTargets ?? []),
         commands: (event.commands?.length ?? 0) > 0 ? [...(event.commands ?? [])] : (previous?.commands ?? []),
         filters: (event.filters?.length ?? 0) > 0 ? [...(event.filters ?? [])] : (previous?.filters ?? []),
-        resultCount: typeof event.resultCount === 'number' ? event.resultCount : previous?.resultCount ?? null,
+        resultCount: typeof event.resultCount === 'number' ? event.resultCount : (previous?.resultCount ?? null),
         resultSummary: nonEmptyString(event.resultSummary) ?? previous?.resultSummary ?? null,
         primaryTargetKind: nonEmptyString(event.primaryTargetKind) ?? previous?.primaryTargetKind ?? null,
-        progress: typeof event.progress === 'number' ? event.progress : previous?.progress ?? null,
+        progress: typeof event.progress === 'number' ? event.progress : (previous?.progress ?? null),
         progressMessage: nonEmptyString(event.progressMessage) ?? previous?.progressMessage ?? null,
         success,
-        durationMs: typeof event.durationMs === 'number' ? event.durationMs : previous?.durationMs ?? null,
+        durationMs: typeof event.durationMs === 'number' ? event.durationMs : (previous?.durationMs ?? null),
         startedAt: previous?.startedAt ?? (completed ? null : now),
         updatedAt: now,
         completedAt: completed ? now : null,
@@ -128,10 +130,29 @@ function pushRecent(entry) {
 }
 
 /**
+ * @param {number} now
+ * @returns {void}
+ */
+function pruneActive(now) {
+    for (const [key, entry] of _active) {
+        if (now - entry.updatedAt > ACTIVE_TOOL_LIFECYCLE_TTL_MS) {
+            _active.delete(key);
+        }
+    }
+    while (_active.size > MAX_ACTIVE_TOOL_LIFECYCLE) {
+        const oldest = _active.keys().next().value;
+        if (typeof oldest !== 'string') break;
+        _active.delete(oldest);
+    }
+}
+
+/**
  * @param {import('../events/tool-lifecycle-event.js').ToolLifecycleEvent} event
  * @returns {void}
  */
 export function recordTerminalToolLifecycleDiagnostic(event) {
+    const now = Number.isFinite(event.timestamp) ? event.timestamp : Date.now();
+    pruneActive(now);
     const key = buildLifecycleKey(event);
     const previous = _active.get(key) ?? null;
     const diagnostic = buildDiagnostic(event, previous);
@@ -145,10 +166,11 @@ export function recordTerminalToolLifecycleDiagnostic(event) {
         return;
     }
     _active.set(key, diagnostic);
+    pruneActive(now);
 }
 
 /**
- * @param {number} [limit=8]
+ * @param {number} [limit=8] Default is `8`
  * @returns {{
  *     active: TerminalToolLifecycleDiagnostic[];
  *     recent: TerminalToolLifecycleDiagnostic[];

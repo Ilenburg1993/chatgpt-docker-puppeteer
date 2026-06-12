@@ -22,7 +22,7 @@ import { log } from '../logger.js';
  */
 
 /**
- * @param {{ bus: EventBus; maxTraces?: number }} deps
+ * @param {{ bus: EventBus; maxTraces?: number; maxEventsPerCorrelation?: number }} deps
  * @returns {{
  *     unsub: () => void;
  *     hasAction: true;
@@ -31,7 +31,7 @@ import { log } from '../logger.js';
  *     getRecentTraces: (limit?: number) => TraceEntry[];
  * }}
  */
-export function createCorrelationTracer({ bus, maxTraces = 500 }) {
+export function createCorrelationTracer({ bus, maxTraces = 500, maxEventsPerCorrelation = 100 }) {
     /** @type {Map<string, TraceEntry[]>} */
     const byCorrelation = new Map();
     /** @type {TraceEntry[]} */
@@ -60,6 +60,9 @@ export function createCorrelationTracer({ bus, maxTraces = 500 }) {
                     byCorrelation.set(entry.correlationId, list);
                 }
                 list.push(entry);
+                if (list.length > maxEventsPerCorrelation) {
+                    list.splice(0, list.length - maxEventsPerCorrelation);
+                }
 
                 // Evict old correlations if map grows too large
                 if (byCorrelation.size > maxTraces) {

@@ -2,16 +2,15 @@
 /**
  * Renderizador canônico de texto público incremental da LLM-B fora de um turno explícito.
  *
- * O SDK 0.3.x separa `assistant.message_delta` (texto público) de `assistant.reasoning_delta`
- * (thinking). Este módulo renderiza apenas o texto público. O thinking segue restrito ao histórico
- * consultável por `/thinking`.
+ * O SDK 0.3.x separa `assistant.message_delta` (texto público) de `assistant.reasoning_delta` (thinking). Este módulo
+ * renderiza apenas o texto público. O thinking segue restrito ao histórico consultável por `/thinking`.
  *
  * @module copilot/terminal/events/public-assistant-stream
  */
 
 import { getShowStreaming } from '../../presentation/state/index.js';
-import { readTerminalDialogStreamMeta } from '../frontend/gateways/index.js';
 import { createDeltaCallback, createDisplayState, renderStreamingFooter } from '../dialog/io/index.js';
+import { readTerminalDialogStreamMeta } from '../frontend/gateways/index.js';
 import {
     completeTerminalTurnMaterialization,
     readTerminalTurnMaterialization,
@@ -28,6 +27,25 @@ import { claimTerminalAssistantTranscript } from './assistant-transcript-rendere
 
 /** @type {Map<string, PublicAssistantStream>} */
 const streams = new Map();
+const PUBLIC_ASSISTANT_STREAM_TTL_MS = 10 * 60_000;
+const MAX_PUBLIC_ASSISTANT_STREAMS = 64;
+
+/**
+ * @param {number} [now]
+ * @returns {void}
+ */
+function prunePublicAssistantStreams(now = Date.now()) {
+    for (const [key, stream] of streams) {
+        if (now - stream.startedAt > PUBLIC_ASSISTANT_STREAM_TTL_MS) {
+            streams.delete(key);
+        }
+    }
+    while (streams.size >= MAX_PUBLIC_ASSISTANT_STREAMS) {
+        const oldest = streams.keys().next().value;
+        if (typeof oldest !== 'string') break;
+        streams.delete(oldest);
+    }
+}
 
 /**
  * @param {string | null | undefined} key
@@ -45,6 +63,7 @@ function getOrCreateStream(streamKey) {
     const current = streams.get(streamKey);
     if (current) return current;
 
+    prunePublicAssistantStreams();
     const { model, reasoningEffort } = readTerminalDialogStreamMeta();
     const startedAt = Date.now();
     const stream = {
@@ -126,3 +145,9 @@ export function finalizeAllPublicAssistantStreams() {
 export function resetPublicAssistantStreamsForTests() {
     streams.clear();
 }
+
+export const __test__ = {
+    maxStreams: MAX_PUBLIC_ASSISTANT_STREAMS,
+    prunePublicAssistantStreams,
+    size: () => streams.size,
+};

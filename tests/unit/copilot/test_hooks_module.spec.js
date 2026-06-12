@@ -55,6 +55,7 @@ import {
     createSensitiveDataRedactor,
     createSessionHooks,
     createStaticInputHandler,
+    createTimingEnricherHook,
     fallback,
     getAuditTail,
     globalAuditBuffer,
@@ -95,6 +96,7 @@ const anyCreateArgSanitizerHook = /** @type {any} */ (createArgSanitizerHook);
 const anyCreateBlocklistHook = /** @type {any} */ (createBlocklistHook);
 const anyCreateAllowlistHook = /** @type {any} */ (createAllowlistHook);
 const anyCreateStaticInputHandler = /** @type {any} */ (createStaticInputHandler);
+const anyCreateTimingEnricherHook = /** @type {any} */ (createTimingEnricherHook);
 const anyCreateAuditHooks = /** @type {any} */ (createAuditHooks);
 const anyCreateDenyAllHooks = /** @type {any} */ (createDenyAllHooks);
 const anyCreateSafeFactoryHooks = /** @type {any} */ (createSafeHooks);
@@ -425,6 +427,62 @@ describe('hooks/tool-interceptor (Gap 3 — onPostToolUse additionalContext)', (
         const result = await callUnaryHook(hook, postInput('read_file'));
         assert.ok(result.additionalContext?.includes('read_file'));
     });
+
+    it('timing preserva chamadas concorrentes da mesma tool e sessão', async () => {
+        let nowMs = 0;
+        const timing = anyCreateTimingEnricherHook({ now: () => nowMs });
+        const input = { ...preInput('read_file'), sessionId: 'runtime-session' };
+
+        await callHook(timing.onPreToolUse, input, inv('host-session'));
+        nowMs = 10;
+        await callHook(timing.onPreToolUse, input, inv('host-session'));
+        nowMs = 20;
+        const first = await callHook(
+            timing.onPostToolUse,
+            { ...postInput('read_file'), sessionId: 'runtime-session' },
+            inv('host-session'),
+        );
+        nowMs = 30;
+        const second = await callHook(
+            timing.onPostToolUse,
+            { ...postInput('read_file'), sessionId: 'runtime-session' },
+            inv('host-session'),
+        );
+
+        assert.match(first.additionalContext, /20ms$/);
+        assert.match(second.additionalContext, /20ms$/);
+    });
+
+    it('timing limpa chamadas que terminam em falha', async () => {
+        let nowMs = 0;
+        const timing = anyCreateTimingEnricherHook({ now: () => nowMs });
+        await callHook(timing.onPreToolUse, preInput('shell'), inv('session'));
+        nowMs = 7;
+        const failure = await callHook(
+            timing.onPostToolUseFailure,
+            { ...preInput('shell'), error: 'failed' },
+            inv('session'),
+        );
+        const duplicateTerminalEvent = await callHook(timing.onPostToolUse, postInput('shell'), inv('session'));
+
+        assert.match(failure.additionalContext, /falhou após 7ms$/);
+        assert.deepStrictEqual(duplicateTerminalEvent, {});
+    });
+
+    it('timing limita execuções pendentes e remove a mais antiga', async () => {
+        let nowMs = 0;
+        const timing = anyCreateTimingEnricherHook({ maxPending: 1, now: () => nowMs });
+        await callHook(timing.onPreToolUse, preInput('first'), inv('session'));
+        nowMs = 1;
+        await callHook(timing.onPreToolUse, preInput('second'), inv('session'));
+        nowMs = 2;
+
+        const evicted = await callHook(timing.onPostToolUse, postInput('first'), inv('session'));
+        const retained = await callHook(timing.onPostToolUse, postInput('second'), inv('session'));
+
+        assert.deepStrictEqual(evicted, {});
+        assert.match(retained.additionalContext, /1ms$/);
+    });
 });
 
 // ─── Seção 5: user-input.js (Gap 5) ──────────────────────────────────────────
@@ -538,9 +596,10 @@ describe('hooks/bus (Gap 6 — HookBus)', () => {
             { toolName: 'shell', toolArgs: {}, timestamp: 1_710_000_000_000, cwd: '/tmp' },
             'sess-10',
         );
-        const input = /** @type {{ sessionId?: string; timestamp?: unknown; workingDirectory?: string; cwd?: string }} */ (
-            normalized
-        );
+        const input =
+            /** @type {{ sessionId?: string; timestamp?: unknown; workingDirectory?: string; cwd?: string }} */ (
+                normalized
+            );
         assert.strictEqual(input.sessionId, 'sess-10');
         assert.ok(input.timestamp instanceof Date);
         assert.strictEqual(input.workingDirectory, '/tmp');
@@ -571,7 +630,9 @@ describe('hooks/bus (Gap 6 — HookBus)', () => {
 
         assert.strictEqual(inputs.length, 2);
         for (const input of inputs) {
-            const record = /** @type {{ sessionId?: string; timestamp?: unknown; workingDirectory?: string }} */ (input);
+            const record = /** @type {{ sessionId?: string; timestamp?: unknown; workingDirectory?: string }} */ (
+                input
+            );
             assert.strictEqual(record.sessionId, 'sess-mcp');
             assert.ok(record.timestamp instanceof Date);
             assert.strictEqual(record.workingDirectory, '/repo');
@@ -947,6 +1008,42 @@ describe('createErrorHandler', () => {
         assert.strictEqual(firstOtherSession.errorHandling, 'retry');
         assert.strictEqual(firstOtherSession.retryCount, 1);
     });
+
+    it('expira retryCount inativo pelo TTL configurado', async () => {
+        let nowMs = 0;
+        const handler = createErrorHandler({
+            strategy: 'retry',
+            maxRetries: 1,
+            stateTtlMs: 10,
+            now: () => nowMs,
+        });
+
+        const first = await handler(errorInput({ error: 'oops', errorContext: 'tool' }), { sessionId: 's' });
+        nowMs = 11;
+        const afterExpiry = await handler(errorInput({ error: 'oops', errorContext: 'tool' }), { sessionId: 's' });
+
+        assert.strictEqual(first.errorHandling, 'retry');
+        assert.strictEqual(afterExpiry.errorHandling, 'retry');
+        assert.strictEqual(afterExpiry.retryCount, 1);
+    });
+
+    it('limita contextos de retry pela ordem LRU', async () => {
+        const handler = createErrorHandler({
+            strategy: 'retry',
+            maxRetries: 1,
+            maxTrackedContexts: 2,
+        });
+
+        await handler(errorInput({ error: 'oops', errorContext: 'tool' }), { sessionId: 's1' });
+        await handler(errorInput({ error: 'oops', errorContext: 'tool' }), { sessionId: 's2' });
+        await handler(errorInput({ error: 'oops', errorContext: 'tool' }), { sessionId: 's3' });
+        const evictedSession = await handler(errorInput({ error: 'oops', errorContext: 'tool' }), {
+            sessionId: 's1',
+        });
+
+        assert.strictEqual(evictedSession.errorHandling, 'retry');
+        assert.strictEqual(evictedSession.retryCount, 1);
+    });
 });
 
 describe('createCircuitBreakerHandler', () => {
@@ -1043,6 +1140,40 @@ describe('createCircuitBreakerHandler', () => {
         assert.strictEqual(firstSession.retryCount, 1);
         assert.strictEqual(secondSession.errorHandling, 'retry');
         assert.strictEqual(secondSession.retryCount, 1);
+    });
+
+    it('expira circuitos inativos pelo TTL configurado', async () => {
+        let nowMs = 0;
+        const handler = createCircuitBreakerHandler({
+            maxRetries: 2,
+            resetAfterMs: 10_000,
+            stateTtlMs: 10,
+            now: () => nowMs,
+        });
+
+        const first = await handler(errorInput({ error: 'e', errorContext: 'ctx' }), { sessionId: 's' });
+        nowMs = 11;
+        const afterExpiry = await handler(errorInput({ error: 'e', errorContext: 'ctx' }), { sessionId: 's' });
+
+        assert.strictEqual(first.retryCount, 1);
+        assert.strictEqual(afterExpiry.errorHandling, 'retry');
+        assert.strictEqual(afterExpiry.retryCount, 1);
+    });
+
+    it('limita circuitos pela ordem LRU', async () => {
+        const handler = createCircuitBreakerHandler({
+            maxRetries: 2,
+            resetAfterMs: 10_000,
+            maxTrackedContexts: 2,
+        });
+
+        await handler(errorInput({ error: 'e', errorContext: 'ctx' }), { sessionId: 's1' });
+        await handler(errorInput({ error: 'e', errorContext: 'ctx' }), { sessionId: 's2' });
+        await handler(errorInput({ error: 'e', errorContext: 'ctx' }), { sessionId: 's3' });
+        const evictedSession = await handler(errorInput({ error: 'e', errorContext: 'ctx' }), { sessionId: 's1' });
+
+        assert.strictEqual(evictedSession.errorHandling, 'retry');
+        assert.strictEqual(evictedSession.retryCount, 1);
     });
 });
 
@@ -1222,14 +1353,16 @@ describe('hooks/audit › createAuditPostToolHandler', () => {
 
     it('chama o logger externo com a entrada', async () => {
         const buf = new AuditRingBuffer({ capacity: 10 });
-        /** @type {{
-    toolName: string;
-    toolArgs: unknown;
-    toolResult: unknown;
-    sessionId: string;
-    ts: string;
-    durationMs?: number;
-}[]} */
+        /**
+         * @type {{
+         *     toolName: string;
+         *     toolArgs: unknown;
+         *     toolResult: unknown;
+         *     sessionId: string;
+         *     ts: string;
+         *     durationMs?: number;
+         * }[]}
+         */
         const captured = [];
         const handler = createAuditPostToolHandler((e) => captured.push(e), buf);
         await handler(

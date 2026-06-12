@@ -3,14 +3,15 @@
  * Contrato: SSE do terminal grava replay global uma única vez por broadcast canônico.
  */
 
-import { describe, expect, it } from 'vitest';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getSseClients, getTerminalReplayBuffer } from '../../../src/copilot/infra/sse/state.js';
 import {
-    readTerminalSseEventArchiveTail,
+    flushTerminalSseEventArchive,
     readTerminalSseEventArchiveState,
+    readTerminalSseEventArchiveTail,
     recordTerminalSseEventArchive,
     resetTerminalSseEventArchiveForTests,
 } from '../../../src/copilot/terminal/state/index.js';
@@ -36,6 +37,10 @@ function createRawClient(writes) {
 }
 
 describe('terminal SSE replay canonical', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it('usa um único replay eventId para raw clients e fanout /events', async () => {
         const previousArchiveDir = process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'];
         const archiveDir = await mkdtemp(join(tmpdir(), 'copilot-terminal-sse-archive-'));
@@ -157,6 +162,34 @@ describe('terminal SSE replay canonical', () => {
             } else {
                 process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'] = previousArchiveDir;
             }
+            await rm(archiveDir, { force: true, recursive: true });
+        }
+    });
+
+    it('rotaciona o arquivo diário quando o processo atravessa meia-noite', async () => {
+        const previousArchiveDir = process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'];
+        const archiveDir = await mkdtemp(join(tmpdir(), 'copilot-terminal-sse-daily-'));
+        process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'] = archiveDir;
+        resetTerminalSseEventArchiveForTests();
+        vi.useFakeTimers();
+        try {
+            vi.setSystemTime(new Date('2026-06-11T23:59:59.000Z'));
+            recordTerminalSseEventArchive({ event: 'day.one', eventId: 1, data: {} });
+            await flushTerminalSseEventArchive();
+
+            vi.setSystemTime(new Date('2026-06-12T00:00:01.000Z'));
+            recordTerminalSseEventArchive({ event: 'day.two', eventId: 2, data: {} });
+            await flushTerminalSseEventArchive();
+
+            expect((await readdir(archiveDir)).sort()).toEqual([
+                'terminal-sse-events-2026-06-11.jsonl',
+                'terminal-sse-events-2026-06-12.jsonl',
+            ]);
+        } finally {
+            resetTerminalSseEventArchiveForTests();
+            vi.useRealTimers();
+            if (previousArchiveDir === undefined) delete process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'];
+            else process.env['TERMINAL_SSE_EVENT_ARCHIVE_DIR'] = previousArchiveDir;
             await rm(archiveDir, { force: true, recursive: true });
         }
     });

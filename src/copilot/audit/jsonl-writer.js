@@ -33,16 +33,16 @@ export function createJsonlWriter(opts) {
     const _queue = [];
     let _flushScheduled = false;
     let _sizeBytes = -1;
+    /** @type {Promise<void>} */
+    let _flushChain = Promise.resolve();
 
-    /** @returns {void} */
-    function scheduleFlush() {
-        if (_flushScheduled) return;
-        _flushScheduled = true;
-        setImmediate(async () => {
-            _flushScheduled = false;
-            const batch = _queue.splice(0);
-            if (!batch.length) return;
-            try {
+    /** @returns {Promise<void>} */
+    function flushQueued() {
+        const batch = _queue.splice(0);
+        if (!batch.length) return _flushChain;
+        _flushChain = _flushChain
+            .catch(() => undefined)
+            .then(async () => {
                 await mkdir(dirname(filePath), { recursive: true });
                 if (_sizeBytes < 0) {
                     try {
@@ -60,10 +60,40 @@ export function createJsonlWriter(opts) {
                 }
                 await appendFile(filePath, data, 'utf8');
                 _sizeBytes += dataBytes;
-            } catch (e) {
+            })
+            .catch((e) => {
                 logSwallowed(e, 'audit.jsonlWriter.write');
-            }
+            })
+            .finally(() => {
+                if (_queue.length > 0) scheduleFlush();
+            });
+        return _flushChain;
+    }
+
+    /** @returns {void} */
+    function scheduleFlush() {
+        if (_flushScheduled) return;
+        _flushScheduled = true;
+        setImmediate(() => {
+            _flushScheduled = false;
+            void flushQueued();
         });
+    }
+
+    /** @returns {Promise<void>} */
+    async function flush() {
+        while (_flushScheduled || _queue.length > 0) {
+            _flushScheduled = false;
+            await flushQueued();
+        }
+        await _flushChain;
+        if (_queue.length > 0) {
+            try {
+                await flush();
+            } catch {
+                // Errors are observed by flushQueued.
+            }
+        }
     }
 
     return {
@@ -77,5 +107,6 @@ export function createJsonlWriter(opts) {
             _queue.push(JSON.stringify(redactSecretRecord(/** @type {Record<string, unknown>} */ (record))) + '\n');
             scheduleFlush();
         },
+        flush,
     };
 }

@@ -17,8 +17,8 @@ import {
 import {
     beginTerminalTurnMaterialization,
     clearTerminalTurnMaterialization,
-    recordTerminalTurnDelta,
     getTerminalAssistantMessageMaterializationDecision,
+    recordTerminalTurnDelta,
     shouldSuppressTerminalAssistantMessageAsMaterializedTurn,
 } from '../../../src/copilot/terminal/state/turn-materialization-state.js';
 
@@ -157,9 +157,7 @@ describe('terminal/task-stream-events.js — contrato', () => {
                 source: 'agent',
             }),
         );
-        expect(mocks.println).toHaveBeenCalledWith(
-            expect.stringContaining('preservado sem reenvio automático'),
-        );
+        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('preservado sem reenvio automático'));
     });
 
     it('consome chunk em task.reasoning como thinking colapsado de tarefa em segundo plano', async () => {
@@ -213,6 +211,18 @@ describe('terminal/task-stream-events.js — contrato', () => {
         expect(stdoutSpy.mock.calls.map(([chunk]) => String(chunk)).join('')).toContain(
             'Teste canônico repetido e validado',
         );
+        stdoutSpy.mockRestore();
+    });
+
+    it('limita streams públicos abandonados que nunca recebem finalize', async () => {
+        const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+        const stream = await import('../../../src/copilot/terminal/events/public-assistant-stream.js');
+
+        for (let i = 0; i < stream.__test__.maxStreams + 10; i++) {
+            stream.renderPublicAssistantStreamDelta({ key: `abandoned:${i}`, chunk: `chunk-${i}` });
+        }
+
+        expect(stream.__test__.size()).toBe(stream.__test__.maxStreams);
         stdoutSpy.mockRestore();
     });
 

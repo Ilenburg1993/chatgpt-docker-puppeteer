@@ -88,20 +88,44 @@ export function getCompactionHistory(sessionId) {
 /** @type {string[]} */
 const _writeQueue = [];
 let _flushScheduled = false;
+/** @type {Promise<void>} */
+let _flushChain = Promise.resolve();
+
+/** @returns {Promise<void>} */
+function flushEventQueue() {
+    const batch = _writeQueue.splice(0);
+    if (!batch.length) return _flushChain;
+    _flushChain = _flushChain
+        .catch(() => undefined)
+        .then(async () => {
+            await mkdir(LOGS_DIR, { recursive: true });
+            try {
+                const { size } = await stat(EVENTS_FILE);
+                if (size >= MAX_EVENTS_BYTES) {
+                    await rename(EVENTS_FILE, EVENTS_FILE + '.1');
+                }
+            } catch (e) {
+                logSwallowed(e, 'event-collector.stat');
+            }
+            await appendFile(EVENTS_FILE, batch.join(''), 'utf8');
+        })
+        .catch((e) => {
+            logSwallowed(e, 'event-collector.persist');
+        })
+        .finally(() => {
+            if (_writeQueue.length > 0) scheduleFlush();
+        });
+    return _flushChain;
+}
 
 /**
  * FINDING-P4-3 fix: flush síncrono dos eventos pendentes antes do processo encerrar. Registrado uma única vez como
  * beforeExit handler para não duplicar em múltiplos reloads.
  */
 async function _flushOnExit() {
-    const batch = _writeQueue.splice(0);
-    if (!batch.length) return;
-    try {
-        await mkdir(LOGS_DIR, { recursive: true });
-        await appendFile(EVENTS_FILE, batch.join(''), 'utf8');
-    } catch (e) {
-        logSwallowed(e, 'event-collector.flush');
-    }
+    _flushScheduled = false;
+    await flushEventQueue();
+    await _flushChain;
 }
 
 registerShutdownHandler(
@@ -120,25 +144,9 @@ registerShutdownHandler(
 function scheduleFlush() {
     if (_flushScheduled) return;
     _flushScheduled = true;
-    setImmediate(async () => {
+    setImmediate(() => {
         _flushScheduled = false;
-        const batch = _writeQueue.splice(0);
-        if (!batch.length) return;
-        try {
-            await mkdir(LOGS_DIR, { recursive: true });
-            // LEAK-OBS-001: rotacionar arquivo quando MAX_EVENTS_BYTES é atingido
-            try {
-                const { size } = await stat(EVENTS_FILE);
-                if (size >= MAX_EVENTS_BYTES) {
-                    await rename(EVENTS_FILE, EVENTS_FILE + '.1');
-                }
-            } catch (e) {
-                logSwallowed(e, 'event-collector.stat');
-            }
-            await appendFile(EVENTS_FILE, batch.join(''), 'utf8');
-        } catch (e) {
-            logSwallowed(e, 'event-collector.persist');
-        }
+        void flushEventQueue();
     });
 }
 /**

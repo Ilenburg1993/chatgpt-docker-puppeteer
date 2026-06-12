@@ -24,11 +24,20 @@ import { log } from './logger.js';
  *
  * @typedef {import('./types.js').PostToolUseHookOutput} PostToolUseHookOutput
  *
+ * @typedef {import('./types.js').PostToolUseFailureHandler} PostToolUseFailureHandler
+ *
  * @typedef {import('./types.js').PreToolUseHandler} PreToolUseHandler
  *
  * @typedef {import('./types.js').PostToolUseHandler} PostToolUseHandler
  *
  * @typedef {import('./types.js').InvocationContext} InvocationContext
+ */
+
+/**
+ * @typedef {object} TimingEnricherOptions
+ * @property {number} [stateTtlMs] - TTL de inícios sem evento terminal. Padrão: 30 minutos
+ * @property {number} [maxPending] - Máximo global de execuções pendentes. Padrão: 1000
+ * @property {() => number} [now] - Relógio injetável para testes
  */
 
 /**
@@ -220,34 +229,113 @@ export function createPostToolEnricher(opts = {}) {
  *     const { hooks } = createSomePreset();
  *     const composedHooks = { ...hooks, ...timing };
  *
- * @returns {{ onPreToolUse: PreToolUseHandler; onPostToolUse: PostToolUseHandler }}
+ * @param {TimingEnricherOptions} [opts]
+ * @returns {{
+ *     onPreToolUse: PreToolUseHandler;
+ *     onPostToolUse: PostToolUseHandler;
+ *     onPostToolUseFailure: PostToolUseFailureHandler;
+ * }}
  */
-export function createTimingEnricherHook() {
-    /** @type {Map<string, number>} */
+export function createTimingEnricherHook(opts = {}) {
+    const stateTtlMs =
+        Number.isFinite(opts.stateTtlMs) && Number(opts.stateTtlMs) > 0
+            ? Math.min(24 * 60 * 60 * 1000, Math.floor(Number(opts.stateTtlMs)))
+            : 30 * 60 * 1000;
+    const maxPending =
+        Number.isInteger(opts.maxPending) && Number(opts.maxPending) > 0
+            ? Math.min(10_000, Number(opts.maxPending))
+            : 1000;
+    const now = opts.now ?? Date.now;
+
+    /** @type {Map<string, number[]>} */
     const timings = new Map();
+    let pendingCount = 0;
+
+    /**
+     * @param {{ sessionId?: string; toolName: string }} input
+     * @param {InvocationContext | undefined} invocation
+     * @returns {string}
+     */
+    function timingKey(input, invocation) {
+        return `${input.sessionId ?? invocation?.sessionId ?? ''}:${input.toolName}`;
+    }
+
+    /**
+     * @param {number} nowMs
+     */
+    function pruneExpired(nowMs) {
+        for (const [key, starts] of timings) {
+            while (starts.length > 0 && nowMs - /** @type {number} */ (starts[0]) >= stateTtlMs) {
+                starts.shift();
+                pendingCount -= 1;
+            }
+            if (starts.length === 0) timings.delete(key);
+        }
+    }
+
+    function evictOldest() {
+        /** @type {string | null} */
+        let oldestKey = null;
+        let oldestStartedAt = Number.POSITIVE_INFINITY;
+        for (const [key, starts] of timings) {
+            const startedAt = starts[0];
+            if (startedAt !== undefined && startedAt < oldestStartedAt) {
+                oldestKey = key;
+                oldestStartedAt = startedAt;
+            }
+        }
+        if (oldestKey === null) return;
+        const starts = timings.get(oldestKey);
+        starts?.shift();
+        pendingCount -= 1;
+        if (!starts || starts.length === 0) timings.delete(oldestKey);
+    }
+
+    /**
+     * @param {{ sessionId?: string; toolName: string }} input
+     * @param {InvocationContext | undefined} invocation
+     * @param {string} outcome
+     * @returns {{ additionalContext?: string }}
+     */
+    function finishTiming(input, invocation, outcome) {
+        const nowMs = now();
+        pruneExpired(nowMs);
+        const key = timingKey(input, invocation);
+        const starts = timings.get(key);
+        const startedAt = starts?.shift();
+        if (startedAt === undefined) return {};
+        pendingCount -= 1;
+        if (!starts || starts.length === 0) timings.delete(key);
+        return { additionalContext: `tool '${input.toolName}' ${outcome} ${nowMs - startedAt}ms` };
+    }
 
     const onPreToolUse = /** @type {PreToolUseHandler} */ (
         async function onPreToolUse(input, invocation) {
-            const key = `${invocation?.sessionId ?? ''}:${input.toolName}`;
-            timings.set(key, Date.now());
+            const nowMs = now();
+            pruneExpired(nowMs);
+            while (pendingCount >= maxPending) evictOldest();
+            const key = timingKey(input, invocation);
+            const starts = timings.get(key) ?? [];
+            starts.push(nowMs);
+            timings.set(key, starts);
+            pendingCount += 1;
             return {};
         }
     );
 
     const onPostToolUse = /** @type {PostToolUseHandler} */ (
         async function onPostToolUse(input, invocation) {
-            const key = `${invocation?.sessionId ?? ''}:${input.toolName}`;
-            const t0 = timings.get(key);
-            timings.delete(key); // limpa independentemente para evitar leak
-            if (t0 !== undefined) {
-                const elapsed = Date.now() - t0;
-                return { additionalContext: `tool '${input.toolName}' completada em ${elapsed}ms` };
-            }
-            return {};
+            return finishTiming(input, invocation, 'completada em');
         }
     );
 
-    return { onPreToolUse, onPostToolUse };
+    const onPostToolUseFailure = /** @type {PostToolUseFailureHandler} */ (
+        async function onPostToolUseFailure(input, invocation) {
+            return finishTiming(input, invocation, 'falhou após');
+        }
+    );
+
+    return { onPreToolUse, onPostToolUse, onPostToolUseFailure };
 }
 
 /**

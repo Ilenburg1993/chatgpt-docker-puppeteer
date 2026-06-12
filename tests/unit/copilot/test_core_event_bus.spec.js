@@ -278,6 +278,21 @@ describe('core/event-bus.js › count + stats', () => {
         assert.equal(s['a:x'], 2);
         assert.equal(s['b:y'], 1);
     });
+
+    it('limita cardinalidade dos contadores sem bloquear entrega de eventos', () => {
+        const bus = createEventBus();
+        let delivered = 0;
+        bus.on('*', () => {
+            delivered += 1;
+        });
+        for (let i = 0; i < 1_025; i++) {
+            bus.emit(evt(`dynamic:${i}`));
+        }
+        assert.equal(delivered, 1_025);
+        assert.ok(Object.keys(bus.stats()).length <= 1_000);
+        assert.equal(bus.count('dynamic:0'), 0);
+        assert.equal(bus.count('dynamic:1024'), 1);
+    });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

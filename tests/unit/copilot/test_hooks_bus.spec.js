@@ -33,7 +33,9 @@ describe('HookBus — emissão e escuta', () => {
         assert.ok(received !== null, 'Listener deve ter recebido o evento');
         assert.equal(received.hookName, 'pre_tool_use');
         assert.equal(received.sessionId, 'session-abc');
-        assert.deepEqual(received.input, { tool: 'bash' });
+        assert.equal(received.input.tool, 'bash');
+        assert.equal(received.input.sessionId, 'session-abc');
+        assert.ok(received.input.timestamp instanceof Date);
         assert.equal(received.output, null);
         assert.ok(typeof received.timestamp === 'number', 'Deve conter timestamp');
     });

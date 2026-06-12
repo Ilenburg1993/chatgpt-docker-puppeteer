@@ -16,6 +16,11 @@
  * @module copilot/core/event-bus
  */
 
+const configuredMaxEventCounters = Number(process.env['COPILOT_EVENT_BUS_MAX_COUNTERS'] ?? 1_000);
+const MAX_EVENT_COUNTERS = Number.isFinite(configuredMaxEventCounters)
+    ? Math.max(1, Math.trunc(configuredMaxEventCounters))
+    : 1_000;
+
 /**
  * @typedef {import('../events/base-events.js').BaseEvent} BaseEvent
  */
@@ -185,7 +190,11 @@ export class EventBus {
         /** @type {BaseEvent} */
         const event = /** @type {BaseEvent} */ (/** @type {unknown} */ (rawEvent));
 
-        // Increment counter
+        // Counters are diagnostic, so bound cardinality without affecting event delivery.
+        if (!this.#counters.has(event.type) && this.#counters.size >= MAX_EVENT_COUNTERS) {
+            const oldest = this.#counters.keys().next().value;
+            if (typeof oldest === 'string') this.#counters.delete(oldest);
+        }
         this.#counters.set(event.type, (this.#counters.get(event.type) ?? 0) + 1);
 
         void this.#runMiddlewareChain(event);
