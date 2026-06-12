@@ -20,7 +20,7 @@ Prioridades reais remanescentes:
 2. **P1 — política workspace-bound ainda não está na fachada:** a engine pública valida string/null-byte, mas containment e symlink policy continuam responsabilidade dos adapters.
 3. **P1 — provas de falha ainda são insuficientes:** faltam dois processos reais e crash injection nos pontos de publish/sync/append.
 4. **P1 — freshness do índice ainda depende demais de mtime+size:** mudanças externas same-size/same-mtime podem escapar.
-5. **P2 — dois lock managers coexistem:** `infra/lockfile.js` e `infra/locks/file-resource-lock.js` ainda têm contratos próprios.
+5. **P2 — consolidação de locks concluída, enablement ainda seletivo:** `infra/lockfile.js` virou facade do L1 canônico, mas o lockfile multiprocess continua opt-in nas mutações gerais.
 6. **P2 — observabilidade de contenção ainda é parcial:** há contadores de stale recovery e heartbeat failure, mas não p95/histograma e snapshot de leases.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock intra-processo” ou “snapshot por read/stat paralelo”. O risco técnico dominante migrou de corrupção nas primitivas centrais para append fragmentado, writers fora da fachada, freshness externa e ausência de provas de falha reais.
@@ -217,6 +217,34 @@ Limites remanescentes de IO-038:
 - `observability/logger.js`, `observability/metrics.js` e transcript archive ainda usam append síncrono/direto.
 - Recovery/truncamento explícito da última linha JSONL parcial ainda não é uma primitiva compartilhada.
 - Ainda faltam crash injection e prova multiprocess durante rotate+append.
+
+### 1.7 Status de implementação — lockfile SSOT e recovery JSONL aplicados em 2026-06-12
+
+Consolidação de lock managers:
+
+- `infra/lockfile.js` deixou de manter implementação própria de metadata, stale recovery e aquisição.
+- A facade legado preserva `acquireLock(): Promise<boolean>`, `releaseLock()` e `releaseLockAsync()`, mas adquire lease no `file-resource-lock.js`.
+- O L1 canônico agora aceita `lockPath` físico explícito, preservando callers que tratam o argumento como arquivo de lock.
+- O path legado é normalizado antes de armazenar lease; release relativo/absoluto não deixa heartbeat órfão.
+- Symlinks continuam recusados antes de adquirir ou recuperar stale.
+
+Recovery de leitura JSONL:
+
+- Nova primitiva `infra/io/jsonl-reader.js` lê cauda por blocos, preserva UTF-8 em fronteiras de bloco e parseia registros completos.
+- Cauda parcial inválida é ignorada e reportada por `trailingPartialIgnored`.
+- Audit summary e terminal SSE tail deixaram de duplicar leitura/parse tolerante.
+
+Validação desta onda:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- `lint:copilot`: **PASS**.
+- Testes focados e contratos: **206 passados, 0 falhas**.
+- Provas novas: metadata L1 na facade legado, recusa de symlink, cauda parcial ignorada e último JSON válido sem newline aceito.
+
+Status:
+
+- **IO-039 concluído:** há um SSOT de lockfile; a API legado é somente facade de compatibilidade.
+- **IO-038 permanece parcial:** escrita assíncrona e leitura tolerante estão centralizadas, mas writers síncronos e truncamento físico opcional ainda não.
 
 ---
 
@@ -472,17 +500,17 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-036 | P1 | Snapshot | **Concluído:** snapshot baixo consistente | `FileHandle.stat/read/stat`, confirmação do path e retry | Cache recebe bytes e metadata do mesmo inode/versão | Testar modificação externa durante read |
 | IO-037 | P1 | Invalidation | **Concluído:** derivados são drenados antes do retorno | `invalidateIoCacheTiers*()` chama `flushIoInvalidationQueue()` | Read-after-write não espera debounce | Medir custo sob bursts de mutação |
 | IO-038 | P1 | JSONL | **Parcial:** writer canônico cobre audit, event collector, SSE e MCP | `infra/io/jsonl-file-writer.js`; cursor/requeue corrigidos | Writers síncronos e linha parcial ainda têm semântica própria | Migrar logger/metrics/transcript e centralizar recovery de última linha |
-| IO-039 | P2 | Lock governance | Dois lockfile managers coexistem | `infra/lockfile.js` e `infra/locks/file-resource-lock.js` | Semânticas divergentes e manutenção duplicada | Definir SSOT e migrar o legado gradualmente |
+| IO-039 | P2 | Lock governance | **Concluído:** `file-resource-lock.js` é SSOT | `infra/lockfile.js` delega aquisição ao L1 canônico e preserva API legado | Remove semânticas concorrentes | Manter facade até callers antigos desaparecerem |
 | IO-040 | P2 | Scanner | **Concluído:** tipo básico vem de `Dirent` | `readdir({ withFileTypes:true })`; `lstat` só para arquivo/ambíguo | Reduz syscalls de classificação | Preservar benchmark e testar DT_UNKNOWN |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-040 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040 |
 | Concluído com limite documentado | IO-001, IO-005 |
 | Parcial | IO-002, IO-006, IO-009, IO-023, IO-025, IO-038 |
-| Aberto | IO-010, IO-014, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-029, IO-030, IO-039 |
+| Aberto | IO-010, IO-014, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-029, IO-030 |
 
 ---
 
@@ -667,7 +695,8 @@ A situação ideal é uma infra IO em camadas:
 - [x] Suportar `flush` explícito e classificação `best-effort`/`durable`.
 - [x] Corrigir cursor de persistência do audit ring buffer.
 - [x] Reenfileirar lote SSE/audit/MCP/event collector em falha recuperável.
-- [ ] Recovery de última linha JSONL parcial na leitura.
+- [x] Leitura compartilhada ignora e sinaliza última linha JSONL parcial.
+- [ ] Truncamento físico opcional da última linha parcial sob lock.
 - [ ] Migrar logger/metrics/transcript síncronos ou formalizar allowlist best-effort.
 
 ### Faixa 2 — Lock multiprocess correto
@@ -684,9 +713,9 @@ A situação ideal é uma infra IO em camadas:
 
 #### Fase 2.2 — Consolidação de lock managers
 
-- [ ] Definir `file-resource-lock.js` como SSOT.
-- [ ] Adaptar `infra/lockfile.js` como compat facade ou migrar callsites.
-- [ ] Unificar symlink policy, metadata e stale recovery.
+- [x] Definir `file-resource-lock.js` como SSOT.
+- [x] Adaptar `infra/lockfile.js` como compat facade.
+- [x] Unificar symlink policy, metadata e stale recovery.
 
 #### Fase 2.3 — Workspace-bound IO
 
@@ -794,10 +823,11 @@ Foram concluídos stale recovery/release do L1, move exclusivo, copy staged, sna
 1. [x] criar append canônico com framing, flush configurável e lock único;
 2. [x] corrigir cursor de persistência do audit ring buffer;
 3. [x] reenfileirar lotes SSE/observability/MCP em falha recuperável;
-4. [ ] adicionar recovery de última linha JSONL parcial;
-5. [ ] migrar ou allowlistar writers síncronos restantes;
-6. [ ] consolidar `infra/lockfile.js` sobre o L1 canônico;
-7. [ ] executar provas multiprocess de create/copy/move/write e crash injection nos pontos de publish/sync.
+4. [x] adicionar leitura tolerante/recovery lógico de última linha JSONL parcial;
+5. [ ] adicionar truncamento físico opcional da cauda parcial;
+6. [ ] migrar ou allowlistar writers síncronos restantes;
+7. [x] consolidar `infra/lockfile.js` sobre o L1 canônico;
+8. [ ] executar provas multiprocess de create/copy/move/write e crash injection nos pontos de publish/sync.
 
 ---
 
@@ -876,4 +906,4 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Completar a onda 10.2 com recovery compartilhado da última linha JSONL parcial e decisão explícita sobre logger/metrics/transcript. Em seguida, consolidar `infra/lockfile.js` e iniciar as provas multiprocess/crash-injection.
+Iniciar as provas multiprocess/crash-injection de create/copy/move/write e rotate+append. Em paralelo, decidir explicitamente entre migração e allowlist best-effort para logger/metrics/transcript síncronos.
