@@ -27,6 +27,7 @@ describe('copilot MCP registry', () => {
             'copilot_session_get',
             'copilot_sessions_list',
             'delegate_to_repo_autonomy_runner',
+            'fetch',
             'git_branch_info',
             'git_diff',
             'git_log',
@@ -120,6 +121,7 @@ describe('copilot MCP registry', () => {
             'run_project_doctor',
             'run_typecheck_copilot',
             'run_unit_copilot',
+            'search',
         ]);
     });
 
@@ -132,6 +134,8 @@ describe('copilot MCP registry', () => {
         assert.equal(names.has('mcp_latency_dashboard'), true);
         assert.equal(names.has('claude_connector_profile'), true);
         assert.equal(names.has('repo_read_file'), true);
+        assert.equal(names.has('search'), true);
+        assert.equal(names.has('fetch'), true);
         assert.equal(names.has('repo_apply_patch'), false);
         assert.equal(names.has('repo_create_file'), false);
         assert.equal(names.has('repo_remove_file'), false);

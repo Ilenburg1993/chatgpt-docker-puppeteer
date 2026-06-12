@@ -672,8 +672,14 @@ describe('copilot MCP tools', () => {
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
         const appsSdk = /** @type {Record<string, unknown>} */ (result.structuredContent?.['appsSdk']);
-        assert.equal(appsSdk['cspApplicable'], false);
-        assert.equal(appsSdk['hasWidgetResource'], false);
+        const companyKnowledge = /** @type {Record<string, unknown>} */ (
+            result.structuredContent?.['companyKnowledge']
+        );
+        assert.equal(appsSdk['cspApplicable'], true);
+        assert.equal(appsSdk['hasWidgetResource'], true);
+        assert.equal(appsSdk['hasCsp'], true);
+        assert.equal(companyKnowledge['searchFetchToolsDetected'], true);
+        assert.deepEqual(companyKnowledge['toolNames'], ['search', 'fetch']);
         assert.equal(typeof result.structuredContent?.['promptFrictionImpact'], 'string');
     });
 

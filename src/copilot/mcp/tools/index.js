@@ -6,6 +6,8 @@
  */
 
 export * from './apps-sdk-readiness.js';
+export * from './apps-sdk-resources.js';
+export * from './company-knowledge.js';
 export * from './cloudflare-config.js';
 export * from './cloudflare-edge-apply.js';
 export * from './cloudflare-edge-backup.js';

@@ -12,6 +12,7 @@ import { getMcpWorkspaceRoot, okResult, readOnlyAnnotations } from '#copilot/mcp
 /** @type {Record<string, string>} */
 const MARKERS = {
     appResource: 'registerAppResource',
+    appResourceRegistrar: 'registerCopilotAppsSdkResources',
     appMime: 'text/html;profile=mcp-app',
     resourceMimeType: 'RESOURCE_MIME_TYPE',
     uiCsp: 'ui: {',
@@ -21,6 +22,8 @@ const MARKERS = {
     frameDomains: 'frameDomains',
     widgetDescription: 'openai/widgetDescription',
     outputTemplate: 'openai/outputTemplate',
+    companySearchTool: "COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME = 'search'",
+    companyFetchTool: "COMPANY_KNOWLEDGE_FETCH_TOOL_NAME = 'fetch'",
 };
 
 /**
@@ -91,6 +94,7 @@ export const mcpAppsSdkReadinessTool = {
         const found = await scanMarkers(files);
         const hasWidgetResource =
             (found['appResource'] ?? []).length > 0 ||
+            (found['appResourceRegistrar'] ?? []).length > 0 ||
             (found['appMime'] ?? []).length > 0 ||
             (found['resourceMimeType'] ?? []).length > 0;
         const hasCsp =
@@ -99,6 +103,8 @@ export const mcpAppsSdkReadinessTool = {
             (found['csp'] ?? []).length > 0;
         const hasFrameDomains = (found['frameDomains'] ?? []).length > 0;
         const hasWidgetDescription = (found['widgetDescription'] ?? []).length > 0;
+        const searchFetchToolsDetected =
+            (found['companySearchTool'] ?? []).length > 0 && (found['companyFetchTool'] ?? []).length > 0;
         return okResult({
             success: true,
             scannedFiles: files.length,
@@ -114,8 +120,12 @@ export const mcpAppsSdkReadinessTool = {
                 ? 'Widget CSP affects iframe/network behavior and review readiness, not host confirmation for MCP write tool calls.'
                 : 'No Apps SDK widget resource detected; CSP is not a current source of tool-call approval prompts.',
             companyKnowledge: {
-                searchFetchToolsDetected: false,
-                note: 'Company Knowledge requires exact search/fetch tool shapes; this repo MCP currently exposes repo-specific read tools instead.',
+                searchFetchToolsDetected,
+                toolNames: searchFetchToolsDetected ? ['search', 'fetch'] : [],
+                outputCompatibility: searchFetchToolsDetected ? 'structuredContent plus JSON content text' : 'not-ready',
+                note: searchFetchToolsDetected
+                    ? 'Company Knowledge exact search/fetch tools are present and read-only.'
+                    : 'Company Knowledge requires exact search/fetch tool shapes; this repo MCP currently exposes repo-specific read tools instead.',
             },
             recommendedActions: [
                 hasWidgetResource ? 'Keep _meta.ui.csp explicit for every widget resource.' : 'Do not spend prompt-friction time on CSP until a widget resource is added.',

@@ -14,6 +14,7 @@
 import { logMcp } from '#copilot/mcp/control-plane';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createHash } from 'node:crypto';
+import { registerCopilotAppsSdkResources } from './tools/apps-sdk-resources.js';
 import {
     getCanonicalMcpRegistryState,
     getCanonicalMcpTools,
@@ -145,6 +146,7 @@ export function createCopilotMcpServer(options = {}) {
         /** @type {ConstructorParameters<typeof McpServer>[1]} */ (profile.sdkOptions),
     );
 
+    registerCopilotAppsSdkResources(server);
     const tools = registerCanonicalMcpTools(server, options);
     const validation = validateMcpToolDescriptors(tools, profile.policy);
     const manifest = buildMcpToolDescriptorManifest(tools, validation, profile);

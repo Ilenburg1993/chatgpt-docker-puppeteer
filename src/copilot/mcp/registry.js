@@ -27,6 +27,7 @@ import {
 import {
     bindMcpOAuthFrictionAuditProvider,
     bindMcpToolsStatusProvider,
+    companyKnowledgeTools,
     connectionTools,
     copilotSessionTools,
     delegateToRepoAutonomyRunnerTool,
@@ -321,6 +322,7 @@ function buildCanonicalMcpToolList() {
         delegateToRepoAutonomyRunnerTool,
         mcpGoldenPromptsTool,
         mcpAppsSdkReadinessTool,
+        ...companyKnowledgeTools,
         ...devcontainerNetworkTools,
         mcpCloudflareConfigAuditTool,
         mcpCloudflarePlanCapabilitiesAuditTool,

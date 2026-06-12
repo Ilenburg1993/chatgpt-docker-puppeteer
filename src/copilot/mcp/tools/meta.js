@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 36;
+const CAPABILITIES_VERSION = 37;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -39,6 +39,8 @@ const READ_TOOLS = [
     'repo_find_symbol_usages',
     'repo_symbol_search',
     'repo_file_outline',
+    'search',
+    'fetch',
 ];
 
 const INDEX_TOOLS = [
