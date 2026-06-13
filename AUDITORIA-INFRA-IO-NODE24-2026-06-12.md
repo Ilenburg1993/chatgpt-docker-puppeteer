@@ -417,6 +417,23 @@ Validação:
 - Testes focados de observabilidade, engine, fault injection, multiprocess, contracts e métricas: **125 passados, 0
   falhas**.
 
+### 1.16 Status de implementação — matriz de cleanup/mkdir aplicada em 2026-06-12
+
+Os mutators diretos restantes fora de `infra` foram classificados:
+
+- `mkdir`: preparação de diretório para DB, PID/log, jobs, latency history, quarantine metadata e estado do agent;
+- `rm`/`unlink`: cleanup de estado/PID/cache e retenção bounded/validada de snapshots, jobs e selection traces.
+
+Um `mkdir` redundante do snapshot store foi removido, pois `writeFileAtomicPortable` já cria o diretório pai. Um contrato
+arquitetural exige correspondência exata entre os calls encontrados e uma matriz por arquivo/operação; ele reconhece
+imports nomeados, namespace/default de `node:fs/promises` e `import { promises as fs } from 'node:fs'`.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- Lint focado: **PASS**.
+- Contrato arquitetural e snapshot store: **92 passados, 0 falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -638,7 +655,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-003 | P0 | Prefetch/cache | Prefetch textual não valida UTF-8 | `io-prefetch.js`: `bytesSnapshot.content.toString('utf8')` | Cache L1 pode servir texto inválido sem passar por `bufferIsUtf8` | Usar `decodeUtf8Buffer()` antes de primar text cache; não criar text entry para binário |
 | IO-004 | P0 | Patch | Patch textual pode corromper binário/UTF-8 inválido | `locked-mutations.js`: `fs.readFile(filePath, 'utf8')` | Bytes inválidos viram U+FFFD e podem ser regravados | Ler Buffer, validar `bufferIsUtf8`, só então decode; recusar patch em binário |
 | IO-005 | P0 | Move | Fallback EXDEV não verifica integridade | `io/fs/move.js`: `copyFile` + `unlink` | Cópia parcial ou divergente pode apagar origem | Copy para temp no destino, hash/size pós-cópia, fsync, rename final, só então unlink origem |
-| IO-006 | P0 | Bypass | **Parcial:** writers diretos foram eliminados e bloqueados por contrato | writers de audit/SSE/export/config/OAuth/jobs/BYOK usam fachadas; cleanup/mkdir diretos permanecem | Deletes/cleanup ainda não têm governança equivalente | Classificar remoções diretas e mkdir; manter contrato de writers |
+| IO-006 | P0 | Bypass | **Concluído com exceções formais:** writers usam fachadas; cleanup/mkdir têm matriz exata | contratos bloqueiam writers e exigem matriz por arquivo/operação para cleanup/mkdir | Exceções intencionais ainda usam fs direto | Manter matriz estreita e remover entradas quando migrações tornarem calls redundantes |
 | IO-007 | P1 | Snapshot | `readFile` e `stat` em paralelo não formam snapshot consistente | `read-bytes.js`, `read-text.js` | Cache pode associar conteúdo de uma versão a mtime/size de outra | Abrir FileHandle, `stat/read/stat` e retry se fingerprint muda; ou stat antes/depois |
 | IO-008 | P1 | Create/copy | `failIfExists` e `overwrite=false` sofrem TOCTOU externo | `locked-writes.js`, `locked-mutations.js` | Processo externo pode criar destino entre `access` e gravação/cópia | Usar `open('wx')`/`COPYFILE_EXCL` e tratar EEXIST atomicamente |
 | IO-009 | P1 | Append | Append de logs não é durável nem framed | `append.js`, bypasses de audit | Crash pode deixar JSONL truncado/torn line | Criar `appendRecordLocked` com newline framing, `flush`, recovery de linha parcial e rotação sob lock |
@@ -681,8 +698,8 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | Estado | IDs |
 | --- | --- |
 | Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
-| Concluído com limite documentado | IO-001, IO-005, IO-038 |
-| Parcial | IO-002, IO-006, IO-009, IO-023, IO-025 |
+| Concluído com limite documentado | IO-001, IO-005, IO-006, IO-038 |
+| Parcial | IO-002, IO-009, IO-023, IO-025 |
 | Aberto | IO-010, IO-014, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-029, IO-030 |
 
 ---
@@ -827,6 +844,7 @@ A situação ideal é uma infra IO em camadas:
 
 - [x] Criar regra de governança/allowlist para writers síncronos diretos.
 - [x] Ampliar governança para writers assíncronos diretos restantes.
+- [x] Classificar cleanup/mkdir diretos em matriz exata por arquivo/operação.
 - [x] Migrar `/export` para atomic portable.
 - [x] Migrar audit/SSE/observability para append canônico.
 - [x] Migrar `storage/json-store.js` para atomic portable.
@@ -1089,4 +1107,4 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Classificar remoções diretas e `mkdir` fora de infra; depois atacar workspace-bound IO e freshness do índice.
+Separar explicitamente workspace-bound IO de portable/trusted; depois atacar freshness do índice.
