@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `d7189789`, seguida da capability workspace-bound
+**Baseline reinvestigado:** `main` sincronizada até `20463d91`, seguida do hardening de freshness do índice
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -16,23 +16,21 @@ invalidação derivada imediata, append/repair JSONL canônico, governança dos 
 provas multiprocess/fault-injection.
 
 No estado atual, a descrição correta é: **as primitivas centrais de mutação e append têm contratos fortes e provas
-reais, e as superfícies externas de path estão vinculadas a policy async; o risco dominante migrou para freshness
-externa do índice, rollback de arquivos grandes e observabilidade de contenção**.
+reais, as superfícies externas de path estão vinculadas a policy async e o índice detecta mudanças externas
+metadata-preserving; o risco dominante migrou para rollback de arquivos grandes e observabilidade de contenção**.
 
 Prioridades reais remanescentes:
 
-1. **P1 — freshness do índice ainda depende demais de mtime+size:** mudanças externas same-size/same-mtime podem
-   escapar.
-2. **P1 — rollback grande ainda é incompleto:** snapshots de mutação respeitam orçamento, mas não há sidecar durável
+1. **P1 — rollback grande ainda é incompleto:** snapshots de mutação respeitam orçamento, mas não há sidecar durável
    para restaurar arquivos acima dele.
-3. **P2 — lockfile multiprocess continua seletivo:** o L1 é canônico e provado, porém opt-in nas mutações gerais.
-4. **P2 — observabilidade de contenção ainda é parcial:** há contadores de stale recovery, heartbeat e durabilidade,
+2. **P2 — lockfile multiprocess continua seletivo:** o L1 é canônico e provado, porém opt-in nas mutações gerais.
+3. **P2 — observabilidade de contenção ainda é parcial:** há contadores de stale recovery, heartbeat e durabilidade,
    mas não p95/histograma nem snapshot sanitizado de leases.
-5. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
+4. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo” ou “append fragmentado sem recovery”. O risco técnico dominante
-migrou de corrupção nas primitivas centrais para freshness externa e gaps operacionais avançados.
+migrou de corrupção nas primitivas centrais para rollback grande e gaps operacionais avançados.
 
 ### 1.1 Status de implementação — Faixa 0 aplicada em 2026-06-12
 
@@ -498,6 +496,34 @@ Validação:
 - Uma rodada mais ampla teve **582 passados** e cinco falhas não relacionadas: quatro imports de módulos
   Cloudflare/CLI ausentes no checkout e timeout de import em `test_code_permission_tools.spec.js`.
 
+### 1.19 Status de implementação — freshness forte do índice aplicada em 2026-06-12
+
+IO-017 deixou de depender somente de `mtime+size`:
+
+- fingerprints do scanner incluem `ctimeMs`, `dev` e `ino`, além de `mtimeMs`, size e realpath;
+- o schema do índice ganhou colunas `dev/ino`, com migração idempotente via `PRAGMA table_info` para bancos existentes;
+- o fast path exige igualdade de `mtime+size+ctime+dev+ino`;
+- arquivos até `IO_INDEX_HASH_VERIFY_MAX_BYTES` (default `1 MiB`) recebem renovação periódica por hash após
+  `IO_INDEX_HASH_VERIFY_INTERVAL_MS` (default `30 s`), cobrindo filesystems com metadata pouco granular;
+- metadata divergente com hash idêntico atualiza somente fingerprint/refreshed time, sem refazer FTS, chunks ou parser;
+- hash divergente reutiliza o snapshot já lido para reindexação, evitando segunda leitura;
+- stats e resultado de build expõem verificações/hits/misses e a freshness policy efetiva;
+- metadata persistida usa `indexVersion: 2`.
+
+Provas adicionadas:
+
+- mudança externa same-size com mtime restaurado é detectada por ctime/identidade e substitui o conteúdo FTS;
+- metadata simuladamente indistinguível é desmascarada pela verificação periódica de hash;
+- hash hit renova freshness sem reindexar;
+- schema legado é migrado preservando a tabela existente.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- `lint:copilot`: **PASS**.
+- Testes focados de índice/scanner/store: **29 passados, 0 falhas**.
+- Validação ampliada de consumidores MCP/tools/contracts: **88 passados, 0 falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -730,7 +756,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-014 | P1 | Path policy | **Concluído:** capabilities workspace-bound e trusted estão separadas | `public/workspace-io.js`, `public/trusted-io.js`, contratos de boundaries/callers | Facade operacional baixa continua sem containment por desenho declarado | Manter superfícies externas sob contrato e allowlistar apenas escapes trusted |
 | IO-015 | P1 | Search | Total bruto pode vazar contagem de linhas redigidas | `text-search.js`: totalMatchCount de stdout cru | Baixo risco de side-channel sobre secrets | Calcular totais pós-redação ou marcar `rawTotalMayIncludeRedacted=true` |
 | IO-016 | P1 | Scanner | `readdir` + `lstat` por entrada é custoso | `io-scanner.js` | Muitos syscalls em árvores grandes | Usar `readdir({ withFileTypes:true })`; avaliar `fsPromises.glob` em Node 24.5 para casos seguros |
-| IO-017 | P1 | Index freshness | Índice confia em mtime+size | `io-index-sqlite.js`, `fingerprint-match.js` tolerância 2ms | Mudança externa com mesmo size/mtime pode não reindexar | Para arquivos pequenos/médios, usar hash ou ctime/inode; para hot files, stat-before-after |
+| IO-017 | P1 | Index freshness | **Concluído:** identidade rica + hash periódico bounded | scanner persiste ctime/dev/ino; índice renova hash até limite configurável | Arquivos grandes confiam em metadata rica entre reindexações | Medir hit/miss/custo e ajustar intervalo/limite por perfil |
 | IO-018 | P1 | L2 SQLite | L2 cache opcional sem política clara de enablement | `io-cache-l2-registry.js` disabled default | Restart perde hotset; baixa performance em sessões longas | Ativar experimentalmente por perfil, medir hit ratio, busy timeout, WAL, synchronous |
 | IO-019 | P1 | Bypass storage | `storage/json-store.js` usa `writeAtomicFileUnlocked` diretamente | `infra/storage/json-store.js` | Sem lock canônico se chamado em concorrência | Trocar por `writeFileAtomicPortable` ou `withIoResourceLock` explícito |
 | IO-020 | P1 | Bypass export | `terminal/commands/export.js` usa `writeFile` direto | Busca de bypass | Export pode sobrescrever sem IO meta/hash | Migrar para `createOrReplaceFileAtomic`/`writeFileAtomic` conforme política |
@@ -761,10 +787,10 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-014, IO-016, IO-019, IO-020, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-014, IO-016, IO-017, IO-019, IO-020, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
 | Concluído com limite documentado | IO-001, IO-005, IO-006, IO-038 |
 | Parcial | IO-002, IO-009, IO-023, IO-025 |
-| Aberto | IO-010, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-030 |
+| Aberto | IO-010, IO-015, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-030 |
 
 ---
 
@@ -1011,13 +1037,13 @@ A situação ideal é uma infra IO em camadas:
 - [x] Normalizar line-offset keys.
 - [x] Forçar flush dos hooks derivados antes de retornar mutação canônica.
 - [x] Testar equivalência de path relativo/absoluto.
-- [ ] Testar mudança same-size/same-length.
+- [x] Testar mudança same-size/same-mtime.
 
 #### Fase 3.4 — L2 e índice
 
 - [ ] Perfil experimental L2 em CI.
 - [ ] Auditar WAL, `busy_timeout` e `synchronous`.
-- [ ] Hash/ctime/inode para freshness de arquivos pequenos.
+- [x] Hash periódico bounded + ctime/dev/ino para freshness.
 - [ ] Medir hit ratio e cold/warm.
 
 ### Faixa 4 — Performance
@@ -1133,7 +1159,8 @@ Usa `Dirent` para classificação básica e mantém a política de não seguir s
 
 ### `io-index-sqlite.js`
 
-Boa base de navegação e performance. A fragilidade é derivada: se qualquer writer burlar a fachada, índice e cache podem divergir.
+Freshness combina metadata rica (`mtime/size/ctime/dev/ino`) com hash periódico bounded. O próximo trabalho é medir
+hit/miss/custo por perfil e decidir enablement do L2, não corrigir stale básico.
 
 ### `io-locks.js`
 
@@ -1172,5 +1199,5 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Atacar freshness do índice para mudanças externas same-size/same-mtime, incorporando identidade de inode/ctime e hash
-bounded sem transformar todo stat em leitura integral.
+Implementar rollback sidecar durável para mutações acima do orçamento em memória, com hash, TTL, cleanup sob lock e
+integração explícita ao token/plano de rollback.
