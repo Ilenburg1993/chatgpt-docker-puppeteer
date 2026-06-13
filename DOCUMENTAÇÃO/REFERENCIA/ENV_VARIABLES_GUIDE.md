@@ -243,6 +243,16 @@ Para ambientes com múltiplos processos cooperativos escrevendo no mesmo workspa
 `high-risk` e use o health de IO para observar p95 de espera, timeouts e leases ativos antes de
 subir para `mutations` ou `all`.
 
+### Parser Workers Copilot
+
+`IO_PARSER_WORKER_QUEUE_MAX` é um knob especializado para backpressure dos parser workers de
+`src/copilot/infra/io-parser.js`. Quando ausente, o runtime usa `max(16, poolSize * 32)`; quando
+configurado, aceita valores entre `0` e `10000`.
+
+Use `0` apenas para diagnósticos ou ambientes muito sensíveis a backlog, pois ele rejeita qualquer
+fila além de workers livres. As métricas `workerQueueLength`, `workerQueueHighWater`,
+`workerQueueRejected` e `workerQueueTimeouts` aparecem no health de IO.
+
 ## Limite Deliberado do Template
 
 O template [`.env.example`](../../.env.example) foi consolidado para cobrir o baseline operacional e
