@@ -780,6 +780,28 @@ describe('W86.5.3 — state-file-io permanece seam infra isolado', () => {
     });
 });
 
+describe('IO-038 — writers síncronos diretos possuem allowlist formal', () => {
+    it('não introduz novos append/write/rename síncronos fora das exceções justificadas', () => {
+        const allowlist = new Set(['config/system-prompt/sdk-defaults/snapshot.js', 'observability/logger.js']);
+        const files = listJsFilesRecursive(COPILOT_ROOT);
+        /** @type {string[]} */
+        const violations = [];
+
+        for (const abs of files) {
+            const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
+            const src = readFileSync(abs, 'utf-8');
+            if (!/\b(?:appendFileSync|writeFileSync|renameSync)\s*\(/.test(src)) continue;
+            if (!allowlist.has(rel)) violations.push(rel);
+        }
+
+        assert.deepEqual(
+            violations,
+            [],
+            `Writer síncrono direto fora da allowlist (logger de emergência e gerador build-time):\n${violations.join('\n')}`,
+        );
+    });
+});
+
 describe('W86.6 — runtime pending-question seam extraído', () => {
     it('agent-runtime-state consome runtime/pending-question-state para operações de pending question', () => {
         const src = readSrc('agent/facades/agent-runtime-state.js');

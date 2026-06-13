@@ -7,6 +7,7 @@
 import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core';
 import { log } from '#copilot/observability';
 import { flushTerminalSseEventArchive } from '../state/events/index.js';
+import { flushTerminalTranscriptArchive } from '../state/transcript-archive.js';
 import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
 
 /**
@@ -17,6 +18,7 @@ import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
  *     rollbackRuntimeListenersPhase: () => Promise<void>;
  *     rollbackPinnedContextPhaseFn?: typeof rollbackTerminalPinnedContextPhase;
  *     flushTerminalSseEventArchiveFn?: typeof flushTerminalSseEventArchive;
+ *     flushTerminalTranscriptArchiveFn?: typeof flushTerminalTranscriptArchive;
  *     flushModelGatewayRuntimeHealthMirrorFn?: () => Promise<unknown>;
  *     registerShutdownHandlerFn?: typeof registerShutdownHandler;
  *     logFn?: (level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL', message: string) => void;
@@ -27,6 +29,7 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
     const rollbackRuntimeListenersPhase = deps.rollbackRuntimeListenersPhase;
     const rollbackPinnedContextPhaseFn = deps.rollbackPinnedContextPhaseFn ?? rollbackTerminalPinnedContextPhase;
     const flushTerminalSseEventArchiveFn = deps.flushTerminalSseEventArchiveFn ?? flushTerminalSseEventArchive;
+    const flushTerminalTranscriptArchiveFn = deps.flushTerminalTranscriptArchiveFn ?? flushTerminalTranscriptArchive;
     const flushModelGatewayRuntimeHealthMirrorFn = deps.flushModelGatewayRuntimeHealthMirrorFn;
     const registerShutdownHandlerFn = deps.registerShutdownHandlerFn ?? registerShutdownHandler;
     const logFn = deps.logFn ?? log;
@@ -66,6 +69,16 @@ export function registerTerminalShutdownHandlers(ctx, deps) {
             logFn('INFO', '[TerminalServer] Activity emitter desacoplado via shutdown handler.');
         },
         SHUTDOWN_PRIORITY.TERMINAL_ACTIVITY,
+    );
+
+    registerShutdownHandlerFn(
+        'terminal.transcriptArchive',
+        async () => {
+            await flushTerminalTranscriptArchiveFn();
+            logFn('INFO', '[TerminalServer] Archive de transcript drenado via shutdown handler.');
+        },
+        SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
+        { timeoutMs: 10_000 },
     );
 
     registerShutdownHandlerFn(

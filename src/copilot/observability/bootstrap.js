@@ -156,6 +156,16 @@ export function bootstrapObservability() {
 
     // FAIXA-0: Shutdown handlers para singletons de observabilidade
     registerShutdownHandler(
+        'observability.metricsSnapshot.flush',
+        async () => {
+            defaultMetrics.stopPeriodicSnapshot();
+            await defaultMetrics.flushPeriodicSnapshot();
+        },
+        SHUTDOWN_PRIORITY.AUDIT_FINALIZER,
+        { timeoutMs: 10_000 },
+    );
+
+    registerShutdownHandler(
         'eventbus.dispose',
         async () => {
             const bus = container.resolve(EVENT_BUS);

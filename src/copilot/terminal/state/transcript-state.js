@@ -176,6 +176,8 @@ export function readTerminalTranscriptTurns() {
  *     memoryEvictions: number;
  *     archivePath: string | null;
  *     archiveError: string | null;
+ *     archiveQueueDepth: number;
+ *     archiveDroppedTurns: number;
  * }}
  */
 export function readTerminalTranscriptStats() {
@@ -195,6 +197,8 @@ export function readTerminalTranscriptStats() {
         memoryEvictions: _terminalTranscriptMemoryEvictions,
         archivePath: archive.path,
         archiveError: archive.error,
+        archiveQueueDepth: archive.queueDepth,
+        archiveDroppedTurns: archive.droppedLines,
     };
 }
 

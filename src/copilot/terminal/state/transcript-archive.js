@@ -8,16 +8,31 @@
  * @module copilot/terminal/state/transcript-archive
  */
 
-import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
+import { createJsonlFileWriter } from '../../infra/io/jsonl-file-writer.js';
 
-const TERMINAL_TRANSCRIPT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'transcripts');
+const DEFAULT_TERMINAL_TRANSCRIPT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'transcripts');
+const TERMINAL_TRANSCRIPT_ARCHIVE_SOFT_QUEUE = 10_000;
+const TERMINAL_TRANSCRIPT_ARCHIVE_CATASTROPHIC_QUEUE = 100_000;
 
 /** @type {string | null} */
 let _terminalTranscriptArchivePath = null;
 /** @type {string | null} */
 let _terminalTranscriptArchiveError = null;
+
+const terminalTranscriptArchiveWriter = createJsonlFileWriter({
+    filePath: resolveTranscriptArchivePath,
+    batchLines: 256,
+    maxQueueLines: TERMINAL_TRANSCRIPT_ARCHIVE_CATASTROPHIC_QUEUE,
+    softQueueLines: TERMINAL_TRANSCRIPT_ARCHIVE_SOFT_QUEUE,
+    onError: (error) => {
+        _terminalTranscriptArchiveError = toError(error).message;
+    },
+    onSuccess: () => {
+        _terminalTranscriptArchiveError = null;
+    },
+});
 
 /**
  * @returns {string}
@@ -25,7 +40,9 @@ let _terminalTranscriptArchiveError = null;
 function resolveTranscriptArchivePath() {
     if (_terminalTranscriptArchivePath) return _terminalTranscriptArchivePath;
     const day = new Date().toISOString().slice(0, 10);
-    _terminalTranscriptArchivePath = join(TERMINAL_TRANSCRIPT_ARCHIVE_DIR, `terminal-transcript-${day}.jsonl`);
+    const configuredDir = process.env['TERMINAL_TRANSCRIPT_ARCHIVE_DIR'];
+    const archiveDir = typeof configuredDir === 'string' && configuredDir.trim() ? configuredDir : DEFAULT_TERMINAL_TRANSCRIPT_ARCHIVE_DIR;
+    _terminalTranscriptArchivePath = join(archiveDir, `terminal-transcript-${day}.jsonl`);
     return _terminalTranscriptArchivePath;
 }
 
@@ -35,10 +52,8 @@ function resolveTranscriptArchivePath() {
  */
 export function appendTerminalTranscriptArchive(entry) {
     try {
-        mkdirSync(TERMINAL_TRANSCRIPT_ARCHIVE_DIR, { recursive: true });
         const path = resolveTranscriptArchivePath();
-        appendFileSync(path, `${JSON.stringify({ ...entry, archived: true })}\n`, 'utf8');
-        _terminalTranscriptArchiveError = null;
+        terminalTranscriptArchiveWriter.enqueueLine(JSON.stringify({ ...entry, archived: true }));
         return { archived: true, path, error: null };
     } catch (error) {
         _terminalTranscriptArchiveError = toError(error).message;
@@ -47,12 +62,28 @@ export function appendTerminalTranscriptArchive(entry) {
 }
 
 /**
- * @returns {{ path: string | null; error: string | null }}
+ * @returns {Promise<void>}
+ */
+export async function flushTerminalTranscriptArchive() {
+    try {
+        await terminalTranscriptArchiveWriter.flush();
+        _terminalTranscriptArchiveError = null;
+    } catch (error) {
+        _terminalTranscriptArchiveError = toError(error).message;
+        throw error;
+    }
+}
+
+/**
+ * @returns {{ path: string | null; error: string | null; queueDepth: number; droppedLines: number }}
  */
 export function readTerminalTranscriptArchiveState() {
+    const writerState = terminalTranscriptArchiveWriter.getState();
     return {
         path: _terminalTranscriptArchivePath,
         error: _terminalTranscriptArchiveError,
+        queueDepth: writerState.queueDepth,
+        droppedLines: writerState.droppedLines,
     };
 }
 
@@ -60,6 +91,7 @@ export function readTerminalTranscriptArchiveState() {
  * @returns {void}
  */
 export function resetTerminalTranscriptArchiveForTests() {
+    terminalTranscriptArchiveWriter.reset();
     _terminalTranscriptArchivePath = null;
     _terminalTranscriptArchiveError = null;
 }

@@ -14,6 +14,7 @@ describe('terminal/terminal-phases/boot-shutdown', () => {
         const rollbackRuntimeListenersPhase = vi.fn(async () => undefined);
         const rollbackPinnedContextPhaseFn = vi.fn(async () => undefined);
         const flushTerminalSseEventArchiveFn = vi.fn(async () => undefined);
+        const flushTerminalTranscriptArchiveFn = vi.fn(async () => undefined);
         const flushModelGatewayRuntimeHealthMirrorFn = vi.fn(async () => undefined);
 
         registerTerminalShutdownHandlers(
@@ -39,6 +40,7 @@ describe('terminal/terminal-phases/boot-shutdown', () => {
                 rollbackRuntimeListenersPhase,
                 rollbackPinnedContextPhaseFn,
                 flushTerminalSseEventArchiveFn,
+                flushTerminalTranscriptArchiveFn,
                 flushModelGatewayRuntimeHealthMirrorFn,
                 logFn: vi.fn(),
                 registerShutdownHandlerFn: (name, handler, priority, options) => {
@@ -54,6 +56,7 @@ describe('terminal/terminal-phases/boot-shutdown', () => {
                 'terminal.reflectionTimer',
                 'terminal.pinnedFilesLoader',
                 'terminal.activityEmitter',
+                'terminal.transcriptArchive',
                 'terminal.sseEventArchive',
             ],
         );
@@ -63,10 +66,12 @@ describe('terminal/terminal-phases/boot-shutdown', () => {
         await registrations[2]?.handler();
         await registrations[3]?.handler();
         await registrations[4]?.handler();
+        await registrations[5]?.handler();
 
         assert.equal(rollbackRuntimeListenersPhase.mock.calls.length, 2);
         assert.equal(rollbackPinnedContextPhaseFn.mock.calls.length, 1);
         assert.equal(flushTerminalSseEventArchiveFn.mock.calls.length, 1);
+        assert.equal(flushTerminalTranscriptArchiveFn.mock.calls.length, 1);
         assert.equal(flushModelGatewayRuntimeHealthMirrorFn.mock.calls.length, 1);
     });
 });

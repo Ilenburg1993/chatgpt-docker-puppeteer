@@ -53,14 +53,15 @@ import { createToolTelemetryStore, defaultToolTelemetryStore } from './tool-stat
  * @property {() => void} reset
  * @property {(intervalMs?: number, logDir?: string) => void} startPeriodicSnapshot
  * @property {() => void} stopPeriodicSnapshot
+ * @property {() => Promise<void>} flushPeriodicSnapshot
  * @property {() => void} [recordQuotaPoll] - Registra uma sondagem de quota (opcional)
  */
 
 // FINDING-P5-3: imports estáticos em vez de dynamic import dentro de setInterval
 import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/config';
-import { appendFile as _appendFile, mkdir as _mkdir } from 'node:fs/promises';
 import { join as _join } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
+import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
 import { createHistogram } from './metrics-histogram.js';
 
 /**
@@ -357,8 +358,8 @@ export function createMetricsStore(options = {}) {
     let _snapshotTimer = null;
     /** @type {string | null} */
     let _snapshotTimerId = null;
-    /** @type {Promise<void>} */
-    let _snapshotWriteChain = Promise.resolve();
+    /** @type {ReturnType<typeof createJsonlFileWriter> | null} */
+    let _snapshotWriter = null;
 
     /**
      * Inicia snapshot periódico de métricas em arquivo.
@@ -372,21 +373,24 @@ export function createMetricsStore(options = {}) {
         const ms = intervalMs ?? COPILOT_METRICS_SNAPSHOT_INTERVAL;
         if (ms <= 0) return;
         const resolvedDir = logDir ?? (COPILOT_LOG_DIR || './var/logs/copilot');
+        const previousWriter = _snapshotWriter;
+        if (previousWriter) {
+            void previousWriter.flush().catch((error) => logSwallowed(error, 'metrics.snapshot.restart'));
+        }
+        _snapshotWriter = createJsonlFileWriter({
+            filePath: _join(resolvedDir, 'metrics.jsonl'),
+            batchLines: 32,
+            maxQueueLines: 10_000,
+            softQueueLines: 1_000,
+            onError: (error) => logSwallowed(error, 'metrics.snapshot'),
+        });
+        const writer = _snapshotWriter;
         _snapshotTimerId = `metrics.snapshot:${Date.now()}:${Math.random().toString(36).slice(2)}`;
         _snapshotTimer = registerInterval(
             _snapshotTimerId,
             () => {
                 const line = JSON.stringify({ _snapshot: new Date().toISOString(), ...getSummary() }) + '\n';
-                _snapshotWriteChain = _snapshotWriteChain
-                    .catch(() => undefined)
-                    .then(async () => {
-                        // FINDING-P5-3: usar imports estáticos em vez de dynamic import a cada tick
-                        await _mkdir(resolvedDir, { recursive: true });
-                        await _appendFile(_join(resolvedDir, 'metrics.jsonl'), line, 'utf8');
-                    })
-                    .catch((e) => {
-                        logSwallowed(e, 'metrics.snapshot');
-                    });
+                writer.enqueueLine(line);
             },
             ms,
         );
@@ -404,6 +408,13 @@ export function createMetricsStore(options = {}) {
             _snapshotTimer = null;
             _snapshotTimerId = null;
         }
+    }
+
+    /**
+     * @returns {Promise<void>}
+     */
+    async function flushPeriodicSnapshot() {
+        await _snapshotWriter?.flush();
     }
 
     /**
@@ -538,6 +549,7 @@ export function createMetricsStore(options = {}) {
         reset,
         startPeriodicSnapshot,
         stopPeriodicSnapshot,
+        flushPeriodicSnapshot,
     };
 }
 
