@@ -41,6 +41,21 @@ export function shouldSyncDirectory(durability) {
 }
 
 /**
+ * Promove falhas reais de sync a erro, preservando misses explicitamente classificados como unsupported/best-effort.
+ *
+ * @param {{ attempted: boolean; ok: boolean; skippedReason?: string; errorCode?: string }} result
+ * @param {{ message: string; code: 'EFILESYNC' | 'EDIRECTORYSYNC' }} options
+ * @returns {void}
+ */
+export function assertSuccessfulSync(result, options) {
+    if (!result.attempted || result.ok || result.skippedReason) return;
+    const error = new Error(options.message);
+    /** @type {{ code?: string; cause?: unknown }} */ (error).code = options.code;
+    /** @type {{ code?: string; cause?: unknown }} */ (error).cause = result.errorCode;
+    throw error;
+}
+
+/**
  * @param {string} filePath
  * @returns {Promise<{ attempted: boolean; ok: boolean; skippedReason?: string; errorCode?: string }>}
  */

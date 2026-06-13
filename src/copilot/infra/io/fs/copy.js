@@ -9,7 +9,7 @@ import { randomBytes } from 'node:crypto';
 import * as nodeFs from 'node:fs';
 import { copyFile, link, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
+import { assertSuccessfulSync, syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
 import { readBinaryMutationSnapshot } from './snapshot.js';
 
@@ -21,6 +21,8 @@ import { readBinaryMutationSnapshot } from './snapshot.js';
  *     expectedSourceHash?: string;
  *     expectedSourceBytes?: number;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     syncFile?: typeof syncFileBestEffort;
+ *     syncDirectory?: typeof syncParentDirectoryBestEffort;
  * }} [options]
  * @returns {Promise<{ destinationHash: string; destinationBytes: number; staged: true }>}
  */
@@ -52,13 +54,13 @@ export async function copyFileUnlocked(source, destination, options = {}) {
             /** @type {{ code?: string }} */ (error).code = 'ECOPYMISMATCH';
             throw error;
         }
-        const syncResult = await syncFileBestEffort(tmpDestination);
-        if (syncResult.attempted && !syncResult.ok && !syncResult.skippedReason) {
-            const error = new Error(`Falha ao sincronizar cópia staged: ${tmpDestination}`);
-            /** @type {{ code?: string; cause?: unknown }} */ (error).code = 'EFILESYNC';
-            /** @type {{ code?: string; cause?: unknown }} */ (error).cause = syncResult.errorCode;
-            throw error;
-        }
+        await emitMutationPhase(options, 'before-file-sync', { source, destination, target: tmpDestination });
+        const syncResult = await (options.syncFile ?? syncFileBestEffort)(tmpDestination);
+        await emitMutationPhase(options, 'after-file-sync', { source, destination, target: tmpDestination, ...syncResult });
+        assertSuccessfulSync(syncResult, {
+            code: 'EFILESYNC',
+            message: `Falha ao sincronizar cópia staged: ${tmpDestination}`,
+        });
         if (options.exclusive) {
             await emitMutationPhase(options, 'before-publish', { source, destination, tmpDestination, exclusive: true });
             await link(tmpDestination, destination);
@@ -70,7 +72,13 @@ export async function copyFileUnlocked(source, destination, options = {}) {
             await emitMutationPhase(options, 'after-publish', { source, destination, tmpDestination, exclusive: false });
         }
         tmpCreated = false;
-        await syncParentDirectoryBestEffort(destination);
+        await emitMutationPhase(options, 'before-destination-directory-sync', { source, destination });
+        const directorySync = await (options.syncDirectory ?? syncParentDirectoryBestEffort)(destination);
+        await emitMutationPhase(options, 'after-destination-directory-sync', { source, destination, ...directorySync });
+        assertSuccessfulSync(directorySync, {
+            code: 'EDIRECTORYSYNC',
+            message: `Falha ao sincronizar diretório da cópia staged: ${destination}`,
+        });
         return { destinationHash: tempHash, destinationBytes: tempAfter.bytesRead, staged: true };
     } catch (error) {
         if (tmpCreated) await unlink(tmpDestination).catch(() => undefined);

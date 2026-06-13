@@ -1,6 +1,6 @@
 // @ts-check
 
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -55,6 +55,20 @@ describe('infra/io deterministic fault injection', () => {
         expect(await readdir(dir)).toEqual(['write.txt']);
     });
 
+    it('promove falha real de directory sync após write sem ocultar o estado aplicado', async () => {
+        const dir = await createTempDir();
+        const target = path.join(dir, 'write.txt');
+        await writeFile(target, 'old');
+
+        await expect(
+            writeAtomicFileUnlocked(target, 'new', {
+                syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO' }),
+            }),
+        ).rejects.toMatchObject({ code: 'EDIRECTORYSYNC', cause: 'EIO' });
+
+        expect(await readFile(target, 'utf8')).toBe('new');
+    });
+
     it('preserva destino anterior quando copy staged falha antes de publish', async () => {
         const dir = await createTempDir();
         const source = path.join(dir, 'source.txt');
@@ -67,6 +81,22 @@ describe('infra/io deterministic fault injection', () => {
 
         expect(await readFile(destination, 'utf8')).toBe('old');
         expect((await readdir(dir)).sort()).toEqual(['destination.txt', 'source.txt']);
+    });
+
+    it('promove falha real de directory sync após copy e preserva a origem', async () => {
+        const dir = await createTempDir();
+        const source = path.join(dir, 'source.txt');
+        const destination = path.join(dir, 'destination.txt');
+        await Promise.all([writeFile(source, 'new'), writeFile(destination, 'old')]);
+
+        await expect(
+            copyFileUnlocked(source, destination, {
+                syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO' }),
+            }),
+        ).rejects.toMatchObject({ code: 'EDIRECTORYSYNC', cause: 'EIO' });
+
+        expect(await readFile(source, 'utf8')).toBe('new');
+        expect(await readFile(destination, 'utf8')).toBe('new');
     });
 
     it('reporta duplicação quando move publica mas falha antes de remover origem', async () => {
@@ -83,6 +113,76 @@ describe('infra/io deterministic fault injection', () => {
         expect(result.duplicatedAfterCrossDeviceMove).toBe(true);
         expect(await readFile(source, 'utf8')).toBe('content');
         expect(await readFile(destination, 'utf8')).toBe('content');
+    });
+
+    it('não remove origem quando directory sync do destino falha após publish', async () => {
+        const dir = await createTempDir();
+        const source = path.join(dir, 'source.txt');
+        const destination = path.join(dir, 'destination.txt');
+        await writeFile(source, 'content');
+
+        const result = await moveFileUnlocked(source, destination, {
+            overwrite: false,
+            syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO' }),
+        });
+
+        expect(result).toMatchObject({
+            crossDevice: false,
+            duplicatedAfterCrossDeviceMove: true,
+            sourceUnlinkErrorCode: 'EDIRECTORYSYNC',
+        });
+        expect(await readFile(source, 'utf8')).toBe('content');
+        expect(await readFile(destination, 'utf8')).toBe('content');
+    });
+
+    it('não reporta duplicação falsa quando sync da origem falha após unlink', async () => {
+        const dir = await createTempDir();
+        const source = path.join(dir, 'source.txt');
+        const destination = path.join(dir, 'destination.txt');
+        await writeFile(source, 'content');
+        let syncCalls = 0;
+
+        await expect(
+            moveFileUnlocked(source, destination, {
+                overwrite: false,
+                syncDirectory: async () => {
+                    syncCalls += 1;
+                    return syncCalls === 1
+                        ? { attempted: true, ok: true }
+                        : { attempted: true, ok: false, errorCode: 'EIO' };
+                },
+            }),
+        ).rejects.toMatchObject({ code: 'EDIRECTORYSYNC', cause: 'EIO' });
+
+        await expect(access(source)).rejects.toMatchObject({ code: 'ENOENT' });
+        expect(await readFile(destination, 'utf8')).toBe('content');
+    });
+
+    it('executa fallback EXDEV real entre devices distintos quando /dev/shm está disponível', async () => {
+        let sharedMemoryStats;
+        try {
+            sharedMemoryStats = await stat('/dev/shm');
+        } catch {
+            return;
+        }
+        if (sharedMemoryStats.dev === (await stat(tmpdir())).dev) return;
+
+        const sourceDir = await createTempDir();
+        const destinationDir = await mkdtemp('/dev/shm/copilot-io-exdev-');
+        tempDirs.push(destinationDir);
+        const source = path.join(sourceDir, 'source.txt');
+        const destination = path.join(destinationDir, 'destination.txt');
+        await writeFile(source, 'cross-device-content');
+
+        const result = await moveFileUnlocked(source, destination, { overwrite: false });
+
+        expect(result).toMatchObject({
+            crossDevice: true,
+            duplicatedAfterCrossDeviceMove: false,
+            sourceUnlinkErrorCode: null,
+        });
+        await expect(access(source)).rejects.toMatchObject({ code: 'ENOENT' });
+        expect(await readFile(destination, 'utf8')).toBe('cross-device-content');
     });
 
     it('reencaminha lote JSONL quando falha depois da rotação e antes do append', async () => {

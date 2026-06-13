@@ -9,6 +9,7 @@ import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import { toOwnedBuffer } from '../../shared/buffer.js';
 import {
+    assertSuccessfulSync,
     normalizeIoDurability,
     shouldFlushFile,
     shouldSyncDirectory,
@@ -50,6 +51,7 @@ export function normalizeWritePayload(filePath, content, encoding) {
  *     exclusive?: boolean;
  *     durability?: import('./durability.js').IoDurabilityMode;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     syncDirectory?: typeof syncParentDirectoryBestEffort;
  * }} [options]
  * @returns {Promise<{
  *     durability: import('./durability.js').IoDurabilityMode;
@@ -77,7 +79,7 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
                     ...(fileFlushRequested ? { flush: true } : {}),
                 },
             );
-            if (shouldSyncDirectory(durability)) directorySync = await syncParentDirectoryBestEffort(filePath);
+            if (shouldSyncDirectory(durability)) directorySync = await syncWriteDirectory(options, filePath);
             return { durability, tempPath: null, fileFlushRequested, directorySync };
         }
 
@@ -95,7 +97,7 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
             await emitMutationPhase(options, 'after-publish', { filePath, tmpPath, exclusive: true });
             await fs.unlink(tmpPath);
             tmpCreated = false;
-            if (shouldSyncDirectory(durability)) directorySync = await syncParentDirectoryBestEffort(filePath);
+            if (shouldSyncDirectory(durability)) directorySync = await syncWriteDirectory(options, filePath);
             return { durability, tempPath: tmpPath, fileFlushRequested, directorySync };
         }
 
@@ -103,7 +105,7 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
         await fs.rename(tmpPath, filePath);
         tmpCreated = false;
         await emitMutationPhase(options, 'after-publish', { filePath, tmpPath, exclusive: false });
-        if (shouldSyncDirectory(durability)) directorySync = await syncParentDirectoryBestEffort(filePath);
+        if (shouldSyncDirectory(durability)) directorySync = await syncWriteDirectory(options, filePath);
         return { durability, tempPath: tmpPath, fileFlushRequested, directorySync };
     } catch (error) {
         if (tmpCreated) {
@@ -115,4 +117,19 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
         }
         throw error;
     }
+}
+
+/**
+ * @param {NonNullable<Parameters<typeof writeAtomicFileUnlocked>[2]>} options
+ * @param {string} filePath
+ */
+async function syncWriteDirectory(options, filePath) {
+    await emitMutationPhase(options, 'before-destination-directory-sync', { filePath, target: filePath });
+    const result = await (options.syncDirectory ?? syncParentDirectoryBestEffort)(filePath);
+    await emitMutationPhase(options, 'after-destination-directory-sync', { filePath, target: filePath, ...result });
+    assertSuccessfulSync(result, {
+        code: 'EDIRECTORYSYNC',
+        message: `Falha ao sincronizar diretório da escrita atômica: ${filePath}`,
+    });
+    return result;
 }

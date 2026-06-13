@@ -9,7 +9,7 @@ import { randomBytes } from 'node:crypto';
 import { copyFile, link, readFile, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { sha256 } from '../../shared/hash.js';
-import { syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
+import { assertSuccessfulSync, syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
 
 /**
@@ -29,6 +29,8 @@ async function readFileIntegrity(filePath) {
  *     expectedSourceHash?: string;
  *     expectedSourceBytes?: number;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     syncFile?: typeof syncFileBestEffort;
+ *     syncDirectory?: typeof syncParentDirectoryBestEffort;
  * }} [options]
  * @returns {Promise<{
  *     crossDevice: boolean;
@@ -44,22 +46,19 @@ export async function moveFileUnlocked(source, destination, options = {}) {
             await emitMutationPhase(options, 'before-publish', { source, destination, exclusive: true });
             await link(source, destination);
             await emitMutationPhase(options, 'after-publish', { source, destination, exclusive: true });
-            await syncParentDirectoryBestEffort(destination);
+            try {
+                await syncMoveDirectory(options, destination, 'destination', { source, destination, crossDevice: false });
+            } catch (syncError) {
+                return duplicatedMoveResult(options, syncError, false);
+            }
             try {
                 await emitMutationPhase(options, 'before-source-unlink', { source, destination, crossDevice: false });
                 await unlink(source);
-                await syncParentDirectoryBestEffort(source);
             } catch (unlinkError) {
-                return {
-                    crossDevice: false,
-                    duplicatedAfterCrossDeviceMove: true,
-                    sourceUnlinkErrorCode: String(
-                        /** @type {{ code?: unknown }} */ (unlinkError)?.code ?? 'UNKNOWN',
-                    ),
-                    destinationHash: options.expectedSourceHash ?? null,
-                    destinationBytes: options.expectedSourceBytes ?? null,
-                };
+                return duplicatedMoveResult(options, unlinkError, false);
             }
+            await emitMutationPhase(options, 'after-source-unlink', { source, destination, crossDevice: false });
+            await syncMoveDirectory(options, source, 'source', { source, destination, crossDevice: false });
             return {
                 crossDevice: false,
                 duplicatedAfterCrossDeviceMove: false,
@@ -78,9 +77,9 @@ export async function moveFileUnlocked(source, destination, options = {}) {
         await emitMutationPhase(options, 'before-publish', { source, destination, exclusive: false });
         await rename(source, destination);
         await emitMutationPhase(options, 'after-publish', { source, destination, exclusive: false });
-        await syncParentDirectoryBestEffort(destination);
+        await syncMoveDirectory(options, destination, 'destination', { source, destination, crossDevice: false });
         if (path.dirname(source) !== path.dirname(destination)) {
-            await syncParentDirectoryBestEffort(source);
+            await syncMoveDirectory(options, source, 'source', { source, destination, crossDevice: false });
         }
         return {
             crossDevice: false,
@@ -104,6 +103,8 @@ export async function moveFileUnlocked(source, destination, options = {}) {
  *     expectedSourceHash?: string;
  *     expectedSourceBytes?: number;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     syncFile?: typeof syncFileBestEffort;
+ *     syncDirectory?: typeof syncParentDirectoryBestEffort;
  * }} options
  * @returns {ReturnType<typeof moveFileUnlocked>}
  */
@@ -133,13 +134,13 @@ async function moveFileAcrossDevices(source, destination, options) {
             /** @type {{ code?: string }} */ (err).code = 'ECOPYMISMATCH';
             throw err;
         }
-        const syncResult = await syncFileBestEffort(tmpDestination);
-        if (syncResult.attempted && !syncResult.ok && !syncResult.skippedReason) {
-            const error = new Error(`Falha ao sincronizar move cross-device: ${tmpDestination}`);
-            /** @type {{ code?: string; cause?: unknown }} */ (error).code = 'EFILESYNC';
-            /** @type {{ code?: string; cause?: unknown }} */ (error).cause = syncResult.errorCode;
-            throw error;
-        }
+        await emitMutationPhase(options, 'before-file-sync', { source, destination, target: tmpDestination });
+        const syncResult = await (options.syncFile ?? syncFileBestEffort)(tmpDestination);
+        await emitMutationPhase(options, 'after-file-sync', { source, destination, target: tmpDestination, ...syncResult });
+        assertSuccessfulSync(syncResult, {
+            code: 'EFILESYNC',
+            message: `Falha ao sincronizar move cross-device: ${tmpDestination}`,
+        });
         if (options.overwrite) {
             await emitMutationPhase(options, 'before-publish', { source, destination, tmpDestination, exclusive: false });
             await rename(tmpDestination, destination);
@@ -151,20 +152,19 @@ async function moveFileAcrossDevices(source, destination, options) {
             await unlink(tmpDestination);
         }
         tmpCreated = false;
-        await syncParentDirectoryBestEffort(destination);
+        try {
+            await syncMoveDirectory(options, destination, 'destination', { source, destination, crossDevice: true });
+        } catch (syncError) {
+            return duplicatedMoveResult(options, syncError, true, tempAfter);
+        }
         try {
             await emitMutationPhase(options, 'before-source-unlink', { source, destination, crossDevice: true });
             await unlink(source);
-            await syncParentDirectoryBestEffort(source);
         } catch (unlinkError) {
-            return {
-                crossDevice: true,
-                duplicatedAfterCrossDeviceMove: true,
-                sourceUnlinkErrorCode: String(/** @type {{ code?: unknown }} */ (unlinkError)?.code ?? 'UNKNOWN'),
-                destinationHash: tempAfter.contentHash,
-                destinationBytes: tempAfter.bytes,
-            };
+            return duplicatedMoveResult(options, unlinkError, true, tempAfter);
         }
+        await emitMutationPhase(options, 'after-source-unlink', { source, destination, crossDevice: true });
+        await syncMoveDirectory(options, source, 'source', { source, destination, crossDevice: true });
         return {
             crossDevice: true,
             duplicatedAfterCrossDeviceMove: false,
@@ -178,4 +178,36 @@ async function moveFileAcrossDevices(source, destination, options) {
         }
         throw error;
     }
+}
+
+/**
+ * @param {NonNullable<Parameters<typeof moveFileUnlocked>[2]>} options
+ * @param {string} target
+ * @param {'source' | 'destination'} role
+ * @param {Record<string, unknown>} details
+ */
+async function syncMoveDirectory(options, target, role, details) {
+    await emitMutationPhase(options, `before-${role}-directory-sync`, { ...details, target });
+    const result = await (options.syncDirectory ?? syncParentDirectoryBestEffort)(target);
+    await emitMutationPhase(options, `after-${role}-directory-sync`, { ...details, target, ...result });
+    assertSuccessfulSync(result, {
+        code: 'EDIRECTORYSYNC',
+        message: `Falha ao sincronizar diretório ${role} do move: ${target}`,
+    });
+}
+
+/**
+ * @param {NonNullable<Parameters<typeof moveFileUnlocked>[2]>} options
+ * @param {unknown} error
+ * @param {boolean} crossDevice
+ * @param {{ contentHash: string; bytes: number }} [integrity]
+ */
+function duplicatedMoveResult(options, error, crossDevice, integrity) {
+    return {
+        crossDevice,
+        duplicatedAfterCrossDeviceMove: true,
+        sourceUnlinkErrorCode: String(/** @type {{ code?: unknown }} */ (error)?.code ?? 'UNKNOWN'),
+        destinationHash: integrity?.contentHash ?? options.expectedSourceHash ?? null,
+        destinationBytes: integrity?.bytes ?? options.expectedSourceBytes ?? null,
+    };
 }
