@@ -77,6 +77,7 @@ function normalizeCreateExclusiveError(filePath, error) {
  *     lockWaitMs: number;
  *     previousHash: string | null;
  *     contentHash: string;
+ *     durability: Awaited<ReturnType<typeof writeAtomicFileUnlocked>>;
  * }>}
  */
 export async function writeFileAtomic(filePath, content, options = {}) {
@@ -121,11 +122,11 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                         previousHash = assertExpectedSha256(await fs.readFile(filePath), options.expectedHash);
                     }
 
-                    await writeAtomicFileUnlocked(filePath, payload, {
+                    const durability = await writeAtomicFileUnlocked(filePath, payload, {
                         ...(options.mode === undefined ? {} : { mode: options.mode }),
                         exclusive: Boolean(options.failIfExists),
                     });
-                    return { path: filePath, bytesWritten: bytes, previousHash, contentHash };
+                    return { path: filePath, bytesWritten: bytes, previousHash, contentHash, durability };
                 });
             } finally {
                 await lease.releaseAsync();
@@ -148,6 +149,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                     lockWaitMs: waitMs,
                     expectedHash: options.expectedHash ?? null,
                     contentHash,
+                    durability: value.durability,
                 },
             }),
             true,

@@ -38,6 +38,9 @@ async function readFileIntegrity(filePath) {
  *     sourceUnlinkErrorCode: string | null;
  *     destinationHash: string | null;
  *     destinationBytes: number | null;
+ *     fileSync: Awaited<ReturnType<typeof syncFileBestEffort>> | null;
+ *     destinationDirectorySync: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
+ *     sourceDirectorySync: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
  * }>}
  */
 export async function moveFileUnlocked(source, destination, options = {}) {
@@ -46,25 +49,39 @@ export async function moveFileUnlocked(source, destination, options = {}) {
             await emitMutationPhase(options, 'before-publish', { source, destination, exclusive: true });
             await link(source, destination);
             await emitMutationPhase(options, 'after-publish', { source, destination, exclusive: true });
+            let destinationDirectorySync;
             try {
-                await syncMoveDirectory(options, destination, 'destination', { source, destination, crossDevice: false });
+                destinationDirectorySync = await syncMoveDirectory(options, destination, 'destination', {
+                    source,
+                    destination,
+                    crossDevice: false,
+                });
             } catch (syncError) {
-                return duplicatedMoveResult(options, syncError, false);
+                return duplicatedMoveResult(options, syncError, false, undefined, {
+                    destinationDirectorySync: syncResultFromError(syncError),
+                });
             }
             try {
                 await emitMutationPhase(options, 'before-source-unlink', { source, destination, crossDevice: false });
                 await unlink(source);
             } catch (unlinkError) {
-                return duplicatedMoveResult(options, unlinkError, false);
+                return duplicatedMoveResult(options, unlinkError, false, undefined, { destinationDirectorySync });
             }
             await emitMutationPhase(options, 'after-source-unlink', { source, destination, crossDevice: false });
-            await syncMoveDirectory(options, source, 'source', { source, destination, crossDevice: false });
+            const sourceDirectorySync = await syncMoveDirectory(options, source, 'source', {
+                source,
+                destination,
+                crossDevice: false,
+            });
             return {
                 crossDevice: false,
                 duplicatedAfterCrossDeviceMove: false,
                 sourceUnlinkErrorCode: null,
                 destinationHash: options.expectedSourceHash ?? null,
                 destinationBytes: options.expectedSourceBytes ?? null,
+                fileSync: null,
+                destinationDirectorySync,
+                sourceDirectorySync,
             };
         } catch (error) {
             const errCode = /** @type {{ code?: unknown }} */ (error)?.code;
@@ -77,9 +94,18 @@ export async function moveFileUnlocked(source, destination, options = {}) {
         await emitMutationPhase(options, 'before-publish', { source, destination, exclusive: false });
         await rename(source, destination);
         await emitMutationPhase(options, 'after-publish', { source, destination, exclusive: false });
-        await syncMoveDirectory(options, destination, 'destination', { source, destination, crossDevice: false });
+        const destinationDirectorySync = await syncMoveDirectory(options, destination, 'destination', {
+            source,
+            destination,
+            crossDevice: false,
+        });
+        let sourceDirectorySync = null;
         if (path.dirname(source) !== path.dirname(destination)) {
-            await syncMoveDirectory(options, source, 'source', { source, destination, crossDevice: false });
+            sourceDirectorySync = await syncMoveDirectory(options, source, 'source', {
+                source,
+                destination,
+                crossDevice: false,
+            });
         }
         return {
             crossDevice: false,
@@ -87,6 +113,9 @@ export async function moveFileUnlocked(source, destination, options = {}) {
             sourceUnlinkErrorCode: null,
             destinationHash: options.expectedSourceHash ?? null,
             destinationBytes: options.expectedSourceBytes ?? null,
+            fileSync: null,
+            destinationDirectorySync,
+            sourceDirectorySync,
         };
     } catch (error) {
         const errCode = /** @type {{ code?: unknown }} */ (error)?.code;
@@ -152,25 +181,43 @@ async function moveFileAcrossDevices(source, destination, options) {
             await unlink(tmpDestination);
         }
         tmpCreated = false;
+        let destinationDirectorySync;
         try {
-            await syncMoveDirectory(options, destination, 'destination', { source, destination, crossDevice: true });
+            destinationDirectorySync = await syncMoveDirectory(options, destination, 'destination', {
+                source,
+                destination,
+                crossDevice: true,
+            });
         } catch (syncError) {
-            return duplicatedMoveResult(options, syncError, true, tempAfter);
+            return duplicatedMoveResult(options, syncError, true, tempAfter, {
+                fileSync: syncResult,
+                destinationDirectorySync: syncResultFromError(syncError),
+            });
         }
         try {
             await emitMutationPhase(options, 'before-source-unlink', { source, destination, crossDevice: true });
             await unlink(source);
         } catch (unlinkError) {
-            return duplicatedMoveResult(options, unlinkError, true, tempAfter);
+            return duplicatedMoveResult(options, unlinkError, true, tempAfter, {
+                fileSync: syncResult,
+                destinationDirectorySync,
+            });
         }
         await emitMutationPhase(options, 'after-source-unlink', { source, destination, crossDevice: true });
-        await syncMoveDirectory(options, source, 'source', { source, destination, crossDevice: true });
+        const sourceDirectorySync = await syncMoveDirectory(options, source, 'source', {
+            source,
+            destination,
+            crossDevice: true,
+        });
         return {
             crossDevice: true,
             duplicatedAfterCrossDeviceMove: false,
             sourceUnlinkErrorCode: null,
             destinationHash: tempAfter.contentHash,
             destinationBytes: tempAfter.bytes,
+            fileSync: syncResult,
+            destinationDirectorySync,
+            sourceDirectorySync,
         };
     } catch (error) {
         if (tmpCreated) {
@@ -194,6 +241,7 @@ async function syncMoveDirectory(options, target, role, details) {
         code: 'EDIRECTORYSYNC',
         message: `Falha ao sincronizar diretório ${role} do move: ${target}`,
     });
+    return result;
 }
 
 /**
@@ -201,13 +249,32 @@ async function syncMoveDirectory(options, target, role, details) {
  * @param {unknown} error
  * @param {boolean} crossDevice
  * @param {{ contentHash: string; bytes: number }} [integrity]
+ * @param {{
+ *     fileSync?: Awaited<ReturnType<typeof syncFileBestEffort>> | null;
+ *     destinationDirectorySync?: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
+ *     sourceDirectorySync?: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
+ * }} [syncs]
  */
-function duplicatedMoveResult(options, error, crossDevice, integrity) {
+function duplicatedMoveResult(options, error, crossDevice, integrity, syncs = {}) {
     return {
         crossDevice,
         duplicatedAfterCrossDeviceMove: true,
         sourceUnlinkErrorCode: String(/** @type {{ code?: unknown }} */ (error)?.code ?? 'UNKNOWN'),
         destinationHash: integrity?.contentHash ?? options.expectedSourceHash ?? null,
         destinationBytes: integrity?.bytes ?? options.expectedSourceBytes ?? null,
+        fileSync: syncs.fileSync ?? null,
+        destinationDirectorySync: syncs.destinationDirectorySync ?? null,
+        sourceDirectorySync: syncs.sourceDirectorySync ?? null,
     };
+}
+
+/**
+ * @param {unknown} error
+ * @returns {Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null}
+ */
+function syncResultFromError(error) {
+    return (
+        /** @type {{ syncResult?: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> }} */ (error)?.syncResult ??
+        null
+    );
 }

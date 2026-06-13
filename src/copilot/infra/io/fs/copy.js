@@ -24,7 +24,13 @@ import { readBinaryMutationSnapshot } from './snapshot.js';
  *     syncFile?: typeof syncFileBestEffort;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
  * }} [options]
- * @returns {Promise<{ destinationHash: string; destinationBytes: number; staged: true }>}
+ * @returns {Promise<{
+ *     destinationHash: string;
+ *     destinationBytes: number;
+ *     staged: true;
+ *     fileSync: Awaited<ReturnType<typeof syncFileBestEffort>>;
+ *     destinationDirectorySync: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>>;
+ * }>}
  */
 export async function copyFileUnlocked(source, destination, options = {}) {
     const tmpDestination = path.join(
@@ -79,7 +85,13 @@ export async function copyFileUnlocked(source, destination, options = {}) {
             code: 'EDIRECTORYSYNC',
             message: `Falha ao sincronizar diretório da cópia staged: ${destination}`,
         });
-        return { destinationHash: tempHash, destinationBytes: tempAfter.bytesRead, staged: true };
+        return {
+            destinationHash: tempHash,
+            destinationBytes: tempAfter.bytesRead,
+            staged: true,
+            fileSync: syncResult,
+            destinationDirectorySync: directorySync,
+        };
     } catch (error) {
         if (tmpCreated) await unlink(tmpDestination).catch(() => undefined);
         throw error;

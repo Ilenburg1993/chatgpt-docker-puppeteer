@@ -50,8 +50,9 @@ export function shouldSyncDirectory(durability) {
 export function assertSuccessfulSync(result, options) {
     if (!result.attempted || result.ok || result.skippedReason) return;
     const error = new Error(options.message);
-    /** @type {{ code?: string; cause?: unknown }} */ (error).code = options.code;
-    /** @type {{ code?: string; cause?: unknown }} */ (error).cause = result.errorCode;
+    /** @type {{ code?: string; cause?: unknown; syncResult?: typeof result }} */ (error).code = options.code;
+    /** @type {{ code?: string; cause?: unknown; syncResult?: typeof result }} */ (error).cause = result.errorCode;
+    /** @type {{ code?: string; cause?: unknown; syncResult?: typeof result }} */ (error).syncResult = result;
     throw error;
 }
 

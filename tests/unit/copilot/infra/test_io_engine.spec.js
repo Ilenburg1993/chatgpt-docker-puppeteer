@@ -99,9 +99,15 @@ describe('infra/io-engine', () => {
                 lockWaitMs: expect.any(Number),
                 previousHash: null,
                 contentHash: expect.any(String),
+                durability: expect.objectContaining({
+                    durability: 'file-and-directory',
+                    fileFlushRequested: true,
+                    directorySync: expect.objectContaining({ attempted: true, ok: true }),
+                }),
                 io: expect.any(Object),
             }),
         );
+        expect(writeResult.io.advisoryLimits?.durability).toEqual(writeResult.durability);
     });
 
     it('readText retorna range vazio consistente quando startLine passa do fim', async () => {
@@ -246,6 +252,10 @@ describe('infra/io-engine', () => {
             Buffer.from('old-destination', 'utf8').toString('base64'),
         );
         expect(result.destinationPreviousSnapshotTruncated).toBe(false);
+        expect(result.fileSync).toMatchObject({ attempted: true, ok: true });
+        expect(result.destinationDirectorySync).toMatchObject({ attempted: true, ok: true });
+        expect(result.io.advisoryLimits?.fileSync).toEqual(result.fileSync);
+        expect(result.io.advisoryLimits?.destinationDirectorySync).toEqual(result.destinationDirectorySync);
         await expect(readFile(destination, 'utf8')).resolves.toBe('source-content');
     });
 
@@ -474,6 +484,10 @@ describe('infra/io-engine', () => {
             Buffer.from('existing-destination', 'utf8').toString('base64'),
         );
         expect(result.destinationPreviousSnapshotTruncated).toBe(false);
+        expect(result.fileSync).toBeNull();
+        expect(result.destinationDirectorySync).toMatchObject({ attempted: true, ok: true });
+        expect(result.sourceDirectorySync).toBeNull();
+        expect(result.io.advisoryLimits?.destinationDirectorySync).toEqual(result.destinationDirectorySync);
         await expect(readFile(destination, 'utf8')).resolves.toBe('incoming');
         await expect(readFile(source, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });
