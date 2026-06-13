@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `2097263e`, seguida da onda de streaming incremental de busca
+**Baseline reinvestigado:** `main` sincronizada até `e2a403fb`, seguida da onda de backpressure dos parser workers
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -23,9 +23,9 @@ explícitos por risco e o risco dominante migrou para custos de busca/cache e gu
 Prioridades reais remanescentes:
 
 1. **P2 — remove recursivo continua sem quarentena intrínseca:** callers precisam impor a proteção.
-2. **P2 — parser workers não expõem pressão de fila:** faltam backpressure e queue length no health.
-3. **P2 — L2/cache ainda carece de perfil experimental medido:** falta hit ratio/custo em cenário cold/warm.
-4. **P2 — preflight de espaço livre ainda inexiste:** writes/copies grandes só descobrem ENOSPC durante a operação.
+2. **P2 — L2/cache ainda carece de perfil experimental medido:** falta hit ratio/custo em cenário cold/warm.
+3. **P2 — preflight de espaço livre ainda inexiste:** writes/copies grandes só descobrem ENOSPC durante a operação.
+4. **P2 — readiness de escopo ainda mistura ready/degraded:** erros em `declareScope` podem parecer sucesso.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -661,6 +661,39 @@ Validação:
 - lint focado dos arquivos alterados: **PASS**.
 - search subprocess, search infra, engine e MCP tools: **89 passados, 0 falhas**.
 
+### 1.25 Status de implementação — parser worker backpressure aplicado em 2026-06-12
+
+A Fase 4.3 deixou de depender de uma fila in-memory ilimitada para parser workers.
+
+Mudanças efetivamente incorporadas:
+
+- `IO_PARSER_WORKER_QUEUE_MAX` foi introduzido como knob especializado, com default adaptativo
+  `max(16, workerPoolSize * 32)`;
+- valores inválidos recuperam para o default adaptativo; valores válidos são limitados a `0..10000`;
+- `queueMax=0` permite dispatch imediato quando há worker livre, mas rejeita backlog;
+- requests na fila têm timeout end-to-end: o orçamento começa enquanto o arquivo ainda aguarda worker;
+- rejeição por fila cheia, timeout de fila e timeout de worker retornam `parseError` parcial em vez de cair para parse
+  síncrono e aumentar pressão no event loop;
+- workers ficam `unref()` quando ociosos e `ref()` apenas durante uma task ativa;
+- `resetParserCacheForTest()` passou a ser awaitable, e teardown de workers ficou explícito por opção;
+- `getParserCacheStats()` e o health de IO agora expõem `workerQueueMax`, `workerQueueLength`,
+  `workerQueueHighWater`, `workerQueueRejected`, `workerQueueTimeouts`, `workerQueueWaitMsLast` e
+  `workerQueueWaitMsMax`;
+- `.env.expert.example`, `.env.schema.json` e `ENV_VARIABLES_GUIDE.md` foram alinhados com o novo knob.
+
+Limite observado:
+
+- Node 24 ainda pode manter um `MessagePort` vivo depois de um ciclo artificial de worker em subprocesso curto; o teste de
+  backpressure força `process.exit(0)` após imprimir o resultado isolado. O contrato de fila/health não depende desse
+  detalhe, mas a investigação de handles pode ser retomada se CLIs reais voltarem a prender processo.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- lint focado dos arquivos alterados: **PASS**.
+- env: `audit-env-surface`, `validate-env` e `check-env-local`: **PASS**.
+- parser e IO observability: **28 passados, 0 falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -899,7 +932,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-020 | P1 | Bypass export | `terminal/commands/export.js` usa `writeFile` direto | Busca de bypass | Export pode sobrescrever sem IO meta/hash | Migrar para `createOrReplaceFileAtomic`/`writeFileAtomic` conforme política |
 | IO-021 | P2 | Temp naming | Temp random é 32-bit | `randomBytes(4)` | Colisão improvável, mas barata de melhorar | Usar 96/128 bits e prefixo dot-hidden `.tmp-<pid>-<random>` |
 | IO-022 | P2 | Remove recursive | Remoção recursiva invalida, mas não há quarentena por default na engine | `removePathLocked` | Erro humano em caller destrutivo | Preferir quarantine nos tools, exigir confirmação e snapshot de árvore |
-| IO-023 | P2 | Parser reset | Reset de workers em teste é assíncrono e chamado com `void` | `io-parser.js` | Testes podem flakear | Exportar/reset async e adaptar testes |
+| IO-023 | P2 | Parser reset | **Concluído:** reset de parser é awaitable e testes aguardam isolamento | `io-parser.js`, `test_io_parser.spec.js` | Teardown de workers é explícito para evitar churn por teste | Usar shutdown/reset com teardown em processos one-shot |
 | IO-024 | P2 | Scope readiness | `declareScope` marca ready mesmo em catch | `io-session-scope.js` | Erros silenciosos podem parecer sucesso | Separar `ready` de `degraded`, expor erro resumido |
 | IO-025 | P2 | Observability | **Concluído:** espera, fila e leases L0/L1 são bounded e sanitizados | histogramas globais/por operação, p95, outcomes e amostra por hash no health | Paths não entram no snapshot; métricas são cumulativas por processo | Usar os dados para definir perfis de ativação do L1 |
 | IO-026 | P2 | Search subprocess | **Concluído:** `rg`/`grep` textuais processam stdout incrementalmente | `subprocess.js`, `text-search.js` | `maxBuffer` permanece como proteção contra linha/chunk anômalo | Monitorar `streamStoppedEarly` e custo em buscas grandes |
@@ -919,14 +952,15 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-040 | P2 | Scanner | **Concluído:** tipo básico vem de `Dirent` | `readdir({ withFileTypes:true })`; `lstat` só para arquivo/ambíguo | Reduz syscalls de classificação | Preservar benchmark e testar DT_UNKNOWN |
 | IO-041 | P0 | Lock wait | **Concluído:** timer aguardado não usa `unref()` | prova multiprocess reproduziu exit 13 durante espera L1 | Processo podia encerrar antes de adquirir/rejeitar lock | Manter `unref()` apenas em heartbeat/background |
 | IO-042 | P0 | Move durability | **Concluído:** sync posterior ao unlink não é confundido com falha de unlink | fases de source unlink e source directory sync foram separadas | Resultado podia reportar duplicação quando a origem já havia sido removida | Manter provas de falha antes/depois do unlink |
+| IO-043 | P2 | Parser workers | **Concluído:** fila bounded, timeout end-to-end e health de pressão | `io-parser.js`, `io-health.js` | Subprocesso curto em Node 24 ainda pode precisar `process.exit` no teste isolado | Monitorar `workerQueueRejected`/`workerQueueTimeouts` em workloads reais |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-025, IO-026, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-023, IO-025, IO-026, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-038 |
-| Parcial | IO-009, IO-023 |
+| Parcial | IO-009 |
 | Aberto | IO-018, IO-021, IO-022, IO-024, IO-027, IO-028, IO-030 |
 
 ---
@@ -1221,8 +1255,8 @@ A situação ideal é uma infra IO em camadas:
 #### Fase 4.3 — Parser workers
 
 - [x] Reset async interno existe e shutdown público aguarda.
-- [ ] Backpressure/limite de fila.
-- [ ] Queue length e timeout por arquivo no health.
+- [x] Backpressure/limite de fila.
+- [x] Queue length e timeout por arquivo no health.
 
 ### Faixa 5 — Provas
 
@@ -1373,5 +1407,5 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Implementar backpressure explícito para parser workers: limite de fila, rejeição/timeout por arquivo e exposição de
-queue length no health, mantendo shutdown/reset assíncronos determinísticos.
+Implementar quarentena intrínseca ou confirmação reforçada para remoção recursiva, com snapshot de árvore antes da
+remoção destrutiva e integração ao contrato público de IO.
