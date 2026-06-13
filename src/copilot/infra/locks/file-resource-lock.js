@@ -24,6 +24,7 @@ const MAX_HEARTBEAT_MS = 30_000;
 const LOCK_SCHEMA_VERSION = 1;
 
 /** @typedef {'none' | 'file' | 'file-and-directory'} IoDurabilityMode */
+/** @typedef {'off' | 'high-risk' | 'mutations' | 'all'} FileResourceLockProfile */
 
 /**
  * @typedef {object} FileResourceLockMetadata
@@ -76,17 +77,52 @@ let heartbeatFailures = 0;
 
 /**
  * @param {unknown} value
- * @returns {boolean}
+ * @returns {FileResourceLockProfile}
  */
-function isTruthyEnv(value) {
-    return /^(1|true|yes|on)$/i.test(String(value ?? '').trim());
+function normalizeFileResourceLockProfile(value) {
+    const normalized = String(value ?? '')
+        .trim()
+        .toLowerCase();
+    if (!normalized || /^(0|false|no|off)$/.test(normalized)) return 'off';
+    if (/^(1|true|yes|on)$/.test(normalized)) return 'all';
+    if (normalized === 'high-risk' || normalized === 'mutations' || normalized === 'all') return normalized;
+    const error = /** @type {Error & { code?: string }} */ (
+        new Error(
+            `COPILOT_IO_FILE_LOCKS_ENABLED inválido "${normalized}". Valores: off, high-risk, mutations, all.`,
+        )
+    );
+    error.code = 'ERR_IO_FILE_LOCK_PROFILE';
+    throw error;
+}
+
+/**
+ * @returns {FileResourceLockProfile}
+ */
+export function getFileResourceLockProfile() {
+    return normalizeFileResourceLockProfile(process.env['COPILOT_IO_FILE_LOCKS_ENABLED']);
 }
 
 /**
  * @returns {boolean}
  */
 export function isFileResourceLockEnabledByEnv() {
-    return isTruthyEnv(process.env['COPILOT_IO_FILE_LOCKS_ENABLED']);
+    return getFileResourceLockProfile() !== 'off';
+}
+
+/**
+ * @param {{
+ *     explicit?: boolean;
+ *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ * }} [options]
+ * @returns {boolean}
+ */
+export function shouldAcquireFileResourceLock(options = {}) {
+    if (options.explicit === true) return true;
+    const profile = getFileResourceLockProfile();
+    if (profile === 'off') return false;
+    if (profile === 'all') return true;
+    if (profile === 'high-risk') return options.riskClass === 'high' || options.riskClass === 'critical';
+    return options.riskClass === 'medium' || options.riskClass === 'high' || options.riskClass === 'critical';
 }
 
 /**
@@ -133,6 +169,8 @@ export function getFileResourceLockPath(resourceKey, lockDir = getFileResourceLo
 /**
  * @returns {{
  *     enabledByEnv: boolean;
+ *     profile: FileResourceLockProfile;
+ *     configurationValid: boolean;
  *     activeLeases: number;
  *     queuedWaiters: number;
  *     queueDepthHighWater: number;
@@ -157,8 +195,18 @@ export function getFileResourceLockPath(resourceKey, lockDir = getFileResourceLo
  */
 export function getFileResourceLockStats() {
     const now = Date.now();
+    /** @type {FileResourceLockProfile} */
+    let profile = 'off';
+    let configurationValid = true;
+    try {
+        profile = getFileResourceLockProfile();
+    } catch {
+        configurationValid = false;
+    }
     return {
-        enabledByEnv: isFileResourceLockEnabledByEnv(),
+        enabledByEnv: configurationValid && profile !== 'off',
+        profile,
+        configurationValid,
         activeLeases: activeFileLocks.size,
         queuedWaiters: fileLockCounters.queuedWaiters,
         queueDepthHighWater: fileLockCounters.queueDepthHighWater,

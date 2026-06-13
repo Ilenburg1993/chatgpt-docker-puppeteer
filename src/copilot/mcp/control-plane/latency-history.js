@@ -50,14 +50,18 @@ export async function appendMcpLatencyDashboardSnapshot(snapshot, options = {}) 
         snapshot: compactSnapshot(snapshot),
     };
     try {
-        const { value: retainedSnapshots } = await withIoResourceLock(filePath, async () => {
-            await fs.mkdir(path.dirname(filePath), { recursive: true });
-            await appendTextLocked(filePath, `${JSON.stringify(entry)}\n`, {
-                encoding: 'utf8',
-                advisoryLimits: { domain: 'mcp-latency-history' },
-            });
-            return trimLatencyHistoryFile(filePath, maxSnapshots);
-        });
+        const { value: retainedSnapshots } = await withIoResourceLock(
+            filePath,
+            async () => {
+                await fs.mkdir(path.dirname(filePath), { recursive: true });
+                await appendTextLocked(filePath, `${JSON.stringify(entry)}\n`, {
+                    encoding: 'utf8',
+                    advisoryLimits: { domain: 'mcp-latency-history' },
+                });
+                return trimLatencyHistoryFile(filePath, maxSnapshots);
+            },
+            { operation: 'mcp-latency-history', target: filePath, riskClass: 'medium' },
+        );
         return {
             persisted: true,
             path: toWorkspaceRelativePath(filePath),

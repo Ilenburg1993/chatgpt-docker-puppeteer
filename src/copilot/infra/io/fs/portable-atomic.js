@@ -16,12 +16,20 @@ import { writeAtomicFileUnlocked } from './write-atomic.js';
 /**
  * @param {string} filePath
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} content
- * @param {{ mode?: number }} [options]
+ * @param {{ mode?: number; riskClass?: import('#copilot/core/io-contracts').IoRiskClass }} [options]
  * @returns {Promise<void>}
  */
 export async function writeFileAtomicPortable(filePath, content, options = {}) {
-    await withIoResourceLock(filePath, async () => {
-        await mkdir(path.dirname(filePath), { recursive: true });
-        await writeAtomicFileUnlocked(filePath, content, options);
-    });
+    await withIoResourceLock(
+        filePath,
+        async () => {
+            await mkdir(path.dirname(filePath), { recursive: true });
+            await writeAtomicFileUnlocked(filePath, content, options);
+        },
+        {
+            operation: 'trusted-write',
+            target: filePath,
+            riskClass: options.riskClass ?? 'medium',
+        },
+    );
 }

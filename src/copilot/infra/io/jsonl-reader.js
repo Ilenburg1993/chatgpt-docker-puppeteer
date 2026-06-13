@@ -38,37 +38,49 @@ export async function repairJsonlTrailingPartial(filePath, options = {}) {
         Math.trunc(options.maxTrailingRecordBytes ?? DEFAULT_MAX_TRAILING_RECORD_BYTES),
     );
     try {
-        const { value } = await withIoResourceLock(filePath, async () => {
-            /** @type {import('node:fs/promises').FileHandle | null} */
-            let handle = null;
-            try {
-                handle = await open(filePath, 'r+');
-                const { size } = await handle.stat();
-                if (size === 0) return repairResult('empty', size, size);
-
-                const readStart = Math.max(0, size - maxTrailingRecordBytes);
-                const trailing = Buffer.alloc(size - readStart);
-                await handle.read(trailing, 0, trailing.byteLength, readStart);
-                if (trailing.at(-1) === 0x0a) return repairResult('newline-terminated', size, size);
-
-                const lastNewline = trailing.lastIndexOf(0x0a);
-                if (readStart > 0 && lastNewline < 0) return repairResult('trailing-record-too-large', size, size);
-                const recordStart = lastNewline < 0 ? 0 : readStart + lastNewline + 1;
-                const record = trailing.subarray(lastNewline + 1).toString('utf8');
+        const { value } = await withIoResourceLock(
+            filePath,
+            async () => {
+                /** @type {import('node:fs/promises').FileHandle | null} */
+                let handle = null;
                 try {
-                    JSON.parse(record);
-                    return repairResult('valid-trailing-record', size, size);
-                } catch {
-                    await options.onPhase?.('before-truncate', { filePath, previousBytes: size, finalBytes: recordStart });
-                    await handle.truncate(recordStart);
-                    if (options.flushToDisk !== false) await handle.sync();
-                    await options.onPhase?.('after-truncate', { filePath, previousBytes: size, finalBytes: recordStart });
-                    return repairResult('invalid-trailing-partial', size, recordStart);
+                    handle = await open(filePath, 'r+');
+                    const { size } = await handle.stat();
+                    if (size === 0) return repairResult('empty', size, size);
+
+                    const readStart = Math.max(0, size - maxTrailingRecordBytes);
+                    const trailing = Buffer.alloc(size - readStart);
+                    await handle.read(trailing, 0, trailing.byteLength, readStart);
+                    if (trailing.at(-1) === 0x0a) return repairResult('newline-terminated', size, size);
+
+                    const lastNewline = trailing.lastIndexOf(0x0a);
+                    if (readStart > 0 && lastNewline < 0) return repairResult('trailing-record-too-large', size, size);
+                    const recordStart = lastNewline < 0 ? 0 : readStart + lastNewline + 1;
+                    const record = trailing.subarray(lastNewline + 1).toString('utf8');
+                    try {
+                        JSON.parse(record);
+                        return repairResult('valid-trailing-record', size, size);
+                    } catch {
+                        await options.onPhase?.('before-truncate', {
+                            filePath,
+                            previousBytes: size,
+                            finalBytes: recordStart,
+                        });
+                        await handle.truncate(recordStart);
+                        if (options.flushToDisk !== false) await handle.sync();
+                        await options.onPhase?.('after-truncate', {
+                            filePath,
+                            previousBytes: size,
+                            finalBytes: recordStart,
+                        });
+                        return repairResult('invalid-trailing-partial', size, recordStart);
+                    }
+                } finally {
+                    await handle?.close();
                 }
-            } finally {
-                await handle?.close();
-            }
-        });
+            },
+            { operation: 'jsonl-repair', target: filePath, riskClass: 'high' },
+        );
         return value;
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;

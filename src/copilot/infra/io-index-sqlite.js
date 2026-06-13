@@ -514,7 +514,11 @@ export function createIoIndexSqlite(options) {
         async indexDirectory(rootPath, options = {}) {
             const normalizedRoot = normalizeIndexPath(options.workspaceRoot ?? rootPath);
             const lockKey = `io-index-build:${normalizedRoot}`;
-            const lease = await acquireIoResourceLock(lockKey);
+            const lease = await acquireIoResourceLock(lockKey, {
+                operation: 'index-build',
+                target: normalizedRoot,
+                riskClass: 'low',
+            });
             try {
                 const value = await lease.run(async () => {
                     const startedAt = Date.now();

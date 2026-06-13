@@ -459,6 +459,10 @@ async function readQuarantineMetadata(quarantineId) {
         const metadata = await readQuarantineMetadataFile(paths.metadataPath);
         if (!metadata || metadata.quarantineId !== parsedId.data) return null;
         return reconcileQuarantineMetadata(metadata, paths);
+    }, {
+        operation: 'quarantine-reconcile',
+        target: paths.metadataPath,
+        riskClass: 'high',
     });
     return value;
 }
@@ -664,6 +668,10 @@ async function quarantineResolvedFile(source) {
             throw error;
         }
         return { metadata, moved };
+    }, {
+        operation: 'quarantine-commit',
+        target: quarantinePaths.metadataPath,
+        riskClass: 'high',
     });
     return value;
 }
@@ -779,6 +787,10 @@ async function restoreQuarantinedFile(quarantineId, destination, overwrite) {
             }
             throw error;
         }
+    }, {
+        operation: 'quarantine-restore',
+        target: quarantinePaths.metadataPath,
+        riskClass: 'high',
     });
     return value;
 }

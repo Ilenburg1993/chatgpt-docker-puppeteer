@@ -172,7 +172,11 @@ export async function deleteFileLocked(filePath) {
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const lease = await acquireIoResourceLock(filePath);
+        const lease = await acquireIoResourceLock(filePath, {
+            operation: 'delete',
+            target: filePath,
+            riskClass: 'high',
+        });
         const value = await (async () => {
             try {
                 return await lease.run(async () => {
@@ -258,7 +262,11 @@ export async function removePathLocked(filePath, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const lease = await acquireIoResourceLock(filePath);
+        const lease = await acquireIoResourceLock(filePath, {
+            operation: 'delete',
+            target: filePath,
+            riskClass: 'high',
+        });
         try {
             await lease.run(async () =>
                 removePathUnlocked(filePath, { recursive: Boolean(options.recursive), force: Boolean(options.force) }),
@@ -316,8 +324,13 @@ export async function copyFileLocked(source, destination, options = {}) {
     assertValidIoFilePath(destination);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
+    const riskClass = options.overwrite ? 'high' : 'medium';
     try {
-        const lease = await acquireIoResourceLocks([source, destination]);
+        const lease = await acquireIoResourceLocks([source, destination], {
+            operation: 'copy',
+            target: destination,
+            riskClass,
+        });
         const value = await (async () => {
             try {
                 return await lease.run(async () => {
@@ -373,7 +386,7 @@ export async function copyFileLocked(source, destination, options = {}) {
                 bytesRead: value.sourceBytes,
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.fs.copyFile',
-                riskClass: options.overwrite ? 'high' : 'medium',
+                riskClass,
                 traceId,
                 advisoryLimits: {
                     lockWaitMs: waitMs,
@@ -421,7 +434,7 @@ export async function copyFileLocked(source, destination, options = {}) {
                 targetKind: 'file',
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.fs.copyFile',
-                riskClass: options.overwrite ? 'high' : 'medium',
+                riskClass,
                 traceId,
             }),
             false,
@@ -444,7 +457,11 @@ export async function moveFileLocked(source, destination, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const lease = await acquireIoResourceLocks([source, destination]);
+        const lease = await acquireIoResourceLocks([source, destination], {
+            operation: 'move',
+            target: destination,
+            riskClass: 'high',
+        });
         const value = await (async () => {
             try {
                 return await lease.run(async () => {
@@ -591,8 +608,13 @@ export async function patchTextLocked(filePath, options) {
     assertValidIoFilePath(filePath);
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
+    const riskClass = options.dryRun ? 'low' : 'high';
     try {
-        const lease = await acquireIoResourceLock(filePath);
+        const lease = await acquireIoResourceLock(filePath, {
+            operation: 'patch',
+            target: filePath,
+            riskClass,
+        });
         const value = await (async () => {
             try {
                 return await lease.run(async () => {
@@ -663,7 +685,7 @@ export async function patchTextLocked(filePath, options) {
                 bytesWritten: value.bytesWritten,
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.patchTextLocked',
-                riskClass: 'high',
+                riskClass,
                 traceId,
                 advisoryLimits: {
                     ...(options.advisoryLimits ?? {}),
@@ -698,7 +720,7 @@ export async function patchTextLocked(filePath, options) {
                 targetKind: 'file',
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.patchTextLocked',
-                riskClass: 'high',
+                riskClass,
                 traceId,
             }),
             false,

@@ -13,7 +13,7 @@ import {
     acquireFileResourceLock,
     getFileResourceLockStats,
     hashFileResourceLockKey,
-    isFileResourceLockEnabledByEnv,
+    shouldAcquireFileResourceLock,
 } from './locks/file-resource-lock.js';
 import { createBoundedLockWaitMetrics, sanitizeLockOperation } from './locks/lock-observability.js';
 import { normalizePathResourceKey } from './policy/path-resource.js';
@@ -206,6 +206,7 @@ function waitForPrevious(previous, key, options) {
  *     fileLockStaleMs?: number;
  *     operation?: string;
  *     target?: string;
+ *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
  * }} [options]
  * @returns {Promise<IoResourceLockLease>}
  */
@@ -281,7 +282,10 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
 
     /** @type {Awaited<ReturnType<typeof acquireFileResourceLock>> | null} */
     let fileLockLease = null;
-    const shouldAcquireFileLock = options.fileLock === true || isFileResourceLockEnabledByEnv();
+    const shouldAcquireFileLock = shouldAcquireFileResourceLock({
+        ...(options.fileLock === undefined ? {} : { explicit: options.fileLock }),
+        ...(options.riskClass === undefined ? {} : { riskClass: options.riskClass }),
+    });
     if (shouldAcquireFileLock) {
         try {
             fileLockLease = await acquireFileResourceLock(key, {
@@ -356,7 +360,16 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
  * Compatível com `await using` via `Symbol.asyncDispose`.
  *
  * @param {string[]} resourceKeys
- * @param {{ timeoutMs?: number; signal?: AbortSignal }} [options]
+ * @param {{
+ *     timeoutMs?: number;
+ *     signal?: AbortSignal;
+ *     fileLock?: boolean;
+ *     fileLockDir?: string;
+ *     fileLockStaleMs?: number;
+ *     operation?: string;
+ *     target?: string;
+ *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ * }} [options]
  * @returns {Promise<IoResourceLocksLease>}
  */
 export async function acquireIoResourceLocks(resourceKeys, options = {}) {
@@ -422,7 +435,16 @@ export async function acquireIoResourceLocks(resourceKeys, options = {}) {
  * @template T
  * @param {string} resourceKey
  * @param {() => Promise<T>} operation
- * @param {{ timeoutMs?: number; signal?: AbortSignal }} [options]
+ * @param {{
+ *     timeoutMs?: number;
+ *     signal?: AbortSignal;
+ *     fileLock?: boolean;
+ *     fileLockDir?: string;
+ *     fileLockStaleMs?: number;
+ *     operation?: string;
+ *     target?: string;
+ *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ * }} [options]
  * @returns {Promise<{ value: T; waitMs: number }>}
  */
 export async function withIoResourceLock(resourceKey, operation, options = {}) {
@@ -444,7 +466,16 @@ export async function withIoResourceLock(resourceKey, operation, options = {}) {
  * @template T
  * @param {string[]} resourceKeys
  * @param {() => Promise<T>} operation
- * @param {{ timeoutMs?: number; signal?: AbortSignal }} [options]
+ * @param {{
+ *     timeoutMs?: number;
+ *     signal?: AbortSignal;
+ *     fileLock?: boolean;
+ *     fileLockDir?: string;
+ *     fileLockStaleMs?: number;
+ *     operation?: string;
+ *     target?: string;
+ *     riskClass?: import('#copilot/core/io-contracts').IoRiskClass;
+ * }} [options]
  * @returns {Promise<{ value: T; waitMs: number }>}
  */
 export async function withIoResourceLocks(resourceKeys, operation, options = {}) {

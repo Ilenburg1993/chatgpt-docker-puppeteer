@@ -86,10 +86,14 @@ export async function writeFileAtomic(filePath, content, options = {}) {
     const startedAt = nowIoMs();
     const { payload, bytes } = normalizeWritePayload(filePath, content, options.encoding ?? 'utf8');
     const contentHash = sha256(payload);
+    const riskClass = options.riskClass ?? 'medium';
     try {
         const lease = await acquireIoResourceLock(filePath, {
             ...(options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs }),
             ...(options.signal === undefined ? {} : { signal: options.signal }),
+            operation: 'write',
+            target: filePath,
+            riskClass,
         });
         const value = await (async () => {
             try {
@@ -142,7 +146,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                 bytesWritten: value.bytesWritten,
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.atomic-write',
-                riskClass: options.riskClass ?? 'medium',
+                riskClass,
                 traceId,
                 advisoryLimits: {
                     ...(options.advisoryLimits ?? {}),
@@ -164,7 +168,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                 targetKind: 'file',
                 durationMs: elapsedMs(startedAt),
                 engine: 'io-engine.atomic-write',
-                riskClass: options.riskClass ?? 'medium',
+                riskClass,
                 traceId,
             }),
             false,
@@ -217,6 +221,9 @@ export async function appendTextLocked(filePath, content, options = {}) {
         const lease = await acquireIoResourceLock(filePath, {
             ...(options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs }),
             ...(options.signal === undefined ? {} : { signal: options.signal }),
+            operation: 'append',
+            target: filePath,
+            riskClass: 'medium',
         });
         try {
             await lease.run(async () =>
@@ -277,11 +284,14 @@ export async function mkdirPathLocked(dirPath, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const { waitMs } = await withIoResourceLock(dirPath, async () =>
-            mkdirPathUnlocked(dirPath, {
-                recursive: Boolean(options.recursive),
-                ...(options.mode === undefined ? {} : { mode: options.mode }),
-            }),
+        const { waitMs } = await withIoResourceLock(
+            dirPath,
+            async () =>
+                mkdirPathUnlocked(dirPath, {
+                    recursive: Boolean(options.recursive),
+                    ...(options.mode === undefined ? {} : { mode: options.mode }),
+                }),
+            { operation: 'mkdir', target: dirPath, riskClass: 'medium' },
         );
         const io = publishAndReturn(
             buildIoMeta({

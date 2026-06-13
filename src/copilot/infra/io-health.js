@@ -155,6 +155,13 @@ export function readIoRuntimeHealthSnapshot() {
             message: 'Ao menos um timeout de aquisição L0/L1 foi observado no runtime.',
         });
     }
+    if (!locks.fileLocks.configurationValid) {
+        alerts.push({
+            code: 'IO_LOCK_PROFILE_INVALID',
+            severity: 'high',
+            message: 'COPILOT_IO_FILE_LOCKS_ENABLED possui um perfil inválido; ativações automáticas estão desabilitadas.',
+        });
+    }
 
     return {
         generatedAt: Date.now(),

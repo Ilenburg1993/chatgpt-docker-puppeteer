@@ -74,30 +74,34 @@ export function createJsonlFileWriter(options) {
      * @returns {Promise<void>}
      */
     async function persistBatch(filePath, data) {
-        await withIoResourceLock(filePath, async () => {
-            await mkdir(path.dirname(filePath), { recursive: true });
-            let currentSize = sizes.get(filePath);
-            if (currentSize === undefined) {
-                try {
-                    currentSize = (await stat(filePath)).size;
-                } catch (error) {
-                    if (errorCode(error) !== 'ENOENT') throw error;
-                    currentSize = 0;
+        await withIoResourceLock(
+            filePath,
+            async () => {
+                await mkdir(path.dirname(filePath), { recursive: true });
+                let currentSize = sizes.get(filePath);
+                if (currentSize === undefined) {
+                    try {
+                        currentSize = (await stat(filePath)).size;
+                    } catch (error) {
+                        if (errorCode(error) !== 'ENOENT') throw error;
+                        currentSize = 0;
+                    }
                 }
-            }
 
-            const dataBytes = utf8ByteLength(data, 'jsonl batch');
-            if (maxBytes !== null && currentSize > 0 && currentSize + dataBytes >= maxBytes) {
-                await options.onPhase?.('before-rotate', { filePath, currentSize, dataBytes });
-                await rename(filePath, resolveRotatedPath(filePath));
-                currentSize = 0;
-                await options.onPhase?.('after-rotate', { filePath, dataBytes });
-            }
-            await options.onPhase?.('before-append', { filePath, dataBytes });
-            await appendFile(filePath, data, { encoding: 'utf8', flush: flushToDisk });
-            await options.onPhase?.('after-append', { filePath, dataBytes });
-            sizes.set(filePath, currentSize + dataBytes);
-        });
+                const dataBytes = utf8ByteLength(data, 'jsonl batch');
+                if (maxBytes !== null && currentSize > 0 && currentSize + dataBytes >= maxBytes) {
+                    await options.onPhase?.('before-rotate', { filePath, currentSize, dataBytes });
+                    await rename(filePath, resolveRotatedPath(filePath));
+                    currentSize = 0;
+                    await options.onPhase?.('after-rotate', { filePath, dataBytes });
+                }
+                await options.onPhase?.('before-append', { filePath, dataBytes });
+                await appendFile(filePath, data, { encoding: 'utf8', flush: flushToDisk });
+                await options.onPhase?.('after-append', { filePath, dataBytes });
+                sizes.set(filePath, currentSize + dataBytes);
+            },
+            { operation: 'jsonl-append', target: filePath, riskClass: 'medium' },
+        );
     }
 
     /**

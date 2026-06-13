@@ -93,9 +93,13 @@ export async function writeStateFileJson(payload) {
  * @returns {Promise<void>}
  */
 export async function removeStateFileIfExists() {
-    await withIoResourceLock(STATE_FILE, async () => {
-        await rm(STATE_FILE, { force: true });
-    });
+    await withIoResourceLock(
+        STATE_FILE,
+        async () => {
+            await rm(STATE_FILE, { force: true });
+        },
+        { operation: 'agent-state-delete', target: STATE_FILE, riskClass: 'high' },
+    );
 }
 
 /**

@@ -15,13 +15,21 @@ import {
 import { acquireLock, releaseLock, releaseLockAsync } from '../../../../src/copilot/infra/lockfile.js';
 import {
     acquireFileResourceLock,
+    getFileResourceLockProfile,
     hashFileResourceLockKey,
+    shouldAcquireFileResourceLock,
 } from '../../../../src/copilot/infra/locks/file-resource-lock.js';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];
+const ORIGINAL_FILE_LOCK_PROFILE = process.env['COPILOT_IO_FILE_LOCKS_ENABLED'];
 
 afterEach(async () => {
+    if (ORIGINAL_FILE_LOCK_PROFILE === undefined) {
+        delete process.env['COPILOT_IO_FILE_LOCKS_ENABLED'];
+    } else {
+        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = ORIGINAL_FILE_LOCK_PROFILE;
+    }
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
         if (dir) await rm(dir, { recursive: true, force: true });
@@ -279,5 +287,69 @@ describe('infra locks', () => {
             }),
         ).rejects.toMatchObject({ code: 'ABORT_ERR' });
         expect(getIoLockStats().fileLocks.aborts).toBe(before.fileLocks.aborts + 1);
+    });
+
+    it('resolve perfis L1 por risco preservando booleano legado como all', () => {
+        delete process.env['COPILOT_IO_FILE_LOCKS_ENABLED'];
+        expect(getFileResourceLockProfile()).toBe('off');
+        expect(shouldAcquireFileResourceLock({ riskClass: 'critical' })).toBe(false);
+
+        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = 'high-risk';
+        expect(shouldAcquireFileResourceLock({ riskClass: 'medium' })).toBe(false);
+        expect(shouldAcquireFileResourceLock({ riskClass: 'high' })).toBe(true);
+        expect(shouldAcquireFileResourceLock({ riskClass: 'critical' })).toBe(true);
+
+        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = 'mutations';
+        expect(shouldAcquireFileResourceLock({ riskClass: 'low' })).toBe(false);
+        expect(shouldAcquireFileResourceLock({ riskClass: 'medium' })).toBe(true);
+
+        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = '1';
+        expect(getFileResourceLockProfile()).toBe('all');
+        expect(shouldAcquireFileResourceLock({ riskClass: 'low' })).toBe(true);
+        expect(shouldAcquireFileResourceLock()).toBe(true);
+    });
+
+    it('aplica high-risk no lock composto e mantém override explícito', async () => {
+        const dir = await createTempDir();
+        const lockDir = join(dir, '.profile-locks');
+        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = 'high-risk';
+
+        const medium = await acquireIoResourceLock(join(dir, 'medium.txt'), {
+            fileLockDir: lockDir,
+            operation: 'profile-medium',
+            riskClass: 'medium',
+        });
+        expect(medium.fileLockEnabled).toBe(false);
+        await medium.releaseAsync();
+
+        const high = await acquireIoResourceLock(join(dir, 'high.txt'), {
+            fileLockDir: lockDir,
+            operation: 'profile-high',
+            riskClass: 'high',
+        });
+        expect(high.fileLockEnabled).toBe(true);
+        await high.releaseAsync();
+
+        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = 'off';
+        const forced = await acquireIoResourceLock(join(dir, 'forced.txt'), {
+            fileLock: true,
+            fileLockDir: lockDir,
+            operation: 'profile-forced',
+            riskClass: 'low',
+        });
+        expect(forced.fileLockEnabled).toBe(true);
+        await forced.releaseAsync();
+    });
+
+    it('rejeita perfil L1 desconhecido e mantém health configurável', () => {
+        process.env['COPILOT_IO_FILE_LOCKS_ENABLED'] = 'surprise';
+        expect(() => getFileResourceLockProfile()).toThrow(
+            expect.objectContaining({ code: 'ERR_IO_FILE_LOCK_PROFILE' }),
+        );
+        expect(getIoLockStats().fileLocks).toMatchObject({
+            enabledByEnv: false,
+            profile: 'off',
+            configurationValid: false,
+        });
     });
 });
