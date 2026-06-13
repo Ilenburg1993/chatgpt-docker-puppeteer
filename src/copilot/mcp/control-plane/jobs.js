@@ -7,10 +7,10 @@
 
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readFile, readdir, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { writeFileAtomic } from '#copilot/infra/public/io';
+import { appendTextLocked, writeFileAtomic } from '#copilot/infra/public/io';
 import { getMcpWorkspaceRoot } from './paths.js';
 
 const MCP_JOBS_DIR = fileURLToPath(new URL('../../.ai/jobs/', import.meta.url));
@@ -177,10 +177,10 @@ export async function spawnValidatorJob(validator, options = {}) {
     if (!artifacts) throw new Error('Generated validator job id is invalid.');
     const { logFile, manifestFile } = artifacts;
     await mkdir(MCP_JOBS_DIR, { recursive: true });
-    await writeFile(
+    await writeFileAtomic(
         logFile,
         `$ ${command.command} ${command.args.join(' ')}\n[job:timeoutMs] ${timeoutMs}\n\n`,
-        'utf8',
+        { encoding: 'utf8', mode: 0o600, failIfExists: true, riskClass: 'medium' },
     );
 
     const child = spawn(command.command, command.args, {
@@ -415,5 +415,8 @@ async function readJobLogTail(id, requestedTailBytes) {
  * @returns {Promise<void>}
  */
 async function appendJobLog(logFile, chunk) {
-    await writeFile(logFile, String(chunk), { flag: 'a' });
+    await appendTextLocked(logFile, String(chunk), {
+        mode: 0o600,
+        advisoryLimits: { domain: 'mcp-validator-job-log' },
+    });
 }

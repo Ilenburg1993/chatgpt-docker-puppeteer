@@ -8,8 +8,9 @@
  */
 
 import { resolvePersistentConfigFile } from '#copilot/boot';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 import { existsSync } from 'node:fs';
-import { readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
+import { readFile as readFileAsync } from 'node:fs/promises';
 import { safeJsonParse } from '../core/safe-json.js';
 import {
     BUILTIN_HANDLER_MAP,
@@ -69,7 +70,7 @@ export async function readSkillsConfig() {
  * @returns {Promise<void>}
  */
 export async function writeSkillsConfig(config) {
-    await writeFileAsync(SKILLS_PATH, JSON.stringify(config, null, 2), 'utf8');
+    await writeFileAtomicPortable(SKILLS_PATH, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
 }
 
 /**

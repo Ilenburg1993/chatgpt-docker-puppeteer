@@ -24,10 +24,9 @@ import {
 } from 'jose';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { lookup as lookupDns } from 'node:dns/promises';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { request as httpsRequest } from 'node:https';
 import { BlockList, isIP } from 'node:net';
-import path from 'node:path';
 import {
     OAUTH_REPLAY_NAMESPACES,
     readPersistentOAuthReplayStatus,
@@ -2914,9 +2913,7 @@ async function persistRenewCredentials(env = process.env) {
  */
 async function writeRenewCredentialsFile(env = process.env) {
     const { refreshTokenFile } = readDevOAuthPersistenceConfig(env);
-    const tempFile = `${refreshTokenFile}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`;
     try {
-        await mkdir(path.dirname(refreshTokenFile), { recursive: true });
         const body = {
             schemaVersion: REFRESH_TOKEN_STORE_SCHEMA_VERSION,
             updatedAt: new Date().toISOString(),
@@ -2937,17 +2934,11 @@ async function writeRenewCredentialsFile(env = process.env) {
                 .filter((record) => record.expiresAt > Date.now())
                 .sort((left, right) => left.expiresAt - right.expiresAt || left.familyId.localeCompare(right.familyId)),
         };
-        await writeFile(tempFile, `${JSON.stringify(body, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
-        await rename(tempFile, refreshTokenFile);
+        await writeFileAtomicPortable(refreshTokenFile, `${JSON.stringify(body, null, 2)}\n`, { mode: 0o600 });
         renewCredentialsLastPersistedAt = body.updatedAt;
         renewCredentialsLastPersistenceError = null;
     } catch (error) {
         renewCredentialsLastPersistenceError = error instanceof Error ? error.message : String(error);
-        try {
-            await rm(tempFile, { force: true });
-        } catch {
-            // Best-effort temp cleanup only.
-        }
     }
 }
 
@@ -3069,9 +3060,7 @@ async function persistRegisteredClients(env = process.env) {
 async function writeRegisteredClientsFile(env = process.env) {
     pruneRegisteredClients();
     const { clientFile } = readDevOAuthPersistenceConfig(env);
-    const tempFile = `${clientFile}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`;
     try {
-        await mkdir(path.dirname(clientFile), { recursive: true });
         const body = {
             schemaVersion: CLIENT_STORE_SCHEMA_VERSION,
             updatedAt: new Date().toISOString(),
@@ -3079,17 +3068,11 @@ async function writeRegisteredClientsFile(env = process.env) {
                 .filter((client) => client.source === 'dcr')
                 .sort((left, right) => left.createdAt - right.createdAt || left.clientId.localeCompare(right.clientId)),
         };
-        await writeFile(tempFile, `${JSON.stringify(body, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
-        await rename(tempFile, clientFile);
+        await writeFileAtomicPortable(clientFile, `${JSON.stringify(body, null, 2)}\n`, { mode: 0o600 });
         registeredClientsLastPersistedAt = body.updatedAt;
         registeredClientsLastPersistenceError = null;
     } catch (error) {
         registeredClientsLastPersistenceError = error instanceof Error ? error.message : String(error);
-        try {
-            await rm(tempFile, { force: true });
-        } catch {
-            // Best-effort temp cleanup only.
-        }
     }
 }
 

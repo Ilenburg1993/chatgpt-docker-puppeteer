@@ -10,6 +10,7 @@
 
 import fs from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { writeFileAtomicPortable } from '#copilot/infra/public/io';
 
 import {
     applyModelGatewayEligibilityToSnapshot,
@@ -7713,9 +7714,7 @@ function mutateEnvLocal(mutate) {
             }
             const next = mutate(text);
             const normalized = next.endsWith('\n') ? next : `${next}\n`;
-            const temp = `${path}.tmp-${process.pid}-${Date.now()}`;
-            await fs.writeFile(temp, normalized, { encoding: 'utf8', mode: 0o600 });
-            await fs.rename(temp, path);
+            await writeFileAtomicPortable(path, normalized, { mode: 0o600 });
             await Promise.resolve(fs.chmod(path, 0o600)).catch(() => undefined);
         });
     envLocalMutationQueue = operation.then(

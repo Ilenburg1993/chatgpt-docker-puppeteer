@@ -802,6 +802,42 @@ describe('IO-038 — writers síncronos diretos possuem allowlist formal', () =>
     });
 });
 
+describe('IO-006 — writers assíncronos diretos ficam restritos a infra', () => {
+    it('produção fora de infra não importa nem chama writers de node:fs/promises', () => {
+        const mutators = ['appendFile', 'copyFile', 'link', 'rename', 'symlink', 'truncate', 'writeFile'];
+        const files = listJsFilesRecursive(COPILOT_ROOT);
+        /** @type {string[]} */
+        const violations = [];
+
+        for (const abs of files) {
+            const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
+            if (rel.startsWith('infra/')) continue;
+            const src = readFileSync(abs, 'utf-8');
+            const namedImport = src.match(/import\s*\{([^}]+)\}\s*from\s*['"]node:fs\/promises['"]/u)?.[1] ?? '';
+            for (const mutator of mutators) {
+                if (new RegExp(`\\b${mutator}(?:\\s+as\\s+\\w+)?\\b`, 'u').test(namedImport)) {
+                    violations.push(`${rel}: import ${mutator}`);
+                }
+            }
+            for (const match of src.matchAll(/import\s+(?:\*\s+as\s+)?(\w+)\s+from\s+['"]node:fs\/promises['"]/gu)) {
+                const binding = match[1];
+                if (!binding) continue;
+                for (const mutator of mutators) {
+                    if (new RegExp(`\\b${binding}\\.${mutator}\\s*\\(`, 'u').test(src)) {
+                        violations.push(`${rel}: ${binding}.${mutator}()`);
+                    }
+                }
+            }
+        }
+
+        assert.deepEqual(
+            violations,
+            [],
+            `Writer assíncrono direto fora de infra; use #copilot/infra/public/io:\n${violations.join('\n')}`,
+        );
+    });
+});
+
 describe('W86.6 — runtime pending-question seam extraído', () => {
     it('agent-runtime-state consome runtime/pending-question-state para operações de pending question', () => {
         const src = readSrc('agent/facades/agent-runtime-state.js');

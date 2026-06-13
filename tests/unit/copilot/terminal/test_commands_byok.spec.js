@@ -1376,6 +1376,10 @@ vi.mock('node:fs/promises', () => ({
     stat,
 }));
 
+vi.mock('#copilot/infra/public/io', () => ({
+    writeFileAtomicPortable: vi.fn((path, content, options) => writeFile(path, content, options)),
+}));
+
 vi.mock('dotenv', () => ({
     config: loadDotenv,
 }));
@@ -6711,7 +6715,7 @@ describe('terminal /byok command', () => {
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('true');
         expect(process.env['COPILOT_BYOK_PROFILE']).toBe('kilo');
         expect(writeFile).toHaveBeenCalledWith(
-            expect.stringMatching(/^\.env\.local\.tmp-/),
+            '.env.local',
             expect.stringContaining('COPILOT_BYOK_PROFILE=kilo'),
             expect.objectContaining({ mode: 0o600 }),
         );
@@ -6719,7 +6723,7 @@ describe('terminal /byok command', () => {
         expect(written).toContain('COPILOT_BYOK_ENABLED=true');
         expect(written).not.toContain('COPILOT_BYOK_MODEL=old-model');
         expect(written).toContain('KILO_CODE_API_KEY=existing-secret');
-        expect(rename).toHaveBeenCalledWith(expect.stringMatching(/^\.env\.local\.tmp-/), '.env.local');
+        expect(rename).not.toHaveBeenCalled();
         expect(ctx.output()).toContain('Perfil BYOK persistido: kilo');
         expect(ctx.output()).not.toContain('existing-secret');
     });
