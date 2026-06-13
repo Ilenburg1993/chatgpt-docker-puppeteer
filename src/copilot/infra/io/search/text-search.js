@@ -16,7 +16,7 @@ import { utf8ByteLength } from '../../shared/buffer.js';
 import { buildGrepArgs } from './grep-adapter.js';
 import { canUseIndexSearch, filterIndexRowsByGlob, formatIndexSearchRows } from './index-search.js';
 import { normalizeSearchWindow, paginateSearchText } from './result-paginator.js';
-import { execSearchFile, isRipgrepAvailable } from './subprocess.js';
+import { isRipgrepAvailable, streamSearchFile } from './subprocess.js';
 import { buildSymbolPattern, formatIndexSymbolRows, kindToGlobs } from './symbol-search.js';
 
 /** @type {ReturnType<typeof resolveIoSearchBudget> | null} */
@@ -51,6 +51,20 @@ function assertValidTargetPath(targetPath) {
     }
 }
 
+const sensitiveLineRe = /-----BEGIN [A-Z ]+-----|ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/;
+
+/**
+ * @param {string} line
+ * @returns {{ text: string; sanitized: boolean; redactions: number; filtered: boolean; policyVersion: string }}
+ */
+function sanitizeSearchLine(line) {
+    if (sensitiveLineRe.test(line)) {
+        const sanitized = sanitizeIoTextOutput({ text: '' });
+        return { ...sanitized, filtered: true, sanitized: true, redactions: sanitized.redactions + 1 };
+    }
+    return { ...sanitizeIoTextOutput({ text: line }), filtered: false };
+}
+
 /**
  * @param {string} stdout
  * @returns {{
@@ -62,22 +76,66 @@ function assertValidTargetPath(targetPath) {
  * }}
  */
 function sanitizeSearchOutput(stdout) {
-    const sensitiveLineRe = /-----BEGIN [A-Z ]+-----|ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/;
     let filteredLines = 0;
-    const lineFiltered = stdout
+    const sanitizedLines = stdout
         .split('\n')
+        .map((line) => sanitizeSearchLine(line))
         .filter((line) => {
-            if (!sensitiveLineRe.test(line)) return true;
+            if (!line.filtered) return true;
             filteredLines += 1;
             return false;
         })
+        .map((line) => line.text)
         .join('\n');
-    const sanitized = sanitizeIoTextOutput({ text: lineFiltered });
+    const sanitized = sanitizeIoTextOutput({ text: sanitizedLines });
     return {
         ...sanitized,
         sanitized: filteredLines > 0 || sanitized.sanitized,
         redactions: filteredLines + sanitized.redactions,
         filteredLines,
+    };
+}
+
+/**
+ * @param {import('./result-paginator.js').SearchWindow} searchWindow
+ */
+function createStreamingSearchCollector(searchWindow) {
+    /** @type {string[]} */
+    const lines = [];
+    const stopAfter = searchWindow.maxResults === null ? null : searchWindow.cursorOffset + searchWindow.maxResults + 1;
+    let sanitized = false;
+    let redactions = 0;
+    let filteredLines = 0;
+    let policyVersion = 'unknown';
+
+    return {
+        /**
+         * @param {string} line
+         * @returns {boolean}
+         */
+        accept(line) {
+            const result = sanitizeSearchLine(line);
+            policyVersion = result.policyVersion;
+            if (result.filtered) {
+                sanitized = true;
+                redactions += result.redactions;
+                filteredLines += 1;
+                return true;
+            }
+            sanitized = sanitized || result.sanitized;
+            redactions += result.redactions;
+            lines.push(result.text);
+            return stopAfter === null || lines.length < stopAfter;
+        },
+        snapshot() {
+            return {
+                text: lines.join('\n'),
+                sanitized,
+                redactions,
+                filteredLines,
+                policyVersion,
+            };
+        },
     };
 }
 
@@ -377,7 +435,8 @@ export async function searchText(targetPath, options) {
 
         if (await isRipgrepAvailable()) {
             try {
-                const { stdout } = await execSearchFile(
+                const streamingCollector = createStreamingSearchCollector(searchWindow);
+                const streamResult = await streamSearchFile(
                     'rg',
                     [
                         '--color=never',
@@ -402,9 +461,11 @@ export async function searchText(targetPath, options) {
                         cwd: options.workspaceRoot,
                         timeout: ioSearchBudget.timeoutMs,
                         maxBuffer: ioSearchBudget.maxBufferBytes,
+                        collectStdout: false,
+                        onStdoutLine: (line) => streamingCollector.accept(line),
                     },
                 );
-                const sanitizedOutput = sanitizeSearchOutput(stdout);
+                const sanitizedOutput = streamingCollector.snapshot();
                 const windowedOutput = paginateSearchText(sanitizedOutput.text, searchWindow);
                 const returnedMatchCount = countSearchMatchLines(windowedOutput.text);
                 const totalMatchCount = countSearchMatchLines(sanitizedOutput.text);
@@ -415,6 +476,7 @@ export async function searchText(targetPath, options) {
                         truncated: windowedOutput.truncated,
                         originalLineCount: windowedOutput.originalLineCount,
                         nextCursor: windowedOutput.nextCursor,
+                        streamStoppedEarly: streamResult.stoppedEarly,
                     }),
                     true,
                 );
@@ -473,12 +535,15 @@ export async function searchText(targetPath, options) {
                 ...(options.excludePattern ? { excludePattern: options.excludePattern } : {}),
                 ...(options.contextLines !== undefined ? { contextLines: options.contextLines } : {}),
             };
-            const { stdout } = await execSearchFile('grep', buildGrepArgs(grepOptions), {
+            const streamingCollector = createStreamingSearchCollector(searchWindow);
+            const streamResult = await streamSearchFile('grep', buildGrepArgs(grepOptions), {
                 cwd: options.workspaceRoot,
                 timeout: ioSearchBudget.timeoutMs,
                 maxBuffer: ioSearchBudget.maxBufferBytes,
+                collectStdout: false,
+                onStdoutLine: (line) => streamingCollector.accept(line),
             });
-            const sanitizedOutput = sanitizeSearchOutput(stdout);
+            const sanitizedOutput = streamingCollector.snapshot();
             const windowedOutput = paginateSearchText(sanitizedOutput.text, searchWindow);
             const returnedMatchCount = countSearchMatchLines(windowedOutput.text);
             const totalMatchCount = countSearchMatchLines(sanitizedOutput.text);
@@ -489,6 +554,7 @@ export async function searchText(targetPath, options) {
                     truncated: windowedOutput.truncated,
                     originalLineCount: windowedOutput.originalLineCount,
                     nextCursor: windowedOutput.nextCursor,
+                    streamStoppedEarly: streamResult.stoppedEarly,
                 }),
                 true,
             );
@@ -689,7 +755,8 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             throw new Error('ripgrep (rg) não está disponível neste ambiente. workspace_symbol_search requer rg.');
         }
 
-        const { stdout } = await execSearchFile(
+        const streamingCollector = createStreamingSearchCollector(searchWindow);
+        const streamResult = await streamSearchFile(
             'rg',
             [
                 '--color=never',
@@ -714,16 +781,18 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 cwd: options.workspaceRoot,
                 timeout: ioSearchBudget.timeoutMs,
                 maxBuffer: ioSearchBudget.maxBufferBytes,
+                collectStdout: false,
+                onStdoutLine: (line) => streamingCollector.accept(line),
             },
         ).catch((error) => {
             const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown }} */ (error);
             if ((execError.code === 1 || execError.status === 1) && !execError.stderr) {
-                return { stdout: '' };
+                return { stoppedEarly: false };
             }
             throw error;
         });
 
-        const sanitized = sanitizeSearchOutput(stdout);
+        const sanitized = streamingCollector.snapshot();
         const windowedOutput = paginateSearchText(sanitized.text, searchWindow);
         const output = windowedOutput.text;
         const lines = output.split('\n').filter(Boolean);
@@ -734,6 +803,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 truncated: windowedOutput.truncated,
                 originalLineCount: windowedOutput.originalLineCount,
                 nextCursor: windowedOutput.nextCursor,
+                streamStoppedEarly: streamResult.stoppedEarly,
             }),
             true,
         );

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { execSearchFile } from '../../../../src/copilot/infra/io/search/subprocess.js';
+import { execSearchFile, streamSearchFile } from '../../../../src/copilot/infra/io/search/subprocess.js';
 
 describe('infra/io/search/subprocess', () => {
     it('executa subprocesso com stdout/stderr coletados', async () => {
@@ -34,6 +34,29 @@ describe('infra/io/search/subprocess', () => {
         ).rejects.toMatchObject({
             code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER',
         });
+    });
+
+    it('streama stdout por linha e encerra com sucesso quando callback pede parada', async () => {
+        /** @type {string[]} */
+        const lines = [];
+        const result = await streamSearchFile(
+            process.execPath,
+            [
+                '-e',
+                "let i = 0; const t = setInterval(() => { console.log(`line-${i++}`); if (i > 100) clearInterval(t); }, 1);",
+            ],
+            {
+                collectStdout: false,
+                timeout: 5_000,
+                onStdoutLine(line) {
+                    lines.push(line);
+                    return lines.length < 3;
+                },
+            },
+        );
+
+        expect(result).toMatchObject({ stdout: '', stoppedEarly: true });
+        expect(lines).toEqual(['line-0', 'line-1', 'line-2']);
     });
 
     it('rejeita executável ou argumentos com byte nulo', async () => {

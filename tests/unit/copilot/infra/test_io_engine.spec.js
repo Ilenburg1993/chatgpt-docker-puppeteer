@@ -91,6 +91,62 @@ describe('infra/io-engine', () => {
         });
     });
 
+    it('searchText interrompe stdout quando janela sanitizada já tem lookahead suficiente', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'search-early-stop.txt');
+        await writeFile(
+            file,
+            Array.from({ length: 200 }, (_, index) => `needle ${String(index).padStart(3, '0')}`).join('\n'),
+            'utf8',
+        );
+
+        const result = await searchText(file, {
+            pattern: 'needle',
+            isRegex: false,
+            caseSensitive: true,
+            contextLines: 0,
+            maxResults: 2,
+        });
+
+        expect(result.output.split('\n')).toHaveLength(2);
+        expect(result).toMatchObject({
+            truncated: true,
+            nextCursor: '2',
+            returnedMatchCount: 2,
+            returnedLineCount: 2,
+            totalLineCount: 3,
+            countsPostSanitization: true,
+        });
+        expect(result.io.advisoryLimits?.['streamStoppedEarly']).toBe(true);
+    });
+
+    it('searchWorkspaceSymbols interrompe stdout do rg com lookahead suficiente', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'symbols-early-stop.js');
+        await writeFile(
+            file,
+            Array.from({ length: 80 }, () => 'function runNeedle() {}').join('\n'),
+            'utf8',
+        );
+
+        const result = await searchWorkspaceSymbols(file, {
+            symbolName: 'runNeedle',
+            kind: 'function',
+            caseSensitive: true,
+            maxResults: 2,
+        });
+
+        expect(result.output.split('\n')).toHaveLength(2);
+        expect(result).toMatchObject({
+            truncated: true,
+            nextCursor: '2',
+            matchCount: 2,
+            totalMatches: 3,
+            countsPostSanitization: true,
+        });
+        expect(result.io.advisoryLimits?.['streamStoppedEarly']).toBe(true);
+    });
+
     it('mantém contratos de retorno estáveis para readBytes/readText/writeFileAtomic', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'contract-shapes.txt');
