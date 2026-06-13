@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `1af25202`, seguida da onda de perfis L1 por risco
+**Baseline reinvestigado:** `main` sincronizada até `2097263e`, seguida da onda de streaming incremental de busca
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -22,10 +22,10 @@ explícitos por risco e o risco dominante migrou para custos de busca/cache e gu
 
 Prioridades reais remanescentes:
 
-1. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
-2. **P2 — remove recursivo continua sem quarentena intrínseca:** callers precisam impor a proteção.
-3. **P2 — parser workers não expõem pressão de fila:** faltam backpressure e queue length no health.
-4. **P2 — L2/cache ainda carece de perfil experimental medido:** falta hit ratio/custo em cenário cold/warm.
+1. **P2 — remove recursivo continua sem quarentena intrínseca:** callers precisam impor a proteção.
+2. **P2 — parser workers não expõem pressão de fila:** faltam backpressure e queue length no health.
+3. **P2 — L2/cache ainda carece de perfil experimental medido:** falta hit ratio/custo em cenário cold/warm.
+4. **P2 — preflight de espaço livre ainda inexiste:** writes/copies grandes só descobrem ENOSPC durante a operação.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -635,6 +635,32 @@ Validação:
 - env: `audit-env-surface`, `validate-env` e `check-env-local`: **PASS**.
 - locks, engine, health, MCP repo-write e state IO: **85 passados, 0 falhas**.
 
+### 1.24 Status de implementação — search streaming aplicado em 2026-06-12
+
+IO-026 saiu do modelo de `execFile` com stdout materializado até `maxBuffer` para parser incremental por linha nos caminhos
+textuais baseados em `rg`/`grep`.
+
+Mudanças efetivamente incorporadas:
+
+- `subprocess.js` ganhou `streamSearchFile()`, preservando `execSearchFile()` para callers legados;
+- o streaming processa stdout por linha e permite que o callback interrompa a busca retornando `false`;
+- interrupção voluntária envia `SIGTERM` ao subprocesso e resolve com `stoppedEarly:true`, sem transformar early stop em erro;
+- o limite de buffer continua existindo como proteção contra linhas/chunks anômalos, mas não é mais a estratégia normal de
+  paginação;
+- `searchText` via `rg`/`grep` passou a sanitizar cada linha antes de contar/paginar e interrompe após a janela
+  `cursorOffset + maxResults + 1`;
+- `searchWorkspaceSymbols` via `rg` também passou a usar coletor incremental com early stop real;
+- resultados textuais e de símbolos expõem `io.advisoryLimits.streamStoppedEarly` quando a busca foi encerrada por janela;
+- FTS/index permanecem fora desse caminho por já operarem sobre dados indexados em memória/SQLite, não stdout de subprocesso;
+- a semântica pós-sanitização foi preservada: linhas filtradas por política sensível não entram no cursor, total parcial ou
+  lookahead.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- lint focado dos arquivos alterados: **PASS**.
+- search subprocess, search infra, engine e MCP tools: **89 passados, 0 falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -876,7 +902,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-023 | P2 | Parser reset | Reset de workers em teste é assíncrono e chamado com `void` | `io-parser.js` | Testes podem flakear | Exportar/reset async e adaptar testes |
 | IO-024 | P2 | Scope readiness | `declareScope` marca ready mesmo em catch | `io-session-scope.js` | Erros silenciosos podem parecer sucesso | Separar `ready` de `degraded`, expor erro resumido |
 | IO-025 | P2 | Observability | **Concluído:** espera, fila e leases L0/L1 são bounded e sanitizados | histogramas globais/por operação, p95, outcomes e amostra por hash no health | Paths não entram no snapshot; métricas são cumulativas por processo | Usar os dados para definir perfis de ativação do L1 |
-| IO-026 | P2 | Search subprocess | `rg`/`grep` maxBuffer aborta, mas não oferece stream incremental | `subprocess.js` | Grandes buscas custam memória até limite | Parser incremental de linhas com early stop em `maxResults` |
+| IO-026 | P2 | Search subprocess | **Concluído:** `rg`/`grep` textuais processam stdout incrementalmente | `subprocess.js`, `text-search.js` | `maxBuffer` permanece como proteção contra linha/chunk anômalo | Monitorar `streamStoppedEarly` e custo em buscas grandes |
 | IO-027 | P2 | Glob policy | Glob simples próprio diverge de minimatch/Node glob | `scan/glob.js` | Diferenças de include/exclude difíceis de prever | Padronizar em `minimatch`/`fsPromises.glob` com testes de compatibilidade |
 | IO-028 | P2 | Statfs | Sem preflight de espaço livre | Não há uso de `statfs` | ENOSPC parcial em copy/write grande | Adicionar preflight opcional para payloads acima de limiar |
 | IO-029 | P2 | Durable append | **Concluído:** recovery lógico e físico opt-in da linha parcial | `jsonl-reader.js` ignora por default e repara sob lock quando solicitado | Evita parser quebrado sem mutação surpresa | Manter repair bounded e opt-in |
@@ -898,10 +924,10 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-025, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-025, IO-026, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-038 |
 | Parcial | IO-009, IO-023 |
-| Aberto | IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-030 |
+| Aberto | IO-018, IO-021, IO-022, IO-024, IO-027, IO-028, IO-030 |
 
 ---
 
@@ -1188,8 +1214,8 @@ A situação ideal é uma infra IO em camadas:
 #### Fase 4.2 — Search streaming
 
 - [x] Sanitizar antes de paginar e contar.
-- [ ] Parser incremental de stdout.
-- [ ] Early stop real em `maxResults`.
+- [x] Parser incremental de stdout.
+- [x] Early stop real em `maxResults`.
 - [x] Totais calculados pós-redação.
 
 #### Fase 4.3 — Parser workers
@@ -1328,7 +1354,7 @@ Para declarar maturidade operacional avançada, ainda faltam:
 - [x] p95/histograma, timeout/abort e leases sanitizados;
 - [ ] quarentena intrínseca ou confirmação reforçada para remove recursivo;
 - [ ] preflight opcional de espaço livre em payloads grandes;
-- [ ] search incremental com early stop real.
+- [x] search incremental com early stop real.
 
 ---
 
@@ -1347,5 +1373,5 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Implementar parser incremental de stdout para `rg`/`grep`, com early stop real em `maxResults` e sem depender apenas de
-`maxBuffer`.
+Implementar backpressure explícito para parser workers: limite de fila, rejeição/timeout por arquivo e exposição de
+queue length no health, mantendo shutdown/reset assíncronos determinísticos.
