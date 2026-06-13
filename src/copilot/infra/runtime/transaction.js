@@ -37,6 +37,7 @@ function clonePayload(value) {
  * @property {string | null} [contentHash]
  * @property {number | null} [bytes]
  * @property {string | null} [snapshotBase64]
+ * @property {import('../io/fs/rollback-sidecar.js').IoRollbackSidecar | null} [snapshotSidecar]
  *
  * @typedef {object} IoChangeSetEntry
  * @property {string} entryId

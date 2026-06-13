@@ -1,11 +1,13 @@
 // @ts-check
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+    cleanupExpiredRollbackSidecars,
+    persistRollbackSidecar,
     readBinaryMutationSnapshot,
     readBytesFileSnapshot,
     readTextLineChunks,
@@ -168,5 +170,70 @@ describe('infra/io/fs read line ports', () => {
         expect(result.contentHash).toBe(sha256(payload));
         expect(result.snapshotBase64).toBe(payload.toString('base64'));
         expect(result.snapshotTruncated).toBe(false);
+    });
+
+    it('readBinaryMutationSnapshot publica sidecar durável quando excede o orçamento', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'snapshot-large.bin');
+        const sidecarDirectory = join(dir, 'rollback');
+        const payload = Buffer.concat([Buffer.alloc(12, 'a'), Buffer.alloc(12, 'b'), Buffer.alloc(12, 'c')]);
+        await writeFile(file, payload);
+
+        const result = await readBinaryMutationSnapshot(file, {
+            snapshotMaxBytes: 10,
+            highWaterMark: 7,
+            rollbackSidecar: { directory: sidecarDirectory, ttlMs: 5_000, nowMs: 1_000 },
+        });
+
+        expect(result.snapshotBase64).toBeNull();
+        expect(result.snapshotTruncated).toBe(true);
+        expect(result.rollbackSidecar).toMatchObject({
+            version: 1,
+            contentHash: sha256(payload),
+            bytes: payload.byteLength,
+            createdAtMs: 1_000,
+            expiresAtMs: 6_000,
+        });
+        await expect(readFile(result.rollbackSidecar?.path ?? '')).resolves.toEqual(payload);
+        const sidecarStat = await stat(result.rollbackSidecar?.path ?? '');
+        expect(sidecarStat.mode & 0o777).toBe(0o600);
+    });
+
+    it('cleanup de sidecars remove somente arquivos expirados do schema', async () => {
+        const dir = await createTempDir();
+        const sidecarDirectory = join(dir, 'rollback-cleanup');
+        const expired = await persistRollbackSidecar(Buffer.from('expired'), {
+            directory: sidecarDirectory,
+            ttlMs: 10,
+            nowMs: 100,
+        });
+        const active = await persistRollbackSidecar(Buffer.from('active'), {
+            directory: sidecarDirectory,
+            ttlMs: 1_000,
+            nowMs: 100,
+        });
+        await writeFile(join(sidecarDirectory, '.pending-110-999-00000000-0000-4000-8000-000000000000'), 'partial');
+        await writeFile(join(sidecarDirectory, 'unknown.rollback'), 'preserve', 'utf8');
+
+        const cleanup = await cleanupExpiredRollbackSidecars({
+            directory: sidecarDirectory,
+            nowMs: 111,
+        });
+
+        expect(cleanup).toMatchObject({ removed: 2, failed: 0, limited: false });
+        await expect(readFile(expired.path)).rejects.toMatchObject({ code: 'ENOENT' });
+        await expect(readFile(active.path, 'utf8')).resolves.toBe('active');
+        expect(await readdir(sidecarDirectory)).toContain('unknown.rollback');
+    });
+
+    it('persistRollbackSidecar rejeita hash que não corresponde aos bytes', async () => {
+        const dir = await createTempDir();
+
+        await expect(
+            persistRollbackSidecar(Buffer.from('payload'), {
+                directory: join(dir, 'rollback-hash'),
+                contentHash: '0'.repeat(64),
+            }),
+        ).rejects.toMatchObject({ code: 'EROLLBACKSIDECARHASH' });
     });
 });

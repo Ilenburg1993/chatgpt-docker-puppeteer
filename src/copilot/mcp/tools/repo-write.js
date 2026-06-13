@@ -1091,8 +1091,10 @@ async function applyBatchFileOperation(operation, index) {
             deleted: removed.deleted,
             previousHash: removed.previousHash,
             previousBytes: removed.previousBytes,
-            rollbackSnapshotAvailable: typeof removed.previousSnapshotBase64 === 'string',
+            rollbackSnapshotAvailable:
+                typeof removed.previousSnapshotBase64 === 'string' || removed.previousRollbackSidecar != null,
             previousSnapshotTruncated: removed.previousSnapshotTruncated,
+            rollbackSidecarExpiresAtMs: removed.previousRollbackSidecar?.expiresAtMs ?? null,
             traceId: removed.io.traceId ?? null,
         };
     }
@@ -2119,6 +2121,8 @@ export const repoWriteTools = [
                     previousHash: removed.previousHash,
                     previousBytes: removed.previousBytes,
                     previousSnapshotTruncated: removed.previousSnapshotTruncated,
+                    rollbackSidecarAvailable: removed.previousRollbackSidecar != null,
+                    rollbackSidecarExpiresAtMs: removed.previousRollbackSidecar?.expiresAtMs ?? null,
                     traceId: removed.io.traceId ?? null,
                 });
                 return okResult({
@@ -2128,8 +2132,10 @@ export const repoWriteTools = [
                     deleted: removed.deleted,
                     previousHash: removed.previousHash,
                     previousBytes: removed.previousBytes,
-                    rollbackSnapshotAvailable: typeof removed.previousSnapshotBase64 === 'string',
+                    rollbackSnapshotAvailable:
+                        typeof removed.previousSnapshotBase64 === 'string' || removed.previousRollbackSidecar != null,
                     previousSnapshotTruncated: removed.previousSnapshotTruncated,
+                    rollbackSidecarExpiresAtMs: removed.previousRollbackSidecar?.expiresAtMs ?? null,
                     io: {
                         operation: removed.io.operation,
                         targetKind: removed.io.targetKind,

@@ -24,6 +24,13 @@ export { readTextLinesSnapshot } from './read-lines.js';
 export { readBytes, readLines, readText, readTextChunks, readTextChunksStream, statPath } from './read-services.js';
 export { readTextFileSnapshot } from './read-text.js';
 export { deleteFileUnlocked, removePathUnlocked } from './remove.js';
+export {
+    cleanupExpiredRollbackSidecars,
+    createRollbackSidecarWriter,
+    getRollbackSidecarDirectory,
+    getRollbackSidecarTtlMs,
+    persistRollbackSidecar,
+} from './rollback-sidecar.js';
 export { readBinaryMutationSnapshot } from './snapshot.js';
 export { statPathSnapshot } from './stat.js';
 export { normalizeWritePayload, toWriteBuffer, writeAtomicFileUnlocked } from './write-atomic.js';

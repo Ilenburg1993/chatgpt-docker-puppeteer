@@ -32,6 +32,7 @@ const TEMP_DIRS = [];
 
 afterEach(async () => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     resetIoL1CacheForTest();
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
@@ -505,6 +506,70 @@ describe('infra/io-engine', () => {
         expect(result.previousSnapshotBase64).toBe(Buffer.from('before patch', 'utf8').toString('base64'));
         expect(result.previousSnapshotTruncated).toBe(false);
         await expect(readFile(file, 'utf8')).resolves.toBe('after patch');
+    });
+
+    it('deleteFileLocked preserva arquivo grande em sidecar antes de remover', async () => {
+        const dir = await createTempDir();
+        const rollbackDirectory = join(dir, 'rollback-delete');
+        const file = join(dir, 'delete-large.bin');
+        const payload = Buffer.alloc(300 * 1024, 'd');
+        vi.stubEnv('COPILOT_IO_ROLLBACK_DIR', rollbackDirectory);
+        await writeFile(file, payload);
+
+        const result = await deleteFileLocked(file);
+
+        expect(result.previousSnapshotBase64).toBeNull();
+        expect(result.previousSnapshotTruncated).toBe(true);
+        expect(result.previousRollbackSidecar).toMatchObject({
+            contentHash: sha256(payload),
+            bytes: payload.byteLength,
+        });
+        await expect(readFile(result.previousRollbackSidecar?.path ?? '')).resolves.toEqual(payload);
+        await expect(readFile(file)).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    it('patchTextLocked referencia sidecar do conteúdo grande anterior', async () => {
+        const dir = await createTempDir();
+        const rollbackDirectory = join(dir, 'rollback-patch');
+        const file = join(dir, 'patch-large.txt');
+        const content = `${'a'.repeat(300 * 1024)} before`;
+        vi.stubEnv('COPILOT_IO_ROLLBACK_DIR', rollbackDirectory);
+        await writeFile(file, content, 'utf8');
+
+        const result = await patchTextLocked(file, {
+            oldString: 'before',
+            newString: 'after',
+            computeDiff: false,
+        });
+
+        expect(result.previousSnapshotBase64).toBeNull();
+        expect(result.previousRollbackSidecar).toMatchObject({
+            contentHash: sha256(content),
+            bytes: Buffer.byteLength(content),
+        });
+        await expect(readFile(result.previousRollbackSidecar?.path ?? '', 'utf8')).resolves.toBe(content);
+        await expect(readFile(file, 'utf8')).resolves.toBe(`${'a'.repeat(300 * 1024)} after`);
+    });
+
+    it('patchTextLocked dry-run não cria sidecar para conteúdo grande', async () => {
+        const dir = await createTempDir();
+        const rollbackDirectory = join(dir, 'rollback-patch-dry-run');
+        const file = join(dir, 'patch-large-dry-run.txt');
+        const content = `${'a'.repeat(300 * 1024)} before`;
+        vi.stubEnv('COPILOT_IO_ROLLBACK_DIR', rollbackDirectory);
+        await writeFile(file, content, 'utf8');
+
+        const result = await patchTextLocked(file, {
+            oldString: 'before',
+            newString: 'after',
+            computeDiff: false,
+            dryRun: true,
+        });
+
+        expect(result.previousSnapshotTruncated).toBe(true);
+        expect(result.previousRollbackSidecar).toBeNull();
+        await expect(readdir(rollbackDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
+        await expect(readFile(file, 'utf8')).resolves.toBe(content);
     });
 
     it('mkdirPathLocked aguarda lock ativo no diretório antes de criar', async () => {

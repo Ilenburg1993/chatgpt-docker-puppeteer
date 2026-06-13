@@ -23,6 +23,7 @@ import { sha256 } from '../shared/hash.js';
  * @property {string | null} contentHash
  * @property {number | null} bytes
  * @property {string | null} snapshotBase64
+ * @property {import('../io/fs/rollback-sidecar.js').IoRollbackSidecar | null} snapshotSidecar
  *
  * @typedef {object} IoRollbackToken
  * @property {number} version
@@ -34,7 +35,8 @@ import { sha256 } from '../shared/hash.js';
  * @property {string} digest
  */
 
-const ROLLBACK_TOKEN_VERSION = 1;
+const ROLLBACK_TOKEN_VERSION = 2;
+const SUPPORTED_ROLLBACK_TOKEN_VERSIONS = new Set([1, ROLLBACK_TOKEN_VERSION]);
 
 /**
  * @param {IoRollbackStep[]} steps
@@ -64,6 +66,7 @@ export function buildIoRollbackPlan(changeSet) {
                 contentHash: rollback.contentHash ?? null,
                 bytes: rollback.bytes ?? null,
                 snapshotBase64: rollback.snapshotBase64 ?? null,
+                snapshotSidecar: rollback.snapshotSidecar ?? null,
             };
         });
     return rollbackEntries;
@@ -91,7 +94,7 @@ export function createIoRollbackToken(changeSet) {
  * @returns {boolean}
  */
 export function verifyIoRollbackToken(token) {
-    if (token.version !== ROLLBACK_TOKEN_VERSION) return false;
+    if (!SUPPORTED_ROLLBACK_TOKEN_VERSIONS.has(token.version)) return false;
     const expected = buildDigest(token.steps, token.changeSetId);
     return expected === token.digest;
 }

@@ -17,6 +17,7 @@ import {
     failIoChangeSet,
     rollbackIoChangeSet,
 } from '../../../../src/copilot/infra/runtime/transaction.js';
+import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 
 describe('infra/runtime/transaction + rollback', () => {
     it('abre changeSet, agrega entradas e finaliza aplicado', () => {
@@ -91,6 +92,14 @@ describe('infra/runtime/transaction + rollback', () => {
                     target: '/tmp/b.txt',
                     previousHash: 'h3',
                     contentHash: 'h4',
+                    snapshotSidecar: {
+                        version: 1,
+                        path: '/tmp/rollback/sidecar.rollback',
+                        contentHash: 'a'.repeat(64),
+                        bytes: 512_000,
+                        createdAtMs: 100,
+                        expiresAtMs: 200,
+                    },
                 },
             },
         );
@@ -99,9 +108,11 @@ describe('infra/runtime/transaction + rollback', () => {
         const plan = buildIoRollbackPlan(applied);
         expect(plan).toHaveLength(2);
         expect(plan[0]?.action).toBe('move');
+        expect(plan[0]?.snapshotSidecar?.path).toBe('/tmp/rollback/sidecar.rollback');
         expect(plan[1]?.action).toBe('write');
 
         const token = createIoRollbackToken(applied);
+        expect(token.version).toBe(2);
         expect(token.stepCount).toBe(2);
         expect(verifyIoRollbackToken(token)).toBe(true);
 
@@ -109,6 +120,35 @@ describe('infra/runtime/transaction + rollback', () => {
         const parsed = parseIoRollbackToken(serialized);
         expect(parsed.changeSetId).toBe(token.changeSetId);
         expect(parsed.digest).toBe(token.digest);
+        expect(parsed.steps[0]?.snapshotSidecar?.contentHash).toBe('a'.repeat(64));
+    });
+
+    it('continua verificando tokens v1 sem campo de sidecar', () => {
+        const changeSetId = 'legacy-change-set';
+        const steps = [
+            {
+                order: 1,
+                entryId: 'legacy-entry',
+                action: /** @type {'write'} */ ('write'),
+                target: '/tmp/legacy.txt',
+                previousHash: 'old',
+                contentHash: 'new',
+                bytes: 3,
+                snapshotBase64: 'b2xk',
+            },
+        ];
+        const legacyToken = {
+            version: 1,
+            tokenId: 'legacy-token',
+            changeSetId,
+            createdAtMs: 1,
+            stepCount: 1,
+            steps,
+            digest: sha256(JSON.stringify({ changeSetId, steps })),
+        };
+
+        expect(verifyIoRollbackToken(/** @type {any} */ (legacyToken))).toBe(true);
+        expect(parseIoRollbackToken(serializeIoRollbackToken(/** @type {any} */ (legacyToken))).version).toBe(1);
     });
 
     it('isola evidence/rollback de mutações externas após append', () => {

@@ -332,6 +332,7 @@ const deleteFileTool = buildTool({
                             previousHash: deleted.previousHash,
                             bytes: deleted.previousBytes,
                             snapshotBase64: deleted.previousSnapshotBase64,
+                            snapshotSidecar: deleted.previousRollbackSidecar,
                         },
                         evidence: { tool: 'delete_file' },
                     }),
@@ -429,6 +430,7 @@ const copyFileTool = buildTool({
                     destinationPreviousHash: copyResult.destinationPreviousHash,
                     destinationPreviousBytes: copyResult.destinationPreviousBytes,
                     destinationPreviousSnapshotTruncated: copyResult.destinationPreviousSnapshotTruncated,
+                    destinationPreviousRollbackSidecar: copyResult.destinationPreviousRollbackSidecar,
                     lockWaitMs: copyResult.lockWaitMs,
                     operation: await completeAndAuditMutation(
                         operation,
@@ -457,13 +459,16 @@ const copyFileTool = buildTool({
                                 action: 'copy',
                                 targets: [src.resolved, dst.resolved],
                                 rollback:
-                                    overwrite && copyResult.destinationPreviousSnapshotBase64
+                                    overwrite &&
+                                    (copyResult.destinationPreviousSnapshotBase64 ||
+                                        copyResult.destinationPreviousRollbackSidecar)
                                         ? {
                                               action: 'write',
                                               target: dst.resolved,
                                               previousHash: copyResult.destinationPreviousHash,
                                               bytes: copyResult.destinationPreviousBytes,
                                               snapshotBase64: copyResult.destinationPreviousSnapshotBase64,
+                                              snapshotSidecar: copyResult.destinationPreviousRollbackSidecar,
                                           }
                                         : {
                                               action: 'delete',
@@ -474,7 +479,10 @@ const copyFileTool = buildTool({
                                 evidence: {
                                     tool: 'copy_file',
                                     overwrite,
-                                    destinationRestoreAvailable: Boolean(copyResult.destinationPreviousSnapshotBase64),
+                                    destinationRestoreAvailable: Boolean(
+                                        copyResult.destinationPreviousSnapshotBase64 ||
+                                        copyResult.destinationPreviousRollbackSidecar,
+                                    ),
                                     destinationRestoreTruncated: Boolean(
                                         copyResult.destinationPreviousSnapshotTruncated,
                                     ),
@@ -560,6 +568,7 @@ const moveFileTool = buildTool({
                     destinationPreviousHash: moveResult.destinationPreviousHash,
                     destinationPreviousBytes: moveResult.destinationPreviousBytes,
                     destinationPreviousSnapshotTruncated: moveResult.destinationPreviousSnapshotTruncated,
+                    destinationPreviousRollbackSidecar: moveResult.destinationPreviousRollbackSidecar,
                     crossDevice: moveResult.crossDevice,
                     duplicatedAfterCrossDeviceMove: moveResult.duplicatedAfterCrossDeviceMove,
                     sourceUnlinkErrorCode: moveResult.sourceUnlinkErrorCode,
@@ -598,7 +607,9 @@ const moveFileTool = buildTool({
                                 },
                                 evidence: { tool: 'move_file', overwrite },
                             },
-                            ...(overwrite && moveResult.destinationPreviousSnapshotBase64
+                            ...(overwrite &&
+                            (moveResult.destinationPreviousSnapshotBase64 ||
+                                moveResult.destinationPreviousRollbackSidecar)
                                 ? [
                                       {
                                           action: /** @type {'move'} */ ('move'),
@@ -609,6 +620,7 @@ const moveFileTool = buildTool({
                                               previousHash: moveResult.destinationPreviousHash,
                                               bytes: moveResult.destinationPreviousBytes,
                                               snapshotBase64: moveResult.destinationPreviousSnapshotBase64,
+                                              snapshotSidecar: moveResult.destinationPreviousRollbackSidecar,
                                           },
                                           evidence: {
                                               tool: 'move_file',

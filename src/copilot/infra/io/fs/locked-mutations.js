@@ -22,6 +22,7 @@ import { copyFileUnlocked } from './copy.js';
 import { mkdirPathUnlocked } from './mkdir.js';
 import { moveFileUnlocked } from './move.js';
 import { deleteFileUnlocked, removePathUnlocked } from './remove.js';
+import { persistRollbackSidecar } from './rollback-sidecar.js';
 import { readBinaryMutationSnapshot } from './snapshot.js';
 import { writeAtomicFileUnlocked } from './write-atomic.js';
 
@@ -80,10 +81,14 @@ function windowTextPreview(text, options = {}) {
  *     bytesRead: number;
  *     snapshotBase64: string | null;
  *     snapshotTruncated: boolean;
+ *     rollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
  * }>}
  */
-async function readMutationSnapshot(filePath) {
-    return readBinaryMutationSnapshot(filePath, { snapshotMaxBytes: ROLLBACK_SNAPSHOT_MAX_BYTES });
+async function readMutationSnapshot(filePath, captureRollback = false) {
+    return readBinaryMutationSnapshot(filePath, {
+        snapshotMaxBytes: ROLLBACK_SNAPSHOT_MAX_BYTES,
+        rollbackSidecar: captureRollback,
+    });
 }
 
 /**
@@ -93,11 +98,12 @@ async function readMutationSnapshot(filePath) {
  *     bytesRead: number;
  *     snapshotBase64: string | null;
  *     snapshotTruncated: boolean;
+ *     rollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
  * } | null>}
  */
-async function readOptionalMutationSnapshot(filePath) {
+async function readOptionalMutationSnapshot(filePath, captureRollback = false) {
     try {
-        return await readMutationSnapshot(filePath);
+        return await readMutationSnapshot(filePath, captureRollback);
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
         if (code === 'ENOENT' || code === 'ENOTDIR') return null;
@@ -126,13 +132,23 @@ async function assertDestinationWritable(destination, overwrite) {
 
 /**
  * @param {Buffer} content
- * @returns {{ snapshotBase64: string | null; snapshotTruncated: boolean }}
+ * @param {{ persistLarge?: boolean; contentHash?: string }} [options]
+ * @returns {Promise<{
+ *     snapshotBase64: string | null;
+ *     snapshotTruncated: boolean;
+ *     rollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
+ * }>}
  */
-function buildRollbackSnapshot(content) {
+async function buildRollbackSnapshot(content, options = {}) {
     if (content.byteLength <= ROLLBACK_SNAPSHOT_MAX_BYTES) {
-        return { snapshotBase64: content.toString('base64'), snapshotTruncated: false };
+        return { snapshotBase64: content.toString('base64'), snapshotTruncated: false, rollbackSidecar: null };
     }
-    return { snapshotBase64: null, snapshotTruncated: true };
+    const rollbackSidecar = options.persistLarge
+        ? await persistRollbackSidecar(content, {
+              ...(options.contentHash === undefined ? {} : { contentHash: options.contentHash }),
+          })
+        : null;
+    return { snapshotBase64: null, snapshotTruncated: true, rollbackSidecar };
 }
 
 /**
@@ -148,6 +164,7 @@ function buildRollbackSnapshot(content) {
  *     previousBytes: number;
  *     previousSnapshotBase64: string | null;
  *     previousSnapshotTruncated: boolean;
+ *     previousRollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
  * }>}
  */
 export async function deleteFileLocked(filePath) {
@@ -159,7 +176,7 @@ export async function deleteFileLocked(filePath) {
         const value = await (async () => {
             try {
                 return await lease.run(async () => {
-                    const snapshot = await readMutationSnapshot(filePath);
+                    const snapshot = await readMutationSnapshot(filePath, true);
                     await deleteFileUnlocked(filePath);
                     return snapshot;
                 });
@@ -179,7 +196,17 @@ export async function deleteFileLocked(filePath) {
                 engine: 'io-engine.fs.unlink',
                 riskClass: 'high',
                 traceId,
-                advisoryLimits: { lockWaitMs: waitMs, previousHash: value.contentHash },
+                advisoryLimits: {
+                    lockWaitMs: waitMs,
+                    previousHash: value.contentHash,
+                    rollbackSidecar: value.rollbackSidecar
+                        ? {
+                              available: true,
+                              bytes: value.rollbackSidecar.bytes,
+                              expiresAtMs: value.rollbackSidecar.expiresAtMs,
+                          }
+                        : null,
+                },
             }),
             true,
         );
@@ -192,6 +219,7 @@ export async function deleteFileLocked(filePath) {
                 previousBytes: value.bytesRead,
                 previousSnapshotBase64: value.snapshotBase64,
                 previousSnapshotTruncated: value.snapshotTruncated,
+                previousRollbackSidecar: value.rollbackSidecar,
             },
             io,
         );
@@ -299,25 +327,22 @@ export async function copyFileLocked(source, destination, options = {}) {
                      *     bytesRead: number;
                      *     snapshotBase64: string | null;
                      *     snapshotTruncated: boolean;
+                     *     rollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
                      * } | null}
                      */
                     let destinationSnapshot = null;
                     if (options.overwrite) {
-                        destinationSnapshot = await readOptionalMutationSnapshot(destination);
+                        destinationSnapshot = await readOptionalMutationSnapshot(destination, true);
                     } else {
                         await assertDestinationWritable(destination, options.overwrite);
                     }
                     const sourceSnapshot = await readMutationSnapshot(source);
                     await mkdirPathUnlocked(dirname(destination), { recursive: true });
-                    const copyResult = await copyFileUnlocked(
-                        source,
-                        destination,
-                        {
-                            exclusive: !options.overwrite,
-                            expectedSourceHash: sourceSnapshot.contentHash,
-                            expectedSourceBytes: sourceSnapshot.bytesRead,
-                        },
-                    );
+                    const copyResult = await copyFileUnlocked(source, destination, {
+                        exclusive: !options.overwrite,
+                        expectedSourceHash: sourceSnapshot.contentHash,
+                        expectedSourceBytes: sourceSnapshot.bytesRead,
+                    });
                     return {
                         bytesWritten: copyResult.destinationBytes,
                         sourceHash: sourceSnapshot.contentHash,
@@ -330,6 +355,7 @@ export async function copyFileLocked(source, destination, options = {}) {
                         destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
                         destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
                         destinationPreviousSnapshotTruncated: destinationSnapshot?.snapshotTruncated ?? false,
+                        destinationPreviousRollbackSidecar: destinationSnapshot?.rollbackSidecar ?? null,
                     };
                 });
             } finally {
@@ -358,6 +384,13 @@ export async function copyFileLocked(source, destination, options = {}) {
                     destinationDirectorySync: value.destinationDirectorySync,
                     overwrite: Boolean(options.overwrite),
                     destinationPreviousHash: value.destinationPreviousHash,
+                    destinationRollbackSidecar: value.destinationPreviousRollbackSidecar
+                        ? {
+                              available: true,
+                              bytes: value.destinationPreviousRollbackSidecar.bytes,
+                              expiresAtMs: value.destinationPreviousRollbackSidecar.expiresAtMs,
+                          }
+                        : null,
                 },
             }),
             true,
@@ -376,6 +409,7 @@ export async function copyFileLocked(source, destination, options = {}) {
             destinationPreviousBytes: value.destinationPreviousBytes,
             destinationPreviousSnapshotBase64: value.destinationPreviousSnapshotBase64,
             destinationPreviousSnapshotTruncated: value.destinationPreviousSnapshotTruncated,
+            destinationPreviousRollbackSidecar: value.destinationPreviousRollbackSidecar,
             lockWaitMs: waitMs,
             io,
         };
@@ -420,11 +454,12 @@ export async function moveFileLocked(source, destination, options = {}) {
                      *     bytesRead: number;
                      *     snapshotBase64: string | null;
                      *     snapshotTruncated: boolean;
+                     *     rollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
                      * } | null}
                      */
                     let destinationSnapshot = null;
                     if (options.overwrite) {
-                        destinationSnapshot = await readOptionalMutationSnapshot(destination);
+                        destinationSnapshot = await readOptionalMutationSnapshot(destination, true);
                     } else {
                         await assertDestinationWritable(destination, options.overwrite);
                     }
@@ -449,6 +484,7 @@ export async function moveFileLocked(source, destination, options = {}) {
                         destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
                         destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
                         destinationPreviousSnapshotTruncated: destinationSnapshot?.snapshotTruncated ?? false,
+                        destinationPreviousRollbackSidecar: destinationSnapshot?.rollbackSidecar ?? null,
                     };
                 });
             } finally {
@@ -473,6 +509,13 @@ export async function moveFileLocked(source, destination, options = {}) {
                     sourceHash: value.contentHash,
                     overwrite: Boolean(options.overwrite),
                     destinationPreviousHash: value.destinationPreviousHash,
+                    destinationRollbackSidecar: value.destinationPreviousRollbackSidecar
+                        ? {
+                              available: true,
+                              bytes: value.destinationPreviousRollbackSidecar.bytes,
+                              expiresAtMs: value.destinationPreviousRollbackSidecar.expiresAtMs,
+                          }
+                        : null,
                     crossDevice: value.crossDevice,
                     duplicatedAfterCrossDeviceMove: value.duplicatedAfterCrossDeviceMove,
                     sourceUnlinkErrorCode: value.sourceUnlinkErrorCode,
@@ -494,6 +537,7 @@ export async function moveFileLocked(source, destination, options = {}) {
             destinationPreviousBytes: value.destinationPreviousBytes,
             destinationPreviousSnapshotBase64: value.destinationPreviousSnapshotBase64,
             destinationPreviousSnapshotTruncated: value.destinationPreviousSnapshotTruncated,
+            destinationPreviousRollbackSidecar: value.destinationPreviousRollbackSidecar,
             crossDevice: value.crossDevice,
             duplicatedAfterCrossDeviceMove: value.duplicatedAfterCrossDeviceMove,
             sourceUnlinkErrorCode: value.sourceUnlinkErrorCode,
@@ -555,11 +599,14 @@ export async function patchTextLocked(filePath, options) {
                     const rawContent = await fs.readFile(filePath);
                     const rawBuffer = typeof rawContent === 'string' ? toOwnedBuffer(rawContent) : rawContent;
                     const content = typeof rawContent === 'string' ? rawContent : decodeUtf8Buffer(rawContent);
-                    const previousHash = assertExpectedSha256(rawBuffer, options.expectedHash);
+                    const previousHash = assertExpectedSha256(rawBuffer, options.expectedHash) ?? sha256(rawBuffer);
                     const patch = computeTextPatch(content, options);
                     const { updated, replacedOccurrences, bytesWritten } = patch;
                     const contentHash = sha256(updated);
-                    const previousSnapshot = buildRollbackSnapshot(rawBuffer);
+                    const previousSnapshot = await buildRollbackSnapshot(rawBuffer, {
+                        persistLarge: !options.dryRun,
+                        contentHash: previousHash,
+                    });
                     const diffContextLines = options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
                     const shouldComputeDiff = options.computeDiff !== false;
                     const diff = shouldComputeDiff
@@ -599,6 +646,7 @@ export async function patchTextLocked(filePath, options) {
                         dryRun: Boolean(options.dryRun),
                         previousSnapshotBase64: previousSnapshot.snapshotBase64,
                         previousSnapshotTruncated: previousSnapshot.snapshotTruncated,
+                        previousRollbackSidecar: previousSnapshot.rollbackSidecar,
                     };
                 });
             } finally {
@@ -630,6 +678,13 @@ export async function patchTextLocked(filePath, options) {
                     replacedOccurrences: value.replacedOccurrences,
                     projectedBytes: value.projectedBytes,
                     byteDelta: value.byteDelta,
+                    rollbackSidecar: value.previousRollbackSidecar
+                        ? {
+                              available: true,
+                              bytes: value.previousRollbackSidecar.bytes,
+                              expiresAtMs: value.previousRollbackSidecar.expiresAtMs,
+                          }
+                        : null,
                 },
             }),
             true,

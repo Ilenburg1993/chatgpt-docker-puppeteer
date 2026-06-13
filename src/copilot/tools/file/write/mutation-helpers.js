@@ -30,6 +30,16 @@ export const ADVISORY_WRITE_CONTENT_BYTES = 2 * 1024 * 1024;
 export const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
 
 /**
+ * @typedef {object} RollbackSidecarDescriptor
+ * @property {1} version
+ * @property {string} path
+ * @property {string} contentHash
+ * @property {number} bytes
+ * @property {number} createdAtMs
+ * @property {number} expiresAtMs
+ */
+
+/**
  * @param {ReturnType<import('#copilot/infra/public/runtime').createIoOperationEnvelope>} operation
  * @param {{
  *     status?: 'planned' | 'applied' | 'failed' | 'dry-run';
@@ -87,6 +97,7 @@ export async function failAndAuditMutation(operation, error, auditContext) {
  *         contentHash?: string | null;
  *         bytes?: number | null;
  *         snapshotBase64?: string | null;
+ *         snapshotSidecar?: RollbackSidecarDescriptor | null;
  *     } | null;
  *     entries?: {
  *         action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
@@ -98,6 +109,7 @@ export async function failAndAuditMutation(operation, error, auditContext) {
  *             contentHash?: string | null;
  *             bytes?: number | null;
  *             snapshotBase64?: string | null;
+ *             snapshotSidecar?: RollbackSidecarDescriptor | null;
  *         } | null;
  *         evidence?: Record<string, unknown>;
  *     }[];
@@ -117,6 +129,7 @@ export function buildMutationChangeSet(input) {
      *         contentHash?: string | null;
      *         bytes?: number | null;
      *         snapshotBase64?: string | null;
+     *         snapshotSidecar?: RollbackSidecarDescriptor | null;
      *     } | null;
      *     evidence?: Record<string, unknown>;
      * }[]}

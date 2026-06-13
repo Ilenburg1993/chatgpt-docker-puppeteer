@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { addAbortSignal } from 'node:stream';
 import { concatBufferViews, toBufferView } from '../../shared/buffer.js';
+import { createRollbackSidecarWriter } from './rollback-sidecar.js';
 
 /**
  * @param {unknown} value
@@ -38,12 +39,14 @@ function nonNegativeIntegerOr(value, fallback) {
  *     snapshotMaxBytes?: number;
  *     highWaterMark?: number;
  *     signal?: AbortSignal;
+ *     rollbackSidecar?: boolean | { directory?: string; ttlMs?: number; nowMs?: number };
  * }} [options]
  * @returns {Promise<{
  *     contentHash: string;
  *     bytesRead: number;
  *     snapshotBase64: string | null;
  *     snapshotTruncated: boolean;
+ *     rollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
  * }>}
  */
 export async function readBinaryMutationSnapshot(filePath, options = {}) {
@@ -55,6 +58,10 @@ export async function readBinaryMutationSnapshot(filePath, options = {}) {
     let snapshotBytes = 0;
     let snapshotTruncated = false;
     let bytesRead = 0;
+    /** @type {Awaited<ReturnType<typeof createRollbackSidecarWriter>> | null} */
+    let sidecarWriter = null;
+    /** @type {import('./rollback-sidecar.js').IoRollbackSidecar | null} */
+    let rollbackSidecar = null;
 
     const baseStream = createReadStream(filePath, { highWaterMark });
     const stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
@@ -69,19 +76,36 @@ export async function readBinaryMutationSnapshot(filePath, options = {}) {
                 snapshotChunks.push(buf);
                 snapshotBytes += buf.byteLength;
             } else {
+                if (!snapshotTruncated && options.rollbackSidecar) {
+                    const sidecarOptions = options.rollbackSidecar === true ? {} : options.rollbackSidecar;
+                    sidecarWriter = await createRollbackSidecarWriter(sidecarOptions);
+                    for (const retainedChunk of snapshotChunks) await sidecarWriter.write(retainedChunk);
+                    await sidecarWriter.write(buf);
+                } else if (sidecarWriter) {
+                    await sidecarWriter.write(buf);
+                }
                 snapshotTruncated = true;
                 snapshotChunks.length = 0;
                 snapshotBytes = 0;
             }
         }
+        const contentHash = hash.digest('hex');
+        if (sidecarWriter) {
+            rollbackSidecar = await sidecarWriter.commit({ contentHash, bytes: bytesRead });
+        }
+        return {
+            contentHash,
+            bytesRead,
+            snapshotBase64: snapshotTruncated
+                ? null
+                : concatBufferViews(snapshotChunks, snapshotBytes).toString('base64'),
+            snapshotTruncated,
+            rollbackSidecar,
+        };
+    } catch (error) {
+        if (sidecarWriter) await sidecarWriter.abort();
+        throw error;
     } finally {
         if (!stream.destroyed) stream.destroy();
     }
-
-    return {
-        contentHash: hash.digest('hex'),
-        bytesRead,
-        snapshotBase64: snapshotTruncated ? null : concatBufferViews(snapshotChunks, snapshotBytes).toString('base64'),
-        snapshotTruncated,
-    };
 }
