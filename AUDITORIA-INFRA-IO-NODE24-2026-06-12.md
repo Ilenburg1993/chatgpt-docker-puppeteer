@@ -359,6 +359,25 @@ Validação:
 - Provas novas cobrem truncamento físico, preservação de JSON válido sem newline, orçamento excedido e falha antes do
   truncate.
 
+### 1.13 Status de implementação — metadata pública de durabilidade aplicada em 2026-06-12
+
+Write/copy/move deixaram de descartar os resultados das primitivas de sync:
+
+- `writeFileAtomic()` retorna o objeto `durability` com modo, file flush solicitado e resultado de directory sync;
+- `copyFileLocked()` retorna `fileSync` e `destinationDirectorySync`;
+- `moveFileLocked()` retorna `fileSync`, `destinationDirectorySync` e `sourceDirectorySync`, usando `null` quando a
+  etapa não se aplica;
+- os mesmos campos são publicados em `io.advisoryLimits`, permitindo projeção em health/telemetria sem reler o
+  filesystem;
+- erros promovidos por sync carregam o resultado baixo que causou `EFILESYNC`/`EDIRECTORYSYNC`.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- `lint:copilot`: **PASS**.
+- Testes focados de engine, fault injection, multiprocess, JSONL, file tools e contracts: **170 passados, 0 falhas**.
+- Contratos novos confirmam metadata pública e metadata publicada no evento de IO.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -789,7 +808,8 @@ A situação ideal é uma infra IO em camadas:
 - [x] Rename/link final e cleanup de temp.
 - [x] Directory sync best-effort.
 - [x] Promover falha real de file/directory sync e preservar skips unsupported.
-- [ ] Propagar metadata detalhada de durabilidade para resultados públicos/health.
+- [x] Propagar metadata detalhada de durabilidade para resultados públicos e eventos de IO.
+- [ ] Projetar agregados de durabilidade no health.
 
 #### Fase 1.2 — Move seguro
 
@@ -1030,5 +1050,4 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Propagar metadata detalhada de durabilidade para resultados públicos/health; depois ampliar governança para writers
-assíncronos diretos restantes.
+Ampliar governança para writers assíncronos diretos restantes; depois projetar agregados de durabilidade no health.
