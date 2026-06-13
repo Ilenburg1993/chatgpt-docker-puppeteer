@@ -378,6 +378,25 @@ Validação:
 - Testes focados de engine, fault injection, multiprocess, JSONL, file tools e contracts: **170 passados, 0 falhas**.
 - Contratos novos confirmam metadata pública e metadata publicada no evento de IO.
 
+### 1.14 Status de implementação — governança de writers assíncronos aplicada em 2026-06-12
+
+A varredura de writers fora de `infra` encontrou quatro bypasses operacionais, todos migrados:
+
+- `config/declarative-runtime-config.js`: skills config usa `writeFileAtomicPortable`;
+- `mcp/control-plane/dev-oauth.js`: refresh tokens e clients usam `writeFileAtomicPortable`;
+- `mcp/control-plane/jobs.js`: log inicial usa `writeFileAtomic` e chunks usam `appendTextLocked`;
+- `terminal/commands/byok.js`: `.env.local` usa `writeFileAtomicPortable`.
+
+Um contrato arquitetural agora analisa imports nomeados, default e namespace de `node:fs/promises` e rejeita
+`appendFile`, `copyFile`, `link`, `rename`, `symlink`, `truncate` e `writeFile` fora de `infra`. Remoções/cleanup e
+`mkdir` continuam classificados separadamente, pois têm semântica diferente de writer/publication.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- `lint:copilot`: **PASS**.
+- Testes focados de contracts, jobs MCP, OAuth, BYOK e config: **321 passados, 0 falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -599,7 +618,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-003 | P0 | Prefetch/cache | Prefetch textual não valida UTF-8 | `io-prefetch.js`: `bytesSnapshot.content.toString('utf8')` | Cache L1 pode servir texto inválido sem passar por `bufferIsUtf8` | Usar `decodeUtf8Buffer()` antes de primar text cache; não criar text entry para binário |
 | IO-004 | P0 | Patch | Patch textual pode corromper binário/UTF-8 inválido | `locked-mutations.js`: `fs.readFile(filePath, 'utf8')` | Bytes inválidos viram U+FFFD e podem ser regravados | Ler Buffer, validar `bufferIsUtf8`, só então decode; recusar patch em binário |
 | IO-005 | P0 | Move | Fallback EXDEV não verifica integridade | `io/fs/move.js`: `copyFile` + `unlink` | Cópia parcial ou divergente pode apagar origem | Copy para temp no destino, hash/size pós-cópia, fsync, rename final, só então unlink origem |
-| IO-006 | P0 | Bypass | Bordas usam filesystem direto | audit logs, SSE archive, export terminal, alias store | Mutação sem IO meta, sem lock canônico, sem flush, sem política comum | Migrar para `appendTextLocked`, `writeFileAtomic`, `portable` com política explícita ou criar `logAppendDurable` |
+| IO-006 | P0 | Bypass | **Parcial:** writers diretos foram eliminados e bloqueados por contrato | writers de audit/SSE/export/config/OAuth/jobs/BYOK usam fachadas; cleanup/mkdir diretos permanecem | Deletes/cleanup ainda não têm governança equivalente | Classificar remoções diretas e mkdir; manter contrato de writers |
 | IO-007 | P1 | Snapshot | `readFile` e `stat` em paralelo não formam snapshot consistente | `read-bytes.js`, `read-text.js` | Cache pode associar conteúdo de uma versão a mtime/size de outra | Abrir FileHandle, `stat/read/stat` e retry se fingerprint muda; ou stat antes/depois |
 | IO-008 | P1 | Create/copy | `failIfExists` e `overwrite=false` sofrem TOCTOU externo | `locked-writes.js`, `locked-mutations.js` | Processo externo pode criar destino entre `access` e gravação/cópia | Usar `open('wx')`/`COPYFILE_EXCL` e tratar EEXIST atomicamente |
 | IO-009 | P1 | Append | Append de logs não é durável nem framed | `append.js`, bypasses de audit | Crash pode deixar JSONL truncado/torn line | Criar `appendRecordLocked` com newline framing, `flush`, recovery de linha parcial e rotação sob lock |
@@ -787,7 +806,7 @@ A situação ideal é uma infra IO em camadas:
 #### Fase 0.2 — Bypass governance
 
 - [x] Criar regra de governança/allowlist para writers síncronos diretos.
-- [ ] Ampliar governança para writers assíncronos diretos restantes.
+- [x] Ampliar governança para writers assíncronos diretos restantes.
 - [x] Migrar `/export` para atomic portable.
 - [x] Migrar audit/SSE/observability para append canônico.
 - [x] Migrar `storage/json-store.js` para atomic portable.
@@ -1050,4 +1069,4 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Ampliar governança para writers assíncronos diretos restantes; depois projetar agregados de durabilidade no health.
+Projetar agregados de durabilidade no health; depois classificar remoções diretas e `mkdir` fora de infra.
