@@ -60,6 +60,9 @@ const PARSER_WORKER_ENABLED = String(process.env['IO_PARSER_WORKER_ENABLED'] ?? 
 const PARSER_WORKER_POOL_POLICY = resolveParserWorkerPoolPolicy();
 /** Tamanho do pool leve de worker threads para parsing. */
 const PARSER_WORKER_POOL_SIZE = PARSER_WORKER_POOL_POLICY.size;
+const PARSER_WORKER_QUEUE_POLICY = resolveParserWorkerQueuePolicy(process.env, PARSER_WORKER_POOL_SIZE);
+/** Backpressure explícito para requests aguardando worker. */
+const PARSER_WORKER_QUEUE_MAX = PARSER_WORKER_QUEUE_POLICY.max;
 const FILE_CONTEXT_CACHE_DISABLED_VALUES = new Set(['0', 'false', 'off', 'disabled']);
 /** Timeout máximo por request no worker (ms). */
 const PARSER_WORKER_REQUEST_TIMEOUT_MS = Math.max(
@@ -99,6 +102,34 @@ export function resolveParserWorkerPoolPolicy(env = process.env, parallelism = a
     };
 }
 
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {number} [poolSize]
+ * @returns {{ max: number; source: 'adaptive' | 'configured' }}
+ */
+export function resolveParserWorkerQueuePolicy(env = process.env, poolSize = PARSER_WORKER_POOL_SIZE) {
+    const normalizedPoolSize = Number.isFinite(poolSize) && poolSize >= 1 ? Math.floor(poolSize) : 1;
+    const adaptiveMax = Math.max(16, normalizedPoolSize * 32);
+    const configured = String(env['IO_PARSER_WORKER_QUEUE_MAX'] ?? '').trim();
+    if (!configured) {
+        return {
+            max: adaptiveMax,
+            source: 'adaptive',
+        };
+    }
+    const parsed = Number(configured);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return {
+            max: adaptiveMax,
+            source: 'adaptive',
+        };
+    }
+    return {
+        max: Math.min(10_000, Math.floor(parsed)),
+        source: 'configured',
+    };
+}
+
 /** Cache de símbolos parseados: max 500 entradas, TTL 5 min. */
 const _symbolCache = new LRUCache(
     /** @type {any} */ ({
@@ -129,6 +160,11 @@ let _parserInvalidationUnregister = null;
  *     workerTimeouts: number;
  *     workerFailures: number;
  *     workerFallbacks: number;
+ *     workerQueueRejected: number;
+ *     workerQueueTimeouts: number;
+ *     workerQueueHighWater: number;
+ *     workerQueueWaitMsLast: number;
+ *     workerQueueWaitMsMax: number;
  * }}
  */
 const _parserRuntimeStats = {
@@ -139,6 +175,11 @@ const _parserRuntimeStats = {
     workerTimeouts: 0,
     workerFailures: 0,
     workerFallbacks: 0,
+    workerQueueRejected: 0,
+    workerQueueTimeouts: 0,
+    workerQueueHighWater: 0,
+    workerQueueWaitMsLast: 0,
+    workerQueueWaitMsMax: 0,
 };
 
 const _fileContextCacheStats = {
@@ -157,6 +198,8 @@ let _workerRequestSeq = 0;
  *     id: number;
  *     payload: { source: string; lang: 'js' | 'ts'; maxParseDurationMs: number };
  *     timeoutMs: number;
+ *     queuedAtMs: number;
+ *     queueTimeout: NodeJS.Timeout | null;
  *     resolve: (value: any) => void;
  *     reject: (reason?: unknown) => void;
  * }} _WorkerTask
@@ -291,6 +334,38 @@ function classifyExtension(ext) {
 const PARSER_WORKER_URL = new URL('./io-parser-worker.js', import.meta.url);
 
 /**
+ * @param {string} message
+ * @param {string} code
+ * @returns {Error & { code: string }}
+ */
+function makeParserWorkerRuntimeError(message, code) {
+    const error = /** @type {Error & { code: string }} */ (new Error(message));
+    error.code = code;
+    return error;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string | null}
+ */
+function getParserWorkerRuntimeErrorCode(error) {
+    return typeof error === 'object' && error !== null && typeof /** @type {{ code?: unknown }} */ (error).code === 'string'
+        ? /** @type {{ code: string }} */ (error).code
+        : null;
+}
+
+/**
+ * @param {_WorkerTask} task
+ * @returns {boolean}
+ */
+function removeQueuedWorkerTask(task) {
+    const index = _workerQueue.findIndex((queued) => queued.id === task.id);
+    if (index < 0) return false;
+    _workerQueue.splice(index, 1);
+    return true;
+}
+
+/**
  * @param {_WorkerSlot} slot
  * @returns {void}
  */
@@ -298,16 +373,42 @@ function dispatchQueuedWorkerTask(slot) {
     if (slot.busy) return;
     const task = _workerQueue.shift();
     if (!task) return;
+    if (task.queueTimeout) {
+        clearTimeout(task.queueTimeout);
+        task.queueTimeout = null;
+    }
+
+    const queueWaitMs = Math.max(0, Math.round(performance.now() - task.queuedAtMs));
+    _parserRuntimeStats.workerQueueWaitMsLast = queueWaitMs;
+    _parserRuntimeStats.workerQueueWaitMsMax = Math.max(_parserRuntimeStats.workerQueueWaitMsMax, queueWaitMs);
+    const remainingTimeoutMs = task.timeoutMs - queueWaitMs;
+    if (remainingTimeoutMs <= 0) {
+        _parserRuntimeStats.workerQueueTimeouts += 1;
+        task.reject(
+            makeParserWorkerRuntimeError(
+                `parser worker queue timeout (${task.timeoutMs}ms)`,
+                'ERR_IO_PARSER_WORKER_QUEUE_TIMEOUT',
+            ),
+        );
+        dispatchQueuedWorkerTask(slot);
+        return;
+    }
 
     slot.busy = true;
     slot.currentTaskId = task.id;
+    slot.worker.ref?.();
 
     const timeout = setTimeout(() => {
         _parserRuntimeStats.workerTimeouts += 1;
         _workerInFlight.delete(task.id);
-        task.reject(new Error(`parser worker timeout (${task.timeoutMs}ms)`));
+        task.reject(
+            makeParserWorkerRuntimeError(
+                `parser worker timeout (${task.timeoutMs}ms)`,
+                'ERR_IO_PARSER_WORKER_TIMEOUT',
+            ),
+        );
         void restartWorkerSlot(slot);
-    }, task.timeoutMs);
+    }, remainingTimeoutMs);
     timeout.unref?.();
 
     _workerInFlight.set(task.id, { task, timeout, slot });
@@ -327,6 +428,7 @@ function handleWorkerMessage(slot, message) {
     _workerInFlight.delete(inFlight.task.id);
     slot.busy = false;
     slot.currentTaskId = null;
+    slot.worker.unref?.();
 
     if (message.ok) {
         inFlight.task.resolve(message.result);
@@ -344,6 +446,7 @@ function handleWorkerMessage(slot, message) {
  */
 function createWorkerSlot(index) {
     const worker = new Worker(PARSER_WORKER_URL);
+    worker.unref?.();
     /** @type {_WorkerSlot} */
     const slot = {
         index,
@@ -396,8 +499,11 @@ function createWorkerSlot(index) {
  * @returns {Promise<void>}
  */
 async function restartWorkerSlot(slot) {
+    const previousWorker = slot.worker;
+    previousWorker.removeAllListeners();
+    previousWorker.unref?.();
     try {
-        await slot.worker.terminate();
+        await previousWorker.terminate();
     } catch {
         // best effort
     }
@@ -413,6 +519,7 @@ async function restartWorkerSlot(slot) {
         _workerPoolDisabledByError = true;
         while (_workerQueue.length > 0) {
             const queued = _workerQueue.shift();
+            if (queued?.queueTimeout) clearTimeout(queued.queueTimeout);
             queued?.reject(new Error('parser worker pool unavailable'));
         }
     }
@@ -451,16 +558,44 @@ async function parseSymbolsInWorker(payload) {
     const id = ++_workerRequestSeq;
 
     return await new Promise((resolve, reject) => {
+        const freeSlot = _workerPool.find((slot) => !slot.busy);
+        if (!freeSlot && _workerQueue.length >= PARSER_WORKER_QUEUE_MAX) {
+            _parserRuntimeStats.workerQueueRejected += 1;
+            reject(
+                makeParserWorkerRuntimeError(
+                    `parser worker queue full (${_workerQueue.length}/${PARSER_WORKER_QUEUE_MAX})`,
+                    'ERR_IO_PARSER_WORKER_QUEUE_FULL',
+                ),
+            );
+            return;
+        }
+        /** @type {_WorkerTask} */
         const task = {
             id,
             payload,
             timeoutMs: PARSER_WORKER_REQUEST_TIMEOUT_MS,
+            queuedAtMs: performance.now(),
+            queueTimeout: null,
             resolve,
             reject,
         };
         _workerQueue.push(task);
+        _parserRuntimeStats.workerQueueHighWater = Math.max(
+            _parserRuntimeStats.workerQueueHighWater,
+            _workerQueue.length,
+        );
+        task.queueTimeout = setTimeout(() => {
+            if (!removeQueuedWorkerTask(task)) return;
+            _parserRuntimeStats.workerQueueTimeouts += 1;
+            reject(
+                makeParserWorkerRuntimeError(
+                    `parser worker queue timeout (${task.timeoutMs}ms)`,
+                    'ERR_IO_PARSER_WORKER_QUEUE_TIMEOUT',
+                ),
+            );
+        }, task.timeoutMs);
+        task.queueTimeout.unref?.();
 
-        const freeSlot = _workerPool.find((slot) => !slot.busy);
         if (freeSlot) dispatchQueuedWorkerTask(freeSlot);
     });
 }
@@ -469,6 +604,7 @@ async function teardownWorkerPoolForTest() {
     _workerPoolShuttingDown = true;
     while (_workerQueue.length > 0) {
         const queued = _workerQueue.shift();
+        if (queued?.queueTimeout) clearTimeout(queued.queueTimeout);
         queued?.reject(new Error('parser worker pool reset'));
     }
 
@@ -478,7 +614,16 @@ async function teardownWorkerPoolForTest() {
     }
     _workerInFlight.clear();
 
-    await Promise.allSettled(_workerPool.map((slot) => slot.worker.terminate()));
+    await Promise.allSettled(
+        _workerPool.map(async (slot) => {
+            slot.worker.unref?.();
+            try {
+                await slot.worker.terminate();
+            } finally {
+                slot.worker.removeAllListeners();
+            }
+        }),
+    );
     _workerPool.length = 0;
     _workerPoolInitialized = false;
     _workerPoolDisabledByError = false;
@@ -732,7 +877,16 @@ export async function parseFileSymbols(filePath, content) {
                 base.imports = workerResult.imports;
                 base.exports = workerResult.exports;
                 return base;
-            } catch {
+            } catch (error) {
+                const errorCode = getParserWorkerRuntimeErrorCode(error);
+                if (
+                    errorCode === 'ERR_IO_PARSER_WORKER_QUEUE_FULL' ||
+                    errorCode === 'ERR_IO_PARSER_WORKER_QUEUE_TIMEOUT' ||
+                    errorCode === 'ERR_IO_PARSER_WORKER_TIMEOUT'
+                ) {
+                    base.parseError = error instanceof Error ? error.message : 'parser worker overloaded';
+                    return base;
+                }
                 _parserRuntimeStats.workerFallbacks += 1;
             }
         }
@@ -854,6 +1008,10 @@ export async function parseFileForContext(filePath, content) {
  *     maxParseLines: number;
  *     workerEnabled: boolean;
  *     workerPoolSize: number;
+ *     workerQueueMax: number;
+ *     workerQueueMaxSource: string;
+ *     workerQueueLength: number;
+ *     workerQueueHighWater: number;
  *     workerRequestTimeoutMs: number;
  *     workerPoolInitialized: boolean;
  *     workerPoolDisabledByError: boolean;
@@ -865,6 +1023,10 @@ export async function parseFileForContext(filePath, content) {
  *     workerTimeouts: number;
  *     workerFailures: number;
  *     workerFallbacks: number;
+ *     workerQueueRejected: number;
+ *     workerQueueTimeouts: number;
+ *     workerQueueWaitMsLast: number;
+ *     workerQueueWaitMsMax: number;
  * }}
  */
 /**
@@ -926,6 +1088,10 @@ export function getParserCacheStats() {
         workerPoolSize: PARSER_WORKER_POOL_SIZE,
         workerPoolSizeSource: PARSER_WORKER_POOL_POLICY.source,
         availableParallelism: PARSER_WORKER_POOL_POLICY.availableParallelism,
+        workerQueueMax: PARSER_WORKER_QUEUE_MAX,
+        workerQueueMaxSource: PARSER_WORKER_QUEUE_POLICY.source,
+        workerQueueLength: _workerQueue.length,
+        workerQueueHighWater: _parserRuntimeStats.workerQueueHighWater,
         workerRequestTimeoutMs: PARSER_WORKER_REQUEST_TIMEOUT_MS,
         workerPoolInitialized: _workerPoolInitialized,
         workerPoolDisabledByError: _workerPoolDisabledByError,
@@ -937,15 +1103,20 @@ export function getParserCacheStats() {
         workerTimeouts: _parserRuntimeStats.workerTimeouts,
         workerFailures: _parserRuntimeStats.workerFailures,
         workerFallbacks: _parserRuntimeStats.workerFallbacks,
+        workerQueueRejected: _parserRuntimeStats.workerQueueRejected,
+        workerQueueTimeouts: _parserRuntimeStats.workerQueueTimeouts,
+        workerQueueWaitMsLast: _parserRuntimeStats.workerQueueWaitMsLast,
+        workerQueueWaitMsMax: _parserRuntimeStats.workerQueueWaitMsMax,
     };
 }
 
 /**
  * Limpa cache do parser e desmonta o hook de invalidação. Útil para isolamento em testes.
  *
- * @returns {void}
+ * @param {{ teardownWorkers?: boolean }} [options]
+ * @returns {Promise<void>}
  */
-export function resetParserCacheForTest() {
+export async function resetParserCacheForTest(options = {}) {
     _symbolCache.clear();
     _fileContextCache.clear();
     _fileContextCacheStats.hits = 0;
@@ -960,7 +1131,14 @@ export function resetParserCacheForTest() {
     _parserRuntimeStats.workerTimeouts = 0;
     _parserRuntimeStats.workerFailures = 0;
     _parserRuntimeStats.workerFallbacks = 0;
+    _parserRuntimeStats.workerQueueRejected = 0;
+    _parserRuntimeStats.workerQueueTimeouts = 0;
+    _parserRuntimeStats.workerQueueHighWater = 0;
+    _parserRuntimeStats.workerQueueWaitMsLast = 0;
+    _parserRuntimeStats.workerQueueWaitMsMax = 0;
     _parserInvalidationUnregister?.();
     _parserInvalidationUnregister = null;
-    void teardownWorkerPoolForTest();
+    if (options.teardownWorkers === true) {
+        await teardownWorkerPoolForTest();
+    }
 }

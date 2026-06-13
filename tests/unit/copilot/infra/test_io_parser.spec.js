@@ -4,9 +4,12 @@
  */
 
 import * as assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
 import {
     buildOutline,
@@ -20,9 +23,12 @@ import {
     parseFileSymbols,
     resetParserCacheForTest,
     resolveParserWorkerPoolPolicy,
+    resolveParserWorkerQueuePolicy,
 } from '../../../../src/copilot/infra/io-parser.js';
 
 let tmpDir = '';
+const IO_PARSER_MODULE_URL = pathToFileURL(path.resolve('src/copilot/infra/io-parser.js')).href;
+const execFileAsync = promisify(execFile);
 const JS_CONTENT = `
 // Module principal de teste
 import { foo } from './foo.js';
@@ -58,9 +64,9 @@ export async function handleRequest(cfg: Config): Promise<void> {
 
 const JSON_CONTENT = JSON.stringify({ name: 'test', version: '1.0.0', keywords: ['a', 'b'] });
 
-afterEach(() => {
+afterEach(async () => {
     process.env['IO_PARSER_FILE_CONTEXT_CACHE_ENABLED'] = '1';
-    resetParserCacheForTest();
+    await resetParserCacheForTest();
 });
 
 const MD_CONTENT = `# Título
@@ -83,6 +89,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+    await resetParserCacheForTest({ teardownWorkers: true });
     await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
@@ -145,6 +152,29 @@ describe('parser worker pool policy', () => {
             size: 2,
             source: 'adaptive',
             availableParallelism: 3,
+        });
+    });
+
+    it('limita fila de workers com default adaptativo e override validado', () => {
+        assert.deepEqual(resolveParserWorkerQueuePolicy({}, 1), {
+            max: 32,
+            source: 'adaptive',
+        });
+        assert.deepEqual(resolveParserWorkerQueuePolicy({}, 8), {
+            max: 256,
+            source: 'adaptive',
+        });
+        assert.deepEqual(resolveParserWorkerQueuePolicy({ IO_PARSER_WORKER_QUEUE_MAX: '0' }, 4), {
+            max: 0,
+            source: 'configured',
+        });
+        assert.deepEqual(resolveParserWorkerQueuePolicy({ IO_PARSER_WORKER_QUEUE_MAX: '100000' }, 4), {
+            max: 10_000,
+            source: 'configured',
+        });
+        assert.deepEqual(resolveParserWorkerQueuePolicy({ IO_PARSER_WORKER_QUEUE_MAX: 'invalid' }, 2), {
+            max: 64,
+            source: 'adaptive',
         });
     });
 });
@@ -245,6 +275,58 @@ describe('parseAndCacheSymbols', () => {
         assert.ok(stats2.size >= 1, `cache size=${stats2.size}`);
     });
 
+    it('expõe métricas de fila dos parser workers no snapshot', async () => {
+        const filePath = path.join(tmpDir, 'module.js');
+        await parseAndCacheSymbols(filePath);
+        const stats = getParserCacheStats();
+
+        assert.equal(typeof stats.workerQueueMax, 'number');
+        assert.equal(typeof stats.workerQueueLength, 'number');
+        assert.equal(typeof stats.workerQueueHighWater, 'number');
+        assert.equal(typeof stats.workerQueueRejected, 'number');
+        assert.equal(typeof stats.workerQueueTimeouts, 'number');
+        assert.equal(typeof stats.workerQueueWaitMsLast, 'number');
+        assert.equal(typeof stats.workerQueueWaitMsMax, 'number');
+        assert.ok(stats.workerQueueMax >= 0);
+        assert.ok(stats.workerQueueLength >= 0);
+    });
+
+    it('rejeita backlog quando a fila de workers atinge o limite configurado', async () => {
+        const script = `
+            import { getParserCacheStats, parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            const content = ${JSON.stringify(JS_CONTENT)};
+            const results = await Promise.all(
+                Array.from({ length: 8 }, (_, index) => parseFileSymbols('/tmp/queued-' + index + '.js', content)),
+            );
+            const stats = getParserCacheStats();
+            await resetParserCacheForTest({ teardownWorkers: true });
+            console.log(JSON.stringify({
+                parseErrors: results.map((result) => result.parseError),
+                workerQueueRejected: stats.workerQueueRejected,
+                workerQueueMax: stats.workerQueueMax
+            }));
+            process.exit(0);
+        `;
+        const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
+            cwd: path.resolve('.'),
+            env: {
+                ...process.env,
+                IO_PARSER_WORKER_POOL_SIZE: '1',
+                IO_PARSER_WORKER_QUEUE_MAX: '0',
+            },
+            timeout: 10_000,
+            maxBuffer: 1024 * 1024,
+        });
+        const result = JSON.parse(stdout);
+
+        assert.ok(
+            result.parseErrors.some((parseError) => String(parseError ?? '').includes('parser worker queue full')),
+            `result=${stdout}`,
+        );
+        assert.ok(result.workerQueueRejected > 0, `result=${stdout}`);
+        assert.equal(result.workerQueueMax, 0);
+    });
+
     it('invalida cache de arquivo específico', async () => {
         const filePath = path.join(tmpDir, 'module.js');
         await parseAndCacheSymbols(filePath);
@@ -281,7 +363,7 @@ describe('parseFileForContext', () => {
 
     it('cacheia FileContext por path e conteúdo', async () => {
         const filePath = path.join(tmpDir, 'module.js');
-        resetParserCacheForTest();
+        await resetParserCacheForTest();
 
         const first = await parseFileForContext(filePath, JS_CONTENT);
         const afterFirst = getParserCacheStats();
@@ -297,7 +379,7 @@ describe('parseFileForContext', () => {
 
     it('invalida FileContext quando invalidateParserCache é chamado', async () => {
         const filePath = path.join(tmpDir, 'module.js');
-        resetParserCacheForTest();
+        await resetParserCacheForTest();
 
         await parseFileForContext(filePath, JS_CONTENT);
         assert.equal(getParserCacheStats().fileContext.size, 1);
@@ -310,7 +392,7 @@ describe('parseFileForContext', () => {
     it('suporta kill-switch do FileContext cache', async () => {
         const filePath = path.join(tmpDir, 'module.js');
         process.env['IO_PARSER_FILE_CONTEXT_CACHE_ENABLED'] = '0';
-        resetParserCacheForTest();
+        await resetParserCacheForTest();
 
         const first = await parseFileForContext(filePath, JS_CONTENT);
         const second = await parseFileForContext(filePath, JS_CONTENT);
