@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `20463d91`, seguida do hardening de freshness do índice
+**Baseline reinvestigado:** `main` sincronizada até `85af248d`, seguida da onda de rollback sidecar
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -15,22 +15,22 @@ stale recovery inseguro do L1, release determinístico, publicação exclusiva/v
 invalidação derivada imediata, append/repair JSONL canônico, governança dos writers, metadata/health de durabilidade e
 provas multiprocess/fault-injection.
 
-No estado atual, a descrição correta é: **as primitivas centrais de mutação e append têm contratos fortes e provas
-reais, as superfícies externas de path estão vinculadas a policy async e o índice detecta mudanças externas
-metadata-preserving; o risco dominante migrou para rollback de arquivos grandes e observabilidade de contenção**.
+No estado atual, a descrição correta é: **as primitivas centrais de mutação, append e rollback material têm contratos
+fortes e provas reais, as superfícies externas de path estão vinculadas a policy async e o índice detecta mudanças
+externas metadata-preserving; o risco dominante migrou para observabilidade de contenção e custos de busca/cache**.
 
 Prioridades reais remanescentes:
 
-1. **P1 — rollback grande ainda é incompleto:** snapshots de mutação respeitam orçamento, mas não há sidecar durável
-   para restaurar arquivos acima dele.
+1. **P1 — contagem bruta de search ainda pode incluir linhas redigidas:** falta eliminar o side-channel ou marcar o
+   contrato de forma explícita.
 2. **P2 — lockfile multiprocess continua seletivo:** o L1 é canônico e provado, porém opt-in nas mutações gerais.
 3. **P2 — observabilidade de contenção ainda é parcial:** há contadores de stale recovery, heartbeat e durabilidade,
    mas não p95/histograma nem snapshot sanitizado de leases.
 4. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
-intra-processo”, “snapshot por read/stat paralelo” ou “append fragmentado sem recovery”. O risco técnico dominante
-migrou de corrupção nas primitivas centrais para rollback grande e gaps operacionais avançados.
+intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
+material”. O risco técnico dominante migrou de corrupção nas primitivas centrais para gaps operacionais avançados.
 
 ### 1.1 Status de implementação — Faixa 0 aplicada em 2026-06-12
 
@@ -524,6 +524,38 @@ Validação:
 - Testes focados de índice/scanner/store: **29 passados, 0 falhas**.
 - Validação ampliada de consumidores MCP/tools/contracts: **88 passados, 0 falhas**.
 
+### 1.20 Status de implementação — rollback sidecar durável aplicado em 2026-06-12
+
+IO-010 foi fechado para delete, patch e restauração de destino em copy/move:
+
+- `rollback-sidecar.js` grava conteúdo excedente em `.ai/rollback` somente após o snapshot ultrapassar o orçamento
+  em memória;
+- a publicação usa temp exclusivo, modo `0600`, escrita completa por `FileHandle`, `sync()` do arquivo, rename e sync
+  do diretório;
+- o nome final codifica expiração, SHA-256 e UUID; o descritor registra version, path, hash, bytes, criação e TTL;
+- o hash fornecido por callers materializados é verificado contra os bytes antes da persistência;
+- cleanup bounded remove somente nomes do schema expirados, incluindo `.pending` órfãos, sob lock L0+L1;
+- `dry-run` de patch grande continua sem efeitos colaterais e não cria sidecar;
+- delete e destinos sobrescritos de copy/move propagam sidecar; snapshots de origem usados apenas para integridade não
+  geram artefatos desnecessários;
+- plano/token de rollback passou a version 2 e inclui `snapshotSidecar`, mantendo verificação e parse de tokens v1;
+- tools e MCP consideram base64 ou sidecar como material de restauração disponível.
+
+Provas adicionadas:
+
+- snapshot streamado grande preserva bytes exatos, hash, tamanho, TTL e modo `0600`;
+- cleanup remove sidecar final e `.pending` expirados sem tocar nome desconhecido ou sidecar ativo;
+- hash divergente é recusado;
+- delete e patch grandes preservam conteúdo anterior materialmente; patch dry-run não cria artefato;
+- token v2 faz round-trip com sidecar e token v1 legado continua verificável.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- `lint:copilot`: **PASS**.
+- rodada focada infra/runtime: **49 passados, 0 falhas**.
+- rodada ampliada infra/tools/MCP: **115 passados, 0 falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -534,7 +566,7 @@ Foram lidos completamente todos os arquivos diretamente sob a árvore de infra I
 
 | Área | Arquivos |
 | --- | --- |
-| `fs` | `append.js`, `copy.js`, `index.js`, `line-offset-cache.js`, `locked-mutations.js`, `locked-writes.js`, `mkdir.js`, `move.js`, `portable-atomic.js`, `read-bytes.js`, `read-chunks.js`, `read-lines.js`, `read-services.js`, `read-text.js`, `remove.js`, `snapshot.js`, `stat.js`, `write-atomic.js` |
+| `fs` | `append.js`, `copy.js`, `index.js`, `line-offset-cache.js`, `locked-mutations.js`, `locked-writes.js`, `mkdir.js`, `move.js`, `portable-atomic.js`, `read-bytes.js`, `read-chunks.js`, `read-lines.js`, `read-services.js`, `read-text.js`, `remove.js`, `rollback-sidecar.js`, `snapshot.js`, `stat.js`, `write-atomic.js` |
 | `invalidation` | `bus.js`, `cache-tiers.js`, `events.js`, `index.js` |
 | `patch` | `index.js`, `text-diff-service.js`, `text-diff.js`, `text-patch.js` |
 | `search` | `grep-adapter.js`, `index-search.js`, `index.js`, `result-paginator.js`, `subprocess.js`, `symbol-search.js`, `text-search.js` |
@@ -749,7 +781,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-007 | P1 | Snapshot | `readFile` e `stat` em paralelo não formam snapshot consistente | `read-bytes.js`, `read-text.js` | Cache pode associar conteúdo de uma versão a mtime/size de outra | Abrir FileHandle, `stat/read/stat` e retry se fingerprint muda; ou stat antes/depois |
 | IO-008 | P1 | Create/copy | `failIfExists` e `overwrite=false` sofrem TOCTOU externo | `locked-writes.js`, `locked-mutations.js` | Processo externo pode criar destino entre `access` e gravação/cópia | Usar `open('wx')`/`COPYFILE_EXCL` e tratar EEXIST atomicamente |
 | IO-009 | P1 | Append | Append de logs não é durável nem framed | `append.js`, bypasses de audit | Crash pode deixar JSONL truncado/torn line | Criar `appendRecordLocked` com newline framing, `flush`, recovery de linha parcial e rotação sob lock |
-| IO-010 | P1 | Rollback | Rollback de patch é parcial para arquivos grandes | `snapshot.js` limita base64 a orçamento | Mutação em arquivo grande pode ficar sem rollback material | Salvar rollback em arquivo sidecar sob `.ai/rollback` com hash, ttl e cleanup seguro |
+| IO-010 | P1 | Rollback | **Concluído:** conteúdo acima do orçamento migra para sidecar durável | `rollback-sidecar.js`, `snapshot.js`, `locked-mutations.js`, token v2 | TTL limita a janela material de restauração por desenho | Monitorar cleanup e tornar TTL configurado visível no health |
 | IO-011 | P1 | Memória | Snapshot de mutação coleta stream inteiro em memória | `snapshot.js`: `Array.fromAsync(stream)` antes de processar | Arquivo grande consome memória desnecessária | Processar `for await` incrementalmente, hash e snapshot budget sem reter todos os chunks |
 | IO-012 | P1 | Cache derivado | Invalidação debounced pode atrasar read-after-write de parser/line-offset | `invalidation/bus.js`: debounce 50ms em produção | Leitura derivada logo após mutação pode ver stale | Após mutação canônica, flush hooks críticos ou oferecer `invalidateSync` para line-offset/parser/index |
 | IO-013 | P1 | Line offsets | Chave de line-offset não é claramente normalizada | `line-offset-cache.js` usa `filePath` recebido | Mesmo arquivo por path relativo/absoluto pode manter caches distintos | Normalizar path com `normalizeIoCacheKey`/`resolve` antes de keyar e invalidar |
@@ -787,10 +819,10 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-014, IO-016, IO-017, IO-019, IO-020, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-016, IO-017, IO-019, IO-020, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
 | Concluído com limite documentado | IO-001, IO-005, IO-006, IO-038 |
 | Parcial | IO-002, IO-009, IO-023, IO-025 |
-| Aberto | IO-010, IO-015, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-030 |
+| Aberto | IO-015, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-030 |
 
 ---
 
@@ -811,18 +843,23 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 **Insuficiente:**
 
-- Muitos callsites de append e alguns writers de configuração burlam a fachada.
-- Ainda faltam provas multiprocess/crash-injection das invariantes implementadas.
-- Índice pode perder mudança externa same-size/same-mtime.
-- Lockfile legado ainda não compartilha a mesma semântica do L1 canônico.
+- L1 multiprocess permanece seletivo/opt-in nas mutações gerais.
+- Sidecars têm janela de restauração limitada pelo TTL e ainda não entram no health agregado.
+- Remoção recursiva da engine continua destrutiva sem quarentena intrínseca.
+- Preflight de espaço livre para copy/write grande ainda não existe.
 
-**Diagnóstico:** as primitivas canônicas agora protegem bem replace, copy, move, snapshot e concorrência cooperativa/multiprocess opt-in. Ainda não deve ser vendida como transacional enquanto append, bypass governance e provas de crash/multiprocess estiverem abertos.
+**Diagnóstico:** as primitivas canônicas protegem replace, copy, move, snapshot, rollback material e concorrência
+cooperativa/multiprocess opt-in. A camada ainda não é uma transação ACID: rollback é um plano com material temporário,
+não um executor atômico distribuído.
 
 ### 6.2 Locks e concorrência
 
 O design L0 de `io-locks.js` continua correto para single-process async concurrency. A reentrância com `AsyncLocalStorage` evita deadlocks e multi-lock ordenado lexicograficamente evita inversão.
 
-O L1 coordena processos cooperativos por `open('wx')`, heartbeat e stale recovery conservador. Release determinístico já compõe L1 antes de liberar L0. A promoção a default ainda depende de prova multiprocess e consolidação com o lockfile legado. Em devcontainer, concorrência externa continua incluindo:
+O L1 coordena processos cooperativos por `open('wx')`, heartbeat e stale recovery conservador. Release determinístico
+compõe L1 antes de liberar L0, o lock manager legado delega ao SSOT e provas multiprocess cobrem espera, exclusão e
+recovery. A promoção a default agora depende de medir contenção/custo e definir perfis de ativação. Em devcontainer,
+concorrência externa continua incluindo:
 
 - VS Code/editor;
 - Git;
@@ -831,11 +868,13 @@ O L1 coordena processos cooperativos por `open('wx')`, heartbeat e stale recover
 - validações/testes;
 - ferramentas externas de format/lint.
 
-Estado ideal: manter L0 rápido, consolidar o lockfile legado e então ativar L1 por perfil para mutações P0/P1.
+Estado ideal: manter L0 rápido e ativar L1 por perfil para mutações P0/P1 com p95, timeout e leases sanitizados.
 
 ### 6.3 Atomicidade e durabilidade
 
-O writer atual já executa a maior parte da sequência durável para replace. O que falta é propagar o resultado da durabilidade, tratar falhas de sync conforme política e aplicar publicação staged às outras mutações. A sequência de referência permanece:
+O writer atual executa a sequência durável para replace, propaga resultados de durabilidade e copy/move usam
+publicação staged/verificada. Falhas reais de sync são promovidas conforme a política, enquanto misses explicitamente
+não suportados permanecem best-effort. A sequência de referência permanece:
 
 1. abrir tmp no mesmo diretório com flags exclusivas;
 2. escrever payload completo;
@@ -845,26 +884,29 @@ O writer atual já executa a maior parte da sequência durável para replace. O 
 6. abrir diretório e `sync()` quando plataforma suportar;
 7. invalidar caches e publicar evento.
 
-Para append, a sequência ideal depende do tipo:
+Para append, a política implementada depende do tipo:
 
 - JSONL/audit: append record framed, newline, flush opcional, recovery de última linha.
 - Logs de baixa criticidade: append buffered sem flush, mas explicitamente classificado como best-effort.
 
 ### 6.4 Cache e invalidação
 
-L1 é bem pensado: TTL, max bytes, mtime+size, hash revalidation para arquivos pequenos. Snapshot inicial consistente, line-offset normalizado e flush derivado já foram incorporados.
+L1 é bem pensado: TTL, max bytes, metadata rica e hash revalidation para arquivos pequenos. Snapshot inicial
+consistente, line-offset normalizado e flush derivado já foram incorporados.
 
 A prioridade remanescente é:
 
-- freshness do índice para mudanças externas same-size.
+- medir hit/miss e custo da verificação periódica do índice.
 - medição do custo do flush imediato sob bursts.
-- governança para writers que ainda não publicam invalidação.
+- definir perfil experimental e política operacional do L2 SQLite.
 
 ### 6.5 Scanner, busca e index
 
 O scanner usa `readdir({ withFileTypes: true })` e evita `lstat` para diretórios e symlinks reconhecidos. O benchmark local ficou entre 154 e 214 ms para 1.565 entradas de `src/copilot`; ainda falta benchmark comparativo automatizado e cobertura de filesystems que retornam tipo desconhecido.
 
-A busca está bem protegida contra shell injection: usa `spawn` com args array e maxBuffer/timeout. O índice FTS é boa oportunidade de performance. O maior risco é stale index por writes fora da fachada.
+A busca está bem protegida contra shell injection: usa `spawn` com args array e maxBuffer/timeout. O índice FTS agora
+combina metadata rica com verificação periódica bounded. Os riscos remanescentes são a contagem bruta antes da redação
+e a materialização de stdout até o limite do subprocesso.
 
 ---
 
@@ -1030,7 +1072,10 @@ A situação ideal é uma infra IO em camadas:
 
 - [x] Remover `Array.fromAsync(stream)`.
 - [x] Hash e orçamento de rollback em `for await`.
-- [ ] Adicionar teste de arquivo grande sem retenção integral.
+- [x] Adicionar teste de arquivo grande sem retenção integral.
+- [x] Persistir excedente em sidecar durável com hash e TTL.
+- [x] Cleanup bounded de finais e `.pending` expirados sob lock.
+- [x] Propagar sidecar pelo token v2 preservando tokens v1.
 
 #### Fase 3.3 — Invalidação read-after-write
 
@@ -1135,7 +1180,8 @@ Bom encapsulamento. `expectedHash` e create exclusivo estão no lugar certo. Dev
 
 ### `io/fs/locked-mutations.js`
 
-Patch já valida UTF-8. Permanecem copy staged, move exclusivo same-device, release determinístico e rollback sidecar para arquivos grandes.
+Patch valida UTF-8 e materializa rollback grande; copy/move staged preservam o destino anterior por base64 ou sidecar.
+O risco remanescente relevante é remoção recursiva sem quarentena intrínseca.
 
 ### `io/fs/move.js`
 
@@ -1143,15 +1189,19 @@ O fallback EXDEV e o caminho same-device foram endurecidos. Sem overwrite, a pub
 
 ### `io/fs/snapshot.js`
 
-O snapshot de mutação agora é incremental e aceita orçamento zero. O próximo passo é teste de arquivo grande e alteração externa durante leitura.
+O snapshot de mutação é incremental, aceita orçamento zero e promove o excedente para writer sidecar sem reter o
+arquivo inteiro. Alteração externa durante o stream continua mitigada pelo lock cooperativo, não por snapshot
+inode-confirmed igual ao caminho de leitura cacheada.
 
 ### `io-prefetch.js`
 
-Agora respeita a validação UTF-8 de `readText`. O risco remanescente vem do snapshot baixo inconsistente e da invalidação derivada atrasada.
+Respeita a validação UTF-8 de `readText`, e snapshot/invalidação derivados já foram endurecidos. O trabalho remanescente
+é medir custo/benefício do warmup e do L2 por perfil.
 
 ### `io-cache.js`
 
-Boa engenharia. O hash revalidation é uma proteção pragmática contra drift de mtime. Depois de snapshot consistente e path normalization universal, torna-se bastante confiável.
+Boa engenharia. Hash revalidation, snapshot consistente e path normalization universal tornam o L1 confiável; falta
+telemetria de hit/custo para orientar budgets e o perfil L2.
 
 ### `io-scanner.js`
 
@@ -1164,23 +1214,33 @@ hit/miss/custo por perfil e decidir enablement do L2, não corrigir stale básic
 
 ### `io-locks.js`
 
-Sólido no L0 e composto com L1 conservador. Release é determinístico; a próxima evolução é consolidar o lockfile legado, ampliar observabilidade e provar concorrência entre processos.
+Sólido no L0 e composto com L1 conservador. Release é determinístico, o legado delega ao SSOT e a concorrência
+multiprocess foi provada. A próxima evolução é ampliar observabilidade e escolher perfis de ativação do L1.
 
 ---
 
 ## 12. Critérios de aceite para declarar a infra IO “confiável”
 
-A infra IO só deve ser considerada plenamente confiável quando:
+Os critérios fundacionais originalmente definidos estão atendidos:
 
-- toda escrita fora de `infra` passar pela fachada pública ou por allowlist formal;
-- `readText`, `prefetch`, `patch` e `index` compartilharem a mesma validação UTF-8;
-- create/copy/move sem overwrite usarem exclusividade real;
-- atomic write tiver modo durável com sync de arquivo e diretório;
-- move EXDEV tiver verificação de integridade;
-- snapshots de leitura forem consistentes ou falharem sem popular cache;
-- cache derivado for invalidado antes de retorno de mutação crítica;
-- houver testes multiprocess e crash-injection;
-- lock semantics estiverem documentadas por nível: intra-processo, lockfile, best-effort.
+- [x] escrita fora de `infra` passa por fachada pública/trusted ou allowlist formal;
+- [x] `readText`, prefetch, patch e index compartilham validação UTF-8;
+- [x] create/copy/move sem overwrite usam exclusividade real;
+- [x] atomic write possui modo durável com sync de arquivo e diretório;
+- [x] move EXDEV verifica integridade;
+- [x] snapshots de leitura são consistentes ou falham sem popular cache;
+- [x] cache derivado é invalidado antes do retorno de mutação crítica;
+- [x] há provas multiprocess e fault injection determinístico;
+- [x] semânticas de lock estão documentadas por nível;
+- [x] rollback material de arquivo grande possui hash, TTL e cleanup seguro.
+
+Para declarar maturidade operacional avançada, ainda faltam:
+
+- [ ] perfil explícito de ativação L1 para mutações P0/P1;
+- [ ] p95/histograma, timeout/abort e leases sanitizados;
+- [ ] quarentena intrínseca ou confirmação reforçada para remove recursivo;
+- [ ] preflight opcional de espaço livre em payloads grandes;
+- [ ] search incremental e contagens pós-redação.
 
 ---
 
@@ -1199,5 +1259,5 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Implementar rollback sidecar durável para mutações acima do orçamento em memória, com hash, TTL, cleanup sob lock e
-integração explícita ao token/plano de rollback.
+Fechar IO-015 eliminando ou declarando explicitamente contagens anteriores à redação em search; em seguida, adicionar
+histograma/p95, timeout/abort e snapshot sanitizado de leases para avançar IO-025.
