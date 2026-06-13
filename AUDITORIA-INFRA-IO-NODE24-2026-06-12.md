@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` em `34fd96cc` (`origin/main` sincronizada em 2026-06-12)
+**Baseline reinvestigado:** `main` sincronizada até `fcd4b4e0`, seguida da onda de separação trusted/workspace-facing
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -10,20 +10,33 @@
 
 ## 1. Sumário executivo
 
-A infra IO de `src/copilot` evoluiu materialmente desde a abertura deste documento. Além das Faixas 0, 1 e 2.1, a onda pós-reinvestigação fechou stale recovery inseguro do L1, release assíncrono determinístico, move same-device exclusivo, copy staged, snapshot consistente, snapshot incremental, invalidação derivada imediata e scanner com `Dirent`.
+A infra IO de `src/copilot` evoluiu materialmente desde a abertura deste documento. As ondas implementadas fecharam
+stale recovery inseguro do L1, release determinístico, publicação exclusiva/verificada, snapshots coerentes,
+invalidação derivada imediata, append/repair JSONL canônico, governança dos writers, metadata/health de durabilidade e
+provas multiprocess/fault-injection.
 
-No estado implementado após `7b83becd`, a descrição correta é: **replace/copy/move têm publicação segura e verificação de integridade, snapshots baixos são coerentes e o L1 deixou de ter as corridas críticas identificadas; append/JSONL, policy workspace-bound, consolidação dos lock managers e provas de crash/multiprocess ainda impedem declarar transacionalidade completa**.
+No estado atual, a descrição correta é: **as primitivas centrais de mutação e append têm contratos fortes e provas
+reais; o risco dominante migrou para containment workspace-bound ainda delegado aos adapters, freshness externa do
+índice, rollback de arquivos grandes e observabilidade de contenção**.
 
 Prioridades reais remanescentes:
 
-1. **P1 — append/JSONL foi consolidado no caminho assíncrono principal, mas ainda é parcial:** audit, mutation audit, event collector, MCP e SSE compartilham writer; logger/metrics/transcript síncronos e recovery de linha parcial permanecem.
-2. **P1 — política workspace-bound ainda não está na fachada:** a engine pública valida string/null-byte, mas containment e symlink policy continuam responsabilidade dos adapters.
-3. **P1 — provas de falha ainda são insuficientes:** faltam dois processos reais e crash injection nos pontos de publish/sync/append.
-4. **P1 — freshness do índice ainda depende demais de mtime+size:** mudanças externas same-size/same-mtime podem escapar.
-5. **P2 — consolidação de locks concluída, enablement ainda seletivo:** `infra/lockfile.js` virou facade do L1 canônico, mas o lockfile multiprocess continua opt-in nas mutações gerais.
-6. **P2 — observabilidade de contenção ainda é parcial:** há contadores de stale recovery e heartbeat failure, mas não p95/histograma e snapshot de leases.
+1. **P1 — política workspace-bound ainda não está aplicada pela fachada:** a capability trusted/portable agora é
+   separada, exige caller e possui allowlist exata; containment e symlink policy da API comum ainda dependem dos
+   adapters.
+2. **P1 — freshness do índice ainda depende demais de mtime+size:** mudanças externas same-size/same-mtime podem
+   escapar.
+3. **P1 — rollback grande ainda é incompleto:** snapshots de mutação respeitam orçamento, mas não há sidecar durável
+   para restaurar arquivos acima dele.
+4. **P2 — lockfile multiprocess continua seletivo:** o L1 é canônico e provado, porém opt-in nas mutações gerais.
+5. **P2 — observabilidade de contenção ainda é parcial:** há contadores de stale recovery, heartbeat e durabilidade,
+   mas não p95/histograma nem snapshot sanitizado de leases.
+6. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
 
-Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock intra-processo” ou “snapshot por read/stat paralelo”. O risco técnico dominante migrou de corrupção nas primitivas centrais para append fragmentado, writers fora da fachada, freshness externa e ausência de provas de falha reais.
+Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
+intra-processo”, “snapshot por read/stat paralelo” ou “append fragmentado sem recovery”. O risco técnico dominante
+migrou de corrupção nas primitivas centrais para fronteiras de autorização de path, freshness externa e gaps
+operacionais avançados.
 
 ### 1.1 Status de implementação — Faixa 0 aplicada em 2026-06-12
 
@@ -434,6 +447,31 @@ Validação:
 - Lint focado: **PASS**.
 - Contrato arquitetural e snapshot store: **92 passados, 0 falhas**.
 
+### 1.17 Status de implementação — capability trusted/portable separada em 2026-06-12
+
+A escrita portable deixou de sair pela mesma fachada da API workspace-facing:
+
+- `infra/public/io.js` não exporta mais `writeFileAtomicPortable`;
+- a nova capability `infra/public/trusted-io.js` exporta `writeFileAtomicTrusted()` e exige `caller` não vazio antes
+  de acessar o filesystem;
+- os 16 owners externos foram migrados para a nova fachada, incluindo o deep import de `/export`;
+- a primitiva `writeFileAtomicPortable` permanece interna a `infra`, onde pode compor stores baixos;
+- contrato arquitetural exige correspondência exata entre importer e caller trusted e rejeita vazamento da primitiva
+  portable para fora de `infra`;
+- teste da fachada comprova fail-fast sem caller e publicação quando a confiança é declarada.
+
+Esta onda fecha a mistura de capabilities, mas **não** declara a API comum workspace-bound: `infra/public/io.js`
+continua workspace-facing e depende da validação feita pelos adapters. O passo restante de IO-014 é aplicar
+`workspaceRoot` e policy async na própria fronteira sem quebrar os consumidores de runtime trusted.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- `lint:copilot`: **PASS**.
+- Testes focados de contracts, fachada trusted e consumidores migrados: **299 passados, 0 falhas**.
+- `typecheck:strict` global parou em dívida preexistente de `terminal/capabilities/structured-preview.js`:
+  `js-yaml.dump` ausente no tipo resolvido.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -663,7 +701,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-011 | P1 | Memória | Snapshot de mutação coleta stream inteiro em memória | `snapshot.js`: `Array.fromAsync(stream)` antes de processar | Arquivo grande consome memória desnecessária | Processar `for await` incrementalmente, hash e snapshot budget sem reter todos os chunks |
 | IO-012 | P1 | Cache derivado | Invalidação debounced pode atrasar read-after-write de parser/line-offset | `invalidation/bus.js`: debounce 50ms em produção | Leitura derivada logo após mutação pode ver stale | Após mutação canônica, flush hooks críticos ou oferecer `invalidateSync` para line-offset/parser/index |
 | IO-013 | P1 | Line offsets | Chave de line-offset não é claramente normalizada | `line-offset-cache.js` usa `filePath` recebido | Mesmo arquivo por path relativo/absoluto pode manter caches distintos | Normalizar path com `normalizeIoCacheKey`/`resolve` antes de keyar e invalidar |
-| IO-014 | P1 | Path policy | Engine valida string/null byte, mas não workspace containment | `policy/path-resource.js`: `assertValidIoFilePath` | Chamador interno pode usar engine em path arbitrário | Separar API `trustedPortable` da API workspace-bound; exigir `workspaceRoot`/policy na fachada pública |
+| IO-014 | P1 | Path policy | **Parcial:** trusted/portable está separado e allowlistado; API comum ainda não aplica containment | `public/trusted-io.js`, contrato de callers; `policy/path-resource.js` ainda só valida forma | Chamador da fachada comum ainda pode usar path arbitrário sem adapter | Exigir `workspaceRoot`/policy async na capability workspace-bound e testar symlinks/traversal |
 | IO-015 | P1 | Search | Total bruto pode vazar contagem de linhas redigidas | `text-search.js`: totalMatchCount de stdout cru | Baixo risco de side-channel sobre secrets | Calcular totais pós-redação ou marcar `rawTotalMayIncludeRedacted=true` |
 | IO-016 | P1 | Scanner | `readdir` + `lstat` por entrada é custoso | `io-scanner.js` | Muitos syscalls em árvores grandes | Usar `readdir({ withFileTypes:true })`; avaliar `fsPromises.glob` em Node 24.5 para casos seguros |
 | IO-017 | P1 | Index freshness | Índice confia em mtime+size | `io-index-sqlite.js`, `fingerprint-match.js` tolerância 2ms | Mudança externa com mesmo size/mtime pode não reindexar | Para arquivos pequenos/médios, usar hash ou ctime/inode; para hot files, stat-before-after |
@@ -699,8 +737,8 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | --- | --- |
 | Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
 | Concluído com limite documentado | IO-001, IO-005, IO-006, IO-038 |
-| Parcial | IO-002, IO-009, IO-023, IO-025 |
-| Aberto | IO-010, IO-014, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-029, IO-030 |
+| Parcial | IO-002, IO-009, IO-014, IO-023, IO-025 |
+| Aberto | IO-010, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-030 |
 
 ---
 
@@ -914,10 +952,11 @@ A situação ideal é uma infra IO em camadas:
 
 #### Fase 2.3 — Workspace-bound IO
 
-- [ ] Dividir fachada em `workspaceIo` e `trustedPortableIo`.
+- [x] Separar capability workspace-facing da capability trusted/portable.
 - [ ] `workspaceIo` exige `workspaceRoot` e policy async.
-- [ ] `trustedPortableIo` exige root/caller explícito.
-- [ ] Testar traversal, symlink externo, absoluto externo e null-byte.
+- [x] `trustedPortableIo` exige caller explícito e possui allowlist exata.
+- [x] Testar fail-fast de trusted sem caller e null-byte na engine baixa.
+- [ ] Testar traversal, symlink externo e absoluto externo na futura capability workspace-bound.
 
 #### Fase 2.4 — Observabilidade
 
@@ -1107,4 +1146,5 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Separar explicitamente workspace-bound IO de portable/trusted; depois atacar freshness do índice.
+Aplicar policy async e `workspaceRoot` na capability workspace-bound sem contaminar os callers trusted; em seguida,
+atacar freshness do índice para mudanças externas same-size/same-mtime.
