@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `2d1f94ae`, seguida da onda de observabilidade de locks
+**Baseline reinvestigado:** `main` sincronizada até `1af25202`, seguida da onda de perfis L1 por risco
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -17,16 +17,15 @@ provas multiprocess/fault-injection.
 
 No estado atual, a descrição correta é: **as primitivas centrais de mutação, append e rollback material têm contratos
 fortes e provas reais, as superfícies externas de path estão vinculadas a policy async, o índice detecta mudanças
-externas metadata-preserving e a contenção L0/L1 é observável sem expor paths; o risco dominante migrou para política
-de ativação do L1 e custos de busca/cache**.
+externas metadata-preserving e a contenção L0/L1 é observável sem expor paths; o L1 multiprocess agora possui perfis
+explícitos por risco e o risco dominante migrou para custos de busca/cache e guardrails destrutivos de UX**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — lockfile multiprocess continua seletivo:** o L1 é canônico, provado e observável, porém opt-in nas mutações
-   gerais; falta definir perfis explícitos de ativação.
-2. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
-3. **P2 — remove recursivo continua sem quarentena intrínseca:** callers precisam impor a proteção.
-4. **P2 — parser workers não expõem pressão de fila:** faltam backpressure e queue length no health.
+1. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
+2. **P2 — remove recursivo continua sem quarentena intrínseca:** callers precisam impor a proteção.
+3. **P2 — parser workers não expõem pressão de fila:** faltam backpressure e queue length no health.
+4. **P2 — L2/cache ainda carece de perfil experimental medido:** falta hit ratio/custo em cenário cold/warm.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -609,6 +608,33 @@ Validação:
 - lint focado dos arquivos alterados: **PASS**.
 - locks, health e engine: **49 passados, 0 falhas**.
 
+### 1.23 Status de implementação — perfis L1 por risco aplicados em 2026-06-12
+
+IO-002 saiu do estado “só L0 intra-processo” para um modelo operacional opt-in e explícito:
+
+- `COPILOT_IO_FILE_LOCKS_ENABLED` passou a aceitar `off`, `high-risk`, `mutations` e `all`;
+- compatibilidade preservada: `1/true/yes/on` equivalem a `all`, `0/false/no/off` equivalem a `off`;
+- `high-risk` ativa L1 para `high`/`critical`, cobrindo delete, remove, move, patch não dry-run, copy overwrite,
+  repair JSONL e transações de quarentena;
+- `mutations` ativa L1 para `medium+`, incluindo write, append, mkdir, JSONL append e writes trusted;
+- `all` mantém o comportamento booleano antigo de ligar L1 para todos os locks, inclusive low-risk;
+- `fileLock:true` continua sendo override explícito para casos especiais como cleanup de sidecar;
+- `getIoLockStats().fileLocks` agora expõe `profile` e `configurationValid`;
+- perfil inválido falha acquisition com `ERR_IO_FILE_LOCK_PROFILE` e aparece no health como
+  `IO_LOCK_PROFILE_INVALID`, sem derrubar a leitura do snapshot;
+- mutators e transações read-modify-write propagam `operation`, `target` e `riskClass` ao resolver o L1;
+- env governance foi alinhada em `.env.schema.json`, `.env.expert.example` e
+  `DOCUMENTAÇÃO/REFERENCIA/ENV_VARIABLES_GUIDE.md`;
+- a lacuna preexistente `TERMINAL_DISPLAY_PRESET` também foi coberta no schema/template para deixar o audit de env
+  limpo.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- lint focado dos arquivos alterados: **PASS**.
+- env: `audit-env-surface`, `validate-env` e `check-env-local`: **PASS**.
+- locks, engine, health, MCP repo-write e state IO: **85 passados, 0 falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -826,7 +852,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | ID | Prioridade | Área | Achado | Evidência local | Risco | Recomendação |
 | --- | --- | --- | --- | --- | --- | --- |
 | IO-001 | P0 | Escrita atômica | Atomic replace não é crash-durable | `io/fs/write-atomic.js`: `writeFile(tmp)` + `rename(tmp, filePath)` | Crash/power loss pode deixar tmp, conteúdo antigo, entrada de diretório não persistida ou arquivo não durável | Criar `durableAtomicReplace`: open tmp, write, `filehandle.sync()`/`flush`, close, rename, fsync do diretório quando suportado |
-| IO-002 | P0 | Locks | Lock é intra-processo, não multiprocess | `io-locks.js` usa `Map` em memória | Outro processo pode escrever no mesmo arquivo e burlar serialização | Documentar escopo e adicionar camada opcional de lockfile/advisory lock para mutações de alto risco |
+| IO-002 | P0 | Locks | **Concluído com limite documentado:** L0 permanece default, L1 multiprocess é opt-in por perfil de risco | `COPILOT_IO_FILE_LOCKS_ENABLED=high-risk|mutations|all`, provas multiprocess e health de locks | Deploy que deixa `off` aceita concorrência apenas intra-processo | Usar `high-risk` em workspaces com múltiplos processos cooperativos |
 | IO-003 | P0 | Prefetch/cache | Prefetch textual não valida UTF-8 | `io-prefetch.js`: `bytesSnapshot.content.toString('utf8')` | Cache L1 pode servir texto inválido sem passar por `bufferIsUtf8` | Usar `decodeUtf8Buffer()` antes de primar text cache; não criar text entry para binário |
 | IO-004 | P0 | Patch | Patch textual pode corromper binário/UTF-8 inválido | `locked-mutations.js`: `fs.readFile(filePath, 'utf8')` | Bytes inválidos viram U+FFFD e podem ser regravados | Ler Buffer, validar `bufferIsUtf8`, só então decode; recusar patch em binário |
 | IO-005 | P0 | Move | Fallback EXDEV não verifica integridade | `io/fs/move.js`: `copyFile` + `unlink` | Cópia parcial ou divergente pode apagar origem | Copy para temp no destino, hash/size pós-cópia, fsync, rename final, só então unlink origem |
@@ -873,8 +899,8 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | Estado | IDs |
 | --- | --- |
 | Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-025, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
-| Concluído com limite documentado | IO-001, IO-005, IO-006, IO-038 |
-| Parcial | IO-002, IO-009, IO-023 |
+| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-038 |
+| Parcial | IO-009, IO-023 |
 | Aberto | IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-030 |
 
 ---
@@ -885,7 +911,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 **Bom:**
 
-- Mutação canônica usa locks intra-processo e pode compor lockfile L1 opt-in.
+- Mutação canônica usa locks intra-processo e pode compor lockfile L1 opt-in por perfil de risco.
 - Patch e write podem usar `expectedHash`.
 - Atomic replace usa temp exclusivo, `flush:true`, rename/link e directory sync best-effort.
 - Move `EXDEV` verifica hash/tamanho antes de publicar e remover a origem.
@@ -896,7 +922,6 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 **Insuficiente:**
 
-- L1 multiprocess permanece seletivo/opt-in nas mutações gerais.
 - Sidecars têm janela de restauração limitada pelo TTL e ainda não entram no health agregado.
 - Remoção recursiva da engine continua destrutiva sem quarentena intrínseca.
 - Preflight de espaço livre para copy/write grande ainda não existe.
@@ -1112,6 +1137,14 @@ A situação ideal é uma infra IO em camadas:
 - [x] Contadores de stale recovery e heartbeat failure.
 - [x] Snapshot de leases com idade e operação, sem vazar path sensível.
 
+#### Fase 2.5 — Perfis de ativação L1
+
+- [x] `off`, `high-risk`, `mutations` e `all` como enum suportado.
+- [x] Compatibilidade booleana legado.
+- [x] Propagar `operation`, `target` e `riskClass` nos mutators centrais.
+- [x] Health degradado para perfil inválido.
+- [x] Schema/template/documentação de env alinhados.
+
 ### Faixa 3 — Snapshot e coerência derivada
 
 #### Fase 3.1 — Snapshot consistente
@@ -1291,7 +1324,7 @@ Os critérios fundacionais originalmente definidos estão atendidos:
 
 Para declarar maturidade operacional avançada, ainda faltam:
 
-- [ ] perfil explícito de ativação L1 para mutações P0/P1;
+- [x] perfil explícito de ativação L1 para mutações P0/P1;
 - [x] p95/histograma, timeout/abort e leases sanitizados;
 - [ ] quarentena intrínseca ou confirmação reforçada para remove recursivo;
 - [ ] preflight opcional de espaço livre em payloads grandes;
@@ -1314,5 +1347,5 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Definir perfis explícitos de ativação do L1 para mutações P0/P1, com defaults conservadores por risco e sem ligar
-lockfile indiscriminadamente em reads ou operações de baixo risco.
+Implementar parser incremental de stdout para `rg`/`grep`, com early stop real em `maxResults` e sem depender apenas de
+`maxBuffer`.
