@@ -9,6 +9,7 @@
  */
 
 import { writeFileAtomicPortable } from '../io/fs/portable-atomic.js';
+import { statPath } from '../io/fs/read-services.js';
 
 /**
  * @typedef {object} TrustedAtomicWriteOptions
@@ -30,4 +31,18 @@ export async function writeFileAtomicTrusted(filePath, content, options) {
 
     const { caller: _caller, ...writeOptions } = options;
     await writeFileAtomicPortable(filePath, content, writeOptions);
+}
+
+/**
+ * @param {string} filePath
+ * @param {{ caller: string; traceId?: string; advisoryLimits?: Record<string, unknown> }} options
+ */
+export async function statPathTrusted(filePath, options) {
+    const caller = options?.caller?.trim();
+    if (!caller) {
+        throw new TypeError('statPathTrusted requires a non-empty caller');
+    }
+
+    const { caller: _caller, ...statOptions } = options;
+    return statPath(filePath, statOptions);
 }

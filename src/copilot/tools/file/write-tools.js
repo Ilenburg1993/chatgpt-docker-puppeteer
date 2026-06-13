@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
 import { createToolFailureResult } from '../infra/tool-feedback.js';
-import { validatePath } from './shared.js';
+import { validatePath, WORKSPACE_ROOT } from './shared.js';
 /**
  * src/copilot/tools/file/write-tools.js
  *
@@ -17,13 +17,7 @@ import { validatePath } from './shared.js';
  * @see module:copilot/tools/file/shared
  */
 
-import {
-    copyFileLocked,
-    createOrReplaceFileAtomic,
-    deleteFileLocked,
-    moveFileLocked,
-    writeFileAtomic,
-} from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { IO_CAPABILITY, IO_RISK, capabilityForCreate, riskForOverwrite } from '#copilot/infra/public/policy';
 import {
     ADVISORY_WRITE_CONTENT_BYTES,
@@ -34,6 +28,9 @@ import {
     patchFileTool,
     pathFailureResult,
 } from './write/index.js';
+
+const { copyFileLocked, createOrReplaceFileAtomic, deleteFileLocked, moveFileLocked, writeFileAtomic } =
+    createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
 // ---------------------------------------------------------------------------
 // Tool: write_file_content

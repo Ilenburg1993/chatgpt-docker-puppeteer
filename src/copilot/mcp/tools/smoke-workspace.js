@@ -7,7 +7,7 @@
 
 import { parseFileForContext } from '#copilot/infra';
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
-import { readText, scanDirectory, searchText, searchWorkspaceSymbols, statPath } from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { readCloudflareTunnelConfig, readQuickTunnelState, summarizeQuickTunnelState } from '#copilot/mcp/cloudflare';
 import {
@@ -19,6 +19,10 @@ import {
 } from '#copilot/mcp/control-plane';
 import { projectDoctorTool } from './project-doctor.js';
 import { repoStatusHandler } from './repo-status.js';
+
+const { readText, scanDirectory, searchText, searchWorkspaceSymbols, statPath } = createWorkspaceIo({
+    workspaceRoot: WORKSPACE_ROOT,
+});
 
 /**
  * @type {import('../registry.js').McpToolDefinition}

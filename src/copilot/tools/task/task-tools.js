@@ -1,7 +1,7 @@
 // @ts-check
 import { SERVER_PORT } from '#copilot/config';
 import { toError } from '#copilot/core';
-import { readText } from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { httpRequest } from '#copilot/sdk';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +18,9 @@ import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
  * @see EventBus
  * @see module:copilot/agent/task-executor
  */
+
+const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../../');
+const { readText } = createWorkspaceIo({ workspaceRoot: ROOT });
 
 /**
  * Tool: get_tasks — lista tarefas recentes do sistema.
@@ -103,7 +106,6 @@ const getSessionStateTool = buildTool({
     parameters: z.object({}),
     handler: async () => {
         try {
-            const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../../');
             const stateDir = join(ROOT, '.github', 'hooks', 'state');
             const files = ['session-briefing.md', 'pending-tasks.md', 'session.json'];
             /** @type {Record<string, string>} */

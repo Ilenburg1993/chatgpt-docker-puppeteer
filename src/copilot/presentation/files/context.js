@@ -11,7 +11,7 @@ import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { evaluateIoPathPolicyAsync } from '../../core/io-policy.js';
 import { decodeBase64ToOwnedBuffer } from '../../infra/public/buffer.js';
 import { normalizeIoCacheKey, registerInvalidationHook } from '../../infra/public/cache.js';
-import { readText, scanDirectory } from '../../infra/public/io.js';
+import { createWorkspaceIo } from '../../infra/public/workspace-io.js';
 
 /** Limite informativo histórico. Não bloqueia embedding em operações da LLM-B. */
 export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;
@@ -20,6 +20,7 @@ export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;
 const FILE_CACHE_TTL_MS = 30_000;
 const FILE_CACHE_MAX_ENTRIES = Math.max(1, Number(process.env['FILE_CONTEXT_CACHE_MAX_ENTRIES'] ?? 200));
 const DIRECTORY_CONTEXT_MAX_FILES = Math.max(1, Number(process.env['FILE_CONTEXT_DIRECTORY_MAX_FILES'] ?? 50));
+const { readText, scanDirectory } = createWorkspaceIo({ workspaceRoot: process.cwd() });
 
 /** Mapa de extensão → linguagem para blocos de código markdown. @type {Record<string, string>} */
 const EXT_LANG = {

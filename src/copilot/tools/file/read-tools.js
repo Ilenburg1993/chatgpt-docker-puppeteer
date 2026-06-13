@@ -1,6 +1,6 @@
 // @ts-check
 import { toError, withIoMeta } from '#copilot/core';
-import { diffText, scanDirectory } from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { stat as fsStat } from 'node:fs/promises';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
@@ -23,6 +23,8 @@ import {
     validatePath,
     WORKSPACE_ROOT,
 } from './shared.js';
+
+const { diffText, scanDirectory } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
 export { readFileContentTool } from './read/index.js';
 

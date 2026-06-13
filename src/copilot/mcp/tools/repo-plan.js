@@ -6,7 +6,7 @@
  */
 
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
-import { readText, statPath } from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
 import {
@@ -18,6 +18,8 @@ import {
     resolveValidatorCommand,
     resolveWritePath,
 } from '#copilot/mcp/control-plane';
+
+const { readText, statPath } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 160;

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { statPathTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 
 /** @type {string[]} */
 const cleanupPaths = [];
@@ -34,5 +34,16 @@ describe('trusted IO facade', () => {
         await writeFileAtomicTrusted(filePath, '{"ok":true}\n', { caller: 'test.trusted-io', mode: 0o600 });
 
         await expect(readFile(filePath, 'utf8')).resolves.toBe('{"ok":true}\n');
+    });
+
+    it('consulta metadata de path trusted com caller explícito', async () => {
+        const root = await mkdtemp(join(tmpdir(), 'copilot-trusted-io-'));
+        cleanupPaths.push(root);
+        const filePath = join(root, 'state.json');
+        await writeFileAtomicTrusted(filePath, '{}', { caller: 'test.trusted-io' });
+
+        const result = await statPathTrusted(filePath, { caller: 'test.trusted-io' });
+
+        expect(result.stats.isFile()).toBe(true);
     });
 });

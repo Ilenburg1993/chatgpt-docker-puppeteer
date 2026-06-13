@@ -61,7 +61,9 @@ const ioMock = {
     mkdirPathLocked: vi.fn(),
     createOrReplaceFileAtomic: vi.fn(),
 };
-vi.mock('#copilot/infra/public/io', () => ioMock);
+vi.mock('#copilot/infra/public/workspace-io', () => ({
+    createWorkspaceIo: () => ioMock,
+}));
 
 const mockExecFileSync = vi.fn();
 vi.mock('node:child_process', () => ({

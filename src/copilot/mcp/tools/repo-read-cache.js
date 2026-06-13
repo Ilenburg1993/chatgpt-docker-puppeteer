@@ -9,9 +9,12 @@
  * @module copilot/mcp/tools/repo-read-cache
  */
 
-import { readText, readTextChunks, statPath } from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { registerIoInvalidationHook } from '#copilot/infra/io/invalidation/bus';
+import { getMcpWorkspaceRoot } from '#copilot/mcp/control-plane';
 import path from 'node:path';
+
+const { readText, readTextChunks, statPath } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 const REPO_READ_FILE_CACHE_MAX_ENTRIES = 128;
 

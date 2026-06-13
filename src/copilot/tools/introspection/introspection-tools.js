@@ -1,6 +1,6 @@
 // @ts-check
 import { COPILOT_MCP_SERVERS, COPILOT_MODEL, COPILOT_SDK_ENABLED } from '#copilot/config';
-import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/io';
+import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/health';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';

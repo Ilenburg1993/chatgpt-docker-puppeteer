@@ -7,15 +7,7 @@
 
 import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/core';
 import { parseFileForContext } from '#copilot/infra';
-import {
-    diffText,
-    readBytes,
-    readText,
-    scanDirectory,
-    searchText,
-    searchWorkspaceSymbols,
-    statPath,
-} from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
 import {
@@ -32,6 +24,10 @@ import {
     readRepoFileWithValidatedResultCache,
 } from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
+
+const { diffText, readBytes, readText, scanDirectory, searchText, searchWorkspaceSymbols, statPath } = createWorkspaceIo({
+    workspaceRoot: getMcpWorkspaceRoot(),
+});
 
 const DEFAULT_REPO_READ_PATH = 'src/copilot';
 

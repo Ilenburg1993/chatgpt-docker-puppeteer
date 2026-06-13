@@ -5,7 +5,7 @@
  * @module copilot/tools/file/write/patch-file
  */
 
-import { patchTextLocked } from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { IO_CAPABILITY, IO_RISK, riskForDryRun } from '#copilot/infra/public/policy';
 import { createIoOperationEnvelope } from '#copilot/infra/public/runtime';
 import { z } from 'zod';
@@ -13,7 +13,7 @@ import { withIoMeta } from '#copilot/core';
 import { log } from '../../infra/logger.js';
 import { buildTool } from '../../infra/tool-factory.js';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';
-import { validatePath } from '../shared.js';
+import { validatePath, WORKSPACE_ROOT } from '../shared.js';
 import {
     ADVISORY_PATCH_SEGMENT_CHARS,
     buildMutationChangeSet,
@@ -23,6 +23,8 @@ import {
     pathFailureResult,
 } from './mutation-helpers.js';
 import { buildPatchFailureTerminalSummary, PATCH_FEEDBACK_FIX } from './patch-feedback.js';
+
+const { patchTextLocked } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
 /**
  * @param {{

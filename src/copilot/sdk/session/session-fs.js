@@ -11,16 +11,8 @@
 
 import { readCopilotSessionFsBootConfig } from '#copilot/boot/session-fs';
 import { evaluateIoPathPolicyAsync } from '#copilot/core/io-policy';
-import {
-    appendTextLocked,
-    createOrReplaceFileAtomic,
-    mkdirPathLocked,
-    moveFileLocked,
-    readText,
-    removePathLocked,
-    scanDirectory,
-    statPath,
-} from '#copilot/infra/public/io';
+import { statPathTrusted } from '#copilot/infra/public/trusted-io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { classifySdkError } from '../errors.js';
 import { log } from '../logger.js';
@@ -189,7 +181,10 @@ function buildSafeSessionFsPathDisplay(absolutePath, workspaceRoot) {
 async function pathExists(path) {
     if (!path) return null;
     try {
-        await statPath(path, { advisoryLimits: { source: 'session.fs.state' } });
+        await statPathTrusted(path, {
+            caller: 'sdk.session.session-fs.state',
+            advisoryLimits: { source: 'session.fs.state' },
+        });
         return true;
     } catch (error) {
         if (isNotFoundError(error)) return false;
@@ -211,6 +206,16 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
 
     const root = resolve(rootDir);
     const sessionId = typeof options.sessionId === 'string' && options.sessionId.trim() ? options.sessionId : undefined;
+    const {
+        appendTextLocked,
+        createOrReplaceFileAtomic,
+        mkdirPathLocked,
+        moveFileLocked,
+        readText,
+        removePathLocked,
+        scanDirectory,
+        statPath,
+    } = createWorkspaceIo({ workspaceRoot: root });
 
     return {
         async readFile(path) {

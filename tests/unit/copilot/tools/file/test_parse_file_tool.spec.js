@@ -37,10 +37,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../../src/copilot/tools/file/shared.js', () => ({
     validatePath: mocks.validatePath,
+    WORKSPACE_ROOT: '/workspaces/chatgpt-docker-puppeteer',
 }));
 
-vi.mock('#copilot/infra/public/io', () => ({
-    readText: mocks.readText,
+vi.mock('#copilot/infra/public/workspace-io', () => ({
+    createWorkspaceIo: () => ({ readText: mocks.readText }),
 }));
 
 vi.mock('#copilot/infra/public/indexing', async (importOriginal) => {

@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { sanitizeIoTextOutput, toError, withIoMeta } from '#copilot/core';
 import { getIoCacheStats } from '#copilot/infra/public/cache';
-import { readBytes, readText, readTextChunks, warmReadThroughContext } from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { log } from '../../infra/logger.js';
 import { buildTool } from '../../infra/tool-factory.js';
 import {
@@ -30,6 +30,10 @@ import {
     normalizePositiveInteger,
     parseReadCursor,
 } from './window.js';
+
+const { readBytes, readText, readTextChunks, warmReadThroughContext } = createWorkspaceIo({
+    workspaceRoot: WORKSPACE_ROOT,
+});
 
 /**
  * Tamanho mínimo em bytes para disparar warm read-through context em arquivos de texto.

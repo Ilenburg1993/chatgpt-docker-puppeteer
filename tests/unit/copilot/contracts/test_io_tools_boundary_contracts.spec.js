@@ -7,6 +7,11 @@ import { describe, expect, it } from 'vitest';
 const REPO_ROOT = process.cwd();
 const COPILOT_ROOT = resolve(REPO_ROOT, 'src/copilot');
 const TOOLS_ROOT = join(COPILOT_ROOT, 'tools');
+const MCP_TOOLS_ROOT = join(COPILOT_ROOT, 'mcp', 'tools');
+const EXTERNAL_PATH_SURFACE_FILES = [
+    join(COPILOT_ROOT, 'presentation', 'files', 'context.js'),
+    join(COPILOT_ROOT, 'sdk', 'session', 'session-fs.js'),
+];
 const COPILOT_INFRA_ROOT = join(COPILOT_ROOT, 'infra');
 const COPILOT_LAYER_ROOTS = new Map([
     ['core', join(COPILOT_ROOT, 'core')],
@@ -136,8 +141,24 @@ describe('IO/tools boundary contracts', () => {
             'session.js',
             'testing.js',
             'trusted-io.js',
+            'workspace-io.js',
         ]) {
             expect(existsSync(join(COPILOT_INFRA_ROOT, 'public', facade)), facade).toBe(true);
         }
+    });
+
+    it('tools não usam a facade operacional irrestrita para acessar paths', () => {
+        const violations = [];
+        for (const filePath of [
+            ...listJsFiles(TOOLS_ROOT),
+            ...listJsFiles(MCP_TOOLS_ROOT),
+            ...EXTERNAL_PATH_SURFACE_FILES,
+        ]) {
+            const source = readFileSync(filePath, 'utf8');
+            if (!source.includes('#copilot/infra/public/io')) continue;
+            violations.push(relative(REPO_ROOT, filePath).replace(/\\/g, '/'));
+        }
+
+        expect(violations).toEqual([]);
     });
 });

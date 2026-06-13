@@ -5,15 +5,7 @@
  * @module copilot/mcp/tools/repo-write
  */
 
-import {
-    createOrReplaceFileAtomic,
-    deleteFileLocked,
-    moveFileLocked,
-    patchTextLocked,
-    readText,
-    withIoResourceLock,
-    writeFileAtomic,
-} from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
@@ -33,6 +25,16 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { clearRepoReadFileResultCacheForResolvedPath } from './repo-read-cache.js';
+
+const {
+    createOrReplaceFileAtomic,
+    deleteFileLocked,
+    moveFileLocked,
+    patchTextLocked,
+    readText,
+    withIoResourceLock,
+    writeFileAtomic,
+} = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 2000;

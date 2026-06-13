@@ -1,7 +1,7 @@
 // @ts-check
 import { z } from 'zod/v3';
 import { buildTool } from '../infra/tool-factory.js';
-import { validatePath } from './shared.js';
+import { validatePath, WORKSPACE_ROOT } from './shared.js';
 /**
  * Tools canônicas para o índice L2 de arquivos.
  *
@@ -321,7 +321,8 @@ export const workspaceParseFileTool = buildTool({
 
         let content;
         try {
-            const { readText } = await import('#copilot/infra/public/io');
+            const { createWorkspaceIo } = await import('#copilot/infra/public/workspace-io');
+            const { readText } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
             const snapshot = await readText(pathCheck.resolved);
             content = snapshot.content;
         } catch (err) {

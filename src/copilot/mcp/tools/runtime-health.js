@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/io';
+import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/health';
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import {
     readCloudflareTunnelConfig,

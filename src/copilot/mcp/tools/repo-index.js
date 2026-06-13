@@ -25,7 +25,7 @@ import {
     parseFileForContext,
     searchIoIndex,
 } from '#copilot/infra/public/indexing';
-import { readText, statPath } from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     boundedWriteAnnotations,
     createTtlCache,
@@ -39,6 +39,8 @@ import {
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { dirname, extname, join, relative, resolve as resolvePath } from 'node:path';
 import { z } from 'zod';
+
+const { readText, statPath } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 const DEFAULT_INDEX_PATH = 'src/copilot';
 const DEFAULT_ORPHAN_IMPORT_SCAN_PATH = 'src/copilot';
