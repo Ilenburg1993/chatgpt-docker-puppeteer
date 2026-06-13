@@ -214,7 +214,8 @@ Validação desta onda:
 
 Limites remanescentes de IO-038:
 
-- `observability/logger.js`, `observability/metrics.js` e transcript archive ainda usam append síncrono/direto.
+- `observability/logger.js` ainda usa append/rotate síncrono como fallback de emergência reentrante; a exceção agora é
+  formal e protegida por contrato.
 - Recovery/truncamento explícito da última linha JSONL parcial ainda não é uma primitiva compartilhada.
 - Ainda faltam crash injection e prova multiprocess durante rotate+append.
 
@@ -244,7 +245,8 @@ Validação desta onda:
 Status:
 
 - **IO-039 concluído:** há um SSOT de lockfile; a API legado é somente facade de compatibilidade.
-- **IO-038 permanece parcial:** escrita assíncrona e leitura tolerante estão centralizadas, mas writers síncronos e truncamento físico opcional ainda não.
+- **IO-038 permanece parcial:** escrita assíncrona e leitura tolerante estão centralizadas; o logger síncrono ficou como
+  exceção formal, mas truncamento físico opcional ainda não existe.
 
 ### 1.8 Status de implementação — provas multiprocess reais aplicadas em 2026-06-12
 
@@ -293,6 +295,26 @@ Limites:
 - Ainda falta forçar o caminho `EXDEV` real em processo isolado.
 - Directory sync é best-effort por desenho; falta uma política explícita para promover falha suportada a erro em perfis duráveis estritos.
 - Fault injection é determinístico por callback; kill real já está coberto para holder L1, mas não em cada fase de publish.
+
+### 1.10 Status de implementação — governança de writers síncronos aplicada em 2026-06-12
+
+Classificação e mudanças:
+
+- `terminal/state/transcript-archive.js` deixou de executar `mkdirSync`/`appendFileSync` no hot path do feed. Agora
+  enfileira no writer JSONL canônico, expõe queue depth/drop count e é drenado pelo shutdown do terminal.
+- `observability/metrics.js` deixou de usar `mkdir`/`appendFile` direto. Cada ciclo periódico usa writer canônico e o
+  singleton é drenado por handler explícito de shutdown.
+- `observability/logger.js` permanece síncrono intencionalmente: sua API pública é síncrona, é usada durante falhas e
+  shutdown, e não pode depender de uma fila assíncrona que também precise reportar a própria falha.
+- Um contrato arquitetural bloqueia novos `appendFileSync`, `writeFileSync` e `renameSync` em produção fora de duas
+  exceções justificadas: logger de emergência e gerador build-time de snapshot.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- `lint:copilot`: **PASS**.
+- Testes focados de contratos, métricas, transcript, shutdown e frontend terminal: **110 passados, 0 falhas**.
+- Prova nova persiste o transcript apenas no flush explícito, sem writer síncrono no caminho de append.
 
 ---
 
@@ -547,7 +569,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-035 | P0 | Copy | **Concluído:** copy staged e verificado | temp exclusivo, hash/tamanho incremental, sync, `link`/`rename` | Preserva destino anterior até publish | Adicionar crash injection e ENOSPC real |
 | IO-036 | P1 | Snapshot | **Concluído:** snapshot baixo consistente | `FileHandle.stat/read/stat`, confirmação do path e retry | Cache recebe bytes e metadata do mesmo inode/versão | Testar modificação externa durante read |
 | IO-037 | P1 | Invalidation | **Concluído:** derivados são drenados antes do retorno | `invalidateIoCacheTiers*()` chama `flushIoInvalidationQueue()` | Read-after-write não espera debounce | Medir custo sob bursts de mutação |
-| IO-038 | P1 | JSONL | **Parcial:** writer canônico cobre audit, event collector, SSE e MCP | `infra/io/jsonl-file-writer.js`; cursor/requeue corrigidos | Writers síncronos e linha parcial ainda têm semântica própria | Migrar logger/metrics/transcript e centralizar recovery de última linha |
+| IO-038 | P1 | JSONL | **Parcial:** writer canônico cobre audit, event collector, SSE, MCP, métricas e transcript | `infra/io/jsonl-file-writer.js`; cursor/requeue corrigidos; logger síncrono allowlistado | Logger de emergência e truncamento físico ainda têm semântica própria | Manter exceção estreita do logger e centralizar truncamento físico da última linha |
 | IO-039 | P2 | Lock governance | **Concluído:** `file-resource-lock.js` é SSOT | `infra/lockfile.js` delega aquisição ao L1 canônico e preserva API legado | Remove semânticas concorrentes | Manter facade até callers antigos desaparecerem |
 | IO-040 | P2 | Scanner | **Concluído:** tipo básico vem de `Dirent` | `readdir({ withFileTypes:true })`; `lstat` só para arquivo/ambíguo | Reduz syscalls de classificação | Preservar benchmark e testar DT_UNKNOWN |
 | IO-041 | P0 | Lock wait | **Concluído:** timer aguardado não usa `unref()` | prova multiprocess reproduziu exit 13 durante espera L1 | Processo podia encerrar antes de adquirir/rejeitar lock | Manter `unref()` apenas em heartbeat/background |
@@ -701,9 +723,10 @@ A situação ideal é uma infra IO em camadas:
 
 #### Fase 0.2 — Bypass governance
 
-- [ ] Criar regra de governança/allowlist para writers diretos.
+- [x] Criar regra de governança/allowlist para writers síncronos diretos.
+- [ ] Ampliar governança para writers assíncronos diretos restantes.
 - [x] Migrar `/export` para atomic portable.
-- [ ] Migrar audit/SSE/observability para append canônico.
+- [x] Migrar audit/SSE/observability para append canônico.
 - [x] Migrar `storage/json-store.js` para atomic portable.
 
 #### Fase 0.3 — Exclusividade básica
@@ -746,7 +769,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Reenfileirar lote SSE/audit/MCP/event collector em falha recuperável.
 - [x] Leitura compartilhada ignora e sinaliza última linha JSONL parcial.
 - [ ] Truncamento físico opcional da última linha parcial sob lock.
-- [ ] Migrar logger/metrics/transcript síncronos ou formalizar allowlist best-effort.
+- [x] Migrar metrics/transcript e formalizar logger síncrono best-effort em allowlist.
 
 ### Faixa 2 — Lock multiprocess correto
 
@@ -876,7 +899,7 @@ Foram concluídos stale recovery/release do L1, move exclusivo, copy staged, sna
 3. [x] reenfileirar lotes SSE/observability/MCP em falha recuperável;
 4. [x] adicionar leitura tolerante/recovery lógico de última linha JSONL parcial;
 5. [ ] adicionar truncamento físico opcional da cauda parcial;
-6. [ ] migrar ou allowlistar writers síncronos restantes;
+6. [x] migrar metrics/transcript e allowlistar logger síncrono restante;
 7. [x] consolidar `infra/lockfile.js` sobre o L1 canônico;
 8. [x] executar provas multiprocess de create/copy/move/write e crash de holder L1;
 9. [x] executar fault injection determinístico em publish e rotate+append;
@@ -959,4 +982,5 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Implementar fault injection em directory sync e EXDEV e decidir explicitamente entre migração e allowlist best-effort para logger/metrics/transcript síncronos.
+Implementar fault injection em directory sync e EXDEV; depois adicionar truncamento físico opcional da cauda JSONL
+parcial sob lock.
