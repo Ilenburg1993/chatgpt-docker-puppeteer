@@ -173,10 +173,10 @@ Evidência de validação desta onda:
 - Benchmark local do scanner em `src/copilot`, 1.565 entradas: **214 ms cold; 154 ms e 165 ms warm**.
 - `typecheck:strict:tests.unit` global continua vermelho por dívida preexistente ampla fora desta onda; nenhum erro foi reportado nos quatro arquivos de teste alterados quando filtrados.
 
-Status dos novos achados:
+Status dos novos achados naquele ponto:
 
 - **Concluídos:** IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037 e IO-040.
-- **Abertos:** IO-038 e IO-039.
+- **Abertos naquele ponto:** IO-038 e IO-039; ambos foram tratados nas ondas posteriores.
 
 ### 1.6 Status de implementação — append/JSONL canônico aplicado em 2026-06-12
 
@@ -212,7 +212,7 @@ Validação desta onda:
 - Testes focados e contratos arquiteturais: **187 passados, 0 falhas**.
 - Provas novas: requeue após falha e dois flushes consecutivos sem duplicação do audit ring.
 
-Limites remanescentes de IO-038:
+Limites remanescentes de IO-038 naquele ponto:
 
 - `observability/logger.js` ainda usa append/rotate síncrono como fallback de emergência reentrante; a exceção agora é
   formal e protegida por contrato.
@@ -245,8 +245,8 @@ Validação desta onda:
 Status:
 
 - **IO-039 concluído:** há um SSOT de lockfile; a API legado é somente facade de compatibilidade.
-- **IO-038 permanece parcial:** escrita assíncrona e leitura tolerante estão centralizadas; o logger síncrono ficou como
-  exceção formal, mas truncamento físico opcional ainda não existe.
+- **IO-038 permanecia parcial naquele ponto:** escrita assíncrona e leitura tolerante estavam centralizadas; a onda
+  1.12 adicionou o truncamento físico opcional.
 
 ### 1.8 Status de implementação — provas multiprocess reais aplicadas em 2026-06-12
 
@@ -337,6 +337,27 @@ Validação:
 - Testes focados de fault injection, engine, multiprocess e file tools: **86 passados, 0 falhas**.
 - Prova `EXDEV` real executada entre `/tmp` e `/dev/shm`: destino íntegro e origem removida somente após publicação e
   sync.
+
+### 1.12 Status de implementação — recovery físico JSONL aplicado em 2026-06-12
+
+Foi adicionada `repairJsonlTrailingPartial()` como mutação explicitamente opt-in:
+
+- adquire o mesmo lock canônico por path usado pelos writers;
+- abre o arquivo em `r+`, inspeciona apenas a última linha dentro de orçamento bounded e só trunca se o JSON final for
+  inválido;
+- preserva um último registro JSON válido mesmo sem newline;
+- recusa truncamento quando a última linha excede o orçamento sem boundary conhecido;
+- sincroniza o filehandle após truncate por default;
+- expõe resultado detalhado (`reason`, bytes anteriores/finais/truncados);
+- `readJsonlTail(..., { repairTrailingPartial:true })` permite repair seguido de leitura, sem mudar o default tolerante.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- `lint:copilot`: **PASS**.
+- Testes focados de reader, fault injection, multiprocess, contracts, audit e SSE: **98 passados, 0 falhas**.
+- Provas novas cobrem truncamento físico, preservação de JSON válido sem newline, orçamento excedido e falha antes do
+  truncate.
 
 ---
 
@@ -582,7 +603,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-026 | P2 | Search subprocess | `rg`/`grep` maxBuffer aborta, mas não oferece stream incremental | `subprocess.js` | Grandes buscas custam memória até limite | Parser incremental de linhas com early stop em `maxResults` |
 | IO-027 | P2 | Glob policy | Glob simples próprio diverge de minimatch/Node glob | `scan/glob.js` | Diferenças de include/exclude difíceis de prever | Padronizar em `minimatch`/`fsPromises.glob` com testes de compatibilidade |
 | IO-028 | P2 | Statfs | Sem preflight de espaço livre | Não há uso de `statfs` | ENOSPC parcial em copy/write grande | Adicionar preflight opcional para payloads acima de limiar |
-| IO-029 | P2 | Durable append | Logs e JSONL não têm recovery de linha parcial | audit/SSE | JSONL pode quebrar parsing | Na leitura, truncar/ignorar última linha inválida; na escrita, flush configurável |
+| IO-029 | P2 | Durable append | **Concluído:** recovery lógico e físico opt-in da linha parcial | `jsonl-reader.js` ignora por default e repara sob lock quando solicitado | Evita parser quebrado sem mutação surpresa | Manter repair bounded e opt-in |
 | IO-030 | P3 | L3 cache | L3 reservado, mas sem contrato | `io-cache-tiering.js` | Sem problema atual | Só planejar se houver múltiplos runtimes/processos reais |
 | IO-031 | P0 | Lock L1 | **Concluído:** PID local vivo prevalece sobre TTL | `file-resource-lock.js:isStaleLock` usa hostname/PID e heartbeat por mtime | Evita roubo de lease local longo | Manter prova multiprocess na Faixa 5 |
 | IO-032 | P0 | Lock L1 | **Concluído:** metadata parcial respeita idade do inode | `observeLock()` combina metadata e `stat`; reclaim confirma a mesma observação | Fecha janela entre `open('wx')` e metadata | Adicionar crash injection durante criação |
@@ -591,7 +612,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-035 | P0 | Copy | **Concluído:** copy staged e verificado | temp exclusivo, hash/tamanho incremental, sync, `link`/`rename` | Preserva destino anterior até publish | Adicionar crash injection e ENOSPC real |
 | IO-036 | P1 | Snapshot | **Concluído:** snapshot baixo consistente | `FileHandle.stat/read/stat`, confirmação do path e retry | Cache recebe bytes e metadata do mesmo inode/versão | Testar modificação externa durante read |
 | IO-037 | P1 | Invalidation | **Concluído:** derivados são drenados antes do retorno | `invalidateIoCacheTiers*()` chama `flushIoInvalidationQueue()` | Read-after-write não espera debounce | Medir custo sob bursts de mutação |
-| IO-038 | P1 | JSONL | **Parcial:** writer canônico cobre audit, event collector, SSE, MCP, métricas e transcript | `infra/io/jsonl-file-writer.js`; cursor/requeue corrigidos; logger síncrono allowlistado | Logger de emergência e truncamento físico ainda têm semântica própria | Manter exceção estreita do logger e centralizar truncamento físico da última linha |
+| IO-038 | P1 | JSONL | **Concluído com exceção formal:** writer, leitura e recovery físico estão centralizados | `jsonl-file-writer.js`, `jsonl-reader.js`; logger síncrono allowlistado | Logger de emergência mantém semântica síncrona intencional | Manter contrato de allowlist e recovery opt-in |
 | IO-039 | P2 | Lock governance | **Concluído:** `file-resource-lock.js` é SSOT | `infra/lockfile.js` delega aquisição ao L1 canônico e preserva API legado | Remove semânticas concorrentes | Manter facade até callers antigos desaparecerem |
 | IO-040 | P2 | Scanner | **Concluído:** tipo básico vem de `Dirent` | `readdir({ withFileTypes:true })`; `lstat` só para arquivo/ambíguo | Reduz syscalls de classificação | Preservar benchmark e testar DT_UNKNOWN |
 | IO-041 | P0 | Lock wait | **Concluído:** timer aguardado não usa `unref()` | prova multiprocess reproduziu exit 13 durante espera L1 | Processo podia encerrar antes de adquirir/rejeitar lock | Manter `unref()` apenas em heartbeat/background |
@@ -601,9 +622,9 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
-| Concluído com limite documentado | IO-001, IO-005 |
-| Parcial | IO-002, IO-006, IO-009, IO-023, IO-025, IO-038 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
+| Concluído com limite documentado | IO-001, IO-005, IO-038 |
+| Parcial | IO-002, IO-006, IO-009, IO-023, IO-025 |
 | Aberto | IO-010, IO-014, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-029, IO-030 |
 
 ---
@@ -793,7 +814,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Corrigir cursor de persistência do audit ring buffer.
 - [x] Reenfileirar lote SSE/audit/MCP/event collector em falha recuperável.
 - [x] Leitura compartilhada ignora e sinaliza última linha JSONL parcial.
-- [ ] Truncamento físico opcional da última linha parcial sob lock.
+- [x] Truncamento físico opcional e bounded da última linha parcial sob lock.
 - [x] Migrar metrics/transcript e formalizar logger síncrono best-effort em allowlist.
 
 ### Faixa 2 — Lock multiprocess correto
@@ -924,7 +945,7 @@ Foram concluídos stale recovery/release do L1, move exclusivo, copy staged, sna
 2. [x] corrigir cursor de persistência do audit ring buffer;
 3. [x] reenfileirar lotes SSE/observability/MCP em falha recuperável;
 4. [x] adicionar leitura tolerante/recovery lógico de última linha JSONL parcial;
-5. [ ] adicionar truncamento físico opcional da cauda parcial;
+5. [x] adicionar truncamento físico opcional e bounded da cauda parcial;
 6. [x] migrar metrics/transcript e allowlistar logger síncrono restante;
 7. [x] consolidar `infra/lockfile.js` sobre o L1 canônico;
 8. [x] executar provas multiprocess de create/copy/move/write e crash de holder L1;
@@ -1009,5 +1030,5 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Adicionar truncamento físico opcional da cauda JSONL parcial sob lock; depois propagar metadata detalhada de
-durabilidade para resultados públicos/health.
+Propagar metadata detalhada de durabilidade para resultados públicos/health; depois ampliar governança para writers
+assíncronos diretos restantes.
