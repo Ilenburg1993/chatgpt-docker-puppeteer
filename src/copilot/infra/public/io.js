@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * Facade pública de I/O local para consumidores fora de `src/copilot/infra`.
+ * Facade pública de I/O workspace-facing para consumidores fora de `src/copilot/infra`.
  *
  * Este módulo é a porta barrel-first para tools e adapters. Implementações internas ainda vivem em módulos legados
- * durante a migração 2.0/2.1.
+ * durante a migração 2.0/2.1. Paths trusted/portable fora do workspace usam a facade separada `trusted-io.js`.
  *
  * @module copilot/infra/public/io
  */
@@ -25,7 +25,6 @@ export {
     statPath,
     withIoResourceLock,
     writeFileAtomic,
-    writeFileAtomicPortable,
 } from '../io/fs/index.js';
 
 export { diffText } from '../io/patch/index.js';

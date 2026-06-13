@@ -9,8 +9,8 @@
  */
 
 import { WORKSPACE_ROOT } from '#copilot/boot';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { join, resolve } from 'node:path';
-import { writeFileAtomicPortable } from '../../infra/io/fs/portable-atomic.js';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretText } from '../../core/security/redaction.js';
 import { sanitizeTerminalExternalToolText } from '../capabilities/index.js';
@@ -99,7 +99,7 @@ export async function cmdExport({ println }, arg) {
     }
 
     try {
-        await writeFileAtomicPortable(filePath, lines.join('\n'));
+        await writeFileAtomicTrusted(filePath, lines.join('\n'), { caller: 'terminal.commands.export' });
         println(terminalThemeRow('Exportado', formatTerminalToolPathForOperator(filePath), { role: 'success' }));
         println(
             terminalThemeRow(

@@ -9,11 +9,11 @@ import { promises as fs } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const ioMocks = vi.hoisted(() => ({
-    writeFileAtomicPortable: vi.fn(),
+    writeFileAtomicTrusted: vi.fn(),
 }));
 
-vi.mock('#copilot/infra/public/io', () => ({
-    writeFileAtomicPortable: ioMocks.writeFileAtomicPortable,
+vi.mock('#copilot/infra/public/trusted-io', () => ({
+    writeFileAtomicTrusted: ioMocks.writeFileAtomicTrusted,
 }));
 
 import {
@@ -30,8 +30,8 @@ describe('persistent-model-cache', () => {
 
     beforeEach(async () => {
         vi.restoreAllMocks();
-        ioMocks.writeFileAtomicPortable.mockReset();
-        ioMocks.writeFileAtomicPortable.mockResolvedValue(undefined);
+        ioMocks.writeFileAtomicTrusted.mockReset();
+        ioMocks.writeFileAtomicTrusted.mockResolvedValue(undefined);
         originalPersistentCacheFile = process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'];
         process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'] =
             `data/copilot/test/persistent-model-cache-${process.pid}-${Date.now()}-${Math.random()
@@ -123,7 +123,7 @@ describe('persistent-model-cache', () => {
         it('ignora modelos não-array', async () => {
             writePersistentModelCacheAsync(/** @type {any} */ ('not-an-array'));
             await clearPersistentModelCache();
-            expect(ioMocks.writeFileAtomicPortable).not.toHaveBeenCalled();
+            expect(ioMocks.writeFileAtomicTrusted).not.toHaveBeenCalled();
         });
 
         it('escreve models válidos de forma async', async () => {
@@ -138,23 +138,23 @@ describe('persistent-model-cache', () => {
             writePersistentModelCacheAsync(models);
             await clearPersistentModelCache();
 
-            expect(ioMocks.writeFileAtomicPortable).toHaveBeenCalled();
-            const call = ioMocks.writeFileAtomicPortable.mock.calls[0];
+            expect(ioMocks.writeFileAtomicTrusted).toHaveBeenCalled();
+            const call = ioMocks.writeFileAtomicTrusted.mock.calls[0];
             if (!call) {
-                throw new Error('writeFileAtomicPortable deveria ter sido chamado ao persistir models válidos');
+                throw new Error('writeFileAtomicTrusted deveria ter sido chamado ao persistir models válidos');
             }
             expect(String(call[0])).toContain('data/copilot/test/persistent-model-cache-');
             const payload = call[1];
             const written = JSON.parse(/** @type {string} */ (payload));
             expect(written.version).toBe(2);
             expect(written.models).toHaveLength(1);
-            expect(call[2]).toEqual({ mode: 0o600 });
+            expect(call[2]).toEqual({ caller: 'sdk.models.persistent-cache', mode: 0o600 });
         });
 
         it('serializa writes concorrentes na ordem de chamada', async () => {
             /** @type {(() => void) | undefined} */
             let releaseFirst;
-            ioMocks.writeFileAtomicPortable
+            ioMocks.writeFileAtomicTrusted
                 .mockImplementationOnce(
                     () =>
                         new Promise((resolve) => {
@@ -167,19 +167,19 @@ describe('persistent-model-cache', () => {
             writePersistentModelCacheAsync([/** @type {any} */ ({ modelId: 'second' })]);
             await Promise.resolve();
 
-            expect(ioMocks.writeFileAtomicPortable).toHaveBeenCalledTimes(1);
+            expect(ioMocks.writeFileAtomicTrusted).toHaveBeenCalledTimes(1);
             releaseFirst?.();
             await clearPersistentModelCache();
 
-            expect(ioMocks.writeFileAtomicPortable).toHaveBeenCalledTimes(2);
-            const secondPayload = JSON.parse(String(ioMocks.writeFileAtomicPortable.mock.calls[1]?.[1]));
+            expect(ioMocks.writeFileAtomicTrusted).toHaveBeenCalledTimes(2);
+            const secondPayload = JSON.parse(String(ioMocks.writeFileAtomicTrusted.mock.calls[1]?.[1]));
             expect(secondPayload.models[0].modelId).toBe('second');
         });
 
         it('ordena clear depois de todos os writes já enfileirados', async () => {
             /** @type {(() => void) | undefined} */
             let releaseWrite;
-            ioMocks.writeFileAtomicPortable.mockImplementationOnce(
+            ioMocks.writeFileAtomicTrusted.mockImplementationOnce(
                 () =>
                     new Promise((resolve) => {
                         releaseWrite = resolve;

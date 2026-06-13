@@ -10,7 +10,7 @@
 
 import fs from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 
 import {
     applyModelGatewayEligibilityToSnapshot,
@@ -7714,7 +7714,7 @@ function mutateEnvLocal(mutate) {
             }
             const next = mutate(text);
             const normalized = next.endsWith('\n') ? next : `${next}\n`;
-            await writeFileAtomicPortable(path, normalized, { mode: 0o600 });
+            await writeFileAtomicTrusted(path, normalized, { caller: 'terminal.commands.byok', mode: 0o600 });
             await Promise.resolve(fs.chmod(path, 0o600)).catch(() => undefined);
         });
     envLocalMutationQueue = operation.then(

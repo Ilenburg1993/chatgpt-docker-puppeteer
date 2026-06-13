@@ -5,7 +5,7 @@
  * @module copilot/mcp/cloudflare/edge-backup
  */
 
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { createHash } from 'node:crypto';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -77,7 +77,7 @@ export async function writeCloudflareEdgeBackup(snapshot, options = {}) {
     };
     const content = `${JSON.stringify(payload, null, 2)}\n`;
     const contentSha256 = sha256(content);
-    await writeFileAtomicPortable(absolutePath, content, { mode: 0o600 });
+    await writeFileAtomicTrusted(absolutePath, content, { caller: 'mcp.cloudflare.edge-backup', mode: 0o600 });
 
     const readiness = asRecord(snapshot['readiness']);
     const policyDiff = asRecord(snapshot['policyDiff']);

@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/automation/policy
  */
 
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -396,6 +396,9 @@ export function validateModelGatewayRuntimeAutomationPolicy(policy) {
 export async function writeModelGatewayRuntimeAutomationPolicyFile(policy, options = {}) {
     const filePath = resolve(options.filePath ?? DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH);
     const normalized = mergeModelGatewayRuntimeAutomationPolicy(policy);
-    await writeFileAtomicPortable(filePath, `${JSON.stringify(normalized, null, 2)}\n`, { mode: 0o600 });
+    await writeFileAtomicTrusted(filePath, `${JSON.stringify(normalized, null, 2)}\n`, {
+        caller: 'model-gateway.automation.policy',
+        mode: 0o600,
+    });
     return { filePath, policy: normalized };
 }

@@ -8,7 +8,8 @@
 
 import { resolveHooksStateDir, resolveHooksStateFile } from '#copilot/boot';
 import { STATE_FILE as _STATE_FILE_ENV } from '#copilot/config/agent';
-import { withIoResourceLock, writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { withIoResourceLock } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { lstat, mkdir, readFile, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
@@ -50,8 +51,17 @@ export async function readStateFileIfExists() {
     return readFile(STATE_FILE, 'utf8');
 }
 
+/**
+ * @param {string} filePath
+ * @param {string} content
+ * @param {{ mode: number }} options
+ */
+async function writeStateFileAtomicTrusted(filePath, content, options) {
+    await writeFileAtomicTrusted(filePath, content, { ...options, caller: 'agent.lifecycle.state-file-io' });
+}
+
 /** @type {(filePath: string, content: string, options: { mode: number }) => Promise<void>} */
-let stateFileWriter = writeFileAtomicPortable;
+let stateFileWriter = writeStateFileAtomicTrusted;
 
 export const stateFileIoTestHarness = Object.freeze({
     /**
@@ -61,9 +71,9 @@ export const stateFileIoTestHarness = Object.freeze({
         stateFileWriter = writer;
     },
     resetStateFileWriter() {
-        stateFileWriter = writeFileAtomicPortable;
+        stateFileWriter = writeStateFileAtomicTrusted;
     },
-    writeFileAtomicPortable,
+    writeStateFileAtomicTrusted,
 });
 
 /**

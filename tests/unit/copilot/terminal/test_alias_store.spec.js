@@ -9,11 +9,11 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { writeFileAtomicPortable } = vi.hoisted(() => ({
-    writeFileAtomicPortable: vi.fn(() => Promise.resolve()),
+const { writeFileAtomicTrusted } = vi.hoisted(() => ({
+    writeFileAtomicTrusted: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('#copilot/infra/public/io', () => ({ writeFileAtomicPortable }));
+vi.mock('#copilot/infra/public/trusted-io', () => ({ writeFileAtomicTrusted }));
 
 import {
     flushAliasPersistence,
@@ -95,9 +95,9 @@ describe('alias-store setAlias', () => {
 
     it('serializa snapshots fire-and-forget e persiste o estado mais novo por último', async () => {
         await flushAliasPersistence();
-        writeFileAtomicPortable.mockClear();
+        writeFileAtomicTrusted.mockClear();
         let releaseFirst = () => {};
-        writeFileAtomicPortable.mockImplementationOnce(
+        writeFileAtomicTrusted.mockImplementationOnce(
             () =>
                 new Promise((resolve) => {
                     releaseFirst = resolve;
@@ -106,18 +106,19 @@ describe('alias-store setAlias', () => {
 
         setAlias('/first', '/echo first');
         setAlias('/second', '/echo second');
-        await vi.waitFor(() => expect(writeFileAtomicPortable).toHaveBeenCalledTimes(1));
+        await vi.waitFor(() => expect(writeFileAtomicTrusted).toHaveBeenCalledTimes(1));
         releaseFirst();
         await flushAliasPersistence();
 
-        expect(writeFileAtomicPortable).toHaveBeenCalledTimes(2);
-        const firstSnapshot = String(writeFileAtomicPortable.mock.calls[0]?.[1]);
-        const secondSnapshot = String(writeFileAtomicPortable.mock.calls[1]?.[1]);
+        expect(writeFileAtomicTrusted).toHaveBeenCalledTimes(2);
+        const firstSnapshot = String(writeFileAtomicTrusted.mock.calls[0]?.[1]);
+        const secondSnapshot = String(writeFileAtomicTrusted.mock.calls[1]?.[1]);
         expect(firstSnapshot).toContain('/first');
         expect(firstSnapshot).not.toContain('/second');
         expect(secondSnapshot).toContain('/first');
         expect(secondSnapshot).toContain('/second');
-        expect(writeFileAtomicPortable).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), {
+        expect(writeFileAtomicTrusted).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), {
+            caller: 'terminal.stores.alias-store',
             mode: 0o600,
         });
     });

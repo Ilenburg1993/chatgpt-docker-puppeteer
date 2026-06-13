@@ -10,7 +10,7 @@
  * @module copilot/mcp/control-plane/dev-oauth
  */
 
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import {
     calculateJwkThumbprint,
     createLocalJWKSet,
@@ -835,7 +835,7 @@ async function exportPublicJwk(privateKey) {
 async function persistPrivateKey(keyFile, privateKey) {
     try {
         const pem = await exportPKCS8(privateKey);
-        await writeFileAtomicPortable(keyFile, pem, { mode: 0o600 });
+        await writeFileAtomicTrusted(keyFile, pem, { caller: 'mcp.control-plane.dev-oauth', mode: 0o600 });
     } catch {
         // The dev issuer can still operate with an in-memory key; persistence is a stability upgrade, not a hard dependency.
     }
@@ -2934,7 +2934,10 @@ async function writeRenewCredentialsFile(env = process.env) {
                 .filter((record) => record.expiresAt > Date.now())
                 .sort((left, right) => left.expiresAt - right.expiresAt || left.familyId.localeCompare(right.familyId)),
         };
-        await writeFileAtomicPortable(refreshTokenFile, `${JSON.stringify(body, null, 2)}\n`, { mode: 0o600 });
+        await writeFileAtomicTrusted(refreshTokenFile, `${JSON.stringify(body, null, 2)}\n`, {
+            caller: 'mcp.control-plane.dev-oauth',
+            mode: 0o600,
+        });
         renewCredentialsLastPersistedAt = body.updatedAt;
         renewCredentialsLastPersistenceError = null;
     } catch (error) {
@@ -3068,7 +3071,10 @@ async function writeRegisteredClientsFile(env = process.env) {
                 .filter((client) => client.source === 'dcr')
                 .sort((left, right) => left.createdAt - right.createdAt || left.clientId.localeCompare(right.clientId)),
         };
-        await writeFileAtomicPortable(clientFile, `${JSON.stringify(body, null, 2)}\n`, { mode: 0o600 });
+        await writeFileAtomicTrusted(clientFile, `${JSON.stringify(body, null, 2)}\n`, {
+            caller: 'mcp.control-plane.dev-oauth',
+            mode: 0o600,
+        });
         registeredClientsLastPersistedAt = body.updatedAt;
         registeredClientsLastPersistenceError = null;
     } catch (error) {

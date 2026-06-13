@@ -19,7 +19,7 @@
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { safeJsonParse } from '#copilot/core/safe-json';
 import { CustomToolsFileSchema } from '#copilot/core/schemas';
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { log } from '../logger.js';
@@ -299,7 +299,7 @@ function _persistCustomToolsAsync() {
     const content = `${JSON.stringify([..._registry.values()], null, 2)}\n`;
     _persistQueue = _persistQueue
         .catch(() => undefined)
-        .then(() => writeFileAtomicPortable(CUSTOM_TOOLS_PATH, content, { mode: 0o600 }))
+        .then(() => writeFileAtomicTrusted(CUSTOM_TOOLS_PATH, content, { caller: 'sdk.tools.custom', mode: 0o600 }))
         .catch((err) => {
             log(
                 'WARN',

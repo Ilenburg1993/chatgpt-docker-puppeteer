@@ -39,6 +39,7 @@ describe('infra barrel governance', () => {
             'runtime.js',
             'session.js',
             'testing.js',
+            'trusted-io.js',
         ]) {
             expect(getInfraModuleDescriptor('public/')?.summary).toContain('Facades públicas');
             expect(readdirSync(join(INFRA_ROOT, 'public'))).toContain(facade);

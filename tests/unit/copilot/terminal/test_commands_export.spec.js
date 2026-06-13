@@ -52,14 +52,14 @@ const readTerminalTimelineProjection = vi.fn(() => ({
     ],
 }));
 
-const writeFileAtomicPortable = vi.fn(async () => undefined);
+const writeFileAtomicTrusted = vi.fn(async () => undefined);
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/timeline.js', () => ({
     readTerminalTimelineProjection,
 }));
 
-vi.mock('../../../../src/copilot/infra/io/fs/portable-atomic.js', () => ({
-    writeFileAtomicPortable,
+vi.mock('#copilot/infra/public/trusted-io', () => ({
+    writeFileAtomicTrusted,
 }));
 
 const { cmdExport } = await import('../../../../src/copilot/terminal/commands/export.js');
@@ -82,8 +82,8 @@ describe('terminal/commands/export', () => {
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
         expect(readTerminalTimelineProjection).toHaveBeenCalled();
-        expect(writeFileAtomicPortable).toHaveBeenCalledOnce();
-        const [, content] = writeFileAtomicPortable.mock.calls[0];
+        expect(writeFileAtomicTrusted).toHaveBeenCalledOnce();
+        const [, content] = writeFileAtomicTrusted.mock.calls[0];
         expect(String(content)).toContain('envelope=sdk/assistant.message');
         expect(String(content)).toContain('trace=trace-export-1');
         expect(String(content)).toContain('streaming=suffix/stream_suffix');
@@ -118,7 +118,7 @@ describe('terminal/commands/export', () => {
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        const [, content] = writeFileAtomicPortable.mock.calls[0];
+        const [, content] = writeFileAtomicTrusted.mock.calls[0];
         const markdown = String(content);
         expect(markdown).toContain('&lt;a href="https://x.example"&gt;&lt;img src=x&gt;oie&lt;/a&gt;');
         expect(markdown).not.toContain('<img src=x>');
@@ -154,7 +154,7 @@ describe('terminal/commands/export', () => {
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        const [, content] = writeFileAtomicPortable.mock.calls[0];
+        const [, content] = writeFileAtomicTrusted.mock.calls[0];
         const markdown = String(content);
         expect(markdown).toContain('vermelho');
         expect(markdown).toContain('link');
@@ -170,8 +170,8 @@ describe('terminal/commands/export', () => {
 
         await cmdExport({ println: ctx.println }, 'artifacts/terminal-live/conversa.md');
 
-        expect(writeFileAtomicPortable).toHaveBeenCalledOnce();
-        const [filePath] = writeFileAtomicPortable.mock.calls[0];
+        expect(writeFileAtomicTrusted).toHaveBeenCalledOnce();
+        const [filePath] = writeFileAtomicTrusted.mock.calls[0];
         expect(String(filePath)).toContain(`${process.cwd()}/artifacts/terminal-live/conversa.md`);
         expect(ctx.output()).toContain('Exportado');
         expect(ctx.output()).toContain('artifacts/terminal-live/conversa.md');
@@ -219,7 +219,7 @@ describe('terminal/commands/export', () => {
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        const [, content] = writeFileAtomicPortable.mock.calls[0];
+        const [, content] = writeFileAtomicTrusted.mock.calls[0];
         expect(String(content)).toContain('envelope=terminal.dialog.engine');
         expect(String(content)).toContain('trace=terminal-turn-key-1');
         expect(String(content)).toContain('turn=42');
@@ -289,7 +289,7 @@ describe('terminal/commands/export', () => {
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        const [, content] = writeFileAtomicPortable.mock.calls[0];
+        const [, content] = writeFileAtomicTrusted.mock.calls[0];
         const markdown = String(content);
         expect(markdown).toContain('timeline=mixed/diverged · sync=blocked:diverged-no-overlap');
         expect(markdown).toContain('## Sistema');
@@ -347,7 +347,7 @@ describe('terminal/commands/export', () => {
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        const [, content] = writeFileAtomicPortable.mock.calls[0];
+        const [, content] = writeFileAtomicTrusted.mock.calls[0];
         const markdown = String(content);
         expect(markdown).toContain('redaction=enabled');
         expect(markdown).toContain('Bearer [redacted]');
@@ -373,8 +373,8 @@ describe('terminal/commands/export', () => {
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        expect(writeFileAtomicPortable).toHaveBeenCalledOnce();
-        const [, content] = writeFileAtomicPortable.mock.calls[0];
+        expect(writeFileAtomicTrusted).toHaveBeenCalledOnce();
+        const [, content] = writeFileAtomicTrusted.mock.calls[0];
         expect(String(content)).toContain('0 mensagens');
         expect(String(content)).toContain('diagnóstico mínimo');
         expect(ctx.output()).toContain('Exportado');

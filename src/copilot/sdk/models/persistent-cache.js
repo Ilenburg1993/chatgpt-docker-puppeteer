@@ -12,7 +12,7 @@
 
 import { toError } from '#copilot/core/error-handlers';
 import { resolveBootWorkspaceRoot } from '#copilot/boot';
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { promises as fs } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { log } from '../logger.js';
@@ -186,7 +186,7 @@ export function writePersistentModelCacheAsync(models) {
             });
 
             const json = JSON.stringify(data, null, 2);
-            await writeFileAtomicPortable(cachePath, json, { mode: 0o600 });
+            await writeFileAtomicTrusted(cachePath, json, { caller: 'sdk.models.persistent-cache', mode: 0o600 });
             log('DEBUG', `[model-cache] Cache persistido: ${modelsSnapshot.length} modelos`);
         } catch (error) {
             // Não re-lançar — graceful degrade para L1-only cache

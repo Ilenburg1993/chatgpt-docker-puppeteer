@@ -16,7 +16,7 @@ import { readFile } from 'node:fs/promises';
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { safeJsonParse } from '#copilot/core/safe-json';
 import { ToolsConfigSchema } from '#copilot/core/schemas';
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -89,7 +89,7 @@ export async function loadToolsConfigAsync() {
 async function _persistToolsConfigAsync() {
     const payload = `${JSON.stringify(getToolsConfig(), null, 2)}\n`;
     const write = _toolsConfigWriteQueue.then(() =>
-        writeFileAtomicPortable(TOOLS_CONFIG_PATH, payload, { mode: 0o600 }),
+        writeFileAtomicTrusted(TOOLS_CONFIG_PATH, payload, { caller: 'sdk.tools.state', mode: 0o600 }),
     );
     _toolsConfigWriteQueue = write.catch((err) => {
         log('WARN', `[tools-state] Falha ao persistir tools-config.json (async): ${toError(err).message}`);

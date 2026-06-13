@@ -6,7 +6,7 @@
  */
 
 import { readFile, rm } from 'node:fs/promises';
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 
 /**
  * @typedef {object} QuickTunnelSmokeState
@@ -69,7 +69,10 @@ export async function readQuickTunnelState(stateFile) {
  * @returns {Promise<void>}
  */
 export async function saveQuickTunnelState(stateFile, state) {
-    await writeFileAtomicPortable(stateFile, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+    await writeFileAtomicTrusted(stateFile, `${JSON.stringify(state, null, 2)}\n`, {
+        caller: 'mcp.cloudflare.state',
+        mode: 0o600,
+    });
 }
 
 /**
@@ -127,7 +130,10 @@ export async function readConnectorSmokeState(smokeFile) {
  * @returns {Promise<void>}
  */
 export async function writeConnectorSmokeState(smokeFile, lastSmoke) {
-    await writeFileAtomicPortable(smokeFile, `${JSON.stringify(lastSmoke, null, 2)}\n`, { mode: 0o600 });
+    await writeFileAtomicTrusted(smokeFile, `${JSON.stringify(lastSmoke, null, 2)}\n`, {
+        caller: 'mcp.cloudflare.state',
+        mode: 0o600,
+    });
 }
 
 /**

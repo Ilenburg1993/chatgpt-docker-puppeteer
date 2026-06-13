@@ -16,11 +16,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks (hoisted) ────────────────────────────────────────────────────────
 
-const { mockLog, mockBuildTool, mockLogSwallowed, mockWriteFileAtomicPortable } = vi.hoisted(() => ({
+const { mockLog, mockBuildTool, mockLogSwallowed, mockWriteFileAtomicTrusted } = vi.hoisted(() => ({
     mockLog: vi.fn(),
     mockBuildTool: vi.fn((opts) => ({ name: opts.name, handler: opts.handler, _handler: opts.handler })),
     mockLogSwallowed: vi.fn(),
-    mockWriteFileAtomicPortable: vi.fn(() => Promise.resolve()),
+    mockWriteFileAtomicTrusted: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('#copilot/observability/logger', () => ({
@@ -37,7 +37,7 @@ vi.mock('#copilot/tools', async (importOriginal) => {
     };
 });
 vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed }));
-vi.mock('#copilot/infra/public/io', () => ({ writeFileAtomicPortable: mockWriteFileAtomicPortable }));
+vi.mock('#copilot/infra/public/trusted-io', () => ({ writeFileAtomicTrusted: mockWriteFileAtomicTrusted }));
 vi.mock('#copilot/core/safe-json', () => ({
     safeJsonParse: vi.fn((raw) => {
         try {
@@ -242,7 +242,7 @@ describe('F39 — registerCustomTool', () => {
 
     it('serializa snapshots concorrentes e persiste o estado mais novo por último', async () => {
         let releaseFirst = () => {};
-        mockWriteFileAtomicPortable.mockImplementationOnce(
+        mockWriteFileAtomicTrusted.mockImplementationOnce(
             () =>
                 new Promise((resolve) => {
                     releaseFirst = resolve;
@@ -251,18 +251,19 @@ describe('F39 — registerCustomTool', () => {
 
         const first = registerCustomTool({ name: 'first_tool', description: 'first', handlerId: 'echo' });
         const second = registerCustomTool({ name: 'second_tool', description: 'second', handlerId: 'echo' });
-        await vi.waitFor(() => expect(mockWriteFileAtomicPortable).toHaveBeenCalledTimes(1));
+        await vi.waitFor(() => expect(mockWriteFileAtomicTrusted).toHaveBeenCalledTimes(1));
         releaseFirst();
         await Promise.all([first, second]);
 
-        expect(mockWriteFileAtomicPortable).toHaveBeenCalledTimes(2);
-        const firstSnapshot = String(mockWriteFileAtomicPortable.mock.calls[0]?.[1]);
-        const secondSnapshot = String(mockWriteFileAtomicPortable.mock.calls[1]?.[1]);
+        expect(mockWriteFileAtomicTrusted).toHaveBeenCalledTimes(2);
+        const firstSnapshot = String(mockWriteFileAtomicTrusted.mock.calls[0]?.[1]);
+        const secondSnapshot = String(mockWriteFileAtomicTrusted.mock.calls[1]?.[1]);
         expect(firstSnapshot).toContain('first_tool');
         expect(firstSnapshot).not.toContain('second_tool');
         expect(secondSnapshot).toContain('first_tool');
         expect(secondSnapshot).toContain('second_tool');
-        expect(mockWriteFileAtomicPortable).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), {
+        expect(mockWriteFileAtomicTrusted).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), {
+            caller: 'sdk.tools.custom',
             mode: 0o600,
         });
     });

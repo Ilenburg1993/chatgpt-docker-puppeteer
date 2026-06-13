@@ -8,7 +8,7 @@
  */
 
 import { LLM_B_ALIASES_FILE } from '#copilot/config';
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { log } from '#copilot/observability';
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -53,7 +53,7 @@ function _saveCustomAliases() {
     const content = serializeCustomAliases();
     _saveQueue = _saveQueue
         .catch(() => undefined)
-        .then(() => writeFileAtomicPortable(ALIASES_FILE, content, { mode: 0o600 }))
+        .then(() => writeFileAtomicTrusted(ALIASES_FILE, content, { caller: 'terminal.stores.alias-store', mode: 0o600 }))
         .catch((e) => {
             logSwallowed(e, 'terminal.aliasStore.write');
             log('WARN', `[alias-store] Falha ao salvar aliases: ${e?.message ?? e}`);

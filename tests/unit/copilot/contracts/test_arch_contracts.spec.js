@@ -802,6 +802,55 @@ describe('IO-038 — writers síncronos diretos possuem allowlist formal', () =>
     });
 });
 
+describe('IO-014 — IO portable/trusted possui capability pública explícita', () => {
+    it('callers trusted correspondem exatamente à allowlist declarada e portable fica interno a infra', () => {
+        const expectedTrustedCallers = [
+            'agent/lifecycle/state/state-file-io.js: agent.lifecycle.state-file-io',
+            'agent/session/state/snapshot-store.js: agent.session.state.snapshot-store',
+            'config/declarative-runtime-config.js: config.declarative-runtime-config',
+            'mcp/cloudflare/cli-process.js: mcp.cloudflare.cli-process',
+            'mcp/cloudflare/edge-backup.js: mcp.cloudflare.edge-backup',
+            'mcp/cloudflare/state.js: mcp.cloudflare.state',
+            'mcp/control-plane/dev-oauth.js: mcp.control-plane.dev-oauth',
+            'model-gateway/automation/policy.js: model-gateway.automation.policy',
+            'model-gateway/health/provider-health.js: model-gateway.health.provider-health',
+            'model-gateway/routing/selection-trace.js: model-gateway.routing.selection-trace',
+            'sdk/models/persistent-cache.js: sdk.models.persistent-cache',
+            'sdk/tools/custom.js: sdk.tools.custom',
+            'sdk/tools/state.js: sdk.tools.state',
+            'terminal/commands/byok.js: terminal.commands.byok',
+            'terminal/commands/export.js: terminal.commands.export',
+            'terminal/stores/alias-store.js: terminal.stores.alias-store',
+        ];
+        /** @type {string[]} */
+        const actualTrustedCallers = [];
+        /** @type {string[]} */
+        const portableLeaks = [];
+
+        for (const abs of listJsFilesRecursive(COPILOT_ROOT)) {
+            const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
+            const src = readFileSync(abs, 'utf-8');
+            if (!rel.startsWith('infra/') && src.includes('writeFileAtomicPortable')) {
+                portableLeaks.push(rel);
+            }
+            if (!src.includes("from '#copilot/infra/public/trusted-io'")) continue;
+            const callers = new Set(
+                [...src.matchAll(/\bcaller:\s*['"]([^'"]+)['"]/gu)]
+                    .map((match) => match[1])
+                    .filter((caller) => caller !== undefined),
+            );
+            for (const caller of callers) actualTrustedCallers.push(`${rel}: ${caller}`);
+        }
+
+        assert.deepEqual(portableLeaks, [], `Primitiva portable vazou para fora de infra:\n${portableLeaks.join('\n')}`);
+        assert.ok(
+            !readSrc('infra/public/io.js').includes('writeFileAtomicPortable'),
+            'facade workspace-facing não deve exportar a capability portable',
+        );
+        assert.deepEqual(actualTrustedCallers.sort(), expectedTrustedCallers.sort());
+    });
+});
+
 describe('IO-006 — writers assíncronos diretos ficam restritos a infra', () => {
     it('produção fora de infra não importa nem chama writers de node:fs/promises', () => {
         const mutators = ['appendFile', 'copyFile', 'link', 'rename', 'symlink', 'truncate', 'writeFile'];

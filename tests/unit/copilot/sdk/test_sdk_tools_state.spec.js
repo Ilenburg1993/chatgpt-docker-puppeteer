@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
     readFile: vi.fn(),
     writeFile: vi.fn(),
-    writeFileAtomicPortable: vi.fn(),
+    writeFileAtomicTrusted: vi.fn(),
     log: vi.fn(),
     logSwallowed: vi.fn(),
 }));
@@ -15,8 +15,8 @@ vi.mock('node:fs/promises', () => ({
     writeFile: mocks.writeFile,
 }));
 
-vi.mock('#copilot/infra/public/io', () => ({
-    writeFileAtomicPortable: mocks.writeFileAtomicPortable,
+vi.mock('#copilot/infra/public/trusted-io', () => ({
+    writeFileAtomicTrusted: mocks.writeFileAtomicTrusted,
 }));
 
 vi.mock('../../../../src/copilot/core/error-handlers.js', () => ({
@@ -46,7 +46,7 @@ vi.mock('../../../../src/copilot/sdk/logger.js', () => ({
 
 describe('sdk/tools/state', () => {
     beforeEach(() => {
-        mocks.writeFileAtomicPortable.mockResolvedValue(undefined);
+        mocks.writeFileAtomicTrusted.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -68,7 +68,7 @@ describe('sdk/tools/state', () => {
         mod.resetToolsConfigForTests();
         /** @type {(() => void) | undefined} */
         let releaseFirst;
-        mocks.writeFileAtomicPortable
+        mocks.writeFileAtomicTrusted
             .mockImplementationOnce(
                 () =>
                     new Promise((resolve) => {
@@ -82,15 +82,15 @@ describe('sdk/tools/state', () => {
         const second = mod.patchToolsConfig({ denylist: ['shell'] });
         await Promise.resolve();
 
-        expect(mocks.writeFileAtomicPortable).toHaveBeenCalledTimes(1);
+        expect(mocks.writeFileAtomicTrusted).toHaveBeenCalledTimes(1);
         releaseFirst?.();
         await Promise.all([first, second]);
 
-        expect(mocks.writeFileAtomicPortable).toHaveBeenCalledTimes(2);
-        const firstPayload = JSON.parse(String(mocks.writeFileAtomicPortable.mock.calls[0]?.[1]));
-        const secondPayload = JSON.parse(String(mocks.writeFileAtomicPortable.mock.calls[1]?.[1]));
+        expect(mocks.writeFileAtomicTrusted).toHaveBeenCalledTimes(2);
+        const firstPayload = JSON.parse(String(mocks.writeFileAtomicTrusted.mock.calls[0]?.[1]));
+        const secondPayload = JSON.parse(String(mocks.writeFileAtomicTrusted.mock.calls[1]?.[1]));
         expect(firstPayload).toEqual({ allowlist: ['read_file'], denylist: [] });
         expect(secondPayload).toEqual({ allowlist: ['read_file'], denylist: ['shell'] });
-        expect(mocks.writeFileAtomicPortable.mock.calls[1]?.[2]).toEqual({ mode: 0o600 });
+        expect(mocks.writeFileAtomicTrusted.mock.calls[1]?.[2]).toEqual({ caller: 'sdk.tools.state', mode: 0o600 });
     });
 });

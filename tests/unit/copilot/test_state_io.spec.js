@@ -216,7 +216,7 @@ describe('state-io', () => {
             stateFileIoTestHarness.setStateFileWriter(async (filePath, content, options) => {
                 writerStarted.resolve(undefined);
                 await releaseWriter.promise;
-                await stateFileIoTestHarness.writeFileAtomicPortable(filePath, content, options);
+                await stateFileIoTestHarness.writeStateFileAtomicTrusted(filePath, content, options);
             });
 
             const writePromise = writeStateAsync({ sessionId: 'stale-write', sendCount: 77 });

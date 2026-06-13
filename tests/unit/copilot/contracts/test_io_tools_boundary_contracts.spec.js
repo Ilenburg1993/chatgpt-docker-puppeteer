@@ -135,6 +135,7 @@ describe('IO/tools boundary contracts', () => {
             'runtime.js',
             'session.js',
             'testing.js',
+            'trusted-io.js',
         ]) {
             expect(existsSync(join(COPILOT_INFRA_ROOT, 'public', facade)), facade).toBe(true);
         }

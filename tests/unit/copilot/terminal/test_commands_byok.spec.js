@@ -1376,8 +1376,8 @@ vi.mock('node:fs/promises', () => ({
     stat,
 }));
 
-vi.mock('#copilot/infra/public/io', () => ({
-    writeFileAtomicPortable: vi.fn((path, content, options) => writeFile(path, content, options)),
+vi.mock('#copilot/infra/public/trusted-io', () => ({
+    writeFileAtomicTrusted: vi.fn((path, content, options) => writeFile(path, content, options)),
 }));
 
 vi.mock('dotenv', () => ({

@@ -3,7 +3,7 @@
  * Non-mutating selection decision trace helpers.
  */
 
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -312,9 +312,15 @@ export async function persistModelGatewaySelectionDecisionTrace(trace, options =
         .then(async () => {
             try {
                 const payload = `${JSON.stringify(trace, null, 2)}\n`;
-                await writeFileAtomicPortable(filePath, payload, { mode: 0o600 });
+                await writeFileAtomicTrusted(filePath, payload, {
+                    caller: 'model-gateway.routing.selection-trace',
+                    mode: 0o600,
+                });
                 if (latestPath) {
-                    await writeFileAtomicPortable(latestPath, payload, { mode: 0o600 });
+                    await writeFileAtomicTrusted(latestPath, payload, {
+                        caller: 'model-gateway.routing.selection-trace',
+                        mode: 0o600,
+                    });
                 }
                 return {
                     schema: /** @type {const} */ ('model-gateway-selection-decision-trace-persistence'),

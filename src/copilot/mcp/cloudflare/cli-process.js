@@ -5,7 +5,7 @@ import { closeSync, openSync } from 'node:fs';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 
 export const CLOUDFLARED_TOKEN_FILE_MIN_VERSION = '2025.4.0';
 const DEFAULT_STOP_TIMEOUT_MS = 5_000;
@@ -111,7 +111,8 @@ export async function ensureDetachedProcess(options) {
     child.unref();
     const stateWriter =
         options.stateWriter ??
-        ((filePath, content) => writeFileAtomicPortable(filePath, content, { mode: 0o600 }));
+        ((filePath, content) =>
+            writeFileAtomicTrusted(filePath, content, { caller: 'mcp.cloudflare.cli-process', mode: 0o600 }));
     try {
         await stateWriter(
             metadataFile,

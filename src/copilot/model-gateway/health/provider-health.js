@@ -11,7 +11,7 @@
  */
 
 import { redactSecretText } from '#copilot/core';
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -565,7 +565,10 @@ export async function flushByokProviderHealth() {
                 updatedAt: new Date().toISOString(),
                 records,
             };
-            await writeFileAtomicPortable(filePath, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
+            await writeFileAtomicTrusted(filePath, `${JSON.stringify(payload, null, 2)}\n`, {
+                caller: 'model-gateway.health.provider-health',
+                mode: 0o600,
+            });
             _byokProviderHealthPersistedRecords = records.length;
             _byokProviderHealthLastError = null;
         } catch (error) {

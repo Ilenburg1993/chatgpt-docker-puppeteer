@@ -10,7 +10,7 @@ import { join, resolve } from 'node:path';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '#copilot/config/agent';
 import { safeJsonParse } from '#copilot/core';
 import { SessionSnapshotDataSchema, SnapshotIdSchema, SnapshotListItemSchema } from '#copilot/core';
-import { writeFileAtomicPortable } from '#copilot/infra/public/io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { logSwallowed } from '../../ports/core-runtime-port.js';
 import { log } from '../../ports/logging/index.js';
 import { startSpan } from '../../ports/tracing-port.js';
@@ -65,7 +65,10 @@ export async function saveSnapshotFileAsync(snapshot) {
             const filename = `${snapshotId}.json`;
             const filepath = join(SNAPSHOT_DIR, filename);
 
-            await writeFileAtomicPortable(filepath, JSON.stringify(snapshot, null, 4), { mode: 0o600 });
+            await writeFileAtomicTrusted(filepath, JSON.stringify(snapshot, null, 4), {
+                caller: 'agent.session.state.snapshot-store',
+                mode: 0o600,
+            });
             log('INFO', `[SessionSnapshot] Snapshot salvo (async): ${filepath}`);
 
             await pruneSnapshotFilesAsync();
