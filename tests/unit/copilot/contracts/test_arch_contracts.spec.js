@@ -828,12 +828,83 @@ describe('IO-006 — writers assíncronos diretos ficam restritos a infra', () =
                     }
                 }
             }
+            const fsPromisesBinding = src.match(
+                /import\s*\{\s*promises\s+as\s+(\w+)\s*\}\s*from\s*['"]node:fs['"]/u,
+            )?.[1];
+            if (fsPromisesBinding) {
+                for (const mutator of mutators) {
+                    if (new RegExp(`\\b${fsPromisesBinding}\\.${mutator}\\s*\\(`, 'u').test(src)) {
+                        violations.push(`${rel}: ${fsPromisesBinding}.${mutator}()`);
+                    }
+                }
+            }
         }
 
         assert.deepEqual(
             violations,
             [],
             `Writer assíncrono direto fora de infra; use #copilot/infra/public/io:\n${violations.join('\n')}`,
+        );
+    });
+});
+
+describe('IO-006 — cleanup e mkdir diretos possuem matriz formal', () => {
+    it('calls diretos de mkdir/rm/unlink fora de infra correspondem exatamente às exceções classificadas', () => {
+        const allowed = [
+            'agent/lifecycle/state/state-file-io.js:mkdir',
+            'agent/lifecycle/state/state-file-io.js:rm',
+            'agent/session/state/snapshot-store.js:rm',
+            'db/sqlite.js:mkdir',
+            'mcp/cloudflare/cli-process.js:mkdir',
+            'mcp/cloudflare/cli-process.js:rm',
+            'mcp/cloudflare/state.js:rm',
+            'mcp/control-plane/ai-artifacts.js:unlink',
+            'mcp/control-plane/jobs.js:mkdir',
+            'mcp/control-plane/latency-history.js:mkdir',
+            'mcp/tools/repo-write.js:mkdir',
+            'model-gateway/routing/selection-trace.js:rm',
+            'sdk/models/persistent-cache.js:unlink',
+        ];
+        const mutators = ['mkdir', 'rm', 'unlink'];
+        /** @type {string[]} */
+        const actual = [];
+
+        for (const abs of listJsFilesRecursive(COPILOT_ROOT)) {
+            const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
+            if (rel.startsWith('infra/')) continue;
+            const src = readFileSync(abs, 'utf-8');
+            const namedImport = src.match(/import\s*\{([^}]+)\}\s*from\s*['"]node:fs\/promises['"]/u)?.[1] ?? '';
+            for (const item of namedImport.split(',')) {
+                const [imported, local = imported] = item
+                    .trim()
+                    .split(/\s+as\s+/u)
+                    .map((part) => part.trim());
+                if (!imported || !local || !mutators.includes(imported)) continue;
+                if (new RegExp(`\\b${local}\\s*\\(`, 'u').test(src)) actual.push(`${rel}:${imported}`);
+            }
+            for (const match of src.matchAll(/import\s+(?:\*\s+as\s+)?(\w+)\s+from\s+['"]node:fs\/promises['"]/gu)) {
+                const binding = match[1];
+                if (!binding) continue;
+                for (const mutator of mutators) {
+                    if (new RegExp(`\\b${binding}\\.${mutator}\\s*\\(`, 'u').test(src)) actual.push(`${rel}:${mutator}`);
+                }
+            }
+            const fsPromisesBinding = src.match(
+                /import\s*\{\s*promises\s+as\s+(\w+)\s*\}\s*from\s*['"]node:fs['"]/u,
+            )?.[1];
+            if (fsPromisesBinding) {
+                for (const mutator of mutators) {
+                    if (new RegExp(`\\b${fsPromisesBinding}\\.${mutator}\\s*\\(`, 'u').test(src)) {
+                        actual.push(`${rel}:${mutator}`);
+                    }
+                }
+            }
+        }
+
+        assert.deepEqual(
+            [...new Set(actual)].sort(),
+            allowed.sort(),
+            'A matriz deve classificar exatamente bootstrap mkdir, retenção bounded e cleanup intencional.',
         );
     });
 });

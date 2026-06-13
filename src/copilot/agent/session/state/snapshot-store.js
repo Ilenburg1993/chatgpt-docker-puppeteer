@@ -5,7 +5,7 @@
  */
 
 import { resolveHooksStateDir } from '#copilot/boot';
-import { access, mkdir, readdir, readFile, rm } from 'node:fs/promises';
+import { access, readdir, readFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '#copilot/config/agent';
 import { safeJsonParse } from '#copilot/core';
@@ -62,8 +62,6 @@ export async function saveSnapshotFileAsync(snapshot) {
         async () => {
             const snapshotId = normalizeSnapshotId(snapshot.snapshotId);
             if (!snapshotId) throw new TypeError('Snapshot ID inválido para persistência.');
-            await mkdir(SNAPSHOT_DIR, { recursive: true });
-
             const filename = `${snapshotId}.json`;
             const filepath = join(SNAPSHOT_DIR, filename);
 
