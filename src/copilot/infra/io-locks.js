@@ -12,8 +12,10 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import {
     acquireFileResourceLock,
     getFileResourceLockStats,
+    hashFileResourceLockKey,
     isFileResourceLockEnabledByEnv,
 } from './locks/file-resource-lock.js';
+import { createBoundedLockWaitMetrics, sanitizeLockOperation } from './locks/lock-observability.js';
 import { normalizePathResourceKey } from './policy/path-resource.js';
 
 const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
@@ -26,6 +28,30 @@ const isError =
 const tails = new Map();
 /** @type {AsyncLocalStorage<Set<string>>} */
 const heldLocksStorage = new AsyncLocalStorage();
+const lockWaitMetrics = createBoundedLockWaitMetrics();
+const lockCounters = {
+    attempts: 0,
+    acquired: 0,
+    contended: 0,
+    reentrant: 0,
+    timeouts: 0,
+    aborts: 0,
+    failures: 0,
+    queuedWaiters: 0,
+    queueDepthHighWater: 0,
+};
+/**
+ * @type {Map<string, {
+ *     resourceHash: string;
+ *     operation: string;
+ *     acquiredAtMs: number;
+ *     waitMs: number;
+ *     l0WaitMs: number;
+ *     fileLockEnabled: boolean;
+ * }>}
+ */
+const activeLeases = new Map();
+const MAX_ACTIVE_LEASE_SAMPLE = 32;
 
 /**
  * @param {string} key
@@ -75,6 +101,21 @@ function createLockError(kind, resourceKey) {
  */
 function asError(error) {
     return isError(error) ? /** @type {Error} */ (error) : new Error(String(error));
+}
+
+/**
+ * @param {unknown} error
+ * @returns {void}
+ */
+function recordLockFailure(error) {
+    const code = /** @type {{ code?: unknown }} */ (error)?.code;
+    if (code === 'ETIMEDOUT') {
+        lockCounters.timeouts += 1;
+    } else if (code === 'ABORT_ERR') {
+        lockCounters.aborts += 1;
+    } else {
+        lockCounters.failures += 1;
+    }
 }
 
 /**
@@ -170,11 +211,15 @@ function waitForPrevious(previous, key, options) {
  */
 export async function acquireIoResourceLock(resourceKey, options = {}) {
     const key = normalizeIoResourceKey(resourceKey);
+    lockCounters.attempts += 1;
     const heldLocks = heldLocksStorage.getStore();
     if (heldLocks?.has(key)) {
         if (options.signal?.aborted) {
-            throw createLockError('Abort', key);
+            const error = createLockError('Abort', key);
+            recordLockFailure(error);
+            throw error;
         }
+        lockCounters.reentrant += 1;
         return /** @type {IoResourceLockLease & { [Symbol.asyncDispose]: () => Promise<void> }} */ ({
             key,
             waitMs: 0,
@@ -189,6 +234,15 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
     }
 
     const startedWait = Date.now();
+    const wasContended = tails.has(key);
+    if (wasContended) {
+        lockCounters.contended += 1;
+        lockCounters.queuedWaiters += 1;
+        lockCounters.queueDepthHighWater = Math.max(
+            lockCounters.queueDepthHighWater,
+            lockCounters.queuedWaiters,
+        );
+    }
     const previous = tails.get(key) ?? Promise.resolve();
     const { promise: current, resolve: releaseCurrent } = Promise.withResolvers();
     const tail = previous
@@ -198,14 +252,21 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
     tails.set(key, tail);
     scheduleTailCleanup(key);
 
+    /** @type {number} */
+    let l0WaitMs;
     try {
         await waitForPrevious(previous, key, options);
+        l0WaitMs = Date.now() - startedWait;
+        lockWaitMetrics.record(l0WaitMs, options.operation);
     } catch (error) {
         releaseCurrent(undefined);
         if (tails.get(key) === tail) {
             tails.delete(key);
         }
+        recordLockFailure(error);
         throw error;
+    } finally {
+        if (wasContended) lockCounters.queuedWaiters = Math.max(0, lockCounters.queuedWaiters - 1);
     }
 
     if (options.signal?.aborted) {
@@ -213,7 +274,9 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
         if (tails.get(key) === tail) {
             tails.delete(key);
         }
-        throw createLockError('Abort', key);
+        const error = createLockError('Abort', key);
+        recordLockFailure(error);
+        throw error;
     }
 
     /** @type {Awaited<ReturnType<typeof acquireFileResourceLock>> | null} */
@@ -234,12 +297,23 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
             if (tails.get(key) === tail) {
                 tails.delete(key);
             }
+            recordLockFailure(error);
             throw error;
         }
     }
 
     const nextHeldLocks = new Set(heldLocks ?? []);
     nextHeldLocks.add(key);
+    const waitMs = Date.now() - startedWait;
+    lockCounters.acquired += 1;
+    activeLeases.set(key, {
+        resourceHash: hashFileResourceLockKey(key),
+        operation: sanitizeLockOperation(options.operation),
+        acquiredAtMs: Date.now(),
+        waitMs,
+        l0WaitMs,
+        fileLockEnabled: Boolean(fileLockLease),
+    });
 
     let releasePromise = /** @type {Promise<void> | null} */ (null);
     const releaseAsync = () => {
@@ -250,6 +324,7 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
             try {
                 if (fileLock) await fileLock.release();
             } finally {
+                activeLeases.delete(key);
                 releaseCurrent(undefined);
                 if (tails.get(key) === tail) {
                     tails.delete(key);
@@ -264,7 +339,7 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
 
     return /** @type {IoResourceLockLease & { [Symbol.asyncDispose]: () => Promise<void> }} */ ({
         key,
-        waitMs: Date.now() - startedWait,
+        waitMs,
         fileLockEnabled: Boolean(fileLockLease),
         fileLockPath: fileLockLease?.lockPath ?? null,
         staleFileLockRecovered: Boolean(fileLockLease?.staleRecovered),
@@ -387,10 +462,54 @@ export async function withIoResourceLocks(resourceKeys, operation, options = {})
  *
  * @returns {{
  *     pendingResources: number;
- *     resources: string[];
+ *     activeLeases: number;
+ *     queuedWaiters: number;
+ *     queueDepthHighWater: number;
+ *     attempts: number;
+ *     acquired: number;
+ *     contended: number;
+ *     reentrant: number;
+ *     timeouts: number;
+ *     aborts: number;
+ *     failures: number;
+ *     wait: ReturnType<ReturnType<typeof createBoundedLockWaitMetrics>['snapshot']>;
+ *     activeLeaseSample: Array<{
+ *         resourceHash: string;
+ *         operation: string;
+ *         ageMs: number;
+ *         waitMs: number;
+ *         l0WaitMs: number;
+ *         fileLockEnabled: boolean;
+ *     }>;
  *     fileLocks: ReturnType<typeof getFileResourceLockStats>;
  * }}
  */
 export function getIoLockStats() {
-    return { pendingResources: tails.size, resources: [...tails.keys()], fileLocks: getFileResourceLockStats() };
+    const now = Date.now();
+    return {
+        pendingResources: tails.size,
+        activeLeases: activeLeases.size,
+        queuedWaiters: lockCounters.queuedWaiters,
+        queueDepthHighWater: lockCounters.queueDepthHighWater,
+        attempts: lockCounters.attempts,
+        acquired: lockCounters.acquired,
+        contended: lockCounters.contended,
+        reentrant: lockCounters.reentrant,
+        timeouts: lockCounters.timeouts,
+        aborts: lockCounters.aborts,
+        failures: lockCounters.failures,
+        wait: lockWaitMetrics.snapshot(),
+        activeLeaseSample: [...activeLeases.values()]
+            .sort((left, right) => left.acquiredAtMs - right.acquiredAtMs)
+            .slice(0, MAX_ACTIVE_LEASE_SAMPLE)
+            .map((lease) => ({
+                resourceHash: lease.resourceHash,
+                operation: lease.operation,
+                ageMs: Math.max(0, now - lease.acquiredAtMs),
+                waitMs: lease.waitMs,
+                l0WaitMs: lease.l0WaitMs,
+                fileLockEnabled: lease.fileLockEnabled,
+            })),
+        fileLocks: getFileResourceLockStats(),
+    };
 }

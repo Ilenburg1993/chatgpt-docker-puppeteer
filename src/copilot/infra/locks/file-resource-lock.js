@@ -14,6 +14,7 @@ import { hostname } from 'node:os';
 import path from 'node:path';
 import { normalizeIoDurability, shouldSyncDirectory, syncParentDirectoryBestEffort } from '../io/fs/durability.js';
 import { normalizePathResourceKey } from '../policy/path-resource.js';
+import { createBoundedLockWaitMetrics, sanitizeLockOperation } from './lock-observability.js';
 
 const DEFAULT_STALE_MS = 10 * 60 * 1000;
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 30_000;
@@ -48,8 +49,28 @@ const LOCK_SCHEMA_VERSION = 1;
  * @property {() => Promise<void>} release
  */
 
-/** @type {Set<string>} */
-const activeFileLockPaths = new Set();
+/**
+ * @type {Map<string, {
+ *     resourceHash: string;
+ *     operation: string;
+ *     acquiredAtMs: number;
+ *     waitMs: number;
+ *     staleRecovered: boolean;
+ * }>}
+ */
+const activeFileLocks = new Map();
+const fileLockWaitMetrics = createBoundedLockWaitMetrics();
+const fileLockCounters = {
+    attempts: 0,
+    acquired: 0,
+    contended: 0,
+    timeouts: 0,
+    aborts: 0,
+    failures: 0,
+    queuedWaiters: 0,
+    queueDepthHighWater: 0,
+};
+const MAX_ACTIVE_LEASE_SAMPLE = 32;
 let staleRecoveries = 0;
 let heartbeatFailures = 0;
 
@@ -113,18 +134,54 @@ export function getFileResourceLockPath(resourceKey, lockDir = getFileResourceLo
  * @returns {{
  *     enabledByEnv: boolean;
  *     activeLeases: number;
- *     lockDir: string;
+ *     queuedWaiters: number;
+ *     queueDepthHighWater: number;
+ *     lockDirHash: string;
+ *     attempts: number;
+ *     acquired: number;
+ *     contended: number;
+ *     timeouts: number;
+ *     aborts: number;
+ *     failures: number;
  *     staleRecoveries: number;
  *     heartbeatFailures: number;
+ *     wait: ReturnType<ReturnType<typeof createBoundedLockWaitMetrics>['snapshot']>;
+ *     activeLeaseSample: Array<{
+ *         resourceHash: string;
+ *         operation: string;
+ *         ageMs: number;
+ *         waitMs: number;
+ *         staleRecovered: boolean;
+ *     }>;
  * }}
  */
 export function getFileResourceLockStats() {
+    const now = Date.now();
     return {
         enabledByEnv: isFileResourceLockEnabledByEnv(),
-        activeLeases: activeFileLockPaths.size,
-        lockDir: getFileResourceLockDir(),
+        activeLeases: activeFileLocks.size,
+        queuedWaiters: fileLockCounters.queuedWaiters,
+        queueDepthHighWater: fileLockCounters.queueDepthHighWater,
+        lockDirHash: createHash('sha256').update(getFileResourceLockDir()).digest('hex'),
+        attempts: fileLockCounters.attempts,
+        acquired: fileLockCounters.acquired,
+        contended: fileLockCounters.contended,
+        timeouts: fileLockCounters.timeouts,
+        aborts: fileLockCounters.aborts,
+        failures: fileLockCounters.failures,
         staleRecoveries,
         heartbeatFailures,
+        wait: fileLockWaitMetrics.snapshot(),
+        activeLeaseSample: [...activeFileLocks.values()]
+            .sort((left, right) => left.acquiredAtMs - right.acquiredAtMs)
+            .slice(0, MAX_ACTIVE_LEASE_SAMPLE)
+            .map((lease) => ({
+                resourceHash: lease.resourceHash,
+                operation: lease.operation,
+                ageMs: Math.max(0, now - lease.acquiredAtMs),
+                waitMs: lease.waitMs,
+                staleRecovered: lease.staleRecovered,
+            })),
     };
 }
 
@@ -359,6 +416,7 @@ async function writeLockMetadata(handle, metadata, durability) {
  * @returns {Promise<FileResourceLockLease>}
  */
 export async function acquireFileResourceLock(resourceKey, options = {}) {
+    fileLockCounters.attempts += 1;
     const normalizedKey = normalizePathResourceKey(resourceKey);
     const explicitLockPath = options.lockPath ? path.resolve(options.lockPath) : null;
     const lockDir = explicitLockPath
@@ -373,76 +431,107 @@ export async function acquireFileResourceLock(resourceKey, options = {}) {
     const durability = normalizeIoDurability(options.durability ?? 'file-and-directory');
     const startedWait = Date.now();
     let staleRecovered = false;
+    let observedContention = false;
 
-    await fs.mkdir(lockDir, { recursive: true });
-    await assertLockPathIsNotSymlink(lockPath);
+    try {
+        await fs.mkdir(lockDir, { recursive: true });
+        await assertLockPathIsNotSymlink(lockPath);
 
-    while (true) {
-        if (options.signal?.aborted) throw createAbortError();
-        /** @type {import('node:fs/promises').FileHandle | null} */
-        let handle = null;
-        const token = randomUUID();
-        const now = Date.now();
-        /** @type {FileResourceLockMetadata} */
-        const metadata = {
-            schemaVersion: LOCK_SCHEMA_VERSION,
-            token,
-            pid: process.pid,
-            hostname: hostname(),
-            resourceKey: normalizedKey,
-            resourceHash: hashFileResourceLockKey(normalizedKey),
-            operation: options.operation ?? null,
-            target: options.target ?? null,
-            startedAt: new Date(now).toISOString(),
-            startedAtMs: now,
-        };
-
-        try {
-            handle = await fs.open(lockPath, 'wx');
-            await writeLockMetadata(handle, metadata, durability);
-            if (shouldSyncDirectory(durability)) await syncParentDirectoryBestEffort(lockPath);
-            activeFileLockPaths.add(lockPath);
-            const lockHandle = handle;
-            handle = null;
-            const heartbeat = startLockHeartbeat(lockHandle, staleMs);
-            let releasePromise = /** @type {Promise<void> | null} */ (null);
-            return {
-                resourceKey: normalizedKey,
-                lockPath,
+        while (true) {
+            if (options.signal?.aborted) throw createAbortError();
+            /** @type {import('node:fs/promises').FileHandle | null} */
+            let handle = null;
+            const token = randomUUID();
+            const now = Date.now();
+            /** @type {FileResourceLockMetadata} */
+            const metadata = {
+                schemaVersion: LOCK_SCHEMA_VERSION,
                 token,
-                waitMs: Date.now() - startedWait,
-                staleRecovered,
-                release: () => {
-                    if (releasePromise) return releasePromise;
-                    releasePromise = (async () => {
-                        clearInterval(heartbeat);
-                        await lockHandle.close().catch(() => undefined);
-                        const current = await readLockMetadata(lockPath);
-                        if (current?.token !== token) return;
-                        await fs.unlink(lockPath).catch((error) => {
-                            if (errorCode(error) !== 'ENOENT') throw error;
-                        });
-                        if (shouldSyncDirectory(durability)) await syncParentDirectoryBestEffort(lockPath);
-                    })().finally(() => {
-                        activeFileLockPaths.delete(lockPath);
-                    });
-                    return releasePromise;
-                },
+                pid: process.pid,
+                hostname: hostname(),
+                resourceKey: normalizedKey,
+                resourceHash: hashFileResourceLockKey(normalizedKey),
+                operation: options.operation ?? null,
+                target: options.target ?? null,
+                startedAt: new Date(now).toISOString(),
+                startedAtMs: now,
             };
-        } catch (error) {
-            if (handle) await handle.close().catch(() => undefined);
-            if (errorCode(error) !== 'EEXIST') throw error;
 
-            await assertLockPathIsNotSymlink(lockPath);
-            const existing = await observeLock(lockPath);
-            if (isStaleLock(existing, Date.now(), staleMs)) {
-                const reclaimed = await reclaimStaleLock(lockPath, existing, durability);
-                staleRecovered = staleRecovered || reclaimed;
-                if (reclaimed) continue;
+            try {
+                handle = await fs.open(lockPath, 'wx');
+                await writeLockMetadata(handle, metadata, durability);
+                if (shouldSyncDirectory(durability)) await syncParentDirectoryBestEffort(lockPath);
+                const waitMs = Date.now() - startedWait;
+                fileLockCounters.acquired += 1;
+                fileLockWaitMetrics.record(waitMs, options.operation);
+                activeFileLocks.set(lockPath, {
+                    resourceHash: metadata.resourceHash,
+                    operation: sanitizeLockOperation(options.operation),
+                    acquiredAtMs: Date.now(),
+                    waitMs,
+                    staleRecovered,
+                });
+                const lockHandle = handle;
+                handle = null;
+                const heartbeat = startLockHeartbeat(lockHandle, staleMs);
+                let releasePromise = /** @type {Promise<void> | null} */ (null);
+                return {
+                    resourceKey: normalizedKey,
+                    lockPath,
+                    token,
+                    waitMs,
+                    staleRecovered,
+                    release: () => {
+                        if (releasePromise) return releasePromise;
+                        releasePromise = (async () => {
+                            clearInterval(heartbeat);
+                            await lockHandle.close().catch(() => undefined);
+                            const current = await readLockMetadata(lockPath);
+                            if (current?.token !== token) return;
+                            await fs.unlink(lockPath).catch((error) => {
+                                if (errorCode(error) !== 'ENOENT') throw error;
+                            });
+                            if (shouldSyncDirectory(durability)) await syncParentDirectoryBestEffort(lockPath);
+                        })().finally(() => {
+                            activeFileLocks.delete(lockPath);
+                        });
+                        return releasePromise;
+                    },
+                };
+            } catch (error) {
+                if (handle) await handle.close().catch(() => undefined);
+                if (errorCode(error) !== 'EEXIST') throw error;
+
+                if (!observedContention) {
+                    observedContention = true;
+                    fileLockCounters.contended += 1;
+                    fileLockCounters.queuedWaiters += 1;
+                    fileLockCounters.queueDepthHighWater = Math.max(
+                        fileLockCounters.queueDepthHighWater,
+                        fileLockCounters.queuedWaiters,
+                    );
+                }
+                await assertLockPathIsNotSymlink(lockPath);
+                const existing = await observeLock(lockPath);
+                if (isStaleLock(existing, Date.now(), staleMs)) {
+                    const reclaimed = await reclaimStaleLock(lockPath, existing, durability);
+                    staleRecovered = staleRecovered || reclaimed;
+                    if (reclaimed) continue;
+                }
+
+                if (Date.now() - startedWait >= timeoutMs) throw createTimeoutError(lockPath);
+                await sleep(Math.min(pollMs, Math.max(1, timeoutMs - (Date.now() - startedWait))), options.signal);
             }
-
-            if (Date.now() - startedWait >= timeoutMs) throw createTimeoutError(lockPath);
-            await sleep(Math.min(pollMs, Math.max(1, timeoutMs - (Date.now() - startedWait))), options.signal);
+        }
+    } catch (error) {
+        const code = errorCode(error);
+        if (code === 'ETIMEDOUT') fileLockCounters.timeouts += 1;
+        else if (code === 'ABORT_ERR') fileLockCounters.aborts += 1;
+        else fileLockCounters.failures += 1;
+        throw error;
+    } finally {
+        if (observedContention) {
+            fileLockCounters.queuedWaiters = Math.max(0, fileLockCounters.queuedWaiters - 1);
         }
     }
 }

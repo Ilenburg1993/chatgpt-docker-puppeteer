@@ -11,6 +11,7 @@ import { getIoL2CacheStats } from './io-cache-l2-registry.js';
 import { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 import { getIoCacheStats } from './io-cache.js';
 import { getIoIndexStats } from './io-index-registry.js';
+import { getIoLockStats } from './io-locks.js';
 import { getIoDurabilityStats, getIoLatencyStats } from './io-observability.js';
 import { getLineOffsetCacheStats } from './io/fs/line-offset-cache.js';
 import { getParserCacheStats } from './io-parser.js';
@@ -65,6 +66,7 @@ function safeCall(fn, fallback) {
  *     index: ReturnType<typeof getIoIndexStats>;
  *     latency: ReturnType<typeof getIoLatencyStats>;
  *     durability: ReturnType<typeof getIoDurabilityStats>;
+ *     locks: ReturnType<typeof getIoLockStats>;
  *     alerts: { code: string; severity: string; message: string }[];
  *     scopes: {
  *         active: number;
@@ -130,6 +132,7 @@ export function readIoRuntimeHealthSnapshot() {
         directorySync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0 },
         lastFailure: null,
     });
+    const locks = getIoLockStats();
     const alerts = [];
     if (circuitOpen) {
         alerts.push({
@@ -143,6 +146,13 @@ export function readIoRuntimeHealthSnapshot() {
             code: 'IO_DURABILITY_SYNC_FAILED',
             severity: 'high',
             message: 'Ao menos uma falha real de file/directory sync foi observada no runtime.',
+        });
+    }
+    if (locks.timeouts > 0 || locks.fileLocks.timeouts > 0) {
+        alerts.push({
+            code: 'IO_LOCK_TIMEOUT_OBSERVED',
+            severity: 'medium',
+            message: 'Ao menos um timeout de aquisição L0/L1 foi observado no runtime.',
         });
     }
 
@@ -214,6 +224,7 @@ export function readIoRuntimeHealthSnapshot() {
         }),
         latency: safeCall(getIoLatencyStats, {}),
         durability,
+        locks,
         alerts,
         scopes: {
             active: ids.length,

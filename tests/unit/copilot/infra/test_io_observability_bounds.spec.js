@@ -51,4 +51,14 @@ describe('infra/io-observability bounds', () => {
             expect.objectContaining({ code: 'IO_DURABILITY_SYNC_FAILED', severity: 'high' }),
         );
     });
+
+    it('projeta locks bounded no health sem recursos em claro', () => {
+        const health = readIoRuntimeHealthSnapshot();
+        expect(health.locks.wait.maxOperationCardinality).toBe(32);
+        expect(health.locks.wait.operationCardinality).toBeLessThanOrEqual(32);
+        expect(health.locks.activeLeaseSample).toHaveLength(0);
+        expect(health.locks.fileLocks.activeLeaseSample).toHaveLength(0);
+        expect(health.locks).not.toHaveProperty('resources');
+        expect(health.locks.fileLocks).not.toHaveProperty('lockDir');
+    });
 });

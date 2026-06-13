@@ -9,9 +9,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
     acquireIoResourceLock,
     acquireIoResourceLocks,
+    getIoLockStats,
     withIoResourceLock,
 } from '../../../../src/copilot/infra/io-locks.js';
 import { acquireLock, releaseLock, releaseLockAsync } from '../../../../src/copilot/infra/lockfile.js';
+import {
+    acquireFileResourceLock,
+    hashFileResourceLockKey,
+} from '../../../../src/copilot/infra/locks/file-resource-lock.js';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];
@@ -176,5 +181,103 @@ describe('infra locks', () => {
 
         const reacquired = await withIoResourceLock(source, async () => 'ok', { timeoutMs: 100 });
         expect(reacquired.value).toBe('ok');
+    });
+
+    it('expõe contenção L0 e lease sanitizado sem path do recurso', async () => {
+        const dir = await createTempDir();
+        const resource = join(dir, 'sensitive-resource.txt');
+        const before = getIoLockStats();
+        const holder = await acquireIoResourceLock(resource, { operation: 'unit-write' });
+
+        try {
+            const active = getIoLockStats();
+            expect(active.activeLeases).toBeGreaterThanOrEqual(1);
+            expect(active.activeLeaseSample).toContainEqual(
+                expect.objectContaining({
+                    resourceHash: hashFileResourceLockKey(resource),
+                    operation: 'unit-write',
+                    fileLockEnabled: false,
+                }),
+            );
+            expect(JSON.stringify(active)).not.toContain(resource);
+
+            await expect(acquireIoResourceLock(resource, { timeoutMs: 5, operation: 'unit-timeout' })).rejects.toMatchObject(
+                { code: 'ETIMEDOUT' },
+            );
+            const after = getIoLockStats();
+            expect(after.contended).toBe(before.contended + 1);
+            expect(after.timeouts).toBe(before.timeouts + 1);
+            expect(after.wait.overall.count).toBeGreaterThan(before.wait.overall.count);
+            expect(after.wait.byOperation['unit-write']).toMatchObject({ count: expect.any(Number) });
+        } finally {
+            await holder.releaseAsync();
+        }
+    });
+
+    it('expõe espera e lease L1 sanitizados e contabiliza timeout', async () => {
+        const dir = await createTempDir();
+        const lockDir = join(dir, '.private-locks');
+        const resource = join(dir, 'private-target.txt');
+        const before = getIoLockStats().fileLocks;
+        const holder = await acquireFileResourceLock(resource, {
+            lockDir,
+            operation: 'unit-l1',
+            timeoutMs: 100,
+        });
+
+        try {
+            const active = getIoLockStats().fileLocks;
+            expect(active.activeLeaseSample).toContainEqual(
+                expect.objectContaining({
+                    resourceHash: hashFileResourceLockKey(resource),
+                    operation: 'unit-l1',
+                }),
+            );
+            expect(JSON.stringify(active)).not.toContain(resource);
+            expect(JSON.stringify(active)).not.toContain(lockDir);
+
+            await expect(
+                acquireFileResourceLock(resource, {
+                    lockDir,
+                    operation: 'unit-l1-timeout',
+                    timeoutMs: 5,
+                    pollMs: 1,
+                }),
+            ).rejects.toMatchObject({ code: 'ETIMEDOUT' });
+            const after = getIoLockStats().fileLocks;
+            expect(after.contended).toBe(before.contended + 1);
+            expect(after.timeouts).toBe(before.timeouts + 1);
+            expect(after.wait.overall.count).toBeGreaterThan(before.wait.overall.count);
+        } finally {
+            await holder.release();
+        }
+    });
+
+    it('contabiliza abort antes da aquisição em L0 e L1', async () => {
+        const dir = await createTempDir();
+        const resource = join(dir, 'aborted-resource.txt');
+        const lockDir = join(dir, '.abort-locks');
+        const before = getIoLockStats();
+        const l0Controller = new AbortController();
+        l0Controller.abort();
+
+        await expect(
+            acquireIoResourceLock(resource, {
+                operation: 'unit-abort-l0',
+                signal: l0Controller.signal,
+            }),
+        ).rejects.toMatchObject({ code: 'ABORT_ERR' });
+        expect(getIoLockStats().aborts).toBe(before.aborts + 1);
+
+        const l1Controller = new AbortController();
+        l1Controller.abort();
+        await expect(
+            acquireFileResourceLock(resource, {
+                lockDir,
+                operation: 'unit-abort-l1',
+                signal: l1Controller.signal,
+            }),
+        ).rejects.toMatchObject({ code: 'ABORT_ERR' });
+        expect(getIoLockStats().fileLocks.aborts).toBe(before.fileLocks.aborts + 1);
     });
 });
