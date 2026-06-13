@@ -21,12 +21,11 @@ externas metadata-preserving; o risco dominante migrou para observabilidade de c
 
 Prioridades reais remanescentes:
 
-1. **P1 — contagem bruta de search ainda pode incluir linhas redigidas:** falta eliminar o side-channel ou marcar o
-   contrato de forma explícita.
-2. **P2 — lockfile multiprocess continua seletivo:** o L1 é canônico e provado, porém opt-in nas mutações gerais.
-3. **P2 — observabilidade de contenção ainda é parcial:** há contadores de stale recovery, heartbeat e durabilidade,
+1. **P2 — observabilidade de contenção ainda é parcial:** há contadores de stale recovery, heartbeat e durabilidade,
    mas não p95/histograma nem snapshot sanitizado de leases.
-4. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
+2. **P2 — lockfile multiprocess continua seletivo:** o L1 é canônico e provado, porém opt-in nas mutações gerais.
+3. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
+4. **P2 — remove recursivo continua sem quarentena intrínseca:** callers precisam impor a proteção.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -556,6 +555,30 @@ Validação:
 - rodada focada infra/runtime: **49 passados, 0 falhas**.
 - rodada ampliada infra/tools/MCP: **115 passados, 0 falhas**.
 
+### 1.21 Status de implementação — contagens pós-sanitização aplicadas em 2026-06-12
+
+IO-015 foi fechado em todas as engines de busca textual e simbólica:
+
+- rg, grep, FTS textual, alternation FTS e busca de símbolos sanitizam o conjunto capturado antes da paginação;
+- linhas integralmente bloqueadas não consomem `maxResults`, não avançam cursor e não entram em totals;
+- linhas preservadas com substituições visíveis como `[redacted]` continuam contando normalmente;
+- filtros integrais de PEM/JWT agora marcam `sanitized=true` e incrementam `redactions`;
+- `matchCount`, `returnedMatchCount`, `returnedLineCount`, `totalMatches`, `totalMatchCount` e `totalLineCount` derivam
+  somente da visão sanitizada;
+- o contrato público explicita `countsPostSanitization: true` em engine, tools e MCP.
+
+Prova regressiva:
+
+- a primeira ocorrência de uma página contém JWT-like e é removida;
+- a ocorrência segura seguinte ocupa a página;
+- totals, cursor e truncation reportam apenas a visão retornável.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- lint dos arquivos tocados: **PASS**.
+- infra/search, engine, tools e MCP: **98 passados, 0 falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -786,7 +809,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-012 | P1 | Cache derivado | Invalidação debounced pode atrasar read-after-write de parser/line-offset | `invalidation/bus.js`: debounce 50ms em produção | Leitura derivada logo após mutação pode ver stale | Após mutação canônica, flush hooks críticos ou oferecer `invalidateSync` para line-offset/parser/index |
 | IO-013 | P1 | Line offsets | Chave de line-offset não é claramente normalizada | `line-offset-cache.js` usa `filePath` recebido | Mesmo arquivo por path relativo/absoluto pode manter caches distintos | Normalizar path com `normalizeIoCacheKey`/`resolve` antes de keyar e invalidar |
 | IO-014 | P1 | Path policy | **Concluído:** capabilities workspace-bound e trusted estão separadas | `public/workspace-io.js`, `public/trusted-io.js`, contratos de boundaries/callers | Facade operacional baixa continua sem containment por desenho declarado | Manter superfícies externas sob contrato e allowlistar apenas escapes trusted |
-| IO-015 | P1 | Search | Total bruto pode vazar contagem de linhas redigidas | `text-search.js`: totalMatchCount de stdout cru | Baixo risco de side-channel sobre secrets | Calcular totais pós-redação ou marcar `rawTotalMayIncludeRedacted=true` |
+| IO-015 | P1 | Search | **Concluído:** sanitização antecede paginação e contagens | rg/grep/FTS/símbolos retornam `countsPostSanitization:true` | Linhas removidas não afetam total ou cursor | Manter prova de primeira página redigida |
 | IO-016 | P1 | Scanner | `readdir` + `lstat` por entrada é custoso | `io-scanner.js` | Muitos syscalls em árvores grandes | Usar `readdir({ withFileTypes:true })`; avaliar `fsPromises.glob` em Node 24.5 para casos seguros |
 | IO-017 | P1 | Index freshness | **Concluído:** identidade rica + hash periódico bounded | scanner persiste ctime/dev/ino; índice renova hash até limite configurável | Arquivos grandes confiam em metadata rica entre reindexações | Medir hit/miss/custo e ajustar intervalo/limite por perfil |
 | IO-018 | P1 | L2 SQLite | L2 cache opcional sem política clara de enablement | `io-cache-l2-registry.js` disabled default | Restart perde hotset; baixa performance em sessões longas | Ativar experimentalmente por perfil, medir hit ratio, busy timeout, WAL, synchronous |
@@ -819,10 +842,10 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-016, IO-017, IO-019, IO-020, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
 | Concluído com limite documentado | IO-001, IO-005, IO-006, IO-038 |
 | Parcial | IO-002, IO-009, IO-023, IO-025 |
-| Aberto | IO-015, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-030 |
+| Aberto | IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-030 |
 
 ---
 
@@ -905,8 +928,8 @@ A prioridade remanescente é:
 O scanner usa `readdir({ withFileTypes: true })` e evita `lstat` para diretórios e symlinks reconhecidos. O benchmark local ficou entre 154 e 214 ms para 1.565 entradas de `src/copilot`; ainda falta benchmark comparativo automatizado e cobertura de filesystems que retornam tipo desconhecido.
 
 A busca está bem protegida contra shell injection: usa `spawn` com args array e maxBuffer/timeout. O índice FTS agora
-combina metadata rica com verificação periódica bounded. Os riscos remanescentes são a contagem bruta antes da redação
-e a materialização de stdout até o limite do subprocesso.
+combina metadata rica com verificação periódica bounded, e contagens/cursor derivam da visão sanitizada. O risco
+remanescente é a materialização de stdout até o limite do subprocesso.
 
 ---
 
@@ -1101,9 +1124,10 @@ A situação ideal é uma infra IO em camadas:
 
 #### Fase 4.2 — Search streaming
 
+- [x] Sanitizar antes de paginar e contar.
 - [ ] Parser incremental de stdout.
 - [ ] Early stop real em `maxResults`.
-- [ ] Totais calculados pós-redação ou marcados como raw.
+- [x] Totais calculados pós-redação.
 
 #### Fase 4.3 — Parser workers
 
@@ -1240,7 +1264,7 @@ Para declarar maturidade operacional avançada, ainda faltam:
 - [ ] p95/histograma, timeout/abort e leases sanitizados;
 - [ ] quarentena intrínseca ou confirmação reforçada para remove recursivo;
 - [ ] preflight opcional de espaço livre em payloads grandes;
-- [ ] search incremental e contagens pós-redação.
+- [ ] search incremental com early stop real.
 
 ---
 
@@ -1259,5 +1283,5 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Fechar IO-015 eliminando ou declarando explicitamente contagens anteriores à redação em search; em seguida, adicionar
-histograma/p95, timeout/abort e snapshot sanitizado de leases para avançar IO-025.
+Adicionar histograma/p95, timeout/abort e snapshot sanitizado de leases para fechar IO-025 e orientar a ativação do L1
+por perfil.
