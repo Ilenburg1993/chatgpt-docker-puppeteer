@@ -397,6 +397,26 @@ Validação:
 - `lint:copilot`: **PASS**.
 - Testes focados de contracts, jobs MCP, OAuth, BYOK e config: **321 passados, 0 falhas**.
 
+### 1.15 Status de implementação — agregados de durabilidade no health aplicados em 2026-06-12
+
+`io-observability.js` agora agrega, com cardinalidade fixa:
+
+- operações observadas e operações com metadata de durabilidade;
+- modos solicitados e file flush solicitado;
+- file/directory sync tentado, confirmado, skipped unsupported e falho;
+- última falha real com kind, operação, código e timestamp.
+
+`readIoRuntimeHealthSnapshot()` expõe o snapshot em `durability` e emite alerta
+`IO_DURABILITY_SYNC_FAILED` quando uma falha real foi observada. Paths e códigos arbitrários não viram séries
+dinâmicas.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- `lint:copilot`: **PASS**.
+- Testes focados de observabilidade, engine, fault injection, multiprocess, contracts e métricas: **125 passados, 0
+  falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -828,7 +848,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Directory sync best-effort.
 - [x] Promover falha real de file/directory sync e preservar skips unsupported.
 - [x] Propagar metadata detalhada de durabilidade para resultados públicos e eventos de IO.
-- [ ] Projetar agregados de durabilidade no health.
+- [x] Projetar agregados de durabilidade no health.
 
 #### Fase 1.2 — Move seguro
 
@@ -1069,4 +1089,4 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Projetar agregados de durabilidade no health; depois classificar remoções diretas e `mkdir` fora de infra.
+Classificar remoções diretas e `mkdir` fora de infra; depois atacar workspace-bound IO e freshness do índice.
