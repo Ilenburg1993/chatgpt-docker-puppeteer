@@ -316,6 +316,28 @@ Validação:
 - Testes focados de contratos, métricas, transcript, shutdown e frontend terminal: **110 passados, 0 falhas**.
 - Prova nova persiste o transcript apenas no flush explícito, sem writer síncrono no caminho de append.
 
+### 1.11 Status de implementação — política de sync e EXDEV aplicada em 2026-06-12
+
+Mudanças:
+
+- Falhas reais de file/directory sync agora são promovidas a `EFILESYNC`/`EDIRECTORYSYNC`; casos explicitamente
+  classificados como unsupported continuam best-effort.
+- Write atômico e copy staged expõem fases antes/depois de directory sync e rejeitam falha real após publish sem
+  ocultar que o conteúdo novo já pode estar aplicado.
+- Move exclusivo same-device e move `EXDEV` sincronizam o diretório destino antes de remover a origem. Se esse sync
+  falha, ambos os arquivos permanecem e o resultado reporta duplicação com `EDIRECTORYSYNC`.
+- Sync do diretório de origem foi separado do `unlink`: uma falha após remoção da origem não é mais falsamente
+  reportada como duplicação.
+- Hooks internos injetáveis de sync permitem fault injection determinístico sem mocks globais de filesystem.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- Lint focado dos arquivos alterados: **PASS**.
+- Testes focados de fault injection, engine, multiprocess e file tools: **86 passados, 0 falhas**.
+- Prova `EXDEV` real executada entre `/tmp` e `/dev/shm`: destino íntegro e origem removida somente após publicação e
+  sync.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -573,12 +595,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-039 | P2 | Lock governance | **Concluído:** `file-resource-lock.js` é SSOT | `infra/lockfile.js` delega aquisição ao L1 canônico e preserva API legado | Remove semânticas concorrentes | Manter facade até callers antigos desaparecerem |
 | IO-040 | P2 | Scanner | **Concluído:** tipo básico vem de `Dirent` | `readdir({ withFileTypes:true })`; `lstat` só para arquivo/ambíguo | Reduz syscalls de classificação | Preservar benchmark e testar DT_UNKNOWN |
 | IO-041 | P0 | Lock wait | **Concluído:** timer aguardado não usa `unref()` | prova multiprocess reproduziu exit 13 durante espera L1 | Processo podia encerrar antes de adquirir/rejeitar lock | Manter `unref()` apenas em heartbeat/background |
+| IO-042 | P0 | Move durability | **Concluído:** sync posterior ao unlink não é confundido com falha de unlink | fases de source unlink e source directory sync foram separadas | Resultado podia reportar duplicação quando a origem já havia sido removida | Manter provas de falha antes/depois do unlink |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-011, IO-012, IO-013, IO-016, IO-019, IO-020, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
 | Concluído com limite documentado | IO-001, IO-005 |
 | Parcial | IO-002, IO-006, IO-009, IO-023, IO-025, IO-038 |
 | Aberto | IO-010, IO-014, IO-015, IO-017, IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-029, IO-030 |
@@ -744,7 +767,8 @@ A situação ideal é uma infra IO em camadas:
 - [x] `flush:true` configurável por modo de durabilidade.
 - [x] Rename/link final e cleanup de temp.
 - [x] Directory sync best-effort.
-- [ ] Propagar metadata de durabilidade para resultados públicos/health.
+- [x] Promover falha real de file/directory sync e preservar skips unsupported.
+- [ ] Propagar metadata detalhada de durabilidade para resultados públicos/health.
 
 #### Fase 1.2 — Move seguro
 
@@ -753,6 +777,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Same-device `overwrite=false` usa publicação exclusiva.
 - [x] Falha real de `syncFileBestEffort` impede remoção da origem quando a durabilidade foi exigida.
 - [x] Sync dos diretórios source/destination no caminho same-device.
+- [x] Falha real no sync do destino preserva origem; sync após unlink não reporta duplicação falsa.
 
 #### Fase 1.3 — Copy staged
 
@@ -856,7 +881,8 @@ A situação ideal é uma infra IO em camadas:
 
 - [ ] Fuzz textual e binário.
 - [x] Fault injection determinístico em write, publish, move e rotate+append.
-- [ ] Crash/fault injection em directory sync e EXDEV.
+- [x] Fault injection em directory sync e prova `EXDEV` real entre devices distintos.
+- [ ] Crash real durante directory sync e fases internas do `EXDEV`.
 - [x] Dois processos concorrendo por create/copy/move/write.
 - [x] Crash de holder L1 seguido de stale recovery real.
 - [ ] Modificação externa durante snapshot e index.
@@ -903,7 +929,8 @@ Foram concluídos stale recovery/release do L1, move exclusivo, copy staged, sna
 7. [x] consolidar `infra/lockfile.js` sobre o L1 canônico;
 8. [x] executar provas multiprocess de create/copy/move/write e crash de holder L1;
 9. [x] executar fault injection determinístico em publish e rotate+append;
-10. [ ] executar crash/fault injection em directory sync e EXDEV.
+10. [x] executar fault injection em directory sync e prova `EXDEV` real;
+11. [ ] executar crash real durante directory sync e fases internas do `EXDEV`.
 
 ---
 
@@ -982,5 +1009,5 @@ A infra IO só deve ser considerada plenamente confiável quando:
 
 ## 14. Próxima ação executável
 
-Implementar fault injection em directory sync e EXDEV; depois adicionar truncamento físico opcional da cauda JSONL
-parcial sob lock.
+Adicionar truncamento físico opcional da cauda JSONL parcial sob lock; depois propagar metadata detalhada de
+durabilidade para resultados públicos/health.
