@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `85af248d`, seguida da onda de rollback sidecar
+**Baseline reinvestigado:** `main` sincronizada até `2d1f94ae`, seguida da onda de observabilidade de locks
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -16,16 +16,17 @@ invalidação derivada imediata, append/repair JSONL canônico, governança dos 
 provas multiprocess/fault-injection.
 
 No estado atual, a descrição correta é: **as primitivas centrais de mutação, append e rollback material têm contratos
-fortes e provas reais, as superfícies externas de path estão vinculadas a policy async e o índice detecta mudanças
-externas metadata-preserving; o risco dominante migrou para observabilidade de contenção e custos de busca/cache**.
+fortes e provas reais, as superfícies externas de path estão vinculadas a policy async, o índice detecta mudanças
+externas metadata-preserving e a contenção L0/L1 é observável sem expor paths; o risco dominante migrou para política
+de ativação do L1 e custos de busca/cache**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — observabilidade de contenção ainda é parcial:** há contadores de stale recovery, heartbeat e durabilidade,
-   mas não p95/histograma nem snapshot sanitizado de leases.
-2. **P2 — lockfile multiprocess continua seletivo:** o L1 é canônico e provado, porém opt-in nas mutações gerais.
-3. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
-4. **P2 — remove recursivo continua sem quarentena intrínseca:** callers precisam impor a proteção.
+1. **P2 — lockfile multiprocess continua seletivo:** o L1 é canônico, provado e observável, porém opt-in nas mutações
+   gerais; falta definir perfis explícitos de ativação.
+2. **P2 — search ainda materializa stdout até limites:** falta parser incremental com early stop real.
+3. **P2 — remove recursivo continua sem quarentena intrínseca:** callers precisam impor a proteção.
+4. **P2 — parser workers não expõem pressão de fila:** faltam backpressure e queue length no health.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -579,6 +580,35 @@ Validação:
 - lint dos arquivos tocados: **PASS**.
 - infra/search, engine, tools e MCP: **98 passados, 0 falhas**.
 
+### 1.22 Status de implementação — observabilidade bounded de locks aplicada em 2026-06-12
+
+IO-025 foi fechado para L0 e L1:
+
+- `lock-observability.js` centraliza histogramas Node de espera geral e por operação sanitizada;
+- a cardinalidade por operação é limitada a 32, com eviction da série mais antiga;
+- L0 expõe attempts, acquisitions, contenções, reentrâncias, timeout, abort, falhas, waiters atuais e high-water real
+  da fila;
+- L1 expõe os mesmos outcomes relevantes, além dos contadores existentes de stale recovery e heartbeat failure;
+- p50/p95/p99, mean, max e count são projetados separadamente para L0 e L1;
+- snapshots públicos limitam leases ativos a 32 entradas, com hash do recurso, operação sanitizada, idade e espera;
+- `resources`, `lockDir`, target, token e paths absolutos deixaram de aparecer nos stats públicos;
+- o health de IO inclui `locks` e emite `IO_LOCK_TIMEOUT_OBSERVED` após timeout L0/L1;
+- a métrica antiga de último `lockWaitMs` permanece compatível, mas o health passa a oferecer distribuição cumulativa.
+
+Provas adicionadas:
+
+- contenção e timeout L0 incrementam os contadores corretos;
+- timeout L1 é observado independentemente do L0;
+- abort pré-aquisição é contado nos dois níveis;
+- snapshots ativos permitem correlação por SHA-256 sem conter path do recurso ou diretório de locks;
+- cardinalidade e amostras públicas permanecem bounded.
+
+Validação:
+
+- `typecheck:strict:src.copilot`: **PASS**.
+- lint focado dos arquivos alterados: **PASS**.
+- locks, health e engine: **49 passados, 0 falhas**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -819,7 +849,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-022 | P2 | Remove recursive | Remoção recursiva invalida, mas não há quarentena por default na engine | `removePathLocked` | Erro humano em caller destrutivo | Preferir quarantine nos tools, exigir confirmação e snapshot de árvore |
 | IO-023 | P2 | Parser reset | Reset de workers em teste é assíncrono e chamado com `void` | `io-parser.js` | Testes podem flakear | Exportar/reset async e adaptar testes |
 | IO-024 | P2 | Scope readiness | `declareScope` marca ready mesmo em catch | `io-session-scope.js` | Erros silenciosos podem parecer sucesso | Separar `ready` de `degraded`, expor erro resumido |
-| IO-025 | P2 | Observability | Lock wait e queue depth ainda pouco visíveis | `getIoLockStats` é básico | Dificulta diagnosticar contenção | Histogramas por lock key prefix, p95 wait, timeout count, active leases |
+| IO-025 | P2 | Observability | **Concluído:** espera, fila e leases L0/L1 são bounded e sanitizados | histogramas globais/por operação, p95, outcomes e amostra por hash no health | Paths não entram no snapshot; métricas são cumulativas por processo | Usar os dados para definir perfis de ativação do L1 |
 | IO-026 | P2 | Search subprocess | `rg`/`grep` maxBuffer aborta, mas não oferece stream incremental | `subprocess.js` | Grandes buscas custam memória até limite | Parser incremental de linhas com early stop em `maxResults` |
 | IO-027 | P2 | Glob policy | Glob simples próprio diverge de minimatch/Node glob | `scan/glob.js` | Diferenças de include/exclude difíceis de prever | Padronizar em `minimatch`/`fsPromises.glob` com testes de compatibilidade |
 | IO-028 | P2 | Statfs | Sem preflight de espaço livre | Não há uso de `statfs` | ENOSPC parcial em copy/write grande | Adicionar preflight opcional para payloads acima de limiar |
@@ -842,9 +872,9 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-025, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042 |
 | Concluído com limite documentado | IO-001, IO-005, IO-006, IO-038 |
-| Parcial | IO-002, IO-009, IO-023, IO-025 |
+| Parcial | IO-002, IO-009, IO-023 |
 | Aberto | IO-018, IO-021, IO-022, IO-024, IO-026, IO-027, IO-028, IO-030 |
 
 ---
@@ -1077,10 +1107,10 @@ A situação ideal é uma infra IO em camadas:
 
 #### Fase 2.4 — Observabilidade
 
-- [ ] Histograma/p95 de espera L0 e L1.
-- [ ] Contadores de timeout e abort.
+- [x] Histograma/p95 de espera L0 e L1.
+- [x] Contadores de timeout e abort.
 - [x] Contadores de stale recovery e heartbeat failure.
-- [ ] Snapshot de leases com idade e operação, sem vazar path sensível.
+- [x] Snapshot de leases com idade e operação, sem vazar path sensível.
 
 ### Faixa 3 — Snapshot e coerência derivada
 
@@ -1239,7 +1269,8 @@ hit/miss/custo por perfil e decidir enablement do L2, não corrigir stale básic
 ### `io-locks.js`
 
 Sólido no L0 e composto com L1 conservador. Release é determinístico, o legado delega ao SSOT e a concorrência
-multiprocess foi provada. A próxima evolução é ampliar observabilidade e escolher perfis de ativação do L1.
+multiprocess foi provada. Espera, fila, timeout/abort e leases ativos são observáveis com cardinalidade e payload
+bounded. A próxima evolução é escolher perfis de ativação do L1 usando esses dados.
 
 ---
 
@@ -1261,7 +1292,7 @@ Os critérios fundacionais originalmente definidos estão atendidos:
 Para declarar maturidade operacional avançada, ainda faltam:
 
 - [ ] perfil explícito de ativação L1 para mutações P0/P1;
-- [ ] p95/histograma, timeout/abort e leases sanitizados;
+- [x] p95/histograma, timeout/abort e leases sanitizados;
 - [ ] quarentena intrínseca ou confirmação reforçada para remove recursivo;
 - [ ] preflight opcional de espaço livre em payloads grandes;
 - [ ] search incremental com early stop real.
@@ -1283,5 +1314,5 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Adicionar histograma/p95, timeout/abort e snapshot sanitizado de leases para fechar IO-025 e orientar a ativação do L1
-por perfil.
+Definir perfis explícitos de ativação do L1 para mutações P0/P1, com defaults conservadores por risco e sem ligar
+lockfile indiscriminadamente em reads ou operações de baixo risco.
