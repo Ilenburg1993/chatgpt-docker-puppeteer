@@ -52,7 +52,7 @@ export {
 } from './io-engine.js';
 export { readIoRuntimeHealthSnapshot } from './io-health.js';
 export { acquireIoResourceLock, acquireIoResourceLocks, getIoLockStats, withIoResourceLocks } from './io-locks.js';
-export { nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-observability.js';
+export { getIoDurabilityStats, nowIoMs, publishIoLifecycleEvent, publishIoOperation } from './io-observability.js';
 export {
     buildOutline,
     extractJsonSchema,

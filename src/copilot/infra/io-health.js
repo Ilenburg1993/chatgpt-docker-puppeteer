@@ -11,7 +11,7 @@ import { getIoL2CacheStats } from './io-cache-l2-registry.js';
 import { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 import { getIoCacheStats } from './io-cache.js';
 import { getIoIndexStats } from './io-index-registry.js';
-import { getIoLatencyStats } from './io-observability.js';
+import { getIoDurabilityStats, getIoLatencyStats } from './io-observability.js';
 import { getLineOffsetCacheStats } from './io/fs/line-offset-cache.js';
 import { getParserCacheStats } from './io-parser.js';
 import { getScopeStats, listScopes } from './io-session-scope.js';
@@ -64,6 +64,7 @@ function safeCall(fn, fallback) {
  *     parser: ReturnType<typeof getParserCacheStats>;
  *     index: ReturnType<typeof getIoIndexStats>;
  *     latency: ReturnType<typeof getIoLatencyStats>;
+ *     durability: ReturnType<typeof getIoDurabilityStats>;
  *     alerts: { code: string; severity: string; message: string }[];
  *     scopes: {
  *         active: number;
@@ -120,15 +121,30 @@ export function readIoRuntimeHealthSnapshot() {
                 ? Number(/** @type {{ lastInitErrorAtMs?: number }} */ (l2).lastInitErrorAtMs ?? 0) || null
                 : null,
     };
-    const alerts = circuitOpen
-        ? [
-              {
-                  code: 'IO_L2_CIRCUIT_OPEN',
-                  severity: 'high',
-                  message: 'L2 cache em circuit-open; runtime operando predominantemente em L1.',
-              },
-          ]
-        : [];
+    const durability = safeCall(getIoDurabilityStats, {
+        operationsObserved: 0,
+        operationsWithMetadata: 0,
+        fileFlushRequested: 0,
+        modes: { none: 0, file: 0, 'file-and-directory': 0 },
+        fileSync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0 },
+        directorySync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0 },
+        lastFailure: null,
+    });
+    const alerts = [];
+    if (circuitOpen) {
+        alerts.push({
+            code: 'IO_L2_CIRCUIT_OPEN',
+            severity: 'high',
+            message: 'L2 cache em circuit-open; runtime operando predominantemente em L1.',
+        });
+    }
+    if (durability.fileSync.failed > 0 || durability.directorySync.failed > 0) {
+        alerts.push({
+            code: 'IO_DURABILITY_SYNC_FAILED',
+            severity: 'high',
+            message: 'Ao menos uma falha real de file/directory sync foi observada no runtime.',
+        });
+    }
 
     return {
         generatedAt: Date.now(),
@@ -197,6 +213,7 @@ export function readIoRuntimeHealthSnapshot() {
             workerFallbacks: 0,
         }),
         latency: safeCall(getIoLatencyStats, {}),
+        durability,
         alerts,
         scopes: {
             active: ids.length,
