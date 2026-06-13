@@ -44,6 +44,9 @@ describe('infra/io-scanner', () => {
         expect(entry?.fingerprint?.realpath).toBe(await realpath(file));
         expect(entry?.fingerprint?.size).toBe(5);
         expect(typeof entry?.fingerprint?.mtimeMs).toBe('number');
+        expect(typeof entry?.fingerprint?.ctimeMs).toBe('number');
+        expect(Number.isFinite(entry?.fingerprint?.dev)).toBe(true);
+        expect(Number.isFinite(entry?.fingerprint?.ino)).toBe(true);
     });
 
     it('publica eventos de lifecycle scan.start e scan.complete', async () => {

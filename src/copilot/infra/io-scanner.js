@@ -54,7 +54,14 @@ function assertValidScannerPath(candidate, label) {
  * @property {number} [size]
  * @property {boolean} [blocked]
  * @property {string} [reasonCode]
- * @property {{ realpath: string; mtimeMs: number; size: number }} [fingerprint]
+ * @property {{
+ *     realpath: string;
+ *     mtimeMs: number;
+ *     ctimeMs: number;
+ *     size: number;
+ *     dev: number;
+ *     ino: number;
+ * }} [fingerprint]
  * @property {IoScanEntry[]} [children]
  */
 

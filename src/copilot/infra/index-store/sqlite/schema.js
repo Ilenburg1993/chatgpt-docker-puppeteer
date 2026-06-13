@@ -20,6 +20,8 @@ export function ensureIoIndexSchema(db) {
             size_bytes      INTEGER NOT NULL,
             mtime_ms        REAL NOT NULL,
             ctime_ms        REAL,
+            dev             INTEGER,
+            ino             INTEGER,
             content_hash    TEXT,
             line_count      INTEGER NOT NULL DEFAULT 0,
             symbol_count    INTEGER NOT NULL DEFAULT 0,
@@ -88,4 +90,12 @@ export function ensureIoIndexSchema(db) {
         CREATE INDEX IF NOT EXISTS idx_io_index_chunks_file
             ON copilot_io_index_chunks(file_path, chunk_index);
     `);
+
+    const columns = new Set(
+        /** @type {{ name?: unknown }[]} */ (db.prepare('PRAGMA table_info(copilot_io_index_files)').all()).map(
+            (column) => String(column.name ?? ''),
+        ),
+    );
+    if (!columns.has('dev')) db.exec('ALTER TABLE copilot_io_index_files ADD COLUMN dev INTEGER');
+    if (!columns.has('ino')) db.exec('ALTER TABLE copilot_io_index_files ADD COLUMN ino INTEGER');
 }

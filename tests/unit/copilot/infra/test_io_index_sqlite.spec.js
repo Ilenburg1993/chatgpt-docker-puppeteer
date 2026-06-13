@@ -2,7 +2,7 @@
 
 import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -31,6 +31,40 @@ afterEach(() => {
 });
 
 describe('createIoIndexSqlite', () => {
+    it('migra schema existente adicionando identidade dev/ino', () => {
+        const db = new Database(':memory:');
+        db.exec(`
+            CREATE TABLE copilot_io_index_files (
+                file_path TEXT PRIMARY KEY,
+                workspace_root TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                file_name TEXT NOT NULL,
+                extension TEXT NOT NULL,
+                content_kind TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                mtime_ms REAL NOT NULL,
+                ctime_ms REAL,
+                content_hash TEXT,
+                line_count INTEGER NOT NULL DEFAULT 0,
+                symbol_count INTEGER NOT NULL DEFAULT 0,
+                import_count INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL,
+                parse_error TEXT,
+                indexed_at_ms INTEGER NOT NULL,
+                refreshed_at_ms INTEGER NOT NULL,
+                metadata_json TEXT
+            ) STRICT;
+        `);
+
+        createIoIndexSqlite({ db });
+
+        const columns = db
+            .prepare('PRAGMA table_info(copilot_io_index_files)')
+            .all()
+            .map((column) => /** @type {{ name: string }} */ (column).name);
+        expect(columns).toEqual(expect.arrayContaining(['dev', 'ino']));
+    });
+
     it('indexa diretório com metadados, FTS, símbolos e imports', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
@@ -105,6 +139,114 @@ describe('createIoIndexSqlite', () => {
         expect(second.indexed).toBe(0);
         expect(second.unchanged).toBe(3);
         expect(second.skipped).toBeGreaterThanOrEqual(3);
+    });
+
+    it('reindexa mudança externa same-size/same-mtime detectada por ctime e identidade', async () => {
+        expect(tmpDir).toBeTruthy();
+        const root = join(/** @type {string} */ (tmpDir), 'freshness-ctime');
+        const filePath = join(root, 'freshness.md');
+        await mkdir(root);
+        await writeFile(filePath, 'oldfresh\n', 'utf8');
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db, hashVerifyMaxBytes: 1 });
+        await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
+        const before = await stat(filePath);
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        await writeFile(filePath, 'newfresh\n', 'utf8');
+        await utimes(filePath, before.atime, before.mtime);
+        const after = await stat(filePath);
+        expect(after.size).toBe(before.size);
+        expect(after.mtimeMs).toBeCloseTo(before.mtimeMs, 0);
+        expect(after.ctimeMs).not.toBe(before.ctimeMs);
+
+        const second = await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
+
+        expect(second.indexed).toBe(1);
+        expect(index.search('oldfresh')).toEqual([]);
+        expect(index.search('newfresh')).toHaveLength(1);
+    });
+
+    it('usa hash periódico bounded quando metadata parece indistinguível', async () => {
+        expect(tmpDir).toBeTruthy();
+        const root = join(/** @type {string} */ (tmpDir), 'freshness-hash');
+        const filePath = join(root, 'freshness.md');
+        await mkdir(root);
+        await writeFile(filePath, 'oldfresh\n', 'utf8');
+        let currentTime = 1_000;
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({
+            db,
+            now: () => currentTime,
+            hashVerifyIntervalMs: 100,
+            hashVerifyMaxBytes: 1024,
+        });
+        await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
+        const before = await stat(filePath);
+
+        await writeFile(filePath, 'newfresh\n', 'utf8');
+        await utimes(filePath, before.atime, before.mtime);
+        const after = await stat(filePath);
+        db.prepare(`
+            UPDATE copilot_io_index_files
+            SET mtime_ms = ?, ctime_ms = ?, size_bytes = ?, dev = ?, ino = ?
+            WHERE file_path = ?
+        `).run(after.mtimeMs, after.ctimeMs, after.size, Number(after.dev), Number(after.ino), filePath);
+        currentTime = 1_101;
+
+        const second = await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
+
+        expect(second.indexed).toBe(1);
+        expect(second.hashVerifiedUnchanged).toBe(0);
+        expect(second).toMatchObject({
+            hashVerifications: 1,
+            hashVerificationHits: 0,
+            hashVerificationMisses: 1,
+        });
+        expect(index.getStats()).toMatchObject({
+            hashVerifications: 1,
+            hashVerificationHits: 0,
+            hashVerificationMisses: 1,
+            freshnessPolicy: {
+                strategy: 'mtime-size-ctime-dev-ino-periodic-hash',
+                hashVerifyMaxBytes: 1024,
+                hashVerifyIntervalMs: 100,
+            },
+        });
+        expect(index.search('newfresh')).toHaveLength(1);
+    });
+
+    it('renova fingerprint periódico sem refazer FTS quando hash não mudou', async () => {
+        expect(tmpDir).toBeTruthy();
+        const root = join(/** @type {string} */ (tmpDir), 'freshness-hash-hit');
+        await mkdir(root);
+        await writeFile(join(root, 'freshness.md'), 'samefresh\n', 'utf8');
+        let currentTime = 2_000;
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({
+            db,
+            now: () => currentTime,
+            hashVerifyIntervalMs: 100,
+            hashVerifyMaxBytes: 1024,
+        });
+        await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
+        currentTime = 2_101;
+
+        const second = await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
+
+        expect(second.indexed).toBe(0);
+        expect(second.unchanged).toBe(1);
+        expect(second.hashVerifiedUnchanged).toBe(1);
+        expect(second).toMatchObject({
+            hashVerifications: 1,
+            hashVerificationHits: 1,
+            hashVerificationMisses: 0,
+        });
+        expect(index.getStats()).toMatchObject({
+            hashVerifications: 1,
+            hashVerificationHits: 1,
+            hashVerificationMisses: 0,
+        });
     });
 
     it('remove do índice arquivos deletados em build completo', async () => {
