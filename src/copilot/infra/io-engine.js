@@ -118,6 +118,7 @@ export const diffText = diffTextInPatchService;
  *     nextCursor?: string | null;
  *     cursorOffset?: number;
  *     totalMatches?: number;
+ *     countsPostSanitization: true;
  *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
@@ -151,6 +152,7 @@ export const searchText = searchTextInSearchModule;
  *     nextCursor?: string | null;
  *     cursorOffset?: number;
  *     totalMatches?: number;
+ *     countsPostSanitization: true;
  *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */

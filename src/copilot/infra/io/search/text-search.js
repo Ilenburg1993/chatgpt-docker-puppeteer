@@ -15,7 +15,7 @@ import { hasNullByte } from '../../policy/path-resource.js';
 import { utf8ByteLength } from '../../shared/buffer.js';
 import { buildGrepArgs } from './grep-adapter.js';
 import { canUseIndexSearch, filterIndexRowsByGlob, formatIndexSearchRows } from './index-search.js';
-import { normalizeSearchWindow, paginateSearchItems, paginateSearchText } from './result-paginator.js';
+import { normalizeSearchWindow, paginateSearchText } from './result-paginator.js';
 import { execSearchFile, isRipgrepAvailable } from './subprocess.js';
 import { buildSymbolPattern, formatIndexSymbolRows, kindToGlobs } from './symbol-search.js';
 
@@ -53,15 +53,52 @@ function assertValidTargetPath(targetPath) {
 
 /**
  * @param {string} stdout
- * @returns {{ text: string; sanitized: boolean; redactions: number; policyVersion: string }}
+ * @returns {{
+ *     text: string;
+ *     sanitized: boolean;
+ *     redactions: number;
+ *     filteredLines: number;
+ *     policyVersion: string;
+ * }}
  */
 function sanitizeSearchOutput(stdout) {
     const sensitiveLineRe = /-----BEGIN [A-Z ]+-----|ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/;
+    let filteredLines = 0;
     const lineFiltered = stdout
         .split('\n')
-        .filter((line) => !sensitiveLineRe.test(line))
+        .filter((line) => {
+            if (!sensitiveLineRe.test(line)) return true;
+            filteredLines += 1;
+            return false;
+        })
         .join('\n');
-    return sanitizeIoTextOutput({ text: lineFiltered });
+    const sanitized = sanitizeIoTextOutput({ text: lineFiltered });
+    return {
+        ...sanitized,
+        sanitized: filteredLines > 0 || sanitized.sanitized,
+        redactions: filteredLines + sanitized.redactions,
+        filteredLines,
+    };
+}
+
+/**
+ * Conta apenas linhas de match real (`path:linenum:text`), excluindo contexto (`path-linenum-text`) e separadores.
+ *
+ * @param {string} text
+ * @returns {number}
+ */
+function countSearchMatchLines(text) {
+    return text.split('\n').filter((line) => /^(?:.+:)?\d+:/.test(line)).length;
+}
+
+/**
+ * @param {string} text
+ * @returns {number}
+ */
+function countSearchOutputLines(text) {
+    if (!text) return 0;
+    const lines = text.split('\n');
+    return lines[lines.length - 1] === '' ? lines.length - 1 : lines.length;
 }
 
 /**
@@ -72,7 +109,14 @@ function parseSimpleRegexAlternation(pattern) {
     const trimmed = pattern.trim();
     if (!trimmed.includes('|')) return null;
     if (!/^[A-Za-z0-9_./:-]+(?:\|[A-Za-z0-9_./:-]+)+$/u.test(trimmed)) return null;
-    const terms = [...new Set(trimmed.split('|').map((part) => part.trim()).filter(Boolean))];
+    const terms = [
+        ...new Set(
+            trimmed
+                .split('|')
+                .map((part) => part.trim())
+                .filter(Boolean),
+        ),
+    ];
     return terms.length >= 2 && terms.length <= 12 ? terms : null;
 }
 
@@ -120,6 +164,7 @@ function publishAndReturn(io, success, error) {
  *     totalMatches?: number;
  *     totalMatchCount?: number;
  *     totalLineCount?: number;
+ *     countsPostSanitization: true;
  *     indexFallback?: boolean;
  *     indexFallbackReason?: string | null;
  *     io: import('#copilot/core/io-contracts').IoMeta;
@@ -193,28 +238,6 @@ export async function searchText(targetPath, options) {
             ...(options.excludePattern ? { excludePattern: options.excludePattern } : {}),
         };
 
-        /**
-         * Conta apenas linhas de match real (formato `path:linenum:text`), excluindo linhas de contexto
-         * (`path-linenum-text`) e separadores (`--`). Funciona com saída de rg (--line-number sempre ativo) e grep (-n
-         * sempre ativo via buildGrepArgs).
-         *
-         * @param {string} text - Saída crua do rg/grep após sanitização
-         * @returns {number}
-         */
-        function countMatchLines(text) {
-            return text.split('\n').filter((line) => /^(?:.+:)?\d+:/.test(line)).length;
-        }
-
-        /**
-         * @param {string} text
-         * @returns {number}
-         */
-        function countOutputLines(text) {
-            if (!text) return 0;
-            const lines = text.split('\n');
-            return lines[lines.length - 1] === '' ? lines.length - 1 : lines.length;
-        }
-
         if (canUseIndexSearch(indexSearchOptions)) {
             const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
             const indexRows =
@@ -228,36 +251,41 @@ export async function searchText(targetPath, options) {
                     : [];
             const filteredRows = filterIndexRowsByGlob(indexRows, options.includePattern, options.excludePattern);
             if (filteredRows.length > 0) {
-                const windowed = paginateSearchItems(filteredRows, searchWindow);
-                const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(windowed.items));
+                const sanitizedOutput = sanitizeSearchOutput(formatIndexSearchRows(filteredRows));
+                const windowedOutput = paginateSearchText(sanitizedOutput.text, searchWindow);
+                const returnedMatchCount = countSearchOutputLines(windowedOutput.text);
+                const totalMatchCount = windowedOutput.originalLineCount;
                 const io = publishAndReturn(
-                    buildSearchIo('io-engine.index.search', utf8ByteLength(filteredOutput.text, 'search output'), {
-                        redactions: filteredOutput.redactions,
+                    buildSearchIo('io-engine.index.search', utf8ByteLength(windowedOutput.text, 'search output'), {
+                        redactions: sanitizedOutput.redactions,
+                        countsPostSanitization: true,
                         fallback: 'rg-on-index-miss-or-complex-query',
-                        truncated: windowed.truncated,
-                        originalResultCount: windowed.totalItems,
-                        nextCursor: windowed.nextCursor,
+                        truncated: windowedOutput.truncated,
+                        originalResultCount: totalMatchCount,
+                        nextCursor: windowedOutput.nextCursor,
                     }),
                     true,
                 );
                 return {
                     targetPath,
                     pattern: options.pattern,
-                    output: filteredOutput.text,
-                    matchCount: windowed.items.length,
-                    returnedMatchCount: windowed.items.length,
-                    returnedLineCount: countOutputLines(filteredOutput.text),
+                    output: windowedOutput.text,
+                    matchCount: returnedMatchCount,
+                    returnedMatchCount,
+                    returnedLineCount: returnedMatchCount,
                     engine: 'fts5-index',
-                    sanitized: filteredOutput.sanitized,
-                    redactions: filteredOutput.redactions,
-                    truncated: windowed.truncated,
-                    nextCursor: windowed.nextCursor,
-                    cursorOffset: windowed.cursorOffset,
-                    totalMatches: windowed.totalItems,
-                    totalMatchCount: windowed.totalItems,
+                    sanitized: sanitizedOutput.sanitized,
+                    redactions: sanitizedOutput.redactions,
+                    truncated: windowedOutput.truncated,
+                    nextCursor: windowedOutput.nextCursor,
+                    cursorOffset: windowedOutput.cursorOffset,
+                    totalMatches: totalMatchCount,
+                    totalMatchCount,
+                    totalLineCount: totalMatchCount,
+                    countsPostSanitization: true,
                     indexFallback: false,
                     indexFallbackReason: null,
-                    io: { ...io, truncated: windowed.truncated, policyVersion: filteredOutput.policyVersion },
+                    io: { ...io, truncated: windowedOutput.truncated, policyVersion: sanitizedOutput.policyVersion },
                 };
             }
             indexFallback = true;
@@ -270,17 +298,21 @@ export async function searchText(targetPath, options) {
         } else if (options.isRegex === true && options.caseSensitive !== true && (options.contextLines ?? 0) === 0) {
             const terms = parseSimpleRegexAlternation(options.pattern);
             const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
-            const perTermRows = terms && Boolean(indexStats?.available) && freshFiles > 0
-                ? terms.map((term) =>
-                      searchIoIndex(term, {
-                          pathPrefix: targetPath,
-                          ...(searchWindow.commandMaxCount === null
-                              ? {}
-                              : { maxResults: Math.min(Math.max(searchWindow.commandMaxCount, 100), 500) }),
-                      }),
-                  )
-                : [];
-            const hasCompleteTermCoverage = Array.isArray(terms) && perTermRows.length === terms.length && perTermRows.every((termRows) => termRows.length > 0);
+            const perTermRows =
+                terms && Boolean(indexStats?.available) && freshFiles > 0
+                    ? terms.map((term) =>
+                          searchIoIndex(term, {
+                              pathPrefix: targetPath,
+                              ...(searchWindow.commandMaxCount === null
+                                  ? {}
+                                  : { maxResults: Math.min(Math.max(searchWindow.commandMaxCount, 100), 500) }),
+                          }),
+                      )
+                    : [];
+            const hasCompleteTermCoverage =
+                Array.isArray(terms) &&
+                perTermRows.length === terms.length &&
+                perTermRows.every((termRows) => termRows.length > 0);
             const rows = hasCompleteTermCoverage ? perTermRows.flat() : [];
             const seenRows = new Set();
             const uniqueRows = rows.filter((row) => {
@@ -291,36 +323,45 @@ export async function searchText(targetPath, options) {
             });
             const filteredRows = filterIndexRowsByGlob(uniqueRows, options.includePattern, options.excludePattern);
             if (filteredRows.length > 0) {
-                const windowed = paginateSearchItems(filteredRows, searchWindow);
-                const filteredOutput = sanitizeSearchOutput(formatIndexSearchRows(windowed.items));
+                const sanitizedOutput = sanitizeSearchOutput(formatIndexSearchRows(filteredRows));
+                const windowedOutput = paginateSearchText(sanitizedOutput.text, searchWindow);
+                const returnedMatchCount = countSearchOutputLines(windowedOutput.text);
+                const totalMatchCount = windowedOutput.originalLineCount;
                 const io = publishAndReturn(
-                    buildSearchIo('io-engine.index.regex-alternation-search', utf8ByteLength(filteredOutput.text, 'search output'), {
-                        redactions: filteredOutput.redactions,
-                        fallback: 'rg-on-index-miss-or-complex-query',
-                        truncated: windowed.truncated,
-                        originalResultCount: windowed.totalItems,
-                        nextCursor: windowed.nextCursor,
-                    }),
+                    buildSearchIo(
+                        'io-engine.index.regex-alternation-search',
+                        utf8ByteLength(windowedOutput.text, 'search output'),
+                        {
+                            redactions: sanitizedOutput.redactions,
+                            countsPostSanitization: true,
+                            fallback: 'rg-on-index-miss-or-complex-query',
+                            truncated: windowedOutput.truncated,
+                            originalResultCount: totalMatchCount,
+                            nextCursor: windowedOutput.nextCursor,
+                        },
+                    ),
                     true,
                 );
                 return {
                     targetPath,
                     pattern: options.pattern,
-                    output: filteredOutput.text,
-                    matchCount: windowed.items.length,
-                    returnedMatchCount: windowed.items.length,
-                    returnedLineCount: countOutputLines(filteredOutput.text),
+                    output: windowedOutput.text,
+                    matchCount: returnedMatchCount,
+                    returnedMatchCount,
+                    returnedLineCount: returnedMatchCount,
                     engine: 'fts5-index-regex-alternation',
-                    sanitized: filteredOutput.sanitized,
-                    redactions: filteredOutput.redactions,
-                    truncated: windowed.truncated,
-                    nextCursor: windowed.nextCursor,
-                    cursorOffset: windowed.cursorOffset,
-                    totalMatches: windowed.totalItems,
-                    totalMatchCount: windowed.totalItems,
+                    sanitized: sanitizedOutput.sanitized,
+                    redactions: sanitizedOutput.redactions,
+                    truncated: windowedOutput.truncated,
+                    nextCursor: windowedOutput.nextCursor,
+                    cursorOffset: windowedOutput.cursorOffset,
+                    totalMatches: totalMatchCount,
+                    totalMatchCount,
+                    totalLineCount: totalMatchCount,
+                    countsPostSanitization: true,
                     indexFallback: false,
                     indexFallbackReason: null,
-                    io: { ...io, truncated: windowed.truncated, policyVersion: filteredOutput.policyVersion },
+                    io: { ...io, truncated: windowedOutput.truncated, policyVersion: sanitizedOutput.policyVersion },
                 };
             }
             indexFallback = true;
@@ -363,13 +404,14 @@ export async function searchText(targetPath, options) {
                         maxBuffer: ioSearchBudget.maxBufferBytes,
                     },
                 );
-                const windowedOutput = paginateSearchText(stdout, searchWindow);
-                const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
-                const returnedMatchCount = countMatchLines(filteredOutput.text);
-                const totalMatchCount = countMatchLines(stdout);
+                const sanitizedOutput = sanitizeSearchOutput(stdout);
+                const windowedOutput = paginateSearchText(sanitizedOutput.text, searchWindow);
+                const returnedMatchCount = countSearchMatchLines(windowedOutput.text);
+                const totalMatchCount = countSearchMatchLines(sanitizedOutput.text);
                 const io = publishAndReturn(
-                    buildSearchIo('io-engine.rg.search', utf8ByteLength(filteredOutput.text, 'search output'), {
-                        redactions: filteredOutput.redactions,
+                    buildSearchIo('io-engine.rg.search', utf8ByteLength(windowedOutput.text, 'search output'), {
+                        redactions: sanitizedOutput.redactions,
+                        countsPostSanitization: true,
                         truncated: windowedOutput.truncated,
                         originalLineCount: windowedOutput.originalLineCount,
                         nextCursor: windowedOutput.nextCursor,
@@ -379,22 +421,23 @@ export async function searchText(targetPath, options) {
                 return {
                     targetPath,
                     pattern: options.pattern,
-                    output: filteredOutput.text,
+                    output: windowedOutput.text,
                     matchCount: returnedMatchCount,
                     returnedMatchCount,
-                    returnedLineCount: countOutputLines(filteredOutput.text),
+                    returnedLineCount: countSearchOutputLines(windowedOutput.text),
                     engine: 'rg',
-                    sanitized: filteredOutput.sanitized,
-                    redactions: filteredOutput.redactions,
+                    sanitized: sanitizedOutput.sanitized,
+                    redactions: sanitizedOutput.redactions,
                     truncated: windowedOutput.truncated,
                     nextCursor: windowedOutput.nextCursor,
                     cursorOffset: windowedOutput.cursorOffset,
                     totalMatches: totalMatchCount,
                     totalMatchCount,
                     totalLineCount: windowedOutput.originalLineCount,
+                    countsPostSanitization: true,
                     indexFallback,
                     indexFallbackReason,
-                    io: { ...io, truncated: windowedOutput.truncated, policyVersion: filteredOutput.policyVersion },
+                    io: { ...io, truncated: windowedOutput.truncated, policyVersion: sanitizedOutput.policyVersion },
                 };
             } catch (error) {
                 const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown }} */ (error);
@@ -410,6 +453,7 @@ export async function searchText(targetPath, options) {
                         engine: 'rg',
                         sanitized: false,
                         redactions: 0,
+                        countsPostSanitization: true,
                         indexFallback,
                         indexFallbackReason,
                         io,
@@ -434,38 +478,40 @@ export async function searchText(targetPath, options) {
                 timeout: ioSearchBudget.timeoutMs,
                 maxBuffer: ioSearchBudget.maxBufferBytes,
             });
-                const windowedOutput = paginateSearchText(stdout, searchWindow);
-                const filteredOutput = sanitizeSearchOutput(windowedOutput.text);
-                const returnedMatchCount = countMatchLines(filteredOutput.text);
-                const totalMatchCount = countMatchLines(stdout);
-                const io = publishAndReturn(
-                buildSearchIo('io-engine.grep.search', utf8ByteLength(filteredOutput.text, 'search output'), {
-                    redactions: filteredOutput.redactions,
+            const sanitizedOutput = sanitizeSearchOutput(stdout);
+            const windowedOutput = paginateSearchText(sanitizedOutput.text, searchWindow);
+            const returnedMatchCount = countSearchMatchLines(windowedOutput.text);
+            const totalMatchCount = countSearchMatchLines(sanitizedOutput.text);
+            const io = publishAndReturn(
+                buildSearchIo('io-engine.grep.search', utf8ByteLength(windowedOutput.text, 'search output'), {
+                    redactions: sanitizedOutput.redactions,
+                    countsPostSanitization: true,
                     truncated: windowedOutput.truncated,
                     originalLineCount: windowedOutput.originalLineCount,
                     nextCursor: windowedOutput.nextCursor,
                 }),
                 true,
             );
-                return {
-                    targetPath,
-                    pattern: options.pattern,
-                    output: filteredOutput.text,
-                    matchCount: returnedMatchCount,
-                    returnedMatchCount,
-                    returnedLineCount: countOutputLines(filteredOutput.text),
-                    engine: 'grep',
-                sanitized: filteredOutput.sanitized,
-                redactions: filteredOutput.redactions,
+            return {
+                targetPath,
+                pattern: options.pattern,
+                output: windowedOutput.text,
+                matchCount: returnedMatchCount,
+                returnedMatchCount,
+                returnedLineCount: countSearchOutputLines(windowedOutput.text),
+                engine: 'grep',
+                sanitized: sanitizedOutput.sanitized,
+                redactions: sanitizedOutput.redactions,
                 truncated: windowedOutput.truncated,
                 nextCursor: windowedOutput.nextCursor,
                 cursorOffset: windowedOutput.cursorOffset,
-                    totalMatches: totalMatchCount,
-                    totalMatchCount,
-                    totalLineCount: windowedOutput.originalLineCount,
-                    indexFallback,
+                totalMatches: totalMatchCount,
+                totalMatchCount,
+                totalLineCount: windowedOutput.originalLineCount,
+                countsPostSanitization: true,
+                indexFallback,
                 indexFallbackReason,
-                io: { ...io, truncated: windowedOutput.truncated, policyVersion: filteredOutput.policyVersion },
+                io: { ...io, truncated: windowedOutput.truncated, policyVersion: sanitizedOutput.policyVersion },
             };
         } catch (error) {
             const execError = /** @type {{ code?: unknown; status?: unknown; stderr?: unknown; message?: unknown }} */ (
@@ -483,6 +529,7 @@ export async function searchText(targetPath, options) {
                     engine: 'grep',
                     sanitized: false,
                     redactions: 0,
+                    countsPostSanitization: true,
                     indexFallback,
                     indexFallbackReason,
                     io,
@@ -535,6 +582,7 @@ export async function searchText(targetPath, options) {
  *     nextCursor?: string | null;
  *     cursorOffset?: number;
  *     totalMatches?: number;
+ *     countsPostSanitization: true;
  *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
@@ -601,31 +649,38 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                 },
             );
             if (rows.length > 0) {
-                const windowed = paginateSearchItems(rows, searchWindow);
-                const sanitized = sanitizeIoTextOutput({ text: formatIndexSymbolRows(windowed.items) });
+                const sanitized = sanitizeSearchOutput(formatIndexSymbolRows(rows));
+                const windowedOutput = paginateSearchText(sanitized.text, searchWindow);
+                const matchCount = countSearchOutputLines(windowedOutput.text);
                 const io = publishAndReturn(
-                    buildSymbolIo('io-engine.index.symbol-search', utf8ByteLength(sanitized.text, 'symbol output'), {
-                        redactions: sanitized.redactions,
-                        truncated: windowed.truncated,
-                        originalResultCount: windowed.totalItems,
-                        nextCursor: windowed.nextCursor,
-                    }),
+                    buildSymbolIo(
+                        'io-engine.index.symbol-search',
+                        utf8ByteLength(windowedOutput.text, 'symbol output'),
+                        {
+                            redactions: sanitized.redactions,
+                            countsPostSanitization: true,
+                            truncated: windowedOutput.truncated,
+                            originalResultCount: windowedOutput.originalLineCount,
+                            nextCursor: windowedOutput.nextCursor,
+                        },
+                    ),
                     true,
                 );
                 return {
                     targetPath,
                     symbol: options.symbolName,
                     kind: resolvedKind,
-                    output: sanitized.text,
-                    matchCount: windowed.items.length,
+                    output: windowedOutput.text,
+                    matchCount,
                     engine: 'fts5-index',
                     sanitized: sanitized.sanitized,
                     redactions: sanitized.redactions,
-                    truncated: windowed.truncated,
-                    nextCursor: windowed.nextCursor,
-                    cursorOffset: windowed.cursorOffset,
-                    totalMatches: windowed.totalItems,
-                    io: { ...io, truncated: windowed.truncated, policyVersion: sanitized.policyVersion },
+                    truncated: windowedOutput.truncated,
+                    nextCursor: windowedOutput.nextCursor,
+                    cursorOffset: windowedOutput.cursorOffset,
+                    totalMatches: windowedOutput.originalLineCount,
+                    countsPostSanitization: true,
+                    io: { ...io, truncated: windowedOutput.truncated, policyVersion: sanitized.policyVersion },
                 };
             }
         }
@@ -668,13 +723,14 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             throw error;
         });
 
-        const windowedOutput = paginateSearchText(stdout, searchWindow);
-        const sanitized = sanitizeIoTextOutput({ text: windowedOutput.text });
-        const output = sanitized.text;
+        const sanitized = sanitizeSearchOutput(stdout);
+        const windowedOutput = paginateSearchText(sanitized.text, searchWindow);
+        const output = windowedOutput.text;
         const lines = output.split('\n').filter(Boolean);
         const io = publishAndReturn(
             buildSymbolIo('io-engine.rg.symbol-search', utf8ByteLength(output, 'symbol output'), {
                 redactions: sanitized.redactions,
+                countsPostSanitization: true,
                 truncated: windowedOutput.truncated,
                 originalLineCount: windowedOutput.originalLineCount,
                 nextCursor: windowedOutput.nextCursor,
@@ -699,6 +755,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             nextCursor: windowedOutput.nextCursor,
             cursorOffset: windowedOutput.cursorOffset,
             totalMatches: windowedOutput.originalLineCount,
+            countsPostSanitization: true,
             io: { ...io, truncated: windowedOutput.truncated, policyVersion: sanitized.policyVersion },
         };
     } catch (error) {

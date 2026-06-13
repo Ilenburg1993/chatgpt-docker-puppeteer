@@ -140,6 +140,7 @@ export const searchInFilesTool = buildTool({
                     nextCursor: result.nextCursor ?? null,
                     cursorOffset: result.cursorOffset ?? 0,
                     totalMatches: result.totalMatches ?? result.matchCount,
+                    countsPostSanitization: result.countsPostSanitization,
                     engine: result.engine,
                     indexFallback: result.indexFallback ?? false,
                     indexFallbackReason: result.indexFallbackReason ?? null,

@@ -244,6 +244,7 @@ describe('copilot MCP tools', () => {
         assert.ok(Number(structured['returnedMatchCount'] ?? 0) > 0);
         assert.ok(Number(structured['returnedLineCount'] ?? 0) >= Number(structured['returnedMatchCount'] ?? 0));
         assert.ok(Number(structured['totalMatchCount'] ?? 0) >= Number(structured['returnedMatchCount'] ?? 0));
+        assert.equal(structured['countsPostSanitization'], true);
     });
 
     it('repo_find_symbol_usages mirrors LLM-B symbol usage search semantics', async () => {

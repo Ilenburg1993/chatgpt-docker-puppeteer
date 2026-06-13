@@ -60,6 +60,37 @@ describe('infra/io-engine', () => {
         ).rejects.toMatchObject({ code: 'ERR_INVALID_ARG_VALUE' });
     });
 
+    it('searchText pagina e conta somente a visão sanitizada', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'search-redaction.txt');
+        const jwtLike = `ey${'a'.repeat(24)}.${'b'.repeat(24)}`;
+        await writeFile(file, `needle ${jwtLike}\nneedle visible\n`, 'utf8');
+
+        const result = await searchText(file, {
+            pattern: 'needle',
+            isRegex: false,
+            caseSensitive: true,
+            contextLines: 0,
+            maxResults: 1,
+        });
+
+        expect(result.output).toContain('needle visible');
+        expect(result.output).not.toContain(jwtLike);
+        expect(result).toMatchObject({
+            matchCount: 1,
+            returnedMatchCount: 1,
+            returnedLineCount: 1,
+            totalMatches: 1,
+            totalMatchCount: 1,
+            totalLineCount: 1,
+            sanitized: true,
+            redactions: 1,
+            truncated: false,
+            nextCursor: null,
+            countsPostSanitization: true,
+        });
+    });
+
     it('mantém contratos de retorno estáveis para readBytes/readText/writeFileAtomic', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'contract-shapes.txt');

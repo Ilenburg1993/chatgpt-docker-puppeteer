@@ -104,6 +104,7 @@ export const workspaceSymbolSearchTool = buildTool({
                     nextCursor: result.nextCursor ?? null,
                     cursorOffset: result.cursorOffset ?? 0,
                     totalMatches: result.totalMatches ?? result.matchCount,
+                    countsPostSanitization: result.countsPostSanitization,
                     ...(output.truncated
                         ? {
                               configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes,
