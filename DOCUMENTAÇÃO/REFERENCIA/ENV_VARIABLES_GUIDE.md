@@ -223,6 +223,26 @@ Depois de qualquer troca de provider/modelo, use `/restart` para abrir uma nova 
 contrato recém-resolvido. O terminal não cria outro renderer, outro loop ou outro histórico para
 BYOK: delta, final, tools, `ask_user`, elicitation e transcript continuam no fluxo canônico.
 
+### IO Copilot e lockfile L1
+
+`COPILOT_IO_FILE_LOCKS_ENABLED` controla o lockfile multiprocess L1 das mutações de IO do
+`src/copilot`. O default é `off`: o runtime usa apenas o lock L0 em memória, suficiente para
+concorrência dentro do processo Node.
+
+Valores suportados:
+
+- `off`: não ativa L1 automaticamente;
+- `high-risk`: ativa L1 para mutações `high`/`critical`, como delete, move, patch, copy overwrite e
+  transações de quarentena;
+- `mutations`: ativa L1 para mutações `medium+`, incluindo writes, appends e mkdir;
+- `all`: ativa L1 para todos os locks, inclusive operações de baixo risco;
+- compatibilidade legada: `1`, `true`, `yes` e `on` equivalem a `all`; `0`, `false`, `no` e `off`
+  equivalem a `off`.
+
+Para ambientes com múltiplos processos cooperativos escrevendo no mesmo workspace, comece por
+`high-risk` e use o health de IO para observar p95 de espera, timeouts e leases ativos antes de
+subir para `mutations` ou `all`.
+
 ## Limite Deliberado do Template
 
 O template [`.env.example`](../../.env.example) foi consolidado para cobrir o baseline operacional e
