@@ -28,9 +28,11 @@ em workload e provas de crash externas**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — faltam provas externas destrutivas:** crash real em directory sync/EXDEV, modificação externa durante
-   snapshot/index e interação com editor/Git ainda não estão automatizados.
-2. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
+1. **P2 — cleanup seguro de temporário órfão:** crash real antes do publish EXDEV deixa um `.move.tmp` íntegro e
+   detectável, mas ainda não há owner automático que remova apenas órfãos antigos sem disputar com outro processo.
+2. **P2 — falta prova de modificação externa:** snapshot/index e interação com editor/Git ainda não estão
+   automatizados.
+3. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
 
 O L2 encerrou sua fase de promoção técnica: workload, batching, crash, contenção e soak passaram. A decisão operacional
 é manter `off` como default heterogêneo e usar `experimental` em runtimes long-lived que comprovadamente reutilizam o
@@ -1080,6 +1082,38 @@ semântica conservadora do repositório.
 Validação: soak **2 passados**; canário **PASS**; conjunto lifecycle/cache/DB **124 passados, 0 falhas**; lint focado e
 typecheck strict de `src/copilot`: **PASS**.
 
+### 1.39 Status de implementação — crash EXDEV real e exclusividade do temporário aplicados em 2026-06-14
+
+A rodada `exploratory-bug-hunt` cobriu integralmente `move.js`, `copy.js`, `write-atomic.js`, `durability.js`,
+`mutation-phase.js`, `temp-path.js` e os testes adjacentes, com foco nas categorias C1/C2/C3/C5/C7/C9.
+
+IO-048 foi encontrado e corrigido: copy staged usava `COPYFILE_EXCL`, mas o fallback cross-device de move chamava
+`copyFile(source, tmpDestination)` sem flag. Isso contradizia a declaração de IO-021 de que a criação exclusiva era a
+autoridade final. `move.js` agora usa `COPYFILE_EXCL`; uma factory de temp injetável no nível baixo permite provar que
+um temp preexistente recebe `EEXIST`, não é sobrescrito e não publica destino.
+
+A nova prova multiprocess usa `/dev/shm` quando ele está em device diferente de `tmpdir()`, inicia o move real e mata
+o child com `SIGKILL` em quatro fases:
+
+| Fase do crash | Origem | Destino | Temp | Conteúdo |
+| --- | --- | --- | --- | --- |
+| `temp-written` | presente | ausente | um `.move.tmp` | temp e origem íntegros |
+| `before-destination-directory-sync` | presente | presente | ausente | duplicação íntegra |
+| dentro do primeiro directory `sync()` | presente | presente | ausente | duplicação íntegra |
+| `after-source-unlink` | ausente | presente | ausente | destino íntegro |
+
+O cenário “dentro do sync” abre o diretório real, conclui `FileHandle.sync()` e bloqueia antes de devolver ao move;
+o processo pai então aplica `SIGKILL`. Assim, a prova cobre a janela entre o syscall confirmado e a transição de fase
+do caller, não apenas um callback sintético antes do sync.
+
+IO-049 permanece parcial: crash antes do publish deixa um temp órfão pelo schema canônico. Ele é oculto, contém PID,
+token de 128 bits e papel, mas não existe cleanup genérico seguro. Remover automaticamente exige distinguir processo
+ativo, PID reutilizado e filesystem compartilhado; essa política não deve nascer como `rm` oportunista em toda
+mutação.
+
+Validação: crash EXDEV multiprocess e fault injection **18 passados, 0 falhas**; lint focado e typecheck strict de
+`src/copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1347,14 +1381,16 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-045 | P1 | L2 SQLite | **Concluído:** sets são agrupados em transações write-behind bounded | janela 25 ms/256 chaves, leitura pendente, flush explícito e workload incluindo drain | `SIGKILL` pode perder somente lote reconstruível ainda pendente | Manter prova multiprocess e alertar sobre batch failures |
 | IO-046 | P1 | Shutdown/DB | **Concluído:** cache drena antes do fechamento SQLite | prioridade `CACHE_PERSISTENCE`, sinais delegam ao shutdown central e prova `SIGTERM` real | `SIGKILL` continua sem cleanup por definição | Manter ordem canônica e prova multiprocess recorrente |
 | IO-047 | P1 | L2 soak | **Concluído:** cap, TTL, reconfiguração, WAL e shutdown passaram em processo longo sintético | duas execuções, 7.200 sets cada, zero batch failure e integridade `ok` | Soak sintético não substitui telemetria de deployment | Ativar `experimental` apenas onde reuse real justificar |
+| IO-048 | P1 | Move EXDEV | **Concluído:** criação do temp cross-device agora é exclusiva | `COPYFILE_EXCL` e colisão determinística preservando sentinel | Token forte reduz corrida, exclusividade decide | Manter mesma regra de copy staged |
+| IO-049 | P2 | Temp recovery | **Parcial:** crash pré-publish deixa um temp íntegro e detectável | prova `SIGKILL` real em `temp-written` | Não há cleanup genérico seguro para PID reutilizado/shared FS | Projetar scan explícito, age-gated e host-aware |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038 |
-| Parcial | IO-009 |
+| Parcial | IO-009, IO-049 |
 | Aberto | IO-030 |
 
 ---
@@ -1698,13 +1734,14 @@ A situação ideal é uma infra IO em camadas:
 - [x] Usar prefixo dot-hidden, PID, papel bounded e token de 128 bits.
 - [x] Limitar nomes longos por bytes sem cortar code point UTF-8.
 - [x] Provar cleanup após falha injetada antes do publish.
+- [ ] Definir cleanup age-gated e host-aware para temporários deixados por crash real.
 
 ### Faixa 5 — Provas
 
 - [ ] Fuzz textual e binário.
 - [x] Fault injection determinístico em write, publish, move e rotate+append.
 - [x] Fault injection em directory sync e prova `EXDEV` real entre devices distintos.
-- [ ] Crash real durante directory sync e fases internas do `EXDEV`.
+- [x] Crash real durante directory sync e fases internas do `EXDEV`, com órfão pré-publish documentado.
 - [x] Dois processos concorrendo por create/copy/move/write.
 - [x] Crash de holder L1 seguido de stale recovery real.
 - [ ] Modificação externa durante snapshot e index.
@@ -1843,7 +1880,7 @@ Critérios operacionais adicionais já atendidos:
 
 Ainda faltam para maturidade operacional avançada:
 
-- [ ] crash real durante directory sync e fases internas do EXDEV;
+- [ ] cleanup seguro dos temporários canônicos deixados por crash pré-publish;
 - [ ] modificação externa durante snapshot/index e interação com editor/Git.
 
 ---
@@ -1863,6 +1900,6 @@ Ainda faltam para maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Executar crash real durante as fases externas ainda não provadas de directory sync e move `EXDEV`, verificando o
-estado observável de origem, destino e temporários após reinício. Em seguida, automatizar modificação concorrente por
-editor/Git durante snapshot e index para confirmar retry/stale sem popular cache incoerente.
+Projetar cleanup explícito dos temporários canônicos deixados por crash, com schema estrito, idade mínima, identidade
+de host/processo e limite por execução; não varrer/remover em toda mutação. Em seguida, automatizar modificação
+concorrente por editor/Git durante snapshot e index para confirmar retry/stale sem popular cache incoerente.
