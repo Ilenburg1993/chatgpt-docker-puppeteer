@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `d58def2d`, seguida da onda de preflight de capacidade com `statfs`
+**Baseline reinvestigado:** `main` sincronizada até `6e15061e`, seguida da onda de readiness explícita de scopes
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -20,17 +20,17 @@ fortes e provas reais, as superfícies externas de path estão vinculadas a poli
 externas metadata-preserving e a contenção L0/L1 é observável sem expor paths; o L1 multiprocess agora possui perfis
 explícitos por risco, remove recursivo exige confirmação exata e a raiz workspace-bound é protegida; L2 possui perfil
 experimental fail-closed e custo observável; mutações que materializam payload grande agora falham cedo quando a
-insuficiência de espaço já é observável; o risco dominante migrou para readiness operacional e decisões de promoção
-baseadas em workload**.
+insuficiência de espaço já é observável; scopes distinguem warming/ready/stale/degraded sem vazar paths; o risco
+dominante migrou para política de glob e decisões de promoção baseadas em workload**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — readiness de escopo ainda mistura ready/degraded:** erros em `declareScope` podem parecer sucesso.
-2. **P2 — política de glob ainda é própria:** include/exclude pode divergir de `minimatch`/Node glob.
-3. **P2 — promoção do L2 depende de workload real:** o perfil experimental existe e foi medido, mas cold-start pode
+1. **P2 — política de glob ainda é própria:** include/exclude pode divergir de `minimatch`/Node glob.
+2. **P2 — promoção do L2 depende de workload real:** o perfil experimental existe e foi medido, mas cold-start pode
    custar mais que filesystem local para payloads pequenos/médios.
-4. **P2 — temp naming legado ainda merece varredura:** primitivas novas usam 96 bits, mas callsites antigos podem
+3. **P2 — temp naming legado ainda merece varredura:** primitivas novas usam 96 bits, mas callsites antigos podem
    manter nomes curtos ou não ocultos.
+4. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -810,6 +810,26 @@ Provas:
 - IO engine + fault injection + capacidade: **60 passados, 0 falhas**;
 - typecheck strict e lint focado: **PASS**.
 
+### 1.30 Status de implementação — readiness explícita de scopes aplicada em 2026-06-14
+
+IO-024 foi fechado sem quebrar o contrato não-rejeitante de `awaitReady()`:
+
+- scopes expõem `status: warming|ready|stale|degraded`, além de `ready` e `degraded` explícitos;
+- erro de warm/parse/index/refresh é resumido por fase, código, nome e resumo estável, sem path ou mensagem crua;
+- warm-up parcial/falho nunca mais define `ready:true`;
+- invalidação é `stale`; refresh bem-sucedido recupera `ready`; refresh falho permanece `degraded`;
+- cleanup de redeclaração só remove o `AbortController` que ainda possui, evitando apagar o controller do scope novo;
+- health agrega contagens por estado e emite `IO_SCOPE_DEGRADED`;
+- terminal mostra `degradado`/`desatualizado` e um resumo sanitizado quando necessário.
+
+Prova live isolada:
+
+- path ausente resolveu com `ready:false`, `degraded:true`, `status:"degraded"` e `failed:1`;
+- health mostrou `degraded:1` e alerta `IO_SCOPE_DEGRADED`;
+- busca explícita no JSON de stats/health confirmou `leaksPath:false`.
+
+Validação focada: scopes, health e comando terminal: **20 passados, 0 falhas**; typecheck strict e lint: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1051,7 +1071,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-021 | P2 | Temp naming | Temp random é 32-bit | `randomBytes(4)` | Colisão improvável, mas barata de melhorar | Usar 96/128 bits e prefixo dot-hidden `.tmp-<pid>-<random>` |
 | IO-022 | P2 | Remove recursive | **Concluído com limite documentado:** remoção recursiva exige confirmação exata e workspace root é protegido | `remove.js`, `locked-mutations.js`, `workspace-io.js`, `session-fs.js` | Após confirmação a operação continua destrutiva e sem snapshot de árvore | Preferir quarantine nos tools; manter confirmação exata na engine |
 | IO-023 | P2 | Parser reset | **Concluído:** reset de parser é awaitable e testes aguardam isolamento | `io-parser.js`, `test_io_parser.spec.js` | Teardown de workers é explícito para evitar churn por teste | Usar shutdown/reset com teardown em processos one-shot |
-| IO-024 | P2 | Scope readiness | `declareScope` marca ready mesmo em catch | `io-session-scope.js` | Erros silenciosos podem parecer sucesso | Separar `ready` de `degraded`, expor erro resumido |
+| IO-024 | P2 | Scope readiness | **Concluído:** warming/ready/stale/degraded são distintos e erro é sanitizado | `io-session-scope.js`, `io-health.js`, terminal scope | `awaitReady()` continua não-rejeitante por compatibilidade | Consumidores devem checar `status`/`degraded`, não apenas conclusão da Promise |
 | IO-025 | P2 | Observability | **Concluído:** espera, fila e leases L0/L1 são bounded e sanitizados | histogramas globais/por operação, p95, outcomes e amostra por hash no health | Paths não entram no snapshot; métricas são cumulativas por processo | Usar os dados para definir perfis de ativação do L1 |
 | IO-026 | P2 | Search subprocess | **Concluído:** `rg`/`grep` textuais processam stdout incrementalmente | `subprocess.js`, `text-search.js` | `maxBuffer` permanece como proteção contra linha/chunk anômalo | Monitorar `streamStoppedEarly` e custo em buscas grandes |
 | IO-027 | P2 | Glob policy | Glob simples próprio diverge de minimatch/Node glob | `scan/glob.js` | Diferenças de include/exclude difíceis de prever | Padronizar em `minimatch`/`fsPromises.glob` com testes de compatibilidade |
@@ -1076,10 +1096,10 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-023, IO-025, IO-026, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-023, IO-024, IO-025, IO-026, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038 |
 | Parcial | IO-009 |
-| Aberto | IO-021, IO-024, IO-027, IO-030 |
+| Aberto | IO-021, IO-027, IO-030 |
 
 ---
 
@@ -1338,6 +1358,13 @@ A situação ideal é uma infra IO em camadas:
 - [x] Falhar aberto quando `statfs` não está disponível.
 - [x] Expor threshold, reserva e relatório estruturado sem prometer reserva de blocos.
 
+#### Fase 2.8 — Readiness de scopes
+
+- [x] Separar warming, ready, stale e degraded.
+- [x] Preservar `awaitReady()` não-rejeitante sem falso `ready:true`.
+- [x] Sanitizar erro por fase/código sem expor path.
+- [x] Projetar contagens/alerta no health e estado humano no terminal.
+
 ### Faixa 3 — Snapshot e coerência derivada
 
 #### Fase 3.1 — Snapshot consistente
@@ -1543,6 +1570,6 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Corrigir readiness de scopes para separar `ready` de `degraded` e expor erro resumido sem vazar payloads. Em paralelo,
-coletar hit ratio/distribuição de payloads do L2 `experimental` em workloads longos antes de considerar promoção para
-`on`.
+Padronizar a política de glob da infra, comparando o matcher simples atual com `minimatch`/`fsPromises.glob` sob a
+matriz Node 24.5 e preservando não-follow de symlink. Em paralelo, coletar hit ratio/distribuição de payloads do L2
+`experimental` em workloads longos antes de considerar promoção para `on`.
