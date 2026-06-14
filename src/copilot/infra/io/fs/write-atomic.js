@@ -16,7 +16,7 @@ import {
 } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
 import { preflightIoCapacity } from './capacity-preflight.js';
-import { createSiblingTempPath } from './temp-path.js';
+import { prepareSiblingTempPath } from './temp-path.js';
 
 /**
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} content
@@ -64,7 +64,7 @@ export function normalizeWritePayload(filePath, content, encoding) {
  * }>}
  */
 export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
-    const tmpPath = createSiblingTempPath(filePath, 'write');
+    const tmpPath = await prepareSiblingTempPath(filePath, 'write');
     const writePayload = toOwnedBuffer(payload);
     const durability = normalizeIoDurability(options.durability);
     const fileFlushRequested = shouldFlushFile(durability);

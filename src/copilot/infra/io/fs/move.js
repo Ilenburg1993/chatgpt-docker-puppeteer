@@ -12,7 +12,7 @@ import { sha256 } from '../../shared/hash.js';
 import { assertSuccessfulSync, syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
 import { preflightIoCapacity } from './capacity-preflight.js';
-import { createSiblingTempPath } from './temp-path.js';
+import { prepareSiblingTempPath } from './temp-path.js';
 
 /**
  * @param {string} filePath
@@ -34,7 +34,7 @@ async function readFileIntegrity(filePath) {
  *     syncFile?: typeof syncFileBestEffort;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
  *     capacityPreflight?: typeof preflightIoCapacity;
- *     tempPathFactory?: typeof createSiblingTempPath;
+ *     tempPathFactory?: typeof import('./temp-path.js').createSiblingTempPath;
  * }} [options]
  * @returns {Promise<{
  *     crossDevice: boolean;
@@ -142,12 +142,14 @@ export async function moveFileUnlocked(source, destination, options = {}) {
  *     syncFile?: typeof syncFileBestEffort;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
  *     capacityPreflight?: typeof preflightIoCapacity;
- *     tempPathFactory?: typeof createSiblingTempPath;
+ *     tempPathFactory?: typeof import('./temp-path.js').createSiblingTempPath;
  * }} options
  * @returns {ReturnType<typeof moveFileUnlocked>}
  */
 async function moveFileAcrossDevices(source, destination, options) {
-    const tmpDestination = (options.tempPathFactory ?? createSiblingTempPath)(destination, 'move');
+    const tmpDestination = options.tempPathFactory
+        ? options.tempPathFactory(destination, 'move')
+        : await prepareSiblingTempPath(destination, 'move');
     let tmpCreated = false;
     try {
         const sourceBefore =

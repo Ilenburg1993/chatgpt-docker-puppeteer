@@ -11,7 +11,7 @@ import { assertSuccessfulSync, syncFileBestEffort, syncParentDirectoryBestEffort
 import { emitMutationPhase } from './mutation-phase.js';
 import { readBinaryMutationSnapshot } from './snapshot.js';
 import { preflightIoCapacity } from './capacity-preflight.js';
-import { createSiblingTempPath } from './temp-path.js';
+import { prepareSiblingTempPath } from './temp-path.js';
 
 /**
  * @param {string} source
@@ -35,7 +35,7 @@ import { createSiblingTempPath } from './temp-path.js';
  * }>}
  */
 export async function copyFileUnlocked(source, destination, options = {}) {
-    const tmpDestination = createSiblingTempPath(destination, 'copy');
+    const tmpDestination = await prepareSiblingTempPath(destination, 'copy');
     let tmpCreated = false;
     const sourceBytes = (await stat(source)).size;
     const capacityPreflight = await (options.capacityPreflight ?? preflightIoCapacity)(destination, sourceBytes);
