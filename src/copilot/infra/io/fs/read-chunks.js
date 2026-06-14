@@ -171,6 +171,7 @@ async function getByteLineIndex(filePath, options = {}) {
     }
     if (cached) byteLineIndexCache.delete(cacheKey);
     const built = await buildByteLineIndex(filePath, {
+        ...(options.highWaterMark !== undefined ? { highWaterMark: options.highWaterMark } : {}),
         ...(options.signal ? { signal: options.signal } : {}),
         ...(options.attempt !== undefined ? { attempt: options.attempt } : {}),
         ...(options.onPhase ? { onPhase: options.onPhase } : {}),
@@ -184,6 +185,7 @@ async function getByteLineIndex(filePath, options = {}) {
 /**
  * @param {string} filePath
  * @param {{
+ *     highWaterMark?: number;
  *     signal?: AbortSignal;
  *     attempt?: number;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
@@ -200,7 +202,14 @@ async function buildByteLineIndex(filePath, options = {}) {
     let exceededMaxLines = false;
     /** @type {number | null} */
     let pendingCrOffset = null;
-    const baseStream = handle.createReadStream({ autoClose: false });
+    const highWaterMark =
+        Number.isFinite(options.highWaterMark) && Number(options.highWaterMark) > 0
+            ? Math.floor(Number(options.highWaterMark))
+            : undefined;
+    const baseStream = handle.createReadStream({
+        autoClose: false,
+        ...(highWaterMark !== undefined ? { highWaterMark } : {}),
+    });
     const stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
 
     try {
@@ -580,7 +589,8 @@ async function readUtf8Range(filePath, byteStart, byteEndExclusive, expected, op
             ? Math.floor(Number(options.highWaterMark))
             : undefined;
     const decoder = new TextDecoder('utf-8', { fatal: true });
-    let text = '';
+    /** @type {string[]} */
+    const decodedChunks = [];
     const handle = await open(filePath, 'r');
     /** @type {import('node:fs').ReadStream | null} */
     let stream = null;
@@ -601,7 +611,8 @@ async function readUtf8Range(filePath, byteStart, byteEndExclusive, expected, op
             stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
             for await (const chunk of stream) {
                 const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
-                text += decodeUtf8Chunk(decoder, buf);
+                const decoded = decodeUtf8Chunk(decoder, buf);
+                if (decoded) decodedChunks.push(decoded);
                 if (options.onPhase) {
                     await options.onPhase('after-byte-range-chunk', {
                         filePath,
@@ -611,7 +622,8 @@ async function readUtf8Range(filePath, byteStart, byteEndExclusive, expected, op
                     });
                 }
             }
-            text += decodeUtf8Chunk(decoder, undefined, true);
+            const finalDecoded = decodeUtf8Chunk(decoder, undefined, true);
+            if (finalDecoded) decodedChunks.push(finalDecoded);
         }
         const after = await handle.stat();
         const pathAfter = await stat(filePath);
@@ -624,7 +636,7 @@ async function readUtf8Range(filePath, byteStart, byteEndExclusive, expected, op
                 snapshotVersion: expected.snapshotVersion,
             });
         }
-        return text;
+        return decodedChunks.join('');
     } finally {
         if (stream && !stream.destroyed) stream.destroy();
         await handle.close().catch(() => undefined);

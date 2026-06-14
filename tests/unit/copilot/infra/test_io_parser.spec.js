@@ -120,6 +120,67 @@ describe('parseFileSymbols - JavaScript', () => {
         const result = await parseFileSymbols(path.join(tmpDir, 'module.js'), JS_CONTENT);
         assert.ok(result.lines > 0);
         assert.ok(result.bytes > 0);
+        assert.equal(result.parsedBytes, result.bytes);
+    });
+
+    it('conta LF, CRLF e CR isolado como linhas físicas', async () => {
+        const result = await parseFileSymbols(path.join(tmpDir, 'mixed-lines.js'), 'a\rb\r\nc\nd');
+
+        assert.equal(result.lines, 4);
+    });
+
+    it('aplica line guard também a arquivos com CR isolado', async () => {
+        const script = `
+            import { parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            const result = await parseFileSymbols('/tmp/cr-only.js', 'a\\rb\\rc\\rd');
+            await resetParserCacheForTest({ teardownWorkers: true });
+            console.log(JSON.stringify({ lines: result.lines, parseError: result.parseError }));
+        `;
+        const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
+            cwd: path.resolve('.'),
+            env: {
+                ...process.env,
+                IO_PARSER_MAX_LINES: '3',
+                IO_PARSER_WORKER_ENABLED: '0',
+            },
+            timeout: 10_000,
+            maxBuffer: 1024 * 1024,
+        });
+        const result = JSON.parse(stdout);
+
+        assert.equal(result.lines, 4);
+        assert.match(result.parseError, /line guard exceeded/);
+    });
+
+    it('trunca o source pelo orçamento UTF-8 real', async () => {
+        const script = `
+            import { parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            const content = "export const before = 1;\\n// 🚀🚀🚀🚀🚀🚀🚀🚀\\nexport const afterBudget = 1;";
+            const result = await parseFileSymbols('/tmp/byte-budget.js', content);
+            await resetParserCacheForTest({ teardownWorkers: true });
+            console.log(JSON.stringify({
+                truncated: result.truncated,
+                bytes: result.bytes,
+                parsedBytes: result.parsedBytes,
+                symbols: result.symbols.map((symbol) => symbol.name)
+            }));
+        `;
+        const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
+            cwd: path.resolve('.'),
+            env: {
+                ...process.env,
+                IO_PARSER_MAX_BYTES: '40',
+                IO_PARSER_WORKER_ENABLED: '0',
+            },
+            timeout: 10_000,
+            maxBuffer: 1024 * 1024,
+        });
+        const result = JSON.parse(stdout);
+
+        assert.equal(result.truncated, true);
+        assert.ok(result.bytes > 40);
+        assert.ok(result.parsedBytes <= 40);
+        assert.ok(!result.symbols.includes('afterBudget'));
     });
 });
 

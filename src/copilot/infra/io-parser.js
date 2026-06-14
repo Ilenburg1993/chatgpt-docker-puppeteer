@@ -41,7 +41,7 @@ import {
     extractMarkdownOutlineWithLines,
     extractTopComments,
 } from './parse/index.js';
-import { utf8ByteLength } from './shared/buffer.js';
+import { truncateUtf8String, utf8ByteLength } from './shared/buffer.js';
 
 export { buildOutline, extractJsonSchema, extractMarkdownOutline, extractTopComments };
 
@@ -274,6 +274,7 @@ function ensureInvalidationHook() {
  * @property {boolean} truncated - Se o arquivo foi truncado por ser grande demais.
  * @property {number} lines - Total de linhas do arquivo.
  * @property {number} bytes - Tamanho em bytes.
+ * @property {number} parsedBytes - Tamanho em bytes efetivamente entregue ao parser.
  * @property {number} parseDurationMs - Duração de parse no runtime atual.
  */
 
@@ -821,6 +822,26 @@ function _extractDeclSymbols(decl, exported, parentNode) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Conta linhas físicas sem materializar um array proporcional ao arquivo.
+ *
+ * @param {string} content
+ * @returns {number}
+ */
+function countPhysicalLines(content) {
+    let lines = 1;
+    for (let index = 0; index < content.length; index += 1) {
+        const code = content.charCodeAt(index);
+        if (code === 13) {
+            lines += 1;
+            if (content.charCodeAt(index + 1) === 10) index += 1;
+        } else if (code === 10) {
+            lines += 1;
+        }
+    }
+    return lines;
+}
+
+/**
  * Parseia um arquivo JS/TS e extrai símbolos, imports e exports.
  *
  * @param {string} filePath - Path do arquivo.
@@ -831,8 +852,10 @@ export async function parseFileSymbols(filePath, content) {
     const ext = nodePath.extname(filePath).toLowerCase();
     const lang = classifyExtension(ext);
     const bytes = utf8ByteLength(content, 'parser content');
-    const lines = content.split('\n').length;
     const truncated = bytes > MAX_PARSE_BYTES;
+    const source = truncated ? truncateUtf8String(content, MAX_PARSE_BYTES).text : content;
+    const parsedBytes = truncated ? utf8ByteLength(source, 'parser truncated content') : bytes;
+    const lines = countPhysicalLines(content);
 
     /** @type {FileSymbols} */
     const base = {
@@ -845,10 +868,9 @@ export async function parseFileSymbols(filePath, content) {
         truncated,
         lines,
         bytes,
+        parsedBytes,
         parseDurationMs: 0,
     };
-
-    const source = truncated ? content.slice(0, MAX_PARSE_BYTES) : content;
 
     if (lang === 'js' || lang === 'ts') {
         if (lines > MAX_PARSE_LINE_GUARD) {

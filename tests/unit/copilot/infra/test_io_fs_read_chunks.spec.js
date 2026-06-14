@@ -242,6 +242,36 @@ describe('infra/io/fs read line ports', () => {
         expect(result.snapshotVersion).toMatch(/^[a-f0-9]{24}$/);
     });
 
+    it('readTextLineChunks propaga highWaterMark para index e byte-seek', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'byte-index-high-water-mark.txt');
+        await writeFile(file, Array.from({ length: 30 }, (_, index) => `linha-${index + 1}`).join('\r\n'), 'utf8');
+        /** @type {number[]} */
+        const physicalChunkBytes = [];
+
+        const result = await readTextLineChunks(file, {
+            startLine: 4,
+            endLine: 8,
+            chunkLines: 2,
+            highWaterMark: 3,
+            onPhase: async (phase, details) => {
+                if (phase === 'after-byte-index-chunk' || phase === 'after-byte-range-chunk') {
+                    physicalChunkBytes.push(Number(details['chunkBytes']));
+                }
+            },
+        });
+
+        expect(result.chunks.flatMap((chunk) => chunk.content.split('\n'))).toEqual([
+            'linha-4',
+            'linha-5',
+            'linha-6',
+            'linha-7',
+            'linha-8',
+        ]);
+        expect(physicalChunkBytes.length).toBeGreaterThan(5);
+        expect(Math.max(...physicalChunkBytes)).toBeLessThanOrEqual(3);
+    });
+
     it('readTextLineChunksStream encerra stale após replace externo sem misturar tokens', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'stream-external.txt');

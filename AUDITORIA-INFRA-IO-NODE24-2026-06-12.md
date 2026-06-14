@@ -1266,6 +1266,33 @@ canônica. O corpus fuzz valida também que os bytes originais não são regrava
 Validação focada pós-IO-054: **139 passados, 0 falhas**; lint focado, `diff --check` e
 `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.46 Status de implementação — `highWaterMark` efetivo e concatenação linear em byte-seek aplicados em 2026-06-14
+
+A revisão pós-fuzz encontrou IO-055 na rota otimizada de leitura por linhas: o caller podia fornecer
+`highWaterMark`, mas a construção inicial do índice byte/linha ignorava a opção. Assim, uma leitura de janela pequena
+ainda podia varrer o arquivo em blocos maiores que o orçamento solicitado. A opção agora é propagada para o stream de
+indexação e para o byte-seek, com prova que observa `after-byte-index-chunk` e `after-byte-range-chunk`.
+
+A mesma rota acumulava cada fragmento decodificado com `text +=`, cujo custo pode crescer de forma superlinear sob
+`highWaterMark` pequeno. Os fragmentos agora são coletados em array e unidos uma única vez, preservando decode UTF-8
+fatal e o token de consistência.
+
+### 1.47 Status de implementação — limites físicos do parser corrigidos em 2026-06-14
+
+IO-056 fechou dois desvios entre o contrato declarado e o trabalho entregue ao parser:
+
+- a contagem `content.split('\n').length` alocava um array proporcional ao arquivo e não reconhecia CR isolado, o que
+  permitia que arquivos CR-only ultrapassassem `IO_PARSER_MAX_LINES`;
+- `IO_PARSER_MAX_BYTES` era aplicado com `content.slice(0, MAX_PARSE_BYTES)`, usando unidades UTF-16 e podendo
+  entregar ao Babel várias vezes o orçamento anunciado quando o prefixo continha Unicode multibyte.
+
+O parser agora conta LF, CRLF e CR isolado em uma passagem sem array intermediário, trunca em fronteira UTF-8 por
+bytes e expõe `parsedBytes` além de `bytes`. Provas isoladas com overrides pequenos confirmam line guard para CR-only,
+ausência de símbolo além do orçamento e `parsedBytes <= IO_PARSER_MAX_BYTES`.
+
+Validação conjunta de IO-055/IO-056: **49 passados, 0 falhas**; lint focado, `diff --check` e
+`typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1540,12 +1567,14 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-052 | P2 | Patch externo | **Concluído com limite documentado:** editor/Git externo é recusado antes do publish | precondição final baixa, processo editor e `git checkout` real | Microjanela portátil entre confirmação e `rename` | Manter a prova coordenada e preferir writers cooperativos quando possível |
 | IO-053 | P1 | Chunk CRLF | **Concluído:** fuzz encontrou carry CRLF reordenado e metadata final inflada | seeds reproduzíveis, regressão mínima e `read-chunks.js` corrigido | Parser podia perder linhas sob fronteira física específica | Manter seeds fixas e ampliar corpus sem tornar a suíte não determinística |
 | IO-054 | P0 | Chunk UTF-8 | **Concluído:** streaming textual usa decode fatal e recusa bytes inválidos | `TextDecoder` streaming fatal, corpus binário e erro canônico | StringDecoder anterior podia substituir bytes silenciosamente | Manter todas as superfícies textuais sob a mesma política fatal |
+| IO-055 | P1 | Chunk byte-seek | **Concluído:** `highWaterMark` governa índice e seek; concatenação é linear | fases observáveis confirmam blocos físicos bounded; join único | Caller agora controla o tamanho dos blocos, não o total varrido para índice frio | Medir indexação fria de arquivos grandes e considerar índice persistente só com evidência |
+| IO-056 | P1 | Parser limits | **Concluído:** line guard cobre CR/LF/CRLF e truncamento respeita bytes UTF-8 | `parsedBytes`, child tests com budgets pequenos e contagem sem split | Conteúdo completo já está materializado pelo caller; limite governa o parse, não a leitura | Auditar callers para evitar materialização integral quando apenas símbolos forem necessários |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2062,6 +2091,7 @@ Critérios operacionais adicionais já atendidos:
 Maturidade operacional avançada:
 
 - [x] fuzz textual/binário bounded e reproduzível sobre patch, chunks e limites;
+- [x] aplicar budgets físicos de linhas/bytes sem arrays ou truncamento em unidades incorretas;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2081,7 +2111,7 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria profunda de parsing/read/streaming/buffer, priorizando limites e alocações redundantes nas
-principais tools, e manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece explicitamente sem implementação até
-existir evidência de múltiplos runtimes/processos reais que justifique o contrato; não há ganho técnico em criar essa
-camada preventivamente.
+Continuar a auditoria profunda dos callers de parse/context/search, priorizando budgets de saída, materialização
+integral evitável e alocações redundantes nas principais tools; manter fuzz/chaos como gates recorrentes. IO-030/L3
+permanece explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que justifique
+o contrato; não há ganho técnico em criar essa camada preventivamente.
