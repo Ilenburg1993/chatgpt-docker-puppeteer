@@ -179,6 +179,10 @@ const StructuredMessageResponseSchema = StructuredMessageSchema.passthrough();
  * @property {string} taskId - ID da tarefa Copilot SDK
  * @property {number} responseLen - Comprimento da resposta bruta
  * @property {string[]} chunks - Chunks coletados via streaming
+ * @property {number | undefined} [observedChunks] - Total de chunks observados
+ * @property {number | undefined} [observedChunkBytes] - Bytes físicos observados
+ * @property {number | undefined} [capturedChunkBytes] - Bytes retidos em `chunks`
+ * @property {boolean | undefined} [chunksTruncated] - Retenção auxiliar excedeu budget ou foi desabilitada
  * @property {number} durationMs - Duração total em ms
  * @property {Error} [parseError] - Erro ao parsear resposta estruturada (undefined quando bem-sucedido)
  */

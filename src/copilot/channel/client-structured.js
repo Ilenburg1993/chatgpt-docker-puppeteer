@@ -10,6 +10,7 @@
 
 import { buildStructuredRequest, parseStructuredResponse, serializeStructuredMessage } from '#copilot/core';
 import { log } from '#copilot/observability';
+import { mergeChunkRetentions } from './chunk-retention.js';
 
 /**
  * @typedef {import('./client.js').ChatResult} ChatResult
@@ -58,11 +59,19 @@ export async function chatStructured(deps, input, opts = {}) {
         if (retryStructured) {
             log('INFO', '[LlmBridgeClient] chatStructured: segunda tentativa bem-sucedida.');
             structured = retryStructured;
+            const mergedChunks = mergeChunkRetentions([chatResult, retryResult], {
+                ...(chatOpts.maxCapturedChunkBytes !== undefined
+                    ? { maxBytes: chatOpts.maxCapturedChunkBytes }
+                    : {}),
+                ...(chatOpts.maxCapturedChunks !== undefined
+                    ? { maxItems: chatOpts.maxCapturedChunks }
+                    : {}),
+            });
             Object.assign(chatResult, {
                 response: retryResult.response,
                 responseLen: retryResult.responseLen,
                 durationMs: chatResult.durationMs + retryResult.durationMs,
-                chunks: [...chatResult.chunks, ...retryResult.chunks],
+                ...mergedChunks,
                 taskId: retryResult.taskId,
             });
         }
@@ -88,6 +97,10 @@ export async function chatStructured(deps, input, opts = {}) {
         taskId: chatResult.taskId,
         responseLen: chatResult.responseLen,
         chunks: chatResult.chunks,
+        observedChunks: chatResult.observedChunks,
+        observedChunkBytes: chatResult.observedChunkBytes,
+        capturedChunkBytes: chatResult.capturedChunkBytes,
+        chunksTruncated: chatResult.chunksTruncated,
         durationMs: chatResult.durationMs,
         ...(parseError !== undefined ? { parseError } : {}),
     };

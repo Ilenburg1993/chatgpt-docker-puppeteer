@@ -1647,6 +1647,34 @@ mas o array auxiliar de chunks duplica esse conteúdo e merece medição própri
 Validação focada de IO-074: **82 passados, 0 falhas** em capture, shell-adjacent contracts, jobs, tunnel smoke,
 SDK HTTP, channel inject/SSE e concorrência; lint focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.66 Status de implementação — retenção auxiliar de deltas bounded em 2026-06-14
+
+IO-075 eliminou a duplicação ilimitada da resposta final no array auxiliar de chunks sem alterar a resposta canônica:
+
+- `channel/chunk-retention.js` aplica simultaneamente budget físico de **2 MiB** e **4.096 itens**, com hard caps de
+  **8 MiB** e **16.384 itens**;
+- `chat()` preserva `response` integral e expõe `observedChunks`, `observedChunkBytes`, `capturedChunkBytes` e
+  `chunksTruncated`;
+- `captureChunks:false` mantém callbacks e contadores, mas não retém deltas; o conversation hub usa esse modo porque
+  já recebe a resposta canônica;
+- o retry estruturado deixou de concatenar arrays sem limite e os combina sob o mesmo budget;
+- o fallback legado do hub para doubles/implementações antigas sem `raw` permanece compatível, mas falha
+  deterministicamente se ultrapassar o orçamento em vez de devolver texto parcial.
+
+Medição sintética isolada com `node --expose-gc`, corpus pré-alocado e **500.000** referências de chunks:
+
+| Estratégia auxiliar | Itens retidos | Delta de heap após GC |
+| --- | ---: | ---: |
+| Array legado ilimitado | 500.000 | 4.642.496 bytes |
+| Coletor bounded default | 4.096 | 94.088 bytes |
+
+O segundo caminho marcou `chunksTruncated:true` e reteve 35.532 bytes de conteúdo. O RSS foi observado, mas não usado
+como critério por incluir decisões do allocator e páginas do runtime. A resposta canônica não participou do delta:
+o benchmark mede especificamente a estrutura auxiliar que IO-075 removeu.
+
+Validação focada de IO-075: **39 passados, 0 falhas** em retenção, cliente, hub e structured retry; lint focado,
+`diff --check` e `typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1941,16 +1969,17 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-072 | P0 | Response inbound | **Concluído:** bytes/texto/JSON usam fachada pública bounded | bridge, BYOK, Cloudflare e scripts migrados; 80 testes focados | Doubles sem stream preservam fallback de compatibilidade | Criar guardrail estático contra consumo direto novo |
 | IO-073 | P1 | HTTP guardrail | **Concluído:** AST impede novo consumo direto de `Response` | Babel policy, aliases/Promise.all, 1,29 s e cadeia completa verde | Convenções muito exóticas de wrapper podem exigir regra adicional | Manter fixtures do checker ao adicionar novos padrões de fetch |
 | IO-074 | P0 | Process/socket capture | **Concluído:** subprocesso, HTTP local e frame SSE têm budgets físicos | head/tail fixos, jobs com backpressure, 82 testes focados | Resposta lógica completa do modelo ainda é retida por contrato | Medir/eliminar duplicação auxiliar de chunks em IO-075 |
-| IO-075 | P1 | Model stream retention | **Aberto:** resposta final e arrays/estado de chunks podem duplicar conteúdo | `channel/client`, structured retry e terminal display identificados | Não truncar a resposta canônica sem contrato explícito | Medir heap e tornar retenção auxiliar bounded/opt-in |
+| IO-075 | P1 | Model stream retention | **Concluído:** resposta canônica integral; retenção auxiliar bounded/opt-out | 2 MiB/4.096 defaults, metadata física e benchmark de 500 mil chunks | Compatibilidade mantém captura ligada por default no cliente público | Preferir `captureChunks:false` quando o caller só usa callbacks/resposta |
+| IO-076 | P1 | Terminal stream materialization | **Aberto:** estado/renderização pode normalizar e comparar respostas integrais repetidamente | `task-stream-events`, `turn-materialization-state` e transcript identificados | Mudanças podem causar resposta duplicada ou suprimida na UX | Medir custo por turno e substituir cópias/normalizações repetidas por estado incremental |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070, IO-071, IO-072, IO-073, IO-074 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070, IO-071, IO-072, IO-073, IO-074, IO-075 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
-| Aberto | IO-030, IO-075 |
+| Aberto | IO-030, IO-076 |
 
 ---
 
@@ -2326,7 +2355,13 @@ A situação ideal é uma infra IO em camadas:
 - [x] Aplicar backpressure ao append de validator jobs.
 - [x] Limitar e validar UTF-8 em HTTP local do SDK/canal.
 - [x] Limitar somente frames SSE incompletos, preservando stream longo.
-- [ ] Medir e reduzir retenção duplicada de chunks do modelo sem truncar a resposta canônica.
+- [x] Medir e reduzir retenção duplicada de chunks do modelo sem truncar a resposta canônica.
+
+#### Fase 4.8 — Materialização do streaming no terminal
+
+- [ ] Medir normalizações, comparações e cópias integrais por turno.
+- [ ] Preservar deduplicação correta entre deltas, reply final e transcript.
+- [ ] Tornar o estado incremental/bounded sem truncar a resposta canônica exibida.
 
 ### Faixa 5 — Provas
 

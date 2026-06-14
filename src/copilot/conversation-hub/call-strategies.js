@@ -13,6 +13,7 @@ import { SessionError } from '#copilot/core';
 import { HUB_EVENTS } from '#copilot/events';
 import { log } from '#copilot/observability';
 import { sendRuntimeDialogTurnOnActiveLoop } from '#copilot/runtime';
+import { createChunkRetention } from '../channel/chunk-retention.js';
 
 /**
  * @typedef {import('./orchestrator.js').AgentLike} AgentLike
@@ -75,23 +76,31 @@ export async function callViaDialogLoop(agent, message, messageContent, ctx) {
  * @returns {Promise<{ llmBResponse: string; llmBStructured: object | null; parseError: unknown }>}
  */
 export async function callViaStructured(bridge, message, ctx) {
-    /** @type {string} */ let accumulated = '';
+    const legacyRawFallback = createChunkRetention();
     const result = await bridge.chatStructured(
         /** @type {import('#copilot/core/structured-message').StructuredMessageInput} */ (message),
         {
             onDelta: (chunk) => {
-                accumulated += chunk;
+                legacyRawFallback.record(chunk);
                 ctx.emit(HUB_EVENTS.TURN_DELTA, {
                     hubSessionId: ctx.hubSessionId,
                     chunk,
                     turnNumber: ctx.turnNumber + 1,
                 });
             },
+            captureChunks: false,
             ...(ctx.timeoutMs !== null ? { timeoutMs: ctx.timeoutMs } : {}),
         },
     );
+    const fallback = legacyRawFallback.snapshot();
+    if (typeof result.raw !== 'string' && fallback.chunksTruncated) {
+        throw new SessionError(
+            '[HubOrchestrator] fallback legado de resposta estruturada excedeu o budget',
+            'ORCH_STRUCTURED_FALLBACK_TOO_LARGE',
+        );
+    }
     return {
-        llmBResponse: result.raw ?? accumulated,
+        llmBResponse: typeof result.raw === 'string' ? result.raw : fallback.chunks.join(''),
         llmBStructured: result.structured ?? null,
         parseError: result.parseError ?? null,
     };
@@ -119,6 +128,7 @@ export async function callViaSimpleChat(bridge, messageContent, ctx) {
                 turnNumber: ctx.turnNumber + 1,
             });
         },
+        captureChunks: false,
         ...(ctx.timeoutMs !== null ? { timeoutMs: ctx.timeoutMs } : {}),
     });
     return result.response;

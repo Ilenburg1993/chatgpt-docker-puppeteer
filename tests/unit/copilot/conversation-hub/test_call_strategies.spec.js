@@ -114,6 +114,7 @@ describe('callViaStructured', () => {
         expect(result.llmBResponse).toBe('resposta raw');
         expect(result.llmBStructured).toEqual({ action: 'test' });
         expect(result.parseError).toBe(null);
+        expect(bridge.chatStructured.mock.calls[0]?.[1]?.captureChunks).toBe(false);
     });
 
     it('usa accumulated quando raw é undefined', async () => {
@@ -143,6 +144,7 @@ describe('callViaSimpleChat', () => {
         const ctx = makeCtx();
         const result = await callViaSimpleChat(/** @type {any} */ (bridge), 'hello', ctx);
         expect(result).toBe('simple response');
+        expect(bridge.chat.mock.calls[0]?.[1]?.captureChunks).toBe(false);
     });
 
     it('emite turn:delta via onDelta callback', async () => {

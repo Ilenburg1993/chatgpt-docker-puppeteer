@@ -154,9 +154,55 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
             assert.strictEqual(receivedChunks[1], 'parte2');
             assert.strictEqual(result.response, 'parte1 parte2');
             assert.strictEqual(result.chunks.length, 2);
+            assert.strictEqual(result.observedChunks, 2);
+            assert.strictEqual(result.observedChunkBytes, 13);
+            assert.strictEqual(result.capturedChunkBytes, 13);
+            assert.strictEqual(result.chunksTruncated, false);
         } finally {
             alwaysAliveAgent.sendMessage = sendMessageOrig;
             // Restaura status descriptor original
+            if (origStatusDescriptor) {
+                Object.defineProperty(alwaysAliveAgent, 'status', origStatusDescriptor);
+            } else {
+                // @ts-expect-error — propriedade de teste definida dinamicamente
+                delete alwaysAliveAgent.status;
+            }
+            client.clearHistory();
+        }
+    });
+
+    it('captureChunks=false preserva callbacks e resposta sem duplicar deltas', async () => {
+        const { LlmBridgeClient: LBC } = await import('../../../src/copilot/channel/client.js');
+        const client = new LBC();
+        const sendMessageOrig = alwaysAliveAgent.sendMessage.bind(alwaysAliveAgent);
+        const origStatusDescriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(alwaysAliveAgent), 'status');
+        const taskId = `task-no-retention-${Date.now()}`;
+        /** @type {string[]} */
+        const receivedChunks = [];
+
+        alwaysAliveAgent.sendMessage = async function (_msg) {
+            alwaysAliveAgent.emit('task.queued', { taskId, message: _msg });
+            alwaysAliveAgent.emit('task.delta', { taskId, chunk: 'parte1 ' });
+            alwaysAliveAgent.emit('task.delta', { taskId, chunk: 'parte2' });
+            return Promise.resolve('parte1 parte2');
+        };
+        Object.defineProperty(alwaysAliveAgent, 'status', { get: () => 'idle', configurable: true });
+
+        try {
+            const result = await client.chat('teste sem retenção', {
+                captureChunks: false,
+                onDelta: (chunk) => receivedChunks.push(chunk),
+            });
+
+            assert.deepStrictEqual(receivedChunks, ['parte1 ', 'parte2']);
+            assert.strictEqual(result.response, 'parte1 parte2');
+            assert.deepStrictEqual(result.chunks, []);
+            assert.strictEqual(result.observedChunks, 2);
+            assert.strictEqual(result.observedChunkBytes, 13);
+            assert.strictEqual(result.capturedChunkBytes, 0);
+            assert.strictEqual(result.chunksTruncated, true);
+        } finally {
+            alwaysAliveAgent.sendMessage = sendMessageOrig;
             if (origStatusDescriptor) {
                 Object.defineProperty(alwaysAliveAgent, 'status', origStatusDescriptor);
             } else {

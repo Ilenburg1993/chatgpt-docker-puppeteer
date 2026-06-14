@@ -18,6 +18,7 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
+import { createChunkRetention } from './chunk-retention.js';
 import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
 import { logSwallowed, toError } from '../core/error-handlers.js';
 import {
@@ -141,6 +142,10 @@ function createInactivityGuard(timeoutMs, onTimeout) {
  * @property {string} response - Resposta completa do modelo
  * @property {number} responseLen - Comprimento da resposta
  * @property {string[]} chunks - Chunks coletados via streaming (task.delta)
+ * @property {number} observedChunks - Total de chunks observados
+ * @property {number} observedChunkBytes - Total físico de bytes observado nos chunks
+ * @property {number} capturedChunkBytes - Bytes retidos no array auxiliar
+ * @property {boolean} chunksTruncated - true quando retenção auxiliar foi desabilitada ou excedeu budget
  * @property {number} durationMs - Tempo total da chamada em ms Opções para uma chamada ao chat().
  *
  * @typedef {Object} ChatOptions
@@ -153,6 +158,9 @@ function createInactivityGuard(timeoutMs, onTimeout) {
  * @property {import('#copilot/sdk/types').MessageOptions['attachments']} [attachments] - Anexos (arquivos, imagens) a
  *   enviar junto com a mensagem
  * @property {Record<string, string>} [requestHeaders] - Headers HTTP por turno no caminho direto `sendMessage()`
+ * @property {boolean} [captureChunks] - Retém array auxiliar de deltas; default true por compatibilidade
+ * @property {number} [maxCapturedChunkBytes] - Budget auxiliar por bytes; default 2 MiB, hard cap 8 MiB
+ * @property {number} [maxCapturedChunks] - Budget auxiliar por itens; default 4096, hard cap 16384
  * @property {number} [retries] - F11.4: número máximo de tentativas em caso de timeout/erro transiente (default: 0)
  * @property {number} [retryDelayMs] - F11.4: delay base entre tentativas em ms (default: 1500; cresce 2× a cada retry)
  *   Cliente de alto nível para conversa contínua com LLM-B via AlwaysAliveAgent.
@@ -204,6 +212,9 @@ export class LlmBridgeClient {
             timeoutMs = null,
             attachments,
             requestHeaders,
+            captureChunks,
+            maxCapturedChunkBytes,
+            maxCapturedChunks,
             retries = 0,
             retryDelayMs = 1_500,
         } = opts;
@@ -218,6 +229,9 @@ export class LlmBridgeClient {
                     timeoutMs,
                     attachments,
                     requestHeaders,
+                    ...(captureChunks !== undefined ? { captureChunks } : {}),
+                    ...(maxCapturedChunkBytes !== undefined ? { maxCapturedChunkBytes } : {}),
+                    ...(maxCapturedChunks !== undefined ? { maxCapturedChunks } : {}),
                 });
             } catch (err) {
                 const msg = toError(err).message;
@@ -246,11 +260,24 @@ export class LlmBridgeClient {
      *     timeoutMs?: number | null;
      *     attachments?: ChatOptions['attachments'];
      *     requestHeaders?: ChatOptions['requestHeaders'];
+     *     captureChunks?: boolean;
+     *     maxCapturedChunkBytes?: number;
+     *     maxCapturedChunks?: number;
      * }} opts
      * @returns {Promise<ChatResult>}
      */
     async #chatOnce(message, opts = {}) {
-        const { onDelta, onReasoning, onQuestion, timeoutMs = null, attachments, requestHeaders } = opts;
+        const {
+            onDelta,
+            onReasoning,
+            onQuestion,
+            timeoutMs = null,
+            attachments,
+            requestHeaders,
+            captureChunks,
+            maxCapturedChunkBytes,
+            maxCapturedChunks,
+        } = opts;
         const startedAt = Date.now();
 
         if (requireAgent().status === 'stopped') {
@@ -268,8 +295,11 @@ export class LlmBridgeClient {
         });
         this.#turnCount++;
 
-        /** @type {string[]} */
-        const chunks = [];
+        const chunkRetention = createChunkRetention({
+            enabled: captureChunks ?? true,
+            ...(maxCapturedChunkBytes !== undefined ? { maxBytes: maxCapturedChunkBytes } : {}),
+            ...(maxCapturedChunks !== undefined ? { maxItems: maxCapturedChunks } : {}),
+        });
         /** @type {string | null} */
         let activeTaskId = null;
 
@@ -281,7 +311,7 @@ export class LlmBridgeClient {
 
         const onDeltaEvt = (/** @type {{ taskId?: string; chunk?: string }} */ evt) => {
             if (activeTaskId && evt.taskId === activeTaskId) {
-                chunks.push(evt.chunk ?? '');
+                chunkRetention.record(evt.chunk ?? '');
                 if (onDelta) {
                     try {
                         onDelta(evt.chunk ?? '', evt.taskId);
@@ -365,6 +395,7 @@ export class LlmBridgeClient {
 
             const responseStr = /** @type {string} */ (response);
             const durationMs = Date.now() - startedAt;
+            const retainedChunks = chunkRetention.snapshot();
 
             // Registra turno do assistente no histórico
             this.#pushHistory({
@@ -377,14 +408,14 @@ export class LlmBridgeClient {
 
             log(
                 'INFO',
-                `[LlmBridgeClient] Turno #${this.#turnCount} concluído em ${durationMs}ms (${responseStr.length} chars, ${chunks.length} chunks)`,
+                `[LlmBridgeClient] Turno #${this.#turnCount} concluído em ${durationMs}ms (${responseStr.length} chars, ${retainedChunks.observedChunks} chunks, retained=${retainedChunks.capturedChunkBytes}B, truncated=${retainedChunks.chunksTruncated})`,
             );
 
             return {
                 taskId: activeTaskId ?? '',
                 response: responseStr,
                 responseLen: responseStr.length,
-                chunks,
+                ...retainedChunks,
                 durationMs,
             };
         } finally {
