@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `509f100a`, seguida do canário CI do L2 experimental
+**Baseline reinvestigado:** `main` sincronizada até `05b73e61`, seguida da medição longa e hardening do L2
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -19,7 +19,7 @@ No estado atual, a descrição correta é: **as primitivas centrais de mutação
 fortes e provas reais, as superfícies externas de path estão vinculadas a policy async, o índice detecta mudanças
 externas metadata-preserving e a contenção L0/L1 é observável sem expor paths; o L1 multiprocess agora possui perfis
 explícitos por risco, remove recursivo exige confirmação exata e a raiz workspace-bound é protegida; L2 possui perfil
-experimental fail-closed e custo observável; mutações que materializam payload grande agora falham cedo quando a
+experimental fail-closed, custo observável e touch de recência throttled; mutações que materializam payload grande agora falham cedo quando a
 insuficiência de espaço já é observável; scopes distinguem warming/ready/stale/degraded sem vazar paths; scanner,
 prefetch e busca FTS compartilham uma política glob sem abrir mão da enumeração protegida; temporários de publicação
 são irmãos ocultos, exclusivos e usam token de 128 bits; o risco dominante migrou para decisões de promoção baseadas
@@ -27,8 +27,8 @@ em workload e provas de crash externas**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — promoção do L2 depende de workload real:** o perfil experimental existe e foi medido, mas cold-start pode
-   custar mais que filesystem local para payloads pequenos/médios.
+1. **P2 — promoção do L2 depende de reduzir o custo de seed:** reuse L2 ficou 2,57x–3,37x mais rápido que filesystem
+   quente, mas o seed atual exige cerca de nove reusos completos dentro do TTL para empatar.
 2. **P2 — faltam provas externas destrutivas:** crash real em directory sync/EXDEV, modificação externa durante
    snapshot/index e interação com editor/Git ainda não estão automatizados.
 3. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
@@ -903,6 +903,68 @@ Validação: canário **PASS**, lint focado **PASS**, typecheck strict de `scrip
 `main_chatgpt-docker-puppeteer.yml` não possui `permissions` top-level. O canário foi ordenado antes desse check para
 continuar produzindo evidência recorrente sem mascarar a falha existente.
 
+### 1.34 Status de implementação — workload longo e touch L2 throttled aplicados em 2026-06-14
+
+O harness `scripts/analysis/copilot-io-l2-workload.mjs` passou a comparar três processos sobre o mesmo manifesto
+protegido do scanner:
+
+1. seed com perfil `experimental`;
+2. baseline com L2 `off` e filesystem já aquecido;
+3. read em novo processo com perfil `experimental`.
+
+Ele mede hit ratio, distribuição de payloads, percentis, throughput, overhead do seed, economia por reuse e quantidade
+de reusos necessária para break-even. O banco e o manifesto são efêmeros; o source é somente leitura.
+
+A primeira rodada sobre 1.246 arquivos JS/TS/MJS/CJS reais de `src/copilot` revelou uma regressão estrutural:
+
+- 10,51 MB totais; 613 arquivos abaixo de 4 KiB e 472 entre 4–16 KiB;
+- hit ratio de 100%, mas L2 levou 952–1.042 ms contra 423–427 ms do filesystem quente;
+- cada `get` executava `UPDATE last_accessed_ms`, convertendo hit em escrita WAL;
+- máximos de get chegaram a 251–261 ms por checkpoint/write amplification.
+
+`io-cache-l2-sqlite.js` agora atualiza recência no máximo uma vez por janela bounded: mínimo 1 s, `TTL/4` e máximo
+30 s. O timestamp continua governando evicção LRU, mas hits próximos apenas incrementam `touchSkips`; `touchWrites`,
+`touchSkips` e `touchIntervalMs` entram nos stats.
+
+Após o hardening, três amostras completas mostraram:
+
+- concorrência 8: read L2 em 152–157 ms contra filesystem quente em 390–406 ms, ganho de 2,57x–2,63x;
+- serial: read L2 em 267 ms contra filesystem quente em 900 ms, ganho de 3,37x;
+- média interna de get caiu de 0,67–0,72 ms para 0,045–0,055 ms;
+- máximo de get caiu de 244–261 ms para 0,60–0,99 ms;
+- 1.246 `touchSkips`, zero `touchWrites` no reuse imediato;
+- seed ainda levou 2,40–2,65 s em concorrência 8, cerca de 5,9x–6,6x o baseline;
+- amostra final calculou premium de seed de 2.000 ms, economia de 248 ms por reuse e break-even em **nove reusos**.
+
+Decisão: manter `IO_L2_CACHE_PROFILE=off` como default. O reuse agora é materialmente melhor, mas a promoção global
+continua injustificada para processos curtos. A próxima hipótese a medir é admissão por tamanho e/ou batching de sets.
+
+Validação: cache SQLite/registry/engine **57 passados, 0 falhas**; lint focado e typecheck strict de `src/copilot` e
+`scripts/analysis`: **PASS**.
+
+### 1.35 Status de implementação — matriz de admissão L2 aplicada em 2026-06-14
+
+Foi adicionado o knob expert `IO_L2_CACHE_MIN_BYTES`, com schema, template, guia e stats `admissionSkips`/`minBytes`.
+Zero admite todos os payloads. O harness aceita `--min-bytes` e mede o workload completo, incluindo arquivos recusados
+que fazem fallback para filesystem.
+
+Matriz sobre os mesmos 1.246 arquivos, concorrência 8:
+
+| Limiar | Entradas persistidas | Bytes persistidos | Seed | Reuse | FS quente | Break-even |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 1.246 | 10,51 MB | 2.406 ms | 157 ms | 406 ms | 9 reusos |
+| 4 KiB | 633 | 9,54 MB | 1.610 ms | 315 ms | 414 ms | 13 reusos |
+| 16 KiB | 161 | 5,43 MB | 1.005 ms | 416 ms | 443 ms | 22 reusos |
+| 64 KiB | 14 | 1,68 MB | 454 ms | 426 ms | 411 ms | não alcança |
+
+Conclusão: admissão por tamanho reduz seed, mas também perde economia de reuse e continua pagando lookup SQLite nos
+misses. Nenhum limiar melhorou o break-even. `experimental`, `on` e compatibilidade legado permanecem com
+`minBytes=0` por default; o knob fica disponível apenas para workloads especializados. A próxima hipótese válida é
+batching de sets.
+
+Validação após a superfície de env: cache/registry/engine **58 passados, 0 falhas**; canário **PASS**; lint e
+typechecks strict **PASS**; `validate-env`, `check-env-local` e `audit-env-surface`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1140,7 +1202,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-015 | P1 | Search | **Concluído:** sanitização antecede paginação e contagens | rg/grep/FTS/símbolos retornam `countsPostSanitization:true` | Linhas removidas não afetam total ou cursor | Manter prova de primeira página redigida |
 | IO-016 | P1 | Scanner | **Concluído:** classificação básica usa `Dirent` | `io-scanner.js`, benchmark local | DT_UNKNOWN ainda exige fallback | Manter `lstat` apenas para arquivo/fingerprint ou ambiguidade |
 | IO-017 | P1 | Index freshness | **Concluído:** identidade rica + hash periódico bounded | scanner persiste ctime/dev/ino; índice renova hash até limite configurável | Arquivos grandes confiam em metadata rica entre reindexações | Medir hit/miss/custo e ajustar intervalo/limite por perfil |
-| IO-018 | P1 | L2 SQLite | **Concluído com limite documentado:** perfil experimental fail-closed e latência bounded | `IO_L2_CACHE_PROFILE`, health/stats e prova cold/warm multiprocess | Primeiro hit persistido mediu 9–14 ms; promoção global pode regredir workloads locais | Manter `off` default e promover somente por evidência de workload |
+| IO-018 | P1 | L2 SQLite | **Concluído com limite documentado:** perfil experimental medido em workload real | 1.246 arquivos; reuse 2,57x–3,37x mais rápido, seed 5,9x–6,6x mais caro | Break-even atual exige cerca de nove reusos dentro do TTL | Manter `off`; admissão foi rejeitada, medir batching antes de promover |
 | IO-019 | P1 | Bypass storage | **Concluído:** json store usa fachada atômica portátil | `infra/storage/json-store.js` | Escape é trusted e explícito | Manter contrato de callers da fachada |
 | IO-020 | P1 | Bypass export | **Concluído:** export usa fachada atômica portátil | `terminal/commands/export.js` | Paths externos continuam capability trusted | Manter caller explícito e testes de contrato |
 | IO-021 | P2 | Temp naming | **Concluído:** publicação usa nome irmão oculto e token de 128 bits | `temp-path.js`; write/copy/move compartilham o helper | Colisão continua decidida por criação exclusiva | Manter papéis bounded e sidecar especializado sob seu schema |
@@ -1166,12 +1228,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-041 | P0 | Lock wait | **Concluído:** timer aguardado não usa `unref()` | prova multiprocess reproduziu exit 13 durante espera L1 | Processo podia encerrar antes de adquirir/rejeitar lock | Manter `unref()` apenas em heartbeat/background |
 | IO-042 | P0 | Move durability | **Concluído:** sync posterior ao unlink não é confundido com falha de unlink | fases de source unlink e source directory sync foram separadas | Resultado podia reportar duplicação quando a origem já havia sido removida | Manter provas de falha antes/depois do unlink |
 | IO-043 | P2 | Parser workers | **Concluído:** fila bounded, timeout end-to-end e health de pressão | `io-parser.js`, `io-health.js` | Subprocesso curto em Node 24 ainda pode precisar `process.exit` no teste isolado | Monitorar `workerQueueRejected`/`workerQueueTimeouts` em workloads reais |
+| IO-044 | P1 | L2 SQLite | **Concluído:** hit não escreve recência em toda leitura | touch throttled por TTL/4, stats e workload antes/depois | Recência pode atrasar até 30 s, aceitável para cache | Manter janela bounded e observar evicção |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -1473,7 +1536,10 @@ A situação ideal é uma infra IO em camadas:
 - [x] Auditar WAL, `busy_timeout` e `synchronous`.
 - [x] Hash periódico bounded + ctime/dev/ino para freshness.
 - [x] Medir cold/warm inicial entre processos e steady-state.
-- [ ] Coletar hit ratio e distribuição de payloads em workload longo.
+- [x] Coletar hit ratio, distribuição de payloads e break-even em workload longo.
+- [x] Remover write amplification de recência em cada hit.
+- [x] Medir admissão por tamanho; nenhum limiar melhorou break-even.
+- [ ] Medir batching de sets para reduzir seed sem perder hit coverage.
 
 ### Faixa 4 — Performance
 
@@ -1651,7 +1717,7 @@ Critérios operacionais adicionais já atendidos:
 
 Ainda faltam para maturidade operacional avançada:
 
-- [ ] hit ratio e distribuição de payloads do L2 em workload longo;
+- [ ] reduzir e medir o custo de seed do L2 antes de qualquer promoção;
 - [ ] crash real durante directory sync e fases internas do EXDEV;
 - [ ] modificação externa durante snapshot/index e interação com editor/Git.
 
@@ -1672,6 +1738,6 @@ Ainda faltam para maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Coletar hit ratio, latência e distribuição de payloads do L2 `experimental` em workload representativo longo, sem
-promover o default. Depois, executar as provas externas ainda abertas de crash durante directory sync/EXDEV e
-modificação concorrente por editor/Git.
+Prototipar batching de `set` no L2, repetir o mesmo workload e aceitar a mudança somente se o break-even cair
+materialmente sem perder hit coverage ou tornar shutdown/reconfiguração não determinísticos. Depois, executar as
+provas externas ainda abertas de crash durante directory sync/EXDEV e modificação concorrente por editor/Git.
