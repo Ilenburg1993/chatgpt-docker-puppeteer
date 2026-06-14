@@ -25,6 +25,7 @@
 
 import { MCP_PORT as _MCP_PORT, MCP_PORT_PROBE_TIMEOUT_MS } from '#copilot/config';
 import { BridgeError, container, toError, withRetry } from '#copilot/core';
+import { readBoundedResponseJson } from '#copilot/infra/public/http-response';
 import * as observability from '#copilot/observability';
 import { convertMcpCallToolResult } from '#copilot/sdk';
 import { buildTool } from '#copilot/tools';
@@ -33,6 +34,7 @@ import { buildZodSchema } from './mcp-tool-schema.js';
 
 const CIRCUIT_RESET_MS = 60_000;
 const BOOT_BACKOFF_MS = [0, 200, 1000, 5_000];
+const MCP_BRIDGE_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 /**
  * @typedef {object} BridgeMetricsStore
@@ -299,7 +301,12 @@ async function rpcCall(method, deps, params) {
                     throw err;
                 }
 
-                const json = /** @type {{ error?: unknown; result?: unknown }} */ (await response.json());
+                const json = /** @type {{ error?: unknown; result?: unknown }} */ (
+                    await readBoundedResponseJson(response, {
+                        maxBytes: MCP_BRIDGE_MAX_RESPONSE_BYTES,
+                        label: `MCP RPC ${method}`,
+                    })
+                );
 
                 if (json.error) {
                     throw new BridgeError(`MCP RPC error [${method}]: ${JSON.stringify(json.error)}`, 'MCP_RPC_ERROR');

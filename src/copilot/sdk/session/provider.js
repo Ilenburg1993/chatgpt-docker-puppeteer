@@ -11,9 +11,12 @@
  * @see EventBus
  */
 
+import { readBoundedResponseJson } from '#copilot/infra/public/http-response';
 import { PROVIDER_TYPES } from '../constants.js';
 import { log } from '../logger.js';
 import { redactSecretRecord, redactSecretText } from '../../core/index.js';
+
+const BYOK_MODEL_DISCOVERY_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1735,7 +1738,10 @@ export async function discoverConfiguredByokModelsFromEnv(env = process.env, opt
         if (!response.ok) {
             throw new Error(`model discovery failed: HTTP ${response.status}`);
         }
-        const payload = await response.json();
+        const payload = await readBoundedResponseJson(response, {
+            maxBytes: BYOK_MODEL_DISCOVERY_MAX_RESPONSE_BYTES,
+            label: 'BYOK model discovery',
+        });
         const models = normalizeDiscoveredModels(payload, {
             contextWindowTokens: state.summary.capabilities.contextWindowTokens,
             supportsReasoning: state.summary.capabilities.reasoningEffort,

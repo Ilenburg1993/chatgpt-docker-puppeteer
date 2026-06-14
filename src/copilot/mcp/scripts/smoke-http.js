@@ -6,6 +6,7 @@
  */
 
 import { pathToFileURL } from 'node:url';
+import { readBoundedResponseText } from '#copilot/infra/public/http-response';
 import { normalizeMcpUrl } from '#copilot/mcp/connection';
 import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 import { getCanonicalMcpTools } from '../registry.js';
@@ -123,7 +124,10 @@ export function extractMcpToolNames(body) {
 async function probeJson(url, init) {
     try {
         const response = await fetch(url, { ...init, signal: AbortSignal.timeout(10000) });
-        const text = await response.text();
+        const text = await readBoundedResponseText(response, {
+            maxBytes: 2 * 1024 * 1024,
+            label: 'MCP smoke response',
+        });
         let body = undefined;
         try {
             body = text ? JSON.parse(text) : undefined;

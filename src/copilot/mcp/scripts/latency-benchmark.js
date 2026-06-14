@@ -9,12 +9,14 @@
  */
 
 import { pathToFileURL } from 'node:url';
+import { readBoundedResponseBytes } from '#copilot/infra/public/http-response';
 import { normalizeMcpUrl } from '#copilot/mcp/connection';
 
 const DEFAULT_PUBLIC_MCP_URL = 'https://mcp.aurelin.org/mcp';
 const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
 const DEFAULT_SAMPLES = 10;
 const DEFAULT_TIMEOUT_MS = 10_000;
+const MAX_BENCHMARK_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 /**
  * @typedef {{ ok: boolean; status?: number; durationMs: number; ttfbMs?: number; downloadMs?: number; bytes?: number; contentLengthHeader?: number | null; contentEncoding?: string | null; cfCacheStatus?: string | null; age?: string | null; cfRay?: string | null; originProtocolMode?: string | null; originHttpVersion?: string | null; originAlpn?: string | null; error?: string }} LatencySample
@@ -145,7 +147,10 @@ async function timedFetch(url, init, timeoutMs) {
     try {
         const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
         const headersAt = performance.now();
-        const body = await response.arrayBuffer();
+        const body = await readBoundedResponseBytes(response, {
+            maxBytes: MAX_BENCHMARK_RESPONSE_BYTES,
+            label: 'MCP latency benchmark response',
+        });
         const completedAt = performance.now();
         const contentLength = response.headers.get('content-length');
         return {

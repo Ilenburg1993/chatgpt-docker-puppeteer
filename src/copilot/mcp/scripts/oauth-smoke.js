@@ -17,6 +17,7 @@
  */
 
 import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
+import { readBoundedResponseText } from '#copilot/infra/public/http-response';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -1733,7 +1734,10 @@ async function probeRawOnce(url, init, runtime) {
     const startedAtMs = Date.now();
     try {
         const response = await fetch(url, { ...init, signal: AbortSignal.timeout(runtime.timeoutMs) });
-        const text = await readBoundedResponseText(response, MAX_RESPONSE_TEXT_BYTES);
+        const text = await readBoundedResponseText(response, {
+            maxBytes: MAX_RESPONSE_TEXT_BYTES,
+            label: 'OAuth smoke response',
+        });
         const headers = headersToRecord(response.headers);
         return {
             ok: response.ok,
@@ -1828,17 +1832,6 @@ function isTransientHttpStatus(status) {
  */
 function isCloudflareTunnelErrorBody(text) {
     return /Cloudflare Tunnel error|Error\s+1033|cf-error-details/iu.test(text);
-}
-
-/**
- * @param {Response} response
- * @param {number} maxBytes
- * @returns {Promise<string>}
- */
-async function readBoundedResponseText(response, maxBytes) {
-    const text = await response.text();
-    if (Buffer.byteLength(text) <= maxBytes) return text;
-    return `${text.slice(0, maxBytes)}...<truncated>`;
 }
 
 /**

@@ -8,6 +8,7 @@
  * @module copilot/mcp/cloudflare/tunnel-origin-plan
  */
 
+import { readBoundedResponseJson } from '#copilot/infra/public/http-response';
 import { buildRecommendedOriginRequestPatch } from './origin-request-profile.js';
 import { readCloudflareRemoteApiConfig, resolveCloudflareRemoteTunnelReference } from './remote-api.js';
 
@@ -180,7 +181,10 @@ async function putTunnelConfiguration(config, tunnelId, desired) {
             body: JSON.stringify({ config: buildCloudflareTunnelOriginApiConfig(asRecord(desired['config'])) }),
         },
     );
-    const body = await response.json().catch(() => ({}));
+    const body = await readBoundedResponseJson(response, {
+        maxBytes: 2 * 1024 * 1024,
+        label: 'Cloudflare tunnel configuration update',
+    }).catch(() => ({}));
     if (!response.ok) {
         throw new Error(
             `Cloudflare tunnel configuration update failed with HTTP ${response.status}: ${sanitizeCloudflareBody(body)}`,

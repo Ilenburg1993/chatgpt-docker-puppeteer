@@ -1558,7 +1558,8 @@ um corpo arbitrário e aceitar UTF-8 substitutivo antes do parse.
 
 Estado novo:
 
-- `response-body.js` centraliza leitura textual/JSON com default de **8 MiB** e hard cap de **32 MiB**;
+- `response-body.js` aplica o perfil de catálogo sobre o leitor HTTP público, com default de **8 MiB** e hard cap de
+  **32 MiB**;
 - `Content-Length` acima do budget falha antes da leitura;
 - streams reais são coletados somente até o limite, cancelados no erro e decodificados pelo helper UTF-8 fatal;
 - paginações e detalhes de Anthropic, Gemini, Groq e Ollama usam o mesmo contrato em cada request;
@@ -1573,6 +1574,33 @@ parcialmente promovidas a evidência.
 
 Validação focada de IO-071: **31 passados, 0 falhas** — 3 casos próprios do leitor e 28 contratos de importação;
 lint de todos os importadores, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
+
+### 1.63 Status de implementação — leitor HTTP público e consumo inbound consolidado em 2026-06-14
+
+IO-072 removeu as implementações paralelas restantes de consumo de `Response`. A nova fachada
+`infra/public/http-response.js` oferece bytes, texto e JSON com o mesmo contrato:
+
+- default global **2 MiB**, hard cap global **32 MiB** e perfil customizável por domínio;
+- precheck de `Content-Length`, contagem física durante streaming e cancelamento quando o limite é excedido;
+- concatenação única com comprimento conhecido e UTF-8 fatal antes de produzir texto ou JSON;
+- fallback para `arrayBuffer()`/`text()` somente quando não há stream;
+- compatibilidade com doubles `json()`-only restrita a objetos sem stream e sem `arrayBuffer()`.
+
+Foram migrados:
+
+- bridge JSON-RPC MCP local, com cap de **2 MiB** antes de entregar resultado de tool ao modelo;
+- descoberta BYOK OpenAI-compatible, com cap de **8 MiB**;
+- cliente HTTP do control plane, substituindo sua implementação privada;
+- metrics, config audit e apply de tunnel origin do Cloudflare;
+- smoke HTTP, smoke OAuth e benchmark de latência MCP;
+- perfil dos 28 importadores, que agora delega ao leitor público com seus caps de catálogo.
+
+A varredura por `.text()`, `.json()`, `.arrayBuffer()`, `.blob()` e `.formData()` em `src/copilot` não encontrou
+consumo inbound direto restante: os matches fora das fachadas são respostas Express (`res.json`) e um exemplo em
+comentário.
+
+Validação focada de IO-072: **80 passados, 0 falhas** em reader, importers, bridge MCP, provider BYOK, HTTP client,
+tunnel origin e OAuth smoke; lint focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
 
 ---
 
@@ -1865,12 +1893,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-069 | P0 | HTTP UTF-8/budgets | **Concluído:** corpos estruturados MCP/OAuth e probes são bounded/fatais | default 2 MiB, request caps 64 KiB, cancelamento e testes de bytes inválidos | Stderr diagnóstico continua best-effort e bounded | Manter payloads estruturados sob decode fatal; não promover stderr a dado confiável |
 | IO-070 | P0 | Web tools | **Concluído:** fetch/search têm caps determinísticos e UTF-8 fatal | 2 MiB default/search, 8 MiB máximo fetch, truncagem code-point-safe | HTML/JSON acima do cap falham em vez de retornar parse parcial | Expor aumento de cap somente de forma explícita e bounded |
 | IO-071 | P0 | Catalog HTTP | **Concluído:** 28 importadores compartilham leitura bounded e UTF-8 fatal | 8 MiB default, 32 MiB hard cap, precheck e 31 testes focados | JSON precisa caber integralmente; doubles sem stream não exercitam budget físico | Manter qualquer importer novo no helper e adicionar prova com `Response` real |
+| IO-072 | P0 | Response inbound | **Concluído:** bytes/texto/JSON usam fachada pública bounded | bridge, BYOK, Cloudflare e scripts migrados; 80 testes focados | Doubles sem stream preservam fallback de compatibilidade | Criar guardrail estático contra consumo direto novo |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070, IO-071 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070, IO-071, IO-072 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2239,7 +2268,8 @@ A situação ideal é uma infra IO em camadas:
 - [x] Aplicar budgets e UTF-8 fatal a corpos MCP/OAuth estruturados.
 - [x] Tornar fetch/search web bounded e observáveis.
 - [x] Migrar todos os importadores de catálogo para um leitor bounded comum.
-- [ ] Auditar downloads, responses e streams textuais restantes fora de `catalog/importers`.
+- [x] Auditar e migrar downloads, responses e streams textuais restantes fora de `catalog/importers`.
+- [ ] Impedir por guardrail estático novo consumo direto de corpos `Response`.
 
 ### Faixa 5 — Provas
 
@@ -2411,6 +2441,7 @@ Maturidade operacional avançada:
 - [x] aplicar budgets e UTF-8 fatal a corpos estruturados HTTP/MCP/OAuth;
 - [x] tornar caps de web fetch/search determinísticos e observáveis;
 - [x] aplicar leitura bounded e UTF-8 fatal aos 28 importadores de catálogo;
+- [x] consolidar consumo inbound de `Response` em fachada pública para bytes/texto/JSON;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2431,8 +2462,8 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria de downloads, responses e streams textuais fora de `model-gateway/catalog/importers`, priorizando
-qualquer `arrayBuffer()`, `text()`, `json()` ou concatenação de chunks sem budget. Ampliar fixtures Babel somente para
-sintaxe realmente aceita pelo workspace e manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece
-explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que justifique o
-contrato.
+Criar guardrail estático que recuse novo consumo direto de corpos `Response` fora das fachadas canônicas, distinguindo
+essas leituras de `res.json()` do Express. Depois continuar a auditoria de streams de subprocesso/socket e ampliar
+fixtures Babel somente para sintaxe realmente aceita pelo workspace. Manter fuzz/chaos como gates recorrentes.
+IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que
+justifique o contrato.

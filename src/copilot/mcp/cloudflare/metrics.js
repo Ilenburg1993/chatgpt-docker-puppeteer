@@ -5,6 +5,7 @@
  * @module copilot/mcp/cloudflare/metrics
  */
 
+import { readBoundedResponseText } from '#copilot/infra/public/http-response';
 import { readCloudflareTunnelConfig } from './config.js';
 import {
     summarizeCloudflaredLatencyHistograms,
@@ -35,7 +36,10 @@ export async function readCloudflaredMetricsSnapshot(options = {}) {
             headers: { accept: 'text/plain' },
             signal: AbortSignal.timeout(options.timeoutMs ?? 5000),
         });
-        const text = await response.text();
+        const text = await readBoundedResponseText(response, {
+            maxBytes: 8 * 1024 * 1024,
+            label: 'cloudflared metrics',
+        });
         const parsed = parsePrometheusMetrics(text);
         return {
             ok: response.ok,

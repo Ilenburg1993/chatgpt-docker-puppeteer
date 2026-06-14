@@ -9,7 +9,7 @@
  * @module copilot/mcp/control-plane/http-client
  */
 
-import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/buffer';
+import { readBoundedResponseText } from '#copilot/infra/public/http-response';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_ATTEMPTS = 1;
@@ -65,7 +65,11 @@ export async function mcpFetchText(url, options = {}) {
         if (options.body !== undefined) init.body = options.body;
         const response = await fetch(url, init);
         const headers = Object.fromEntries(response.headers.entries());
-        const rawBody = await readResponseTextLimited(response, options.maxBytes);
+        const rawBody = await readBoundedResponseText(response, {
+            defaultMaxBytes: DEFAULT_MAX_RESPONSE_BYTES,
+            label: 'MCP control-plane response',
+            ...(options.maxBytes !== undefined ? { maxBytes: options.maxBytes } : {}),
+        });
         return {
             ok: response.ok,
             status: response.status,
@@ -132,44 +136,6 @@ function normalizePositiveInteger(value, fallback) {
  */
 function normalizeNonNegativeInteger(value, fallback) {
     return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : fallback;
-}
-
-/**
- * @param {Response} response
- * @param {number | undefined} maxBytes
- * @returns {Promise<string>}
- */
-async function readResponseTextLimited(response, maxBytes) {
-    const limit = normalizePositiveInteger(maxBytes, DEFAULT_MAX_RESPONSE_BYTES);
-    const contentLength = Number(response.headers.get('content-length') ?? 0);
-    if (Number.isFinite(contentLength) && contentLength > limit) {
-        throw new Error(`Response exceeds ${limit} bytes.`);
-    }
-    const body = /** @type {{ getReader?: () => { read: () => Promise<{ done?: boolean; value?: Uint8Array }>; cancel?: () => Promise<void> } } | null} */ (
-        /** @type {unknown} */ (response.body)
-    );
-    if (!body?.getReader) {
-        const bytes = Buffer.from(await response.arrayBuffer());
-        if (bytes.byteLength > limit) throw new Error(`Response exceeds ${limit} bytes.`);
-        return decodeUtf8Buffer(bytes, 'Response contains invalid UTF-8.');
-    }
-    const reader = body.getReader();
-    /** @type {Buffer[]} */
-    const chunks = [];
-    let bytesRead = 0;
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!value) continue;
-        const buffer = Buffer.from(value);
-        bytesRead += buffer.length;
-        if (bytesRead > limit) {
-            await reader.cancel?.().catch(() => {});
-            throw new Error(`Response exceeds ${limit} bytes.`);
-        }
-        chunks.push(buffer);
-    }
-    return decodeUtf8Buffer(concatBufferViews(chunks, bytesRead), 'Response contains invalid UTF-8.');
 }
 
 /**

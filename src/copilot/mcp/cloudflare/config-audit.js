@@ -10,6 +10,7 @@
  */
 
 import { createTtlCache } from '#copilot/mcp/control-plane';
+import { readBoundedResponseJson } from '#copilot/infra/public/http-response';
 import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
 
 /** @typedef {import('cloudflare').default} CloudflareConfigAuditClient */
@@ -339,7 +340,10 @@ async function readZoneSetting(apiToken, zoneId, setting) {
             headers: { authorization: `Bearer ${apiToken}`, accept: 'application/json' },
             signal: AbortSignal.timeout(15000),
         });
-        const body = await response.json().catch(() => null);
+        const body = await readBoundedResponseJson(response, {
+            maxBytes: 2 * 1024 * 1024,
+            label: `Cloudflare zone setting ${setting.id}`,
+        }).catch(() => null);
         const result = asRecord(asRecord(body)['result']);
         const value = normalizeSettingValue(result['value']);
         const editable = typeof result['editable'] === 'boolean' ? String(result['editable']) : null;
