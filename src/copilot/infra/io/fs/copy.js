@@ -5,14 +5,13 @@
  * @module copilot/infra/io/fs/copy
  */
 
-import { randomBytes } from 'node:crypto';
 import * as nodeFs from 'node:fs';
 import { copyFile, link, rename, stat, unlink } from 'node:fs/promises';
-import path from 'node:path';
 import { assertSuccessfulSync, syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
 import { readBinaryMutationSnapshot } from './snapshot.js';
 import { preflightIoCapacity } from './capacity-preflight.js';
+import { createSiblingTempPath } from './temp-path.js';
 
 /**
  * @param {string} source
@@ -36,10 +35,7 @@ import { preflightIoCapacity } from './capacity-preflight.js';
  * }>}
  */
 export async function copyFileUnlocked(source, destination, options = {}) {
-    const tmpDestination = path.join(
-        path.dirname(destination),
-        `.${path.basename(destination)}.${randomBytes(12).toString('hex')}.copy-tmp`,
-    );
+    const tmpDestination = createSiblingTempPath(destination, 'copy');
     let tmpCreated = false;
     const sourceBytes = (await stat(source)).size;
     const capacityPreflight = await (options.capacityPreflight ?? preflightIoCapacity)(destination, sourceBytes);

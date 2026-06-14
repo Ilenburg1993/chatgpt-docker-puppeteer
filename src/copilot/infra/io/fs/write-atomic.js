@@ -5,7 +5,6 @@
  * @module copilot/infra/io/fs/write-atomic
  */
 
-import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import { toOwnedBuffer } from '../../shared/buffer.js';
 import {
@@ -17,6 +16,7 @@ import {
 } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
 import { preflightIoCapacity } from './capacity-preflight.js';
+import { createSiblingTempPath } from './temp-path.js';
 
 /**
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} content
@@ -64,7 +64,7 @@ export function normalizeWritePayload(filePath, content, encoding) {
  * }>}
  */
 export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
-    const tmpPath = `${filePath}.${randomBytes(12).toString('hex')}.tmp`;
+    const tmpPath = createSiblingTempPath(filePath, 'write');
     const writePayload = toOwnedBuffer(payload);
     const durability = normalizeIoDurability(options.durability);
     const fileFlushRequested = shouldFlushFile(durability);

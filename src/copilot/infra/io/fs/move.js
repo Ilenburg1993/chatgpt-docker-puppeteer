@@ -5,13 +5,13 @@
  * @module copilot/infra/io/fs/move
  */
 
-import { randomBytes } from 'node:crypto';
 import { copyFile, link, readFile, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { sha256 } from '../../shared/hash.js';
 import { assertSuccessfulSync, syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
 import { preflightIoCapacity } from './capacity-preflight.js';
+import { createSiblingTempPath } from './temp-path.js';
 
 /**
  * @param {string} filePath
@@ -144,11 +144,7 @@ export async function moveFileUnlocked(source, destination, options = {}) {
  * @returns {ReturnType<typeof moveFileUnlocked>}
  */
 async function moveFileAcrossDevices(source, destination, options) {
-    const destinationDir = path.dirname(destination);
-    const tmpDestination = path.join(
-        destinationDir,
-        `.${path.basename(destination)}.${randomBytes(12).toString('hex')}.move-tmp`,
-    );
+    const tmpDestination = createSiblingTempPath(destination, 'move');
     let tmpCreated = false;
     try {
         const sourceBefore =
