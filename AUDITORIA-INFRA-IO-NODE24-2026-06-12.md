@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `146f647a`, seguida da onda de higiene de temporários
+**Baseline reinvestigado:** `main` sincronizada até `509f100a`, seguida do canário CI do L2 experimental
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -29,11 +29,9 @@ Prioridades reais remanescentes:
 
 1. **P2 — promoção do L2 depende de workload real:** o perfil experimental existe e foi medido, mas cold-start pode
    custar mais que filesystem local para payloads pequenos/médios.
-2. **P2 — perfil L2 experimental ainda não roda em CI:** a capacidade existe e foi provada live, mas falta canário
-   recorrente sem promover o default.
-3. **P2 — faltam provas externas destrutivas:** crash real em directory sync/EXDEV, modificação externa durante
+2. **P2 — faltam provas externas destrutivas:** crash real em directory sync/EXDEV, modificação externa durante
    snapshot/index e interação com editor/Git ainda não estão automatizados.
-4. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
+3. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -879,6 +877,32 @@ Prova live com falha injetada antes do publish:
 
 Validação focada: **65 passados, 0 falhas**; typecheck strict de `src/copilot` e lint dos arquivos tocados: **PASS**.
 
+### 1.33 Status de implementação — canário CI do L2 experimental aplicado em 2026-06-14
+
+A pendência de execução recorrente do perfil `experimental` foi fechada sem alterar o default:
+
+- `scripts/ci/check-copilot-io-l2.mjs` cria um banco SQLite efêmero fora do workspace;
+- um subprocesso prova que ausência de configuração continua resolvendo para `off`;
+- um segundo subprocesso inicializa `experimental`, valida defaults conservadores e persiste payload de 65.557 bytes;
+- um terceiro subprocesso abre o mesmo banco, confirma hash/metadata e contabiliza hit real;
+- o banco, WAL/SHM e diretório temporário são removidos ao final;
+- o step roda antes da validação global de workflows no job `validate` de todo push/PR;
+- `validate-workflows.mjs` exige a presença do script e do comando no workflow, evitando remoção silenciosa;
+- `GITHUB_STEP_SUMMARY` recebe perfil, persistência, bytes e latências observadas.
+
+Prova local repetida:
+
+- default: `off`, `enabled:false`;
+- experimental: TTL 60 s, máximo 10.000 entradas e prune de 60 s;
+- persistência multiprocess: `true`, zero erros e hash SHA-256 idêntico;
+- amostras cold do primeiro get no processo leitor: 34,296 ms, 16,188 ms e 8,054 ms;
+- set observado entre 0,314 ms e 1,072 ms.
+
+Validação: canário **PASS**, lint focado **PASS**, typecheck strict de `scripts/ci` **PASS**, parse YAML/actionlint
+**PASS**. O validador global continua encontrando uma dívida preexistente e externa à onda:
+`main_chatgpt-docker-puppeteer.yml` não possui `permissions` top-level. O canário foi ordenado antes desse check para
+continuar produzindo evidência recorrente sem mascarar a falha existente.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1444,7 +1468,7 @@ A situação ideal é uma infra IO em camadas:
 
 #### Fase 3.4 — L2 e índice
 
-- [ ] Perfil experimental L2 em CI.
+- [x] Perfil experimental L2 em CI, isolado e multiprocess.
 - [x] Perfil operacional `off|experimental|on`, fail-closed e documentado.
 - [x] Auditar WAL, `busy_timeout` e `synchronous`.
 - [x] Hash periódico bounded + ctime/dev/ino para freshness.
@@ -1623,10 +1647,10 @@ Critérios operacionais adicionais já atendidos:
 - [x] confirmação reforçada intrínseca para remove recursivo e proteção da raiz workspace-bound;
 - [x] preflight opcional de espaço livre em payloads grandes;
 - [x] search incremental com early stop real.
+- [x] canário recorrente do perfil L2 `experimental` em CI sem alterar o default.
 
 Ainda faltam para maturidade operacional avançada:
 
-- [ ] canário recorrente do perfil L2 `experimental` em CI;
 - [ ] hit ratio e distribuição de payloads do L2 em workload longo;
 - [ ] crash real durante directory sync e fases internas do EXDEV;
 - [ ] modificação externa durante snapshot/index e interação com editor/Git.
@@ -1648,6 +1672,6 @@ Ainda faltam para maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Adicionar um canário CI isolado para `IO_L2_CACHE_PROFILE=experimental`, sem alterar o default, e coletar hit ratio,
-latência e distribuição de payloads em workload representativo longo. Depois, executar as provas externas ainda
-abertas de crash durante directory sync/EXDEV e modificação concorrente por editor/Git.
+Coletar hit ratio, latência e distribuição de payloads do L2 `experimental` em workload representativo longo, sem
+promover o default. Depois, executar as provas externas ainda abertas de crash durante directory sync/EXDEV e
+modificação concorrente por editor/Git.
