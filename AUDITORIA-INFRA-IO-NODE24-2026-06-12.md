@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `b80a85a8`, seguida da onda de confirmação forte para remove recursivo
+**Baseline reinvestigado:** `main` sincronizada até `46d0bd75`, seguida da onda experimental medida de cache L2
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -18,15 +18,17 @@ provas multiprocess/fault-injection.
 No estado atual, a descrição correta é: **as primitivas centrais de mutação, append e rollback material têm contratos
 fortes e provas reais, as superfícies externas de path estão vinculadas a policy async, o índice detecta mudanças
 externas metadata-preserving e a contenção L0/L1 é observável sem expor paths; o L1 multiprocess agora possui perfis
-explícitos por risco, remove recursivo exige confirmação exata e a raiz workspace-bound é protegida; o risco dominante
-migrou para custos de cache, preflight de capacidade e readiness operacional**.
+explícitos por risco, remove recursivo exige confirmação exata e a raiz workspace-bound é protegida; L2 possui perfil
+experimental fail-closed e custo observável; o risco dominante migrou para preflight de capacidade, readiness
+operacional e decisões de promoção baseadas em workload**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — L2/cache ainda carece de perfil experimental medido:** falta hit ratio/custo em cenário cold/warm.
-2. **P2 — preflight de espaço livre ainda inexiste:** writes/copies grandes só descobrem ENOSPC durante a operação.
-3. **P2 — readiness de escopo ainda mistura ready/degraded:** erros em `declareScope` podem parecer sucesso.
-4. **P2 — política de glob ainda é própria:** include/exclude pode divergir de `minimatch`/Node glob.
+1. **P2 — preflight de espaço livre ainda inexiste:** writes/copies grandes só descobrem ENOSPC durante a operação.
+2. **P2 — readiness de escopo ainda mistura ready/degraded:** erros em `declareScope` podem parecer sucesso.
+3. **P2 — política de glob ainda é própria:** include/exclude pode divergir de `minimatch`/Node glob.
+4. **P2 — promoção do L2 depende de workload real:** o perfil experimental existe e foi medido, mas cold-start pode
+   custar mais que filesystem local para payloads pequenos/médios.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -755,6 +757,34 @@ Validação focada:
 - IO engine, workspace IO e SessionFS: **57 passados, 0 falhas**;
 - typecheck strict e lint focado: **PASS** após ajuste de `exactOptionalPropertyTypes`.
 
+### 1.28 Status de implementação — perfil experimental e telemetria L2 aplicados em 2026-06-14
+
+IO-018 deixou de ser uma ativação booleana opaca. O cache L2 SQLite agora possui política operacional explícita,
+compatibilidade legada e telemetria suficiente para decidir promoção sem adivinhação.
+
+Mudanças efetivamente incorporadas:
+
+- `IO_L2_CACHE_PROFILE=off|experimental|on` é o contrato preferido; valor inválido falha fechado e gera alerta
+  `IO_L2_PROFILE_INVALID`;
+- `experimental` usa TTL/pruning de 60 segundos e até 10.000 entradas; `on` preserva TTL/pruning de 5 minutos e até
+  100.000 entradas; overrides especializados continuam disponíveis;
+- `IO_L2_CACHE_ENABLED` permanece como compatibilidade apenas quando o perfil explícito está ausente;
+- stats/health expõem perfil, origem, validade e latência bounded de `get`, `set`, `invalidate`, `prune` e `clear`;
+- schema, catálogo expert e guia canônico de ENV foram alinhados;
+- a auditoria confirmou que o DB Copilot já usa `WAL`, `synchronous=NORMAL`, `busy_timeout=5000`,
+  `wal_autocheckpoint=1000` e cache SQLite de 16 MiB.
+
+Prova live com dois processos Node separados e banco isolado:
+
+- primeiro processo: `l1-miss`, um miss L2 e um set de payload textual de 91.562 bytes;
+- processos seguintes: `l2-hit` real com fingerprint `l2-mtime-size`;
+- primeiro hit persistido por processo custou entre **9,053 ms e 13,941 ms** nessa amostra;
+- steady-state direto de 101 gets: média **0,147 ms**, máximo **0,384 ms**; set: **1,076 ms**.
+
+Conclusão operacional: o perfil experimental funciona e preserva hotset após restart, mas permanece `off` por default.
+O custo cold-start observado impede promover `on` globalmente sem hit ratio e distribuição de payloads do workload
+real. IO-018 está concluído com esse limite documentado.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -988,7 +1018,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-015 | P1 | Search | **Concluído:** sanitização antecede paginação e contagens | rg/grep/FTS/símbolos retornam `countsPostSanitization:true` | Linhas removidas não afetam total ou cursor | Manter prova de primeira página redigida |
 | IO-016 | P1 | Scanner | `readdir` + `lstat` por entrada é custoso | `io-scanner.js` | Muitos syscalls em árvores grandes | Usar `readdir({ withFileTypes:true })`; avaliar `fsPromises.glob` em Node 24.5 para casos seguros |
 | IO-017 | P1 | Index freshness | **Concluído:** identidade rica + hash periódico bounded | scanner persiste ctime/dev/ino; índice renova hash até limite configurável | Arquivos grandes confiam em metadata rica entre reindexações | Medir hit/miss/custo e ajustar intervalo/limite por perfil |
-| IO-018 | P1 | L2 SQLite | L2 cache opcional sem política clara de enablement | `io-cache-l2-registry.js` disabled default | Restart perde hotset; baixa performance em sessões longas | Ativar experimentalmente por perfil, medir hit ratio, busy timeout, WAL, synchronous |
+| IO-018 | P1 | L2 SQLite | **Concluído com limite documentado:** perfil experimental fail-closed e latência bounded | `IO_L2_CACHE_PROFILE`, health/stats e prova cold/warm multiprocess | Primeiro hit persistido mediu 9–14 ms; promoção global pode regredir workloads locais | Manter `off` default e promover somente por evidência de workload |
 | IO-019 | P1 | Bypass storage | `storage/json-store.js` usa `writeAtomicFileUnlocked` diretamente | `infra/storage/json-store.js` | Sem lock canônico se chamado em concorrência | Trocar por `writeFileAtomicPortable` ou `withIoResourceLock` explícito |
 | IO-020 | P1 | Bypass export | `terminal/commands/export.js` usa `writeFile` direto | Busca de bypass | Export pode sobrescrever sem IO meta/hash | Migrar para `createOrReplaceFileAtomic`/`writeFileAtomic` conforme política |
 | IO-021 | P2 | Temp naming | Temp random é 32-bit | `randomBytes(4)` | Colisão improvável, mas barata de melhorar | Usar 96/128 bits e prefixo dot-hidden `.tmp-<pid>-<random>` |
@@ -1020,9 +1050,9 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | Estado | IDs |
 | --- | --- |
 | Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-023, IO-025, IO-026, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
-| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-022, IO-038 |
+| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-038 |
 | Parcial | IO-009 |
-| Aberto | IO-018, IO-021, IO-024, IO-027, IO-028, IO-030 |
+| Aberto | IO-021, IO-024, IO-027, IO-028, IO-030 |
 
 ---
 
@@ -1098,7 +1128,7 @@ A prioridade remanescente é:
 
 - medir hit/miss e custo da verificação periódica do índice.
 - medição do custo do flush imediato sob bursts.
-- definir perfil experimental e política operacional do L2 SQLite.
+- coletar hit ratio/distribuição de payloads do L2 experimental em workloads longos antes de promover `on`.
 
 ### 6.5 Scanner, busca e index
 
@@ -1302,9 +1332,11 @@ A situação ideal é uma infra IO em camadas:
 #### Fase 3.4 — L2 e índice
 
 - [ ] Perfil experimental L2 em CI.
-- [ ] Auditar WAL, `busy_timeout` e `synchronous`.
+- [x] Perfil operacional `off|experimental|on`, fail-closed e documentado.
+- [x] Auditar WAL, `busy_timeout` e `synchronous`.
 - [x] Hash periódico bounded + ctime/dev/ino para freshness.
-- [ ] Medir hit ratio e cold/warm.
+- [x] Medir cold/warm inicial entre processos e steady-state.
+- [ ] Coletar hit ratio e distribuição de payloads em workload longo.
 
 ### Faixa 4 — Performance
 
@@ -1413,12 +1445,12 @@ inode-confirmed igual ao caminho de leitura cacheada.
 ### `io-prefetch.js`
 
 Respeita a validação UTF-8 de `readText`, e snapshot/invalidação derivados já foram endurecidos. O trabalho remanescente
-é medir custo/benefício do warmup e do L2 por perfil.
+é medir custo/benefício do warmup por workload; o L2 experimental já expõe custo por operação.
 
 ### `io-cache.js`
 
-Boa engenharia. Hash revalidation, snapshot consistente e path normalization universal tornam o L1 confiável; falta
-telemetria de hit/custo para orientar budgets e o perfil L2.
+Boa engenharia. Hash revalidation, snapshot consistente e path normalization universal tornam o L1 confiável. O L2
+agora possui perfil explícito e telemetria de hit/custo; promoção além de `experimental` depende de workload real.
 
 ### `io-scanner.js`
 
@@ -1427,7 +1459,7 @@ Usa `Dirent` para classificação básica e mantém a política de não seguir s
 ### `io-index-sqlite.js`
 
 Freshness combina metadata rica (`mtime/size/ctime/dev/ino`) com hash periódico bounded. O próximo trabalho é medir
-hit/miss/custo por perfil e decidir enablement do L2, não corrigir stale básico.
+hit/miss/custo do índice por perfil e ajustar orçamento, não corrigir stale básico.
 
 ### `io-locks.js`
 
@@ -1477,6 +1509,6 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Executar a Fase 3.4 experimental: ativar L2 SQLite em um perfil controlado, medir hit ratio/custo cold-warm e auditar
-`WAL`, `busy_timeout` e `synchronous`. Em seguida, implementar preflight opcional com `statfs` para writes/copies acima
-de limiar, sem transformar ENOSPC estimado em falsa garantia.
+Implementar preflight opcional com `statfs` para writes/copies acima de limiar, sem transformar ENOSPC estimado em
+falsa garantia. Em paralelo, coletar hit ratio/distribuição de payloads do L2 `experimental` em workloads longos antes
+de considerar promoção para `on`.
