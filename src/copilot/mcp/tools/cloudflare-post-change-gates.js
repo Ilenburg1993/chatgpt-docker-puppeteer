@@ -140,35 +140,54 @@ export function evaluateGates(input) {
         Array.isArray(originDiagnostics['recentMetricsBindErrors']) ? originDiagnostics['recentMetricsBindErrors'] : [],
         lastSmokeCheckedAt,
     );
-    if (permanentTunnel['lastSmokeFresh'] === true) passed.push('permanent tunnel smoke is fresh.');
+    const tunnelSmokeFresh = permanentTunnel['lastSmokeFresh'] === true;
+    const noRecentActionableOriginErrors = recentOriginErrors.length === 0;
+    if (tunnelSmokeFresh) passed.push('permanent tunnel smoke is fresh.');
     else critical.push('permanent tunnel smoke is not fresh.');
-    if (recentOriginErrors.length === 0) passed.push('no actionable origin errors after the latest smoke.');
+    if (noRecentActionableOriginErrors) passed.push('no actionable origin errors after the latest smoke.');
     else critical.push(`actionable origin errors after latest smoke: ${recentOriginErrors.length}.`);
     if (recentTunnelTransportErrors.length > 0) warnings.push(`recent tunnel transport errors after latest smoke: ${recentTunnelTransportErrors.length}; recovered state is judged by HA connections, smoke and metrics.`);
     if (recentMetricsBindErrors.length > 0) warnings.push(`recent cloudflared metrics bind errors after latest smoke: ${recentMetricsBindErrors.length}; ensure restart serialization remains enabled.`);
 
-    if (input.remoteAudit['ok'] === true) passed.push('Cloudflare remote audit ok=true.');
+    const remoteAuditOk = input.remoteAudit['ok'] === true;
+    if (remoteAuditOk) passed.push('Cloudflare remote audit ok=true.');
     else critical.push('Cloudflare remote audit did not return ok=true.');
     const remote = asRecord(input.remoteAudit['remote']);
     const connections = asRecord(remote['connections']);
     const activeConnections = toNumber(connections['active']);
-    if (activeConnections !== null && activeConnections >= MIN_HA_CONNECTIONS) {
+    const remoteHaHealthy = activeConnections !== null && activeConnections >= MIN_HA_CONNECTIONS;
+    if (remoteHaHealthy) {
         passed.push(`remote active HA connections >= ${MIN_HA_CONNECTIONS}.`);
     } else {
         critical.push(`remote active HA connections below ${MIN_HA_CONNECTIONS}.`);
     }
 
-    if (input.metrics['ok'] === true) passed.push('cloudflared metrics snapshot ok=true.');
+    const metricsOk = input.metrics['ok'] === true;
+    if (metricsOk) passed.push('cloudflared metrics snapshot ok=true.');
     else critical.push('cloudflared metrics snapshot did not return ok=true.');
     const operational = asRecord(input.metrics['operational']);
     const requestErrorRate = toNumber(operational['requestErrorRate']);
     const metricHaConnections = toNumber(operational['haConnections']);
+    const metricHaHealthy = metricHaConnections !== null && metricHaConnections >= MIN_HA_CONNECTIONS;
+    const recoveredDespiteHistoricalRequestErrors =
+        requestErrorRate !== null &&
+        requestErrorRate > MAX_ERROR_RATE &&
+        tunnelSmokeFresh &&
+        noRecentActionableOriginErrors &&
+        remoteAuditOk &&
+        remoteHaHealthy &&
+        metricsOk &&
+        metricHaHealthy;
     if (requestErrorRate !== null && requestErrorRate <= MAX_ERROR_RATE) {
         passed.push('requestErrorRate is 0.');
+    } else if (recoveredDespiteHistoricalRequestErrors) {
+        warnings.push(
+            `aggregate requestErrorRate is ${requestErrorRate}; treating as historical because latest smoke, HA connections and origin diagnostics are healthy.`,
+        );
     } else {
         critical.push('requestErrorRate is above 0 or unavailable.');
     }
-    if (metricHaConnections !== null && metricHaConnections >= MIN_HA_CONNECTIONS) {
+    if (metricHaHealthy) {
         passed.push(`metrics haConnections >= ${MIN_HA_CONNECTIONS}.`);
     } else {
         critical.push(`metrics haConnections below ${MIN_HA_CONNECTIONS}.`);
@@ -236,7 +255,7 @@ function isActionableOriginErrorLine(line) {
             line,
         );
     if (hardOriginFailure) return true;
-    const benignClientOrStreamClose = /context canceled|context cancelled|client disconnected|request canceled|request cancelled|stream closed/iu.test(
+    const benignClientOrStreamClose = /context canceled|context cancelled|client disconnected|request canceled|request cancelled|stream closed|unexpected eof/iu.test(
         normalized,
     );
     if (benignClientOrStreamClose) return false;

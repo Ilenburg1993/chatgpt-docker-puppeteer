@@ -488,16 +488,32 @@ function cloneStructuredReadFileResult(structured) {
 }
 
 /**
+ * Clone JSON-like MCP result records without serializing large immutable strings.
+ *
+ * The previous JSON.stringify/parse clone copied full file contents again on every cache hit. A shallow/deep structural
+ * clone keeps cached nested arrays/objects isolated while preserving primitive values directly, which is safe because
+ * strings, numbers, booleans and null are immutable.
+ *
  * @param {Record<string, unknown>} value
  * @returns {Record<string, unknown>}
  */
 function cloneJsonLikeRecord(value) {
-    try {
-        const cloned = JSON.parse(JSON.stringify(value));
-        return cloned && typeof cloned === 'object' && !Array.isArray(cloned)
-            ? /** @type {Record<string, unknown>} */ (cloned)
-            : { ...value };
-    } catch {
-        return { ...value };
+    const cloned = cloneJsonLikeValue(value);
+    return cloned && typeof cloned === 'object' && !Array.isArray(cloned)
+        ? /** @type {Record<string, unknown>} */ (cloned)
+        : { ...value };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function cloneJsonLikeValue(value) {
+    if (value === null || typeof value !== 'object') return value;
+    if (Array.isArray(value)) return value.map((entry) => cloneJsonLikeValue(entry));
+    const output = /** @type {Record<string, unknown>} */ ({});
+    for (const [key, entry] of Object.entries(/** @type {Record<string, unknown>} */ (value))) {
+        if (entry !== undefined) output[key] = cloneJsonLikeValue(entry);
     }
+    return output;
 }

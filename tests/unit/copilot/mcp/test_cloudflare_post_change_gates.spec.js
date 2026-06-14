@@ -92,6 +92,36 @@ describe('Cloudflare post-change gates', () => {
         assert.ok(result.warnings.includes('rpcClientLatency.p95Ms above budget: 3000ms.'));
     });
 
+    it('downgrades aggregate request error rate when fresh smoke and HA origin signals prove recovery', () => {
+        const result = evaluateGates({
+            tunnelStatus: {
+                success: true,
+                permanentTunnel: {
+                    transportProtocol: 'quic',
+                    lastSmokeFresh: true,
+                    lastSmoke: { checkedAt: '2026-06-14T01:24:55.271Z' },
+                    originDiagnostics: { recentOriginErrors: [] },
+                },
+            },
+            remoteAudit: {
+                ok: true,
+                remote: { connections: { active: 4 } },
+            },
+            metrics: {
+                ok: true,
+                operational: { requestErrorRate: 0.092683, haConnections: 4 },
+                latency: { rpcClientLatency: { p95Ms: 1170 } },
+                quic: { present: true, smoothedRttMs: 22 },
+            },
+        });
+
+        assert.deepEqual(result.critical, []);
+        assert.ok(
+            result.warnings.some((warning) => warning.includes('aggregate requestErrorRate is 0.092683')),
+        );
+        assert.ok(result.passed.includes('no actionable origin errors after the latest smoke.'));
+    });
+
     it('does not fail gates for recovered QUIC transport errors when smoke and HA metrics are healthy', () => {
         const result = evaluateGates({
             tunnelStatus: {
@@ -122,6 +152,37 @@ describe('Cloudflare post-change gates', () => {
 
         assert.deepEqual(result.critical, []);
         assert.ok(result.warnings.some((warning) => warning.includes('recent tunnel transport errors')));
+    });
+
+    it('does not fail origin gates for abrupt stream/client closes after latest smoke', () => {
+        const result = evaluateGates({
+            tunnelStatus: {
+                success: true,
+                permanentTunnel: {
+                    transportProtocol: 'quic',
+                    lastSmokeFresh: true,
+                    lastSmoke: { checkedAt: '2026-06-14T01:45:00.000Z' },
+                    originDiagnostics: {
+                        recentOriginErrors: [
+                            '2026-06-14T01:46:24Z ERR  error="unexpected eof" connIndex=3 event=1 ingressRule=0 originService=https://127.0.0.1:3333',
+                        ],
+                    },
+                },
+            },
+            remoteAudit: {
+                ok: true,
+                remote: { connections: { active: 4 } },
+            },
+            metrics: {
+                ok: true,
+                operational: { requestErrorRate: 0, haConnections: 4 },
+                latency: { rpcClientLatency: { p95Ms: 50 } },
+                quic: { present: true, smoothedRttMs: 31 },
+            },
+        });
+
+        assert.deepEqual(result.critical, []);
+        assert.ok(result.passed.includes('no actionable origin errors after the latest smoke.'));
     });
 
     it('does not fail origin gates for context-canceled stream/client closes after latest smoke', () => {

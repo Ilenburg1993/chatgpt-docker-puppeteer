@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, vi } from 'vitest';
 
-import { runMcpOAuthSmoke } from '#copilot/mcp/scripts';
+import { parseMcpJsonResponseText, runMcpOAuthSmoke } from '#copilot/mcp/scripts';
 
 const originalEnv = { ...process.env };
 
@@ -93,6 +93,19 @@ describe('MCP OAuth smoke hardening', () => {
         assert.equal(flow.token.ok, false);
         assert.equal(flow.token.error, 'authorization state mismatch');
         assert.equal(fetchMock.mock.calls.some(([input]) => String(input).endsWith('/oauth/token')), false);
+    });
+
+    it('normalizes Streamable HTTP POST SSE frames into JSON-RPC objects', () => {
+        const parsed = parseMcpJsonResponseText(
+            'event: message\n' +
+                'data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"repo_status"}]}}\n\n',
+        );
+
+        assert.deepEqual(parsed, {
+            jsonrpc: '2.0',
+            id: 2,
+            result: { tools: [{ name: 'repo_status' }] },
+        });
     });
 
     it('parses relative redirects and still rejects mismatched state', async () => {

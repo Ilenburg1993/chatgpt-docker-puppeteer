@@ -4,9 +4,9 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(__filename), '../../../..');
@@ -42,7 +42,10 @@ export async function ensureStatefulEnvFile(relativePath = process.env['COPILOT_
 
     if (!existsSync(envFile)) {
         const secret = normalizeSecret(process.env[secretKey]) || generateSessionSecret();
-        await writeFile(envFile, buildEnvFileContent(secret), { encoding: 'utf8', mode: 0o600 });
+        await writeFileAtomicTrusted(envFile, buildEnvFileContent(secret), {
+            caller: 'mcp.scripts.stateful-env',
+            mode: 0o600,
+        });
         chmodSync(envFile, 0o600);
         created = true;
     }
@@ -60,7 +63,10 @@ export async function ensureStatefulEnvFile(relativePath = process.env['COPILOT_
     if (!secret) throw new Error(`${secretKey} is missing or too short in ${relativePath}`);
     const upgradedText = upgradeStatefulEnvFileContent(envText, env);
     if (upgradedText !== envText) {
-        await writeFile(envFile, upgradedText, { encoding: 'utf8', mode: 0o600 });
+        await writeFileAtomicTrusted(envFile, upgradedText, {
+            caller: 'mcp.scripts.stateful-env',
+            mode: 0o600,
+        });
         chmodSync(envFile, 0o600);
         warnings.push('env-file-upgraded');
     }

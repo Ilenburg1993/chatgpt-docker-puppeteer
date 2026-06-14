@@ -29,7 +29,7 @@ import {
 } from '../control-plane/auth-jwks-warmup.js';
 import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
-import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
+import { readMcpMetricsSnapshot, recordMcpHttpTransportMode } from '../control-plane/metrics.js';
 import {
     readMcpHttpSessionRuntimeState as readStatefulMcpHttpSessionRuntimeState,
     readMcpHttpStatefulSessionPolicy,
@@ -482,6 +482,7 @@ export function createMcpHttpRequestHandler(options) {
                     }
                     const sessionPolicy = readMcpHttpSessionPolicy();
                     if (sessionPolicy.enabled) {
+                        recordMcpHttpTransportMode('stateful');
                         await handleStatefulMcpHttpRequest({
                             req,
                             res,
@@ -494,6 +495,12 @@ export function createMcpHttpRequestHandler(options) {
                         });
                         return;
                     }
+                    recordMcpHttpTransportMode('stateless-fallback');
+                    logMcp('WARN', 'MCP HTTP stateless fallback request handled.', {
+                        sessionPolicyReason: sessionPolicy.reason,
+                        statefulRequested: sessionPolicy.requested,
+                        statelessCompat: sessionPolicy.statelessCompat,
+                    });
                     await handleMcpRequest(req, res, url, parsedMcpBody);
                 } catch (error) {
                     logMcp('ERROR', 'Error handling MCP HTTP request.', {

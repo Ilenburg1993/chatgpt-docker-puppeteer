@@ -7,6 +7,11 @@
 
 const startedAt = Date.now();
 const MAX_TOOL_METRICS = 1000;
+
+const HTTP_METRICS = {
+    statefulRequests: 0,
+    statelessFallbackRequests: 0,
+};
 const MAX_PHASE_METRICS_PER_TOOL = 64;
 
 /**
@@ -31,6 +36,25 @@ const MAX_PHASE_METRICS_PER_TOOL = 64;
 
 /** @type {Map<string, ToolMetric>} */
 const TOOL_METRICS = new Map();
+
+/**
+ * @param {string} tool
+ * @param {{
+ *     durationMs: number;
+ *     isError: boolean;
+ *     phases?: Record<string, number>;
+ *     resultSize?: { strategy?: string; bytes?: number | null; rejected?: boolean };
+ * }} event
+ * @returns {void}
+ */
+/**
+ * @param {'stateful' | 'stateless-fallback'} mode
+ * @returns {void}
+ */
+export function recordMcpHttpTransportMode(mode) {
+    if (mode === 'stateful') HTTP_METRICS.statefulRequests += 1;
+    else HTTP_METRICS.statelessFallbackRequests += 1;
+}
 
 /**
  * @param {string} tool
@@ -107,6 +131,7 @@ export function recordMcpToolMetric(tool, event) {
  *     startedAt: number;
  *     uptimeMs: number;
  *     totals: { calls: number; errors: number; tools: number };
+ *     http: { statefulRequests: number; statelessFallbackRequests: number };
  *     tools: Record<
  *         string,
  *         ToolMetric & {
@@ -162,6 +187,7 @@ export function readMcpMetricsSnapshot() {
             errors,
             tools: TOOL_METRICS.size,
         },
+        http: { ...HTTP_METRICS },
         tools,
     };
 }
@@ -171,4 +197,6 @@ export function readMcpMetricsSnapshot() {
  */
 export function resetMcpMetricsForTests() {
     TOOL_METRICS.clear();
+    HTTP_METRICS.statefulRequests = 0;
+    HTTP_METRICS.statelessFallbackRequests = 0;
 }

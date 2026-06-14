@@ -81,7 +81,13 @@ export function readMcpHttpStatefulSessionPolicy(env = process.env) {
     const raw = String(env['COPILOT_MCP_HTTP_STATEFUL_SESSIONS'] ?? '')
         .trim()
         .toLowerCase();
-    const requested = raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on' || raw === 'experimental';
+    const explicitTrue = raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on' || raw === 'experimental';
+    const explicitFalse = raw === 'false' || raw === '0' || raw === 'no' || raw === 'off' || raw === 'disabled';
+    const oauthEnforcementRequiresStateful =
+        !explicitFalse &&
+        String(env['COPILOT_MCP_AUTH_MODE'] ?? '').trim().toLowerCase() === 'oauth' &&
+        String(env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? '').trim().toLowerCase() === 'all';
+    const requested = explicitTrue || oauthEnforcementRequiresStateful;
     const statelessCompat = readBooleanEnv(env, 'COPILOT_MCP_HTTP_STATELESS_COMPAT', false);
     const enabled = requested && !statelessCompat;
     return {
@@ -91,10 +97,14 @@ export function readMcpHttpStatefulSessionPolicy(env = process.env) {
         ttlMs: readPositiveIntegerEnv(env, 'COPILOT_MCP_HTTP_SESSION_TTL_MS', DEFAULT_MCP_HTTP_SESSION_TTL_MS, 10_000),
         maxSessions: readPositiveIntegerEnv(env, 'COPILOT_MCP_HTTP_MAX_SESSIONS', DEFAULT_MCP_HTTP_MAX_SESSIONS, 1),
         reason: enabled
-            ? 'stateful-session-runtime-enabled-by-policy'
+            ? explicitTrue
+                ? 'stateful-session-runtime-enabled-by-policy'
+                : 'stateful-session-runtime-enabled-by-oauth-enforcement'
             : statelessCompat
               ? 'stateless-compatibility-fallback-enabled'
-              : 'stateful-session-runtime-disabled-until-opt-in',
+              : explicitFalse
+                ? 'stateful-session-runtime-explicitly-disabled'
+                : 'stateful-session-runtime-disabled-until-opt-in',
     };
 }
 

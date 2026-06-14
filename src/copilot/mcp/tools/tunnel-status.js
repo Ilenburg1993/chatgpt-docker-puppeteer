@@ -23,6 +23,7 @@ import {
     errorResult,
     okResult,
     readMcpAuthConfig,
+    readMcpHttpStatefulSessionPolicy,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
 
@@ -420,6 +421,13 @@ export const mcpPostRestartReadinessTool = {
             publicHealthUrl ? probeHealth(publicHealthUrl) : Promise.resolve({ ok: false, error: 'public MCP URL not configured' }),
         ]);
         const originDiagnostics = await readCloudflaredOriginDiagnostics();
+        const statefulPolicy = {
+            ...readMcpHttpStatefulSessionPolicy(),
+            postSessionContractEnforced: process.env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'] === 'true',
+            sessionIdHashSecretPresent:
+                typeof process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'] === 'string' &&
+                process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'].trim().length >= 32,
+        };
         const permanentUrlReady =
             config.mode === 'named-permanent' && Boolean(config.publicMcpUrl) && publicUrlValidation?.ok === true;
         const healthReady = localHealth.ok || publicHealth.ok;
@@ -456,6 +464,7 @@ export const mcpPostRestartReadinessTool = {
             publicHealth,
             healthReady,
             originDiagnostics,
+            statefulPolicy,
             connectorSmoke: {
                 ...connectorSmoke,
                 fresh: connectorSmokeFresh,

@@ -139,6 +139,8 @@ async function runSmoke({ env }) {
             ok: Boolean(oauthRecord['ok']),
             durationMs: oauthRecord['durationMs'],
             failedChecks: oauthRecord['failedChecks'],
+            runtimeHealth: dcrFlow['runtimeHealth'] ?? null,
+            authenticatedToolsList: dcrFlow['authenticatedToolsList'] ?? null,
             authenticatedSse: dcrFlow['authenticatedSse'] ?? null,
         },
     });

@@ -22,6 +22,7 @@ import {
     okResult,
     readMcpAuthConfigCacheStats,
     readMcpAuthDecisionCacheStats,
+    readMcpHttpStatefulSessionPolicy,
     readMcpIndexAutoBuildState,
     readMcpMetricsSnapshot,
     readMcpWorkspaceSmokeSummary,
@@ -237,6 +238,19 @@ function nullableNumber(value) {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * @returns {Record<string, unknown>}
+ */
+function readStatefulRuntimePolicySnapshot() {
+    const policy = readMcpHttpStatefulSessionPolicy();
+    return {
+        ...policy,
+        postSessionContractEnforced: process.env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'] === 'true',
+        sessionIdHashSecretPresent: typeof process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'] === 'string' && process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'].trim().length >= 32,
+        statelessFallbackPossible: !policy.enabled,
+    };
+}
+
 export const mcpRuntimeHealthTool = {
     name: 'mcp_runtime_health',
     title: 'MCP runtime health',
@@ -268,6 +282,7 @@ export const mcpRuntimeHealthTool = {
         const index = summarizeIndexHealth(indexStats);
         const indexAutoBuild = readMcpIndexAutoBuildState();
         const lastWorkspaceSmoke = readMcpWorkspaceSmokeSummary();
+        const statefulPolicy = readStatefulRuntimePolicySnapshot();
         const warnings = [];
         const critical = [];
         const informational = [];
@@ -337,6 +352,7 @@ export const mcpRuntimeHealthTool = {
                         lastSmokeOk: connectorSmoke.ok,
                         lastSmokeAgeMinutes: connectorSmoke.ageMinutes,
                     },
+                    statefulPolicy,
                 },
                 indexStats: summarizeIndexStats(indexStats),
                 metrics: {
@@ -388,6 +404,7 @@ export const mcpRuntimeHealthTool = {
                     ...tunnel,
                     ignoredForOperationalReadiness: permanentMode,
                 },
+                statefulPolicy,
             },
             indexStats,
             metrics: {

@@ -263,6 +263,169 @@ describe('MCP HTTP stateful router', () => {
         assert.deepEqual(replayed, [{ jsonrpc: '2.0', method: 'second' }]);
     });
 
+    it('seeds the explicit SDK replay diagnostic on the same event store before GET handling', async () => {
+        const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
+        const errors = [];
+        const eventStore = createMcpInMemoryEventStore({ maxEventsPerStream: 10, eventTtlMs: 10_000 });
+        /** @type {unknown[]} */
+        const replayed = [];
+        /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransportOptions} */
+        let transportOptions;
+        const transport = {
+            async handleRequest(req, _res, body) {
+                if (String(req.method ?? '').toUpperCase() === 'POST') {
+                    transportOptions.onsessioninitialized?.('session-replay-probe');
+                    assert.equal(body, initializeBody);
+                    return;
+                }
+                const lastEventId = readHeader(/** @type {import('node:http').IncomingMessage} */ (req), 'last-event-id');
+                assert.ok(lastEventId);
+                await eventStore.replayEventsAfter(String(lastEventId), { send: (message) => replayed.push(message) });
+            },
+            async close() {},
+        };
+
+        await handleStatefulMcpHttpRequest({
+            req: fakeReq('POST'),
+            res: fakeRes(),
+            url: new URL('https://mcp.aurelin.org/mcp'),
+            parsedMcpBody: initializeBody,
+            authContext: { bearerToken: null, headers: {}, method: 'POST', url: 'https://mcp.aurelin.org/mcp' },
+            protocolVersion: '2025-11-25',
+            runtime,
+            useSqliteStore: false,
+            readHeader,
+            writeTransportError: captureTransportErrors(errors),
+            createServer: () => ({ async connect() {}, async close() {} }),
+            createEventStore: () => eventStore,
+            createTransport: (options) => {
+                transportOptions = options;
+                return /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransport} */ (transport);
+            },
+        });
+
+        const headers = {};
+        const res = /** @type {import('node:http').ServerResponse} */ ({
+            headersSent: false,
+            writableEnded: false,
+            setHeader(name, value) { headers[String(name).toLowerCase()] = String(value); },
+            end() {},
+        });
+        const firstEventId = await eventStore.storeEvent('stream-replay-probe', { jsonrpc: '2.0', method: 'first' });
+        await handleStatefulMcpHttpRequest({
+            req: fakeReq('GET', {
+                accept: 'text/event-stream',
+                'mcp-session-id': 'session-replay-probe',
+                'last-event-id': firstEventId,
+                'x-copilot-mcp-sdk-replay-probe': '1',
+            }),
+            res,
+            url: new URL('https://mcp.aurelin.org/mcp'),
+            parsedMcpBody: undefined,
+            authContext: { bearerToken: null, headers: {}, method: 'GET', url: 'https://mcp.aurelin.org/mcp' },
+            protocolVersion: '2025-11-25',
+            runtime,
+            useSqliteStore: false,
+            readHeader,
+            writeTransportError: captureTransportErrors(errors),
+        });
+
+        assert.equal(errors.length, 0);
+        assert.equal(headers['x-copilot-mcp-sse-replay-probe'], 'seeded-same-stream');
+        assert.deepEqual(replayed, [{
+            jsonrpc: '2.0',
+            method: 'notifications/message',
+            params: { level: 'info', logger: 'copilot-mcp-sdk-replay-probe', data: { sequence: 2 } },
+        }]);
+    });
+
+    it('answers the explicit SSE diagnostic probe without entering the long-lived SDK stream', async () => {
+        const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
+        let handled = 0;
+        runtime.register({
+            sessionId: 'session-probe',
+            transport: { async handleRequest() { handled += 1; } },
+            server: {},
+        });
+        const errors = [];
+        const headers = {};
+        const res = /** @type {import('node:http').ServerResponse} */ ({
+            headersSent: false,
+            writableEnded: false,
+            statusCode: 0,
+            body: '',
+            setHeader(name, value) { headers[String(name).toLowerCase()] = String(value); },
+            write(chunk) { this.headersSent = true; this.body += String(chunk); },
+            end() { this.writableEnded = true; },
+        });
+
+        await handleStatefulMcpHttpRequest({
+            req: fakeReq('GET', {
+                accept: 'text/event-stream',
+                'mcp-session-id': 'session-probe',
+                'x-copilot-mcp-sse-probe': '1',
+            }),
+            res,
+            url: new URL('https://mcp.aurelin.org/mcp'),
+            parsedMcpBody: undefined,
+            authContext: { bearerToken: null, headers: {}, method: 'GET', url: 'https://mcp.aurelin.org/mcp' },
+            protocolVersion: '2025-11-25',
+            runtime,
+            useSqliteStore: false,
+            readHeader,
+            writeTransportError: captureTransportErrors(errors),
+        });
+
+        assert.equal(errors.length, 0);
+        assert.equal(handled, 0);
+        assert.equal(/** @type {{ statusCode: number; body: string; writableEnded: boolean }} */ (res).statusCode, 200);
+        assert.equal(headers['x-copilot-mcp-sse-probe'], 'ok');
+        assert.match(headers['content-type'], /text\/event-stream/u);
+        assert.match(/** @type {{ body: string }} */ (res).body, /copilot-mcp-sse-probe/u);
+        assert.equal(/** @type {{ writableEnded: boolean }} */ (res).writableEnded, true);
+    });
+
+    it('enters the SDK GET stream path and sends the explicit SDK SSE diagnostic notification', async () => {
+        const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
+        let handled = 0;
+        const sent = [];
+        runtime.register({
+            sessionId: 'session-sdk-probe',
+            transport: {
+                async handleRequest() {
+                    handled += 1;
+                    await new Promise((resolve) => setTimeout(resolve, 60));
+                },
+                async send(message) { sent.push(message); },
+            },
+            server: {},
+        });
+        const errors = [];
+
+        await handleStatefulMcpHttpRequest({
+            req: fakeReq('GET', {
+                accept: 'text/event-stream',
+                'mcp-session-id': 'session-sdk-probe',
+                'x-copilot-mcp-sdk-sse-probe': '1',
+            }),
+            res: fakeRes(),
+            url: new URL('https://mcp.aurelin.org/mcp'),
+            parsedMcpBody: undefined,
+            authContext: { bearerToken: null, headers: {}, method: 'GET', url: 'https://mcp.aurelin.org/mcp' },
+            protocolVersion: '2025-11-25',
+            runtime,
+            useSqliteStore: false,
+            readHeader,
+            writeTransportError: captureTransportErrors(errors),
+        });
+
+        assert.equal(errors.length, 0);
+        assert.equal(handled, 1);
+        assert.equal(sent.length, 1);
+        assert.equal(sent[0]?.method, 'notifications/message');
+        assert.equal(sent[0]?.params?.logger, 'copilot-mcp-sdk-sse-probe');
+    });
+
     it('rejects malformed Last-Event-ID on GET before opening a stream', async () => {
         const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
         runtime.register({ sessionId: 'session-3', transport: {}, server: {} });

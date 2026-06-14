@@ -1,7 +1,7 @@
 # MCP Stateful Streamable HTTP — runbook de reinicio
 
 Data: 2026-06-13
-Estado: pronto para reinicio com runtime stateful opt-in.
+Estado: pronto para reinicio com runtime stateful obrigatório no caminho OAuth; GET/SSE autenticado ainda em diagnóstico por timeout remoto.
 
 ## Objetivo
 
@@ -104,6 +104,15 @@ unset COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT
 ```
 
 Depois reinicie o processo MCP.
+
+## Estado auditado em 2026-06-14 UTC
+
+> Atualização desta rodada: documentação revisada contra o código atual; transformação de código ficou limitada por bloqueio de escrita em arquivos-fonte do workspace nesta sessão, então os itens novos abaixo ficam como próximos patches aplicáveis. Probes confirmaram que algumas ações mutáveis são barradas antes de alcançar o MCP; a mitigação é planejar com ferramenta read-only, reduzir payload, suprimir diff e aplicar em chamada única quando a camada host permitir.
+
+- [x] `mcp_runtime_health` indica stateful policy carregada: `enabled=true`, `statelessCompat=false`, contrato pós-initialize ativo e fallback stateless indisponível no processo atual.
+- [x] Smoke OAuth autenticado executa `mcp_runtime_health` e `tools/list` via sessão; `tools/list` retornou 102/102 tools após normalização de resposta POST em SSE.
+- [ ] GET/SSE autenticado ainda aborta por timeout; manter este ponto como gate de promoção antes de declarar P0 remoto encerrado.
+- [ ] O gate vivo de Cloudflare ainda pode reprovar por contador agregado `requestErrorRate` até o processo MCP carregar a heurística nova; o teste unitário da heurística já passou no `mcp-full` job `36828763-587d-4f35-9127-c11fd87cfe30`.
 
 ## Checklist antes do reinicio
 

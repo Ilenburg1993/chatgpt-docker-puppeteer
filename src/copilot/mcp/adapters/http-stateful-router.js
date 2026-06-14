@@ -50,6 +50,8 @@ import { isMcpInitializeRequestBody, normalizeMcpSessionId } from './http-body.j
  * @typedef {{ handled: true; mode: 'stateful'; kind: 'initialize' | 'session-bound' }} StatefulRouterResult
  */
 
+const statefulTransportEventStores = new WeakMap();
+
 /**
  * @param {StatefulRouterOptions} options
  * @returns {Promise<StatefulRouterResult>}
@@ -132,8 +134,15 @@ export async function handleStatefulMcpHttpRequest(options) {
         return { handled: true, mode: 'stateful', kind: 'session-bound' };
     }
 
+    if (method === 'GET' && writeStatefulSseProbeIfRequested(options)) {
+        runtime.touch(sessionId);
+        return { handled: true, mode: 'stateful', kind: 'session-bound' };
+    }
+
     const streamRegistry = options.streamRegistry ?? getDefaultMcpHttpStreamRegistry();
     const stream = method === 'GET' ? streamRegistry.open({ sessionId, kind: 'standalone-get-sse' }) : null;
+    if (method === 'GET') await seedStatefulSdkReplayProbeIfRequested(options, session.transport);
+    const sdkSseProbeTimer = method === 'GET' ? scheduleStatefulSdkSseProbeIfRequested(options, session.transport) : null;
     try {
         await handleRequestOnExistingTransport(options, session.transport, method === 'POST' ? options.parsedMcpBody : undefined);
         if (method === 'DELETE') {
@@ -145,9 +154,82 @@ export async function handleStatefulMcpHttpRequest(options) {
             if (stream) streamRegistry.touch(stream.streamKey);
         }
     } finally {
+        if (sdkSseProbeTimer) clearTimeout(sdkSseProbeTimer);
         if (stream) streamRegistry.close(stream.streamKey, 'response_closed');
     }
     return { handled: true, mode: 'stateful', kind: 'session-bound' };
+}
+
+/**
+ * @param {StatefulRouterOptions} options
+ * @returns {boolean}
+ */
+function writeStatefulSseProbeIfRequested(options) {
+    if (options.readHeader(options.req, 'x-copilot-mcp-sse-probe') !== '1') return false;
+    const response = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (options.res));
+    if (response['headersSent'] === true || response['writableEnded'] === true) return false;
+    setHeaderIfSupported(options.res, 'Content-Type', 'text/event-stream; charset=utf-8');
+    setHeaderIfSupported(options.res, 'Cache-Control', 'no-store, no-transform');
+    setHeaderIfSupported(options.res, 'X-Accel-Buffering', 'no');
+    setHeaderIfSupported(options.res, 'X-Copilot-MCP-SSE-Probe', 'ok');
+    response['statusCode'] = 200;
+    const payload = JSON.stringify({ ok: true, diagnostic: true, at: new Date().toISOString() });
+    const write = response['write'];
+    const end = response['end'];
+    if (typeof write === 'function') write.call(options.res, `event: copilot-mcp-sse-probe\ndata: ${payload}\n\n`);
+    if (typeof end === 'function') end.call(options.res);
+    return true;
+}
+
+/**
+ * @param {StatefulRouterOptions} options
+ * @param {unknown} transport
+ * @returns {NodeJS.Timeout | null}
+ */
+function scheduleStatefulSdkSseProbeIfRequested(options, transport) {
+    if (options.readHeader(options.req, 'x-copilot-mcp-sdk-sse-probe') !== '1') return null;
+    const send = transport && typeof transport === 'object'
+        ? /** @type {Record<string, unknown>} */ (transport)['send']
+        : null;
+    if (typeof send !== 'function') return null;
+    return setTimeout(() => {
+        Promise.resolve(
+            send.call(transport, {
+                jsonrpc: '2.0',
+                method: 'notifications/message',
+                params: {
+                    level: 'info',
+                    logger: 'copilot-mcp-sdk-sse-probe',
+                    data: { ok: true, at: new Date().toISOString() },
+                },
+            }),
+        ).catch((error) => {
+            logMcp('WARN', 'MCP stateful SDK SSE probe send failed.', {
+                error: error instanceof Error ? error.message : String(error),
+            });
+        });
+    }, 25);
+}
+
+/**
+ * @param {StatefulRouterOptions} options
+ * @param {unknown} transport
+ * @returns {Promise<void>}
+ */
+async function seedStatefulSdkReplayProbeIfRequested(options, transport) {
+    if (options.readHeader(options.req, 'x-copilot-mcp-sdk-replay-probe') !== '1') return;
+    if (!transport || typeof transport !== 'object') return;
+    const eventStore = statefulTransportEventStores.get(transport);
+    if (!eventStore) return;
+    const lastEventId = options.readHeader(options.req, 'last-event-id');
+    const parsed = lastEventId ? parseMcpEventId(lastEventId) : null;
+    if (!parsed) return;
+    await eventStore.storeEvent(parsed.streamId, {
+        jsonrpc: '2.0',
+        method: 'notifications/message',
+        params: { level: 'info', logger: 'copilot-mcp-sdk-replay-probe', data: { sequence: parsed.sequence + 1 } },
+    });
+    setHeaderIfSupported(options.res, 'X-Copilot-MCP-SSE-Replay-Probe', 'seeded-same-stream');
 }
 
 /**
@@ -238,8 +320,9 @@ async function handleStatefulInitialize(options, runtime, authBinding) {
     const createTransport = options.createTransport ?? ((transportOptions) => new StreamableHTTPServerTransport(transportOptions));
     const createEventStore = options.createEventStore ?? (() => createDefaultStatefulEventStore(options));
     const server = createServer({ authContext: options.authContext });
+    const rawEventStore = createEventStore();
     const eventStore = /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').EventStore} */ (
-        /** @type {unknown} */ (createEventStore())
+        /** @type {unknown} */ (rawEventStore)
     );
     /** @type {string | null} */
     let initializedSessionId = null;
@@ -266,6 +349,7 @@ async function handleStatefulInitialize(options, runtime, authBinding) {
             });
         },
     });
+    if (transport && typeof transport === 'object') statefulTransportEventStores.set(transport, rawEventStore);
 
     try {
         await server.connect(

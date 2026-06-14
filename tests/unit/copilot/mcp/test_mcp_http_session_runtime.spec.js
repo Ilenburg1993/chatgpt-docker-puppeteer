@@ -99,7 +99,7 @@ describe('MCP HTTP stateful session runtime', () => {
         }
     });
 
-    it('enables stateful policy only when explicitly requested and not in stateless fallback', () => {
+    it('enables stateful policy when explicitly requested or required by OAuth-all, unless stateless fallback is explicit', () => {
         assert.deepEqual(
             readMcpHttpStatefulSessionPolicy({ COPILOT_MCP_HTTP_STATEFUL_SESSIONS: 'true' }),
             {
@@ -110,6 +110,28 @@ describe('MCP HTTP stateful session runtime', () => {
                 maxSessions: 256,
                 reason: 'stateful-session-runtime-enabled-by-policy',
             },
+        );
+        assert.deepEqual(
+            readMcpHttpStatefulSessionPolicy({
+                COPILOT_MCP_AUTH_MODE: 'oauth',
+                COPILOT_MCP_AUTH_ENFORCEMENT: 'all',
+            }),
+            {
+                enabled: true,
+                requested: true,
+                statelessCompat: false,
+                ttlMs: 600_000,
+                maxSessions: 256,
+                reason: 'stateful-session-runtime-enabled-by-oauth-enforcement',
+            },
+        );
+        assert.equal(
+            readMcpHttpStatefulSessionPolicy({
+                COPILOT_MCP_AUTH_MODE: 'oauth',
+                COPILOT_MCP_AUTH_ENFORCEMENT: 'all',
+                COPILOT_MCP_HTTP_STATEFUL_SESSIONS: 'false',
+            }).enabled,
+            false,
         );
         assert.equal(
             readMcpHttpStatefulSessionPolicy({

@@ -49,6 +49,8 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     transient?: boolean;
  *     durationMs?: number;
  *     responseBytes?: number;
+ *     eventReceived?: boolean | null;
+ *     lastEventId?: string;
  *     skipped?: boolean;
  * }} ProbeResult
  *
@@ -1377,10 +1379,19 @@ async function probeMcpSseStatefully(mcpUrl, accessToken, runtime) {
     );
     const sessionId = normalizeMcpSessionId(initialize.headers?.['mcp-session-id']);
     if (!initialize.ok || hasJsonRpcError(initialize.body) || !sessionId) {
+        const contentType = String(initialize.headers?.['content-type'] ?? '').toLowerCase();
+        const statelessInitializeDetected = initialize.ok && !sessionId && contentType.includes('application/json');
         return {
             ...initialize,
             ok: false,
-            error: initialize.error ?? (!sessionId ? 'missing Mcp-Session-Id after SSE initialize' : 'SSE initialize failed'),
+            error: initialize.error ?? (statelessInitializeDetected ? 'stateless_initialize_detected' : !sessionId ? 'missing Mcp-Session-Id after SSE initialize' : 'SSE initialize failed'),
+            body: {
+                ...(initialize.body && typeof initialize.body === 'object' && !Array.isArray(initialize.body)
+                    ? /** @type {Record<string, unknown>} */ (initialize.body)
+                    : { value: initialize.body ?? null }),
+                statelessInitializeDetected,
+                expectedHeader: 'Mcp-Session-Id',
+            },
         };
     }
     const sessionHeaders = { ...buildMcpAuthorizationHeaders(accessToken), 'mcp-session-id': sessionId };
@@ -1402,32 +1413,64 @@ async function probeMcpSseStatefully(mcpUrl, accessToken, runtime) {
         accept: 'text/event-stream',
         'mcp-session-id': sessionId,
         'mcp-protocol-version': process.env['COPILOT_MCP_PROTOCOL_VERSION'] ?? DEFAULT_PROTOCOL_VERSION,
+        'x-copilot-mcp-sdk-sse-probe': '1',
     };
     try {
         const initial = await probeSseHeadersOnce(mcpUrl, { method: 'GET', headers }, runtime);
-        const lastEventId = `oauth-smoke.${0}.${randomUUID()}`;
+        const realLastEventIdObserved = typeof initial.lastEventId === 'string' && initial.lastEventId.length > 0;
+        const lastEventId = typeof initial.lastEventId === 'string' && initial.lastEventId.length > 0
+            ? initial.lastEventId
+            : `oauth-smoke.${0}.${randomUUID()}`;
+        const reconnectHeaders = {
+            authorization: headers.authorization,
+            accept: headers.accept,
+            'mcp-session-id': headers['mcp-session-id'],
+            'mcp-protocol-version': headers['mcp-protocol-version'],
+            'last-event-id': lastEventId,
+            'x-copilot-mcp-sdk-replay-probe': '1',
+        };
         const reconnect = await probeSseHeadersOnce(
             mcpUrl,
-            { method: 'GET', headers: { ...headers, 'last-event-id': lastEventId } },
+            { method: 'GET', headers: reconnectHeaders },
             runtime,
         );
+        const envelopeOk = initial.ok && reconnect.ok;
+        const diagnosticEnvelopeOnly = isSseDiagnosticProbe(initial) || isSseDiagnosticProbe(reconnect);
+        const realReplayCandidate = Boolean(realLastEventIdObserved && reconnect.ok);
         return {
-            ok: initial.ok && reconnect.ok,
-
+            ok: envelopeOk && !diagnosticEnvelopeOnly,
             durationMs: Number(initial.durationMs ?? 0) + Number(reconnect.durationMs ?? 0),
             responseBytes: Number(initial.responseBytes ?? 0) + Number(reconnect.responseBytes ?? 0),
             body: {
                 initial: summarizeSseProbe(initial),
                 reconnect: summarizeSseProbe(reconnect),
+                envelopeOk,
+                diagnosticEnvelopeOnly,
+                realLastEventIdObserved,
+                realReplayCandidate,
                 lastEventIdAccepted: reconnect.ok,
             },
-            ...(!initial.ok || !reconnect.ok
-                ? { error: initial.error ?? reconnect.error ?? 'authenticated SSE reconnect with Last-Event-ID failed' }
+            ...(!envelopeOk || diagnosticEnvelopeOnly
+                ? {
+                    error: initial.error
+                        ?? reconnect.error
+                        ?? (diagnosticEnvelopeOnly
+                            ? 'authenticated SSE envelope diagnostic passed; long-lived SDK stream not proven'
+                            : 'authenticated SSE reconnect with Last-Event-ID failed'),
+                }
                 : {}),
         };
     } finally {
         await closeMcpStatefulSession(mcpUrl, accessToken, sessionId, runtime);
     }
+}
+
+/**
+ * @param {ProbeResult} probe
+ * @returns {boolean}
+ */
+function isSseDiagnosticProbe(probe) {
+    return probe.headers?.['x-copilot-mcp-sse-probe'] === 'ok';
 }
 
 /**
@@ -1441,15 +1484,25 @@ async function probeSseHeadersOnce(mcpUrl, init, runtime) {
     try {
         const response = await fetch(mcpUrl, { ...init, signal: AbortSignal.timeout(runtime.timeoutMs) });
         const headers = headersToRecord(response.headers);
-        await response.body?.cancel();
         const contentType = headers['content-type'] ?? '';
+        const wantsSdkProbe = requestInitHasHeader(init, 'x-copilot-mcp-sdk-sse-probe', '1')
+            || requestInitHasHeader(init, 'x-copilot-mcp-sdk-replay-probe', '1');
+        const eventProbe = wantsSdkProbe
+            ? await readFirstSseChunk(response, runtime)
+            : { responseBytes: 0, eventReceived: null, lastEventId: undefined, error: undefined };
+        await response.body?.cancel().catch(() => {});
+        const ok = response.ok
+            && contentType.toLowerCase().includes('text/event-stream')
+            && (!wantsSdkProbe || eventProbe.eventReceived === true);
         return {
-            ok: response.ok && contentType.toLowerCase().includes('text/event-stream'),
+            ok,
             status: response.status,
             headers,
             durationMs: Date.now() - startedAtMs,
-            responseBytes: 0,
-            ...(response.ok ? {} : { error: `HTTP ${response.status}` }),
+            responseBytes: eventProbe.responseBytes,
+            eventReceived: eventProbe.eventReceived,
+            ...(eventProbe.lastEventId ? { lastEventId: eventProbe.lastEventId } : {}),
+            ...(ok ? {} : { error: response.ok ? eventProbe.error ?? 'SSE SDK probe event was not received.' : `HTTP ${response.status}` }),
         };
     } catch (error) {
         return {
@@ -1459,6 +1512,58 @@ async function probeSseHeadersOnce(mcpUrl, init, runtime) {
             transient: true,
         };
     }
+}
+
+/**
+ * @param {Response} response
+ * @param {OAuthSmokeRuntimeOptions} runtime
+ * @returns {Promise<{ responseBytes: number; eventReceived: boolean; lastEventId?: string; error?: string }>}
+ */
+async function readFirstSseChunk(response, runtime) {
+    const reader = response.body?.getReader();
+    if (!reader) return { responseBytes: 0, eventReceived: false, error: 'SSE response body is unavailable.' };
+    try {
+        const result = await Promise.race([
+            reader.read(),
+            new Promise((resolve) => setTimeout(() => resolve({ done: true, value: undefined, timeout: true }), runtime.timeoutMs)),
+        ]);
+        const chunk = /** @type {{ done?: boolean; value?: Uint8Array; timeout?: boolean }} */ (result);
+        if (chunk.timeout) return { responseBytes: 0, eventReceived: false, error: 'SSE SDK probe event timed out.' };
+        const responseBytes = chunk.value?.byteLength ?? 0;
+        const text = chunk.value ? new TextDecoder().decode(chunk.value) : '';
+        const lastEventId = parseSseEventId(text);
+        return { responseBytes, eventReceived: responseBytes > 0, ...(lastEventId ? { lastEventId } : {}) };
+    } finally {
+        await reader.cancel().catch(() => {});
+    }
+}
+
+/**
+ * @param {string} text
+ * @returns {string | undefined}
+ */
+function parseSseEventId(text) {
+    for (const line of text.split(/\r?\n/u)) {
+        if (line.toLowerCase().startsWith('id:')) {
+            const eventId = line.slice(3).trim();
+            if (/^[^\s.]+\.\d+\.[0-9a-f-]{36}$/u.test(eventId)) return eventId;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * @param {RequestInit} init
+ * @param {string} name
+ * @param {string} expected
+ * @returns {boolean}
+ */
+function requestInitHasHeader(init, name, expected) {
+    const needle = name.toLowerCase();
+    const headers = init.headers;
+    if (!headers || Array.isArray(headers)) return false;
+    if (headers instanceof Headers) return headers.get(name) === expected;
+    return String(/** @type {Record<string, unknown>} */ (headers)[needle] ?? '') === expected;
 }
 
 /**
@@ -1568,15 +1673,44 @@ function buildMcpAuthorizationHeaders(accessToken) {
  */
 async function probeJsonWithRetry(url, init, runtime) {
     const raw = await probeRawWithRetry(url, init, runtime);
-    let body = raw.body;
-    if (typeof body === 'string') {
+    const body = typeof raw.body === 'string' ? parseMcpJsonResponseText(raw.body) : raw.body;
+    return { ...raw, body };
+}
+
+/**
+ * Parse regular JSON responses and Streamable HTTP POST responses delivered as SSE event frames.
+ * The MCP transport permits either application/json or text/event-stream for POST responses, so smoke diagnostics must
+ * normalize both shapes before looking for JSON-RPC result payloads.
+ *
+ * @param {string} text
+ * @returns {unknown}
+ */
+export function parseMcpJsonResponseText(text) {
+    const raw = String(text ?? '');
+    if (!raw.trim()) return undefined;
+    try {
+        return JSON.parse(raw);
+    } catch {
+        // Continue below: many valid Streamable HTTP POST responses are SSE frames with JSON in data: lines.
+    }
+    const messages = [];
+    for (const block of raw.split(/\r?\n\r?\n/u)) {
+        const data = block
+            .split(/\r?\n/u)
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.slice(5).trimStart())
+            .join('\n')
+            .trim();
+        if (!data || data === '[DONE]') continue;
         try {
-            body = body ? JSON.parse(body) : undefined;
+            messages.push(JSON.parse(data));
         } catch {
-            // Keep string body for diagnostics.
+            // Ignore malformed event payloads and keep scanning subsequent frames.
         }
     }
-    return { ...raw, body };
+    if (messages.length === 1) return messages[0];
+    if (messages.length > 1) return messages;
+    return text;
 }
 
 /**
@@ -1880,12 +2014,41 @@ function summarizeToken(token) {
  * @returns {Record<string, unknown> & { ok: boolean }}
  */
 function summarizeSseProbe(probe) {
+    const body = probe.body && typeof probe.body === 'object' && !Array.isArray(probe.body)
+        ? /** @type {Record<string, unknown>} */ (probe.body)
+        : {};
+    const initial = body['initial'] && typeof body['initial'] === 'object' && !Array.isArray(body['initial'])
+        ? /** @type {Record<string, unknown>} */ (body['initial'])
+        : {};
+    const reconnect = body['reconnect'] && typeof body['reconnect'] === 'object' && !Array.isArray(body['reconnect'])
+        ? /** @type {Record<string, unknown>} */ (body['reconnect'])
+        : {};
     return {
         ok: probe.ok,
-        status: probe.status ?? null,
+        status: probe.status ?? initial['status'] ?? reconnect['status'] ?? null,
         attempts: probe.attempts ?? null,
         durationMs: probe.durationMs ?? null,
-        contentType: probe.headers?.['content-type'] ?? null,
+        contentType: probe.headers?.['content-type'] ?? initial['contentType'] ?? reconnect['contentType'] ?? null,
+        diagnosticProbe: probe.headers?.['x-copilot-mcp-sse-probe'] === 'ok'
+            || initial['diagnosticProbe'] === true
+            || reconnect['diagnosticProbe'] === true,
+        envelopeOk: body['envelopeOk'] ?? null,
+        diagnosticEnvelopeOnly: body['diagnosticEnvelopeOnly'] ?? null,
+        realLastEventIdObserved: body['realLastEventIdObserved'] ?? null,
+        realReplayCandidate: body['realReplayCandidate'] ?? null,
+        eventReceived: probe['eventReceived'] ?? initial['eventReceived'] ?? reconnect['eventReceived'] ?? null,
+        lastEventId: probe['lastEventId'] ?? null,
+        initialOk: initial['ok'] ?? null,
+        initialStatus: initial['status'] ?? null,
+        initialEventReceived: initial['eventReceived'] ?? null,
+        initialLastEventId: initial['lastEventId'] ?? null,
+        initialError: initial['error'] ?? null,
+        reconnectOk: reconnect['ok'] ?? null,
+        reconnectStatus: reconnect['status'] ?? null,
+        reconnectEventReceived: reconnect['eventReceived'] ?? null,
+        reconnectLastEventId: reconnect['lastEventId'] ?? null,
+        reconnectError: reconnect['error'] ?? null,
+        lastEventIdAccepted: body['lastEventIdAccepted'] ?? null,
         error: probe.error ?? null,
     };
 }
@@ -1934,6 +2097,13 @@ function previewList(values) {
  * @returns {string[]}
  */
 function extractMcpToolNames(body) {
+    if (Array.isArray(body)) {
+        const names = new Set();
+        for (const message of body) {
+            for (const name of extractMcpToolNames(message)) names.add(name);
+        }
+        return [...names].sort((left, right) => left.localeCompare(right));
+    }
     if (!body || typeof body !== 'object') return [];
     if (!('result' in body) || !body.result || typeof body.result !== 'object') return [];
     if (!('tools' in body.result) || !Array.isArray(body.result.tools)) return [];
@@ -1986,6 +2156,7 @@ function summarizeUserinfo(probe) {
  * @returns {boolean}
  */
 function hasJsonRpcError(body) {
+    if (Array.isArray(body)) return body.some((message) => hasJsonRpcError(message));
     return Boolean(body && typeof body === 'object' && 'error' in body && body.error);
 }
 
