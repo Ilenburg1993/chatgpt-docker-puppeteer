@@ -66,6 +66,16 @@ describe('MCP HTTP JSON body helpers', () => {
         assert.equal(result.ok ? '' : result.error.error_description.includes('bad'), false);
     });
 
+    it('rejects invalid UTF-8 before JSON parsing', async () => {
+        const result = await readMcpHttpJsonBody(
+            requestWithBody(Buffer.from([0x7b, 0x22, 0x78, 0x22, 0x3a, 0x22, 0xff, 0x22, 0x7d])),
+        );
+
+        assert.equal(result.ok, false);
+        assert.equal(result.ok ? null : result.statusCode, 400);
+        assert.equal(result.ok ? null : result.error.error_description, 'Invalid JSON request body.');
+    });
+
     it('rejects Content-Length above the configured limit before reading', async () => {
         const result = await readMcpHttpJsonBody(
             requestWithBody('{"jsonrpc":"2.0"}', { 'content-length': '100' }),

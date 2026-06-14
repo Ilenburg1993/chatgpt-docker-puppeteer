@@ -1487,6 +1487,48 @@ incompleta.
 Validação focada de IO-067: **124 passados, 0 falhas** em JSONL, audit pipeline, SSE canônico e commands; lint
 focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.59 Status de investigação — custo real de `attachComment` medido em 2026-06-14
+
+IO-068 encerrou a decisão pendente sobre o custo documentado de `attachComment`. O benchmark local usou os **1.272
+arquivos JS/TS** de `src/copilot` (**10.666.067 bytes**) com a policy Babel real por extensão, warm-up e oito pares
+alternando a ordem on/off.
+
+Resultados de parse puro:
+
+- razão mediana `attachComment=true/false`: **1,109x**;
+- faixa observada dos pares: **0,970x–1,330x**, ainda sensível a JIT/GC;
+- uma rodada mais ampla com extração ficou sobreposta pelo ruído, sem regressão estável acima dessa faixa;
+- símbolos extraídos: **10.423** em ambos os modos;
+- símbolos com `docComment`: **8.591** com comments versus **0** sem comments;
+- erros de parse no corpus: **0**.
+
+Decisão: manter `attachComment:true` como policy canônica. O custo mediano local aproximado de 10,9% é menor que a
+perda funcional de documentação em 82,4% dos símbolos. Um futuro perfil sem comments só será aceitável se:
+
+1. for opt-in explícito por caller que não consome `docComment`;
+2. usar chave/cache distinta para não contaminar resultados ricos;
+3. provar ganho end-to-end, não apenas parse microbench;
+4. nunca for aplicado às tools de outline/symbol search ou ao índice que persiste documentação.
+
+### 1.60 Status de implementação — corpos HTTP/MCP/OAuth bounded e UTF-8 fatal em 2026-06-14
+
+IO-069 estendeu a política textual fatal às fronteiras HTTP estruturadas de `src/copilot`:
+
+- `readMcpHttpJsonBody` valida UTF-8 antes de `JSON.parse`, mantendo 400 genérico sem eco do payload;
+- `mcpFetchText` agora tem limite default de **2 MiB** mesmo quando o caller omite `maxBytes`;
+- respostas são rejeitadas cedo por `Content-Length`, cancelam o reader ao exceder o stream e usam decode fatal;
+- request bodies OAuth e documentos remotos de client metadata usam o helper UTF-8 canônico após budgets de 64 KiB;
+- concatenação usa `concatBufferViews` com comprimento conhecido, eliminando somas/decodes ad hoc.
+
+Stderr de subprocessos permanece uma exceção consciente: é diagnóstico bounded e decode best-effort evita descartar o
+erro operacional inteiro por bytes não textuais. `execSearchFile` legado só é usado pelo probe `rg --version`; stdout
+das buscas reais já está sob IO-066.
+
+Validação focada de IO-069: **39 passados, 0 falhas** em HTTP body/client, stateful router, connection profile e JWKS;
+lint focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**. Uma suíte Cloudflare adicional não carregou
+por alias preexistente ausente (`#copilot/mcp/cloudflare/cli-probe.js`); as superfícies alteradas passaram
+isoladamente.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1774,12 +1816,14 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-065 | P1 | Diff/output window | **Concluído:** inputs não viram arrays integrais para diff/paginação | duas passagens lazy, scanners de offsets e 10 mil casos diferenciais | Diff continua index-aligned, não é algoritmo LCS | Só migrar algoritmo com contrato/fixtures de inserção e benchmark |
 | IO-066 | P0 | Search UTF-8 | **Concluído:** stdout streaming usa decode incremental fatal | code point entre chunks, bytes inválidos e early stop cobertos | stderr diagnóstico e `execSearchFile` legado continuam decode best-effort após concatenação | Manter stdout textual de busca sob política fatal |
 | IO-067 | P0 | JSONL tail | **Concluído:** cauda tem budgets físicos e decode incremental fatal | hard caps, ring bounded, regressões e propagação SSE/audit | Uma linha maior que `maxBytes` é omitida e sinalizada, não parcialmente parseada | Manter warning/metadata quando completude for funcionalmente relevante |
+| IO-068 | P2 | Babel comments | **Concluído por medição:** `attachComment` permanece ligado | 1.272 arquivos/10,7 MB; mediana 1,109x; 8.591 docs preservados | Benchmark local tem dispersão de JIT/GC e não substitui telemetria | Perfil sem docs somente opt-in, cacheado à parte e com prova end-to-end |
+| IO-069 | P0 | HTTP UTF-8/budgets | **Concluído:** corpos estruturados MCP/OAuth e probes são bounded/fatais | default 2 MiB, request caps 64 KiB, cancelamento e testes de bytes inválidos | Stderr diagnóstico continua best-effort e bounded | Manter payloads estruturados sob decode fatal; não promover stderr a dado confiável |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2308,6 +2352,8 @@ Maturidade operacional avançada:
 - [x] remover arrays integrais de diff/output-window sem alterar contratos;
 - [x] tornar fatal e incremental o decode UTF-8 do stdout de busca;
 - [x] limitar cauda JSONL por bytes/linhas e recusar decode substitutivo;
+- [x] medir `attachComment` no corpus real e formalizar a decisão funcional;
+- [x] aplicar budgets e UTF-8 fatal a corpos estruturados HTTP/MCP/OAuth;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2328,7 +2374,7 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria de buffers diagnósticos legados e medir o custo de `attachComment` antes de qualquer perfil sem
-doc comments. Ampliar fixtures Babel somente para sintaxe realmente aceita pelo workspace e manter fuzz/chaos como
-gates recorrentes. IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos
-runtimes/processos reais que justifique o contrato.
+Continuar a auditoria das principais tools e fronteiras HTTP/streaming remanescentes. Ampliar fixtures Babel somente
+para sintaxe realmente aceita pelo workspace e manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece
+explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que justifique o
+contrato.

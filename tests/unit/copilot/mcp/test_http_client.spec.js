@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { afterEach, describe, it } from 'vitest';
 
-import { mcpFetchStatus, mcpFetchTextWithRetry } from '#copilot/mcp/control-plane';
+import { mcpFetchStatus, mcpFetchText, mcpFetchTextWithRetry } from '#copilot/mcp/control-plane';
 
 /** @type {http.Server[]} */
 const servers = [];
@@ -64,5 +64,26 @@ describe('MCP HTTP client', () => {
         assert.equal(result.rawBody, '{"ok":true}');
         assert.equal(result.attempts, 2);
         assert.equal(calls, 2);
+    });
+
+    it('rejects invalid UTF-8 and enforces response byte budgets', async () => {
+        const invalidBaseUrl = await startServer((_request, response) => {
+            response.writeHead(200, { 'content-type': 'application/json' }).end(
+                Buffer.from([0x7b, 0x22, 0x78, 0x22, 0x3a, 0x22, 0xff, 0x22, 0x7d]),
+            );
+        });
+        const invalid = await mcpFetchText(`${invalidBaseUrl}/invalid`, { timeoutMs: 1000 });
+
+        assert.equal(invalid.ok, false);
+        assert.equal(invalid.status, 0);
+        assert.match(String(invalid.error), /invalid UTF-8/u);
+
+        const largeBaseUrl = await startServer((_request, response) => {
+            response.writeHead(200, { 'content-type': 'text/plain', 'content-length': '6' }).end('abcdef');
+        });
+        const oversized = await mcpFetchText(`${largeBaseUrl}/large`, { timeoutMs: 1000, maxBytes: 4 });
+
+        assert.equal(oversized.ok, false);
+        assert.match(String(oversized.error), /exceeds 4 bytes/u);
     });
 });

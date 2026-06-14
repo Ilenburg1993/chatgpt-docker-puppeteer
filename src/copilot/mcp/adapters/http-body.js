@@ -10,6 +10,7 @@
  */
 
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/buffer';
 
 export const DEFAULT_MCP_HTTP_BODY_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -80,8 +81,11 @@ export async function readMcpHttpJsonBody(req, options = {}) {
         return bodyFailure(400, 'invalid_request', 'MCP POST requests must include a JSON request body.', bytesRead);
     }
 
-    const raw = Buffer.concat(chunks, bytesRead).toString(DEFAULT_ENCODING);
     try {
+        const raw = decodeUtf8Buffer(
+            concatBufferViews(chunks, bytesRead),
+            'MCP request body contains invalid UTF-8.',
+        );
         const body = JSON.parse(raw);
         return { ok: true, body, bytesRead, initializeRequest: isMcpInitializeRequestBody(body) };
     } catch {

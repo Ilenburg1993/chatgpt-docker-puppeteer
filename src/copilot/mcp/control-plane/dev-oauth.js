@@ -11,6 +11,7 @@
  */
 
 import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/buffer';
 import {
     calculateJwkThumbprint,
     createLocalJWKSet,
@@ -3157,6 +3158,7 @@ async function readOAuthRequestBody(req, res, options) {
  * @returns {Promise<Record<string, unknown>>}
  */
 async function readRequestBody(req, options) {
+    /** @type {Buffer[]} */
     const chunks = [];
     let totalBytes = 0;
     for await (const chunk of req) {
@@ -3167,7 +3169,10 @@ async function readRequestBody(req, options) {
         }
         chunks.push(buffer);
     }
-    const text = Buffer.concat(chunks).toString('utf8');
+    const text = decodeUtf8Buffer(
+        concatBufferViews(chunks, totalBytes),
+        'OAuth request body contains invalid UTF-8.',
+    );
     if (!text.trim()) return {};
     const contentType = normalizeContentType(req.headers['content-type']);
     if (contentType === JSON_CONTENT_TYPE) {
@@ -3565,7 +3570,12 @@ async function handleClientMetadataIncomingMessage(currentUrl, incoming, maxByte
 
     try {
         return {
-            document: JSON.parse(Buffer.concat(chunks).toString('utf8')),
+            document: JSON.parse(
+                decodeUtf8Buffer(
+                    concatBufferViews(chunks, totalBytes),
+                    'OAuth client metadata contains invalid UTF-8.',
+                ),
+            ),
             cacheTtlMs: resolveHttpCacheTtlMs(incoming.headers),
         };
     } catch {
