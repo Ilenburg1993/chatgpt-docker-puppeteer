@@ -205,6 +205,7 @@ async function appendGithubSummary(summary) {
         `- Experimental persistence across processes: **${String(/** @type {any} */ (summary.read)?.persistedAcrossProcesses)}**`,
         `- Payload: ${String(/** @type {any} */ (summary.read)?.payloadBytes)} bytes`,
         `- Seed set max latency: ${String(seedLatency?.set?.maxMs ?? 'n/a')} ms`,
+        `- Seed flush max latency: ${String(seedLatency?.flush?.maxMs ?? 'n/a')} ms`,
         `- Read get max latency: ${String(readLatency?.get?.maxMs ?? 'n/a')} ms`,
         '',
     ].join('\n');

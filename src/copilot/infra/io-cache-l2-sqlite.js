@@ -29,9 +29,10 @@ import { readEnvNonNegativeInt, readEnvPositiveInt } from './shared/env.js';
 const DEFAULT_TTL_MS = readEnvPositiveInt('IO_L2_CACHE_TTL_MS', 5 * 60 * 1000);
 const DEFAULT_MAX_ENTRIES = readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', 100_000);
 const DEFAULT_MIN_BYTES = readEnvNonNegativeInt('IO_L2_CACHE_MIN_BYTES', 0);
-const CAP_CHECK_INTERVAL = 100;
 const MIN_TOUCH_INTERVAL_MS = 1_000;
 const MAX_TOUCH_INTERVAL_MS = 30_000;
+const DEFAULT_SET_BATCH_WINDOW_MS = 25;
+const DEFAULT_SET_BATCH_MAX_ENTRIES = 256;
 
 /**
  * @param {string} filePath
@@ -81,11 +82,13 @@ function ensureIoL2Schema(db) {
 
 /**
  * @param {{
- *     db: { exec: Function; prepare: Function };
+ *     db: { exec: Function; prepare: Function; transaction?: Function };
  *     ttlMs?: number;
  *     maxEntries?: number;
  *     minBytes?: number;
  *     touchIntervalMs?: number;
+ *     setBatchWindowMs?: number;
+ *     setBatchMaxEntries?: number;
  *     now?: () => number;
  * }} options
  */
@@ -109,6 +112,14 @@ export function createIoL2SqliteCache(options) {
         Number.isFinite(options?.touchIntervalMs) && Number(options?.touchIntervalMs) >= 0
             ? Number(options?.touchIntervalMs)
             : Math.min(MAX_TOUCH_INTERVAL_MS, Math.max(MIN_TOUCH_INTERVAL_MS, Math.floor(ttlMs / 4)));
+    const setBatchWindowMs =
+        Number.isFinite(options?.setBatchWindowMs) && Number(options?.setBatchWindowMs) >= 0
+            ? Number(options?.setBatchWindowMs)
+            : DEFAULT_SET_BATCH_WINDOW_MS;
+    const setBatchMaxEntries =
+        Number.isInteger(options?.setBatchMaxEntries) && Number(options?.setBatchMaxEntries) > 0
+            ? Number(options?.setBatchMaxEntries)
+            : DEFAULT_SET_BATCH_MAX_ENTRIES;
     const now = typeof options?.now === 'function' ? options.now : Date.now;
 
     ensureIoL2Schema(db);
@@ -123,10 +134,14 @@ export function createIoL2SqliteCache(options) {
         touchWrites: 0,
         touchSkips: 0,
         admissionSkips: 0,
+        batchFlushes: 0,
+        batchedRows: 0,
+        batchFailures: 0,
     };
     const latency = {
         get: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
         set: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
+        flush: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
         invalidate: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
         prune: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
         clear: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
@@ -215,6 +230,10 @@ export function createIoL2SqliteCache(options) {
             LIMIT ?
         )
     `);
+    /** @type {Map<string, IoL2CacheRow>} */
+    const pendingSets = new Map();
+    /** @type {NodeJS.Timeout | null} */
+    let setBatchTimer = null;
 
     /** @type {(value: unknown) => Buffer} */
     const toBuffer = (value) => {
@@ -237,6 +256,64 @@ export function createIoL2SqliteCache(options) {
         stats.evictions += overflow;
     }
 
+    /**
+     * @param {IoL2CacheRow[]} rows
+     */
+    function persistRows(rows) {
+        for (const row of rows) {
+            stmtSet.run(
+                row.key,
+                row.path,
+                row.kind,
+                row.payload,
+                row.encoding || null,
+                row.sizeBytes,
+                row.createdAtMs,
+                row.expiresAtMs,
+                normalizeTimestampMs(row.mtimeMs),
+                normalizeTimestampMs(row.ctimeMs),
+                row.metaJson || null,
+                row.lastAccessedMs,
+            );
+        }
+    }
+
+    const persistRowsBatch = typeof db.transaction === 'function' ? db.transaction(persistRows) : persistRows;
+
+    function cancelSetBatchTimer() {
+        if (setBatchTimer) clearTimeout(setBatchTimer);
+        setBatchTimer = null;
+    }
+
+    function flushPendingSets() {
+        cancelSetBatchTimer();
+        if (pendingSets.size === 0) return 0;
+        const startedAt = performance.now();
+        const rows = [...pendingSets.values()];
+        pendingSets.clear();
+        try {
+            persistRowsBatch(rows);
+            stats.batchFlushes += 1;
+            stats.batchedRows += rows.length;
+            capSizeIfNeeded();
+            return rows.length;
+        } catch {
+            for (const row of rows) {
+                if (!pendingSets.has(row.key)) pendingSets.set(row.key, row);
+            }
+            stats.errors += 1;
+            stats.batchFailures += 1;
+            return 0;
+        } finally {
+            recordLatency('flush', startedAt);
+        }
+    }
+
+    function scheduleSetBatchFlush() {
+        if (setBatchTimer) return;
+        setBatchTimer = setTimeout(flushPendingSets, setBatchWindowMs);
+    }
+
     return {
         ttlMs,
         maxEntries,
@@ -245,18 +322,21 @@ export function createIoL2SqliteCache(options) {
         get(key) {
             const startedAt = performance.now();
             try {
-                const row = /** @type {IoL2CacheRow | undefined} */ (stmtGet.get(key));
+                const row =
+                    pendingSets.get(key) ?? /** @type {IoL2CacheRow | undefined} */ (stmtGet.get(key));
                 if (!row) {
                     stats.misses += 1;
                     return null;
                 }
                 const nowMs = now();
                 if (Number(row.expiresAtMs) <= nowMs) {
-                    stmtDeleteKey.run(key);
+                    if (!pendingSets.delete(key)) stmtDeleteKey.run(key);
                     stats.misses += 1;
                     return null;
                 }
-                if (nowMs - Number(row.lastAccessedMs) >= touchIntervalMs) {
+                if (pendingSets.has(key)) {
+                    stats.touchSkips += 1;
+                } else if (nowMs - Number(row.lastAccessedMs) >= touchIntervalMs) {
                     stmtTouch.run(nowMs, key);
                     stats.touchWrites += 1;
                 } else {
@@ -305,24 +385,23 @@ export function createIoL2SqliteCache(options) {
                 const expiresAtMs =
                     nowMs + (Number.isFinite(input?.ttlMs) && Number(input?.ttlMs) > 0 ? Number(input?.ttlMs) : ttlMs);
                 const normalizedPath = normalizeL2Path(input.path);
-                stmtSet.run(
-                    input.key,
-                    normalizedPath,
-                    input.kind || 'bytes',
+                pendingSets.set(input.key, {
+                    key: input.key,
+                    path: normalizedPath,
+                    kind: input.kind || 'bytes',
                     payload,
-                    input.encoding || null,
-                    Number.isFinite(input.sizeBytes) ? input.sizeBytes : payload.byteLength,
-                    nowMs,
+                    encoding: input.encoding || null,
+                    sizeBytes: Number.isFinite(input.sizeBytes) ? Number(input.sizeBytes) : payload.byteLength,
+                    createdAtMs: nowMs,
                     expiresAtMs,
-                    normalizeTimestampMs(input.mtimeMs),
-                    normalizeTimestampMs(input.ctimeMs),
-                    input.metaJson || null,
-                    nowMs,
-                );
+                    mtimeMs: normalizeTimestampMs(input.mtimeMs),
+                    ctimeMs: normalizeTimestampMs(input.ctimeMs),
+                    metaJson: input.metaJson || null,
+                    lastAccessedMs: nowMs,
+                });
                 stats.sets += 1;
-                if (maxEntries <= CAP_CHECK_INTERVAL || stats.sets % CAP_CHECK_INTERVAL === 0) {
-                    capSizeIfNeeded();
-                }
+                if (pendingSets.size >= setBatchMaxEntries || setBatchWindowMs === 0) flushPendingSets();
+                else scheduleSetBatchFlush();
                 return true;
             } catch {
                 stats.errors += 1;
@@ -337,6 +416,10 @@ export function createIoL2SqliteCache(options) {
             const startedAt = performance.now();
             try {
                 const normalized = normalizeL2Path(filePath);
+                const subtreePrefix = `${normalized}/`;
+                for (const [key, row] of pendingSets) {
+                    if (row.path === normalized || row.path.startsWith(subtreePrefix)) pendingSets.delete(key);
+                }
                 stmtDeletePathPrefix.run(normalized, `${normalized}/%`);
                 stats.invalidations += 1;
                 return true;
@@ -351,8 +434,16 @@ export function createIoL2SqliteCache(options) {
         pruneExpired() {
             const startedAt = performance.now();
             try {
-                const result = stmtDeleteExpired.run(now());
-                const removed = Number(result?.changes || 0);
+                const nowMs = now();
+                let removed = 0;
+                for (const [key, row] of pendingSets) {
+                    if (row.expiresAtMs <= nowMs) {
+                        pendingSets.delete(key);
+                        removed += 1;
+                    }
+                }
+                const result = stmtDeleteExpired.run(nowMs);
+                removed += Number(result?.changes || 0);
                 if (removed > 0) {
                     stats.evictions += removed;
                 }
@@ -369,6 +460,8 @@ export function createIoL2SqliteCache(options) {
         clearAll() {
             const startedAt = performance.now();
             try {
+                cancelSetBatchTimer();
+                pendingSets.clear();
                 db.exec('DELETE FROM copilot_io_cache_l2');
                 return true;
             } catch {
@@ -379,7 +472,12 @@ export function createIoL2SqliteCache(options) {
             }
         },
 
+        flushPending() {
+            return flushPendingSets();
+        },
+
         getStats() {
+            flushPendingSets();
             const snapshot = stmtCount.get() || { total: 0, bytes: 0 };
             return {
                 ...stats,
@@ -389,6 +487,10 @@ export function createIoL2SqliteCache(options) {
                 maxEntries,
                 minBytes,
                 touchIntervalMs,
+                setBatchWindowMs,
+                setBatchMaxEntries,
+                pendingSets: pendingSets.size,
+                averageBatchSize: stats.batchFlushes > 0 ? Number((stats.batchedRows / stats.batchFlushes).toFixed(3)) : 0,
                 latency: Object.fromEntries(
                     Object.entries(latency).map(([operation, metric]) => [
                         operation,

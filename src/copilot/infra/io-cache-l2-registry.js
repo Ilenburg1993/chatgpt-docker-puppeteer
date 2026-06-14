@@ -152,6 +152,14 @@ function stopPruneTimer() {
     _pruneTimerId = null;
 }
 
+function flushActiveL2Cache() {
+    try {
+        _ioL2Cache?.flushPending?.();
+    } catch {
+        // Cache L2 é best-effort; reconfiguração não deve bloquear o runtime.
+    }
+}
+
 /**
  * @param {ReturnType<typeof getIoL2CacheConfiguration>} configuration
  */
@@ -168,6 +176,7 @@ function getConfigurationKey(configuration) {
 export function getIoL2Cache() {
     const configuration = getIoL2CacheConfiguration();
     if (!configuration.enabled) {
+        flushActiveL2Cache();
         _ioL2Cache = null;
         _activeConfigurationKey = null;
         stopPruneTimer();
@@ -175,6 +184,7 @@ export function getIoL2Cache() {
     }
     const configurationKey = getConfigurationKey(configuration);
     if (_ioL2Cache && _activeConfigurationKey !== configurationKey) {
+        flushActiveL2Cache();
         _ioL2Cache = null;
         stopPruneTimer();
     }
@@ -317,6 +327,7 @@ export function getIoL2CacheHealth() {
 }
 
 export function resetIoL2CacheForTest() {
+    flushActiveL2Cache();
     _ioL2Cache = null;
     _activeConfigurationKey = null;
     _lastInitError = null;

@@ -116,6 +116,7 @@ describe('createIoL2SqliteCache', () => {
         });
 
         cache.set({ key: 'touch', path: '/tmp/touch', payload: 'value' });
+        cache.flushPending();
         cache.get('touch');
         expect(
             db.prepare('SELECT last_accessed_ms as lastAccessedMs FROM copilot_io_cache_l2 WHERE cache_key = ?').get(
@@ -154,5 +155,71 @@ describe('createIoL2SqliteCache', () => {
             admissionSkips: 1,
             minBytes: 4,
         });
+    });
+
+    it('batches pending sets while preserving immediate reads and explicit flush', () => {
+        const db = createDb();
+        const cache = createIoL2SqliteCache({
+            db,
+            ttlMs: 60_000,
+            setBatchWindowMs: 10_000,
+            setBatchMaxEntries: 100,
+        });
+
+        cache.set({ key: 'a', path: '/tmp/a', payload: 'a' });
+        cache.set({ key: 'b', path: '/tmp/b', payload: 'b' });
+        cache.set({ key: 'c', path: '/tmp/c', payload: 'c' });
+
+        expect(db.prepare('SELECT COUNT(*) as total FROM copilot_io_cache_l2').get()).toMatchObject({ total: 0 });
+        expect(cache.get('b')?.payload.toString('utf8')).toBe('b');
+        expect(cache.flushPending()).toBe(3);
+        expect(db.prepare('SELECT COUNT(*) as total FROM copilot_io_cache_l2').get()).toMatchObject({ total: 3 });
+        expect(cache.getStats()).toMatchObject({
+            sets: 3,
+            batchFlushes: 1,
+            batchedRows: 3,
+            batchFailures: 0,
+            pendingSets: 0,
+            averageBatchSize: 3,
+            setBatchWindowMs: 10_000,
+            setBatchMaxEntries: 100,
+        });
+        cache.clearAll();
+    });
+
+    it('keeps pending rows readable when a batch transaction fails', () => {
+        const db = createDb();
+        const transaction = db.transaction.bind(db);
+        let shouldFail = true;
+        db.transaction = (handler) => {
+            const persist = transaction(handler);
+            return (...args) => {
+                if (shouldFail) throw new Error('controlled batch failure');
+                return persist(...args);
+            };
+        };
+        const cache = createIoL2SqliteCache({
+            db,
+            ttlMs: 60_000,
+            setBatchWindowMs: 10_000,
+        });
+
+        cache.set({ key: 'retry', path: '/tmp/retry', payload: 'value' });
+        expect(cache.flushPending()).toBe(0);
+        expect(cache.get('retry')?.payload.toString('utf8')).toBe('value');
+        expect(cache.getStats()).toMatchObject({
+            errors: 2,
+            batchFailures: 2,
+            pendingSets: 1,
+        });
+
+        shouldFail = false;
+        expect(cache.flushPending()).toBe(1);
+        expect(cache.getStats()).toMatchObject({
+            batchFlushes: 1,
+            batchedRows: 1,
+            pendingSets: 0,
+        });
+        cache.clearAll();
     });
 });

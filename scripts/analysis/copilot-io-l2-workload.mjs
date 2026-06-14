@@ -260,6 +260,7 @@ async function executePhase(phase, manifestPath, concurrency) {
 
     try {
         await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, () => worker()));
+        l2Cache?.flushPending?.();
         const wallMs = performance.now() - startedAt;
         if (errors > 0) {
             throw new Error(`workload phase ${phase} had ${errors} read errors: ${errorSamples.join(', ')}`);

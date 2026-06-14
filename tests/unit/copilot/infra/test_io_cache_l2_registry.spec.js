@@ -65,11 +65,13 @@ describe('io-cache-l2-registry', () => {
     it('reconfigures the live cache when the explicit profile changes', () => {
         process.env['IO_L2_CACHE_PROFILE'] = 'experimental';
         const experimental = getIoL2Cache();
+        experimental?.set({ key: 'pending', path: '/tmp/pending', payload: 'pending' });
 
         process.env['IO_L2_CACHE_PROFILE'] = 'on';
         const on = getIoL2Cache();
 
         expect(experimental?.ttlMs).toBe(60_000);
+        expect(experimental?.getStats()).toMatchObject({ pendingSets: 0, batchedRows: 1 });
         expect(on?.ttlMs).toBe(300_000);
         expect(on).not.toBe(experimental);
     });
