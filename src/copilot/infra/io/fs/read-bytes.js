@@ -6,6 +6,7 @@
  */
 
 import * as fs from 'node:fs/promises';
+import { richFingerprintMatches } from '../../shared/fingerprint-match.js';
 
 const DEFAULT_SNAPSHOT_RETRIES = 2;
 
@@ -14,13 +15,23 @@ const DEFAULT_SNAPSHOT_RETRIES = 2;
  * @param {import('node:fs').Stats} right
  * @returns {boolean}
  */
-function sameFileSnapshot(left, right) {
-    return (
-        Number(left.dev) === Number(right.dev) &&
-        Number(left.ino) === Number(right.ino) &&
-        left.size === right.size &&
-        left.mtimeMs === right.mtimeMs &&
-        left.ctimeMs === right.ctimeMs
+export function sameFileSnapshot(left, right) {
+    return richFingerprintMatches(
+        {
+            sizeBytes: left.size,
+            mtimeMs: left.mtimeMs,
+            ctimeMs: left.ctimeMs,
+            dev: Number(left.dev),
+            ino: Number(left.ino),
+        },
+        {
+            sizeBytes: right.size,
+            mtimeMs: right.mtimeMs,
+            ctimeMs: right.ctimeMs,
+            dev: Number(right.dev),
+            ino: Number(right.ino),
+        },
+        { mtimeToleranceMs: 0 },
     );
 }
 
@@ -29,7 +40,7 @@ function sameFileSnapshot(left, right) {
  * @param {number} attempts
  * @returns {Error & { code?: string; attempts?: number }}
  */
-function createStaleSnapshotError(filePath, attempts) {
+export function createStaleSnapshotError(filePath, attempts) {
     const error = /** @type {Error & { code?: string; attempts?: number }} */ (
         new Error(`Arquivo mudou durante snapshot consistente: ${filePath}`)
     );

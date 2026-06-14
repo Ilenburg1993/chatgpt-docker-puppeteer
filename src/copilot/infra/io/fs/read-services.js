@@ -11,7 +11,7 @@ import { getIoL1Cache, getVerifiedIoL1Entry, makeBytesKey, makeTextKey, normaliz
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
 import { bufferIsUtf8, isBufferValue, toOwnedBuffer } from '../../shared/buffer.js';
-import { fingerprintMatches } from '../../shared/fingerprint-match.js';
+import { fingerprintMatches, richFingerprintMatches } from '../../shared/fingerprint-match.js';
 import { sha256 } from '../../shared/hash.js';
 import { readBytesFileSnapshot } from './read-bytes.js';
 import { sliceTextByCachedLineOffsets } from './line-offset-cache.js';
@@ -59,13 +59,24 @@ function readCacheContentHash(meta) {
 }
 
 /**
- * @param {{ mtimeMs?: number | null; sizeBytes: number }} l2Entry
- * @param {{ mtimeMs?: number; size?: number } | null} metadata
+ * @param {Record<string, unknown>} meta
  * @returns {boolean}
  */
-function l2EntryMatchesStat(l2Entry, metadata) {
+function hasRichCacheFingerprint(meta) {
+    return ['ctimeMs', 'dev', 'ino'].every(
+        (key) => typeof meta[key] === 'number' && Number.isFinite(meta[key]),
+    );
+}
+
+/**
+ * @param {{ mtimeMs?: number | null; sizeBytes: number }} l2Entry
+ * @param {Record<string, unknown>} l2Meta
+ * @param {{ mtimeMs?: number; ctimeMs?: number; size?: number; dev?: number | bigint; ino?: number | bigint } | null} metadata
+ * @returns {boolean}
+ */
+function l2EntryMatchesStat(l2Entry, l2Meta, metadata) {
     if (!metadata) return false;
-    return fingerprintMatches(
+    const basicMatches = fingerprintMatches(
         {
             mtimeMs: Number(l2Entry.mtimeMs),
             sizeBytes: Number(l2Entry.sizeBytes),
@@ -73,6 +84,25 @@ function l2EntryMatchesStat(l2Entry, metadata) {
         {
             mtimeMs: Number(metadata.mtimeMs),
             sizeBytes: Number(metadata.size),
+        },
+    );
+    if (!basicMatches) return false;
+
+    if (!hasRichCacheFingerprint(l2Meta)) return true;
+    return richFingerprintMatches(
+        {
+            mtimeMs: Number(l2Entry.mtimeMs),
+            ctimeMs: Number(l2Meta['ctimeMs']),
+            sizeBytes: Number(l2Entry.sizeBytes),
+            dev: Number(l2Meta['dev']),
+            ino: Number(l2Meta['ino']),
+        },
+        {
+            mtimeMs: Number(metadata.mtimeMs),
+            ctimeMs: Number(metadata.ctimeMs),
+            sizeBytes: Number(metadata.size),
+            dev: Number(metadata.dev),
+            ino: Number(metadata.ino),
         },
     );
 }
@@ -142,7 +172,10 @@ export async function readBytes(filePath, options = {}) {
                 const contentHash = readCacheContentHash(l2Meta) ?? sha256(l2Entry.payload);
                 const metadata = await statPathSnapshot(filePath).catch(() => null);
 
-                if (l2EntryMatchesStat(l2Entry, metadata)) {
+                if (l2EntryMatchesStat(l2Entry, l2Meta, metadata)) {
+                    const fingerprintStrategy = hasRichCacheFingerprint(l2Meta)
+                        ? 'l2-mtime-size-ctime-dev-ino'
+                        : 'l2-mtime-size';
                     const _now = Date.now();
                     _l1.set(_cacheKey, {
                         content: l2Entry.payload,
@@ -152,8 +185,11 @@ export async function readBytes(filePath, options = {}) {
                         accessCount: 1,
                         mtime: Number(metadata?.mtimeMs),
                         size: Number(metadata?.size),
+                        ctime: Number(metadata?.ctimeMs),
+                        dev: Number(metadata?.dev),
+                        ino: Number(metadata?.ino),
                         contentHash,
-                        fingerprintStrategy: 'l2-mtime-size',
+                        fingerprintStrategy,
                     });
                     const io = publishAndReturn(
                         buildIoMeta({
@@ -177,7 +213,7 @@ export async function readBytes(filePath, options = {}) {
                         sizeBytes: Number(metadata?.size ?? l2Entry.sizeBytes),
                         mtimeMs: Number.isFinite(Number(metadata?.mtimeMs)) ? Number(metadata?.mtimeMs) : null,
                         contentHash,
-                        cacheFingerprintStrategy: 'l2-mtime-size',
+                        cacheFingerprintStrategy: fingerprintStrategy,
                         io,
                     };
                 }
@@ -198,6 +234,9 @@ export async function readBytes(filePath, options = {}) {
             accessCount: 1,
             mtime: snapshot.mtimeMs,
             size: snapshot.sizeBytes,
+            ctime: snapshot.ctimeMs,
+            dev: snapshot.dev,
+            ino: snapshot.ino,
             contentHash,
             fingerprintStrategy: 'fs-read',
         };
@@ -210,7 +249,12 @@ export async function readBytes(filePath, options = {}) {
                 payload: content,
                 sizeBytes: content.byteLength,
                 mtimeMs: Number.isFinite(_entry.mtime) ? Number(_entry.mtime) : null,
-                metaJson: stringifyCacheMeta({ contentHash }),
+                metaJson: stringifyCacheMeta({
+                    contentHash,
+                    ctimeMs: snapshot.ctimeMs,
+                    dev: snapshot.dev,
+                    ino: snapshot.ino,
+                }),
             });
         }
         const io = publishAndReturn(
@@ -350,7 +394,10 @@ export async function readText(filePath, options = {}) {
                 const l2ContentHash = readCacheContentHash(l2Meta);
                 const metadata = await statPathSnapshot(filePath).catch(() => null);
 
-                if (l2EntryMatchesStat(l2Entry, metadata)) {
+                if (l2EntryMatchesStat(l2Entry, l2Meta, metadata)) {
+                    const fingerprintStrategy = hasRichCacheFingerprint(l2Meta)
+                        ? 'l2-mtime-size-ctime-dev-ino'
+                        : 'l2-mtime-size';
                     const text = l2Entry.payload.toString('utf8');
                     const contentHash = l2ContentHash ?? sha256(text);
                     const sliced = sliceTextByCachedLineOffsets(
@@ -376,8 +423,11 @@ export async function readText(filePath, options = {}) {
                         accessCount: 1,
                         mtime: Number(metadata?.mtimeMs),
                         size: Number(metadata?.size),
+                        ctime: Number(metadata?.ctimeMs),
+                        dev: Number(metadata?.dev),
+                        ino: Number(metadata?.ino),
                         contentHash,
-                        fingerprintStrategy: 'l2-mtime-size',
+                        fingerprintStrategy,
                     });
 
                     const io = publishAndReturn(
@@ -407,7 +457,7 @@ export async function readText(filePath, options = {}) {
                         mtimeMs: Number.isFinite(Number(metadata?.mtimeMs)) ? Number(metadata?.mtimeMs) : null,
                         contentHash,
                         returnedContentHash: sha256(content),
-                        cacheFingerprintStrategy: 'l2-mtime-size',
+                        cacheFingerprintStrategy: fingerprintStrategy,
                         totalLines,
                         returnedLines: { start: sliceStart, end: sliceEnd },
                         io,
@@ -464,6 +514,9 @@ export async function readText(filePath, options = {}) {
             accessCount: 1,
             mtime: textSnapshot.mtimeMs,
             size: textSnapshot.sizeBytes,
+            ctime: textSnapshot.ctimeMs,
+            dev: textSnapshot.dev,
+            ino: textSnapshot.ino,
             contentHash,
             fingerprintStrategy: 'fs-read',
         };
@@ -476,7 +529,14 @@ export async function readText(filePath, options = {}) {
                 payload: text,
                 sizeBytes: raw.byteLength,
                 mtimeMs: Number.isFinite(_textEntry.mtime) ? Number(_textEntry.mtime) : null,
-                metaJson: stringifyCacheMeta({ contentHash, lineCount: totalLines, encoding: 'utf8' }),
+                metaJson: stringifyCacheMeta({
+                    contentHash,
+                    lineCount: totalLines,
+                    encoding: 'utf8',
+                    ctimeMs: textSnapshot.ctimeMs,
+                    dev: textSnapshot.dev,
+                    ino: textSnapshot.ino,
+                }),
             });
         }
         const io = publishAndReturn(buildIoMeta(baseMeta), true);

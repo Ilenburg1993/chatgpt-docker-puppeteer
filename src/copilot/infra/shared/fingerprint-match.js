@@ -27,3 +27,26 @@ export function fingerprintMatches(cached, actual, options = {}) {
     const sizeOk = cachedSize === actualSize;
     return mtimeOk && sizeOk;
 }
+
+/**
+ * Compara tamanho, timestamps e identidade do inode.
+ *
+ * @param {{ mtimeMs: number; ctimeMs: number; sizeBytes: number; dev: number; ino: number }} cached
+ * @param {{ mtimeMs: number; ctimeMs: number; sizeBytes: number; dev: number; ino: number }} actual
+ * @param {{ mtimeToleranceMs?: number }} [options]
+ * @returns {boolean}
+ */
+export function richFingerprintMatches(cached, actual, options = {}) {
+    return (
+        fingerprintMatches(cached, actual, options) &&
+        Number.isFinite(Number(cached.ctimeMs)) &&
+        Number.isFinite(Number(actual.ctimeMs)) &&
+        Number(cached.ctimeMs) === Number(actual.ctimeMs) &&
+        Number.isFinite(Number(cached.dev)) &&
+        Number.isFinite(Number(actual.dev)) &&
+        Number(cached.dev) === Number(actual.dev) &&
+        Number.isFinite(Number(cached.ino)) &&
+        Number.isFinite(Number(actual.ino)) &&
+        Number(cached.ino) === Number(actual.ino)
+    );
+}

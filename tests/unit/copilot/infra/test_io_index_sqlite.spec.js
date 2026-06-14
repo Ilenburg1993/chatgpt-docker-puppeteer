@@ -1,6 +1,7 @@
 // @ts-check
 
 import Database from 'better-sqlite3';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { mkdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -10,8 +11,43 @@ import { createIoIndexSqlite } from '../../../../src/copilot/infra/io-index-sqli
 
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
 
+const REPLACE_TEXT_CHILD = `
+import { rename, writeFile } from 'node:fs/promises';
+process.on('message', async (message) => {
+    try {
+        const tempPath = message.filePath + '.external-replacement';
+        await writeFile(tempPath, message.content, 'utf8');
+        await rename(tempPath, message.filePath);
+        process.send?.({ ok: true });
+        process.exit(0);
+    } catch (error) {
+        process.send?.({ ok: false, message: error instanceof Error ? error.message : String(error) });
+        process.exit(1);
+    }
+});
+`;
+
 /** @type {string | null} */
 let tmpDir = null;
+
+/**
+ * @param {string} filePath
+ * @param {string} content
+ */
+async function replaceTextFromChild(filePath, content) {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', REPLACE_TEXT_CHILD], {
+        stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
+    });
+    await new Promise((resolve, reject) => {
+        child.once('error', reject);
+        child.once('message', (message) => {
+            const result = /** @type {{ ok?: boolean; message?: string }} */ (message);
+            if (result.ok) resolve(undefined);
+            else reject(new Error(result.message ?? 'external replacement failed'));
+        });
+        child.send({ filePath, content });
+    });
+}
 
 beforeEach(async () => {
     tmpDir = mkdtempSync(join(WORKSPACE, 'tmp', '.io-index-'));
@@ -247,6 +283,39 @@ describe('createIoIndexSqlite', () => {
             hashVerificationHits: 1,
             hashVerificationMisses: 0,
         });
+    });
+
+    it('repete snapshot quando processo externo substitui arquivo antes do commit', async () => {
+        expect(tmpDir).toBeTruthy();
+        const root = join(/** @type {string} */ (tmpDir), 'external-race');
+        const filePath = join(root, 'race.md');
+        await mkdir(root);
+        await writeFile(filePath, 'old-token\n', 'utf8');
+        let replaced = false;
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({
+            db,
+            onPhase: async (phase, details) => {
+                if (
+                    phase !== 'before-file-commit-validation' ||
+                    details['action'] !== 'index' ||
+                    details['attempt'] !== 1 ||
+                    details['filePath'] !== filePath ||
+                    replaced
+                ) {
+                    return;
+                }
+                replaced = true;
+                await replaceTextFromChild(filePath, 'new-token\n');
+            },
+        });
+
+        const result = await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
+
+        expect(result).toMatchObject({ indexed: 1, failed: 0, snapshotConflicts: 1 });
+        expect(index.search('old-token')).toEqual([]);
+        expect(index.search('new-token')).toHaveLength(1);
+        expect(index.getStats().snapshotConflicts).toBe(1);
     });
 
     it('remove do índice arquivos deletados em build completo', async () => {

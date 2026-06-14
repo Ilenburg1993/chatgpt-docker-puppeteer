@@ -2,7 +2,7 @@
 import * as assert from 'node:assert/strict';
 import * as os from 'node:os';
 import * as nodePath from 'node:path';
-import { rm, stat, writeFile } from 'node:fs/promises';
+import { rename, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { afterEach, describe, it } from 'vitest';
 
 import {
@@ -105,10 +105,47 @@ describe('infra/io-cache — get/set/hit/miss', () => {
         const stats = cache.stats();
 
         assert.ok(result !== null);
-        assert.equal(result?.fingerprintStrategy, 'mtime-size-hash');
+        assert.equal(result?.fingerprintStrategy, 'mtime-size-ctime-dev-ino-hash');
         assert.equal(stats.hashRevalidations, 1);
         assert.equal(stats.hashRevalidationHits, 1);
 
+        await rm(filePath, { force: true });
+    });
+
+    it('invalida replace atômico same-size/same-mtime pela identidade rica', async () => {
+        const filePath = nodePath.join(os.tmpdir(), `io-cache-rich-${Date.now()}.txt`);
+        const replacementPath = `${filePath}.replacement`;
+        await writeFile(filePath, 'old-content', 'utf8');
+        const before = await stat(filePath);
+        const cache = getIoL1Cache();
+        const key = makeBytesKey(normalizeIoCacheKey(filePath));
+        const content = Buffer.from('old-content', 'utf8');
+
+        cache.set(key, {
+            content,
+            bytes: content.byteLength,
+            cachedAt: 0,
+            lastValidatedAt: 0,
+            mtime: before.mtimeMs,
+            size: before.size,
+            ctime: before.ctimeMs,
+            dev: Number(before.dev),
+            ino: Number(before.ino),
+            contentHash: sha256(content),
+        });
+
+        await writeFile(replacementPath, 'new-content', 'utf8');
+        await utimes(replacementPath, before.atime, before.mtime);
+        await rename(replacementPath, filePath);
+        const after = await stat(filePath);
+        assert.equal(after.size, before.size);
+        assert.ok(Math.abs(after.mtimeMs - before.mtimeMs) <= 2);
+        assert.notEqual(Number(after.ino), Number(before.ino));
+
+        const result = await getVerifiedIoL1Entry(key, filePath);
+
+        assert.equal(result, null);
+        assert.equal(cache.stats().staleHits, 1);
         await rm(filePath, { force: true });
     });
 });

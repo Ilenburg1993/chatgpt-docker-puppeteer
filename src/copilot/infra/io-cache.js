@@ -14,7 +14,7 @@
  * - Invalidação ativa por prefixo: toda escrita, delete, move ou patch invalida TODAS as entradas do path (bytes + text +
  *   ranges).
  * - Stats: hits, misses, evictions, invalidations, bytesStored (via `cache.calculatedSize`).
- * - Fingerprint (mtime+size): detecta arquivos modificados externamente sem depender só do TTL.
+ * - Fingerprint rico (mtime+size+ctime+dev+ino): detecta arquivos modificados ou substituídos externamente.
  * - Stale-probe: a cada `IO_L1_STALE_PROBE_INTERVAL_MS` (padrão 2s) re-valida a entrada com stat() leve.
  *
  * @module copilot/infra/io-cache
@@ -25,7 +25,7 @@ import * as fsPromises from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import { normalizeIoCacheKey } from './cache/l1/index.js';
 import { publishIoInvalidation, registerIoInvalidationHook } from './io/invalidation/bus.js';
-import { fingerprintMatches } from './shared/fingerprint-match.js';
+import { fingerprintMatches, richFingerprintMatches } from './shared/fingerprint-match.js';
 import { sha256 } from './shared/hash.js';
 
 // ---------------------------------------------------------------------------
@@ -61,6 +61,9 @@ const STALE_PROBE_INTERVAL_MS = Number(process.env['IO_L1_STALE_PROBE_INTERVAL_M
  * @property {number} cachedAt - Timestamp (ms) de quando foi armazenado.
  * @property {number} [mtime] - Mtime do arquivo no momento do cache (ms). Usado para stale detection.
  * @property {number} [size] - Tamanho do arquivo no momento do cache (bytes). Complemento do mtime.
+ * @property {number} [ctime] - Ctime do arquivo no momento do cache (ms).
+ * @property {number} [dev] - Device do arquivo no momento do cache.
+ * @property {number} [ino] - Inode do arquivo no momento do cache.
  * @property {number} [lastValidatedAt] - Última vez que o fingerprint foi validado (ms).
  * @property {number} [accessCount] - Contagem de acessos para TTL adaptativo.
  * @property {string} [contentHash] - SHA-256 do conteúdo completo cacheado, quando conhecido.
@@ -180,11 +183,29 @@ export function getIoL1Cache() {
                 const stat = await fsPromises.stat(filePath);
                 const currentMtime = stat.mtimeMs;
                 const currentSize = stat.size;
-
-                const isFresh = fingerprintMatches(
-                    { mtimeMs: entry.mtime, sizeBytes: entry.size },
-                    { mtimeMs: currentMtime, sizeBytes: currentSize },
-                );
+                const hasRichFingerprint =
+                    Number.isFinite(entry.ctime) && Number.isFinite(entry.dev) && Number.isFinite(entry.ino);
+                const isFresh = hasRichFingerprint
+                    ? richFingerprintMatches(
+                          {
+                              mtimeMs: entry.mtime,
+                              ctimeMs: Number(entry.ctime),
+                              sizeBytes: entry.size,
+                              dev: Number(entry.dev),
+                              ino: Number(entry.ino),
+                          },
+                          {
+                              mtimeMs: currentMtime,
+                              ctimeMs: stat.ctimeMs,
+                              sizeBytes: currentSize,
+                              dev: Number(stat.dev),
+                              ino: Number(stat.ino),
+                          },
+                      )
+                    : fingerprintMatches(
+                          { mtimeMs: entry.mtime, sizeBytes: entry.size },
+                          { mtimeMs: currentMtime, sizeBytes: currentSize },
+                      );
 
                 if (!isFresh) {
                     const hashRevalidationEligible =
@@ -199,8 +220,11 @@ export function getIoL1Cache() {
                             if (actualHash === entry.contentHash) {
                                 entry.mtime = currentMtime;
                                 entry.size = currentSize;
+                                entry.ctime = stat.ctimeMs;
+                                entry.dev = Number(stat.dev);
+                                entry.ino = Number(stat.ino);
                                 entry.lastValidatedAt = now;
-                                entry.fingerprintStrategy = 'mtime-size-hash';
+                                entry.fingerprintStrategy = 'mtime-size-ctime-dev-ino-hash';
                                 _hits++;
                                 _hashRevalidationHits++;
                                 if (entry.accessCount !== undefined) entry.accessCount++;
@@ -221,7 +245,7 @@ export function getIoL1Cache() {
 
                 // Fingerprint válido: atualiza lastValidatedAt in-place (sem custo de set)
                 entry.lastValidatedAt = now;
-                entry.fingerprintStrategy = 'mtime-size';
+                entry.fingerprintStrategy = hasRichFingerprint ? 'mtime-size-ctime-dev-ino' : 'mtime-size';
                 _hits++;
                 if (entry.accessCount !== undefined) entry.accessCount++;
                 else entry.accessCount = 1;
@@ -314,8 +338,8 @@ export function invalidateIoCacheSubtree(filePath) {
 }
 
 /**
- * Wrapper de conveniência para `getVerified` — valida fingerprint mtime+size antes de retornar. Deve ser usado em lugar
- * de `getIoL1Cache().get()` em leituras que precisam de consistência forte.
+ * Wrapper de conveniência para `getVerified` — valida o fingerprint disponível antes de retornar. Deve ser usado em
+ * lugar de `getIoL1Cache().get()` em leituras que precisam de consistência forte.
  *
  * @param {string} key - Chave de cache (resultado de `makeBytesKey` ou `makeTextKey`).
  * @param {string} filePath - Path do arquivo (para stat de validação).

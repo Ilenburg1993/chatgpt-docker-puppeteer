@@ -57,7 +57,7 @@ const _scopes = new Map();
 /**
  * @param {string} key
  * @param {Buffer | string} content
- * @param {{ sizeBytes: number; mtimeMs: number; contentHash?: string }} meta
+ * @param {{ sizeBytes: number; mtimeMs: number; ctimeMs: number; dev: number; ino: number; contentHash?: string }} meta
  * @returns {void}
  */
 function primeIoL1Entry(key, content, meta) {
@@ -70,6 +70,9 @@ function primeIoL1Entry(key, content, meta) {
         cachedAt: now,
         mtime: meta.mtimeMs,
         size: meta.sizeBytes,
+        ctime: meta.ctimeMs,
+        dev: meta.dev,
+        ino: meta.ino,
         lastValidatedAt: now,
         accessCount: 0,
         ...(meta.contentHash ? { contentHash: meta.contentHash } : {}),
@@ -97,6 +100,9 @@ async function warmSinglePath(filePath, textMode, cachedBytes, cachedText, signa
         primeIoL1Entry(bytesKey, bytesSnapshot.content, {
             sizeBytes: bytesSnapshot.sizeBytes,
             mtimeMs: bytesSnapshot.mtimeMs,
+            ctimeMs: bytesSnapshot.ctimeMs,
+            dev: bytesSnapshot.dev,
+            ino: bytesSnapshot.ino,
             contentHash: hash,
         });
         warmed = true;
@@ -106,6 +112,9 @@ async function warmSinglePath(filePath, textMode, cachedBytes, cachedText, signa
             primeIoL1Entry(textKey, text, {
                 sizeBytes: bytesSnapshot.sizeBytes,
                 mtimeMs: bytesSnapshot.mtimeMs,
+                ctimeMs: bytesSnapshot.ctimeMs,
+                dev: bytesSnapshot.dev,
+                ino: bytesSnapshot.ino,
                 contentHash: hash,
             });
             warmed = true;
@@ -118,6 +127,9 @@ async function warmSinglePath(filePath, textMode, cachedBytes, cachedText, signa
         primeIoL1Entry(textKey, textSnapshot.content, {
             sizeBytes: textSnapshot.sizeBytes,
             mtimeMs: textSnapshot.mtimeMs,
+            ctimeMs: textSnapshot.ctimeMs,
+            dev: textSnapshot.dev,
+            ino: textSnapshot.ino,
             contentHash: sha256(textSnapshot.content),
         });
         warmed = true;
@@ -368,11 +380,17 @@ export async function warmReadThroughContext(filePath, opts = {}) {
         primeIoL1Entry(makeTextKey(normalized, undefined, undefined), text.content, {
             sizeBytes: text.sizeBytes,
             mtimeMs: text.mtimeMs,
+            ctimeMs: text.ctimeMs,
+            dev: text.dev,
+            ino: text.ino,
             contentHash: textHash,
         });
         primeIoL1Entry(makeBytesKey(normalized), toOwnedBuffer(text.content), {
             sizeBytes: text.sizeBytes,
             mtimeMs: text.mtimeMs,
+            ctimeMs: text.ctimeMs,
+            dev: text.dev,
+            ino: text.ino,
             contentHash: textHash,
         });
 
@@ -386,6 +404,8 @@ export async function warmReadThroughContext(filePath, opts = {}) {
              *         sizeBytes: number;
              *         mtimeMs: number;
              *         ctimeMs: number | null;
+             *         dev?: number | null;
+             *         ino?: number | null;
              *         metadata?: Record<string, unknown>;
              *     }) => Promise<unknown>;
              * } | null}
@@ -398,6 +418,8 @@ export async function warmReadThroughContext(filePath, opts = {}) {
                     sizeBytes: text.sizeBytes,
                     mtimeMs: text.mtimeMs,
                     ctimeMs: text.ctimeMs,
+                    dev: text.dev,
+                    ino: text.ino,
                     metadata: { source: 'read-through', limitMode: 'informative' },
                 });
                 indexed = true;

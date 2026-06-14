@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `dce94c0f`, seguida do recovery bounded de temporários
+**Baseline reinvestigado:** `main` sincronizada até `1f47bced`, seguida da onda de consistência externa
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -23,13 +23,14 @@ experimental fail-closed, custo observável, touch de recência throttled e sets
 mutações que materializam payload grande agora falham cedo quando a
 insuficiência de espaço já é observável; scopes distinguem warming/ready/stale/degraded sem vazar paths; scanner,
 prefetch e busca FTS compartilham uma política glob sem abrir mão da enumeração protegida; temporários de publicação
-são irmãos ocultos, exclusivos e usam token de 128 bits; o risco dominante migrou para decisões de promoção baseadas
-em workload e provas de crash externas**.
+são irmãos ocultos, exclusivos e usam token de 128 bits; snapshot de rollback, L1 e índice agora recusam versões
+obsoletas sob replace externo coordenado; o risco dominante migrou para contratos de streaming e decisões de
+promoção baseadas em workload**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — falta prova de modificação externa:** snapshot/index e interação com editor/Git ainda não estão
-   automatizados.
+1. **P2 — leitura em chunks ainda é streaming best-effort:** o byte-line index usa `mtime+size` e a variante
+   `ReadableStream` não pode retrair chunks já entregues se o arquivo mudar.
 2. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
 
 O L2 encerrou sua fase de promoção técnica: workload, batching, crash, contenção e soak passaram. A decisão operacional
@@ -37,8 +38,9 @@ O L2 encerrou sua fase de promoção técnica: workload, batching, crash, conten
 corpus pelo menos 3–4 vezes dentro do TTL.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
-intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
-material”. O risco técnico dominante migrou de corrupção nas primitivas centrais para gaps operacionais avançados.
+intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery”, “rollback grande sem
+material” ou “índice pode publicar livremente após parse obsoleto”. O risco técnico dominante migrou de corrupção
+nas primitivas centrais para gaps operacionais avançados.
 
 ### 1.1 Status de implementação — Faixa 0 aplicada em 2026-06-12
 
@@ -1139,6 +1141,43 @@ Validação focada de temp/write/copy/move/capacidade/engine/multiprocess: **68 
 typecheck strict de `src/copilot`: **PASS**. `check:crude` continua bloqueado por cinco ocorrências preexistentes fora
 desta onda.
 
+### 1.41 Status de implementação — consistência sob alteração externa aplicada em 2026-06-14
+
+IO-050 fechou as janelas reproduzíveis entre leitura, cache, parse e commit:
+
+- `readBinaryMutationSnapshot()` agora abre `FileHandle`, confirma `stat` antes/depois e confirma que o path ainda
+  aponta para o mesmo `dev/ino/size/mtime/ctime`;
+- a leitura continua streamada e bounded; conflito aborta sidecar parcial, fecha handle e repete até duas vezes por
+  default, terminando em `ESTALESNAPSHOT` quando a instabilidade persiste;
+- o L1 passou a persistir e comparar `ctime/dev/ino` além de `mtime/size`; revalidação por hash renova todo o
+  fingerprint rico;
+- `readBytes`, `readText`, todos os caminhos de prefetch e promoções L2->L1 carregam a identidade rica;
+- novos registros L2 persistem `ctime/dev/ino` em `metaJson`; entradas legadas continuam em fallback `mtime+size`
+  somente até expiração/regravação;
+- o índice reconfirma o arquivo antes de aceitar o fast path unchanged, antes de renovar fingerprint por hash e
+  depois do parse, imediatamente antes da transação SQLite;
+- builds de diretório repetem conflitos até `snapshotRetries` (default 2) e expõem `snapshotConflicts`; callers
+  diretos com fingerprint rico falham stale em vez de publicar conteúdo obsoleto.
+
+Provas novas usam processos Node externos e replace atômico real:
+
+- durante o primeiro chunk do snapshot, o child substitui o inode; a tentativa antiga é descartada, o sidecar parcial
+  é removido e a segunda tentativa materializa somente os bytes novos;
+- entre parse e commit do índice, o child substitui o arquivo; o FTS não recebe o token antigo, o retry publica apenas
+  o token novo e registra um conflito recuperado;
+- replace same-size/same-mtime invalida o L1 pela identidade do inode.
+
+Validação focada: **102 passados, 0 falhas**; provas snapshot+índice: **27 passados, 0 falhas**; lint focado e
+`typecheck:strict:src.copilot`: **PASS**. O strict global de testes permanece vermelho por dívidas preexistentes fora
+desta onda; após a correção, nenhum erro reportado nele pertence aos arquivos de produção alterados.
+
+Limites conscientes:
+
+- o stale probe L1 preserva a janela configurável de 2 s por default; `0` oferece validação a cada hit;
+- entradas L2 antigas sem fingerprint rico mantêm compatibilidade até TTL/regravação;
+- `readTextChunks`/`readTextChunksStream` são streaming best-effort e foram separados como IO-051, pois chunks já
+  entregues exigem contrato de versão/abort distinto de uma leitura materializada.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1365,7 +1404,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-004 | P0 | Patch | **Concluído:** patch recusa UTF-8 inválido antes de editar | `locked-mutations.js`, testes de binário sem regravação | Nenhum byte inválido é convertido em U+FFFD | Manter leitura em Buffer e validação prévia |
 | IO-005 | P0 | Move | **Concluído com limite documentado:** EXDEV é staged, verificado e durável | `move.js`, prova EXDEV real e fault injection | Falha após publish pode deixar duplicação reportada | Manter metadata explícita e provas por fase |
 | IO-006 | P0 | Bypass | **Concluído com exceções formais:** writers usam fachadas; cleanup/mkdir têm matriz exata | contratos bloqueiam writers e exigem matriz por arquivo/operação para cleanup/mkdir | Exceções intencionais ainda usam fs direto | Manter matriz estreita e remover entradas quando migrações tornarem calls redundantes |
-| IO-007 | P1 | Snapshot | **Concluído:** leitura confirma FileHandle/path antes de cachear | `snapshot.js`, `read-bytes.js`, `read-text.js` | Mudança concorrente provoca retry/falha, não cache incoerente | Manter fingerprints ricos e retry bounded |
+| IO-007 | P1 | Snapshot | **Concluído:** leitura normal e rollback streamado confirmam FileHandle/path | `snapshot.js`, `read-bytes.js`, prova de replace externo | Mudança concorrente provoca retry/falha e sidecar parcial é abortado | Manter fingerprints ricos e retry bounded |
 | IO-008 | P1 | Create/copy | **Concluído:** create/copy sem overwrite têm exclusividade real | hard link/open `wx`, `COPYFILE_EXCL`, testes concorrentes | Processo externo recebe/gera EEXIST sem overwrite | Manter exclusividade no publish, não em precheck |
 | IO-009 | P1 | Append | **Parcial por desenho:** JSONL é framed/durável; logs fracos são best-effort explícito | `append.js`, `jsonl-file-writer.js`, `jsonl-reader.js` | Logs não críticos ainda podem perder cauda em crash | Manter classificação explícita e recovery físico opt-in |
 | IO-010 | P1 | Rollback | **Concluído:** conteúdo acima do orçamento migra para sidecar durável | `rollback-sidecar.js`, `snapshot.js`, `locked-mutations.js`, token v2 | TTL limita a janela material de restauração por desenho | Monitorar cleanup e tornar TTL configurado visível no health |
@@ -1375,7 +1414,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-014 | P1 | Path policy | **Concluído:** capabilities workspace-bound e trusted estão separadas | `public/workspace-io.js`, `public/trusted-io.js`, contratos de boundaries/callers | Facade operacional baixa continua sem containment por desenho declarado | Manter superfícies externas sob contrato e allowlistar apenas escapes trusted |
 | IO-015 | P1 | Search | **Concluído:** sanitização antecede paginação e contagens | rg/grep/FTS/símbolos retornam `countsPostSanitization:true` | Linhas removidas não afetam total ou cursor | Manter prova de primeira página redigida |
 | IO-016 | P1 | Scanner | **Concluído:** classificação básica usa `Dirent` | `io-scanner.js`, benchmark local | DT_UNKNOWN ainda exige fallback | Manter `lstat` apenas para arquivo/fingerprint ou ambiguidade |
-| IO-017 | P1 | Index freshness | **Concluído:** identidade rica + hash periódico bounded | scanner persiste ctime/dev/ino; índice renova hash até limite configurável | Arquivos grandes confiam em metadata rica entre reindexações | Medir hit/miss/custo e ajustar intervalo/limite por perfil |
+| IO-017 | P1 | Index freshness | **Concluído:** identidade rica, hash periódico e confirmação pré-commit | unchanged/hash refresh/parse reconfirmam path; retry bounded no build | Arquivos grandes confiam em metadata rica entre reindexações | Medir hit/miss/custo e conflitos por perfil |
 | IO-018 | P1 | L2 SQLite | **Concluído com limite documentado:** perfil experimental medido, hardened e aprovado para long-lived opt-in | break-even 2–4 reusos; crash, contenção e soak de 7.200 sets passaram | Processos curtos podem não amortizar seed | Manter default `off`; ativar por perfil de deployment |
 | IO-019 | P1 | Bypass storage | **Concluído:** json store usa fachada atômica portátil | `infra/storage/json-store.js` | Escape é trusted e explícito | Manter contrato de callers da fachada |
 | IO-020 | P1 | Bypass export | **Concluído:** export usa fachada atômica portátil | `terminal/commands/export.js` | Paths externos continuam capability trusted | Manter caller explícito e testes de contrato |
@@ -1408,15 +1447,17 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-047 | P1 | L2 soak | **Concluído:** cap, TTL, reconfiguração, WAL e shutdown passaram em processo longo sintético | duas execuções, 7.200 sets cada, zero batch failure e integridade `ok` | Soak sintético não substitui telemetria de deployment | Ativar `experimental` apenas onde reuse real justificar |
 | IO-048 | P1 | Move EXDEV | **Concluído:** criação do temp cross-device agora é exclusiva | `COPYFILE_EXCL` e colisão determinística preservando sentinel | Token forte reduz corrida, exclusividade decide | Manter mesma regra de copy staged |
 | IO-049 | P2 | Temp recovery | **Concluído com limite documentado:** cleanup é age-gated, host-aware e bounded | 24 h/PID morto local; host estrangeiro opt-in; scan 10 mil e cache 1.024 dirs | Recriação de container pode exigir limpeza administrativa | Manter schema estrito e nunca limpar por glob aproximado |
+| IO-050 | P1 | Consistência externa | **Concluído:** snapshot, L1 e índice recusam inode/versão obsoletos | fingerprint rico, retries e provas multiprocess com replace atômico | L1 ainda respeita stale-probe configurável; L2 legado cai em fallback | Usar probe `0` somente em perfis paranoicos e observar `snapshotConflicts` |
+| IO-051 | P2 | Chunk streaming | **Aberto:** byte-line index e stream não possuem contrato de versão end-to-end | `read-chunks.js` usa `mtime+size` e entrega incrementalmente | Editor/Git pode trocar arquivo entre indexação de offsets e leitura | Definir handle/version token, abort explícito e semântica de retry só para API materializada |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049 |
 | Parcial | IO-009 |
-| Aberto | IO-030 |
+| Aberto | IO-030, IO-051 |
 
 ---
 
@@ -1486,12 +1527,15 @@ Para append, a política implementada depende do tipo:
 
 ### 6.4 Cache e invalidação
 
-L1 é bem pensado: TTL, max bytes, metadata rica e hash revalidation para arquivos pequenos. Snapshot inicial
-consistente, line-offset normalizado e flush derivado já foram incorporados.
+L1 é bem pensado: TTL, max bytes, fingerprint `mtime/size/ctime/dev/ino` e hash revalidation para arquivos pequenos.
+Snapshot inicial consistente, line-offset normalizado e flush derivado já foram incorporados. O stale probe de 2 s é
+uma decisão de custo/freshness, não uma garantia instantânea; deployments que exigem validação em cada hit podem usar
+intervalo `0`.
 
 A prioridade remanescente é:
 
 - medir hit/miss e custo da verificação periódica do índice.
+- medir `snapshotConflicts` e a incidência real de retry sob editor/Git.
 - medição do custo do flush imediato sob bursts.
 - coletar telemetria do L2 apenas nos deployments long-lived que optarem por `experimental`; os gates sintéticos estão
   concluídos e o default global permanece `off`.
@@ -1502,7 +1546,8 @@ O scanner usa `readdir({ withFileTypes: true })` e evita `lstat` para diretório
 
 A busca está bem protegida contra shell injection: usa `spawn` com args array e maxBuffer/timeout. O índice FTS agora
 combina metadata rica com verificação periódica bounded, e contagens/cursor derivam da visão sanitizada. O risco
-remanescente é a materialização de stdout até o limite do subprocesso.
+remanescente é a materialização de stdout até o limite do subprocesso e o contrato best-effort da leitura textual em
+chunks.
 
 ---
 
@@ -1701,6 +1746,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Persistir excedente em sidecar durável com hash e TTL.
 - [x] Cleanup bounded de finais e `.pending` expirados sob lock.
 - [x] Propagar sidecar pelo token v2 preservando tokens v1.
+- [x] Confirmar handle/path após o stream e repetir conflito externo sem publicar sidecar parcial.
 
 #### Fase 3.3 — Invalidação read-after-write
 
@@ -1723,6 +1769,15 @@ A situação ideal é uma infra IO em camadas:
 - [x] Provar perda bounded sob `SIGKILL`, contenção SQLite externa e shutdown por `SIGTERM`.
 - [x] Executar soak de processo longo cobrindo TTL, evicção, reconfiguração e crescimento de WAL.
 - [x] Documentar decisão: `experimental` para long-lived com reuse comprovado; default global `off`.
+- [x] Persistir fingerprint rico em novos registros L2 e propagar identidade na promoção L2->L1.
+- [x] Reconfirmar unchanged/hash-refresh/parse imediatamente antes de commit e repetir conflito bounded.
+
+#### Fase 3.5 — Streaming versionado
+
+- [ ] Migrar byte-line index para fingerprint rico e handle confirmado.
+- [ ] Definir version token/abort para `readTextChunksStream` quando o path trocar de inode.
+- [ ] Permitir retry somente na API materializada, antes de expor chunks ao caller.
+- [ ] Provar replace externo entre construção de offsets e byte-seek.
 
 ### Faixa 4 — Performance
 
@@ -1760,7 +1815,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Limitar nomes longos por bytes sem cortar code point UTF-8.
 - [x] Provar cleanup após falha injetada antes do publish.
 - [x] Recuperar órfãos de crash com host/PID, idade mínima e scan/cache bounded.
-- [ ] Definir cleanup age-gated e host-aware para temporários deixados por crash real.
+- [x] Definir cleanup age-gated e host-aware para temporários deixados por crash real.
 
 ### Faixa 5 — Provas
 
@@ -1770,8 +1825,9 @@ A situação ideal é uma infra IO em camadas:
 - [x] Crash real durante directory sync e fases internas do `EXDEV`, com órfão pré-publish documentado.
 - [x] Dois processos concorrendo por create/copy/move/write.
 - [x] Crash de holder L1 seguido de stale recovery real.
-- [ ] Modificação externa durante snapshot e index.
+- [x] Modificação externa durante snapshot e index.
 - [ ] Git checkout/editor save durante patch.
+- [ ] Replace externo durante byte-line index/stream.
 
 ---
 
@@ -1789,11 +1845,12 @@ A situação ideal é uma infra IO em camadas:
 | Copy | `overwrite=false` com corrida externa | Não sobrescreve destino externo |
 | Move | EXDEV com copy parcial | Origem preservada; destino final não publicado |
 | Cache | Read relativo + read absoluto + write | Todas as entradas equivalentes invalidam |
-| Snapshot | Arquivo muda durante read | Retry ou `consistent=false`; não popular cache ruim |
+| Snapshot | Arquivo muda durante read | Retry ou `ESTALESNAPSHOT`; não popular cache/sidecar ruim |
 | Append | JSONL truncado por crash | Recovery ignora/trunca última linha inválida |
 | Scanner | Symlink para fora do workspace | Não atravessa por padrão; path redigido/bloqueado |
 | Search | Resultado enorme | Early stop sem estourar buffer |
-| Index | Mudança externa same-size | Hash/ctime detecta ou marca stale |
+| Index | Mudança externa após parse | Retry antes da transação; FTS contém somente versão confirmada |
+| Chunk stream | Inode troca após byte-line index | Abort/version mismatch; nunca usar offsets de versão anterior |
 | Lock | Multiprocess lockfile stale | Segundo processo detecta stale só quando seguro |
 
 ---
@@ -1846,19 +1903,21 @@ O fallback EXDEV e o caminho same-device foram endurecidos. Sem overwrite, a pub
 ### `io/fs/snapshot.js`
 
 O snapshot de mutação é incremental, aceita orçamento zero e promove o excedente para writer sidecar sem reter o
-arquivo inteiro. Alteração externa durante o stream continua mitigada pelo lock cooperativo, não por snapshot
-inode-confirmed igual ao caminho de leitura cacheada.
+arquivo inteiro. Agora lê pelo `FileHandle`, confirma handle/path ao final e aborta o sidecar da tentativa stale antes
+de repetir. A prova multiprocess substitui o inode após o primeiro chunk e confirma que somente a versão nova é
+materializada.
 
 ### `io-prefetch.js`
 
-Respeita a validação UTF-8 de `readText`, e snapshot/invalidação derivados já foram endurecidos. O trabalho remanescente
-é medir custo/benefício do warmup por workload; o L2 experimental já expõe custo por operação.
+Respeita a validação UTF-8 de `readText` e promove `ctime/dev/ino` em todos os caminhos bytes/text/read-through. O
+trabalho remanescente é medir custo/benefício do warmup por workload; o L2 experimental já expõe custo por operação.
 
 ### `io-cache.js`
 
-Boa engenharia. Hash revalidation, snapshot consistente e path normalization universal tornam o L1 confiável. O L2
-agora possui perfil explícito, touch throttled, batching transacional e telemetria separada de set/flush. O custo
-básico já atingiu break-even em 2–4 reusos; promoção além de `experimental` depende das provas operacionais restantes.
+Boa engenharia. Hash revalidation, fingerprint rico, snapshot consistente e path normalization universal tornam o L1
+confiável fora da janela configurada de stale probe. O L2 agora possui perfil explícito, touch throttled, batching
+transacional, fingerprint rico para registros novos e telemetria separada de set/flush. O custo básico já atingiu
+break-even em 2–4 reusos; promoção além de `experimental` depende de telemetria de deployment.
 
 ### `io-scanner.js`
 
@@ -1866,8 +1925,9 @@ Usa `Dirent` para classificação básica e mantém a política de não seguir s
 
 ### `io-index-sqlite.js`
 
-Freshness combina metadata rica (`mtime/size/ctime/dev/ino`) com hash periódico bounded. O próximo trabalho é medir
-hit/miss/custo do índice por perfil e ajustar orçamento, não corrigir stale básico.
+Freshness combina metadata rica (`mtime/size/ctime/dev/ino`) com hash periódico bounded e confirmação pré-commit.
+Fast path, renovação por hash e resultado do parser são reconfirmados; builds repetem conflitos e expõem
+`snapshotConflicts`. O próximo trabalho é medir hit/miss/retry por perfil e ajustar orçamento.
 
 ### `io-locks.js`
 
@@ -1903,10 +1963,12 @@ Critérios operacionais adicionais já atendidos:
 - [x] reduzir e medir o custo de seed do L2 sem esconder o flush terminal.
 - [x] provar perda bounded em `SIGKILL`, retry após contenção e flush antes do DB em `SIGTERM`.
 - [x] executar soak L2 com TTL, evicção, reconfiguração, checkpoint WAL e reabertura íntegra.
+- [x] provar replace externo durante snapshot de rollback, validação L1 e commit do índice.
 
 Ainda faltam para maturidade operacional avançada:
 
-- [ ] modificação externa durante snapshot/index e interação com editor/Git.
+- [ ] contrato versionado para `readTextChunks`/`readTextChunksStream` sob replace externo.
+- [ ] interação de Git checkout/editor save durante patch read-modify-write não cooperativo.
 
 ---
 
@@ -1925,6 +1987,7 @@ Ainda faltam para maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Automatizar modificação concorrente por editor/Git durante snapshot e index para confirmar retry/stale sem popular
-cache incoerente. A prova deve cobrir replace por rename, edição same-size/same-mtime e checkout que troca inode,
-comparando snapshot, L1 e índice persistido.
+Fechar IO-051: tornar o byte-line index dependente de fingerprint rico/handle confirmado e definir semântica de
+version mismatch para `readTextChunksStream`. A API materializada pode repetir antes de retornar; a API incremental
+deve abortar explicitamente quando detectar troca de inode, sem fingir que chunks de versões diferentes formam um
+snapshot. Depois, automatizar Git checkout/editor save durante patch read-modify-write não cooperativo.

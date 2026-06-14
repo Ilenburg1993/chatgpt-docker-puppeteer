@@ -1,5 +1,6 @@
 // @ts-check
 
+import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,6 +20,22 @@ import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 /** @type {string[]} */
 const TEMP_DIRS = [];
 
+const REPLACE_FILE_CHILD = `
+import { rename, writeFile } from 'node:fs/promises';
+process.on('message', async (message) => {
+    try {
+        const tempPath = message.filePath + '.external-replacement';
+        await writeFile(tempPath, Buffer.alloc(message.size, message.fill));
+        await rename(tempPath, message.filePath);
+        process.send?.({ ok: true });
+        process.exit(0);
+    } catch (error) {
+        process.send?.({ ok: false, message: error instanceof Error ? error.message : String(error) });
+        process.exit(1);
+    }
+});
+`;
+
 afterEach(async () => {
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
@@ -30,6 +47,26 @@ async function createTempDir() {
     const dir = await mkdtemp(join(tmpdir(), 'copilot-io-fs-read-'));
     TEMP_DIRS.push(dir);
     return dir;
+}
+
+/**
+ * @param {string} filePath
+ * @param {number} size
+ * @param {string} fill
+ */
+async function replaceFileFromChild(filePath, size, fill) {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', REPLACE_FILE_CHILD], {
+        stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
+    });
+    await new Promise((resolve, reject) => {
+        child.once('error', reject);
+        child.once('message', (message) => {
+            const result = /** @type {{ ok?: boolean; message?: string }} */ (message);
+            if (result.ok) resolve(undefined);
+            else reject(new Error(result.message ?? 'external replacement failed'));
+        });
+        child.send({ filePath, size, fill });
+    });
 }
 
 describe('infra/io/fs read line ports', () => {
@@ -197,6 +234,37 @@ describe('infra/io/fs read line ports', () => {
         await expect(readFile(result.rollbackSidecar?.path ?? '')).resolves.toEqual(payload);
         const sidecarStat = await stat(result.rollbackSidecar?.path ?? '');
         expect(sidecarStat.mode & 0o777).toBe(0o600);
+    });
+
+    it('readBinaryMutationSnapshot repete após replace atômico externo e descarta sidecar parcial', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'snapshot-external.bin');
+        const sidecarDirectory = join(dir, 'rollback-external');
+        const size = 512 * 1024;
+        const replacement = Buffer.alloc(size, 'b');
+        await writeFile(file, Buffer.alloc(size, 'a'));
+        let replaced = false;
+
+        const result = await readBinaryMutationSnapshot(file, {
+            snapshotMaxBytes: 0,
+            highWaterMark: 4 * 1024,
+            rollbackSidecar: { directory: sidecarDirectory },
+            onPhase: async (phase, details) => {
+                if (phase !== 'after-chunk' || details['attempt'] !== 1 || replaced) return;
+                replaced = true;
+                await replaceFileFromChild(file, size, 'b');
+            },
+        });
+
+        expect(result).toMatchObject({
+            attempts: 2,
+            consistent: true,
+            bytesRead: size,
+            contentHash: sha256(replacement),
+            snapshotTruncated: true,
+        });
+        await expect(readFile(result.rollbackSidecar?.path ?? '')).resolves.toEqual(replacement);
+        expect((await readdir(sidecarDirectory)).filter((name) => name.endsWith('.rollback'))).toHaveLength(1);
     });
 
     it('cleanup de sidecars remove somente arquivos expirados do schema', async () => {
