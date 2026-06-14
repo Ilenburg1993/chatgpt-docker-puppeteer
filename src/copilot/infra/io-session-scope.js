@@ -63,8 +63,22 @@ import { readEnvPositiveInt } from './shared/env.js';
  * @property {{ available: boolean; indexed: number; failed: number; durationMs: number } | null} index
  * @property {number} warmDurationMs - Duração do warm-up em ms.
  * @property {boolean} ready - Se o escopo está pronto (prefetch completo).
+ * @property {boolean} degraded - Se o último warm-up/refresh terminou com falha.
+ * @property {'warming' | 'ready' | 'stale' | 'degraded'} status
+ * @property {ScopeFailureSummary | null} lastError - Erro sanitizado, sem path/mensagem crua.
  * @property {number} startedAt - Timestamp de início.
+ * @property {number | null} completedAt - Timestamp do último warm-up/refresh concluído.
  * @property {number} maxActiveScopes - Capacidade máxima configurada para escopos ativos simultâneos.
+ */
+
+/**
+ * @typedef {{
+ *     phase: 'warm' | 'parse' | 'index' | 'refresh' | 'lifecycle';
+ *     code: string;
+ *     name: string;
+ *     summary: string;
+ *     atMs: number;
+ * }} ScopeFailureSummary
  */
 
 /**
@@ -84,7 +98,10 @@ import { readEnvPositiveInt } from './shared/env.js';
  * @property {{ available: boolean; indexed: number; failed: number; durationMs: number } | null} index
  * @property {number} warmDurationMs
  * @property {boolean} ready
+ * @property {boolean} degraded
+ * @property {ScopeFailureSummary | null} lastError
  * @property {number} startedAt
+ * @property {number | null} completedAt
  * @property {number} lastAccessAt
  */
 
@@ -164,6 +181,45 @@ function markScopePathInvalidated(scope, filePath, options = {}) {
         }
     }
     scope.ready = false;
+}
+
+/**
+ * @param {_InternalScope} scope
+ * @returns {'warming' | 'ready' | 'stale' | 'degraded'}
+ */
+function getScopeStatus(scope) {
+    if (scope.degraded) return 'degraded';
+    if (scope.invalidatedPaths.size > 0) return 'stale';
+    return scope.ready ? 'ready' : 'warming';
+}
+
+/**
+ * @param {_InternalScope} scope
+ * @param {unknown} error
+ * @param {ScopeFailureSummary['phase']} phase
+ * @param {string} summary
+ */
+function recordScopeFailure(scope, error, phase, summary) {
+    const record = /** @type {{ code?: unknown; name?: unknown }} */ (error);
+    scope.degraded = true;
+    scope.ready = false;
+    scope.lastError = {
+        phase,
+        code: String(record?.code ?? 'UNKNOWN').slice(0, 64),
+        name: String(record?.name ?? 'Error').slice(0, 64),
+        summary,
+        atMs: Date.now(),
+    };
+}
+
+/**
+ * @param {_InternalScope} scope
+ */
+function markScopeReady(scope) {
+    scope.degraded = false;
+    scope.ready = true;
+    scope.lastError = null;
+    scope.completedAt = Date.now();
 }
 
 /**
@@ -254,7 +310,10 @@ export function declareScope(opts) {
         index: null,
         warmDurationMs: 0,
         ready: false,
+        degraded: false,
+        lastError: null,
         startedAt: Date.now(),
+        completedAt: null,
         lastAccessAt: Date.now(),
     };
     _registry.set(sessionId, scope);
@@ -316,6 +375,8 @@ export function declareScope(opts) {
                             parsed++;
                         } catch (parseErr) {
                             if (!silent) throw parseErr;
+                            scope.failed++;
+                            recordScopeFailure(scope, parseErr, 'parse', 'análise de símbolos falhou durante aquecimento');
                         }
                     }
                 };
@@ -344,14 +405,36 @@ export function declareScope(opts) {
                     failed: Number(indexResult.failed ?? 0),
                     durationMs: Number(indexResult.durationMs ?? 0),
                 };
+                if (scope.index.failed > 0) {
+                    scope.failed += scope.index.failed;
+                    recordScopeFailure(scope, { code: 'EINDEXPARTIAL', name: 'ScopeIndexError' }, 'index', 'índice do escopo terminou com falhas');
+                }
             }
 
             if (warmController.signal.aborted) return;
-            scope.ready = true;
-        } catch {
-            scope.ready = true; // marca ready mesmo em erro para não travar awaitReady
+            if (scope.failed > 0) {
+                if (!scope.degraded) {
+                    recordScopeFailure(
+                        scope,
+                        { code: 'ESCOPEPARTIAL', name: 'ScopeWarmError' },
+                        'warm',
+                        'aquecimento do escopo terminou com falhas',
+                    );
+                }
+                scope.completedAt = Date.now();
+            } else {
+                markScopeReady(scope);
+            }
+        } catch (error) {
+            if (!warmController.signal.aborted) {
+                scope.failed++;
+                recordScopeFailure(scope, error, 'warm', 'aquecimento do escopo falhou');
+                scope.completedAt = Date.now();
+            }
         } finally {
-            _warmControllers.delete(sessionId);
+            if (_warmControllers.get(sessionId) === warmController) {
+                _warmControllers.delete(sessionId);
+            }
         }
     })();
     _warmPromises.set(sessionId, warmPromise);
@@ -371,8 +454,18 @@ export function declareScope(opts) {
                     invalidated: 0,
                     index: null,
                     warmDurationMs: 0,
-                    ready: true,
+                    ready: false,
+                    degraded: true,
+                    status: /** @type {const} */ ('degraded'),
+                    lastError: {
+                        phase: /** @type {const} */ ('lifecycle'),
+                        code: 'ESCOPECLOSED',
+                        name: 'ScopeLifecycleError',
+                        summary: 'escopo fechado antes do snapshot de prontidão',
+                        atMs: Date.now(),
+                    },
                     startedAt: scope.startedAt,
+                    completedAt: Date.now(),
                     maxActiveScopes: MAX_ACTIVE_SCOPES,
                 }
             );
@@ -400,7 +493,11 @@ export function getScopeStats(sessionId) {
         index: scope.index,
         warmDurationMs: scope.warmDurationMs,
         ready: scope.ready,
+        degraded: scope.degraded,
+        status: getScopeStatus(scope),
+        lastError: scope.lastError,
         startedAt: scope.startedAt,
+        completedAt: scope.completedAt,
         maxActiveScopes: MAX_ACTIVE_SCOPES,
     };
 }
@@ -423,7 +520,7 @@ export function getScopeSymbolIndex(sessionId) {
  * exports mais relevantes.
  *
  * @param {string} sessionId
- * @returns {{ sessionId: string; files: number; symbols: number; topExports: string[]; ready: boolean } | null}
+ * @returns {{ sessionId: string; files: number; symbols: number; topExports: string[]; ready: boolean; degraded: boolean; status: ScopeStats['status']; lastError: ScopeFailureSummary | null } | null}
  */
 export function getScopeContext(sessionId) {
     const scope = _registry.get(sessionId);
@@ -446,6 +543,9 @@ export function getScopeContext(sessionId) {
         symbols: totalSymbols,
         topExports: allExports.slice(0, 50),
         ready: scope.ready,
+        degraded: scope.degraded,
+        status: getScopeStatus(scope),
+        lastError: scope.lastError,
     };
 }
 
@@ -517,6 +617,10 @@ export async function refreshScope(sessionId, modifiedPaths) {
     let refreshed = 0;
     let failed = 0;
 
+    if (targets.length === 0) {
+        return { refreshed, failed };
+    }
+
     for (const p of targets) {
         try {
             invalidateParserCache(p);
@@ -526,12 +630,19 @@ export async function refreshScope(sessionId, modifiedPaths) {
             scope.symbolIndex.set(p, symbols);
             scope.invalidatedPaths.delete(p);
             refreshed++;
-        } catch {
+        } catch (error) {
             failed++;
+            recordScopeFailure(scope, error, 'refresh', 'atualização do escopo falhou');
         }
     }
 
-    scope.ready = true;
+    scope.completedAt = Date.now();
+    if (failed === 0 && scope.invalidatedPaths.size === 0) {
+        markScopeReady(scope);
+    } else {
+        scope.ready = false;
+        scope.degraded = failed > 0;
+    }
     return { refreshed, failed };
 }
 

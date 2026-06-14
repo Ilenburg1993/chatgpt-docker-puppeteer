@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 import { invalidateIoCacheSubtree, resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
 import { writeFileAtomic } from '../../../../src/copilot/infra/io-engine.js';
+import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/io-health.js';
 import {
     closeScope,
     declareScope,
@@ -61,6 +62,9 @@ describe('declareScope + getScopeStats', () => {
         // Aguarda warm + parse
         const stats = await handle.awaitReady();
         assert.ok(stats.ready === true, `stats.ready=${stats.ready}`);
+        assert.strictEqual(stats.status, 'ready');
+        assert.strictEqual(stats.degraded, false);
+        assert.strictEqual(stats.lastError, null);
         assert.ok(stats.pathCount === 2, `pathCount=${stats.pathCount}`);
         assert.ok(stats.preloaded >= 0);
         assert.ok(stats.parsed >= 0);
@@ -83,6 +87,30 @@ describe('declareScope + getScopeStats', () => {
         assert.ok(stats !== null);
         assert.strictEqual(stats.sessionId, sessionId);
         assert.ok(stats.ready === true);
+
+        closeScope(sessionId);
+    });
+
+    it('resolve awaitReady como degraded, sem falso ready nem path no erro resumido', async () => {
+        const sessionId = 'test-scope-degraded-warm';
+        const missingPath = path.join(tmpDir, 'missing-secret-name.js');
+
+        const stats = await declareScope({
+            sessionId,
+            paths: [missingPath],
+            parseSymbols: false,
+            silent: true,
+        }).awaitReady();
+
+        assert.strictEqual(stats.ready, false);
+        assert.strictEqual(stats.degraded, true);
+        assert.strictEqual(stats.status, 'degraded');
+        assert.strictEqual(stats.lastError?.phase, 'warm');
+        assert.ok(!JSON.stringify(stats.lastError).includes(missingPath));
+        assert.ok(
+            readIoRuntimeHealthSnapshot().alerts.some((alert) => alert.code === 'IO_SCOPE_DEGRADED'),
+            'health deve projetar escopo degradado',
+        );
 
         closeScope(sessionId);
     });
@@ -205,6 +233,8 @@ describe('refreshScope', () => {
         const invalidatedStats = getScopeStats(sessionId);
         assert.ok(invalidatedStats !== null);
         assert.strictEqual(invalidatedStats.ready, false);
+        assert.strictEqual(invalidatedStats.status, 'stale');
+        assert.strictEqual(invalidatedStats.degraded, false);
         assert.strictEqual(invalidatedStats.invalidated, 1);
         assert.strictEqual(findSymbol(sessionId, 'beforeWrite', { exactMatch: true }).length, 0);
 
@@ -215,7 +245,28 @@ describe('refreshScope', () => {
         const freshStats = getScopeStats(sessionId);
         assert.ok(freshStats !== null);
         assert.strictEqual(freshStats.ready, true);
+        assert.strictEqual(freshStats.status, 'ready');
         assert.strictEqual(freshStats.invalidated, 0);
+
+        closeScope(sessionId);
+    });
+
+    it('mantém refresh com falha em degraded em vez de anunciar ready', async () => {
+        const sessionId = 'test-scope-refresh-degraded';
+        const pathA = path.join(tmpDir, 'a.js');
+        const missingPath = path.join(tmpDir, 'missing-refresh.js');
+        await declareScope({ sessionId, paths: [pathA], parseSymbols: true }).awaitReady();
+
+        const result = await refreshScope(sessionId, [missingPath]);
+        const stats = getScopeStats(sessionId);
+
+        assert.strictEqual(result.failed, 1);
+        assert.ok(stats !== null);
+        assert.strictEqual(stats.ready, false);
+        assert.strictEqual(stats.degraded, true);
+        assert.strictEqual(stats.status, 'degraded');
+        assert.strictEqual(stats.lastError?.phase, 'refresh');
+        assert.ok(!JSON.stringify(stats.lastError).includes(missingPath));
 
         closeScope(sessionId);
     });
@@ -236,6 +287,7 @@ describe('refreshScope', () => {
         const stats = getScopeStats(sessionId);
         assert.ok(stats !== null);
         assert.strictEqual(stats.ready, false);
+        assert.strictEqual(stats.status, 'stale');
         assert.strictEqual(stats.invalidated, 1);
         assert.strictEqual(findSymbol(sessionId, 'nestedChild', { exactMatch: true }).length, 0);
 

@@ -267,13 +267,21 @@ function printScopeStats(ctx, stats) {
         ctx.println(terminalThemeRow('Escopo', 'não encontrado', { role: 'warn' }));
         return;
     }
-    const ready = stats.ready ? 'pronto' : 'aquecendo';
+    const statusLabel = {
+        ready: 'pronto',
+        warming: 'aquecendo',
+        stale: 'desatualizado',
+        degraded: 'degradado',
+    }[stats.status];
     ctx.println(
         terminalThemeRow(
             'Escopo',
-            `${stats.sessionId} · ${ready} · arquivos ${stats.pathCount} · cache L1 ${stats.preloaded} · analisados ${stats.parsed} · invalidados ${stats.invalidated} · falhas ${stats.failed} · ${Math.round(stats.warmDurationMs)}ms`,
+            `${stats.sessionId} · ${statusLabel} · arquivos ${stats.pathCount} · cache L1 ${stats.preloaded} · analisados ${stats.parsed} · invalidados ${stats.invalidated} · falhas ${stats.failed} · ${Math.round(stats.warmDurationMs)}ms`,
         ),
     );
+    if (stats.lastError) {
+        ctx.println(terminalThemeRow('Atenção', `${stats.lastError.summary} · ${stats.lastError.code}`, { role: 'warn' }));
+    }
 }
 
 /**
@@ -350,10 +358,15 @@ function runContext(ctx, parts) {
         ctx.println(terminalThemeRow('Escopo', `não encontrado: ${sessionId}`, { role: 'warn' }));
         return;
     }
-    const ready = scope.ready ? 'pronto' : 'aquecendo';
+    const statusLabel = {
+        ready: 'pronto',
+        warming: 'aquecendo',
+        stale: 'desatualizado',
+        degraded: 'degradado',
+    }[scope.status];
     ctx.println('');
     ctx.println(terminalThemeHeadline('assistant', 'Contexto de escopo'));
-    ctx.println(terminalThemeRow('Escopo', `${scope.sessionId} · ${ready}`));
+    ctx.println(terminalThemeRow('Escopo', `${scope.sessionId} · ${statusLabel}`));
     ctx.println(terminalThemeRow('Arquivos', `${scope.files} · símbolos ${scope.symbols} · exportações ${scope.topExports.length}`));
     for (const item of scope.topExports.slice(0, 30)) ctx.println(terminalThemeRow('Exportação', renderScopeExportLabel(item)));
     if (scope.topExports.length > 30)

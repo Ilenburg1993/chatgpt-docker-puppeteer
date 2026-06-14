@@ -70,6 +70,10 @@ function safeCall(fn, fallback) {
  *     alerts: { code: string; severity: string; message: string }[];
  *     scopes: {
  *         active: number;
+ *         ready: number;
+ *         warming: number;
+ *         stale: number;
+ *         degraded: number;
  *         ids: string[];
  *         recent: Array<NonNullable<ReturnType<typeof getScopeStats>>>;
  *     };
@@ -94,10 +98,10 @@ export function readIoRuntimeHealthSnapshot() {
     };
     const aggregate = aggregateIoCacheTierStats({ l1, l2, l3 });
     const ids = safeCall(listScopes, []);
-    const recent = ids
-        .slice(0, 10)
+    const allScopeStats = ids
         .map((id) => safeCall(() => getScopeStats(id), null))
         .filter((stats) => stats !== null);
+    const recent = allScopeStats.slice(0, 10);
 
     const circuitOpen =
         Boolean(l2 && typeof l2 === 'object' && 'reason' in l2) &&
@@ -134,6 +138,19 @@ export function readIoRuntimeHealthSnapshot() {
     });
     const locks = getIoLockStats();
     const alerts = [];
+    const scopeStatusCounts = {
+        ready: allScopeStats.filter((scope) => scope.status === 'ready').length,
+        warming: allScopeStats.filter((scope) => scope.status === 'warming').length,
+        stale: allScopeStats.filter((scope) => scope.status === 'stale').length,
+        degraded: allScopeStats.filter((scope) => scope.status === 'degraded').length,
+    };
+    if (scopeStatusCounts.degraded > 0) {
+        alerts.push({
+            code: 'IO_SCOPE_DEGRADED',
+            severity: 'medium',
+            message: 'Ao menos um escopo de IO terminou warm-up/refresh em estado degradado.',
+        });
+    }
     if (l2 && typeof l2 === 'object' && 'configurationValid' in l2 && l2.configurationValid === false) {
         alerts.push({
             code: 'IO_L2_PROFILE_INVALID',
@@ -250,6 +267,7 @@ export function readIoRuntimeHealthSnapshot() {
         alerts,
         scopes: {
             active: ids.length,
+            ...scopeStatusCounts,
             ids,
             recent,
         },
