@@ -134,6 +134,13 @@ export function readIoRuntimeHealthSnapshot() {
     });
     const locks = getIoLockStats();
     const alerts = [];
+    if (l2 && typeof l2 === 'object' && 'configurationValid' in l2 && l2.configurationValid === false) {
+        alerts.push({
+            code: 'IO_L2_PROFILE_INVALID',
+            severity: 'high',
+            message: 'IO_L2_CACHE_PROFILE possui valor inválido; L2 permanece desabilitado.',
+        });
+    }
     if (circuitOpen) {
         alerts.push({
             code: 'IO_L2_CIRCUIT_OPEN',

@@ -243,6 +243,23 @@ Para ambientes com múltiplos processos cooperativos escrevendo no mesmo workspa
 `high-risk` e use o health de IO para observar p95 de espera, timeouts e leases ativos antes de
 subir para `mutations` ou `all`.
 
+### Cache L2 SQLite Copilot
+
+`IO_L2_CACHE_PROFILE` controla o cache L2 persistente local do `src/copilot`. O default é `off`;
+valores inválidos falham fechados e aparecem como `IO_L2_PROFILE_INVALID` no health de IO.
+
+- `off`: mantém apenas L1 em memória;
+- `experimental`: ativa L2 com TTL e pruning de 60 segundos e limite de 10.000 entradas;
+- `on`: ativa L2 com TTL/pruning de 5 minutos e limite de 100.000 entradas.
+
+Os knobs `IO_L2_CACHE_TTL_MS`, `IO_L2_CACHE_MAX_ENTRIES` e `IO_L2_CACHE_PRUNE_MS` substituem os
+defaults do perfil. `IO_L2_CACHE_ENABLED` continua aceito apenas para compatibilidade quando
+`IO_L2_CACHE_PROFILE` está ausente. O health expõe perfil, origem da configuração, hit/miss,
+ocupação e latência bounded de get/set/invalidate/prune/clear.
+
+Comece por `experimental`, compare cold/warm e só promova para `on` quando hit ratio e custo SQLite
+justificarem o footprint persistente.
+
 ### Parser Workers Copilot
 
 `IO_PARSER_WORKER_QUEUE_MAX` é um knob especializado para backpressure dos parser workers de

@@ -85,4 +85,23 @@ describe('createIoL2SqliteCache', () => {
         expect(stats.size).toBe(2);
         expect(stats.evictions).toBeGreaterThan(0);
     });
+
+    it('exposes bounded latency metrics per synchronous operation', () => {
+        const db = createDb();
+        const cache = createIoL2SqliteCache({ db, ttlMs: 60_000 });
+
+        cache.set({ key: 'a', path: '/tmp/a', payload: 'a' });
+        cache.get('a');
+        cache.invalidatePath('/tmp/a');
+        cache.pruneExpired();
+        cache.clearAll();
+
+        expect(cache.getStats().latency).toMatchObject({
+            get: { count: 1, totalMs: expect.any(Number), averageMs: expect.any(Number), maxMs: expect.any(Number) },
+            set: { count: 1, totalMs: expect.any(Number), averageMs: expect.any(Number), maxMs: expect.any(Number) },
+            invalidate: { count: 1 },
+            prune: { count: 1 },
+            clear: { count: 1 },
+        });
+    });
 });

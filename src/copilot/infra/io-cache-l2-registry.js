@@ -25,12 +25,80 @@ let _lastPruneErrorAtMs = null;
 let _initFailCount = 0;
 /** @type {number | null} */
 let _circuitOpenUntilMs = null;
+/** @type {string | null} */
+let _activeConfigurationKey = null;
 
 const MAX_INIT_FAILURES = 3;
 const CIRCUIT_BACKOFF_MS = [1000, 5000, 30000];
+const PROFILE_DEFAULTS = {
+    experimental: {
+        ttlMs: 60 * 1000,
+        maxEntries: 10_000,
+        pruneMs: 60 * 1000,
+    },
+    on: {
+        ttlMs: 5 * 60 * 1000,
+        maxEntries: 100_000,
+        pruneMs: 5 * 60 * 1000,
+    },
+};
 
-function isEnabled() {
-    return readBooleanEnv('IO_L2_CACHE_ENABLED', false);
+/**
+ * @typedef {'off' | 'experimental' | 'on' | 'invalid'} IoL2CacheProfile
+ */
+
+/**
+ * @returns {{
+ *     enabled: boolean;
+ *     profile: IoL2CacheProfile;
+ *     profileSource: 'default' | 'IO_L2_CACHE_PROFILE' | 'IO_L2_CACHE_ENABLED';
+ *     configurationValid: boolean;
+ *     ttlMs: number;
+ *     maxEntries: number;
+ *     pruneMs: number;
+ *     rawProfile?: string;
+ * }}
+ */
+export function getIoL2CacheConfiguration() {
+    const rawProfile = String(process.env['IO_L2_CACHE_PROFILE'] ?? '')
+        .trim()
+        .toLowerCase();
+    if (rawProfile) {
+        if (rawProfile !== 'off' && rawProfile !== 'experimental' && rawProfile !== 'on') {
+            return {
+                enabled: false,
+                profile: 'invalid',
+                profileSource: 'IO_L2_CACHE_PROFILE',
+                configurationValid: false,
+                ttlMs: PROFILE_DEFAULTS.on.ttlMs,
+                maxEntries: PROFILE_DEFAULTS.on.maxEntries,
+                pruneMs: PROFILE_DEFAULTS.on.pruneMs,
+                rawProfile,
+            };
+        }
+        const defaults = rawProfile === 'experimental' ? PROFILE_DEFAULTS.experimental : PROFILE_DEFAULTS.on;
+        return {
+            enabled: rawProfile !== 'off',
+            profile: rawProfile,
+            profileSource: 'IO_L2_CACHE_PROFILE',
+            configurationValid: true,
+            ttlMs: readEnvPositiveInt('IO_L2_CACHE_TTL_MS', defaults.ttlMs),
+            maxEntries: readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', defaults.maxEntries),
+            pruneMs: readEnvPositiveInt('IO_L2_CACHE_PRUNE_MS', defaults.pruneMs),
+        };
+    }
+
+    const legacyConfigured = String(process.env['IO_L2_CACHE_ENABLED'] ?? '').trim() !== '';
+    const enabled = readBooleanEnv('IO_L2_CACHE_ENABLED', false);
+    return {
+        enabled,
+        profile: enabled ? 'on' : 'off',
+        profileSource: legacyConfigured ? 'IO_L2_CACHE_ENABLED' : 'default',
+        configurationValid: true,
+        ttlMs: readEnvPositiveInt('IO_L2_CACHE_TTL_MS', PROFILE_DEFAULTS.on.ttlMs),
+        maxEntries: readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', PROFILE_DEFAULTS.on.maxEntries),
+        pruneMs: readEnvPositiveInt('IO_L2_CACHE_PRUNE_MS', PROFILE_DEFAULTS.on.pruneMs),
+    };
 }
 
 /**
@@ -46,9 +114,12 @@ function readBooleanEnv(name, fallback) {
     return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
 
-function startPruneTimer() {
+/**
+ * @param {ReturnType<typeof getIoL2CacheConfiguration>} configuration
+ */
+function startPruneTimer(configuration) {
     if (_pruneTimer) return;
-    const pruneCycleMs = readEnvPositiveInt('IO_L2_CACHE_PRUNE_MS', 5 * 60 * 1000);
+    const pruneCycleMs = configuration.pruneMs;
     _pruneTimerId = `io-cache-l2.prune:${Date.now()}:${Math.random().toString(36).slice(2)}`;
     _pruneTimer = registerInterval(_pruneTimerId, () => {
         try {
@@ -69,9 +140,31 @@ function startPruneTimer() {
     _pruneTimer.unref();
 }
 
+function stopPruneTimer() {
+    if (_pruneTimerId) cancelTimer(_pruneTimerId);
+    _pruneTimer = null;
+    _pruneTimerId = null;
+}
+
+/**
+ * @param {ReturnType<typeof getIoL2CacheConfiguration>} configuration
+ */
+function getConfigurationKey(configuration) {
+    return [configuration.profile, configuration.ttlMs, configuration.maxEntries, configuration.pruneMs].join(':');
+}
+
 export function getIoL2Cache() {
-    if (!isEnabled()) {
+    const configuration = getIoL2CacheConfiguration();
+    if (!configuration.enabled) {
+        _ioL2Cache = null;
+        _activeConfigurationKey = null;
+        stopPruneTimer();
         return null;
+    }
+    const configurationKey = getConfigurationKey(configuration);
+    if (_ioL2Cache && _activeConfigurationKey !== configurationKey) {
+        _ioL2Cache = null;
+        stopPruneTimer();
     }
     if (_circuitOpenUntilMs && Date.now() < _circuitOpenUntilMs) {
         return null;
@@ -82,9 +175,10 @@ export function getIoL2Cache() {
     try {
         _ioL2Cache = createIoL2SqliteCache({
             db: getCopilotDb(),
-            ttlMs: readEnvPositiveInt('IO_L2_CACHE_TTL_MS', 5 * 60 * 1000),
-            maxEntries: readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', 100_000),
+            ttlMs: configuration.ttlMs,
+            maxEntries: configuration.maxEntries,
         });
+        _activeConfigurationKey = configurationKey;
         _lastInitError = null;
         _lastInitErrorAtMs = null;
         const hadCircuitOpen = _circuitOpenUntilMs !== null;
@@ -95,7 +189,7 @@ export function getIoL2Cache() {
                 reason: 'init-succeeded',
             });
         }
-        startPruneTimer();
+        startPruneTimer(configuration);
         return _ioL2Cache;
     } catch (err) {
         _initFailCount += 1;
@@ -120,11 +214,16 @@ export function getIoL2Cache() {
 }
 
 export function getIoL2CacheStats() {
+    const configuration = getIoL2CacheConfiguration();
     const health = getIoL2CacheHealth();
     if (!health.available) {
         return {
             enabled: false,
+            profile: configuration.profile,
+            profileSource: configuration.profileSource,
+            configurationValid: configuration.configurationValid,
             reason: health.reason,
+            ...(configuration.rawProfile ? { rawProfile: configuration.rawProfile } : {}),
             ...(_initFailCount > 0 ? { initFailCount: _initFailCount } : {}),
             ...(_circuitOpenUntilMs ? { circuitOpenUntilMs: _circuitOpenUntilMs } : {}),
             ...(_lastInitError ? { lastInitError: _lastInitError } : {}),
@@ -140,6 +239,9 @@ export function getIoL2CacheStats() {
     }
     return {
         enabled: true,
+        profile: configuration.profile,
+        profileSource: configuration.profileSource,
+        configurationValid: configuration.configurationValid,
         ...cache.getStats(),
         ...(_lastPruneError ? { lastPruneError: _lastPruneError } : {}),
         ...(_lastPruneErrorAtMs ? { lastPruneErrorAtMs: _lastPruneErrorAtMs } : {}),
@@ -147,15 +249,34 @@ export function getIoL2CacheStats() {
 }
 
 export function getIoL2CacheHealth() {
-    const enabled = isEnabled();
-    if (!enabled) {
-        return { available: false, reason: 'disabled' };
+    const configuration = getIoL2CacheConfiguration();
+    if (!configuration.configurationValid) {
+        return {
+            available: false,
+            reason: 'invalid-profile',
+            profile: configuration.profile,
+            profileSource: configuration.profileSource,
+            configurationValid: false,
+            ...(configuration.rawProfile ? { rawProfile: configuration.rawProfile } : {}),
+        };
+    }
+    if (!configuration.enabled) {
+        return {
+            available: false,
+            reason: 'disabled',
+            profile: configuration.profile,
+            profileSource: configuration.profileSource,
+            configurationValid: true,
+        };
     }
     const cache = getIoL2Cache();
     if (!cache) {
         return {
             available: false,
             reason: _circuitOpenUntilMs && Date.now() < _circuitOpenUntilMs ? 'circuit-open' : 'init-failed',
+            profile: configuration.profile,
+            profileSource: configuration.profileSource,
+            configurationValid: configuration.configurationValid,
             ...(_initFailCount > 0 ? { initFailCount: _initFailCount } : {}),
             ...(_circuitOpenUntilMs ? { circuitOpenUntilMs: _circuitOpenUntilMs } : {}),
             ...(_lastInitError ? { lastInitError: _lastInitError } : {}),
@@ -163,11 +284,20 @@ export function getIoL2CacheHealth() {
         };
     }
     if (typeof cache.get !== 'function' || typeof cache.set !== 'function') {
-        return { available: false, reason: 'corrupted-instance' };
+        return {
+            available: false,
+            reason: 'corrupted-instance',
+            profile: configuration.profile,
+            profileSource: configuration.profileSource,
+            configurationValid: configuration.configurationValid,
+        };
     }
     return {
         available: true,
         reason: 'ready',
+        profile: configuration.profile,
+        profileSource: configuration.profileSource,
+        configurationValid: configuration.configurationValid,
         ...(_lastPruneError ? { lastPruneError: _lastPruneError } : {}),
         ...(_lastPruneErrorAtMs ? { lastPruneErrorAtMs: _lastPruneErrorAtMs } : {}),
     };
@@ -175,15 +305,12 @@ export function getIoL2CacheHealth() {
 
 export function resetIoL2CacheForTest() {
     _ioL2Cache = null;
+    _activeConfigurationKey = null;
     _lastInitError = null;
     _lastInitErrorAtMs = null;
     _lastPruneError = null;
     _lastPruneErrorAtMs = null;
     _initFailCount = 0;
     _circuitOpenUntilMs = null;
-    if (_pruneTimer) {
-        if (_pruneTimerId) cancelTimer(_pruneTimerId);
-        _pruneTimer = null;
-        _pruneTimerId = null;
-    }
+    stopPruneTimer();
 }

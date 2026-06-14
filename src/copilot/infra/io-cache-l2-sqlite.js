@@ -1,6 +1,7 @@
 // @ts-check
 
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { isBufferValue, toOwnedBuffer } from './shared/buffer.js';
 import { readEnvPositiveInt } from './shared/env.js';
 
@@ -101,6 +102,26 @@ export function createIoL2SqliteCache(options) {
         invalidations: 0,
         errors: 0,
     };
+    const latency = {
+        get: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
+        set: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
+        invalidate: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
+        prune: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
+        clear: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
+    };
+
+    /**
+     * @param {keyof typeof latency} operation
+     * @param {number} startedAt
+     */
+    function recordLatency(operation, startedAt) {
+        const durationMs = Math.max(0, performance.now() - startedAt);
+        const metric = latency[operation];
+        metric.count += 1;
+        metric.totalMs += durationMs;
+        metric.lastMs = durationMs;
+        metric.maxMs = Math.max(metric.maxMs, durationMs);
+    }
 
     const stmtGet = db.prepare(`
         SELECT
@@ -199,6 +220,7 @@ export function createIoL2SqliteCache(options) {
 
         /** @param {string} key */
         get(key) {
+            const startedAt = performance.now();
             try {
                 const row = /** @type {IoL2CacheRow | undefined} */ (stmtGet.get(key));
                 if (!row) {
@@ -224,6 +246,8 @@ export function createIoL2SqliteCache(options) {
             } catch {
                 stats.errors += 1;
                 return null;
+            } finally {
+                recordLatency('get', startedAt);
             }
         },
 
@@ -242,6 +266,7 @@ export function createIoL2SqliteCache(options) {
          * }} input
          */
         set(input) {
+            const startedAt = performance.now();
             try {
                 const payload = toBuffer(input.payload);
                 const nowMs = now();
@@ -270,11 +295,14 @@ export function createIoL2SqliteCache(options) {
             } catch {
                 stats.errors += 1;
                 return false;
+            } finally {
+                recordLatency('set', startedAt);
             }
         },
 
         /** @param {string} filePath */
         invalidatePath(filePath) {
+            const startedAt = performance.now();
             try {
                 const normalized = normalizeL2Path(filePath);
                 stmtDeletePathPrefix.run(normalized, `${normalized}/%`);
@@ -283,10 +311,13 @@ export function createIoL2SqliteCache(options) {
             } catch {
                 stats.errors += 1;
                 return false;
+            } finally {
+                recordLatency('invalidate', startedAt);
             }
         },
 
         pruneExpired() {
+            const startedAt = performance.now();
             try {
                 const result = stmtDeleteExpired.run(now());
                 const removed = Number(result?.changes || 0);
@@ -298,16 +329,21 @@ export function createIoL2SqliteCache(options) {
             } catch {
                 stats.errors += 1;
                 return 0;
+            } finally {
+                recordLatency('prune', startedAt);
             }
         },
 
         clearAll() {
+            const startedAt = performance.now();
             try {
                 db.exec('DELETE FROM copilot_io_cache_l2');
                 return true;
             } catch {
                 stats.errors += 1;
                 return false;
+            } finally {
+                recordLatency('clear', startedAt);
             }
         },
 
@@ -319,6 +355,18 @@ export function createIoL2SqliteCache(options) {
                 bytesStored: Number(snapshot.bytes || 0),
                 ttlMs,
                 maxEntries,
+                latency: Object.fromEntries(
+                    Object.entries(latency).map(([operation, metric]) => [
+                        operation,
+                        {
+                            count: metric.count,
+                            totalMs: Number(metric.totalMs.toFixed(3)),
+                            averageMs: metric.count > 0 ? Number((metric.totalMs / metric.count).toFixed(3)) : 0,
+                            lastMs: Number(metric.lastMs.toFixed(3)),
+                            maxMs: Number(metric.maxMs.toFixed(3)),
+                        },
+                    ]),
+                ),
             };
         },
     };
