@@ -5,7 +5,7 @@
  * @module copilot/infra/io/search/index-search
  */
 
-import { minimatch } from 'minimatch';
+import { matchesGlobPattern } from '../../scan/glob.js';
 
 /**
  * Decide se a busca via índice FTS5 é viável para os parâmetros fornecidos. `includePattern`/`excludePattern` são
@@ -40,42 +40,17 @@ export function canUseIndexSearch(opts) {
 export function filterIndexRowsByGlob(rows, includePattern, excludePattern) {
     if (!includePattern && !excludePattern) return rows;
 
-    /**
-     * Padrões sem barra e sem metacaracteres podem representar tanto basename quanto segmento de diretório. Ex.:
-     * `node_modules` deve excluir `node_modules/lib.ts`, e não apenas arquivos chamados literalmente `node_modules`.
-     *
-     * @param {string} target
-     * @param {string} pattern
-     * @returns {boolean}
-     */
-    const matchesPlainPathPattern = (target, pattern) => {
-        const hasSlash = pattern.includes('/');
-        const hasGlobMeta = /[*?[\]{}()!+@]/u.test(pattern);
-        if (hasGlobMeta) return false;
-        if (target === pattern || target.startsWith(`${pattern}/`)) return true;
-        if (hasSlash) return false;
-        return target.includes(`/${pattern}/`);
-    };
-
     return rows.filter((row) => {
         const target = row.relativePath || row.filePath;
 
         if (includePattern) {
-            const matchBase = !includePattern.includes('/');
-            if (
-                !minimatch(target, includePattern, { matchBase, dot: true }) &&
-                !matchesPlainPathPattern(target, includePattern)
-            ) {
+            if (!matchesGlobPattern(target, includePattern)) {
                 return false;
             }
         }
 
         if (excludePattern) {
-            const matchBase = !excludePattern.includes('/');
-            if (
-                minimatch(target, excludePattern, { matchBase, dot: true }) ||
-                matchesPlainPathPattern(target, excludePattern)
-            ) {
+            if (matchesGlobPattern(target, excludePattern)) {
                 return false;
             }
         }

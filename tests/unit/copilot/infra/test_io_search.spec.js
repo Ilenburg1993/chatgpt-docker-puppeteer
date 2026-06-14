@@ -44,6 +44,19 @@ describe('infra/io/search', () => {
         ]);
     });
 
+    it('filtra índice com a mesma política de braces usada pelo scanner', () => {
+        const rows = [
+            { filePath: '/ws/src/a.js', relativePath: 'src/a.js' },
+            { filePath: '/ws/src/b.ts', relativePath: 'src/b.ts' },
+            { filePath: '/ws/src/c.md', relativePath: 'src/c.md' },
+        ];
+
+        expect(filterIndexRowsByGlob(rows, 'src/*.{js,ts}', undefined).map((row) => row.relativePath)).toEqual([
+            'src/a.js',
+            'src/b.ts',
+        ]);
+    });
+
     it('monta argumentos de grep fallback', () => {
         expect(buildGrepArgs({ pattern: 'alpha', resolved: 'src', includePattern: '*.js' })).toEqual(
             expect.arrayContaining(['-R', '-n', '-F', '-i', '--exclude-dir=.git', '--include=*.js', 'alpha', 'src']),

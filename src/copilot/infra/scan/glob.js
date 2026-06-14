@@ -1,11 +1,61 @@
 // @ts-check
 /**
- * Matching glob simples usado por scan/prefetch.
+ * Política glob canônica usada por scan, prefetch e pós-filtro do índice.
  *
  * @module copilot/infra/scan/glob
  */
 
+import { minimatch } from 'minimatch';
 import { basename, relative, resolve } from 'node:path';
+
+export const IO_GLOB_ENGINE = 'minimatch-v10';
+
+const MINIMATCH_OPTIONS = Object.freeze({
+    dot: true,
+    nocomment: true,
+    nonegate: true,
+    windowsPathsNoEscape: true,
+});
+
+/**
+ * @param {string} value
+ */
+function normalizeGlobPath(value) {
+    return String(value).replace(/\\/gu, '/').replace(/^\.\//u, '');
+}
+
+/**
+ * Padrões sem metacaracteres também podem nomear diretórios/segmentos. Assim, `node_modules` exclui toda a subtree e
+ * `src/copilot` inclui seus descendentes, preservando a UX histórica dos callers.
+ *
+ * @param {string} target
+ * @param {string} pattern
+ */
+export function matchesPlainPathPattern(target, pattern) {
+    const normalizedTarget = normalizeGlobPath(target);
+    const normalizedPattern = normalizeGlobPath(pattern).replace(/\/+$/u, '');
+    if (!normalizedPattern || /[*?[\]{}()!+@]/u.test(normalizedPattern)) return false;
+    if (normalizedTarget === normalizedPattern || normalizedTarget.startsWith(`${normalizedPattern}/`)) return true;
+    if (normalizedPattern.includes('/')) return false;
+    return normalizedTarget.split('/').includes(normalizedPattern);
+}
+
+/**
+ * @param {string} target
+ * @param {string} pattern
+ * @returns {boolean}
+ */
+export function matchesGlobPattern(target, pattern) {
+    const normalizedTarget = normalizeGlobPath(target);
+    const normalizedPattern = normalizeGlobPath(pattern);
+    if (!normalizedPattern) return false;
+    return (
+        minimatch(normalizedTarget, normalizedPattern, {
+            ...MINIMATCH_OPTIONS,
+            matchBase: !normalizedPattern.includes('/'),
+        }) || matchesPlainPathPattern(normalizedTarget, normalizedPattern)
+    );
+}
 
 /**
  * @param {string} name
@@ -14,8 +64,7 @@ import { basename, relative, resolve } from 'node:path';
  */
 export function matchesFilter(name, filter) {
     if (!filter) return true;
-    if (filter.startsWith('*.')) return name.endsWith(filter.slice(1));
-    return name === filter;
+    return matchesGlobPattern(basename(name), filter);
 }
 
 /**
@@ -23,26 +72,12 @@ export function matchesFilter(name, filter) {
  * @returns {RegExp}
  */
 export function simpleGlobToRegExp(pattern) {
-    const normalized = pattern.replace(/\\/g, '/');
-    let out = '^';
-    for (let i = 0; i < normalized.length; i++) {
-        const ch = normalized[i];
-        if (ch === '*') {
-            const next = normalized[i + 1];
-            if (next === '*') {
-                out += '.*';
-                i += 1;
-            } else {
-                out += '[^/]*';
-            }
-        } else if (ch === '?') {
-            out += '[^/]';
-        } else {
-            out += ch?.replace(/[|\\{}()[\]^$+?.]/g, '\\$&') ?? '';
-        }
-    }
-    out += '$';
-    return new RegExp(out, 'u');
+    const normalizedPattern = normalizeGlobPath(pattern);
+    const compiled = minimatch.makeRe(normalizedPattern, {
+        ...MINIMATCH_OPTIONS,
+        matchBase: !normalizedPattern.includes('/'),
+    });
+    return compiled || /$a/u;
 }
 
 /**
@@ -55,9 +90,8 @@ export function matchesAnyPattern(absolutePath, workspaceRoot, patterns) {
     if (!patterns.length) return false;
     const normalizedAbsolute = resolve(absolutePath).replace(/\\/g, '/');
     const normalizedRelative = relative(workspaceRoot, absolutePath).replace(/\\/g, '/');
-    const name = basename(absolutePath);
-    return patterns.some((pattern) => {
-        const re = simpleGlobToRegExp(pattern);
-        return re.test(normalizedRelative) || re.test(normalizedAbsolute) || re.test(name);
-    });
+    return patterns.some(
+        (pattern) =>
+            matchesGlobPattern(normalizedRelative, pattern) || matchesGlobPattern(normalizedAbsolute, pattern),
+    );
 }

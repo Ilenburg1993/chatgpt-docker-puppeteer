@@ -160,4 +160,31 @@ describe('infra/io-scanner', () => {
         expect(result.entries.at(4)?.children?.map((entry) => entry.name)).toEqual(['4.txt']);
         expect(result.io.advisoryLimits).toMatchObject({ batchSize: 2, concurrency: 2 });
     });
+
+    it('usa glob canônico com braces e exclusão por segmento simples', async () => {
+        const dir = await createTempDir();
+        await mkdir(join(dir, 'src', 'nested'), { recursive: true });
+        await mkdir(join(dir, 'node_modules', 'pkg'), { recursive: true });
+        await writeFile(join(dir, 'src', 'a.ts'), 'export const a = 1;', 'utf8');
+        await writeFile(join(dir, 'src', 'nested', 'b.js'), 'export const b = 1;', 'utf8');
+        await writeFile(join(dir, 'src', 'nested', 'c.md'), '# c', 'utf8');
+        await writeFile(join(dir, 'node_modules', 'pkg', 'dep.ts'), 'export const dep = 1;', 'utf8');
+
+        const result = await scanDirectory(dir, {
+            workspaceRoot: dir,
+            recursive: true,
+            depth: 4,
+            showHidden: true,
+            respectDenylist: false,
+            include: ['src/**/*.{js,ts}'],
+            exclude: ['node_modules'],
+        });
+        const serialized = JSON.stringify(result.entries);
+
+        expect(serialized).toContain('a.ts');
+        expect(serialized).toContain('b.js');
+        expect(serialized).not.toContain('c.md');
+        expect(serialized).not.toContain('node_modules');
+        expect(result.io.advisoryLimits?.globEngine).toBe('minimatch-v10');
+    });
 });

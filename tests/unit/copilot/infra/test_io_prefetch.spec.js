@@ -184,4 +184,27 @@ describe('warmFromDirectory', () => {
         assert.strictEqual(result.advisoryLimits.limitMode, 'enforced-max-files');
         assert.strictEqual(result.advisoryLimits.hardLimitReached, true);
     });
+
+    it('aplica braces e exclusão por diretório com a política glob canônica', async () => {
+        const nested = path.join(tmpDir, 'glob-nested');
+        const excluded = path.join(tmpDir, 'glob-excluded');
+        await fs.mkdir(nested, { recursive: true });
+        await fs.mkdir(excluded, { recursive: true });
+        await fs.writeFile(path.join(nested, 'match.ts'), 'export const match = true;', 'utf8');
+        await fs.writeFile(path.join(nested, 'skip.md'), '# skip', 'utf8');
+        await fs.writeFile(path.join(excluded, 'hidden.js'), 'export const hidden = true;', 'utf8');
+        resetIoL1CacheForTest();
+
+        const result = await warmFromDirectory(tmpDir, {
+            extensions: ['.js', '.ts', '.md'],
+            include: ['**/*.{js,ts}'],
+            exclude: ['glob-excluded'],
+            maxFiles: 100,
+        });
+
+        assert.ok(result.paths.some((filePath) => filePath.endsWith('glob-nested/match.ts')));
+        assert.ok(!result.paths.some((filePath) => filePath.endsWith('glob-nested/skip.md')));
+        assert.ok(!result.paths.some((filePath) => filePath.includes('glob-excluded')));
+        assert.strictEqual(result.advisoryLimits.globEngine, 'minimatch-v10');
+    });
 });

@@ -16,7 +16,7 @@ import { parseAndCacheSymbols } from './io-parser.js';
 import { scanDirectory } from './io-scanner.js';
 import { readBytesFileSnapshot } from './io/fs/read-bytes.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
-import { matchesAnyPattern } from './scan/glob.js';
+import { IO_GLOB_ENGINE, matchesAnyPattern } from './scan/glob.js';
 import { decodeUtf8Buffer, toOwnedBuffer, utf8ByteLength } from './shared/buffer.js';
 import { sha256 } from './shared/hash.js';
 
@@ -312,6 +312,7 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
             recursive,
             includePatternCount: include.length,
             excludePatternCount: exclude.length,
+            globEngine: IO_GLOB_ENGINE,
             limitMode: 'enforced-max-files',
         },
     };

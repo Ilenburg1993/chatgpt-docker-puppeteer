@@ -8,4 +8,11 @@
 export { mapInBatches, normalizeBatchSize } from './batching.js';
 export { buildFileFingerprint, classifyStats } from './fingerprint.js';
 export { loadGitignoreMatcher } from './gitignore.js';
-export { matchesAnyPattern, matchesFilter, simpleGlobToRegExp } from './glob.js';
+export {
+    IO_GLOB_ENGINE,
+    matchesAnyPattern,
+    matchesFilter,
+    matchesGlobPattern,
+    matchesPlainPathPattern,
+    simpleGlobToRegExp,
+} from './glob.js';

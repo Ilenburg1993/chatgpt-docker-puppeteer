@@ -24,7 +24,7 @@ import { hasNullByte, normalizeWorkspaceRoot } from './policy/path-resource.js';
 import { mapInBatches, normalizeBatchSize } from './scan/batching.js';
 import { buildFileFingerprint, classifyStats } from './scan/fingerprint.js';
 import { loadGitignoreMatcher } from './scan/gitignore.js';
-import { matchesAnyPattern, matchesFilter } from './scan/glob.js';
+import { IO_GLOB_ENGINE, matchesAnyPattern, matchesFilter } from './scan/glob.js';
 import { readEnvPositiveInt } from './shared/env.js';
 
 const DEFAULT_SCAN_BATCH_SIZE = readEnvPositiveInt('IO_SCAN_BATCH_SIZE', 512);
@@ -256,6 +256,7 @@ export async function scanDirectory(rootPath, options = {}) {
                 gitignore: respectGitignore ? 'enabled' : 'disabled',
                 includePatternCount: includePatterns.length,
                 excludePatternCount: excludePatterns.length,
+                globEngine: IO_GLOB_ENGINE,
                 concurrency,
                 batchSize,
                 fingerprint: includeFingerprint,
