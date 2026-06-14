@@ -5,6 +5,7 @@
  * @module copilot/infra/io/fs/move
  */
 
+import * as nodeFs from 'node:fs';
 import { copyFile, link, readFile, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { sha256 } from '../../shared/hash.js';
@@ -33,6 +34,7 @@ async function readFileIntegrity(filePath) {
  *     syncFile?: typeof syncFileBestEffort;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
  *     capacityPreflight?: typeof preflightIoCapacity;
+ *     tempPathFactory?: typeof createSiblingTempPath;
  * }} [options]
  * @returns {Promise<{
  *     crossDevice: boolean;
@@ -140,11 +142,12 @@ export async function moveFileUnlocked(source, destination, options = {}) {
  *     syncFile?: typeof syncFileBestEffort;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
  *     capacityPreflight?: typeof preflightIoCapacity;
+ *     tempPathFactory?: typeof createSiblingTempPath;
  * }} options
  * @returns {ReturnType<typeof moveFileUnlocked>}
  */
 async function moveFileAcrossDevices(source, destination, options) {
-    const tmpDestination = createSiblingTempPath(destination, 'move');
+    const tmpDestination = (options.tempPathFactory ?? createSiblingTempPath)(destination, 'move');
     let tmpCreated = false;
     try {
         const sourceBefore =
@@ -155,7 +158,7 @@ async function moveFileAcrossDevices(source, destination, options) {
             destination,
             sourceBefore.bytes,
         );
-        await copyFile(source, tmpDestination);
+        await copyFile(source, tmpDestination, nodeFs.constants.COPYFILE_EXCL);
         tmpCreated = true;
         await emitMutationPhase(options, 'temp-written', { source, destination, tmpDestination, crossDevice: true });
         const [sourceAfter, tempAfter] = await Promise.all([readFileIntegrity(source), readFileIntegrity(tmpDestination)]);

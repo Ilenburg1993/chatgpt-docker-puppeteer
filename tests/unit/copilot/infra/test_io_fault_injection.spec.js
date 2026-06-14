@@ -185,6 +185,35 @@ describe('infra/io deterministic fault injection', () => {
         expect(await readFile(destination, 'utf8')).toBe('cross-device-content');
     });
 
+    it('não sobrescreve temporário cross-device preexistente', async () => {
+        let sharedMemoryStats;
+        try {
+            sharedMemoryStats = await stat('/dev/shm');
+        } catch {
+            return;
+        }
+        if (sharedMemoryStats.dev === (await stat(tmpdir())).dev) return;
+
+        const sourceDir = await createTempDir();
+        const destinationDir = await mkdtemp('/dev/shm/copilot-io-exdev-temp-');
+        tempDirs.push(destinationDir);
+        const source = path.join(sourceDir, 'source.txt');
+        const destination = path.join(destinationDir, 'destination.txt');
+        const controlledTemp = path.join(destinationDir, '.destination.controlled.move.tmp');
+        await Promise.all([writeFile(source, 'source-content'), writeFile(controlledTemp, 'sentinel')]);
+
+        await expect(
+            moveFileUnlocked(source, destination, {
+                overwrite: false,
+                tempPathFactory: () => controlledTemp,
+            }),
+        ).rejects.toMatchObject({ code: 'EEXIST' });
+
+        expect(await readFile(source, 'utf8')).toBe('source-content');
+        expect(await readFile(controlledTemp, 'utf8')).toBe('sentinel');
+        await expect(access(destination)).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
     it('reencaminha lote JSONL quando falha depois da rotação e antes do append', async () => {
         const dir = await createTempDir();
         const filePath = path.join(dir, 'events.jsonl');
