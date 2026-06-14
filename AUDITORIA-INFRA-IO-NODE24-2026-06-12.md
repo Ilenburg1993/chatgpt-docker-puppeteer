@@ -1529,6 +1529,26 @@ lint focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**. Uma suí
 por alias preexistente ausente (`#copilot/mcp/cloudflare/cli-probe.js`); as superfícies alteradas passaram
 isoladamente.
 
+### 1.61 Status de implementação — tools web com caps determinísticos em 2026-06-14
+
+IO-070 corrigiu um contrato inconsistente em `web_fetch_local`: `maxBytes` era descrito como informativo, mas o loop
+parava depois de adicionar o chunk inteiro quando `received >= limit`. Assim, a mesma resposta podia ser integral ou
+truncada conforme o chunking físico, `truncated` permanecia falso e a ausência de parâmetro deixava retenção
+ilimitada.
+
+Estado novo:
+
+- `web_fetch_local` aplica default **2 MiB**, hard cap configurável **8 MiB** e coleta no máximo o prefixo pedido;
+- truncagem em meio de code point recua até três bytes, sem aceitar UTF-8 inválido interno;
+- metadata expõe `effectiveMaxBytes`, `returnedBytes`, `boundaryTrimmedBytes`, `limitMode:'enforced'` e truncagem real;
+- `bytesRead` representa bytes observados da rede, separado dos bytes retornados;
+- `web_search` não usa mais `response.json()/text()` sem bound: JSON e HTML devem caber integralmente em **2 MiB**,
+  com precheck de `Content-Length`, cancelamento e decode fatal;
+- cleanup aceita readers cujo `cancel()` seja síncrono ou assíncrono.
+
+Validação focada de IO-070: **50 passados, 0 falhas** em web tools/introspection; lint focado, `diff --check` e
+`typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1818,12 +1838,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-067 | P0 | JSONL tail | **Concluído:** cauda tem budgets físicos e decode incremental fatal | hard caps, ring bounded, regressões e propagação SSE/audit | Uma linha maior que `maxBytes` é omitida e sinalizada, não parcialmente parseada | Manter warning/metadata quando completude for funcionalmente relevante |
 | IO-068 | P2 | Babel comments | **Concluído por medição:** `attachComment` permanece ligado | 1.272 arquivos/10,7 MB; mediana 1,109x; 8.591 docs preservados | Benchmark local tem dispersão de JIT/GC e não substitui telemetria | Perfil sem docs somente opt-in, cacheado à parte e com prova end-to-end |
 | IO-069 | P0 | HTTP UTF-8/budgets | **Concluído:** corpos estruturados MCP/OAuth e probes são bounded/fatais | default 2 MiB, request caps 64 KiB, cancelamento e testes de bytes inválidos | Stderr diagnóstico continua best-effort e bounded | Manter payloads estruturados sob decode fatal; não promover stderr a dado confiável |
+| IO-070 | P0 | Web tools | **Concluído:** fetch/search têm caps determinísticos e UTF-8 fatal | 2 MiB default/search, 8 MiB máximo fetch, truncagem code-point-safe | HTML/JSON acima do cap falham em vez de retornar parse parcial | Expor aumento de cap somente de forma explícita e bounded |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2354,6 +2375,7 @@ Maturidade operacional avançada:
 - [x] limitar cauda JSONL por bytes/linhas e recusar decode substitutivo;
 - [x] medir `attachComment` no corpus real e formalizar a decisão funcional;
 - [x] aplicar budgets e UTF-8 fatal a corpos estruturados HTTP/MCP/OAuth;
+- [x] tornar caps de web fetch/search determinísticos e observáveis;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2374,7 +2396,7 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria das principais tools e fronteiras HTTP/streaming remanescentes. Ampliar fixtures Babel somente
-para sintaxe realmente aceita pelo workspace e manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece
-explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que justifique o
-contrato.
+Continuar a auditoria das principais tools, importers de catálogo e fronteiras HTTP/streaming remanescentes. Ampliar
+fixtures Babel somente para sintaxe realmente aceita pelo workspace e manter fuzz/chaos como gates recorrentes.
+IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que
+justifique o contrato.

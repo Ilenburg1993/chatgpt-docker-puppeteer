@@ -330,7 +330,7 @@ describe('web-tools', () => {
             expect(result.error).toMatch(/redirect bloqueado/i);
         });
 
-        it('mantém resposta integral quando excede maxBytes informativo', async () => {
+        it('aplica maxBytes efetivo e reporta truncagem determinística', async () => {
             const bigBody = 'x'.repeat(1000);
             fetchSpy.mockResolvedValueOnce(mockResponse(bigBody, { url: 'https://example.com/big' }));
 
@@ -338,9 +338,54 @@ describe('web-tools', () => {
             const result = await tool.handler({ url: 'https://example.com/big', maxBytes: 100 });
 
             expect(result.success).toBe(true);
-            expect(result.truncated).toBe(false);
-            expect(result.content.length).toBe(1000);
+            expect(result.truncated).toBe(true);
+            expect(result.content.length).toBe(100);
+            expect(result.maxBytes).toBe(100);
+            expect(result.returnedBytes).toBe(100);
             expect(result.advisoryMaxBytes).toBe(100);
+            expect(result.io?.truncated).toBe(true);
+            expect(result.io?.advisoryLimits?.limitMode).toBe('enforced');
+        });
+
+        it('recua em fronteira UTF-8 quando o limite corta um code point', async () => {
+            fetchSpy.mockResolvedValueOnce(mockResponse('ab😀cd', { url: 'https://example.com/unicode' }));
+
+            const tool = findFetch();
+            const result = await tool.handler({ url: 'https://example.com/unicode', maxBytes: 4 });
+
+            expect(result.success).toBe(true);
+            expect(result.content).toBe('ab');
+            expect(result.truncated).toBe(true);
+            expect(result.returnedBytes).toBe(2);
+            expect(result.boundaryTrimmedBytes).toBe(2);
+        });
+
+        it('rejeita bytes UTF-8 inválidos em resposta text/*', async () => {
+            const bytes = new Uint8Array([0x61, 0xff, 0x62]);
+            let read = false;
+            fetchSpy.mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                url: 'https://example.com/invalid',
+                headers: { get: () => 'text/plain' },
+                body: {
+                    getReader: () => ({
+                        read: async () => {
+                            if (read) return { done: true, value: undefined };
+                            read = true;
+                            return { done: false, value: bytes };
+                        },
+                        cancel: vi.fn(),
+                        releaseLock: vi.fn(),
+                    }),
+                },
+            });
+
+            const tool = findFetch();
+            const result = await tool.handler({ url: 'https://example.com/invalid' });
+
+            expect(result.success).toBe(false);
+            expect(result.error).toMatch(/UTF-8/u);
         });
 
         it('retorna erro para resposta sem corpo', async () => {
@@ -377,10 +422,9 @@ describe('web-tools', () => {
                 ],
             };
 
-            fetchSpy.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ddgResponse,
-            });
+            fetchSpy.mockResolvedValueOnce(
+                mockResponse(JSON.stringify(ddgResponse), { contentType: 'application/json' }),
+            );
 
             const tool = findSearch();
             const result = await tool.handler({ query: 'Node.js', maxResults: 5 });
@@ -402,10 +446,9 @@ describe('web-tools', () => {
                 ],
             };
 
-            fetchSpy.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ddgResponse,
-            });
+            fetchSpy.mockResolvedValueOnce(
+                mockResponse(JSON.stringify(ddgResponse), { contentType: 'application/json' }),
+            );
 
             const tool = findSearch();
             const result = await tool.handler({ query: 'token' });
@@ -419,10 +462,9 @@ describe('web-tools', () => {
 
         it('cai para HTML scraping quando JSON API retorna 0 resultados', async () => {
             // DDG JSON API retorna vazio
-            fetchSpy.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ RelatedTopics: [] }),
-            });
+            fetchSpy.mockResolvedValueOnce(
+                mockResponse(JSON.stringify({ RelatedTopics: [] }), { contentType: 'application/json' }),
+            );
 
             // DDG HTML scraping
             const html = `
@@ -431,10 +473,7 @@ describe('web-tools', () => {
                 <a class="result__a" href="https://example.com/result2">Result 2</a>
                 <a class="result__snippet">Snippet 2 text</a>
             `;
-            fetchSpy.mockResolvedValueOnce({
-                ok: true,
-                text: async () => html,
-            });
+            fetchSpy.mockResolvedValueOnce(mockResponse(html, { contentType: 'text/html' }));
 
             const tool = findSearch();
             const result = await tool.handler({ query: 'obscure search' });
@@ -451,10 +490,9 @@ describe('web-tools', () => {
                 ],
             };
 
-            fetchSpy.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ddgResponse,
-            });
+            fetchSpy.mockResolvedValueOnce(
+                mockResponse(JSON.stringify(ddgResponse), { contentType: 'application/json' }),
+            );
 
             const tool = findSearch();
             const result = await tool.handler({ query: 'test' });

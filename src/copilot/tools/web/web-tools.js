@@ -1,6 +1,11 @@
 // @ts-check
 import { getWebRateLimitPolicy, WEB_FETCH_DISABLED, WEB_SEARCH_DISABLED } from '#copilot/config';
-import { concatBufferViews, utf8ByteLength } from '#copilot/infra/public/buffer';
+import {
+    bufferIsUtf8,
+    concatBufferViews,
+    decodeUtf8Buffer,
+    utf8ByteLength,
+} from '#copilot/infra/public/buffer';
 import { publishIoOperation } from '#copilot/infra/public/events';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
@@ -34,6 +39,9 @@ import {
 const RATE_WINDOW = new Map();
 const REDIRECT_BLOCKED_PORTS = new Set([22, 25, 3306, 5432, 6379, 8080, 8443, 9200, 27017]);
 const MAX_WEB_FETCH_BODY_BYTES = 64 * 1024;
+const DEFAULT_WEB_FETCH_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_WEB_FETCH_RESPONSE_BYTES = 8 * 1024 * 1024;
+const MAX_WEB_SEARCH_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 /**
  * Reset util para testes — limpa buckets de rate-limit em memória.
@@ -121,6 +129,82 @@ function sanitizeRequestHeaders(headers) {
     return out;
 }
 
+/**
+ * @param {number | undefined} value
+ * @returns {number}
+ */
+function resolveWebFetchMaxBytes(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+        ? Math.min(MAX_WEB_FETCH_RESPONSE_BYTES, Math.trunc(value))
+        : DEFAULT_WEB_FETCH_RESPONSE_BYTES;
+}
+
+/**
+ * Decodifica o prefixo coletado. Quando houve truncagem, remove somente uma sequência multibyte final incompleta.
+ *
+ * @param {Buffer} bytes
+ * @param {boolean} truncated
+ * @returns {{ text: string; returnedBytes: number; boundaryTrimmedBytes: number }}
+ */
+function decodeWebFetchBytes(bytes, truncated) {
+    let safeBytes = bytes;
+    if (truncated && !bufferIsUtf8(safeBytes)) {
+        for (let trim = 1; trim <= Math.min(3, safeBytes.byteLength); trim += 1) {
+            const candidate = safeBytes.subarray(0, safeBytes.byteLength - trim);
+            if (!bufferIsUtf8(candidate)) continue;
+            safeBytes = candidate;
+            break;
+        }
+    }
+    return {
+        text: decodeUtf8Buffer(safeBytes, 'Resposta web contém bytes inválidos para UTF-8.'),
+        returnedBytes: safeBytes.byteLength,
+        boundaryTrimmedBytes: bytes.byteLength - safeBytes.byteLength,
+    };
+}
+
+/**
+ * Lê uma resposta textual completa com orçamento estrito. JSON/HTML de busca não pode ser parseado parcialmente.
+ *
+ * @param {Response} response
+ * @param {number} maxBytes
+ * @param {string} label
+ * @returns {Promise<string>}
+ */
+async function readCompleteWebTextResponse(response, maxBytes, label) {
+    const contentLength = Number(response.headers.get('content-length') ?? 0);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+        throw new Error(`${label} excede limite de ${maxBytes} bytes.`);
+    }
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error(`${label} sem corpo textual.`);
+    /** @type {Uint8Array[]} */
+    const chunks = [];
+    let bytesRead = 0;
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            bytesRead += value.byteLength;
+            if (bytesRead > maxBytes) {
+                throw new Error(`${label} excede limite de ${maxBytes} bytes.`);
+            }
+            chunks.push(value);
+        }
+    } finally {
+        try {
+            await reader.cancel();
+        } catch {
+            // best effort: a resposta já foi consumida ou rejeitada pelo budget
+        }
+        reader.releaseLock();
+    }
+    return decodeUtf8Buffer(
+        concatBufferViews(chunks, bytesRead),
+        `${label} contém bytes inválidos para UTF-8.`,
+    );
+}
+
 // ─── Tool: web_fetch_local ───────────────────────────────────────────────────
 
 /**
@@ -199,13 +283,19 @@ const webFetchTool = buildTool({
         'Fetch web local com proteção SSRF. Em runtimes com built-in do CLI (`web_fetch`), a built-in prevalece. ' +
         'Busca o conteúdo de uma URL pública (HTTP/HTTPS). Apenas texto (text/*). ' +
         'Bloqueado para IPs privados, localhost e esquemas não-HTTP (proteção SSRF). ' +
-        'Volume/timeout são informativos e não bloqueiam a operação.',
+        'Resposta limitada por bytes e timeout efetivo para evitar retenção ilimitada.',
     parameters: z.object({
         url: z.string().url().describe('URL completa da página a buscar (https:// recomendado)'),
         method: z.enum(['GET', 'POST', 'PUT', 'PATCH']).optional().describe('Método HTTP. Default: GET.'),
         headers: z.record(z.string(), z.string()).optional().describe('Headers HTTP opcionais (sanitizados).'),
         body: z.string().optional().describe('Body textual opcional para métodos não-GET.'),
-        maxBytes: z.number().int().min(1).optional().describe('Tamanho informativo da resposta em bytes.'),
+        maxBytes: z
+            .number()
+            .int()
+            .min(1)
+            .max(MAX_WEB_FETCH_RESPONSE_BYTES)
+            .optional()
+            .describe(`Máximo efetivo da resposta em bytes. Default: ${DEFAULT_WEB_FETCH_RESPONSE_BYTES}.`),
         timeoutMs: z
             .number()
             .int()
@@ -246,7 +336,7 @@ const webFetchTool = buildTool({
         }
         const parsed = inputUrlDecision.url;
 
-        const advisoryLimit = maxBytes ?? null;
+        const responseMaxBytes = resolveWebFetchMaxBytes(maxBytes);
         const maxRedirects = inputUrlDecision.maxRedirects ?? IO_URL_MAX_REDIRECTS;
         const timeoutBudgetMs =
             typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : null;
@@ -280,7 +370,7 @@ const webFetchTool = buildTool({
             }
 
             const contentType = response.headers.get('content-type') ?? '';
-            if (!contentType.startsWith('text/')) {
+            if (!contentType.toLowerCase().startsWith('text/')) {
                 return {
                     success: false,
                     error: `Content-type não suportado: '${contentType}'. Apenas text/* é aceito.`,
@@ -291,16 +381,23 @@ const webFetchTool = buildTool({
             if (!reader) return { success: false, error: 'Resposta sem corpo.' };
 
             let received = 0;
+            let collectedBytes = 0;
+            let truncated = false;
             const chunks = /** @type {Uint8Array[]} */ ([]);
-            // FIX WT-WEB-02: aplicar advisoryLimit no loop; cleanup robusto com cancel()+releaseLock().
             try {
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
                     received += value.byteLength;
-                    chunks.push(value);
-                    if (advisoryLimit !== null && received >= advisoryLimit) {
-                        log('INFO', `[copilot/web_fetch] advisoryLimit ${advisoryLimit}B atingido — truncando.`);
+                    const remaining = responseMaxBytes - collectedBytes;
+                    if (remaining > 0) {
+                        const accepted = value.byteLength <= remaining ? value : value.subarray(0, remaining);
+                        chunks.push(accepted);
+                        collectedBytes += accepted.byteLength;
+                    }
+                    if (value.byteLength > remaining) {
+                        truncated = true;
+                        log('INFO', `[copilot/web_fetch] maxBytes ${responseMaxBytes}B atingido — truncando.`);
                         break;
                     }
                 }
@@ -313,18 +410,25 @@ const webFetchTool = buildTool({
                 reader.releaseLock();
             }
 
-            const text = new TextDecoder().decode(concatBufferViews(chunks, received));
+            const decoded = decodeWebFetchBytes(
+                concatBufferViews(chunks, collectedBytes),
+                truncated,
+            );
 
-            const sanitized = sanitizeIoTextOutput({ text });
+            const sanitized = sanitizeIoTextOutput({ text: decoded.text });
             const io = buildIoMeta({
                 operation: 'fetch',
                 target: finalUrl,
                 targetKind: 'url',
-                bytesRead: utf8ByteLength(sanitized.text, 'web_fetch sanitized text'),
+                bytesRead: received,
                 engine: 'fetch',
-                truncated: false,
+                truncated,
                 advisoryLimits: {
-                    requestedMaxBytes: advisoryLimit,
+                    requestedMaxBytes: maxBytes ?? null,
+                    effectiveMaxBytes: responseMaxBytes,
+                    returnedBytes: decoded.returnedBytes,
+                    boundaryTrimmedBytes: decoded.boundaryTrimmedBytes,
+                    limitMode: 'enforced',
                     advisoryTimeoutMs: timeoutMs ?? null,
                     method: safeMethod,
                     requestBodyBytes: bodySizeBytes,
@@ -347,10 +451,13 @@ const webFetchTool = buildTool({
                     status: response.status,
                     method: safeMethod,
                     contentType,
-                    truncated: false,
-                    advisoryMaxBytes: advisoryLimit,
+                    truncated,
+                    maxBytes: responseMaxBytes,
+                    advisoryMaxBytes: maxBytes ?? null,
                     advisoryTimeoutMs: timeoutMs ?? null,
                     bytesRead: received,
+                    returnedBytes: decoded.returnedBytes,
+                    boundaryTrimmedBytes: decoded.boundaryTrimmedBytes,
                     length: sanitized.text.length,
                     content: sanitized.text,
                     sanitized: sanitized.sanitized,
@@ -429,7 +536,15 @@ const webSearchTool = buildTool({
                 /** @type {Record<string, unknown> | null} */
                 let data;
                 try {
-                    data = /** @type {Record<string, unknown>} */ (await response.json());
+                    data = /** @type {Record<string, unknown>} */ (
+                        JSON.parse(
+                            await readCompleteWebTextResponse(
+                                response,
+                                MAX_WEB_SEARCH_RESPONSE_BYTES,
+                                'Resposta JSON do DDG',
+                            ),
+                        )
+                    );
                 } catch (jsonErr) {
                     const message = toError(jsonErr).message;
                     log(
@@ -553,7 +668,11 @@ const webSearchTool = buildTool({
                 return { success: false, error: `DDG retornou status ${response.status}` };
             }
 
-            const html = await response.text();
+            const html = await readCompleteWebTextResponse(
+                response,
+                MAX_WEB_SEARCH_RESPONSE_BYTES,
+                'Resposta HTML do DDG',
+            );
 
             // Extrai resultados via regex sobre o HTML do DDG Lite.
             // AVISO: este parsing é frágil por design — depende do layout HTML do DDG que pode mudar sem aviso.
