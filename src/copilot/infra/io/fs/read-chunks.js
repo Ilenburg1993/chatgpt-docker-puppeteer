@@ -5,19 +5,40 @@
  * @module copilot/infra/io/fs/read-chunks
  */
 
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { open, stat } from 'node:fs/promises';
 import { addAbortSignal } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
+import { normalizePathResourceKey } from '../../policy/path-resource.js';
 import { toBufferView, utf8ByteLength } from '../../shared/buffer.js';
+import { richFingerprintMatches } from '../../shared/fingerprint-match.js';
+import { sha256 } from '../../shared/hash.js';
+import { sameFileSnapshot } from './read-bytes.js';
 
 const BYTE_LINE_INDEX_MAX_ENTRIES = 64;
 const DEFAULT_BYTE_LINE_INDEX_MAX_LINES = 1_000_000;
 const HARD_BYTE_LINE_INDEX_MAX_LINES = 5_000_000;
+const DEFAULT_CHUNK_SNAPSHOT_RETRIES = 2;
 
 /**
- * @typedef {{ index: number; startLine: number; endLine: number; content: string; bytes: number }} TextLineChunk
- * @typedef {{ sizeBytes: number; mtimeMs: number; lineStarts: number[]; totalLines: number; builtAtMs: number }} ByteLineIndexEntry
+ * @typedef {{
+ *     index: number;
+ *     startLine: number;
+ *     endLine: number;
+ *     content: string;
+ *     bytes: number;
+ *     snapshotVersion?: string;
+ * }} TextLineChunk
+ * @typedef {{
+ *     sizeBytes: number;
+ *     mtimeMs: number;
+ *     ctimeMs: number;
+ *     dev: number;
+ *     ino: number;
+ *     snapshotVersion: string;
+ *     lineStarts: number[];
+ *     totalLines: number;
+ *     builtAtMs: number;
+ * }} ByteLineIndexEntry
  */
 
 /** @type {Map<string, ByteLineIndexEntry>} */
@@ -34,6 +55,67 @@ function throwAbortError() {
 }
 
 /**
+ * @param {string} filePath
+ * @param {number} attempts
+ * @param {{ partial?: boolean; snapshotVersion?: string }} [details]
+ * @returns {Error & { code?: string; attempts?: number; partial?: boolean; snapshotVersion?: string }}
+ */
+function createStaleChunkSnapshotError(filePath, attempts, details = {}) {
+    const error = /** @type {Error & {
+     *     code?: string;
+     *     attempts?: number;
+     *     partial?: boolean;
+     *     snapshotVersion?: string;
+     * }} */ (new Error(`Arquivo mudou durante leitura textual em chunks: ${filePath}`));
+    error.code = details.partial ? 'ESTALECHUNKSTREAM' : 'ESTALECHUNKSNAPSHOT';
+    error.attempts = attempts;
+    error.partial = details.partial ?? false;
+    if (details.snapshotVersion) error.snapshotVersion = details.snapshotVersion;
+    return error;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isStaleChunkSnapshotError(error) {
+    const code = /** @type {{ code?: unknown }} */ (error)?.code;
+    return code === 'ESTALECHUNKSNAPSHOT' || code === 'ESTALECHUNKSTREAM';
+}
+
+/**
+ * @param {import('node:fs').Stats} stats
+ */
+function fingerprintFromStats(stats) {
+    return {
+        sizeBytes: stats.size,
+        mtimeMs: stats.mtimeMs,
+        ctimeMs: stats.ctimeMs,
+        dev: Number(stats.dev),
+        ino: Number(stats.ino),
+    };
+}
+
+/**
+ * @param {{ sizeBytes: number; mtimeMs: number; ctimeMs: number; dev: number; ino: number }} fingerprint
+ * @returns {string}
+ */
+function buildSnapshotVersion(fingerprint) {
+    return sha256(
+        `${fingerprint.dev}:${fingerprint.ino}:${fingerprint.sizeBytes}:${fingerprint.mtimeMs}:${fingerprint.ctimeMs}`,
+    ).slice(0, 24);
+}
+
+/**
+ * @param {ByteLineIndexEntry} entry
+ * @param {import('node:fs').Stats} stats
+ * @returns {boolean}
+ */
+function byteLineIndexMatchesStats(entry, stats) {
+    return richFingerprintMatches(entry, fingerprintFromStats(stats), { mtimeToleranceMs: 0 });
+}
+
+/**
  * @returns {number}
  */
 function readByteLineIndexMaxLines() {
@@ -44,71 +126,131 @@ function readByteLineIndexMaxLines() {
 
 /**
  * @param {string} filePath
+ * @param {{
+ *     highWaterMark?: number;
+ *     signal?: AbortSignal;
+ *     attempt?: number;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ * }} [options]
  * @returns {Promise<ByteLineIndexEntry | null>}
  */
-async function getByteLineIndex(filePath) {
+async function getByteLineIndex(filePath, options = {}) {
     if (process.env['COPILOT_IO_BYTE_LINE_INDEX_DISABLE'] === 'true') return null;
+    const cacheKey = normalizePathResourceKey(filePath);
     const stats = await stat(filePath);
-    const sizeBytes = Number(stats.size);
-    const mtimeMs = Number(stats.mtimeMs);
-    const cached = byteLineIndexCache.get(filePath);
-    if (cached && cached.sizeBytes === sizeBytes && cached.mtimeMs === mtimeMs) {
-        byteLineIndexCache.delete(filePath);
-        byteLineIndexCache.set(filePath, cached);
+    const cached = byteLineIndexCache.get(cacheKey);
+    if (cached && byteLineIndexMatchesStats(cached, stats)) {
+        byteLineIndexCache.delete(cacheKey);
+        byteLineIndexCache.set(cacheKey, cached);
         return cached;
     }
-    const built = await buildByteLineIndex(filePath, sizeBytes, mtimeMs);
+    if (cached) byteLineIndexCache.delete(cacheKey);
+    const built = await buildByteLineIndex(filePath, {
+        ...(options.signal ? { signal: options.signal } : {}),
+        ...(options.attempt !== undefined ? { attempt: options.attempt } : {}),
+        ...(options.onPhase ? { onPhase: options.onPhase } : {}),
+    });
     if (!built) return null;
-    byteLineIndexCache.set(filePath, built);
+    byteLineIndexCache.set(cacheKey, built);
     trimByteLineIndexCache();
     return built;
 }
 
 /**
  * @param {string} filePath
- * @param {number} sizeBytes
- * @param {number} mtimeMs
+ * @param {{
+ *     signal?: AbortSignal;
+ *     attempt?: number;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ * }} [options]
  * @returns {Promise<ByteLineIndexEntry | null>}
  */
-async function buildByteLineIndex(filePath, sizeBytes, mtimeMs) {
+async function buildByteLineIndex(filePath, options = {}) {
+    options.signal?.throwIfAborted();
     const maxLines = readByteLineIndexMaxLines();
-    if (sizeBytes === 0) {
-        return { sizeBytes, mtimeMs, lineStarts: [], totalLines: 0, builtAtMs: Date.now() };
-    }
+    const handle = await open(filePath, 'r');
     /** @type {number[]} */
     const lineStarts = [0];
     let byteOffset = 0;
+    let exceededMaxLines = false;
     /** @type {number | null} */
     let pendingCrOffset = null;
-    const stream = createReadStream(filePath);
-    for await (const chunk of stream) {
-        const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
-        for (let index = 0; index < buf.byteLength; index += 1) {
-            const byte = buf[index];
-            if (pendingCrOffset !== null) {
-                if (byte === 0x0a) {
-                    lineStarts.push(byteOffset + 1);
-                    pendingCrOffset = null;
+    const baseStream = handle.createReadStream({ autoClose: false });
+    const stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
+
+    try {
+        const before = await handle.stat();
+        const fingerprint = fingerprintFromStats(before);
+        const snapshotVersion = buildSnapshotVersion(fingerprint);
+        if (before.size > 0) {
+            for await (const chunk of stream) {
+                const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
+                for (let index = 0; index < buf.byteLength; index += 1) {
+                    const byte = buf[index];
+                    if (pendingCrOffset !== null) {
+                        if (byte === 0x0a) {
+                            lineStarts.push(byteOffset + 1);
+                            pendingCrOffset = null;
+                            byteOffset += 1;
+                            if (lineStarts.length > maxLines + 1) exceededMaxLines = true;
+                            if (exceededMaxLines) break;
+                            continue;
+                        }
+                        lineStarts.push(pendingCrOffset + 1);
+                        pendingCrOffset = null;
+                        if (lineStarts.length > maxLines + 1) exceededMaxLines = true;
+                        if (exceededMaxLines) break;
+                    }
+                    if (byte === 0x0d) {
+                        pendingCrOffset = byteOffset;
+                    } else if (byte === 0x0a) {
+                        lineStarts.push(byteOffset + 1);
+                        if (lineStarts.length > maxLines + 1) exceededMaxLines = true;
+                        if (exceededMaxLines) break;
+                    }
                     byteOffset += 1;
-                    if (lineStarts.length > maxLines + 1) return null;
-                    continue;
                 }
-                lineStarts.push(pendingCrOffset + 1);
-                pendingCrOffset = null;
-                if (lineStarts.length > maxLines + 1) return null;
+                if (options.onPhase) {
+                    await options.onPhase('after-byte-index-chunk', {
+                        filePath,
+                        attempt: options.attempt ?? 1,
+                        bytesRead: byteOffset,
+                        chunkBytes: buf.byteLength,
+                        snapshotVersion,
+                    });
+                }
+                if (exceededMaxLines) break;
             }
-            if (byte === 0x0d) {
-                pendingCrOffset = byteOffset;
-            } else if (byte === 0x0a) {
-                lineStarts.push(byteOffset + 1);
-                if (lineStarts.length > maxLines + 1) return null;
-            }
-            byteOffset += 1;
         }
+        const after = await handle.stat();
+        const pathAfter = await stat(filePath);
+        if (!sameFileSnapshot(before, after) || !sameFileSnapshot(after, pathAfter)) {
+            throw createStaleChunkSnapshotError(filePath, options.attempt ?? 1, { snapshotVersion });
+        }
+        if (exceededMaxLines) return null;
+        if (pendingCrOffset !== null) lineStarts.push(pendingCrOffset + 1);
+        while (lineStarts.length > 0 && lineStarts[lineStarts.length - 1] === after.size) lineStarts.pop();
+        if (after.size === 0) lineStarts.length = 0;
+        const built = {
+            ...fingerprintFromStats(after),
+            snapshotVersion,
+            lineStarts,
+            totalLines: lineStarts.length,
+            builtAtMs: Date.now(),
+        };
+        if (options.onPhase) {
+            await options.onPhase('after-byte-index-built', {
+                filePath,
+                attempt: options.attempt ?? 1,
+                totalLines: built.totalLines,
+                snapshotVersion,
+            });
+        }
+        return built;
+    } finally {
+        if (!stream.destroyed) stream.destroy();
+        await handle.close().catch(() => undefined);
     }
-    if (pendingCrOffset !== null) lineStarts.push(pendingCrOffset + 1);
-    while (lineStarts.length > 0 && lineStarts[lineStarts.length - 1] === sizeBytes) lineStarts.pop();
-    return { sizeBytes, mtimeMs, lineStarts, totalLines: lineStarts.length, builtAtMs: Date.now() };
 }
 
 /** @returns {void} */
@@ -128,15 +270,33 @@ function trimByteLineIndexCache() {
  *     endLine?: number;
  *     highWaterMark?: number;
  *     signal?: AbortSignal;
+ *     attempt?: number;
+ *     deliveryMode?: 'materialized' | 'stream';
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]
- * @param {{ totalLines: number; bytesRead: number; stoppedAtRequestedWindow: boolean }} [state={ totalLines: 0, bytesRead: 0, stoppedAtRequestedWindow: false }]
- *   Default is `{ totalLines: 0, bytesRead: 0, stoppedAtRequestedWindow: false }`
+ * @param {{
+ *     totalLines: number;
+ *     bytesRead: number;
+ *     stoppedAtRequestedWindow: boolean;
+ *     chunksEmitted: number;
+ *     snapshotVersion: string | null;
+ *     sizeBytes: number | null;
+ *     mtimeMs: number | null;
+ * }} [state]
  * @returns {AsyncGenerator<TextLineChunk, void, void>}
  */
 async function* iterateTextLineChunks(
     filePath,
     options = {},
-    state = { totalLines: 0, bytesRead: 0, stoppedAtRequestedWindow: false },
+    state = {
+        totalLines: 0,
+        bytesRead: 0,
+        stoppedAtRequestedWindow: false,
+        chunksEmitted: 0,
+        snapshotVersion: null,
+        sizeBytes: null,
+        mtimeMs: null,
+    },
 ) {
     const chunkLines =
         Number.isFinite(options.chunkLines) && Number(options.chunkLines) > 0
@@ -156,8 +316,15 @@ async function* iterateTextLineChunks(
     let carry = '';
     let chunkIndex = 0;
     const decoder = new StringDecoder('utf8');
-
-    const baseStream = createReadStream(filePath, {
+    options.signal?.throwIfAborted();
+    const handle = await open(filePath, 'r');
+    const before = await handle.stat();
+    const snapshotVersion = buildSnapshotVersion(fingerprintFromStats(before));
+    state.snapshotVersion = snapshotVersion;
+    state.sizeBytes = before.size;
+    state.mtimeMs = before.mtimeMs;
+    const baseStream = handle.createReadStream({
+        autoClose: false,
         ...(highWaterMark !== undefined ? { highWaterMark } : {}),
     });
     const stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
@@ -173,8 +340,10 @@ async function* iterateTextLineChunks(
             endLine: state.totalLines,
             content,
             bytes: utf8ByteLength(content, 'read chunk'),
+            ...(options.deliveryMode === 'stream' ? { snapshotVersion } : {}),
         };
         chunkIndex += 1;
+        state.chunksEmitted += 1;
         current = [];
         return chunk;
     }
@@ -233,6 +402,15 @@ async function* iterateTextLineChunks(
         for await (const chunk of stream) {
             const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
             state.bytesRead += buf.byteLength;
+            if (options.onPhase) {
+                await options.onPhase('after-stream-chunk', {
+                    filePath,
+                    attempt: options.attempt ?? 1,
+                    bytesRead: state.bytesRead,
+                    chunkBytes: buf.byteLength,
+                    snapshotVersion,
+                });
+            }
             for (const emitted of processDecoded(decoder.write(buf), false)) {
                 yield emitted;
             }
@@ -243,8 +421,17 @@ async function* iterateTextLineChunks(
                 yield emitted;
             }
         }
+        const after = await handle.stat();
+        const pathAfter = await stat(filePath);
+        if (!sameFileSnapshot(before, after) || !sameFileSnapshot(after, pathAfter)) {
+            throw createStaleChunkSnapshotError(filePath, options.attempt ?? 1, {
+                partial: options.deliveryMode === 'stream' && state.chunksEmitted > 0,
+                snapshotVersion,
+            });
+        }
     } finally {
         if (!stream.destroyed) stream.destroy();
+        await handle.close().catch(() => undefined);
     }
 
     if (current.length > 0) {
@@ -254,7 +441,15 @@ async function* iterateTextLineChunks(
 
 /**
  * @param {string} filePath
- * @param {{ chunkLines?: number; startLine?: number; endLine?: number; highWaterMark?: number; signal?: AbortSignal }} [options]
+ * @param {{
+ *     chunkLines?: number;
+ *     startLine?: number;
+ *     endLine?: number;
+ *     highWaterMark?: number;
+ *     signal?: AbortSignal;
+ *     attempt?: number;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ * }} [options]
  * @returns {Promise<{
  *     path: string;
  *     chunks: TextLineChunk[];
@@ -269,10 +464,15 @@ async function* iterateTextLineChunks(
  *     endLine: number | null;
  *     engine: string;
  *     cacheFingerprintStrategy: string;
+ *     snapshotFingerprintStrategy: string;
+ *     snapshotVersion: string;
+ *     sizeBytes: number;
+ *     mtimeMs: number;
+ *     consistent: true;
  * } | null>}
  */
 async function readTextLineChunksByByteIndex(filePath, options = {}) {
-    const byteIndex = await getByteLineIndex(filePath);
+    const byteIndex = await getByteLineIndex(filePath, options);
     if (!byteIndex || byteIndex.totalLines === 0) return null;
     const startLine = Math.max(1, options.startLine ?? 1);
     const requestedEndLine = Number.isFinite(options.endLine) ? Math.max(startLine, Number(options.endLine)) : null;
@@ -293,6 +493,11 @@ async function readTextLineChunksByByteIndex(filePath, options = {}) {
             endLine: requestedEndLine,
             engine: 'io-engine.fs.createReadStream.textChunks.byteSeek',
             cacheFingerprintStrategy: 'byte-line-index',
+            snapshotFingerprintStrategy: 'mtime-size-ctime-dev-ino',
+            snapshotVersion: byteIndex.snapshotVersion,
+            sizeBytes: byteIndex.sizeBytes,
+            mtimeMs: byteIndex.mtimeMs,
+            consistent: true,
         };
     }
     const maybeByteStart = byteIndex.lineStarts[startLine - 1];
@@ -301,7 +506,7 @@ async function readTextLineChunksByByteIndex(filePath, options = {}) {
     const byteStart = Number(maybeByteStart);
     const byteEndExclusive = Number(maybeByteEndExclusive);
     if (byteEndExclusive < byteStart) return null;
-    const text = await readUtf8Range(filePath, byteStart, byteEndExclusive, options);
+    const text = await readUtf8Range(filePath, byteStart, byteEndExclusive, byteIndex, options);
     const lines = splitTextLinesLikeScanner(text);
     const chunks = buildTextLineChunks(lines, startLine, chunkLines);
     return {
@@ -318,6 +523,11 @@ async function readTextLineChunksByByteIndex(filePath, options = {}) {
         endLine: requestedEndLine,
         engine: 'io-engine.fs.createReadStream.textChunks.byteSeek',
         cacheFingerprintStrategy: 'byte-line-index',
+        snapshotFingerprintStrategy: 'mtime-size-ctime-dev-ino',
+        snapshotVersion: byteIndex.snapshotVersion,
+        sizeBytes: byteIndex.sizeBytes,
+        mtimeMs: byteIndex.mtimeMs,
+        consistent: true,
     };
 }
 
@@ -325,29 +535,70 @@ async function readTextLineChunksByByteIndex(filePath, options = {}) {
  * @param {string} filePath
  * @param {number} byteStart
  * @param {number} byteEndExclusive
- * @param {{ highWaterMark?: number; signal?: AbortSignal }} options
+ * @param {ByteLineIndexEntry} expected
+ * @param {{
+ *     highWaterMark?: number;
+ *     signal?: AbortSignal;
+ *     attempt?: number;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ * }} options
  * @returns {Promise<string>}
  */
-async function readUtf8Range(filePath, byteStart, byteEndExclusive, options) {
+async function readUtf8Range(filePath, byteStart, byteEndExclusive, expected, options) {
     if (options.signal?.aborted) throwAbortError();
-    if (byteEndExclusive <= byteStart) return '';
-    const highWaterMark = Number.isFinite(options.highWaterMark) && Number(options.highWaterMark) > 0 ? Math.floor(Number(options.highWaterMark)) : undefined;
+    const highWaterMark =
+        Number.isFinite(options.highWaterMark) && Number(options.highWaterMark) > 0
+            ? Math.floor(Number(options.highWaterMark))
+            : undefined;
     const decoder = new StringDecoder('utf8');
     let text = '';
-    const baseStream = createReadStream(filePath, {
-        start: byteStart,
-        end: byteEndExclusive - 1,
-        ...(highWaterMark !== undefined ? { highWaterMark } : {}),
-    });
-    const stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
+    const handle = await open(filePath, 'r');
+    /** @type {import('node:fs').ReadStream | null} */
+    let stream = null;
     try {
-        for await (const chunk of stream) {
-            text += decoder.write(toBufferView(/** @type {Buffer | Uint8Array} */ (chunk)));
+        const before = await handle.stat();
+        if (!byteLineIndexMatchesStats(expected, before)) {
+            throw createStaleChunkSnapshotError(filePath, options.attempt ?? 1, {
+                snapshotVersion: expected.snapshotVersion,
+            });
         }
-        text += decoder.end();
+        if (byteEndExclusive > byteStart) {
+            const baseStream = handle.createReadStream({
+                autoClose: false,
+                start: byteStart,
+                end: byteEndExclusive - 1,
+                ...(highWaterMark !== undefined ? { highWaterMark } : {}),
+            });
+            stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
+            for await (const chunk of stream) {
+                const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
+                text += decoder.write(buf);
+                if (options.onPhase) {
+                    await options.onPhase('after-byte-range-chunk', {
+                        filePath,
+                        attempt: options.attempt ?? 1,
+                        chunkBytes: buf.byteLength,
+                        snapshotVersion: expected.snapshotVersion,
+                    });
+                }
+            }
+            text += decoder.end();
+        }
+        const after = await handle.stat();
+        const pathAfter = await stat(filePath);
+        if (
+            !sameFileSnapshot(before, after) ||
+            !sameFileSnapshot(after, pathAfter) ||
+            !byteLineIndexMatchesStats(expected, after)
+        ) {
+            throw createStaleChunkSnapshotError(filePath, options.attempt ?? 1, {
+                snapshotVersion: expected.snapshotVersion,
+            });
+        }
         return text;
     } finally {
-        if (!stream.destroyed) stream.destroy();
+        if (stream && !stream.destroyed) stream.destroy();
+        await handle.close().catch(() => undefined);
     }
 }
 
@@ -395,6 +646,8 @@ function buildTextLineChunks(lines, startLine, chunkLines) {
  *     endLine?: number;
  *     highWaterMark?: number;
  *     signal?: AbortSignal;
+ *     maxRetries?: number;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -410,41 +663,80 @@ function buildTextLineChunks(lines, startLine, chunkLines) {
  *     endLine: number | null;
  *     engine?: string;
  *     cacheFingerprintStrategy?: string;
+ *     snapshotFingerprintStrategy: string;
+ *     snapshotVersion: string;
+ *     sizeBytes: number;
+ *     mtimeMs: number;
+ *     attempts: number;
+ *     consistent: true;
  * }>}
  */
 export async function readTextLineChunks(filePath, options = {}) {
     if (options.signal?.aborted) throwAbortError();
     const startLine = Math.max(1, options.startLine ?? 1);
-    if (startLine > 1) {
-        const seekSnapshot = await readTextLineChunksByByteIndex(filePath, options).catch(() => null);
-        if (seekSnapshot) return seekSnapshot;
-    }
-    const state = { totalLines: 0, bytesRead: 0, stoppedAtRequestedWindow: false };
-    const arrayCtor = /** @type {any} */ (Array);
-    const chunks = await arrayCtor.fromAsync(iterateTextLineChunks(filePath, options, state));
+    const maxRetries =
+        Number.isInteger(options.maxRetries) && Number(options.maxRetries) >= 0
+            ? Math.min(10, Number(options.maxRetries))
+            : DEFAULT_CHUNK_SNAPSHOT_RETRIES;
 
-    return {
-        path: filePath,
-        chunks,
-        totalLines: state.totalLines,
-        totalLinesKnown: options.endLine === undefined,
-        returnedLineCount: chunks.reduce(
-            (/** @type {number} */ sum, /** @type {TextLineChunk} */ chunk) =>
-                sum + Math.max(0, chunk.endLine - chunk.startLine + 1),
-            0,
-        ),
-        lastScannedLine: state.totalLines,
-        stoppedAtRequestedWindow: state.stoppedAtRequestedWindow,
-        bytesRead: state.bytesRead,
-        chunkLines:
-            Number.isFinite(options.chunkLines) && Number(options.chunkLines) > 0
-                ? Math.floor(Number(options.chunkLines))
-                : 200,
-        startLine,
-        endLine: Number.isFinite(options.endLine) ? Math.max(startLine, Number(options.endLine)) : null,
-        engine: 'io-engine.fs.createReadStream.textChunks',
-        cacheFingerprintStrategy: 'stream-bypass',
-    };
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt += 1) {
+        try {
+            const attemptOptions = { ...options, attempt, deliveryMode: /** @type {const} */ ('materialized') };
+            if (startLine > 1) {
+                const seekSnapshot = await readTextLineChunksByByteIndex(filePath, attemptOptions);
+                if (seekSnapshot) return { ...seekSnapshot, attempts: attempt };
+            }
+            const state = {
+                totalLines: 0,
+                bytesRead: 0,
+                stoppedAtRequestedWindow: false,
+                chunksEmitted: 0,
+                snapshotVersion: /** @type {string | null} */ (null),
+                sizeBytes: /** @type {number | null} */ (null),
+                mtimeMs: /** @type {number | null} */ (null),
+            };
+            const arrayCtor = /** @type {any} */ (Array);
+            const chunks = /** @type {TextLineChunk[]} */ (
+                await arrayCtor.fromAsync(iterateTextLineChunks(filePath, attemptOptions, state))
+            );
+            if (!state.snapshotVersion || state.sizeBytes === null || state.mtimeMs === null) {
+                throw createStaleChunkSnapshotError(filePath, attempt);
+            }
+
+            return {
+                path: filePath,
+                chunks,
+                totalLines: state.totalLines,
+                totalLinesKnown: options.endLine === undefined,
+                returnedLineCount: chunks.reduce(
+                    (sum, chunk) => sum + Math.max(0, chunk.endLine - chunk.startLine + 1),
+                    0,
+                ),
+                lastScannedLine: state.totalLines,
+                stoppedAtRequestedWindow: state.stoppedAtRequestedWindow,
+                bytesRead: state.bytesRead,
+                chunkLines:
+                    Number.isFinite(options.chunkLines) && Number(options.chunkLines) > 0
+                        ? Math.floor(Number(options.chunkLines))
+                        : 200,
+                startLine,
+                endLine: Number.isFinite(options.endLine) ? Math.max(startLine, Number(options.endLine)) : null,
+                engine: 'io-engine.fs.createReadStream.textChunks',
+                cacheFingerprintStrategy: 'stream-bypass',
+                snapshotFingerprintStrategy: 'mtime-size-ctime-dev-ino',
+                snapshotVersion: state.snapshotVersion,
+                sizeBytes: state.sizeBytes,
+                mtimeMs: state.mtimeMs,
+                attempts: attempt,
+                consistent: true,
+            };
+        } catch (error) {
+            if (!isStaleChunkSnapshotError(error) || attempt > maxRetries) throw error;
+            byteLineIndexCache.delete(normalizePathResourceKey(filePath));
+        }
+    }
+
+    throw createStaleChunkSnapshotError(filePath, maxRetries + 1);
 }
 
 /**
@@ -457,12 +749,21 @@ export async function readTextLineChunks(filePath, options = {}) {
  *     endLine?: number;
  *     highWaterMark?: number;
  *     signal?: AbortSignal;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]
  * @returns {ReadableStream<TextLineChunk>}
  */
 export function readTextLineChunksStream(filePath, options = {}) {
-    const state = { totalLines: 0, bytesRead: 0, stoppedAtRequestedWindow: false };
-    const iterable = iterateTextLineChunks(filePath, options, state);
+    const state = {
+        totalLines: 0,
+        bytesRead: 0,
+        stoppedAtRequestedWindow: false,
+        chunksEmitted: 0,
+        snapshotVersion: /** @type {string | null} */ (null),
+        sizeBytes: /** @type {number | null} */ (null),
+        mtimeMs: /** @type {number | null} */ (null),
+    };
+    const iterable = iterateTextLineChunks(filePath, { ...options, attempt: 1, deliveryMode: 'stream' }, state);
     const readableStreamCtor = /** @type {any} */ (globalThis.ReadableStream);
     if (typeof readableStreamCtor?.from === 'function') {
         return readableStreamCtor.from(iterable);

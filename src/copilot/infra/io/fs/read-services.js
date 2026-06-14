@@ -605,7 +605,6 @@ export async function readTextChunks(filePath, options = {}) {
     const startedAt = nowIoMs();
     try {
         const snapshot = await readTextLineChunks(filePath, options);
-        const stats = await statPathSnapshot(filePath).catch(() => null);
         const io = publishAndReturn(
             buildIoMeta({
                 operation: 'read',
@@ -639,8 +638,12 @@ export async function readTextChunks(filePath, options = {}) {
             fileTotalLines: snapshot.totalLinesKnown ?? snapshot.endLine === null ? snapshot.totalLines : null,
             fileTotalLinesKnown: snapshot.totalLinesKnown ?? snapshot.endLine === null,
             bytesRead: snapshot.bytesRead,
-            sizeBytes: stats ? stats.size : null,
-            mtimeMs: stats ? stats.mtimeMs : null,
+            sizeBytes: snapshot.sizeBytes,
+            mtimeMs: snapshot.mtimeMs,
+            snapshotVersion: snapshot.snapshotVersion,
+            snapshotAttempts: snapshot.attempts,
+            consistent: snapshot.consistent,
+            snapshotFingerprintStrategy: snapshot.snapshotFingerprintStrategy,
             cacheFingerprintStrategy: snapshot.cacheFingerprintStrategy ?? 'stream-bypass',
             io,
         };

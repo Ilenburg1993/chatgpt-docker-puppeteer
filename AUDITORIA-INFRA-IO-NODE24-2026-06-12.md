@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `1f47bced`, seguida da onda de consistência externa
+**Baseline reinvestigado:** `main` sincronizada até `7e6ee217`, seguida da onda de streaming versionado
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -24,13 +24,13 @@ mutações que materializam payload grande agora falham cedo quando a
 insuficiência de espaço já é observável; scopes distinguem warming/ready/stale/degraded sem vazar paths; scanner,
 prefetch e busca FTS compartilham uma política glob sem abrir mão da enumeração protegida; temporários de publicação
 são irmãos ocultos, exclusivos e usam token de 128 bits; snapshot de rollback, L1 e índice agora recusam versões
-obsoletas sob replace externo coordenado; o risco dominante migrou para contratos de streaming e decisões de
-promoção baseadas em workload**.
+obsoletas sob replace externo coordenado; leitura em chunks agora possui versão/abort explícitos; o risco dominante
+migrou para interação de patch com writers não cooperativos e decisões de promoção baseadas em workload**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — leitura em chunks ainda é streaming best-effort:** o byte-line index usa `mtime+size` e a variante
-   `ReadableStream` não pode retrair chunks já entregues se o arquivo mudar.
+1. **P2 — falta prova de patch contra writer não cooperativo:** Git checkout/editor save durante read-modify-write
+   ainda precisa de reprodução externa e contrato final.
 2. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
 
 O L2 encerrou sua fase de promoção técnica: workload, batching, crash, contenção e soak passaram. A decisão operacional
@@ -1175,8 +1175,37 @@ Limites conscientes:
 
 - o stale probe L1 preserva a janela configurável de 2 s por default; `0` oferece validação a cada hit;
 - entradas L2 antigas sem fingerprint rico mantêm compatibilidade até TTL/regravação;
-- `readTextChunks`/`readTextChunksStream` são streaming best-effort e foram separados como IO-051, pois chunks já
-  entregues exigem contrato de versão/abort distinto de uma leitura materializada.
+- `readTextChunks`/`readTextChunksStream` foram separados como IO-051 porque chunks já entregues exigem contrato de
+  versão/abort distinto de uma leitura materializada; a seção seguinte registra o fechamento.
+
+### 1.42 Status de implementação — streaming textual versionado aplicado em 2026-06-14
+
+IO-051 foi fechado sem fingir que uma stream já consumida pode ser repetida transparentemente:
+
+- o byte-line index usa `mtime/size/ctime/dev/ino`, chave de path normalizada e construção por `FileHandle`;
+- construção de offsets e byte-seek confirmam handle/path antes de aceitar o resultado;
+- `readTextLineChunks()` descarta a tentativa inteira e repete até duas vezes por default antes de devolver qualquer
+  chunk;
+- o resultado materializado expõe `snapshotVersion`, `snapshotAttempts`, `consistent` e metadata originada no mesmo
+  handle, removendo o `stat(path)` posterior que podia desalinhar conteúdo e metadata;
+- `readTextLineChunksStream()` mantém um handle fixo e inclui o mesmo token opaco de 24 hex chars em cada chunk;
+- se inode ou fingerprint mudar, a stream encerra com `ESTALECHUNKSTREAM`, `partial:true` e o token da versão que deve
+  ser descartada pelo consumidor;
+- o fast path por byte seek preserva os labels públicos existentes e expõe separadamente
+  `snapshotFingerprintStrategy: mtime-size-ctime-dev-ino`.
+
+Provas multiprocess novas:
+
+- um child troca o inode exatamente depois da construção do byte-line index; o primeiro seek é recusado e a segunda
+  tentativa retorna somente as linhas da versão nova;
+- um child troca o inode após o primeiro chunk bruto da `ReadableStream`; todos os chunks entregues pertencem ao
+  mesmo token/handle antigo e o fechamento sinaliza stale, sem apresentar conclusão falsa.
+
+Validação: leitura baixa + engine **56 passados, 0 falhas**; rodada ampliada com MCP/read tools **133 passados,
+0 falhas**; lint focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
+
+Limite consciente: `ESTALECHUNKSTREAM` pode chegar após chunks já consumidos. O contrato exige descartar a versão
+parcial; retry automático só é correto na API materializada, antes da exposição ao caller.
 
 ---
 
@@ -1448,16 +1477,17 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-048 | P1 | Move EXDEV | **Concluído:** criação do temp cross-device agora é exclusiva | `COPYFILE_EXCL` e colisão determinística preservando sentinel | Token forte reduz corrida, exclusividade decide | Manter mesma regra de copy staged |
 | IO-049 | P2 | Temp recovery | **Concluído com limite documentado:** cleanup é age-gated, host-aware e bounded | 24 h/PID morto local; host estrangeiro opt-in; scan 10 mil e cache 1.024 dirs | Recriação de container pode exigir limpeza administrativa | Manter schema estrito e nunca limpar por glob aproximado |
 | IO-050 | P1 | Consistência externa | **Concluído:** snapshot, L1 e índice recusam inode/versão obsoletos | fingerprint rico, retries e provas multiprocess com replace atômico | L1 ainda respeita stale-probe configurável; L2 legado cai em fallback | Usar probe `0` somente em perfis paranoicos e observar `snapshotConflicts` |
-| IO-051 | P2 | Chunk streaming | **Aberto:** byte-line index e stream não possuem contrato de versão end-to-end | `read-chunks.js` usa `mtime+size` e entrega incrementalmente | Editor/Git pode trocar arquivo entre indexação de offsets e leitura | Definir handle/version token, abort explícito e semântica de retry só para API materializada |
+| IO-051 | P2 | Chunk streaming | **Concluído com limite documentado:** handle/version token e stale abort end-to-end | byte-index rico, retry materializado e `ESTALECHUNKSTREAM` multiprocess | Caller incremental pode ter consumido chunks antes do erro | Exigir descarte integral do token stale; nunca retry transparente após entrega |
+| IO-052 | P2 | Patch externo | **Aberto:** falta prova de Git/editor durante read-modify-write | patch tem lock cooperativo e precondições, mas writer externo ignora L0/L1 | Versão pode mudar entre snapshot e publish | Reproduzir checkout/save externo e confirmar expected hash imediatamente antes do publish |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
 | Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050 |
-| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049 |
+| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051 |
 | Parcial | IO-009 |
-| Aberto | IO-030, IO-051 |
+| Aberto | IO-030, IO-052 |
 
 ---
 
@@ -1774,10 +1804,10 @@ A situação ideal é uma infra IO em camadas:
 
 #### Fase 3.5 — Streaming versionado
 
-- [ ] Migrar byte-line index para fingerprint rico e handle confirmado.
-- [ ] Definir version token/abort para `readTextChunksStream` quando o path trocar de inode.
-- [ ] Permitir retry somente na API materializada, antes de expor chunks ao caller.
-- [ ] Provar replace externo entre construção de offsets e byte-seek.
+- [x] Migrar byte-line index para fingerprint rico e handle confirmado.
+- [x] Definir version token/abort para `readTextChunksStream` quando o path trocar de inode.
+- [x] Permitir retry somente na API materializada, antes de expor chunks ao caller.
+- [x] Provar replace externo entre construção de offsets e byte-seek.
 
 ### Faixa 4 — Performance
 
@@ -1827,7 +1857,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Crash de holder L1 seguido de stale recovery real.
 - [x] Modificação externa durante snapshot e index.
 - [ ] Git checkout/editor save durante patch.
-- [ ] Replace externo durante byte-line index/stream.
+- [x] Replace externo durante byte-line index/stream.
 
 ---
 
@@ -1967,7 +1997,6 @@ Critérios operacionais adicionais já atendidos:
 
 Ainda faltam para maturidade operacional avançada:
 
-- [ ] contrato versionado para `readTextChunks`/`readTextChunksStream` sob replace externo.
 - [ ] interação de Git checkout/editor save durante patch read-modify-write não cooperativo.
 
 ---
@@ -1987,7 +2016,6 @@ Ainda faltam para maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Fechar IO-051: tornar o byte-line index dependente de fingerprint rico/handle confirmado e definir semântica de
-version mismatch para `readTextChunksStream`. A API materializada pode repetir antes de retornar; a API incremental
-deve abortar explicitamente quando detectar troca de inode, sem fingir que chunks de versões diferentes formam um
-snapshot. Depois, automatizar Git checkout/editor save durante patch read-modify-write não cooperativo.
+Investigar IO-052 com processo Git/editor real durante patch read-modify-write. A prova deve coordenar a troca externa
+de versão depois do snapshot e antes do publish, verificar se `expectedHash` é reconfirmado no último ponto seguro e
+garantir que nenhum conteúdo calculado sobre uma base antiga substitua silenciosamente a versão externa.

@@ -25,7 +25,10 @@ import { rename, writeFile } from 'node:fs/promises';
 process.on('message', async (message) => {
     try {
         const tempPath = message.filePath + '.external-replacement';
-        await writeFile(tempPath, Buffer.alloc(message.size, message.fill));
+        const payload = message.contentBase64
+            ? Buffer.from(message.contentBase64, 'base64')
+            : Buffer.alloc(message.size, message.fill);
+        await writeFile(tempPath, payload);
         await rename(tempPath, message.filePath);
         process.send?.({ ok: true });
         process.exit(0);
@@ -66,6 +69,25 @@ async function replaceFileFromChild(filePath, size, fill) {
             else reject(new Error(result.message ?? 'external replacement failed'));
         });
         child.send({ filePath, size, fill });
+    });
+}
+
+/**
+ * @param {string} filePath
+ * @param {string} content
+ */
+async function replaceTextFileFromChild(filePath, content) {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', REPLACE_FILE_CHILD], {
+        stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
+    });
+    await new Promise((resolve, reject) => {
+        child.once('error', reject);
+        child.once('message', (message) => {
+            const result = /** @type {{ ok?: boolean; message?: string }} */ (message);
+            if (result.ok) resolve(undefined);
+            else reject(new Error(result.message ?? 'external replacement failed'));
+        });
+        child.send({ filePath, contentBase64: Buffer.from(content, 'utf8').toString('base64') });
     });
 }
 
@@ -151,10 +173,92 @@ describe('infra/io/fs read line ports', () => {
             chunks.push(value);
         }
 
+        const snapshotVersion = chunks[0]?.snapshotVersion;
+        expect(snapshotVersion).toMatch(/^[a-f0-9]{24}$/);
         expect(chunks).toEqual([
-            { index: 0, startLine: 1, endLine: 2, content: 'l1\nl2', bytes: 5 },
-            { index: 1, startLine: 3, endLine: 4, content: 'l3\nl4', bytes: 5 },
+            { index: 0, startLine: 1, endLine: 2, content: 'l1\nl2', bytes: 5, snapshotVersion },
+            { index: 1, startLine: 3, endLine: 4, content: 'l3\nl4', bytes: 5, snapshotVersion },
         ]);
+    });
+
+    it('readTextLineChunks repete quando inode muda entre byte-line index e byte seek', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'byte-index-external.txt');
+        const oldContent = Array.from({ length: 20 }, (_, index) => `old-${String(index + 1).padStart(2, '0')}`).join(
+            '\n',
+        );
+        const newContent = Array.from({ length: 20 }, (_, index) => `new-${String(index + 1).padStart(2, '0')}`).join(
+            '\n',
+        );
+        await writeFile(file, oldContent, 'utf8');
+        let replaced = false;
+
+        const result = await readTextLineChunks(file, {
+            startLine: 2,
+            endLine: 4,
+            chunkLines: 3,
+            highWaterMark: 8,
+            onPhase: async (phase, details) => {
+                if (phase !== 'after-byte-index-built' || details['attempt'] !== 1 || replaced) return;
+                replaced = true;
+                await replaceTextFileFromChild(file, newContent);
+            },
+        });
+
+        expect(result).toMatchObject({
+            attempts: 2,
+            consistent: true,
+            cacheFingerprintStrategy: 'byte-line-index',
+            snapshotFingerprintStrategy: 'mtime-size-ctime-dev-ino',
+        });
+        expect(result.chunks.map((chunk) => chunk.content)).toEqual(['new-02\nnew-03\nnew-04']);
+        expect(result.snapshotVersion).toMatch(/^[a-f0-9]{24}$/);
+    });
+
+    it('readTextLineChunksStream encerra stale após replace externo sem misturar tokens', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'stream-external.txt');
+        const oldContent = Array.from({ length: 80 }, (_, index) => `old-${String(index + 1).padStart(3, '0')}`).join(
+            '\n',
+        );
+        const newContent = Array.from({ length: 80 }, (_, index) => `new-${String(index + 1).padStart(3, '0')}`).join(
+            '\n',
+        );
+        await writeFile(file, oldContent, 'utf8');
+        let replaced = false;
+        const stream = readTextLineChunksStream(file, {
+            chunkLines: 1,
+            highWaterMark: 16,
+            onPhase: async (phase) => {
+                if (phase !== 'after-stream-chunk' || replaced) return;
+                replaced = true;
+                await replaceTextFileFromChild(file, newContent);
+            },
+        });
+        const reader = stream.getReader();
+        /** @type {Array<Awaited<ReturnType<typeof reader.read>>['value']>} */
+        const chunks = [];
+        let caught;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+            }
+        } catch (error) {
+            caught = error;
+        }
+
+        expect(chunks.length).toBeGreaterThan(0);
+        const versions = new Set(chunks.map((chunk) => chunk?.snapshotVersion));
+        expect(versions.size).toBe(1);
+        expect([...versions][0]).toMatch(/^[a-f0-9]{24}$/);
+        expect(chunks.every((chunk) => chunk?.content.startsWith('old-'))).toBe(true);
+        expect(caught).toMatchObject({
+            code: 'ESTALECHUNKSTREAM',
+            partial: true,
+            snapshotVersion: [...versions][0],
+        });
     });
 
     it('readTextLinesSnapshot retorna linhas de snapshot UTF-8 normalizando quebras', async () => {
