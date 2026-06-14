@@ -21,6 +21,24 @@ const RULES = [
     { kind: 'session.getMessages direct', regex: /\bsession\.getMessages\s*\(/ },
 ];
 
+const ALLOWLIST = [
+    {
+        file: 'src/copilot/config/system-prompt/sections/guidelines.js',
+        kind: 'session.send direct',
+        regex: /session\.send\(\); turno explícito/u,
+    },
+    {
+        file: 'src/copilot/terminal/dialog/output.js',
+        kind: 'session.send direct',
+        regex: /abrir novo session\.send\(\)\./u,
+    },
+    {
+        file: 'src/copilot/mcp/adapters/http2.js',
+        kind: 'session.on direct',
+        regex: /session\.on\('(?:close|error|stream)'/u,
+    },
+];
+
 /**
  * @param {string} dir
  * @returns {string[]}
@@ -59,6 +77,18 @@ function isSuppressed(line) {
     return line.includes('// crude-ok');
 }
 
+/**
+ * @param {string} file
+ * @param {string} kind
+ * @param {string} line
+ * @returns {boolean}
+ */
+function isAllowlisted(file, kind, line) {
+    return ALLOWLIST.some(
+        (entry) => entry.file === file && entry.kind === kind && entry.regex.test(line),
+    );
+}
+
 /** @type {Finding[]} */
 const findings = [];
 for (const file of walk(TARGET)) {
@@ -69,7 +99,7 @@ for (const file of walk(TARGET)) {
         if (isCommentOnly(line)) return;
         if (isSuppressed(line)) return;
         for (const rule of RULES) {
-            if (rule.regex.test(line)) {
+            if (rule.regex.test(line) && !isAllowlisted(rel, rule.kind, line)) {
                 findings.push({ file: rel, line: index + 1, kind: rule.kind, text: line.trim() });
             }
         }

@@ -1602,6 +1602,28 @@ comentário.
 Validação focada de IO-072: **80 passados, 0 falhas** em reader, importers, bridge MCP, provider BYOK, HTTP client,
 tunnel origin e OAuth smoke; lint focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.64 Status de implementação — guardrail AST para consumo de `Response` em 2026-06-14
+
+IO-073 tornou a conclusão de IO-072 uma propriedade verificável. O novo
+`check-copilot-http-response-consumption.mjs`:
+
+- usa a policy canônica do Babel parser e desliga `attachComment` explicitamente, pois não extrai documentação;
+- reconhece bindings vindos de `fetch`, `fetchImpl`, member `fetchImpl`, aliases e `Promise.all` destruturado;
+- bloqueia `text()`, `json()`, `arrayBuffer()`, `blob()` e `formData()` em respostas inbound;
+- distingue chamadas Express como `res.status(...).json(...)`;
+- permite somente `infra/public/http-response.js` como owner do consumo nativo;
+- faz prefilter textual conservador para decidir quais arquivos precisam de AST, sem usar regex para a decisão final.
+
+O prefilter reduziu uma execução sobre `src/copilot` de cerca de **6,97 s / 393 MiB RSS** para
+**1,29 s / 131 MiB RSS**. O checker foi integrado a `check:copilot:guardrails`.
+
+A execução da cadeia revelou cinco falsos positivos antigos no checker crude: duas menções literais de
+`session.send()` em prompts e três eventos de `Http2Session`. Eles receberam allowlist exata por arquivo, regra e
+texto; nenhum diretório ou kind inteiro foi liberado.
+
+Validação focada de IO-073: **3 passados, 0 falhas** no contrato do checker; checker isolado, cadeia completa de
+guardrails, lint focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1894,12 +1916,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-070 | P0 | Web tools | **Concluído:** fetch/search têm caps determinísticos e UTF-8 fatal | 2 MiB default/search, 8 MiB máximo fetch, truncagem code-point-safe | HTML/JSON acima do cap falham em vez de retornar parse parcial | Expor aumento de cap somente de forma explícita e bounded |
 | IO-071 | P0 | Catalog HTTP | **Concluído:** 28 importadores compartilham leitura bounded e UTF-8 fatal | 8 MiB default, 32 MiB hard cap, precheck e 31 testes focados | JSON precisa caber integralmente; doubles sem stream não exercitam budget físico | Manter qualquer importer novo no helper e adicionar prova com `Response` real |
 | IO-072 | P0 | Response inbound | **Concluído:** bytes/texto/JSON usam fachada pública bounded | bridge, BYOK, Cloudflare e scripts migrados; 80 testes focados | Doubles sem stream preservam fallback de compatibilidade | Criar guardrail estático contra consumo direto novo |
+| IO-073 | P1 | HTTP guardrail | **Concluído:** AST impede novo consumo direto de `Response` | Babel policy, aliases/Promise.all, 1,29 s e cadeia completa verde | Convenções muito exóticas de wrapper podem exigir regra adicional | Manter fixtures do checker ao adicionar novos padrões de fetch |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070, IO-071, IO-072 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070, IO-071, IO-072, IO-073 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2269,7 +2292,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Tornar fetch/search web bounded e observáveis.
 - [x] Migrar todos os importadores de catálogo para um leitor bounded comum.
 - [x] Auditar e migrar downloads, responses e streams textuais restantes fora de `catalog/importers`.
-- [ ] Impedir por guardrail estático novo consumo direto de corpos `Response`.
+- [x] Impedir por guardrail estático novo consumo direto de corpos `Response`.
 
 ### Faixa 5 — Provas
 
@@ -2442,6 +2465,7 @@ Maturidade operacional avançada:
 - [x] tornar caps de web fetch/search determinísticos e observáveis;
 - [x] aplicar leitura bounded e UTF-8 fatal aos 28 importadores de catálogo;
 - [x] consolidar consumo inbound de `Response` em fachada pública para bytes/texto/JSON;
+- [x] impedir regressão de consumo direto de `Response` por guardrail AST;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2462,8 +2486,7 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Criar guardrail estático que recuse novo consumo direto de corpos `Response` fora das fachadas canônicas, distinguindo
-essas leituras de `res.json()` do Express. Depois continuar a auditoria de streams de subprocesso/socket e ampliar
-fixtures Babel somente para sintaxe realmente aceita pelo workspace. Manter fuzz/chaos como gates recorrentes.
-IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que
-justifique o contrato.
+Continuar a auditoria de streams de subprocesso/socket, priorizando concatenação sem budget, decode substitutivo e
+listeners sem backpressure/cancelamento. Ampliar fixtures Babel somente para sintaxe realmente aceita pelo workspace
+e manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece explicitamente sem implementação até existir evidência
+de múltiplos runtimes/processos reais que justifique o contrato.
