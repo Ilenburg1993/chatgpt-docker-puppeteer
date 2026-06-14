@@ -26,6 +26,7 @@ import {
     paginateSearchItems,
     parseFileForContext,
     searchIoIndex,
+    windowFileContext,
 } from '#copilot/infra/public/indexing';
 
 const IndexBuildParameters = z.object({
@@ -294,6 +295,20 @@ const ParseFileParameters = z.object({
         .boolean()
         .optional()
         .describe('Se true, inclui comentários de topo do arquivo (file-level JSDoc/header). Default: false.'),
+    maxItems: z
+        .number()
+        .int()
+        .positive()
+        .max(5_000)
+        .optional()
+        .describe('Máximo de itens por coleção retornada. Default: 500.'),
+    maxBytes: z
+        .number()
+        .int()
+        .positive()
+        .max(4 * 1024 * 1024)
+        .optional()
+        .describe('Orçamento UTF-8 total das coleções retornadas. Default: 524288.'),
 });
 
 /**
@@ -315,6 +330,8 @@ export const workspaceParseFileTool = buildTool({
         includeExports = true,
         includeOutline = true,
         includeTopComments = false,
+        maxItems,
+        maxBytes,
     }) => {
         const pathCheck = await validatePath(filePath, { mode: 'read' });
         if (!pathCheck.ok) return { path: filePath, error: pathCheck.reason, success: false };
@@ -330,18 +347,32 @@ export const workspaceParseFileTool = buildTool({
         }
 
         const parsed = await parseFileForContext(pathCheck.resolved, content);
+        const windowed = windowFileContext(parsed, {
+            maxItems,
+            maxBytes,
+            includeImports,
+            includeExports,
+            includeOutline,
+            includeTopComments,
+        });
 
         /** @type {Record<string, unknown>} */
         const result = {
             path: pathCheck.resolved,
             success: true,
-            symbols: parsed.symbols.symbols,
+            symbols: windowed.symbols,
             parseError: parsed.symbols.parseError ?? null,
+            truncated: windowed.truncated,
+            maxItems: windowed.maxItems,
+            maxBytes: windowed.maxBytes,
+            returnedContentBytes: windowed.returnedContentBytes,
+            totalCounts: windowed.totalCounts,
+            returnedCounts: windowed.returnedCounts,
         };
-        if (includeImports) result['imports'] = parsed.symbols.imports;
-        if (includeExports) result['exports'] = parsed.symbols.exports;
-        if (includeOutline) result['outline'] = parsed.outline;
-        if (includeTopComments) result['topComments'] = parsed.topComments;
+        if (includeImports) result['imports'] = windowed.imports;
+        if (includeExports) result['exports'] = windowed.exports;
+        if (includeOutline) result['outline'] = windowed.outline;
+        if (includeTopComments) result['topComments'] = windowed.topComments;
         return result;
     },
 });

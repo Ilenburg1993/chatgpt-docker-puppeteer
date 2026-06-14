@@ -65,6 +65,7 @@ export {
     parseFileSymbols,
     resolveParserWorkerPoolPolicy,
     shutdownParserWorkerPool,
+    windowFileContext,
 } from './io-parser.js';
 export {
     endSessionScope,

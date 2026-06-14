@@ -5,6 +5,8 @@
  * @module copilot/infra/parse/json-outline
  */
 
+import { iterateTextLines } from './text-lines.js';
+
 /**
  * Extrai top-level keys de um JSON completo ou da primeira linha JSONL válida.
  *
@@ -36,11 +38,10 @@ export function parseJsonOrJsonlSample(content) {
     try {
         return JSON.parse(content);
     } catch (error) {
-        const firstLine = content
-            .split(/\r?\n/u)
-            .map((line) => line.trim())
-            .find((line) => line.length > 0);
-        if (!firstLine) throw error;
-        return JSON.parse(firstLine);
+        for (const { text } of iterateTextLines(content)) {
+            const sample = text.trim();
+            if (sample) return JSON.parse(sample);
+        }
+        throw error;
     }
 }

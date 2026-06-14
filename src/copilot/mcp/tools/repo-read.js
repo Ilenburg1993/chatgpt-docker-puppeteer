@@ -6,7 +6,7 @@
  */
 
 import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/core';
-import { parseFileForContext } from '#copilot/infra';
+import { parseFileForContext, windowFileContext } from '#copilot/infra';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
@@ -658,23 +658,53 @@ export const repoReadTools = [
             includeExports: z.boolean().optional().describe('Include exports. Default: true.'),
             includeOutline: z.boolean().optional().describe('Include textual outline. Default: true.'),
             includeTopComments: z.boolean().optional().describe('Include top comments. Default: false.'),
+            maxItems: z.number().int().min(1).max(5_000).optional().describe('Maximum items returned per collection.'),
+            maxBytes: z
+                .number()
+                .int()
+                .min(1)
+                .max(4 * 1024 * 1024)
+                .optional()
+                .describe('Total UTF-8 budget for returned collections. Default: 524288.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, includeImports, includeExports, includeOutline, includeTopComments }) => {
+        handler: async ({
+            path,
+            includeImports,
+            includeExports,
+            includeOutline,
+            includeTopComments,
+            maxItems,
+            maxBytes,
+        }) => {
             const resolved = await resolveReadPath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const snapshot = await readText(resolved.resolved);
             const parsed = await parseFileForContext(resolved.resolved, snapshot.content);
+            const windowed = windowFileContext(parsed, {
+                maxItems,
+                maxBytes,
+                includeImports: includeImports !== false,
+                includeExports: includeExports !== false,
+                includeOutline: includeOutline !== false,
+                includeTopComments: includeTopComments === true,
+            });
             const structured = {
                 success: true,
                 path: resolved.relative,
                 sha256: snapshot.contentHash,
-                symbols: parsed.symbols.symbols,
+                symbols: windowed.symbols,
                 parseError: parsed.symbols.parseError ?? null,
-                ...(includeImports !== false ? { imports: parsed.symbols.imports } : {}),
-                ...(includeExports !== false ? { exports: parsed.symbols.exports } : {}),
-                ...(includeOutline !== false ? { outline: parsed.outline } : {}),
-                ...(includeTopComments === true ? { topComments: parsed.topComments } : {}),
+                truncated: windowed.truncated,
+                maxItems: windowed.maxItems,
+                maxBytes: windowed.maxBytes,
+                returnedContentBytes: windowed.returnedContentBytes,
+                totalCounts: windowed.totalCounts,
+                returnedCounts: windowed.returnedCounts,
+                ...(includeImports !== false ? { imports: windowed.imports } : {}),
+                ...(includeExports !== false ? { exports: windowed.exports } : {}),
+                ...(includeOutline !== false ? { outline: windowed.outline } : {}),
+                ...(includeTopComments === true ? { topComments: windowed.topComments } : {}),
             };
             const text = Array.isArray(structured.outline) ? structured.outline.join('\n') : '';
             return okResult(structured, text);

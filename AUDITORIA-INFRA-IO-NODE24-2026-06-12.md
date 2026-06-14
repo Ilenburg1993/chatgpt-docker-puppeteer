@@ -1293,6 +1293,35 @@ ausência de símbolo além do orçamento e `parsedBytes <= IO_PARSER_MAX_BYTES`
 Validação conjunta de IO-055/IO-056: **49 passados, 0 falhas**; lint focado, `diff --check` e
 `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.48 Status de implementação — parsers puros migrados para linhas lazy em 2026-06-14
+
+IO-057 removeu três materializações proporcionais ao arquivo fora do Babel:
+
+- `extractTopComments` fazia `split('\n')` do conteúdo inteiro para examinar somente as primeiras 50 linhas;
+- o outline Markdown dividia todo o documento antes de percorrê-lo;
+- o fallback JSONL fazia `split + map + find` para localizar a primeira linha não vazia.
+
+A nova primitiva `iterateTextLines` percorre LF, CRLF e CR isolado de forma lazy e preserva linha física. Comentários
+interrompem a leitura lógica na linha 50, JSONL retorna na primeira amostra e Markdown mantém linhas reais sem array
+intermediário. As regressões incluem CR-only nas três superfícies.
+
+### 1.49 Status de implementação — retenção e saída do parser bounded por bytes em 2026-06-14
+
+IO-058 fechou dois budgets ausentes:
+
+- os LRUs de símbolos e `FileContext` eram limitados apenas por quantidade de entradas; agora também usam
+  `maxSize/sizeCalculation`, com defaults de 64 MiB, overrides por env e exposição de `calculatedSize/maxBytes` no
+  health;
+- `workspace_parse_file` e `repo_file_outline` podiam devolver todas as coleções extraídas. Ambas agora aceitam
+  `maxItems` e `maxBytes`, com defaults de 500 itens e 512 KiB, orçamento global somente sobre coleções solicitadas,
+  `returnedContentBytes`, contagens total/retornada e `truncated`.
+
+Um contexto maior que o orçamento individual do LRU não é retido e incrementa `fileContext.rejected`. O índice
+interno continua recebendo o parse completo; o windowing ocorre apenas na fronteira de resposta para LLM/tool.
+
+Validação focada de IO-057/IO-058: **87 passados, 0 falhas**; lint focado, `diff --check` e
+`typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1569,12 +1598,14 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-054 | P0 | Chunk UTF-8 | **Concluído:** streaming textual usa decode fatal e recusa bytes inválidos | `TextDecoder` streaming fatal, corpus binário e erro canônico | StringDecoder anterior podia substituir bytes silenciosamente | Manter todas as superfícies textuais sob a mesma política fatal |
 | IO-055 | P1 | Chunk byte-seek | **Concluído:** `highWaterMark` governa índice e seek; concatenação é linear | fases observáveis confirmam blocos físicos bounded; join único | Caller agora controla o tamanho dos blocos, não o total varrido para índice frio | Medir indexação fria de arquivos grandes e considerar índice persistente só com evidência |
 | IO-056 | P1 | Parser limits | **Concluído:** line guard cobre CR/LF/CRLF e truncamento respeita bytes UTF-8 | `parsedBytes`, child tests com budgets pequenos e contagem sem split | Conteúdo completo já está materializado pelo caller; limite governa o parse, não a leitura | Auditar callers para evitar materialização integral quando apenas símbolos forem necessários |
+| IO-057 | P1 | Parsers puros | **Concluído:** comentários, Markdown e JSONL iteram linhas lazy | primitiva CR/LF/CRLF compartilhada e regressões CR-only | Slices de cada linha ainda criam somente a string consumida, bounded pelo avanço | Reusar a primitiva em novos parsers line-oriented |
+| IO-058 | P1 | Parser budgets | **Concluído:** caches e respostas de outline são bounded por bytes | LRU weighted, health, rejection metric, `maxItems/maxBytes` nas duas tools | Estimativa de heap do LRU é conservadora, não medição exata do V8 | Calibrar defaults com telemetria de produção e manter hard caps |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2092,6 +2123,7 @@ Maturidade operacional avançada:
 
 - [x] fuzz textual/binário bounded e reproduzível sobre patch, chunks e limites;
 - [x] aplicar budgets físicos de linhas/bytes sem arrays ou truncamento em unidades incorretas;
+- [x] limitar retenção dos caches de parser por peso e respostas de outline por itens/bytes;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2111,7 +2143,7 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria profunda dos callers de parse/context/search, priorizando budgets de saída, materialização
-integral evitável e alocações redundantes nas principais tools; manter fuzz/chaos como gates recorrentes. IO-030/L3
-permanece explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que justifique
-o contrato; não há ganho técnico em criar essa camada preventivamente.
+Continuar a auditoria profunda dos callers de parse/context/search, priorizando leitura parcial quando somente
+símbolos/cabeçalhos forem necessários e evitando dupla retenção entre L1, parser e índice; manter fuzz/chaos como gates
+recorrentes. IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos
+runtimes/processos reais que justifique o contrato; não há ganho técnico em criar essa camada preventivamente.

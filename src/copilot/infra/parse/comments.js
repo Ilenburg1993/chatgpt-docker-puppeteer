@@ -5,6 +5,8 @@
  * @module copilot/infra/parse/comments
  */
 
+import { iterateTextLines } from './text-lines.js';
+
 /**
  * Extrai os primeiros comentários de bloco ou linha do arquivo.
  *
@@ -14,11 +16,11 @@
 export function extractTopComments(content) {
     /** @type {string[]} */
     const comments = [];
-    const lines = content.split('\n');
     let inBlock = false;
     let blockLines = /** @type {string[]} */ ([]);
 
-    for (const line of lines.slice(0, 50)) {
+    for (const { text: line, line: lineNumber } of iterateTextLines(content)) {
+        if (lineNumber > 50) break;
         const trimmed = line.trim();
         if (!inBlock && trimmed.startsWith('/*')) {
             inBlock = true;

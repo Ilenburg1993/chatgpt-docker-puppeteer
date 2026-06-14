@@ -5,6 +5,8 @@
  * @module copilot/infra/parse/markdown-outline
  */
 
+import { iterateTextLines } from './text-lines.js';
+
 /**
  * Extrai headings H1-H4 de Markdown.
  *
@@ -24,15 +26,13 @@ export function extractMarkdownOutline(content) {
 export function extractMarkdownOutlineWithLines(content) {
     /** @type {{ heading: string; line: number; depth: number }[]} */
     const headings = [];
-    const lines = content.split('\n');
-    for (let index = 0; index < lines.length; index++) {
-        const line = lines[index] ?? '';
-        const m = /^(#{1,4})\s+(.+)$/.exec(line);
+    for (const { text, line } of iterateTextLines(content)) {
+        const m = /^(#{1,4})\s+(.+)$/.exec(text);
         if (m) {
             const marker = m[1] ?? '';
             headings.push({
                 heading: `${marker} ${(m[2] ?? '').trim()}`,
-                line: index + 1,
+                line,
                 depth: marker.length,
             });
         }

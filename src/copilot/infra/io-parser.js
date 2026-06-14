@@ -69,6 +69,20 @@ const PARSER_WORKER_REQUEST_TIMEOUT_MS = Math.max(
     MAX_PARSE_DURATION_MS,
     Number(process.env['IO_PARSER_WORKER_REQUEST_TIMEOUT_MS'] ?? 500),
 );
+const SYMBOL_CACHE_MAX_ENTRIES = readPositiveIntegerEnv('IO_PARSER_SYMBOL_CACHE_MAX_ENTRIES', 500);
+const SYMBOL_CACHE_MAX_BYTES = readPositiveIntegerEnv('IO_PARSER_SYMBOL_CACHE_MAX_BYTES', 64 * 1024 * 1024);
+const FILE_CONTEXT_CACHE_MAX_ENTRIES = readPositiveIntegerEnv('IO_PARSER_FILE_CONTEXT_CACHE_MAX_ENTRIES', 256);
+const FILE_CONTEXT_CACHE_MAX_BYTES = readPositiveIntegerEnv('IO_PARSER_FILE_CONTEXT_CACHE_MAX_BYTES', 64 * 1024 * 1024);
+
+/**
+ * @param {string} name
+ * @param {number} fallback
+ * @returns {number}
+ */
+function readPositiveIntegerEnv(name, fallback) {
+    const value = Number(process.env[name] ?? fallback);
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
 
 /**
  * @param {NodeJS.ProcessEnv} [env]
@@ -130,10 +144,42 @@ export function resolveParserWorkerQueuePolicy(env = process.env, poolSize = PAR
     };
 }
 
-/** Cache de símbolos parseados: max 500 entradas, TTL 5 min. */
+/**
+ * Estima retenção heap do resultado sem serializá-lo novamente.
+ *
+ * @param {FileSymbols} value
+ * @returns {number}
+ */
+function estimateFileSymbolsCacheSize(value) {
+    let size = Math.max(1, value.parsedBytes);
+    for (const symbol of value.symbols) {
+        size += 96 + symbol.name.length * 2 + (symbol.docComment?.length ?? 0) * 2;
+    }
+    for (const entry of value.imports) {
+        size += 96 + entry.source.length * 2;
+        for (const specifier of entry.specifiers) size += 16 + specifier.length * 2;
+    }
+    for (const entry of value.exports) size += 16 + entry.length * 2;
+    return size;
+}
+
+/**
+ * @param {FileContext} value
+ * @returns {number}
+ */
+function estimateFileContextCacheSize(value) {
+    let size = estimateFileSymbolsCacheSize(value.symbols);
+    for (const line of value.outline) size += 16 + line.length * 2;
+    for (const comment of value.topComments) size += 16 + comment.length * 2;
+    return size;
+}
+
+/** Cache de símbolos parseados: bounded por entradas e peso estimado, TTL 5 min. */
 const _symbolCache = new LRUCache(
     /** @type {any} */ ({
-        max: 500,
+        max: SYMBOL_CACHE_MAX_ENTRIES,
+        maxSize: SYMBOL_CACHE_MAX_BYTES,
+        sizeCalculation: estimateFileSymbolsCacheSize,
         ttl: 5 * 60_000,
         updateAgeOnGet: true,
     }),
@@ -142,7 +188,9 @@ const _symbolCache = new LRUCache(
 /** Cache de contexto completo de arquivo: symbols + outline + top comments, keyado por path+hash de conteúdo. */
 const _fileContextCache = new LRUCache(
     /** @type {any} */ ({
-        max: Number(process.env['IO_PARSER_FILE_CONTEXT_CACHE_MAX_ENTRIES'] ?? 256),
+        max: FILE_CONTEXT_CACHE_MAX_ENTRIES,
+        maxSize: FILE_CONTEXT_CACHE_MAX_BYTES,
+        sizeCalculation: estimateFileContextCacheSize,
         ttl: Number(process.env['IO_PARSER_FILE_CONTEXT_CACHE_TTL_MS'] ?? 5 * 60_000),
         updateAgeOnGet: true,
     }),
@@ -188,6 +236,7 @@ const _fileContextCacheStats = {
     sets: 0,
     clears: 0,
     bypasses: 0,
+    rejected: 0,
 };
 
 /** @type {number} */
@@ -1015,9 +1064,98 @@ export async function parseFileForContext(filePath, content) {
     const context = { symbols, outline, topComments };
     if (cacheKey) {
         _fileContextCache.set(cacheKey, context);
-        _fileContextCacheStats.sets += 1;
+        if (_fileContextCache.has(cacheKey)) _fileContextCacheStats.sets += 1;
+        else _fileContextCacheStats.rejected += 1;
     }
     return context;
+}
+
+/**
+ * Aplica um orçamento uniforme às coleções de contexto antes de expô-las para uma tool.
+ *
+ * @param {FileContext} context
+ * @param {{
+ *     maxItems?: number;
+ *     maxBytes?: number;
+ *     includeImports?: boolean;
+ *     includeExports?: boolean;
+ *     includeOutline?: boolean;
+ *     includeTopComments?: boolean;
+ * }} [options]
+ */
+export function windowFileContext(context, options = {}) {
+    const maxItems =
+        Number.isFinite(options.maxItems) && Number(options.maxItems) > 0
+            ? Math.min(5_000, Math.floor(Number(options.maxItems)))
+            : 500;
+    const maxBytes =
+        Number.isFinite(options.maxBytes) && Number(options.maxBytes) > 0
+            ? Math.min(4 * 1024 * 1024, Math.floor(Number(options.maxBytes)))
+            : 512 * 1024;
+    let returnedContentBytes = 0;
+
+    /**
+     * @template T
+     * @param {readonly T[]} items
+     * @param {boolean} included
+     * @returns {T[]}
+     */
+    const take = (items, included) => {
+        if (!included) return [];
+        /** @type {T[]} */
+        const selected = [];
+        for (const item of items) {
+            if (selected.length >= maxItems) break;
+            const serialized = typeof item === 'string' ? item : JSON.stringify(item);
+            const itemBytes = utf8ByteLength(serialized, 'parser context output item');
+            if (returnedContentBytes + itemBytes > maxBytes) break;
+            selected.push(item);
+            returnedContentBytes += itemBytes;
+        }
+        return selected;
+    };
+
+    const included = {
+        symbols: true,
+        imports: options.includeImports !== false,
+        exports: options.includeExports !== false,
+        outline: options.includeOutline !== false,
+        topComments: options.includeTopComments === true,
+    };
+    const totalCounts = {
+        symbols: context.symbols.symbols.length,
+        imports: context.symbols.imports.length,
+        exports: context.symbols.exports.length,
+        outline: context.outline.length,
+        topComments: context.topComments.length,
+    };
+    const symbols = take(context.symbols.symbols, included.symbols);
+    const imports = take(context.symbols.imports, included.imports);
+    const exports = take(context.symbols.exports, included.exports);
+    const outline = take(context.outline, included.outline);
+    const topComments = take(context.topComments, included.topComments);
+    const returnedCounts = {
+        symbols: symbols.length,
+        imports: imports.length,
+        exports: exports.length,
+        outline: outline.length,
+        topComments: topComments.length,
+    };
+    return {
+        symbols,
+        imports,
+        exports,
+        outline,
+        topComments,
+        maxItems,
+        maxBytes,
+        returnedContentBytes,
+        totalCounts,
+        returnedCounts,
+        truncated: /** @type {(keyof typeof totalCounts)[]} */ (Object.keys(totalCounts)).some(
+            (key) => included[key] && totalCounts[key] > returnedCounts[key],
+        ),
+    };
 }
 
 /**
@@ -1026,6 +1164,8 @@ export async function parseFileForContext(filePath, content) {
  * @returns {{
  *     size: number;
  *     maxSize: number;
+ *     calculatedSize: number;
+ *     maxBytes: number;
  *     maxParseDurationMs: number;
  *     maxParseLines: number;
  *     workerEnabled: boolean;
@@ -1093,16 +1233,21 @@ function isFileContextCacheEnabled() {
 export function getParserCacheStats() {
     return {
         size: _symbolCache.size,
-        maxSize: 500,
+        maxSize: SYMBOL_CACHE_MAX_ENTRIES,
+        calculatedSize: _symbolCache.calculatedSize,
+        maxBytes: SYMBOL_CACHE_MAX_BYTES,
         fileContext: {
             enabled: isFileContextCacheEnabled(),
             size: _fileContextCache.size,
-            maxSize: Number(process.env['IO_PARSER_FILE_CONTEXT_CACHE_MAX_ENTRIES'] ?? 256),
+            maxSize: FILE_CONTEXT_CACHE_MAX_ENTRIES,
+            calculatedSize: _fileContextCache.calculatedSize,
+            maxBytes: FILE_CONTEXT_CACHE_MAX_BYTES,
             hits: _fileContextCacheStats.hits,
             misses: _fileContextCacheStats.misses,
             sets: _fileContextCacheStats.sets,
             clears: _fileContextCacheStats.clears,
             bypasses: _fileContextCacheStats.bypasses,
+            rejected: _fileContextCacheStats.rejected,
         },
         maxParseDurationMs: MAX_PARSE_DURATION_MS,
         maxParseLines: MAX_PARSE_LINE_GUARD,
@@ -1146,6 +1291,7 @@ export async function resetParserCacheForTest(options = {}) {
     _fileContextCacheStats.sets = 0;
     _fileContextCacheStats.clears = 0;
     _fileContextCacheStats.bypasses = 0;
+    _fileContextCacheStats.rejected = 0;
     _parserRuntimeStats.budgetExceeded = 0;
     _parserRuntimeStats.skippedByLineGuard = 0;
     _parserRuntimeStats.lastParseDurationMs = 0;

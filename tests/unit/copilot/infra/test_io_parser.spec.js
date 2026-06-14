@@ -24,6 +24,7 @@ import {
     resetParserCacheForTest,
     resolveParserWorkerPoolPolicy,
     resolveParserWorkerQueuePolicy,
+    windowFileContext,
 } from '../../../../src/copilot/infra/io-parser.js';
 
 let tmpDir = '';
@@ -274,6 +275,14 @@ describe('extractJsonSchema', () => {
         assert.ok(names.includes('id'));
         assert.ok(names.includes('name'));
     });
+
+    it('extrai primeira amostra JSONL separada por CR isolado', () => {
+        const result = extractJsonSchema('\r{"first":1}\r{"second":2}');
+        const names = result.symbols.map((s) => s.name);
+
+        assert.equal(result.parseError, null);
+        assert.deepEqual(names, ['first']);
+    });
 });
 
 describe('extractMarkdownOutline', () => {
@@ -299,6 +308,10 @@ describe('extractMarkdownOutline', () => {
         assert.ok(h2 !== undefined);
         assert.ok(h2.startsWith('##'), `h2=${h2}`);
     });
+
+    it('preserva linhas de headings com CR isolado', () => {
+        assert.deepEqual(extractMarkdownOutline('# Um\rtexto\r## Dois'), ['# Um', '## Dois']);
+    });
 });
 
 describe('buildOutline', () => {
@@ -318,6 +331,15 @@ describe('extractTopComments', () => {
         assert.ok(Array.isArray(comments));
         // A presença de comentários no topo (ou array vazio se não houver)
         assert.ok(comments.length >= 0);
+    });
+
+    it('limita a leitura lógica às primeiras 50 linhas com CR isolado', () => {
+        const content = `${Array.from({ length: 50 }, (_, index) => `// ${index + 1}`).join('\r')}\r// 51`;
+        const comments = extractTopComments(content);
+
+        assert.equal(comments.length, 10);
+        assert.equal(comments.at(-1), '// 10');
+        assert.ok(!comments.includes('// 51'));
     });
 });
 
@@ -422,6 +444,28 @@ describe('parseFileForContext', () => {
         assert.ok(result.outline.length > 0, `outline=${JSON.stringify(result.outline)}`);
     });
 
+    it('aplica budgets de itens e bytes somente às coleções solicitadas', async () => {
+        const parsed = await parseFileForContext(path.join(tmpDir, 'module.js'), JS_CONTENT);
+        const result = windowFileContext(parsed, {
+            maxItems: 1,
+            maxBytes: 256,
+            includeImports: true,
+            includeExports: true,
+            includeOutline: true,
+            includeTopComments: false,
+        });
+
+        assert.ok(result.symbols.length <= 1);
+        assert.ok(result.imports.length <= 1);
+        assert.ok(result.exports.length <= 1);
+        assert.ok(result.outline.length <= 1);
+        assert.deepEqual(result.topComments, []);
+        assert.ok(result.returnedContentBytes <= 256);
+        assert.equal(result.maxItems, 1);
+        assert.equal(result.maxBytes, 256);
+        assert.equal(result.truncated, true);
+    });
+
     it('cacheia FileContext por path e conteúdo', async () => {
         const filePath = path.join(tmpDir, 'module.js');
         await resetParserCacheForTest();
@@ -436,6 +480,8 @@ describe('parseFileForContext', () => {
         assert.equal(afterFirst.fileContext.sets, 1);
         assert.equal(afterSecond.fileContext.hits, 1);
         assert.equal(afterSecond.fileContext.size, 1);
+        assert.ok(afterSecond.fileContext.calculatedSize > 0);
+        assert.ok(afterSecond.fileContext.calculatedSize <= afterSecond.fileContext.maxBytes);
     });
 
     it('invalida FileContext quando invalidateParserCache é chamado', async () => {
@@ -463,6 +509,31 @@ describe('parseFileForContext', () => {
         assert.equal(stats.fileContext.enabled, false);
         assert.equal(stats.fileContext.bypasses, 2);
         assert.equal(stats.fileContext.size, 0);
+    });
+
+    it('recusa retenção de FileContext maior que o orçamento configurado', async () => {
+        const script = `
+            import { getParserCacheStats, parseFileForContext, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            await parseFileForContext('/tmp/oversized-context.js', 'export const oversizedContext = 1;');
+            const stats = getParserCacheStats();
+            await resetParserCacheForTest({ teardownWorkers: true });
+            console.log(JSON.stringify(stats));
+        `;
+        const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
+            cwd: path.resolve('.'),
+            env: {
+                ...process.env,
+                IO_PARSER_FILE_CONTEXT_CACHE_MAX_BYTES: '8',
+                IO_PARSER_WORKER_ENABLED: '0',
+            },
+            timeout: 10_000,
+            maxBuffer: 1024 * 1024,
+        });
+        const stats = JSON.parse(stdout);
+
+        assert.equal(stats.fileContext.maxBytes, 8);
+        assert.equal(stats.fileContext.size, 0);
+        assert.equal(stats.fileContext.rejected, 1);
     });
 
     it('preserva linha real dos headings markdown no parse simbólico', async () => {

@@ -79,8 +79,8 @@ const PARSED_PAYLOAD = {
         exports: ['buildTool'],
         parseError: null,
     },
-    outline: '── Exports (1)\n  buildTool',
-    topComments: '// @ts-check\n/** @module */\n',
+    outline: ['── Exports (1)', '  buildTool'],
+    topComments: ['// @ts-check', '/** @module */'],
 };
 
 beforeEach(() => {
@@ -104,7 +104,7 @@ describe('workspace_parse_file', () => {
         expect(result.symbols).toEqual(PARSED_PAYLOAD.symbols.symbols);
         expect(result.imports).toEqual(PARSED_PAYLOAD.symbols.imports);
         expect(result.exports).toEqual(PARSED_PAYLOAD.symbols.exports);
-        expect(result.outline).toBe(PARSED_PAYLOAD.outline);
+        expect(result.outline).toEqual(PARSED_PAYLOAD.outline);
         expect(result.parseError).toBeNull();
     });
 
@@ -120,7 +120,34 @@ describe('workspace_parse_file', () => {
             includeTopComments: true,
         });
 
-        expect(result.topComments).toBe(PARSED_PAYLOAD.topComments);
+        expect(result.topComments).toEqual(PARSED_PAYLOAD.topComments);
+    });
+
+    it('limita coleções por itens e bytes e expõe totais', async () => {
+        mocks.parseFileForContext.mockResolvedValue({
+            ...PARSED_PAYLOAD,
+            symbols: {
+                ...PARSED_PAYLOAD.symbols,
+                symbols: [
+                    ...PARSED_PAYLOAD.symbols.symbols,
+                    { name: 'second', kind: 'function', line: 9 },
+                ],
+            },
+        });
+
+        const result = await getHandler(workspaceParseFileTool)({
+            path: 'src/copilot/foo.js',
+            maxItems: 1,
+            maxBytes: 256,
+        });
+
+        expect(result.symbols).toHaveLength(1);
+        expect(result.truncated).toBe(true);
+        expect(result.maxItems).toBe(1);
+        expect(result.maxBytes).toBe(256);
+        expect(result.returnedContentBytes).toBeLessThanOrEqual(256);
+        expect(result.totalCounts.symbols).toBe(2);
+        expect(result.returnedCounts.symbols).toBe(1);
     });
 
     it('omite imports quando includeImports=false', async () => {

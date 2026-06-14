@@ -391,6 +391,18 @@ describe('copilot MCP tools', () => {
         assert.ok(Array.isArray(outlineResult.structuredContent?.['outline']));
         const exports = /** @type {string[]} */ (outlineResult.structuredContent?.['exports'] ?? []);
         assert.ok(exports.includes('repoReadTools'));
+
+        const boundedOutline = await outlineTool.handler({
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            maxItems: 1,
+            maxBytes: 512,
+        });
+        assert.equal(boundedOutline.structuredContent?.['truncated'], true);
+        assert.equal(boundedOutline.structuredContent?.['maxItems'], 1);
+        assert.ok(Number(boundedOutline.structuredContent?.['returnedContentBytes'] ?? Infinity) <= 512);
+        assert.ok(
+            /** @type {unknown[]} */ (boundedOutline.structuredContent?.['symbols'] ?? []).length <= 1,
+        );
     });
 
     it('mcp_smoke_workspace runs read-only end-to-end checks', async () => {
