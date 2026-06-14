@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `6e15061e`, seguida da onda de readiness explícita de scopes
+**Baseline reinvestigado:** `main` sincronizada até `0134ec27`, seguida da política glob canônica
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -20,16 +20,18 @@ fortes e provas reais, as superfícies externas de path estão vinculadas a poli
 externas metadata-preserving e a contenção L0/L1 é observável sem expor paths; o L1 multiprocess agora possui perfis
 explícitos por risco, remove recursivo exige confirmação exata e a raiz workspace-bound é protegida; L2 possui perfil
 experimental fail-closed e custo observável; mutações que materializam payload grande agora falham cedo quando a
-insuficiência de espaço já é observável; scopes distinguem warming/ready/stale/degraded sem vazar paths; o risco
-dominante migrou para política de glob e decisões de promoção baseadas em workload**.
+insuficiência de espaço já é observável; scopes distinguem warming/ready/stale/degraded sem vazar paths; scanner,
+prefetch e busca FTS compartilham uma política glob sem abrir mão da enumeração protegida; o risco dominante migrou
+para hygiene de temporários e decisões de promoção baseadas em workload**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — política de glob ainda é própria:** include/exclude pode divergir de `minimatch`/Node glob.
+1. **P2 — temp naming legado ainda merece varredura:** primitivas novas usam 96 bits, mas callsites antigos podem
+   manter nomes curtos ou não ocultos.
 2. **P2 — promoção do L2 depende de workload real:** o perfil experimental existe e foi medido, mas cold-start pode
    custar mais que filesystem local para payloads pequenos/médios.
-3. **P2 — temp naming legado ainda merece varredura:** primitivas novas usam 96 bits, mas callsites antigos podem
-   manter nomes curtos ou não ocultos.
+3. **P2 — perfil L2 experimental ainda não roda em CI:** a capacidade existe e foi provada live, mas falta canário
+   recorrente sem promover o default.
 4. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
@@ -830,6 +832,28 @@ Prova live isolada:
 
 Validação focada: scopes, health e comando terminal: **20 passados, 0 falhas**; typecheck strict e lint: **PASS**.
 
+### 1.31 Status de implementação — política glob canônica aplicada em 2026-06-14
+
+IO-027 foi fechado consolidando matching, sem substituir o scanner seguro por enumeração crua:
+
+- `scan/glob.js` usa `minimatch` v10 como autoridade para brace expansion, globstar, extglob, classes, dotfiles e
+  separadores Windows;
+- padrões sem barra mantêm basename matching; padrões simples como `node_modules` e `src/copilot` continuam
+  representando segmentos/subtrees;
+- scanner, prefetch e pós-filtro FTS compartilham a mesma função;
+- `!` e `#` são literais, pois include/exclude já são campos separados e negation implícita seria perigosa;
+- metadata informa `globEngine:"minimatch-v10"`;
+- a enumeração permanece em `io-scanner`, preservando denylist, policy async, gitignore e não-follow de symlink.
+
+Prova live em `src/copilot` com `**/*.{js,ts}` e exclude simples `docs`:
+
+- scanner canônico: **1.259 arquivos**;
+- `fsPromises.glob`: **1.264 arquivos**;
+- os cinco extras do glob cru estavam em `model-gateway/secrets`, corretamente removidos pela policy do scanner;
+- nenhum arquivo de `docs/` atravessou o exclude.
+
+Validação focada de glob/scanner/prefetch/search/index: **50 passados, 0 falhas**; typecheck strict e lint: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -962,7 +986,9 @@ Referência: https://nodejs.org/docs/latest-v24.x/api/fs.html#fspromisesstatfspa
 
 A documentação de Node 24.x marca `fsPromises.glob()` como estável em Node 24.0.0, mas mostra que `followSymlinks` só foi adicionado em Node 24.16.0.
 
-**Implicação:** em runtime alvo 24.5, `glob` já pode substituir parte do scanner em cenários simples, mas não devemos depender de `followSymlinks` se a matriz real for 24.5. Para segurança, a política atual de não seguir symlinks por padrão deve permanecer.
+**Implicação aplicada:** `minimatch` governa a semântica de padrões, mas `glob` cru não substitui o scanner. A prova
+live mostrou que ele enumeraria paths de `model-gateway/secrets` removidos pela policy async. Também não devemos
+depender de `followSymlinks`, ausente na matriz alvo 24.5.
 
 Referência: https://nodejs.org/docs/latest-v24.x/api/fs.html#fspromisesglobpattern-options
 
@@ -1074,7 +1100,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-024 | P2 | Scope readiness | **Concluído:** warming/ready/stale/degraded são distintos e erro é sanitizado | `io-session-scope.js`, `io-health.js`, terminal scope | `awaitReady()` continua não-rejeitante por compatibilidade | Consumidores devem checar `status`/`degraded`, não apenas conclusão da Promise |
 | IO-025 | P2 | Observability | **Concluído:** espera, fila e leases L0/L1 são bounded e sanitizados | histogramas globais/por operação, p95, outcomes e amostra por hash no health | Paths não entram no snapshot; métricas são cumulativas por processo | Usar os dados para definir perfis de ativação do L1 |
 | IO-026 | P2 | Search subprocess | **Concluído:** `rg`/`grep` textuais processam stdout incrementalmente | `subprocess.js`, `text-search.js` | `maxBuffer` permanece como proteção contra linha/chunk anômalo | Monitorar `streamStoppedEarly` e custo em buscas grandes |
-| IO-027 | P2 | Glob policy | Glob simples próprio diverge de minimatch/Node glob | `scan/glob.js` | Diferenças de include/exclude difíceis de prever | Padronizar em `minimatch`/`fsPromises.glob` com testes de compatibilidade |
+| IO-027 | P2 | Glob policy | **Concluído:** matcher minimatch v10 compartilhado, enumeração protegida preservada | scanner/prefetch/FTS usam `scan/glob.js`; prova comparativa com Node glob | Node glob cru não aplica policy async/denylist | Manter scanner como owner da enumeração |
 | IO-028 | P2 | Statfs | **Concluído com limite documentado:** preflight advisory antes de materializar payload grande | `capacity-preflight.js`, atomic write, copy staged, move EXDEV | `statfs` não reserva blocos e pode falhar aberto em plataforma unsupported | Manter ENOSPC real como autoridade final |
 | IO-029 | P2 | Durable append | **Concluído:** recovery lógico e físico opt-in da linha parcial | `jsonl-reader.js` ignora por default e repara sob lock quando solicitado | Evita parser quebrado sem mutação surpresa | Manter repair bounded e opt-in |
 | IO-030 | P3 | L3 cache | L3 reservado, mas sem contrato | `io-cache-tiering.js` | Sem problema atual | Só planejar se houver múltiplos runtimes/processos reais |
@@ -1096,10 +1122,10 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-023, IO-024, IO-025, IO-026, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038 |
 | Parcial | IO-009 |
-| Aberto | IO-021, IO-027, IO-030 |
+| Aberto | IO-021, IO-030 |
 
 ---
 
@@ -1420,6 +1446,13 @@ A situação ideal é uma infra IO em camadas:
 - [x] Backpressure/limite de fila.
 - [x] Queue length e timeout por arquivo no health.
 
+#### Fase 4.4 — Política glob
+
+- [x] Consolidar scanner, prefetch e filtro FTS em minimatch v10.
+- [x] Preservar basename e segmentos simples para compatibilidade operacional.
+- [x] Tratar negation/comments literalmente em campos include/exclude separados.
+- [x] Comparar live com `fsPromises.glob` e manter enumeração sob policy async.
+
 ### Faixa 5 — Provas
 
 - [ ] Fuzz textual e binário.
@@ -1570,6 +1603,6 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Padronizar a política de glob da infra, comparando o matcher simples atual com `minimatch`/`fsPromises.glob` sob a
-matriz Node 24.5 e preservando não-follow de symlink. Em paralelo, coletar hit ratio/distribuição de payloads do L2
-`experimental` em workloads longos antes de considerar promoção para `on`.
+Auditar todos os temporários de `src/copilot`, eliminando nomes curtos/não ocultos e padronizando 96/128 bits onde
+ainda houver geração artesanal. Em paralelo, coletar hit ratio/distribuição de payloads do L2 `experimental` em
+workloads longos antes de considerar promoção para `on`.
