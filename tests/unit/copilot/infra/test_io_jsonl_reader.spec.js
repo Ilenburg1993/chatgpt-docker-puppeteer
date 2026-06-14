@@ -99,4 +99,67 @@ describe('infra/io/jsonl-reader', () => {
         expect(repair).toMatchObject({ repaired: false, reason: 'trailing-record-too-large', truncatedBytes: 0 });
         expect(await readFile(filePath, 'utf8')).toBe(content);
     });
+
+    it('limita bytes da cauda quando uma linha sem newline é anormalmente grande', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-jsonl-reader-'));
+        tempDirs.push(dir);
+        const filePath = join(dir, 'events.jsonl');
+        await writeFile(filePath, `{"payload":"${'x'.repeat(8_192)}"}`);
+
+        const result = await readJsonlTail(filePath, { maxLines: 10, blockSize: 1_024, maxBytes: 2_048 });
+
+        expect(result.records).toEqual([]);
+        expect(result.bytesRead).toBe(2_048);
+        expect(result.maxBytes).toBe(2_048);
+        expect(result.truncatedByByteLimit).toBe(true);
+    });
+
+    it('rejeita bytes UTF-8 inválidos em vez de aceitar texto substituído', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-jsonl-reader-'));
+        tempDirs.push(dir);
+        const filePath = join(dir, 'events.jsonl');
+        await writeFile(filePath, Buffer.from([0x7b, 0x22, 0x76, 0x22, 0x3a, 0x22, 0xff, 0x22, 0x7d]));
+
+        await expect(readJsonlTail(filePath, { maxLines: 10 })).rejects.toMatchObject({ code: 'EUTF8JSONL' });
+        await expect(repairJsonlTrailingPartial(filePath)).rejects.toMatchObject({ code: 'EUTF8JSONL' });
+    });
+
+    it('preserva code point UTF-8 dividido entre blocos cronológicos', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-jsonl-reader-'));
+        tempDirs.push(dir);
+        const filePath = join(dir, 'events.jsonl');
+        let content = '';
+        for (let suffixLength = 900; suffixLength < 1_100; suffixLength += 1) {
+            const candidate = `${JSON.stringify({ value: `😀${'x'.repeat(suffixLength)}` })}\n`;
+            const bytes = Buffer.from(candidate);
+            const emojiStart = bytes.indexOf(Buffer.from('😀'));
+            const boundary = bytes.length - 1_024;
+            if (boundary > emojiStart && boundary < emojiStart + 4) {
+                content = candidate;
+                break;
+            }
+        }
+        expect(content).not.toBe('');
+        await writeFile(filePath, content);
+
+        const result = await readJsonlTail(filePath, { maxLines: 2, blockSize: 1_024, maxBytes: 4_096 });
+
+        expect(result.records).toEqual([JSON.parse(content)]);
+        expect(result.truncatedByByteLimit).toBe(false);
+    });
+
+    it('descarta linha parcial em bytes antes de validar UTF-8 dos registros completos', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-jsonl-reader-'));
+        tempDirs.push(dir);
+        const filePath = join(dir, 'events.jsonl');
+        await writeFile(
+            filePath,
+            Buffer.concat([Buffer.alloc(4_096, 0xff), Buffer.from('\n{"id":2}\n', 'utf8')]),
+        );
+
+        const result = await readJsonlTail(filePath, { maxLines: 2, blockSize: 1_024, maxBytes: 1_024 });
+
+        expect(result.records).toEqual([{ id: 2 }]);
+        expect(result.truncatedByByteLimit).toBe(true);
+    });
 });

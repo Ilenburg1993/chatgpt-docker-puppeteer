@@ -1460,6 +1460,29 @@ Validação combinada de IO-065/IO-066: **119 passados, 0 falhas** em patch, fuz
 engine e MCP; duas provas diferenciais de 5.000 casos; lint focado, `diff --check` e
 `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.58 Status de implementação — cauda JSONL bounded e UTF-8 fatal em 2026-06-14
+
+IO-067 corrigiu a última leitura textual potencialmente sem bound encontrada nesta rodada. `readJsonlTail` parava
+por quantidade de newlines; uma linha final gigante sem newline fazia o leitor caminhar até o início e concatenar o
+arquivo inteiro. O decode usava `Buffer.toString('utf8')`, permitindo substituição silenciosa dentro de um JSON
+sintaticamente válido.
+
+O leitor agora:
+
+- impõe orçamento efetivo `maxBytes` (default 16 MiB, hard cap 64 MiB), `maxLines` até 10 mil e blocos até 1 MiB;
+- expõe `bytesRead`, `maxBytes` e `truncatedByByteLimit`;
+- guarda blocos em ordem reversa sem `unshift`, descarta a primeira linha parcial em bytes e só então decodifica;
+- usa `TextDecoder` incremental fatal entre blocos e `EUTF8JSONL` para bytes inválidos;
+- mantém somente um ring de no máximo `maxLines`, sem `Buffer.concat + split + filter + slice`;
+- reaproveita o último bloco para detectar newline terminal, removendo um syscall/read redundante.
+
+`repairJsonlTrailingPartial` também valida UTF-8 fatal antes de aceitar uma última linha como JSON legítimo. Provas
+cobrem linha gigante bounded, code point atravessando blocos, UTF-8 inválido real e bytes inválidos contidos apenas
+na linha parcial descartada.
+
+Validação focada de IO-067: **38 passados, 0 falhas** em JSONL e audit pipeline; lint focado, `diff --check` e
+`typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1746,12 +1769,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-064 | P1 | Read line offsets | **Concluído:** slicing físico é uniforme e retenção do cache é bounded por bytes | scanner O(1) no bypass, offsets `Uint32Array`, health e regressões CR/LF/CRLF | Construção de offsets faz duas varreduras para obter alocação compacta exata | Medir miss frio versus redução de heap; manter o orçamento global |
 | IO-065 | P1 | Diff/output window | **Concluído:** inputs não viram arrays integrais para diff/paginação | duas passagens lazy, scanners de offsets e 10 mil casos diferenciais | Diff continua index-aligned, não é algoritmo LCS | Só migrar algoritmo com contrato/fixtures de inserção e benchmark |
 | IO-066 | P0 | Search UTF-8 | **Concluído:** stdout streaming usa decode incremental fatal | code point entre chunks, bytes inválidos e early stop cobertos | stderr diagnóstico e `execSearchFile` legado continuam decode best-effort após concatenação | Manter stdout textual de busca sob política fatal |
+| IO-067 | P0 | JSONL tail | **Concluído:** cauda tem budgets físicos e decode incremental fatal | hard caps, ring bounded e regressões de fronteira/linha gigante | Uma linha maior que `maxBytes` é omitida e sinalizada, não parcialmente parseada | Callers devem observar `truncatedByByteLimit` quando completude for obrigatória |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2279,6 +2303,7 @@ Maturidade operacional avançada:
 - [x] unificar linhas físicas na leitura e limitar o line-offset cache por bytes;
 - [x] remover arrays integrais de diff/output-window sem alterar contratos;
 - [x] tornar fatal e incremental o decode UTF-8 do stdout de busca;
+- [x] limitar cauda JSONL por bytes/linhas e recusar decode substitutivo;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2299,8 +2324,8 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria do leitor de cauda JSONL e de buffers diagnósticos legados, separando arrays exigidos pelo
-contrato de duplicações internas removíveis. Medir o custo de `attachComment` antes de qualquer perfil sem doc
-comments e ampliar fixtures Babel somente para sintaxe realmente aceita pelo workspace; manter fuzz/chaos como gates
-recorrentes. IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos
-runtimes/processos reais que justifique o contrato.
+Continuar a auditoria de buffers diagnósticos legados e propagar `truncatedByByteLimit` onde a completude da cauda
+JSONL for requisito funcional. Medir o custo de `attachComment` antes de qualquer perfil sem doc comments e ampliar
+fixtures Babel somente para sintaxe realmente aceita pelo workspace; manter fuzz/chaos como gates recorrentes.
+IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que
+justifique o contrato.

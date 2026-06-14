@@ -11,6 +11,37 @@ import { withIoResourceLock } from '../io-locks.js';
 const DEFAULT_BLOCK_SIZE = 65_536;
 const DEFAULT_MAX_TRAILING_RECORD_BYTES = 4 * 1024 * 1024;
 const DEFAULT_MAX_REPAIR_SCAN_BYTES = 16 * 1024 * 1024;
+const DEFAULT_MAX_TAIL_BYTES = 16 * 1024 * 1024;
+const MAX_TAIL_LINES = 10_000;
+const MAX_BLOCK_SIZE = 1024 * 1024;
+const MAX_TAIL_BYTES = 64 * 1024 * 1024;
+
+/**
+ * @param {Buffer | Uint8Array} bytes
+ * @returns {string}
+ */
+function decodeJsonlUtf8(bytes) {
+    try {
+        return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch (cause) {
+        throw Object.assign(new Error('JSONL contém bytes inválidos para UTF-8.', { cause }), {
+            code: 'EUTF8JSONL',
+        });
+    }
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @param {number} minimum
+ * @param {number} maximum
+ * @returns {number}
+ */
+function normalizeJsonlLimit(value, fallback, minimum, maximum) {
+    const numeric = Number(value ?? fallback);
+    if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+    return Math.min(maximum, Math.max(minimum, Math.trunc(numeric)));
+}
 
 /**
  * @typedef {{
@@ -65,7 +96,7 @@ export async function repairJsonlTrailingPartial(filePath, options = {}) {
                     const recordBytes = size - recordStart;
                     const recordBuffer = Buffer.alloc(recordBytes);
                     await handle.read(recordBuffer, 0, recordBytes, recordStart);
-                    const record = recordBuffer.toString('utf8');
+                    const record = decodeJsonlUtf8(recordBuffer);
                     try {
                         JSON.parse(record);
                         return repairResult('valid-trailing-record', size, size);
@@ -145,6 +176,7 @@ function repairResult(reason, previousBytes, finalBytes) {
  * @param {{
  *     maxLines?: number;
  *     blockSize?: number;
+ *     maxBytes?: number;
  *     repairTrailingPartial?: boolean;
  *     maxTrailingRecordBytes?: number;
  *     flushRepairToDisk?: boolean;
@@ -154,11 +186,15 @@ function repairResult(reason, previousBytes, finalBytes) {
  *     invalidLines: number;
  *     trailingPartialIgnored: boolean;
  *     trailingRepair: JsonlTrailingRepairResult | null;
+ *     bytesRead: number;
+ *     maxBytes: number;
+ *     truncatedByByteLimit: boolean;
  * }>}
  */
 export async function readJsonlTail(filePath, options = {}) {
-    const maxLines = Math.max(1, Math.trunc(options.maxLines ?? 50));
-    const blockSize = Math.max(1_024, Math.trunc(options.blockSize ?? DEFAULT_BLOCK_SIZE));
+    const maxLines = normalizeJsonlLimit(options.maxLines, 50, 1, MAX_TAIL_LINES);
+    const blockSize = normalizeJsonlLimit(options.blockSize, DEFAULT_BLOCK_SIZE, 1_024, MAX_BLOCK_SIZE);
+    const maxBytes = normalizeJsonlLimit(options.maxBytes, DEFAULT_MAX_TAIL_BYTES, 1_024, MAX_TAIL_BYTES);
     const trailingRepair = options.repairTrailingPartial
         ? await repairJsonlTrailingPartial(filePath, {
               ...(options.maxTrailingRecordBytes === undefined
@@ -172,30 +208,42 @@ export async function readJsonlTail(filePath, options = {}) {
     try {
         handle = await open(filePath, 'r');
         const { size } = await handle.stat();
-        if (size === 0) return { records: [], invalidLines: 0, trailingPartialIgnored: false, trailingRepair };
+        if (size === 0) {
+            return {
+                records: [],
+                invalidLines: 0,
+                trailingPartialIgnored: false,
+                trailingRepair,
+                bytesRead: 0,
+                maxBytes,
+                truncatedByByteLimit: false,
+            };
+        }
 
-        const finalByte = Buffer.alloc(1);
-        await handle.read(finalByte, 0, 1, size - 1);
-        const hasTrailingNewline = finalByte[0] === 0x0a;
         let remaining = size;
         let newlineCount = 0;
         let collectedBytes = 0;
         /** @type {Buffer[]} */
         const chunks = [];
-        while (remaining > 0 && newlineCount <= maxLines) {
-            const readSize = Math.min(blockSize, remaining);
+        while (remaining > 0 && newlineCount <= maxLines && collectedBytes < maxBytes) {
+            const readSize = Math.min(blockSize, remaining, maxBytes - collectedBytes);
             remaining -= readSize;
             const buffer = Buffer.alloc(readSize);
-            await handle.read(buffer, 0, readSize, remaining);
-            chunks.unshift(buffer);
-            collectedBytes += readSize;
-            for (const byte of buffer) {
+            const { bytesRead } = await handle.read(buffer, 0, readSize, remaining);
+            const chunk = bytesRead === readSize ? buffer : buffer.subarray(0, bytesRead);
+            chunks.push(chunk);
+            collectedBytes += bytesRead;
+            for (const byte of chunk) {
                 if (byte === 0x0a) newlineCount += 1;
             }
         }
-        const split = Buffer.concat(chunks, collectedBytes).toString('utf8').split('\n');
-        if (remaining > 0) split.shift();
-        const lines = split.filter((line) => line.trim()).slice(-maxLines);
+        const truncatedByByteLimit = remaining > 0 && collectedBytes >= maxBytes && newlineCount <= maxLines;
+        const newestChunk = chunks[0];
+        const hasTrailingNewline = newestChunk?.[newestChunk.length - 1] === 0x0a;
+        const chronologicalChunks = chunks.reverse();
+        const completeChunks = remaining > 0 ? discardLeadingPartialJsonlLine(chronologicalChunks) : chronologicalChunks;
+        const text = decodeJsonlChunks(completeChunks);
+        const lines = collectJsonlTailLines(text, maxLines);
 
         /** @type {unknown[]} */
         const records = [];
@@ -211,12 +259,90 @@ export async function readJsonlTail(filePath, options = {}) {
                 if (!hasTrailingNewline && index === lines.length - 1) trailingPartialIgnored = true;
             }
         }
-        return { records, invalidLines, trailingPartialIgnored, trailingRepair };
+        return {
+            records,
+            invalidLines,
+            trailingPartialIgnored,
+            trailingRepair,
+            bytesRead: collectedBytes,
+            maxBytes,
+            truncatedByByteLimit,
+        };
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
-        if (code === 'ENOENT') return { records: [], invalidLines: 0, trailingPartialIgnored: false, trailingRepair };
+        if (code === 'ENOENT') {
+            return {
+                records: [],
+                invalidLines: 0,
+                trailingPartialIgnored: false,
+                trailingRepair,
+                bytesRead: 0,
+                maxBytes,
+                truncatedByByteLimit: false,
+            };
+        }
         throw error;
     } finally {
         await handle?.close();
     }
+}
+
+/**
+ * @param {Buffer[]} chunks
+ * @returns {Buffer[]}
+ */
+function discardLeadingPartialJsonlLine(chunks) {
+    for (let index = 0; index < chunks.length; index += 1) {
+        const newlineIndex = chunks[index]?.indexOf(0x0a) ?? -1;
+        if (newlineIndex < 0) continue;
+        const remainder = chunks[index]?.subarray(newlineIndex + 1);
+        return [...(remainder && remainder.byteLength > 0 ? [remainder] : []), ...chunks.slice(index + 1)];
+    }
+    return [];
+}
+
+/**
+ * @param {Buffer[]} chunks
+ * @returns {string}
+ */
+function decodeJsonlChunks(chunks) {
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    /** @type {string[]} */
+    const decoded = [];
+    try {
+        for (const chunk of chunks) {
+            const text = decoder.decode(chunk, { stream: true });
+            if (text) decoded.push(text);
+        }
+        const tail = decoder.decode();
+        if (tail) decoded.push(tail);
+        return decoded.join('');
+    } catch (cause) {
+        throw Object.assign(new Error('JSONL contém bytes inválidos para UTF-8.', { cause }), {
+            code: 'EUTF8JSONL',
+        });
+    }
+}
+
+/**
+ * @param {string} text
+ * @param {number} maxLines
+ * @returns {string[]}
+ */
+function collectJsonlTailLines(text, maxLines) {
+    const ring = new Array(maxLines);
+    let count = 0;
+    let next = 0;
+    let start = 0;
+    for (let index = 0; index <= text.length; index += 1) {
+        if (index < text.length && text.charCodeAt(index) !== 10) continue;
+        const line = text.slice(start, index);
+        start = index + 1;
+        if (!line.trim()) continue;
+        ring[next] = line;
+        next = (next + 1) % maxLines;
+        count = Math.min(maxLines, count + 1);
+    }
+    const first = count === maxLines ? next : 0;
+    return Array.from({ length: count }, (_, index) => /** @type {string} */ (ring[(first + index) % maxLines]));
 }
