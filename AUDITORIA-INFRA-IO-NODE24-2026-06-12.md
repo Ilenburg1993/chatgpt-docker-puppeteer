@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `0134ec27`, seguida da política glob canônica
+**Baseline reinvestigado:** `main` sincronizada até `146f647a`, seguida da onda de higiene de temporários
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -21,17 +21,18 @@ externas metadata-preserving e a contenção L0/L1 é observável sem expor path
 explícitos por risco, remove recursivo exige confirmação exata e a raiz workspace-bound é protegida; L2 possui perfil
 experimental fail-closed e custo observável; mutações que materializam payload grande agora falham cedo quando a
 insuficiência de espaço já é observável; scopes distinguem warming/ready/stale/degraded sem vazar paths; scanner,
-prefetch e busca FTS compartilham uma política glob sem abrir mão da enumeração protegida; o risco dominante migrou
-para hygiene de temporários e decisões de promoção baseadas em workload**.
+prefetch e busca FTS compartilham uma política glob sem abrir mão da enumeração protegida; temporários de publicação
+são irmãos ocultos, exclusivos e usam token de 128 bits; o risco dominante migrou para decisões de promoção baseadas
+em workload e provas de crash externas**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — temp naming legado ainda merece varredura:** primitivas novas usam 96 bits, mas callsites antigos podem
-   manter nomes curtos ou não ocultos.
-2. **P2 — promoção do L2 depende de workload real:** o perfil experimental existe e foi medido, mas cold-start pode
+1. **P2 — promoção do L2 depende de workload real:** o perfil experimental existe e foi medido, mas cold-start pode
    custar mais que filesystem local para payloads pequenos/médios.
-3. **P2 — perfil L2 experimental ainda não roda em CI:** a capacidade existe e foi provada live, mas falta canário
+2. **P2 — perfil L2 experimental ainda não roda em CI:** a capacidade existe e foi provada live, mas falta canário
    recorrente sem promover o default.
+3. **P2 — faltam provas externas destrutivas:** crash real em directory sync/EXDEV, modificação externa durante
+   snapshot/index e interação com editor/Git ainda não estão automatizados.
 4. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
@@ -854,6 +855,30 @@ Prova live em `src/copilot` com `**/*.{js,ts}` e exclude simples `docs`:
 
 Validação focada de glob/scanner/prefetch/search/index: **50 passados, 0 falhas**; typecheck strict e lint: **PASS**.
 
+### 1.32 Status de implementação — temporários canônicos aplicados em 2026-06-14
+
+IO-021 foi fechado após varredura dos geradores reais de temporários e artefatos de recuperação em `src/copilot`:
+
+- `write-atomic`, copy staged e move cross-device agora usam `createSiblingTempPath()` como autoridade única;
+- o formato é `.<basename>.<pid>.<token-128-bit>.<role>.tmp`, no mesmo diretório do destino;
+- o nome da entrada é limitado a 240 bytes, truncando o basename em fronteira UTF-8 para preservar destinos longos;
+- `writeFile(..., flag:'wx')` e `COPYFILE_EXCL` continuam sendo a autoridade contra colisão;
+- o sidecar de rollback já era conforme: `.pending`, `open('wx')`, PID e UUID, com schema especializado para cleanup;
+- backups de restore da quarentena não são temporários descartáveis: são material de recuperação referenciado pelo
+  journal e já usam UUID integral.
+
+A busca completa não encontrou o `randomBytes(4)` citado pelo achado original. Antes desta onda, write/copy/move já
+usavam 96 bits; o débito real era o atomic write não oculto e três convenções artesanais divergentes.
+
+Prova live com falha injetada antes do publish:
+
+- write, copy e move produziram nomes ocultos com exatamente 32 dígitos hexadecimais;
+- write/copy removeram o temporário no caminho de erro;
+- o diretório terminou apenas com `source.txt` e `target.txt`;
+- maior nome observado: 60 bytes.
+
+Validação focada: **65 passados, 0 falhas**; typecheck strict de `src/copilot` e lint dos arquivos tocados: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -864,7 +889,7 @@ Foram lidos completamente todos os arquivos diretamente sob a árvore de infra I
 
 | Área | Arquivos |
 | --- | --- |
-| `fs` | `append.js`, `capacity-preflight.js`, `copy.js`, `index.js`, `line-offset-cache.js`, `locked-mutations.js`, `locked-writes.js`, `mkdir.js`, `move.js`, `portable-atomic.js`, `read-bytes.js`, `read-chunks.js`, `read-lines.js`, `read-services.js`, `read-text.js`, `remove.js`, `rollback-sidecar.js`, `snapshot.js`, `stat.js`, `write-atomic.js` |
+| `fs` | `append.js`, `capacity-preflight.js`, `copy.js`, `index.js`, `line-offset-cache.js`, `locked-mutations.js`, `locked-writes.js`, `mkdir.js`, `move.js`, `portable-atomic.js`, `read-bytes.js`, `read-chunks.js`, `read-lines.js`, `read-services.js`, `read-text.js`, `remove.js`, `rollback-sidecar.js`, `snapshot.js`, `stat.js`, `temp-path.js`, `write-atomic.js` |
 | `invalidation` | `bus.js`, `cache-tiers.js`, `events.js`, `index.js` |
 | `patch` | `index.js`, `text-diff-service.js`, `text-diff.js`, `text-patch.js` |
 | `search` | `grep-adapter.js`, `index-search.js`, `index.js`, `result-paginator.js`, `subprocess.js`, `symbol-search.js`, `text-search.js` |
@@ -1074,27 +1099,27 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 | ID | Prioridade | Área | Achado | Evidência local | Risco | Recomendação |
 | --- | --- | --- | --- | --- | --- | --- |
-| IO-001 | P0 | Escrita atômica | Atomic replace não é crash-durable | `io/fs/write-atomic.js`: `writeFile(tmp)` + `rename(tmp, filePath)` | Crash/power loss pode deixar tmp, conteúdo antigo, entrada de diretório não persistida ou arquivo não durável | Criar `durableAtomicReplace`: open tmp, write, `filehandle.sync()`/`flush`, close, rename, fsync do diretório quando suportado |
+| IO-001 | P0 | Escrita atômica | **Concluído com limite documentado:** replace usa flush e sync do diretório | `write-atomic.js`, `durability.js`, metadata/health | Filesystem pode não suportar directory sync | Promover falha real e manter unsupported explicitamente best-effort |
 | IO-002 | P0 | Locks | **Concluído com limite documentado:** L0 permanece default, L1 multiprocess é opt-in por perfil de risco | `COPILOT_IO_FILE_LOCKS_ENABLED=high-risk|mutations|all`, provas multiprocess e health de locks | Deploy que deixa `off` aceita concorrência apenas intra-processo | Usar `high-risk` em workspaces com múltiplos processos cooperativos |
-| IO-003 | P0 | Prefetch/cache | Prefetch textual não valida UTF-8 | `io-prefetch.js`: `bytesSnapshot.content.toString('utf8')` | Cache L1 pode servir texto inválido sem passar por `bufferIsUtf8` | Usar `decodeUtf8Buffer()` antes de primar text cache; não criar text entry para binário |
-| IO-004 | P0 | Patch | Patch textual pode corromper binário/UTF-8 inválido | `locked-mutations.js`: `fs.readFile(filePath, 'utf8')` | Bytes inválidos viram U+FFFD e podem ser regravados | Ler Buffer, validar `bufferIsUtf8`, só então decode; recusar patch em binário |
-| IO-005 | P0 | Move | Fallback EXDEV não verifica integridade | `io/fs/move.js`: `copyFile` + `unlink` | Cópia parcial ou divergente pode apagar origem | Copy para temp no destino, hash/size pós-cópia, fsync, rename final, só então unlink origem |
+| IO-003 | P0 | Prefetch/cache | **Concluído:** prefetch textual usa validação UTF-8 canônica | `io-prefetch.js`, testes binários | Binário não cria text cache | Manter decode compartilhado com `readText` |
+| IO-004 | P0 | Patch | **Concluído:** patch recusa UTF-8 inválido antes de editar | `locked-mutations.js`, testes de binário sem regravação | Nenhum byte inválido é convertido em U+FFFD | Manter leitura em Buffer e validação prévia |
+| IO-005 | P0 | Move | **Concluído com limite documentado:** EXDEV é staged, verificado e durável | `move.js`, prova EXDEV real e fault injection | Falha após publish pode deixar duplicação reportada | Manter metadata explícita e provas por fase |
 | IO-006 | P0 | Bypass | **Concluído com exceções formais:** writers usam fachadas; cleanup/mkdir têm matriz exata | contratos bloqueiam writers e exigem matriz por arquivo/operação para cleanup/mkdir | Exceções intencionais ainda usam fs direto | Manter matriz estreita e remover entradas quando migrações tornarem calls redundantes |
-| IO-007 | P1 | Snapshot | `readFile` e `stat` em paralelo não formam snapshot consistente | `read-bytes.js`, `read-text.js` | Cache pode associar conteúdo de uma versão a mtime/size de outra | Abrir FileHandle, `stat/read/stat` e retry se fingerprint muda; ou stat antes/depois |
-| IO-008 | P1 | Create/copy | `failIfExists` e `overwrite=false` sofrem TOCTOU externo | `locked-writes.js`, `locked-mutations.js` | Processo externo pode criar destino entre `access` e gravação/cópia | Usar `open('wx')`/`COPYFILE_EXCL` e tratar EEXIST atomicamente |
-| IO-009 | P1 | Append | Append de logs não é durável nem framed | `append.js`, bypasses de audit | Crash pode deixar JSONL truncado/torn line | Criar `appendRecordLocked` com newline framing, `flush`, recovery de linha parcial e rotação sob lock |
+| IO-007 | P1 | Snapshot | **Concluído:** leitura confirma FileHandle/path antes de cachear | `snapshot.js`, `read-bytes.js`, `read-text.js` | Mudança concorrente provoca retry/falha, não cache incoerente | Manter fingerprints ricos e retry bounded |
+| IO-008 | P1 | Create/copy | **Concluído:** create/copy sem overwrite têm exclusividade real | hard link/open `wx`, `COPYFILE_EXCL`, testes concorrentes | Processo externo recebe/gera EEXIST sem overwrite | Manter exclusividade no publish, não em precheck |
+| IO-009 | P1 | Append | **Parcial por desenho:** JSONL é framed/durável; logs fracos são best-effort explícito | `append.js`, `jsonl-file-writer.js`, `jsonl-reader.js` | Logs não críticos ainda podem perder cauda em crash | Manter classificação explícita e recovery físico opt-in |
 | IO-010 | P1 | Rollback | **Concluído:** conteúdo acima do orçamento migra para sidecar durável | `rollback-sidecar.js`, `snapshot.js`, `locked-mutations.js`, token v2 | TTL limita a janela material de restauração por desenho | Monitorar cleanup e tornar TTL configurado visível no health |
-| IO-011 | P1 | Memória | Snapshot de mutação coleta stream inteiro em memória | `snapshot.js`: `Array.fromAsync(stream)` antes de processar | Arquivo grande consome memória desnecessária | Processar `for await` incrementalmente, hash e snapshot budget sem reter todos os chunks |
-| IO-012 | P1 | Cache derivado | Invalidação debounced pode atrasar read-after-write de parser/line-offset | `invalidation/bus.js`: debounce 50ms em produção | Leitura derivada logo após mutação pode ver stale | Após mutação canônica, flush hooks críticos ou oferecer `invalidateSync` para line-offset/parser/index |
-| IO-013 | P1 | Line offsets | Chave de line-offset não é claramente normalizada | `line-offset-cache.js` usa `filePath` recebido | Mesmo arquivo por path relativo/absoluto pode manter caches distintos | Normalizar path com `normalizeIoCacheKey`/`resolve` antes de keyar e invalidar |
+| IO-011 | P1 | Memória | **Concluído:** snapshot de mutação processa stream incrementalmente | `snapshot.js`, sidecar writer | Memória fica bounded pelo orçamento de rollback | Manter hash/sidecar em `for await` |
+| IO-012 | P1 | Cache derivado | **Concluído:** hooks derivados são drenados antes do retorno | `invalidation/cache-tiers.js`, testes read-after-write | Burst pode aumentar latência de mutação | Medir custo, sem reintroduzir janela stale |
+| IO-013 | P1 | Line offsets | **Concluído:** keys e invalidação usam caminho normalizado | `line-offset-cache.js`, testes relativo/absoluto | Aliases equivalentes convergem para a mesma entrada | Manter normalização canônica |
 | IO-014 | P1 | Path policy | **Concluído:** capabilities workspace-bound e trusted estão separadas | `public/workspace-io.js`, `public/trusted-io.js`, contratos de boundaries/callers | Facade operacional baixa continua sem containment por desenho declarado | Manter superfícies externas sob contrato e allowlistar apenas escapes trusted |
 | IO-015 | P1 | Search | **Concluído:** sanitização antecede paginação e contagens | rg/grep/FTS/símbolos retornam `countsPostSanitization:true` | Linhas removidas não afetam total ou cursor | Manter prova de primeira página redigida |
-| IO-016 | P1 | Scanner | `readdir` + `lstat` por entrada é custoso | `io-scanner.js` | Muitos syscalls em árvores grandes | Usar `readdir({ withFileTypes:true })`; avaliar `fsPromises.glob` em Node 24.5 para casos seguros |
+| IO-016 | P1 | Scanner | **Concluído:** classificação básica usa `Dirent` | `io-scanner.js`, benchmark local | DT_UNKNOWN ainda exige fallback | Manter `lstat` apenas para arquivo/fingerprint ou ambiguidade |
 | IO-017 | P1 | Index freshness | **Concluído:** identidade rica + hash periódico bounded | scanner persiste ctime/dev/ino; índice renova hash até limite configurável | Arquivos grandes confiam em metadata rica entre reindexações | Medir hit/miss/custo e ajustar intervalo/limite por perfil |
 | IO-018 | P1 | L2 SQLite | **Concluído com limite documentado:** perfil experimental fail-closed e latência bounded | `IO_L2_CACHE_PROFILE`, health/stats e prova cold/warm multiprocess | Primeiro hit persistido mediu 9–14 ms; promoção global pode regredir workloads locais | Manter `off` default e promover somente por evidência de workload |
-| IO-019 | P1 | Bypass storage | `storage/json-store.js` usa `writeAtomicFileUnlocked` diretamente | `infra/storage/json-store.js` | Sem lock canônico se chamado em concorrência | Trocar por `writeFileAtomicPortable` ou `withIoResourceLock` explícito |
-| IO-020 | P1 | Bypass export | `terminal/commands/export.js` usa `writeFile` direto | Busca de bypass | Export pode sobrescrever sem IO meta/hash | Migrar para `createOrReplaceFileAtomic`/`writeFileAtomic` conforme política |
-| IO-021 | P2 | Temp naming | Temp random é 32-bit | `randomBytes(4)` | Colisão improvável, mas barata de melhorar | Usar 96/128 bits e prefixo dot-hidden `.tmp-<pid>-<random>` |
+| IO-019 | P1 | Bypass storage | **Concluído:** json store usa fachada atômica portátil | `infra/storage/json-store.js` | Escape é trusted e explícito | Manter contrato de callers da fachada |
+| IO-020 | P1 | Bypass export | **Concluído:** export usa fachada atômica portátil | `terminal/commands/export.js` | Paths externos continuam capability trusted | Manter caller explícito e testes de contrato |
+| IO-021 | P2 | Temp naming | **Concluído:** publicação usa nome irmão oculto e token de 128 bits | `temp-path.js`; write/copy/move compartilham o helper | Colisão continua decidida por criação exclusiva | Manter papéis bounded e sidecar especializado sob seu schema |
 | IO-022 | P2 | Remove recursive | **Concluído com limite documentado:** remoção recursiva exige confirmação exata e workspace root é protegido | `remove.js`, `locked-mutations.js`, `workspace-io.js`, `session-fs.js` | Após confirmação a operação continua destrutiva e sem snapshot de árvore | Preferir quarantine nos tools; manter confirmação exata na engine |
 | IO-023 | P2 | Parser reset | **Concluído:** reset de parser é awaitable e testes aguardam isolamento | `io-parser.js`, `test_io_parser.spec.js` | Teardown de workers é explícito para evitar churn por teste | Usar shutdown/reset com teardown em processos one-shot |
 | IO-024 | P2 | Scope readiness | **Concluído:** warming/ready/stale/degraded são distintos e erro é sanitizado | `io-session-scope.js`, `io-health.js`, terminal scope | `awaitReady()` continua não-rejeitante por compatibilidade | Consumidores devem checar `status`/`degraded`, não apenas conclusão da Promise |
@@ -1122,10 +1147,10 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038 |
 | Parcial | IO-009 |
-| Aberto | IO-021, IO-030 |
+| Aberto | IO-030 |
 
 ---
 
@@ -1141,6 +1166,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 - Move `EXDEV` verifica hash/tamanho antes de publicar e remover a origem.
 - Create, copy e move sem overwrite têm exclusividade real.
 - Copy com overwrite é staged e só substitui o destino após verificação e sync.
+- Temporários de publicação são ocultos, irmãos do destino, bounded e usam token de 128 bits.
 - Snapshot baixo confirma inode/fingerprint antes de alimentar cache.
 - Cache é invalidado após mutações canônicas.
 
@@ -1149,7 +1175,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 - Sidecars têm janela de restauração limitada pelo TTL e ainda não entram no health agregado.
 - Remoção recursiva continua destrutiva após confirmação, mas não pode mais ocorrer sem repetir o alvo exato e não
   pode remover a raiz de uma capability workspace-bound.
-- Preflight de espaço livre para copy/write grande ainda não existe.
+- O preflight de espaço é advisory e não reserva blocos; `ENOSPC` durante a operação continua sendo a autoridade final.
 
 **Diagnóstico:** as primitivas canônicas protegem replace, copy, move, snapshot, rollback material e concorrência
 cooperativa/multiprocess opt-in. A camada ainda não é uma transação ACID: rollback é um plano com material temporário,
@@ -1453,6 +1479,14 @@ A situação ideal é uma infra IO em camadas:
 - [x] Tratar negation/comments literalmente em campos include/exclude separados.
 - [x] Comparar live com `fsPromises.glob` e manter enumeração sob policy async.
 
+#### Fase 4.5 — Higiene de temporários
+
+- [x] Inventariar geradores de temporário, sidecars e backups de recuperação.
+- [x] Consolidar write/copy/move em helper irmão no mesmo diretório.
+- [x] Usar prefixo dot-hidden, PID, papel bounded e token de 128 bits.
+- [x] Limitar nomes longos por bytes sem cortar code point UTF-8.
+- [x] Provar cleanup após falha injetada antes do publish.
+
 ### Faixa 5 — Provas
 
 - [ ] Fuzz textual e binário.
@@ -1475,6 +1509,7 @@ A situação ideal é uma infra IO em camadas:
 | Atomic write | Abort durante espera de lock | Nenhum tmp órfão relevante; lock liberado |
 | Atomic write | Crash antes de rename | Destino intacto; tmp detectável/limpável |
 | Atomic write | Crash após rename | Destino íntegro; diretório persistido no modo durable |
+| Temp naming | Destino com basename longo/Unicode | Temp oculto no mesmo diretório, entrada <= 240 bytes e UTF-8 válido |
 | Create | Dois processos criando mesmo arquivo | Um vence; outro recebe EEXIST sem sobrescrever |
 | Copy | `overwrite=false` com corrida externa | Não sobrescreve destino externo |
 | Move | EXDEV com copy parcial | Origem preservada; destino final não publicado |
@@ -1514,11 +1549,14 @@ Foram concluídos stale recovery/release do L1, move exclusivo, copy staged, sna
 
 ### `io/fs/write-atomic.js`
 
-É a primitiva baixa canônica de replace e já possui estratégia de durabilidade. Falta expor o resultado de file flush/directory sync aos callers e decidir quando uma falha best-effort deve virar erro.
+É a primitiva baixa canônica de replace, possui estratégia de durabilidade e retorna o resultado do preflight e do
+directory sync. O temporário é gerado por `temp-path.js`, no mesmo diretório, oculto e com 128 bits; falhas reais de
+sync são promovidas, enquanto ausência explícita de suporte permanece best-effort.
 
 ### `io/fs/locked-writes.js`
 
-Bom encapsulamento. `expectedHash` e create exclusivo estão no lugar certo. Deve aguardar release L1 determinístico, propagar durabilidade e evoluir append para flush/rotação canônicos.
+Bom encapsulamento. `expectedHash`, create exclusivo, release L1 determinístico e propagação de durabilidade estão no
+lugar certo. Append/rotação seguem o writer canônico separado, evitando misturar replace e append na mesma primitiva.
 
 ### `io/fs/locked-mutations.js`
 
@@ -1578,13 +1616,20 @@ Os critérios fundacionais originalmente definidos estão atendidos:
 - [x] semânticas de lock estão documentadas por nível;
 - [x] rollback material de arquivo grande possui hash, TTL e cleanup seguro.
 
-Para declarar maturidade operacional avançada, ainda faltam:
+Critérios operacionais adicionais já atendidos:
 
 - [x] perfil explícito de ativação L1 para mutações P0/P1;
 - [x] p95/histograma, timeout/abort e leases sanitizados;
 - [x] confirmação reforçada intrínseca para remove recursivo e proteção da raiz workspace-bound;
 - [x] preflight opcional de espaço livre em payloads grandes;
 - [x] search incremental com early stop real.
+
+Ainda faltam para maturidade operacional avançada:
+
+- [ ] canário recorrente do perfil L2 `experimental` em CI;
+- [ ] hit ratio e distribuição de payloads do L2 em workload longo;
+- [ ] crash real durante directory sync e fases internas do EXDEV;
+- [ ] modificação externa durante snapshot/index e interação com editor/Git.
 
 ---
 
@@ -1603,6 +1648,6 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Auditar todos os temporários de `src/copilot`, eliminando nomes curtos/não ocultos e padronizando 96/128 bits onde
-ainda houver geração artesanal. Em paralelo, coletar hit ratio/distribuição de payloads do L2 `experimental` em
-workloads longos antes de considerar promoção para `on`.
+Adicionar um canário CI isolado para `IO_L2_CACHE_PROFILE=experimental`, sem alterar o default, e coletar hit ratio,
+latência e distribuição de payloads em workload representativo longo. Depois, executar as provas externas ainda
+abertas de crash durante directory sync/EXDEV e modificação concorrente por editor/Git.
