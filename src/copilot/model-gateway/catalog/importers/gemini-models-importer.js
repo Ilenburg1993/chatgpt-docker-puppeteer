@@ -20,6 +20,7 @@ import {
     normalizeModelIdentityTraits,
     normalizeModelTokenLimits,
 } from '../normalizers.js';
+import { readCatalogResponseJson, readCatalogResponseText } from './response-body.js';
 
 export const GEMINI_MODELS_API_VERSION = 'v1beta';
 export const GEMINI_MODELS_CATALOG_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -104,7 +105,7 @@ function parseGeminiRows(raw) {
  * @returns {Promise<Error>}
  */
 async function geminiHttpError(response, operation) {
-    const text = await response.text().catch(() => '');
+    const text = await readCatalogResponseText(response, { label: `Gemini ${operation} error` }).catch(() => '');
     const record = (() => {
         try {
             const parsed = JSON.parse(text);
@@ -277,7 +278,7 @@ export function createGeminiModelsImporter(options = {}) {
                     headers: { accept: 'application/json' },
                 });
                 if (!response.ok) throw await geminiHttpError(response, 'models.list');
-                const payload = await response.json();
+                const payload = await readCatalogResponseJson(response, { label: 'Gemini models page' });
                 const pageRecord = isRecord(payload) ? payload : {};
                 models.push(...parseGeminiRows(pageRecord));
                 pageToken = stringValue(pageRecord['nextPageToken']);
@@ -303,7 +304,9 @@ export function createGeminiModelsImporter(options = {}) {
                     detailedModels.push(model);
                     continue;
                 }
-                const detail = await response.json();
+                const detail = await readCatalogResponseJson(response, {
+                    label: `Gemini model detail ${resourceName}`,
+                });
                 detailedModels.push(isRecord(detail) ? { ...model, ...detail } : model);
             }
             return detailErrors.length > 0

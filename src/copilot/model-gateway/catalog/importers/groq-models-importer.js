@@ -22,6 +22,7 @@ import {
     normalizeModelModalities,
     normalizeModelTokenLimits,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const GROQ_OPENAI_BASE_URL = 'https://api.groq.com/openai/v1';
 export const GROQ_MODELS_CATALOG_URL = `${GROQ_OPENAI_BASE_URL}/models`;
@@ -173,7 +174,7 @@ export function createGroqModelsImporter(options = {}) {
             const headers = { accept: 'application/json', authorization: `Bearer ${options.apiKey}` };
             const response = await fetchImpl(url, { headers });
             if (!response.ok) throw new Error(`Groq models fetch failed with HTTP ${response.status}`);
-            const payload = await response.json();
+            const payload = await readCatalogResponseJson(response, { label: 'Groq models' });
             const rows = parseGroqRows(payload);
             if (!includeModelDetails) return payload;
             /** @type {Record<string, unknown>[]} */
@@ -192,7 +193,9 @@ export function createGroqModelsImporter(options = {}) {
                     data.push(row);
                     continue;
                 }
-                const detail = await detailResponse.json();
+                const detail = await readCatalogResponseJson(detailResponse, {
+                    label: `Groq model detail ${providerModel}`,
+                });
                 data.push(isRecord(detail) ? { ...row, ...detail } : row);
             }
             return retrieveErrors.length > 0 ? { object: 'list', data, retrieveErrors } : { object: 'list', data };

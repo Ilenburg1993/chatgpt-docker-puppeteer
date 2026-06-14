@@ -23,6 +23,7 @@ import {
     normalizeModelModalities,
     normalizeModelTokenLimits,
 } from '../normalizers.js';
+import { readCatalogResponseJson, readCatalogResponseText } from './response-body.js';
 
 export const CLOUDFLARE_WORKERS_AI_MODELS_CATALOG_URL = 'https://developers.cloudflare.com/ai/models/';
 export const CLOUDFLARE_WORKERS_AI_REST_BASE_URL = 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai';
@@ -339,7 +340,9 @@ export function createCloudflareWorkersAiCatalogImporter(options = {}) {
             const response = await fetchImpl(url, { headers });
             if (!response.ok) throw new Error(`Cloudflare Workers AI catalog fetch failed with HTTP ${response.status}`);
             const contentType = response.headers?.get?.('content-type') ?? '';
-            return contentType.includes('application/json') ? response.json() : response.text();
+            return contentType.includes('application/json')
+                ? readCatalogResponseJson(response, { label: 'Cloudflare Workers AI catalog' })
+                : readCatalogResponseText(response, { label: 'Cloudflare Workers AI catalog' });
         },
         parseRows: parseCloudflareRows,
         toEvidenceFacts(rows, context) {

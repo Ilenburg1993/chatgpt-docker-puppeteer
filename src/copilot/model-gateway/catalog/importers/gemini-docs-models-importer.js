@@ -23,6 +23,7 @@ import {
     normalizeModelTokenLimits,
 } from '../normalizers.js';
 import { htmlText } from './html-docs-parser.js';
+import { readCatalogResponseText } from './response-body.js';
 
 export const GEMINI_MODELS_DOCS_URL = 'https://ai.google.dev/gemini-api/docs/models';
 export const GEMINI_PRICING_DOCS_URL = 'https://ai.google.dev/gemini-api/docs/pricing';
@@ -300,7 +301,7 @@ export function createGeminiDocsModelsImporter(options = {}) {
             const fetchText = async (url) => {
                 const response = await fetchImpl(url, { headers: { accept: 'text/html, text/plain;q=0.9, */*;q=0.1' } });
                 if (!response.ok) throw new Error(`Gemini docs fetch failed for ${url} with HTTP ${response.status}`);
-                return response.text();
+                return readCatalogResponseText(response, { label: `Gemini docs ${url}` });
             };
             const [models, pricing, openai, vertex] = await Promise.all([
                 fetchText(modelsUrl),

@@ -22,6 +22,7 @@ import {
     normalizeModelModalities,
     normalizeModelTokenLimits,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const MISTRAL_MODELS_CATALOG_URL = 'https://api.mistral.ai/v1/models';
 
@@ -187,7 +188,7 @@ export function createMistralModelsImporter(options = {}) {
                 },
             });
             if (!response.ok) throw new Error(`Mistral models fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'Mistral models' });
         },
         parseRows: parseMistralRows,
         toEvidenceFacts(rows, context) {

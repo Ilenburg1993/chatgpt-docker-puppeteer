@@ -21,6 +21,7 @@ import {
     normalizeModelTokenLimits,
     normalizeUsdPricing,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const HUGGINGFACE_ROUTER_BASE_URL = 'https://router.huggingface.co/v1';
 export const HUGGINGFACE_ROUTER_MODELS_URL = `${HUGGINGFACE_ROUTER_BASE_URL}/models`;
@@ -206,7 +207,7 @@ export function createHuggingFaceInferenceProvidersImporter(options = {}) {
                 : { accept: 'application/json' };
             const response = await fetchImpl(url, { headers });
             if (!response.ok) throw new Error(`Hugging Face router models fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'Hugging Face router models' });
         },
         parseRows: parseHuggingFaceRows,
         toEvidenceFacts(rows, context) {

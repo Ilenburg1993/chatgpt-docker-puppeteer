@@ -24,6 +24,7 @@ import {
     normalizeOpenAICompatibleModelCapabilities,
     normalizeUsdPricing,
 } from '../normalizers.js';
+import { readCatalogResponseText } from './response-body.js';
 
 export const ZAI_OPENAI_BASE_URL = 'https://api.z.ai/api/paas/v4';
 export const ZAI_DOCS_PRICING_URL = 'https://docs.z.ai/guides/overview/pricing.md';
@@ -276,7 +277,7 @@ export function createZaiModelsImporter(options = {}) {
                 headers: { accept: 'text/markdown, text/plain;q=0.9, */*;q=0.1' },
             });
             if (!response.ok) throw new Error(`Z.AI pricing docs fetch failed with HTTP ${response.status}`);
-            return response.text();
+            return readCatalogResponseText(response, { label: 'Z.AI pricing docs' });
         },
         parseRows: parseZaiPricingRows,
         toEvidenceFacts(rows, context) {

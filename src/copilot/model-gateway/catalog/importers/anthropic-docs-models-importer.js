@@ -22,6 +22,7 @@ import {
     normalizeModelTokenLimits,
 } from '../normalizers.js';
 import { htmlText } from './html-docs-parser.js';
+import { readCatalogResponseText } from './response-body.js';
 
 export const ANTHROPIC_MODELS_DOCS_URL = 'https://docs.anthropic.com/en/docs/about-claude/models/overview';
 export const ANTHROPIC_PRICING_DOCS_URL = 'https://docs.anthropic.com/en/docs/about-claude/pricing';
@@ -287,7 +288,7 @@ export function createAnthropicDocsModelsImporter(options = {}) {
             const fetchText = async (url) => {
                 const response = await fetchImpl(url, { headers: { accept: 'text/html, text/plain;q=0.9, */*;q=0.1' } });
                 if (!response.ok) throw new Error(`Anthropic docs fetch failed for ${url} with HTTP ${response.status}`);
-                return response.text();
+                return readCatalogResponseText(response, { label: `Anthropic docs ${url}` });
             };
             const [models, pricing, api] = await Promise.all([fetchText(modelsUrl), fetchText(pricingUrl), fetchText(apiDocsUrl)]);
             return { models, pricing, api };

@@ -22,6 +22,7 @@ import {
     normalizeModelTokenLimits,
 } from '../normalizers.js';
 import { htmlText } from './html-docs-parser.js';
+import { readCatalogResponseText } from './response-body.js';
 
 export const MISTRAL_MODELS_DOCS_URL = 'https://docs.mistral.ai/models/overview';
 export const MISTRAL_KNOWN_LIMITATIONS_DOCS_URL = 'https://docs.mistral.ai/resources/known-limitations';
@@ -273,7 +274,7 @@ export function createMistralDocsModelsImporter(options = {}) {
             const fetchText = async (url) => {
                 const response = await fetchImpl(url, { headers: { accept: 'text/html, text/plain;q=0.9, */*;q=0.1' } });
                 if (!response.ok) throw new Error(`Mistral docs fetch failed for ${url} with HTTP ${response.status}`);
-                return response.text();
+                return readCatalogResponseText(response, { label: `Mistral docs ${url}` });
             };
             const [models, limits, api] = await Promise.all([fetchText(modelsUrl), fetchText(limitsUrl), fetchText(apiDocsUrl)]);
             return { models, limits, api };

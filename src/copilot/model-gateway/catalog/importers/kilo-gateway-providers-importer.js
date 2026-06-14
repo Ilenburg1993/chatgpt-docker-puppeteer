@@ -12,6 +12,7 @@ import {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     createProviderMetadataEvidence,
 } from '../contracts.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const KILO_GATEWAY_PROVIDERS_CATALOG_URL = 'https://api.kilo.ai/api/gateway/providers';
 
@@ -111,7 +112,7 @@ export function createKiloGatewayProvidersImporter(options = {}) {
             if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Kilo Gateway providers import');
             const response = await fetchImpl(url, { headers: { accept: 'application/json' } });
             if (!response.ok) throw new Error(`Kilo Gateway providers fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'Kilo Gateway providers' });
         },
         parseRows: parseKiloProviderRows,
         toEvidenceFacts() {

@@ -18,6 +18,7 @@ import {
     createProviderMetadataEvidence,
 } from '../contracts.js';
 import { normalizeAccountOverlayControls } from '../normalizers.js';
+import { readCatalogResponseJson, readCatalogResponseText } from './response-body.js';
 
 export const CLOUDFLARE_API_BASE_URL = 'https://api.cloudflare.com/client/v4';
 export const CLOUDFLARE_WORKERS_AI_MODELS_SEARCH_PATH = '/accounts/{account_id}/ai/models/search';
@@ -251,7 +252,9 @@ async function fetchCloudflareEndpoint(name, url, fetchImpl, apiToken) {
     let body;
     const contentType = response.headers?.get?.('content-type') ?? '';
     try {
-        body = contentType.includes('application/json') || typeof response.json === 'function' ? await response.json() : await response.text();
+        body = contentType.includes('application/json') || (!response.body && typeof response.json === 'function')
+            ? await readCatalogResponseJson(response, { label: `Cloudflare account ${name}` })
+            : await readCatalogResponseText(response, { label: `Cloudflare account ${name}` });
     } catch (error) {
         body = { parseError: error instanceof Error ? error.message : 'unknown response parse error' };
     }

@@ -16,6 +16,7 @@ import {
     createProviderAccountOverlay,
     createProviderMetadataEvidence,
 } from '../contracts.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const OPENROUTER_KEY_URL = 'https://openrouter.ai/api/v1/key';
 
@@ -117,7 +118,7 @@ export function createOpenRouterKeyAccountImporter(options = {}) {
                 },
             });
             if (!response.ok) throw new Error(`OpenRouter key fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'OpenRouter key account' });
         },
         parseRows: parseOpenRouterKeyRows,
         toEvidenceFacts() {

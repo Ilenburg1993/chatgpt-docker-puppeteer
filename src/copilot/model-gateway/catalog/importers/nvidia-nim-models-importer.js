@@ -21,6 +21,7 @@ import {
     normalizeModelLifecycle,
     normalizeModelModalities,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const NVIDIA_NIM_BASE_URL = 'https://integrate.api.nvidia.com/v1';
 export const NVIDIA_NIM_MODELS_CATALOG_URL = `${NVIDIA_NIM_BASE_URL}/models`;
@@ -199,7 +200,7 @@ export function createNvidiaNimModelsImporter(options = {}) {
                 headers: { accept: 'application/json', authorization: `Bearer ${options.apiKey}` },
             });
             if (!response.ok) throw new Error(`NVIDIA NIM models fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'NVIDIA NIM models' });
         },
         parseRows: parseNvidiaRows,
         toEvidenceFacts(rows, context) {

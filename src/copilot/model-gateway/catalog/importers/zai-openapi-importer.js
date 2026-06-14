@@ -13,6 +13,7 @@ import {
     createProviderMetadataEvidence,
 } from '../contracts.js';
 import { ZAI_CHAT_COMPLETIONS_PATH, ZAI_OPENAPI_URL } from './zai-models-importer.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 /**
  * @param {unknown} value
@@ -177,7 +178,7 @@ export function createZaiOpenApiImporter(options = {}) {
             if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Z.AI OpenAPI import');
             const response = await fetchImpl(url, { headers: { accept: 'application/json' } });
             if (!response.ok) throw new Error(`Z.AI OpenAPI fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'Z.AI OpenAPI' });
         },
         parseRows: parseZaiOpenApiRows,
         toEvidenceFacts() {

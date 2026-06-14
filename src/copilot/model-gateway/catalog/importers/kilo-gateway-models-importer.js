@@ -23,6 +23,7 @@ import {
     normalizeOpenAICompatibleModelCapabilities,
     normalizeUsdPricing,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const KILO_GATEWAY_MODELS_CATALOG_URL = 'https://api.kilo.ai/api/gateway/models';
 
@@ -205,7 +206,7 @@ export function createKiloGatewayModelsImporter(options = {}) {
             if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Kilo Gateway catalog import');
             const response = await fetchImpl(url, { headers: { accept: 'application/json' } });
             if (!response.ok) throw new Error(`Kilo Gateway catalog fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'Kilo Gateway models' });
         },
         parseRows: parseKiloRows,
         toEvidenceFacts(rows, context) {

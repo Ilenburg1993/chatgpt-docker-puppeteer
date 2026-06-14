@@ -21,6 +21,7 @@ import {
     normalizeModelTokenLimits,
     normalizeUsdPricing,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const CEREBRAS_PUBLIC_MODELS_CATALOG_URL = 'https://api.cerebras.ai/public/v1/models';
 
@@ -182,7 +183,7 @@ export function createCerebrasPublicModelsImporter(options = {}) {
             if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Cerebras public catalog import');
             const response = await fetchImpl(url, { headers: { accept: 'application/json' } });
             if (!response.ok) throw new Error(`Cerebras public catalog fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'Cerebras public models' });
         },
         parseRows: parseCerebrasRows,
         toEvidenceFacts(rows, context) {

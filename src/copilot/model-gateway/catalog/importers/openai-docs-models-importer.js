@@ -22,6 +22,7 @@ import {
     normalizeOpenAICompatibleModelCapabilities,
 } from '../normalizers.js';
 import { htmlText } from './html-docs-parser.js';
+import { readCatalogResponseText } from './response-body.js';
 
 export const OPENAI_MODELS_DOCS_URL = 'https://developers.openai.com/docs/models';
 export const OPENAI_PRICING_URL = 'https://developers.openai.com/docs/pricing';
@@ -220,7 +221,7 @@ export function createOpenAiDocsModelsImporter(options = {}) {
                     },
                 });
                 if (!response.ok) throw new Error(`OpenAI docs fetch failed for ${url} with HTTP ${response.status}`);
-                return response.text();
+                return readCatalogResponseText(response, { label: `OpenAI docs ${url}` });
             };
             const [models, pricing, compare] = await Promise.all([fetchText(modelsUrl), fetchText(pricingUrl), fetchText(compareUrl)]);
             return { models, pricing, compare };

@@ -23,6 +23,7 @@ import {
 } from '../contracts.js';
 import { normalizeAccountOverlayControls } from '../normalizers.js';
 import { KILO_GATEWAY_MODELS_CATALOG_URL } from './kilo-gateway-models-importer.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 /**
  * @param {unknown} value
@@ -332,7 +333,7 @@ export function createKiloGatewayAccountImporter(options = {}) {
             /** @type {unknown} */
             let body;
             try {
-                body = await response.json();
+                body = await readCatalogResponseJson(response, { label: 'Kilo Gateway account' });
             } catch (error) {
                 body = { parseError: error instanceof Error ? error.message : 'unknown response parse error' };
             }

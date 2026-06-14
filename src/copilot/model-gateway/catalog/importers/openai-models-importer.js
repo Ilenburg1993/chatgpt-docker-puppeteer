@@ -20,6 +20,7 @@ import {
     normalizeModelIdentityTraits,
     normalizeModelLifecycle,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const OPENAI_MODELS_CATALOG_URL = 'https://api.openai.com/v1/models';
 
@@ -170,7 +171,7 @@ export function createOpenAIModelsImporter(options = {}) {
                 },
             });
             if (!response.ok) throw new Error(`OpenAI models fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'OpenAI models' });
         },
         parseRows: parseOpenAiRows,
         toEvidenceFacts(rows, context) {

@@ -21,6 +21,7 @@ import {
     normalizeModelModalities,
     normalizeModelTokenLimits,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const OLLAMA_LOCAL_API_BASE_URL = 'http://localhost:11434/api';
 export const OLLAMA_LOCAL_TAGS_URL = `${OLLAMA_LOCAL_API_BASE_URL}/tags`;
@@ -233,7 +234,7 @@ export function createOllamaCatalogImporter(options = {}) {
             if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Ollama catalog import');
             const tagsResponse = await fetchImpl(tagsUrl, { headers: { accept: 'application/json' } });
             if (!tagsResponse.ok) throw new Error(`Ollama /api/tags fetch failed with HTTP ${tagsResponse.status}`);
-            const tagsPayload = await tagsResponse.json();
+            const tagsPayload = await readCatalogResponseJson(tagsResponse, { label: 'Ollama tags' });
             const tagRows = parseOllamaRows(tagsPayload);
             /** @type {Record<string, unknown>[]} */
             const models = [];
@@ -255,7 +256,9 @@ export function createOllamaCatalogImporter(options = {}) {
                     models.push(tagRow);
                     continue;
                 }
-                const showPayload = await showResponse.json();
+                const showPayload = await readCatalogResponseJson(showResponse, {
+                    label: `Ollama model detail ${providerModel}`,
+                });
                 const showRecord = isRecord(showPayload) ? showPayload : {};
                 models.push({
                     ...tagRow,

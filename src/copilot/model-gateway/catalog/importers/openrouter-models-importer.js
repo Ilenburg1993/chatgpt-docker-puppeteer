@@ -22,6 +22,7 @@ import {
     normalizeOpenAICompatibleModelCapabilities,
     normalizeUsdPricing,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const OPENROUTER_MODELS_CATALOG_URL = 'https://openrouter.ai/api/v1/models';
 
@@ -191,7 +192,7 @@ export function createOpenRouterModelsImporter(options = {}) {
             if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for OpenRouter catalog import');
             const response = await fetchImpl(url, { headers: { accept: 'application/json' } });
             if (!response.ok) throw new Error(`OpenRouter catalog fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'OpenRouter models' });
         },
         parseRows: parseOpenRouterRows,
         toEvidenceFacts(rows, context) {

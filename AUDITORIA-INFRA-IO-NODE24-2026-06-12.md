@@ -1549,6 +1549,31 @@ Estado novo:
 Validação focada de IO-070: **50 passados, 0 falhas** em web tools/introspection; lint focado, `diff --check` e
 `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.62 Status de implementação — importadores de catálogo com resposta bounded em 2026-06-14
+
+IO-071 fechou a fronteira HTTP textual dos **28 importadores** em
+`model-gateway/catalog/importers`. Antes, os importadores misturavam `response.json()` e `response.text()` diretos:
+catálogos públicos, páginas de documentação, paginação autenticada e enriquecimentos por modelo podiam materializar
+um corpo arbitrário e aceitar UTF-8 substitutivo antes do parse.
+
+Estado novo:
+
+- `response-body.js` centraliza leitura textual/JSON com default de **8 MiB** e hard cap de **32 MiB**;
+- `Content-Length` acima do budget falha antes da leitura;
+- streams reais são coletados somente até o limite, cancelados no erro e decodificados pelo helper UTF-8 fatal;
+- paginações e detalhes de Anthropic, Gemini, Groq e Ollama usam o mesmo contrato em cada request;
+- catálogos JSON e superfícies HTML/Markdown de OpenAI, Anthropic, Gemini, Groq, Mistral, Cloudflare, OpenRouter,
+  Kilo, Cerebras, NVIDIA, Hugging Face, Chutes, Z.AI e OpenCode Zen foram migrados;
+- doubles legados de teste que expõem apenas `json()` continuam aceitos somente quando não possuem um
+  `ReadableStream`; respostas `Response` reais nunca usam esse bypass.
+
+O cap é maior que o das tools web porque um catálogo integral pode conter milhares de modelos e precisa ser parseado
+como documento completo. Ainda assim, o teto impede crescimento arbitrário; respostas truncadas não são
+parcialmente promovidas a evidência.
+
+Validação focada de IO-071: **31 passados, 0 falhas** — 3 casos próprios do leitor e 28 contratos de importação;
+lint de todos os importadores, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1839,12 +1864,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-068 | P2 | Babel comments | **Concluído por medição:** `attachComment` permanece ligado | 1.272 arquivos/10,7 MB; mediana 1,109x; 8.591 docs preservados | Benchmark local tem dispersão de JIT/GC e não substitui telemetria | Perfil sem docs somente opt-in, cacheado à parte e com prova end-to-end |
 | IO-069 | P0 | HTTP UTF-8/budgets | **Concluído:** corpos estruturados MCP/OAuth e probes são bounded/fatais | default 2 MiB, request caps 64 KiB, cancelamento e testes de bytes inválidos | Stderr diagnóstico continua best-effort e bounded | Manter payloads estruturados sob decode fatal; não promover stderr a dado confiável |
 | IO-070 | P0 | Web tools | **Concluído:** fetch/search têm caps determinísticos e UTF-8 fatal | 2 MiB default/search, 8 MiB máximo fetch, truncagem code-point-safe | HTML/JSON acima do cap falham em vez de retornar parse parcial | Expor aumento de cap somente de forma explícita e bounded |
+| IO-071 | P0 | Catalog HTTP | **Concluído:** 28 importadores compartilham leitura bounded e UTF-8 fatal | 8 MiB default, 32 MiB hard cap, precheck e 31 testes focados | JSON precisa caber integralmente; doubles sem stream não exercitam budget físico | Manter qualquer importer novo no helper e adicionar prova com `Response` real |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070, IO-071 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2208,6 +2234,13 @@ A situação ideal é uma infra IO em camadas:
 - [x] Recuperar órfãos de crash com host/PID, idade mínima e scan/cache bounded.
 - [x] Definir cleanup age-gated e host-aware para temporários deixados por crash real.
 
+#### Fase 4.6 — Fronteiras HTTP textuais
+
+- [x] Aplicar budgets e UTF-8 fatal a corpos MCP/OAuth estruturados.
+- [x] Tornar fetch/search web bounded e observáveis.
+- [x] Migrar todos os importadores de catálogo para um leitor bounded comum.
+- [ ] Auditar downloads, responses e streams textuais restantes fora de `catalog/importers`.
+
 ### Faixa 5 — Provas
 
 - [x] Fuzz textual e binário bounded, determinístico e reproduzível.
@@ -2241,6 +2274,7 @@ A situação ideal é uma infra IO em camadas:
 | Append | JSONL truncado por crash | Recovery ignora/trunca última linha inválida |
 | Scanner | Symlink para fora do workspace | Não atravessa por padrão; path redigido/bloqueado |
 | Search | Resultado enorme | Early stop sem estourar buffer |
+| Catalog HTTP | Corpo acima do budget ou UTF-8 inválido | Falha antes do parse; nenhuma evidência parcial |
 | Index | Mudança externa após parse | Retry antes da transação; FTS contém somente versão confirmada |
 | Chunk stream | Inode troca após byte-line index | Abort/version mismatch; nunca usar offsets de versão anterior |
 | Lock | Multiprocess lockfile stale | Segundo processo detecta stale só quando seguro |
@@ -2376,6 +2410,7 @@ Maturidade operacional avançada:
 - [x] medir `attachComment` no corpus real e formalizar a decisão funcional;
 - [x] aplicar budgets e UTF-8 fatal a corpos estruturados HTTP/MCP/OAuth;
 - [x] tornar caps de web fetch/search determinísticos e observáveis;
+- [x] aplicar leitura bounded e UTF-8 fatal aos 28 importadores de catálogo;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2396,7 +2431,8 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria das principais tools, importers de catálogo e fronteiras HTTP/streaming remanescentes. Ampliar
-fixtures Babel somente para sintaxe realmente aceita pelo workspace e manter fuzz/chaos como gates recorrentes.
-IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que
-justifique o contrato.
+Continuar a auditoria de downloads, responses e streams textuais fora de `model-gateway/catalog/importers`, priorizando
+qualquer `arrayBuffer()`, `text()`, `json()` ou concatenação de chunks sem budget. Ampliar fixtures Babel somente para
+sintaxe realmente aceita pelo workspace e manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece
+explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que justifique o
+contrato.

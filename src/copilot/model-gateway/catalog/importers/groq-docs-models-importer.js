@@ -18,6 +18,7 @@ import {
     normalizeUsdPricing,
 } from '../normalizers.js';
 import { decodeHtmlEntities, htmlTableCells, htmlTableRows, htmlText } from './html-docs-parser.js';
+import { readCatalogResponseText } from './response-body.js';
 
 export const GROQ_DOCS_MODELS_URL = 'https://console.groq.com/docs/models';
 export const GROQ_PRICING_URL = 'https://groq.com/pricing';
@@ -361,8 +362,8 @@ export function createGroqDocsModelsImporter(options = {}) {
             return {
                 modelsUrl,
                 pricingUrl,
-                modelsHtml: await modelsResponse.text(),
-                pricingHtml: await pricingResponse.text(),
+                modelsHtml: await readCatalogResponseText(modelsResponse, { label: 'Groq models docs' }),
+                pricingHtml: await readCatalogResponseText(pricingResponse, { label: 'Groq pricing docs' }),
             };
         },
         parseRows: parseGroqDocsRows,

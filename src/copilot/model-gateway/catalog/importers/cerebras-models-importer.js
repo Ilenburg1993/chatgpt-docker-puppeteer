@@ -19,6 +19,7 @@ import {
     normalizeModelIdentityTraits,
     normalizeModelLifecycle,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const CEREBRAS_MODELS_CATALOG_URL = 'https://api.cerebras.ai/v1/models';
 export const CEREBRAS_OPENAI_BASE_URL = 'https://api.cerebras.ai/v1';
@@ -116,7 +117,7 @@ export function createCerebrasModelsImporter(options = {}) {
                 },
             });
             if (!response.ok) throw new Error(`Cerebras models fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'Cerebras models' });
         },
         parseRows: parseCerebrasModelsRows,
         toEvidenceFacts(rows, context) {

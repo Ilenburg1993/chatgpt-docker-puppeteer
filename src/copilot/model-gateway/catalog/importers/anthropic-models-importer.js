@@ -20,6 +20,7 @@ import {
     normalizeModelIdentityTraits,
     normalizeModelLifecycle,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const ANTHROPIC_MODELS_CATALOG_URL = 'https://api.anthropic.com/v1/models';
 export const ANTHROPIC_MODELS_API_VERSION = '2023-06-01';
@@ -179,7 +180,9 @@ async function fetchAnthropicModelDetails(fetchImpl, baseUrl, rows, apiVersion, 
             data.push(row);
             continue;
         }
-        const detail = await response.json();
+        const detail = await readCatalogResponseJson(response, {
+            label: `Anthropic model detail ${requestedModel}`,
+        });
         data.push(isRecord(detail) ? { ...row, ...detail, requested_id: requestedModel } : row);
     }
     return { data, detailErrors };
@@ -228,7 +231,7 @@ export function createAnthropicModelsImporter(options = {}) {
                     },
                 });
                 if (!response.ok) throw new Error(`Anthropic models fetch failed with HTTP ${response.status}`);
-                const payload = await response.json();
+                const payload = await readCatalogResponseJson(response, { label: 'Anthropic models page' });
                 const pageRecord = isRecord(payload) ? payload : {};
                 data.push(...parseAnthropicRows(pageRecord));
                 lastPage = pageRecord;

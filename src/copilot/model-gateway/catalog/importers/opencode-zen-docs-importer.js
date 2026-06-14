@@ -20,6 +20,7 @@ import {
     OPENCODE_ZEN_CHAT_COMPLETIONS_URL,
 } from './opencode-zen-models-importer.js';
 import { htmlTables } from './html-docs-parser.js';
+import { readCatalogResponseText } from './response-body.js';
 
 export const OPENCODE_ZEN_DOCS_URL = 'https://opencode.ai/docs/zen/';
 
@@ -260,7 +261,7 @@ export function createOpenCodeZenDocsImporter(options = {}) {
             if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for OpenCode Zen docs import');
             const response = await fetchImpl(url, { headers: { accept: 'text/html' } });
             if (!response.ok) throw new Error(`OpenCode Zen docs fetch failed with HTTP ${response.status}`);
-            return { url, html: await response.text() };
+            return { url, html: await readCatalogResponseText(response, { label: 'OpenCode Zen docs' }) };
         },
         parseRows: parseOpenCodeDocsRaw,
         toEvidenceFacts(rows, context) {

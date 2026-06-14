@@ -25,6 +25,7 @@ import {
     normalizeOpenAICompatibleModelCapabilities,
     normalizeUsdPricing,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const CHUTES_OPENAI_BASE_URL = 'https://llm.chutes.ai/v1';
 export const CHUTES_MODELS_CATALOG_URL = `${CHUTES_OPENAI_BASE_URL}/models`;
@@ -220,7 +221,7 @@ export function createChutesModelsImporter(options = {}) {
                 : { accept: 'application/json' };
             const response = await fetchImpl(url, { headers });
             if (!response.ok) throw new Error(`Chutes models fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'Chutes models' });
         },
         parseRows: parseChutesRows,
         toEvidenceFacts(rows, context) {

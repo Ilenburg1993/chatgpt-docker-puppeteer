@@ -22,6 +22,7 @@ import {
     normalizeModelLifecycle,
     normalizeUsdPricing,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 export const OPENCODE_ZEN_BASE_URL = 'https://opencode.ai/zen/v1';
 export const OPENCODE_ZEN_MODELS_URL = `${OPENCODE_ZEN_BASE_URL}/models`;
@@ -256,7 +257,7 @@ export function createOpenCodeZenModelsImporter(options = {}) {
                 : { accept: 'application/json' };
             const response = await fetchImpl(url, { headers });
             if (!response.ok) throw new Error(`OpenCode Zen models fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: 'OpenCode Zen models' });
         },
         parseRows: parseOpenCodeRows,
         toEvidenceFacts(rows, context) {

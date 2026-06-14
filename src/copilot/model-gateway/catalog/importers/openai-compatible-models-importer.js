@@ -19,6 +19,7 @@ import {
     normalizeModelIdentityTraits,
     normalizeModelLifecycle,
 } from '../normalizers.js';
+import { readCatalogResponseJson } from './response-body.js';
 
 /**
  * @param {unknown} value
@@ -117,7 +118,7 @@ export function createOpenAICompatibleModelsImporter(options = {}) {
                 : { accept: 'application/json' };
             const response = await fetchImpl(url, { headers });
             if (!response.ok) throw new Error(`${providerId} OpenAI-compatible models fetch failed with HTTP ${response.status}`);
-            return response.json();
+            return readCatalogResponseJson(response, { label: `${providerId} OpenAI-compatible models` });
         },
         parseRows: parseOpenAICompatibleRows,
         toEvidenceFacts(rows, context) {
