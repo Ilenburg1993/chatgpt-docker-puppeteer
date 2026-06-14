@@ -13,7 +13,7 @@ if (!fs.existsSync(workflowsDir)) {
 const githubDir = path.resolve('.github');
 const dependabotPath = path.join(githubDir, 'dependabot.yml');
 const requiredGithubDocs = ['AGENTS.md', 'COPILOT_CONFIG.md', 'README.md'];
-const requiredCiScripts = ['validate-workflows.mjs', 'verify-github-workflows.mjs'];
+const requiredCiScripts = ['check-copilot-io-l2.mjs', 'validate-workflows.mjs', 'verify-github-workflows.mjs'];
 const requiredScheduledWorkflowKeys = ['concurrency'];
 const workflowsRequiringConcurrency = new Set([
     'audit-nightly.yml',
@@ -59,6 +59,17 @@ for (const file of files) {
     const fullPath = path.join(workflowsDir, file);
     const raw = fs.readFileSync(fullPath, 'utf8');
     const parsed = yaml.load(raw);
+
+    if (file === 'ci.yml') {
+        const l2CanaryIndex = raw.indexOf('npm run check:copilot:io-l2-canary');
+        const workflowValidationIndex = raw.indexOf('node scripts/ci/validate-workflows.mjs');
+        if (l2CanaryIndex < 0) {
+            throw new Error('[ci] ci.yml must run the Copilot IO L2 experimental canary.');
+        }
+        if (workflowValidationIndex < 0 || l2CanaryIndex > workflowValidationIndex) {
+            throw new Error('[ci] ci.yml must run the L2 canary before global workflow validation.');
+        }
+    }
 
     if (!parsed || typeof parsed !== 'object') {
         throw new Error(`[ci] Invalid YAML object in ${file}`);

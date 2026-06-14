@@ -4,12 +4,13 @@
 workflows GitHub.  
 **Status**: Canônico.  
 **Público**: Engenheiros de CI/CD e mantenedores.  
-**Última atualização**: 2 de março de 2026.
+**Última atualização**: 14 de junho de 2026.
 
 ## Entradas principais
 
 | Arquivo                        | Descrição                                     |
 | ------------------------------ | --------------------------------------------- |
+| `check-copilot-io-l2.mjs`      | Canário L2 experimental isolado e multiprocess |
 | `check-node-version.mjs`       | Garante que Node.js >= 24 está em uso         |
 | `run-ci-suite.mjs`             | Executa a suíte completa de CI localmente     |
 | `validate-workflows.mjs`       | Valida estrutura dos workflows GitHub Actions |

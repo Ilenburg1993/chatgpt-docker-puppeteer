@@ -5,7 +5,7 @@ name: CI
 # Lint (ESLint + Prettier) → lint.yml | Shell lint (ShellCheck + actionlint) → shellcheck.yml
 #
 # Jobs:
-#   validate   — validação do Node runtime e YAMLs dos workflows (bloqueante)
+#   validate   — validação do Node runtime, YAMLs e canário Copilot IO L2 (bloqueante)
 #   audit-lite — auditoria rápida não-bloqueante (artefatos + PR comment)
 
 on:
@@ -74,6 +74,10 @@ jobs:
         id: node_check
         run: node scripts/ci/check-node-version.mjs
 
+      - name: Copilot IO L2 experimental canary
+        id: l2_canary
+        run: npm run check:copilot:io-l2-canary
+
       - name: Validate workflow YAMLs
         id: yaml_check
         run: node scripts/ci/validate-workflows.mjs
@@ -83,9 +87,10 @@ jobs:
         env:
           NODE_OUTCOME: ${{ steps.node_check.outcome }}
           YAML_OUTCOME: ${{ steps.yaml_check.outcome }}
+          L2_OUTCOME: ${{ steps.l2_canary.outcome }}
         run: |
           icon() { if [ "$1" = "success" ]; then echo "✅"; else echo "❌"; fi; }
-          if [ "$NODE_OUTCOME" != "success" ] || [ "$YAML_OUTCOME" != "success" ]; then
+          if [ "$NODE_OUTCOME" != "success" ] || [ "$YAML_OUTCOME" != "success" ] || [ "$L2_OUTCOME" != "success" ]; then
             ALL_OK="failure"
           else
             ALL_OK="success"
@@ -97,6 +102,7 @@ jobs:
             echo "|---|---|"
             echo "| Validate Node runtime | $(icon "$NODE_OUTCOME") $NODE_OUTCOME |"
             echo "| Validate workflow YAMLs | $(icon "$YAML_OUTCOME") $YAML_OUTCOME |"
+            echo "| Copilot IO L2 experimental canary | $(icon "$L2_OUTCOME") $L2_OUTCOME |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: CI Summary
@@ -105,12 +111,14 @@ jobs:
         env:
           NODE_OUTCOME: ${{ steps.node_check.outcome }}
           YAML_OUTCOME: ${{ steps.yaml_check.outcome }}
+          L2_OUTCOME: ${{ steps.l2_canary.outcome }}
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const nodeOk = process.env.NODE_OUTCOME === 'success';
             const yamlOk = process.env.YAML_OUTCOME === 'success';
-            const allOk = nodeOk && yamlOk;
+            const l2Ok = process.env.L2_OUTCOME === 'success';
+            const allOk = nodeOk && yamlOk && l2Ok;
             const icon = (ok) => ok ? '✅' : '❌';
             const marker = '<!-- ci-validate-summary -->';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -122,6 +130,7 @@ jobs:
               '|---|---|',
               `| Validate Node runtime | ${icon(nodeOk)} ${nodeOk ? 'passed' : 'failed'} |`,
               `| Validate workflow YAMLs | ${icon(yamlOk)} ${yamlOk ? 'passed' : 'failed'} |`,
+              `| Copilot IO L2 experimental canary | ${icon(l2Ok)} ${l2Ok ? 'passed' : 'failed'} |`,
               '',
               allOk
                 ? `> ✅ Validação do ambiente passou. [Ver logs](${runUrl}).`

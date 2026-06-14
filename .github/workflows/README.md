@@ -4,13 +4,13 @@
 noturna e publicação de releases.  
 **Status**: Canônico.  
 **Público**: Engenheiros de CI/CD e mantenedores.  
-**Última atualização**: 2 de março de 2026.
+**Última atualização**: 14 de junho de 2026.
 
 ## Entradas principais
 
 | Arquivo                    | Descrição                                             |
 | -------------------------- | ----------------------------------------------------- |
-| `ci.yml`                   | Pipeline principal de CI (lint, testes, typecheck)    |
+| `ci.yml`                   | Validação de runtime/workflows e canário Copilot IO L2 |
 | `code-quality.yml`         | Análise de qualidade de código                        |
 | `coverage.yml`             | Relatório de cobertura de testes                      |
 | `audit-nightly.yml`        | Auditoria profunda noturna                            |

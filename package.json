@@ -299,6 +299,7 @@
     "check:base-strict": "node scripts/ci/check-base-strict.mjs",
     "check:chrome": "node scripts/health/check-chrome.js",
     "check:copilot:boundary": "node scripts/check-copilot-sdk-boundary.mjs",
+    "check:copilot:io-l2-canary": "node scripts/ci/check-copilot-io-l2.mjs",
     "check:copilot:guardrails": "npm run check:copilot:boundary && npm run check:crude && npm run check:copilot:seams",
     "check:copilot:seams": "node scripts/check-copilot-official-seams.mjs",
     "check:crude": "node scripts/check-copilot-crude-calls.mjs",
