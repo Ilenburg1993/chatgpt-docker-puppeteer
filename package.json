@@ -293,6 +293,7 @@
     "audit:security": "env -u NO_COLOR node scripts/audit/runner.mjs --profile quick --audit-mode security --changed-only --focus bug-first --contracts-mode hybrid --enforce-level p0 --proposal-depth deep --chaos-profile off --cloud-fallback off --contract-coverage-report true --progress true --eta true --heartbeat-ms 5000 --refresh-context smart --shadow-gate true",
     "audit:security-checklist": "npm run audit:security",
     "audit-agent:run": "node src/audit_agent/main.js",
+    "analyze:io:l2-soak": "node scripts/analysis/copilot-io-l2-soak.mjs",
     "build": "node scripts/build/build.mjs",
     "build:sea": "node scripts/build/build-sea.mjs",
     "build:sea:prod": "NODE_ENV=production node scripts/build/build-sea.mjs",
