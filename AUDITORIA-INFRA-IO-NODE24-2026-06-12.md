@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `7ea23ce3`, seguida do lifecycle e soak do write-behind L2
+**Baseline reinvestigado:** `main` sincronizada até `dce94c0f`, seguida do recovery bounded de temporários
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -28,11 +28,9 @@ em workload e provas de crash externas**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — cleanup seguro de temporário órfão:** crash real antes do publish EXDEV deixa um `.move.tmp` íntegro e
-   detectável, mas ainda não há owner automático que remova apenas órfãos antigos sem disputar com outro processo.
-2. **P2 — falta prova de modificação externa:** snapshot/index e interação com editor/Git ainda não estão
+1. **P2 — falta prova de modificação externa:** snapshot/index e interação com editor/Git ainda não estão
    automatizados.
-3. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
+2. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
 
 O L2 encerrou sua fase de promoção técnica: workload, batching, crash, contenção e soak passaram. A decisão operacional
 é manter `off` como default heterogêneo e usar `experimental` em runtimes long-lived que comprovadamente reutilizam o
@@ -863,7 +861,7 @@ Validação focada de glob/scanner/prefetch/search/index: **50 passados, 0 falha
 IO-021 foi fechado após varredura dos geradores reais de temporários e artefatos de recuperação em `src/copilot`:
 
 - `write-atomic`, copy staged e move cross-device agora usam `createSiblingTempPath()` como autoridade única;
-- o formato é `.<basename>.<pid>.<token-128-bit>.<role>.tmp`, no mesmo diretório do destino;
+- o formato original desta onda era `.<basename>.<pid>.<token-128-bit>.<role>.tmp`, no mesmo diretório do destino;
 - o nome da entrada é limitado a 240 bytes, truncando o basename em fronteira UTF-8 para preservar destinos longos;
 - `writeFile(..., flag:'wx')` e `COPYFILE_EXCL` continuam sendo a autoridade contra colisão;
 - o sidecar de rollback já era conforme: `.pending`, `open('wx')`, PID e UUID, com schema especializado para cleanup;
@@ -1113,6 +1111,33 @@ mutação.
 
 Validação: crash EXDEV multiprocess e fault injection **18 passados, 0 falhas**; lint focado e typecheck strict de
 `src/copilot`: **PASS**.
+
+### 1.40 Status de implementação — recovery bounded de temporários aplicado em 2026-06-14
+
+IO-049 foi fechado sem introduzir uma varredura global ou remover arquivos de outro processo por nome aproximado:
+
+- novos temporários usam
+  `.<basename>.<host-12hex>.<pid>.<token-128-bit>.<role>.tmp`;
+- parser aceita somente roles `write|copy|move`, host/token hex e PID inteiro;
+- antes da primeira publicação em cada diretório por processo, write/copy/move executam um scan best-effort;
+- host local exige idade mínima de 24 h **e** PID morto;
+- host diferente é preservado por default; limpeza administrativa pode fornecer quarentena explícita, provada com
+  sete dias;
+- nomes legados, symlinks, arquivos jovens e PID vivo são preservados;
+- o scan examina no máximo 10 mil entradas;
+- o cache FIFO de diretórios preparados é limitado a 1.024 e falha de scan permite retry futuro.
+
+Uma prova cria simultaneamente temp local morto, PID atual, host estrangeiro jovem, host estrangeiro abandonado, nome
+legado e arquivo jovem. Apenas os dois candidatos autorizados são removidos. Outra prova mostra que o primeiro write
+do diretório remove um órfão de dois dias e o segundo write não repete a varredura no mesmo processo.
+
+Limite consciente: cleanup é recuperação de lixo reconstruível, não mecanismo de coordenação. Recriação de container
+pode trocar o hostname e deixar o temp preservado até uma limpeza administrativa explícita; shared filesystems
+favorecem falso negativo (preservar) em vez de falso positivo (apagar temp ativo).
+
+Validação focada de temp/write/copy/move/capacidade/engine/multiprocess: **68 passados, 0 falhas**; lint focado e
+typecheck strict de `src/copilot`: **PASS**. `check:crude` continua bloqueado por cinco ocorrências preexistentes fora
+desta onda.
 
 ---
 
@@ -1382,15 +1407,15 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-046 | P1 | Shutdown/DB | **Concluído:** cache drena antes do fechamento SQLite | prioridade `CACHE_PERSISTENCE`, sinais delegam ao shutdown central e prova `SIGTERM` real | `SIGKILL` continua sem cleanup por definição | Manter ordem canônica e prova multiprocess recorrente |
 | IO-047 | P1 | L2 soak | **Concluído:** cap, TTL, reconfiguração, WAL e shutdown passaram em processo longo sintético | duas execuções, 7.200 sets cada, zero batch failure e integridade `ok` | Soak sintético não substitui telemetria de deployment | Ativar `experimental` apenas onde reuse real justificar |
 | IO-048 | P1 | Move EXDEV | **Concluído:** criação do temp cross-device agora é exclusiva | `COPYFILE_EXCL` e colisão determinística preservando sentinel | Token forte reduz corrida, exclusividade decide | Manter mesma regra de copy staged |
-| IO-049 | P2 | Temp recovery | **Parcial:** crash pré-publish deixa um temp íntegro e detectável | prova `SIGKILL` real em `temp-written` | Não há cleanup genérico seguro para PID reutilizado/shared FS | Projetar scan explícito, age-gated e host-aware |
+| IO-049 | P2 | Temp recovery | **Concluído com limite documentado:** cleanup é age-gated, host-aware e bounded | 24 h/PID morto local; host estrangeiro opt-in; scan 10 mil e cache 1.024 dirs | Recriação de container pode exigir limpeza administrativa | Manter schema estrito e nunca limpar por glob aproximado |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
 | Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048 |
-| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038 |
-| Parcial | IO-009, IO-049 |
+| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049 |
+| Parcial | IO-009 |
 | Aberto | IO-030 |
 
 ---
@@ -1734,6 +1759,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Usar prefixo dot-hidden, PID, papel bounded e token de 128 bits.
 - [x] Limitar nomes longos por bytes sem cortar code point UTF-8.
 - [x] Provar cleanup após falha injetada antes do publish.
+- [x] Recuperar órfãos de crash com host/PID, idade mínima e scan/cache bounded.
 - [ ] Definir cleanup age-gated e host-aware para temporários deixados por crash real.
 
 ### Faixa 5 — Provas
@@ -1880,7 +1906,6 @@ Critérios operacionais adicionais já atendidos:
 
 Ainda faltam para maturidade operacional avançada:
 
-- [ ] cleanup seguro dos temporários canônicos deixados por crash pré-publish;
 - [ ] modificação externa durante snapshot/index e interação com editor/Git.
 
 ---
@@ -1900,6 +1925,6 @@ Ainda faltam para maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Projetar cleanup explícito dos temporários canônicos deixados por crash, com schema estrito, idade mínima, identidade
-de host/processo e limite por execução; não varrer/remover em toda mutação. Em seguida, automatizar modificação
-concorrente por editor/Git durante snapshot e index para confirmar retry/stale sem popular cache incoerente.
+Automatizar modificação concorrente por editor/Git durante snapshot e index para confirmar retry/stale sem popular
+cache incoerente. A prova deve cobrir replace por rename, edição same-size/same-mtime e checkout que troca inode,
+comparando snapshot, L1 e índice persistido.
