@@ -16,6 +16,7 @@ import {
     syncParentDirectoryBestEffort,
 } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
+import { preflightIoCapacity } from './capacity-preflight.js';
 
 /**
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} content
@@ -52,12 +53,14 @@ export function normalizeWritePayload(filePath, content, encoding) {
  *     durability?: import('./durability.js').IoDurabilityMode;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
+ *     capacityPreflight?: typeof preflightIoCapacity;
  * }} [options]
  * @returns {Promise<{
  *     durability: import('./durability.js').IoDurabilityMode;
  *     tempPath: string | null;
  *     fileFlushRequested: boolean;
  *     directorySync: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
+ *     capacityPreflight: Awaited<ReturnType<typeof preflightIoCapacity>>;
  * }>}
  */
 export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
@@ -65,6 +68,7 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
     const writePayload = toOwnedBuffer(payload);
     const durability = normalizeIoDurability(options.durability);
     const fileFlushRequested = shouldFlushFile(durability);
+    const capacityPreflight = await (options.capacityPreflight ?? preflightIoCapacity)(filePath, writePayload.byteLength);
     /** @type {Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null} */
     let directorySync = null;
     let tmpCreated = false;
@@ -80,7 +84,7 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
                 },
             );
             if (shouldSyncDirectory(durability)) directorySync = await syncWriteDirectory(options, filePath);
-            return { durability, tempPath: null, fileFlushRequested, directorySync };
+            return { durability, tempPath: null, fileFlushRequested, directorySync, capacityPreflight };
         }
 
         await fs.writeFile(tmpPath, writePayload, {
@@ -98,7 +102,7 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
             await fs.unlink(tmpPath);
             tmpCreated = false;
             if (shouldSyncDirectory(durability)) directorySync = await syncWriteDirectory(options, filePath);
-            return { durability, tempPath: tmpPath, fileFlushRequested, directorySync };
+            return { durability, tempPath: tmpPath, fileFlushRequested, directorySync, capacityPreflight };
         }
 
         await emitMutationPhase(options, 'before-publish', { filePath, tmpPath, exclusive: false });
@@ -106,7 +110,7 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
         tmpCreated = false;
         await emitMutationPhase(options, 'after-publish', { filePath, tmpPath, exclusive: false });
         if (shouldSyncDirectory(durability)) directorySync = await syncWriteDirectory(options, filePath);
-        return { durability, tempPath: tmpPath, fileFlushRequested, directorySync };
+        return { durability, tempPath: tmpPath, fileFlushRequested, directorySync, capacityPreflight };
     } catch (error) {
         if (tmpCreated) {
             try {

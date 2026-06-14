@@ -371,6 +371,7 @@ export async function copyFileLocked(source, destination, options = {}) {
                         staged: copyResult.staged,
                         fileSync: copyResult.fileSync,
                         destinationDirectorySync: copyResult.destinationDirectorySync,
+                        capacityPreflight: copyResult.capacityPreflight,
                         destinationPreviousHash: destinationSnapshot?.contentHash ?? null,
                         destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
                         destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
@@ -402,6 +403,7 @@ export async function copyFileLocked(source, destination, options = {}) {
                     staged: value.staged,
                     fileSync: value.fileSync,
                     destinationDirectorySync: value.destinationDirectorySync,
+                    capacityPreflight: value.capacityPreflight,
                     overwrite: Boolean(options.overwrite),
                     destinationPreviousHash: value.destinationPreviousHash,
                     destinationRollbackSidecar: value.destinationPreviousRollbackSidecar
@@ -425,6 +427,7 @@ export async function copyFileLocked(source, destination, options = {}) {
             staged: value.staged,
             fileSync: value.fileSync,
             destinationDirectorySync: value.destinationDirectorySync,
+            capacityPreflight: value.capacityPreflight,
             destinationPreviousHash: value.destinationPreviousHash,
             destinationPreviousBytes: value.destinationPreviousBytes,
             destinationPreviousSnapshotBase64: value.destinationPreviousSnapshotBase64,
@@ -504,6 +507,7 @@ export async function moveFileLocked(source, destination, options = {}) {
                         fileSync: moveResult.fileSync,
                         destinationDirectorySync: moveResult.destinationDirectorySync,
                         sourceDirectorySync: moveResult.sourceDirectorySync,
+                        capacityPreflight: moveResult.capacityPreflight,
                         destinationPreviousHash: destinationSnapshot?.contentHash ?? null,
                         destinationPreviousBytes: destinationSnapshot?.bytesRead ?? null,
                         destinationPreviousSnapshotBase64: destinationSnapshot?.snapshotBase64 ?? null,
@@ -548,6 +552,7 @@ export async function moveFileLocked(source, destination, options = {}) {
                     fileSync: value.fileSync,
                     destinationDirectorySync: value.destinationDirectorySync,
                     sourceDirectorySync: value.sourceDirectorySync,
+                    capacityPreflight: value.capacityPreflight,
                 },
             }),
             true,
@@ -570,6 +575,7 @@ export async function moveFileLocked(source, destination, options = {}) {
             fileSync: value.fileSync,
             destinationDirectorySync: value.destinationDirectorySync,
             sourceDirectorySync: value.sourceDirectorySync,
+            capacityPreflight: value.capacityPreflight,
             lockWaitMs: waitMs,
             io,
         };
@@ -647,9 +653,7 @@ export async function patchTextLocked(filePath, options) {
                               maxBytes: options.maxDiffBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES,
                           })
                         : { text: '', truncated: false, lines: 0, bytes: 0 };
-                    if (!options.dryRun) {
-                        await writeAtomicFileUnlocked(filePath, updated);
-                    }
+                    const durability = options.dryRun ? null : await writeAtomicFileUnlocked(filePath, updated);
                     return {
                         occurrences: patch.occurrences,
                         replacedOccurrences,
@@ -676,6 +680,7 @@ export async function patchTextLocked(filePath, options) {
                         previousSnapshotBase64: previousSnapshot.snapshotBase64,
                         previousSnapshotTruncated: previousSnapshot.snapshotTruncated,
                         previousRollbackSidecar: previousSnapshot.rollbackSidecar,
+                        capacityPreflight: durability?.capacityPreflight ?? null,
                     };
                 });
             } finally {
@@ -707,6 +712,7 @@ export async function patchTextLocked(filePath, options) {
                     replacedOccurrences: value.replacedOccurrences,
                     projectedBytes: value.projectedBytes,
                     byteDelta: value.byteDelta,
+                    capacityPreflight: value.capacityPreflight,
                     rollbackSidecar: value.previousRollbackSidecar
                         ? {
                               available: true,

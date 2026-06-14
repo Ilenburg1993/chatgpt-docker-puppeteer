@@ -192,6 +192,7 @@ describe('infra/io-engine', () => {
                     durability: 'file-and-directory',
                     fileFlushRequested: true,
                     directorySync: expect.objectContaining({ attempted: true, ok: true }),
+                    capacityPreflight: expect.objectContaining({ checked: false, reason: 'below-threshold' }),
                 }),
                 io: expect.any(Object),
             }),
@@ -417,6 +418,7 @@ describe('infra/io-engine', () => {
         expect(result.destinationDirectorySync).toMatchObject({ attempted: true, ok: true });
         expect(result.io.advisoryLimits?.fileSync).toEqual(result.fileSync);
         expect(result.io.advisoryLimits?.destinationDirectorySync).toEqual(result.destinationDirectorySync);
+        expect(result.io.advisoryLimits?.capacityPreflight).toEqual(result.capacityPreflight);
         await expect(readFile(destination, 'utf8')).resolves.toBe('source-content');
     });
 
@@ -648,6 +650,7 @@ describe('infra/io-engine', () => {
         expect(result.fileSync).toBeNull();
         expect(result.destinationDirectorySync).toMatchObject({ attempted: true, ok: true });
         expect(result.sourceDirectorySync).toBeNull();
+        expect(result.capacityPreflight).toBeNull();
         expect(result.io.advisoryLimits?.destinationDirectorySync).toEqual(result.destinationDirectorySync);
         await expect(readFile(destination, 'utf8')).resolves.toBe('incoming');
         await expect(readFile(source, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });

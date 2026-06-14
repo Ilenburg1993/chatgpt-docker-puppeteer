@@ -11,6 +11,7 @@ import path from 'node:path';
 import { sha256 } from '../../shared/hash.js';
 import { assertSuccessfulSync, syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
+import { preflightIoCapacity } from './capacity-preflight.js';
 
 /**
  * @param {string} filePath
@@ -31,6 +32,7 @@ async function readFileIntegrity(filePath) {
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     syncFile?: typeof syncFileBestEffort;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
+ *     capacityPreflight?: typeof preflightIoCapacity;
  * }} [options]
  * @returns {Promise<{
  *     crossDevice: boolean;
@@ -41,6 +43,7 @@ async function readFileIntegrity(filePath) {
  *     fileSync: Awaited<ReturnType<typeof syncFileBestEffort>> | null;
  *     destinationDirectorySync: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
  *     sourceDirectorySync: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
+ *     capacityPreflight: Awaited<ReturnType<typeof preflightIoCapacity>> | null;
  * }>}
  */
 export async function moveFileUnlocked(source, destination, options = {}) {
@@ -82,6 +85,7 @@ export async function moveFileUnlocked(source, destination, options = {}) {
                 fileSync: null,
                 destinationDirectorySync,
                 sourceDirectorySync,
+                capacityPreflight: null,
             };
         } catch (error) {
             const errCode = /** @type {{ code?: unknown }} */ (error)?.code;
@@ -116,6 +120,7 @@ export async function moveFileUnlocked(source, destination, options = {}) {
             fileSync: null,
             destinationDirectorySync,
             sourceDirectorySync,
+            capacityPreflight: null,
         };
     } catch (error) {
         const errCode = /** @type {{ code?: unknown }} */ (error)?.code;
@@ -134,6 +139,7 @@ export async function moveFileUnlocked(source, destination, options = {}) {
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     syncFile?: typeof syncFileBestEffort;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
+ *     capacityPreflight?: typeof preflightIoCapacity;
  * }} options
  * @returns {ReturnType<typeof moveFileUnlocked>}
  */
@@ -149,6 +155,10 @@ async function moveFileAcrossDevices(source, destination, options) {
             options.expectedSourceHash && typeof options.expectedSourceBytes === 'number'
                 ? { contentHash: options.expectedSourceHash, bytes: options.expectedSourceBytes }
                 : await readFileIntegrity(source);
+        const capacityPreflight = await (options.capacityPreflight ?? preflightIoCapacity)(
+            destination,
+            sourceBefore.bytes,
+        );
         await copyFile(source, tmpDestination);
         tmpCreated = true;
         await emitMutationPhase(options, 'temp-written', { source, destination, tmpDestination, crossDevice: true });
@@ -192,6 +202,7 @@ async function moveFileAcrossDevices(source, destination, options) {
             return duplicatedMoveResult(options, syncError, true, tempAfter, {
                 fileSync: syncResult,
                 destinationDirectorySync: syncResultFromError(syncError),
+                capacityPreflight,
             });
         }
         try {
@@ -201,6 +212,7 @@ async function moveFileAcrossDevices(source, destination, options) {
             return duplicatedMoveResult(options, unlinkError, true, tempAfter, {
                 fileSync: syncResult,
                 destinationDirectorySync,
+                capacityPreflight,
             });
         }
         await emitMutationPhase(options, 'after-source-unlink', { source, destination, crossDevice: true });
@@ -218,6 +230,7 @@ async function moveFileAcrossDevices(source, destination, options) {
             fileSync: syncResult,
             destinationDirectorySync,
             sourceDirectorySync,
+            capacityPreflight,
         };
     } catch (error) {
         if (tmpCreated) {
@@ -253,6 +266,7 @@ async function syncMoveDirectory(options, target, role, details) {
  *     fileSync?: Awaited<ReturnType<typeof syncFileBestEffort>> | null;
  *     destinationDirectorySync?: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
  *     sourceDirectorySync?: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
+ *     capacityPreflight?: Awaited<ReturnType<typeof preflightIoCapacity>> | null;
  * }} [syncs]
  */
 function duplicatedMoveResult(options, error, crossDevice, integrity, syncs = {}) {
@@ -265,6 +279,7 @@ function duplicatedMoveResult(options, error, crossDevice, integrity, syncs = {}
         fileSync: syncs.fileSync ?? null,
         destinationDirectorySync: syncs.destinationDirectorySync ?? null,
         sourceDirectorySync: syncs.sourceDirectorySync ?? null,
+        capacityPreflight: syncs.capacityPreflight ?? null,
     };
 }
 

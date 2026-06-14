@@ -6,6 +6,7 @@
  */
 
 export { appendFileUnlocked } from './append.js';
+export { getIoCapacityPreflightConfiguration, preflightIoCapacity } from './capacity-preflight.js';
 export { copyFileUnlocked } from './copy.js';
 export {
     copyFileLocked,

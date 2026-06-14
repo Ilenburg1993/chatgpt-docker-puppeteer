@@ -7,11 +7,12 @@
 
 import { randomBytes } from 'node:crypto';
 import * as nodeFs from 'node:fs';
-import { copyFile, link, rename, unlink } from 'node:fs/promises';
+import { copyFile, link, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { assertSuccessfulSync, syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
 import { readBinaryMutationSnapshot } from './snapshot.js';
+import { preflightIoCapacity } from './capacity-preflight.js';
 
 /**
  * @param {string} source
@@ -23,6 +24,7 @@ import { readBinaryMutationSnapshot } from './snapshot.js';
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     syncFile?: typeof syncFileBestEffort;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
+ *     capacityPreflight?: typeof preflightIoCapacity;
  * }} [options]
  * @returns {Promise<{
  *     destinationHash: string;
@@ -30,6 +32,7 @@ import { readBinaryMutationSnapshot } from './snapshot.js';
  *     staged: true;
  *     fileSync: Awaited<ReturnType<typeof syncFileBestEffort>>;
  *     destinationDirectorySync: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>>;
+ *     capacityPreflight: Awaited<ReturnType<typeof preflightIoCapacity>>;
  * }>}
  */
 export async function copyFileUnlocked(source, destination, options = {}) {
@@ -38,6 +41,8 @@ export async function copyFileUnlocked(source, destination, options = {}) {
         `.${path.basename(destination)}.${randomBytes(12).toString('hex')}.copy-tmp`,
     );
     let tmpCreated = false;
+    const sourceBytes = (await stat(source)).size;
+    const capacityPreflight = await (options.capacityPreflight ?? preflightIoCapacity)(destination, sourceBytes);
     try {
         await copyFile(source, tmpDestination, nodeFs.constants.COPYFILE_EXCL);
         tmpCreated = true;
@@ -91,6 +96,7 @@ export async function copyFileUnlocked(source, destination, options = {}) {
             staged: true,
             fileSync: syncResult,
             destinationDirectorySync: directorySync,
+            capacityPreflight,
         };
     } catch (error) {
         if (tmpCreated) await unlink(tmpDestination).catch(() => undefined);

@@ -260,6 +260,20 @@ ocupação e latência bounded de get/set/invalidate/prune/clear.
 Comece por `experimental`, compare cold/warm e só promova para `on` quando hit ratio e custo SQLite
 justificarem o footprint persistente.
 
+### Preflight de capacidade IO Copilot
+
+`IO_CAPACITY_PREFLIGHT_MIN_BYTES` define a partir de qual payload atomic write, copy staged e move
+`EXDEV` consultam `statfs` no diretório de destino. O default é 64 MiB; use `0` para desabilitar.
+`IO_CAPACITY_PREFLIGHT_RESERVE_BYTES` exige headroom adicional, também 64 MiB por default.
+
+Quando o filesystem já reporta espaço insuficiente, a operação falha cedo com `ENOSPC`, antes de criar o
+temporário ou substituir o destino. Se `statfs` estiver indisponível, a checagem falha aberta e a mutação segue para
+preservar portabilidade. O relatório aparece em metadata de IO.
+
+O preflight é advisory: ele não reserva blocos e outra operação ainda pode consumir espaço entre a checagem e a
+escrita. Move same-device não materializa o payload e portanto não executa essa checagem; apenas o fallback
+cross-device precisa dela.
+
 ### Parser Workers Copilot
 
 `IO_PARSER_WORKER_QUEUE_MAX` é um knob especializado para backpressure dos parser workers de
