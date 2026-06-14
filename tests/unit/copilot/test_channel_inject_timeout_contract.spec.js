@@ -100,4 +100,27 @@ describe('channel/inject.js — timeout contract', () => {
             },
         );
     });
+
+    it('rejeita Content-Length acima do hard cap antes de materializar a resposta', async () => {
+        const server = createServer((req, res) => {
+            req.resume();
+            req.on('end', () => {
+                res.writeHead(200, {
+                    'Content-Type': 'application/json',
+                    'Content-Length': String(32 * 1024 * 1024 + 1),
+                });
+                res.end('{}');
+            });
+        });
+        const port = await listen(server);
+
+        await assert.rejects(
+            () => injectToLlmB('oversized', { port, retries: 0, timeoutMs: 15_000 }),
+            (error) => {
+                assert.ok(error instanceof BridgeError);
+                assert.equal(error.code, 'LLM_B_RESPONSE_TOO_LARGE');
+                return true;
+            },
+        );
+    });
 });

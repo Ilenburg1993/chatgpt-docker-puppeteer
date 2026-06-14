@@ -12,6 +12,7 @@
 import { getShellOutputPolicy } from '#copilot/config';
 import { toExecError } from '#copilot/core';
 import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
+import { createBoundedProcessOutputCapture } from '#copilot/infra/public/process-output';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { safeEnv } from './sandbox.js';
@@ -129,26 +130,6 @@ export function splitPipelineSegments(command) {
 }
 
 /**
- * Acumula dados de stream com limite em bytes.
- *
- * @param {string} current
- * @param {Buffer | string} chunk
- * @param {number} maxBytes
- * @returns {string}
- */
-function appendCaptured(current, chunk, maxBytes) {
-    if (current.length >= maxBytes) {
-        return current;
-    }
-    const text = String(chunk);
-    const next = current + text;
-    if (next.length <= maxBytes) {
-        return next;
-    }
-    return next.slice(0, maxBytes);
-}
-
-/**
  * Preserva output integral. O nome é mantido por compatibilidade com chamadas existentes.
  *
  * @param {string} text
@@ -255,13 +236,13 @@ export async function runPipeline(stages, { cwd, timeoutMs }) {
             return;
         }
 
-        let stdout = '';
-        let stderr = '';
+        const stdout = createBoundedProcessOutputCapture({ maxBytes: CAPTURE_MAX_BYTES });
+        const stderr = createBoundedProcessOutputCapture({ maxBytes: CAPTURE_MAX_BYTES });
         lastProc.stdout?.on('data', (d) => {
-            stdout = appendCaptured(stdout, d, CAPTURE_MAX_BYTES);
+            stdout.append(d);
         });
         lastProc.stderr?.on('data', (d) => {
-            stderr = appendCaptured(stderr, d, CAPTURE_MAX_BYTES);
+            stderr.append(d);
         });
 
         for (const proc of procs) {
@@ -269,8 +250,10 @@ export async function runPipeline(stages, { cwd, timeoutMs }) {
                 stopAll('SIGTERM');
                 finalize({
                     exitCode: 1,
-                    stdout: truncateOutput(stdout),
-                    stderr: truncateOutput(`${stderr}\n${error.message}`.trim()),
+                    stdout: truncateOutput(stdout.toString({ includeTruncationMarker: true })),
+                    stderr: truncateOutput(
+                        `${stderr.toString({ includeTruncationMarker: true })}\n${error.message}`.trim(),
+                    ),
                     durationMs: Date.now() - start,
                 });
             });
@@ -285,8 +268,10 @@ export async function runPipeline(stages, { cwd, timeoutMs }) {
                       }, 750).unref();
                       finalize({
                           exitCode: 124,
-                          stdout: truncateOutput(stdout),
-                          stderr: truncateOutput(`${stderr}\nTimeout`.trim()),
+                          stdout: truncateOutput(stdout.toString({ includeTruncationMarker: true })),
+                          stderr: truncateOutput(
+                              `${stderr.toString({ includeTruncationMarker: true })}\nTimeout`.trim(),
+                          ),
                           durationMs: Date.now() - start,
                       });
                   }, timeoutMs)
@@ -296,8 +281,8 @@ export async function runPipeline(stages, { cwd, timeoutMs }) {
             if (timer) clearTimeout(timer);
             finalize({
                 exitCode: code ?? 1,
-                stdout: truncateOutput(stdout),
-                stderr: truncateOutput(stderr),
+                stdout: truncateOutput(stdout.toString({ includeTruncationMarker: true })),
+                stderr: truncateOutput(stderr.toString({ includeTruncationMarker: true })),
                 durationMs: Date.now() - start,
             });
         });

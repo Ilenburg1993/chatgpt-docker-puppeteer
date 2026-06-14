@@ -22,6 +22,7 @@ import {
     toError,
 } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { createBoundedProcessOutputCapture } from '#copilot/infra/public/process-output';
 import { log, recordToolCall } from '#copilot/observability';
 import http from 'node:http';
 import { HealthResponseSchema } from '../core/schemas.js';
@@ -40,6 +41,7 @@ const DEFAULT_PORT = (() => {
 /** Timeout padrão para aguardar resposta (ms). */
 const DEFAULT_TIMEOUT_MS = LLM_B_TURN_TIMEOUT_MS;
 const INJECT_LATENCY_HISTORY_SIZE = 120;
+const LLM_B_HTTP_RESPONSE_MAX_BYTES = 32 * 1024 * 1024;
 
 /** @type {number[]} */
 const _injectLatencyHistory = [];
@@ -190,11 +192,44 @@ function httpRequest(method, path, body, port, timeoutMs) {
                 headers,
             },
             (res) => {
-                let data = '';
-                res.on('data', (/** @type {Buffer} */ chunk) => {
-                    data += chunk.toString('utf8');
+                const capture = createBoundedProcessOutputCapture({
+                    maxBytes: LLM_B_HTTP_RESPONSE_MAX_BYTES,
                 });
-                res.on('end', () => resolve({ statusCode: res.statusCode ?? 0, body: data }));
+                const contentLength = Number(res.headers['content-length'] ?? 0);
+                if (Number.isFinite(contentLength) && contentLength > LLM_B_HTTP_RESPONSE_MAX_BYTES) {
+                    req.destroy(
+                        new BridgeError(
+                            `Resposta da LLM-B excede ${LLM_B_HTTP_RESPONSE_MAX_BYTES} bytes`,
+                            'LLM_B_RESPONSE_TOO_LARGE',
+                        ),
+                    );
+                    return;
+                }
+                res.on('data', (/** @type {Buffer} */ chunk) => {
+                    if (capture.append(chunk).truncated) {
+                        req.destroy(
+                            new BridgeError(
+                                `Resposta da LLM-B excede ${LLM_B_HTTP_RESPONSE_MAX_BYTES} bytes`,
+                                'LLM_B_RESPONSE_TOO_LARGE',
+                            ),
+                        );
+                    }
+                });
+                res.on('end', () => {
+                    try {
+                        resolve({
+                            statusCode: res.statusCode ?? 0,
+                            body: capture.toString({ fatal: true, label: 'LLM-B response' }),
+                        });
+                    } catch {
+                        reject(
+                            new BridgeError(
+                                'Resposta da LLM-B contém UTF-8 inválido',
+                                'LLM_B_INVALID_RESPONSE',
+                            ),
+                        );
+                    }
+                });
             },
         );
 

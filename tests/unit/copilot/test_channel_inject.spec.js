@@ -32,12 +32,12 @@ describe('copilot/channel/inject.js — structural', () => {
 
     // ─── Security ───────────────────────────────────────────────────────────────
 
-    it('não deve impor limite bloqueante de tamanho na resposta HTTP da LLM-B', () => {
-        assert.ok(!SRC.includes('MAX_RESPONSE_BYTES'));
+    it('deve impor hard cap alto e explícito na resposta HTTP da LLM-B', () => {
+        assert.ok(SRC.includes('LLM_B_HTTP_RESPONSE_MAX_BYTES'));
     });
 
-    it('não deve emitir erro bloqueante para resposta grande da LLM-B', () => {
-        assert.ok(!SRC.includes('LLM_B_RESPONSE_TOO_LARGE'));
+    it('deve emitir erro específico para resposta grande da LLM-B', () => {
+        assert.ok(SRC.includes('LLM_B_RESPONSE_TOO_LARGE'));
     });
 
     it('deve ter timeout no request HTTP', () => {
@@ -184,6 +184,11 @@ describe('copilot/channel/inject.js — structural', () => {
 
     it('SSE deve aceitar text/event-stream', () => {
         assert.ok(SSE_SRC.includes('text/event-stream'));
+    });
+
+    it('SSE deve limitar somente o frame pendente e usar UTF-8 incremental fatal', () => {
+        assert.ok(SSE_SRC.includes('MAX_SSE_PENDING_EVENT_BYTES'));
+        assert.ok(SSE_SRC.includes("new TextDecoder('utf-8', { fatal: true })"));
     });
 
     it('SSE deve retornar unsubscribe', () => {

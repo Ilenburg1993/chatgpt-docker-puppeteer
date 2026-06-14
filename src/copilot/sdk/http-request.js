@@ -13,6 +13,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { createBoundedProcessOutputCapture } from '#copilot/infra/public/process-output';
 
 /**
  * Executa uma requisição HTTP(S) simples para URLs `http://` e `https://`.
@@ -53,17 +54,29 @@ export function httpRequest(method, urlStr, body = null, timeoutMs = 5000, maxRe
             options.headers['Content-Length'] = String(utf8ByteLength(body, 'http request body'));
         }
         const req = transport.request(options, (res) => {
-            let data = '';
-            let received = 0;
+            const capture = createBoundedProcessOutputCapture({ maxBytes: maxResponseBytes });
+            const effectiveMaxBytes = capture.snapshot().maxBytes;
+            const contentLength = Number(res.headers['content-length'] ?? 0);
+            if (Number.isFinite(contentLength) && contentLength > effectiveMaxBytes) {
+                req.destroy(new Error(`Resposta excede limite de ${effectiveMaxBytes} bytes`));
+                return;
+            }
             res.on('data', (/** @type {Buffer} */ chunk) => {
-                received += chunk.length;
-                if (received > maxResponseBytes) {
-                    req.destroy(new Error(`Resposta excede limite de ${maxResponseBytes} bytes`));
+                if (capture.append(chunk).truncated) {
+                    req.destroy(new Error(`Resposta excede limite de ${effectiveMaxBytes} bytes`));
                     return;
                 }
-                data += chunk.toString('utf8');
             });
-            res.on('end', () => resolve({ statusCode: res.statusCode ?? 0, body: data }));
+            res.on('end', () => {
+                try {
+                    resolve({
+                        statusCode: res.statusCode ?? 0,
+                        body: capture.toString({ fatal: true, label: 'HTTP response' }),
+                    });
+                } catch (error) {
+                    reject(error instanceof Error ? error : new Error(String(error)));
+                }
+            });
         });
         req.setTimeout(timeoutMs, () => {
             req.destroy(new Error(`Timeout após ${timeoutMs}ms`));

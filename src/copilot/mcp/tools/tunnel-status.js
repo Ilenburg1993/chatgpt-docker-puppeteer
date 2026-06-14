@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import https from 'node:https';
 import { z } from 'zod';
+import { createBoundedProcessOutputCapture } from '#copilot/infra/public/process-output';
 import {
     readCloudflareTunnelConfig,
     readConnectorSmokeState,
@@ -216,31 +217,33 @@ async function runConnectorSmokeRefresh(input) {
         },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let stdout = '';
-    let stderr = '';
+    const stdoutCapture = createBoundedProcessOutputCapture({
+        maxBytes: CONNECTOR_SMOKE_OUTPUT_LIMIT,
+        mode: 'tail',
+    });
+    const stderrCapture = createBoundedProcessOutputCapture({
+        maxBytes: CONNECTOR_SMOKE_OUTPUT_LIMIT,
+        mode: 'tail',
+    });
     let timedOut = false;
-    /**
-     * @param {string} current
-     * @param {Buffer | string} chunk
-     * @returns {string}
-     */
-    const appendBounded = (current, chunk) => `${current}${String(chunk)}`.slice(-CONNECTOR_SMOKE_OUTPUT_LIMIT);
     const timeout = setTimeout(() => {
         timedOut = true;
         child.kill('SIGTERM');
     }, CONNECTOR_SMOKE_TIMEOUT_MS);
     timeout.unref?.();
     child.stdout.on('data', (chunk) => {
-        stdout = appendBounded(stdout, chunk);
+        stdoutCapture.append(chunk);
     });
     child.stderr.on('data', (chunk) => {
-        stderr = appendBounded(stderr, chunk);
+        stderrCapture.append(chunk);
     });
     const exit = await new Promise((resolve) => {
         child.on('error', (error) => resolve({ code: null, signal: null, error }));
         child.on('close', (code, signal) => resolve({ code, signal, error: null }));
     });
     clearTimeout(timeout);
+    const stdout = stdoutCapture.toString();
+    const stderr = stderrCapture.toString();
     if (timedOut) {
         return errorResult('Cloudflare connector smoke refresh timed out.', {
             code: 'ERR_CONNECTOR_SMOKE_TIMEOUT',

@@ -92,6 +92,23 @@ function enqueueJobIo(record, operation, task) {
 }
 
 /**
+ * Pausa o pipe enquanto o append serializado está pendente, limitando a fila a um chunk por stream.
+ *
+ * @param {JobRecord} record
+ * @param {import('node:stream').Readable} stream
+ * @param {'stdout' | 'stderr'} channel
+ * @param {string} logFile
+ */
+function attachJobOutputStream(record, stream, channel, logFile) {
+    stream.on('data', (chunk) => {
+        stream.pause();
+        void enqueueJobIo(record, `append ${channel}`, () => appendJobLog(logFile, chunk)).finally(() => {
+            if (!stream.destroyed) stream.resume();
+        });
+    });
+}
+
+/**
  * Limita somente jobs não ativos; manifests e logs persistidos continuam disponíveis para reload.
  *
  * @param {Map<string, JobRecord>} records
@@ -223,13 +240,9 @@ export async function spawnValidatorJob(validator, options = {}) {
     }, timeoutMs);
     timeout.unref();
 
-    child.stdout.on('data', (chunk) => {
-        void enqueueJobIo(record, 'append stdout', () => appendJobLog(logFile, chunk));
-    });
-    child.stderr.on('data', (chunk) => {
-        void enqueueJobIo(record, 'append stderr', () => appendJobLog(logFile, chunk));
-    });
-    child.on('exit', (code, signal) => {
+    attachJobOutputStream(record, child.stdout, 'stdout', logFile);
+    attachJobOutputStream(record, child.stderr, 'stderr', logFile);
+    child.on('close', (code, signal) => {
         clearTimeout(timeout);
         record.endedAt = Date.now();
         record.exitCode = code;

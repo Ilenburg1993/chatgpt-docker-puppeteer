@@ -10,8 +10,11 @@
  */
 
 import { log } from '#copilot/observability';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import http from 'node:http';
 import { logSwallowed } from '../core/error-handlers.js';
+
+export const MAX_SSE_PENDING_EVENT_BYTES = 1024 * 1024;
 
 /**
  * @typedef {Object} SseEvent
@@ -24,6 +27,44 @@ import { logSwallowed } from '../core/error-handlers.js';
  * @param {SseEvent} event
  * @returns {void}
  */
+
+/**
+ * @param {{ maxPendingBytes?: number }} [options]
+ */
+export function createSseBlockDecoder(options = {}) {
+    const maxPendingBytes =
+        Number.isInteger(options.maxPendingBytes) && Number(options.maxPendingBytes) > 0
+            ? Math.min(MAX_SSE_PENDING_EVENT_BYTES, Number(options.maxPendingBytes))
+            : MAX_SSE_PENDING_EVENT_BYTES;
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    let buffer = '';
+
+    return {
+        /**
+         * @param {Buffer | Uint8Array} chunk
+         * @returns {string[]}
+         */
+        push(chunk) {
+            buffer += decoder.decode(chunk, { stream: true });
+            const blocks = buffer.split(/\r?\n\r?\n/u);
+            buffer = blocks.pop() ?? '';
+            if (utf8ByteLength(buffer, 'SSE pending event') > maxPendingBytes) {
+                throw new Error(`SSE pending event exceeds ${maxPendingBytes} bytes.`);
+            }
+            return blocks;
+        },
+        /**
+         * @returns {string}
+         */
+        finish() {
+            buffer += decoder.decode();
+            if (utf8ByteLength(buffer, 'SSE pending event') > maxPendingBytes) {
+                throw new Error(`SSE pending event exceeds ${maxPendingBytes} bytes.`);
+            }
+            return buffer;
+        },
+    };
+}
 
 /**
  * Conecta ao endpoint SSE e entrega eventos ao callback. MR-09: reconecta automaticamente com backoff exponencial
@@ -74,12 +115,19 @@ export function subscribeSse(path, port, onEvent) {
                     return;
                 }
                 reconnectMs = 1_000;
-                let buf = '';
+                const blockDecoder = createSseBlockDecoder();
                 res.on('data', (/** @type {Buffer} */ chunk) => {
-                    const chunkStr = chunk.toString();
-                    buf += chunkStr;
-                    const blocks = buf.split(/\r?\n\r?\n/);
-                    buf = blocks.pop() ?? '';
+                    let blocks;
+                    try {
+                        blocks = blockDecoder.push(chunk);
+                    } catch (error) {
+                        log(
+                            'WARN',
+                            `[inject] SSE frame inválido (${path}): ${error instanceof Error ? error.message : String(error)}`,
+                        );
+                        res.destroy(error instanceof Error ? error : new Error(String(error)));
+                        return;
+                    }
 
                     for (const block of blocks) {
                         if (!block.trim()) continue;
@@ -104,6 +152,13 @@ export function subscribeSse(path, port, onEvent) {
                                 logSwallowed(e, 'channel.sseClient.parseJson');
                             }
                         }
+                    }
+                });
+                res.on('end', () => {
+                    try {
+                        blockDecoder.finish();
+                    } catch (error) {
+                        logSwallowed(error, 'channel.sseClient.finishDecoder');
                     }
                 });
                 res.on('close', () => {

@@ -1624,6 +1624,29 @@ texto; nenhum diretório ou kind inteiro foi liberado.
 Validação focada de IO-073: **3 passados, 0 falhas** no contrato do checker; checker isolado, cadeia completa de
 guardrails, lint focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.65 Status de implementação — captura de subprocesso, HTTP local e SSE bounded em 2026-06-14
+
+IO-074 tratou retenção e framing fora do `fetch`:
+
+- `infra/public/process-output.js` fornece captura binária bounded, com head de crescimento geométrico e tail em ring
+  fixo, máximo absoluto de **64 MiB**, bytes observados/retidos/omitidos e materialização única;
+- pipeline shell retém no máximo **2 MiB por stream**, preserva UTF-8 fragmentado entre chunks e sinaliza truncagem;
+- smoke do connector Cloudflare usa ring tail de **256 KiB**, eliminando concatenação O(n²) e limite por caracteres;
+- `sdk/http-request` mantém default **1 MiB**, faz precheck de `Content-Length`, conta bytes e usa UTF-8 fatal;
+- `channel/inject` ganhou hard cap de **32 MiB**, erro `LLM_B_RESPONSE_TOO_LARGE` e decode fatal;
+- o decoder SSE é incremental/fatal e limita somente o frame ainda sem delimitador a **1 MiB**; eventos completos
+  continuam ilimitados ao longo da vida da conexão;
+- validator jobs pausam stdout/stderr enquanto o append canônico serializado está pendente e finalizam em `close`,
+  depois de os pipes serem drenados.
+
+A segunda varredura classificou as ocorrências restantes: search, OAuth e request bodies já possuem budgets; quick
+tunnel apenas encaminha stdout com `setEncoding`; acumuladores de transcript/fallback já têm caps. A retenção da
+resposta lógica do modelo em `channel/client`/terminal continua separada porque o caller exige a resposta completa,
+mas o array auxiliar de chunks duplica esse conteúdo e merece medição própria em IO-075.
+
+Validação focada de IO-074: **82 passados, 0 falhas** em capture, shell-adjacent contracts, jobs, tunnel smoke,
+SDK HTTP, channel inject/SSE e concorrência; lint focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1917,15 +1940,17 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-071 | P0 | Catalog HTTP | **Concluído:** 28 importadores compartilham leitura bounded e UTF-8 fatal | 8 MiB default, 32 MiB hard cap, precheck e 31 testes focados | JSON precisa caber integralmente; doubles sem stream não exercitam budget físico | Manter qualquer importer novo no helper e adicionar prova com `Response` real |
 | IO-072 | P0 | Response inbound | **Concluído:** bytes/texto/JSON usam fachada pública bounded | bridge, BYOK, Cloudflare e scripts migrados; 80 testes focados | Doubles sem stream preservam fallback de compatibilidade | Criar guardrail estático contra consumo direto novo |
 | IO-073 | P1 | HTTP guardrail | **Concluído:** AST impede novo consumo direto de `Response` | Babel policy, aliases/Promise.all, 1,29 s e cadeia completa verde | Convenções muito exóticas de wrapper podem exigir regra adicional | Manter fixtures do checker ao adicionar novos padrões de fetch |
+| IO-074 | P0 | Process/socket capture | **Concluído:** subprocesso, HTTP local e frame SSE têm budgets físicos | head/tail fixos, jobs com backpressure, 82 testes focados | Resposta lógica completa do modelo ainda é retida por contrato | Medir/eliminar duplicação auxiliar de chunks em IO-075 |
+| IO-075 | P1 | Model stream retention | **Aberto:** resposta final e arrays/estado de chunks podem duplicar conteúdo | `channel/client`, structured retry e terminal display identificados | Não truncar a resposta canônica sem contrato explícito | Medir heap e tornar retenção auxiliar bounded/opt-in |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070, IO-071, IO-072, IO-073 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066, IO-067, IO-068, IO-069, IO-070, IO-071, IO-072, IO-073, IO-074 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
-| Aberto | IO-030 |
+| Aberto | IO-030, IO-075 |
 
 ---
 
@@ -2294,6 +2319,15 @@ A situação ideal é uma infra IO em camadas:
 - [x] Auditar e migrar downloads, responses e streams textuais restantes fora de `catalog/importers`.
 - [x] Impedir por guardrail estático novo consumo direto de corpos `Response`.
 
+#### Fase 4.7 — Subprocessos e sockets
+
+- [x] Criar captura binária bounded head/tail para stdout/stderr.
+- [x] Migrar shell e connector smoke sem concatenação proporcional.
+- [x] Aplicar backpressure ao append de validator jobs.
+- [x] Limitar e validar UTF-8 em HTTP local do SDK/canal.
+- [x] Limitar somente frames SSE incompletos, preservando stream longo.
+- [ ] Medir e reduzir retenção duplicada de chunks do modelo sem truncar a resposta canônica.
+
 ### Faixa 5 — Provas
 
 - [x] Fuzz textual e binário bounded, determinístico e reproduzível.
@@ -2328,6 +2362,8 @@ A situação ideal é uma infra IO em camadas:
 | Scanner | Symlink para fora do workspace | Não atravessa por padrão; path redigido/bloqueado |
 | Search | Resultado enorme | Early stop sem estourar buffer |
 | Catalog HTTP | Corpo acima do budget ou UTF-8 inválido | Falha antes do parse; nenhuma evidência parcial |
+| Process output | Chunks acima do cap ou code point fragmentado | Retenção fixa, ordem íntegra e truncagem observável |
+| SSE | Evento sem delimitador acima de 1 MiB | Conexão abortada/reconectada sem crescimento ilimitado |
 | Index | Mudança externa após parse | Retry antes da transação; FTS contém somente versão confirmada |
 | Chunk stream | Inode troca após byte-line index | Abort/version mismatch; nunca usar offsets de versão anterior |
 | Lock | Multiprocess lockfile stale | Segundo processo detecta stale só quando seguro |
@@ -2466,6 +2502,7 @@ Maturidade operacional avançada:
 - [x] aplicar leitura bounded e UTF-8 fatal aos 28 importadores de catálogo;
 - [x] consolidar consumo inbound de `Response` em fachada pública para bytes/texto/JSON;
 - [x] impedir regressão de consumo direto de `Response` por guardrail AST;
+- [x] tornar captura de subprocesso/HTTP local e framing SSE bounded em bytes;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2486,7 +2523,8 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria de streams de subprocesso/socket, priorizando concatenação sem budget, decode substitutivo e
-listeners sem backpressure/cancelamento. Ampliar fixtures Babel somente para sintaxe realmente aceita pelo workspace
-e manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece explicitamente sem implementação até existir evidência
-de múltiplos runtimes/processos reais que justifique o contrato.
+Medir a duplicação de heap entre resposta final, arrays de `task.delta`, structured retry e estados de display; tornar
+essa retenção auxiliar bounded ou opt-in sem truncar a resposta canônica entregue ao caller. Ampliar fixtures Babel
+somente para sintaxe realmente aceita pelo workspace e manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece
+explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que justifique o
+contrato.

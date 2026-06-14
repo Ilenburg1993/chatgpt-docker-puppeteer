@@ -30,6 +30,39 @@ describe('sdk/http-request hardening', () => {
             await new Promise((resolve) => server.close(() => resolve(undefined)));
         }
     });
+
+    it('rejeita resposta acima do budget e UTF-8 inválido', async () => {
+        const oversized = http.createServer((_req, res) => {
+            res.writeHead(200, { 'Content-Length': '10' });
+            res.end('ok');
+        });
+        const invalid = http.createServer((_req, res) => {
+            res.end(Buffer.from([0xff]));
+        });
+        await Promise.all([
+            new Promise((resolve) => oversized.listen(0, '127.0.0.1', () => resolve(undefined))),
+            new Promise((resolve) => invalid.listen(0, '127.0.0.1', () => resolve(undefined))),
+        ]);
+        try {
+            const oversizedAddress = oversized.address();
+            const invalidAddress = invalid.address();
+            assert.ok(oversizedAddress && typeof oversizedAddress === 'object');
+            assert.ok(invalidAddress && typeof invalidAddress === 'object');
+            await assert.rejects(
+                httpRequest('GET', `http://127.0.0.1:${oversizedAddress.port}/`, null, 5_000, 4),
+                /excede limite de 4 bytes/u,
+            );
+            await assert.rejects(
+                httpRequest('GET', `http://127.0.0.1:${invalidAddress.port}/`),
+                /contains invalid UTF-8/u,
+            );
+        } finally {
+            await Promise.all([
+                new Promise((resolve) => oversized.close(() => resolve(undefined))),
+                new Promise((resolve) => invalid.close(() => resolve(undefined))),
+            ]);
+        }
+    });
 });
 
 describe('sdk/persistent-paths hardening', () => {
