@@ -14,6 +14,12 @@ import { z } from 'zod';
 import { FILE_TOOLS_OUTPUT_POLICY, truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../file/shared.js';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
+import {
+    buildToolSuccessResult,
+    extractToolFailureCode,
+    extractToolFailureTraceId,
+    normalizeToolFailure,
+} from '../infra/tool-operation-result.js';
 
 const { searchText } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
@@ -100,8 +106,16 @@ export const searchInFilesTool = buildTool({
         maxResults,
         cursor,
     }) => {
+        const startedAt = Date.now();
         const { ok, reason, resolved } = await validatePath(searchPath ?? '.', { mode: 'read' });
-        if (!ok) return { success: false, error: reason };
+        if (!ok) {
+            return normalizeToolFailure(reason ?? 'Path inválido para leitura.', {
+                category: 'filesystem',
+                blockedReason: 'invalid_path',
+                suggestedNextAction: 'Use um caminho relativo válido dentro do workspace.',
+                durationMs: Date.now() - startedAt,
+            });
+        }
 
         log('INFO', `[copilot/search_in_files] pattern="${pattern}" in ${resolved}`);
 
@@ -131,33 +145,49 @@ export const searchInFilesTool = buildTool({
                 );
             }
             return withIoMeta(
-                {
-                    success: true,
-                    pattern,
-                    searchPath: resolved,
-                    output: output.text,
-                    truncated: output.truncated || Boolean(result.truncated),
-                    nextCursor: result.nextCursor ?? null,
-                    cursorOffset: result.cursorOffset ?? 0,
-                    totalMatches: result.totalMatches ?? result.matchCount,
-                    countsPostSanitization: result.countsPostSanitization,
-                    engine: result.engine,
-                    indexFallback: result.indexFallback ?? false,
-                    indexFallbackReason: result.indexFallbackReason ?? null,
-                    matchCount: result.matchCount,
-                    sanitized: result.sanitized,
-                    redactions: result.redactions,
-                    ...(output.truncated
-                        ? {
-                              configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes,
-                              originalOutputBytes: output.originalBytes,
-                          }
-                        : {}),
-                },
+                buildToolSuccessResult(
+                    {
+                        pattern,
+                        searchPath: resolved,
+                        output: output.text,
+                        truncated: output.truncated || Boolean(result.truncated),
+                        nextCursor: result.nextCursor ?? null,
+                        cursorOffset: result.cursorOffset ?? 0,
+                        totalMatches: result.totalMatches ?? result.matchCount,
+                        countsPostSanitization: result.countsPostSanitization,
+                        engine: result.engine,
+                        indexFallback: result.indexFallback ?? false,
+                        indexFallbackReason: result.indexFallbackReason ?? null,
+                        matchCount: result.matchCount,
+                        sanitized: result.sanitized,
+                        redactions: result.redactions,
+                        ...(output.truncated
+                            ? {
+                                  configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes,
+                                  originalOutputBytes: output.originalBytes,
+                              }
+                            : {}),
+                    },
+                    { terminalSummary: `search_in_files retornou ${result.matchCount} matches.` },
+                ),
                 { ...result.io, truncated: output.truncated || Boolean(result.truncated) },
             );
         } catch (err) {
-            return { success: false, error: toError(err).message };
+            const error = toError(err);
+            const code = extractToolFailureCode(err);
+            const traceId = extractToolFailureTraceId(err);
+            return normalizeToolFailure(error, {
+                ...(code ? { code } : {}),
+                ...(traceId ? { traceId } : {}),
+                durationMs: Date.now() - startedAt,
+                category: code === 'ERR_INVALID_CURSOR' ? 'validation' : 'internal',
+                ...(code === 'ERR_INVALID_CURSOR'
+                    ? {
+                          blockedReason: 'invalid_cursor',
+                          suggestedNextAction: 'Use o nextCursor retornado anteriormente ou omita cursor para reiniciar a paginação.',
+                      }
+                    : {}),
+            });
         }
     },
 });
@@ -209,8 +239,16 @@ export const findSymbolUsagesTool = buildTool({
         maxResults,
         cursor,
     }) => {
+        const startedAt = Date.now();
         const { ok, reason, resolved } = await validatePath(searchPath ?? '.', { mode: 'read' });
-        if (!ok) return { success: false, error: reason };
+        if (!ok) {
+            return normalizeToolFailure(reason ?? 'Path inválido para leitura.', {
+                category: 'filesystem',
+                blockedReason: 'invalid_path',
+                suggestedNextAction: 'Use um caminho relativo válido dentro do workspace.',
+                durationMs: Date.now() - startedAt,
+            });
+        }
 
         const escaped = escapeForRegex(symbol);
         const pattern = wholeWord !== false ? `\\b${escaped}\\b` : escaped;
@@ -233,23 +271,39 @@ export const findSymbolUsagesTool = buildTool({
 
             const { matches, fileCount } = parseUsageOutput(result.output, WORKSPACE_ROOT);
             return withIoMeta(
-                {
-                    success: true,
-                    symbol,
-                    searchPath: resolved,
-                    output: formatUsageMatches(matches),
-                    matchCount: matches.length,
-                    fileCount,
-                    matches,
-                    engine: result.engine,
-                    sanitized: result.sanitized,
-                    truncated: Boolean(result.truncated),
-                    nextCursor: result.nextCursor ?? null,
-                },
+                buildToolSuccessResult(
+                    {
+                        symbol,
+                        searchPath: resolved,
+                        output: formatUsageMatches(matches),
+                        matchCount: matches.length,
+                        fileCount,
+                        matches,
+                        engine: result.engine,
+                        sanitized: result.sanitized,
+                        truncated: Boolean(result.truncated),
+                        nextCursor: result.nextCursor ?? null,
+                    },
+                    { terminalSummary: `find_symbol_usages retornou ${matches.length} usos em ${fileCount} arquivos.` },
+                ),
                 result.io,
             );
         } catch (err) {
-            return { success: false, error: toError(err).message };
+            const error = toError(err);
+            const code = extractToolFailureCode(err);
+            const traceId = extractToolFailureTraceId(err);
+            return normalizeToolFailure(error, {
+                ...(code ? { code } : {}),
+                ...(traceId ? { traceId } : {}),
+                durationMs: Date.now() - startedAt,
+                category: code === 'ERR_INVALID_CURSOR' ? 'validation' : 'internal',
+                ...(code === 'ERR_INVALID_CURSOR'
+                    ? {
+                          blockedReason: 'invalid_cursor',
+                          suggestedNextAction: 'Use o nextCursor retornado anteriormente ou omita cursor para reiniciar a paginação.',
+                      }
+                    : {}),
+            });
         }
     },
 });

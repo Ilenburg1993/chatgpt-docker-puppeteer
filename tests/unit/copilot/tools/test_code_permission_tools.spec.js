@@ -132,28 +132,48 @@ describe('F46 — code-tools', () => {
         mod = await import('#copilot/tools');
     });
 
-    it('codeTools exporta array com 3 tools', () => {
+    it('codeTools exporta array combinado com tools read-only e mutável', () => {
         expect(Array.isArray(mod.codeTools)).toBe(true);
-        expect(mod.codeTools).toHaveLength(3);
+        expect(mod.codeTools).toHaveLength(5);
+        expect(mod.codeReadTools).toHaveLength(4);
+        expect(mod.codeWriteTools).toHaveLength(1);
     });
 
-    it('contém lint_check, run_tests e typecheck', () => {
+    it('contém lint_check, lint_fix, quality_gate, run_tests e typecheck', () => {
         const names = mod.codeTools.map((/** @type {any} */ t) => t.name);
         expect(names).toContain('lint_check');
+        expect(names).toContain('lint_fix');
+        expect(names).toContain('quality_gate');
         expect(names).toContain('run_tests');
         expect(names).toContain('typecheck');
     });
 
-    it('lint_check handler retorna { success, output }', async () => {
+    it('lint_check handler retorna { success, output } sem aceitar fix', async () => {
         const lintTool = /** @type {any} */ (mod.codeTools.find((/** @type {any} */ t) => t.name === 'lint_check'));
-        const result = await lintTool.handler({ fix: false, path: 'src/copilot/audit/ring-buffer.js' });
+        const blocked = await lintTool.handler({ fix: true, path: 'src/copilot/audit/ring-buffer.js' });
+        expect(blocked.success).toBe(false);
+        expect(blocked.blockedReason).toBe('mutating_parameter_on_readonly_tool');
+
+        const result = await lintTool.handler({ path: 'src/copilot/audit/ring-buffer.js' });
         expect(result).toHaveProperty('success');
         expect(result).toHaveProperty('output');
     }, 30_000);
 
-    it('todas as tools têm skipPermission true (via withSkipPermission)', () => {
-        for (const tool of mod.codeTools) {
+    it('quality_gate rejeita gate não allowlisted em chamada direta defensiva', async () => {
+        const qualityGate = /** @type {any} */ (mod.codeTools.find((/** @type {any} */ t) => t.name === 'quality_gate'));
+        const result = await qualityGate.handler({ gate: 'npm-run-anything', scope: 'src/copilot' });
+        expect(result).toMatchObject({
+            success: false,
+            ok: false,
+            blockedReason: 'quality_gate_not_allowlisted',
+        });
+    });
+
+    it('apenas codeReadTools têm skipPermission true; lint_fix requer aprovação', () => {
+        for (const tool of mod.codeReadTools) {
             expect(/** @type {any} */ (tool).skipPermission).toBe(true);
         }
+        const lintFix = /** @type {any} */ (mod.codeWriteTools.find((/** @type {any} */ t) => t.name === 'lint_fix'));
+        expect(lintFix.skipPermission).not.toBe(true);
     });
 });

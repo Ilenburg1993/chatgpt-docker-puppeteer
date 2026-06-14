@@ -6,4 +6,9 @@
  *
  * @module copilot/tools/code
  */
-export { codeTools } from './code-tools.js';
+export { codeReadTools, codeTools, codeWriteTools } from './code-tools.js';
+export {
+    buildQualityGateResultEnvelope,
+    extractQualityGateFailingFiles,
+    summarizeQualityGateText,
+} from './quality-gate-output.js';

@@ -25,6 +25,15 @@ import {
 import { createReadFileFailure } from './feedback.js';
 import { buildReadFileMetadata } from './metadata.js';
 import {
+    DEFAULT_READ_THROUGH_AUTO_TIMEOUT_MS,
+    DEFAULT_READ_THROUGH_FORCE_TIMEOUT_MS,
+    buildAttemptedReadThroughReport,
+    buildSkippedReadThroughReport,
+    buildTimedOutReadThroughReport,
+    normalizeReadThroughMode,
+    planReadThrough,
+} from './read-through-policy.js';
+import {
     nextLineCursor,
     normalizeNonNegativeInteger,
     normalizePositiveInteger,
@@ -42,6 +51,32 @@ const { readBytes, readText, readTextChunks, warmReadThroughContext } = createWo
  */
 const MIN_READ_THROUGH_BYTES = 1024;
 const DEFAULT_STREAM_CHUNK_LINES = 200;
+
+/**
+ * @param {string} resolved
+ * @param {'off' | 'auto' | 'force'} mode
+ */
+async function warmReadThroughWithBudget(resolved, mode) {
+    const startedAt = Date.now();
+    const timeoutMs = mode === 'force' ? DEFAULT_READ_THROUGH_FORCE_TIMEOUT_MS : DEFAULT_READ_THROUGH_AUTO_TIMEOUT_MS;
+    const warmPromise = warmReadThroughContext(resolved, {
+        workspaceRoot: WORKSPACE_ROOT,
+        relatedImports: true,
+        concurrency: 4,
+        silent: true,
+    });
+    warmPromise.catch(() => undefined);
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let timer = null;
+    const timeoutPromise = new Promise((resolve) => {
+        timer = setTimeout(() => resolve(buildTimedOutReadThroughReport(mode, startedAt, timeoutMs)), timeoutMs);
+    });
+    const result = await Promise.race([warmPromise, timeoutPromise]);
+    if (timer) clearTimeout(timer);
+    return result && typeof result === 'object' && 'timedOut' in result
+        ? result
+        : buildAttemptedReadThroughReport(mode, startedAt, result);
+}
 
 /**
  * @param {{
@@ -168,10 +203,12 @@ export const readFileContentTool = buildTool({
             .default(false)
             .describe('Inclui SHA-256 do arquivo completo e do conteúdo retornado em metadata.'),
         includeReadThrough: z
-            .boolean()
+            .union([z.boolean(), z.enum(['off', 'auto', 'force'])])
             .optional()
-            .default(true)
-            .describe('Aquece contexto relacionado para arquivos de texto maiores quando readStrategy=cached.'),
+            .default('auto')
+            .describe(
+                "Controla aquecimento de contexto relacionado: 'off' desativa, 'auto' usa heurística de tamanho, 'force' tenta sempre em utf8/cached. Boolean legado: true=auto, false=off.",
+            ),
         includeCacheStats: z
             .boolean()
             .optional()
@@ -217,6 +254,7 @@ export const readFileContentTool = buildTool({
         };
         const resolvedEncoding = encoding ?? 'utf8';
         const resolvedReadStrategy = readStrategy ?? 'cached';
+        const readThroughMode = normalizeReadThroughMode(includeReadThrough);
         const outputMaxBytes =
             normalizePositiveInteger(maxBytes, FILE_TOOLS_OUTPUT_POLICY.maxContentBytes) ?? Number.POSITIVE_INFINITY;
         const resolvedMaxLines = normalizePositiveInteger(maxLines);
@@ -408,15 +446,15 @@ export const readFileContentTool = buildTool({
                     : text.returnedLines;
             const totalLinesKnown = 'totalLinesKnown' in text ? text.totalLinesKnown : true;
             const nextCursor = nextLineCursor(returnedLines, text.totalLines, totalLinesKnown);
-            const readThrough =
-                resolvedReadStrategy === 'cached' && includeReadThrough !== false && stats.size >= MIN_READ_THROUGH_BYTES
-                    ? await warmReadThroughContext(resolved, {
-                          workspaceRoot: WORKSPACE_ROOT,
-                          relatedImports: true,
-                          concurrency: 4,
-                          silent: true,
-                      })
-                    : null;
+            const readThroughPlan = planReadThrough({
+                mode: readThroughMode,
+                readStrategy: resolvedReadStrategy,
+                fileSize: stats.size,
+                minBytes: MIN_READ_THROUGH_BYTES,
+            });
+            const readThrough = readThroughPlan.attempted
+                ? await warmReadThroughWithBudget(resolved, readThroughMode)
+                : buildSkippedReadThroughReport(readThroughPlan);
             const sanitized = sanitizeIoTextOutput({ text: textContent });
             const contentOutput = truncateUtf8Text(
                 sanitized.text,

@@ -188,6 +188,29 @@ function getSessionExcludedToolRecords() {
 let _toolContractReport = createEmptyToolContractReport();
 
 /**
+ * @typedef {{
+ *     category: string;
+ *     error: string;
+ *     toolCount: number;
+ * }} FailedToolCategoryRecord
+ *
+ * @typedef {{
+ *     generatedAt: number;
+ *     bootstrapDegraded: boolean;
+ *     failedToolCategories: FailedToolCategoryRecord[];
+ *     failedToolCategoryNames: string[];
+ * }} ToolBootstrapHealth
+ */
+
+/** @type {ToolBootstrapHealth} */
+let _toolBootstrapHealth = {
+    generatedAt: Date.now(),
+    bootstrapDegraded: false,
+    failedToolCategories: [],
+    failedToolCategoryNames: [],
+};
+
+/**
  * Provedor narrow do contexto de agente para enriquecer `get_agent_info` com estado live (modelo negociado e
  * reasoning).
  *
@@ -381,6 +404,21 @@ export function readToolContractReport() {
 }
 
 /**
+ * @param {ToolBootstrapHealth} health
+ * @returns {void}
+ */
+export function setToolBootstrapHealth(health) {
+    _toolBootstrapHealth = health;
+}
+
+/**
+ * @returns {ToolBootstrapHealth}
+ */
+export function readToolBootstrapHealth() {
+    return _toolBootstrapHealth;
+}
+
+/**
  * Retorna snapshot canônico do estado de carga de tools observado pela introspecção.
  *
  * Útil para `/status`, `/diagnose` e validação de boot/load sem executar uma tool em loop.
@@ -400,6 +438,7 @@ export function readToolContractReport() {
  *     hasSdkWorkspaceTooling: boolean;
  *     hasLegacySdkShellToolsLoaded: boolean;
  *     toolContract: import('./tool-contract-verifier.js').ToolContractReport;
+ *     bootstrapHealth: ToolBootstrapHealth;
  *     metadataByName: Record<string, import('./tool-metadata.js').ToolDefinitionMetadata>;
  * }}
  */
@@ -437,6 +476,7 @@ export function readIntrospectionRegistrySnapshot() {
         hasSdkWorkspaceTooling,
         hasLegacySdkShellToolsLoaded,
         toolContract: _toolContractReport,
+        bootstrapHealth: _toolBootstrapHealth,
         metadataByName: _toolContractReport.metadataByName ?? {},
         runtimeDisabled: getRuntimeDisabledTools(),
         runtimeDisabledRecords: getRuntimeDisabledToolRecords(),
@@ -456,6 +496,12 @@ export function resetIntrospectionStateForTests() {
     _sessionExcludedTools.clear();
     _sessionExcludedToolRecords.clear();
     _toolContractReport = createEmptyToolContractReport();
+    _toolBootstrapHealth = {
+        generatedAt: Date.now(),
+        bootstrapDegraded: false,
+        failedToolCategories: [],
+        failedToolCategoryNames: [],
+    };
     _agentInfoProvider = null;
 }
 
@@ -958,6 +1004,7 @@ const getToolHealthTool = buildTool({
             totalBlocked,
             overallErrorRate: total > 0 ? parseFloat(((totalErrors / total) * 100).toFixed(1)) : 0,
             topTools: entries,
+            bootstrap: _toolBootstrapHealth,
         };
     },
 });

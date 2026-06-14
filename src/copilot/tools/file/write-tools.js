@@ -28,9 +28,41 @@ import {
     patchFileTool,
     pathFailureResult,
 } from './write/index.js';
+import { dryRunPatchPlan, normalizePatchPlan } from './write/patch-plan.js';
 
 const { copyFileLocked, createOrReplaceFileAtomic, deleteFileLocked, moveFileLocked, writeFileAtomic } =
     createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+
+// ---------------------------------------------------------------------------
+// Tool: patch_bundle_plan (read-only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tool: patch_bundle_plan — simula execução de patch multi-arquivo sem efeitos colaterais.
+ */
+const patchBundlePlanTool = buildTool({
+    name: 'patch_bundle_plan',
+    description:
+        'Simula aplicação de um patch bundle multi-arquivo usando dry-run. Não modifica arquivos.',
+    instructions:
+        'Use patch_bundle_plan para validar mudanças em múltiplos arquivos antes de executar patch_file. Sempre forneça um ' +
+        'plano válido no formato de patch-plan. Nunca use este tool para mutação real.',
+    parameters: z.object({
+        plan: z.any().describe('Patch plan normalizado (use normalizePatchPlan antes se necessário)'),
+        fileContents: z.record(z.string(), z.string()).describe('Mapa de conteúdo atual dos arquivos'),
+    }),
+    handler: async ({ plan, fileContents }) => {
+        const normalized = normalizePatchPlan(plan);
+        if (!normalized.ok) {
+            return {
+                success: false,
+                error: 'invalid patch plan',
+                details: normalized.errors,
+            };
+        }
+        return dryRunPatchPlan(normalized.plan, fileContents);
+    },
+});
 
 // ---------------------------------------------------------------------------
 // Tool: write_file_content
@@ -667,6 +699,7 @@ export const fileWriteTools = [
     writeFileContentTool,
     createFileTool,
     deleteFileTool,
+    patchBundlePlanTool,
     copyFileTool,
     moveFileTool,
     patchFileTool,

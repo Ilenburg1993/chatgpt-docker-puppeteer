@@ -13,6 +13,12 @@ import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
+import {
+    buildToolSuccessResult,
+    extractToolFailureCode,
+    extractToolFailureTraceId,
+    normalizeToolFailure,
+} from '../infra/tool-operation-result.js';
 import { FILE_TOOLS_OUTPUT_POLICY, truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../file/shared.js';
 
 const { searchWorkspaceSymbols } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
@@ -56,8 +62,16 @@ export const workspaceSymbolSearchTool = buildTool({
         cursor,
         exactMatch,
     }) => {
+        const startedAt = Date.now();
         const { ok, reason, resolved } = await validatePath(searchPath ?? '.', { mode: 'read' });
-        if (!ok) return { success: false, error: reason };
+        if (!ok) {
+            return normalizeToolFailure(reason ?? 'Path inválido para leitura.', {
+                category: 'filesystem',
+                blockedReason: 'invalid_path',
+                suggestedNextAction: 'Use um caminho relativo válido dentro do workspace.',
+                durationMs: Date.now() - startedAt,
+            });
+        }
 
         const resolvedKind =
             /** @type {'function' | 'class' | 'variable' | 'export' | 'type' | 'all'} */
@@ -91,32 +105,48 @@ export const workspaceSymbolSearchTool = buildTool({
             }
 
             return withIoMeta(
-                {
-                    success: true,
-                    symbol: symbolName,
-                    kind: resolvedKind,
-                    searchPath: resolved,
-                    matchCount: result.matchCount,
-                    output: output.text,
-                    sanitized: result.sanitized,
-                    redactions: result.redactions,
-                    truncated: output.truncated || Boolean(result.truncated),
-                    nextCursor: result.nextCursor ?? null,
-                    cursorOffset: result.cursorOffset ?? 0,
-                    totalMatches: result.totalMatches ?? result.matchCount,
-                    countsPostSanitization: result.countsPostSanitization,
-                    ...(output.truncated
-                        ? {
-                              configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes,
-                              originalOutputBytes: output.originalBytes,
-                          }
-                        : {}),
-                    ...(result.message ? { message: result.message } : {}),
-                },
+                buildToolSuccessResult(
+                    {
+                        symbol: symbolName,
+                        kind: resolvedKind,
+                        searchPath: resolved,
+                        matchCount: result.matchCount,
+                        output: output.text,
+                        sanitized: result.sanitized,
+                        redactions: result.redactions,
+                        truncated: output.truncated || Boolean(result.truncated),
+                        nextCursor: result.nextCursor ?? null,
+                        cursorOffset: result.cursorOffset ?? 0,
+                        totalMatches: result.totalMatches ?? result.matchCount,
+                        countsPostSanitization: result.countsPostSanitization,
+                        ...(output.truncated
+                            ? {
+                                  configuredLimitBytes: FILE_TOOLS_OUTPUT_POLICY.maxSearchOutputBytes,
+                                  originalOutputBytes: output.originalBytes,
+                              }
+                            : {}),
+                        ...(result.message ? { message: result.message } : {}),
+                    },
+                    { terminalSummary: `workspace_symbol_search retornou ${result.matchCount} símbolos.` },
+                ),
                 { ...result.io, truncated: output.truncated || Boolean(result.truncated) },
             );
         } catch (err) {
-            return { success: false, error: toError(err).message };
+            const error = toError(err);
+            const code = extractToolFailureCode(err);
+            const traceId = extractToolFailureTraceId(err);
+            return normalizeToolFailure(error, {
+                ...(code ? { code } : {}),
+                ...(traceId ? { traceId } : {}),
+                durationMs: Date.now() - startedAt,
+                category: code === 'ERR_INVALID_CURSOR' ? 'validation' : 'internal',
+                ...(code === 'ERR_INVALID_CURSOR'
+                    ? {
+                          blockedReason: 'invalid_cursor',
+                          suggestedNextAction: 'Use o nextCursor retornado anteriormente ou omita cursor para reiniciar a paginação.',
+                      }
+                    : {}),
+            });
         }
     },
 });

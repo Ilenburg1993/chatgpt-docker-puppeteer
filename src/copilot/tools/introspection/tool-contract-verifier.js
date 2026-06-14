@@ -47,6 +47,7 @@ import {
  *     missingInstructionsCount: number;
  *     riskySkipPermissionCount: number;
  *     autonomySkipPermissionCount: number;
+ *     mutableReadOnlyParameterCount: number;
  *     noticeCount: number;
  *     decisionCount: number;
  *     permissionMode: import('./tool-metadata.js').ToolPermissionMode;
@@ -97,6 +98,113 @@ function isUsableSchema(schema) {
     return false;
 }
 
+const MUTATING_PARAMETER_NAMES = new Set([
+    'apply',
+    'confirm',
+    'delete',
+    'dryRun',
+    'dry_run',
+    'fix',
+    'mode',
+    'overwrite',
+    'replaceAll',
+    'replace_all',
+    'write',
+]);
+
+const MUTATING_MODE_VALUES = new Set(['apply', 'delete', 'fix', 'move', 'patch', 'remove', 'replace', 'write']);
+
+const TOOL_OPERATION_RESULT_REQUIRED_FIELDS = Object.freeze({
+    common: ['success', 'ok', 'status', 'retryable', 'terminalSummary'],
+    failure: ['error', 'category', 'blockedReason'],
+    code: ['exitCode', 'durationMs'],
+    search: ['matchCount'],
+});
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function asRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+}
+
+/**
+ * @param {string} category
+ * @param {unknown} result
+ * @returns {ToolContractIssue[]}
+ */
+export function verifyToolOperationResultFieldsForCategory(category, result) {
+    const record = asRecord(result);
+    if (!record) {
+        return [
+            {
+                severity: 'error',
+                code: 'INVALID_OPERATION_RESULT_ENVELOPE',
+                toolName: category,
+                message: 'Resultado de tool não é um objeto JSON estruturado.',
+            },
+        ];
+    }
+    /** @type {ToolContractIssue[]} */
+    const issues = [];
+    const required = [...TOOL_OPERATION_RESULT_REQUIRED_FIELDS.common];
+    const success = record['success'];
+    if (success === false) required.push(...TOOL_OPERATION_RESULT_REQUIRED_FIELDS.failure);
+    if (category === 'code') required.push(...TOOL_OPERATION_RESULT_REQUIRED_FIELDS.code);
+    if (category === 'search' && success === true) required.push(...TOOL_OPERATION_RESULT_REQUIRED_FIELDS.search);
+    for (const field of required) {
+        if (!(field in record)) {
+            issues.push({
+                severity: 'error',
+                code: 'MISSING_OPERATION_RESULT_FIELD',
+                toolName: category,
+                message: `Resultado de tool da categoria '${category}' não possui campo obrigatório '${field}'.`,
+            });
+        }
+    }
+    return issues;
+}
+
+/**
+ * @param {unknown} schema
+ * @returns {Record<string, unknown>}
+ */
+function readSchemaProperties(schema) {
+    if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return {};
+    const record = /** @type {Record<string, unknown>} */ (schema);
+    return record['properties'] && typeof record['properties'] === 'object' && !Array.isArray(record['properties'])
+        ? /** @type {Record<string, unknown>} */ (record['properties'])
+        : {};
+}
+
+/**
+ * @param {unknown} schema
+ * @returns {string[]}
+ */
+function findMutatingReadOnlyParameters(schema) {
+    const properties = readSchemaProperties(schema);
+    /** @type {string[]} */
+    const found = [];
+    for (const [name, value] of Object.entries(properties)) {
+        const normalized = name.trim();
+        if (MUTATING_PARAMETER_NAMES.has(normalized)) {
+            if (normalized !== 'mode') {
+                found.push(normalized);
+                continue;
+            }
+            const property = value && typeof value === 'object' && !Array.isArray(value)
+                ? /** @type {Record<string, unknown>} */ (value)
+                : {};
+            const enumValues = Array.isArray(property['enum']) ? property['enum'].map(String) : [];
+            if (enumValues.length === 0 || enumValues.some((entry) => MUTATING_MODE_VALUES.has(entry))) {
+                found.push(normalized);
+            }
+        }
+    }
+    return found;
+}
+
 /**
  * @returns {ToolContractReport}
  */
@@ -115,6 +223,7 @@ export function createEmptyToolContractReport() {
         missingInstructionsCount: 0,
         riskySkipPermissionCount: 0,
         autonomySkipPermissionCount: 0,
+        mutableReadOnlyParameterCount: 0,
         noticeCount: 0,
         decisionCount: 0,
         permissionMode: 'selective',
@@ -172,6 +281,7 @@ export function verifyToolRegistryContracts(registry, options = {}) {
     let missingInstructionsCount = 0;
     let riskySkipPermissionCount = 0;
     let autonomySkipPermissionCount = 0;
+    let mutableReadOnlyParameterCount = 0;
     /** @type {Record<string, import('./tool-metadata.js').ToolDefinitionMetadata>} */
     const metadataByName = {};
 
@@ -226,6 +336,21 @@ export function verifyToolRegistryContracts(registry, options = {}) {
                 toolName,
                 message: 'Tool sem schema de parâmetros explícito.',
             });
+        }
+
+        if (metadata.readOnly && hasParametersKey && parameters !== undefined) {
+            const mutatingParameters = findMutatingReadOnlyParameters(parameters);
+            if (mutatingParameters.length > 0) {
+                mutableReadOnlyParameterCount += 1;
+                issues.push({
+                    severity: 'error',
+                    code: 'READONLY_MUTATING_PARAMETERS',
+                    toolName,
+                    message:
+                        `Tool read-only expõe parâmetros com semântica mutável: ${mutatingParameters.join(', ')}. ` +
+                        'Separe a operação mutável em outra tool ou remova esses parâmetros do schema read-only.',
+                });
+            }
         }
 
         const category = typeof entry['category'] === 'string' ? entry['category'].trim() : '';
@@ -318,6 +443,7 @@ export function verifyToolRegistryContracts(registry, options = {}) {
         missingInstructionsCount,
         riskySkipPermissionCount,
         autonomySkipPermissionCount,
+        mutableReadOnlyParameterCount,
         permissionMode,
         metadataCoverage: {
             descriptionPct: pct(withDescription, totalTools),

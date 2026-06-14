@@ -9,6 +9,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Readable } from 'node:stream';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ const fsMock = {
     open: vi.fn(async (filePath) => ({
         stat: async () => fsMock.stat(filePath),
         readFile: async () => fsMock.readFile(filePath),
+        createReadStream: () => Readable.from([mocks.streamPayloads.get(String(filePath)) ?? Buffer.alloc(0)]),
         sync: async () => undefined,
         close: async () => undefined,
     })),
@@ -147,9 +149,11 @@ beforeEach(() => {
     fsMock.open.mockImplementation(async (filePath) => ({
         stat: async () => fsMock.stat(filePath),
         readFile: async () => fsMock.readFile(filePath),
+        createReadStream: () => Readable.from([mocks.streamPayloads.get(String(filePath)) ?? Buffer.alloc(0)]),
         sync: async () => undefined,
         close: async () => undefined,
     }));
+    fsMock.stat.mockResolvedValue(stableStats(0));
     mocks.streamPayloads.clear();
 });
 
@@ -414,7 +418,7 @@ describe('F35 — delete_file (F185)', () => {
 
     it('deleta arquivo existente', async () => {
         pathOk('/workspace/doomed.txt');
-        fsMock.stat.mockResolvedValue({ isDirectory: () => false });
+        fsMock.stat.mockResolvedValue({ ...stableStats(6), isDirectory: () => false });
         fsMock.readFile.mockResolvedValue(Buffer.from('doomed', 'utf8'));
         streamPayload('/workspace/doomed.txt', 'doomed');
         fsMock.unlink.mockResolvedValue(undefined);
@@ -605,7 +609,7 @@ describe('F35 — move_file (F186)', () => {
         fsMock.copyFile.mockResolvedValue(undefined);
         fsMock.unlink.mockResolvedValue(undefined);
         fsMock.readFile.mockResolvedValue(Buffer.from('move', 'utf8'));
-        fsMock.stat.mockResolvedValue({ size: 4 });
+        fsMock.stat.mockResolvedValue(stableStats(4));
         streamPayload('/workspace/a.txt', 'move');
 
         const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: false });
@@ -613,7 +617,11 @@ describe('F35 — move_file (F186)', () => {
         expect(result.success).toBe(true);
         expect(result.crossDevice).toBe(true);
         expect(result.duplicatedAfterCrossDeviceMove).toBe(false);
-        expect(fsMock.copyFile).toHaveBeenCalledWith('/workspace/a.txt', expect.stringContaining('.b.txt.'));
+        expect(fsMock.copyFile).toHaveBeenCalledWith(
+            '/workspace/a.txt',
+            expect.stringContaining('.b.txt.'),
+            expect.any(Number),
+        );
         expect(fsMock.link).toHaveBeenCalledWith(expect.stringContaining('.b.txt.'), '/workspace/b.txt');
         expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/a.txt');
     });
@@ -894,8 +902,8 @@ describe('F35 — patch_file (F187)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F35 — fileWriteTools export shape (F188)', () => {
-    it('exporta array com 6 tools', () => {
-        expect(fileWriteTools).toHaveLength(6);
+    it('exporta array com 7 tools', () => {
+        expect(fileWriteTools).toHaveLength(7);
     });
 
     it('cada tool tem name, description, handler', () => {

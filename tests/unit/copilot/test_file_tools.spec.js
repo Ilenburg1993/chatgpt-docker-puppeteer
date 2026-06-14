@@ -91,9 +91,9 @@ describe('fileTools — exportações do módulo', () => {
         assert.ok(fileReadTools.length >= 3);
     });
 
-    it('fileWriteTools é um Array com 6 elementos', () => {
+    it('fileWriteTools é um Array com 7 elementos', () => {
         assert.ok(Array.isArray(fileWriteTools));
-        assert.equal(fileWriteTools.length, 6);
+        assert.equal(fileWriteTools.length, 7);
     });
 
     it('fileTools = fileReadTools + indexTools + scopeTools + fileWriteTools', () => {
@@ -218,6 +218,14 @@ describe('read_file_content', () => {
         const result = await callTool(tool, { path: '/etc/passwd' });
         assert.equal(result.success, false);
         assert.ok(result.error?.includes('Acesso negado') || result.error?.includes('fora do workspace'));
+    });
+
+    it('retorna relatório explícito quando read-through é desativado', async () => {
+        const result = await callTool(tool, { path: tmpFile, includeReadThrough: 'off' });
+        assert.equal(result.success, true);
+        assert.equal(result.readThrough.attempted, false);
+        assert.equal(result.readThrough.mode, 'off');
+        assert.equal(result.readThrough.skippedReason, 'disabled');
     });
 
     it('retorna success=false quando path aponta para diretório', async () => {

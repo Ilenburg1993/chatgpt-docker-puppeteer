@@ -19,7 +19,7 @@
 import { buildCustomTools, getAllTools as getRegistryTools, registerTools } from '#copilot/sdk/tools';
 import { log } from '../observability/logger.js';
 import { wrapWithStats } from '../observability/tool-stats.js';
-import { codeTools } from './code/index.js';
+import { codeReadTools, codeTools, codeWriteTools } from './code/index.js';
 import { fileReadTools, fileWriteTools, indexTools, scopeTools } from './file/index.js';
 import { searchTools } from './search/index.js';
 import { gitTools } from './git/index.js';
@@ -28,6 +28,7 @@ import { hubTools, setHub } from './hub/index.js';
 import {
     introspectionTools,
     registerForIntrospection,
+    setToolBootstrapHealth,
     setToolContractReport,
     verifyToolRegistryContracts,
 } from './introspection/index.js';
@@ -130,6 +131,72 @@ export const allTools = /** @type {any} */ (
 );
 
 /**
+ * @param {{ category: string; error: string; toolCount: number }[]} failedToolCategories
+ * @param {number} [generatedAt]
+ */
+export function buildToolBootstrapHealth(failedToolCategories, generatedAt = Date.now()) {
+    return {
+        generatedAt,
+        bootstrapDegraded: failedToolCategories.length > 0,
+        failedToolCategories,
+        failedToolCategoryNames: failedToolCategories.map((record) => record.category),
+    };
+}
+
+const PRIMARY_TOOL_CATEGORIES = new Set(['code', 'file', 'search', 'shell', 'introspection']);
+
+/**
+ * @param {{ category: string; error: string; toolCount: number }[]} failedToolCategories
+ * @returns {{ category: string; error: string; toolCount: number }[]}
+ */
+export function findFailedPrimaryToolCategories(failedToolCategories) {
+    return failedToolCategories.filter((record) => PRIMARY_TOOL_CATEGORIES.has(record.category));
+}
+
+/**
+ * @param {{ category: string; error: string; toolCount: number }[]} failedToolCategories
+ * @param {{ strict?: boolean }} [options]
+ */
+export function assertPrimaryToolCategoriesHealthy(failedToolCategories, options = {}) {
+    const strict =
+        options.strict === true || process.env['CI'] === 'true' || process.env['COPILOT_BOOTSTRAP_STRICT_CI'] === '1';
+    if (!strict) return;
+    const failedPrimaryCategories = findFailedPrimaryToolCategories(failedToolCategories);
+    if (failedPrimaryCategories.length === 0) return;
+    throw new Error(
+        `Categorias primárias de tools falharam no bootstrap: ${failedPrimaryCategories
+            .map((record) => `${record.category}(${record.error})`)
+            .join(', ')}`,
+    );
+}
+
+/**
+ * @param {ToolRegistry} registry
+ * @param {ToolGroupConfig[]} toolGroups
+ * @param {(registry: ToolRegistry, tools: Tool[], options: { category: string; tags: string[]; readOnly?: boolean }) => void} [registerFn]
+ * @returns {{ category: string; error: string; toolCount: number }[]}
+ */
+export function registerToolGroupsCollectFailures(registry, toolGroups, registerFn = registerTools) {
+    /** @type {{ category: string; error: string; toolCount: number }[]} */
+    const failedToolCategories = [];
+    for (const group of toolGroups) {
+        try {
+            registerFn(registry, group.tools, {
+                category: group.category,
+                tags: group.tags,
+                ...(group.readOnly !== undefined ? { readOnly: group.readOnly } : {}),
+            });
+        } catch (err) {
+            const category = group.category;
+            const error = /** @type {Error} */ (err);
+            log('ERROR', `[tools-bootstrap] Erro ao registrar categoria '${category}': ${error.message}`);
+            failedToolCategories.push({ category, error: error.message, toolCount: group.tools.length });
+        }
+    }
+    return failedToolCategories;
+}
+
+/**
  * Registra todas as tools estáticas do agente no registry por categoria/tags, e expõe o registry/telemetria para as
  * ferramentas de introspecção.
  *
@@ -141,7 +208,8 @@ export function bootstrapTools(registry, mcpTools) {
     /** @type {ToolGroupConfig[]} */
     const TOOL_GROUPS = [
         { tools: taskTools, category: 'task', tags: ['queue', 'state'] },
-        { tools: codeTools, category: 'code', tags: ['lint', 'test', 'typecheck'], readOnly: true },
+        { tools: codeReadTools, category: 'code', tags: ['lint', 'test', 'typecheck'], readOnly: true },
+        { tools: codeWriteTools, category: 'code', tags: ['lint', 'fix', 'filesystem', 'write'], readOnly: false },
         { tools: gitTools, category: 'git', tags: ['vcs', 'diff', 'commit'] },
         { tools: sessionTools, category: 'session', tags: ['hooks', 'briefing'] },
         { tools: sessionRpcTools, category: 'session-rpc', tags: ['rpc', 'mode', 'plan', 'agent', 'compaction'] },
@@ -168,20 +236,7 @@ export function bootstrapTools(registry, mcpTools) {
 
     // G1-ARCH-07: itera sobre TOOL_GROUPS uma única vez — evita duplicação entre registerTools e allTools
     // C1-FIX: Granular error handling em cada categoria de tools (bootstrap robusto)
-    for (const group of TOOL_GROUPS) {
-        try {
-            registerTools(registry, group.tools, {
-                category: group.category,
-                tags: group.tags,
-                ...(group.readOnly !== undefined ? { readOnly: group.readOnly } : {}),
-            });
-        } catch (err) {
-            const category = group.category;
-            const error = /** @type {Error} */ (err);
-            log('ERROR', `[tools-bootstrap] Erro ao registrar categoria '${category}': ${error.message}`);
-            // Não relançar — permitir que outras categorias sejam registradas
-        }
-    }
+    const failedToolCategories = registerToolGroupsCollectFailures(registry, TOOL_GROUPS);
 
     if (mcpTools.length > 0) {
         try {
@@ -189,6 +244,7 @@ export function bootstrapTools(registry, mcpTools) {
         } catch (err) {
             const error = /** @type {Error} */ (err);
             log('ERROR', `[tools-bootstrap] Erro ao registrar MCP tools: ${error.message}`);
+            failedToolCategories.push({ category: 'mcp', error: error.message, toolCount: mcpTools.length });
         }
     }
 
@@ -200,6 +256,7 @@ export function bootstrapTools(registry, mcpTools) {
         } catch (err) {
             const error = /** @type {Error} */ (err);
             log('ERROR', `[tools-bootstrap] Erro ao registrar custom tools: ${error.message}`);
+            failedToolCategories.push({ category: 'custom', error: error.message, toolCount: customTools.length });
         }
     }
 
@@ -221,6 +278,9 @@ export function bootstrapTools(registry, mcpTools) {
 
     // F7.3: instrumentar todas as tools com wrapWithStats para capturar latência e erros automaticamente
     const instrumentedTools = sdkSessionTools.map(wrapWithStats);
+
+    assertPrimaryToolCategoriesHealthy(failedToolCategories);
+    setToolBootstrapHealth(buildToolBootstrapHealth(failedToolCategories));
 
     // Expõe registry para as ferramentas de introspecção (necessário antes de iniciar sessão)
     registerForIntrospection(registry);
