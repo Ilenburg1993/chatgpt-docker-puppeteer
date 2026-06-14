@@ -73,6 +73,7 @@ async function runSeedPhase(dbPath) {
                 ttlMs: configuration.ttlMs,
                 maxEntries: configuration.maxEntries,
                 pruneMs: configuration.pruneMs,
+                minBytes: configuration.minBytes,
             },
             {
                 enabled: true,
@@ -81,6 +82,7 @@ async function runSeedPhase(dbPath) {
                 ttlMs: 60_000,
                 maxEntries: 10_000,
                 pruneMs: 60_000,
+                minBytes: 0,
             },
         );
 
@@ -164,6 +166,7 @@ function runChild(phase, dbPath) {
     delete env['IO_L2_CACHE_TTL_MS'];
     delete env['IO_L2_CACHE_MAX_ENTRIES'];
     delete env['IO_L2_CACHE_PRUNE_MS'];
+    delete env['IO_L2_CACHE_MIN_BYTES'];
     if (phase === 'default') {
         delete env['IO_L2_CACHE_PROFILE'];
     } else {

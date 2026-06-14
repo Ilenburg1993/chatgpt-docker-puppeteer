@@ -2,7 +2,7 @@
 
 **Propósito**: Scripts de análise estática do código — grafo de dependências, variáveis, strings
 mágicas e cobertura JSDoc. **Status**: Canônico de apoio. **Público**: Mantenedores e ferramentas de
-CI de qualidade. **Última atualização**: 2 de março de 2026.
+CI de qualidade. **Última atualização**: 14 de junho de 2026.
 
 ## O que esta pasta contém
 
@@ -16,6 +16,7 @@ CI de qualidade. **Última atualização**: 2 de março de 2026.
 | `analyze-variables.mjs`                      | Analisa uso de variáveis no projeto       |
 | `audit-dependencies.js`                      | Audita dependências npm                   |
 | `audit-tmp-scripts.js`                       | Identifica scripts temporários esquecidos |
+| `copilot-io-l2-workload.mjs`                 | Mede L2 contra filesystem quente multiprocess |
 | `jsdoc_coverage_cli.mjs`                     | CLI de cobertura JSDoc                    |
 | `jsdoc_coverage_engine.mjs`                  | Engine de análise de cobertura JSDoc      |
 | `jsdoc_backfill_missing_exports.mjs`         | Identifica exports sem JSDoc              |

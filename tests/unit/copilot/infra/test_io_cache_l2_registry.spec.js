@@ -16,6 +16,7 @@ describe('io-cache-l2-registry', () => {
         delete process.env['IO_L2_CACHE_TTL_MS'];
         delete process.env['IO_L2_CACHE_MAX_ENTRIES'];
         delete process.env['IO_L2_CACHE_PRUNE_MS'];
+        delete process.env['IO_L2_CACHE_MIN_BYTES'];
         resetIoL2CacheForTest();
     });
 
@@ -46,6 +47,7 @@ describe('io-cache-l2-registry', () => {
             ttlMs: 60_000,
             maxEntries: 10_000,
             pruneMs: 60_000,
+            minBytes: 0,
         });
     });
 

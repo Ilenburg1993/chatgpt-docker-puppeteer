@@ -104,4 +104,55 @@ describe('createIoL2SqliteCache', () => {
             clear: { count: 1 },
         });
     });
+
+    it('throttles recency touches instead of writing SQLite on every hit', () => {
+        const db = createDb();
+        let nowMs = 1_000;
+        const cache = createIoL2SqliteCache({
+            db,
+            ttlMs: 60_000,
+            touchIntervalMs: 10_000,
+            now: () => nowMs,
+        });
+
+        cache.set({ key: 'touch', path: '/tmp/touch', payload: 'value' });
+        cache.get('touch');
+        expect(
+            db.prepare('SELECT last_accessed_ms as lastAccessedMs FROM copilot_io_cache_l2 WHERE cache_key = ?').get(
+                'touch',
+            ),
+        ).toMatchObject({ lastAccessedMs: 1_000 });
+
+        nowMs = 11_001;
+        cache.get('touch');
+
+        expect(
+            db.prepare('SELECT last_accessed_ms as lastAccessedMs FROM copilot_io_cache_l2 WHERE cache_key = ?').get(
+                'touch',
+            ),
+        ).toMatchObject({ lastAccessedMs: 11_001 });
+        expect(cache.getStats()).toMatchObject({
+            hits: 2,
+            touchWrites: 1,
+            touchSkips: 1,
+            touchIntervalMs: 10_000,
+        });
+    });
+
+    it('skips payloads below the configured admission threshold', () => {
+        const db = createDb();
+        const cache = createIoL2SqliteCache({ db, ttlMs: 60_000, minBytes: 4 });
+
+        expect(cache.set({ key: 'small', path: '/tmp/small', payload: 'abc' })).toBe(false);
+        expect(cache.set({ key: 'large', path: '/tmp/large', payload: 'abcd' })).toBe(true);
+
+        expect(cache.get('small')).toBeNull();
+        expect(cache.get('large')?.payload.toString('utf8')).toBe('abcd');
+        expect(cache.getStats()).toMatchObject({
+            size: 1,
+            sets: 1,
+            admissionSkips: 1,
+            minBytes: 4,
+        });
+    });
 });

@@ -18,3 +18,17 @@ export function readEnvPositiveInt(key, fallback) {
     const parsed = Number(raw);
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
+
+/**
+ * Lê inteiro não negativo de `process.env`, aceitando zero como override explícito.
+ *
+ * @param {string} key
+ * @param {number} fallback
+ * @returns {number}
+ */
+export function readEnvNonNegativeInt(key, fallback) {
+    const raw = process.env[key];
+    if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}

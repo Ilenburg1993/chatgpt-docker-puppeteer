@@ -3,7 +3,7 @@
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { isBufferValue, toOwnedBuffer } from './shared/buffer.js';
-import { readEnvPositiveInt } from './shared/env.js';
+import { readEnvNonNegativeInt, readEnvPositiveInt } from './shared/env.js';
 
 /**
  * @typedef {'bytes' | 'text' | 'json'} IoL2Kind
@@ -22,12 +22,16 @@ import { readEnvPositiveInt } from './shared/env.js';
  *     mtimeMs?: number | null;
  *     ctimeMs?: number | null;
  *     metaJson?: string | null;
+ *     lastAccessedMs: number;
  * }} IoL2CacheRow
  */
 
 const DEFAULT_TTL_MS = readEnvPositiveInt('IO_L2_CACHE_TTL_MS', 5 * 60 * 1000);
 const DEFAULT_MAX_ENTRIES = readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', 100_000);
+const DEFAULT_MIN_BYTES = readEnvNonNegativeInt('IO_L2_CACHE_MIN_BYTES', 0);
 const CAP_CHECK_INTERVAL = 100;
+const MIN_TOUCH_INTERVAL_MS = 1_000;
+const MAX_TOUCH_INTERVAL_MS = 30_000;
 
 /**
  * @param {string} filePath
@@ -76,7 +80,14 @@ function ensureIoL2Schema(db) {
 }
 
 /**
- * @param {{ db: { exec: Function; prepare: Function }; ttlMs?: number; maxEntries?: number; now?: () => number }} options
+ * @param {{
+ *     db: { exec: Function; prepare: Function };
+ *     ttlMs?: number;
+ *     maxEntries?: number;
+ *     minBytes?: number;
+ *     touchIntervalMs?: number;
+ *     now?: () => number;
+ * }} options
  */
 export function createIoL2SqliteCache(options) {
     const db = options?.db;
@@ -90,6 +101,14 @@ export function createIoL2SqliteCache(options) {
         Number.isFinite(options?.maxEntries) && Number(options?.maxEntries) > 0
             ? Number(options?.maxEntries)
             : DEFAULT_MAX_ENTRIES;
+    const minBytes =
+        Number.isFinite(options?.minBytes) && Number(options?.minBytes) >= 0
+            ? Number(options?.minBytes)
+            : DEFAULT_MIN_BYTES;
+    const touchIntervalMs =
+        Number.isFinite(options?.touchIntervalMs) && Number(options?.touchIntervalMs) >= 0
+            ? Number(options?.touchIntervalMs)
+            : Math.min(MAX_TOUCH_INTERVAL_MS, Math.max(MIN_TOUCH_INTERVAL_MS, Math.floor(ttlMs / 4)));
     const now = typeof options?.now === 'function' ? options.now : Date.now;
 
     ensureIoL2Schema(db);
@@ -101,6 +120,9 @@ export function createIoL2SqliteCache(options) {
         evictions: 0,
         invalidations: 0,
         errors: 0,
+        touchWrites: 0,
+        touchSkips: 0,
+        admissionSkips: 0,
     };
     const latency = {
         get: { count: 0, totalMs: 0, lastMs: 0, maxMs: 0 },
@@ -135,7 +157,8 @@ export function createIoL2SqliteCache(options) {
             expires_at_ms as expiresAtMs,
             mtime_ms as mtimeMs,
             ctime_ms as ctimeMs,
-            meta_json as metaJson
+            meta_json as metaJson,
+            last_accessed_ms as lastAccessedMs
         FROM copilot_io_cache_l2
         WHERE cache_key = ?
         LIMIT 1
@@ -233,7 +256,12 @@ export function createIoL2SqliteCache(options) {
                     stats.misses += 1;
                     return null;
                 }
-                stmtTouch.run(nowMs, key);
+                if (nowMs - Number(row.lastAccessedMs) >= touchIntervalMs) {
+                    stmtTouch.run(nowMs, key);
+                    stats.touchWrites += 1;
+                } else {
+                    stats.touchSkips += 1;
+                }
                 stats.hits += 1;
                 const payload = /** @type {unknown} */ (row.payload);
                 return {
@@ -269,6 +297,10 @@ export function createIoL2SqliteCache(options) {
             const startedAt = performance.now();
             try {
                 const payload = toBuffer(input.payload);
+                if (payload.byteLength < minBytes) {
+                    stats.admissionSkips += 1;
+                    return false;
+                }
                 const nowMs = now();
                 const expiresAtMs =
                     nowMs + (Number.isFinite(input?.ttlMs) && Number(input?.ttlMs) > 0 ? Number(input?.ttlMs) : ttlMs);
@@ -355,6 +387,8 @@ export function createIoL2SqliteCache(options) {
                 bytesStored: Number(snapshot.bytes || 0),
                 ttlMs,
                 maxEntries,
+                minBytes,
+                touchIntervalMs,
                 latency: Object.fromEntries(
                     Object.entries(latency).map(([operation, metric]) => [
                         operation,

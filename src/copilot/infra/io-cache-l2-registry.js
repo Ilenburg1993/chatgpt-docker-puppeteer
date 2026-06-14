@@ -5,7 +5,7 @@ import { getCopilotDb } from '#copilot/db';
 import { publishIoLifecycleEvent } from './io-observability.js';
 
 import { createIoL2SqliteCache } from './io-cache-l2-sqlite.js';
-import { readEnvPositiveInt } from './shared/env.js';
+import { readEnvNonNegativeInt, readEnvPositiveInt } from './shared/env.js';
 
 /** @type {ReturnType<typeof createIoL2SqliteCache> | null} */
 let _ioL2Cache = null;
@@ -35,11 +35,13 @@ const PROFILE_DEFAULTS = {
         ttlMs: 60 * 1000,
         maxEntries: 10_000,
         pruneMs: 60 * 1000,
+        minBytes: 0,
     },
     on: {
         ttlMs: 5 * 60 * 1000,
         maxEntries: 100_000,
         pruneMs: 5 * 60 * 1000,
+        minBytes: 0,
     },
 };
 
@@ -56,6 +58,7 @@ const PROFILE_DEFAULTS = {
  *     ttlMs: number;
  *     maxEntries: number;
  *     pruneMs: number;
+ *     minBytes: number;
  *     rawProfile?: string;
  * }}
  */
@@ -73,6 +76,7 @@ export function getIoL2CacheConfiguration() {
                 ttlMs: PROFILE_DEFAULTS.on.ttlMs,
                 maxEntries: PROFILE_DEFAULTS.on.maxEntries,
                 pruneMs: PROFILE_DEFAULTS.on.pruneMs,
+                minBytes: PROFILE_DEFAULTS.on.minBytes,
                 rawProfile,
             };
         }
@@ -85,6 +89,7 @@ export function getIoL2CacheConfiguration() {
             ttlMs: readEnvPositiveInt('IO_L2_CACHE_TTL_MS', defaults.ttlMs),
             maxEntries: readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', defaults.maxEntries),
             pruneMs: readEnvPositiveInt('IO_L2_CACHE_PRUNE_MS', defaults.pruneMs),
+            minBytes: readEnvNonNegativeInt('IO_L2_CACHE_MIN_BYTES', defaults.minBytes),
         };
     }
 
@@ -98,6 +103,7 @@ export function getIoL2CacheConfiguration() {
         ttlMs: readEnvPositiveInt('IO_L2_CACHE_TTL_MS', PROFILE_DEFAULTS.on.ttlMs),
         maxEntries: readEnvPositiveInt('IO_L2_CACHE_MAX_ENTRIES', PROFILE_DEFAULTS.on.maxEntries),
         pruneMs: readEnvPositiveInt('IO_L2_CACHE_PRUNE_MS', PROFILE_DEFAULTS.on.pruneMs),
+        minBytes: readEnvNonNegativeInt('IO_L2_CACHE_MIN_BYTES', PROFILE_DEFAULTS.on.minBytes),
     };
 }
 
@@ -150,7 +156,13 @@ function stopPruneTimer() {
  * @param {ReturnType<typeof getIoL2CacheConfiguration>} configuration
  */
 function getConfigurationKey(configuration) {
-    return [configuration.profile, configuration.ttlMs, configuration.maxEntries, configuration.pruneMs].join(':');
+    return [
+        configuration.profile,
+        configuration.ttlMs,
+        configuration.maxEntries,
+        configuration.pruneMs,
+        configuration.minBytes,
+    ].join(':');
 }
 
 export function getIoL2Cache() {
@@ -177,6 +189,7 @@ export function getIoL2Cache() {
             db: getCopilotDb(),
             ttlMs: configuration.ttlMs,
             maxEntries: configuration.maxEntries,
+            minBytes: configuration.minBytes,
         });
         _activeConfigurationKey = configurationKey;
         _lastInitError = null;

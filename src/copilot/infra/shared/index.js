@@ -5,7 +5,7 @@
  * @module copilot/infra/shared
  */
 
-export { readEnvPositiveInt } from './env.js';
+export { readEnvNonNegativeInt, readEnvPositiveInt } from './env.js';
 export { sha256 } from './hash.js';
 export {
     BUFFER_MAX_LENGTH,

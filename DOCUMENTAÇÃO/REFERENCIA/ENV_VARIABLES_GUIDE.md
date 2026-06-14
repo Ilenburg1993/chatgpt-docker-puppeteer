@@ -249,16 +249,18 @@ subir para `mutations` ou `all`.
 valores inválidos falham fechados e aparecem como `IO_L2_PROFILE_INVALID` no health de IO.
 
 - `off`: mantém apenas L1 em memória;
-- `experimental`: ativa L2 com TTL e pruning de 60 segundos e limite de 10.000 entradas;
+- `experimental`: ativa L2 com TTL/pruning de 60 segundos e limite de 10.000 entradas;
 - `on`: ativa L2 com TTL/pruning de 5 minutos e limite de 100.000 entradas.
 
-Os knobs `IO_L2_CACHE_TTL_MS`, `IO_L2_CACHE_MAX_ENTRIES` e `IO_L2_CACHE_PRUNE_MS` substituem os
-defaults do perfil. `IO_L2_CACHE_ENABLED` continua aceito apenas para compatibilidade quando
+Os knobs `IO_L2_CACHE_TTL_MS`, `IO_L2_CACHE_MAX_ENTRIES`, `IO_L2_CACHE_PRUNE_MS` e
+`IO_L2_CACHE_MIN_BYTES` substituem os defaults do perfil. Zero em `IO_L2_CACHE_MIN_BYTES` admite todos os payloads.
+`IO_L2_CACHE_ENABLED` continua aceito apenas para compatibilidade quando
 `IO_L2_CACHE_PROFILE` está ausente. O health expõe perfil, origem da configuração, hit/miss,
 ocupação e latência bounded de get/set/invalidate/prune/clear.
 
 Comece por `experimental`, compare cold/warm e só promova para `on` quando hit ratio e custo SQLite
-justificarem o footprint persistente.
+justificarem o footprint persistente. A matriz local com admissão em 4/16/64 KiB piorou o break-even porque misses
+ainda consultam SQLite antes do fallback; por isso todos os perfis mantêm limiar zero por default.
 
 ### Preflight de capacidade IO Copilot
 
