@@ -15,6 +15,7 @@ import {
     moveFileLocked,
     patchTextLocked,
     readBytes,
+    readLines,
     readText,
     readTextChunks,
     removePathLocked,
@@ -270,6 +271,21 @@ describe('infra/io-engine', () => {
         expect(range.totalLines).toBe(3);
         expect(range.returnedLines).toEqual({ start: 2, end: 2 });
         expect(range.io.cache).toBe('l1-hit');
+    });
+
+    it('readText e readLines compartilham semântica física para CRLF e CR isolado', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'physical-lines.txt');
+        await writeFile(file, 'one\r\ntwo\rthree\nfour', 'utf8');
+
+        const range = await readText(file, { startLine: 2, endLine: 3 });
+        const lines = await readLines(file, { startLine: 2, endLine: 3 });
+
+        expect(range.content).toBe('two\rthree');
+        expect(range.totalLines).toBe(4);
+        expect(lines.content).toBe('two\rthree');
+        expect(lines.lines).toEqual(['two', 'three']);
+        expect(lines.totalLines).toBe(4);
     });
 
     it('readBytes usa L2 em miss de L1 e reaquece L1 para próxima leitura', async () => {

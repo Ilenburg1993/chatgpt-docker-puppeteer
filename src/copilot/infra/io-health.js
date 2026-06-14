@@ -205,9 +205,12 @@ export function readIoRuntimeHealthSnapshot() {
                 busInvalidations: 0,
                 enabled: true,
                 recursiveInvalidations: 0,
+                rejected: 0,
                 size: 0,
+                sizeBytes: 0,
                 maxEntries: 0,
                 maxTextChars: 0,
+                maxBytes: 0,
             }),
             aggregate,
             plan: buildIoCacheTierPlan({

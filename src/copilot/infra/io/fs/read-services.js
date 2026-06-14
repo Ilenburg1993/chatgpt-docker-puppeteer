@@ -13,6 +13,7 @@ import { assertValidIoFilePath } from '../../policy/path-resource.js';
 import { bufferIsUtf8, isBufferValue, toOwnedBuffer } from '../../shared/buffer.js';
 import { fingerprintMatches, richFingerprintMatches } from '../../shared/fingerprint-match.js';
 import { sha256 } from '../../shared/hash.js';
+import { splitPhysicalTextLines } from '../../shared/text-lines.js';
 import { readBytesFileSnapshot } from './read-bytes.js';
 import { sliceTextByCachedLineOffsets } from './line-offset-cache.js';
 import { readTextLineChunks, readTextLineChunksStream } from './read-chunks.js';
@@ -581,7 +582,7 @@ export async function readText(filePath, options = {}) {
  */
 export async function readLines(filePath, options = {}) {
     const result = await readText(filePath, options);
-    return { ...result, lines: result.content.split('\n') };
+    return { ...result, lines: splitPhysicalTextLines(result.content) };
 }
 
 /**

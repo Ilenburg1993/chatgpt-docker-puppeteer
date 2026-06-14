@@ -6,6 +6,7 @@
  */
 
 import { readTextFileSnapshot } from './read-text.js';
+import { splitPhysicalTextLines } from '../../shared/text-lines.js';
 
 /**
  * @param {string} filePath
@@ -13,7 +14,7 @@ import { readTextFileSnapshot } from './read-text.js';
  */
 export async function readTextLinesSnapshot(filePath) {
     const snapshot = await readTextFileSnapshot(filePath);
-    const lines = snapshot.content.length === 0 ? [] : snapshot.content.split(/\r\n|\r|\n/u);
+    const lines = splitPhysicalTextLines(snapshot.content, { emptyAsNoLines: true });
     return {
         path: filePath,
         lines,

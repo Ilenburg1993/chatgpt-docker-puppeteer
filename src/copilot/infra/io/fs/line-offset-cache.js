@@ -11,10 +11,12 @@
 
 import path from 'node:path';
 import { normalizePathResourceKey } from '../../policy/path-resource.js';
+import { collectPhysicalLineStarts, slicePhysicalTextLines } from '../../shared/text-lines.js';
 import { registerIoInvalidationHook } from '../invalidation/bus.js';
 
 const MAX_LINE_OFFSET_CACHE_ENTRIES = Number(process.env['IO_LINE_OFFSET_CACHE_MAX_ENTRIES'] ?? 256);
 const DEFAULT_MAX_TEXT_CHARS = Number(process.env['IO_LINE_OFFSET_CACHE_MAX_TEXT_CHARS'] ?? 2_000_000);
+const DEFAULT_MAX_CACHE_BYTES = Number(process.env['IO_LINE_OFFSET_CACHE_MAX_BYTES'] ?? 16 * 1024 * 1024);
 const LINE_OFFSET_CACHE_DISABLED_VALUES = new Set(['0', 'false', 'off', 'disabled']);
 
 /**
@@ -23,12 +25,14 @@ const LINE_OFFSET_CACHE_DISABLED_VALUES = new Set(['0', 'false', 'off', 'disable
  * @property {number} sizeBytes
  * @property {number} mtimeMs
  * @property {number} textLength
- * @property {number[]} starts
+ * @property {Uint32Array} starts
  * @property {number} totalLines
+ * @property {number} estimatedBytes
  */
 
 /** @type {Map<string, LineOffsetEntry>} */
 const lineOffsetCache = new Map();
+let lineOffsetCacheBytes = 0;
 
 const lineOffsetCacheStats = {
     hits: 0,
@@ -40,6 +44,7 @@ const lineOffsetCacheStats = {
     bypasses: 0,
     busInvalidations: 0,
     recursiveInvalidations: 0,
+    rejected: 0,
 };
 
 /** @type {(() => void) | null} */
@@ -48,15 +53,17 @@ let lineOffsetInvalidationUnregister = null;
 ensureLineOffsetCacheInvalidationHook();
 
 /**
- * @returns {Record<string, number | boolean> & { enabled: boolean; size: number; maxEntries: number; maxTextChars: number }}
+ * @returns {Record<string, number | boolean> & { enabled: boolean; size: number; sizeBytes: number; maxEntries: number; maxTextChars: number; maxBytes: number }}
  */
 export function getLineOffsetCacheStats() {
     return {
         ...lineOffsetCacheStats,
         enabled: isLineOffsetCacheEnabled(),
         size: lineOffsetCache.size,
+        sizeBytes: lineOffsetCacheBytes,
         maxEntries: readLineOffsetCacheMaxEntries(),
         maxTextChars: readLineOffsetCacheMaxTextChars(),
+        maxBytes: readLineOffsetCacheMaxBytes(),
     };
 }
 
@@ -65,6 +72,7 @@ export function getLineOffsetCacheStats() {
  */
 export function resetLineOffsetCacheForTest() {
     lineOffsetCache.clear();
+    lineOffsetCacheBytes = 0;
     for (const key of Object.keys(lineOffsetCacheStats)) {
         lineOffsetCacheStats[/** @type {keyof typeof lineOffsetCacheStats} */ (key)] = 0;
     }
@@ -121,7 +129,7 @@ function clearLineOffsetCacheByPrefixes(prefixes) {
     let removed = 0;
     for (const key of [...lineOffsetCache.keys()]) {
         if (!prefixes.some((prefix) => key.startsWith(prefix))) continue;
-        lineOffsetCache.delete(key);
+        deleteLineOffsetCacheEntry(key);
         removed += 1;
     }
     return removed;
@@ -146,7 +154,7 @@ export function sliceTextByCachedLineOffsets(filePath, text, fingerprint, window
         text.length > readLineOffsetCacheMaxTextChars()
     ) {
         lineOffsetCacheStats.bypasses += 1;
-        return { ...sliceTextBySplit(text, window), cache: 'line-offset-bypass' };
+        return { ...slicePhysicalTextLines(text, window), cache: 'line-offset-bypass' };
     }
 
     const normalizedPath = normalizePathResourceKey(filePath);
@@ -161,52 +169,52 @@ export function sliceTextByCachedLineOffsets(filePath, text, fingerprint, window
         lineOffsetCache.set(key, entry);
     } else {
         if (entry) {
-            lineOffsetCache.delete(key);
+            deleteLineOffsetCacheEntry(key);
             lineOffsetCacheStats.stale += 1;
         }
         lineOffsetCacheStats.misses += 1;
+        const starts = collectPhysicalLineStarts(text);
         entry = {
             path: normalizedPath,
             sizeBytes,
             mtimeMs,
             textLength: text.length,
-            starts: buildLineStarts(text),
-            totalLines: 0,
+            starts,
+            totalLines: starts.length,
+            estimatedBytes: starts.byteLength + normalizedPath.length * 2 + 128,
         };
-        entry.totalLines = entry.starts.length;
-        lineOffsetCache.set(key, entry);
-        lineOffsetCacheStats.sets += 1;
-        trimLineOffsetCache();
+        if (entry.estimatedBytes <= readLineOffsetCacheMaxBytes()) {
+            lineOffsetCache.set(key, entry);
+            lineOffsetCacheBytes += entry.estimatedBytes;
+            lineOffsetCacheStats.sets += 1;
+            trimLineOffsetCache();
+        } else {
+            lineOffsetCacheStats.rejected += 1;
+        }
     }
     return { ...sliceTextByOffsets(text, entry.starts, window), cache: cacheState };
 }
 
 /**
  * @param {string} text
- * @returns {number[]}
- */
-function buildLineStarts(text) {
-    const starts = [0];
-    for (let index = 0; index < text.length; index += 1) {
-        if (text.charCodeAt(index) === 10) starts.push(index + 1);
-    }
-    return starts;
-}
-
-/**
- * @param {string} text
- * @param {number[]} starts
+ * @param {Uint32Array} starts
  * @param {{ startLine?: number | undefined; endLine?: number | undefined }} window
  * @returns {{ content: string; totalLines: number; returnedLines: { start: number; end: number } }}
  */
 function sliceTextByOffsets(text, starts, window) {
     const totalLines = starts.length;
-    const requestedStart = Math.max(1, window.startLine ?? 1);
+    const requestedStart = Math.max(1, Math.trunc(window.startLine ?? 1));
+    const requestedEnd = window.endLine === undefined ? totalLines : Math.trunc(window.endLine);
     const sliceStart = Math.min(requestedStart, totalLines + 1);
-    const sliceEnd = sliceStart > totalLines ? totalLines : Math.min(window.endLine ?? totalLines, totalLines);
-    if (sliceStart > totalLines) return { content: '', totalLines, returnedLines: { start: sliceStart, end: sliceEnd } };
+    const sliceEnd = sliceStart > totalLines ? totalLines : Math.min(requestedEnd, totalLines);
+    if (sliceStart > totalLines || sliceEnd < sliceStart) {
+        return { content: '', totalLines, returnedLines: { start: sliceStart, end: sliceEnd } };
+    }
     const contentStart = starts[sliceStart - 1] ?? text.length;
-    const contentEnd = sliceEnd >= totalLines ? text.length : Math.max(contentStart, (starts[sliceEnd] ?? text.length) - 1);
+    const contentEnd =
+        sliceEnd >= totalLines
+            ? text.length
+            : Math.max(contentStart, lineContentEndFromNextStart(text, starts[sliceEnd] ?? text.length));
     return {
         content: text.slice(contentStart, contentEnd),
         totalLines,
@@ -216,20 +224,14 @@ function sliceTextByOffsets(text, starts, window) {
 
 /**
  * @param {string} text
- * @param {{ startLine?: number | undefined; endLine?: number | undefined }} window
- * @returns {{ content: string; totalLines: number; returnedLines: { start: number; end: number } }}
+ * @param {number} nextStart
+ * @returns {number}
  */
-function sliceTextBySplit(text, window) {
-    const lines = text.split('\n');
-    const totalLines = lines.length;
-    const requestedStart = Math.max(1, window.startLine ?? 1);
-    const sliceStart = Math.min(requestedStart, totalLines + 1);
-    const sliceEnd = sliceStart > totalLines ? totalLines : Math.min(window.endLine ?? totalLines, totalLines);
-    return {
-        content: sliceStart > totalLines ? '' : lines.slice(sliceStart - 1, sliceEnd).join('\n'),
-        totalLines,
-        returnedLines: { start: sliceStart, end: sliceEnd },
-    };
+function lineContentEndFromNextStart(text, nextStart) {
+    let end = nextStart;
+    if (text.charCodeAt(end - 1) === 10) end -= 1;
+    if (text.charCodeAt(end - 1) === 13) end -= 1;
+    return end;
 }
 
 /**
@@ -253,12 +255,25 @@ function isLineOffsetCacheEnabled() {
 
 function trimLineOffsetCache() {
     const maxEntries = readLineOffsetCacheMaxEntries();
-    while (lineOffsetCache.size > maxEntries) {
+    const maxBytes = readLineOffsetCacheMaxBytes();
+    while (lineOffsetCache.size > maxEntries || lineOffsetCacheBytes > maxBytes) {
         const oldest = lineOffsetCache.keys().next().value;
         if (typeof oldest !== 'string') break;
-        lineOffsetCache.delete(oldest);
+        deleteLineOffsetCacheEntry(oldest);
         lineOffsetCacheStats.evictions += 1;
     }
+}
+
+/**
+ * @param {string} key
+ * @returns {boolean}
+ */
+function deleteLineOffsetCacheEntry(key) {
+    const entry = lineOffsetCache.get(key);
+    if (!entry) return false;
+    lineOffsetCache.delete(key);
+    lineOffsetCacheBytes = Math.max(0, lineOffsetCacheBytes - entry.estimatedBytes);
+    return true;
 }
 
 /**
@@ -277,4 +292,13 @@ function readLineOffsetCacheMaxTextChars() {
     return Number.isFinite(DEFAULT_MAX_TEXT_CHARS) && DEFAULT_MAX_TEXT_CHARS > 0
         ? Math.max(4096, Math.trunc(DEFAULT_MAX_TEXT_CHARS))
         : 2_000_000;
+}
+
+/**
+ * @returns {number}
+ */
+function readLineOffsetCacheMaxBytes() {
+    return Number.isFinite(DEFAULT_MAX_CACHE_BYTES) && DEFAULT_MAX_CACHE_BYTES > 0
+        ? Math.max(1024 * 1024, Math.trunc(DEFAULT_MAX_CACHE_BYTES))
+        : 16 * 1024 * 1024;
 }

@@ -1408,6 +1408,28 @@ o array intermediário de `split/join`.
 Validação focada de IO-063: **61 passados, 0 falhas**, incluindo fuzz, patch plan e MCP; lint focado,
 `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.55 Status de implementação — leitura física e cache de offsets bounded em 2026-06-14
+
+IO-064 fechou duas divergências no núcleo de leitura. O caminho de bypass do line-offset cache ainda executava
+`split('\n')`, materializando strings e array proporcionais ao arquivo, e o cache reconhecia apenas LF. Além disso,
+o LRU limitava quantidade de entradas, mas não bytes retidos; arquivos densos em newlines podiam manter milhões de
+`number` do heap por entrada.
+
+A primitiva compartilhada de linhas agora:
+
+- recorta janelas LF, CRLF e CR isolado em uma varredura com memória auxiliar O(1);
+- preserva delimitadores internos originais e remove somente o delimitador final da janela;
+- oferece arrays de linhas físicas apenas para APIs cujo contrato exige materialização;
+- constrói offsets compactos em `Uint32Array`.
+
+O line-offset cache usa o scanner O(1) no bypass, aplica a mesma semântica física em hits/misses e mantém orçamento
+global `IO_LINE_OFFSET_CACHE_MAX_BYTES` (default 16 MiB), além dos limites por entradas e tamanho textual. Health
+expõe `sizeBytes`, `maxBytes` e `rejected`; invalidações e evicções descontam o peso retido. `readText`, `readLines` e
+`readTextLinesSnapshot` agora concordam para CRLF/CR, preservando a distinção histórica de snapshot vazio.
+
+Validação focada de IO-064: **70 passados, 0 falhas** em cache, engine, chunks e índice; lint focado,
+`diff --check` e `typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1691,12 +1713,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-061 | P1 | Babel parser | **Concluído:** policy/extrator únicos usam opções atuais por extensão | CommonJS/module, TS dts/mts/tsx, ImportExpression, error codes e paridade worker | Proposals/Flow não são auto-habilitados; decorators continuam legacy | Monitorar Babel semver e criar fixture antes de alterar syntax policy |
 | IO-062 | P1 | Read-through | **Concluído:** snapshot textual L1 é reutilizado e Buffer duplicado é opt-out | métricas no relatório e prova de miss binário posterior | Reuso exige fingerprint rico; entradas legadas caem para snapshot físico | Propagar snapshots diretamente em novos callers, sem reconstruir conteúdo |
 | IO-063 | P1 | Patch lines | **Concluído:** metadata usa LF/CRLF/CR e ocorrência específica evita segunda varredura | regressão mista, fuzz e consumers de patch-plan | Diffs ainda normalizam por LF em módulo próprio | Auditar diff separadamente sem alterar formato público inadvertidamente |
+| IO-064 | P1 | Read line offsets | **Concluído:** slicing físico é uniforme e retenção do cache é bounded por bytes | scanner O(1) no bypass, offsets `Uint32Array`, health e regressões CR/LF/CRLF | Construção de offsets faz duas varreduras para obter alocação compacta exata | Medir miss frio versus redução de heap; manter o orçamento global |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2220,6 +2243,7 @@ Maturidade operacional avançada:
 - [x] unificar policy/extrator Babel e alinhar source modes, TS e ImportExpression à documentação oficial;
 - [x] reutilizar snapshot textual L1 no read-through e evitar cache binário duplicado no caller textual;
 - [x] unificar linhas físicas no patch e remover segunda varredura/arrays do replace-all;
+- [x] unificar linhas físicas na leitura e limitar o line-offset cache por bytes;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2240,7 +2264,8 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria de leitura parcial e dupla retenção entre L1, parser e índice, e medir o custo de `attachComment`
-antes de qualquer perfil sem doc comments. Em paralelo, ampliar fixtures Babel somente para sintaxe realmente aceita
-pelo workspace; manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece explicitamente sem implementação até
-existir evidência de múltiplos runtimes/processos reais que justifique o contrato.
+Continuar a auditoria de materializações em `text-diff`, busca textual e leitores JSONL/output-window, separando
+arrays exigidos pelo contrato de duplicações internas removíveis. Medir o custo de `attachComment` antes de qualquer
+perfil sem doc comments e ampliar fixtures Babel somente para sintaxe realmente aceita pelo workspace; manter
+fuzz/chaos como gates recorrentes. IO-030/L3 permanece explicitamente sem implementação até existir evidência de
+múltiplos runtimes/processos reais que justifique o contrato.

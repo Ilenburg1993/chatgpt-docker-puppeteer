@@ -35,6 +35,8 @@ describe('infra/io/fs line-offset cache', () => {
         assert.equal(first.cache, 'line-offset-miss');
         assert.equal(afterFirst.misses, 1);
         assert.equal(afterFirst.sets, 1);
+        assert.ok(afterFirst.sizeBytes > 0);
+        assert.ok(afterFirst.sizeBytes <= afterFirst.maxBytes);
 
         assert.equal(second.content, text);
         assert.deepEqual(second.returnedLines, { start: 1, end: 4 });
@@ -56,6 +58,7 @@ describe('infra/io/fs line-offset cache', () => {
         assert.equal(stats.busInvalidations, 1);
         assert.equal(stats.clears, 1);
         assert.equal(stats.size, 0);
+        assert.equal(stats.sizeBytes, 0);
     });
 
     it('normaliza paths relativos e absolutos para a mesma entrada', () => {
@@ -85,36 +88,37 @@ describe('infra/io/fs line-offset cache', () => {
         assert.equal(getLineOffsetCacheStats().size, 0);
     });
 
-    it('supports an operational kill switch', () => {
-        process.env['IO_LINE_OFFSET_CACHE_ENABLED'] = '0';
+    it('treats CRLF and isolated CR as physical delimiters on cache hits and misses', () => {
         resetLineOffsetCacheForTest();
-        const text = 'one\ntwo';
-        const result = sliceTextByCachedLineOffsets(
-            FILE,
-            text,
-            { sizeBytes: Buffer.byteLength(text, 'utf8'), mtimeMs: 9012 },
-            { startLine: 1 },
-        );
-        const stats = getLineOffsetCacheStats();
+        const text = 'one\r\ntwo\rthree\nfour';
+        const fingerprint = { sizeBytes: Buffer.byteLength(text, 'utf8'), mtimeMs: 8901 };
 
-        assert.equal(result.cache, 'line-offset-bypass');
-        assert.equal(stats.enabled, false);
-        assert.equal(stats.bypasses, 1);
-        assert.equal(stats.size, 0);
+        const first = sliceTextByCachedLineOffsets(FILE, text, fingerprint, { startLine: 2, endLine: 3 });
+        const second = sliceTextByCachedLineOffsets(FILE, text, fingerprint, { startLine: 1, endLine: 2 });
+
+        assert.equal(first.content, 'two\rthree');
+        assert.equal(first.totalLines, 4);
+        assert.equal(first.cache, 'line-offset-miss');
+        assert.equal(second.content, 'one\r\ntwo');
+        assert.equal(second.totalLines, 4);
+        assert.equal(second.cache, 'line-offset-hit');
     });
 
-    it('supports an operational kill switch', () => {
+    it('uses the same physical-line semantics without allocating a split array on bypass', () => {
         process.env['IO_LINE_OFFSET_CACHE_ENABLED'] = '0';
         resetLineOffsetCacheForTest();
-        const text = 'one\ntwo';
+        const text = 'one\r\ntwo\rthree\n';
         const result = sliceTextByCachedLineOffsets(
             FILE,
             text,
             { sizeBytes: Buffer.byteLength(text, 'utf8'), mtimeMs: 9012 },
-            { startLine: 1 },
+            { startLine: 2, endLine: 3 },
         );
         const stats = getLineOffsetCacheStats();
 
+        assert.equal(result.content, 'two\rthree');
+        assert.equal(result.totalLines, 4);
+        assert.deepEqual(result.returnedLines, { start: 2, end: 3 });
         assert.equal(result.cache, 'line-offset-bypass');
         assert.equal(stats.enabled, false);
         assert.equal(stats.bypasses, 1);
