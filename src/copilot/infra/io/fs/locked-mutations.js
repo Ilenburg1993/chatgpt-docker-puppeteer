@@ -17,7 +17,7 @@ import { assertExpectedSha256 } from '../../policy/preconditions.js';
 import { decodeUtf8Buffer, toOwnedBuffer, utf8ByteLength } from '../../shared/buffer.js';
 import { sha256 } from '../../shared/hash.js';
 import { invalidateIoCacheTiers, invalidateIoCacheTierSubtrees } from '../invalidation/cache-tiers.js';
-import { buildSimpleTextDiff, computeTextPatch } from '../patch/index.js';
+import { buildSimpleTextDiffAroundLineRange, computeTextPatch } from '../patch/index.js';
 import { copyFileUnlocked } from './copy.js';
 import { mkdirPathUnlocked } from './mkdir.js';
 import { moveFileUnlocked } from './move.js';
@@ -149,6 +149,22 @@ async function buildRollbackSnapshot(content, options = {}) {
           })
         : null;
     return { snapshotBase64: null, snapshotTruncated: true, rollbackSidecar };
+}
+
+/**
+ * @param {unknown} error
+ */
+function isUnpublishedSnapshotConflict(error) {
+    const code = /** @type {{ code?: unknown }} */ (error)?.code;
+    return code === 'EEXPECTEDHASH' || code === 'ESTALESNAPSHOT';
+}
+
+/**
+ * @param {import('./rollback-sidecar.js').IoRollbackSidecar | null} sidecar
+ */
+async function discardRollbackSidecar(sidecar) {
+    if (!sidecar) return;
+    await fs.unlink(sidecar.path).catch(() => undefined);
 }
 
 /**
@@ -598,7 +614,7 @@ export async function moveFileLocked(source, destination, options = {}) {
 }
 
 /**
- * Patch textual com read + write dentro do mesmo lock.
+ * Patch textual com read + write dentro do mesmo lock e preview otimizado quando seguro.
  *
  * @param {string} filePath
  * @param {{
@@ -614,6 +630,7 @@ export async function moveFileLocked(source, destination, options = {}) {
  *     maxDiffLines?: number;
  *     maxDiffBytes?: number;
  *     computeDiff?: boolean;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
  */
@@ -631,11 +648,17 @@ export async function patchTextLocked(filePath, options) {
         const value = await (async () => {
             try {
                 return await lease.run(async () => {
+                    const readStartedAt = nowIoMs();
                     const rawContent = await fs.readFile(filePath);
+                    const readMs = elapsedMs(readStartedAt);
                     const rawBuffer = typeof rawContent === 'string' ? toOwnedBuffer(rawContent) : rawContent;
                     const content = typeof rawContent === 'string' ? rawContent : decodeUtf8Buffer(rawContent);
                     const previousHash = assertExpectedSha256(rawBuffer, options.expectedHash) ?? sha256(rawBuffer);
+                    const patchStartedAt = nowIoMs();
                     const patch = computeTextPatch(content, options);
+                    const patchMs = elapsedMs(patchStartedAt);
+                    void readMs;
+                    void patchMs;
                     const { updated, replacedOccurrences, bytesWritten } = patch;
                     const contentHash = sha256(updated);
                     const previousSnapshot = await buildRollbackSnapshot(rawBuffer, {
@@ -643,17 +666,31 @@ export async function patchTextLocked(filePath, options) {
                         contentHash: previousHash,
                     });
                     const diffContextLines = options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
+                    const { firstMatchLine, lastMatchLine, lineDelta } = patch;
                     const shouldComputeDiff = options.computeDiff !== false;
                     const diff = shouldComputeDiff
-                        ? buildSimpleTextDiff(content, updated, { contextLines: diffContextLines })
-                        : { diff: '', contextLines: diffContextLines };
+                        ? buildSimpleTextDiffAroundLineRange(content, updated, { firstMatchLine, lastMatchLine, lineDelta, contextLines: diffContextLines, replacedOccurrences: replacedOccurrences })
+                        : { diff: '', contextLines: diffContextLines, rangeOptimized: false };
                     const diffPreview = shouldComputeDiff
                         ? windowTextPreview(diff.diff, {
                               maxLines: options.maxDiffLines ?? DEFAULT_PATCH_DIFF_MAX_LINES,
                               maxBytes: options.maxDiffBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES,
                           })
                         : { text: '', truncated: false, lines: 0, bytes: 0 };
-                    const durability = options.dryRun ? null : await writeAtomicFileUnlocked(filePath, updated);
+                    let durability = null;
+                    if (!options.dryRun) {
+                        try {
+                            durability = await writeAtomicFileUnlocked(filePath, updated, {
+                                expectedHash: previousHash,
+                                ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
+                            });
+                        } catch (error) {
+                            if (isUnpublishedSnapshotConflict(error)) {
+                                await discardRollbackSidecar(previousSnapshot.rollbackSidecar);
+                            }
+                            throw error;
+                        }
+                    }
                     return {
                         occurrences: patch.occurrences,
                         replacedOccurrences,
@@ -673,6 +710,7 @@ export async function patchTextLocked(filePath, options) {
                         diffPreviewLines: diffPreview.lines,
                         diffPreviewBytes: diffPreview.bytes,
                         diffContextLines: diff.contextLines,
+                        diffRangeOptimized: diff.rangeOptimized === true,
                         computeDiff: shouldComputeDiff,
                         previousHash,
                         contentHash,
@@ -706,6 +744,7 @@ export async function patchTextLocked(filePath, options) {
                     contentHash: value.contentHash,
                     dryRun: Boolean(options.dryRun),
                     computeDiff: value.computeDiff,
+                    diffRangeOptimized: value.diffRangeOptimized,
                     occurrenceIndex: options.occurrenceIndex ?? null,
                     replaceAll: Boolean(options.replaceAll),
                     occurrences: value.occurrences,

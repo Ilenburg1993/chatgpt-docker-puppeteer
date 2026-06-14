@@ -8,13 +8,12 @@
 import { sha256 } from '../shared/hash.js';
 
 /**
- * @param {string | Buffer | Uint8Array} currentContent
+ * @param {string} actualHash
  * @param {string | undefined | null} expectedHash
  * @returns {string | null}
  */
-export function assertExpectedSha256(currentContent, expectedHash) {
+export function assertExpectedSha256Digest(actualHash, expectedHash) {
     if (!expectedHash) return null;
-    const actualHash = sha256(currentContent);
     if (actualHash !== expectedHash) {
         const err = new Error(`expectedHash mismatch: expected ${expectedHash}, got ${actualHash}`);
         /** @type {{ code?: string; expectedHash?: string; actualHash?: string }} */ (err).code = 'EEXPECTEDHASH';
@@ -23,4 +22,14 @@ export function assertExpectedSha256(currentContent, expectedHash) {
         throw err;
     }
     return actualHash;
+}
+
+/**
+ * @param {string | Buffer | Uint8Array} currentContent
+ * @param {string | undefined | null} expectedHash
+ * @returns {string | null}
+ */
+export function assertExpectedSha256(currentContent, expectedHash) {
+    if (!expectedHash) return null;
+    return assertExpectedSha256Digest(sha256(currentContent), expectedHash);
 }

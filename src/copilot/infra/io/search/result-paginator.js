@@ -22,7 +22,7 @@ import { normalizeCursorOffset, normalizeMaxResults, windowItems, windowTextLine
  */
 export function normalizeSearchWindow(options = {}) {
     const maxResults = normalizeMaxResults(options.maxResults);
-    const cursorOffset = normalizeCursorOffset(options.cursor);
+    const cursorOffset = normalizeCursorOffset(options.cursor, { strict: true });
     return {
         maxResults,
         ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
@@ -41,6 +41,7 @@ export function paginateSearchItems(items, window) {
     return windowItems(items, {
         maxResults: window.maxResults,
         ...(window.cursor === undefined ? {} : { cursor: window.cursor }),
+        strictCursor: true,
     });
 }
 
@@ -59,5 +60,6 @@ export function paginateSearchText(text, window) {
     return windowTextLines(text, {
         maxResults: window.maxResults,
         ...(window.cursor === undefined ? {} : { cursor: window.cursor }),
+        strictCursor: true,
     });
 }

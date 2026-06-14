@@ -9,11 +9,21 @@ import {
 } from '../../../../src/copilot/infra/policy/output-window.js';
 
 describe('infra/policy/output-window', () => {
-    it('normaliza cursor numérico defensivamente', () => {
+    it('normaliza cursor numérico defensivamente por padrão', () => {
         expect(normalizeCursorOffset(undefined)).toBe(0);
         expect(normalizeCursorOffset('2')).toBe(2);
         expect(normalizeCursorOffset('-1')).toBe(0);
         expect(normalizeCursorOffset('abc')).toBe(0);
+    });
+
+    it('rejeita cursor inválido em modo estrito', () => {
+        expect(() => normalizeCursorOffset('abc', { strict: true })).toThrow('Cursor de paginação inválido');
+        expect(() => windowTextLines('a\nb', { maxResults: 1, cursor: 'abc', strictCursor: true })).toThrow(
+            'Cursor de paginação inválido',
+        );
+        expect(() => windowItems(['a', 'b'], { maxResults: 1, cursor: '-1', strictCursor: true })).toThrow(
+            'Cursor de paginação inválido',
+        );
     });
 
     it('pagina linhas de texto com nextCursor estável', () => {

@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `7e6ee217`, seguida da onda de streaming versionado
+**Baseline reinvestigado:** `main` sincronizada até `3c23d73b`, seguida da onda de patch externo protegido
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -24,13 +24,14 @@ mutações que materializam payload grande agora falham cedo quando a
 insuficiência de espaço já é observável; scopes distinguem warming/ready/stale/degraded sem vazar paths; scanner,
 prefetch e busca FTS compartilham uma política glob sem abrir mão da enumeração protegida; temporários de publicação
 são irmãos ocultos, exclusivos e usam token de 128 bits; snapshot de rollback, L1 e índice agora recusam versões
-obsoletas sob replace externo coordenado; leitura em chunks agora possui versão/abort explícitos; o risco dominante
-migrou para interação de patch com writers não cooperativos e decisões de promoção baseadas em workload**.
+obsoletas sob replace externo coordenado; leitura em chunks possui versão/abort explícitos; patch e write com
+precondição reconfirmam a versão no último ponto portátil antes do publish; o risco dominante migrou para cobertura
+por fuzz e decisões de promoção baseadas em workload**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — falta prova de patch contra writer não cooperativo:** Git checkout/editor save durante read-modify-write
-   ainda precisa de reprodução externa e contrato final.
+1. **P2 — falta fuzz textual/binário sistemático:** as provas determinísticas cobrem os cenários conhecidos, mas ainda
+   falta explorar combinações de line endings, UTF-8, ranges e payloads arbitrários.
 2. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
 
 O L2 encerrou sua fase de promoção técnica: workload, batching, crash, contenção e soak passaram. A decisão operacional
@@ -1207,6 +1208,32 @@ Validação: leitura baixa + engine **56 passados, 0 falhas**; rodada ampliada c
 Limite consciente: `ESTALECHUNKSTREAM` pode chegar após chunks já consumidos. O contrato exige descartar a versão
 parcial; retry automático só é correto na API materializada, antes da exposição ao caller.
 
+### 1.43 Status de implementação — patch protegido contra writer externo aplicado em 2026-06-14
+
+IO-052 foi fechado no limite portátil disponível em Node/POSIX:
+
+- `writeAtomicFileUnlocked(..., { expectedHash })` recalcula um snapshot consistente e bounded imediatamente antes
+  de `rename`, depois de `before-publish`;
+- `writeFileAtomic` propaga a precondição até a primitiva baixa, removendo a antiga janela entre a checagem sob lock e
+  a publicação;
+- `patchTextLocked` sempre usa o hash da base lida como precondição final, mesmo quando o caller não forneceu
+  `expectedHash`;
+- conflito externo recusa o publish com `EEXPECTEDHASH`, preserva a versão de editor/Git e remove o temporário;
+- quando um patch grande já materializou sidecar de rollback, o conflito pré-publish também descarta esse sidecar
+  obsoleto.
+
+Provas novas coordenam a troca exatamente em `before-publish`: um processo Node simula o save atômico de editor e um
+repositório Git real executa `git checkout` de outra versão. Em ambos, o patch calculado sobre a base antiga é
+recusado e a versão externa permanece íntegra. A prova baixa adicional cobre `writeAtomicFileUnlocked` diretamente.
+
+Validação focada desta onda: **104 passados, 0 falhas**; lint Copilot, `diff --check` e
+`typecheck:strict:src.copilot`: **PASS**. O strict também encontrou e levou à correção de uma assinatura Zod
+incompatível em trabalho paralelo que será sincronizado.
+
+Limite consciente: APIs portáteis de filesystem não oferecem compare-and-swap entre hash de conteúdo e `rename`.
+Permanece uma microjanela entre a última confirmação e o syscall de publicação; eliminá-la exigiria cooperação do
+writer externo, protocolo de versão compartilhado ou primitiva específica de plataforma.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1478,16 +1505,16 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-049 | P2 | Temp recovery | **Concluído com limite documentado:** cleanup é age-gated, host-aware e bounded | 24 h/PID morto local; host estrangeiro opt-in; scan 10 mil e cache 1.024 dirs | Recriação de container pode exigir limpeza administrativa | Manter schema estrito e nunca limpar por glob aproximado |
 | IO-050 | P1 | Consistência externa | **Concluído:** snapshot, L1 e índice recusam inode/versão obsoletos | fingerprint rico, retries e provas multiprocess com replace atômico | L1 ainda respeita stale-probe configurável; L2 legado cai em fallback | Usar probe `0` somente em perfis paranoicos e observar `snapshotConflicts` |
 | IO-051 | P2 | Chunk streaming | **Concluído com limite documentado:** handle/version token e stale abort end-to-end | byte-index rico, retry materializado e `ESTALECHUNKSTREAM` multiprocess | Caller incremental pode ter consumido chunks antes do erro | Exigir descarte integral do token stale; nunca retry transparente após entrega |
-| IO-052 | P2 | Patch externo | **Aberto:** falta prova de Git/editor durante read-modify-write | patch tem lock cooperativo e precondições, mas writer externo ignora L0/L1 | Versão pode mudar entre snapshot e publish | Reproduzir checkout/save externo e confirmar expected hash imediatamente antes do publish |
+| IO-052 | P2 | Patch externo | **Concluído com limite documentado:** editor/Git externo é recusado antes do publish | precondição final baixa, processo editor e `git checkout` real | Microjanela portátil entre confirmação e `rename` | Manter a prova coordenada e preferir writers cooperativos quando possível |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
 | Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050 |
-| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051 |
+| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
-| Aberto | IO-030, IO-052 |
+| Aberto | IO-030 |
 
 ---
 
@@ -1856,7 +1883,7 @@ A situação ideal é uma infra IO em camadas:
 - [x] Dois processos concorrendo por create/copy/move/write.
 - [x] Crash de holder L1 seguido de stale recovery real.
 - [x] Modificação externa durante snapshot e index.
-- [ ] Git checkout/editor save durante patch.
+- [x] Git checkout/editor save durante patch.
 - [x] Replace externo durante byte-line index/stream.
 
 ---
@@ -1913,7 +1940,8 @@ Foram concluídos stale recovery/release do L1, move exclusivo, copy staged, sna
 
 É a primitiva baixa canônica de replace, possui estratégia de durabilidade e retorna o resultado do preflight e do
 directory sync. O temporário é gerado por `temp-path.js`, no mesmo diretório, oculto e com 128 bits; falhas reais de
-sync são promovidas, enquanto ausência explícita de suporte permanece best-effort.
+sync são promovidas, enquanto ausência explícita de suporte permanece best-effort. Quando recebe `expectedHash`,
+reconfirma um snapshot consistente imediatamente antes do publish.
 
 ### `io/fs/locked-writes.js`
 
@@ -1922,9 +1950,10 @@ lugar certo. Append/rotação seguem o writer canônico separado, evitando mistu
 
 ### `io/fs/locked-mutations.js`
 
-Patch valida UTF-8 e materializa rollback grande; copy/move staged preservam o destino anterior por base64 ou sidecar.
-Remove recursivo agora exige confirmação exata do alvo resolvido. A operação ainda não cria snapshot de árvore, por
-desenho; callers humanos devem continuar preferindo a quarentena reversível do MCP.
+Patch valida UTF-8, materializa rollback grande e reconfirma a base antes do publish; conflito externo preserva a
+versão vencedora e descarta sidecar obsoleto. Copy/move staged preservam o destino anterior por base64 ou sidecar.
+Remove recursivo exige confirmação exata do alvo resolvido. A operação ainda não cria snapshot de árvore, por desenho;
+callers humanos devem continuar preferindo a quarentena reversível do MCP.
 
 ### `io/fs/move.js`
 
@@ -1995,9 +2024,9 @@ Critérios operacionais adicionais já atendidos:
 - [x] executar soak L2 com TTL, evicção, reconfiguração, checkpoint WAL e reabertura íntegra.
 - [x] provar replace externo durante snapshot de rollback, validação L1 e commit do índice.
 
-Ainda faltam para maturidade operacional avançada:
+Ainda falta para maturidade operacional avançada:
 
-- [ ] interação de Git checkout/editor save durante patch read-modify-write não cooperativo.
+- [ ] fuzz textual/binário sistemático sobre patch, chunks e limites.
 
 ---
 
@@ -2016,6 +2045,7 @@ Ainda faltam para maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Investigar IO-052 com processo Git/editor real durante patch read-modify-write. A prova deve coordenar a troca externa
-de versão depois do snapshot e antes do publish, verificar se `expectedHash` é reconfirmado no último ponto seguro e
-garantir que nenhum conteúdo calculado sobre uma base antiga substitua silenciosamente a versão externa.
+Implementar a primeira bateria de fuzz textual/binário da Faixa 5. Ela deve gerar combinações bounded e reproduzíveis
+de UTF-8 válido/inválido, CRLF/LF, match ranges, replace-all, chunks e fronteiras de byte; qualquer falha deve gravar
+seed/caso mínimo para regressão determinística. IO-030/L3 permanece explicitamente sem implementação até existir
+evidência de múltiplos runtimes/processos reais que justifique o contrato.

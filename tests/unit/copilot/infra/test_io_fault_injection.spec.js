@@ -8,6 +8,7 @@ import { createJsonlFileWriter } from '../../../../src/copilot/infra/io/jsonl-fi
 import { copyFileUnlocked } from '../../../../src/copilot/infra/io/fs/copy.js';
 import { moveFileUnlocked } from '../../../../src/copilot/infra/io/fs/move.js';
 import { writeAtomicFileUnlocked } from '../../../../src/copilot/infra/io/fs/write-atomic.js';
+import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 
 /** @type {string[]} */
 const tempDirs = [];
@@ -53,6 +54,27 @@ describe('infra/io deterministic fault injection', () => {
 
         expect(await readFile(target, 'utf8')).toBe('new');
         expect(await readdir(dir)).toEqual(['write.txt']);
+    });
+
+    it('preserva alteração concorrente quando expectedHash diverge antes do publish', async () => {
+        const dir = await createTempDir();
+        const target = path.join(dir, 'write-expected.txt');
+        await writeFile(target, 'base');
+        let replaced = false;
+
+        await expect(
+            writeAtomicFileUnlocked(target, 'patched', {
+                expectedHash: sha256('base'),
+                onPhase: async (phase) => {
+                    if (phase !== 'before-publish' || replaced) return;
+                    replaced = true;
+                    await writeFile(target, 'external');
+                },
+            }),
+        ).rejects.toMatchObject({ code: 'EEXPECTEDHASH' });
+
+        expect(await readFile(target, 'utf8')).toBe('external');
+        expect(await readdir(dir)).toEqual(['write-expected.txt']);
     });
 
     it('promove falha real de directory sync após write sem ocultar o estado aplicado', async () => {

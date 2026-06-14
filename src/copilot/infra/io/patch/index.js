@@ -6,5 +6,5 @@
  */
 
 export { diffText, diffTextWithReader } from './text-diff-service.js';
-export { buildSimpleTextDiff } from './text-diff.js';
+export { buildSimpleTextDiff, buildSimpleTextDiffAroundLineRange } from './text-diff.js';
 export { computeTextPatch } from './text-patch.js';

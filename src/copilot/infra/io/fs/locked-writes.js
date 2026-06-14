@@ -68,6 +68,7 @@ function normalizeCreateExclusiveError(filePath, error) {
  *     expectedHash?: string;
  *     lockTimeoutMs?: number;
  *     signal?: AbortSignal;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     advisoryLimits?: Record<string, unknown>;
  * }} [options]
  * @returns {Promise<{
@@ -129,6 +130,8 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                     const durability = await writeAtomicFileUnlocked(filePath, payload, {
                         ...(options.mode === undefined ? {} : { mode: options.mode }),
                         exclusive: Boolean(options.failIfExists),
+                        ...(options.expectedHash === undefined ? {} : { expectedHash: options.expectedHash }),
+                        ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
                     });
                     return { path: filePath, bytesWritten: bytes, previousHash, contentHash, durability };
                 });

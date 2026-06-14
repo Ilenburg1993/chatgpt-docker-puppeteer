@@ -296,21 +296,6 @@ export function createIoIndexSqlite(options) {
         ORDER BY rank
         LIMIT ?
     `);
-    const stmtSymbolSearch = db.prepare(`
-        SELECT
-            s.file_path as filePath,
-            f.relative_path as relativePath,
-            s.symbol_name as symbolName,
-            s.symbol_kind as symbolKind,
-            s.exported as exported,
-            s.line as line,
-            s.doc_comment as docComment
-        FROM copilot_io_index_symbols s
-        JOIN copilot_io_index_files f ON f.file_path = s.file_path
-        WHERE s.symbol_name = ? OR s.symbol_name LIKE ?
-        ORDER BY s.symbol_name ASC, f.relative_path ASC
-        LIMIT ?
-    `);
     const stmtImportSearch = db.prepare(`
         SELECT
             i.file_path as filePath,
@@ -908,13 +893,62 @@ export function createIoIndexSqlite(options) {
 
         /**
          * @param {string} name
-         * @param {{ maxResults?: number }} [options]
+         * @param {{
+         *     maxResults?: number;
+         *     pathPrefix?: string;
+         *     kind?: string;
+         *     exactMatch?: boolean;
+         *     caseSensitive?: boolean;
+         * }} [options]
          */
         findSymbol(name, options = {}) {
             stats.searches += 1;
-            return /** @type {IoIndexSymbolResult[]} */ (
-                stmtSymbolSearch.all(name, `%${name}%`, normalizeIndexMaxResults(options.maxResults))
-            );
+            const safe = String(name ?? '').trim();
+            if (!safe) return /** @type {IoIndexSymbolResult[]} */ ([]);
+
+            /** @type {string[]} */
+            const where = [];
+            /** @type {unknown[]} */
+            const params = [];
+            if (options.exactMatch === true) {
+                where.push(options.caseSensitive === true ? 's.symbol_name = ?' : 'lower(s.symbol_name) = lower(?)');
+                params.push(safe);
+            } else if (options.caseSensitive === true) {
+                where.push('instr(s.symbol_name, ?) > 0');
+                params.push(safe);
+            } else {
+                where.push('lower(s.symbol_name) LIKE lower(?)');
+                params.push(`%${safe}%`);
+            }
+
+            if (options.kind && options.kind !== 'all') {
+                where.push('s.symbol_kind = ?');
+                params.push(options.kind);
+            }
+
+            if (options.pathPrefix) {
+                const prefix = normalizeIndexPath(options.pathPrefix);
+                where.push('(s.file_path = ? OR s.file_path LIKE ?)');
+                params.push(prefix, `${prefix}/%`);
+            }
+
+            params.push(normalizeIndexMaxResults(options.maxResults));
+            const sql = `
+                SELECT
+                    s.file_path as filePath,
+                    f.relative_path as relativePath,
+                    s.symbol_name as symbolName,
+                    s.symbol_kind as symbolKind,
+                    s.exported as exported,
+                    s.line as line,
+                    s.doc_comment as docComment
+                FROM copilot_io_index_symbols s
+                JOIN copilot_io_index_files f ON f.file_path = s.file_path
+                WHERE ${where.join(' AND ')}
+                ORDER BY s.symbol_name ASC, f.relative_path ASC
+                LIMIT ?
+            `;
+            return /** @type {IoIndexSymbolResult[]} */ (db.prepare(sql).all(...params));
         },
 
         /**

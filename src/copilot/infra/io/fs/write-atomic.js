@@ -6,6 +6,7 @@
  */
 
 import * as fs from 'node:fs/promises';
+import { assertExpectedSha256Digest } from '../../policy/preconditions.js';
 import { toOwnedBuffer } from '../../shared/buffer.js';
 import {
     assertSuccessfulSync,
@@ -17,6 +18,7 @@ import {
 import { emitMutationPhase } from './mutation-phase.js';
 import { preflightIoCapacity } from './capacity-preflight.js';
 import { prepareSiblingTempPath } from './temp-path.js';
+import { readBinaryMutationSnapshot } from './snapshot.js';
 
 /**
  * @param {string | Buffer | Uint8Array | ArrayBuffer | SharedArrayBuffer | DataView} content
@@ -50,6 +52,7 @@ export function normalizeWritePayload(filePath, content, encoding) {
  * @param {{
  *     mode?: number;
  *     exclusive?: boolean;
+ *     expectedHash?: string;
  *     durability?: import('./durability.js').IoDurabilityMode;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     syncDirectory?: typeof syncParentDirectoryBestEffort;
@@ -106,6 +109,10 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
         }
 
         await emitMutationPhase(options, 'before-publish', { filePath, tmpPath, exclusive: false });
+        if (options.expectedHash) {
+            const current = await readBinaryMutationSnapshot(filePath, { snapshotMaxBytes: 0 });
+            assertExpectedSha256Digest(current.contentHash, options.expectedHash);
+        }
         await fs.rename(tmpPath, filePath);
         tmpCreated = false;
         await emitMutationPhase(options, 'after-publish', { filePath, tmpPath, exclusive: false });

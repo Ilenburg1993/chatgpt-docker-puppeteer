@@ -649,6 +649,8 @@ export async function searchText(targetPath, options) {
  *     cursorOffset?: number;
  *     totalMatches?: number;
  *     countsPostSanitization: true;
+ *     scopedIndex?: boolean;
+ *     caseSensitiveEffective?: boolean;
  *     io: import('#copilot/core/io-contracts').IoMeta;
  * }>}
  */
@@ -701,19 +703,14 @@ export async function searchWorkspaceSymbols(targetPath, options) {
         });
 
     try {
-        if (!options.includePattern && !options.caseSensitive) {
-            const rows = findIoIndexSymbol(
-                options.symbolName,
-                searchWindow.commandMaxCount === null ? {} : { maxResults: searchWindow.commandMaxCount },
-            ).filter(
-                /** @param {{ filePath: string; symbolKind: string; symbolName: string }} row */
-                (row) => {
-                    const samePath = row.filePath === targetPath || row.filePath.startsWith(`${targetPath}/`);
-                    const sameKind = resolvedKind === 'all' ? true : row.symbolKind === resolvedKind;
-                    const exactOk = options.exactMatch ? row.symbolName === options.symbolName : true;
-                    return samePath && sameKind && exactOk;
-                },
-            );
+        if (!options.includePattern) {
+            const rows = findIoIndexSymbol(options.symbolName, {
+                pathPrefix: targetPath,
+                kind: resolvedKind,
+                exactMatch: options.exactMatch === true,
+                caseSensitive: options.caseSensitive === true,
+                ...(searchWindow.commandMaxCount === null ? {} : { maxResults: searchWindow.commandMaxCount }),
+            });
             if (rows.length > 0) {
                 const sanitized = sanitizeSearchOutput(formatIndexSymbolRows(rows));
                 const windowedOutput = paginateSearchText(sanitized.text, searchWindow);
@@ -728,6 +725,8 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                             truncated: windowedOutput.truncated,
                             originalResultCount: windowedOutput.originalLineCount,
                             nextCursor: windowedOutput.nextCursor,
+                            scopedIndex: true,
+                            caseSensitiveEffective: options.caseSensitive === true,
                         },
                     ),
                     true,
@@ -746,6 +745,8 @@ export async function searchWorkspaceSymbols(targetPath, options) {
                     cursorOffset: windowedOutput.cursorOffset,
                     totalMatches: windowedOutput.originalLineCount,
                     countsPostSanitization: true,
+                    scopedIndex: true,
+                    caseSensitiveEffective: options.caseSensitive === true,
                     io: { ...io, truncated: windowedOutput.truncated, policyVersion: sanitized.policyVersion },
                 };
             }

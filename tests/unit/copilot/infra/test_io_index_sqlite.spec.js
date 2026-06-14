@@ -132,6 +132,47 @@ describe('createIoIndexSqlite', () => {
         expect(symbols[0]?.symbolName).toBe('alphaHelper');
     });
 
+    it('busca símbolo com filtro SQL scoped antes de aplicar limit', async () => {
+        expect(tmpDir).toBeTruthy();
+        const root = /** @type {string} */ (tmpDir);
+        await mkdir(join(root, 'many'), { recursive: true });
+        await mkdir(join(root, 'wanted'), { recursive: true });
+        for (let i = 0; i < 12; i += 1) {
+            await writeFile(join(root, 'many', `outside-${i}.js`), 'export function sharedSymbol() { return 1; }\n', 'utf8');
+        }
+        await writeFile(join(root, 'wanted', 'inside.js'), 'export function sharedSymbol() { return 2; }\n', 'utf8');
+
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+        await index.indexDirectory(root, { extensions: ['.js'], recursive: true });
+
+        const symbols = index.findSymbol('sharedSymbol', {
+            pathPrefix: join(root, 'wanted'),
+            exactMatch: true,
+            kind: 'function',
+            maxResults: 1,
+        });
+
+        expect(symbols).toHaveLength(1);
+        expect(symbols[0]?.relativePath).toContain('wanted/inside.js');
+    });
+
+    it('respeita exactMatch case-insensitive no índice simbólico', async () => {
+        expect(tmpDir).toBeTruthy();
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+        await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.js'], recursive: true });
+
+        const symbols = index.findSymbol('alphahelper', {
+            pathPrefix: /** @type {string} */ (tmpDir),
+            exactMatch: true,
+            caseSensitive: false,
+        });
+
+        expect(symbols.length).toBeGreaterThanOrEqual(1);
+        expect(symbols[0]?.symbolName).toBe('alphaHelper');
+    });
+
     it('invalida path indexado', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
