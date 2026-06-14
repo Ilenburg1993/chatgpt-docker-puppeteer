@@ -362,7 +362,12 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
             return instrumentSessionFsOperation(
                 'session.fs.rm',
                 async () => {
-                    await removePathLocked(await resolveWithinRoot(root, path, 'write'), { recursive, force });
+                    const target = await resolveWithinRoot(root, path, 'write');
+                    await removePathLocked(target, {
+                        recursive,
+                        force,
+                        ...(recursive ? { recursiveConfirmation: target } : {}),
+                    });
                 },
                 createOperationContext(sessionId, {
                     provider: 'local',

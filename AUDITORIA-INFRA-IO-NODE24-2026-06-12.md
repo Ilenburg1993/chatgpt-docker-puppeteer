@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `e2a403fb`, seguida da onda de backpressure dos parser workers
+**Baseline reinvestigado:** `main` sincronizada até `b80a85a8`, seguida da onda de confirmação forte para remove recursivo
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -18,14 +18,15 @@ provas multiprocess/fault-injection.
 No estado atual, a descrição correta é: **as primitivas centrais de mutação, append e rollback material têm contratos
 fortes e provas reais, as superfícies externas de path estão vinculadas a policy async, o índice detecta mudanças
 externas metadata-preserving e a contenção L0/L1 é observável sem expor paths; o L1 multiprocess agora possui perfis
-explícitos por risco e o risco dominante migrou para custos de busca/cache e guardrails destrutivos de UX**.
+explícitos por risco, remove recursivo exige confirmação exata e a raiz workspace-bound é protegida; o risco dominante
+migrou para custos de cache, preflight de capacidade e readiness operacional**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — remove recursivo continua sem quarentena intrínseca:** callers precisam impor a proteção.
-2. **P2 — L2/cache ainda carece de perfil experimental medido:** falta hit ratio/custo em cenário cold/warm.
-3. **P2 — preflight de espaço livre ainda inexiste:** writes/copies grandes só descobrem ENOSPC durante a operação.
-4. **P2 — readiness de escopo ainda mistura ready/degraded:** erros em `declareScope` podem parecer sucesso.
+1. **P2 — L2/cache ainda carece de perfil experimental medido:** falta hit ratio/custo em cenário cold/warm.
+2. **P2 — preflight de espaço livre ainda inexiste:** writes/copies grandes só descobrem ENOSPC durante a operação.
+3. **P2 — readiness de escopo ainda mistura ready/degraded:** erros em `declareScope` podem parecer sucesso.
+4. **P2 — política de glob ainda é própria:** include/exclude pode divergir de `minimatch`/Node glob.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -694,6 +695,66 @@ Validação:
 - env: `audit-env-surface`, `validate-env` e `check-env-local`: **PASS**.
 - parser e IO observability: **28 passados, 0 falhas**.
 
+### 1.26 Investigação transversal — seleção e troca funcional de modelo em 2026-06-14
+
+A investigação adicional solicitada sobre `model-gateway` encontrou dois problemas funcionais e dois falsos negativos
+do harness live:
+
+- `autoStandby` e `operatorReady` usavam implicitamente `metadata_first`; a mesma rota que `liveReadiness` reconhecia
+  como provada aparecia como `needsProbe:true`;
+- a automação confundia `routeProfile/taskProfile` (`repo_agent`) com o perfil BYOK vivo (`kilo`), exigindo nova sessão
+  mesmo quando preset e modelo já estavam alinhados;
+- o harness aguardava indefinidamente um novo prompt após `LLM-B pronta`, embora o terminal já aceitasse comandos;
+- critérios live dependiam de títulos antigos e da janela truncada de `/events --raw`, em vez do SSE coletado.
+
+Transformações aplicadas em `b80a85a8`:
+
+- standby/operator-ready passaram a preferir rotas provadas por default;
+- cada rota expõe `recommendedAction` e `recommendedCommand`: sonda para rota sem prova, `/byok model` para mesma
+  fronteira e handoff explícito para novo provedor;
+- a superfície terminal mostra `Recomendado`;
+- a decisão automática separa perfil de tarefa da fronteira BYOK real;
+- o harness live inicia a sequência após prontidão mesmo quando o prompt não é redesenhado e valida confirmação de
+  modelo pelo SSE coletado.
+
+Provas live executadas:
+
+- fixture BYOK: **PASS**, incluindo `byok-fixture-model-switch`, em
+  `artifacts/terminal-live/2026-06-14T05-52-13-315Z/summary.md`;
+- troca SDK viva `/model gpt-4.1-mini`: **PASS**, confirmada por `session.model_changed`, em
+  `artifacts/terminal-live/2026-06-14T05-57-05-435Z/summary.md`;
+- automação LLM-B/operator-ready/standby/apply: **PASS**, com rota alinhada classificada como `keep_current`, em
+  `artifacts/terminal-live/2026-06-14T05-59-33-180Z/summary.md`.
+
+Resultado operacional: operador e LLM-B agora recebem uma ação direta priorizada a partir de rotas provadas, a troca
+viva SDK foi confirmada end-to-end e a automação não exige novo boot por conflito falso entre perfis de naturezas
+diferentes.
+
+### 1.27 Status de implementação — confirmação forte de remove recursivo aplicada em 2026-06-14
+
+IO-022 foi fechado por confirmação reforçada intrínseca, preservando o sistema de quarentena reversível existente no
+MCP sem criar uma segunda implementação concorrente na engine baixa.
+
+Mudanças efetivamente incorporadas:
+
+- `removePathUnlocked` e `removePathLocked` recusam `recursive:true` sem `recursiveConfirmation` exatamente igual ao
+  path resolvido do alvo, com erro `ERECURSIVEREMOVECONFIRMATION`;
+- `workspaceIo.removePathLocked` traduz uma confirmação relativa que coincide com o input para o path real validado
+  pela policy async;
+- a capability workspace-bound recusa remover recursivamente a própria raiz, com
+  `ERECURSIVEWORKSPACEROOT`;
+- `SessionFsProvider.rm` continua compatível, mas só confirma depois de resolver containment dentro da raiz isolada;
+- metadata de IO registra `recursiveConfirmed:true` quando a remoção destrutiva foi autorizada corretamente.
+
+Limite consciente: a engine continua removendo de forma destrutiva após confirmação; árvore inteira não é copiada para
+snapshot/quarentena por default. Para fluxos humanos reversíveis, `repo_quarantine_file` continua sendo a superfície
+preferida. O risco acidental foi reduzido sem transformar `rm` em uma operação de cópia potencialmente ilimitada.
+
+Validação focada:
+
+- IO engine, workspace IO e SessionFS: **57 passados, 0 falhas**;
+- typecheck strict e lint focado: **PASS** após ajuste de `exactOptionalPropertyTypes`.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -931,7 +992,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-019 | P1 | Bypass storage | `storage/json-store.js` usa `writeAtomicFileUnlocked` diretamente | `infra/storage/json-store.js` | Sem lock canônico se chamado em concorrência | Trocar por `writeFileAtomicPortable` ou `withIoResourceLock` explícito |
 | IO-020 | P1 | Bypass export | `terminal/commands/export.js` usa `writeFile` direto | Busca de bypass | Export pode sobrescrever sem IO meta/hash | Migrar para `createOrReplaceFileAtomic`/`writeFileAtomic` conforme política |
 | IO-021 | P2 | Temp naming | Temp random é 32-bit | `randomBytes(4)` | Colisão improvável, mas barata de melhorar | Usar 96/128 bits e prefixo dot-hidden `.tmp-<pid>-<random>` |
-| IO-022 | P2 | Remove recursive | Remoção recursiva invalida, mas não há quarentena por default na engine | `removePathLocked` | Erro humano em caller destrutivo | Preferir quarantine nos tools, exigir confirmação e snapshot de árvore |
+| IO-022 | P2 | Remove recursive | **Concluído com limite documentado:** remoção recursiva exige confirmação exata e workspace root é protegido | `remove.js`, `locked-mutations.js`, `workspace-io.js`, `session-fs.js` | Após confirmação a operação continua destrutiva e sem snapshot de árvore | Preferir quarantine nos tools; manter confirmação exata na engine |
 | IO-023 | P2 | Parser reset | **Concluído:** reset de parser é awaitable e testes aguardam isolamento | `io-parser.js`, `test_io_parser.spec.js` | Teardown de workers é explícito para evitar churn por teste | Usar shutdown/reset com teardown em processos one-shot |
 | IO-024 | P2 | Scope readiness | `declareScope` marca ready mesmo em catch | `io-session-scope.js` | Erros silenciosos podem parecer sucesso | Separar `ready` de `degraded`, expor erro resumido |
 | IO-025 | P2 | Observability | **Concluído:** espera, fila e leases L0/L1 são bounded e sanitizados | histogramas globais/por operação, p95, outcomes e amostra por hash no health | Paths não entram no snapshot; métricas são cumulativas por processo | Usar os dados para definir perfis de ativação do L1 |
@@ -959,9 +1020,9 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | Estado | IDs |
 | --- | --- |
 | Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-023, IO-025, IO-026, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
-| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-038 |
+| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-022, IO-038 |
 | Parcial | IO-009 |
-| Aberto | IO-018, IO-021, IO-022, IO-024, IO-027, IO-028, IO-030 |
+| Aberto | IO-018, IO-021, IO-024, IO-027, IO-028, IO-030 |
 
 ---
 
@@ -983,7 +1044,8 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 **Insuficiente:**
 
 - Sidecars têm janela de restauração limitada pelo TTL e ainda não entram no health agregado.
-- Remoção recursiva da engine continua destrutiva sem quarentena intrínseca.
+- Remoção recursiva continua destrutiva após confirmação, mas não pode mais ocorrer sem repetir o alvo exato e não
+  pode remover a raiz de uma capability workspace-bound.
 - Preflight de espaço livre para copy/write grande ainda não existe.
 
 **Diagnóstico:** as primitivas canônicas protegem replace, copy, move, snapshot, rollback material e concorrência
@@ -1205,6 +1267,13 @@ A situação ideal é uma infra IO em camadas:
 - [x] Health degradado para perfil inválido.
 - [x] Schema/template/documentação de env alinhados.
 
+#### Fase 2.6 — Guardrail destrutivo
+
+- [x] Exigir confirmação exata do path resolvido em toda remoção recursiva da engine.
+- [x] Proteger a raiz da capability workspace-bound contra remove recursivo.
+- [x] Fazer SessionFS confirmar somente após containment.
+- [x] Manter quarentena MCP como caminho reversível preferido, sem duplicá-la na engine baixa.
+
 ### Faixa 3 — Snapshot e coerência derivada
 
 #### Fase 3.1 — Snapshot consistente
@@ -1328,7 +1397,8 @@ Bom encapsulamento. `expectedHash` e create exclusivo estão no lugar certo. Dev
 ### `io/fs/locked-mutations.js`
 
 Patch valida UTF-8 e materializa rollback grande; copy/move staged preservam o destino anterior por base64 ou sidecar.
-O risco remanescente relevante é remoção recursiva sem quarentena intrínseca.
+Remove recursivo agora exige confirmação exata do alvo resolvido. A operação ainda não cria snapshot de árvore, por
+desenho; callers humanos devem continuar preferindo a quarentena reversível do MCP.
 
 ### `io/fs/move.js`
 
@@ -1386,7 +1456,7 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 - [x] perfil explícito de ativação L1 para mutações P0/P1;
 - [x] p95/histograma, timeout/abort e leases sanitizados;
-- [ ] quarentena intrínseca ou confirmação reforçada para remove recursivo;
+- [x] confirmação reforçada intrínseca para remove recursivo e proteção da raiz workspace-bound;
 - [ ] preflight opcional de espaço livre em payloads grandes;
 - [x] search incremental com early stop real.
 
@@ -1407,5 +1477,6 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Implementar quarentena intrínseca ou confirmação reforçada para remoção recursiva, com snapshot de árvore antes da
-remoção destrutiva e integração ao contrato público de IO.
+Executar a Fase 3.4 experimental: ativar L2 SQLite em um perfil controlado, medir hit ratio/custo cold-warm e auditar
+`WAL`, `busy_timeout` e `synchronous`. Em seguida, implementar preflight opcional com `statfs` para writes/copies acima
+de limiar, sem transformar ENOSPC estimado em falsa garantia.

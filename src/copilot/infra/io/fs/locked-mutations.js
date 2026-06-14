@@ -249,7 +249,7 @@ export async function deleteFileLocked(filePath) {
  * Remove arquivo ou diretório com lock por path.
  *
  * @param {string} filePath
- * @param {{ recursive?: boolean; force?: boolean; traceId?: string }} [options]
+ * @param {{ recursive?: boolean; force?: boolean; recursiveConfirmation?: string; traceId?: string }} [options]
  * @returns {Promise<{
  *     path: string;
  *     deleted: true;
@@ -269,7 +269,13 @@ export async function removePathLocked(filePath, options = {}) {
         });
         try {
             await lease.run(async () =>
-                removePathUnlocked(filePath, { recursive: Boolean(options.recursive), force: Boolean(options.force) }),
+                removePathUnlocked(filePath, {
+                    recursive: Boolean(options.recursive),
+                    force: Boolean(options.force),
+                    ...(options.recursiveConfirmation === undefined
+                        ? {}
+                        : { recursiveConfirmation: options.recursiveConfirmation }),
+                }),
             );
         } finally {
             await lease.releaseAsync();
@@ -288,6 +294,7 @@ export async function removePathLocked(filePath, options = {}) {
                 advisoryLimits: {
                     lockWaitMs: waitMs,
                     recursive: Boolean(options.recursive),
+                    recursiveConfirmed: Boolean(options.recursive) && options.recursiveConfirmation === filePath,
                     force: Boolean(options.force),
                 },
             }),

@@ -17,6 +17,7 @@ import {
     readBytes,
     readText,
     readTextChunks,
+    removePathLocked,
     searchText,
     searchWorkspaceSymbols,
     withIoResourceLock,
@@ -218,6 +219,25 @@ describe('infra/io-engine', () => {
         expect(result.created).toBe(false);
         expect(result.createdPath).toBeUndefined();
         expect(result.io.advisoryLimits?.created).toBe(false);
+    });
+
+    it('removePathLocked exige confirmação exata antes de remoção recursiva', async () => {
+        const dir = await createTempDir();
+        const target = join(dir, 'recursive-target');
+        await mkdir(join(target, 'nested'), { recursive: true });
+        await writeFile(join(target, 'nested', 'keep.txt'), 'keep', 'utf8');
+
+        await expect(removePathLocked(target, { recursive: true, force: true })).rejects.toMatchObject({
+            code: 'ERECURSIVEREMOVECONFIRMATION',
+        });
+        await expect(removePathLocked(target, { recursive: true, force: true, recursiveConfirmation: `${target}-wrong` })).rejects.toMatchObject({
+            code: 'ERECURSIVEREMOVECONFIRMATION',
+        });
+        await expect(readFile(join(target, 'nested', 'keep.txt'), 'utf8')).resolves.toBe('keep');
+
+        const result = await removePathLocked(target, { recursive: true, force: true, recursiveConfirmation: target });
+        expect(result.io.advisoryLimits?.recursiveConfirmed).toBe(true);
+        await expect(stat(target)).rejects.toMatchObject({ code: 'ENOENT' });
     });
 
     it('readText retorna range vazio consistente quando startLine passa do fim', async () => {

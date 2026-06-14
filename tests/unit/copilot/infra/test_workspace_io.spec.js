@@ -1,6 +1,6 @@
 // @ts-check
 
-import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -56,5 +56,30 @@ describe('workspace IO capability', () => {
         const snapshot = await io.readText(filePath);
 
         expect(snapshot.content).toBe('inside');
+    });
+
+    it('confirma remoção recursiva relativa e protege a raiz do workspace', async () => {
+        const { workspaceRoot, io } = await createWorkspaceFixture();
+        await mkdir(join(workspaceRoot, 'nested', 'deep'), { recursive: true });
+        await writeFile(join(workspaceRoot, 'nested', 'deep', 'file.txt'), 'inside');
+
+        await expect(io.removePathLocked('nested', { recursive: true, force: true })).rejects.toMatchObject({
+            code: 'ERECURSIVEREMOVECONFIRMATION',
+        });
+        await io.removePathLocked('nested', {
+            recursive: true,
+            force: true,
+            recursiveConfirmation: 'nested',
+        });
+        await expect(stat(join(workspaceRoot, 'nested'))).rejects.toMatchObject({ code: 'ENOENT' });
+
+        await expect(
+            io.removePathLocked(workspaceRoot, {
+                recursive: true,
+                force: true,
+                recursiveConfirmation: workspaceRoot,
+            }),
+        ).rejects.toMatchObject({ code: 'ERECURSIVEWORKSPACEROOT' });
+        await expect(stat(workspaceRoot)).resolves.toBeDefined();
     });
 });

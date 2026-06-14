@@ -9,6 +9,7 @@
  */
 
 import { evaluateIoPathPolicyAsync } from '#copilot/core';
+import path from 'node:path';
 import {
     appendTextLocked,
     copyFileLocked,
@@ -71,6 +72,30 @@ function bindWorkspacePathOperation(operation, mode, context) {
 }
 
 /**
+ * @param {typeof removePathLocked} operation
+ * @param {WorkspaceIoContext} context
+ * @returns {typeof removePathLocked}
+ */
+function bindWorkspaceRemovePathOperation(operation, context) {
+    return async (filePath, options = {}) => {
+        const resolvedPath = await resolveWorkspacePath(filePath, 'delete', context);
+        if (options.recursive && path.resolve(resolvedPath) === path.resolve(context.workspaceRoot)) {
+            const error = /** @type {Error & { code?: string }} */ (
+                new Error('Workspace IO refuses recursive removal of the workspace root.')
+            );
+            error.code = 'ERECURSIVEWORKSPACEROOT';
+            throw error;
+        }
+        return operation(resolvedPath, {
+            ...options,
+            ...(options.recursive && options.recursiveConfirmation === filePath
+                ? { recursiveConfirmation: resolvedPath }
+                : {}),
+        });
+    };
+}
+
+/**
  * @template {unknown[]} Args
  * @template Result
  * @param {(source: string, destination: string, ...args: Args) => Promise<Result>} operation
@@ -129,7 +154,7 @@ export function createWorkspaceIo(context) {
         readLines: bindWorkspacePathOperation(readLines, 'read', context),
         readText: bindWorkspacePathOperation(readText, 'read', context),
         readTextChunks: bindWorkspacePathOperation(readTextChunks, 'read', context),
-        removePathLocked: bindWorkspacePathOperation(removePathLocked, 'delete', context),
+        removePathLocked: bindWorkspaceRemovePathOperation(removePathLocked, context),
         scanDirectory: scanWorkspaceDirectory,
         searchText: searchWorkspaceText,
         searchWorkspaceSymbols: searchBoundWorkspaceSymbols,

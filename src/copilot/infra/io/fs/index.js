@@ -23,7 +23,7 @@ export { readTextLineChunks, readTextLineChunksStream } from './read-chunks.js';
 export { readTextLinesSnapshot } from './read-lines.js';
 export { readBytes, readLines, readText, readTextChunks, readTextChunksStream, statPath } from './read-services.js';
 export { readTextFileSnapshot } from './read-text.js';
-export { deleteFileUnlocked, removePathUnlocked } from './remove.js';
+export { assertRecursiveRemovalConfirmed, deleteFileUnlocked, removePathUnlocked } from './remove.js';
 export {
     cleanupExpiredRollbackSidecars,
     createRollbackSidecarWriter,
