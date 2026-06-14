@@ -695,6 +695,33 @@ function runtimeSelectorStandbyCommands(selected, timeoutMs) {
 }
 
 /**
+ * @param {{ hasRuntimeProof: boolean; standbyClass: 'selected_route' | 'new_model_same_provider' | 'new_provider'; commands: ReturnType<typeof runtimeSelectorStandbyCommands> }} row
+ * @returns {{ action: 'probe_agent' | 'live_model' | 'new_session_provider' | 'unavailable'; command: string | null }}
+ */
+function runtimeSelectorStandbyRecommendation(row) {
+    if (!row.hasRuntimeProof) {
+        return {
+            action: row.commands.probeAgent ? 'probe_agent' : 'unavailable',
+            command: row.commands.probeAgent,
+        };
+    }
+    if (row.standbyClass === 'new_provider') {
+        const command =
+            row.commands.newSession && row.commands.provider
+                ? `${row.commands.newSession} && ${row.commands.provider}`
+                : row.commands.provider;
+        return {
+            action: command ? 'new_session_provider' : 'unavailable',
+            command,
+        };
+    }
+    return {
+        action: row.commands.liveModel ? 'live_model' : 'unavailable',
+        command: row.commands.liveModel,
+    };
+}
+
+/**
  * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} runtimeSelectorPlan
  * @param {{ limit?: number; timeoutMs?: number; includeSelected?: boolean }} [options]
  * @returns {Array<{
@@ -712,6 +739,8 @@ function runtimeSelectorStandbyCommands(selected, timeoutMs) {
  *   hasRuntimeProof: boolean;
  *   needsProbe: boolean;
  *   standbyClass: 'selected_route' | 'new_model_same_provider' | 'new_provider';
+ *   recommendedAction: 'probe_agent' | 'live_model' | 'new_session_provider' | 'unavailable';
+ *   recommendedCommand: string | null;
  *   runtimeEnvStatus: string | null;
  *   reasons: string[];
  *   commands: ReturnType<typeof runtimeSelectorStandbyCommands>;
@@ -763,6 +792,12 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
                     : providerId && selectedProviderId && providerId === selectedProviderId
                         ? 'new_model_same_provider'
                         : 'new_provider';
+            const commands = runtimeSelectorStandbyCommands(selected, timeoutMs);
+            const recommendation = runtimeSelectorStandbyRecommendation({
+                hasRuntimeProof,
+                standbyClass,
+                commands,
+            });
             rows.push({
                 profileId: route.profileId,
                 rank,
@@ -778,9 +813,11 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
                 hasRuntimeProof,
                 needsProbe: !hasRuntimeProof,
                 standbyClass,
+                recommendedAction: recommendation.action,
+                recommendedCommand: recommendation.command,
                 runtimeEnvStatus: optionalString(optionalRecord(candidate.runtimeEnv)?.['status']),
                 reasons: candidate.reasons,
-                commands: runtimeSelectorStandbyCommands(selected, timeoutMs),
+                commands,
             });
             if (rows.length >= limit) return rows;
         }
@@ -811,6 +848,7 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
  *     sameBoundaryCommandCount: number;
  *     newProviderCommandCount: number;
  *     probeCommandCount: number;
+ *     recommendedCommandCount: number;
  *   };
  *   routes: ReturnType<typeof buildModelGatewayRuntimeStandbyRoutes>;
  *   nextCommands: string[];
@@ -825,14 +863,8 @@ export function buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, options
     /** @type {string[]} */
     const nextCommandCandidates = routes
         .slice(0, Math.min(routes.length, nextCommandLimit))
-        .flatMap((row) =>
-            [
-                row.commands.probeAgent,
-                row.commands.liveModel,
-                row.commands.provider,
-                row.commands.persistProvider,
-            ].filter(isNonEmptyString),
-        );
+        .map((row) => row.recommendedCommand)
+        .filter(isNonEmptyString);
     const nextCommands = [
         ...new Set(
             nextCommandCandidates,
@@ -858,6 +890,7 @@ export function buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, options
             sameBoundaryCommandCount: routes.filter((row) => row.commands.liveModel).length,
             newProviderCommandCount: routes.filter((row) => row.commands.provider).length,
             probeCommandCount: routes.filter((row) => row.commands.probeAgent || row.commands.probeChat).length,
+            recommendedCommandCount: routes.filter((row) => row.recommendedCommand).length,
         },
         routes,
         nextCommands,

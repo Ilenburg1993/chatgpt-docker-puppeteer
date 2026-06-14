@@ -1277,6 +1277,8 @@ describe('model-gateway foundation', () => {
         assert.equal(standbyRoutes[0].commands.persistProvider, '/byok persist provider openrouter openai/gpt-oss-120b:groq');
         assert.equal(standbyRoutes[0].standbyClass, 'selected_route');
         assert.equal(standbyRoutes[0].needsProbe, false);
+        assert.equal(standbyRoutes[0].recommendedAction, 'live_model');
+        assert.equal(standbyRoutes[0].recommendedCommand, '/byok model openai/gpt-oss-120b:groq');
         const standbyPlan = buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, {
             limit: 4,
             timeoutMs: 15_000,
@@ -1290,7 +1292,9 @@ describe('model-gateway foundation', () => {
         assert.equal(standbyPlan.summary.selectedRouteCount > 0, true);
         assert.equal(standbyPlan.summary.newProviderCount >= 0, true);
         assert.equal(standbyPlan.summary.needsProbeCount >= 0, true);
-        assert.equal(standbyPlan.nextCommands.includes('/byok probe agent provider:openrouter model:openai/gpt-oss-120b timeout:15000'), true);
+        assert.equal(standbyPlan.summary.recommendedCommandCount > 0, true);
+        assert.equal(standbyPlan.nextCommands.includes('/byok model openai/gpt-oss-120b:groq'), true);
+        assert.equal(standbyPlan.nextCommands[0], '/byok model openai/gpt-oss-120b:groq');
 
         const strictRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(requireRuntimeProof, {
             requireRuntimeProof: true,
@@ -1328,6 +1332,22 @@ describe('model-gateway foundation', () => {
         assert.equal(keepDecision.action, 'keep_current');
         assert.equal(keepDecision.ok, true);
         assert.equal(keepDecision.nonActionReason, 'already_aligned');
+        const keepDecisionAcrossTaskAndByokProfiles = buildModelGatewayRuntimeAutomationDecision({
+            runtimeSelectorPlan,
+            profileId: 'repo_agent',
+            currentSessionId: 'sdk-live',
+            liveByokBinding: {
+                enabled: true,
+                profile: 'kilo',
+                preset: 'openrouter',
+                providerType: 'openai_compatible_aggregator',
+                model: 'openai/gpt-oss-120b:groq',
+            },
+            policy: { allowLiveSetModel: true },
+        });
+        assert.equal(keepDecisionAcrossTaskAndByokProfiles.action, 'keep_current');
+        assert.equal(keepDecisionAcrossTaskAndByokProfiles.requiresNewSession, false);
+        assert.equal(keepDecisionAcrossTaskAndByokProfiles.targetBoundary.profile, null);
         const autoPolicy = readModelGatewayRuntimeAutomationPolicy({
             COPILOT_BYOK_GATEWAY_AUTO: 'true',
             COPILOT_BYOK_GATEWAY_AUTO_PRESET: 'auto-prepare-new-session',

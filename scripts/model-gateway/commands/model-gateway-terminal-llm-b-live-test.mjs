@@ -6223,7 +6223,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         {
             id: 'gateway-operator-ready-visible',
             pass:
-                /BYOK model-gateway operator-ready/.test(plain) &&
+                /BYOK operador pronto/.test(plain) &&
                 /sem\s+chamada\s+a\s+provedor/iu.test(plain) &&
                 /Standby\s+\d+/u.test(plain),
             detail: '/byok gateway operator-ready rendered the read-only terminal cockpit',
@@ -6231,8 +6231,8 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         {
             id: 'auto-policy-visible',
             pass:
-                /BYOK model-gateway auto policy/.test(plain) &&
-                /Efetivo\s+(?:ativo|desativado)/u.test(plain) &&
+                /BYOK política da automação/.test(plain) &&
+                /Política\s+.+fonte/u.test(plain) &&
                 /troca viva/.test(plain) &&
                 /nova sessão/.test(plain),
             detail: '/byok auto policy rendered effective policy and source-independent flags',
@@ -6240,7 +6240,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         {
             id: 'auto-status-visible',
             pass:
-                /BYOK model-gateway auto/i.test(plain) &&
+                /BYOK automação do gateway/i.test(plain) &&
                 /seletor (?:runtime|de execução)/u.test(plain) &&
                 /ação/.test(plain) &&
                 new RegExp(`perfil\\s+${escapeRegExp(routeProfile)}\\b`, 'iu').test(plain),
@@ -6254,7 +6254,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         {
             id: 'auto-doctor-visible',
             pass:
-                /BYOK model-gateway auto doctor/.test(plain) &&
+                /BYOK diagnóstico da automação/.test(plain) &&
                 /Política\s+ativa/u.test(plain) &&
                 /Decisão\s+ok/u.test(plain) &&
                 /Registros\s+decisões/u.test(plain),
@@ -6265,7 +6265,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
             pass:
                 /Explicação BYOK auto/u.test(plain) &&
                 /decisão atual \+ diagnóstico operacional/u.test(plain) &&
-                /BYOK model-gateway auto doctor/u.test(plain),
+                /BYOK diagnóstico da automação/u.test(plain),
             detail: '/byok auto explain rendered the automation explanation',
         },
         {
@@ -6285,7 +6285,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         },
         {
             id: 'auto-history-visible',
-            pass: /BYOK model-gateway auto history/.test(plain),
+            pass: /BYOK histórico da automação/.test(plain),
             detail: '/byok auto history rendered persisted automation decisions or empty state',
         },
         {
@@ -6309,7 +6309,7 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
         {
             id: 'auto-standby-visible',
             pass:
-                /BYOK model-gateway auto standby/.test(plain) &&
+                /BYOK prontidão automática/.test(plain) &&
                 /sem chamada\s+a\s+provedor/iu.test(plain) &&
                 ((/Provar\s+\/byok probe/u.test(plain) &&
                     /Novo boot\s+\/session sdk next new/u.test(plain)) ||
@@ -6367,6 +6367,10 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
 function evaluateModelProbeOutput(plain, sseSummary) {
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const defaultSurface = plain.split(/\/events\s+80\s+--raw/iu)[0] ?? plain;
+    const modelChangedEvents = sseSummary.events.filter((event) => event?.event === 'session.model_changed');
+    const hasCanonicalModelChangedSummary = modelChangedEvents.some((event) =>
+        /confirmado(?: sem troca)?: .+ · origem SDK · \d{4}-\d{2}-\d{2}T/u.test(String(event?.data?.operatorSummary ?? '')),
+    );
     return [
         {
             id: 'ready',
@@ -6392,7 +6396,7 @@ function evaluateModelProbeOutput(plain, sseSummary) {
             id: 'model-auto-visible',
             pass:
                 /Modelo solicitado\s+·\s+auto \(sem troca\)/u.test(plain) &&
-                /Auto\s+roteamento nativo do Copilot/u.test(plain),
+                /Modo automático\s+roteamento nativo do Copilot/u.test(plain),
             detail: '/model auto rendered native routing guidance without BYOK/provider jargon',
         },
         {
@@ -6404,11 +6408,7 @@ function evaluateModelProbeOutput(plain, sseSummary) {
         },
         {
             id: 'model-change-sse-operator-summary',
-            pass:
-                /"event":"session\.model_changed"/u.test(plain) &&
-                /"operatorSummary":"confirmado sem troca: auto \(sem troca\) · origem SDK · \d{4}-\d{2}-\d{2}T/u.test(
-                    plain,
-                ),
+            pass: hasCanonicalModelChangedSummary,
             detail: 'session.model_changed raw SSE carries the canonical operator summary with ISO timestamp',
         },
         {
@@ -7246,6 +7246,7 @@ async function main() {
     let promptSynchronizedCommandOutputOffset = 0;
     let waitingForPromptSynchronizedCommand = false;
     let waitingForPromptBeforeSynchronizedCommand = false;
+    let promptSynchronizedStartFallbackTimer = null;
     let pendingByokLiveProtocolDiagnostics = false;
     let askBeforeDeltasDiagnosticsSent = false;
     let askBeforeDeltasDiagnosticsPendingAfterAnswer = false;
@@ -7293,7 +7294,13 @@ async function main() {
             return false;
         }
     };
+    const clearPromptSynchronizedStartFallback = () => {
+        if (!promptSynchronizedStartFallbackTimer) return;
+        clearTimeout(promptSynchronizedStartFallbackTimer);
+        promptSynchronizedStartFallbackTimer = null;
+    };
     const sendNextPromptSynchronizedCommand = () => {
+        clearPromptSynchronizedStartFallback();
         waitingForPromptBeforeSynchronizedCommand = false;
         const next = promptSynchronizedCommands.shift();
         if (!next) {
@@ -7330,6 +7337,13 @@ async function main() {
         }
         waitingForPromptBeforeSynchronizedCommand = true;
         promptSynchronizedCommandOutputOffset = plain.length;
+        promptSynchronizedStartFallbackTimer = setTimeout(() => {
+            promptSynchronizedStartFallbackTimer = null;
+            if (waitingForPromptBeforeSynchronizedCommand && !waitingForPromptSynchronizedCommand) {
+                sendNextPromptSynchronizedCommand();
+            }
+        }, 1_000);
+        promptSynchronizedStartFallbackTimer.unref();
     };
     const scheduleForcedKill = (delayMs = 2_000) => {
         if (forcedKillTimer) return;

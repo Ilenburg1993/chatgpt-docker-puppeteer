@@ -92,7 +92,7 @@ function targetBoundary(route) {
     const selected = selectedRoute(route);
     const runtimeEnv = record(route?.['runtimeEnv']);
     return {
-        profile: text(route?.['profileId']) ?? text(selected?.['routeProfile']) ?? text(selected?.['taskProfile']),
+        profile: text(runtimeEnv?.['profile']) ?? text(selected?.['byokProfile']),
         preset: text(runtimeEnv?.['providerPreset']) ?? text(selected?.['providerId']),
         providerType: text(selected?.['runtimeKind']) ?? text(selected?.['routeLayer']),
         baseUrl: text(selected?.['baseUrl']) ?? text(selected?.['openAICompatibleBaseUrl']),
@@ -155,7 +155,7 @@ function liveBoundary(binding) {
  */
 function sameProviderBoundary(target, live) {
     if (!live.enabled) return false;
-    if (target.profile !== live.profile) return false;
+    if (target.profile && target.profile !== live.profile) return false;
     if (target.preset !== live.preset) return false;
     if (target.baseUrl && live.baseUrl && target.baseUrl !== live.baseUrl) return false;
     return true;

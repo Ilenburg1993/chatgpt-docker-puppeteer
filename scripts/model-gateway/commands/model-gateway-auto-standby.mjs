@@ -20,8 +20,9 @@ if (argSet.has('--json')) {
 if (argSet.has('--help') || argSet.has('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-standby.mjs [--json] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--temporary-failure-cooldown-ms N] [--limit N] [--timeout-ms N] [--alternates-only] [--write-sqlite] [--read-sqlite|--persisted]
 
-Build a read-only standby route list for model-gateway auto mode. It does not call providers, run probes, mutate env or
-touch the terminal session. It renders ready replacement routes and the explicit terminal commands an operator may choose.
+Build a read-only standby route list for model-gateway auto mode. It defaults to prefer_runtime_proved, does not call
+providers, run probes, mutate env or touch the terminal session. It renders ready replacement routes and one recommended
+explicit terminal command per route.
 Use --write-sqlite to persist the generated standby plan as operational history.
 Use --read-sqlite or --persisted to list previously persisted standby plans without recalculating selector state.
 `);
@@ -45,6 +46,7 @@ function readPositiveInt(name, fallback) {
 
 function runtimeSelectorArgs(profile) {
     const forwarded = ['--json', `--profile=${profile}`];
+    let hasSelectionPolicy = false;
     for (const flag of [
         '--fallback-profiles',
         '--selection-policy',
@@ -53,8 +55,12 @@ function runtimeSelectorArgs(profile) {
         '--temporary-failure-cooldown-ms',
     ]) {
         const value = readArg(flag);
-        if (value) forwarded.push(`${flag}=${value}`);
+        if (value) {
+            forwarded.push(`${flag}=${value}`);
+            if (flag === '--selection-policy') hasSelectionPolicy = true;
+        }
     }
+    if (!hasSelectionPolicy) forwarded.push('--selection-policy=prefer_runtime_proved');
     return forwarded;
 }
 
@@ -149,6 +155,7 @@ if (argSet.has('--json')) {
         process.stdout.write(
             `  ${row.profileId} #${row.rank} ${row.source} ${row.providerId}:${row.providerModel} proof=${row.hasRuntimeProof ? 'yes' : 'no'} env=${row.runtimeEnvStatus ?? '-'} score=${row.score ?? '-'}\n`,
         );
+        process.stdout.write(`    recommended: ${row.recommendedAction} -> ${row.recommendedCommand ?? '-'}\n`);
         process.stdout.write(`    prove: ${row.commands.probeAgent ?? '-'}\n`);
         process.stdout.write(`    live:  ${row.commands.liveModel ?? '-'}\n`);
         process.stdout.write(`    next:  ${row.commands.newSession} && ${row.commands.provider ?? '-'}\n`);

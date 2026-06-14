@@ -82,8 +82,18 @@ const limit = readPositiveInt('--limit', 12);
 
 const diagnostics = runJson('sqliteDiagnostics', ['--json']);
 const autoReady = runJson('autoReady', ['--json', `--profile=${profile}`]);
-const runtimeSelector = runJson('runtimeSelector', ['--json', '--fail', `--profile=${profile}`]);
-const standby = runJson('autoStandby', ['--json', `--profile=${profile}`, `--limit=${limit}`]);
+const runtimeSelector = runJson('runtimeSelector', [
+    '--json',
+    '--fail',
+    `--profile=${profile}`,
+    '--selection-policy=prefer_runtime_proved',
+]);
+const standby = runJson('autoStandby', [
+    '--json',
+    `--profile=${profile}`,
+    `--limit=${limit}`,
+    '--selection-policy=prefer_runtime_proved',
+]);
 const healthDiff = runJson('runtimeHealthDiff', ['--json']);
 const liveRuns = runJson('liveRuns', ['--json', '--limit=8']);
 
@@ -102,7 +112,6 @@ const liveRunsJson = optionalRecord(liveRuns.json);
 const liveRunRows = Array.isArray(liveRunsJson?.['rows']) ? liveRunsJson['rows'].filter(optionalRecord) : [];
 const liveScenarioRunRowCount = Math.max(optionalNumber(opsDatabase?.['liveScenarioRunRows']) ?? 0, liveRunRows.length);
 const latestLiveScenarioRunEffective = optionalString(latestLiveScenarioRun?.['summaryPath']) ? latestLiveScenarioRun : (liveRunRows[0] ?? {});
-const readyChecks = Array.isArray(autoReadyJson?.['checks']) ? autoReadyJson['checks'].filter(optionalRecord) : [];
 const runtimeRoutes = Array.isArray(runtimePlan?.['routes']) ? runtimePlan['routes'].filter(optionalRecord) : [];
 const selectedRuntimeRoute = runtimeRoutes.find((route) => route['profileId'] === profile) ?? null;
 const standbyRoutes = Array.isArray(standbyJson?.['routes']) ? standbyJson['routes'].filter(optionalRecord) : [];
@@ -128,6 +137,8 @@ function buildCandidateAction(route) {
         providerId,
         providerModel,
         standbyClass: optionalString(route['standbyClass']),
+        recommendedAction: optionalString(route['recommendedAction']),
+        recommendedCommand: optionalString(route['recommendedCommand']),
         needsProbe: route['needsProbe'] === true,
         hasRuntimeProof: route['hasRuntimeProof'] === true,
         runtimeEnvStatus: optionalString(route['runtimeEnvStatus']),
@@ -199,6 +210,7 @@ const commandGroups = {
         ...uniqueNextSafeCommands,
     ]),
     probeBeforePromotion: uniqueCommands(candidateActions.flatMap((action) => [action.commands.probeAgent, action.commands.probeChat])),
+    recommended: uniqueCommands(candidateActions.map((action) => action.recommendedCommand)),
     sameBoundarySwitch: uniqueCommands(candidateActions.map((action) => action.commands.liveModel)),
     newSessionHandoff: uniqueCommands(candidateActions.map((action) => action.commands.newSessionProvider)),
     persistence: uniqueCommands([
@@ -360,6 +372,8 @@ const output = {
         hasRuntimeProof: route['hasRuntimeProof'] === true,
         needsProbe: route['needsProbe'] === true,
         standbyClass: optionalString(route['standbyClass']),
+        recommendedAction: optionalString(route['recommendedAction']),
+        recommendedCommand: optionalString(route['recommendedCommand']),
         runtimeEnvStatus: optionalString(route['runtimeEnvStatus']),
         commands: optionalRecord(route['commands']) ?? {},
     })),

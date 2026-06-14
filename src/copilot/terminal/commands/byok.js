@@ -3814,6 +3814,7 @@ async function renderByokGatewayOperatorReady(println, rest) {
                 { role: row.needsProbe ? 'warn' : 'success', columns: 112 },
             ),
         );
+        println(terminalThemeWrappedRow('Recomendado', row.recommendedCommand ?? '-', { role: 'command', columns: 112 }));
         println(terminalThemeWrappedRow('Provar', row.commands.probeAgent ?? '-', { role: 'command', columns: 112 }));
         println(terminalThemeWrappedRow('Usar', row.commands.liveModel ?? '-', { role: 'command', columns: 112 }));
         println(
@@ -5775,6 +5776,7 @@ async function renderByokGatewayAutoStandby(println, rest) {
                 { role: row.needsProbe ? 'warn' : 'success', columns: 112 },
             ),
         );
+        println(terminalThemeWrappedRow('Recomendado', row.recommendedCommand ?? '-', { role: 'command', columns: 112 }));
         println(terminalThemeWrappedRow('Provar', row.commands.probeAgent ?? '-', { role: 'command', columns: 112 }));
         println(
             terminalThemeWrappedRow('Mesmo provedor', row.commands.liveModel ?? '-', { role: 'command', columns: 112 }),
