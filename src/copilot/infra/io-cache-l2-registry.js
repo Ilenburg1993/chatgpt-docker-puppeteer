@@ -1,6 +1,12 @@
 // @ts-check
 
-import { cancelTimer, registerInterval, toError } from '#copilot/core';
+import {
+    cancelTimer,
+    registerInterval,
+    registerShutdownHandler,
+    SHUTDOWN_PRIORITY,
+    toError,
+} from '#copilot/core';
 import { getCopilotDb } from '#copilot/db';
 import { publishIoLifecycleEvent } from './io-observability.js';
 
@@ -160,6 +166,17 @@ function flushActiveL2Cache() {
     }
 }
 
+function ensureL2ShutdownHandler() {
+    registerShutdownHandler(
+        'copilot-io-l2.flush',
+        async () => {
+            flushActiveL2Cache();
+            stopPruneTimer();
+        },
+        SHUTDOWN_PRIORITY.CACHE_PERSISTENCE,
+    );
+}
+
 /**
  * @param {ReturnType<typeof getIoL2CacheConfiguration>} configuration
  */
@@ -174,6 +191,7 @@ function getConfigurationKey(configuration) {
 }
 
 export function getIoL2Cache() {
+    ensureL2ShutdownHandler();
     const configuration = getIoL2CacheConfiguration();
     if (!configuration.enabled) {
         flushActiveL2Cache();

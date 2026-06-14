@@ -22,7 +22,7 @@
  */
 
 import { resolveWorkspacePath } from '#copilot/boot';
-import { ConfigError, registerShutdownHandler, SHUTDOWN_PRIORITY, toError } from '#copilot/core';
+import { ConfigError, registerShutdownHandler, runShutdown, SHUTDOWN_PRIORITY, toError } from '#copilot/core';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import { mkdir } from 'node:fs/promises';
@@ -244,12 +244,11 @@ function registerExitHandler() {
         }
     };
 
-    // DB-P3-01: registrar também SIGTERM/SIGINT para garantir flush do WAL em
-    // graceful shutdown PM2 (SIGTERM → 1600ms timeout).
+    // Sinais entram no coordenador central para caches e writers drenarem antes do close do banco.
     if (!exitState.registered) {
         process.on('exit', runExitHandlers);
-        process.once('SIGTERM', runExitHandlers);
-        process.once('SIGINT', runExitHandlers);
+        process.once('SIGTERM', () => void runShutdown('SIGTERM'));
+        process.once('SIGINT', () => void runShutdown('SIGINT'));
         exitState.registered = true;
     }
 
