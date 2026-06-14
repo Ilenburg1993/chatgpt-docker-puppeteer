@@ -129,6 +129,32 @@ describe('warmCacheForPaths', () => {
         const parserStats = getParserCacheStats();
         assert.strictEqual(parserStats.symbolSuppliedSnapshots, 1);
         assert.strictEqual(parserStats.symbolSnapshotReads, 0);
+        assert.strictEqual(result.reusedTextCache, false);
+        assert.strictEqual(result.primedByteCache, true);
+    });
+
+    it('reutiliza texto L1 verificado e evita cópia binária quando solicitado', async () => {
+        resetIoL1CacheForTest();
+        await resetParserCacheForTest();
+        const entry = path.join(tmpDir, 'entry-cached.js');
+        await fs.writeFile(entry, 'export const cachedValue = 1;\n', 'utf8');
+        const firstRead = await readText(entry);
+        assert.strictEqual(firstRead.io.cache, 'l1-miss');
+
+        const result = await warmReadThroughContext(entry, {
+            workspaceRoot: tmpDir,
+            index: false,
+            relatedImports: true,
+            cacheBytes: false,
+        });
+        const bytes = await readBytes(entry);
+
+        assert.strictEqual(result.reusedTextCache, true);
+        assert.strictEqual(result.primedByteCache, false);
+        assert.strictEqual(bytes.io.cache, 'l1-miss');
+        const parserStats = getParserCacheStats();
+        assert.strictEqual(parserStats.symbolSuppliedSnapshots, 1);
+        assert.strictEqual(parserStats.symbolSnapshotReads, 0);
     });
 });
 

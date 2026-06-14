@@ -64,6 +64,7 @@ async function warmReadThroughWithBudget(resolved, mode) {
         relatedImports: true,
         concurrency: 4,
         silent: true,
+        cacheBytes: false,
     });
     warmPromise.catch(() => undefined);
     /** @type {ReturnType<typeof setTimeout> | null} */

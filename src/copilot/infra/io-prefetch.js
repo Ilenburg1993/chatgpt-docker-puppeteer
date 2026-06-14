@@ -347,10 +347,13 @@ export async function warmRecentPaths(recentPaths, opts = {}) {
  *     relatedImports?: boolean;
  *     concurrency?: number;
  *     silent?: boolean;
+ *     cacheBytes?: boolean;
  * }} [opts]
  * @returns {Promise<{
  *     filePath: string;
  *     indexed: boolean;
+ *     reusedTextCache: boolean;
+ *     primedByteCache: boolean;
  *     relatedPaths: string[];
  *     relatedPreloaded: number;
  *     relatedFailed: number;
@@ -365,34 +368,67 @@ export async function warmReadThroughContext(filePath, opts = {}) {
         relatedImports = true,
         concurrency = 4,
         silent = true,
+        cacheBytes = true,
     } = opts;
 
     let indexed = false;
+    let reusedTextCache = false;
+    let primedByteCache = false;
     /** @type {string[]} */
     let relatedPaths = [];
     let relatedPreloaded = 0;
     let relatedFailed = 0;
 
     try {
-        const text = await readTextFileSnapshot(filePath);
         const normalized = normalizeIoCacheKey(filePath);
+        const textKey = makeTextKey(normalized, undefined, undefined);
+        const cachedText = await getVerifiedIoL1Entry(textKey, filePath);
+        const canReuseTextCache =
+            cachedText !== null &&
+            typeof cachedText.content === 'string' &&
+            Number.isFinite(cachedText.size) &&
+            Number.isFinite(cachedText.mtime) &&
+            Number.isFinite(cachedText.ctime) &&
+            Number.isFinite(cachedText.dev) &&
+            Number.isFinite(cachedText.ino);
+        const text =
+            canReuseTextCache
+                ? {
+                      path: filePath,
+                      content: /** @type {string} */ (cachedText.content),
+                      bytesRead: /** @type {NonNullable<typeof cachedText>} */ (cachedText).bytes,
+                      sizeBytes: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).size),
+                      mtimeMs: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).mtime),
+                      ctimeMs: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).ctime),
+                      dev: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).dev),
+                      ino: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).ino),
+                      attempts: 0,
+                      consistent: /** @type {const} */ (true),
+                  }
+                : await readTextFileSnapshot(filePath);
+        reusedTextCache = canReuseTextCache;
         const textHash = sha256(text.content);
-        primeIoL1Entry(makeTextKey(normalized, undefined, undefined), text.content, {
-            sizeBytes: text.sizeBytes,
-            mtimeMs: text.mtimeMs,
-            ctimeMs: text.ctimeMs,
-            dev: text.dev,
-            ino: text.ino,
-            contentHash: textHash,
-        });
-        primeIoL1Entry(makeBytesKey(normalized), toOwnedBuffer(text.content), {
-            sizeBytes: text.sizeBytes,
-            mtimeMs: text.mtimeMs,
-            ctimeMs: text.ctimeMs,
-            dev: text.dev,
-            ino: text.ino,
-            contentHash: textHash,
-        });
+        if (!reusedTextCache) {
+            primeIoL1Entry(textKey, text.content, {
+                sizeBytes: text.sizeBytes,
+                mtimeMs: text.mtimeMs,
+                ctimeMs: text.ctimeMs,
+                dev: text.dev,
+                ino: text.ino,
+                contentHash: textHash,
+            });
+        }
+        if (cacheBytes) {
+            primeIoL1Entry(makeBytesKey(normalized), toOwnedBuffer(text.content), {
+                sizeBytes: text.sizeBytes,
+                mtimeMs: text.mtimeMs,
+                ctimeMs: text.ctimeMs,
+                dev: text.dev,
+                ino: text.ino,
+                contentHash: textHash,
+            });
+            primedByteCache = true;
+        }
 
         if (index) {
             const indexStore = /**
@@ -442,6 +478,8 @@ export async function warmReadThroughContext(filePath, opts = {}) {
     return {
         filePath,
         indexed,
+        reusedTextCache,
+        primedByteCache,
         relatedPaths,
         relatedPreloaded,
         relatedFailed,

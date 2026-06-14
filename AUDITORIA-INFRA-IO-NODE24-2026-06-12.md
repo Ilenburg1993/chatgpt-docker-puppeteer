@@ -1378,6 +1378,23 @@ Provas cobrem CommonJS versus módulo, import aninhado inválido, `.d.ts`, `.mts
 Validação focada de IO-061: parser/governança **48 passados, 0 falhas**; índice **20 passados, 0 falhas**; lint
 focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.53 Status de implementação — read-through reutiliza L1 e evita cópia binária em 2026-06-14
+
+IO-062 fechou uma dupla materialização no caminho principal de `read_file_content`: após `readText` já carregar e
+validar o texto integral no L1, `warmReadThroughContext` relia o arquivo para index/parse e criava também um Buffer
+UTF-8 completo. O read-through agora:
+
+- consulta a entrada textual L1 com fingerprint verificado e a converte em `TextFileSnapshot` sem nova leitura;
+- passa esse mesmo snapshot ao cache simbólico versionado;
+- aceita `cacheBytes`; o caller textual usa `false`, evitando a cópia binária sem consumidor;
+- expõe `reusedTextCache` e `primedByteCache` no relatório.
+
+Provas confirmam que o caminho frio preserva o comportamento legado quando `cacheBytes=true`, enquanto o caminho de
+`read_file_content` reutiliza L1, mantém `symbolSnapshotReads=0` e uma leitura binária posterior ainda é `l1-miss`.
+
+Validação focada de IO-062: **92 passados, 0 falhas**; lint focado, `diff --check` e
+`typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1659,12 +1676,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-059 | P0 | Symbol cache | **Concluído:** hits são validados por fingerprint rico e parse é reconfirmado | replace externo real, retries bounded e métricas por caminho | `stat` por hit adiciona syscall deliberado em troca de consistência | Medir hit latency; só considerar probe temporal com evidência |
 | IO-060 | P1 | Index chunks | **Concluído:** contagem/chunking não materializam todas as linhas | iterador compartilhado, gerador bounded e inserção SQLite incremental | FTS ainda recebe o conteúdo integral exigido pela API atual | Avaliar FTS5 contentless/external-content apenas com benchmark e plano de migração |
 | IO-061 | P1 | Babel parser | **Concluído:** policy/extrator únicos usam opções atuais por extensão | CommonJS/module, TS dts/mts/tsx, ImportExpression, error codes e paridade worker | Proposals/Flow não são auto-habilitados; decorators continuam legacy | Monitorar Babel semver e criar fixture antes de alterar syntax policy |
+| IO-062 | P1 | Read-through | **Concluído:** snapshot textual L1 é reutilizado e Buffer duplicado é opt-out | métricas no relatório e prova de miss binário posterior | Reuso exige fingerprint rico; entradas legadas caem para snapshot físico | Propagar snapshots diretamente em novos callers, sem reconstruir conteúdo |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2186,6 +2204,7 @@ Maturidade operacional avançada:
 - [x] validar cache simbólico contra writers externos e eliminar releitura no read-through;
 - [x] inserir chunks do índice a partir de gerador bounded;
 - [x] unificar policy/extrator Babel e alinhar source modes, TS e ImportExpression à documentação oficial;
+- [x] reutilizar snapshot textual L1 no read-through e evitar cache binário duplicado no caller textual;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
