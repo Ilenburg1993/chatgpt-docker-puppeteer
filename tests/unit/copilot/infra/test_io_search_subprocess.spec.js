@@ -59,6 +59,28 @@ describe('infra/io/search/subprocess', () => {
         expect(lines).toEqual(['line-0', 'line-1', 'line-2']);
     });
 
+    it('preserva UTF-8 quando um code point atravessa chunks de stdout', async () => {
+        /** @type {string[]} */
+        const lines = [];
+        const result = await streamSearchFile(
+            process.execPath,
+            [
+                '-e',
+                "process.stdout.write(Buffer.from([0xf0, 0x9f])); setTimeout(() => process.stdout.write(Buffer.from([0x98, 0x80, 0x0a])), 20);",
+            ],
+            { onStdoutLine: (line) => void lines.push(line) },
+        );
+
+        expect(lines).toEqual(['😀']);
+        expect(result.stdout).toBe('😀');
+    });
+
+    it('rejeita stdout textual com UTF-8 inválido', async () => {
+        await expect(
+            streamSearchFile(process.execPath, ['-e', 'process.stdout.write(Buffer.from([0xff, 0x0a]));']),
+        ).rejects.toMatchObject({ code: 'EUTF8SEARCHOUTPUT' });
+    });
+
     it('rejeita executável ou argumentos com byte nulo', async () => {
         await expect(execSearchFile('node\u0000bad', [])).rejects.toMatchObject({ code: 'ERR_INVALID_ARG_VALUE' });
         await expect(execSearchFile(process.execPath, ['ok\u0000bad'])).rejects.toMatchObject({

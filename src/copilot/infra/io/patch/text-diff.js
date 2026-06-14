@@ -5,6 +5,30 @@
  * @module copilot/infra/io/patch
  */
 
+import { iterateTextLines } from '../../shared/text-lines.js';
+
+/**
+ * @param {string} contentA
+ * @param {string} contentB
+ * @returns {Generator<{ index: number; a: string | undefined; b: string | undefined }>}
+ */
+function* iteratePairedTextLines(contentA, contentB) {
+    const aIterator = iterateTextLines(contentA);
+    const bIterator = iterateTextLines(contentB);
+    let index = 0;
+    while (true) {
+        const aEntry = aIterator.next();
+        const bEntry = bIterator.next();
+        if (aEntry.done && bEntry.done) return;
+        yield {
+            index,
+            a: aEntry.done ? undefined : aEntry.value.text,
+            b: bEntry.done ? undefined : bEntry.value.text,
+        };
+        index += 1;
+    }
+}
+
 /**
  * @param {string} contentA
  * @param {string} contentB
@@ -12,24 +36,15 @@
  * @returns {{ diff: string; contextLines: number }}
  */
 export function buildSimpleTextDiff(contentA, contentB, options = {}) {
-    const aLines = contentA.split('\n');
-    const bLines = contentB.split('\n');
-    const max = Math.max(aLines.length, bLines.length);
     const contextLines = Math.max(0, options.contextLines ?? 3);
-    /** @type {number[]} */
-    const changeIndexes = [];
-    for (let i = 0; i < max; i++) {
-        if (aLines[i] !== bLines[i]) changeIndexes.push(i);
-    }
-    if (changeIndexes.length === 0) {
-        return { diff: '', contextLines };
-    }
-
     /** @type {{ start: number; end: number }[]} */
     const hunks = [];
-    for (const index of changeIndexes) {
+    let totalLines = 0;
+    for (const { index, a, b } of iteratePairedTextLines(contentA, contentB)) {
+        totalLines = index + 1;
+        if (a === b) continue;
         const start = Math.max(0, index - contextLines);
-        const end = Math.min(max, index + contextLines + 1);
+        const end = index + contextLines + 1;
         const last = hunks[hunks.length - 1];
         if (last && start <= last.end) {
             last.end = Math.max(last.end, end);
@@ -37,21 +52,23 @@ export function buildSimpleTextDiff(contentA, contentB, options = {}) {
         }
         hunks.push({ start, end });
     }
+    if (hunks.length === 0) return { diff: '', contextLines };
+    for (const hunk of hunks) hunk.end = Math.min(totalLines, hunk.end);
 
     /** @type {string[]} */
     const out = [];
-    for (const hunk of hunks) {
-        const start = hunk.start;
-        const end = hunk.end;
-        out.push(`@@ ${start + 1},${end - start} @@`);
-        for (let j = start; j < end; j++) {
-            if (aLines[j] === bLines[j]) {
-                if (aLines[j] !== undefined) out.push(` ${aLines[j]}`);
-            } else {
-                if (aLines[j] !== undefined) out.push(`-${aLines[j]}`);
-                if (bLines[j] !== undefined) out.push(`+${bLines[j]}`);
-            }
+    let hunkIndex = 0;
+    for (const { index, a, b } of iteratePairedTextLines(contentA, contentB)) {
+        const hunk = hunks[hunkIndex];
+        if (!hunk || index < hunk.start) continue;
+        if (index === hunk.start) out.push(`@@ ${hunk.start + 1},${hunk.end - hunk.start} @@`);
+        if (a === b) {
+            if (a !== undefined) out.push(` ${a}`);
+        } else {
+            if (a !== undefined) out.push(`-${a}`);
+            if (b !== undefined) out.push(`+${b}`);
         }
+        if (index + 1 >= hunk.end) hunkIndex += 1;
     }
     return { diff: out.join('\n'), contextLines };
 }
@@ -66,17 +83,9 @@ export function buildSimpleTextDiff(contentA, contentB, options = {}) {
  */
 function extractLineWindow(text, startLine, endLine) {
     const lines = [];
-    let line = 1;
-    let start = 0;
-    for (let index = 0; index <= text.length; index++) {
-        if (index !== text.length && text.charCodeAt(index) !== 10) continue;
-        if (line >= startLine && line <= endLine) {
-            const end = index > start && text.charCodeAt(index - 1) === 13 ? index - 1 : index;
-            lines.push(text.slice(start, end));
-        }
-        if (line > endLine) break;
-        line += 1;
-        start = index + 1;
+    for (const entry of iterateTextLines(text)) {
+        if (entry.line > endLine) break;
+        if (entry.line >= startLine) lines.push(entry.text);
     }
     return lines;
 }

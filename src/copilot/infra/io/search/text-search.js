@@ -77,22 +77,32 @@ function sanitizeSearchLine(line) {
  */
 function sanitizeSearchOutput(stdout) {
     let filteredLines = 0;
-    const sanitizedLines = stdout
-        .split('\n')
-        .map((line) => sanitizeSearchLine(line))
-        .filter((line) => {
-            if (!line.filtered) return true;
+    let sanitized = false;
+    let redactions = 0;
+    let policyVersion = 'unknown';
+    /** @type {string[]} */
+    const outputLines = [];
+    let start = 0;
+    for (let index = 0; index <= stdout.length; index += 1) {
+        if (index < stdout.length && stdout.charCodeAt(index) !== 10) continue;
+        const line = sanitizeSearchLine(stdout.slice(start, index));
+        policyVersion = line.policyVersion;
+        sanitized = sanitized || line.sanitized;
+        redactions += line.redactions;
+        if (line.filtered) {
             filteredLines += 1;
-            return false;
-        })
-        .map((line) => line.text)
-        .join('\n');
-    const sanitized = sanitizeIoTextOutput({ text: sanitizedLines });
+        } else {
+            outputLines.push(line.text);
+        }
+        start = index + 1;
+    }
+    const finalSanitized = sanitizeIoTextOutput({ text: outputLines.join('\n') });
     return {
-        ...sanitized,
-        sanitized: filteredLines > 0 || sanitized.sanitized,
-        redactions: filteredLines + sanitized.redactions,
+        ...finalSanitized,
+        sanitized: filteredLines > 0 || sanitized || finalSanitized.sanitized,
+        redactions: redactions + finalSanitized.redactions,
         filteredLines,
+        policyVersion: finalSanitized.policyVersion || policyVersion,
     };
 }
 
@@ -146,7 +156,14 @@ function createStreamingSearchCollector(searchWindow) {
  * @returns {number}
  */
 function countSearchMatchLines(text) {
-    return text.split('\n').filter((line) => /^(?:.+:)?\d+:/.test(line)).length;
+    let matches = 0;
+    let start = 0;
+    for (let index = 0; index <= text.length; index += 1) {
+        if (index < text.length && text.charCodeAt(index) !== 10) continue;
+        if (/^(?:.+:)?\d+:/.test(text.slice(start, index))) matches += 1;
+        start = index + 1;
+    }
+    return matches;
 }
 
 /**
@@ -155,8 +172,11 @@ function countSearchMatchLines(text) {
  */
 function countSearchOutputLines(text) {
     if (!text) return 0;
-    const lines = text.split('\n');
-    return lines[lines.length - 1] === '' ? lines.length - 1 : lines.length;
+    let lines = 1;
+    for (let index = 0; index < text.length; index += 1) {
+        if (text.charCodeAt(index) === 10) lines += 1;
+    }
+    return text.charCodeAt(text.length - 1) === 10 ? lines - 1 : lines;
 }
 
 /**
@@ -796,7 +816,7 @@ export async function searchWorkspaceSymbols(targetPath, options) {
         const sanitized = streamingCollector.snapshot();
         const windowedOutput = paginateSearchText(sanitized.text, searchWindow);
         const output = windowedOutput.text;
-        const lines = output.split('\n').filter(Boolean);
+        const matchCount = countSearchOutputLines(output);
         const io = publishAndReturn(
             buildSymbolIo('io-engine.rg.symbol-search', utf8ByteLength(output, 'symbol output'), {
                 redactions: sanitized.redactions,
@@ -813,8 +833,8 @@ export async function searchWorkspaceSymbols(targetPath, options) {
             symbol: options.symbolName,
             kind: resolvedKind,
             output,
-            matchCount: lines.length,
-            ...(lines.length === 0
+            matchCount,
+            ...(matchCount === 0
                 ? {
                       message: `Nenhuma declaração de "${options.symbolName}" (${resolvedKind}) encontrada em ${targetPath}`,
                   }

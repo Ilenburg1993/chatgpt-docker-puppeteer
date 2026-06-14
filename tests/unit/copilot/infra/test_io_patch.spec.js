@@ -2,7 +2,11 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { buildSimpleTextDiff, computeTextPatch } from '../../../../src/copilot/infra/io/patch/index.js';
+import {
+    buildSimpleTextDiff,
+    buildSimpleTextDiffAroundLineRange,
+    computeTextPatch,
+} from '../../../../src/copilot/infra/io/patch/index.js';
 
 describe('infra/io/patch', () => {
     it('calcula patch textual com substituição única', () => {
@@ -114,5 +118,26 @@ describe('infra/io/patch', () => {
         const contextX2Count = lines.filter((line) => line === ' x2').length;
 
         expect(contextX2Count).toBe(1);
+    });
+
+    it('gera diff por linhas físicas sem reter arrays completos dos dois textos', () => {
+        const result = buildSimpleTextDiff('one\r\ntwo\rthree\nfour', 'one\r\nTWO\rthree\nfour', {
+            contextLines: 1,
+        });
+
+        expect(result.diff).toBe('@@ 1,3 @@\n one\n-two\n+TWO\n three');
+    });
+
+    it('usa linhas físicas compartilhadas no diff otimizado por range', () => {
+        const result = buildSimpleTextDiffAroundLineRange('one\r\ntwo\rthree', 'one\r\nTWO\rthree', {
+            firstMatchLine: 2,
+            lastMatchLine: 2,
+            lineDelta: 0,
+            replacedOccurrences: 1,
+            contextLines: 1,
+        });
+
+        expect(result.rangeOptimized).toBe(true);
+        expect(result.diff).toBe('@@ 1,3 @@\n one\n-two\n+TWO\n three');
     });
 });

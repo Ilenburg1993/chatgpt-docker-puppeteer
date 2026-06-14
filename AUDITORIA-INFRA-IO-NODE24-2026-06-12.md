@@ -1430,6 +1430,36 @@ expõe `sizeBytes`, `maxBytes` e `rejected`; invalidações e evicções descont
 Validação focada de IO-064: **70 passados, 0 falhas** em cache, engine, chunks e índice; lint focado,
 `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.56 Status de implementação — diff e output window sem arrays integrais em 2026-06-14
+
+IO-065 removeu materializações proporcionais aos inputs em duas superfícies de saída:
+
+- `buildSimpleTextDiff` deixou de criar arrays completos para os dois arquivos e uma lista de cada linha alterada;
+  duas passagens lazy calculam hunks e renderizam somente os ranges necessários;
+- o diff completo e o otimizado por range usam a mesma primitiva física LF/CRLF/CR;
+- `limitTextLines` e `windowTextLines` deixaram de executar `split/slice/join`; contagem e offsets LF são calculados
+  sem array proporcional, preservando byte a byte a semântica pública de newline terminal e cursor;
+- arrays remanescentes são proporcionais aos hunks/saída retornada, não aos inputs completos.
+
+Compatibilidade foi provada diferencialmente em **5.000 pares LF** para diff e **5.000 casos** de paginação, além das
+regressões físicas CR/CRLF. O algoritmo de diff permanece intencionalmente simples e index-aligned; esta onda não
+introduziu LCS/Myers nem alterou seu formato público.
+
+### 1.57 Status de implementação — UTF-8 fatal no stdout de busca em 2026-06-14
+
+IO-066 fechou a lacuna textual remanescente de `streamSearchFile`: cada chunk era convertido isoladamente com
+`Buffer.toString('utf8')`, portanto um code point dividido entre eventos de stdout podia virar U+FFFD. O subprocesso
+agora usa `TextDecoder` incremental fatal, preserva carry multibyte e rejeita bytes inválidos ou sequência truncada
+com `EUTF8SEARCHOUTPUT`.
+
+O parser de linhas do stdout deixou de executar `pendingStdout.split('\n')` por chunk e passa a avançar por offsets,
+mantendo early stop, `maxBuffer` e coleta opcional. Sanitização e contagens de busca também deixaram pipelines de
+`split/map/filter`, sem mudar a visão pós-sanitização nem o contrato de paginação.
+
+Validação combinada de IO-065/IO-066: **119 passados, 0 falhas** em patch, fuzz, output-window, search, subprocess,
+engine e MCP; duas provas diferenciais de 5.000 casos; lint focado, `diff --check` e
+`typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1712,14 +1742,16 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-060 | P1 | Index chunks | **Concluído:** contagem/chunking não materializam todas as linhas | iterador compartilhado, gerador bounded e inserção SQLite incremental | FTS ainda recebe o conteúdo integral exigido pela API atual | Avaliar FTS5 contentless/external-content apenas com benchmark e plano de migração |
 | IO-061 | P1 | Babel parser | **Concluído:** policy/extrator únicos usam opções atuais por extensão | CommonJS/module, TS dts/mts/tsx, ImportExpression, error codes e paridade worker | Proposals/Flow não são auto-habilitados; decorators continuam legacy | Monitorar Babel semver e criar fixture antes de alterar syntax policy |
 | IO-062 | P1 | Read-through | **Concluído:** snapshot textual L1 é reutilizado e Buffer duplicado é opt-out | métricas no relatório e prova de miss binário posterior | Reuso exige fingerprint rico; entradas legadas caem para snapshot físico | Propagar snapshots diretamente em novos callers, sem reconstruir conteúdo |
-| IO-063 | P1 | Patch lines | **Concluído:** metadata usa LF/CRLF/CR e ocorrência específica evita segunda varredura | regressão mista, fuzz e consumers de patch-plan | Diffs ainda normalizam por LF em módulo próprio | Auditar diff separadamente sem alterar formato público inadvertidamente |
+| IO-063 | P1 | Patch lines | **Concluído:** metadata usa LF/CRLF/CR e ocorrência específica evita segunda varredura | regressão mista, fuzz e consumers de patch-plan | Diff foi alinhado posteriormente em IO-065 | Manter fuzz físico compartilhado |
 | IO-064 | P1 | Read line offsets | **Concluído:** slicing físico é uniforme e retenção do cache é bounded por bytes | scanner O(1) no bypass, offsets `Uint32Array`, health e regressões CR/LF/CRLF | Construção de offsets faz duas varreduras para obter alocação compacta exata | Medir miss frio versus redução de heap; manter o orçamento global |
+| IO-065 | P1 | Diff/output window | **Concluído:** inputs não viram arrays integrais para diff/paginação | duas passagens lazy, scanners de offsets e 10 mil casos diferenciais | Diff continua index-aligned, não é algoritmo LCS | Só migrar algoritmo com contrato/fixtures de inserção e benchmark |
+| IO-066 | P0 | Search UTF-8 | **Concluído:** stdout streaming usa decode incremental fatal | code point entre chunks, bytes inválidos e early stop cobertos | stderr diagnóstico e `execSearchFile` legado continuam decode best-effort após concatenação | Manter stdout textual de busca sob política fatal |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063, IO-064, IO-065, IO-066 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -1810,9 +1842,10 @@ A prioridade remanescente é:
 O scanner usa `readdir({ withFileTypes: true })` e evita `lstat` para diretórios e symlinks reconhecidos. O benchmark local ficou entre 154 e 214 ms para 1.565 entradas de `src/copilot`; ainda falta benchmark comparativo automatizado e cobertura de filesystems que retornam tipo desconhecido.
 
 A busca está bem protegida contra shell injection: usa `spawn` com args array e maxBuffer/timeout. O índice FTS agora
-combina metadata rica com verificação periódica bounded, e contagens/cursor derivam da visão sanitizada. O risco
-remanescente é a materialização de stdout até o limite do subprocesso e o contrato best-effort da leitura textual em
-chunks.
+combina metadata rica com verificação periódica bounded, e contagens/cursor derivam da visão sanitizada. Stdout
+textual de `rg`/`grep` é processado incrementalmente, com UTF-8 fatal e early stop. O risco remanescente fica restrito
+a chamadas sem `maxResults`, que podem coletar saída até `maxBuffer`, e ao decode best-effort de stderr/adapter legado
+após concatenação bounded.
 
 ---
 
@@ -2244,6 +2277,8 @@ Maturidade operacional avançada:
 - [x] reutilizar snapshot textual L1 no read-through e evitar cache binário duplicado no caller textual;
 - [x] unificar linhas físicas no patch e remover segunda varredura/arrays do replace-all;
 - [x] unificar linhas físicas na leitura e limitar o line-offset cache por bytes;
+- [x] remover arrays integrais de diff/output-window sem alterar contratos;
+- [x] tornar fatal e incremental o decode UTF-8 do stdout de busca;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2264,8 +2299,8 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria de materializações em `text-diff`, busca textual e leitores JSONL/output-window, separando
-arrays exigidos pelo contrato de duplicações internas removíveis. Medir o custo de `attachComment` antes de qualquer
-perfil sem doc comments e ampliar fixtures Babel somente para sintaxe realmente aceita pelo workspace; manter
-fuzz/chaos como gates recorrentes. IO-030/L3 permanece explicitamente sem implementação até existir evidência de
-múltiplos runtimes/processos reais que justifique o contrato.
+Continuar a auditoria do leitor de cauda JSONL e de buffers diagnósticos legados, separando arrays exigidos pelo
+contrato de duplicações internas removíveis. Medir o custo de `attachComment` antes de qualquer perfil sem doc
+comments e ampliar fixtures Babel somente para sintaxe realmente aceita pelo workspace; manter fuzz/chaos como gates
+recorrentes. IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos
+runtimes/processos reais que justifique o contrato.

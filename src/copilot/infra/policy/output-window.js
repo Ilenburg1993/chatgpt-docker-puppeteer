@@ -25,6 +25,48 @@ function createInvalidCursorError(value) {
 }
 
 /**
+ * Conta linhas LF comparáveis, excluindo a entrada vazia criada por newline terminal.
+ *
+ * @param {string} text
+ * @returns {number}
+ */
+function countComparableTextLines(text) {
+    if (text.length === 0) return 0;
+    let lines = 1;
+    for (let index = 0; index < text.length; index += 1) {
+        if (text.charCodeAt(index) === 10) lines += 1;
+    }
+    return text.charCodeAt(text.length - 1) === 10 ? lines - 1 : lines;
+}
+
+/**
+ * Recorta linhas LF em offsets zero-based sem materializar o texto completo em array.
+ *
+ * @param {string} text
+ * @param {number} startLine
+ * @param {number} endLine
+ * @param {number} totalLines
+ * @returns {string}
+ */
+function sliceComparableTextLines(text, startLine, endLine, totalLines) {
+    if (startLine >= totalLines || endLine <= startLine) return '';
+    let currentLine = 0;
+    let startOffset = startLine === 0 ? 0 : -1;
+    let endOffset = text.charCodeAt(text.length - 1) === 10 ? text.length - 1 : text.length;
+
+    for (let index = 0; index < text.length; index += 1) {
+        if (text.charCodeAt(index) !== 10) continue;
+        currentLine += 1;
+        if (currentLine === startLine) startOffset = index + 1;
+        if (currentLine === endLine) {
+            endOffset = index;
+            break;
+        }
+    }
+    return text.slice(startOffset, endOffset);
+}
+
+/**
  * @param {string | number | null | undefined} value
  * @param {{ strict?: boolean }} [options]
  * @returns {number}
@@ -46,16 +88,14 @@ export function normalizeCursorOffset(value, options = {}) {
  * @returns {{ text: string; truncated: boolean; originalLineCount: number }}
  */
 export function limitTextLines(text, maxResults) {
-    const lines = text.split('\n');
-    const trailingEmpty = lines.length > 0 && lines[lines.length - 1] === '';
-    const comparableLines = trailingEmpty ? lines.slice(0, -1) : lines;
-    if (maxResults === null || comparableLines.length <= maxResults) {
-        return { text, truncated: false, originalLineCount: comparableLines.length };
+    const originalLineCount = countComparableTextLines(text);
+    if (maxResults === null || originalLineCount <= maxResults) {
+        return { text, truncated: false, originalLineCount };
     }
     return {
-        text: comparableLines.slice(0, maxResults).join('\n'),
+        text: sliceComparableTextLines(text, 0, maxResults, originalLineCount),
         truncated: true,
-        originalLineCount: comparableLines.length,
+        originalLineCount,
     };
 }
 
@@ -71,25 +111,23 @@ export function limitTextLines(text, maxResults) {
  * }}
  */
 export function windowTextLines(text, options) {
-    const lines = text.split('\n');
-    const trailingEmpty = lines.length > 0 && lines[lines.length - 1] === '';
-    const comparableLines = trailingEmpty ? lines.slice(0, -1) : lines;
+    const originalLineCount = countComparableTextLines(text);
     const cursorOffset = normalizeCursorOffset(options.cursor, { strict: options.strictCursor === true });
     if (options.maxResults === null) {
         return {
-            text: comparableLines.slice(cursorOffset).join('\n'),
+            text: sliceComparableTextLines(text, cursorOffset, originalLineCount, originalLineCount),
             truncated: false,
-            originalLineCount: comparableLines.length,
+            originalLineCount,
             cursorOffset,
             nextCursor: null,
         };
     }
     const endOffset = cursorOffset + options.maxResults;
-    const nextCursor = comparableLines.length > endOffset ? String(endOffset) : null;
+    const nextCursor = originalLineCount > endOffset ? String(endOffset) : null;
     return {
-        text: comparableLines.slice(cursorOffset, endOffset).join('\n'),
+        text: sliceComparableTextLines(text, cursorOffset, endOffset, originalLineCount),
         truncated: nextCursor !== null,
-        originalLineCount: comparableLines.length,
+        originalLineCount,
         cursorOffset,
         nextCursor,
     };

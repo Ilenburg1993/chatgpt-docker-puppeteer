@@ -322,6 +322,7 @@ export async function streamSearchFile(file, args, options = {}) {
         let settled = false;
         let stoppedEarly = false;
         let pendingStdout = '';
+        const stdoutDecoder = new TextDecoder('utf-8', { fatal: true });
         /** @type {NodeJS.Timeout | null} */
         let timeoutId = null;
 
@@ -410,12 +411,24 @@ export async function streamSearchFile(file, args, options = {}) {
                 );
                 return;
             }
-            pendingStdout += buffer.toString('utf8');
-            const lines = pendingStdout.split('\n');
-            pendingStdout = lines.pop() ?? '';
-            for (const line of lines) {
-                if (!emitLine(line)) break;
+            try {
+                pendingStdout += stdoutDecoder.decode(buffer, { stream: true });
+            } catch {
+                rejectRuntime('stdout contém bytes inválidos para UTF-8.', 'EUTF8SEARCHOUTPUT');
+                return;
             }
+            let lineStart = 0;
+            while (true) {
+                const newlineIndex = pendingStdout.indexOf('\n', lineStart);
+                if (newlineIndex < 0) break;
+                const line = pendingStdout.slice(lineStart, newlineIndex);
+                lineStart = newlineIndex + 1;
+                if (!emitLine(line)) {
+                    pendingStdout = '';
+                    return;
+                }
+            }
+            if (lineStart > 0) pendingStdout = pendingStdout.slice(lineStart);
         };
 
         /**
@@ -462,9 +475,17 @@ export async function streamSearchFile(file, args, options = {}) {
 
         child.once('close', (status, signal) => {
             if (settled) return;
-            if (!stoppedEarly && pendingStdout) {
-                emitLine(pendingStdout);
-                pendingStdout = '';
+            if (!stoppedEarly) {
+                try {
+                    pendingStdout += stdoutDecoder.decode();
+                } catch {
+                    rejectRuntime('stdout contém sequência UTF-8 truncada.', 'EUTF8SEARCHOUTPUT');
+                    return;
+                }
+                if (pendingStdout) {
+                    emitLine(pendingStdout);
+                    pendingStdout = '';
+                }
             }
             const stdout = decodeStdout();
             const stderr = decodeStderr();

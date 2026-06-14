@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    limitTextLines,
     normalizeCursorOffset,
     windowItems,
     windowTextLines,
@@ -32,6 +33,34 @@ describe('infra/policy/output-window', () => {
 
         expect(first).toMatchObject({ text: 'a\nb', truncated: true, nextCursor: '2', cursorOffset: 0 });
         expect(second).toMatchObject({ text: 'c', truncated: false, nextCursor: null, cursorOffset: 2 });
+    });
+
+    it('preserva semântica LF, newline terminal e cursores além do fim sem arrays proporcionais', () => {
+        expect(limitTextLines('a\r\nb\r\n', 1)).toEqual({
+            text: 'a\r',
+            truncated: true,
+            originalLineCount: 2,
+        });
+        expect(limitTextLines('a\nb\n', null)).toEqual({
+            text: 'a\nb\n',
+            truncated: false,
+            originalLineCount: 2,
+        });
+        expect(windowTextLines('a\nb\n', { maxResults: null })).toMatchObject({
+            text: 'a\nb',
+            originalLineCount: 2,
+        });
+        expect(windowTextLines('a\nb', { maxResults: 2, cursor: 9 })).toMatchObject({
+            text: '',
+            truncated: false,
+            originalLineCount: 2,
+            cursorOffset: 9,
+        });
+        expect(windowTextLines('', { maxResults: 2 })).toMatchObject({
+            text: '',
+            originalLineCount: 0,
+            nextCursor: null,
+        });
     });
 
     it('pagina arrays mantendo total e offset', () => {
