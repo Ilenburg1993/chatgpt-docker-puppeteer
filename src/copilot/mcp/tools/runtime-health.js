@@ -31,6 +31,10 @@ import { readRepoReadFileResultCacheStats } from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
+const WORKSPACE_STATUS_CACHE_TTL_MS = 5 * 1000;
+
+/** @type {{ expiresAt: number; value: { dirty: boolean | null; branch: string | null; head: string | null; error: string | null } } | null} */
+let cachedWorkspaceStatus = null;
 
 /**
  * @param {unknown} stats
@@ -63,6 +67,7 @@ function summarizeIndexHealth(stats) {
  * @returns {Promise<{ dirty: boolean | null; branch: string | null; head: string | null; error: string | null }>}
  */
 async function summarizeWorkspaceStatus() {
+    if (cachedWorkspaceStatus && cachedWorkspaceStatus.expiresAt > Date.now()) return cachedWorkspaceStatus.value;
     try {
         const result = await repoStatusHandler();
         if (result.isError === true) {
@@ -73,20 +78,24 @@ async function summarizeWorkspaceStatus() {
                 error: String(result.structuredContent?.['error'] ?? 'repo_status failed'),
             };
         }
-        return {
+        const value = {
             dirty: result.structuredContent?.['dirty'] === true,
             branch:
                 typeof result.structuredContent?.['branch'] === 'string' ? result.structuredContent['branch'] : null,
             head: typeof result.structuredContent?.['head'] === 'string' ? result.structuredContent['head'] : null,
             error: null,
         };
+        cachedWorkspaceStatus = { expiresAt: Date.now() + WORKSPACE_STATUS_CACHE_TTL_MS, value };
+        return value;
     } catch (error) {
-        return {
+        const value = {
             dirty: null,
             branch: null,
             head: null,
             error: error instanceof Error ? error.message : String(error),
         };
+        cachedWorkspaceStatus = { expiresAt: Date.now() + WORKSPACE_STATUS_CACHE_TTL_MS, value };
+        return value;
     }
 }
 

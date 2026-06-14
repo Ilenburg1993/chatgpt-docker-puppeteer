@@ -342,6 +342,48 @@ const COPILOT_MIGRATIONS = [
         // Model Gateway R.1: schema relacional reservado para catálogo universal, overlays e eligibility pré-runtime.
         up: MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
     },
+    {
+        version: 13,
+        name: 'create_mcp_http_sessions',
+        up: `
+            CREATE TABLE IF NOT EXISTS copilot_mcp_http_sessions (
+                session_id_hash    TEXT PRIMARY KEY,
+                session_id_preview TEXT NOT NULL,
+                protocol_version   TEXT NOT NULL,
+                created_at_ms      INTEGER NOT NULL,
+                last_seen_at_ms    INTEGER NOT NULL,
+                expires_at_ms      INTEGER NOT NULL,
+                status             TEXT NOT NULL CHECK(status IN ('active', 'terminated', 'expired')),
+                terminated_at_ms   INTEGER,
+                terminate_reason   TEXT,
+                auth_binding_json  TEXT NOT NULL,
+                transport_json     TEXT NOT NULL
+            ) STRICT;
+            CREATE INDEX IF NOT EXISTS idx_mcp_http_sessions_status
+                ON copilot_mcp_http_sessions(status, expires_at_ms);
+            CREATE INDEX IF NOT EXISTS idx_mcp_http_sessions_last_seen
+                ON copilot_mcp_http_sessions(last_seen_at_ms DESC);
+        `,
+    },
+    {
+        version: 14,
+        name: 'create_mcp_http_events',
+        up: `
+            CREATE TABLE IF NOT EXISTS copilot_mcp_http_events (
+                event_id TEXT PRIMARY KEY,
+                stream_id TEXT NOT NULL,
+                sequence INTEGER NOT NULL,
+                message_json TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL,
+                expires_at_ms INTEGER NOT NULL,
+                UNIQUE(stream_id, sequence)
+            ) STRICT;
+            CREATE INDEX IF NOT EXISTS idx_mcp_http_events_stream_seq
+                ON copilot_mcp_http_events(stream_id, sequence);
+            CREATE INDEX IF NOT EXISTS idx_mcp_http_events_expires
+                ON copilot_mcp_http_events(expires_at_ms);
+        `,
+    },
 ];
 
 export { COPILOT_MIGRATIONS };

@@ -100,6 +100,9 @@ describe('copilot MCP tools', () => {
         assert.deepEqual(second.content, first.content);
         assert.equal(afterFirst.misses, 1);
         assert.equal(afterFirst.sets, 1);
+        assert.equal(typeof afterFirst.bytes, 'number');
+        assert.ok(afterFirst.bytes > 0);
+        assert.equal(typeof afterFirst.maxBytes, 'number');
         assert.equal(afterSecond.hits, 1);
         assert.equal(afterSecond.size, 1);
         const resolved = await resolveReadPath(args.path);
@@ -109,6 +112,26 @@ describe('copilot MCP tools', () => {
         assert.equal(afterInvalidation.busInvalidations, 1);
         assert.equal(afterInvalidation.clears, 1);
         assert.equal(afterInvalidation.size, 0);
+    });
+
+    it('repo_read_file coalesces concurrent same-window reads through singleflight', async () => {
+        resetRepoReadResponseCacheForTest();
+        const tool = findTool('repo_read_file');
+        const args = {
+            path: 'src/copilot/mcp/README.md',
+            startLine: 1,
+            endLine: 20,
+        };
+        const [first, second] = await Promise.all([tool.handler(args), tool.handler(args)]);
+        const stats = readRepoReadFileResultCacheStats();
+
+        assert.equal(first.isError, undefined);
+        assert.equal(second.isError, undefined);
+        assert.deepEqual(second.structuredContent, first.structuredContent);
+        assert.equal(stats.misses, 1);
+        assert.equal(stats.singleflightLeaders, 1);
+        assert.equal(stats.singleflightJoins, 1);
+        assert.equal(stats.size, 1);
     });
 
     it('repo_file_stats returns metadata and optional content hash', async () => {
@@ -295,6 +318,8 @@ describe('copilot MCP tools', () => {
         assert.deepEqual(second.content, first.content);
         assert.equal(afterFirst.chunkMisses, 1);
         assert.equal(afterFirst.chunkSets, 1);
+        assert.equal(typeof afterFirst.chunkBytes, 'number');
+        assert.ok(afterFirst.chunkBytes > 0);
         assert.equal(afterSecond.chunkHits, 1);
         assert.equal(afterSecond.chunkSize, 1);
         const resolved = await resolveReadPath(args.path);
@@ -304,6 +329,27 @@ describe('copilot MCP tools', () => {
         assert.equal(afterInvalidation.busInvalidations, 1);
         assert.equal(afterInvalidation.chunkClears, 1);
         assert.equal(afterInvalidation.chunkSize, 0);
+    });
+
+    it('repo_read_file_chunks coalesces concurrent same-window chunk reads through singleflight', async () => {
+        resetRepoReadResponseCacheForTest();
+        const tool = findTool('repo_read_file_chunks');
+        const args = {
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            chunkLines: 10,
+            startLine: 1,
+            endLine: 30,
+        };
+        const [first, second] = await Promise.all([tool.handler(args), tool.handler(args)]);
+        const stats = readRepoReadFileResultCacheStats();
+
+        assert.equal(first.isError, undefined);
+        assert.equal(second.isError, undefined);
+        assert.deepEqual(second.structuredContent, first.structuredContent);
+        assert.equal(stats.chunkMisses, 1);
+        assert.equal(stats.chunkSingleflightLeaders, 1);
+        assert.equal(stats.chunkSingleflightJoins, 1);
+        assert.equal(stats.chunkSize, 1);
     });
 
     it('repo_read_file_chunks separates returned lines from scanned line metadata', async () => {

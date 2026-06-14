@@ -11,8 +11,12 @@
 # • Compatível com Docker / DevContainer do zero
 # • Alinhado com package.json v1.1.4 e scripts de rede/control-plane canônicos
 #
-# Versão: 4.4.0
-# Data:   2026-05-20
+# Versão: 4.5.0
+# Data:   2026-06-13
+# Changelog v4.5.0:
+#   - Adiciona comandos canônicos síncronos para MCP Stateful Streamable HTTP.
+#   - Adiciona gates mcp-stateful-* para typecheck, lint, unit, suite fast/full e restart-ready.
+#   - Adiciona helpers de flags stateful full e rollback stateless compat.
 # Changelog v4.4.0:
 #   - Sincroniza com package.json v1.1.4, DevContainer v5.9.0, Dockerfile v1.5.0 e post-create v1.2.1.
 #   - Integra network-control-plane-state.sh v1.1.0 como agregador passivo canônico.
@@ -200,8 +204,8 @@ help:
 	@echo "  $(CYAN)make validate-platform$(NC)     Validação consolidada de plataforma/CI"
 	@echo "  $(CYAN)make validate-git$(NC)      Validar configurações Git"
 	@echo "  $(CYAN)make mcp-diagnose$(NC)      Diagnóstico MCP (RAG/LSP/Ollama)"
-	@echo "  $(CYAN)make copilot-mcp-up$(NC)    Sobe MCP OAuth + Cloudflare permanente"
-	@echo "  $(CYAN)make copilot-mcp-restart$(NC) Reinicia MCP OAuth + Cloudflare"
+	@echo "  $(CYAN)make copilot-mcp-up$(NC)    Sobe MCP Stateful Streamable HTTP + Cloudflare permanente"
+	@echo "  $(CYAN)make copilot-mcp-restart$(NC) Reinicia MCP Stateful Streamable HTTP + Cloudflare"
 	@echo "  $(CYAN)make copilot-mcp-h2-origin-plan$(NC) Planeja origin remoto HTTPS/HTTP2 sem aplicar"
 	@echo "  $(CYAN)make copilot-mcp-h2-origin-apply-dry-run$(NC) Dry-run do apply HTTPS/HTTP2 no named tunnel"
 	@echo "  $(CYAN)make copilot-mcp-h2-origin-apply$(NC) Aplica HTTPS/HTTP2 no named tunnel com confirmação explícita"
@@ -1216,7 +1220,7 @@ test-all: test test-unit test-integration test-e2e
 # 9️⃣.1 RAG & MCP
 # =============================================================================
 
-.PHONY: mcp-diagnose copilot-mcp-up copilot-mcp-down copilot-mcp-restart copilot-mcp-h2-up copilot-mcp-h2-restart copilot-mcp-h2-status copilot-mcp-h2-remote-audit copilot-mcp-h2-canary copilot-mcp-h2-migrate copilot-mcp-http1-rollback copilot-mcp-status copilot-mcp-remote-audit copilot-mcp-origin-plan copilot-mcp-h2-origin-plan copilot-mcp-h2-origin-apply-dry-run copilot-mcp-h2-origin-apply copilot-mcp-smoke copilot-mcp-smoke-refresh copilot-mcp-oauth-smoke lsp-health semantic-preflight rag-help audit-help rag-preflight rag-health rag-index rag-index-code-config rag-index-docs rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero rag-rebuild-code-config rag-rebuild-code-config-strict
+.PHONY: mcp-diagnose copilot-mcp-up copilot-mcp-down copilot-mcp-restart copilot-mcp-status copilot-mcp-stateful-up copilot-mcp-stateful-restart copilot-mcp-stateful-status copilot-mcp-stateless-compat-up copilot-mcp-stateless-compat-restart copilot-mcp-h2-up copilot-mcp-h2-restart copilot-mcp-h2-status copilot-mcp-h2-remote-audit copilot-mcp-h2-canary copilot-mcp-h2-migrate copilot-mcp-http1-rollback copilot-mcp-remote-audit copilot-mcp-origin-plan copilot-mcp-h2-origin-plan copilot-mcp-h2-origin-apply-dry-run copilot-mcp-h2-origin-apply copilot-mcp-smoke copilot-mcp-smoke-refresh copilot-mcp-oauth-smoke lsp-health semantic-preflight rag-help audit-help rag-preflight rag-health rag-index rag-index-code-config rag-index-docs rag-ask rag-hybrid rag-expand rag-reset rag-watch rag-full-rebuild rag-rebuild-zero rag-rebuild-code-config rag-rebuild-code-config-strict
 
 rag-help:
 	@echo ""
@@ -1259,33 +1263,45 @@ mcp-diagnose:
 	@echo "$(CYAN)🔍 Diagnóstico MCP$(NC)"
 	@$(NPM) run mcp:diagnose
 
-copilot-mcp-up:
-	@echo "$(CYAN)🔐 Subindo MCP OAuth + Cloudflare permanente$(NC)"
-	@$(NPM) run copilot:mcp:up
+copilot-mcp-up: copilot-mcp-stateful-up
+
+copilot-mcp-stateful-up:
+	@echo "$(CYAN)🔐 Subindo MCP Stateful Streamable HTTP + OAuth + Cloudflare permanente$(NC)"
+	@$(NPM) run mcp:stateful:up
 
 copilot-mcp-down:
 	@echo "$(CYAN)🛑 Encerrando MCP + Cloudflare permanente$(NC)"
 	@$(NPM) run copilot:mcp:cloudflare:down
 
-copilot-mcp-restart:
-	@echo "$(CYAN)🔁 Reiniciando MCP OAuth + Cloudflare permanente$(NC)"
-	@$(NPM) run copilot:mcp:restart
+copilot-mcp-restart: copilot-mcp-stateful-restart
+
+copilot-mcp-stateful-restart:
+	@echo "$(CYAN)🔁 Reiniciando MCP Stateful Streamable HTTP + OAuth + Cloudflare permanente$(NC)"
+	@$(NPM) run mcp:stateful:restart
 
 copilot-mcp-status:
-	@echo "$(CYAN)📡 Status MCP + Cloudflare permanente$(NC)"
-	@$(NPM) run copilot:mcp:status
+	@echo "$(CYAN)Status MCP Stateful Streamable HTTP + Cloudflare permanente$(NC)"
+	@$(NPM) run mcp:stateful:status
+
+copilot-mcp-stateless-compat-up:
+	@echo "$(YELLOW)Rollback: subindo MCP em stateless compatibility fallback$(NC)"
+	@$(NPM) run mcp:stateless:compat:up
+
+copilot-mcp-stateless-compat-restart:
+	@echo "$(YELLOW)Rollback: reiniciando MCP em stateless compatibility fallback$(NC)"
+	@$(NPM) run mcp:stateless:compat:restart
 
 copilot-mcp-h2-status:
-	@echo "$(CYAN)📡 Status MCP + Cloudflare permanente em origin HTTPS/HTTP2$(NC)"
-	@$(NPM) run copilot:mcp:h2:status
+	@echo "$(CYAN)Status MCP Stateful Streamable HTTP + Cloudflare em origin HTTPS/HTTP2$(NC)"
+	@$(NPM) run mcp:stateful:h2:status
 
 copilot-mcp-h2-restart:
-	@echo "$(CYAN)🚀 Reiniciando MCP OAuth + Cloudflare com origin HTTPS/HTTP2$(NC)"
-	@$(NPM) run copilot:mcp:h2:restart
+	@echo "$(CYAN)Reiniciando MCP Stateful Streamable HTTP + Cloudflare com origin HTTPS/HTTP2$(NC)"
+	@$(NPM) run mcp:stateful:h2:restart
 
 copilot-mcp-h2-up:
-	@echo "$(CYAN)🚀 Subindo MCP OAuth + Cloudflare com origin HTTPS/HTTP2$(NC)"
-	@$(NPM) run copilot:mcp:h2:up
+	@echo "$(CYAN)Subindo MCP Stateful Streamable HTTP + Cloudflare com origin HTTPS/HTTP2$(NC)"
+	@$(NPM) run mcp:stateful:h2:up
 
 copilot-mcp-remote-audit:
 	@echo "$(CYAN)☁️  Auditoria remota Cloudflare MCP$(NC)"
@@ -2001,5 +2017,62 @@ docs-list:
 	@ls -1 docs/integration/*.md 2>/dev/null || echo "$(YELLOW)Sem arquivos .md em docs/integration/$(NC)"
 
 # =============================================================================
-# FIM DO MAKEFILE v4.4.0
+# 1️⃣7️⃣ MCP STATEFUL STREAMABLE HTTP — COMANDOS CANÔNICOS SÍNCRONOS
+# =============================================================================
+
+.PHONY: mcp-stateful-help mcp-stateful-validate-fast mcp-stateful-validate-full mcp-stateful-typecheck mcp-stateful-lint mcp-stateful-unit mcp-stateful-restart-ready mcp-stateful-env-print mcp-stateful-smoke mcp-stateful-rollback-env
+
+mcp-stateful-help:
+	@echo "$(CYAN)MCP Stateful Streamable HTTP — comandos canônicos$(NC)"
+	@echo "  make mcp-stateful-typecheck       # Typecheck estrito src/copilot"
+	@echo "  make mcp-stateful-lint            # Lint copilot"
+	@echo "  make mcp-stateful-unit            # Testes unitários MCP"
+	@echo "  make mcp-stateful-validate-fast   # Suite MCP rápida síncrona"
+	@echo "  make mcp-stateful-validate-full   # Suite MCP completa síncrona"
+	@echo "  make mcp-stateful-restart-ready   # Gate completo antes de restart"
+	@echo "  make mcp-stateful-env-print       # Flags stateful full para copiar"
+	@echo "  make mcp-stateful-rollback-env    # Flags de rollback stateless compat"
+
+mcp-stateful-typecheck:
+	@$(NPM) run typecheck:strict:src.copilot
+
+mcp-stateful-lint:
+	@$(NPM) run lint:copilot
+
+mcp-stateful-unit:
+	@npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp
+
+mcp-stateful-validate-fast:
+	@$(NODE) src/copilot/mcp/scripts/run-safe-validation-suite.js mcp-fast
+
+mcp-stateful-validate-full:
+	@$(NODE) src/copilot/mcp/scripts/run-safe-validation-suite.js mcp-full
+
+mcp-stateful-restart-ready:
+	@echo "$(CYAN)MCP stateful restart-ready gate$(NC)"
+	@$(NPM) run typecheck:strict:src.copilot
+	@$(NPM) run lint:copilot
+	@npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp
+	@$(NODE) src/copilot/mcp/scripts/run-safe-validation-suite.js mcp-full
+	@echo "$(GREEN)✅ MCP stateful pronto para restart operacional$(NC)"
+
+mcp-stateful-smoke:
+	@$(NODE) src/copilot/mcp/scripts/run-safe-validation-suite.js mcp-fast
+
+mcp-stateful-env-print:
+	@$(NPM) run mcp:stateful:env
+
+mcp-stateful-secret-ensure:
+	@$(NPM) run mcp:stateful:secret:ensure
+
+mcp-stateful-secret-status:
+	@$(NPM) run mcp:stateful:secret:status
+
+mcp-stateful-rollback-env:
+	@printf '%s\n' 'export COPILOT_MCP_HTTP_STATEFUL_SESSIONS=false'
+	@printf '%s\n' 'export COPILOT_MCP_HTTP_STATELESS_COMPAT=true'
+	@printf '%s\n' 'unset COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'
+
+# =============================================================================
+# FIM DO MAKEFILE v4.5.0
 # =============================================================================

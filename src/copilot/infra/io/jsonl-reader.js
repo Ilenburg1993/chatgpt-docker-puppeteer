@@ -10,6 +10,7 @@ import { withIoResourceLock } from '../io-locks.js';
 
 const DEFAULT_BLOCK_SIZE = 65_536;
 const DEFAULT_MAX_TRAILING_RECORD_BYTES = 4 * 1024 * 1024;
+const DEFAULT_MAX_REPAIR_SCAN_BYTES = 16 * 1024 * 1024;
 
 /**
  * @typedef {{
@@ -27,6 +28,7 @@ const DEFAULT_MAX_TRAILING_RECORD_BYTES = 4 * 1024 * 1024;
  * @param {string} filePath
  * @param {{
  *     maxTrailingRecordBytes?: number;
+ *     maxRepairScanBytes?: number;
  *     flushToDisk?: boolean;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]
@@ -36,6 +38,10 @@ export async function repairJsonlTrailingPartial(filePath, options = {}) {
     const maxTrailingRecordBytes = Math.max(
         1_024,
         Math.trunc(options.maxTrailingRecordBytes ?? DEFAULT_MAX_TRAILING_RECORD_BYTES),
+    );
+    const maxRepairScanBytes = Math.max(
+        maxTrailingRecordBytes,
+        Math.trunc(options.maxRepairScanBytes ?? DEFAULT_MAX_REPAIR_SCAN_BYTES),
     );
     try {
         const { value } = await withIoResourceLock(
@@ -48,15 +54,18 @@ export async function repairJsonlTrailingPartial(filePath, options = {}) {
                     const { size } = await handle.stat();
                     if (size === 0) return repairResult('empty', size, size);
 
-                    const readStart = Math.max(0, size - maxTrailingRecordBytes);
-                    const trailing = Buffer.alloc(size - readStart);
-                    await handle.read(trailing, 0, trailing.byteLength, readStart);
-                    if (trailing.at(-1) === 0x0a) return repairResult('newline-terminated', size, size);
+                    const trailingByte = Buffer.alloc(1);
+                    await handle.read(trailingByte, 0, 1, size - 1);
+                    if (trailingByte[0] === 0x0a) return repairResult('newline-terminated', size, size);
 
-                    const lastNewline = trailing.lastIndexOf(0x0a);
-                    if (readStart > 0 && lastNewline < 0) return repairResult('trailing-record-too-large', size, size);
-                    const recordStart = lastNewline < 0 ? 0 : readStart + lastNewline + 1;
-                    const record = trailing.subarray(lastNewline + 1).toString('utf8');
+                    const recordStart = await findTrailingRecordStart(handle, size, maxRepairScanBytes);
+                    if (recordStart === null || (recordStart === 0 && size > maxTrailingRecordBytes)) {
+                        return repairResult('trailing-record-too-large', size, size);
+                    }
+                    const recordBytes = size - recordStart;
+                    const recordBuffer = Buffer.alloc(recordBytes);
+                    await handle.read(recordBuffer, 0, recordBytes, recordStart);
+                    const record = recordBuffer.toString('utf8');
                     try {
                         JSON.parse(record);
                         return repairResult('valid-trailing-record', size, size);
@@ -87,6 +96,32 @@ export async function repairJsonlTrailingPartial(filePath, options = {}) {
         if (code === 'ENOENT') return repairResult('missing', 0, 0);
         throw error;
     }
+}
+
+/**
+ * Procura o início da última linha JSONL a partir do fim, com limite estrito de bytes para evitar varredura/memória
+ * sem bound em arquivos corrompidos ou registros anormalmente grandes.
+ *
+ * @param {import('node:fs/promises').FileHandle} handle
+ * @param {number} size
+ * @param {number} maxScanBytes
+ * @returns {Promise<number | null>}
+ */
+async function findTrailingRecordStart(handle, size, maxScanBytes) {
+    let searchEnd = size;
+    let scannedBytes = 0;
+    while (searchEnd > 0 && scannedBytes < maxScanBytes) {
+        const readSize = Math.min(DEFAULT_BLOCK_SIZE, searchEnd, maxScanBytes - scannedBytes);
+        const readStart = searchEnd - readSize;
+        const buffer = Buffer.alloc(readSize);
+        const { bytesRead } = await handle.read(buffer, 0, readSize, readStart);
+        const chunk = bytesRead === readSize ? buffer : buffer.subarray(0, bytesRead);
+        const lastNewline = chunk.lastIndexOf(0x0a);
+        if (lastNewline >= 0) return readStart + lastNewline + 1;
+        scannedBytes += bytesRead;
+        searchEnd = readStart;
+    }
+    return searchEnd === 0 ? 0 : null;
 }
 
 /**

@@ -1,6 +1,6 @@
 // @ts-check
 import { calculateJwkThumbprint, createRemoteJWKSet, importJWK, jwtVerify } from 'jose';
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import {
     getMcpAuthDecisionCacheStats,
     readCachedMcpAuthorizationDecision,
@@ -70,6 +70,17 @@ import { createTtlCache } from './ttl-cache.js';
  * @property {string} [message]
  * @property {string} [hint]
  * @property {string} [challenge]
+ *
+ * @typedef {object} McpSessionAuthBinding
+ * @property {'oauth' | 'mixed-auth' | 'none-dev' | 'secure-mcp-tunnel' | string} mode
+ * @property {string} issuerHash
+ * @property {string} subjectHash
+ * @property {string} clientIdHash
+ * @property {string} resource
+ * @property {string} audience
+ * @property {string[]} scopes
+ *
+ * @typedef {{ ok: true; binding: McpSessionAuthBinding; verified: boolean } | { ok: false; statusCode: number; error: { error: string; error_description: string }; challenge?: string }} McpSessionAuthBindingResolution
  */
 
 export const MCP_AUTH_SCOPES = /** @type {const} */ ({
@@ -788,6 +799,222 @@ function normalizeAudienceClaim(value) {
     if (typeof value === 'string') return [value];
     if (Array.isArray(value)) return value.filter((item) => typeof item === 'string').map(String);
     return [];
+}
+
+/**
+ * Build a redacted MCP HTTP session binding from a JWT payload that has already passed signature, issuer,
+ * audience/resource and DPoP validation. This helper deliberately stores hashes for actor identifiers and preserves
+ * only non-secret resource/audience/scope metadata.
+ *
+ * @param {import('jose').JWTPayload} payload
+ * @param {{ config?: McpAuthConfig; tokenResource?: string; resourceUrl?: string }} [options]
+ * @returns {McpSessionAuthBinding}
+ */
+export function buildMcpSessionAuthBindingFromVerifiedJwtPayload(payload, options = {}) {
+    const config = options.config ?? readMcpAuthConfig();
+    const audienceValues = normalizeAudienceClaim(payload.aud);
+    const audience =
+        audienceValues.find((value) => audienceMatchesAnyAccepted(value, config.acceptedAudiences)) ??
+        config.expectedAudience ??
+        '';
+    const tokenResource =
+        typeof payload['resource'] === 'string' ? normalizeAudience(payload['resource'], '') : options.tokenResource ?? '';
+    const clientId = firstStringClaim(payload, ['client_id', 'azp', 'cid']);
+    const subject = firstStringClaim(payload, ['sub', 'uid', 'user_id']) || clientId || firstStringClaim(payload, ['jti']);
+    const scopes = uniqueStrings(
+        [...normalizeScopeClaim(payload['scope']), ...normalizeScopeClaim(payload['scp'])]
+            .filter((scope) => config.scopesSupported.includes(/** @type {McpAuthScope} */ (scope)))
+            .sort(),
+        MAX_SCOPE_TOKENS,
+    );
+    return {
+        mode: 'oauth',
+        issuerHash: hashSessionAuthComponent(firstStringClaim(payload, ['iss'])),
+        subjectHash: hashSessionAuthComponent(subject),
+        clientIdHash: hashSessionAuthComponent(clientId),
+        resource: tokenResource || normalizeAudience(options.resourceUrl, '') || config.expectedAudience || config.resource,
+        audience: normalizeAudience(audience, config.expectedAudience || config.resource),
+        scopes,
+    };
+}
+
+/**
+ * Resolve a per-request MCP HTTP session binding. OAuth/JWT bearer tokens are verified before claims become part of the
+ * binding; static bearer fallback is represented only as a token hash and should remain an operational fallback, not the
+ * preferred production path.
+ *
+ * @param {McpAuthContext} context
+ * @param {string} resourceUrl
+ * @param {McpAuthConfig} [config]
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {Promise<McpSessionAuthBindingResolution>}
+ */
+export async function resolveMcpSessionAuthBinding(
+    context,
+    resourceUrl,
+    config = readMcpAuthConfig(),
+    env = process.env,
+) {
+    const bearerToken = context.bearerToken;
+    if (!bearerToken) {
+        if (config.mode === 'oauth' && config.enforcement !== 'off') {
+            return {
+                ok: false,
+                statusCode: 401,
+                error: {
+                    error: 'invalid_token',
+                    error_description: 'Bearer token is required before creating or reusing an MCP session.',
+                },
+                challenge: buildWwwAuthenticateChallenge(config.initialScopes, config, {
+                    error: 'invalid_token',
+                    errorDescription: 'Bearer token is required before creating or reusing an MCP session.',
+                    realm: resourceUrl,
+                }),
+            };
+        }
+        return {
+            ok: true,
+            verified: false,
+            binding: {
+                mode: 'none-dev',
+                issuerHash: '',
+                subjectHash: '',
+                clientIdHash: '',
+                resource: normalizeAudience(resourceUrl, config.resource),
+                audience: config.expectedAudience || config.resource,
+                scopes: [],
+            },
+        };
+    }
+
+    const staticBearerToken = readStaticBearerToken(env);
+    if (config.staticBearerEnabled && staticBearerToken && safeEqualString(bearerToken, staticBearerToken)) {
+        return {
+            ok: true,
+            verified: true,
+            binding: {
+                mode: 'secure-mcp-tunnel',
+                issuerHash: hashSessionAuthComponent(config.expectedIssuer || config.resource),
+                subjectHash: hashSessionAuthComponent(bearerToken),
+                clientIdHash: '',
+                resource: normalizeAudience(resourceUrl, config.resource),
+                audience: config.expectedAudience || config.resource,
+                scopes: [...config.scopesSupported].sort(),
+            },
+        };
+    }
+
+    if (!config.jwksUri || !config.expectedIssuer || !config.expectedAudience || config.acceptedAudiences.length === 0) {
+        return {
+            ok: false,
+            statusCode: 401,
+            error: {
+                error: 'invalid_token',
+                error_description: 'OAuth bearer validation is not fully configured for MCP session binding.',
+            },
+            challenge: buildWwwAuthenticateChallenge(config.initialScopes, config, {
+                error: 'invalid_token',
+                errorDescription: 'OAuth bearer validation is not fully configured.',
+                realm: resourceUrl,
+            }),
+        };
+    }
+
+    try {
+        const jwks = getRemoteJwks(config.jwksUri);
+        const verified = await jwtVerify(bearerToken, jwks, {
+            issuer: config.expectedIssuer,
+            audience: config.acceptedAudiences,
+            algorithms: config.jwtAlgorithms,
+            clockTolerance: JWT_CLOCK_TOLERANCE_SECONDS,
+            maxTokenAge: `${MAX_TOKEN_AGE_SECONDS}s`,
+        });
+        const payload = verified.payload;
+        const dpopDecision = await validateDpopConfirmationForResource(payload, context, [], config);
+        if (dpopDecision) {
+            return {
+                ok: false,
+                statusCode: 401,
+                error: {
+                    error: 'invalid_token',
+                    error_description: dpopDecision.hint ?? dpopDecision.message ?? 'DPoP-bound token validation failed.',
+                },
+                ...(dpopDecision.challenge ? { challenge: dpopDecision.challenge } : {}),
+            };
+        }
+        const audienceValues = normalizeAudienceClaim(payload.aud);
+        const tokenResource = typeof payload['resource'] === 'string' ? normalizeAudience(payload['resource'], '') : '';
+        if (tokenResource && !audienceMatchesAnyAccepted(tokenResource, config.acceptedAudiences)) {
+            return sessionBindingInvalidToken(config, resourceUrl, 'Bearer token resource claim does not match this MCP resource.');
+        }
+        if (config.requireResourceClaim && !tokenResource) {
+            return sessionBindingInvalidToken(config, resourceUrl, 'Bearer token is missing the required resource claim.');
+        }
+        if (audienceValues.length === 0) {
+            return sessionBindingInvalidToken(config, resourceUrl, 'Bearer token is missing an audience claim.');
+        }
+        return {
+            ok: true,
+            verified: true,
+            binding: buildMcpSessionAuthBindingFromVerifiedJwtPayload(payload, { config, tokenResource, resourceUrl }),
+        };
+    } catch (error) {
+        const classification = classifyBearerVerificationError(error);
+        return {
+            ok: false,
+            statusCode: 401,
+            error: {
+                error: classification.wwwAuthenticateError,
+                error_description: classification.errorDescription,
+            },
+            challenge: buildWwwAuthenticateChallenge(config.initialScopes, config, {
+                error: classification.wwwAuthenticateError,
+                errorDescription: classification.errorDescription,
+                realm: resourceUrl,
+            }),
+        };
+    }
+}
+
+/**
+ * @param {McpAuthConfig} config
+ * @param {string} resourceUrl
+ * @param {string} errorDescription
+ * @returns {McpSessionAuthBindingResolution}
+ */
+function sessionBindingInvalidToken(config, resourceUrl, errorDescription) {
+    return {
+        ok: false,
+        statusCode: 401,
+        error: { error: 'invalid_token', error_description: errorDescription },
+        challenge: buildWwwAuthenticateChallenge(config.initialScopes, config, {
+            error: 'invalid_token',
+            errorDescription,
+            realm: resourceUrl,
+        }),
+    };
+}
+
+/**
+ * @param {import('jose').JWTPayload} payload
+ * @param {string[]} names
+ * @returns {string}
+ */
+function firstStringClaim(payload, names) {
+    for (const name of names) {
+        const value = payload[name];
+        if (typeof value === 'string' && value.trim() && !hasAsciiControlChars(value)) return value.trim();
+    }
+    return '';
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function hashSessionAuthComponent(value) {
+    const normalized = String(value ?? '').trim();
+    return normalized ? createHash('sha256').update(normalized).digest('hex') : '';
 }
 
 /**

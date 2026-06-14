@@ -17,9 +17,11 @@ import path from 'node:path';
 const { readText, readTextChunks, statPath } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 const REPO_READ_FILE_CACHE_MAX_ENTRIES = 128;
+const DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
+const HARD_REPO_READ_FILE_CACHE_MAX_BYTES = 64 * 1024 * 1024;
 
 /**
- * @typedef {{ sizeBytes: number; mtimeMs: number; validatedAtMs: number; structured: Record<string, unknown>; text: string }} RepoReadCacheEntry
+ * @typedef {{ sizeBytes: number; mtimeMs: number; validatedAtMs: number; structured: Record<string, unknown>; text: string; weightBytes: number }} RepoReadCacheEntry
  */
 
 /** @type {Map<string, RepoReadCacheEntry>} */
@@ -35,6 +37,9 @@ const repoReadCacheStats = {
     sets: 0,
     evictions: 0,
     clears: 0,
+    singleflightLeaders: 0,
+    singleflightJoins: 0,
+    singleflightErrors: 0,
     chunkHits: 0,
     chunkMisses: 0,
     chunkStale: 0,
@@ -42,9 +47,21 @@ const repoReadCacheStats = {
     chunkSets: 0,
     chunkEvictions: 0,
     chunkClears: 0,
+    chunkSingleflightLeaders: 0,
+    chunkSingleflightJoins: 0,
+    chunkSingleflightErrors: 0,
     busInvalidations: 0,
     recursiveInvalidations: 0,
 };
+
+/**
+ * @typedef {{ structured: Record<string, unknown>; text: string }} RepoReadCacheResult
+ */
+
+/** @type {Map<string, Promise<RepoReadCacheResult>>} */
+const repoReadFileInflight = new Map();
+/** @type {Map<string, Promise<RepoReadCacheResult>>} */
+const repoReadFileChunkInflight = new Map();
 
 /** @type {(() => void) | null} */
 let repoReadCacheInvalidationUnregister = null;
@@ -54,13 +71,16 @@ ensureRepoReadCacheInvalidationHook();
 /**
  * Return MCP repo read response-cache stats. Kept under the historical function name for runtime-health compatibility.
  *
- * @returns {Record<string, number> & { size: number; chunkSize: number; trustWindowMs: number }}
+ * @returns {Record<string, number> & { size: number; chunkSize: number; bytes: number; chunkBytes: number; maxBytes: number; trustWindowMs: number }}
  */
 export function readRepoReadFileResultCacheStats() {
     return {
         ...repoReadCacheStats,
         size: repoReadFileResultCache.size,
         chunkSize: repoReadFileChunkCache.size,
+        bytes: sumRepoReadCacheWeightBytes(repoReadFileResultCache),
+        chunkBytes: sumRepoReadCacheWeightBytes(repoReadFileChunkCache),
+        maxBytes: readRepoReadCacheMaxBytes(),
         trustWindowMs: readRepoReadTrustWindowMs(),
     };
 }
@@ -111,33 +131,40 @@ export async function readRepoFileWithValidatedResultCache(resolved, startLine, 
     });
     if (cached) return { structured: cloneStructuredReadFileResult(cached.structured), text: cached.text };
 
-    repoReadCacheStats.misses += 1;
-    const snapshot = await readText(resolved.resolved, {
-        ...(startLine !== undefined ? { startLine } : {}),
-        ...(endLine !== undefined ? { endLine } : {}),
-    });
-    const structured = {
-        success: true,
-        path: resolved.relative,
-        content: snapshot.content,
-        sha256: snapshot.contentHash,
-        returnedSha256: snapshot.returnedContentHash,
-        bytes: snapshot.bytesRead,
-        totalLines: snapshot.totalLines,
-        returnedLines: snapshot.returnedLines,
-    };
-    const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
-    const mtimeMs = Number(snapshot.mtimeMs);
-    if (Number.isFinite(sizeBytes) && Number.isFinite(mtimeMs)) {
-        rememberRepoReadFileCacheEntry(key, {
-            sizeBytes,
-            mtimeMs,
-            validatedAtMs: Date.now(),
-            structured,
-            text: snapshot.content,
+    return runRepoReadSingleflight(repoReadFileInflight, key, {
+        leaderStat: 'singleflightLeaders',
+        joinStat: 'singleflightJoins',
+        errorStat: 'singleflightErrors',
+    }, async () => {
+        repoReadCacheStats.misses += 1;
+        const snapshot = await readText(resolved.resolved, {
+            ...(startLine !== undefined ? { startLine } : {}),
+            ...(endLine !== undefined ? { endLine } : {}),
         });
-    }
-    return { structured, text: snapshot.content };
+        const structured = {
+            success: true,
+            path: resolved.relative,
+            content: snapshot.content,
+            sha256: snapshot.contentHash,
+            returnedSha256: snapshot.returnedContentHash,
+            bytes: snapshot.bytesRead,
+            totalLines: snapshot.totalLines,
+            returnedLines: snapshot.returnedLines,
+        };
+        const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
+        const mtimeMs = Number(snapshot.mtimeMs);
+        if (Number.isFinite(sizeBytes) && Number.isFinite(mtimeMs)) {
+            rememberRepoReadFileCacheEntry(key, {
+                sizeBytes,
+                mtimeMs,
+                validatedAtMs: Date.now(),
+                structured,
+                text: snapshot.content,
+                weightBytes: estimateRepoReadCacheEntryWeightBytes(structured, snapshot.content),
+            });
+        }
+        return { structured, text: snapshot.content };
+    });
 }
 
 /**
@@ -167,50 +194,57 @@ export async function readRepoFileChunksWithValidatedResultCache(
     });
     if (cached) return { structured: cloneStructuredReadFileResult(cached.structured), text: cached.text };
 
-    repoReadCacheStats.chunkMisses += 1;
-    const snapshot = await readTextChunks(resolved.resolved, {
-        startLine: effectiveStartLine,
-        ...(endLine !== undefined ? { endLine } : {}),
-        chunkLines,
-        ...(highWaterMark !== undefined ? { highWaterMark } : {}),
-    });
-    const lastChunk = snapshot.chunks[snapshot.chunks.length - 1];
-    const lastReturnedLine = lastChunk?.endLine ?? effectiveStartLine - 1;
-    const nextCursor = snapshot.totalLinesKnown && lastReturnedLine < snapshot.totalLines ? String(lastReturnedLine + 1) : null;
-    const text = snapshot.chunks.map((chunk) => chunk.content).join('\n');
-    const structured = {
-        success: true,
-        path: resolved.relative,
-        chunks: snapshot.chunks,
-        chunkCount: snapshot.chunks.length,
-        returnedChunkCount: snapshot.returnedChunkCount ?? snapshot.chunks.length,
-        returnedLineCount: snapshot.returnedLineCount ?? 0,
-        chunkLines,
-        startLine: effectiveStartLine,
-        endLine: endLine ?? null,
-        totalLines: snapshot.totalLines,
-        totalLinesKnown: snapshot.totalLinesKnown,
-        lastScannedLine: snapshot.lastScannedLine ?? snapshot.totalLines,
-        fileTotalLines: snapshot.fileTotalLines ?? (snapshot.totalLinesKnown ? snapshot.totalLines : null),
-        fileTotalLinesKnown: snapshot.fileTotalLinesKnown ?? snapshot.totalLinesKnown,
-        bytes: snapshot.bytesRead,
-        sizeBytes: snapshot.sizeBytes,
-        nextCursor,
-        cursor: cursor ?? null,
-        engine: snapshot.io.engine,
-    };
-    const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
-    const mtimeMs = Number(snapshot.mtimeMs);
-    if (Number.isFinite(sizeBytes) && Number.isFinite(mtimeMs)) {
-        rememberRepoReadFileChunkCacheEntry(key, {
-            sizeBytes,
-            mtimeMs,
-            validatedAtMs: Date.now(),
-            structured,
-            text,
+    return runRepoReadSingleflight(repoReadFileChunkInflight, key, {
+        leaderStat: 'chunkSingleflightLeaders',
+        joinStat: 'chunkSingleflightJoins',
+        errorStat: 'chunkSingleflightErrors',
+    }, async () => {
+        repoReadCacheStats.chunkMisses += 1;
+        const snapshot = await readTextChunks(resolved.resolved, {
+            startLine: effectiveStartLine,
+            ...(endLine !== undefined ? { endLine } : {}),
+            chunkLines,
+            ...(highWaterMark !== undefined ? { highWaterMark } : {}),
         });
-    }
-    return { structured, text };
+        const lastChunk = snapshot.chunks[snapshot.chunks.length - 1];
+        const lastReturnedLine = lastChunk?.endLine ?? effectiveStartLine - 1;
+        const nextCursor = snapshot.totalLinesKnown && lastReturnedLine < snapshot.totalLines ? String(lastReturnedLine + 1) : null;
+        const text = snapshot.chunks.map((chunk) => chunk.content).join('\n');
+        const structured = {
+            success: true,
+            path: resolved.relative,
+            chunks: snapshot.chunks,
+            chunkCount: snapshot.chunks.length,
+            returnedChunkCount: snapshot.returnedChunkCount ?? snapshot.chunks.length,
+            returnedLineCount: snapshot.returnedLineCount ?? 0,
+            chunkLines,
+            startLine: effectiveStartLine,
+            endLine: endLine ?? null,
+            totalLines: snapshot.totalLines,
+            totalLinesKnown: snapshot.totalLinesKnown,
+            lastScannedLine: snapshot.lastScannedLine ?? snapshot.totalLines,
+            fileTotalLines: snapshot.fileTotalLines ?? (snapshot.totalLinesKnown ? snapshot.totalLines : null),
+            fileTotalLinesKnown: snapshot.fileTotalLinesKnown ?? snapshot.totalLinesKnown,
+            bytes: snapshot.bytesRead,
+            sizeBytes: snapshot.sizeBytes,
+            nextCursor,
+            cursor: cursor ?? null,
+            engine: snapshot.io.engine,
+        };
+        const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
+        const mtimeMs = Number(snapshot.mtimeMs);
+        if (Number.isFinite(sizeBytes) && Number.isFinite(mtimeMs)) {
+            rememberRepoReadFileChunkCacheEntry(key, {
+                sizeBytes,
+                mtimeMs,
+                validatedAtMs: Date.now(),
+                structured,
+                text,
+                weightBytes: estimateRepoReadCacheEntryWeightBytes(structured, text),
+            });
+        }
+        return { structured, text };
+    });
 }
 
 /**
@@ -221,6 +255,8 @@ export async function readRepoFileChunksWithValidatedResultCache(
 export function resetRepoReadResponseCacheForTest() {
     repoReadFileResultCache.clear();
     repoReadFileChunkCache.clear();
+    repoReadFileInflight.clear();
+    repoReadFileChunkInflight.clear();
     for (const key of Object.keys(repoReadCacheStats)) {
         repoReadCacheStats[/** @type {keyof typeof repoReadCacheStats} */ (key)] = 0;
     }
@@ -328,6 +364,84 @@ function readRepoReadTrustWindowMs() {
 }
 
 /**
+ * @returns {number}
+ */
+function readRepoReadCacheMaxBytes() {
+    const value = Number(process.env['COPILOT_MCP_REPO_READ_CACHE_MAX_BYTES'] ?? DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES);
+    if (!Number.isFinite(value) || value <= 0) return DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES;
+    return Math.min(HARD_REPO_READ_FILE_CACHE_MAX_BYTES, Math.floor(value));
+}
+
+/**
+ * @param {Record<string, unknown>} structured
+ * @param {string} text
+ * @returns {number}
+ */
+/**
+ * @param {RepoReadCacheResult} result
+ * @returns {RepoReadCacheResult}
+ */
+function cloneRepoReadSingleflightResult(result) {
+    return { structured: cloneStructuredReadFileResult(result.structured), text: result.text };
+}
+
+/**
+ * @param {Map<string, Promise<RepoReadCacheResult>>} activeReads
+ * @param {string} key
+ * @param {Record<string, 'singleflightLeaders' | 'singleflightJoins' | 'singleflightErrors' | 'chunkSingleflightLeaders' | 'chunkSingleflightJoins' | 'chunkSingleflightErrors'>} stats
+ * @param {() => Promise<RepoReadCacheResult>} loader
+ * @returns {Promise<RepoReadCacheResult>}
+ */
+async function runRepoReadSingleflight(activeReads, key, stats, loader) {
+    const currentRead = activeReads.get(key);
+    if (currentRead) {
+        repoReadCacheStats.singleflightJoins += activeReads === repoReadFileInflight ? 1 : 0;
+        repoReadCacheStats.chunkSingleflightJoins += activeReads === repoReadFileChunkInflight ? 1 : 0;
+        return cloneRepoReadSingleflightResult(await currentRead);
+    }
+    void stats;
+    repoReadCacheStats.singleflightLeaders += activeReads === repoReadFileInflight ? 1 : 0;
+    repoReadCacheStats.chunkSingleflightLeaders += activeReads === repoReadFileChunkInflight ? 1 : 0;
+    const currentReadPromise = loader();
+    activeReads.set(key, currentReadPromise);
+    try {
+        return cloneRepoReadSingleflightResult(await currentReadPromise);
+    } catch (error) {
+        repoReadCacheStats.singleflightErrors += activeReads === repoReadFileInflight ? 1 : 0;
+        repoReadCacheStats.chunkSingleflightErrors += activeReads === repoReadFileChunkInflight ? 1 : 0;
+        throw error;
+    } finally {
+        if (activeReads.get(key) === currentReadPromise) activeReads.delete(key);
+    }
+}
+
+/**
+ * @param {Record<string, unknown>} structured
+ * @param {string} text
+ * @returns {number}
+ */
+function estimateRepoReadCacheEntryWeightBytes(structured, text) {
+    const textBytes = Buffer.byteLength(String(text ?? ''), 'utf8');
+    let structuredBytes;
+    try {
+        structuredBytes = Buffer.byteLength(JSON.stringify(structured), 'utf8');
+    } catch {
+        structuredBytes = 1024;
+    }
+    return Math.max(1, textBytes + structuredBytes);
+}
+
+/**
+ * @param {Map<string, RepoReadCacheEntry>} cache
+ * @returns {number}
+ */
+function sumRepoReadCacheWeightBytes(cache) {
+    let total = 0;
+    for (const entry of cache.values()) total += Math.max(0, Number(entry.weightBytes ?? 0));
+    return total;
+}
+
+/**
  * @param {string} key
  * @param {RepoReadCacheEntry} entry
  * @returns {void}
@@ -352,11 +466,12 @@ function rememberRepoReadFileChunkCacheEntry(key, entry) {
 }
 
 /**
- * @param {Map<string, unknown>} cache
+ * @param {Map<string, RepoReadCacheEntry>} cache
  * @param {'evictions' | 'chunkEvictions'} statName
  */
 function trimRepoReadCache(cache, statName) {
-    while (cache.size > REPO_READ_FILE_CACHE_MAX_ENTRIES) {
+    const maxBytes = readRepoReadCacheMaxBytes();
+    while (cache.size > REPO_READ_FILE_CACHE_MAX_ENTRIES || sumRepoReadCacheWeightBytes(cache) > maxBytes) {
         const oldest = cache.keys().next().value;
         if (typeof oldest !== 'string') break;
         cache.delete(oldest);
@@ -369,13 +484,20 @@ function trimRepoReadCache(cache, statName) {
  * @returns {Record<string, unknown>}
  */
 function cloneStructuredReadFileResult(structured) {
-    const output = { ...structured };
-    if (Object.prototype.hasOwnProperty.call(structured, 'returnedLines')) {
-        const returnedLines = structured['returnedLines'];
-        output['returnedLines'] =
-            returnedLines && typeof returnedLines === 'object' && !Array.isArray(returnedLines)
-                ? { .../** @type {Record<string, unknown>} */ (returnedLines) }
-                : returnedLines;
+    return cloneJsonLikeRecord(structured);
+}
+
+/**
+ * @param {Record<string, unknown>} value
+ * @returns {Record<string, unknown>}
+ */
+function cloneJsonLikeRecord(value) {
+    try {
+        const cloned = JSON.parse(JSON.stringify(value));
+        return cloned && typeof cloned === 'object' && !Array.isArray(cloned)
+            ? /** @type {Record<string, unknown>} */ (cloned)
+            : { ...value };
+    } catch {
+        return { ...value };
     }
-    return output;
 }

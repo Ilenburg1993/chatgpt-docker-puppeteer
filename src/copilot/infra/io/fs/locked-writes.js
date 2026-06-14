@@ -118,7 +118,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                             throw err;
                         } catch (accessError) {
                             const code = /** @type {{ code?: unknown }} */ (accessError)?.code;
-                            if (code !== 'ENOENT' && code !== 'ENOTDIR') throw accessError;
+                            if (code !== 'ENOENT') throw accessError;
                         }
                     }
 
@@ -274,7 +274,8 @@ export async function appendTextLocked(filePath, content, options = {}) {
  * @param {{ recursive?: boolean; mode?: number; traceId?: string; advisoryLimits?: Record<string, unknown> }} [options]
  * @returns {Promise<{
  *     path: string;
- *     created: true;
+ *     created: boolean;
+ *     createdPath: string | undefined;
  *     io: import('#copilot/core/io-contracts').IoMeta;
  *     lockWaitMs: number;
  * }>}
@@ -284,7 +285,7 @@ export async function mkdirPathLocked(dirPath, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     try {
-        const { waitMs } = await withIoResourceLock(
+        const { value: mkdirResult, waitMs } = await withIoResourceLock(
             dirPath,
             async () =>
                 mkdirPathUnlocked(dirPath, {
@@ -306,11 +307,16 @@ export async function mkdirPathLocked(dirPath, options = {}) {
                     ...(options.advisoryLimits ?? {}),
                     lockWaitMs: waitMs,
                     recursive: Boolean(options.recursive),
+                    created: mkdirResult.created,
+                    createdPath: mkdirResult.createdPath ?? null,
                 },
             }),
             true,
         );
-        return withIoMeta({ path: dirPath, created: /** @type {const} */ (true), lockWaitMs: waitMs }, io);
+        return withIoMeta(
+            { path: dirPath, created: mkdirResult.created, createdPath: mkdirResult.createdPath, lockWaitMs: waitMs },
+            io,
+        );
     } catch (error) {
         publishAndReturn(
             buildIoMeta({

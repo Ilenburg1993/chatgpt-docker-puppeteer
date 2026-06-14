@@ -10,7 +10,7 @@
 
 import { createHash } from 'node:crypto';
 
-const DEFAULT_TTL_MS = 60 * 1000;
+const DEFAULT_TTL_MS = 300 * 1000;
 const MAX_TTL_MS = 5 * 60 * 1000;
 const MAX_ENTRIES = 4096;
 const EXPIRY_SKEW_MS = 5 * 1000;

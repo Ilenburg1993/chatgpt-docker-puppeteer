@@ -198,6 +198,28 @@ describe('infra/io-engine', () => {
         expect(writeResult.io.advisoryLimits?.durability).toEqual(writeResult.durability);
     });
 
+    it('writeFileAtomic com failIfExists preserva ENOTDIR em componente intermediário', async () => {
+        const dir = await createTempDir();
+        const fileComponent = join(dir, 'not-a-dir');
+        await writeFile(fileComponent, 'leaf', 'utf8');
+
+        await expect(writeFileAtomic(join(fileComponent, 'child.txt'), 'payload', { failIfExists: true })).rejects.toMatchObject({
+            code: 'ENOTDIR',
+        });
+    });
+
+    it('mkdirPathLocked informa created=false quando diretório recursivo já existia', async () => {
+        const dir = await createTempDir();
+        const nested = join(dir, 'existing');
+        await mkdir(nested, { recursive: true });
+
+        const result = await mkdirPathLocked(nested, { recursive: true });
+
+        expect(result.created).toBe(false);
+        expect(result.createdPath).toBeUndefined();
+        expect(result.io.advisoryLimits?.created).toBe(false);
+    });
+
     it('readText retorna range vazio consistente quando startLine passa do fim', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'notes.txt');
@@ -297,8 +319,39 @@ describe('infra/io-engine', () => {
             { index: 0, startLine: 2, endLine: 3, content: 'l2\nl3', bytes: 5 },
             { index: 1, startLine: 4, endLine: 5, content: 'l4\nl5', bytes: 5 },
         ]);
-        expect(result.io.engine).toBe('io-engine.fs.createReadStream.textChunks');
+        expect(result.totalLinesKnown).toBe(true);
+        expect(result.fileTotalLinesKnown).toBe(true);
+        expect(result.fileTotalLines).toBe(5);
+        expect(result.cacheFingerprintStrategy).toBe('byte-line-index');
+        expect(result.io.engine).toBe('io-engine.fs.createReadStream.textChunks.byteSeek');
         expect(result.io.advisoryLimits?.limitMode).toBe('informative');
+    });
+
+    it('readTextChunks usa byte seek com UTF-8 multibyte sem cortar caracteres', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'chunks-multibyte.txt');
+        await writeFile(file, ['linha 1', 'ação 🚀', '日本語', 'emoji 😀 final'].join('\n'), 'utf8');
+
+        const result = await readTextChunks(file, { chunkLines: 1, startLine: 2, endLine: 4 });
+
+        expect(result.chunks.map((chunk) => chunk.content)).toEqual(['ação 🚀', '日本語', 'emoji 😀 final']);
+        expect(result.totalLines).toBe(4);
+        expect(result.totalLinesKnown).toBe(true);
+        expect(result.cacheFingerprintStrategy).toBe('byte-line-index');
+        expect(result.io.engine).toBe('io-engine.fs.createReadStream.textChunks.byteSeek');
+    });
+
+    it('readTextChunks preserva fallback de stream scan quando byte-line index é desativado', async () => {
+        vi.stubEnv('COPILOT_IO_BYTE_LINE_INDEX_DISABLE', 'true');
+        const dir = await createTempDir();
+        const file = join(dir, 'chunks-fallback.txt');
+        await writeFile(file, 'a\nb\nc\nd', 'utf8');
+
+        const result = await readTextChunks(file, { chunkLines: 2, startLine: 2, endLine: 3 });
+
+        expect(result.chunks.map((chunk) => chunk.content)).toEqual(['b\nc']);
+        expect(result.cacheFingerprintStrategy).toBe('stream-bypass');
+        expect(result.io.engine).toBe('io-engine.fs.createReadStream.textChunks');
     });
 
     it('createOrReplaceFileAtomic reporta bytes reais de UTF-8 multibyte', async () => {

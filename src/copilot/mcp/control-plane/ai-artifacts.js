@@ -15,6 +15,10 @@ import { getMcpWorkspaceRoot } from './paths.js';
 const STRICT_UUID_JOB_ARTIFACT_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(json|log)$/u;
 const DEFAULT_RETAIN_NEWEST = 240;
 const DEFAULT_CLOUDFLARE_LOG_THRESHOLD_BYTES = 2 * 1024 * 1024;
+const REPORT_CACHE_TTL_MS = 5 * 1000;
+
+/** @type {{ key: string; expiresAt: number; report: Record<string, unknown> } | null} */
+let cachedReport = null;
 
 /**
  * @typedef {object} AiArtifactsReportOptions
@@ -70,6 +74,8 @@ export async function buildAiArtifactsReport(options = {}) {
         256 * 1024,
         256 * 1024 * 1024,
     );
+    const cacheKey = JSON.stringify({ workspaceRoot, retainNewest, cloudflareLogThresholdBytes });
+    if (cachedReport && cachedReport.key === cacheKey && cachedReport.expiresAt > Date.now()) return cachedReport.report;
 
     const jobsEntries = await readdirSafe(jobsDir);
     /** @type {JobArtifactSummary[]} */
@@ -102,7 +108,7 @@ export async function buildAiArtifactsReport(options = {}) {
     }
 
     const mcpEntries = await readdirSafe(mcpDir);
-    return {
+    const report = {
         aiPath: path.relative(workspaceRoot, aiDir),
         jobs: {
             artifactCount: jobArtifacts.length,
@@ -139,6 +145,12 @@ export async function buildAiArtifactsReport(options = {}) {
                 'delete only strict UUID-named .json/.log validator artifacts beyond retention; never delete OAuth stores, tunnel token, pid files, quarantine, or unknown names',
         },
     };
+    cachedReport = { key: cacheKey, expiresAt: Date.now() + REPORT_CACHE_TTL_MS, report };
+    return report;
+}
+
+export function clearAiArtifactsReportCache() {
+    cachedReport = null;
 }
 
 /**
@@ -149,6 +161,7 @@ export async function buildAiArtifactsReport(options = {}) {
  * @returns {Promise<Record<string, unknown>>}
  */
 export async function cleanupAiArtifacts(options = {}) {
+    clearAiArtifactsReportCache();
     const workspaceRoot = options.workspaceRoot ?? getMcpWorkspaceRoot();
     const retainNewest = normalizePositiveInteger(options.retainNewest, DEFAULT_RETAIN_NEWEST, 20, 10_000);
     const maxDeleteCount = normalizePositiveInteger(options.maxDeleteCount, 100, 1, 500);

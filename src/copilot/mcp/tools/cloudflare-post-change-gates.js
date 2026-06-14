@@ -222,9 +222,25 @@ function extractStructuredContent(result) {
  * @returns {string[]}
  */
 function filterActionableOriginErrors(lines, checkedAt) {
-    return filterRecentLogLines(lines, checkedAt).filter((line) =>
-        /origin service|originService=|first record does not look like a TLS handshake|connection refused|502|1033/iu.test(line),
+    return filterRecentLogLines(lines, checkedAt).filter(isActionableOriginErrorLine);
+}
+
+/**
+ * @param {string} line
+ * @returns {boolean}
+ */
+function isActionableOriginErrorLine(line) {
+    const normalized = String(line ?? '').toLowerCase();
+    const hardOriginFailure =
+        /first record does not look like a tls handshake|connection refused|bad gateway|\b502\b|\b1033\b|unable to reach the origin service|tls:|x509:|certificate|no route to host|connection reset by peer/iu.test(
+            line,
+        );
+    if (hardOriginFailure) return true;
+    const benignClientOrStreamClose = /context canceled|context cancelled|client disconnected|request canceled|request cancelled|stream closed/iu.test(
+        normalized,
     );
+    if (benignClientOrStreamClose) return false;
+    return /origin service|originService=/iu.test(line);
 }
 
 /**

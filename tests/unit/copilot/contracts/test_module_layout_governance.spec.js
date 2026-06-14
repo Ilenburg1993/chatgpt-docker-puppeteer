@@ -471,6 +471,7 @@ describe('W114 — module layout governance: terminal root', () => {
         assert.deepEqual(scorecard.watch, [
             'dev-watch.js',
             'runtime-root.js',
+            'state/transcript-state.js',
             'stores/',
             'stores/alias-store.js',
             'terminal-phases/',

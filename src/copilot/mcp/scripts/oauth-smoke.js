@@ -10,7 +10,7 @@
  * - Client ID Metadata Document flow.
  * - Optional private_key_jwt client-auth flow when advertised.
  * - Resource Indicator propagation in authorization-code and refresh-token requests.
- * - Authenticated MCP calls and tools/list registry diff.
+ * - Auth MCP calls and tools/list registry diff.
  * - Retry/backoff for transient Cloudflare Tunnel edge windows after restarts.
  *
  * @module copilot/mcp/scripts/oauth-smoke
@@ -18,7 +18,7 @@
 
 import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { getCanonicalMcpTools } from '../registry.js';
 
@@ -191,15 +191,23 @@ export async function runMcpOAuthSmoke(options = {}) {
             : typeof dcrTokenBody?.['access_token'] === 'string'
               ? dcrTokenBody['access_token']
               : null;
+    const runtimeHealthUnusedRuntimeChecks =
+        typeof dcrRuntimeAccessToken === 'string'
+            ? await runMcpToolRuntimeChecks(mcpUrl, dcrRuntimeAccessToken, runtime)
+            : { runtimeHealth: failure('token missing'), authenticatedToolsList: failure('token missing'), authenticatedSse: failure('token missing') };
     const runtimeHealth =
         typeof dcrRuntimeAccessToken === 'string'
-            ? await callMcpTool(mcpUrl, dcrRuntimeAccessToken, 'mcp_runtime_health', runtime)
+            ? runtimeHealthUnusedRuntimeChecks.runtimeHealth
             : failure('token missing');
     const authenticatedToolsList =
         typeof dcrRuntimeAccessToken === 'string'
-            ? await listMcpTools(mcpUrl, dcrRuntimeAccessToken, runtime)
+            ? await Promise.resolve(runtimeHealthUnusedRuntimeChecks.authenticatedToolsList)
             : failure('token missing');
     const authenticatedToolsSummary = summarizeAuthenticatedToolsList(authenticatedToolsList, runtime);
+    const authenticatedSse =
+        typeof dcrRuntimeAccessToken === 'string'
+            ? await Promise.resolve(runtimeHealthUnusedRuntimeChecks.authenticatedSse)
+            : failure('token missing');
 
     const cimdAdvertised = metadata?.['client_id_metadata_document_supported'] === true;
     const cimdFlow = await runCimdSmoke({
@@ -242,6 +250,7 @@ export async function runMcpOAuthSmoke(options = {}) {
         dcrRefreshTokenClaims: dcrRefreshTokenValidation.ok,
         runtimeHealth: runtimeHealth.ok,
         authenticatedToolsList: authenticatedToolsSummary.ok,
+        authenticatedSse: authenticatedSse.ok,
         cimd: !cimdAdvertised || Boolean(cimdFlow.ok),
         privateKeyJwt: !privateKeyJwtFlow.required || privateKeyJwtFlow.ok,
         negativeResourceChecks: !runtime.runNegativeResourceChecks || negativeResourceChecks.ok,
@@ -292,6 +301,7 @@ export async function runMcpOAuthSmoke(options = {}) {
                 error: runtimeHealth.error ?? null,
             },
             authenticatedToolsList: authenticatedToolsSummary,
+            authenticatedSse: summarizeSseProbe(authenticatedSse),
         },
         cimdFlow,
         privateKeyJwtFlow,
@@ -1301,22 +1311,28 @@ function summarizeNegativeProbe(probe) {
  * @param {OAuthSmokeRuntimeOptions} runtime
  * @returns {Promise<ProbeResult>}
  */
+/**
+ * @param {string} a
+ * @param {string} b
+ * @param {OAuthSmokeRuntimeOptions} c
+ * @returns {Promise<{ runtimeHealth: ProbeResult; authenticatedToolsList: ProbeResult; authenticatedSse: ProbeResult }>}
+ */
+async function runMcpToolRuntimeChecks(a, b, c) {
+    const one = await callMcpTool(a, b, 'mcp_runtime_health', c);
+    const two = await listMcpTools(a, b, c);
+    const three = await probeMcpSseStatefully(a, b, c);
+    return { runtimeHealth: one, authenticatedToolsList: two, authenticatedSse: three };
+
+}
+
+/** @param {string} mcpUrl @param {string} accessToken @param {string} toolName @param {OAuthSmokeRuntimeOptions} runtime @returns {Promise<ProbeResult>} */
 async function callMcpTool(mcpUrl, accessToken, toolName, runtime) {
-    const response = await probeJsonWithRetry(
+    return postMcpJsonRpcStatefully(
         mcpUrl,
-        {
-            method: 'POST',
-            headers: buildMcpAuthorizationHeaders(accessToken),
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: 1,
-                method: 'tools/call',
-                params: { name: toolName, arguments: {} },
-            }),
-        },
+        accessToken,
+        { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: toolName, arguments: {} } },
         runtime,
     );
-    return { ...response, ok: response.ok && !hasJsonRpcError(response.body) };
 }
 
 /**
@@ -1326,16 +1342,209 @@ async function callMcpTool(mcpUrl, accessToken, toolName, runtime) {
  * @returns {Promise<ProbeResult>}
  */
 async function listMcpTools(mcpUrl, accessToken, runtime) {
-    const response = await probeJsonWithRetry(
+    return postMcpJsonRpcStatefully(
+        mcpUrl,
+        accessToken,
+        { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
+        runtime,
+    );
+}
+
+/**
+ * @param {string} mcpUrl
+ * @param {string} accessToken
+ * @param {OAuthSmokeRuntimeOptions} runtime
+ * @returns {Promise<ProbeResult>}
+ */
+async function probeMcpSseStatefully(mcpUrl, accessToken, runtime) {
+    const initialize = await probeJsonWithRetry(
         mcpUrl,
         {
             method: 'POST',
             headers: buildMcpAuthorizationHeaders(accessToken),
-            body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }),
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 'oauth-smoke-sse-initialize',
+                method: 'initialize',
+                params: {
+                    protocolVersion: process.env['COPILOT_MCP_PROTOCOL_VERSION'] ?? DEFAULT_PROTOCOL_VERSION,
+                    capabilities: {},
+                    clientInfo: { name: OAUTH_SMOKE_IMPLEMENTATION_NAME, version: OAUTH_SMOKE_IMPLEMENTATION_VERSION },
+                },
+            }),
         },
         runtime,
     );
-    return { ...response, ok: response.ok && !hasJsonRpcError(response.body) };
+    const sessionId = normalizeMcpSessionId(initialize.headers?.['mcp-session-id']);
+    if (!initialize.ok || hasJsonRpcError(initialize.body) || !sessionId) {
+        return {
+            ...initialize,
+            ok: false,
+            error: initialize.error ?? (!sessionId ? 'missing Mcp-Session-Id after SSE initialize' : 'SSE initialize failed'),
+        };
+    }
+    const sessionHeaders = { ...buildMcpAuthorizationHeaders(accessToken), 'mcp-session-id': sessionId };
+    const initialized = await probeJsonWithRetry(
+        mcpUrl,
+        {
+            method: 'POST',
+            headers: sessionHeaders,
+            body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+        },
+        runtime,
+    );
+    if (!initialized.ok || hasJsonRpcError(initialized.body)) {
+        await closeMcpStatefulSession(mcpUrl, accessToken, sessionId, runtime);
+        return { ...initialized, ok: false, error: initialized.error ?? 'SSE notifications/initialized failed' };
+    }
+    const headers = {
+        authorization: `Bearer ${accessToken}`,
+        accept: 'text/event-stream',
+        'mcp-session-id': sessionId,
+        'mcp-protocol-version': process.env['COPILOT_MCP_PROTOCOL_VERSION'] ?? DEFAULT_PROTOCOL_VERSION,
+    };
+    try {
+        const initial = await probeSseHeadersOnce(mcpUrl, { method: 'GET', headers }, runtime);
+        const lastEventId = `oauth-smoke.${0}.${randomUUID()}`;
+        const reconnect = await probeSseHeadersOnce(
+            mcpUrl,
+            { method: 'GET', headers: { ...headers, 'last-event-id': lastEventId } },
+            runtime,
+        );
+        return {
+            ok: initial.ok && reconnect.ok,
+
+            durationMs: Number(initial.durationMs ?? 0) + Number(reconnect.durationMs ?? 0),
+            responseBytes: Number(initial.responseBytes ?? 0) + Number(reconnect.responseBytes ?? 0),
+            body: {
+                initial: summarizeSseProbe(initial),
+                reconnect: summarizeSseProbe(reconnect),
+                lastEventIdAccepted: reconnect.ok,
+            },
+            ...(!initial.ok || !reconnect.ok
+                ? { error: initial.error ?? reconnect.error ?? 'authenticated SSE reconnect with Last-Event-ID failed' }
+                : {}),
+        };
+    } finally {
+        await closeMcpStatefulSession(mcpUrl, accessToken, sessionId, runtime);
+    }
+}
+
+/**
+ * @param {string} mcpUrl
+ * @param {RequestInit} init
+ * @param {OAuthSmokeRuntimeOptions} runtime
+ * @returns {Promise<ProbeResult>}
+ */
+async function probeSseHeadersOnce(mcpUrl, init, runtime) {
+    const startedAtMs = Date.now();
+    try {
+        const response = await fetch(mcpUrl, { ...init, signal: AbortSignal.timeout(runtime.timeoutMs) });
+        const headers = headersToRecord(response.headers);
+        await response.body?.cancel();
+        const contentType = headers['content-type'] ?? '';
+        return {
+            ok: response.ok && contentType.toLowerCase().includes('text/event-stream'),
+            status: response.status,
+            headers,
+            durationMs: Date.now() - startedAtMs,
+            responseBytes: 0,
+            ...(response.ok ? {} : { error: `HTTP ${response.status}` }),
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+            durationMs: Date.now() - startedAtMs,
+            transient: true,
+        };
+    }
+}
+
+/**
+ * @param {string} mcpUrl
+ * @param {string} accessToken
+ * @param {Record<string, unknown>} request
+ * @param {OAuthSmokeRuntimeOptions} runtime
+ * @returns {Promise<ProbeResult>}
+ */
+async function postMcpJsonRpcStatefully(mcpUrl, accessToken, request, runtime) {
+    const initialize = await probeJsonWithRetry(
+        mcpUrl,
+        {
+            method: 'POST',
+            headers: buildMcpAuthorizationHeaders(accessToken),
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 'oauth-smoke-initialize',
+                method: 'initialize',
+                params: {
+                    protocolVersion: process.env['COPILOT_MCP_PROTOCOL_VERSION'] ?? DEFAULT_PROTOCOL_VERSION,
+                    capabilities: {},
+                    clientInfo: { name: OAUTH_SMOKE_IMPLEMENTATION_NAME, version: OAUTH_SMOKE_IMPLEMENTATION_VERSION },
+                },
+            }),
+        },
+        runtime,
+    );
+    const sessionId = normalizeMcpSessionId(initialize.headers?.['mcp-session-id']);
+    if (!initialize.ok || hasJsonRpcError(initialize.body) || !sessionId) {
+        return {
+            ...initialize,
+            ok: false,
+            error: initialize.error ?? (!sessionId ? 'missing Mcp-Session-Id after initialize' : 'initialize failed'),
+        };
+    }
+
+    const sessionHeaders = { ...buildMcpAuthorizationHeaders(accessToken), 'mcp-session-id': sessionId };
+    try {
+        const initialized = await probeJsonWithRetry(
+            mcpUrl,
+            {
+                method: 'POST',
+                headers: sessionHeaders,
+                body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+            },
+            runtime,
+        );
+        if (!initialized.ok || hasJsonRpcError(initialized.body)) {
+            return { ...initialized, ok: false, error: initialized.error ?? 'notifications/initialized failed' };
+        }
+
+        const response = await probeJsonWithRetry(
+            mcpUrl,
+            {
+                method: 'POST',
+                headers: sessionHeaders,
+                body: JSON.stringify(request),
+            },
+            runtime,
+        );
+        return { ...response, ok: response.ok && !hasJsonRpcError(response.body) };
+    } finally {
+        await closeMcpStatefulSession(mcpUrl, accessToken, sessionId, runtime);
+    }
+}
+
+/**
+ * @param {string} mcpUrl
+ * @param {string} accessToken
+ * @param {string} sessionId
+ * @param {OAuthSmokeRuntimeOptions} runtime
+ * @returns {Promise<void>}
+ */
+async function closeMcpStatefulSession(mcpUrl, accessToken, sessionId, runtime) {
+    const headers = { ...buildMcpAuthorizationHeaders(accessToken), 'mcp-session-id': sessionId };
+    await probeRawWithRetry(mcpUrl, { method: 'DELETE', headers }, runtime);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeMcpSessionId(value) {
+    const normalized = String(value ?? '').trim();
+    return /^[\x21-\x7E]{8,256}$/u.test(normalized) ? normalized : '';
 }
 
 /**
@@ -1663,6 +1872,21 @@ function summarizeToken(token) {
         refreshTokenExpiresIn: body?.['refresh_token_expires_in'] ?? null,
         idTokenIssued: typeof body?.['id_token'] === 'string',
         error: token.error ?? null,
+    };
+}
+
+/**
+ * @param {ProbeResult} probe
+ * @returns {Record<string, unknown> & { ok: boolean }}
+ */
+function summarizeSseProbe(probe) {
+    return {
+        ok: probe.ok,
+        status: probe.status ?? null,
+        attempts: probe.attempts ?? null,
+        durationMs: probe.durationMs ?? null,
+        contentType: probe.headers?.['content-type'] ?? null,
+        error: probe.error ?? null,
     };
 }
 

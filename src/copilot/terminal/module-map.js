@@ -364,7 +364,7 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         kind: 'file',
         role: 'state',
         tier: 'secondary',
-        risk: 'stable',
+        risk: 'watch',
         public: false,
         summary: 'Feed local elástico de mensagens da LLM-B com controle de pressão de memória.',
     },

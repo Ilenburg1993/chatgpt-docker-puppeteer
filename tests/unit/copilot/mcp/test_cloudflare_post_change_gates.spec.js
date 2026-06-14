@@ -124,6 +124,37 @@ describe('Cloudflare post-change gates', () => {
         assert.ok(result.warnings.some((warning) => warning.includes('recent tunnel transport errors')));
     });
 
+    it('does not fail origin gates for context-canceled stream/client closes after latest smoke', () => {
+        const result = evaluateGates({
+            tunnelStatus: {
+                success: true,
+                permanentTunnel: {
+                    transportProtocol: 'quic',
+                    lastSmokeFresh: true,
+                    lastSmoke: { checkedAt: '2026-06-13T09:20:00.000Z' },
+                    originDiagnostics: {
+                        recentOriginErrors: [
+                            '2026-06-13T09:21:20Z ERR  error="context canceled" connIndex=1 event=1 ingressRule=0 originService=https://127.0.0.1:3333',
+                        ],
+                    },
+                },
+            },
+            remoteAudit: {
+                ok: true,
+                remote: { connections: { active: 4 } },
+            },
+            metrics: {
+                ok: true,
+                operational: { requestErrorRate: 0, haConnections: 4 },
+                latency: { rpcClientLatency: { p95Ms: 50 } },
+                quic: { present: true, smoothedRttMs: 31 },
+            },
+        });
+
+        assert.deepEqual(result.critical, []);
+        assert.ok(result.passed.includes('no actionable origin errors after the latest smoke.'));
+    });
+
     it('still fails gates for origin TLS/proxy errors after latest smoke', () => {
         const result = evaluateGates({
             tunnelStatus: {

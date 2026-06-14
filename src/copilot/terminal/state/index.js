@@ -115,6 +115,7 @@ export {
     readTerminalTranscriptStats,
     readTerminalTranscriptTurns,
 } from './transcript-state.js';
+export { flushTerminalTranscriptArchive } from './transcript-archive.js';
 export {
     clearTerminalStreamDiagnosticsForTests,
     readTerminalStreamDiagnosticsProjection,

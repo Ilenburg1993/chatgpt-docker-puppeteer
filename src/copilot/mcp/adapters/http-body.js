@@ -1,0 +1,198 @@
+// @ts-check
+/**
+ * Bounded MCP JSON body helpers for Streamable HTTP.
+ *
+ * This module deliberately does not log request payloads. It exists to let the HTTP adapter distinguish initialize
+ * requests before the stateful session router is introduced, while preserving the SDK's ability to receive a parsed
+ * JSON-RPC body through StreamableHTTPServerTransport.handleRequest(req, res, body).
+ *
+ * @module copilot/mcp/adapters/http-body
+ */
+
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+
+export const DEFAULT_MCP_HTTP_BODY_MAX_BYTES = 2 * 1024 * 1024;
+
+const DEFAULT_ENCODING = 'utf8';
+
+/**
+ * @typedef {import('node:http').IncomingMessage | import('node:http2').Http2ServerRequest} McpHttpBodyRequest
+ *
+ * @typedef {{ error: string; error_description: string }} McpHttpBodyError
+ *
+ * @typedef {{ ok: true; body: unknown; bytesRead: number; initializeRequest: boolean }} McpHttpJsonBodyResult
+ *
+ * @typedef {{ ok: false; statusCode: number; error: McpHttpBodyError; bytesRead: number }} McpHttpJsonBodyFailure
+ *
+ * @typedef {{ maxBytes?: number }} McpHttpJsonBodyOptions
+ *
+ * @typedef {{
+ *     ok: true;
+ *     kind: 'not-post' | 'initialize' | 'session-bound';
+ *     sessionId: string | null;
+ *     initializeRequest: boolean;
+ * } | {
+ *     ok: false;
+ *     statusCode: 400;
+ *     error: McpHttpBodyError;
+ *     kind: 'missing-session' | 'initialize-with-session';
+ *     sessionId: string | null;
+ *     initializeRequest: boolean;
+ * }} McpPostSessionClassification
+ */
+
+/**
+ * Read and parse a bounded JSON MCP request body.
+ *
+ * @param {McpHttpBodyRequest} req
+ * @param {McpHttpJsonBodyOptions} [options]
+ * @returns {Promise<McpHttpJsonBodyResult | McpHttpJsonBodyFailure>}
+ */
+export async function readMcpHttpJsonBody(req, options = {}) {
+    const maxBytes = normalizeMaxBytes(options.maxBytes);
+    const contentLength = readBodyHeader(req, 'content-length');
+    if (contentLength) {
+        if (!/^\d+$/u.test(contentLength)) {
+            return bodyFailure(400, 'invalid_request', 'Invalid Content-Length header.', 0);
+        }
+        if (Number(contentLength) > maxBytes) {
+            return bodyFailure(413, 'request_entity_too_large', 'MCP request body exceeds configured limit.', 0);
+        }
+    }
+
+    let bytesRead = 0;
+    /** @type {Buffer[]} */
+    const chunks = [];
+    try {
+        for await (const chunk of req) {
+            const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), DEFAULT_ENCODING);
+            bytesRead += buffer.byteLength;
+            if (bytesRead > maxBytes) {
+                return bodyFailure(413, 'request_entity_too_large', 'MCP request body exceeds configured limit.', bytesRead);
+            }
+            chunks.push(buffer);
+        }
+    } catch {
+        return bodyFailure(400, 'invalid_request', 'Could not read MCP request body.', bytesRead);
+    }
+
+    if (bytesRead === 0) {
+        return bodyFailure(400, 'invalid_request', 'MCP POST requests must include a JSON request body.', bytesRead);
+    }
+
+    const raw = Buffer.concat(chunks, bytesRead).toString(DEFAULT_ENCODING);
+    try {
+        const body = JSON.parse(raw);
+        return { ok: true, body, bytesRead, initializeRequest: isMcpInitializeRequestBody(body) };
+    } catch {
+        return bodyFailure(400, 'invalid_request', 'Invalid JSON request body.', bytesRead);
+    }
+}
+
+/**
+ * Classify the session contract for a POST after the JSON-RPC body has been parsed.
+ *
+ * This helper is intentionally side-effect-free. During Faixa 1 it can run in report-only mode; Faixa 3 turns the
+ * stateful contract into the default runtime behavior when the server emits Mcp-Session-Id.
+ *
+ * @param {{ method?: string | null; sessionId?: string | null; body: unknown }} input
+ * @returns {McpPostSessionClassification}
+ */
+export function classifyMcpPostSessionRequirement(input) {
+    const method = String(input.method ?? '').toUpperCase();
+    const sessionId = normalizeMcpSessionId(input.sessionId);
+    const initializeRequest = isMcpInitializeRequestBody(input.body);
+
+    if (method !== 'POST') {
+        return { ok: true, kind: 'not-post', sessionId, initializeRequest };
+    }
+    if (!sessionId && initializeRequest) {
+        return { ok: true, kind: 'initialize', sessionId, initializeRequest };
+    }
+    if (sessionId && !initializeRequest) {
+        return { ok: true, kind: 'session-bound', sessionId, initializeRequest };
+    }
+    if (sessionId && initializeRequest) {
+        return {
+            ok: false,
+            statusCode: 400,
+            kind: 'initialize-with-session',
+            sessionId,
+            initializeRequest,
+            error: {
+                error: 'invalid_request',
+                error_description: 'MCP initialize requests must not include an existing session ID.',
+            },
+        };
+    }
+    return {
+        ok: false,
+        statusCode: 400,
+        kind: 'missing-session',
+        sessionId,
+        initializeRequest,
+        error: {
+            error: 'invalid_request',
+            error_description: 'MCP POST requests without a session ID must be initialize requests.',
+        },
+    };
+}
+
+/**
+ * Return true when a parsed JSON-RPC body is an MCP initialize request according to the SDK helper.
+ *
+ * @param {unknown} body
+ * @returns {boolean}
+ */
+export function isMcpInitializeRequestBody(body) {
+    try {
+        return isInitializeRequest(body);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * @param {string | null | undefined} value
+ * @returns {string | null}
+ */
+export function normalizeMcpSessionId(value) {
+    const normalized = String(value ?? '').trim();
+    return normalized ? normalized : null;
+}
+
+/**
+ * @param {McpHttpBodyRequest} req
+ * @param {string} name
+ * @returns {string | undefined}
+ */
+function readBodyHeader(req, name) {
+    const value = req.headers[name.toLowerCase()];
+    if (Array.isArray(value)) return value.length === 1 ? value[0] : undefined;
+    return typeof value === 'string' ? value : undefined;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number}
+ */
+function normalizeMaxBytes(value) {
+    const parsed = Number(value ?? DEFAULT_MCP_HTTP_BODY_MAX_BYTES);
+    return Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : DEFAULT_MCP_HTTP_BODY_MAX_BYTES;
+}
+
+/**
+ * @param {number} statusCode
+ * @param {string} error
+ * @param {string} errorDescription
+ * @param {number} bytesRead
+ * @returns {McpHttpJsonBodyFailure}
+ */
+function bodyFailure(statusCode, error, errorDescription, bytesRead) {
+    return {
+        ok: false,
+        statusCode,
+        error: { error, error_description: errorDescription },
+        bytesRead,
+    };
+}

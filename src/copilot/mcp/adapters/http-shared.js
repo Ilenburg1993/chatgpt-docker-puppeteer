@@ -3,8 +3,8 @@
  * Protocol-neutral Streamable HTTP route handler for the Copilot MCP endpoint.
  *
  * Canonical hardened replacement for the shared HTTP adapter. It accepts Node HTTP/1.1 requests and Node HTTP/2
- * compatibility requests, keeps the MCP body unread before delegating to the MCP SDK, and centralizes the HTTP surface
- * hardening needed by the OAuth/MCP/Cloudflare roadmap:
+ * compatibility requests, reads bounded MCP JSON POST bodies only at the Streamable HTTP boundary, and centralizes the
+ * HTTP surface hardening needed by the OAuth/MCP/Cloudflare roadmap:
  *
  * - OAuth authorization endpoint is deliberately excluded from CORS.
  * - MCP protected resource discovery is exposed through RFC 9728-style metadata and WWW-Authenticate challenges.
@@ -31,11 +31,18 @@ import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
 import { readMcpMetricsSnapshot } from '../control-plane/metrics.js';
 import {
+    readMcpHttpSessionRuntimeState as readStatefulMcpHttpSessionRuntimeState,
+    readMcpHttpStatefulSessionPolicy,
+} from '../control-plane/session-runtime.js';
+import {
     readMcpStartupMaintenanceState,
     scheduleMcpStartupMaintenance,
 } from '../control-plane/startup-maintenance.js';
+import { getDefaultMcpHttpStreamRegistry } from '../control-plane/stream-registry.js';
 import { createCopilotMcpServer } from '../server.js';
+import { classifyMcpPostSessionRequirement, readMcpHttpJsonBody } from './http-body.js';
 import { buildMcpHttpProtocolReport, setMcpHttpProtocolResponseHeaders } from './http-protocol.js';
+import { handleStatefulMcpHttpRequest } from './http-stateful-router.js';
 
 export const MCP_HTTP_SHARED_IMPLEMENTATION_VERSION = '1.5.0';
 export const MCP_PATH = '/mcp';
@@ -72,8 +79,6 @@ const DEFAULT_CORS_EXPOSED_HEADERS = /** @type {const} */ ([
 const DEFAULT_HTTP_KEEP_ALIVE_TIMEOUT_MS = 90_000;
 const DEFAULT_HTTP_HEADERS_TIMEOUT_MS = 95_000;
 const DEFAULT_HTTP_REQUEST_TIMEOUT_MS = 120_000;
-const DEFAULT_MCP_SESSION_TTL_MS = 10 * 60 * 1000;
-const DEFAULT_MAX_MCP_SESSIONS = 32;
 const DEFAULT_HSTS_MAX_AGE_SECONDS = 31_536_000;
 const DEFAULT_MAX_MCP_REQUEST_BODY_BYTES = 2 * 1024 * 1024;
 const DEFAULT_ANONYMOUS_MCP_RATE_LIMIT_WINDOW_MS = 10_000;
@@ -83,8 +88,6 @@ const MAX_REQUEST_TARGET_LENGTH = 4096;
 const MAX_AUTHORITY_LENGTH = 255;
 const PUBLIC_METADATA_CACHE_CONTROL = 'public, max-age=60, s-maxage=300, stale-while-revalidate=300';
 const NO_STORE_CACHE_CONTROL = 'no-store, no-transform';
-const STATEFUL_SESSION_DISABLED_REASON =
-    'stateful-session-body-replay-disabled; production adapter is stateless to preserve MCP SDK JSON-RPC compatibility';
 const MCP_PROTOCOL_VERSION = '2025-11-25';
 const MCP_PROTOCOL_MISSING_HEADER_FALLBACK_VERSION = '2025-03-26';
 const DEFAULT_SUPPORTED_MCP_PROTOCOL_VERSIONS = /** @type {const} */ (['2025-11-25', '2025-06-18', '2025-03-26']);
@@ -194,36 +197,23 @@ export function readMcpHttpServerTimingPolicy(env = process.env) {
 }
 
 /**
- * Kept for config/tests/health visibility. Runtime session persistence is intentionally disabled in production because
- * the SDK owns request-body parsing and does not expose a safe pre-parse hook for initialize detection here.
+ * Session policy is now owned by the MCP control-plane runtime. Faixa 2 keeps the default disabled unless an operator
+ * explicitly opts in with COPILOT_MCP_HTTP_STATEFUL_SESSIONS and does not enable stateless compatibility fallback.
  *
  * @param {NodeJS.ProcessEnv} [env]
- * @returns {{ enabled: boolean; requested: boolean; ttlMs: number; maxSessions: number; reason: string }}
+ * @returns {{ enabled: boolean; requested: boolean; statelessCompat: boolean; ttlMs: number; maxSessions: number; reason: string }}
  */
 export function readMcpHttpSessionPolicy(env = process.env) {
-    const raw = String(env['COPILOT_MCP_HTTP_STATEFUL_SESSIONS'] ?? '')
-        .trim()
-        .toLowerCase();
-    const requested = raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on' || raw === 'experimental';
-    return {
-        enabled: false,
-        requested,
-        ttlMs: readPositiveIntegerEnv(env, 'COPILOT_MCP_HTTP_SESSION_TTL_MS', DEFAULT_MCP_SESSION_TTL_MS, 10_000),
-        maxSessions: readPositiveIntegerEnv(env, 'COPILOT_MCP_HTTP_MAX_SESSIONS', DEFAULT_MAX_MCP_SESSIONS, 1),
-        reason: STATEFUL_SESSION_DISABLED_REASON,
-    };
+    return readMcpHttpStatefulSessionPolicy(env);
 }
 
 /**
- * @returns {{ activeSessions: number; enabled: boolean; requested: boolean; reason: string }}
+ * @returns {Record<string, unknown>}
  */
 export function readMcpHttpSessionRuntimeState() {
-    const policy = readMcpHttpSessionPolicy();
     return {
-        activeSessions: 0,
-        enabled: policy.enabled,
-        requested: policy.requested,
-        reason: policy.reason,
+        ...readStatefulMcpHttpSessionRuntimeState(),
+        streamRegistry: getDefaultMcpHttpStreamRegistry().snapshot(),
     };
 }
 
@@ -233,7 +223,8 @@ export function readMcpHttpSessionRuntimeState() {
  *     minimumOriginProtocol: 'HTTP/2+';
  *     nodeHandlerMode: 'http1-and-http2-compat';
  *     cloudflareHttp2ToOriginExpected: true;
- *     statelessMcpTransport: true;
+ *     statelessMcpTransport: boolean;
+ *     statefulSessionRuntime: boolean;
  *     protocolVersion: string;
  *     supportedProtocolVersions: string[];
  *     strictAcceptHeaders: boolean;
@@ -243,11 +234,13 @@ export function readMcpHttpSessionRuntimeState() {
  * }}
  */
 export function readMcpHttpTransportPolicy(env = process.env) {
+    const sessionPolicy = readMcpHttpSessionPolicy(env);
     return {
         minimumOriginProtocol: 'HTTP/2+',
         nodeHandlerMode: 'http1-and-http2-compat',
         cloudflareHttp2ToOriginExpected: true,
-        statelessMcpTransport: true,
+        statelessMcpTransport: !sessionPolicy.enabled,
+        statefulSessionRuntime: sessionPolicy.enabled,
         protocolVersion: MCP_PROTOCOL_VERSION,
         supportedProtocolVersions: readSupportedMcpProtocolVersions(env),
         strictAcceptHeaders: readStrictMcpAcceptHeaders(env),
@@ -461,7 +454,47 @@ export function createMcpHttpRequestHandler(options) {
 
                 setNoStoreResponseHeaders(res);
                 try {
-                    await handleMcpRequest(req, res, url);
+                    /** @type {unknown} */
+                    let parsedMcpBody;
+                    if (String(req.method ?? '').toUpperCase() === 'POST') {
+                        const bodyResult = await readMcpHttpJsonBody(req, { maxBytes: readMaxMcpRequestBodyBytes() });
+                        if (!bodyResult.ok) {
+                            writeMcpTransportError(res, bodyResult.statusCode, bodyResult.error);
+                            return;
+                        }
+                        parsedMcpBody = bodyResult.body;
+                        const postSessionContract = classifyMcpPostSessionRequirement({
+                            method: req.method,
+                            sessionId: readHeader(req, 'mcp-session-id') ?? null,
+                            body: parsedMcpBody,
+                        });
+                        if (!postSessionContract.ok) {
+                            if (readMcpPostSessionContractEnforcement()) {
+                                writeMcpTransportError(res, postSessionContract.statusCode, postSessionContract.error);
+                                return;
+                            }
+                            logMcp('WARN', 'MCP POST request violates future stateful session contract; report-only during Faixa 1.', {
+                                kind: postSessionContract.kind,
+                                initializeRequest: postSessionContract.initializeRequest,
+                                sessionIdPresent: Boolean(postSessionContract.sessionId),
+                            });
+                        }
+                    }
+                    const sessionPolicy = readMcpHttpSessionPolicy();
+                    if (sessionPolicy.enabled) {
+                        await handleStatefulMcpHttpRequest({
+                            req,
+                            res,
+                            url,
+                            parsedMcpBody,
+                            authContext: buildAuthContext(req, url),
+                            protocolVersion: readHeader(req, 'mcp-protocol-version') ?? MCP_PROTOCOL_VERSION,
+                            readHeader,
+                            writeTransportError: writeMcpTransportError,
+                        });
+                        return;
+                    }
+                    await handleMcpRequest(req, res, url, parsedMcpBody);
                 } catch (error) {
                     logMcp('ERROR', 'Error handling MCP HTTP request.', {
                         error: error instanceof Error ? error.message : String(error),
@@ -759,6 +792,17 @@ function readMaxMcpRequestBodyBytes(env = process.env) {
  */
 function readStrictMcpContentType(env = process.env) {
     return readBooleanEnv(env, 'COPILOT_MCP_STRICT_CONTENT_TYPE', true);
+}
+
+/**
+ * Report-only by default until Faixa 3 emits and reuses Mcp-Session-Id. Enable only in focused stateful tests or after
+ * the stateful router is active.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean}
+ */
+function readMcpPostSessionContractEnforcement(env = process.env) {
+    return readBooleanEnv(env, 'COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT', false);
 }
 
 /**
@@ -1247,9 +1291,10 @@ function buildAuthContext(req, url) {
  * @param {McpHttpRequest} req
  * @param {McpHttpResponse} res
  * @param {URL} url
+ * @param {unknown} [parsedMcpBody]
  * @returns {Promise<void>}
  */
-async function handleMcpRequest(req, res, url) {
+async function handleMcpRequest(req, res, url, parsedMcpBody) {
     const server = createCopilotMcpServer({ authContext: buildAuthContext(req, url) });
     const transport = new StreamableHTTPServerTransport(
         /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransportOptions} */ (
@@ -1268,10 +1313,18 @@ async function handleMcpRequest(req, res, url) {
         await server.connect(
             /** @type {import('@modelcontextprotocol/sdk/shared/transport.js').Transport} */ (transport),
         );
-        await transport.handleRequest(
-            /** @type {import('node:http').IncomingMessage} */ (req),
-            /** @type {import('node:http').ServerResponse} */ (res),
-        );
+        if (parsedMcpBody === undefined) {
+            await transport.handleRequest(
+                /** @type {import('node:http').IncomingMessage} */ (req),
+                /** @type {import('node:http').ServerResponse} */ (res),
+            );
+        } else {
+            await transport.handleRequest(
+                /** @type {import('node:http').IncomingMessage} */ (req),
+                /** @type {import('node:http').ServerResponse} */ (res),
+                parsedMcpBody,
+            );
+        }
     } finally {
         if (res.writableEnded) closeOnce();
     }

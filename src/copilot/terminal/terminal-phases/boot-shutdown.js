@@ -6,8 +6,7 @@
 
 import { registerShutdownHandler, SHUTDOWN_PRIORITY } from '#copilot/core';
 import { log } from '#copilot/observability';
-import { flushTerminalSseEventArchive } from '../state/events/index.js';
-import { flushTerminalTranscriptArchive } from '../state/transcript-archive.js';
+import { flushTerminalSseEventArchive, flushTerminalTranscriptArchive } from '../state/index.js';
 import { rollbackTerminalPinnedContextPhase } from './boot-pinned.js';
 
 /**

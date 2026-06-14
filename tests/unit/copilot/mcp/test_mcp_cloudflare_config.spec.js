@@ -187,8 +187,10 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
     });
 
     it('normalizes the temporary tunnel stale window', () => {
+        assert.equal(DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS, 24 * 60 * 60 * 1000);
         assert.equal(normalizeStaleAfterMs(undefined), DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS);
         assert.equal(normalizeStaleAfterMs('120000.4'), 120000);
+        assert.equal(normalizeStaleAfterMs(String(24 * 60 * 60 * 1000)), 24 * 60 * 60 * 1000);
         assert.throws(() => normalizeStaleAfterMs('59999'), /stale window/);
         assert.throws(() => normalizeStaleAfterMs(String(8 * 24 * 60 * 60 * 1000)), /stale window/);
         assert.throws(() => normalizeStaleAfterMs('not-a-number'), /stale window/);

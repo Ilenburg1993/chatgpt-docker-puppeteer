@@ -5,7 +5,9 @@
  * @module copilot/mcp/adapters
  */
 
+export * from './http-body.js';
 export * from './http-protocol.js';
+export * from './http-stateful-router.js';
 export {
     configureHttp1ServerTiming,
     configureHttp2ServerTiming,
