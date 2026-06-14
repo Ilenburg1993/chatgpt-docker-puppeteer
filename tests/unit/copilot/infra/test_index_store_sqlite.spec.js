@@ -6,6 +6,7 @@ import {
     classifyContentKind,
     countLines,
     flattenScanEntries,
+    iterateLineChunks,
     makeLineChunks,
     normalizeIndexExtensions,
     normalizeIndexMaxResults,
@@ -32,11 +33,16 @@ describe('infra/index-store/sqlite', () => {
         expect(classifyContentKind('/tmp/README.md')).toBe('markdown');
         expect(classifyContentKind('/tmp/data.unknown')).toBe('text');
         expect(countLines('a\nb\nc')).toBe(3);
+        expect(countLines('a\rb\r\nc\n')).toBe(4);
 
         const chunks = makeLineChunks('a\nb\nc\nd', 2);
         expect(chunks).toHaveLength(2);
         expect(chunks[0]).toMatchObject({ index: 0, startLine: 1, endLine: 2, content: 'a\nb' });
         expect(chunks[1]?.hash).toMatch(/^[a-f0-9]{64}$/u);
+        expect([...iterateLineChunks('a\rb\r\nc\n', 2)]).toMatchObject([
+            { index: 0, startLine: 1, endLine: 2, content: 'a\nb' },
+            { index: 1, startLine: 3, endLine: 4, content: 'c\n' },
+        ]);
     });
 
     it('normaliza query FTS e maxResults', () => {

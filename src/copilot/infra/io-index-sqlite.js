@@ -18,7 +18,7 @@ import {
     DEFAULT_INDEX_EXTENSIONS,
     ensureIoIndexSchema,
     flattenScanEntries,
-    makeLineChunks,
+    iterateLineChunks,
     normalizeIndexExtensions,
     normalizeIndexMaxResults,
     normalizeIndexPath,
@@ -449,7 +449,6 @@ export function createIoIndexSqlite(options) {
             clearFileRows(filePath);
             const fileSymbols = symbols?.symbols ?? [];
             const fileImports = symbols?.imports ?? [];
-            const chunks = makeLineChunks(input.content);
             stmtUpsertFile.run({
                 filePath,
                 workspaceRoot,
@@ -484,7 +483,7 @@ export function createIoIndexSqlite(options) {
                 }),
             });
             stmtInsertFts.run(filePath, relativePath, input.content);
-            for (const chunk of chunks) {
+            for (const chunk of iterateLineChunks(input.content)) {
                 stmtInsertChunk.run(
                     filePath,
                     chunk.index,

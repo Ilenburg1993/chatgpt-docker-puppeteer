@@ -427,7 +427,7 @@ export async function warmReadThroughContext(filePath, opts = {}) {
         }
 
         if (relatedImports) {
-            const symbols = await parseAndCacheSymbols(filePath).catch(() => null);
+            const symbols = await parseAndCacheSymbols(filePath, { snapshot: text }).catch(() => null);
             relatedPaths = await resolveRelativeImportTargets(filePath, symbols?.imports ?? []);
             if (relatedPaths.length > 0) {
                 const warm = await warmCacheForPaths(relatedPaths, { concurrency, silent, textMode: true });

@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * Iteração lazy de linhas físicas para parsers puros.
+ * Iteração lazy de linhas físicas para consumidores textuais.
  *
- * @module copilot/infra/parse/text-lines
+ * @module copilot/infra/shared/text-lines
  */
 
 /**

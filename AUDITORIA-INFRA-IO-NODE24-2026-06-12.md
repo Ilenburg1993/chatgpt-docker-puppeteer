@@ -1301,7 +1301,7 @@ IO-057 removeu três materializações proporcionais ao arquivo fora do Babel:
 - o outline Markdown dividia todo o documento antes de percorrê-lo;
 - o fallback JSONL fazia `split + map + find` para localizar a primeira linha não vazia.
 
-A nova primitiva `iterateTextLines` percorre LF, CRLF e CR isolado de forma lazy e preserva linha física. Comentários
+A nova primitiva compartilhada `iterateTextLines` percorre LF, CRLF e CR isolado de forma lazy e preserva linha física. Comentários
 interrompem a leitura lógica na linha 50, JSONL retorna na primeira amostra e Markdown mantém linhas reais sem array
 intermediário. As regressões incluem CR-only nas três superfícies.
 
@@ -1320,6 +1320,28 @@ Um contexto maior que o orçamento individual do LRU não é retido e incrementa
 interno continua recebendo o parse completo; o windowing ocorre apenas na fronteira de resposta para LLM/tool.
 
 Validação focada de IO-057/IO-058: **87 passados, 0 falhas**; lint focado, `diff --check` e
+`typecheck:strict:src.copilot`: **PASS**.
+
+### 1.50 Status de implementação — cache simbólico validado por versão física em 2026-06-14
+
+IO-059 corrigiu um risco de consistência externa no `_symbolCache`: a chave era apenas o path e um editor/Git que
+substituísse o inode sem passar pelo bus podia receber símbolos antigos até o TTL. Cada entrada agora carrega
+fingerprint rico (`size/mtime/ctime/dev/ino`); hits são confirmados por `stat`, o arquivo é reconfirmado depois do
+worker e conflitos durante parse repetem de forma bounded.
+
+`parseAndCacheSymbols` também aceita um `TextFileSnapshot` consistente já lido. `warmReadThroughContext` usa essa
+porta, eliminando sua segunda leitura do mesmo arquivo. O health distingue hits, misses, stales, leituras internas,
+snapshots fornecidos e conflitos. Uma prova com replace atômico externo sem invalidação confirma que o símbolo antigo
+nunca é devolvido; outra comprova `symbolSuppliedSnapshots=1` e `symbolSnapshotReads=0` no read-through.
+
+### 1.51 Status de implementação — chunking do index-store migrado para gerador bounded em 2026-06-14
+
+IO-060 removeu outra materialização proporcional: `countLines` e `makeLineChunks` faziam split integral, e o commit
+SQLite mantinha simultaneamente o array de todas as linhas e o array de todos os chunks. A primitiva de linhas físicas
+foi promovida para `infra/shared`; `iterateLineChunks` conserva apenas o chunk atual e o indexador insere cada chunk
+diretamente na transação. A API array permanece como compatibilidade para callers pequenos.
+
+Validação conjunta de IO-059/IO-060: **68 passados, 0 falhas**; lint focado, `diff --check` e
 `typecheck:strict:src.copilot`: **PASS**.
 
 ---
@@ -1600,12 +1622,14 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-056 | P1 | Parser limits | **Concluído:** line guard cobre CR/LF/CRLF e truncamento respeita bytes UTF-8 | `parsedBytes`, child tests com budgets pequenos e contagem sem split | Conteúdo completo já está materializado pelo caller; limite governa o parse, não a leitura | Auditar callers para evitar materialização integral quando apenas símbolos forem necessários |
 | IO-057 | P1 | Parsers puros | **Concluído:** comentários, Markdown e JSONL iteram linhas lazy | primitiva CR/LF/CRLF compartilhada e regressões CR-only | Slices de cada linha ainda criam somente a string consumida, bounded pelo avanço | Reusar a primitiva em novos parsers line-oriented |
 | IO-058 | P1 | Parser budgets | **Concluído:** caches e respostas de outline são bounded por bytes | LRU weighted, health, rejection metric, `maxItems/maxBytes` nas duas tools | Estimativa de heap do LRU é conservadora, não medição exata do V8 | Calibrar defaults com telemetria de produção e manter hard caps |
+| IO-059 | P0 | Symbol cache | **Concluído:** hits são validados por fingerprint rico e parse é reconfirmado | replace externo real, retries bounded e métricas por caminho | `stat` por hit adiciona syscall deliberado em troca de consistência | Medir hit latency; só considerar probe temporal com evidência |
+| IO-060 | P1 | Index chunks | **Concluído:** contagem/chunking não materializam todas as linhas | iterador compartilhado, gerador bounded e inserção SQLite incremental | FTS ainda recebe o conteúdo integral exigido pela API atual | Avaliar FTS5 contentless/external-content apenas com benchmark e plano de migração |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2124,6 +2148,8 @@ Maturidade operacional avançada:
 - [x] fuzz textual/binário bounded e reproduzível sobre patch, chunks e limites;
 - [x] aplicar budgets físicos de linhas/bytes sem arrays ou truncamento em unidades incorretas;
 - [x] limitar retenção dos caches de parser por peso e respostas de outline por itens/bytes;
+- [x] validar cache simbólico contra writers externos e eliminar releitura no read-through;
+- [x] inserir chunks do índice a partir de gerador bounded;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2143,7 +2169,8 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria profunda dos callers de parse/context/search, priorizando leitura parcial quando somente
-símbolos/cabeçalhos forem necessários e evitando dupla retenção entre L1, parser e índice; manter fuzz/chaos como gates
-recorrentes. IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos
-runtimes/processos reais que justifique o contrato; não há ganho técnico em criar essa camada preventivamente.
+Aplicar a revisão integral da documentação oficial do `@babel/parser`: unificar opções entre main/worker, tornar
+`sourceType` e plugins sensíveis à extensão, preparar `ImportExpression`/Babel 8 e preservar recovery/doc comments sem
+habilitar permissões globais desnecessárias. Depois, continuar a auditoria de leitura parcial e dupla retenção entre
+L1, parser e índice; manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece explicitamente sem implementação
+até existir evidência de múltiplos runtimes/processos reais que justifique o contrato.

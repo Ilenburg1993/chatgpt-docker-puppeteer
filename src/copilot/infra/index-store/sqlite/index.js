@@ -10,6 +10,7 @@ export {
     countLines,
     DEFAULT_CHUNK_LINES,
     DEFAULT_INDEX_EXTENSIONS,
+    iterateLineChunks,
     makeLineChunks,
     sha256,
     SYMBOL_EXTENSIONS,

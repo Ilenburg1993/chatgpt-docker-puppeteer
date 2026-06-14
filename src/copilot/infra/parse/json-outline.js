@@ -5,7 +5,7 @@
  * @module copilot/infra/parse/json-outline
  */
 
-import { iterateTextLines } from './text-lines.js';
+import { iterateTextLines } from '../shared/text-lines.js';
 
 /**
  * Extrai top-level keys de um JSON completo ou da primeira linha JSONL válida.

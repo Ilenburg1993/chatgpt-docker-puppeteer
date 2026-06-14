@@ -7,6 +7,7 @@
 
 import { extname } from 'node:path';
 import { sha256 as hashSha256 } from '../../shared/hash.js';
+import { iterateTextLines } from '../../shared/text-lines.js';
 
 export const DEFAULT_INDEX_EXTENSIONS = Object.freeze([
     '.js',
@@ -51,7 +52,9 @@ export function sha256(content) {
  */
 export function countLines(content) {
     if (content.length === 0) return 0;
-    return content.split(/\r\n|\r|\n/u).length;
+    let count = 0;
+    for (const _line of iterateTextLines(content)) count += 1;
+    return count;
 }
 
 /**
@@ -75,20 +78,48 @@ export function classifyContentKind(filePath) {
  * @returns {{ index: number; startLine: number; endLine: number; content: string; hash: string }[]}
  */
 export function makeLineChunks(content, chunkLines = DEFAULT_CHUNK_LINES) {
-    if (content.length === 0) return [];
+    return [...iterateLineChunks(content, chunkLines)];
+}
+
+/**
+ * Produz chunks com memória intermediária limitada a `chunkLines`.
+ *
+ * @param {string} content
+ * @param {number} [chunkLines]
+ * @returns {Generator<{ index: number; startLine: number; endLine: number; content: string; hash: string }>}
+ */
+export function* iterateLineChunks(content, chunkLines = DEFAULT_CHUNK_LINES) {
+    if (content.length === 0) return;
     const safeChunkLines = Number.isFinite(chunkLines) && chunkLines > 0 ? Math.floor(chunkLines) : DEFAULT_CHUNK_LINES;
-    const lines = content.split(/\r\n|\r|\n/u);
-    const chunks = [];
-    for (let i = 0; i < lines.length; i += safeChunkLines) {
-        const slice = lines.slice(i, i + safeChunkLines);
-        const chunkContent = slice.join('\n');
-        chunks.push({
-            index: chunks.length,
-            startLine: i + 1,
-            endLine: i + slice.length,
+    /** @type {string[]} */
+    let lines = [];
+    let chunkIndex = 0;
+    let startLine = 1;
+
+    for (const entry of iterateTextLines(content)) {
+        lines.push(entry.text);
+        if (lines.length < safeChunkLines) continue;
+        const chunkContent = lines.join('\n');
+        yield {
+            index: chunkIndex,
+            startLine,
+            endLine: entry.line,
             content: chunkContent,
             hash: sha256(chunkContent),
-        });
+        };
+        chunkIndex += 1;
+        startLine = entry.line + 1;
+        lines = [];
     }
-    return chunks;
+
+    if (lines.length > 0) {
+        const chunkContent = lines.join('\n');
+        yield {
+            index: chunkIndex,
+            startLine,
+            endLine: startLine + lines.length - 1,
+            content: chunkContent,
+            hash: sha256(chunkContent),
+        };
+    }
 }

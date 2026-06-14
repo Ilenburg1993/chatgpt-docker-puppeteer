@@ -33,7 +33,9 @@ import * as nodePath from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Worker } from 'node:worker_threads';
 import { registerInvalidationHook } from './io-cache.js';
+import { createStaleSnapshotError } from './io/fs/read-bytes.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
+import { statPathSnapshot } from './io/fs/stat.js';
 import {
     buildOutline,
     extractJsonSchema,
@@ -42,6 +44,7 @@ import {
     extractTopComments,
 } from './parse/index.js';
 import { truncateUtf8String, utf8ByteLength } from './shared/buffer.js';
+import { richFingerprintMatches } from './shared/fingerprint-match.js';
 
 export { buildOutline, extractJsonSchema, extractMarkdownOutline, extractTopComments };
 
@@ -150,7 +153,7 @@ export function resolveParserWorkerQueuePolicy(env = process.env, poolSize = PAR
  * @param {FileSymbols} value
  * @returns {number}
  */
-function estimateFileSymbolsCacheSize(value) {
+function estimateFileSymbolsSize(value) {
     let size = Math.max(1, value.parsedBytes);
     for (const symbol of value.symbols) {
         size += 96 + symbol.name.length * 2 + (symbol.docComment?.length ?? 0) * 2;
@@ -163,12 +166,17 @@ function estimateFileSymbolsCacheSize(value) {
     return size;
 }
 
+/** @param {SymbolCacheEntry} value */
+function estimateFileSymbolsCacheSize(value) {
+    return estimateFileSymbolsSize(value.symbols);
+}
+
 /**
  * @param {FileContext} value
  * @returns {number}
  */
 function estimateFileContextCacheSize(value) {
-    let size = estimateFileSymbolsCacheSize(value.symbols);
+    let size = estimateFileSymbolsSize(value.symbols);
     for (const line of value.outline) size += 16 + line.length * 2;
     for (const comment of value.topComments) size += 16 + comment.length * 2;
     return size;
@@ -213,6 +221,12 @@ let _parserInvalidationUnregister = null;
  *     workerQueueHighWater: number;
  *     workerQueueWaitMsLast: number;
  *     workerQueueWaitMsMax: number;
+ *     symbolCacheHits: number;
+ *     symbolCacheMisses: number;
+ *     symbolCacheStale: number;
+ *     symbolSnapshotReads: number;
+ *     symbolSuppliedSnapshots: number;
+ *     symbolSnapshotConflicts: number;
  * }}
  */
 const _parserRuntimeStats = {
@@ -228,6 +242,12 @@ const _parserRuntimeStats = {
     workerQueueHighWater: 0,
     workerQueueWaitMsLast: 0,
     workerQueueWaitMsMax: 0,
+    symbolCacheHits: 0,
+    symbolCacheMisses: 0,
+    symbolCacheStale: 0,
+    symbolSnapshotReads: 0,
+    symbolSuppliedSnapshots: 0,
+    symbolSnapshotConflicts: 0,
 };
 
 const _fileContextCacheStats = {
@@ -332,6 +352,21 @@ function ensureInvalidationHook() {
  * @property {FileSymbols} symbols - Resultado do parse de símbolos.
  * @property {string[]} outline - Outline simbólico resumido (strings legíveis por LLM).
  * @property {string[]} topComments - Primeiros comentários de bloco/JSDoc do arquivo.
+ */
+
+/**
+ * @typedef {object} ParserFingerprint
+ * @property {number} sizeBytes
+ * @property {number} mtimeMs
+ * @property {number} ctimeMs
+ * @property {number} dev
+ * @property {number} ino
+ */
+
+/**
+ * @typedef {object} SymbolCacheEntry
+ * @property {FileSymbols} symbols
+ * @property {ParserFingerprint} fingerprint
  */
 
 // ---------------------------------------------------------------------------
@@ -1008,22 +1043,108 @@ export async function parseFileSymbols(filePath, content) {
 }
 
 /**
- * Lê o arquivo do disco (via io-engine + L1 cache) e parseia símbolos. Cacheia o resultado no `_symbolCache` por TTL de
- * 5 min.
+ * Valida a versão física, lê um snapshot textual quando necessário e cacheia o parse por path + fingerprint rico.
  *
  * @param {string} filePath
+ * @param {{
+ *     snapshot?: import('./io/fs/read-text.js').TextFileSnapshot;
+ *     maxRetries?: number;
+ * }} [options]
  * @returns {Promise<FileSymbols>}
  */
-export async function parseAndCacheSymbols(filePath) {
+export async function parseAndCacheSymbols(filePath, options = {}) {
     ensureInvalidationHook();
     const cacheKey = normalizeParserPath(filePath);
-    const cached = /** @type {FileSymbols | undefined} */ (_symbolCache.get(cacheKey));
-    if (cached) return cached;
+    const maxRetries =
+        Number.isInteger(options.maxRetries) && Number(options.maxRetries) >= 0
+            ? Math.min(10, Number(options.maxRetries))
+            : 2;
+    let suppliedSnapshot = options.snapshot ?? null;
 
-    const snapshot = await readTextFileSnapshot(filePath);
-    const symbols = await parseFileSymbols(filePath, snapshot.content);
-    _symbolCache.set(cacheKey, symbols);
-    return symbols;
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt += 1) {
+        const cached = /** @type {SymbolCacheEntry | undefined} */ (_symbolCache.get(cacheKey));
+        let snapshot = suppliedSnapshot;
+        suppliedSnapshot = null;
+
+        if (snapshot) {
+            _parserRuntimeStats.symbolSuppliedSnapshots += 1;
+            const current = await statPathSnapshot(filePath);
+            if (!parserFingerprintMatches(snapshot, current)) {
+                _parserRuntimeStats.symbolSnapshotConflicts += 1;
+                if (attempt <= maxRetries) continue;
+                throw createStaleSnapshotError(filePath, attempt);
+            }
+            if (cached && parserFingerprintMatches(cached.fingerprint, snapshot)) {
+                _parserRuntimeStats.symbolCacheHits += 1;
+                return cached.symbols;
+            }
+            if (cached) {
+                _parserRuntimeStats.symbolCacheStale += 1;
+                _symbolCache.delete(cacheKey);
+            }
+        } else if (cached) {
+            const current = await statPathSnapshot(filePath);
+            if (parserFingerprintMatches(cached.fingerprint, current)) {
+                _parserRuntimeStats.symbolCacheHits += 1;
+                return cached.symbols;
+            }
+            _parserRuntimeStats.symbolCacheStale += 1;
+            _symbolCache.delete(cacheKey);
+        }
+
+        if (!snapshot) {
+            _parserRuntimeStats.symbolSnapshotReads += 1;
+            snapshot = await readTextFileSnapshot(filePath);
+        }
+        _parserRuntimeStats.symbolCacheMisses += 1;
+        const symbols = await parseFileSymbols(filePath, snapshot.content);
+        const current = await statPathSnapshot(filePath);
+        if (!parserFingerprintMatches(snapshot, current)) {
+            _parserRuntimeStats.symbolSnapshotConflicts += 1;
+            if (attempt <= maxRetries) continue;
+            throw createStaleSnapshotError(filePath, attempt);
+        }
+
+        _symbolCache.set(cacheKey, {
+            symbols,
+            fingerprint: parserFingerprintFromSnapshot(snapshot),
+        });
+        return symbols;
+    }
+
+    throw createStaleSnapshotError(filePath, maxRetries + 1);
+}
+
+/**
+ * @param {{ sizeBytes: number; mtimeMs: number; ctimeMs: number; dev: number | bigint; ino: number | bigint }} value
+ * @returns {ParserFingerprint}
+ */
+function parserFingerprintFromSnapshot(value) {
+    return {
+        sizeBytes: value.sizeBytes,
+        mtimeMs: value.mtimeMs,
+        ctimeMs: value.ctimeMs,
+        dev: Number(value.dev),
+        ino: Number(value.ino),
+    };
+}
+
+/**
+ * @param {{ sizeBytes: number; mtimeMs: number; ctimeMs: number; dev: number | bigint; ino: number | bigint }} left
+ * @param {{ sizeBytes?: number; size?: number; mtimeMs: number; ctimeMs: number; dev: number | bigint; ino: number | bigint }} right
+ */
+function parserFingerprintMatches(left, right) {
+    return richFingerprintMatches(
+        parserFingerprintFromSnapshot(left),
+        {
+            sizeBytes: Number(right.sizeBytes ?? right.size),
+            mtimeMs: right.mtimeMs,
+            ctimeMs: right.ctimeMs,
+            dev: Number(right.dev),
+            ino: Number(right.ino),
+        },
+        { mtimeToleranceMs: 0 },
+    );
 }
 
 /**
@@ -1189,6 +1310,12 @@ export function windowFileContext(context, options = {}) {
  *     workerQueueTimeouts: number;
  *     workerQueueWaitMsLast: number;
  *     workerQueueWaitMsMax: number;
+ *     symbolCacheHits: number;
+ *     symbolCacheMisses: number;
+ *     symbolCacheStale: number;
+ *     symbolSnapshotReads: number;
+ *     symbolSuppliedSnapshots: number;
+ *     symbolSnapshotConflicts: number;
  * }}
  */
 /**
@@ -1274,6 +1401,12 @@ export function getParserCacheStats() {
         workerQueueTimeouts: _parserRuntimeStats.workerQueueTimeouts,
         workerQueueWaitMsLast: _parserRuntimeStats.workerQueueWaitMsLast,
         workerQueueWaitMsMax: _parserRuntimeStats.workerQueueWaitMsMax,
+        symbolCacheHits: _parserRuntimeStats.symbolCacheHits,
+        symbolCacheMisses: _parserRuntimeStats.symbolCacheMisses,
+        symbolCacheStale: _parserRuntimeStats.symbolCacheStale,
+        symbolSnapshotReads: _parserRuntimeStats.symbolSnapshotReads,
+        symbolSuppliedSnapshots: _parserRuntimeStats.symbolSuppliedSnapshots,
+        symbolSnapshotConflicts: _parserRuntimeStats.symbolSnapshotConflicts,
     };
 }
 
@@ -1304,6 +1437,12 @@ export async function resetParserCacheForTest(options = {}) {
     _parserRuntimeStats.workerQueueHighWater = 0;
     _parserRuntimeStats.workerQueueWaitMsLast = 0;
     _parserRuntimeStats.workerQueueWaitMsMax = 0;
+    _parserRuntimeStats.symbolCacheHits = 0;
+    _parserRuntimeStats.symbolCacheMisses = 0;
+    _parserRuntimeStats.symbolCacheStale = 0;
+    _parserRuntimeStats.symbolSnapshotReads = 0;
+    _parserRuntimeStats.symbolSuppliedSnapshots = 0;
+    _parserRuntimeStats.symbolSnapshotConflicts = 0;
     _parserInvalidationUnregister?.();
     _parserInvalidationUnregister = null;
     if (options.teardownWorkers === true) {

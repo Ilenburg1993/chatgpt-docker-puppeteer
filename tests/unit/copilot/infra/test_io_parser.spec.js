@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
+import { readTextFileSnapshot } from '../../../../src/copilot/infra/io/fs/read-text.js';
 import {
     buildOutline,
     extractJsonSchema,
@@ -356,6 +357,42 @@ describe('parseAndCacheSymbols', () => {
         const stats2 = getParserCacheStats();
         // cache size deve ser >= 1
         assert.ok(stats2.size >= 1, `cache size=${stats2.size}`);
+        assert.equal(stats2.symbolSnapshotReads, stats1.symbolSnapshotReads);
+        assert.equal(stats2.symbolCacheHits, stats1.symbolCacheHits + 1);
+    });
+
+    it('aceita snapshot consistente fornecido sem reler o arquivo', async () => {
+        const filePath = path.join(tmpDir, 'module.js');
+        const snapshot = await readTextFileSnapshot(filePath);
+        await resetParserCacheForTest();
+
+        const result = await parseAndCacheSymbols(filePath, { snapshot });
+        const stats = getParserCacheStats();
+
+        assert.ok(result.symbols.length > 0);
+        assert.equal(stats.symbolSuppliedSnapshots, 1);
+        assert.equal(stats.symbolSnapshotReads, 0);
+        assert.equal(stats.symbolCacheMisses, 1);
+    });
+
+    it('recusa cache antigo após replace atômico externo sem invalidação', async () => {
+        const filePath = path.join(tmpDir, 'external-replace.js');
+        const tempPath = `${filePath}.next`;
+        await fs.writeFile(filePath, 'export const beforeReplace = 1;\n', 'utf8');
+        const first = await parseAndCacheSymbols(filePath);
+        assert.ok(first.symbols.some((symbol) => symbol.name === 'beforeReplace'));
+
+        await fs.writeFile(tempPath, 'export const afterReplace = 2;\n', 'utf8');
+        await fs.rename(tempPath, filePath);
+
+        const second = await parseAndCacheSymbols(filePath);
+        const names = second.symbols.map((symbol) => symbol.name);
+        const stats = getParserCacheStats();
+
+        assert.ok(names.includes('afterReplace'), `symbols=${JSON.stringify(names)}`);
+        assert.ok(!names.includes('beforeReplace'), `symbols=${JSON.stringify(names)}`);
+        assert.ok(stats.symbolCacheStale >= 1);
+        assert.ok(stats.symbolSnapshotReads >= 2);
     });
 
     it('expõe métricas de fila dos parser workers no snapshot', async () => {

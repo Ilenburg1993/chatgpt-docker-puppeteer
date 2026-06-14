@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 import { getIoCacheStats, resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
 import { readBytes, readText } from '../../../../src/copilot/infra/io-engine.js';
+import { getParserCacheStats, resetParserCacheForTest } from '../../../../src/copilot/infra/io-parser.js';
 import {
     endSessionScope,
     getSessionScopeStats,
@@ -33,6 +34,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+    await resetParserCacheForTest({ teardownWorkers: true });
     await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
@@ -108,6 +110,7 @@ describe('warmCacheForPaths', () => {
 
     it('warmReadThroughContext indexa arquivo lido e aquece import relativo direto', async () => {
         resetIoL1CacheForTest();
+        await resetParserCacheForTest();
         const dep = path.join(tmpDir, 'dep.js');
         const entry = path.join(tmpDir, 'entry.js');
         await fs.writeFile(dep, 'export const dep = 1;\n', 'utf8');
@@ -123,6 +126,9 @@ describe('warmCacheForPaths', () => {
         assert.ok(result.relatedPaths.includes(dep));
         assert.strictEqual(result.relatedFailed, 0);
         assert.strictEqual(depText.io.cache, 'l1-hit');
+        const parserStats = getParserCacheStats();
+        assert.strictEqual(parserStats.symbolSuppliedSnapshots, 1);
+        assert.strictEqual(parserStats.symbolSnapshotReads, 0);
     });
 });
 

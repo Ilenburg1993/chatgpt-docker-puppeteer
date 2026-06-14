@@ -5,7 +5,7 @@
  * @module copilot/infra/parse/markdown-outline
  */
 
-import { iterateTextLines } from './text-lines.js';
+import { iterateTextLines } from '../shared/text-lines.js';
 
 /**
  * Extrai headings H1-H4 de Markdown.

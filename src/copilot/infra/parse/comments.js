@@ -5,7 +5,7 @@
  * @module copilot/infra/parse/comments
  */
 
-import { iterateTextLines } from './text-lines.js';
+import { iterateTextLines } from '../shared/text-lines.js';
 
 /**
  * Extrai os primeiros comentários de bloco ou linha do arquivo.
