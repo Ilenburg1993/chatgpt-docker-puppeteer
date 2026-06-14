@@ -38,10 +38,13 @@ import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { statPathSnapshot } from './io/fs/stat.js';
 import {
     buildOutline,
+    extractBabelFileSymbols,
     extractJsonSchema,
     extractMarkdownOutline,
     extractMarkdownOutlineWithLines,
     extractTopComments,
+    formatBabelParserError,
+    resolveBabelParserOptions,
 } from './parse/index.js';
 import { truncateUtf8String, utf8ByteLength } from './shared/buffer.js';
 import { richFingerprintMatches } from './shared/fingerprint-match.js';
@@ -265,7 +268,7 @@ let _workerRequestSeq = 0;
 /**
  * @typedef {{
  *     id: number;
- *     payload: { source: string; lang: 'js' | 'ts'; maxParseDurationMs: number };
+ *     payload: { source: string; parserOptions: Record<string, unknown>; maxParseDurationMs: number };
  *     timeoutMs: number;
  *     queuedAtMs: number;
  *     queueTimeout: NodeJS.Timeout | null;
@@ -624,7 +627,7 @@ function ensureWorkerPool() {
 }
 
 /**
- * @param {{ source: string; lang: 'js' | 'ts'; maxParseDurationMs: number }} payload
+ * @param {{ source: string; parserOptions: Record<string, unknown>; maxParseDurationMs: number }} payload
  * @returns {Promise<{
  *     symbols: SymbolEntry[];
  *     imports: ImportEntry[];
@@ -734,171 +737,17 @@ export async function shutdownParserWorkerPool() {
 
 /**
  * @param {string} code
- * @param {'js' | 'ts'} lang
- * @returns {any | null} AST ou null se falhou
+ * @param {Record<string, unknown>} parserOptions
+ * @returns {{ ast: any | null; parseError: string | null }}
  */
-function tryBabelParse(code, lang) {
+function tryBabelParse(code, parserOptions) {
     const parser = _babelParse;
-    if (!parser || parser === 'unavailable') return null;
+    if (!parser || parser === 'unavailable') return { ast: null, parseError: 'babel parser unavailable' };
     try {
-        return parser(code, {
-            sourceType: 'unambiguous',
-            allowImportExportEverywhere: true,
-            allowReturnOutsideFunction: true,
-            plugins: lang === 'ts' ? ['typescript', 'jsx', 'decorators-legacy'] : ['jsx', 'decorators-legacy'],
-            errorRecovery: true,
-        });
-    } catch {
-        return null;
+        return { ast: parser(code, parserOptions), parseError: null };
+    } catch (error) {
+        return { ast: null, parseError: formatBabelParserError(error) };
     }
-}
-
-/**
- * Extrai o nome de um nó de binding (Identifier, ObjectPattern, etc.).
- *
- * @param {any} node
- * @returns {string}
- */
-function extractName(node) {
-    if (!node) return '<unknown>';
-    if (node.type === 'Identifier') return node.name;
-    if (node.type === 'RestElement') return `...${extractName(node.argument)}`;
-    return `<${node.type}>`;
-}
-
-/**
- * Tenta extrair o comentário JSDoc/bloco imediatamente antes de um nó.
- *
- * @param {any} node
- * @returns {string | null}
- */
-function extractLeadingComment(node) {
-    const comments = node.leadingComments;
-    if (!Array.isArray(comments) || comments.length === 0) return null;
-    const last = comments[comments.length - 1];
-    if (last.type === 'CommentBlock') return `/*${last.value}*/`.trim();
-    return null;
-}
-
-/**
- * Extrai símbolos de um AST Babel.
- *
- * @param {any} ast
- * @returns {{ symbols: SymbolEntry[]; imports: ImportEntry[]; exports: string[] }}
- */
-function extractSymbolsFromAst(ast) {
-    /** @type {SymbolEntry[]} */
-    const symbols = [];
-    /** @type {ImportEntry[]} */
-    const imports = [];
-    /** @type {string[]} */
-    const exports = [];
-
-    if (!ast?.program?.body) return { symbols, imports, exports };
-
-    for (const node of ast.program.body) {
-        const line = node.loc?.start?.line ?? 0;
-
-        // ── Import declarations ──────────────────────────────────────────
-        if (node.type === 'ImportDeclaration') {
-            imports.push({
-                source: String(node.source.value),
-                specifiers: (node.specifiers ?? []).map(
-                    (/** @type {any} */ s) => s.local?.name ?? s.imported?.name ?? '*',
-                ),
-                isDynamic: false,
-                line,
-            });
-            continue;
-        }
-
-        // ── Export named ─────────────────────────────────────────────────
-        if (node.type === 'ExportNamedDeclaration') {
-            const decl = node.declaration;
-            if (decl) {
-                const declaredSymbols = _extractDeclSymbols(decl, true, node);
-                declaredSymbols.forEach((s) => symbols.push(s));
-                declaredSymbols.forEach((s) => exports.push(s.name));
-            }
-            for (const spec of node.specifiers ?? []) {
-                const name = spec.exported?.name ?? spec.exported?.value ?? '<unknown>';
-                exports.push(name);
-            }
-            continue;
-        }
-
-        // ── Export default ───────────────────────────────────────────────
-        if (node.type === 'ExportDefaultDeclaration') {
-            const decl = node.declaration;
-            const name =
-                decl?.id?.name ??
-                (decl?.type === 'FunctionDeclaration'
-                    ? '<default fn>'
-                    : decl?.type === 'ClassDeclaration'
-                      ? '<default class>'
-                      : '<default>');
-            symbols.push({
-                kind: 'export',
-                name,
-                exported: true,
-                line,
-                docComment: extractLeadingComment(node),
-            });
-            exports.push('default');
-            continue;
-        }
-
-        // ── Export all ───────────────────────────────────────────────────
-        if (node.type === 'ExportAllDeclaration') {
-            exports.push(`* from ${node.source?.value ?? '?'}`);
-            continue;
-        }
-
-        // ── Top-level declarations (non-exported) ─────────────────────────
-        _extractDeclSymbols(node, false, node).forEach((s) => symbols.push(s));
-    }
-
-    return { symbols, imports, exports };
-}
-
-/**
- * @param {any} decl - Declaration node
- * @param {boolean} exported
- * @param {any} parentNode - For leading comment lookup
- * @returns {SymbolEntry[]}
- */
-function _extractDeclSymbols(decl, exported, parentNode) {
-    if (!decl) return [];
-    const line = decl.loc?.start?.line ?? parentNode?.loc?.start?.line ?? 0;
-    const comment = extractLeadingComment(parentNode ?? decl);
-
-    if (decl.type === 'FunctionDeclaration' || decl.type === 'FunctionExpression') {
-        const name = decl.id?.name ?? '<anonymous>';
-        return [{ kind: 'function', name, exported, line, docComment: comment }];
-    }
-    if (decl.type === 'ClassDeclaration' || decl.type === 'ClassExpression') {
-        const name = decl.id?.name ?? '<anonymous class>';
-        return [{ kind: 'class', name, exported, line, docComment: comment }];
-    }
-    if (decl.type === 'TSTypeAliasDeclaration') {
-        return [{ kind: 'type', name: decl.id?.name ?? '<type>', exported, line, docComment: comment }];
-    }
-    if (decl.type === 'TSInterfaceDeclaration') {
-        return [{ kind: 'interface', name: decl.id?.name ?? '<interface>', exported, line, docComment: comment }];
-    }
-    if (decl.type === 'TSEnumDeclaration') {
-        return [{ kind: 'enum', name: decl.id?.name ?? '<enum>', exported, line, docComment: comment }];
-    }
-    if (decl.type === 'VariableDeclaration') {
-        return (decl.declarations ?? []).map((/** @type {any} */ d) => ({
-            kind: /** @type {'variable'} */ ('variable'),
-            name: extractName(d.id),
-            exported,
-            line: d.loc?.start?.line ?? line,
-            docComment: comment,
-        }));
-    }
-    return [];
 }
 
 // ---------------------------------------------------------------------------
@@ -935,6 +784,7 @@ function countPhysicalLines(content) {
 export async function parseFileSymbols(filePath, content) {
     const ext = nodePath.extname(filePath).toLowerCase();
     const lang = classifyExtension(ext);
+    const parserOptions = lang === 'js' || lang === 'ts' ? resolveBabelParserOptions(filePath, lang) : null;
     const bytes = utf8ByteLength(content, 'parser content');
     const truncated = bytes > MAX_PARSE_BYTES;
     const source = truncated ? truncateUtf8String(content, MAX_PARSE_BYTES).text : content;
@@ -967,7 +817,7 @@ export async function parseFileSymbols(filePath, content) {
             try {
                 const workerResult = await parseSymbolsInWorker({
                     source,
-                    lang,
+                    parserOptions: /** @type {Record<string, unknown>} */ (parserOptions),
                     maxParseDurationMs: MAX_PARSE_DURATION_MS,
                 });
                 base.parseDurationMs = Number(workerResult.parseDurationMs ?? 0);
@@ -999,24 +849,26 @@ export async function parseFileSymbols(filePath, content) {
 
         await getBabelParse();
         const parseStart = performance.now();
-        const ast = tryBabelParse(source, lang);
+        const parsed = tryBabelParse(source, /** @type {Record<string, unknown>} */ (parserOptions));
         const parseDurationMs = Math.max(0, Math.round(performance.now() - parseStart));
         base.parseDurationMs = parseDurationMs;
         _parserRuntimeStats.lastParseDurationMs = parseDurationMs;
 
-        if (!ast) {
-            base.parseError = 'babel parse returned null';
+        if (!parsed.ast) {
+            base.parseError = parsed.parseError ?? 'babel parse returned null';
             return base;
         }
         if (parseDurationMs > MAX_PARSE_DURATION_MS) {
             _parserRuntimeStats.budgetExceeded += 1;
             base.parseError = `parser budget exceeded (${parseDurationMs}ms > ${MAX_PARSE_DURATION_MS}ms)`;
         }
-        if (ast.errors?.length) {
-            const astError = ast.errors.map((/** @type {any} */ e) => e.reasonCode ?? String(e)).join('; ');
+        if (parsed.ast.errors?.length) {
+            const astError = parsed.ast.errors
+                .map((/** @type {any} */ error) => formatBabelParserError(error))
+                .join('; ');
             base.parseError = base.parseError ? `${base.parseError}; ${astError}` : astError;
         }
-        const extracted = extractSymbolsFromAst(ast);
+        const extracted = extractBabelFileSymbols(parsed.ast);
         base.symbols = extracted.symbols;
         base.imports = extracted.imports;
         base.exports = extracted.exports;

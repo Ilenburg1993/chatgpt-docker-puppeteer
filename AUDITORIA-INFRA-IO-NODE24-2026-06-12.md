@@ -1344,6 +1344,40 @@ diretamente na transação. A API array permanece como compatibilidade para call
 Validação conjunta de IO-059/IO-060: **68 passados, 0 falhas**; lint focado, `diff --check` e
 `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.52 Status de implementação — revisão integral do `@babel/parser` aplicada em 2026-06-14
+
+A documentação oficial completa do `@babel/parser` foi confrontada com a versão instalada, **7.29.7**. IO-061
+removeu drift entre main thread e worker e atualizou o contrato para as APIs atuais:
+
+- uma policy única define `sourceType`: `.cjs/.cts` usam `commonjs`, `.mjs/.mts` usam `module` e extensões ambíguas
+  mantêm `unambiguous`;
+- `allowImportExportEverywhere` e `allowReturnOutsideFunction` foram removidos. Código inválido volta a produzir
+  `BABEL_PARSER_SYNTAX_ERROR/reasonCode`, enquanto CommonJS legítimo aceita top-level return pela semântica própria;
+- TypeScript ativa `dts` em `.d.ts/.d.mts/.d.cts`, `disallowAmbiguousJSXLike` em `.mts/.cts` e JSX apenas em `.tsx`;
+- `sourceFilename`, `attachComment`, `errorRecovery` e `createImportExpressions` são explícitos;
+- erros recuperáveis e irrecuperáveis são normalizados com `code`, `reasonCode`, linha/coluna e mensagem;
+- o extrator AST também foi unificado e agora cobre `ImportExpression`, forma legada de dynamic import, `require`
+  estático, `TSImportEqualsDeclaration`, `TSExportAssignment`, ambient declarations, namespaces e bindings
+  destruturados.
+
+Decisões conscientes após a leitura:
+
+- `parse()` permanece correto porque a unidade é arquivo/programa; `parseExpression()` não serve ao índice simbólico;
+- `tokens` e `ranges` continuam desligados para não ampliar AST/memória sem consumidor;
+- AST Babel nativo é preservado; `estree` não é necessário para os extratores internos;
+- `attachComment` permanece ligado apesar do custo documentado porque `docComment` é parte do índice e das tools;
+- features ECMAScript já estáveis não recebem plugins redundantes;
+- Flow, V8 intrinsics e proposals experimentais não são habilitados globalmente sem extensão/pragma e caso de uso,
+  evitando interpretar sintaxe inválida como válida;
+- `decorators-legacy` permanece por compatibilidade com o corpus atual; migração para decorators stage 3 exige
+  evidência e fixture própria.
+
+Provas cobrem CommonJS versus módulo, import aninhado inválido, `.d.ts`, `.mts`, `.tsx`, destructuring,
+`ImportExpression`, `require`, paridade worker/fallback e worker sem fallback silencioso.
+
+Validação focada de IO-061: parser/governança **48 passados, 0 falhas**; índice **20 passados, 0 falhas**; lint
+focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1624,12 +1658,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-058 | P1 | Parser budgets | **Concluído:** caches e respostas de outline são bounded por bytes | LRU weighted, health, rejection metric, `maxItems/maxBytes` nas duas tools | Estimativa de heap do LRU é conservadora, não medição exata do V8 | Calibrar defaults com telemetria de produção e manter hard caps |
 | IO-059 | P0 | Symbol cache | **Concluído:** hits são validados por fingerprint rico e parse é reconfirmado | replace externo real, retries bounded e métricas por caminho | `stat` por hit adiciona syscall deliberado em troca de consistência | Medir hit latency; só considerar probe temporal com evidência |
 | IO-060 | P1 | Index chunks | **Concluído:** contagem/chunking não materializam todas as linhas | iterador compartilhado, gerador bounded e inserção SQLite incremental | FTS ainda recebe o conteúdo integral exigido pela API atual | Avaliar FTS5 contentless/external-content apenas com benchmark e plano de migração |
+| IO-061 | P1 | Babel parser | **Concluído:** policy/extrator únicos usam opções atuais por extensão | CommonJS/module, TS dts/mts/tsx, ImportExpression, error codes e paridade worker | Proposals/Flow não são auto-habilitados; decorators continuam legacy | Monitorar Babel semver e criar fixture antes de alterar syntax policy |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2150,6 +2185,7 @@ Maturidade operacional avançada:
 - [x] limitar retenção dos caches de parser por peso e respostas de outline por itens/bytes;
 - [x] validar cache simbólico contra writers externos e eliminar releitura no read-through;
 - [x] inserir chunks do índice a partir de gerador bounded;
+- [x] unificar policy/extrator Babel e alinhar source modes, TS e ImportExpression à documentação oficial;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
@@ -2164,13 +2200,13 @@ Maturidade operacional avançada:
 - `fsPromises.glob`: https://nodejs.org/docs/latest-v24.x/api/fs.html#fspromisesglobpattern-options
 - `fsPromises.statfs`: https://nodejs.org/docs/latest-v24.x/api/fs.html#fspromisesstatfspath-options
 - Node FS threadpool usage: https://nodejs.org/docs/latest-v24.x/api/fs.html#threadpool-usage
+- `@babel/parser` API, options, AST, plugins e error codes: https://babeljs.io/docs/babel-parser
 
 ---
 
 ## 14. Próxima ação executável
 
-Aplicar a revisão integral da documentação oficial do `@babel/parser`: unificar opções entre main/worker, tornar
-`sourceType` e plugins sensíveis à extensão, preparar `ImportExpression`/Babel 8 e preservar recovery/doc comments sem
-habilitar permissões globais desnecessárias. Depois, continuar a auditoria de leitura parcial e dupla retenção entre
-L1, parser e índice; manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece explicitamente sem implementação
-até existir evidência de múltiplos runtimes/processos reais que justifique o contrato.
+Continuar a auditoria de leitura parcial e dupla retenção entre L1, parser e índice, e medir o custo de `attachComment`
+antes de qualquer perfil sem doc comments. Em paralelo, ampliar fixtures Babel somente para sintaxe realmente aceita
+pelo workspace; manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece explicitamente sem implementação até
+existir evidência de múltiplos runtimes/processos reais que justifique o contrato.

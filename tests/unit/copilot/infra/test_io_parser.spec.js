@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
 import { readTextFileSnapshot } from '../../../../src/copilot/infra/io/fs/read-text.js';
+import { resolveBabelParserOptions } from '../../../../src/copilot/infra/parse/babel-policy.js';
 import {
     buildOutline,
     extractJsonSchema,
@@ -111,6 +112,34 @@ describe('parseFileSymbols - JavaScript', () => {
         assert.ok(result.imports.length > 0, 'deve detectar imports');
         const sources = result.imports.map(/** @param {any} i */ (i) => i.source);
         assert.ok(sources.includes('./foo.js'), `imports=${JSON.stringify(sources)}`);
+    });
+
+    it('detecta require estático e import() no formato Babel 8', async () => {
+        const result = await parseFileSymbols(
+            path.join(tmpDir, 'runtime-imports.js'),
+            "const legacy = require('./legacy.cjs');\nasync function load() { return import('./lazy.js'); }\n",
+        );
+
+        assert.ok(result.imports.some((entry) => entry.source === './legacy.cjs' && entry.isDynamic === false));
+        assert.ok(result.imports.some((entry) => entry.source === './lazy.js' && entry.isDynamic === true));
+    });
+
+    it('usa sourceType commonjs para .cjs sem permissões globais', async () => {
+        const commonjs = await parseFileSymbols(path.join(tmpDir, 'entry.cjs'), 'return require("./dep.cjs");');
+        const module = await parseFileSymbols(path.join(tmpDir, 'entry.mjs'), 'return 1;');
+
+        assert.equal(commonjs.parseError, null);
+        assert.ok(commonjs.imports.some((entry) => entry.source === './dep.cjs'));
+        assert.match(module.parseError ?? '', /BABEL_PARSER_SYNTAX_ERROR|IllegalReturn/);
+    });
+
+    it('reporta import aninhado inválido em vez de habilitar allowImportExportEverywhere', async () => {
+        const result = await parseFileSymbols(
+            path.join(tmpDir, 'nested-import.mjs'),
+            'function invalid() { import value from "./dep.js"; }',
+        );
+
+        assert.match(result.parseError ?? '', /BABEL_PARSER_SYNTAX_ERROR/);
     });
 
     it('detecta exports', async () => {
@@ -250,6 +279,90 @@ describe('parseFileSymbols - TypeScript', () => {
             names.includes('Config') || names.includes('Handler') || names.includes('handleRequest'),
             `symbols=${JSON.stringify(names)}`,
         );
+    });
+
+    it('habilita contexto ambient em .d.ts e extrai declarations', async () => {
+        const result = await parseFileSymbols(
+            path.join(tmpDir, 'ambient.d.ts'),
+            'export declare function ambient(input: string): void;\nexport declare namespace Runtime { const version: string; }\n',
+        );
+        const names = result.symbols.map((symbol) => symbol.name);
+
+        assert.equal(result.parseError, null);
+        assert.ok(names.includes('ambient'), `symbols=${JSON.stringify(names)}`);
+        assert.ok(names.includes('Runtime'), `symbols=${JSON.stringify(names)}`);
+    });
+
+    it('aceita JSX somente em .tsx e preserva bindings destruturados', async () => {
+        const tsx = await parseFileSymbols(
+            path.join(tmpDir, 'view.tsx'),
+            'export const View = () => <div />;\nexport const { left, nested: { right } } = source;',
+        );
+        const names = tsx.symbols.map((symbol) => symbol.name);
+
+        assert.equal(tsx.parseError, null);
+        assert.ok(names.includes('View'));
+        assert.ok(names.includes('left'));
+        assert.ok(names.includes('right'));
+    });
+
+    it('aplica disallowAmbiguousJSXLike em .mts', async () => {
+        const result = await parseFileSymbols(path.join(tmpDir, 'strict.mts'), 'const value = <Type>input;');
+
+        assert.match(result.parseError ?? '', /ReservedTypeAssertion|BABEL_PARSER_SYNTAX_ERROR/);
+    });
+});
+
+describe('Babel parser policy', () => {
+    it('resolve sourceType e plugins por extensão sem opções permissivas globais', () => {
+        const cjs = resolveBabelParserOptions('/tmp/entry.cjs', 'js');
+        const mts = resolveBabelParserOptions('/tmp/types.mts', 'ts');
+        const dts = resolveBabelParserOptions('/tmp/index.d.ts', 'ts');
+        const tsx = resolveBabelParserOptions('/tmp/view.tsx', 'ts');
+
+        assert.equal(cjs['sourceType'], 'commonjs');
+        assert.equal(mts['sourceType'], 'module');
+        assert.equal(cjs['createImportExpressions'], true);
+        assert.equal(cjs['allowImportExportEverywhere'], undefined);
+        assert.equal(cjs['allowReturnOutsideFunction'], undefined);
+        assert.deepEqual(/** @type {any[]} */ (mts['plugins'])[0], [
+            'typescript',
+            { dts: false, disallowAmbiguousJSXLike: true },
+        ]);
+        assert.deepEqual(/** @type {any[]} */ (dts['plugins'])[0], [
+            'typescript',
+            { dts: true, disallowAmbiguousJSXLike: false },
+        ]);
+        assert.ok(/** @type {any[]} */ (tsx['plugins']).includes('jsx'));
+        assert.ok(!/** @type {any[]} */ (mts['plugins']).includes('jsx'));
+    });
+
+    it('mantém paridade entre worker e fallback síncrono', async () => {
+        const filePath = '/tmp/parser-parity.cts';
+        const content = 'import dep = require("./dep.cjs");\nexport = dep;';
+        const workerResult = await parseFileSymbols(filePath, content);
+        const workerStats = getParserCacheStats();
+        const script = `
+            import { parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            const result = await parseFileSymbols(${JSON.stringify(filePath)}, ${JSON.stringify(content)});
+            await resetParserCacheForTest({ teardownWorkers: true });
+            console.log(JSON.stringify(result));
+        `;
+        const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
+            cwd: path.resolve('.'),
+            env: { ...process.env, IO_PARSER_WORKER_ENABLED: '0' },
+            timeout: 10_000,
+            maxBuffer: 1024 * 1024,
+        });
+        const fallbackResult = JSON.parse(stdout);
+
+        assert.deepEqual(fallbackResult.symbols, workerResult.symbols);
+        assert.deepEqual(fallbackResult.imports, workerResult.imports);
+        assert.deepEqual(fallbackResult.exports, workerResult.exports);
+        assert.equal(fallbackResult.parseError, workerResult.parseError);
+        assert.equal(workerStats.workerRequests, 1);
+        assert.equal(workerStats.workerFailures, 0);
+        assert.equal(workerStats.workerFallbacks, 0);
     });
 });
 
