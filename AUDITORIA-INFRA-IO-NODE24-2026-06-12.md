@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `46d0bd75`, seguida da onda experimental medida de cache L2
+**Baseline reinvestigado:** `main` sincronizada até `d58def2d`, seguida da onda de preflight de capacidade com `statfs`
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -19,16 +19,18 @@ No estado atual, a descrição correta é: **as primitivas centrais de mutação
 fortes e provas reais, as superfícies externas de path estão vinculadas a policy async, o índice detecta mudanças
 externas metadata-preserving e a contenção L0/L1 é observável sem expor paths; o L1 multiprocess agora possui perfis
 explícitos por risco, remove recursivo exige confirmação exata e a raiz workspace-bound é protegida; L2 possui perfil
-experimental fail-closed e custo observável; o risco dominante migrou para preflight de capacidade, readiness
-operacional e decisões de promoção baseadas em workload**.
+experimental fail-closed e custo observável; mutações que materializam payload grande agora falham cedo quando a
+insuficiência de espaço já é observável; o risco dominante migrou para readiness operacional e decisões de promoção
+baseadas em workload**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — preflight de espaço livre ainda inexiste:** writes/copies grandes só descobrem ENOSPC durante a operação.
-2. **P2 — readiness de escopo ainda mistura ready/degraded:** erros em `declareScope` podem parecer sucesso.
-3. **P2 — política de glob ainda é própria:** include/exclude pode divergir de `minimatch`/Node glob.
-4. **P2 — promoção do L2 depende de workload real:** o perfil experimental existe e foi medido, mas cold-start pode
+1. **P2 — readiness de escopo ainda mistura ready/degraded:** erros em `declareScope` podem parecer sucesso.
+2. **P2 — política de glob ainda é própria:** include/exclude pode divergir de `minimatch`/Node glob.
+3. **P2 — promoção do L2 depende de workload real:** o perfil experimental existe e foi medido, mas cold-start pode
    custar mais que filesystem local para payloads pequenos/médios.
+4. **P2 — temp naming legado ainda merece varredura:** primitivas novas usam 96 bits, mas callsites antigos podem
+   manter nomes curtos ou não ocultos.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -785,6 +787,29 @@ Conclusão operacional: o perfil experimental funciona e preserva hotset após r
 O custo cold-start observado impede promover `on` globalmente sem hit ratio e distribuição de payloads do workload
 real. IO-018 está concluído com esse limite documentado.
 
+### 1.29 Status de implementação — preflight de capacidade aplicado em 2026-06-14
+
+IO-028 foi fechado nas mutações que realmente precisam materializar um payload completo no destino:
+
+- atomic write, copy staged e move cross-device consultam `statfs` antes de criar o temporário;
+- move same-device não paga a checagem, pois `rename`/hard link não copiam o payload;
+- o default checa payloads a partir de 64 MiB e exige 64 MiB adicionais de headroom;
+- `IO_CAPACITY_PREFLIGHT_MIN_BYTES=0` desabilita; `IO_CAPACITY_PREFLIGHT_RESERVE_BYTES` ajusta a reserva advisory;
+- insuficiência observável falha cedo com `ENOSPC` e relatório estruturado;
+- `statfs` ausente/unsupported falha aberto para preservar portabilidade;
+- resultados são propagados em metadata das mutações canônicas.
+
+Limite consciente: `statfs` não reserva blocos. Outra operação ainda pode consumir espaço entre preflight e escrita,
+portanto o relatório reduz falhas parciais previsíveis sem prometer ausência de `ENOSPC`.
+
+Provas:
+
+- teste live real em `/tmp`: relatório `checked:true`, `sufficient:true`, com bytes disponíveis/headroom;
+- unitários cobrem disabled/below-threshold/sufficient/insufficient/unsupported e provam que atomic write/copy não
+  criam temp nem substituem destino quando o preflight rejeita;
+- IO engine + fault injection + capacidade: **60 passados, 0 falhas**;
+- typecheck strict e lint focado: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -795,7 +820,7 @@ Foram lidos completamente todos os arquivos diretamente sob a árvore de infra I
 
 | Área | Arquivos |
 | --- | --- |
-| `fs` | `append.js`, `copy.js`, `index.js`, `line-offset-cache.js`, `locked-mutations.js`, `locked-writes.js`, `mkdir.js`, `move.js`, `portable-atomic.js`, `read-bytes.js`, `read-chunks.js`, `read-lines.js`, `read-services.js`, `read-text.js`, `remove.js`, `rollback-sidecar.js`, `snapshot.js`, `stat.js`, `write-atomic.js` |
+| `fs` | `append.js`, `capacity-preflight.js`, `copy.js`, `index.js`, `line-offset-cache.js`, `locked-mutations.js`, `locked-writes.js`, `mkdir.js`, `move.js`, `portable-atomic.js`, `read-bytes.js`, `read-chunks.js`, `read-lines.js`, `read-services.js`, `read-text.js`, `remove.js`, `rollback-sidecar.js`, `snapshot.js`, `stat.js`, `write-atomic.js` |
 | `invalidation` | `bus.js`, `cache-tiers.js`, `events.js`, `index.js` |
 | `patch` | `index.js`, `text-diff-service.js`, `text-diff.js`, `text-patch.js` |
 | `search` | `grep-adapter.js`, `index-search.js`, `index.js`, `result-paginator.js`, `subprocess.js`, `symbol-search.js`, `text-search.js` |
@@ -903,11 +928,13 @@ Referência: https://nodejs.org/docs/latest-v24.x/api/fs.html#fspromiseswritefil
 
 Referência: https://nodejs.org/docs/latest-v24.x/api/fs.html#fspromisesmkdtempdisposableprefix-options
 
-### 3.5 `statfs` pode apoiar preflight de espaço livre
+### 3.5 `statfs` apoia preflight advisory de espaço livre
 
 `fsPromises.statfs()` retorna informações do filesystem de um path.
 
-**Implicação:** antes de mover/copiar/gravar arquivos grandes, a engine pode estimar `bavail * bsize` e bloquear operações com risco de ENOSPC parcial, ou ao menos registrar warning e telemetry.
+**Implicação aplicada:** atomic write, copy staged e move `EXDEV` acima de limiar estimam `bavail * bsize` e falham
+cedo quando a insuficiência já é observável. ENOSPC real continua sendo a autoridade final, pois o preflight não
+reserva blocos.
 
 Referência: https://nodejs.org/docs/latest-v24.x/api/fs.html#fspromisesstatfspath-options
 
@@ -1028,7 +1055,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-025 | P2 | Observability | **Concluído:** espera, fila e leases L0/L1 são bounded e sanitizados | histogramas globais/por operação, p95, outcomes e amostra por hash no health | Paths não entram no snapshot; métricas são cumulativas por processo | Usar os dados para definir perfis de ativação do L1 |
 | IO-026 | P2 | Search subprocess | **Concluído:** `rg`/`grep` textuais processam stdout incrementalmente | `subprocess.js`, `text-search.js` | `maxBuffer` permanece como proteção contra linha/chunk anômalo | Monitorar `streamStoppedEarly` e custo em buscas grandes |
 | IO-027 | P2 | Glob policy | Glob simples próprio diverge de minimatch/Node glob | `scan/glob.js` | Diferenças de include/exclude difíceis de prever | Padronizar em `minimatch`/`fsPromises.glob` com testes de compatibilidade |
-| IO-028 | P2 | Statfs | Sem preflight de espaço livre | Não há uso de `statfs` | ENOSPC parcial em copy/write grande | Adicionar preflight opcional para payloads acima de limiar |
+| IO-028 | P2 | Statfs | **Concluído com limite documentado:** preflight advisory antes de materializar payload grande | `capacity-preflight.js`, atomic write, copy staged, move EXDEV | `statfs` não reserva blocos e pode falhar aberto em plataforma unsupported | Manter ENOSPC real como autoridade final |
 | IO-029 | P2 | Durable append | **Concluído:** recovery lógico e físico opt-in da linha parcial | `jsonl-reader.js` ignora por default e repara sob lock quando solicitado | Evita parser quebrado sem mutação surpresa | Manter repair bounded e opt-in |
 | IO-030 | P3 | L3 cache | L3 reservado, mas sem contrato | `io-cache-tiering.js` | Sem problema atual | Só planejar se houver múltiplos runtimes/processos reais |
 | IO-031 | P0 | Lock L1 | **Concluído:** PID local vivo prevalece sobre TTL | `file-resource-lock.js:isStaleLock` usa hostname/PID e heartbeat por mtime | Evita roubo de lease local longo | Manter prova multiprocess na Faixa 5 |
@@ -1050,9 +1077,9 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | Estado | IDs |
 | --- | --- |
 | Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-023, IO-025, IO-026, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043 |
-| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-038 |
+| Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038 |
 | Parcial | IO-009 |
-| Aberto | IO-021, IO-024, IO-027, IO-028, IO-030 |
+| Aberto | IO-021, IO-024, IO-027, IO-030 |
 
 ---
 
@@ -1304,6 +1331,13 @@ A situação ideal é uma infra IO em camadas:
 - [x] Fazer SessionFS confirmar somente após containment.
 - [x] Manter quarentena MCP como caminho reversível preferido, sem duplicá-la na engine baixa.
 
+#### Fase 2.7 — Preflight de capacidade
+
+- [x] Consultar `statfs` antes de atomic write/copy staged/move EXDEV acima de limiar.
+- [x] Falhar cedo com ENOSPC apenas quando a insuficiência é observável.
+- [x] Falhar aberto quando `statfs` não está disponível.
+- [x] Expor threshold, reserva e relatório estruturado sem prometer reserva de blocos.
+
 ### Faixa 3 — Snapshot e coerência derivada
 
 #### Fase 3.1 — Snapshot consistente
@@ -1489,7 +1523,7 @@ Para declarar maturidade operacional avançada, ainda faltam:
 - [x] perfil explícito de ativação L1 para mutações P0/P1;
 - [x] p95/histograma, timeout/abort e leases sanitizados;
 - [x] confirmação reforçada intrínseca para remove recursivo e proteção da raiz workspace-bound;
-- [ ] preflight opcional de espaço livre em payloads grandes;
+- [x] preflight opcional de espaço livre em payloads grandes;
 - [x] search incremental com early stop real.
 
 ---
@@ -1509,6 +1543,6 @@ Para declarar maturidade operacional avançada, ainda faltam:
 
 ## 14. Próxima ação executável
 
-Implementar preflight opcional com `statfs` para writes/copies acima de limiar, sem transformar ENOSPC estimado em
-falsa garantia. Em paralelo, coletar hit ratio/distribuição de payloads do L2 `experimental` em workloads longos antes
-de considerar promoção para `on`.
+Corrigir readiness de scopes para separar `ready` de `degraded` e expor erro resumido sem vazar payloads. Em paralelo,
+coletar hit ratio/distribuição de payloads do L2 `experimental` em workloads longos antes de considerar promoção para
+`on`.
