@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `3c23d73b`, seguida da onda de patch externo protegido
+**Baseline reinvestigado:** `main` sincronizada até `f58d8f03`, seguida da onda de fuzz determinístico
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -28,11 +28,10 @@ obsoletas sob replace externo coordenado; leitura em chunks possui versão/abort
 precondição reconfirmam a versão no último ponto portátil antes do publish; o risco dominante migrou para cobertura
 por fuzz e decisões de promoção baseadas em workload**.
 
-Prioridades reais remanescentes:
+Prioridade arquitetural remanescente:
 
-1. **P2 — falta fuzz textual/binário sistemático:** as provas determinísticas cobrem os cenários conhecidos, mas ainda
-   falta explorar combinações de line endings, UTF-8, ranges e payloads arbitrários.
-2. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
+1. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
+   Fuzz determinístico passa a ser uma prova recorrente, não um projeto aberto.
 
 O L2 encerrou sua fase de promoção técnica: workload, batching, crash, contenção e soak passaram. A decisão operacional
 é manter `off` como default heterogêneo e usar `experimental` em runtimes long-lived que comprovadamente reutilizam o
@@ -1234,6 +1233,39 @@ Limite consciente: APIs portáteis de filesystem não oferecem compare-and-swap 
 Permanece uma microjanela entre a última confirmação e o syscall de publicação; eliminá-la exigiria cooperação do
 writer externo, protocolo de versão compartilhado ou primitiva específica de plataforma.
 
+### 1.44 Status de implementação — primeira bateria de fuzz determinístico aplicada em 2026-06-14
+
+A Faixa 5 recebeu uma bateria bounded e reproduzível sem dependência nova:
+
+- seed `0x1a2b3c4d`: 160 casos de patch com Unicode, LF/CRLF, ocorrência específica, replace-all, bytes e line delta;
+- seed `0x5e6f7788`: 48 casos de leitura em chunks com janelas, Unicode, LF/CRLF e `highWaterMark` entre 1 e 12 bytes;
+- corpus binário: 6 sequências UTF-8 inválidas confirmam `BinaryFileError` e preservação byte a byte.
+
+Cada falha informa seed, índice e caso serializado. A primeira execução encontrou IO-053 em produção:
+
+- quando um chunk físico terminava em `\r`, o parser guardava `\r + fragmento` em vez de `fragmento + \r`, criando
+  linhas vazias e perdendo linhas válidas em CRLF;
+- ao parar depois de atingir `endLine`, o último chunk parcial usava a linha apenas escaneada como `endLine`, inflando
+  `returnedLineCount` mesmo quando o conteúdo devolvido estava correto.
+
+As duas falhas foram corrigidas em `read-chunks.js`; uma regressão mínima de fronteira CRLF complementa o fuzz.
+Validação: bateria fuzz **214 casos gerados/corpus, 0 falhas**; rodada focada ampliada **208 passados, 0 falhas**;
+suíte Copilot completa **6.661 total, 6.633 passados, 0 falhas, 28 pending**.
+
+### 1.45 Status de implementação — UTF-8 fatal no streaming textual aplicado em 2026-06-14
+
+A investigação contínua após o fuzz encontrou IO-054: `readText` e patch recusavam UTF-8 inválido, mas as duas rotas
+de leitura em chunks usavam `StringDecoder`, que substituía bytes inválidos silenciosamente. Isso podia apresentar
+texto com U+FFFD como se fosse conteúdo válido.
+
+O parser streaming agora usa `TextDecoder('utf-8', { fatal: true })`, que no Node 24 preserva sequências multibyte
+entre chamadas com `{ stream:true }` e recusa dados malformados. O erro nativo é normalizado para
+`BinaryFileError/ERR_INVALID_UTF8`, alinhando chunks materializados, byte-seek e stream com a política textual
+canônica. O corpus fuzz valida também que os bytes originais não são regravados.
+
+Validação focada pós-IO-054: **139 passados, 0 falhas**; lint focado, `diff --check` e
+`typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1506,12 +1538,14 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-050 | P1 | Consistência externa | **Concluído:** snapshot, L1 e índice recusam inode/versão obsoletos | fingerprint rico, retries e provas multiprocess com replace atômico | L1 ainda respeita stale-probe configurável; L2 legado cai em fallback | Usar probe `0` somente em perfis paranoicos e observar `snapshotConflicts` |
 | IO-051 | P2 | Chunk streaming | **Concluído com limite documentado:** handle/version token e stale abort end-to-end | byte-index rico, retry materializado e `ESTALECHUNKSTREAM` multiprocess | Caller incremental pode ter consumido chunks antes do erro | Exigir descarte integral do token stale; nunca retry transparente após entrega |
 | IO-052 | P2 | Patch externo | **Concluído com limite documentado:** editor/Git externo é recusado antes do publish | precondição final baixa, processo editor e `git checkout` real | Microjanela portátil entre confirmação e `rename` | Manter a prova coordenada e preferir writers cooperativos quando possível |
+| IO-053 | P1 | Chunk CRLF | **Concluído:** fuzz encontrou carry CRLF reordenado e metadata final inflada | seeds reproduzíveis, regressão mínima e `read-chunks.js` corrigido | Parser podia perder linhas sob fronteira física específica | Manter seeds fixas e ampliar corpus sem tornar a suíte não determinística |
+| IO-054 | P0 | Chunk UTF-8 | **Concluído:** streaming textual usa decode fatal e recusa bytes inválidos | `TextDecoder` streaming fatal, corpus binário e erro canônico | StringDecoder anterior podia substituir bytes silenciosamente | Manter todas as superfícies textuais sob a mesma política fatal |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -1876,7 +1910,8 @@ A situação ideal é uma infra IO em camadas:
 
 ### Faixa 5 — Provas
 
-- [ ] Fuzz textual e binário.
+- [x] Fuzz textual e binário bounded, determinístico e reproduzível.
+- [x] UTF-8 inválido recusado também em chunks materializados/streaming.
 - [x] Fault injection determinístico em write, publish, move e rotate+append.
 - [x] Fault injection em directory sync e prova `EXDEV` real entre devices distintos.
 - [x] Crash real durante directory sync e fases internas do `EXDEV`, com órfão pré-publish documentado.
@@ -2024,9 +2059,10 @@ Critérios operacionais adicionais já atendidos:
 - [x] executar soak L2 com TTL, evicção, reconfiguração, checkpoint WAL e reabertura íntegra.
 - [x] provar replace externo durante snapshot de rollback, validação L1 e commit do índice.
 
-Ainda falta para maturidade operacional avançada:
+Maturidade operacional avançada:
 
-- [ ] fuzz textual/binário sistemático sobre patch, chunks e limites.
+- [x] fuzz textual/binário bounded e reproduzível sobre patch, chunks e limites;
+- [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---
 
@@ -2045,7 +2081,7 @@ Ainda falta para maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Implementar a primeira bateria de fuzz textual/binário da Faixa 5. Ela deve gerar combinações bounded e reproduzíveis
-de UTF-8 válido/inválido, CRLF/LF, match ranges, replace-all, chunks e fronteiras de byte; qualquer falha deve gravar
-seed/caso mínimo para regressão determinística. IO-030/L3 permanece explicitamente sem implementação até existir
-evidência de múltiplos runtimes/processos reais que justifique o contrato.
+Continuar a auditoria profunda de parsing/read/streaming/buffer, priorizando limites e alocações redundantes nas
+principais tools, e manter fuzz/chaos como gates recorrentes. IO-030/L3 permanece explicitamente sem implementação até
+existir evidência de múltiplos runtimes/processos reais que justifique o contrato; não há ganho técnico em criar essa
+camada preventivamente.

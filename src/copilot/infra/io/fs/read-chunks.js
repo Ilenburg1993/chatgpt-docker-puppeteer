@@ -7,7 +7,6 @@
 
 import { open, stat } from 'node:fs/promises';
 import { addAbortSignal } from 'node:stream';
-import { StringDecoder } from 'node:string_decoder';
 import { normalizePathResourceKey } from '../../policy/path-resource.js';
 import { toBufferView, utf8ByteLength } from '../../shared/buffer.js';
 import { richFingerprintMatches } from '../../shared/fingerprint-match.js';
@@ -81,6 +80,32 @@ function createStaleChunkSnapshotError(filePath, attempts, details = {}) {
 function isStaleChunkSnapshotError(error) {
     const code = /** @type {{ code?: unknown }} */ (error)?.code;
     return code === 'ESTALECHUNKSNAPSHOT' || code === 'ESTALECHUNKSTREAM';
+}
+
+/**
+ * @param {unknown} cause
+ * @returns {Error & { code?: string }}
+ */
+function createInvalidUtf8ChunkError(cause) {
+    const error = /** @type {Error & { code?: string }} */ (
+        new Error('Arquivo binário detectado (bytes inválidos para UTF-8).', { cause })
+    );
+    error.name = 'BinaryFileError';
+    error.code = 'ERR_INVALID_UTF8';
+    return error;
+}
+
+/**
+ * @param {TextDecoder} decoder
+ * @param {Buffer | Uint8Array | undefined} chunk
+ * @param {boolean} final
+ */
+function decodeUtf8Chunk(decoder, chunk, final = false) {
+    try {
+        return final ? decoder.decode() : decoder.decode(chunk, { stream: true });
+    } catch (error) {
+        throw createInvalidUtf8ChunkError(error);
+    }
 }
 
 /**
@@ -315,7 +340,7 @@ async function* iterateTextLineChunks(
     let currentStartLine = startLine;
     let carry = '';
     let chunkIndex = 0;
-    const decoder = new StringDecoder('utf8');
+    const decoder = new TextDecoder('utf-8', { fatal: true });
     options.signal?.throwIfAborted();
     const handle = await open(filePath, 'r');
     const before = await handle.stat();
@@ -337,7 +362,7 @@ async function* iterateTextLineChunks(
         const chunk = {
             index: chunkIndex,
             startLine: currentStartLine,
-            endLine: state.totalLines,
+            endLine: currentStartLine + current.length - 1,
             content,
             bytes: utf8ByteLength(content, 'read chunk'),
             ...(options.deliveryMode === 'stream' ? { snapshotVersion } : {}),
@@ -377,15 +402,19 @@ async function* iterateTextLineChunks(
         const emitted = [];
         let data = carry + decoded;
         carry = '';
+        let trailingCr = '';
         if (!final && data.endsWith('\r')) {
-            carry = '\r';
+            trailingCr = '\r';
             data = data.slice(0, -1);
         }
-        if (data === '') return emitted;
+        if (data === '') {
+            carry = trailingCr;
+            return emitted;
+        }
 
         const parts = data.split(/\r\n|\n|\r/);
         if (!final) {
-            carry += parts.pop() ?? '';
+            carry = `${parts.pop() ?? ''}${trailingCr}`;
         } else if (/\r\n|\n|\r/.test(data.slice(-2))) {
             while (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
         }
@@ -411,13 +440,13 @@ async function* iterateTextLineChunks(
                     snapshotVersion,
                 });
             }
-            for (const emitted of processDecoded(decoder.write(buf), false)) {
+            for (const emitted of processDecoded(decodeUtf8Chunk(decoder, buf), false)) {
                 yield emitted;
             }
             if (state.stoppedAtRequestedWindow) break;
         }
         if (!state.stoppedAtRequestedWindow) {
-            for (const emitted of processDecoded(decoder.end(), true)) {
+            for (const emitted of processDecoded(decodeUtf8Chunk(decoder, undefined, true), true)) {
                 yield emitted;
             }
         }
@@ -550,7 +579,7 @@ async function readUtf8Range(filePath, byteStart, byteEndExclusive, expected, op
         Number.isFinite(options.highWaterMark) && Number(options.highWaterMark) > 0
             ? Math.floor(Number(options.highWaterMark))
             : undefined;
-    const decoder = new StringDecoder('utf8');
+    const decoder = new TextDecoder('utf-8', { fatal: true });
     let text = '';
     const handle = await open(filePath, 'r');
     /** @type {import('node:fs').ReadStream | null} */
@@ -572,7 +601,7 @@ async function readUtf8Range(filePath, byteStart, byteEndExclusive, expected, op
             stream = options.signal ? addAbortSignal(options.signal, baseStream) : baseStream;
             for await (const chunk of stream) {
                 const buf = toBufferView(/** @type {Buffer | Uint8Array} */ (chunk));
-                text += decoder.write(buf);
+                text += decodeUtf8Chunk(decoder, buf);
                 if (options.onPhase) {
                     await options.onPhase('after-byte-range-chunk', {
                         filePath,
@@ -582,7 +611,7 @@ async function readUtf8Range(filePath, byteStart, byteEndExclusive, expected, op
                     });
                 }
             }
-            text += decoder.end();
+            text += decodeUtf8Chunk(decoder, undefined, true);
         }
         const after = await handle.stat();
         const pathAfter = await stat(filePath);

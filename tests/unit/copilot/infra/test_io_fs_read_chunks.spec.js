@@ -158,6 +158,33 @@ describe('infra/io/fs read line ports', () => {
         expect(result.bytesRead).toBeLessThanOrEqual(Buffer.byteLength(content, 'utf8'));
     });
 
+    it('readTextLineChunks preserva CRLF quando o CR termina um chunk físico', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'stream-crlf-boundary.txt');
+        const lines = ['fim alpha', 'ação βeta', '東京 zero', '🚀', 'fim'];
+        await writeFile(file, lines.join('\r\n'), 'utf8');
+
+        const result = await readTextLineChunks(file, {
+            chunkLines: 1,
+            startLine: 1,
+            endLine: lines.length,
+            highWaterMark: 3,
+        });
+
+        expect(result.chunks.map((chunk) => chunk.content)).toEqual(lines);
+    });
+
+    it('readTextLineChunks recusa UTF-8 inválido mesmo quando a sequência cruza chunks físicos', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'stream-invalid-utf8.bin');
+        await writeFile(file, Buffer.from([0x61, 0x0a, 0xf0, 0x9f, 0x92, 0x0a, 0x62]));
+
+        await expect(readTextLineChunks(file, { highWaterMark: 2 })).rejects.toMatchObject({
+            name: 'BinaryFileError',
+            code: 'ERR_INVALID_UTF8',
+        });
+    });
+
     it('readTextLineChunksStream expõe chunks via ReadableStream.from', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'stream.txt');
