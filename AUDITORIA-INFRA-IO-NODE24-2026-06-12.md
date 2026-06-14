@@ -1,7 +1,7 @@
 # Auditoria profunda de `src/copilot` — foco em Infra IO, performance, locks e corrupção de arquivos
 
 **Data:** 2026-06-12  
-**Baseline reinvestigado:** `main` sincronizada até `2b4fcb89`, seguida do batching write-behind medido do L2
+**Baseline reinvestigado:** `main` sincronizada até `7ea23ce3`, seguida do lifecycle e soak do write-behind L2
 **Escopo primário:** `src/copilot/infra/io/**`  
 **Escopo ampliado:** `src/copilot/infra` adjacente, usos diretos de filesystem em `src/copilot`, runtime Node 24.5+  
 **Objetivo:** verificar se a infraestrutura de IO faz o que promete sob concorrência, falhas, cache, locks, edge cases e risco de corrupção; propor estado ideal e roadmap faseado.
@@ -28,12 +28,13 @@ em workload e provas de crash externas**.
 
 Prioridades reais remanescentes:
 
-1. **P2 — promoção do L2 depende de provas operacionais, não mais de custo básico:** batching reduziu o break-even de
-   nove para 3–4 reusos sob concorrência 8 e para dois reusos no perfil serial, preservando 100% de hits. O default
-   permanece `off` até provar desligamento abrupto, contenção SQLite externa e workloads reais de processo longo.
-2. **P2 — faltam provas externas destrutivas:** crash real em directory sync/EXDEV, modificação externa durante
+1. **P2 — faltam provas externas destrutivas:** crash real em directory sync/EXDEV, modificação externa durante
    snapshot/index e interação com editor/Git ainda não estão automatizados.
-3. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
+2. **P3 — L3 continua reservado sem demanda real:** não deve ser implementado antes de múltiplos runtimes justificarem.
+
+O L2 encerrou sua fase de promoção técnica: workload, batching, crash, contenção e soak passaram. A decisão operacional
+é manter `off` como default heterogêneo e usar `experimental` em runtimes long-lived que comprovadamente reutilizam o
+corpus pelo menos 3–4 vezes dentro do TTL.
 
 Conclusão atualizada: a infra já não deve ser descrita como “temp+rename sem durabilidade”, “somente lock
 intra-processo”, “snapshot por read/stat paralelo”, “append fragmentado sem recovery” ou “rollback grande sem
@@ -1006,6 +1007,79 @@ degradar a leitura não é.
 Validação: cache SQLite/registry/engine **60 passados, 0 falhas**; canário cross-process **PASS**; lint focado e
 typecheck strict de `src/copilot`: **PASS**.
 
+### 1.37 Status de implementação — lifecycle e provas multiprocess do write-behind aplicados em 2026-06-14
+
+A investigação do gate de shutdown encontrou IO-046: o banco registrava fechamento na prioridade `DATABASE`, mas o
+registry L2 não participava do shutdown central; além disso, listeners próprios de `SIGTERM`/`SIGINT` fechavam SQLite
+diretamente. Um sinal dentro da janela write-behind podia, portanto, fechar o banco antes do flush.
+
+A correção:
+
+- adiciona `SHUTDOWN_PRIORITY.CACHE_PERSISTENCE`, imediatamente anterior a `DATABASE`;
+- registra `copilot-io-l2.flush` de forma idempotente sempre que o registry é consultado;
+- drena o lote e interrompe o prune antes do close;
+- faz os listeners de sinal do banco delegarem a `runShutdown()`;
+- mantém o handler síncrono de `exit` como última proteção de fechamento.
+
+Nova prova `test_io_cache_l2_multiprocess.spec.js`, sempre sobre bancos temporários reais:
+
+1. `SIGKILL` antes do flush: a linha pendente não aparece no banco e `PRAGMA integrity_check` retorna `ok`;
+2. shutdown central coordenado: a linha não existia antes do shutdown e persiste após o close;
+3. `SIGTERM` real: timer de runtime é drenado, cache faz flush, DB fecha e processo sai com código zero;
+4. `BEGIN IMMEDIATE` externo: primeiro flush recebe busy e mantém a linha legível/pendente; após liberação, retry
+   persiste uma única linha, sem corrupção.
+
+A semântica aceita é explícita: cache não confirmado pode ser perdido por `SIGKILL`, porque é reconstruível; lote
+confirmado não pode sumir, lock externo não pode descartar o buffer e shutdown cooperativo deve ordenar flush antes
+do close.
+
+Validação: prova multiprocess **4 passados, 0 falhas**; conjunto focado DB/cache/registry **62 passados, 0 falhas**;
+lint focado e typecheck strict de `src/copilot`: **PASS**.
+
+### 1.38 Status de implementação — soak L2 e decisão de promoção aplicados em 2026-06-14
+
+O novo harness `scripts/analysis/copilot-io-l2-soak.mjs` força um ciclo operacional completo sobre banco isolado:
+
+- 24 ciclos, 300 entradas por ciclo e 7.200 sets totais de 4 KiB;
+- janela write-behind real, leitura imediata do último item pendente e cap de 500 entradas;
+- TTL de 250 ms seguido de prune;
+- transições `experimental -> on -> off -> on` com lote pendente;
+- checkpoint `PASSIVE` e `TRUNCATE` do WAL;
+- shutdown central e reabertura por nova conexão com `integrity_check`.
+
+Duas execuções consecutivas convergiram:
+
+| Métrica | Run 1 | Run 2 |
+| --- | ---: | ---: |
+| batch flushes | 48 | 48 |
+| linhas persistidas em lotes | 7.200 | 7.200 |
+| lote médio | 150 | 150 |
+| batch failures | 0 | 0 |
+| máximo observado | 500 | 500 |
+| removidos após TTL | 500 | 500 |
+| WAL antes de truncate | 5.261.272 bytes | 5.261.272 bytes |
+| WAL depois de truncate | 0 | 0 |
+| crescimento de heap no pico | 3.269.536 bytes | 3.271.312 bytes |
+| duração | 3.328 ms | 3.309 ms |
+| integridade | `ok` | `ok` |
+
+As 24 leituras de linha ainda pendente passaram; duas chaves atravessaram reconfiguração; o banco final reabriu com
+102 entradas esperadas. A ordem observada no shutdown foi `timers.cancelAll`, `copilot-io-l2.flush`,
+`copilot-db.close`.
+
+Artefatos locais:
+
+- `artifacts/io-l2-workload/soak-run-1.json`;
+- `artifacts/io-l2-workload/soak-run-2.json`.
+
+Decisão final de IO-018: o perfil está tecnicamente apto para opt-in em processo longo, mas não deve virar default
+global. O custo de seed já é amortizável em 3–4 reusos concorrentes ou dois seriais, porém processos one-shot e
+subcomandos curtos não garantem esse padrão. Promoção deve ser por perfil de deployment, com telemetria, sem mudar a
+semântica conservadora do repositório.
+
+Validação: soak **2 passados**; canário **PASS**; conjunto lifecycle/cache/DB **124 passados, 0 falhas**; lint focado e
+typecheck strict de `src/copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1243,7 +1317,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-015 | P1 | Search | **Concluído:** sanitização antecede paginação e contagens | rg/grep/FTS/símbolos retornam `countsPostSanitization:true` | Linhas removidas não afetam total ou cursor | Manter prova de primeira página redigida |
 | IO-016 | P1 | Scanner | **Concluído:** classificação básica usa `Dirent` | `io-scanner.js`, benchmark local | DT_UNKNOWN ainda exige fallback | Manter `lstat` apenas para arquivo/fingerprint ou ambiguidade |
 | IO-017 | P1 | Index freshness | **Concluído:** identidade rica + hash periódico bounded | scanner persiste ctime/dev/ino; índice renova hash até limite configurável | Arquivos grandes confiam em metadata rica entre reindexações | Medir hit/miss/custo e ajustar intervalo/limite por perfil |
-| IO-018 | P1 | L2 SQLite | **Concluído com limite documentado:** perfil experimental medido e seed reduzido por batching | 1.246 arquivos; reuse 2,29x–2,64x mais rápido e break-even em 2–4 reusos | Faltam provas de crash/contenção externa e processo longo | Manter `off` até fechar os gates operacionais |
+| IO-018 | P1 | L2 SQLite | **Concluído com limite documentado:** perfil experimental medido, hardened e aprovado para long-lived opt-in | break-even 2–4 reusos; crash, contenção e soak de 7.200 sets passaram | Processos curtos podem não amortizar seed | Manter default `off`; ativar por perfil de deployment |
 | IO-019 | P1 | Bypass storage | **Concluído:** json store usa fachada atômica portátil | `infra/storage/json-store.js` | Escape é trusted e explícito | Manter contrato de callers da fachada |
 | IO-020 | P1 | Bypass export | **Concluído:** export usa fachada atômica portátil | `terminal/commands/export.js` | Paths externos continuam capability trusted | Manter caller explícito e testes de contrato |
 | IO-021 | P2 | Temp naming | **Concluído:** publicação usa nome irmão oculto e token de 128 bits | `temp-path.js`; write/copy/move compartilham o helper | Colisão continua decidida por criação exclusiva | Manter papéis bounded e sidecar especializado sob seu schema |
@@ -1270,13 +1344,15 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-042 | P0 | Move durability | **Concluído:** sync posterior ao unlink não é confundido com falha de unlink | fases de source unlink e source directory sync foram separadas | Resultado podia reportar duplicação quando a origem já havia sido removida | Manter provas de falha antes/depois do unlink |
 | IO-043 | P2 | Parser workers | **Concluído:** fila bounded, timeout end-to-end e health de pressão | `io-parser.js`, `io-health.js` | Subprocesso curto em Node 24 ainda pode precisar `process.exit` no teste isolado | Monitorar `workerQueueRejected`/`workerQueueTimeouts` em workloads reais |
 | IO-044 | P1 | L2 SQLite | **Concluído:** hit não escreve recência em toda leitura | touch throttled por TTL/4, stats e workload antes/depois | Recência pode atrasar até 30 s, aceitável para cache | Manter janela bounded e observar evicção |
-| IO-045 | P1 | L2 SQLite | **Concluído:** sets são agrupados em transações write-behind bounded | janela 25 ms/256 chaves, leitura pendente, flush explícito e workload incluindo drain | `SIGKILL` pode perder somente lote reconstruível ainda pendente | Provar crash real, contenção externa e shutdown antes de promover |
+| IO-045 | P1 | L2 SQLite | **Concluído:** sets são agrupados em transações write-behind bounded | janela 25 ms/256 chaves, leitura pendente, flush explícito e workload incluindo drain | `SIGKILL` pode perder somente lote reconstruível ainda pendente | Manter prova multiprocess e alertar sobre batch failures |
+| IO-046 | P1 | Shutdown/DB | **Concluído:** cache drena antes do fechamento SQLite | prioridade `CACHE_PERSISTENCE`, sinais delegam ao shutdown central e prova `SIGTERM` real | `SIGKILL` continua sem cleanup por definição | Manter ordem canônica e prova multiprocess recorrente |
+| IO-047 | P1 | L2 soak | **Concluído:** cap, TTL, reconfiguração, WAL e shutdown passaram em processo longo sintético | duas execuções, 7.200 sets cada, zero batch failure e integridade `ok` | Soak sintético não substitui telemetria de deployment | Ativar `experimental` apenas onde reuse real justificar |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -1356,7 +1432,8 @@ A prioridade remanescente é:
 
 - medir hit/miss e custo da verificação periódica do índice.
 - medição do custo do flush imediato sob bursts.
-- provar lote pendente sob crash, contenção SQLite externa e processo longo antes de promover L2 para `on`.
+- coletar telemetria do L2 apenas nos deployments long-lived que optarem por `experimental`; os gates sintéticos estão
+  concluídos e o default global permanece `off`.
 
 ### 6.5 Scanner, busca e index
 
@@ -1582,7 +1659,9 @@ A situação ideal é uma infra IO em camadas:
 - [x] Remover write amplification de recência em cada hit.
 - [x] Medir admissão por tamanho; nenhum limiar melhorou break-even.
 - [x] Aplicar batching de sets e medir seed incluindo o flush terminal.
-- [ ] Provar perda bounded sob `SIGKILL`, contenção SQLite externa e shutdown/reconfiguração em processo longo.
+- [x] Provar perda bounded sob `SIGKILL`, contenção SQLite externa e shutdown por `SIGTERM`.
+- [x] Executar soak de processo longo cobrindo TTL, evicção, reconfiguração e crescimento de WAL.
+- [x] Documentar decisão: `experimental` para long-lived com reuse comprovado; default global `off`.
 
 ### Faixa 4 — Performance
 
@@ -1759,10 +1838,11 @@ Critérios operacionais adicionais já atendidos:
 - [x] search incremental com early stop real.
 - [x] canário recorrente do perfil L2 `experimental` em CI sem alterar o default.
 - [x] reduzir e medir o custo de seed do L2 sem esconder o flush terminal.
+- [x] provar perda bounded em `SIGKILL`, retry após contenção e flush antes do DB em `SIGTERM`.
+- [x] executar soak L2 com TTL, evicção, reconfiguração, checkpoint WAL e reabertura íntegra.
 
 Ainda faltam para maturidade operacional avançada:
 
-- [ ] provar lote L2 pendente sob crash real, contenção SQLite externa e shutdown de processo longo;
 - [ ] crash real durante directory sync e fases internas do EXDEV;
 - [ ] modificação externa durante snapshot/index e interação com editor/Git.
 
@@ -1783,8 +1863,6 @@ Ainda faltam para maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Construir uma prova multiprocess do write-behind L2 com três cenários: `SIGKILL` antes do flush, encerramento
-cooperativo com flush e um segundo processo mantendo contenção SQLite. O aceite exige banco íntegro, ausência de
-hang, leitura cross-process dos lotes confirmados e perda limitada somente ao lote reconstruível não confirmado.
-Depois, executar as provas externas ainda abertas de crash durante directory sync/EXDEV e modificação concorrente
-por editor/Git.
+Executar crash real durante as fases externas ainda não provadas de directory sync e move `EXDEV`, verificando o
+estado observável de origem, destino e temporários após reinício. Em seguida, automatizar modificação concorrente por
+editor/Git durante snapshot e index para confirmar retry/stale sem popular cache incoerente.
