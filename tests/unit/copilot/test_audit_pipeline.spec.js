@@ -180,6 +180,24 @@ describe('audit/pipeline › createAuditLog', () => {
             await rm(dir, { recursive: true, force: true });
         }
     });
+
+    it('normaliza limite do resumo persistido e retorna execuções recentes', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-audit-summary-'));
+        const auditFile = join(dir, 'audit.jsonl');
+        const toolAuditFile = join(dir, 'tool-audit.jsonl');
+        const log = createAuditLog({ maxEntries: 5, auditFile, toolAuditFile });
+        try {
+            log.recordToolStart({ toolCallId: 'summary-1', toolName: 'read_file', args: { path: '/tmp/a' } });
+            log.recordToolComplete({ toolCallId: 'summary-1', success: true, sessionId: 'session-a' });
+            await log.flush();
+
+            await expect(log.getAuditSummary('session-a', Number.POSITIVE_INFINITY)).resolves.toMatchObject([
+                expect.objectContaining({ toolCallId: 'summary-1', toolName: 'read_file', success: true }),
+            ]);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    });
 });
 
 // ─── Part 3: isHighRiskTool ──────────────────────────────────────────────────

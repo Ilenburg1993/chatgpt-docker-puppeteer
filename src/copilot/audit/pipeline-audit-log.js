@@ -252,14 +252,24 @@ export function createAuditLog(opts = {}) {
     async function getAuditSummary(sessionId, limit = 50) {
         try {
             if (!fs.existsSync(toolAuditFile)) return [];
-            const fetchCount = sessionId ? limit * 10 : limit;
-            const { records } = await readJsonlTail(toolAuditFile, { maxLines: fetchCount });
+            const safeLimit =
+                Number.isFinite(limit) && limit > 0 ? Math.min(500, Math.trunc(limit)) : 50;
+            const fetchCount = sessionId ? safeLimit * 10 : safeLimit;
+            const { records, truncatedByByteLimit, bytesRead, maxBytes } = await readJsonlTail(toolAuditFile, {
+                maxLines: fetchCount,
+            });
+            if (truncatedByByteLimit) {
+                log(
+                    'WARN',
+                    `[audit/pipeline] tool audit tail reached byte budget (${bytesRead}/${maxBytes}); summary may be incomplete`,
+                );
+            }
             const entries = /** @type {Record<string, unknown>[]} */ (
                 records.filter((entry) => entry && typeof entry === 'object')
             );
             const filtered = sessionId ? entries.filter((entry) => entry['sessionId'] === sessionId) : entries;
             return filtered
-                .slice(-limit)
+                .slice(-safeLimit)
                 .map((entry) => redactSecretRecord(/** @type {Record<string, unknown>} */ (entry)));
         } catch {
             return [];

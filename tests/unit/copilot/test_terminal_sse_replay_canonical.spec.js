@@ -83,6 +83,11 @@ describe('terminal SSE replay canonical', () => {
 
             const tail = await readTerminalSseEventArchiveTail({ limit: 5, event: 'unit.delta' });
             expect(tail.entries).toHaveLength(1);
+            expect(tail.tailRead).toMatchObject({
+                bytesRead: expect.any(Number),
+                maxBytes: expect.any(Number),
+                truncatedByByteLimit: false,
+            });
             expect(tail.entries[0]).toMatchObject({
                 event: 'unit.delta',
                 eventId,

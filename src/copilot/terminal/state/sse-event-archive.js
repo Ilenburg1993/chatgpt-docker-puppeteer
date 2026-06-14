@@ -246,6 +246,11 @@ export function readTerminalSseEventArchiveState() {
  *         requestId: string | null;
  *         hubSessionId: string | null;
  *     };
+ *     tailRead: {
+ *         bytesRead: number;
+ *         maxBytes: number;
+ *         truncatedByByteLimit: boolean;
+ *     };
  * }>}
  */
 export async function readTerminalSseEventArchiveTail(input = {}) {
@@ -264,11 +269,18 @@ export async function readTerminalSseEventArchiveTail(input = {}) {
     };
     const path = _terminalSseEventArchivePath;
     if (!path) {
-        return { entries: [], state: readTerminalSseEventArchiveState(), filters };
+        return {
+            entries: [],
+            state: readTerminalSseEventArchiveState(),
+            filters,
+            tailRead: { bytesRead: 0, maxBytes: 0, truncatedByByteLimit: false },
+        };
     }
     const hasFilter = Object.entries(filters).some(([key, value]) => key !== 'limit' && Boolean(value));
     const fetchCount = hasFilter ? limit * 20 : limit;
-    const { records } = await readJsonlTail(path, { maxLines: fetchCount });
+    const { records, bytesRead, maxBytes, truncatedByByteLimit } = await readJsonlTail(path, {
+        maxLines: fetchCount,
+    });
     /** @type {TerminalSseEventArchiveEntry[]} */
     const matchedEntries = [];
     for (const record of records) {
@@ -305,6 +317,7 @@ export async function readTerminalSseEventArchiveTail(input = {}) {
         entries,
         state: readTerminalSseEventArchiveState(),
         filters,
+        tailRead: { bytesRead, maxBytes, truncatedByByteLimit },
     };
 }
 

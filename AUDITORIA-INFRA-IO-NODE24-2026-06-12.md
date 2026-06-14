@@ -1480,8 +1480,12 @@ O leitor agora:
 cobrem linha gigante bounded, code point atravessando blocos, UTF-8 inválido real e bytes inválidos contidos apenas
 na linha parcial descartada.
 
-Validação focada de IO-067: **38 passados, 0 falhas** em JSONL e audit pipeline; lint focado, `diff --check` e
-`typecheck:strict:src.copilot`: **PASS**.
+Os callers foram alinhados ao novo sinal: o archive SSE retorna `tailRead` com bytes/orçamento/truncagem; o resumo
+legado de auditoria mantém `object[]`, normaliza `limit` em até 500 e emite warning quando a cauda pode estar
+incompleta.
+
+Validação focada de IO-067: **124 passados, 0 falhas** em JSONL, audit pipeline, SSE canônico e commands; lint
+focado, `diff --check` e `typecheck:strict:src.copilot`: **PASS**.
 
 ---
 
@@ -1769,7 +1773,7 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-064 | P1 | Read line offsets | **Concluído:** slicing físico é uniforme e retenção do cache é bounded por bytes | scanner O(1) no bypass, offsets `Uint32Array`, health e regressões CR/LF/CRLF | Construção de offsets faz duas varreduras para obter alocação compacta exata | Medir miss frio versus redução de heap; manter o orçamento global |
 | IO-065 | P1 | Diff/output window | **Concluído:** inputs não viram arrays integrais para diff/paginação | duas passagens lazy, scanners de offsets e 10 mil casos diferenciais | Diff continua index-aligned, não é algoritmo LCS | Só migrar algoritmo com contrato/fixtures de inserção e benchmark |
 | IO-066 | P0 | Search UTF-8 | **Concluído:** stdout streaming usa decode incremental fatal | code point entre chunks, bytes inválidos e early stop cobertos | stderr diagnóstico e `execSearchFile` legado continuam decode best-effort após concatenação | Manter stdout textual de busca sob política fatal |
-| IO-067 | P0 | JSONL tail | **Concluído:** cauda tem budgets físicos e decode incremental fatal | hard caps, ring bounded e regressões de fronteira/linha gigante | Uma linha maior que `maxBytes` é omitida e sinalizada, não parcialmente parseada | Callers devem observar `truncatedByByteLimit` quando completude for obrigatória |
+| IO-067 | P0 | JSONL tail | **Concluído:** cauda tem budgets físicos e decode incremental fatal | hard caps, ring bounded, regressões e propagação SSE/audit | Uma linha maior que `maxBytes` é omitida e sinalizada, não parcialmente parseada | Manter warning/metadata quando completude for funcionalmente relevante |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
@@ -2324,8 +2328,7 @@ Maturidade operacional avançada:
 
 ## 14. Próxima ação executável
 
-Continuar a auditoria de buffers diagnósticos legados e propagar `truncatedByByteLimit` onde a completude da cauda
-JSONL for requisito funcional. Medir o custo de `attachComment` antes de qualquer perfil sem doc comments e ampliar
-fixtures Babel somente para sintaxe realmente aceita pelo workspace; manter fuzz/chaos como gates recorrentes.
-IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos runtimes/processos reais que
-justifique o contrato.
+Continuar a auditoria de buffers diagnósticos legados e medir o custo de `attachComment` antes de qualquer perfil sem
+doc comments. Ampliar fixtures Babel somente para sintaxe realmente aceita pelo workspace e manter fuzz/chaos como
+gates recorrentes. IO-030/L3 permanece explicitamente sem implementação até existir evidência de múltiplos
+runtimes/processos reais que justifique o contrato.
