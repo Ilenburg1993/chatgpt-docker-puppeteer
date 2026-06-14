@@ -48,6 +48,7 @@ import {
 } from './parse/index.js';
 import { truncateUtf8String, utf8ByteLength } from './shared/buffer.js';
 import { richFingerprintMatches } from './shared/fingerprint-match.js';
+import { countPhysicalTextLines } from './shared/text-lines.js';
 
 export { buildOutline, extractJsonSchema, extractMarkdownOutline, extractTopComments };
 
@@ -755,26 +756,6 @@ function tryBabelParse(code, parserOptions) {
 // ---------------------------------------------------------------------------
 
 /**
- * Conta linhas físicas sem materializar um array proporcional ao arquivo.
- *
- * @param {string} content
- * @returns {number}
- */
-function countPhysicalLines(content) {
-    let lines = 1;
-    for (let index = 0; index < content.length; index += 1) {
-        const code = content.charCodeAt(index);
-        if (code === 13) {
-            lines += 1;
-            if (content.charCodeAt(index + 1) === 10) index += 1;
-        } else if (code === 10) {
-            lines += 1;
-        }
-    }
-    return lines;
-}
-
-/**
  * Parseia um arquivo JS/TS e extrai símbolos, imports e exports.
  *
  * @param {string} filePath - Path do arquivo.
@@ -789,7 +770,7 @@ export async function parseFileSymbols(filePath, content) {
     const truncated = bytes > MAX_PARSE_BYTES;
     const source = truncated ? truncateUtf8String(content, MAX_PARSE_BYTES).text : content;
     const parsedBytes = truncated ? utf8ByteLength(source, 'parser truncated content') : bytes;
-    const lines = countPhysicalLines(content);
+    const lines = countPhysicalTextLines(content);
 
     /** @type {FileSymbols} */
     const base = {

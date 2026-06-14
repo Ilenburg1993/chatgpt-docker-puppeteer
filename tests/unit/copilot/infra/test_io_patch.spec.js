@@ -41,6 +41,21 @@ describe('infra/io/patch', () => {
         expect(patch.occurrenceIndex).toBe(2);
     });
 
+    it('calcula linhas físicas CR, CRLF e LF sem materializar prefixos', () => {
+        const patch = computeTextPatch('a\rb\r\nc\nb', {
+            oldString: 'b',
+            newString: 'B\nextra',
+            replaceAll: true,
+            expectedOccurrences: 2,
+        });
+
+        expect(patch.updated).toBe('a\rB\nextra\r\nc\nB\nextra');
+        expect(patch.firstMatchLine).toBe(2);
+        expect(patch.lastMatchLine).toBe(4);
+        expect(patch.lineDelta).toBe(2);
+        expect(patch.replacedOccurrences).toBe(2);
+    });
+
     it('rejeita replaceAll junto com occurrenceIndex', () => {
         expect(() =>
             computeTextPatch('same same', {

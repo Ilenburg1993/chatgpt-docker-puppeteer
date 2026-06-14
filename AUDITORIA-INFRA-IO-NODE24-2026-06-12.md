@@ -1395,6 +1395,19 @@ Provas confirmam que o caminho frio preserva o comportamento legado quando `cach
 Validação focada de IO-062: **92 passados, 0 falhas**; lint focado, `diff --check` e
 `typecheck:strict:src.copilot`: **PASS**.
 
+### 1.54 Status de implementação — semântica física de linhas aplicada ao patch em 2026-06-14
+
+IO-063 corrigiu metadata incorreta em arquivos CR-only/mistos: `countPatchLines` e `lineNumberAt` consideravam apenas
+LF, e o segundo criava `slice + split` para cada consulta. A primitiva compartilhada agora oferece contagem física e
+linha por offset sem substring, tratando LF, CRLF e CR isolado.
+
+O caminho de ocorrência específica usa diretamente o offset já encontrado, eliminando uma segunda varredura e
+concatenação incremental. Replace-all no patch canônico, patch-plan e MCP usa `String.prototype.replaceAll`, evitando
+o array intermediário de `split/join`.
+
+Validação focada de IO-063: **61 passados, 0 falhas**, incluindo fuzz, patch plan e MCP; lint focado,
+`diff --check` e `typecheck:strict:src.copilot`: **PASS**.
+
 ---
 
 ## 2. Evidência de leitura integral
@@ -1677,12 +1690,13 @@ A performance geral é madura. O maior ganho agora é reduzir I/O redundante, us
 | IO-060 | P1 | Index chunks | **Concluído:** contagem/chunking não materializam todas as linhas | iterador compartilhado, gerador bounded e inserção SQLite incremental | FTS ainda recebe o conteúdo integral exigido pela API atual | Avaliar FTS5 contentless/external-content apenas com benchmark e plano de migração |
 | IO-061 | P1 | Babel parser | **Concluído:** policy/extrator únicos usam opções atuais por extensão | CommonJS/module, TS dts/mts/tsx, ImportExpression, error codes e paridade worker | Proposals/Flow não são auto-habilitados; decorators continuam legacy | Monitorar Babel semver e criar fixture antes de alterar syntax policy |
 | IO-062 | P1 | Read-through | **Concluído:** snapshot textual L1 é reutilizado e Buffer duplicado é opt-out | métricas no relatório e prova de miss binário posterior | Reuso exige fingerprint rico; entradas legadas caem para snapshot físico | Propagar snapshots diretamente em novos callers, sem reconstruir conteúdo |
+| IO-063 | P1 | Patch lines | **Concluído:** metadata usa LF/CRLF/CR e ocorrência específica evita segunda varredura | regressão mista, fuzz e consumers de patch-plan | Diffs ainda normalizam por LF em módulo próprio | Auditar diff separadamente sem alterar formato público inadvertidamente |
 
 ### 5.1 Reclassificação dos achados originais no baseline atual
 
 | Estado | IDs |
 | --- | --- |
-| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062 |
+| Concluído | IO-003, IO-004, IO-007, IO-008, IO-010, IO-011, IO-012, IO-013, IO-014, IO-015, IO-016, IO-017, IO-019, IO-020, IO-021, IO-023, IO-024, IO-025, IO-026, IO-027, IO-029, IO-031, IO-032, IO-033, IO-034, IO-035, IO-036, IO-037, IO-039, IO-040, IO-041, IO-042, IO-043, IO-044, IO-045, IO-046, IO-047, IO-048, IO-050, IO-053, IO-054, IO-055, IO-056, IO-057, IO-058, IO-059, IO-060, IO-061, IO-062, IO-063 |
 | Concluído com limite documentado | IO-001, IO-002, IO-005, IO-006, IO-018, IO-022, IO-028, IO-038, IO-049, IO-051, IO-052 |
 | Parcial | IO-009 |
 | Aberto | IO-030 |
@@ -2205,6 +2219,7 @@ Maturidade operacional avançada:
 - [x] inserir chunks do índice a partir de gerador bounded;
 - [x] unificar policy/extrator Babel e alinhar source modes, TS e ImportExpression à documentação oficial;
 - [x] reutilizar snapshot textual L1 no read-through e evitar cache binário duplicado no caller textual;
+- [x] unificar linhas físicas no patch e remover segunda varredura/arrays do replace-all;
 - [ ] manter ampliação contínua do corpus quando incidentes ou novos contratos surgirem.
 
 ---

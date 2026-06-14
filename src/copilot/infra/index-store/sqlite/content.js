@@ -7,7 +7,7 @@
 
 import { extname } from 'node:path';
 import { sha256 as hashSha256 } from '../../shared/hash.js';
-import { iterateTextLines } from '../../shared/text-lines.js';
+import { countPhysicalTextLines, iterateTextLines } from '../../shared/text-lines.js';
 
 export const DEFAULT_INDEX_EXTENSIONS = Object.freeze([
     '.js',
@@ -51,10 +51,7 @@ export function sha256(content) {
  * @returns {number}
  */
 export function countLines(content) {
-    if (content.length === 0) return 0;
-    let count = 0;
-    for (const _line of iterateTextLines(content)) count += 1;
-    return count;
+    return content.length === 0 ? 0 : countPhysicalTextLines(content);
 }
 
 /**

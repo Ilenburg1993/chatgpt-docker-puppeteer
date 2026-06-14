@@ -106,7 +106,7 @@ function applyOperationToContent(content, operation) {
     }
     return {
         ok: true,
-        content: content.split(operation.oldString).join(operation.newString),
+        content: content.replaceAll(operation.oldString, operation.newString),
         occurrenceCount: count,
         changedOccurrences: count,
     };

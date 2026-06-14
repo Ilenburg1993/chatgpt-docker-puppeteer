@@ -15,6 +15,10 @@ import {
     sanitizeFtsQuery,
     shouldIndexFile,
 } from '../../../../src/copilot/infra/index-store/sqlite/index.js';
+import {
+    countPhysicalTextLines,
+    lineNumberAtTextOffset,
+} from '../../../../src/copilot/infra/shared/text-lines.js';
 
 describe('infra/index-store/sqlite', () => {
     it('normaliza paths, extensões e filtros de arquivo', () => {
@@ -34,6 +38,9 @@ describe('infra/index-store/sqlite', () => {
         expect(classifyContentKind('/tmp/data.unknown')).toBe('text');
         expect(countLines('a\nb\nc')).toBe(3);
         expect(countLines('a\rb\r\nc\n')).toBe(4);
+        expect(countPhysicalTextLines('')).toBe(1);
+        expect(lineNumberAtTextOffset('a\r\nb', 2)).toBe(1);
+        expect(lineNumberAtTextOffset('a\r\nb', 3)).toBe(2);
 
         const chunks = makeLineChunks('a\nb\nc\nd', 2);
         expect(chunks).toHaveLength(2);

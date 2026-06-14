@@ -6,6 +6,7 @@
  */
 
 import { utf8ByteLength } from '../../shared/buffer.js';
+import { countPhysicalTextLines, lineNumberAtTextOffset } from '../../shared/text-lines.js';
 
 /**
  * @typedef {{
@@ -37,17 +38,7 @@ function createPatchError(message, code, details = {}) {
  * @returns {number}
  */
 function countPatchLines(content) {
-    return content.length === 0 ? 1 : content.split('\n').length;
-}
-
-/**
- * @param {string} content
- * @param {number} offset
- * @returns {number}
- */
-function lineNumberAt(content, offset) {
-    if (offset <= 0) return 1;
-    return content.slice(0, offset).split('\n').length;
+    return countPhysicalTextLines(content);
 }
 
 /**
@@ -66,28 +57,6 @@ function findOccurrenceOffsets(content, needle) {
         index = found + needle.length;
     }
     return offsets;
-}
-
-/**
- * @param {string} content
- * @param {string} oldString
- * @param {string} newString
- * @param {number} occurrenceIndex One-based.
- * @returns {string}
- */
-function replaceOccurrenceAt(content, oldString, newString, occurrenceIndex) {
-    let seen = 0;
-    let cursor = 0;
-    let out = '';
-    while (cursor <= content.length) {
-        const found = content.indexOf(oldString, cursor);
-        if (found === -1) return `${out}${content.slice(cursor)}`;
-        seen += 1;
-        out += content.slice(cursor, found);
-        out += seen === occurrenceIndex ? newString : oldString;
-        cursor = found + oldString.length;
-    }
-    return out;
 }
 
 /**
@@ -171,16 +140,17 @@ export function computeTextPatch(content, options) {
             'ERR_PATCH_AMBIGUOUS_MATCH',
             {
                 occurrenceCount: occurrences,
-                firstMatchLine: lineNumberAt(content, offsets[0] ?? 0),
-                lastMatchLine: lineNumberAt(content, offsets[offsets.length - 1] ?? 0),
+                firstMatchLine: lineNumberAtTextOffset(content, offsets[0] ?? 0),
+                lastMatchLine: lineNumberAtTextOffset(content, offsets[offsets.length - 1] ?? 0),
             },
         );
     }
 
     const occurrenceIndex = options.occurrenceIndex ?? null;
+    const targetOffset = offsets[(occurrenceIndex ?? 1) - 1] ?? 0;
     const updated = options.replaceAll
-        ? content.split(options.oldString).join(options.newString)
-        : replaceOccurrenceAt(content, options.oldString, options.newString, occurrenceIndex ?? 1);
+        ? content.replaceAll(options.oldString, options.newString)
+        : `${content.slice(0, targetOffset)}${options.newString}${content.slice(targetOffset + options.oldString.length)}`;
     const previousBytes = utf8ByteLength(content, 'patch previous content');
     const bytesWritten = utf8ByteLength(updated, 'patch updated content');
     return {
@@ -192,8 +162,8 @@ export function computeTextPatch(content, options) {
         byteDelta: bytesWritten - previousBytes,
         oldStringBytes: utf8ByteLength(options.oldString, 'patch old_string'),
         newStringBytes: utf8ByteLength(options.newString, 'patch new_string'),
-        firstMatchLine: lineNumberAt(content, offsets[0] ?? 0),
-        lastMatchLine: lineNumberAt(content, offsets[offsets.length - 1] ?? 0),
+        firstMatchLine: lineNumberAtTextOffset(content, offsets[0] ?? 0),
+        lastMatchLine: lineNumberAtTextOffset(content, offsets[offsets.length - 1] ?? 0),
         lineDelta: countPatchLines(updated) - countPatchLines(content),
         occurrenceIndex,
         noop: updated === content,

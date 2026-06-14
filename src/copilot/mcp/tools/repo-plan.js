@@ -199,7 +199,7 @@ export const repoPlanTools = [
             }
             const plannedContent =
                 replace_all === true
-                    ? snapshot.content.split(old_string).join(new_string)
+                    ? snapshot.content.replaceAll(old_string, new_string)
                     : snapshot.content.replace(old_string, new_string);
             const diff = buildPlanDiffPreview(snapshot.content, plannedContent, {
                 contextLines: optionalInteger(diffContextLines) ?? DEFAULT_DIFF_CONTEXT_LINES,
