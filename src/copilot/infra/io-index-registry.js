@@ -10,6 +10,7 @@
 
 import { getCopilotDb } from '#copilot/db';
 import { resolve } from 'node:path';
+import { beginIoAdvisoryBudget } from './io-advisory-budget.js';
 import { registerInvalidationHook } from './io-cache.js';
 import { createIoIndexSqlite } from './io-index-sqlite.js';
 
@@ -100,9 +101,17 @@ export async function buildIoIndexForDirectory(directory, options = {}) {
         return /** @type {Awaited<ReturnType<typeof index.indexDirectory>>} */ (await inflight);
     }
 
-    const buildPromise = index.indexDirectory(directory, options).finally(() => {
-        if (mayCoalesce) _inflightIndexBuilds.delete(key);
+    const budget = beginIoAdvisoryBudget({
+        operation: 'index.build',
     });
+    const buildPromise = (async () => {
+        try {
+            return await index.indexDirectory(directory, options);
+        } finally {
+            budget.finish();
+            if (mayCoalesce) _inflightIndexBuilds.delete(key);
+        }
+    })();
 
     if (mayCoalesce) _inflightIndexBuilds.set(key, buildPromise);
     return await buildPromise;

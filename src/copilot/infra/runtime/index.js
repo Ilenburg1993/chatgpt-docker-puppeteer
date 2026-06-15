@@ -14,6 +14,7 @@ export {
     serializeIoRollbackToken,
     verifyIoRollbackToken,
 } from './rollback.js';
+export { executeIoRollbackToken } from './rollback-executor.js';
 export {
     abortIoChangeSet,
     appendIoChangeSetEntry,

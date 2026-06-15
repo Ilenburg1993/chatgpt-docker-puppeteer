@@ -16,3 +16,4 @@ export {
     pathFailureResult,
 } from './mutation-helpers.js';
 export { PATCH_FEEDBACK_FIX } from './patch-feedback.js';
+export { rollbackFileChangesTool, rollbackSidecarsStatusTool } from './rollback-tools.js';

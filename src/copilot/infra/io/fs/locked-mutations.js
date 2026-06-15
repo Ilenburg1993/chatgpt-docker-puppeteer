@@ -13,7 +13,7 @@ import { dirname } from 'node:path';
 import { acquireIoResourceLock, acquireIoResourceLocks } from '../../io-locks.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
-import { assertExpectedSha256 } from '../../policy/preconditions.js';
+import { assertExpectedSha256, assertExpectedSha256Digest } from '../../policy/preconditions.js';
 import { decodeUtf8Buffer, toOwnedBuffer, utf8ByteLength } from '../../shared/buffer.js';
 import { sha256 } from '../../shared/hash.js';
 import { invalidateIoCacheTiers, invalidateIoCacheTierSubtrees } from '../invalidation/cache-tiers.js';
@@ -171,6 +171,7 @@ async function discardRollbackSidecar(sidecar) {
  * Remove arquivo com lock por path.
  *
  * @param {string} filePath
+ * @param {{ expectedHash?: string }} [options]
  * @returns {Promise<{
  *     path: string;
  *     deleted: true;
@@ -183,7 +184,7 @@ async function discardRollbackSidecar(sidecar) {
  *     previousRollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
  * }>}
  */
-export async function deleteFileLocked(filePath) {
+export async function deleteFileLocked(filePath, options = {}) {
     assertValidIoFilePath(filePath);
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
@@ -197,6 +198,7 @@ export async function deleteFileLocked(filePath) {
             try {
                 return await lease.run(async () => {
                     const snapshot = await readMutationSnapshot(filePath, true);
+                    assertExpectedSha256Digest(snapshot.contentHash, options.expectedHash);
                     await deleteFileUnlocked(filePath);
                     return snapshot;
                 });
@@ -480,7 +482,7 @@ export async function copyFileLocked(source, destination, options = {}) {
  *
  * @param {string} source
  * @param {string} destination
- * @param {{ overwrite?: boolean; traceId?: string }} [options]
+ * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string }} [options]
  */
 export async function moveFileLocked(source, destination, options = {}) {
     assertValidIoFilePath(source);
@@ -512,6 +514,7 @@ export async function moveFileLocked(source, destination, options = {}) {
                         await assertDestinationWritable(destination, options.overwrite);
                     }
                     const sourceSnapshot = await readMutationSnapshot(source);
+                    assertExpectedSha256Digest(sourceSnapshot.contentHash, options.expectedSourceHash);
                     await mkdirPathUnlocked(dirname(destination), { recursive: true });
                     const moveResult = await moveFileUnlocked(source, destination, {
                         overwrite: Boolean(options.overwrite),

@@ -93,6 +93,8 @@ export async function failAndAuditMutation(operation, error, auditContext) {
  *     rollback?: {
  *         action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
  *         target: string;
+ *         source?: string | null;
+ *         destination?: string | null;
  *         previousHash?: string | null;
  *         contentHash?: string | null;
  *         bytes?: number | null;
@@ -105,6 +107,8 @@ export async function failAndAuditMutation(operation, error, auditContext) {
  *         rollback: {
  *             action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
  *             target: string;
+ *             source?: string | null;
+ *             destination?: string | null;
  *             previousHash?: string | null;
  *             contentHash?: string | null;
  *             bytes?: number | null;
@@ -123,8 +127,10 @@ export function buildMutationChangeSet(input) {
      *     action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
      *     targets: string[];
      *     rollback: {
-     *         action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
-     *         target: string;
+ *         action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
+ *         target: string;
+ *         source?: string | null;
+ *         destination?: string | null;
      *         previousHash?: string | null;
      *         contentHash?: string | null;
      *         bytes?: number | null;

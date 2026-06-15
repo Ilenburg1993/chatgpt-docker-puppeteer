@@ -115,6 +115,8 @@ const deleteFileTool = requireTool('delete_file');
 const copyFileTool = requireTool('copy_file');
 const moveFileTool = requireTool('move_file');
 const patchFileTool = requireTool('patch_file');
+const rollbackFileChangesTool = requireTool('rollback_file_changes');
+const rollbackSidecarsStatusTool = requireTool('rollback_sidecars_status');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -196,6 +198,12 @@ describe('F35 — write_file_content (F181-F182)', () => {
             status: 'applied',
         });
         expect(result.bytesWritten).toBe(5);
+        expect(result.changeSet?.rollback?.steps?.[0]).toMatchObject({
+            action: 'write',
+            previousHash: 'mock-sha256',
+            contentHash: 'mock-sha256',
+            snapshotBase64: expect.any(String),
+        });
         expect(fsMock.writeFile).toHaveBeenCalledOnce();
         expect(fsMock.rename).toHaveBeenCalledOnce();
     });
@@ -307,6 +315,11 @@ describe('F35 — create_file (F184)', () => {
         });
 
         expect(result.success).toBe(true);
+        expect(result.changeSet?.rollback?.steps?.[0]).toMatchObject({
+            action: 'delete',
+            previousHash: null,
+            contentHash: 'mock-sha256',
+        });
         expect(result.bytesWritten).toBe(11);
         expect(fsMock.mkdir).toHaveBeenCalledWith(expect.any(String), { recursive: true });
     });
@@ -340,6 +353,10 @@ describe('F35 — create_file (F184)', () => {
         });
 
         expect(result.success).toBe(true);
+        expect(result.changeSet?.rollback?.steps?.[0]).toMatchObject({
+            action: 'write',
+            snapshotBase64: expect.any(String),
+        });
     });
 
     it('cria diretórios intermediários quando createParentDirs=true', async () => {
@@ -590,6 +607,7 @@ describe('F35 — copy_file (F186)', () => {
         expect(result.operation).toMatchObject({ capability: 'file.copy', status: 'applied' });
         expect(result.changeSet?.rollback?.stepCount).toBeGreaterThanOrEqual(1);
         expect(result.changeSet?.rollback?.steps?.[0]?.action).toBe('write');
+        expect(result.changeSet?.rollback?.steps?.[0]?.contentHash).toBe('mock-sha256');
     });
 
     it('falha se source path inválido', async () => {
@@ -656,6 +674,17 @@ describe('F35 — move_file (F186)', () => {
         expect(result.sourceHash).toBe('mock-sha256');
         expect(result.operation).toMatchObject({ capability: 'file.move', status: 'applied' });
         expect(result.changeSet?.rollback?.stepCount).toBe(2);
+        expect(result.changeSet?.rollback?.steps?.[0]).toMatchObject({
+            action: 'move',
+            source: '/workspace/b.txt',
+            destination: '/workspace/a.txt',
+            contentHash: 'mock-sha256',
+        });
+        expect(result.changeSet?.rollback?.steps?.[1]).toMatchObject({
+            action: 'write',
+            target: '/workspace/b.txt',
+            contentHash: null,
+        });
     });
 
     it('move EXDEV publica via temp verificado antes de remover origem', async () => {
@@ -961,8 +990,8 @@ describe('F35 — patch_file (F187)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F35 — fileWriteTools export shape (F188)', () => {
-    it('exporta array com 7 tools', () => {
-        expect(fileWriteTools).toHaveLength(7);
+    it('exporta array com 9 tools', () => {
+        expect(fileWriteTools).toHaveLength(9);
     });
 
     it('cada tool tem name, description, handler', () => {
@@ -985,6 +1014,8 @@ describe('F35 — fileWriteTools export shape (F188)', () => {
         expect(copyFileTool.name).toBe('copy_file');
         expect(moveFileTool.name).toBe('move_file');
         expect(patchFileTool.name).toBe('patch_file');
+        expect(rollbackFileChangesTool.name).toBe('rollback_file_changes');
+        expect(rollbackSidecarsStatusTool.name).toBe('rollback_sidecars_status');
     });
 
     it('descriptions não prometem aprovação manual', () => {

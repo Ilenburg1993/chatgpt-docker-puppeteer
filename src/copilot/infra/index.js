@@ -25,6 +25,11 @@ export { getIoL2Cache, getIoL2CacheHealth, getIoL2CacheStats, resetIoL2CacheForT
 
 export { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 export {
+    beginIoAdvisoryBudget,
+    getIoAdvisoryBudgetStats,
+    resetIoAdvisoryBudgetForTest,
+} from './io-advisory-budget.js';
+export {
     buildIoIndexForDirectory,
     findIoIndexSymbol,
     getIoIndex,

@@ -1235,13 +1235,13 @@ não bug.
 | ID     | Status                              | Validação atual                                                                                                                              |
 | ------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | GAP-1  | **remediado**                       | O index-store possui migrations sequenciais próprias, versão atual 2, execução transacional e integração pela migration global 15.          |
-| GAP-2  | **confirmado com pré-requisito**    | Não há executor de rollback; alguns tokens atuais também não carregam snapshot suficiente para restauração completa.                         |
+| GAP-2  | **remediado**                       | Tokens v3 carregam precondições/snapshots completos; executor faz dry-run ou apply sob locks, e a tool exige confirmação e registra auditoria. |
 | GAP-3  | **confirmado**                      | `invalidateScopePath` é público em infra, mas não existe tool local correspondente.                                                          |
 | GAP-4  | **confirmado**                      | Evicção LRU de scope não produz evento nem retorno observável ao consumidor.                                                                 |
-| GAP-5  | **oportunidade**                    | Falta orçamento/throttle comum para tools mutáveis e builds; deve ser advisory por default para não quebrar automação legítima.              |
+| GAP-5  | **remediado como advisory**         | Budget rolante comum mede operações, bytes estimados e concorrência em mutações workspace-bound e builds, com evento/health sem bloquear I/O. |
 | GAP-6  | **parcial**                         | `workspace_parse_file` opera com `WORKSPACE_ROOT` canônico e path validado; multi-workspace requer mudança sistêmica, não parâmetro isolado. |
 | GAP-7  | **remediado**                       | Cada linha FTS referencia um chunk persistido; resultados incluem `chunkIndex`, `startLine` e `endLine`, inclusive após backfill legado.     |
-| GAP-8  | **confirmado com restrição**        | Falta superfície operacional segura para listar/verificar sidecars; leitura crua deve respeitar path policy e redaction.                     |
+| GAP-8  | **remediado com restrição segura**  | Tool lista metadados e verifica conteúdo internamente; leitura valida diretório, nome, expiração, tamanho, hash e não segue symlink.           |
 | UPG-1  | **adiado**                          | Migração para `node:sqlite` tem blast radius alto e não deve ser misturada com correções funcionais.                                         |
 | UPG-2  | **oportunidade**                    | `import.meta.dirname` pode simplificar `module-map.js`; `new URL()` para worker continua claro e correto.                                    |
 | UPG-3  | **adiado**                          | `fs.promises.glob` não é substituição semântica direta para o contrato atual de minimatch.                                                   |
@@ -1300,6 +1300,24 @@ P2-8, P2-9, P3-7, P3-8, P3-14, GAP-3, GAP-4. UPG-6 foi rejeitado por evidência 
 
 **Itens remediados nesta faixa:** P1-1, GAP-1 e GAP-7.
 
+### 9.8 Evidências de implementação — Faixa 4
+
+- [x] Todas as mutações `write/create/patch/delete/copy/move` foram confrontadas com seus tokens e estados anterior/posterior.
+- [x] Token v3 mantém compatibilidade de leitura com v1/v2 e inclui `source`/`destination` para moves executáveis.
+- [x] Snapshots binários são capturados dentro do lock; payloads grandes permanecem em sidecar durável verificado.
+- [x] Executor faz preflight integral sob locks L0/L1 antes de aplicar e bloqueia hash, ausência ou move legado divergentes.
+- [x] Aplicação retorna resultado por etapa, distingue falha parcial e invalida os tiers de cache após cada mutação.
+- [x] Tool `rollback_file_changes` usa dry-run por padrão, exige `confirm=true` no apply, revalida paths e grava auditoria.
+- [x] Tool `rollback_sidecars_status` não expõe path absoluto nem conteúdo e pode verificar hash/tamanho sob demanda.
+- [x] Budget advisory rolante cobre mutações da capability workspace e builds reais de índice, sem cobrar builds coalescidos.
+- [x] Pressão por operações, bytes ou concorrência é publicada em `copilot.io.budget` e projetada no health snapshot.
+- [x] Casos de snapshot inline, arquivo vazio, sidecar, delete, move com overwrite e stale hash têm cobertura direta.
+- [x] Testes focalizados finais: `74/74` passaram.
+- [x] `npm run typecheck:strict:src.copilot` e ESLint focalizado passaram.
+
+**Itens remediados nesta faixa:** GAP-2, GAP-5 e GAP-8. A implementação também corrigiu tokens incompletos de
+`write_file_content`, overwrite em `create_file`/`copy_file` e a ordem de restauração de `move_file`.
+
 ## 10. Roadmap sistêmico de implementação
 
 ### Fase 0 — Evidência e baseline
@@ -1347,11 +1365,11 @@ P2-8, P2-9, P3-7, P3-8, P3-14, GAP-3, GAP-4. UPG-6 foi rejeitado por evidência 
 
 ### Fase 4 — Rollback operacional e governança de tools
 
-- [ ] Auditar completude dos rollback tokens para cada write/patch/delete/copy/move.
-- [ ] Implementar executor dry-run de rollback com verificação de hash/precondições.
-- [ ] Implementar aplicação explícita de rollback com auditoria e resultado por etapa.
-- [ ] Adicionar listagem/verificação segura de sidecars sem expor conteúdo sensível.
-- [ ] Criar orçamento/throttle advisory comum para writes, patches e builds de índice.
+- [x] Auditar completude dos rollback tokens para cada write/patch/delete/copy/move.
+- [x] Implementar executor dry-run de rollback com verificação de hash/precondições.
+- [x] Implementar aplicação explícita de rollback com auditoria e resultado por etapa.
+- [x] Adicionar listagem/verificação segura de sidecars sem expor conteúdo sensível.
+- [x] Criar orçamento advisory comum para writes, patches e builds de índice.
 
 ### Fase 5 — Modernizações Node 24 guiadas por gates
 

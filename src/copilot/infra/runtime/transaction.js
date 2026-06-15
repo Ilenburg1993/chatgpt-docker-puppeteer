@@ -33,6 +33,8 @@ function clonePayload(value) {
  * @typedef {object} IoRollbackHint
  * @property {IoChangeAction} action
  * @property {string} target
+ * @property {string | null} [source]
+ * @property {string | null} [destination]
  * @property {string | null} [previousHash]
  * @property {string | null} [contentHash]
  * @property {number | null} [bytes]

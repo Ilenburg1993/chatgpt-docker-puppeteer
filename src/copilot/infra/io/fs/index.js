@@ -30,7 +30,9 @@ export {
     createRollbackSidecarWriter,
     getRollbackSidecarDirectory,
     getRollbackSidecarTtlMs,
+    listRollbackSidecars,
     persistRollbackSidecar,
+    readVerifiedRollbackSidecar,
 } from './rollback-sidecar.js';
 export { readBinaryMutationSnapshot } from './snapshot.js';
 export { statPathSnapshot } from './stat.js';

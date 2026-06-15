@@ -10,6 +10,7 @@
 
 import { evaluateIoPathPolicyAsync } from '#copilot/core';
 import path from 'node:path';
+import { beginIoAdvisoryBudget } from '../io-advisory-budget.js';
 import {
     appendTextLocked,
     copyFileLocked,
@@ -36,6 +37,24 @@ import { scanDirectory } from '../io-scanner.js';
  * @typedef {'append' | 'copy' | 'delete' | 'mkdir' | 'move' | 'patch' | 'read' | 'scan' | 'search' | 'stat' | 'write'} WorkspaceIoMode
  * @typedef {{ workspaceRoot: string; blockedSegments?: readonly string[] }} WorkspaceIoContext
  */
+
+const MUTABLE_MODES = new Set(['append', 'copy', 'delete', 'mkdir', 'move', 'patch', 'write']);
+
+/**
+ * @param {unknown[]} args
+ * @returns {number}
+ */
+function estimateMutationBytes(args) {
+    const value = args[0];
+    if (typeof value === 'string') return Buffer.byteLength(value);
+    if (ArrayBuffer.isView(value)) return value.byteLength;
+    if (value instanceof ArrayBuffer) return value.byteLength;
+    if (value && typeof value === 'object' && 'newString' in value) {
+        const replacement = /** @type {{ newString?: unknown }} */ (value).newString;
+        if (typeof replacement === 'string') return Buffer.byteLength(replacement);
+    }
+    return 0;
+}
 
 /**
  * @param {string} filePath
@@ -68,7 +87,19 @@ async function resolveWorkspacePath(filePath, mode, context) {
  * @returns {(filePath: string, ...args: Args) => Promise<Result>}
  */
 function bindWorkspacePathOperation(operation, mode, context) {
-    return async (filePath, ...args) => operation(await resolveWorkspacePath(filePath, mode, context), ...args);
+    return async (filePath, ...args) => {
+        const resolvedPath = await resolveWorkspacePath(filePath, mode, context);
+        if (!MUTABLE_MODES.has(mode)) return operation(resolvedPath, ...args);
+        const budget = beginIoAdvisoryBudget({
+            operation: `workspace.${mode}`,
+            estimatedBytes: estimateMutationBytes(args),
+        });
+        try {
+            return await operation(resolvedPath, ...args);
+        } finally {
+            budget.finish();
+        }
+    };
 }
 
 /**
@@ -86,12 +117,17 @@ function bindWorkspaceRemovePathOperation(operation, context) {
             error.code = 'ERECURSIVEWORKSPACEROOT';
             throw error;
         }
-        return operation(resolvedPath, {
-            ...options,
-            ...(options.recursive && options.recursiveConfirmation === filePath
-                ? { recursiveConfirmation: resolvedPath }
-                : {}),
-        });
+        const budget = beginIoAdvisoryBudget({ operation: 'workspace.delete' });
+        try {
+            return await operation(resolvedPath, {
+                ...options,
+                ...(options.recursive && options.recursiveConfirmation === filePath
+                    ? { recursiveConfirmation: resolvedPath }
+                    : {}),
+            });
+        } finally {
+            budget.finish();
+        }
     };
 }
 
@@ -110,7 +146,17 @@ function bindWorkspacePathPairOperation(operation, sourceMode, destinationMode, 
             resolveWorkspacePath(source, sourceMode, context),
             resolveWorkspacePath(destination, destinationMode, context),
         ]);
-        return operation(resolvedSource, resolvedDestination, ...args);
+        const mutable = MUTABLE_MODES.has(sourceMode) || MUTABLE_MODES.has(destinationMode);
+        if (!mutable) return operation(resolvedSource, resolvedDestination, ...args);
+        const budget = beginIoAdvisoryBudget({
+            operation: `workspace.${sourceMode}-${destinationMode}`,
+            estimatedBytes: estimateMutationBytes(args),
+        });
+        try {
+            return await operation(resolvedSource, resolvedDestination, ...args);
+        } finally {
+            budget.finish();
+        }
     };
 }
 

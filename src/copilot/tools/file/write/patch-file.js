@@ -330,7 +330,7 @@ export const patchFileTool = buildTool({
                             target: v.resolved,
                             previousHash: patchResult.previousHash,
                             contentHash: patchResult.contentHash,
-                            bytes: patchResult.projectedBytes,
+                            bytes: patchResult.previousBytes,
                             snapshotBase64: patchResult.previousSnapshotBase64,
                             snapshotSidecar: patchResult.previousRollbackSidecar,
                         },

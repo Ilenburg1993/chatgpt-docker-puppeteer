@@ -27,6 +27,8 @@ import {
     mutationFailureResult,
     patchFileTool,
     pathFailureResult,
+    rollbackFileChangesTool,
+    rollbackSidecarsStatusTool,
 } from './write/index.js';
 import { dryRunPatchPlan, normalizePatchPlan } from './write/patch-plan.js';
 
@@ -134,6 +136,7 @@ const writeFileContentTool = buildTool({
             }
             const writeResult = await writeFileAtomic(resolved, buf, {
                 requireExists: true,
+                captureRollback: true,
                 ...(expectedHash ? { expectedHash } : {}),
                 riskClass: IO_RISK.high,
                 advisoryLimits: {
@@ -173,7 +176,9 @@ const writeFileContentTool = buildTool({
                             target: resolved,
                             previousHash: writeResult.previousHash,
                             contentHash: writeResult.contentHash,
-                            bytes: buf.length,
+                            bytes: writeResult.previousBytes,
+                            snapshotBase64: writeResult.previousSnapshotBase64,
+                            snapshotSidecar: writeResult.previousRollbackSidecar,
                         },
                         evidence: { tool: 'write_file_content' },
                     }),
@@ -273,6 +278,7 @@ const createFileTool = buildTool({
             const writeResult = await createOrReplaceFileAtomic(resolved, payload, {
                 createParentDirs,
                 failIfExists: !overwrite,
+                captureRollback: overwrite,
                 riskClass,
                 advisoryLimits: {
                     advisoryWriteContentBytes: ADVISORY_WRITE_CONTENT_BYTES,
@@ -299,13 +305,23 @@ const createFileTool = buildTool({
                         traceId: writeResult.io.traceId ?? null,
                         action: 'write',
                         targets: [resolved],
-                        rollback: {
-                            action: 'delete',
-                            target: resolved,
-                            previousHash: writeResult.previousHash,
-                            contentHash: writeResult.contentHash,
-                            bytes: writeResult.bytesWritten,
-                        },
+                        rollback: writeResult.previousHash
+                            ? {
+                                  action: 'write',
+                                  target: resolved,
+                                  previousHash: writeResult.previousHash,
+                                  contentHash: writeResult.contentHash,
+                                  bytes: writeResult.previousBytes,
+                                  snapshotBase64: writeResult.previousSnapshotBase64,
+                                  snapshotSidecar: writeResult.previousRollbackSidecar,
+                              }
+                            : {
+                                  action: 'delete',
+                                  target: resolved,
+                                  previousHash: null,
+                                  contentHash: writeResult.contentHash,
+                                  bytes: writeResult.bytesWritten,
+                              },
                         evidence: { tool: 'create_file', overwrite },
                     }),
                 },
@@ -529,6 +545,7 @@ const copyFileTool = buildTool({
                                               action: 'write',
                                               target: dst.resolved,
                                               previousHash: copyResult.destinationPreviousHash,
+                                              contentHash: copyResult.destinationHash,
                                               bytes: copyResult.destinationPreviousBytes,
                                               snapshotBase64: copyResult.destinationPreviousSnapshotBase64,
                                               snapshotSidecar: copyResult.destinationPreviousRollbackSidecar,
@@ -536,7 +553,8 @@ const copyFileTool = buildTool({
                                         : {
                                               action: 'delete',
                                               target: dst.resolved,
-                                              previousHash: copyResult.destinationPreviousHash ?? copyResult.sourceHash,
+                                              previousHash: null,
+                                              contentHash: copyResult.destinationHash,
                                               bytes: copyResult.bytesWritten,
                                           },
                                 evidence: {
@@ -659,17 +677,6 @@ const moveFileTool = buildTool({
                         riskClass,
                         traceId: moveResult.io.traceId ?? null,
                         entries: [
-                            {
-                                action: 'move',
-                                targets: [src.resolved, dst.resolved],
-                                rollback: {
-                                    action: 'move',
-                                    target: src.resolved,
-                                    previousHash: moveResult.sourceHash,
-                                    bytes: moveResult.sourceBytes,
-                                },
-                                evidence: { tool: 'move_file', overwrite },
-                            },
                             ...(overwrite &&
                             (moveResult.destinationPreviousSnapshotBase64 ||
                                 moveResult.destinationPreviousRollbackSidecar)
@@ -681,6 +688,7 @@ const moveFileTool = buildTool({
                                               action: /** @type {'write'} */ ('write'),
                                               target: dst.resolved,
                                               previousHash: moveResult.destinationPreviousHash,
+                                              contentHash: null,
                                               bytes: moveResult.destinationPreviousBytes,
                                               snapshotBase64: moveResult.destinationPreviousSnapshotBase64,
                                               snapshotSidecar: moveResult.destinationPreviousRollbackSidecar,
@@ -696,6 +704,20 @@ const moveFileTool = buildTool({
                                       },
                                   ]
                                 : []),
+                            {
+                                action: 'move',
+                                targets: [src.resolved, dst.resolved],
+                                rollback: {
+                                    action: 'move',
+                                    target: src.resolved,
+                                    source: dst.resolved,
+                                    destination: src.resolved,
+                                    previousHash: moveResult.sourceHash,
+                                    contentHash: moveResult.destinationHash ?? moveResult.sourceHash,
+                                    bytes: moveResult.sourceBytes,
+                                },
+                                evidence: { tool: 'move_file', overwrite },
+                            },
                         ],
                         evidence: { tool: 'move_file', overwrite },
                     }),
@@ -719,7 +741,16 @@ const moveFileTool = buildTool({
 // Exports
 // ---------------------------------------------------------------------------
 
-export { copyFileTool, createFileTool, deleteFileTool, moveFileTool, patchFileTool, writeFileContentTool };
+export {
+    copyFileTool,
+    createFileTool,
+    deleteFileTool,
+    moveFileTool,
+    patchFileTool,
+    rollbackFileChangesTool,
+    rollbackSidecarsStatusTool,
+    writeFileContentTool,
+};
 
 /**
  * Tools de escrita do filesystem.
@@ -734,4 +765,6 @@ export const fileWriteTools = [
     copyFileTool,
     moveFileTool,
     patchFileTool,
+    rollbackFileChangesTool,
+    rollbackSidecarsStatusTool,
 ];

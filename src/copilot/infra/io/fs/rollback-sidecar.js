@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { acquireIoResourceLock } from '../../io-locks.js';
@@ -179,6 +180,113 @@ export async function persistRollbackSidecar(content, options = {}) {
         await writer.abort();
         throw error;
     }
+}
+
+/**
+ * Lê e valida um sidecar sem seguir symlinks nem aceitar paths fora do diretório configurado.
+ *
+ * @param {IoRollbackSidecar} descriptor
+ * @param {{ directory?: string; nowMs?: number; allowExpired?: boolean }} [options]
+ * @returns {Promise<Buffer>}
+ */
+export async function readVerifiedRollbackSidecar(descriptor, options = {}) {
+    const directory = path.resolve(options.directory ?? getRollbackSidecarDirectory());
+    const candidate = path.resolve(String(descriptor?.path ?? ''));
+    if (path.dirname(candidate) !== directory) {
+        const error = new Error('Sidecar de rollback fora do diretório permitido.');
+        /** @type {{ code?: string }} */ (error).code = 'EROLLBACKSIDECARPATH';
+        throw error;
+    }
+    const match = SIDECAR_FILE_PATTERN.exec(path.basename(candidate));
+    if (
+        !match ||
+        Number(match[1]) !== descriptor.expiresAtMs ||
+        match[2] !== descriptor.contentHash ||
+        descriptor.version !== 1
+    ) {
+        const error = new Error('Descriptor de sidecar não corresponde ao nome persistido.');
+        /** @type {{ code?: string }} */ (error).code = 'EROLLBACKSIDECARDESCRIPTOR';
+        throw error;
+    }
+    if (!options.allowExpired && descriptor.expiresAtMs <= Math.trunc(options.nowMs ?? Date.now())) {
+        const error = new Error('Sidecar de rollback expirado.');
+        /** @type {{ code?: string }} */ (error).code = 'EROLLBACKSIDECAR_EXPIRED';
+        throw error;
+    }
+
+    const handle = await fs.open(candidate, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+    try {
+        const stats = await handle.stat();
+        if (!stats.isFile() || stats.size !== descriptor.bytes) {
+            const error = new Error('Tamanho ou tipo do sidecar de rollback diverge do descriptor.');
+            /** @type {{ code?: string }} */ (error).code = 'EROLLBACKSIDECARSIZE';
+            throw error;
+        }
+        const payload = await handle.readFile();
+        if (sha256(payload) !== descriptor.contentHash) {
+            const error = new Error('Hash do sidecar de rollback diverge do descriptor.');
+            /** @type {{ code?: string }} */ (error).code = 'EROLLBACKSIDECARHASH';
+            throw error;
+        }
+        return payload;
+    } finally {
+        await handle.close();
+    }
+}
+
+/**
+ * Lista apenas metadados derivados de nomes válidos; nunca retorna conteúdo nem path absoluto.
+ *
+ * @param {{ directory?: string; nowMs?: number; maxEntries?: number; verifyContent?: boolean }} [options]
+ */
+export async function listRollbackSidecars(options = {}) {
+    const directory = path.resolve(options.directory ?? getRollbackSidecarDirectory());
+    const nowMs = Math.trunc(options.nowMs ?? Date.now());
+    const maxEntries = positiveIntegerOr(options.maxEntries, 100);
+    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+    const candidates = (await fs.readdir(directory, { withFileTypes: true }))
+        .filter((entry) => entry.isFile() && SIDECAR_FILE_PATTERN.test(entry.name))
+        .sort((left, right) => left.name.localeCompare(right.name));
+    const entries = candidates.slice(0, maxEntries);
+    const sidecars = [];
+    for (const entry of entries) {
+        const match = SIDECAR_FILE_PATTERN.exec(entry.name);
+        if (!match) continue;
+        const candidate = path.join(directory, entry.name);
+        const stats = await fs.lstat(candidate);
+        const descriptor = {
+            version: /** @type {const} */ (1),
+            path: candidate,
+            contentHash: String(match[2]),
+            bytes: stats.size,
+            createdAtMs: Math.trunc(stats.birthtimeMs || stats.ctimeMs),
+            expiresAtMs: Number(match[1]),
+        };
+        let contentVerified = null;
+        if (options.verifyContent) {
+            contentVerified = await readVerifiedRollbackSidecar(descriptor, {
+                directory,
+                nowMs,
+                allowExpired: true,
+            })
+                .then(() => true)
+                .catch(() => false);
+        }
+        sidecars.push({
+            id: entry.name,
+            contentHash: descriptor.contentHash,
+            bytes: descriptor.bytes,
+            createdAtMs: descriptor.createdAtMs,
+            expiresAtMs: descriptor.expiresAtMs,
+            expired: descriptor.expiresAtMs <= nowMs,
+            contentVerified,
+        });
+    }
+    return {
+        count: sidecars.length,
+        limited: candidates.length > entries.length,
+        sidecars,
+    };
 }
 
 /**

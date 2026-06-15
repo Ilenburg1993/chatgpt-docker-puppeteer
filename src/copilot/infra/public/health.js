@@ -6,3 +6,4 @@
  */
 
 export { readIoRuntimeHealthSnapshot } from '../io-health.js';
+export { getIoAdvisoryBudgetStats } from '../io-advisory-budget.js';

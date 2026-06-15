@@ -49,6 +49,8 @@ export {
     fileWriteTools,
     moveFileTool,
     patchFileTool,
+    rollbackFileChangesTool,
+    rollbackSidecarsStatusTool,
     writeFileContentTool,
 } from './write-tools.js';
 
@@ -69,4 +71,3 @@ export {
 } from './shared.js';
 
 export { fileTools } from './file-tools.js';
-

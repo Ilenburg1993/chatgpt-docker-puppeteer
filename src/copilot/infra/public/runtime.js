@@ -15,6 +15,7 @@ export {
     completeIoOperationEnvelope,
     createIoOperationEnvelope,
     createIoRollbackToken,
+    executeIoRollbackToken,
     failIoChangeSet,
     failIoOperationEnvelope,
     getIoMutationAuditLogPath,
@@ -22,5 +23,6 @@ export {
     recordIoMutationAudit,
     rollbackIoChangeSet,
     serializeIoRollbackToken,
-    verifyIoRollbackToken
+    verifyIoRollbackToken,
 } from '../runtime/index.js';
+export { listRollbackSidecars } from '../io/fs/rollback-sidecar.js';

@@ -18,8 +18,10 @@ const ioIndexChannel = channel('copilot.io.index');
 const ioLockChannel = channel('copilot.io.lock');
 const ioScopeChannel = channel('copilot.io.scope');
 const ioScanChannel = channel('copilot.io.scan');
+const ioBudgetChannel = channel('copilot.io.budget');
 
 const lifecycleChannels = {
+    budget: ioBudgetChannel,
     cache: ioCacheChannel,
     index: ioIndexChannel,
     lock: ioLockChannel,
@@ -202,7 +204,7 @@ export function getIoDurabilityStats() {
 /**
  * Publica eventos de lifecycle mais granulares sem acoplar `infra/` a collectors específicos.
  *
- * @param {'cache' | 'index' | 'lock' | 'scope' | 'scan'} domain
+ * @param {'budget' | 'cache' | 'index' | 'lock' | 'scope' | 'scan'} domain
  * @param {string} phase
  * @param {Record<string, unknown>} payload
  * @returns {void}

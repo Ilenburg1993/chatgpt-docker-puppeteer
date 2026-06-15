@@ -112,7 +112,7 @@ describe('infra/runtime/transaction + rollback', () => {
         expect(plan[1]?.action).toBe('write');
 
         const token = createIoRollbackToken(applied);
-        expect(token.version).toBe(2);
+        expect(token.version).toBe(3);
         expect(token.stepCount).toBe(2);
         expect(verifyIoRollbackToken(token)).toBe(true);
 

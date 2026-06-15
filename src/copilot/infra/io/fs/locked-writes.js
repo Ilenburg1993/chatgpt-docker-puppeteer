@@ -13,12 +13,15 @@ import { dirname } from 'node:path';
 import { acquireIoResourceLock, withIoResourceLock } from '../../io-locks.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
-import { assertExpectedSha256 } from '../../policy/preconditions.js';
+import { assertExpectedSha256Digest } from '../../policy/preconditions.js';
 import { sha256 } from '../../shared/hash.js';
 import { invalidateIoCacheTiers } from '../invalidation/cache-tiers.js';
 import { appendFileUnlocked } from './append.js';
 import { mkdirPathUnlocked } from './mkdir.js';
+import { readBinaryMutationSnapshot } from './snapshot.js';
 import { normalizeWritePayload, writeAtomicFileUnlocked } from './write-atomic.js';
+
+const ROLLBACK_SNAPSHOT_MAX_BYTES = 256 * 1024;
 
 /**
  * @param {number} startedAt
@@ -70,6 +73,7 @@ function normalizeCreateExclusiveError(filePath, error) {
  *     signal?: AbortSignal;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     advisoryLimits?: Record<string, unknown>;
+ *     captureRollback?: boolean;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -77,6 +81,10 @@ function normalizeCreateExclusiveError(filePath, error) {
  *     io: import('#copilot/core/io-contracts').IoMeta;
  *     lockWaitMs: number;
  *     previousHash: string | null;
+ *     previousBytes: number | null;
+ *     previousSnapshotBase64: string | null;
+ *     previousSnapshotTruncated: boolean;
+ *     previousRollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
  *     contentHash: string;
  *     durability: Awaited<ReturnType<typeof writeAtomicFileUnlocked>>;
  * }>}
@@ -88,6 +96,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
     const { payload, bytes } = normalizeWritePayload(filePath, content, options.encoding ?? 'utf8');
     const contentHash = sha256(payload);
     const riskClass = options.riskClass ?? 'medium';
+    const rollbackCleanup = { path: /** @type {string | null} */ (null) };
     try {
         const lease = await acquireIoResourceLock(filePath, {
             ...(options.lockTimeoutMs === undefined ? {} : { timeoutMs: options.lockTimeoutMs }),
@@ -99,8 +108,6 @@ export async function writeFileAtomic(filePath, content, options = {}) {
         const value = await (async () => {
             try {
                 return await lease.run(async () => {
-                    /** @type {string | null} */
-                    let previousHash = null;
                     if (options.requireExists) {
                         try {
                             await fs.access(filePath);
@@ -123,22 +130,52 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                         }
                     }
 
-                    if (options.expectedHash) {
-                        previousHash = assertExpectedSha256(await fs.readFile(filePath), options.expectedHash);
+                    let previousSnapshot = /** @type {Awaited<ReturnType<typeof readBinaryMutationSnapshot>> | null} */ (
+                        null
+                    );
+                    if (options.captureRollback || options.expectedHash) {
+                        try {
+                            previousSnapshot = await readBinaryMutationSnapshot(filePath, {
+                                snapshotMaxBytes: options.captureRollback ? ROLLBACK_SNAPSHOT_MAX_BYTES : 0,
+                                rollbackSidecar: Boolean(options.captureRollback),
+                            });
+                            rollbackCleanup.path = previousSnapshot.rollbackSidecar?.path ?? null;
+                        } catch (error) {
+                            const code = /** @type {{ code?: unknown }} */ (error)?.code;
+                            if (options.requireExists || options.expectedHash || (code !== 'ENOENT' && code !== 'ENOTDIR')) {
+                                throw error;
+                            }
+                        }
                     }
+                    assertExpectedSha256Digest(previousSnapshot?.contentHash ?? '', options.expectedHash);
 
                     const durability = await writeAtomicFileUnlocked(filePath, payload, {
                         ...(options.mode === undefined ? {} : { mode: options.mode }),
                         exclusive: Boolean(options.failIfExists),
-                        ...(options.expectedHash === undefined ? {} : { expectedHash: options.expectedHash }),
+                        ...(previousSnapshot?.contentHash
+                            ? { expectedHash: previousSnapshot.contentHash }
+                            : options.expectedHash === undefined
+                              ? {}
+                              : { expectedHash: options.expectedHash }),
                         ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
                     });
-                    return { path: filePath, bytesWritten: bytes, previousHash, contentHash, durability };
+                    return {
+                        path: filePath,
+                        bytesWritten: bytes,
+                        previousHash: previousSnapshot?.contentHash ?? null,
+                        previousBytes: previousSnapshot?.bytesRead ?? null,
+                        previousSnapshotBase64: previousSnapshot?.snapshotBase64 ?? null,
+                        previousSnapshotTruncated: previousSnapshot?.snapshotTruncated ?? false,
+                        previousRollbackSidecar: previousSnapshot?.rollbackSidecar ?? null,
+                        contentHash,
+                        durability,
+                    };
                 });
             } finally {
                 await lease.releaseAsync();
             }
         })();
+        rollbackCleanup.path = null;
         const waitMs = lease.waitMs;
         invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
@@ -163,6 +200,9 @@ export async function writeFileAtomic(filePath, content, options = {}) {
         );
         return { ...value, lockWaitMs: waitMs, io };
     } catch (error) {
+        if (rollbackCleanup.path) {
+            await fs.unlink(rollbackCleanup.path).catch(() => undefined);
+        }
         const finalError = options.failIfExists ? normalizeCreateExclusiveError(filePath, error) : error;
         publishAndReturn(
             buildIoMeta({

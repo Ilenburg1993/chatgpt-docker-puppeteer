@@ -10,6 +10,7 @@
 import { getIoL2CacheStats } from './io-cache-l2-registry.js';
 import { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 import { getIoCacheStats } from './io-cache.js';
+import { getIoAdvisoryBudgetStats } from './io-advisory-budget.js';
 import { getIoIndexStats } from './io-index-registry.js';
 import { getIoLockStats } from './io-locks.js';
 import { getIoDurabilityStats, getIoLatencyStats } from './io-observability.js';
@@ -79,6 +80,7 @@ function readParserHealthStats() {
  *     index: ReturnType<typeof getIoIndexStats>;
  *     latency: ReturnType<typeof getIoLatencyStats>;
  *     durability: ReturnType<typeof getIoDurabilityStats>;
+ *     advisoryBudget: ReturnType<typeof getIoAdvisoryBudgetStats>;
  *     locks: ReturnType<typeof getIoLockStats>;
  *     alerts: { code: string; severity: string; message: string }[];
  *     scopes: {
@@ -150,6 +152,7 @@ export function readIoRuntimeHealthSnapshot() {
         lastFailure: null,
     });
     const locks = getIoLockStats();
+    const advisoryBudget = getIoAdvisoryBudgetStats();
     const alerts = [];
     const scopeStatusCounts = {
         ready: allScopeStats.filter((scope) => scope.status === 'ready').length,
@@ -206,6 +209,13 @@ export function readIoRuntimeHealthSnapshot() {
             message: 'COPILOT_IO_FILE_LOCKS_ENABLED possui um perfil inválido; ativações automáticas estão desabilitadas.',
         });
     }
+    if (advisoryBudget.pressure) {
+        alerts.push({
+            code: 'IO_ADVISORY_BUDGET_PRESSURE',
+            severity: 'medium',
+            message: `Pressão advisory de I/O observada: ${advisoryBudget.reasons.join(', ')}.`,
+        });
+    }
 
     return {
         generatedAt: Date.now(),
@@ -248,6 +258,7 @@ export function readIoRuntimeHealthSnapshot() {
         parser: readParserHealthStats(),
         latency: safeCall(getIoLatencyStats, {}),
         durability,
+        advisoryBudget,
         locks,
         alerts,
         scopes: {
