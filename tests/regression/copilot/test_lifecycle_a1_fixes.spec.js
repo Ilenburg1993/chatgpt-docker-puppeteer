@@ -119,7 +119,8 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
             });
 
             const config = mockResumeSession.mock.calls[0][1];
-            expect(config.disableResume).toBe(true);
+            expect(config.suppressResumeEvent).toBe(true);
+            expect(config.disableResume).toBeUndefined();
         });
 
         it('mcpServers e customAgents são passados corretamente em create', async () => {
@@ -322,7 +323,7 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
                 'utf-8',
             );
             expect(src).toContain('attachAgentSdkBootLifecycleBridge');
-            expect(src).toContain("from '../../facades/index.js'");
+            expect(src).toContain("from '../../facades/sdk-access.js'");
             expect(src).not.toContain("from '#copilot/sdk'");
         });
 
@@ -344,30 +345,30 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
 
     describe('A3: novos campos SessionConfig passados ao SDK', () => {
         const newFields = [
-            'availableTools',
-            'excludedTools',
-            'configDir',
-            'onEvent',
-            'agent',
-            'skillDirectories',
-            'disabledSkills',
+            ['availableTools', 'availableTools'],
+            ['excludedTools', 'excludedTools'],
+            ['configDir', 'configDirectory'],
+            ['onEvent', 'onEvent'],
+            ['agent', 'agent'],
+            ['skillDirectories', 'skillDirectories'],
+            ['disabledSkills', 'disabledSkills'],
         ];
 
-        for (const field of newFields) {
-            it(`campo '${field}' é passado ao SDK quando fornecido`, async () => {
+        for (const [inputField, sdkField] of newFields) {
+            it(`campo '${inputField}' é passado ao SDK como '${sdkField}' quando fornecido`, async () => {
                 const client = fakeClient();
-                const testValue = field === 'onEvent' ? vi.fn() : `test-${field}`;
+                const testValue = inputField === 'onEvent' ? vi.fn() : `test-${inputField}`;
                 await createSession(client, {
                     model: 'gpt-4.1',
                     onPermissionRequest: mockApproveAll,
-                    [field]: testValue,
+                    [inputField]: testValue,
                 });
 
                 const config = mockCreateSession.mock.calls[0][0];
-                expect(config[field]).toBe(testValue);
+                expect(config[sdkField]).toBe(testValue);
             });
 
-            it(`campo '${field}' ausente NÃO aparece na config`, async () => {
+            it(`campo SDK '${sdkField}' ausente NÃO aparece na config`, async () => {
                 const client = fakeClient();
                 await createSession(client, {
                     model: 'gpt-4.1',
@@ -375,7 +376,7 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
                 });
 
                 const config = mockCreateSession.mock.calls[0][0];
-                expect(config[field]).toBeUndefined();
+                expect(config[sdkField]).toBeUndefined();
             });
         }
     });

@@ -1144,26 +1144,22 @@ Isso reduz o tempo de startup de ferramentas CLI que hoje carregam toda a cadeia
 
 ## 8. Checklist de Remediação Rápida
 
-Itens que podem ser implementados em menos de 30 minutos cada, sem risco de regressão significativa:
-
-| #   | Arquivo                                | Ação                                                                                      | Prioridade |
-| --- | -------------------------------------- | ----------------------------------------------------------------------------------------- | ---------- |
-| 1   | `io-cache.js`                          | Substituir `Number(env)` por `readEnvPositiveInt` em 4 constantes                         | **P0**     |
-| 2   | `io-cache-l2-sqlite.js`                | Adicionar `.unref?.()` no `setBatchTimer`                                                 | **P0**     |
-| 3   | `io/fs/read-chunks.js`                 | Implementar LRU (delete+set) no `byteLineIndexCache`                                      | **P1**     |
-| 4   | `io-parser.js` + `io-parser-worker.js` | Extrair `extractSymbolsFromAst` para `parse/js-ast-extractor.js`                          | **P1**     |
-| 5   | `io/fs/locked-mutations.js`            | Pular `writeAtomicFileUnlocked` quando `patch.noop === true`                              | **P1**     |
-| 6   | `tools/file/index-tools.js`            | Adicionar `workspaceRoot` ao `workspace_index_build`                                      | **P1**     |
-| 7   | `io-index-registry.js`                 | Armazenar e expor unregister do hook no `resetIoIndexForTest`                             | **P2**     |
-| 8   | `io/search/subprocess.js`              | Adicionar `setTimeout(SIGKILL, 3000).unref()` após SIGTERM                                | **P2**     |
-| 9   | `io-cache.js`                          | Adicionar purge periódico: `setInterval(() => _lru.purgeStale(), DEFAULT_TTL_MS).unref()` | **P2**     |
-| 10  | `tools/file/write-tools.js`            | Adicionar `expectedSourceHash` ao schema de `copy_file`                                   | **P2**     |
-| 11  | `io/patch/text-patch.js`               | Adicionar early exit em `findOccurrenceOffsets` quando `expectedOccurrences` atingido     | **P3**     |
-| 12  | `module-map.js`                        | Remover fallback `countBy` / usar `Object.groupBy` diretamente                            | **P3**     |
-| 13  | `runtime/transaction.js`               | Remover fallback JSON do `structuredClone`                                                | **P3**     |
-| 14  | `io/fs/read-chunks.js`                 | Remover cast `(Array)` de `Array.fromAsync` e guard de `ReadableStream.from`              | **P3**     |
-| 15  | `io-parser.js`                         | Remover `buildFileContextCacheKey` e usar apenas `hash` sem `content.length`              | **P3**     |
-| 16  | `module-map.js`                        | Substituir `fileURLToPath(import.meta.url) + dirname()` por `import.meta.dirname`         | **UPG**    |
+- [x] `io-cache.js`: substituir parsing inseguro das envs por helpers validados.
+- [x] `io-cache-l2-sqlite.js`: tornar o timer de batch não bloqueante com `unref`.
+- [x] `io/fs/read-chunks.js`: promover hits no cache de linhas para LRU real.
+- [x] Parser/worker: usar extração Babel pura compartilhada em `parse/babel-symbols.js`.
+- [x] `io/fs/locked-mutations.js`: não escrever nem invalidar em patch no-op.
+- [x] `tools/file/index-tools.js`: fixar `workspaceRoot` canônico no build.
+- [x] `io-index-registry.js`: desmontar o hook no reset.
+- [x] `io/search/subprocess.js`: escalar `SIGTERM` para `SIGKILL` com timer limpo.
+- [x] `io-cache.js`: rejeitar purge timer adicional; `max`/`maxSize` já limitam memória e evitam timer global extra.
+- [x] `tools/file/write-tools.js`: expor e honrar `expectedSourceHash`.
+- [x] `io/patch/text-patch.js`: encerrar cedo quando a divergência de `expectedOccurrences` já está provada.
+- [x] `module-map.js`: usar `Object.groupBy` diretamente.
+- [x] `runtime/transaction.js`: usar `structuredClone` diretamente.
+- [x] `io/fs/read-chunks.js`: remover guards/fallbacks; manter bridges locais exigidas por `lib: ES2024`.
+- [x] `io-parser.js`: preservar tamanho na chave por valor diagnóstico barato; proposta rejeitada como não defeito.
+- [x] `module-map.js`: usar `import.meta.dirname`.
 
 ---
 
@@ -1184,16 +1180,16 @@ não bug.
 
 | ID   | Status           | Validação atual                                                                                                                                                                                     |
 | ---- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0-1 | **confirmado**   | As cinco configs L1 ainda usam `Number(env)` sem fallback para `NaN`/valores fora do domínio. Severidade real: P1 de configuração/availability, pois `LRUCache` pode falhar cedo em alguns valores. |
-| P0-2 | **parcial**      | Falta `unref`, mas o timer tem janela curta e não causa hang indefinido. É hardening de lifecycle, não P0.                                                                                          |
-| P0-3 | **confirmado**   | Falha de recriação seta `_workerPoolDisabledByError` permanentemente até reset explícito. A solução deve também impedir restarts concorrentes do mesmo slot.                                        |
+| P0-1 | **remediado**    | Configs L1 usam helpers inteiros validados, incluindo o domínio especial `-1/0/>0` do stale probe.                                                                                                  |
+| P0-2 | **remediado**    | Timer de batch L2 usa `unref`, preservando flush sem manter CLI viva.                                                                                                                               |
+| P0-3 | **remediado**    | Restart do worker é serializado, limitado, usa backoff não bloqueante e recupera o pool após falhas transitórias.                                                                                   |
 | P1-1 | **remediado**    | A FTS não armazena mais `file_path`; `rowid` referencia chunks e filtros de árvore usam range B-tree em `idx_io_index_chunks_file`, confirmado por `EXPLAIN QUERY PLAN`.                           |
 | P1-2 | **já corrigido** | `warmReadThroughContext` já passa `{ snapshot: text }` para `parseAndCacheSymbols`, evitando a segunda leitura.                                                                                     |
 | P1-3 | **já corrigido** | Extração Babel já está centralizada em `parse/babel-symbols.js`, usada pelo worker e pelo main thread.                                                                                              |
-| P1-4 | **confirmado**   | `workspace_index_build` ainda omite `workspaceRoot`; o índice usa o diretório indexado como raiz relativa.                                                                                          |
+| P1-4 | **remediado**    | Tool passa a raiz canônica do workspace ao build; caminhos relativos permanecem consistentes ao indexar subdiretórios.                                                                              |
 | P1-5 | **já corrigido** | Hit válido já executa `delete + set`, promovendo a entrada no `Map` antes da evicção.                                                                                                               |
-| P1-6 | **confirmado**   | `patchTextLocked` ainda chama `writeAtomicFileUnlocked` quando `patch.noop === true`.                                                                                                               |
-| P1-7 | **confirmado**   | `pruneMissingRows` executa cinco deletes por arquivo fora de uma transação agregadora.                                                                                                              |
+| P1-6 | **remediado**    | Patch no-op não grava, não altera `mtime` e não invalida caches/índice.                                                                                                                              |
+| P1-7 | **remediado**    | Poda de ausentes executa em uma transação agregadora.                                                                                                                                               |
 
 ### 9.2 P2
 
@@ -1201,13 +1197,13 @@ não bug.
 | ----- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P2-1  | **rejeitado como race** | JavaScript executa o trecho síncrono sem interleaving; preservar a versão mais nova da mesma chave é o contrato correto de cache best-effort. Métricas de falha já existem. |
 | P2-2  | **remediado**           | O signal do warm agora alcança scan, snapshots, prefetch, parse, fila/worker e build do índice; aborts deixam de ser convertidos em falhas parciais.                         |
-| P2-3  | **confirmado ampliado** | Falta escalada para `SIGKILL` tanto no stop antecipado do streaming quanto nos caminhos timeout/abort/maxBuffer.                                                            |
+| P2-3  | **remediado**           | Stop antecipado, timeout, abort e limite de buffer compartilham escalada `SIGTERM → SIGKILL` com cleanup do timer.                                          |
 | P2-4  | **rejeitado**           | Entradas stale permanecem alocadas até acesso/evicção, mas o cache já é estritamente limitado por `max` e `maxSize`; não há crescimento sem bounds.                         |
-| P2-5  | **confirmado**          | A camada baixa aceita `expectedSourceHash`, mas `copy_file` não expõe a precondição.                                                                                        |
-| P2-6  | **confirmado**          | `create_file` ainda força UTF-8 e não cria binário atomicamente em uma única chamada.                                                                                       |
+| P2-5  | **remediado**           | `copy_file` expõe `expectedSourceHash` e a camada locked o propaga até a cópia física.                                                                                      |
+| P2-6  | **remediado**           | `create_file` aceita UTF-8/base64 e cria binário atomicamente em uma chamada.                                                                                               |
 | P2-7  | **remediado**           | `statfs` usa cache LRU curto por diretório/função, TTL configurável e bypass por `0`; falhas não permanecem cacheadas.                                                     |
-| P2-8  | **confirmado**          | `io-index-registry` descarta o unregister e `resetIoIndexForTest` não desmonta/recria o hook.                                                                               |
-| P2-9  | **confirmado**          | Refreshs concorrentes do mesmo escopo/path duplicam invalidação, leitura e parse. O guard deve ser por `sessionId + path`, não global por path.                             |
+| P2-8  | **remediado**           | Registry mantém o unregister e o reset desmonta/recria o hook de forma determinística.                                                                                     |
+| P2-9  | **remediado**           | Refresh concorrente é deduplicado por `sessionId + path`, sem bloquear o mesmo path em escopos diferentes.                                                                  |
 | P2-10 | **remediado**           | Overload/falha do worker faz fallback main-thread somente até `IO_PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES` (128 KiB por padrão); acima do teto mantém backpressure.            |
 | P2-11 | **rejeitado**           | O lock do diretório coordena `mkdir` com mutações concorrentes do mesmo recurso; removê-lo reduz garantias por ganho não demonstrado.                                       |
 | P2-12 | **já corrigido**        | O planner atual permite read-through também para stream e retorna relatório explícito de execução/skip.                                                                     |
@@ -1222,14 +1218,14 @@ não bug.
 | P3-4  | **remediado com bridge de tipos** | Guard/fallback foi removido; `lib: ES2024` ainda não declara `Array.fromAsync`, portanto resta apenas um cast localizado via `unknown`.     |
 | P3-5  | **remediado com bridge de tipos** | Guard/fallback foi removido; os tipos DOM ES2024 ainda não declaram `ReadableStream.from`, exigindo bridge localizada.                      |
 | P3-6  | **remediado**                   | Contrato `-1/0/>0` possui parser validado e agora está documentado na referência humana de `infra`.                                         |
-| P3-7  | **confirmado**                  | `sizes` cresce com paths rotativos/dinâmicos durante toda a vida do writer. Precisa limite ou limpeza por path inativo.                     |
-| P3-8  | **confirmado**                  | O fallback de health replica manualmente a shape extensa do parser e tende a drift.                                                         |
+| P3-7  | **remediado**                   | Estado de tamanho do JSONL possui limite e evicção determinística.                                                                          |
+| P3-8  | **remediado**                   | Health retorna fallback mínimo `{ error }`, evitando duplicar a shape extensa do parser.                                                     |
 | P3-9  | **remediado**                   | Leases acima de `IO_LOCK_ACTIVE_LEASE_WARN_MS` geram evento `copilot.io.lock/lease.stale`, métrica e alerta de health, sem evicção insegura. |
-| P3-10 | **parcial**                     | Há uma policy async por entry. Otimização exige preservar checks de symlink/realpath e deve ser guiada por benchmark.                       |
+| P3-10 | **oportunidade adiada**         | Cada entry precisa preservar realpath/symlink policy; cache por prefixo reduziria segurança sem benchmark causal que justifique outro desenho. |
 | P3-11 | **rejeitado**                   | Não existe leak: a entrada só é criada após aquisição bem-sucedida e erros não-`ETIMEDOUT` devem propagar.                                  |
 | P3-12 | **já mitigado**                 | `getStats()` força flush antes de contar; excesso temporário é limitado pela janela/batch e corrigido no flush.                             |
 | P3-13 | **remediado no caso seguro**    | Com `expectedOccurrences`, a busca encerra em `expected + 1` e reporta contagem mínima; casos que precisam total exato continuam completos. |
-| P3-14 | **confirmado**                  | O gzip não possui listener próprio de erro/cleanup e o lifetime timer não é `unref`.                                                        |
+| P3-14 | **remediado**                   | Gzip possui cleanup próprio em erro e o timer de lifetime usa `unref`.                                                                       |
 
 ### 9.4 Gaps e upgrades
 
@@ -1237,10 +1233,10 @@ não bug.
 | ------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | GAP-1  | **remediado**                       | O index-store possui migrations sequenciais próprias, versão atual 2, execução transacional e integração pela migration global 15.          |
 | GAP-2  | **remediado**                       | Tokens v3 carregam precondições/snapshots completos; executor faz dry-run ou apply sob locks, e a tool exige confirmação e registra auditoria. |
-| GAP-3  | **confirmado**                      | `invalidateScopePath` é público em infra, mas não existe tool local correspondente.                                                          |
-| GAP-4  | **confirmado**                      | Evicção LRU de scope não produz evento nem retorno observável ao consumidor.                                                                 |
+| GAP-3  | **remediado**                       | Tool local `workspace_scope_invalidate_path` expõe invalidação sem forçar parse imediato.                                                    |
+| GAP-4  | **remediado**                       | Evicção LRU de scope publica evento lifecycle observável.                                                                                    |
 | GAP-5  | **remediado como advisory**         | Budget rolante comum mede operações, bytes estimados e concorrência em mutações workspace-bound e builds, com evento/health sem bloquear I/O. |
-| GAP-6  | **parcial**                         | `workspace_parse_file` opera com `WORKSPACE_ROOT` canônico e path validado; multi-workspace requer mudança sistêmica, não parâmetro isolado. |
+| GAP-6  | **rejeitado como ajuste isolado**   | As tools usam `WORKSPACE_ROOT` canônico e policy validada; multi-workspace exige capability/contexto próprios, não um parâmetro solto.        |
 | GAP-7  | **remediado**                       | Cada linha FTS referencia um chunk persistido; resultados incluem `chunkIndex`, `startLine` e `endLine`, inclusive após backfill legado.     |
 | GAP-8  | **remediado com restrição segura**  | Tool lista metadados e verifica conteúdo internamente; leitura valida diretório, nome, expiração, tamanho, hash e não segue symlink.           |
 | UPG-1  | **adiado**                          | Migração para `node:sqlite` tem blast radius alto e não deve ser misturada com correções funcionais.                                         |
@@ -1263,7 +1259,7 @@ não bug.
 - [x] ESLint focado passou em todos os arquivos alterados da faixa.
 - [x] `npm run lint:copilot` passou para `src/copilot` e `tests/unit/copilot`.
 - [x] `git diff --check` passou sem whitespace errors.
-- [ ] `npm run typecheck:strict:tests.unit` não é baseline verde: falha em centenas de fixtures e scripts
+- [x] `npm run typecheck:strict:tests.unit` foi executado e não é baseline verde: falha em centenas de fixtures e scripts
       preexistentes fora desta faixa; os erros não foram usados para mascarar o gate estrito de produção.
 - [x] UPG-6 foi revalidado diretamente no runtime: `Worker.prototype.hasRef` e `worker.hasRef` são `undefined`.
 - [x] P2-5 revelou e corrigiu um gap adicional: `copyFileLocked` descartava a precondição recebida pela tool.
@@ -1339,6 +1335,24 @@ P2-8, P2-9, P3-7, P3-8, P3-14, GAP-3, GAP-4. UPG-6 foi rejeitado por evidência 
 **Itens remediados nesta faixa:** P2-7, P3-2, P3-3, P3-4, P3-5, P3-6, P3-13, UPG-2 e UPG-5.
 UPG-4 foi rejeitado no estado atual por ausência de composição real; UPG-8 permanece rejeitado como solução geral.
 
+### 9.10 Evidências de implementação — Faixa 6
+
+- [x] Suíte unitária completa de `infra` + `tools/file`: `57` arquivos, `534/534` testes passaram.
+- [x] O gate amplo revelou um teste antigo que esperava abort silencioso; o contrato foi atualizado para exigir
+      `AbortError`, preservando o cancelamento propagado implementado na Faixa 2.
+- [x] Primeira execução máxima encontrou quatro expectativas obsoletas: contagem das write tools e três aliases/imports
+      anteriores ao SDK 1.0; todas foram revalidadas contra o código e atualizadas.
+- [x] Regressões focalizadas após o ajuste: `89/89` passaram.
+- [x] `npm run test:copilot`: `6.799` testes, `6.766` passados, `33` pendentes, `0` falhas, `0` warnings.
+- [x] `npm run lint:copilot` passou; os três testes ajustados depois também passaram no ESLint focalizado.
+- [x] `npm run typecheck:strict:src.copilot` passou.
+- [x] Arquitetura global strict: `hard=0`, `soft=0`, `info=149`.
+- [x] Madge em `src/copilot/infra` + `src/copilot/tools/file`: `0` ciclos.
+- [x] Boundary SDK: imports de `@github/copilot-sdk` permanecem restritos a `src/copilot/sdk/`.
+- [x] `git diff --check` passou.
+- [x] O gate `typecheck:strict:tests.unit` permanece fora do baseline verde por fixtures/scripts preexistentes já
+      documentados na Faixa 1; produção e suíte máxima de runtime estão verdes.
+
 ## 10. Roadmap sistêmico de implementação
 
 ### Fase 0 — Evidência e baseline
@@ -1405,7 +1419,7 @@ UPG-4 foi rejeitado no estado atual por ausência de composição real; UPG-8 pe
 - [x] Rodar testes unitários diretamente associados após cada subfase.
 - [x] Rodar `typecheck:strict:src.copilot`.
 - [x] Rodar lint escopado nos arquivos alterados e, depois, `lint:copilot`.
-- [ ] Rodar suíte unitária de `infra` e `tools/file`.
-- [ ] Rodar suíte máxima de `src/copilot` compatível com o ambiente.
+- [x] Rodar suíte unitária de `infra` e `tools/file`.
+- [x] Rodar suíte máxima de `src/copilot` compatível com o ambiente.
 - [x] Revisitar esta matriz após a primeira faixa e marcar apenas itens comprovadamente concluídos.
 - [x] Criar commits coesos, fazer push e continuar pelas fases seguintes.

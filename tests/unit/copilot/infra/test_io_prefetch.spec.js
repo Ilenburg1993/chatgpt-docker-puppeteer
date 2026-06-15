@@ -78,9 +78,10 @@ describe('warmCacheForPaths', () => {
     it('respeita AbortSignal', async () => {
         const ctrl = new AbortController();
         ctrl.abort();
-        const result = await warmCacheForPaths([path.join(tmpDir, 'a.js')], { signal: ctrl.signal });
-        // Com sinal abortado imediatamente, não deve processar
-        assert.ok(result.preloaded === 0 || result.skipped > 0);
+        await assert.rejects(
+            () => warmCacheForPaths([path.join(tmpDir, 'a.js')], { signal: ctrl.signal }),
+            (error) => error instanceof Error && error.name === 'AbortError',
+        );
     });
 
     it('aquece texto mesmo quando bytes já estavam quentes', async () => {

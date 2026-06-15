@@ -91,9 +91,9 @@ describe('fileTools — exportações do módulo', () => {
         assert.ok(fileReadTools.length >= 3);
     });
 
-    it('fileWriteTools é um Array com 7 elementos', () => {
+    it('fileWriteTools é um Array com 9 elementos', () => {
         assert.ok(Array.isArray(fileWriteTools));
-        assert.equal(fileWriteTools.length, 7);
+        assert.equal(fileWriteTools.length, 9);
     });
 
     it('fileTools = fileReadTools + indexTools + scopeTools + fileWriteTools', () => {
@@ -116,7 +116,7 @@ describe('fileTools — exportações do módulo', () => {
         assert.ok(names.includes('search_in_files'));
     });
 
-    it('fileWriteTools inclui write_file_content, create_file, delete_file, copy_file, move_file, patch_file', () => {
+    it('fileWriteTools inclui mutações e operações de rollback', () => {
         const names = fileWriteTools.map((t) => /** @type {any} */ (t).name);
         assert.ok(names.includes('write_file_content'));
         assert.ok(names.includes('create_file'));
@@ -124,6 +124,8 @@ describe('fileTools — exportações do módulo', () => {
         assert.ok(names.includes('copy_file'));
         assert.ok(names.includes('move_file'));
         assert.ok(names.includes('patch_file'));
+        assert.ok(names.includes('rollback_file_changes'));
+        assert.ok(names.includes('rollback_sidecars_status'));
     });
 
     it('allTools em index.js inclui todas as fileTools', () => {
