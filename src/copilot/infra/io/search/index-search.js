@@ -63,7 +63,13 @@ export function filterIndexRowsByGlob(rows, includePattern, excludePattern) {
  * Formata linhas do índice FTS5 para string de saída legível. Highlights FTS5 `[match]` são convertidos para
  * `**match**` (markdown bold).
  *
- * @param {{ filePath: string; relativePath: string; snippet: string }[]} rows
+ * @param {{
+ *     filePath: string;
+ *     relativePath: string;
+ *     snippet: string;
+ *     startLine?: number;
+ *     endLine?: number;
+ * }[]} rows
  * @returns {string}
  */
 export function formatIndexSearchRows(rows) {
@@ -73,7 +79,12 @@ export function formatIndexSearchRows(rows) {
                 .replace(/\[([^\]]*)\]/gu, '**$1**')
                 .replace(/\s+/gu, ' ')
                 .trim();
-            return `${row.relativePath || row.filePath}: ${snippet}`;
+            const path = row.relativePath || row.filePath;
+            const startLine = Number(row.startLine ?? 0);
+            const endLine = Number(row.endLine ?? startLine);
+            const location =
+                startLine > 0 ? `${path}:${startLine}${endLine > startLine ? `-${endLine}` : ''}` : path;
+            return `${location}: ${snippet}`;
         })
         .join('\n');
 }

@@ -25,6 +25,27 @@ export function normalizeRelativePath(workspaceRoot, filePath) {
 }
 
 /**
+ * Constrói limites lexicográficos para selecionar um path exato e seus descendentes usando índice B-tree.
+ *
+ * @param {string} normalizedPath
+ * @returns {{ exact: string; descendantStart: string; descendantEnd: string }}
+ */
+export function buildIndexPathTreeRange(normalizedPath) {
+    const exact = normalizeIndexPath(normalizedPath);
+    const descendantStart = exact.endsWith('/') ? exact : `${exact}/`;
+    const lastIndex = descendantStart.length - 1;
+    const nextCodePoint = descendantStart.codePointAt(lastIndex);
+    if (nextCodePoint === undefined) {
+        throw new TypeError('normalizedPath must not be empty');
+    }
+    return {
+        exact,
+        descendantStart,
+        descendantEnd: `${descendantStart.slice(0, lastIndex)}${String.fromCodePoint(nextCodePoint + 1)}`,
+    };
+}
+
+/**
  * @param {import('../../io-scanner.js').IoScanEntry[]} entries
  * @returns {import('../../io-scanner.js').IoScanEntry[]}
  */

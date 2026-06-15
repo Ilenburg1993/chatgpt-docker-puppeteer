@@ -1186,7 +1186,7 @@ não bug.
 | P0-1 | **confirmado**   | As cinco configs L1 ainda usam `Number(env)` sem fallback para `NaN`/valores fora do domínio. Severidade real: P1 de configuração/availability, pois `LRUCache` pode falhar cedo em alguns valores. |
 | P0-2 | **parcial**      | Falta `unref`, mas o timer tem janela curta e não causa hang indefinido. É hardening de lifecycle, não P0.                                                                                          |
 | P0-3 | **confirmado**   | Falha de recriação seta `_workerPoolDisabledByError` permanentemente até reset explícito. A solução deve também impedir restarts concorrentes do mesmo slot.                                        |
-| P1-1 | **confirmado**   | Filtro de path em coluna FTS5 `UNINDEXED` exige scan. A sugestão de subquery sobre a própria FTS não elimina o scan; requer mapping/index auxiliar ou redesign por chunks.                          |
+| P1-1 | **remediado**    | A FTS não armazena mais `file_path`; `rowid` referencia chunks e filtros de árvore usam range B-tree em `idx_io_index_chunks_file`, confirmado por `EXPLAIN QUERY PLAN`.                           |
 | P1-2 | **já corrigido** | `warmReadThroughContext` já passa `{ snapshot: text }` para `parseAndCacheSymbols`, evitando a segunda leitura.                                                                                     |
 | P1-3 | **já corrigido** | Extração Babel já está centralizada em `parse/babel-symbols.js`, usada pelo worker e pelo main thread.                                                                                              |
 | P1-4 | **confirmado**   | `workspace_index_build` ainda omite `workspaceRoot`; o índice usa o diretório indexado como raiz relativa.                                                                                          |
@@ -1234,13 +1234,13 @@ não bug.
 
 | ID     | Status                              | Validação atual                                                                                                                              |
 | ------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| GAP-1  | **confirmado**                      | Migrações do índice continuam ad hoc por `PRAGMA table_info`; precisa versionamento antes de mudança estrutural da FTS.                      |
+| GAP-1  | **remediado**                       | O index-store possui migrations sequenciais próprias, versão atual 2, execução transacional e integração pela migration global 15.          |
 | GAP-2  | **confirmado com pré-requisito**    | Não há executor de rollback; alguns tokens atuais também não carregam snapshot suficiente para restauração completa.                         |
 | GAP-3  | **confirmado**                      | `invalidateScopePath` é público em infra, mas não existe tool local correspondente.                                                          |
 | GAP-4  | **confirmado**                      | Evicção LRU de scope não produz evento nem retorno observável ao consumidor.                                                                 |
 | GAP-5  | **oportunidade**                    | Falta orçamento/throttle comum para tools mutáveis e builds; deve ser advisory por default para não quebrar automação legítima.              |
 | GAP-6  | **parcial**                         | `workspace_parse_file` opera com `WORKSPACE_ROOT` canônico e path validado; multi-workspace requer mudança sistêmica, não parâmetro isolado. |
-| GAP-7  | **confirmado**                      | FTS indexa arquivo completo; chunks persistidos não alimentam busca localizada. Exige migração versionada.                                   |
+| GAP-7  | **remediado**                       | Cada linha FTS referencia um chunk persistido; resultados incluem `chunkIndex`, `startLine` e `endLine`, inclusive após backfill legado.     |
 | GAP-8  | **confirmado com restrição**        | Falta superfície operacional segura para listar/verificar sidecars; leitura crua deve respeitar path policy e redaction.                     |
 | UPG-1  | **adiado**                          | Migração para `node:sqlite` tem blast radius alto e não deve ser misturada com correções funcionais.                                         |
 | UPG-2  | **oportunidade**                    | `import.meta.dirname` pode simplificar `module-map.js`; `new URL()` para worker continua claro e correto.                                    |
@@ -1284,6 +1284,22 @@ P2-8, P2-9, P3-7, P3-8, P3-14, GAP-3, GAP-4. UPG-6 foi rejeitado por evidência 
 
 **Itens remediados nesta faixa:** P2-2, P2-10 e P3-9.
 
+### 9.7 Evidências de implementação — Faixa 3
+
+- [x] Subschema do índice versionado em `copilot_io_index_schema_migrations`, com versão atual 2.
+- [x] Migration global 15 aciona a mesma implementação canônica usada por bancos in-memory e callers diretos.
+- [x] Banco legado com FTS por arquivo é backfillado para chunks antes da recriação da FTS.
+- [x] Falha induzida ao registrar a versão 2 reverte `ALTER`, backfill e recriação da FTS integralmente.
+- [x] FTS usa `rowid = chunk.id`; busca retorna `chunkIndex`, `startLine` e `endLine`.
+- [x] Filtro scoped usa range lexicográfico e `idx_io_index_chunks_file`; `EXPLAIN QUERY PLAN` não faz scan dos chunks.
+- [x] Workload reproduzível adicionado em `npm run analyze:io:index-workload`.
+- [x] Amostra de 300 arquivos no Node 24.15.0: build `260,568 ms`, busca scoped média `2,154 ms`,
+      invalidate `0,953 ms`, prune de 50 arquivos `74,482 ms`.
+- [x] Testes focados de índice, tools, banco e io-engine: `124/124` passaram.
+- [x] `npm run typecheck:strict:src.copilot`, ESLint focado e `git diff --check` passaram.
+
+**Itens remediados nesta faixa:** P1-1, GAP-1 e GAP-7.
+
 ## 10. Roadmap sistêmico de implementação
 
 ### Fase 0 — Evidência e baseline
@@ -1323,11 +1339,11 @@ P2-8, P2-9, P3-7, P3-8, P3-14, GAP-3, GAP-4. UPG-6 foi rejeitado por evidência 
 
 ### Fase 3 — Índice, schema e busca localizada
 
-- [ ] Introduzir versionamento transacional de schema para estruturas de I/O.
-- [ ] Projetar mapping indexado de path para linhas FTS sem scan de coluna `UNINDEXED`.
-- [ ] Migrar FTS para resultados por chunk com `startLine`/`endLine`.
-- [ ] Preservar compatibilidade de bancos existentes e rollback de migration.
-- [ ] Adicionar benchmarks de invalidate/search/prune em workspaces grandes.
+- [x] Introduzir versionamento transacional de schema para estruturas de I/O.
+- [x] Projetar mapping indexado de path para linhas FTS sem scan de coluna `UNINDEXED`.
+- [x] Migrar FTS para resultados por chunk com `startLine`/`endLine`.
+- [x] Preservar compatibilidade de bancos existentes e rollback de migration.
+- [x] Adicionar workload parametrizável de invalidate/search/prune para workspaces grandes.
 
 ### Fase 4 — Rollback operacional e governança de tools
 

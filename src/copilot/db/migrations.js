@@ -21,6 +21,7 @@
  */
 
 import { MODEL_GATEWAY_SQLITE_SCHEMA_SQL } from '../model-gateway/catalog/sqlite-schema.js';
+import { ensureIoIndexSchema } from '../infra/index-store/sqlite/schema.js';
 
 /**
  * @typedef {Object} CopilotMigration
@@ -383,6 +384,11 @@ const COPILOT_MIGRATIONS = [
             CREATE INDEX IF NOT EXISTS idx_mcp_http_events_expires
                 ON copilot_mcp_http_events(expires_at_ms);
         `,
+    },
+    {
+        version: 15,
+        name: 'migrate_io_index_fts_to_chunks',
+        upFn: ensureIoIndexSchema,
     },
 ];
 

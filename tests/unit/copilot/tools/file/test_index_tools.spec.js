@@ -88,12 +88,19 @@ describe('tools/file/index-tools', () => {
     it('formats search results as output string with FTS5 highlights as **bold**', async () => {
         mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
         mocks.searchIoIndex.mockReturnValue([
-            { filePath: '/ws/src/a.js', relativePath: 'src/a.js', snippet: 'some [match] text', rank: 1 },
+            {
+                filePath: '/ws/src/a.js',
+                relativePath: 'src/a.js',
+                snippet: 'some [match] text',
+                rank: 1,
+                startLine: 10,
+                endLine: 20,
+            },
         ]);
 
         const result = await getHandler(workspaceIndexSearchTool)({ query: 'match', maxResults: 10 });
 
-        expect(result.output).toContain('src/a.js');
+        expect(result.output).toContain('src/a.js:10-20');
         expect(result.output).toContain('**match**');
         expect(result.output).not.toContain('[match]');
         expect(result.matchCount).toBe(1);

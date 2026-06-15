@@ -258,6 +258,7 @@
     "analyze:graph:export": "node scripts/analysis/analyze-code-graph.js --export-json --export-dot",
     "analyze:graph:full": "node scripts/analysis/analyze-code-graph.js --stats --circular --orphans --nerv",
     "analyze:io:l2-workload": "node scripts/analysis/copilot-io-l2-workload.mjs",
+    "analyze:io:index-workload": "node scripts/analysis/copilot-io-index-workload.mjs",
     "analyze:jsdoc": "node audit-jsdoc-coverage.mjs",
     "analyze:nerv": "node scripts/analysis/analyze-code-graph.js --nerv",
     "analyze:orphans": "node scripts/analysis/analyze-code-graph.js --orphans",

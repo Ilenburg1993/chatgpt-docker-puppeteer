@@ -16,6 +16,7 @@ export {
     SYMBOL_EXTENSIONS,
 } from './content.js';
 export {
+    buildIndexPathTreeRange,
     flattenScanEntries,
     normalizeIndexExtensions,
     normalizeIndexPath,
@@ -23,4 +24,4 @@ export {
     shouldIndexFile,
 } from './paths.js';
 export { normalizeIndexMaxResults, sanitizeFtsQuery } from './query.js';
-export { ensureIoIndexSchema } from './schema.js';
+export { ensureIoIndexSchema, IO_INDEX_SCHEMA_VERSION } from './schema.js';

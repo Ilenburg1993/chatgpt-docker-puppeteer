@@ -8,6 +8,11 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createIoIndexSqlite } from '../../../../src/copilot/infra/io-index-sqlite.js';
+import {
+    ensureIoIndexSchema,
+    IO_INDEX_SCHEMA_VERSION,
+} from '../../../../src/copilot/infra/index-store/sqlite/schema.js';
+import { buildIndexPathTreeRange } from '../../../../src/copilot/infra/index-store/sqlite/paths.js';
 
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
 
@@ -47,6 +52,75 @@ async function replaceTextFromChild(filePath, content) {
         });
         child.send({ filePath, content });
     });
+}
+
+/**
+ * @param {Database.Database} db
+ * @param {string} content
+ */
+function createLegacyIoIndex(db, content) {
+    db.exec(`
+        CREATE TABLE copilot_io_index_files (
+            file_path TEXT PRIMARY KEY,
+            workspace_root TEXT NOT NULL,
+            relative_path TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            extension TEXT NOT NULL,
+            content_kind TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL,
+            mtime_ms REAL NOT NULL,
+            ctime_ms REAL,
+            content_hash TEXT,
+            line_count INTEGER NOT NULL DEFAULT 0,
+            symbol_count INTEGER NOT NULL DEFAULT 0,
+            import_count INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL,
+            parse_error TEXT,
+            indexed_at_ms INTEGER NOT NULL,
+            refreshed_at_ms INTEGER NOT NULL,
+            metadata_json TEXT
+        ) STRICT;
+        CREATE TABLE copilot_io_index_chunks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_path TEXT NOT NULL,
+            chunk_index INTEGER NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            created_at_ms INTEGER NOT NULL,
+            UNIQUE(file_path, chunk_index)
+        ) STRICT;
+        CREATE VIRTUAL TABLE copilot_io_index_fts USING fts5(
+            file_path UNINDEXED,
+            relative_path,
+            content
+        );
+    `);
+    db.prepare(`
+        INSERT INTO copilot_io_index_files(
+            file_path, workspace_root, relative_path, file_name, extension, content_kind,
+            size_bytes, mtime_ms, line_count, status, indexed_at_ms, refreshed_at_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        '/workspace/legacy.md',
+        '/workspace',
+        'legacy.md',
+        'legacy.md',
+        '.md',
+        'markdown',
+        Buffer.byteLength(content),
+        1,
+        content.split('\n').length,
+        'fresh',
+        1,
+        1,
+    );
+    db.prepare('INSERT INTO copilot_io_index_fts(file_path, relative_path, content) VALUES (?, ?, ?)').run(
+        '/workspace/legacy.md',
+        'legacy.md',
+        content,
+    );
 }
 
 beforeEach(async () => {
@@ -99,6 +173,86 @@ describe('createIoIndexSqlite', () => {
             .all()
             .map((column) => /** @type {{ name: string }} */ (column).name);
         expect(columns).toEqual(expect.arrayContaining(['dev', 'ino']));
+        expect(
+            db
+                .prepare('SELECT version FROM copilot_io_index_schema_migrations ORDER BY version')
+                .all()
+                .map((row) => /** @type {{ version: number }} */ (row).version),
+        ).toEqual([1, IO_INDEX_SCHEMA_VERSION]);
+        expect(
+            db
+                .prepare('PRAGMA table_info(copilot_io_index_fts)')
+                .all()
+                .map((column) => /** @type {{ name: string }} */ (column).name),
+        ).toEqual(['relative_path', 'content']);
+    });
+
+    it('migra conteúdo FTS legado para chunks sem perder busca', () => {
+        const db = new Database(':memory:');
+        const content = Array.from({ length: 205 }, (_, index) =>
+            index === 202 ? 'legacy migration token' : `legacy line ${index + 1}`,
+        ).join('\n');
+        createLegacyIoIndex(db, content);
+
+        expect(ensureIoIndexSchema(db)).toBe(IO_INDEX_SCHEMA_VERSION);
+
+        const chunks = db
+            .prepare(`
+                SELECT chunk_index AS chunkIndex, start_line AS startLine, end_line AS endLine
+                FROM copilot_io_index_chunks
+                ORDER BY chunk_index
+            `)
+            .all();
+        expect(chunks).toEqual([
+            { chunkIndex: 0, startLine: 1, endLine: 200 },
+            { chunkIndex: 1, startLine: 201, endLine: 205 },
+        ]);
+        const hit = db
+            .prepare(`
+                SELECT chunks.start_line AS startLine, chunks.end_line AS endLine
+                FROM copilot_io_index_fts
+                JOIN copilot_io_index_chunks AS chunks ON chunks.id = copilot_io_index_fts.rowid
+                WHERE copilot_io_index_fts MATCH ?
+            `)
+            .get('"migration"');
+        expect(hit).toEqual({ startLine: 201, endLine: 205 });
+    });
+
+    it('reverte integralmente a migração do FTS quando o registro da versão falha', () => {
+        const db = new Database(':memory:');
+        createLegacyIoIndex(db, 'legacy rollback token');
+        db.exec(`
+            CREATE TABLE copilot_io_index_schema_migrations (
+                version INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                applied_at_ms INTEGER NOT NULL
+            ) STRICT;
+            INSERT INTO copilot_io_index_schema_migrations(version, name, applied_at_ms)
+            VALUES (1, 'create_legacy_io_index', 1);
+            CREATE TRIGGER reject_io_index_v2
+            BEFORE INSERT ON copilot_io_index_schema_migrations
+            WHEN NEW.version = 2
+            BEGIN
+                SELECT RAISE(ABORT, 'forced migration failure');
+            END;
+        `);
+
+        expect(() => ensureIoIndexSchema(db)).toThrow(/forced migration failure/u);
+
+        expect(
+            db
+                .prepare('PRAGMA table_info(copilot_io_index_fts)')
+                .all()
+                .map((column) => /** @type {{ name: string }} */ (column).name),
+        ).toEqual(['file_path', 'relative_path', 'content']);
+        expect(db.prepare('SELECT COUNT(*) AS total FROM copilot_io_index_fts').get()).toEqual({ total: 1 });
+        expect(db.prepare('SELECT COUNT(*) AS total FROM copilot_io_index_chunks').get()).toEqual({ total: 0 });
+        expect(
+            db
+                .prepare('PRAGMA table_info(copilot_io_index_files)')
+                .all()
+                .map((column) => /** @type {{ name: string }} */ (column).name),
+        ).not.toContain('dev');
     });
 
     it('indexa diretório com metadados, FTS, símbolos e imports', async () => {
@@ -117,6 +271,7 @@ describe('createIoIndexSqlite', () => {
 
         const stats = index.getStats();
         expect(stats.available).toBe(true);
+        expect(stats.schemaVersion).toBe(IO_INDEX_SCHEMA_VERSION);
         expect(stats.files).toBe(3);
         expect(stats.symbols).toBeGreaterThanOrEqual(2);
         expect(stats.imports).toBeGreaterThanOrEqual(1);
@@ -126,10 +281,38 @@ describe('createIoIndexSqlite', () => {
         const textResults = index.search('semantic index token');
         expect(textResults.length).toBeGreaterThanOrEqual(1);
         expect(textResults[0]?.relativePath).toContain('notes.md');
+        expect(textResults[0]).toMatchObject({ chunkIndex: 0, startLine: 1, endLine: 4 });
 
         const symbols = index.findSymbol('alphaHelper');
         expect(symbols.length).toBeGreaterThanOrEqual(1);
         expect(symbols[0]?.symbolName).toBe('alphaHelper');
+    });
+
+    it('retorna o chunk e a faixa de linhas que contêm o match', async () => {
+        expect(tmpDir).toBeTruthy();
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+        const content = Array.from({ length: 450 }, (_, index) =>
+            index === 204 ? 'localized chunk search token' : `line ${index + 1}`,
+        ).join('\n');
+
+        await index.indexTextFile({
+            filePath: join(/** @type {string} */ (tmpDir), 'long.md'),
+            workspaceRoot: /** @type {string} */ (tmpDir),
+            content,
+            sizeBytes: Buffer.byteLength(content),
+            mtimeMs: 1,
+            ctimeMs: null,
+        });
+
+        expect(index.search('localized chunk search token')).toEqual([
+            expect.objectContaining({
+                relativePath: 'long.md',
+                chunkIndex: 1,
+                startLine: 201,
+                endLine: 400,
+            }),
+        ]);
     });
 
     it('busca símbolo com filtro SQL scoped antes de aplicar limit', async () => {
@@ -391,6 +574,19 @@ describe('createIoIndexSqlite', () => {
         expect(rootResults.length).toBeGreaterThanOrEqual(2);
         expect(nestedResults.length).toBe(1);
         expect(nestedResults[0]?.relativePath).toContain('nested/notes-nested.md');
+
+        const range = buildIndexPathTreeRange(join(/** @type {string} */ (tmpDir), 'nested'));
+        const plan = db
+            .prepare(`
+                EXPLAIN QUERY PLAN
+                SELECT id
+                FROM copilot_io_index_chunks
+                WHERE file_path = ? OR (file_path >= ? AND file_path < ?)
+            `)
+            .all(range.exact, range.descendantStart, range.descendantEnd)
+            .map((row) => String(/** @type {{ detail?: unknown }} */ (row).detail ?? ''));
+        expect(plan.some((detail) => detail.includes('idx_io_index_chunks_file'))).toBe(true);
+        expect(plan.some((detail) => detail === 'SCAN copilot_io_index_chunks')).toBe(false);
     });
 
     it('limita busca FTS e símbolos com janela explícita', async () => {

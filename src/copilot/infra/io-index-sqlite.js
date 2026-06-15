@@ -13,12 +13,14 @@ import { createIoTraceId, toError } from '#copilot/core';
 import { basename, extname } from 'node:path';
 import pLimit from 'p-limit';
 import {
+    buildIndexPathTreeRange,
     classifyContentKind,
     countLines,
     DEFAULT_INDEX_EXTENSIONS,
     ensureIoIndexSchema,
     flattenScanEntries,
     iterateLineChunks,
+    IO_INDEX_SCHEMA_VERSION,
     normalizeIndexExtensions,
     normalizeIndexMaxResults,
     normalizeIndexPath,
@@ -87,6 +89,9 @@ function createStaleIndexSnapshotError(filePath, attempts) {
  * @typedef {{
  *     filePath: string;
  *     relativePath: string;
+ *     chunkIndex: number;
+ *     startLine: number;
+ *     endLine: number;
  *     snippet: string;
  *     rank: number;
  * }} IoIndexSearchResult
@@ -140,7 +145,7 @@ export function createIoIndexSqlite(options) {
             ? Math.min(10, Number(options.snapshotRetries))
             : DEFAULT_INDEX_SNAPSHOT_RETRIES;
 
-    ensureIoIndexSchema(db);
+    const schemaVersion = ensureIoIndexSchema(db);
 
     const stats = {
         builds: 0,
@@ -173,15 +178,27 @@ export function createIoIndexSqlite(options) {
         }
     }
 
-    const stmtDeleteFile = db.prepare('DELETE FROM copilot_io_index_files WHERE file_path = ? OR file_path LIKE ?');
-    const stmtDeleteFts = db.prepare('DELETE FROM copilot_io_index_fts WHERE file_path = ? OR file_path LIKE ?');
+    const stmtDeleteFile = db.prepare(`
+        DELETE FROM copilot_io_index_files
+        WHERE file_path = ? OR (file_path >= ? AND file_path < ?)
+    `);
+    const stmtDeleteFts = db.prepare(`
+        DELETE FROM copilot_io_index_fts
+        WHERE rowid IN (
+            SELECT id
+            FROM copilot_io_index_chunks
+            WHERE file_path = ? OR (file_path >= ? AND file_path < ?)
+        )
+    `);
     const stmtDeleteSymbols = db.prepare(
-        'DELETE FROM copilot_io_index_symbols WHERE file_path = ? OR file_path LIKE ?',
+        'DELETE FROM copilot_io_index_symbols WHERE file_path = ? OR (file_path >= ? AND file_path < ?)',
     );
     const stmtDeleteImports = db.prepare(
-        'DELETE FROM copilot_io_index_imports WHERE file_path = ? OR file_path LIKE ?',
+        'DELETE FROM copilot_io_index_imports WHERE file_path = ? OR (file_path >= ? AND file_path < ?)',
     );
-    const stmtDeleteChunks = db.prepare('DELETE FROM copilot_io_index_chunks WHERE file_path = ? OR file_path LIKE ?');
+    const stmtDeleteChunks = db.prepare(
+        'DELETE FROM copilot_io_index_chunks WHERE file_path = ? OR (file_path >= ? AND file_path < ?)',
+    );
     const stmtUpsertFile = db.prepare(`
         INSERT INTO copilot_io_index_files (
             file_path, workspace_root, relative_path, file_name, extension, content_kind, size_bytes, mtime_ms, ctime_ms,
@@ -224,7 +241,7 @@ export function createIoIndexSqlite(options) {
         WHERE file_path = @filePath
     `);
     const stmtInsertFts = db.prepare(`
-        INSERT INTO copilot_io_index_fts(file_path, relative_path, content)
+        INSERT INTO copilot_io_index_fts(rowid, relative_path, content)
         VALUES (?, ?, ?)
     `);
     const stmtInsertSymbol = db.prepare(`
@@ -256,7 +273,7 @@ export function createIoIndexSqlite(options) {
     const stmtListIndexedUnderPathFiltered = db.prepare(`
         SELECT file_path as filePath, extension
         FROM copilot_io_index_files
-        WHERE (file_path = ? OR file_path LIKE ?)
+        WHERE (file_path = ? OR (file_path >= ? AND file_path < ?))
             AND (? = '[]' OR extension IN (SELECT value FROM json_each(?)))
         ORDER BY file_path ASC
     `);
@@ -275,25 +292,45 @@ export function createIoIndexSqlite(options) {
     const stmtLatest = db.prepare('SELECT MAX(refreshed_at_ms) as latest FROM copilot_io_index_files');
     const stmtSearch = db.prepare(`
         SELECT
-            file_path as filePath,
-            relative_path as relativePath,
-            snippet(copilot_io_index_fts, 2, '[', ']', ' … ', 12) as snippet,
+            chunks.file_path as filePath,
+            files.relative_path as relativePath,
+            chunks.chunk_index as chunkIndex,
+            chunks.start_line as startLine,
+            chunks.end_line as endLine,
+            snippet(copilot_io_index_fts, 1, '[', ']', ' … ', 12) as snippet,
             bm25(copilot_io_index_fts) as rank
         FROM copilot_io_index_fts
+        JOIN copilot_io_index_chunks AS chunks ON chunks.id = copilot_io_index_fts.rowid
+        JOIN copilot_io_index_files AS files ON files.file_path = chunks.file_path
         WHERE copilot_io_index_fts MATCH ?
-        ORDER BY rank
+        ORDER BY rank, files.relative_path, chunks.chunk_index
         LIMIT ?
     `);
     const stmtSearchScoped = db.prepare(`
+        WITH scoped_chunks AS MATERIALIZED (
+            SELECT
+                chunks.id,
+                chunks.file_path,
+                chunks.chunk_index,
+                chunks.start_line,
+                chunks.end_line,
+                files.relative_path
+            FROM copilot_io_index_chunks AS chunks
+            JOIN copilot_io_index_files AS files ON files.file_path = chunks.file_path
+            WHERE chunks.file_path = ? OR (chunks.file_path >= ? AND chunks.file_path < ?)
+        )
         SELECT
-            file_path as filePath,
-            relative_path as relativePath,
-            snippet(copilot_io_index_fts, 2, '[', ']', ' … ', 12) as snippet,
+            scoped_chunks.file_path as filePath,
+            scoped_chunks.relative_path as relativePath,
+            scoped_chunks.chunk_index as chunkIndex,
+            scoped_chunks.start_line as startLine,
+            scoped_chunks.end_line as endLine,
+            snippet(copilot_io_index_fts, 1, '[', ']', ' … ', 12) as snippet,
             bm25(copilot_io_index_fts) as rank
-        FROM copilot_io_index_fts
+        FROM scoped_chunks
+        JOIN copilot_io_index_fts ON copilot_io_index_fts.rowid = scoped_chunks.id
         WHERE copilot_io_index_fts MATCH ?
-            AND (file_path = ? OR file_path LIKE ?)
-        ORDER BY rank
+        ORDER BY rank, scoped_chunks.relative_path, scoped_chunks.chunk_index
         LIMIT ?
     `);
     const stmtImportSearch = db.prepare(`
@@ -320,7 +357,7 @@ export function createIoIndexSqlite(options) {
             i.line as line
         FROM copilot_io_index_imports i
         JOIN copilot_io_index_files f ON f.file_path = i.file_path
-        WHERE i.file_path = ? OR i.file_path LIKE ?
+        WHERE i.file_path = ? OR (i.file_path >= ? AND i.file_path < ?)
         ORDER BY i.file_path ASC, i.line ASC
     `);
 
@@ -328,12 +365,13 @@ export function createIoIndexSqlite(options) {
      * @param {string} filePath
      */
     function clearFileRows(filePath) {
-        const prefix = `${filePath}/%`;
-        stmtDeleteChunks.run(filePath, prefix);
-        stmtDeleteFts.run(filePath, prefix);
-        stmtDeleteSymbols.run(filePath, prefix);
-        stmtDeleteImports.run(filePath, prefix);
-        stmtDeleteFile.run(filePath, prefix);
+        const range = buildIndexPathTreeRange(filePath);
+        const params = [range.exact, range.descendantStart, range.descendantEnd];
+        stmtDeleteFts.run(...params);
+        stmtDeleteChunks.run(...params);
+        stmtDeleteSymbols.run(...params);
+        stmtDeleteImports.run(...params);
+        stmtDeleteFile.run(...params);
     }
 
     /**
@@ -352,8 +390,15 @@ export function createIoIndexSqlite(options) {
         const normalizedRoot = normalizeIndexPath(rootPath);
         const normalizedExtensions = extensions.map((ext) => String(ext).toLowerCase());
         const extensionJson = JSON.stringify(normalizedExtensions);
+        const range = buildIndexPathTreeRange(normalizedRoot);
         const rows = /** @type {{ filePath: string; extension: string }[]} */ (
-            stmtListIndexedUnderPathFiltered.all(normalizedRoot, `${normalizedRoot}/%`, extensionJson, extensionJson)
+            stmtListIndexedUnderPathFiltered.all(
+                range.exact,
+                range.descendantStart,
+                range.descendantEnd,
+                extensionJson,
+                extensionJson,
+            )
         );
         let pruned = 0;
         const prune = () => {
@@ -483,7 +528,7 @@ export function createIoIndexSqlite(options) {
                 refreshedAtMs: indexedAtMs,
                 metadataJson: safeMetaJson({
                     ...(input.metadata ?? {}),
-                    indexVersion: 2,
+                    indexVersion: IO_INDEX_SCHEMA_VERSION,
                     fingerprint: {
                         mtimeMs: input.mtimeMs,
                         ctimeMs: input.ctimeMs ?? null,
@@ -494,9 +539,8 @@ export function createIoIndexSqlite(options) {
                     },
                 }),
             });
-            stmtInsertFts.run(filePath, relativePath, input.content);
             for (const chunk of iterateLineChunks(input.content)) {
-                stmtInsertChunk.run(
+                const inserted = stmtInsertChunk.run(
                     filePath,
                     chunk.index,
                     chunk.startLine,
@@ -505,6 +549,7 @@ export function createIoIndexSqlite(options) {
                     chunk.hash,
                     indexedAtMs,
                 );
+                stmtInsertFts.run(Number(inserted.lastInsertRowid), relativePath, chunk.content);
             }
             for (const symbol of fileSymbols) {
                 stmtInsertSymbol.run(
@@ -914,7 +959,10 @@ export function createIoIndexSqlite(options) {
                 return /** @type {IoIndexSearchResult[]} */ (stmtSearch.all(safe, maxResults));
             }
             const prefix = normalizeIndexPath(options.pathPrefix);
-            return /** @type {IoIndexSearchResult[]} */ (stmtSearchScoped.all(safe, prefix, `${prefix}/%`, maxResults));
+            const range = buildIndexPathTreeRange(prefix);
+            return /** @type {IoIndexSearchResult[]} */ (
+                stmtSearchScoped.all(range.exact, range.descendantStart, range.descendantEnd, safe, maxResults)
+            );
         },
 
         /**
@@ -953,9 +1001,9 @@ export function createIoIndexSqlite(options) {
             }
 
             if (options.pathPrefix) {
-                const prefix = normalizeIndexPath(options.pathPrefix);
-                where.push('(s.file_path = ? OR s.file_path LIKE ?)');
-                params.push(prefix, `${prefix}/%`);
+                const range = buildIndexPathTreeRange(options.pathPrefix);
+                where.push('(s.file_path = ? OR (s.file_path >= ? AND s.file_path < ?))');
+                params.push(range.exact, range.descendantStart, range.descendantEnd);
             }
 
             params.push(normalizeIndexMaxResults(options.maxResults));
@@ -997,8 +1045,10 @@ export function createIoIndexSqlite(options) {
          */
         findImportsByPath(pathPrefix) {
             stats.searches += 1;
-            const safe = normalizeIndexPath(pathPrefix);
-            return /** @type {IoIndexImportResult[]} */ (stmtImportSearchByPath.all(safe, `${safe}/%`));
+            const range = buildIndexPathTreeRange(pathPrefix);
+            return /** @type {IoIndexImportResult[]} */ (
+                stmtImportSearchByPath.all(range.exact, range.descendantStart, range.descendantEnd)
+            );
         },
 
         getStats() {
@@ -1012,6 +1062,7 @@ export function createIoIndexSqlite(options) {
             return {
                 enabled: true,
                 available: totalFiles > 0,
+                schemaVersion,
                 ...stats,
                 files: totalFiles,
                 freshFiles: Number(files.fresh ?? 0),
