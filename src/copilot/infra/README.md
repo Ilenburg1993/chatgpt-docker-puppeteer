@@ -120,6 +120,25 @@ A poda de arquivos removidos é automática em builds completos. Em builds parci
 `--include`/`--exclude`, a poda é desativada por segurança para não apagar entradas fora da fatia
 materializada.
 
+## Variáveis operacionais de I/O
+
+Os valores inválidos voltam ao default seguro. Limites em bytes usam inteiros decimais.
+
+| Variável | Default | Contrato |
+| --- | ---: | --- |
+| `IO_L1_CACHE_TTL_MS` | `60000` | TTL positivo das entradas L1. |
+| `IO_L1_CACHE_MAX_ENTRIES` | `2000` | Máximo positivo de entradas L1. |
+| `IO_L1_CACHE_MAX_BYTES` | `134217728` | Budget positivo de memória L1. |
+| `IO_L1_STALE_PROBE_INTERVAL_MS` | `2000` | `-1` desativa fingerprint, `0` valida sempre, `>0` define o intervalo. |
+| `IO_CAPACITY_PREFLIGHT_MIN_BYTES` | `67108864` | `0` desativa; payloads menores não executam `statfs`. |
+| `IO_CAPACITY_PREFLIGHT_RESERVE_BYTES` | `67108864` | Reserva advisory exigida além do payload. |
+| `IO_CAPACITY_PREFLIGHT_CACHE_TTL_MS` | `1000` | Janela curta de reuso de `statfs`; `0` desativa o cache. |
+| `IO_PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES` | `131072` | Teto para fallback síncrono após falha do worker. |
+| `IO_ADVISORY_BUDGET_WINDOW_MS` | `60000` | Janela rolante do budget observável de mutações/builds. |
+| `IO_ADVISORY_BUDGET_MAX_OPERATIONS` | `120` | Pressão advisory por quantidade de operações na janela. |
+| `IO_ADVISORY_BUDGET_MAX_BYTES` | `67108864` | Pressão advisory por bytes estimados na janela. |
+| `IO_ADVISORY_BUDGET_MAX_ACTIVE` | `12` | Pressão advisory por concorrência ativa. |
+
 ## Links relacionados
 
 - Hub superior: `../README.md`.

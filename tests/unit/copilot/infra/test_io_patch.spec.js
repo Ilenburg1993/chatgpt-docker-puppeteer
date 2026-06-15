@@ -32,6 +32,27 @@ describe('infra/io/patch', () => {
         ).toThrow('2 vezes');
     });
 
+    it('interrompe a contagem quando expectedOccurrences já divergiu', () => {
+        try {
+            computeTextPatch('same '.repeat(10_000), {
+                oldString: 'same',
+                newString: 'other',
+                expectedOccurrences: 1,
+            });
+            throw new Error('patch deveria falhar');
+        } catch (error) {
+            expect(error).toMatchObject({
+                code: 'ERR_PATCH_EXPECTED_OCCURRENCES',
+                details: {
+                    expectedOccurrences: 1,
+                    occurrenceCount: 2,
+                    occurrenceCountExact: false,
+                },
+            });
+            expect(/** @type {Error} */ (error).message).toContain('pelo menos 2');
+        }
+    });
+
     it('substitui ocorrência específica com occurrenceIndex', () => {
         const patch = computeTextPatch('same middle same end', {
             oldString: 'same',

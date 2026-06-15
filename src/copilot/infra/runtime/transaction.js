@@ -12,22 +12,6 @@ import { randomUUID } from 'node:crypto';
 import { completeIoOperationEnvelope, createIoOperationEnvelope, failIoOperationEnvelope } from './operation.js';
 
 /**
- * Clona payload com `structuredClone` quando disponível, mantendo fallback resiliente.
- *
- * @template T
- * @param {T} value
- * @returns {T}
- */
-function clonePayload(value) {
-    const structuredCloneFn = /** @type {undefined | (<U>(input: U) => U)} */ (globalThis.structuredClone);
-    if (typeof structuredCloneFn === 'function') {
-        return structuredCloneFn(value);
-    }
-
-    return /** @type {T} */ (JSON.parse(JSON.stringify(value)));
-}
-
-/**
  * @typedef {'write' | 'patch' | 'delete' | 'copy' | 'move'} IoChangeAction
  *
  * @typedef {object} IoRollbackHint
@@ -105,8 +89,8 @@ export function beginIoChangeSet(input) {
  */
 export function appendIoChangeSetEntry(changeSet, entry) {
     assertOpen(changeSet);
-    const evidence = clonePayload(entry.evidence ?? {});
-    const rollback = entry.rollback ? clonePayload(entry.rollback) : null;
+    const evidence = structuredClone(entry.evidence ?? {});
+    const rollback = entry.rollback ? structuredClone(entry.rollback) : null;
     const nextEntry = {
         entryId: randomUUID(),
         createdAtMs: Date.now(),

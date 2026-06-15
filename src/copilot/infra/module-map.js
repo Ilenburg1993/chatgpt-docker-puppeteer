@@ -9,8 +9,6 @@
  */
 
 import { readdirSync } from 'node:fs';
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 /**
  * @typedef {'file' | 'directory'} InfraModuleKind
@@ -255,6 +253,15 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         summary: 'Planejamento e agregação de tiers de cache.',
     },
     {
+        path: 'io-advisory-budget.js',
+        kind: 'file',
+        role: 'observability',
+        tier: 'secondary',
+        risk: 'stable',
+        public: false,
+        summary: 'Budget advisory rolante para pressão de mutações e builds de índice.',
+    },
+    {
         path: 'io-index-registry.js',
         kind: 'file',
         role: 'io-index',
@@ -383,16 +390,7 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
 ]);
 
 /**
- * @param {Record<string, number>} bucket
- * @param {string} key
- * @returns {void}
- */
-function increment(bucket, key) {
-    bucket[key] = (bucket[key] ?? 0) + 1;
-}
-
-/**
- * Conta entradas por chave usando `Object.groupBy` quando disponível (Node 24+), com fallback seguro.
+ * Conta entradas por chave usando a API nativa do baseline Node 24.
  *
  * @template T
  * @param {readonly T[]} entries
@@ -400,19 +398,8 @@ function increment(bucket, key) {
  * @returns {Record<string, number>}
  */
 function countBy(entries, selector) {
-    const objectCtor =
-        /** @type {{ groupBy?: (items: readonly T[], fn: (item: T) => string) => Record<string, T[]> }} */ (Object);
-    if (typeof objectCtor.groupBy === 'function') {
-        const grouped = objectCtor.groupBy(entries, selector);
-        return Object.fromEntries(Object.entries(grouped).map(([key, values]) => [key, values.length]));
-    }
-
-    /** @type {Record<string, number>} */
-    const fallback = {};
-    for (const entry of entries) {
-        increment(fallback, selector(entry));
-    }
-    return fallback;
+    const grouped = Object.groupBy(entries, selector);
+    return Object.fromEntries(Object.entries(grouped).map(([key, values]) => [key, values?.length ?? 0]));
 }
 
 /**
@@ -473,8 +460,7 @@ export function buildInfraModuleScorecard() {
     };
 
     try {
-        const modulePath = fileURLToPath(import.meta.url);
-        const infraRoot = dirname(modulePath);
+        const infraRoot = import.meta.dirname;
         const actualEntries = readdirSync(infraRoot, { withFileTypes: true })
             .filter((entry) => entry.name === 'README.md' || entry.name.endsWith('.js') || entry.isDirectory())
             .map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))

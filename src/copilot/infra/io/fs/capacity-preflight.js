@@ -13,6 +13,14 @@ import path from 'node:path';
 
 const DEFAULT_MIN_BYTES = 64 * 1024 * 1024;
 const DEFAULT_RESERVE_BYTES = 64 * 1024 * 1024;
+const DEFAULT_CACHE_TTL_MS = 1_000;
+const MAX_CACHE_ENTRIES = 256;
+
+/** @type {Map<string, { expiresAtMs: number; promise: ReturnType<typeof fs.statfs> }>} */
+const statfsCache = new Map();
+/** @type {WeakMap<Function, number>} */
+let statfsFunctionIds = new WeakMap();
+let nextStatfsFunctionId = 1;
 
 /**
  * @param {string} key
@@ -31,7 +39,51 @@ export function getIoCapacityPreflightConfiguration() {
         enabled: minBytes > 0,
         minBytes,
         reserveBytes: readNonNegativeIntegerEnv('IO_CAPACITY_PREFLIGHT_RESERVE_BYTES', DEFAULT_RESERVE_BYTES),
+        cacheTtlMs: readNonNegativeIntegerEnv('IO_CAPACITY_PREFLIGHT_CACHE_TTL_MS', DEFAULT_CACHE_TTL_MS),
     };
+}
+
+/**
+ * @param {typeof fs.statfs} statfs
+ */
+function getStatfsFunctionId(statfs) {
+    let id = statfsFunctionIds.get(statfs);
+    if (id === undefined) {
+        id = nextStatfsFunctionId++;
+        statfsFunctionIds.set(statfs, id);
+    }
+    return id;
+}
+
+/**
+ * @param {string} directory
+ * @param {typeof fs.statfs} statfs
+ * @param {number} cacheTtlMs
+ * @param {number} nowMs
+ */
+function readStatfsCached(directory, statfs, cacheTtlMs, nowMs) {
+    if (cacheTtlMs <= 0) return statfs(directory, { bigint: true });
+    const key = `${getStatfsFunctionId(statfs)}:${path.resolve(directory)}`;
+    const cached = statfsCache.get(key);
+    if (cached && cached.expiresAtMs > nowMs) {
+        statfsCache.delete(key);
+        statfsCache.set(key, cached);
+        return cached.promise;
+    }
+    if (cached) statfsCache.delete(key);
+
+    const promise = statfs(directory, { bigint: true });
+    const entry = { expiresAtMs: nowMs + cacheTtlMs, promise };
+    statfsCache.set(key, entry);
+    void promise.catch(() => {
+        if (statfsCache.get(key) === entry) statfsCache.delete(key);
+    });
+    while (statfsCache.size > MAX_CACHE_ENTRIES) {
+        const oldest = statfsCache.keys().next().value;
+        if (typeof oldest !== 'string') break;
+        statfsCache.delete(oldest);
+    }
+    return promise;
 }
 
 /**
@@ -71,6 +123,8 @@ function toNonNegativeBigInt(value) {
  * @param {{
  *     minBytes?: number;
  *     reserveBytes?: number;
+ *     cacheTtlMs?: number;
+ *     nowMs?: number;
  *     statfs?: typeof fs.statfs;
  * }} [options]
  * @returns {Promise<IoCapacityPreflightResult>}
@@ -79,6 +133,7 @@ export async function preflightIoCapacity(targetPath, requiredBytes, options = {
     const configuration = getIoCapacityPreflightConfiguration();
     const minBytes = Math.max(0, Math.floor(options.minBytes ?? configuration.minBytes));
     const reserveBytes = Math.max(0, Math.floor(options.reserveBytes ?? configuration.reserveBytes));
+    const cacheTtlMs = Math.max(0, Math.floor(options.cacheTtlMs ?? configuration.cacheTtlMs));
     const numericRequiredBytes = Number(requiredBytes);
     const normalizedRequiredBytes =
         Number.isFinite(numericRequiredBytes) && numericRequiredBytes > 0 ? Math.floor(numericRequiredBytes) : 0;
@@ -105,7 +160,12 @@ export async function preflightIoCapacity(targetPath, requiredBytes, options = {
     }
 
     try {
-        const snapshot = await statfs(path.dirname(targetPath), { bigint: true });
+        const snapshot = await readStatfsCached(
+            path.dirname(targetPath),
+            statfs,
+            cacheTtlMs,
+            Math.trunc(options.nowMs ?? Date.now()),
+        );
         const available = toNonNegativeBigInt(snapshot.bavail) * toNonNegativeBigInt(snapshot.bsize);
         const required = BigInt(requiredWithReserveBytes);
         const sufficient = available >= required;
@@ -137,4 +197,10 @@ export async function preflightIoCapacity(targetPath, requiredBytes, options = {
             errorCode: String(/** @type {{ code?: unknown }} */ (error)?.code ?? 'UNKNOWN'),
         };
     }
+}
+
+export function resetIoCapacityPreflightCacheForTest() {
+    statfsCache.clear();
+    statfsFunctionIds = new WeakMap();
+    nextStatfsFunctionId = 1;
 }

@@ -1,6 +1,7 @@
 # Auditoria Técnica — `src/copilot/infra/` + `tools/file/`
 **Projeto:** `chatgpt-docker-puppeteer`
-**Runtime alvo:** Node.js 24.5 · ESM · WSL2/Docker DevContainer
+**Runtime alvo:** Node.js 24.x · ESM · WSL2/Docker DevContainer
+**Runtime validado nesta remediação:** Node.js 24.15.0
 **Data:** 14 de junho de 2026
 **Escopo:** todos os arquivos anexados nas pastas `src/copilot/infra/**` e `src/copilot/tools/file/**`
 **Metodologia:** leitura integral line-by-line, cruzamento com Node 24 API docs, SQLite 3.x, `lru-cache` v10, `better-sqlite3` e as interfaces públicas já auditadas do SDK Copilot.
@@ -1204,7 +1205,7 @@ não bug.
 | P2-4  | **rejeitado**           | Entradas stale permanecem alocadas até acesso/evicção, mas o cache já é estritamente limitado por `max` e `maxSize`; não há crescimento sem bounds.                         |
 | P2-5  | **confirmado**          | A camada baixa aceita `expectedSourceHash`, mas `copy_file` não expõe a precondição.                                                                                        |
 | P2-6  | **confirmado**          | `create_file` ainda força UTF-8 e não cria binário atomicamente em uma única chamada.                                                                                       |
-| P2-7  | **parcial**             | `statfs` repetido pode custar em lotes grandes, porém só ocorre para payloads acima do limiar de 64 MiB. Cache curto é oportunidade mensurável, não bug geral.              |
+| P2-7  | **remediado**           | `statfs` usa cache LRU curto por diretório/função, TTL configurável e bypass por `0`; falhas não permanecem cacheadas.                                                     |
 | P2-8  | **confirmado**          | `io-index-registry` descarta o unregister e `resetIoIndexForTest` não desmonta/recria o hook.                                                                               |
 | P2-9  | **confirmado**          | Refreshs concorrentes do mesmo escopo/path duplicam invalidação, leitura e parse. O guard deve ser por `sessionId + path`, não global por path.                             |
 | P2-10 | **remediado**           | Overload/falha do worker faz fallback main-thread somente até `IO_PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES` (128 KiB por padrão); acima do teto mantém backpressure.            |
@@ -1216,18 +1217,18 @@ não bug.
 | ID    | Status                          | Validação atual                                                                                                                             |
 | ----- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | P3-1  | **oportunidade rejeitada**      | O tamanho na chave é redundante criptograficamente, mas barato e útil para diagnóstico; não há defeito.                                     |
-| P3-2  | **oportunidade**                | Fallback de `Object.groupBy` é removível se Node 24 permanecer baseline obrigatório.                                                        |
-| P3-3  | **oportunidade**                | Fallback de `structuredClone` é removível no baseline Node 24.                                                                              |
-| P3-4  | **oportunidade**                | Cast de `Array.fromAsync` é removível após confirmação do typecheck estrito.                                                                |
-| P3-5  | **oportunidade**                | Guard de `ReadableStream.from` é removível após confirmação do typecheck estrito.                                                           |
-| P3-6  | **já documentado parcialmente** | O contrato `-1/0/>0` consta no comentário do módulo; falta apenas validação robusta da env e documentação humana.                           |
+| P3-2  | **remediado**                   | `Object.groupBy` nativo substituiu o fallback manual e passou no strict typecheck ES2024.                                                    |
+| P3-3  | **remediado**                   | `structuredClone` nativo é usado diretamente no runtime transacional.                                                                      |
+| P3-4  | **remediado com bridge de tipos** | Guard/fallback foi removido; `lib: ES2024` ainda não declara `Array.fromAsync`, portanto resta apenas um cast localizado via `unknown`.     |
+| P3-5  | **remediado com bridge de tipos** | Guard/fallback foi removido; os tipos DOM ES2024 ainda não declaram `ReadableStream.from`, exigindo bridge localizada.                      |
+| P3-6  | **remediado**                   | Contrato `-1/0/>0` possui parser validado e agora está documentado na referência humana de `infra`.                                         |
 | P3-7  | **confirmado**                  | `sizes` cresce com paths rotativos/dinâmicos durante toda a vida do writer. Precisa limite ou limpeza por path inativo.                     |
 | P3-8  | **confirmado**                  | O fallback de health replica manualmente a shape extensa do parser e tende a drift.                                                         |
 | P3-9  | **remediado**                   | Leases acima de `IO_LOCK_ACTIVE_LEASE_WARN_MS` geram evento `copilot.io.lock/lease.stale`, métrica e alerta de health, sem evicção insegura. |
 | P3-10 | **parcial**                     | Há uma policy async por entry. Otimização exige preservar checks de symlink/realpath e deve ser guiada por benchmark.                       |
 | P3-11 | **rejeitado**                   | Não existe leak: a entrada só é criada após aquisição bem-sucedida e erros não-`ETIMEDOUT` devem propagar.                                  |
 | P3-12 | **já mitigado**                 | `getStats()` força flush antes de contar; excesso temporário é limitado pela janela/batch e corrigido no flush.                             |
-| P3-13 | **parcial**                     | Early exit só é correto quando já há prova de mismatch; `replaceAll`, mensagens exatas e seleção por índice ainda exigem contagem completa. |
+| P3-13 | **remediado no caso seguro**    | Com `expectedOccurrences`, a busca encerra em `expected + 1` e reporta contagem mínima; casos que precisam total exato continuam completos. |
 | P3-14 | **confirmado**                  | O gzip não possui listener próprio de erro/cleanup e o lifetime timer não é `unref`.                                                        |
 
 ### 9.4 Gaps e upgrades
@@ -1243,10 +1244,10 @@ não bug.
 | GAP-7  | **remediado**                       | Cada linha FTS referencia um chunk persistido; resultados incluem `chunkIndex`, `startLine` e `endLine`, inclusive após backfill legado.     |
 | GAP-8  | **remediado com restrição segura**  | Tool lista metadados e verifica conteúdo internamente; leitura valida diretório, nome, expiração, tamanho, hash e não segue symlink.           |
 | UPG-1  | **adiado**                          | Migração para `node:sqlite` tem blast radius alto e não deve ser misturada com correções funcionais.                                         |
-| UPG-2  | **oportunidade**                    | `import.meta.dirname` pode simplificar `module-map.js`; `new URL()` para worker continua claro e correto.                                    |
+| UPG-2  | **remediado no ponto aplicável**    | `module-map.js` usa `import.meta.dirname`; URLs de worker permanecem com `new URL()` por expressarem melhor a referência de módulo.           |
 | UPG-3  | **adiado**                          | `fs.promises.glob` não é substituição semântica direta para o contrato atual de minimatch.                                                   |
-| UPG-4  | **oportunidade**                    | `AbortSignal.any()` pode simplificar composição, mas não elimina cleanup/contratos específicos de lock.                                      |
-| UPG-5  | **oportunidade**                    | Modernizações Node 24 são válidas após gates estritos.                                                                                       |
+| UPG-4  | **avaliado e não aplicável agora**  | Não há composição de múltiplos signals em `infra`; listeners atuais carregam semântica de fila, restart e cleanup que `any()` não substitui. |
+| UPG-5  | **remediado com limite de tipos**   | Fallbacks de Node 24 foram removidos; duas APIs recentes mantêm bridges locais porque o projeto fixa `lib: ES2024`.                            |
 | UPG-6  | **rejeitado**                       | Node 24.15.0 não expõe `Worker.hasRef()`; o método existe em `MessagePort`, não em `Worker`. Verificado diretamente no runtime alvo.         |
 | UPG-7  | **oportunidade operacional**        | Permission Model é defesa adicional de processo e requer desenho de entrypoint/container.                                                    |
 | UPG-8  | **rejeitado como solução geral**    | `subtle.digest` ainda materializa o buffer inteiro; para arquivos grandes, hashing incremental/streaming é a solução adequada.               |
@@ -1318,6 +1319,26 @@ P2-8, P2-9, P3-7, P3-8, P3-14, GAP-3, GAP-4. UPG-6 foi rejeitado por evidência 
 **Itens remediados nesta faixa:** GAP-2, GAP-5 e GAP-8. A implementação também corrigiu tokens incompletos de
 `write_file_content`, overwrite em `create_file`/`copy_file` e a ordem de restauração de `move_file`.
 
+### 9.9 Evidências de implementação — Faixa 5
+
+- [x] `Object.groupBy`, `structuredClone` e `import.meta.dirname` são usados diretamente no baseline Node 24.
+- [x] Guards/fallbacks de `Array.fromAsync` e `ReadableStream.from` foram removidos; bridges tipadas locais preservam
+      `lib: ES2024` sem ampliar globalmente o contrato do compilador.
+- [x] Novo módulo de budget foi incluído no inventário executável; o gate de drift voltou a cobrir toda a raiz.
+- [x] Capacity preflight reutiliza `statfs` por até 1 segundo, limita o cache a 256 entradas e remove promises falhas.
+- [x] Patch com `expectedOccurrences` encerra cedo após encontrar uma ocorrência excedente e explicita contagem não exata.
+- [x] Referência humana de envs documenta L1 stale probe, capacity preflight, parser fallback e budget advisory.
+- [x] `AbortSignal.any()` foi confrontado com todos os pontos de abort em `infra`; não existe composição de signals que
+      justifique substituir handlers com semântica adicional.
+- [x] Benchmark local de SHA-256, 32 MiB × 5 no Node 24.15.0: `createHash` contíguo `535,6 MiB/s`, chunks de 1 MiB
+      `532,7 MiB/s`, `subtle.digest` contíguo `399,3 MiB/s`.
+- [x] Snapshot grande já calcula hash incremental enquanto lê/escreve sidecar; migrar para WebCrypto aumentaria
+      materialização sem ganho observado.
+- [x] Testes focalizados: `49/49` passaram; strict typecheck e ESLint focalizado passaram.
+
+**Itens remediados nesta faixa:** P2-7, P3-2, P3-3, P3-4, P3-5, P3-6, P3-13, UPG-2 e UPG-5.
+UPG-4 foi rejeitado no estado atual por ausência de composição real; UPG-8 permanece rejeitado como solução geral.
+
 ## 10. Roadmap sistêmico de implementação
 
 ### Fase 0 — Evidência e baseline
@@ -1373,11 +1394,11 @@ P2-8, P2-9, P3-7, P3-8, P3-14, GAP-3, GAP-4. UPG-6 foi rejeitado por evidência 
 
 ### Fase 5 — Modernizações Node 24 guiadas por gates
 
-- [ ] Remover fallbacks mortos de APIs Node 24 somente após typecheck/lint/test focados.
-- [ ] Adotar `import.meta.dirname` onde simplifica sem reduzir clareza.
-- [ ] Avaliar `AbortSignal.any()` nos fluxos com composição real de signals.
-- [ ] Medir hashing incremental versus opções assíncronas para payloads grandes.
-- [ ] Avaliar `node:sqlite`, Permission Model e snapshots em roadmaps próprios.
+- [x] Remover fallbacks mortos de APIs Node 24 somente após typecheck/lint/test focados.
+- [x] Adotar `import.meta.dirname` onde simplifica sem reduzir clareza.
+- [x] Avaliar `AbortSignal.any()` nos fluxos com composição real de signals.
+- [x] Medir hashing incremental versus opções assíncronas para payloads grandes.
+- [x] Avaliar `node:sqlite`, Permission Model e snapshots em roadmaps próprios, mantendo-os fora desta remediação.
 
 ### Fase 6 — Validação contínua e entrega
 
@@ -1387,4 +1408,4 @@ P2-8, P2-9, P3-7, P3-8, P3-14, GAP-3, GAP-4. UPG-6 foi rejeitado por evidência 
 - [ ] Rodar suíte unitária de `infra` e `tools/file`.
 - [ ] Rodar suíte máxima de `src/copilot` compatível com o ambiente.
 - [x] Revisitar esta matriz após a primeira faixa e marcar apenas itens comprovadamente concluídos.
-- [ ] Criar commits coesos, fazer push e continuar pelas fases seguintes.
+- [x] Criar commits coesos, fazer push e continuar pelas fases seguintes.

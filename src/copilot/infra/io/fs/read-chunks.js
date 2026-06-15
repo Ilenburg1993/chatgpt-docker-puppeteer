@@ -736,10 +736,10 @@ export async function readTextLineChunks(filePath, options = {}) {
                 sizeBytes: /** @type {number | null} */ (null),
                 mtimeMs: /** @type {number | null} */ (null),
             };
-            const arrayCtor = /** @type {any} */ (Array);
-            const chunks = /** @type {TextLineChunk[]} */ (
-                await arrayCtor.fromAsync(iterateTextLineChunks(filePath, attemptOptions, state))
-            );
+            const arrayFromAsync = /** @type {{
+             *     fromAsync: <T>(items: AsyncIterable<T> | Iterable<T>) => Promise<T[]>;
+             * }} */ (/** @type {unknown} */ (Array)).fromAsync;
+            const chunks = await arrayFromAsync(iterateTextLineChunks(filePath, attemptOptions, state));
             if (!state.snapshotVersion || state.sizeBytes === null || state.mtimeMs === null) {
                 throw createStaleChunkSnapshotError(filePath, attempt);
             }
@@ -805,19 +805,8 @@ export function readTextLineChunksStream(filePath, options = {}) {
         mtimeMs: /** @type {number | null} */ (null),
     };
     const iterable = iterateTextLineChunks(filePath, { ...options, attempt: 1, deliveryMode: 'stream' }, state);
-    const readableStreamCtor = /** @type {any} */ (globalThis.ReadableStream);
-    if (typeof readableStreamCtor?.from === 'function') {
-        return readableStreamCtor.from(iterable);
-    }
-
-    return new ReadableStream({
-        async start(controller) {
-            try {
-                for await (const chunk of iterable) controller.enqueue(chunk);
-                controller.close();
-            } catch (error) {
-                controller.error(error);
-            }
-        },
-    });
+    const readableStreamFrom = /** @type {{
+     *     from: <T>(items: AsyncIterable<T> | Iterable<T>) => ReadableStream<T>;
+     * }} */ (/** @type {unknown} */ (ReadableStream)).from;
+    return readableStreamFrom(iterable);
 }

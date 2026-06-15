@@ -44,9 +44,10 @@ function countPatchLines(content) {
 /**
  * @param {string} content
  * @param {string} needle
- * @returns {number[]}
+ * @param {number} [maxOffsets]
+ * @returns {{ offsets: number[]; truncated: boolean }}
  */
-function findOccurrenceOffsets(content, needle) {
+function findOccurrenceOffsets(content, needle, maxOffsets = Number.POSITIVE_INFINITY) {
     /** @type {number[]} */
     const offsets = [];
     let index = 0;
@@ -54,9 +55,10 @@ function findOccurrenceOffsets(content, needle) {
         const found = content.indexOf(needle, index);
         if (found === -1) break;
         offsets.push(found);
+        if (offsets.length >= maxOffsets) return { offsets, truncated: true };
         index = found + needle.length;
     }
-    return offsets;
+    return { offsets, truncated: false };
 }
 
 /**
@@ -99,7 +101,15 @@ export function computeTextPatch(content, options) {
         );
     }
 
-    const offsets = findOccurrenceOffsets(content, options.oldString);
+    const occurrenceLimit =
+        options.expectedOccurrences === undefined
+            ? Number.POSITIVE_INFINITY
+            : Math.max(1, options.expectedOccurrences + 1);
+    const { offsets, truncated: occurrenceCountTruncated } = findOccurrenceOffsets(
+        content,
+        options.oldString,
+        occurrenceLimit,
+    );
     const occurrences = offsets.length;
     if (occurrences === 0) {
         throw createPatchError('old_string não encontrado no arquivo.', 'ERR_PATCH_NOT_FOUND', {
@@ -107,10 +117,15 @@ export function computeTextPatch(content, options) {
         });
     }
     if (options.expectedOccurrences !== undefined && options.expectedOccurrences !== occurrences) {
+        const foundLabel = occurrenceCountTruncated ? `pelo menos ${occurrences}` : String(occurrences);
         throw createPatchError(
-            `expected_occurrences=${options.expectedOccurrences}, mas encontrado=${occurrences}.`,
+            `expected_occurrences=${options.expectedOccurrences}, mas encontrado=${foundLabel}.`,
             'ERR_PATCH_EXPECTED_OCCURRENCES',
-            { expectedOccurrences: options.expectedOccurrences, occurrenceCount: occurrences },
+            {
+                expectedOccurrences: options.expectedOccurrences,
+                occurrenceCount: occurrences,
+                occurrenceCountExact: !occurrenceCountTruncated,
+            },
         );
     }
     if (options.replaceAll && options.occurrenceIndex !== undefined) {

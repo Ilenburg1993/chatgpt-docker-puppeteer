@@ -2,7 +2,10 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { preflightIoCapacity } from '../../../../src/copilot/infra/io/fs/capacity-preflight.js';
+import {
+    preflightIoCapacity,
+    resetIoCapacityPreflightCacheForTest,
+} from '../../../../src/copilot/infra/io/fs/capacity-preflight.js';
 import { copyFileUnlocked } from '../../../../src/copilot/infra/io/fs/copy.js';
 import { writeAtomicFileUnlocked } from '../../../../src/copilot/infra/io/fs/write-atomic.js';
 
@@ -10,6 +13,7 @@ import { writeAtomicFileUnlocked } from '../../../../src/copilot/infra/io/fs/wri
 const tempDirs = [];
 
 afterEach(async () => {
+    resetIoCapacityPreflightCacheForTest();
     await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
@@ -58,6 +62,38 @@ describe('io capacity preflight', () => {
             availableBytes: 100,
             headroomBytes: 20,
         });
+    });
+
+    it('reusa statfs por diretório durante a janela curta e expira depois dela', async () => {
+        let calls = 0;
+        const statfs = /** @type {any} */ (async () => {
+            calls += 1;
+            return { bavail: 1_000n, bsize: 1n };
+        });
+
+        await preflightIoCapacity('/tmp/a/first', 10, {
+            minBytes: 1,
+            reserveBytes: 0,
+            cacheTtlMs: 1_000,
+            nowMs: 10_000,
+            statfs,
+        });
+        await preflightIoCapacity('/tmp/a/second', 20, {
+            minBytes: 1,
+            reserveBytes: 0,
+            cacheTtlMs: 1_000,
+            nowMs: 10_500,
+            statfs,
+        });
+        await preflightIoCapacity('/tmp/a/third', 30, {
+            minBytes: 1,
+            reserveBytes: 0,
+            cacheTtlMs: 1_000,
+            nowMs: 11_000,
+            statfs,
+        });
+
+        expect(calls).toBe(2);
     });
 
     it('fails early with ENOSPC when insufficiency is observable', async () => {
