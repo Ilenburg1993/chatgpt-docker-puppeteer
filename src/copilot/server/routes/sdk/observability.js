@@ -219,6 +219,7 @@ export default function createObservabilityRouter(deps) {
             const l1HitRatio = Number(ioRuntime.cache.aggregate.hitRatio || 0);
             const l2Enabled = Boolean(ioRuntime.cache.l2?.['enabled']);
             const ioIndex = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
+            const ioParser = /** @type {Record<string, unknown>} */ (ioRuntime.parser);
 
             /** @type {Record<string, { status: string; details?: string }>} */
             const components = {
@@ -259,8 +260,11 @@ export default function createObservabilityRouter(deps) {
                     details: `l1=${ioRuntime.cache.l1?.['enabled'] ? 'on' : 'off'} · l2=${l2Enabled ? 'on' : 'off'} · hitRatio=${l1HitRatio.toFixed(3)}`,
                 },
                 io_parser: {
-                    status: 'healthy',
-                    details: `symbols=${ioRuntime.parser.size}/${ioRuntime.parser.maxSize}`,
+                    status: typeof ioParser['error'] === 'string' ? 'degraded' : 'healthy',
+                    details:
+                        typeof ioParser['error'] === 'string'
+                            ? `unavailable: ${ioParser['error']}`
+                            : `symbols=${ioParser['size'] ?? 0}/${ioParser['maxSize'] ?? 0}`,
                 },
                 io_index: {
                     status: ioIndex['available'] ? 'healthy' : 'degraded',

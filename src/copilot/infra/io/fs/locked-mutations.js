@@ -340,7 +340,7 @@ export async function removePathLocked(filePath, options = {}) {
  *
  * @param {string} source
  * @param {string} destination
- * @param {{ overwrite?: boolean; traceId?: string }} [options]
+ * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string }} [options]
  */
 export async function copyFileLocked(source, destination, options = {}) {
     assertValidIoFilePath(source);
@@ -373,6 +373,11 @@ export async function copyFileLocked(source, destination, options = {}) {
                         await assertDestinationWritable(destination, options.overwrite);
                     }
                     const sourceSnapshot = await readMutationSnapshot(source);
+                    if (options.expectedSourceHash && sourceSnapshot.contentHash !== options.expectedSourceHash) {
+                        const error = new Error(`Hash SHA-256 da origem diverge do esperado: ${source}`);
+                        /** @type {{ code?: string }} */ (error).code = 'EEXPECTEDHASH';
+                        throw error;
+                    }
                     await mkdirPathUnlocked(dirname(destination), { recursive: true });
                     const copyResult = await copyFileUnlocked(source, destination, {
                         exclusive: !options.overwrite,
@@ -661,10 +666,12 @@ export async function patchTextLocked(filePath, options) {
                     void patchMs;
                     const { updated, replacedOccurrences, bytesWritten } = patch;
                     const contentHash = sha256(updated);
-                    const previousSnapshot = await buildRollbackSnapshot(rawBuffer, {
-                        persistLarge: !options.dryRun,
-                        contentHash: previousHash,
-                    });
+                    const previousSnapshot = patch.noop
+                        ? { snapshotBase64: null, snapshotTruncated: false, rollbackSidecar: null }
+                        : await buildRollbackSnapshot(rawBuffer, {
+                              persistLarge: !options.dryRun,
+                              contentHash: previousHash,
+                          });
                     const diffContextLines = options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
                     const { firstMatchLine, lastMatchLine, lineDelta } = patch;
                     const shouldComputeDiff = options.computeDiff !== false;
@@ -678,7 +685,7 @@ export async function patchTextLocked(filePath, options) {
                           })
                         : { text: '', truncated: false, lines: 0, bytes: 0 };
                     let durability = null;
-                    if (!options.dryRun) {
+                    if (!options.dryRun && !patch.noop) {
                         try {
                             durability = await writeAtomicFileUnlocked(filePath, updated, {
                                 expectedHash: previousHash,
@@ -694,7 +701,7 @@ export async function patchTextLocked(filePath, options) {
                     return {
                         occurrences: patch.occurrences,
                         replacedOccurrences,
-                        bytesWritten: options.dryRun ? 0 : bytesWritten,
+                        bytesWritten: options.dryRun || patch.noop ? 0 : bytesWritten,
                         projectedBytes: bytesWritten,
                         previousBytes: patch.previousBytes,
                         byteDelta: patch.byteDelta,
@@ -726,7 +733,7 @@ export async function patchTextLocked(filePath, options) {
             }
         })();
         const waitMs = lease.waitMs;
-        if (!options.dryRun) invalidateIoCacheTiers(filePath);
+        if (!options.dryRun && !value.noop) invalidateIoCacheTiers(filePath);
         const io = publishAndReturn(
             buildIoMeta({
                 operation: 'patch',

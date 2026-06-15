@@ -577,6 +577,31 @@ describe('infra/io-engine', () => {
         await expect(readFile(file, 'utf8')).resolves.toBe('alpha beta');
     });
 
+    it('patchTextLocked allowNoop não regrava nem invalida o arquivo', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'noop-patch.txt');
+        await writeFile(file, 'stable content', 'utf8');
+        const before = await stat(file);
+
+        const result = await patchTextLocked(file, {
+            oldString: 'stable content',
+            newString: 'stable content',
+            allowNoop: true,
+        });
+        const after = await stat(file);
+
+        expect(result).toMatchObject({
+            noop: true,
+            bytesWritten: 0,
+            previousSnapshotBase64: null,
+            previousRollbackSidecar: null,
+            capacityPreflight: null,
+        });
+        expect(after.ino).toBe(before.ino);
+        expect(after.mtimeMs).toBe(before.mtimeMs);
+        await expect(readFile(file, 'utf8')).resolves.toBe('stable content');
+    });
+
     it('patchTextLocked rejeita bytes inválidos para UTF-8 sem regravar arquivo', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'binary-patch.bin');

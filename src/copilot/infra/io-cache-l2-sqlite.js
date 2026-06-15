@@ -312,6 +312,7 @@ export function createIoL2SqliteCache(options) {
     function scheduleSetBatchFlush() {
         if (setBatchTimer) return;
         setBatchTimer = setTimeout(flushPendingSets, setBatchWindowMs);
+        setBatchTimer.unref?.();
     }
 
     return {

@@ -9,6 +9,7 @@ import {
     findSymbol,
     getScopeContext,
     getScopeStats,
+    invalidateScopePath,
     listScopes,
     refreshScope,
 } from '#copilot/infra/public/session';
@@ -46,6 +47,11 @@ const ScopeIdParameters = z.object({
 
 const ScopeContextParameters = z.object({
     sessionId: z.string().min(1).describe('ID do escopo.'),
+});
+
+const ScopeInvalidatePathParameters = z.object({
+    sessionId: z.string().min(1).describe('ID do escopo.'),
+    path: z.string().min(1).describe('Arquivo do workspace a invalidar no cache e índice simbólico do escopo.'),
 });
 
 const ScopeListParameters = z.object({
@@ -161,6 +167,18 @@ export const workspaceScopeRefreshTool = buildTool({
     },
 });
 
+export const workspaceScopeInvalidatePathTool = buildTool({
+    name: 'workspace_scope_invalidate_path',
+    description: 'Invalida um path no cache e índice simbólico de um escopo sem re-parse imediato.',
+    parameters: ScopeInvalidatePathParameters,
+    handler: async ({ sessionId, path }) => {
+        const pathCheck = await validatePath(path, { mode: 'read' });
+        if (!pathCheck.ok) return { success: false, error: pathCheck.reason, path };
+        invalidateScopePath(sessionId, pathCheck.resolved);
+        return { success: true, sessionId, path: pathCheck.resolved };
+    },
+});
+
 export const workspaceScopeListTool = buildTool({
     name: 'workspace_scope_list',
     description: 'Lista escopos de trabalho ativos da LLM-B e seus stats de cache/parser quando solicitado.',
@@ -207,6 +225,7 @@ export const scopeTools = [
     workspaceScopeDeclareTool,
     workspaceScopeListTool,
     workspaceScopeRefreshTool,
+    workspaceScopeInvalidatePathTool,
     workspaceScopeContextTool,
     workspaceScopeFindSymbolTool,
     workspaceScopeCloseTool,

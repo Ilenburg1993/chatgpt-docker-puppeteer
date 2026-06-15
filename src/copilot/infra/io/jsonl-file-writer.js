@@ -17,6 +17,7 @@ import { utf8ByteLength } from '../shared/buffer.js';
  * @property {number} [batchLines]
  * @property {number} [maxQueueLines]
  * @property {number} [softQueueLines]
+ * @property {number} [maxTrackedFiles]
  * @property {boolean} [autoFlush]
  * @property {boolean} [flushToDisk]
  * @property {(filePath: string) => string} [resolveRotatedPath]
@@ -40,6 +41,7 @@ export function createJsonlFileWriter(options) {
     const batchLines = Math.max(1, Math.trunc(options.batchLines ?? 256));
     const maxQueueLines = Math.max(batchLines, Math.trunc(options.maxQueueLines ?? Number.MAX_SAFE_INTEGER));
     const softQueueLines = Math.max(1, Math.min(maxQueueLines, Math.trunc(options.softQueueLines ?? maxQueueLines)));
+    const maxTrackedFiles = Math.max(1, Math.trunc(options.maxTrackedFiles ?? 64));
     const autoFlush = options.autoFlush !== false;
     const flushToDisk = options.flushToDisk === true;
     const maxBytes =
@@ -70,6 +72,32 @@ export function createJsonlFileWriter(options) {
 
     /**
      * @param {string} filePath
+     * @returns {number | undefined}
+     */
+    function getTrackedSize(filePath) {
+        const size = sizes.get(filePath);
+        if (size === undefined) return undefined;
+        sizes.delete(filePath);
+        sizes.set(filePath, size);
+        return size;
+    }
+
+    /**
+     * @param {string} filePath
+     * @param {number} size
+     */
+    function setTrackedSize(filePath, size) {
+        sizes.delete(filePath);
+        sizes.set(filePath, size);
+        while (sizes.size > maxTrackedFiles) {
+            const oldest = sizes.keys().next().value;
+            if (typeof oldest !== 'string') break;
+            sizes.delete(oldest);
+        }
+    }
+
+    /**
+     * @param {string} filePath
      * @param {string} data
      * @returns {Promise<void>}
      */
@@ -78,7 +106,7 @@ export function createJsonlFileWriter(options) {
             filePath,
             async () => {
                 await mkdir(path.dirname(filePath), { recursive: true });
-                let currentSize = sizes.get(filePath);
+                let currentSize = getTrackedSize(filePath);
                 if (currentSize === undefined) {
                     try {
                         currentSize = (await stat(filePath)).size;
@@ -98,7 +126,7 @@ export function createJsonlFileWriter(options) {
                 await options.onPhase?.('before-append', { filePath, dataBytes });
                 await appendFile(filePath, data, { encoding: 'utf8', flush: flushToDisk });
                 await options.onPhase?.('after-append', { filePath, dataBytes });
-                sizes.set(filePath, currentSize + dataBytes);
+                setTrackedSize(filePath, currentSize + dataBytes);
             },
             { operation: 'jsonl-append', target: filePath, riskClass: 'medium' },
         );
@@ -210,6 +238,8 @@ export function createJsonlFileWriter(options) {
             failedBatches,
             droppedLines,
             lastError,
+            trackedFiles: sizes.size,
+            maxTrackedFiles,
         }),
     };
 }

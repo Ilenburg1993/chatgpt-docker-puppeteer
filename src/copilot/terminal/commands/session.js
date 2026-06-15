@@ -306,7 +306,17 @@ function renderTerminalSdkFsRoutingLine(routing) {
 }
 
 /**
- * @param {{ cache: { l1: Record<string, unknown>; l2: Record<string, unknown>; aggregate: Record<string, unknown> }; index?: unknown; scopes: { active: number }; parser: { size: number; maxSize: number } }} ioRuntime
+ * @param {unknown} parser
+ * @returns {string}
+ */
+function renderTerminalParserUsage(parser) {
+    const record = /** @type {Record<string, unknown>} */ (parser ?? {});
+    if (typeof record['error'] === 'string') return 'indisponível';
+    return `${record['size'] ?? 0}/${record['maxSize'] ?? 0}`;
+}
+
+/**
+ * @param {{ cache: { l1: Record<string, unknown>; l2: Record<string, unknown>; aggregate: Record<string, unknown> }; index?: unknown; scopes: { active: number }; parser: unknown }} ioRuntime
  * @returns {{ cache: string; scope: string }}
  */
 function renderTerminalIoStatusLines(ioRuntime) {
@@ -318,7 +328,7 @@ function renderTerminalIoStatusLines(ioRuntime) {
     const indexFiles = Number(ioIndex['files'] ?? 0);
     return {
         cache: `L1 ${ioL1['enabled'] ? 'ativo' : 'inativo'} · entradas ${ioL1['size'] ?? 0} · bytes ${ioL1['bytesStored'] ?? 0} · L2 ${ioL2['enabled'] ? 'ativo' : 'inativo'} · entradas ${ioL2['size'] ?? 0} · acerto ${hitPercent}`,
-        scope: `escopos ${ioRuntime.scopes.active} · parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize} · índice ${
+        scope: `escopos ${ioRuntime.scopes.active} · parser ${renderTerminalParserUsage(ioRuntime.parser)} · índice ${
             ioIndex['available'] ? countLabel(indexFiles, 'arquivo', 'arquivos') : 'vazio'
         }`,
     };
@@ -643,7 +653,7 @@ function renderLiveRuntimeTarget(value) {
 }
 
 /**
- * @param {{ cache: { l1: Record<string, unknown>; l2: Record<string, unknown>; aggregate: Record<string, unknown> }; index?: unknown; scopes: { active: number }; parser: { size: number; maxSize: number } }} ioRuntime
+ * @param {{ cache: { l1: Record<string, unknown>; l2: Record<string, unknown>; aggregate: Record<string, unknown> }; index?: unknown; scopes: { active: number }; parser: unknown }} ioRuntime
  * @returns {string}
  */
 function renderLiveContextLine(ioRuntime) {
@@ -662,7 +672,7 @@ function renderLiveContextLine(ioRuntime) {
         `acerto ${hitPercent}`,
         `índice ${indexLabel}`,
         `escopos ${ioRuntime.scopes.active}`,
-        `parser ${ioRuntime.parser.size}/${ioRuntime.parser.maxSize}`,
+        `parser ${renderTerminalParserUsage(ioRuntime.parser)}`,
     ].join(' · ');
 }
 

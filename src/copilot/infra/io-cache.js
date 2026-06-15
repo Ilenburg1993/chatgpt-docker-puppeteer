@@ -27,28 +27,29 @@ import { normalizeIoCacheKey } from './cache/l1/index.js';
 import { publishIoInvalidation, registerIoInvalidationHook } from './io/invalidation/bus.js';
 import { fingerprintMatches, richFingerprintMatches } from './shared/fingerprint-match.js';
 import { sha256 } from './shared/hash.js';
+import { readEnvIntAtLeast, readEnvPositiveInt } from './shared/env.js';
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 /** TTL padrão do cache L1 (ms). Pode ser sobrescrito via env `IO_L1_CACHE_TTL_MS`. */
-const DEFAULT_TTL_MS = Number(process.env['IO_L1_CACHE_TTL_MS'] ?? 60_000);
+const DEFAULT_TTL_MS = readEnvPositiveInt('IO_L1_CACHE_TTL_MS', 60_000);
 
 /** Tamanho máximo do cache L1 (entradas). */
-const DEFAULT_MAX_ENTRIES = Number(process.env['IO_L1_CACHE_MAX_ENTRIES'] ?? 2_000);
+const DEFAULT_MAX_ENTRIES = readEnvPositiveInt('IO_L1_CACHE_MAX_ENTRIES', 2_000);
 
 /** Limite de memória do cache L1 (bytes). Padrão: 128 MiB. */
-const DEFAULT_MAX_BYTES = Number(process.env['IO_L1_CACHE_MAX_BYTES'] ?? 128 * 1024 * 1024);
+const DEFAULT_MAX_BYTES = readEnvPositiveInt('IO_L1_CACHE_MAX_BYTES', 128 * 1024 * 1024);
 
 /** Limite para revalidação por hash quando mtime diverge mas size segue igual. */
-const DEFAULT_HASH_REVALIDATE_MAX_BYTES = Number(process.env['IO_L1_HASH_REVALIDATE_MAX_BYTES'] ?? 1024 * 1024);
+const DEFAULT_HASH_REVALIDATE_MAX_BYTES = readEnvPositiveInt('IO_L1_HASH_REVALIDATE_MAX_BYTES', 1024 * 1024);
 
 /**
  * Intervalo mínimo entre validações de fingerprint (stat) para o mesmo arquivo. Padrão: 2000ms. Ajustável via
  * `IO_L1_STALE_PROBE_INTERVAL_MS`. 0 = sempre valida (modo paranoico). -1 = nunca valida (desativa fingerprint).
  */
-const STALE_PROBE_INTERVAL_MS = Number(process.env['IO_L1_STALE_PROBE_INTERVAL_MS'] ?? 2_000);
+const STALE_PROBE_INTERVAL_MS = readEnvIntAtLeast('IO_L1_STALE_PROBE_INTERVAL_MS', 2_000, -1);
 
 // ---------------------------------------------------------------------------
 // Typedefs

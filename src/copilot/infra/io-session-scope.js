@@ -29,6 +29,7 @@ import { invalidateIoCachePath, registerInvalidationHook } from './io-cache.js';
 import { buildIoIndexForDirectory } from './io-index-registry.js';
 import { invalidateParserCache, parseAndCacheSymbols } from './io-parser.js';
 import { endSessionScope, startSessionScope, warmFromDirectory } from './io-prefetch.js';
+import { publishIoLifecycleEvent } from './io-observability.js';
 import { readEnvPositiveInt } from './shared/env.js';
 
 // ---------------------------------------------------------------------------
@@ -115,6 +116,8 @@ const _registry = new Map();
 const _warmPromises = new Map();
 /** @type {Map<string, AbortController>} */
 const _warmControllers = new Map();
+/** @type {Map<string, Promise<boolean>>} */
+const _refreshingPaths = new Map();
 
 const MAX_ACTIVE_SCOPES = readEnvPositiveInt('IO_MAX_ACTIVE_SCOPES', 10);
 
@@ -258,6 +261,11 @@ function enforceScopeLimit(incomingSessionId) {
             }
         }
         if (!oldestSessionId) break;
+        publishIoLifecycleEvent('scope', 'evicted', {
+            sessionId: oldestSessionId,
+            activeScopes: _registry.size,
+            maxActiveScopes: MAX_ACTIVE_SCOPES,
+        });
         closeScope(oldestSessionId);
     }
 }
@@ -622,18 +630,31 @@ export async function refreshScope(sessionId, modifiedPaths) {
     }
 
     for (const p of targets) {
-        try {
-            invalidateParserCache(p);
-            invalidateIoCachePath(p);
-            const symbols = await parseAndCacheSymbols(p);
-            if (!scopeContainsPath(scope, p)) scope.paths.push(p);
-            scope.symbolIndex.set(p, symbols);
-            scope.invalidatedPaths.delete(p);
-            refreshed++;
-        } catch (error) {
-            failed++;
-            recordScopeFailure(scope, error, 'refresh', 'atualização do escopo falhou');
+        const refreshKey = `${sessionId}\u0000${normalizeScopePath(p)}`;
+        const inProgress = _refreshingPaths.get(refreshKey);
+        if (inProgress) {
+            await inProgress;
+            continue;
         }
+        const refreshPromise = (async () => {
+            try {
+                invalidateParserCache(p);
+                invalidateIoCachePath(p);
+                const symbols = await parseAndCacheSymbols(p);
+                if (!scopeContainsPath(scope, p)) scope.paths.push(p);
+                scope.symbolIndex.set(p, symbols);
+                scope.invalidatedPaths.delete(p);
+                return true;
+            } catch (error) {
+                recordScopeFailure(scope, error, 'refresh', 'atualização do escopo falhou');
+                return false;
+            }
+        })();
+        _refreshingPaths.set(refreshKey, refreshPromise);
+        const succeeded = await refreshPromise;
+        if (_refreshingPaths.get(refreshKey) === refreshPromise) _refreshingPaths.delete(refreshKey);
+        if (succeeded) refreshed++;
+        else failed++;
     }
 
     scope.completedAt = Date.now();

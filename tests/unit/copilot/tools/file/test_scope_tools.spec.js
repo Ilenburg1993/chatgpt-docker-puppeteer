@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
     findSymbol: vi.fn(),
     listScopes: vi.fn(),
     getScopeStats: vi.fn(),
+    invalidateScopePath: vi.fn(),
     closeScope: vi.fn(),
 }));
 
@@ -18,6 +19,7 @@ vi.mock('#copilot/infra/public/session', () => ({
     refreshScope: mocks.refreshScope,
     getScopeContext: mocks.getScopeContext,
     getScopeStats: mocks.getScopeStats,
+    invalidateScopePath: mocks.invalidateScopePath,
     findSymbol: mocks.findSymbol,
     listScopes: mocks.listScopes,
 }));
@@ -28,6 +30,7 @@ import {
     workspaceScopeContextTool,
     workspaceScopeDeclareTool,
     workspaceScopeFindSymbolTool,
+    workspaceScopeInvalidatePathTool,
     workspaceScopeListTool,
     workspaceScopeRefreshTool,
 } from '../../../../../src/copilot/tools/file/scope-tools.js';
@@ -45,6 +48,7 @@ describe('tools/file/scope-tools', () => {
         mocks.findSymbol.mockReset();
         mocks.listScopes.mockReset();
         mocks.getScopeStats.mockReset();
+        mocks.invalidateScopePath.mockReset();
         mocks.closeScope.mockReset();
     });
 
@@ -53,6 +57,7 @@ describe('tools/file/scope-tools', () => {
             'workspace_scope_declare',
             'workspace_scope_list',
             'workspace_scope_refresh',
+            'workspace_scope_invalidate_path',
             'workspace_scope_context',
             'workspace_scope_find_symbol',
             'workspace_scope_close',
@@ -122,6 +127,7 @@ describe('tools/file/scope-tools', () => {
 
         await getHandler(workspaceScopeListTool)({ includeStats: true });
         await getHandler(workspaceScopeRefreshTool)({ sessionId: 'abc', modifiedPaths: ['src/a.ts'] });
+        await getHandler(workspaceScopeInvalidatePathTool)({ sessionId: 'abc', path: 'src/a.ts' });
         await getHandler(workspaceScopeContextTool)({ sessionId: 'abc' });
         await getHandler(workspaceScopeFindSymbolTool)({ sessionId: 'abc', symbol: 'buildTool' });
         await getHandler(workspaceScopeCloseTool)({ sessionId: 'abc' });
@@ -129,6 +135,7 @@ describe('tools/file/scope-tools', () => {
         expect(mocks.listScopes).toHaveBeenCalled();
         expect(mocks.getScopeStats).toHaveBeenCalledWith('abc');
         expect(mocks.refreshScope).toHaveBeenCalledWith('abc', [expect.stringMatching(/src[/\\]a\.ts$/)]);
+        expect(mocks.invalidateScopePath).toHaveBeenCalledWith('abc', expect.stringMatching(/src[/\\]a\.ts$/));
         expect(mocks.getScopeContext).toHaveBeenCalledWith('abc');
         expect(mocks.findSymbol).toHaveBeenCalledWith('abc', 'buildTool', { exactMatch: undefined });
         expect(mocks.closeScope).toHaveBeenCalledWith('abc');
@@ -148,5 +155,12 @@ describe('tools/file/scope-tools', () => {
 
         expect(out.success).toBe(false);
         expect(mocks.refreshScope).not.toHaveBeenCalled();
+    });
+
+    it('rejects invalidate path outside workspace before calling infra', async () => {
+        const out = await getHandler(workspaceScopeInvalidatePathTool)({ sessionId: 'abc', path: '/etc/passwd' });
+
+        expect(out.success).toBe(false);
+        expect(mocks.invalidateScopePath).not.toHaveBeenCalled();
     });
 });

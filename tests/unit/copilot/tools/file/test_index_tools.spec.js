@@ -272,6 +272,7 @@ describe('tools/file/index-tools', () => {
         const status = await getHandler(workspaceIndexStatusTool)({});
 
         expect(mocks.buildIoIndexForDirectory).toHaveBeenCalledWith(expect.stringMatching(/src[/\\]copilot$/), {
+            workspaceRoot: '/workspaces/chatgpt-docker-puppeteer',
             include: ['*.js'],
             concurrency: 3,
         });

@@ -19,19 +19,27 @@ let _ioIndex = null;
 /** @type {Map<string, Promise<unknown>>} */
 const _inflightIndexBuilds = new Map();
 
-registerInvalidationHook((filePath) => {
-    try {
-        getIoIndex()?.invalidatePath(filePath);
-    } catch {
-        /* invalidation hooks não devem derrubar o writer */
-    }
-});
+/** @type {(() => void) | null} */
+let _indexInvalidationUnregister = null;
+
+function ensureIndexInvalidationHook() {
+    if (_indexInvalidationUnregister) return;
+    _indexInvalidationUnregister =
+        registerInvalidationHook((filePath) => {
+            try {
+                getIoIndex()?.invalidatePath(filePath);
+            } catch {
+                /* invalidation hooks não devem derrubar o writer */
+            }
+        }) ?? null;
+}
 
 function isDisabled() {
     return String(process.env['IO_INDEX_ENABLED'] ?? '1').trim() === '0';
 }
 
 export function getIoIndex() {
+    ensureIndexInvalidationHook();
     if (isDisabled()) return null;
     if (_ioIndex) return _ioIndex;
     try {
@@ -141,4 +149,6 @@ export function invalidateIoIndexPath(filePath) {
 export function resetIoIndexForTest() {
     _ioIndex = null;
     _inflightIndexBuilds.clear();
+    _indexInvalidationUnregister?.();
+    _indexInvalidationUnregister = null;
 }

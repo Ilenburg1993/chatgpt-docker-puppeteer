@@ -55,7 +55,12 @@ const DEFAULT_EMPTY_TURN_QUIESCENCE_MS = 160;
  *     droppedDeltaChars: number;
  * }} TerminalTurnMaterializationSnapshot
  *
- * @typedef {TerminalTurnMaterializationSnapshot & { deltaText: string }} InternalTerminalTurnMaterialization
+ * @typedef {TerminalTurnMaterializationSnapshot & {
+ *     deltaText: string;
+ *     normalizedDeltaText: string;
+ *     deltaNormalizationPendingWhitespace: boolean;
+ *     hasDialogDelta: boolean;
+ * }} InternalTerminalTurnMaterialization
  *
  * @typedef {{
  *     reply: string | null;
@@ -80,7 +85,7 @@ let _currentTurnMaterialization = null;
 const _materializationEmitter = new EventEmitter();
 _materializationEmitter.setMaxListeners(25);
 
-/** @type {{ turnKey: string; turnId: string | null; reply: string; deltaText: string; normalizedReply: string; normalizedDeltaText: string; completedAt: number }[]} */
+/** @type {{ turnKey: string; turnId: string | null; deltaText: string; normalizedReply: string; normalizedDeltaText: string; completedAt: number }[]} */
 const _recentCompletedTurnMaterializations = [];
 
 /**
@@ -111,7 +116,31 @@ function normalizeComparableTranscript(value) {
 }
 
 /**
- * Encontra o sufixo bruto de uma mensagem final preservando markdown/quebras originais.
+ * Acrescenta um fragmento à forma comparável sem renormalizar todo o turno.
+ *
+ * @param {string} current
+ * @param {boolean} pendingWhitespace
+ * @param {string} chunk
+ * @returns {{ text: string; pendingWhitespace: boolean }}
+ */
+function appendComparableTranscript(current, pendingWhitespace, chunk) {
+    const normalizedChunk = normalizeComparableTranscript(chunk);
+    const chunkStartsWithWhitespace = /^\s/u.test(chunk);
+    const chunkEndsWithWhitespace = /\s$/u.test(chunk);
+    if (!normalizedChunk) {
+        return {
+            text: current,
+            pendingWhitespace: current.length > 0 && (pendingWhitespace || chunk.length > 0),
+        };
+    }
+    return {
+        text: `${current}${current && (pendingWhitespace || chunkStartsWithWhitespace) ? ' ' : ''}${normalizedChunk}`,
+        pendingWhitespace: chunkEndsWithWhitespace,
+    };
+}
+
+/**
+ * Encontra em O(n) o sufixo bruto de uma mensagem final preservando markdown/quebras originais.
  *
  * @param {string} finalContent
  * @param {string} alreadyRenderedContent
@@ -120,12 +149,22 @@ function normalizeComparableTranscript(value) {
 function findRawSuffixAfterRenderedPrefix(finalContent, alreadyRenderedContent) {
     const renderedNormalized = normalizeComparableTranscript(alreadyRenderedContent);
     if (!renderedNormalized) return null;
-    for (let index = 0; index <= finalContent.length; index += 1) {
-        if (normalizeComparableTranscript(finalContent.slice(0, index)) === renderedNormalized) {
-            return finalContent.slice(index);
+    let rawIndex = 0;
+    let normalizedIndex = 0;
+    while (rawIndex < finalContent.length && /\s/u.test(finalContent[rawIndex] ?? '')) rawIndex += 1;
+    while (normalizedIndex < renderedNormalized.length) {
+        const expected = renderedNormalized[normalizedIndex];
+        if (expected === ' ') {
+            if (!/\s/u.test(finalContent[rawIndex] ?? '')) return null;
+            while (rawIndex < finalContent.length && /\s/u.test(finalContent[rawIndex] ?? '')) rawIndex += 1;
+            normalizedIndex += 1;
+            continue;
         }
+        if (finalContent[rawIndex] !== expected) return null;
+        rawIndex += 1;
+        normalizedIndex += 1;
     }
-    return null;
+    return finalContent.slice(rawIndex);
 }
 
 /**
@@ -228,6 +267,9 @@ export function beginTerminalTurnMaterialization({
         assistantMessages: [],
         deltaSlices: [],
         deltaText: '',
+        normalizedDeltaText: '',
+        deltaNormalizationPendingWhitespace: false,
+        hasDialogDelta: false,
         deltaChars: 0,
         droppedDeltaSlices: 0,
         droppedDeltaChars: 0,
@@ -328,6 +370,14 @@ export function recordTerminalTurnDelta(input) {
         timestamp,
     };
     _currentTurnMaterialization.deltaText += input.chunk;
+    const comparable = appendComparableTranscript(
+        _currentTurnMaterialization.normalizedDeltaText,
+        _currentTurnMaterialization.deltaNormalizationPendingWhitespace,
+        input.chunk,
+    );
+    _currentTurnMaterialization.normalizedDeltaText = comparable.text;
+    _currentTurnMaterialization.deltaNormalizationPendingWhitespace = comparable.pendingWhitespace;
+    _currentTurnMaterialization.hasDialogDelta ||= entry.source === 'dialog/onDelta';
     _currentTurnMaterialization.deltaChars += input.chunk.length;
     _currentTurnMaterialization.deltaSlices.push(entry);
     if (_currentTurnMaterialization.deltaSlices.length > MAX_DELTA_SLICES_PER_TURN) {
@@ -445,12 +495,11 @@ export function completeTerminalTurnMaterialization({
         current.updatedAt = timestamp;
         current.completedAt = timestamp;
         const normalizedReply = normalizeComparableTranscript(reply);
-        const normalizedDeltaText = normalizeComparableTranscript(current.deltaText);
+        const normalizedDeltaText = current.normalizedDeltaText;
         if (normalizedReply || normalizedDeltaText) {
             _recentCompletedTurnMaterializations.unshift({
                 turnKey: current.turnKey,
                 turnId: current.turnId,
-                reply: reply ?? '',
                 deltaText: current.deltaText,
                 normalizedReply,
                 normalizedDeltaText,
@@ -502,7 +551,7 @@ export function getTerminalAssistantMessageMaterializationDecision({
     const normalizedTurnId = normalizeTurnId(turnId);
 
     const decideFromEntry = (
-        /** @type {{ turnKey: string; turnId: string | null; reply?: string; deltaText?: string; normalizedReply: string; normalizedDeltaText: string }} */ entry,
+        /** @type {{ turnKey: string; turnId: string | null; deltaText?: string; normalizedReply: string; normalizedDeltaText: string }} */ entry,
     ) => {
         if (normalizedTurnId && entry.turnId && normalizedTurnId !== entry.turnId) return null;
         if (entry.normalizedReply && entry.normalizedReply === normalizedContent) {
@@ -570,13 +619,12 @@ export function getTerminalAssistantMessageMaterializationDecision({
         const currentDecision = decideFromEntry({
             turnKey: _currentTurnMaterialization.turnKey,
             turnId: _currentTurnMaterialization.turnId,
-            reply: '',
             deltaText: _currentTurnMaterialization.deltaText,
             normalizedReply: '',
-            normalizedDeltaText: normalizeComparableTranscript(_currentTurnMaterialization.deltaText),
+            normalizedDeltaText: _currentTurnMaterialization.normalizedDeltaText,
         });
         if (currentDecision) return currentDecision;
-        if (normalizeComparableTranscript(_currentTurnMaterialization.deltaText)) {
+        if (_currentTurnMaterialization.normalizedDeltaText) {
             return {
                 action: 'render_full',
                 reason: 'stream_mismatch',
@@ -627,10 +675,8 @@ export function shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
 export function shouldSuppressTerminalTaskDeltaAsMaterializedDialog({ chunk }) {
     const normalizedChunk = normalizeComparableTranscript(chunk);
     if (!normalizedChunk || !_currentTurnMaterialization) return false;
-    const hasDialogDelta = _currentTurnMaterialization.deltaSlices.some((entry) => entry.source === 'dialog/onDelta');
-    if (!hasDialogDelta) return false;
-    const normalizedDeltaText = normalizeComparableTranscript(_currentTurnMaterialization.deltaText);
-    return Boolean(normalizedDeltaText && normalizedDeltaText.includes(normalizedChunk));
+    if (!_currentTurnMaterialization.hasDialogDelta) return false;
+    return _currentTurnMaterialization.normalizedDeltaText.includes(normalizedChunk);
 }
 
 /**

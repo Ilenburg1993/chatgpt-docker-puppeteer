@@ -12,9 +12,26 @@ import { spawn } from 'node:child_process';
 import { concatBufferViews, toOwnedBuffer } from '../../shared/buffer.js';
 
 const DEFAULT_SEARCH_SUBPROCESS_MAX_BUFFER_BYTES = 1024 * 1024;
+const SEARCH_SUBPROCESS_KILL_GRACE_MS = 3_000;
 
 /** @type {boolean | null} */
 let _rgAvailable = null;
+
+/**
+ * Envia SIGTERM e escala para SIGKILL se o processo não fechar dentro da janela de graça.
+ *
+ * @param {import('node:child_process').ChildProcess} child
+ * @returns {void}
+ */
+function terminateSearchChild(child) {
+    if (child.exitCode !== null || child.signalCode !== null) return;
+    child.kill('SIGTERM');
+    const killTimer = setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    }, SEARCH_SUBPROCESS_KILL_GRACE_MS);
+    killTimer.unref?.();
+    child.once('close', () => clearTimeout(killTimer));
+}
 
 /**
  * @typedef {object} SearchSubprocessOptions
@@ -218,7 +235,7 @@ export async function execSearchFile(file, args, options = {}) {
             if (settled) return;
             const stdout = decodeStdout();
             const stderr = decodeStderr();
-            if (!child.killed) child.kill('SIGTERM');
+            terminateSearchChild(child);
             finish(() => reject(makeSearchRuntimeError(message, stdout, stderr, code)));
         };
 
@@ -368,7 +385,7 @@ export async function streamSearchFile(file, args, options = {}) {
             if (settled) return;
             const stdout = decodeStdout();
             const stderr = decodeStderr();
-            if (!child.killed) child.kill('SIGTERM');
+            terminateSearchChild(child);
             finish(() => reject(makeSearchRuntimeError(message, stdout, stderr, code)));
         };
 
@@ -386,7 +403,7 @@ export async function streamSearchFile(file, args, options = {}) {
             if (collectStdout) stdoutLines.push(line);
             if (keepGoing === false) {
                 stoppedEarly = true;
-                if (!child.killed) child.kill('SIGTERM');
+                terminateSearchChild(child);
                 return false;
             }
             return true;

@@ -395,6 +395,42 @@ describe('F35 — create_file (F184)', () => {
         expect(result.bytesWritten).toBe(Buffer.byteLength('ação 🚀', 'utf8'));
     });
 
+    it('cria arquivo binário novo a partir de base64 em uma operação', async () => {
+        pathOk('/workspace/new.bin');
+        fsMock.access.mockRejectedValue(enoent());
+        fsMock.mkdir.mockResolvedValue(undefined);
+        fsMock.writeFile.mockResolvedValue(undefined);
+        fsMock.rename.mockResolvedValue(undefined);
+        const payload = Buffer.from([0x00, 0xff, 0x7f]);
+
+        const result = await handler({
+            path: 'new.bin',
+            content: payload.toString('base64'),
+            encoding: 'base64',
+            createParentDirs: true,
+            overwrite: false,
+        });
+
+        expect(result).toMatchObject({ success: true, bytesWritten: payload.byteLength });
+        expect(fsMock.writeFile.mock.calls[0]?.[1]).toEqual(payload);
+    });
+
+    it('rejeita base64 inválido antes de criar arquivo', async () => {
+        pathOk('/workspace/new.bin');
+
+        const result = await handler({
+            path: 'new.bin',
+            content: '%%%',
+            encoding: 'base64',
+            createParentDirs: true,
+            overwrite: false,
+        });
+
+        expect(result).toMatchObject({ success: false });
+        expect(result.toolFeedback).toMatchObject({ toolName: 'create_file', category: 'invalid-parameters' });
+        expect(fsMock.writeFile).not.toHaveBeenCalled();
+    });
+
     it('falha se validatePath rejeita', async () => {
         pathFail('Blocked');
 
@@ -496,6 +532,29 @@ describe('F35 — copy_file (F186)', () => {
         );
         expect(fsMock.link).toHaveBeenCalledWith(expect.stringContaining('.dst.txt.'), '/workspace/dst.txt');
         expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write' });
+    });
+
+    it('aplica expectedSourceHash antes de publicar a cópia', async () => {
+        mockValidatePath
+            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/src.txt', reason: undefined })
+            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/dst.txt', reason: undefined });
+        fsMock.access.mockRejectedValue(new Error('ENOENT'));
+        fsMock.readFile.mockResolvedValue(Buffer.from('source', 'utf8'));
+        streamPayload('/workspace/src.txt', 'source');
+        fsMock.mkdir.mockResolvedValue(undefined);
+        fsMock.copyFile.mockImplementation(async (source, destination) => copyStreamPayload(source, destination));
+        fsMock.stat.mockResolvedValue(stableStats(6));
+
+        const result = await handler({
+            source: 'src.txt',
+            destination: 'dst.txt',
+            overwrite: false,
+            expectedSourceHash: 'wrong-hash',
+        });
+
+        expect(result.success).toBe(false);
+        expect(fsMock.link).not.toHaveBeenCalled();
+        expect(fsMock.rename).not.toHaveBeenCalled();
     });
 
     it('falha se destino existe e overwrite=false', async () => {

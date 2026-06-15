@@ -262,4 +262,22 @@ describe('infra/io deterministic fault injection', () => {
         expect(await readFile(filePath, 'utf8')).toBe('{"new":true}\n');
         expect(writer.getState().queueDepth).toBe(0);
     });
+
+    it('limita paths rastreados pelo writer JSONL dinâmico', async () => {
+        const dir = await createTempDir();
+        let currentPath = path.join(dir, 'one.jsonl');
+        const writer = createJsonlFileWriter({
+            filePath: () => currentPath,
+            autoFlush: false,
+            maxTrackedFiles: 2,
+        });
+
+        for (const name of ['one.jsonl', 'two.jsonl', 'three.jsonl']) {
+            currentPath = path.join(dir, name);
+            writer.enqueueLine(JSON.stringify({ name }));
+            await writer.flush();
+        }
+
+        expect(writer.getState()).toMatchObject({ trackedFiles: 2, maxTrackedFiles: 2 });
+    });
 });

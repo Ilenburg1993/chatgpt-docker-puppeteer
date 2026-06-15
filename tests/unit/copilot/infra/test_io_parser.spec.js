@@ -520,6 +520,9 @@ describe('parseAndCacheSymbols', () => {
         assert.equal(typeof stats.workerQueueTimeouts, 'number');
         assert.equal(typeof stats.workerQueueWaitMsLast, 'number');
         assert.equal(typeof stats.workerQueueWaitMsMax, 'number');
+        assert.equal(typeof stats.workerPoolRestarting, 'number');
+        assert.equal(typeof stats.workerRestarts, 'number');
+        assert.equal(typeof stats.workerRestartFailures, 'number');
         assert.ok(stats.workerQueueMax >= 0);
         assert.ok(stats.workerQueueLength >= 0);
     });

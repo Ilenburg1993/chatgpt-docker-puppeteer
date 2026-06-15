@@ -209,6 +209,7 @@ export function createSseWriter(req, res, opts = {}) {
                 else res.end();
             }
         }, maxLifetimeMs);
+        lifetimeTimer.unref?.();
     }
 
     // --- Cleanup ---
@@ -222,6 +223,7 @@ export function createSseWriter(req, res, opts = {}) {
         _cleaned = true;
         if (heartbeatTimerId) cancelTimer(heartbeatTimerId);
         if (lifetimeTimer) clearTimeout(lifetimeTimer);
+        if (gzStream && !gzStream.destroyed) gzStream.destroy();
         tracker?.decrement();
         for (const cb of cleanupCallbacks) cb();
     };
@@ -229,6 +231,10 @@ export function createSseWriter(req, res, opts = {}) {
     req.on('close', cleanup);
     res.on('error', cleanup);
     res.on('finish', cleanup);
+    gzStream?.on('error', (error) => {
+        cleanup();
+        if (!res.writableEnded) res.destroy(error);
+    });
 
     return {
         send,

@@ -100,11 +100,14 @@ function summarizeIoRuntime(ioRuntime) {
     const hitRatio = ioRuntime.cache.aggregate.hitRatio;
     const cache = `acerto ${pct(hitRatio)} · L2 ${yn(Boolean(ioRuntime.cache.l2?.['enabled']))}`;
     const indexRecord = /** @type {Record<string, unknown>} */ (ioRuntime.index ?? {});
+    const parserRecord = /** @type {Record<string, unknown>} */ (ioRuntime.parser ?? {});
     const index = indexRecord['available']
         ? `ok · arquivos ${String(indexRecord['files'] ?? indexRecord['fileCount'] ?? '-')}`
         : `off · ${String(indexRecord['reason'] ?? 'unavailable')}`;
     return {
-        io: `escopos ${ioRuntime.scopes.active} · parser ${String(ioRuntime.parser?.size ?? 0)}`,
+        io: `escopos ${ioRuntime.scopes.active} · parser ${
+            typeof parserRecord['error'] === 'string' ? 'indisponível' : String(parserRecord['size'] ?? 0)
+        }`,
         cache,
         index,
     };

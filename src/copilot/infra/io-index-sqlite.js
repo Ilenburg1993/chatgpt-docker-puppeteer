@@ -356,11 +356,15 @@ export function createIoIndexSqlite(options) {
             stmtListIndexedUnderPathFiltered.all(normalizedRoot, `${normalizedRoot}/%`, extensionJson, extensionJson)
         );
         let pruned = 0;
-        for (const row of rows) {
-            if (currentFilePaths.has(row.filePath)) continue;
-            clearFileRows(row.filePath);
-            pruned += 1;
-        }
+        const prune = () => {
+            for (const row of rows) {
+                if (currentFilePaths.has(row.filePath)) continue;
+                clearFileRows(row.filePath);
+                pruned += 1;
+            }
+        };
+        if (typeof db.transaction === 'function') db.transaction(prune)();
+        else prune();
         return pruned;
     }
 

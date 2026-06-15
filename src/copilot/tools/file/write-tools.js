@@ -1,6 +1,6 @@
 // @ts-check
 import { withIoMeta } from '#copilot/core';
-import { decodeBase64ToOwnedBuffer, toOwnedBuffer, utf8ByteLength } from '#copilot/infra/public/buffer';
+import { decodeBase64ToOwnedBuffer, toOwnedBuffer } from '#copilot/infra/public/buffer';
 import { createIoOperationEnvelope } from '#copilot/infra/public/runtime';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
@@ -213,6 +213,11 @@ const createFileTool = buildTool({
     parameters: z.object({
         path: z.string().describe('Caminho do arquivo a criar'),
         content: z.string().optional().default('').describe('Conteúdo inicial do arquivo'),
+        encoding: z
+            .enum(['utf8', 'base64'])
+            .optional()
+            .default('utf8')
+            .describe('Codificação do conteúdo inicial (utf8 para texto, base64 para binário)'),
         createParentDirs: z
             .boolean()
             .optional()
@@ -224,11 +229,12 @@ const createFileTool = buildTool({
             .default(false)
             .describe('Se true, sobrescreve o arquivo se já existir (⚠️ destrutivo)'),
     }),
-    handler: async ({ path: filePath, content, createParentDirs, overwrite }) => {
+    handler: async ({ path: filePath, content, encoding, createParentDirs, overwrite }) => {
         const { ok, reason, resolved } = await validatePath(filePath, { mode: 'write' });
         if (!ok) {
             return pathFailureResult('create_file', reason ?? 'Caminho inválido.', {
                 path: filePath,
+                encoding,
                 createParentDirs,
                 overwrite,
             });
@@ -244,9 +250,27 @@ const createFileTool = buildTool({
         });
 
         try {
-            const contentBytes = utf8ByteLength(content ?? '', 'write_file_content content');
-            const writeResult = await createOrReplaceFileAtomic(resolved, content ?? '', {
-                encoding: 'utf8',
+            let payload;
+            try {
+                payload =
+                    encoding === 'base64'
+                        ? decodeBase64ToOwnedBuffer(content ?? '', 'create_file.content')
+                        : toOwnedBuffer(content ?? '', 'utf8');
+            } catch (error) {
+                return createToolFailureResult({
+                    toolName: 'create_file',
+                    error,
+                    category: 'invalid-parameters',
+                    fix: 'Envie content como texto UTF-8 ou como base64/base64url válido quando encoding=base64.',
+                    receivedParameters: { path: filePath, encoding, createParentDirs, overwrite },
+                    details: { path: resolved, encoding },
+                    extra: {
+                        operation: await failAndAuditMutation(operation, error, { tool: 'create_file' }),
+                    },
+                });
+            }
+            const contentBytes = payload.byteLength;
+            const writeResult = await createOrReplaceFileAtomic(resolved, payload, {
                 createParentDirs,
                 failIfExists: !overwrite,
                 riskClass,
@@ -292,7 +316,7 @@ const createFileTool = buildTool({
             return mutationFailureResult(
                 'create_file',
                 err,
-                { path: filePath, createParentDirs, overwrite },
+                { path: filePath, encoding, createParentDirs, overwrite },
                 { path: resolved },
                 { operation: failedOperation },
             );
@@ -416,14 +440,18 @@ const copyFileTool = buildTool({
         source: z.string().describe('Caminho do arquivo de origem'),
         destination: z.string().describe('Caminho de destino'),
         overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
+        expectedSourceHash: z
+            .string()
+            .optional()
+            .describe('SHA-256 esperado da origem. Se ela mudou, a cópia falha sem publicar o destino.'),
     }),
-    handler: async ({ source, destination, overwrite }) => {
+    handler: async ({ source, destination, overwrite, expectedSourceHash }) => {
         const src = await validatePath(source, { mode: 'read' });
         if (!src.ok) {
             return pathFailureResult(
                 'copy_file',
                 src.reason ?? 'Caminho de origem inválido.',
-                { source, destination, overwrite },
+                { source, destination, overwrite, expectedSourceHash },
                 { field: 'source' },
             );
         }
@@ -433,7 +461,7 @@ const copyFileTool = buildTool({
             return pathFailureResult(
                 'copy_file',
                 dst.reason ?? 'Caminho de destino inválido.',
-                { source, destination, overwrite },
+                { source, destination, overwrite, expectedSourceHash },
                 { field: 'destination' },
             );
         }
@@ -448,7 +476,10 @@ const copyFileTool = buildTool({
         });
 
         try {
-            const copyResult = await copyFileLocked(src.resolved, dst.resolved, { overwrite });
+            const copyResult = await copyFileLocked(src.resolved, dst.resolved, {
+                overwrite,
+                ...(expectedSourceHash ? { expectedSourceHash } : {}),
+            });
             return withIoMeta(
                 {
                     success: true,
@@ -531,7 +562,7 @@ const copyFileTool = buildTool({
             return mutationFailureResult(
                 'copy_file',
                 err,
-                { source, destination, overwrite },
+                { source, destination, overwrite, expectedSourceHash },
                 { source: src.resolved, destination: dst.resolved },
                 { operation: failedOperation },
             );

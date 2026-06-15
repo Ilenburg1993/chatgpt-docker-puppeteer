@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     findImports: vi.fn(() => []),
     getCopilotDb: vi.fn(() => ({})),
     registerInvalidationHook: vi.fn(),
+    unregisterInvalidationHook: vi.fn(),
 }));
 
 vi.mock('#copilot/db', () => ({
@@ -36,8 +37,11 @@ vi.mock('../../../../src/copilot/infra/io-index-sqlite.js', () => ({
 import { buildIoIndexForDirectory, resetIoIndexForTest } from '../../../../src/copilot/infra/io-index-registry.js';
 
 beforeEach(() => {
+    mocks.registerInvalidationHook.mockImplementation(() => mocks.unregisterInvalidationHook);
     resetIoIndexForTest();
+    mocks.registerInvalidationHook.mockClear();
     mocks.indexDirectory.mockReset();
+    mocks.unregisterInvalidationHook.mockReset();
 });
 
 afterEach(() => {
@@ -81,5 +85,24 @@ describe('io-index-registry build coalescing', () => {
         ]);
 
         expect(mocks.indexDirectory).toHaveBeenCalledTimes(2);
+    });
+
+    it('desmonta e recria o hook de invalidação ao resetar', async () => {
+        mocks.indexDirectory.mockResolvedValue({
+            available: true,
+            indexed: 0,
+            skipped: 0,
+            failed: 0,
+            durationMs: 0,
+        });
+
+        await buildIoIndexForDirectory('/tmp/ws-hook');
+        expect(mocks.registerInvalidationHook).toHaveBeenCalledTimes(1);
+
+        resetIoIndexForTest();
+        expect(mocks.unregisterInvalidationHook).toHaveBeenCalledTimes(1);
+
+        await buildIoIndexForDirectory('/tmp/ws-hook');
+        expect(mocks.registerInvalidationHook).toHaveBeenCalledTimes(2);
     });
 });

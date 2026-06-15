@@ -110,7 +110,7 @@ export const workspaceIndexBuildTool = buildTool({
             };
         }
         /** @type {Parameters<typeof buildIoIndexForDirectory>[1]} */
-        const options = {};
+        const options = { workspaceRoot: WORKSPACE_ROOT };
         if (recursive !== undefined) options.recursive = recursive;
         if (depth !== undefined) options.depth = depth;
         if (respectGitignore !== undefined) options.respectGitignore = respectGitignore;

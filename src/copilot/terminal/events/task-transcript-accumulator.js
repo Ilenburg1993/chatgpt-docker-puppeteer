@@ -19,7 +19,8 @@ const INTERNAL_TASK_KEY = 'internal-task';
 
 /**
  * @typedef {{
- *     content: string;
+ *     chunks: string[];
+ *     chars: number;
  *     truncated: boolean;
  *     seenWhileBusy: boolean;
  *     liveRendered: boolean;
@@ -75,6 +76,19 @@ export function createTaskTranscriptAccumulator(options = {}) {
     const renderTranscript = options.renderTranscript ?? renderTerminalAssistantTranscript;
     /** @type {Map<string, TaskTranscriptEntry>} */
     const entries = new Map();
+    let totalChars = 0;
+
+    /**
+     * @param {string} taskKey
+     * @returns {boolean}
+     */
+    function deleteEntry(taskKey) {
+        const entry = entries.get(taskKey);
+        if (!entry) return false;
+        entries.delete(taskKey);
+        totalChars = Math.max(0, totalChars - entry.chars);
+        return true;
+    }
 
     /**
      * @param {string} taskKey
@@ -84,12 +98,12 @@ export function createTaskTranscriptAccumulator(options = {}) {
         while (!entries.has(taskKey) && entries.size >= maxEntries) {
             const oldest = entries.keys().next().value;
             if (typeof oldest !== 'string') break;
-            entries.delete(oldest);
+            deleteEntry(oldest);
         }
-        while ([...entries.values()].reduce((sum, entry) => sum + entry.content.length, 0) >= maxTotalChars) {
+        while (totalChars >= maxTotalChars) {
             const oldest = entries.keys().next().value;
             if (typeof oldest !== 'string' || (oldest === taskKey && entries.size === 1)) break;
-            entries.delete(oldest);
+            deleteEntry(oldest);
         }
     }
 
@@ -102,21 +116,22 @@ export function createTaskTranscriptAccumulator(options = {}) {
         const taskKey = getTaskTranscriptKey(taskId);
         makeRoomFor(taskKey);
         const entry = entries.get(taskKey) ?? {
-            content: '',
+            chunks: [],
+            chars: 0,
             truncated: false,
             seenWhileBusy: false,
             liveRendered: false,
         };
         entry.seenWhileBusy = entry.seenWhileBusy || isBusy();
-        if (entry.content.length < maxChars) {
-            const totalWithoutEntry =
-                [...entries.values()].reduce((sum, item) => sum + item.content.length, 0) - entry.content.length;
-            const remaining = Math.max(
-                0,
-                Math.min(maxChars - entry.content.length, maxTotalChars - totalWithoutEntry - entry.content.length),
-            );
-            entry.content += chunk.slice(0, remaining);
-            if (chunk.length > remaining) entry.truncated = true;
+        if (entry.chars < maxChars) {
+            const remaining = Math.max(0, Math.min(maxChars - entry.chars, maxTotalChars - totalChars));
+            const retained = chunk.slice(0, remaining);
+            if (retained) {
+                entry.chunks.push(retained);
+                entry.chars += retained.length;
+                totalChars += retained.length;
+            }
+            if (retained.length < chunk.length) entry.truncated = true;
         } else {
             entry.truncated = true;
         }
@@ -132,7 +147,8 @@ export function createTaskTranscriptAccumulator(options = {}) {
         const taskKey = getTaskTranscriptKey(taskId);
         makeRoomFor(taskKey);
         const entry = entries.get(taskKey) ?? {
-            content: '',
+            chunks: [],
+            chars: 0,
             truncated: false,
             seenWhileBusy: false,
             liveRendered: false,
@@ -152,8 +168,8 @@ export function createTaskTranscriptAccumulator(options = {}) {
         const taskKey = getTaskTranscriptKey(taskId);
         const entry = entries.get(taskKey);
         if (!entry) return false;
-        entries.delete(taskKey);
-        const content = entry.content.trim();
+        deleteEntry(taskKey);
+        const content = entry.chunks.join('').trim();
         if (!content || entry.seenWhileBusy || entry.liveRendered) return false;
         return renderTranscript({
             content,
@@ -178,7 +194,7 @@ export function createTaskTranscriptAccumulator(options = {}) {
             return processed;
         },
         delete: (taskId) => {
-            entries.delete(getTaskTranscriptKey(taskId));
+            deleteEntry(getTaskTranscriptKey(taskId));
         },
         size: () => entries.size,
     };

@@ -76,6 +76,7 @@ const PARSER_WORKER_REQUEST_TIMEOUT_MS = Math.max(
     MAX_PARSE_DURATION_MS,
     Number(process.env['IO_PARSER_WORKER_REQUEST_TIMEOUT_MS'] ?? 500),
 );
+const PARSER_WORKER_RESTART_BACKOFF_MS = [100, 250, 500, 1_000, 2_000, 5_000];
 const SYMBOL_CACHE_MAX_ENTRIES = readPositiveIntegerEnv('IO_PARSER_SYMBOL_CACHE_MAX_ENTRIES', 500);
 const SYMBOL_CACHE_MAX_BYTES = readPositiveIntegerEnv('IO_PARSER_SYMBOL_CACHE_MAX_BYTES', 64 * 1024 * 1024);
 const FILE_CONTEXT_CACHE_MAX_ENTRIES = readPositiveIntegerEnv('IO_PARSER_FILE_CONTEXT_CACHE_MAX_ENTRIES', 256);
@@ -225,6 +226,8 @@ let _parserInvalidationUnregister = null;
  *     workerQueueHighWater: number;
  *     workerQueueWaitMsLast: number;
  *     workerQueueWaitMsMax: number;
+ *     workerRestarts: number;
+ *     workerRestartFailures: number;
  *     symbolCacheHits: number;
  *     symbolCacheMisses: number;
  *     symbolCacheStale: number;
@@ -246,6 +249,8 @@ const _parserRuntimeStats = {
     workerQueueHighWater: 0,
     workerQueueWaitMsLast: 0,
     workerQueueWaitMsMax: 0,
+    workerRestarts: 0,
+    workerRestartFailures: 0,
     symbolCacheHits: 0,
     symbolCacheMisses: 0,
     symbolCacheStale: 0,
@@ -284,6 +289,8 @@ let _workerRequestSeq = 0;
  *     worker: Worker;
  *     busy: boolean;
  *     currentTaskId: number | null;
+ *     restarting: boolean;
+ *     restartPromise: Promise<void> | null;
  * }} _WorkerSlot
  */
 
@@ -299,6 +306,7 @@ const _workerInFlight = new Map();
 let _workerPoolInitialized = false;
 let _workerPoolDisabledByError = false;
 let _workerPoolShuttingDown = false;
+let _workerPoolGeneration = 0;
 
 function ensureInvalidationHook() {
     if (_parserInvalidationUnregister) return;
@@ -459,7 +467,7 @@ function removeQueuedWorkerTask(task) {
  * @returns {void}
  */
 function dispatchQueuedWorkerTask(slot) {
-    if (slot.busy) return;
+    if (slot.busy || slot.restarting) return;
     const task = _workerQueue.shift();
     if (!task) return;
     if (task.queueTimeout) {
@@ -542,6 +550,8 @@ function createWorkerSlot(index) {
         worker,
         busy: false,
         currentTaskId: null,
+        restarting: false,
+        restartPromise: null,
     };
 
     worker.on('message', (message) => {
@@ -588,30 +598,52 @@ function createWorkerSlot(index) {
  * @returns {Promise<void>}
  */
 async function restartWorkerSlot(slot) {
-    const previousWorker = slot.worker;
-    previousWorker.removeAllListeners();
-    previousWorker.unref?.();
-    try {
-        await previousWorker.terminate();
-    } catch {
-        // best effort
-    }
-
-    slot.busy = false;
-    slot.currentTaskId = null;
-
-    try {
-        const replacement = createWorkerSlot(slot.index);
-        _workerPool[slot.index] = replacement;
-        dispatchQueuedWorkerTask(replacement);
-    } catch {
-        _workerPoolDisabledByError = true;
-        while (_workerQueue.length > 0) {
-            const queued = _workerQueue.shift();
-            if (queued?.queueTimeout) clearTimeout(queued.queueTimeout);
-            queued?.reject(new Error('parser worker pool unavailable'));
+    if (slot.restartPromise) return slot.restartPromise;
+    const generation = _workerPoolGeneration;
+    slot.restarting = true;
+    slot.restartPromise = (async () => {
+        const previousWorker = slot.worker;
+        previousWorker.removeAllListeners();
+        previousWorker.unref?.();
+        try {
+            await previousWorker.terminate();
+        } catch {
+            // best effort
         }
-    }
+
+        slot.busy = false;
+        slot.currentTaskId = null;
+
+        let attempt = 0;
+        while (!_workerPoolShuttingDown && generation === _workerPoolGeneration) {
+            if (attempt > 0) {
+                const delayMs =
+                    PARSER_WORKER_RESTART_BACKOFF_MS[
+                        Math.min(attempt - 1, PARSER_WORKER_RESTART_BACKOFF_MS.length - 1)
+                    ] ?? 5_000;
+                await new Promise((resolve) => {
+                    const timer = setTimeout(resolve, delayMs);
+                    timer.unref?.();
+                });
+            }
+            if (_workerPoolShuttingDown || generation !== _workerPoolGeneration) return;
+            try {
+                const replacement = createWorkerSlot(slot.index);
+                _workerPool[slot.index] = replacement;
+                _workerPoolDisabledByError = false;
+                _parserRuntimeStats.workerRestarts += 1;
+                dispatchQueuedWorkerTask(replacement);
+                return;
+            } catch {
+                _parserRuntimeStats.workerRestartFailures += 1;
+                attempt += 1;
+            }
+        }
+    })().finally(() => {
+        slot.restarting = false;
+        slot.restartPromise = null;
+    });
+    return slot.restartPromise;
 }
 
 function ensureWorkerPool() {
@@ -647,7 +679,7 @@ async function parseSymbolsInWorker(payload) {
     const id = ++_workerRequestSeq;
 
     return await new Promise((resolve, reject) => {
-        const freeSlot = _workerPool.find((slot) => !slot.busy);
+        const freeSlot = _workerPool.find((slot) => !slot.busy && !slot.restarting);
         if (!freeSlot && _workerQueue.length >= PARSER_WORKER_QUEUE_MAX) {
             _parserRuntimeStats.workerQueueRejected += 1;
             reject(
@@ -691,6 +723,7 @@ async function parseSymbolsInWorker(payload) {
 
 async function teardownWorkerPoolForTest() {
     _workerPoolShuttingDown = true;
+    _workerPoolGeneration += 1;
     while (_workerQueue.length > 0) {
         const queued = _workerQueue.shift();
         if (queued?.queueTimeout) clearTimeout(queued.queueTimeout);
@@ -1223,6 +1256,7 @@ export function getParserCacheStats() {
         workerPoolInitialized: _workerPoolInitialized,
         workerPoolDisabledByError: _workerPoolDisabledByError,
         workerPoolShuttingDown: _workerPoolShuttingDown,
+        workerPoolRestarting: _workerPool.filter((slot) => slot.restarting).length,
         budgetExceeded: _parserRuntimeStats.budgetExceeded,
         skippedByLineGuard: _parserRuntimeStats.skippedByLineGuard,
         lastParseDurationMs: _parserRuntimeStats.lastParseDurationMs,
@@ -1234,6 +1268,8 @@ export function getParserCacheStats() {
         workerQueueTimeouts: _parserRuntimeStats.workerQueueTimeouts,
         workerQueueWaitMsLast: _parserRuntimeStats.workerQueueWaitMsLast,
         workerQueueWaitMsMax: _parserRuntimeStats.workerQueueWaitMsMax,
+        workerRestarts: _parserRuntimeStats.workerRestarts,
+        workerRestartFailures: _parserRuntimeStats.workerRestartFailures,
         symbolCacheHits: _parserRuntimeStats.symbolCacheHits,
         symbolCacheMisses: _parserRuntimeStats.symbolCacheMisses,
         symbolCacheStale: _parserRuntimeStats.symbolCacheStale,
@@ -1270,6 +1306,8 @@ export async function resetParserCacheForTest(options = {}) {
     _parserRuntimeStats.workerQueueHighWater = 0;
     _parserRuntimeStats.workerQueueWaitMsLast = 0;
     _parserRuntimeStats.workerQueueWaitMsMax = 0;
+    _parserRuntimeStats.workerRestarts = 0;
+    _parserRuntimeStats.workerRestartFailures = 0;
     _parserRuntimeStats.symbolCacheHits = 0;
     _parserRuntimeStats.symbolCacheMisses = 0;
     _parserRuntimeStats.symbolCacheStale = 0;

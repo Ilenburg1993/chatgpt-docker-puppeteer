@@ -44,6 +44,19 @@ function safeCall(fn, fallback) {
 }
 
 /**
+ * @returns {ReturnType<typeof getParserCacheStats> | { error: string }}
+ */
+function readParserHealthStats() {
+    try {
+        return getParserCacheStats();
+    } catch (error) {
+        return {
+            error: isError(error) ? /** @type {Error} */ (error).message : String(error),
+        };
+    }
+}
+
+/**
  * @returns {{
  *     generatedAt: number;
  *     cache: {
@@ -62,7 +75,7 @@ function safeCall(fn, fallback) {
  *         aggregate: ReturnType<typeof aggregateIoCacheTierStats>;
  *         plan: ReturnType<typeof buildIoCacheTierPlan>;
  *     };
- *     parser: ReturnType<typeof getParserCacheStats>;
+ *     parser: ReturnType<typeof getParserCacheStats> | { error: string };
  *     index: ReturnType<typeof getIoIndexStats>;
  *     latency: ReturnType<typeof getIoLatencyStats>;
  *     durability: ReturnType<typeof getIoDurabilityStats>;
@@ -225,56 +238,7 @@ export function readIoRuntimeHealthSnapshot() {
             available: false,
             reason: 'error',
         }),
-        parser: safeCall(getParserCacheStats, {
-            size: 0,
-            maxSize: 500,
-            calculatedSize: 0,
-            maxBytes: 0,
-            fileContext: {
-                enabled: false,
-                size: 0,
-                maxSize: 0,
-                calculatedSize: 0,
-                maxBytes: 0,
-                hits: 0,
-                misses: 0,
-                sets: 0,
-                clears: 0,
-                bypasses: 0,
-                rejected: 0,
-            },
-            maxParseDurationMs: 0,
-            maxParseLines: 0,
-            workerEnabled: false,
-            workerPoolSize: 0,
-            workerPoolSizeSource: 'adaptive',
-            availableParallelism: 1,
-            workerQueueMax: 0,
-            workerQueueMaxSource: 'adaptive',
-            workerQueueLength: 0,
-            workerQueueHighWater: 0,
-            workerRequestTimeoutMs: 0,
-            workerPoolInitialized: false,
-            workerPoolDisabledByError: false,
-            workerPoolShuttingDown: false,
-            budgetExceeded: 0,
-            skippedByLineGuard: 0,
-            lastParseDurationMs: 0,
-            workerRequests: 0,
-            workerTimeouts: 0,
-            workerFailures: 0,
-            workerFallbacks: 0,
-            workerQueueRejected: 0,
-            workerQueueTimeouts: 0,
-            workerQueueWaitMsLast: 0,
-            workerQueueWaitMsMax: 0,
-            symbolCacheHits: 0,
-            symbolCacheMisses: 0,
-            symbolCacheStale: 0,
-            symbolSnapshotReads: 0,
-            symbolSuppliedSnapshots: 0,
-            symbolSnapshotConflicts: 0,
-        }),
+        parser: readParserHealthStats(),
         latency: safeCall(getIoLatencyStats, {}),
         durability,
         locks,

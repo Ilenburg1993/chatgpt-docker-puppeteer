@@ -219,6 +219,26 @@ describe('refreshScope', () => {
         closeScope(sessionId);
     });
 
+    it('deduplica refresh concorrente do mesmo path sem anunciar ready cedo', async () => {
+        const sessionId = 'test-scope-refresh-dedup';
+        const pathA = path.join(tmpDir, 'a.js');
+        await declareScope({ sessionId, paths: [pathA], parseSymbols: true }).awaitReady();
+        invalidateScopePath(sessionId, pathA);
+
+        const [first, second] = await Promise.all([
+            refreshScope(sessionId, [pathA]),
+            refreshScope(sessionId, [pathA]),
+        ]);
+        const stats = getScopeStats(sessionId);
+
+        assert.strictEqual(first.refreshed + second.refreshed, 1);
+        assert.strictEqual(first.failed + second.failed, 0);
+        assert.strictEqual(stats?.status, 'ready');
+        assert.ok(findSymbol(sessionId, 'helperA', { exactMatch: true }).length >= 1);
+
+        closeScope(sessionId);
+    });
+
     it('marca escopo como invalidado quando io-engine escreve arquivo e reindexa no refresh', async () => {
         const sessionId = 'test-scope-refresh-write-hook';
         const watchedPath = path.join(tmpDir, 'watched.js');
