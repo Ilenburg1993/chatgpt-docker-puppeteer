@@ -1,6 +1,7 @@
 // @ts-check
 
 import { existsSync, writeFileSync } from 'node:fs';
+import { channel } from 'node:diagnostics_channel';
 import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
@@ -196,6 +197,12 @@ describe('infra locks', () => {
         const resource = join(dir, 'sensitive-resource.txt');
         const before = getIoLockStats();
         const holder = await acquireIoResourceLock(resource, { operation: 'unit-write' });
+        /** @type {Record<string, unknown>[]} */
+        const staleEvents = [];
+        const lockChannel = channel('copilot.io.lock');
+        /** @param {unknown} message */
+        const onLockEvent = (message) => staleEvents.push(/** @type {Record<string, unknown>} */ (message));
+        lockChannel.subscribe(onLockEvent);
 
         try {
             const active = getIoLockStats();
@@ -207,6 +214,12 @@ describe('infra locks', () => {
                     fileLockEnabled: false,
                 }),
             );
+            const stale = getIoLockStats({ nowMs: Date.now() + active.activeLeaseWarnMs + 1 });
+            expect(stale.staleActiveLeases).toBeGreaterThanOrEqual(1);
+            expect(stale.oldestActiveLeaseAgeMs).toBeGreaterThanOrEqual(active.activeLeaseWarnMs);
+            getIoLockStats({ nowMs: Date.now() + active.activeLeaseWarnMs + 2 });
+            expect(staleEvents.filter((event) => event['phase'] === 'lease.stale')).toHaveLength(1);
+            expect(JSON.stringify(staleEvents)).not.toContain(resource);
             expect(JSON.stringify(active)).not.toContain(resource);
 
             await expect(acquireIoResourceLock(resource, { timeoutMs: 5, operation: 'unit-timeout' })).rejects.toMatchObject(
@@ -218,6 +231,7 @@ describe('infra locks', () => {
             expect(after.wait.overall.count).toBeGreaterThan(before.wait.overall.count);
             expect(after.wait.byOperation['unit-write']).toMatchObject({ count: expect.any(Number) });
         } finally {
+            lockChannel.unsubscribe(onLockEvent);
             await holder.releaseAsync();
         }
     });

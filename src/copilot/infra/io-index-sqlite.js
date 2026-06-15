@@ -414,9 +414,10 @@ export function createIoIndexSqlite(options) {
      *     ino?: number | null;
      *     metadata?: Record<string, unknown>;
      * }} input
-     * @param {{ confirmCurrent?: boolean; attempt?: number }} [internal]
+     * @param {{ confirmCurrent?: boolean; attempt?: number; signal?: AbortSignal }} [internal]
      */
     async function indexTextFile(input, internal = {}) {
+        internal.signal?.throwIfAborted();
         const filePath = normalizeIndexPath(input.filePath);
         const workspaceRoot = normalizeIndexPath(input.workspaceRoot);
         const relativePath = normalizeRelativePath(workspaceRoot, filePath);
@@ -428,13 +429,19 @@ export function createIoIndexSqlite(options) {
         let parseError = /** @type {string | null} */ (null);
         if (SYMBOL_EXTENSIONS.has(extension)) {
             try {
-                symbols = await parseFileSymbols(filePath, input.content);
+                symbols = await parseFileSymbols(
+                    filePath,
+                    input.content,
+                    internal.signal ? { signal: internal.signal } : {},
+                );
                 parseError = symbols.parseError;
             } catch (e) {
+                internal.signal?.throwIfAborted();
                 parseError = toError(e).message;
             }
         }
 
+        internal.signal?.throwIfAborted();
         if (internal.confirmCurrent !== false && input.ctimeMs != null && input.dev != null && input.ino != null) {
             await assertCurrentFileSnapshot(
                 filePath,
@@ -449,6 +456,7 @@ export function createIoIndexSqlite(options) {
             );
         }
 
+        internal.signal?.throwIfAborted();
         const commit = () => {
             clearFileRows(filePath);
             const fileSymbols = symbols?.symbols ?? [];
@@ -569,6 +577,7 @@ export function createIoIndexSqlite(options) {
          *     concurrency?: number;
          *     maxFiles?: number;
          *     pruneMissing?: boolean;
+         *     signal?: AbortSignal;
          * }} [options]
          */
         async indexDirectory(rootPath, options = {}) {
@@ -578,9 +587,11 @@ export function createIoIndexSqlite(options) {
                 operation: 'index-build',
                 target: normalizedRoot,
                 riskClass: 'low',
+                ...(options.signal ? { signal: options.signal } : {}),
             });
             try {
                 const value = await lease.run(async () => {
+                    options.signal?.throwIfAborted();
                     const startedAt = Date.now();
                     const traceId = createIoTraceId();
                     const workspaceRoot = normalizeIndexPath(options.workspaceRoot ?? rootPath);
@@ -611,10 +622,12 @@ export function createIoIndexSqlite(options) {
                         respectGitignore: options.respectGitignore ?? true,
                         concurrency,
                         fingerprint: true,
+                        ...(options.signal ? { signal: options.signal } : {}),
                     };
                     if (options.include !== undefined) scanOptions.include = options.include;
                     if (options.exclude !== undefined) scanOptions.exclude = options.exclude;
                     const scan = await scanDirectory(rootPath, scanOptions);
+                    options.signal?.throwIfAborted();
                     const allCandidates = flattenScanEntries(scan.entries).filter((entry) =>
                         shouldIndexFile(entry.absolutePath, extensions),
                     );
@@ -640,6 +653,7 @@ export function createIoIndexSqlite(options) {
                         files.map((entry) =>
                             limit(async () => {
                                 try {
+                                    options.signal?.throwIfAborted();
                                     const normalizedFilePath = normalizeIndexPath(entry.absolutePath);
                                     const existing = /**
                                      * @type {{
@@ -710,7 +724,11 @@ export function createIoIndexSqlite(options) {
 
                                     for (let snapshotAttempt = 1; snapshotAttempt <= snapshotRetries + 1; snapshotAttempt += 1) {
                                         try {
-                                            const text = await readTextFileSnapshot(entry.absolutePath);
+                                            const text = await readTextFileSnapshot(
+                                                entry.absolutePath,
+                                                options.signal ? { signal: options.signal } : {},
+                                            );
+                                            options.signal?.throwIfAborted();
                                             const hashVerificationEligible =
                                                 existing?.status === 'fresh' &&
                                                 text.sizeBytes === Number(existing.sizeBytes) &&
@@ -778,7 +796,11 @@ export function createIoIndexSqlite(options) {
                                                             realpath: entry.fingerprint?.realpath ?? null,
                                                         },
                                                     },
-                                                    { confirmCurrent: true, attempt: snapshotAttempt },
+                                                    {
+                                                        confirmCurrent: true,
+                                                        attempt: snapshotAttempt,
+                                                        ...(options.signal ? { signal: options.signal } : {}),
+                                                    },
                                                 ),
                                             );
                                             if (indexed.length % 50 === 0) {
@@ -809,6 +831,7 @@ export function createIoIndexSqlite(options) {
                                         }
                                     }
                                 } catch {
+                                    options.signal?.throwIfAborted();
                                     failed += 1;
                                 }
                             }),

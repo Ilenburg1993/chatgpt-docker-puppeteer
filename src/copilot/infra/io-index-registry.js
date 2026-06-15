@@ -94,16 +94,17 @@ export async function buildIoIndexForDirectory(directory, options = {}) {
         options.exclude ? [...options.exclude].map(String).sort() : null,
     ]);
 
-    const inflight = _inflightIndexBuilds.get(key);
+    const mayCoalesce = options.signal === undefined;
+    const inflight = mayCoalesce ? _inflightIndexBuilds.get(key) : null;
     if (inflight) {
         return /** @type {Awaited<ReturnType<typeof index.indexDirectory>>} */ (await inflight);
     }
 
     const buildPromise = index.indexDirectory(directory, options).finally(() => {
-        _inflightIndexBuilds.delete(key);
+        if (mayCoalesce) _inflightIndexBuilds.delete(key);
     });
 
-    _inflightIndexBuilds.set(key, buildPromise);
+    if (mayCoalesce) _inflightIndexBuilds.set(key, buildPromise);
     return await buildPromise;
 }
 

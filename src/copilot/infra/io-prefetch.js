@@ -123,7 +123,7 @@ async function warmSinglePath(filePath, textMode, cachedBytes, cachedText, signa
     }
 
     if (textMode && cachedText === null) {
-        const textSnapshot = await readTextFileSnapshot(filePath);
+        const textSnapshot = await readTextFileSnapshot(filePath, signalOptions);
         primeIoL1Entry(textKey, textSnapshot.content, {
             sizeBytes: textSnapshot.sizeBytes,
             mtimeMs: textSnapshot.mtimeMs,
@@ -156,12 +156,13 @@ export async function warmCacheForPaths(paths, opts = {}) {
     await Promise.all(
         paths.map((filePath) =>
             limit(async () => {
-                if (signal?.aborted) return;
+                signal?.throwIfAborted();
                 const normalized = normalizeIoCacheKey(filePath);
                 const bytesKey = makeBytesKey(normalized);
                 const textKey = makeTextKey(normalized, undefined, undefined);
                 const cachedBytes = await getVerifiedIoL1Entry(bytesKey, filePath);
                 const cachedText = textMode ? await getVerifiedIoL1Entry(textKey, filePath) : null;
+                signal?.throwIfAborted();
                 if (cachedBytes !== null && (!textMode || cachedText !== null)) {
                     skipped++;
                     return;
@@ -177,6 +178,7 @@ export async function warmCacheForPaths(paths, opts = {}) {
                     );
                     if (warmed) preloaded++;
                 } catch (err) {
+                    signal?.throwIfAborted();
                     if (!silent) throw err;
                     failed++;
                 }
@@ -280,13 +282,16 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
 
     const t0 = Date.now();
     const baseDir = nodePath.resolve(directory);
+    prefetchOpts.signal?.throwIfAborted();
 
     const scanResult = await scanDirectory(directory, {
         recursive,
         showHidden: false,
         depth: recursive ? 20 : 1,
         respectGitignore: true,
+        ...(prefetchOpts.signal ? { signal: prefetchOpts.signal } : {}),
     });
+    prefetchOpts.signal?.throwIfAborted();
 
     /** @param {import('./io-scanner.js').IoScanEntry[]} entries @returns {import('./io-scanner.js').IoScanEntry[]} */
     function flattenEntries(entries) {
@@ -310,6 +315,7 @@ export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {})
     const files = allCandidateFiles.slice(0, effectiveMaxFiles);
 
     const result = await warmCacheForPaths(files, prefetchOpts);
+    prefetchOpts.signal?.throwIfAborted();
     return {
         scanned: scanResult.scannedEntries,
         ...result,

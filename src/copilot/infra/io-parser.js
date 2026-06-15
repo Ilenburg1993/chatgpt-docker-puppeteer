@@ -76,6 +76,11 @@ const PARSER_WORKER_REQUEST_TIMEOUT_MS = Math.max(
     MAX_PARSE_DURATION_MS,
     Number(process.env['IO_PARSER_WORKER_REQUEST_TIMEOUT_MS'] ?? 500),
 );
+/** Limite para fallback síncrono após overload/falha do worker (padrão: 128 KiB). */
+const PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES = readPositiveIntegerEnv(
+    'IO_PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES',
+    128 * 1024,
+);
 const PARSER_WORKER_RESTART_BACKOFF_MS = [100, 250, 500, 1_000, 2_000, 5_000];
 const SYMBOL_CACHE_MAX_ENTRIES = readPositiveIntegerEnv('IO_PARSER_SYMBOL_CACHE_MAX_ENTRIES', 500);
 const SYMBOL_CACHE_MAX_BYTES = readPositiveIntegerEnv('IO_PARSER_SYMBOL_CACHE_MAX_BYTES', 64 * 1024 * 1024);
@@ -278,6 +283,7 @@ let _workerRequestSeq = 0;
  *     timeoutMs: number;
  *     queuedAtMs: number;
  *     queueTimeout: NodeJS.Timeout | null;
+ *     abortCleanup: (() => void) | null;
  *     resolve: (value: any) => void;
  *     reject: (reason?: unknown) => void;
  * }} _WorkerTask
@@ -463,6 +469,15 @@ function removeQueuedWorkerTask(task) {
 }
 
 /**
+ * @param {_WorkerTask} task
+ * @returns {void}
+ */
+function cleanupWorkerTaskAbort(task) {
+    task.abortCleanup?.();
+    task.abortCleanup = null;
+}
+
+/**
  * @param {_WorkerSlot} slot
  * @returns {void}
  */
@@ -481,6 +496,7 @@ function dispatchQueuedWorkerTask(slot) {
     const remainingTimeoutMs = task.timeoutMs - queueWaitMs;
     if (remainingTimeoutMs <= 0) {
         _parserRuntimeStats.workerQueueTimeouts += 1;
+        cleanupWorkerTaskAbort(task);
         task.reject(
             makeParserWorkerRuntimeError(
                 `parser worker queue timeout (${task.timeoutMs}ms)`,
@@ -498,6 +514,7 @@ function dispatchQueuedWorkerTask(slot) {
     const timeout = setTimeout(() => {
         _parserRuntimeStats.workerTimeouts += 1;
         _workerInFlight.delete(task.id);
+        cleanupWorkerTaskAbort(task);
         task.reject(
             makeParserWorkerRuntimeError(
                 `parser worker timeout (${task.timeoutMs}ms)`,
@@ -523,6 +540,7 @@ function handleWorkerMessage(slot, message) {
 
     clearTimeout(inFlight.timeout);
     _workerInFlight.delete(inFlight.task.id);
+    cleanupWorkerTaskAbort(inFlight.task);
     slot.busy = false;
     slot.currentTaskId = null;
     slot.worker.unref?.();
@@ -569,6 +587,7 @@ function createWorkerSlot(index) {
             if (inFlight) {
                 clearTimeout(inFlight.timeout);
                 _workerInFlight.delete(slot.currentTaskId);
+                cleanupWorkerTaskAbort(inFlight.task);
                 inFlight.task.reject(new Error('parser worker crashed'));
             }
         }
@@ -584,6 +603,7 @@ function createWorkerSlot(index) {
             if (inFlight) {
                 clearTimeout(inFlight.timeout);
                 _workerInFlight.delete(slot.currentTaskId);
+                cleanupWorkerTaskAbort(inFlight.task);
                 inFlight.task.reject(new Error(`parser worker exited with code ${code}`));
             }
         }
@@ -661,6 +681,7 @@ function ensureWorkerPool() {
 
 /**
  * @param {{ source: string; parserOptions: Record<string, unknown>; maxParseDurationMs: number }} payload
+ * @param {AbortSignal} [signal]
  * @returns {Promise<{
  *     symbols: SymbolEntry[];
  *     imports: ImportEntry[];
@@ -669,7 +690,8 @@ function ensureWorkerPool() {
  *     parseDurationMs: number;
  * }>}
  */
-async function parseSymbolsInWorker(payload) {
+async function parseSymbolsInWorker(payload, signal) {
+    signal?.throwIfAborted();
     ensureWorkerPool();
     if (_workerPoolDisabledByError || _workerPool.length === 0) {
         throw new Error('parser worker pool unavailable');
@@ -697,10 +719,42 @@ async function parseSymbolsInWorker(payload) {
             timeoutMs: PARSER_WORKER_REQUEST_TIMEOUT_MS,
             queuedAtMs: performance.now(),
             queueTimeout: null,
+            abortCleanup: null,
             resolve,
             reject,
         };
         _workerQueue.push(task);
+        if (signal) {
+            const onAbort = () => {
+                const abortReason =
+                    signal.reason instanceof Error
+                        ? signal.reason
+                        : new DOMException(
+                              typeof signal.reason === 'string' ? signal.reason : 'Parser abortado',
+                              'AbortError',
+                          );
+                if (removeQueuedWorkerTask(task)) {
+                    if (task.queueTimeout) clearTimeout(task.queueTimeout);
+                    task.queueTimeout = null;
+                    cleanupWorkerTaskAbort(task);
+                    reject(abortReason);
+                    return;
+                }
+                const inFlight = _workerInFlight.get(task.id);
+                if (!inFlight) return;
+                clearTimeout(inFlight.timeout);
+                _workerInFlight.delete(task.id);
+                cleanupWorkerTaskAbort(task);
+                reject(abortReason);
+                void restartWorkerSlot(inFlight.slot);
+            };
+            signal.addEventListener('abort', onAbort, { once: true });
+            task.abortCleanup = () => signal.removeEventListener('abort', onAbort);
+            if (signal.aborted) {
+                onAbort();
+                return;
+            }
+        }
         _parserRuntimeStats.workerQueueHighWater = Math.max(
             _parserRuntimeStats.workerQueueHighWater,
             _workerQueue.length,
@@ -708,6 +762,7 @@ async function parseSymbolsInWorker(payload) {
         task.queueTimeout = setTimeout(() => {
             if (!removeQueuedWorkerTask(task)) return;
             _parserRuntimeStats.workerQueueTimeouts += 1;
+            cleanupWorkerTaskAbort(task);
             reject(
                 makeParserWorkerRuntimeError(
                     `parser worker queue timeout (${task.timeoutMs}ms)`,
@@ -727,11 +782,13 @@ async function teardownWorkerPoolForTest() {
     while (_workerQueue.length > 0) {
         const queued = _workerQueue.shift();
         if (queued?.queueTimeout) clearTimeout(queued.queueTimeout);
+        if (queued) cleanupWorkerTaskAbort(queued);
         queued?.reject(new Error('parser worker pool reset'));
     }
 
     for (const inFlight of _workerInFlight.values()) {
         clearTimeout(inFlight.timeout);
+        cleanupWorkerTaskAbort(inFlight.task);
         inFlight.task.reject(new Error('parser worker pool reset'));
     }
     _workerInFlight.clear();
@@ -793,9 +850,11 @@ function tryBabelParse(code, parserOptions) {
  *
  * @param {string} filePath - Path do arquivo.
  * @param {string} content - Conteúdo já lido (evita dupla leitura).
+ * @param {{ signal?: AbortSignal }} [options]
  * @returns {Promise<FileSymbols>}
  */
-export async function parseFileSymbols(filePath, content) {
+export async function parseFileSymbols(filePath, content, options = {}) {
+    options.signal?.throwIfAborted();
     const ext = nodePath.extname(filePath).toLowerCase();
     const lang = classifyExtension(ext);
     const parserOptions = lang === 'js' || lang === 'ts' ? resolveBabelParserOptions(filePath, lang) : null;
@@ -829,11 +888,15 @@ export async function parseFileSymbols(filePath, content) {
 
         if (PARSER_WORKER_ENABLED) {
             try {
-                const workerResult = await parseSymbolsInWorker({
-                    source,
-                    parserOptions: /** @type {Record<string, unknown>} */ (parserOptions),
-                    maxParseDurationMs: MAX_PARSE_DURATION_MS,
-                });
+                const workerResult = await parseSymbolsInWorker(
+                    {
+                        source,
+                        parserOptions: /** @type {Record<string, unknown>} */ (parserOptions),
+                        maxParseDurationMs: MAX_PARSE_DURATION_MS,
+                    },
+                    options.signal,
+                );
+                options.signal?.throwIfAborted();
                 base.parseDurationMs = Number(workerResult.parseDurationMs ?? 0);
                 _parserRuntimeStats.lastParseDurationMs = base.parseDurationMs;
                 if (
@@ -848,22 +911,27 @@ export async function parseFileSymbols(filePath, content) {
                 base.exports = workerResult.exports;
                 return base;
             } catch (error) {
+                options.signal?.throwIfAborted();
                 const errorCode = getParserWorkerRuntimeErrorCode(error);
                 if (
                     errorCode === 'ERR_IO_PARSER_WORKER_QUEUE_FULL' ||
                     errorCode === 'ERR_IO_PARSER_WORKER_QUEUE_TIMEOUT' ||
                     errorCode === 'ERR_IO_PARSER_WORKER_TIMEOUT'
                 ) {
-                    base.parseError = error instanceof Error ? error.message : 'parser worker overloaded';
-                    return base;
+                    if (parsedBytes > PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES) {
+                        base.parseError = error instanceof Error ? error.message : 'parser worker overloaded';
+                        return base;
+                    }
                 }
                 _parserRuntimeStats.workerFallbacks += 1;
             }
         }
 
         await getBabelParse();
+        options.signal?.throwIfAborted();
         const parseStart = performance.now();
         const parsed = tryBabelParse(source, /** @type {Record<string, unknown>} */ (parserOptions));
+        options.signal?.throwIfAborted();
         const parseDurationMs = Math.max(0, Math.round(performance.now() - parseStart));
         base.parseDurationMs = parseDurationMs;
         _parserRuntimeStats.lastParseDurationMs = parseDurationMs;
@@ -915,11 +983,13 @@ export async function parseFileSymbols(filePath, content) {
  * @param {{
  *     snapshot?: import('./io/fs/read-text.js').TextFileSnapshot;
  *     maxRetries?: number;
+ *     signal?: AbortSignal;
  * }} [options]
  * @returns {Promise<FileSymbols>}
  */
 export async function parseAndCacheSymbols(filePath, options = {}) {
     ensureInvalidationHook();
+    options.signal?.throwIfAborted();
     const cacheKey = normalizeParserPath(filePath);
     const maxRetries =
         Number.isInteger(options.maxRetries) && Number(options.maxRetries) >= 0
@@ -928,6 +998,7 @@ export async function parseAndCacheSymbols(filePath, options = {}) {
     let suppliedSnapshot = options.snapshot ?? null;
 
     for (let attempt = 1; attempt <= maxRetries + 1; attempt += 1) {
+        options.signal?.throwIfAborted();
         const cached = /** @type {SymbolCacheEntry | undefined} */ (_symbolCache.get(cacheKey));
         let snapshot = suppliedSnapshot;
         suppliedSnapshot = null;
@@ -935,6 +1006,7 @@ export async function parseAndCacheSymbols(filePath, options = {}) {
         if (snapshot) {
             _parserRuntimeStats.symbolSuppliedSnapshots += 1;
             const current = await statPathSnapshot(filePath);
+            options.signal?.throwIfAborted();
             if (!parserFingerprintMatches(snapshot, current)) {
                 _parserRuntimeStats.symbolSnapshotConflicts += 1;
                 if (attempt <= maxRetries) continue;
@@ -950,6 +1022,7 @@ export async function parseAndCacheSymbols(filePath, options = {}) {
             }
         } else if (cached) {
             const current = await statPathSnapshot(filePath);
+            options.signal?.throwIfAborted();
             if (parserFingerprintMatches(cached.fingerprint, current)) {
                 _parserRuntimeStats.symbolCacheHits += 1;
                 return cached.symbols;
@@ -960,11 +1033,17 @@ export async function parseAndCacheSymbols(filePath, options = {}) {
 
         if (!snapshot) {
             _parserRuntimeStats.symbolSnapshotReads += 1;
-            snapshot = await readTextFileSnapshot(filePath);
+            snapshot = await readTextFileSnapshot(filePath, options.signal ? { signal: options.signal } : {});
         }
         _parserRuntimeStats.symbolCacheMisses += 1;
-        const symbols = await parseFileSymbols(filePath, snapshot.content);
+        const symbols = await parseFileSymbols(
+            filePath,
+            snapshot.content,
+            options.signal ? { signal: options.signal } : {},
+        );
+        options.signal?.throwIfAborted();
         const current = await statPathSnapshot(filePath);
+        options.signal?.throwIfAborted();
         if (!parserFingerprintMatches(snapshot, current)) {
             _parserRuntimeStats.symbolSnapshotConflicts += 1;
             if (attempt <= maxRetries) continue;
@@ -1176,6 +1255,7 @@ export function windowFileContext(context, options = {}) {
  *     workerQueueTimeouts: number;
  *     workerQueueWaitMsLast: number;
  *     workerQueueWaitMsMax: number;
+ *     mainThreadFallbackMaxBytes: number;
  *     symbolCacheHits: number;
  *     symbolCacheMisses: number;
  *     symbolCacheStale: number;
@@ -1268,6 +1348,7 @@ export function getParserCacheStats() {
         workerQueueTimeouts: _parserRuntimeStats.workerQueueTimeouts,
         workerQueueWaitMsLast: _parserRuntimeStats.workerQueueWaitMsLast,
         workerQueueWaitMsMax: _parserRuntimeStats.workerQueueWaitMsMax,
+        mainThreadFallbackMaxBytes: PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES,
         workerRestarts: _parserRuntimeStats.workerRestarts,
         workerRestartFailures: _parserRuntimeStats.workerRestartFailures,
         symbolCacheHits: _parserRuntimeStats.symbolCacheHits,

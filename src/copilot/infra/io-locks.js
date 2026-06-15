@@ -15,8 +15,10 @@ import {
     hashFileResourceLockKey,
     shouldAcquireFileResourceLock,
 } from './locks/file-resource-lock.js';
+import { publishIoLifecycleEvent } from './io-observability.js';
 import { createBoundedLockWaitMetrics, sanitizeLockOperation } from './locks/lock-observability.js';
 import { normalizePathResourceKey } from './policy/path-resource.js';
+import { readEnvPositiveInt } from './shared/env.js';
 
 const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
 const isError =
@@ -51,7 +53,9 @@ const lockCounters = {
  * }>}
  */
 const activeLeases = new Map();
+const warnedLeaseKeys = new Set();
 const MAX_ACTIVE_LEASE_SAMPLE = 32;
+const ACTIVE_LEASE_WARN_MS = readEnvPositiveInt('IO_LOCK_ACTIVE_LEASE_WARN_MS', 60_000);
 
 /**
  * @param {string} key
@@ -329,6 +333,7 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
                 if (fileLock) await fileLock.release();
             } finally {
                 activeLeases.delete(key);
+                warnedLeaseKeys.delete(key);
                 releaseCurrent(undefined);
                 if (tails.get(key) === tail) {
                     tails.delete(key);
@@ -491,6 +496,7 @@ export async function withIoResourceLocks(resourceKeys, operation, options = {})
 /**
  * Snapshot leve para health/tests.
  *
+ * @param {{ nowMs?: number }} [options]
  * @returns {{
  *     pendingResources: number;
  *     activeLeases: number;
@@ -503,6 +509,9 @@ export async function withIoResourceLocks(resourceKeys, operation, options = {})
  *     timeouts: number;
  *     aborts: number;
  *     failures: number;
+ *     activeLeaseWarnMs: number;
+ *     staleActiveLeases: number;
+ *     oldestActiveLeaseAgeMs: number;
  *     wait: ReturnType<ReturnType<typeof createBoundedLockWaitMetrics>['snapshot']>;
  *     activeLeaseSample: Array<{
  *         resourceHash: string;
@@ -515,8 +524,23 @@ export async function withIoResourceLocks(resourceKeys, operation, options = {})
  *     fileLocks: ReturnType<typeof getFileResourceLockStats>;
  * }}
  */
-export function getIoLockStats() {
-    const now = Date.now();
+export function getIoLockStats(options = {}) {
+    const now = Number.isFinite(options.nowMs) ? Number(options.nowMs) : Date.now();
+    const leasesByAge = [...activeLeases.entries()].sort(
+        ([, left], [, right]) => left.acquiredAtMs - right.acquiredAtMs,
+    );
+    const staleLeases = leasesByAge.filter(([, lease]) => now - lease.acquiredAtMs >= ACTIVE_LEASE_WARN_MS);
+    for (const [key, lease] of staleLeases) {
+        if (warnedLeaseKeys.has(key)) continue;
+        warnedLeaseKeys.add(key);
+        publishIoLifecycleEvent('lock', 'lease.stale', {
+            resourceHash: lease.resourceHash,
+            operation: lease.operation,
+            ageMs: Math.max(0, now - lease.acquiredAtMs),
+            thresholdMs: ACTIVE_LEASE_WARN_MS,
+            fileLockEnabled: lease.fileLockEnabled,
+        });
+    }
     return {
         pendingResources: tails.size,
         activeLeases: activeLeases.size,
@@ -529,9 +553,13 @@ export function getIoLockStats() {
         timeouts: lockCounters.timeouts,
         aborts: lockCounters.aborts,
         failures: lockCounters.failures,
+        activeLeaseWarnMs: ACTIVE_LEASE_WARN_MS,
+        staleActiveLeases: staleLeases.length,
+        oldestActiveLeaseAgeMs:
+            leasesByAge.length > 0 ? Math.max(0, now - Number(leasesByAge[0]?.[1].acquiredAtMs ?? now)) : 0,
         wait: lockWaitMetrics.snapshot(),
-        activeLeaseSample: [...activeLeases.values()]
-            .sort((left, right) => left.acquiredAtMs - right.acquiredAtMs)
+        activeLeaseSample: leasesByAge
+            .map(([, lease]) => lease)
             .slice(0, MAX_ACTIVE_LEASE_SAMPLE)
             .map((lease) => ({
                 resourceHash: lease.resourceHash,

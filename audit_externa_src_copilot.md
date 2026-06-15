@@ -1199,7 +1199,7 @@ não bug.
 | ID    | Status                  | Validação atual                                                                                                                                                             |
 | ----- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P2-1  | **rejeitado como race** | JavaScript executa o trecho síncrono sem interleaving; preservar a versão mais nova da mesma chave é o contrato correto de cache best-effort. Métricas de falha já existem. |
-| P2-2  | **confirmado**          | Re-declaração aborta o warm anterior, mas aguarda sua promise; nem parse nem index recebem cancelamento completo.                                                           |
+| P2-2  | **remediado**           | O signal do warm agora alcança scan, snapshots, prefetch, parse, fila/worker e build do índice; aborts deixam de ser convertidos em falhas parciais.                         |
 | P2-3  | **confirmado ampliado** | Falta escalada para `SIGKILL` tanto no stop antecipado do streaming quanto nos caminhos timeout/abort/maxBuffer.                                                            |
 | P2-4  | **rejeitado**           | Entradas stale permanecem alocadas até acesso/evicção, mas o cache já é estritamente limitado por `max` e `maxSize`; não há crescimento sem bounds.                         |
 | P2-5  | **confirmado**          | A camada baixa aceita `expectedSourceHash`, mas `copy_file` não expõe a precondição.                                                                                        |
@@ -1207,7 +1207,7 @@ não bug.
 | P2-7  | **parcial**             | `statfs` repetido pode custar em lotes grandes, porém só ocorre para payloads acima do limiar de 64 MiB. Cache curto é oportunidade mensurável, não bug geral.              |
 | P2-8  | **confirmado**          | `io-index-registry` descarta o unregister e `resetIoIndexForTest` não desmonta/recria o hook.                                                                               |
 | P2-9  | **confirmado**          | Refreshs concorrentes do mesmo escopo/path duplicam invalidação, leitura e parse. O guard deve ser por `sessionId + path`, não global por path.                             |
-| P2-10 | **parcial**             | A assimetria é deliberada para proteger o event loop. Fallback main-thread só é aceitável sob limite pequeno explícito e observável.                                        |
+| P2-10 | **remediado**           | Overload/falha do worker faz fallback main-thread somente até `IO_PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES` (128 KiB por padrão); acima do teto mantém backpressure.            |
 | P2-11 | **rejeitado**           | O lock do diretório coordena `mkdir` com mutações concorrentes do mesmo recurso; removê-lo reduz garantias por ganho não demonstrado.                                       |
 | P2-12 | **já corrigido**        | O planner atual permite read-through também para stream e retorna relatório explícito de execução/skip.                                                                     |
 
@@ -1223,7 +1223,7 @@ não bug.
 | P3-6  | **já documentado parcialmente** | O contrato `-1/0/>0` consta no comentário do módulo; falta apenas validação robusta da env e documentação humana.                           |
 | P3-7  | **confirmado**                  | `sizes` cresce com paths rotativos/dinâmicos durante toda a vida do writer. Precisa limite ou limpeza por path inativo.                     |
 | P3-8  | **confirmado**                  | O fallback de health replica manualmente a shape extensa do parser e tende a drift.                                                         |
-| P3-9  | **parcial**                     | Lease sem release já é defeito do caller; o registry precisa alerta de idade, não evicção automática insegura.                              |
+| P3-9  | **remediado**                   | Leases acima de `IO_LOCK_ACTIVE_LEASE_WARN_MS` geram evento `copilot.io.lock/lease.stale`, métrica e alerta de health, sem evicção insegura. |
 | P3-10 | **parcial**                     | Há uma policy async por entry. Otimização exige preservar checks de symlink/realpath e deve ser guiada por benchmark.                       |
 | P3-11 | **rejeitado**                   | Não existe leak: a entrada só é criada após aquisição bem-sucedida e erros não-`ETIMEDOUT` devem propagar.                                  |
 | P3-12 | **já mitigado**                 | `getStats()` força flush antes de contar; excesso temporário é limitado pela janela/batch e corrigido no flush.                             |
@@ -1270,6 +1270,20 @@ não bug.
 **Itens remediados nesta faixa:** P0-1, P0-2, P0-3, P1-4, P1-6, P1-7, P2-3, P2-5, P2-6,
 P2-8, P2-9, P3-7, P3-8, P3-14, GAP-3, GAP-4. UPG-6 foi rejeitado por evidência de runtime.
 
+### 9.6 Evidências de implementação — Faixa 2
+
+- [x] Cancelamento propagado de session scope até scanner, snapshots, prefetch, parser e build do índice.
+- [x] Tarefa abortada é retirada da fila do parser; tarefa em voo é rejeitada e o slot afetado é reiniciado.
+- [x] Builds com signal deixaram de compartilhar promise com callers de ownership distinto.
+- [x] Leases antigas produzem uma única notificação por lease e aparecem em stats/health sem revelar paths.
+- [x] Fallback síncrono do parser ficou restrito a payloads pequenos por teto explícito e observável.
+- [x] Testes focados de scanner/parser/scope/index/locks/health: `89/89` passaram.
+- [x] Testes focados finais do parser, incluindo os dois lados do limite de fallback: `46/46` passaram.
+- [x] `npm run typecheck:strict:src.copilot` passou.
+- [x] ESLint focado passou nos arquivos alterados da faixa.
+
+**Itens remediados nesta faixa:** P2-2, P2-10 e P3-9.
+
 ## 10. Roadmap sistêmico de implementação
 
 ### Fase 0 — Evidência e baseline
@@ -1299,11 +1313,12 @@ P2-8, P2-9, P3-7, P3-8, P3-14, GAP-3, GAP-4. UPG-6 foi rejeitado por evidência 
 - [x] Implementar restart serializado e recuperável do worker pool com backoff limitado.
 - [x] Rejeitar `Worker.hasRef()` após prova negativa no Node 24.15.0 e manter apenas métricas suportadas de restart/lifecycle.
 - [x] Deduplicar refresh concorrente por `sessionId + path`.
-- [ ] Propagar cancelamento do warm até scan, parse e index onde o contrato permitir.
+- [x] Propagar cancelamento do warm até scan, parse e index onde o contrato permitir.
 - [x] Emitir evento observável na evicção LRU de scopes.
 - [x] Limitar o mapa de tamanhos do writer JSONL.
 - [x] Simplificar fallback de health do parser sem drift de shape.
-- [ ] Adicionar alerta observável para leases excessivamente antigas.
+- [x] Adicionar alerta observável para leases excessivamente antigas.
+- [x] Limitar fallback main-thread do parser a arquivos pequenos sob teto configurável.
 - [x] Corrigir cleanup/erro/unref do gzip SSE.
 
 ### Fase 3 — Índice, schema e busca localizada

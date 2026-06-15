@@ -520,11 +520,61 @@ describe('parseAndCacheSymbols', () => {
         assert.equal(typeof stats.workerQueueTimeouts, 'number');
         assert.equal(typeof stats.workerQueueWaitMsLast, 'number');
         assert.equal(typeof stats.workerQueueWaitMsMax, 'number');
+        assert.equal(typeof stats.mainThreadFallbackMaxBytes, 'number');
         assert.equal(typeof stats.workerPoolRestarting, 'number');
         assert.equal(typeof stats.workerRestarts, 'number');
         assert.equal(typeof stats.workerRestartFailures, 'number');
         assert.ok(stats.workerQueueMax >= 0);
         assert.ok(stats.workerQueueLength >= 0);
+    });
+
+    it('cancela parse antes de ler snapshot', async () => {
+        const controller = new AbortController();
+        controller.abort(new DOMException('parse cancelado', 'AbortError'));
+
+        await assert.rejects(
+            parseAndCacheSymbols(path.join(tmpDir, 'module.js'), { signal: controller.signal }),
+            (error) => error instanceof Error && error.name === 'AbortError',
+        );
+    });
+
+    it('remove tarefa abortada da fila de workers', async () => {
+        const script = `
+            import { getParserCacheStats, parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            const slowContent = Array.from({ length: 20_000 }, (_, index) => 'export function f' + index + '() { return ' + index + '; }').join('\\n');
+            const first = parseFileSymbols('/tmp/abort-holder.js', slowContent);
+            const controller = new AbortController();
+            const queued = parseFileSymbols('/tmp/abort-queued.js', slowContent, { signal: controller.signal });
+            controller.abort(new DOMException('queued parse cancelled', 'AbortError'));
+            const queuedResult = await queued.then(
+                () => ({ status: 'resolved' }),
+                (error) => ({ status: 'rejected', name: error?.name, message: error?.message }),
+            );
+            await first;
+            const stats = getParserCacheStats();
+            await resetParserCacheForTest({ teardownWorkers: true });
+            console.log(JSON.stringify({ queuedResult, workerQueueLength: stats.workerQueueLength }));
+            process.exit(0);
+        `;
+        const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
+            cwd: path.resolve('.'),
+            env: {
+                ...process.env,
+                IO_PARSER_WORKER_POOL_SIZE: '1',
+                IO_PARSER_WORKER_QUEUE_MAX: '8',
+                IO_PARSER_WORKER_REQUEST_TIMEOUT_MS: '5000',
+            },
+            timeout: 10_000,
+            maxBuffer: 1024 * 1024,
+        });
+        const result = JSON.parse(stdout);
+
+        assert.deepEqual(result.queuedResult, {
+            status: 'rejected',
+            name: 'AbortError',
+            message: 'queued parse cancelled',
+        });
+        assert.equal(result.workerQueueLength, 0);
     });
 
     it('rejeita backlog quando a fila de workers atinge o limite configurado', async () => {
@@ -549,6 +599,7 @@ describe('parseAndCacheSymbols', () => {
                 ...process.env,
                 IO_PARSER_WORKER_POOL_SIZE: '1',
                 IO_PARSER_WORKER_QUEUE_MAX: '0',
+                IO_PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES: '1',
             },
             timeout: 10_000,
             maxBuffer: 1024 * 1024,
@@ -561,6 +612,44 @@ describe('parseAndCacheSymbols', () => {
         );
         assert.ok(result.workerQueueRejected > 0, `result=${stdout}`);
         assert.equal(result.workerQueueMax, 0);
+    });
+
+    it('faz fallback síncrono limitado para arquivos pequenos sob overload', async () => {
+        const script = `
+            import { getParserCacheStats, parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            const content = ${JSON.stringify(JS_CONTENT)};
+            const results = await Promise.all(
+                Array.from({ length: 8 }, (_, index) => parseFileSymbols('/tmp/fallback-' + index + '.js', content)),
+            );
+            const stats = getParserCacheStats();
+            await resetParserCacheForTest({ teardownWorkers: true });
+            console.log(JSON.stringify({
+                parseErrors: results.map((result) => result.parseError),
+                symbolCounts: results.map((result) => result.symbols.length),
+                workerFallbacks: stats.workerFallbacks,
+                workerQueueRejected: stats.workerQueueRejected,
+                mainThreadFallbackMaxBytes: stats.mainThreadFallbackMaxBytes
+            }));
+            process.exit(0);
+        `;
+        const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
+            cwd: path.resolve('.'),
+            env: {
+                ...process.env,
+                IO_PARSER_WORKER_POOL_SIZE: '1',
+                IO_PARSER_WORKER_QUEUE_MAX: '0',
+                IO_PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES: '131072',
+            },
+            timeout: 10_000,
+            maxBuffer: 1024 * 1024,
+        });
+        const result = JSON.parse(stdout);
+
+        assert.ok(result.workerQueueRejected > 0, `result=${stdout}`);
+        assert.ok(result.workerFallbacks > 0, `result=${stdout}`);
+        assert.ok(result.parseErrors.every((parseError) => parseError === null), `result=${stdout}`);
+        assert.ok(result.symbolCounts.every((count) => count > 0), `result=${stdout}`);
+        assert.equal(result.mainThreadFallbackMaxBytes, 131_072);
     });
 
     it('invalida cache de arquivo específico', async () => {

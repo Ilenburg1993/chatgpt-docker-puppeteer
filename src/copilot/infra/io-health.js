@@ -192,6 +192,13 @@ export function readIoRuntimeHealthSnapshot() {
             message: 'Ao menos um timeout de aquisição L0/L1 foi observado no runtime.',
         });
     }
+    if (locks.staleActiveLeases > 0) {
+        alerts.push({
+            code: 'IO_LOCK_LEASE_STALE',
+            severity: 'medium',
+            message: 'Ao menos uma lease de I/O permanece ativa além do threshold operacional.',
+        });
+    }
     if (!locks.fileLocks.configurationValid) {
         alerts.push({
             code: 'IO_LOCK_PROFILE_INVALID',

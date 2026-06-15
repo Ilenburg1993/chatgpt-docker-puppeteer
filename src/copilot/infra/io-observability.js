@@ -15,12 +15,14 @@ import { createHistogram, performance } from 'node:perf_hooks';
 const ioOperationChannel = channel('copilot.io.operation');
 const ioCacheChannel = channel('copilot.io.cache');
 const ioIndexChannel = channel('copilot.io.index');
+const ioLockChannel = channel('copilot.io.lock');
 const ioScopeChannel = channel('copilot.io.scope');
 const ioScanChannel = channel('copilot.io.scan');
 
 const lifecycleChannels = {
     cache: ioCacheChannel,
     index: ioIndexChannel,
+    lock: ioLockChannel,
     scope: ioScopeChannel,
     scan: ioScanChannel,
 };
@@ -200,7 +202,7 @@ export function getIoDurabilityStats() {
 /**
  * Publica eventos de lifecycle mais granulares sem acoplar `infra/` a collectors específicos.
  *
- * @param {'cache' | 'index' | 'scope' | 'scan'} domain
+ * @param {'cache' | 'index' | 'lock' | 'scope' | 'scan'} domain
  * @param {string} phase
  * @param {Record<string, unknown>} payload
  * @returns {void}

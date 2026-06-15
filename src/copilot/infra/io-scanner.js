@@ -86,6 +86,7 @@ function assertValidScannerPath(candidate, label) {
  *     fingerprint?: boolean;
  *     redactProtectedPaths?: boolean;
  *     maxEntries?: number;
+ *     signal?: AbortSignal;
  * }} [options]
  * @returns {Promise<{
  *     path: string;
@@ -97,6 +98,7 @@ function assertValidScannerPath(candidate, label) {
  */
 export async function scanDirectory(rootPath, options = {}) {
     assertValidScannerPath(rootPath, 'rootPath');
+    options.signal?.throwIfAborted();
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     const recursive = Boolean(options.recursive);
@@ -122,6 +124,7 @@ export async function scanDirectory(rootPath, options = {}) {
             : DEFAULT_SCAN_HARD_MAX_ENTRIES;
     const limit = pLimit(concurrency);
     const gitignore = respectGitignore ? await loadGitignoreMatcher(workspaceRoot) : ignore();
+    options.signal?.throwIfAborted();
     const blockedSegments = new Set(
         (options.blockedSegments ?? DEFAULT_BLOCKED_PATH_SEGMENTS)
             .filter((segment) => typeof segment === 'string' && segment)
@@ -145,9 +148,12 @@ export async function scanDirectory(rootPath, options = {}) {
      * @returns {Promise<IoScanEntry[]>}
      */
     async function scan(dir, currentDepth) {
+        options.signal?.throwIfAborted();
         const dirents = await readdir(dir, { withFileTypes: true });
+        options.signal?.throwIfAborted();
         dirents.sort((a, b) => a.name.localeCompare(b.name));
         const entries = await mapInBatches(dirents, batchSize, async (dirent) => {
+            options.signal?.throwIfAborted();
             const name = dirent.name;
             if (hardLimitReached || scannedEntries >= hardMaxEntries) {
                 hardLimitReached = true;
@@ -165,6 +171,7 @@ export async function scanDirectory(rootPath, options = {}) {
                     mode: 'read',
                     blockedSegments: [...blockedSegments],
                 });
+                options.signal?.throwIfAborted();
                 if (!policy.ok) {
                     blockedEntries += 1;
                     return null;
@@ -182,6 +189,7 @@ export async function scanDirectory(rootPath, options = {}) {
             if (type === 'file' || type === 'other') {
                 try {
                     stats = await limit(() => lstat(absolutePath));
+                    options.signal?.throwIfAborted();
                     type = classifyStats(stats);
                 } catch {
                     return null;
@@ -202,6 +210,7 @@ export async function scanDirectory(rootPath, options = {}) {
             if (type === 'file' && stats) entry.size = stats.size;
             if (includeFingerprint && type === 'file' && stats) {
                 entry.fingerprint = await buildFileFingerprint(absolutePath, stats, limit);
+                options.signal?.throwIfAborted();
             }
             scannedEntries += 1;
             if (scannedEntries >= hardMaxEntries) {
@@ -219,6 +228,7 @@ export async function scanDirectory(rootPath, options = {}) {
         });
         const visibleEntries = entries.filter((entry) => entry !== null);
         if (recursive && currentDepth < maxDepth) {
+            options.signal?.throwIfAborted();
             const directoryEntries = visibleEntries.filter((entry) => entry.type === 'directory');
             await Promise.all(
                 directoryEntries.map(async (entry) => {
@@ -231,10 +241,12 @@ export async function scanDirectory(rootPath, options = {}) {
 
     try {
         const rootStats = await lstat(rootPath);
+        options.signal?.throwIfAborted();
         if (!rootStats.isDirectory()) {
             throw new Error('Não é um diretório.');
         }
         const entries = await scan(rootPath, 1);
+        options.signal?.throwIfAborted();
         const io = buildIoMeta({
             operation: 'scan',
             target: rootPath,

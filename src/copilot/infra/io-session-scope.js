@@ -378,7 +378,7 @@ export function declareScope(opts) {
                         const p = parseTargets[idx++];
                         if (!p) continue;
                         try {
-                            const symbols = await parseAndCacheSymbols(p);
+                            const symbols = await parseAndCacheSymbols(p, { signal: warmController.signal });
                             scope.symbolIndex.set(p, symbols);
                             parsed++;
                         } catch (parseErr) {
@@ -402,6 +402,7 @@ export function declareScope(opts) {
                 const indexOptions = {
                     recursive,
                     concurrency,
+                    signal: warmController.signal,
                 };
                 if (extensions !== undefined) indexOptions.extensions = extensions;
                 if (include !== undefined) indexOptions.include = include;

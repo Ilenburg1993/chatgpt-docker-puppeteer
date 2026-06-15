@@ -25,6 +25,16 @@ async function createTempDir() {
 }
 
 describe('infra/io-scanner', () => {
+    it('rejeita imediatamente scan com signal já abortado', async () => {
+        const dir = await createTempDir();
+        const controller = new AbortController();
+        controller.abort(new DOMException('scan cancelado', 'AbortError'));
+
+        await expect(scanDirectory(dir, { signal: controller.signal })).rejects.toMatchObject({
+            name: 'AbortError',
+        });
+    });
+
     it('rejeita rootPath/workspaceRoot inválidos com null-byte', async () => {
         const dir = await createTempDir();
         await expect(scanDirectory(`${dir}\u0000bad`)).rejects.toMatchObject({ code: 'ERR_INVALID_ARG_VALUE' });
