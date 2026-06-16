@@ -627,7 +627,7 @@ describe('commands/session — sync commands', () => {
             expect(ctx.output()).toContain('permissões automáticas');
             expect(ctx.output()).toContain('1 provedor');
             expect(ctx.output()).toContain('3 modelos');
-            expect(ctx.output()).toContain('ativo openrouter · deepseek/deepseek-v4-flash:free');
+            expect(ctx.output()).toContain('ativo kilo-code · kilo-auto/free');
             expect(ctx.output()).not.toContain('runtime=');
             expect(ctx.output()).not.toContain('gateway=providers');
             expect(ctx.output()).not.toContain('PM:approve_all');
@@ -965,7 +965,8 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).toContain('7 CommandDefinitions expostos');
         expect(ctx.output()).toContain('nenhum comando chamado nesta janela');
         expect(ctx.output()).toContain('/session sdk commands');
-        expect(ctx.output()).toContain('/restart reinicia só a conversa');
+        expect(ctx.output()).toContain('/restart reinicia a sessão SDK');
+        expect(ctx.output()).toContain('/conversation-restart reinicia só a conversa');
         expect(ctx.output()).not.toContain('dialog loop');
         expect(ctx.output()).toContain('/resume injeta histórico do hub');
         expect(ctx.output()).toContain('#1');
@@ -1024,7 +1025,8 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).not.toContain('sdk-second');
         expect(ctx.output()).toContain('/session sdk <n>');
         expect(ctx.output()).toContain('/session sdk controla sessões SDK');
-        expect(ctx.output()).toContain('/restart reinicia só a conversa');
+        expect(ctx.output()).toContain('/restart reinicia a sessão SDK');
+        expect(ctx.output()).toContain('/conversation-restart reinicia só a conversa');
         expect(ctx.output()).toContain('/session sdk next new');
         expect(ctx.output()).not.toContain('/session sdk controla sessão SDK;');
         expect(ctx.output()).not.toContain('/session sdk next new |');

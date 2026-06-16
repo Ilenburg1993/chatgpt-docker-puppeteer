@@ -11,6 +11,7 @@ describe('terminal/repl/repl-input-routing.js', () => {
     it('classifica comandos de escape que furam qualquer fila', () => {
         expect(isTerminalEscapeCommand('quit')).toBe(true);
         expect(isTerminalEscapeCommand('restart')).toBe(true);
+        expect(isTerminalEscapeCommand('conversation-restart')).toBe(true);
         expect(isTerminalEscapeCommand('status')).toBe(false);
     });
 

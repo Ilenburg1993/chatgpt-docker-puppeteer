@@ -60,7 +60,7 @@ ${terminalThemeDivider(74)}
 ${terminalThemeHeadline('assistant', 'Terminal LLM-B', ['sessão permanente', 'menu completo'])}
 ${terminalThemeDivider(74)}
 ${bannerGroup('Essenciais', ['/status', '/health', '/now', '/live [n]', '/activity [n]', '/help'])}
-${bannerGroup('Sessão', ['/history [n]', '/db-history [n] [offset]', '/db-sessions [n]', '/who', '/restart'])}
+${bannerGroup('Sessão', ['/history [n]', '/db-history [n] [offset]', '/db-sessions [n]', '/who', '/restart', '/conversation-restart'])}
 ${bannerGroup('Modelo', ['/model [list|id]', '/reasoning [low|medium|high|xhigh|off]', '/count'])}
 ${bannerGroup('Contexto', ['/attach [path|blob|clear]', '/context', '/compact', '/plan [on|off|autopilot|read|clear]', '/resume [id]'])}
 ${bannerGroup('Fluxo', ['/pause', '/dialog-resume [bootPrompt]', '/handoff', '/queue <msg>', '/queue [status|consume|clear]', '/turn <msg>'])}

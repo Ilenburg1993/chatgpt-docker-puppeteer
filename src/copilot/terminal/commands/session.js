@@ -2568,7 +2568,7 @@ export async function cmdSessionSdk({ println }, arg = '') {
             println(terminalThemeRow('Uso', '/session sdk next <new|resume <id|#n|atual|última|primeiro-plano>|auto>', { role: 'warn' }));
             return;
         }
-        println(terminalThemeRow('Nota', 'a diretiva é consumida pelo initializer no próximo boot; /restart reinicia só a conversa'));
+        println(terminalThemeRow('Nota', 'a diretiva é consumida pelo initializer no próximo boot; /restart executa esse boot agora'));
         return;
     }
     if (action === 'delete' || action === 'remove') {
@@ -2667,7 +2667,8 @@ export async function cmdSessionSdk({ println }, arg = '') {
     println(
         terminalThemeRows('Comandos', [
             '/session sdk controla sessões SDK',
-            '/restart reinicia só a conversa',
+            '/restart reinicia a sessão SDK',
+            '/conversation-restart reinicia só a conversa',
             '/resume injeta histórico do hub',
             '/session save|list|restore usa snapshots locais',
         ], { role: 'command' }),
@@ -2728,6 +2729,8 @@ export async function cmdSessionSdk({ println }, arg = '') {
             '/session sdk next new',
             '/session sdk next resume <id|#n|atual|última|primeiro-plano>',
             '/session sdk next auto',
+            '/session sdk restart new',
+            '/session sdk restart resume <id|#n|atual|última|primeiro-plano>',
         ], { role: 'command' }),
     );
     println(

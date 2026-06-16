@@ -550,7 +550,7 @@ function yesNoPlain(value) {
 
 /**
  * Explica a fronteira entre seletor BYOK e sessão SDK viva. Provider/profile vivem no contrato de criação/retomada de
- * sessão; `/restart` reinicia apenas a conversa e não pode ser narrado como troca de provider.
+ * sessão; `/restart` força o ciclo de sessão SDK, enquanto `/conversation-restart` reinicia só o diálogo.
  *
  * @param {(text: string) => void} println
  * @param {{ persisted?: boolean }} [options]
@@ -564,7 +564,7 @@ function printByokSdkSessionBoundaryHint(println, options = {}) {
         terminalThemeRow('Próximo', `${prefix} Mudança de provedor usa reattach do mesmo sessionId.`),
     );
     println(
-        terminalThemeRow('Conversa', '/restart reinicia só a conversa; não troca o provedor da sessão viva.', {
+        terminalThemeRow('Sessão SDK', '/restart reinicia a sessão SDK; /conversation-restart reinicia só a conversa.', {
             role: 'command',
         }),
     );

@@ -26,7 +26,9 @@ Este arquivo passa a ser o novo guia operacional para as próximas etapas. O roa
 - [x] Trabalho parcial fica em `[ ]` com nota de progresso.
 - [x] Live runs que falham por harness, mas provam funcionalidade, são registrados como evidência operacional, não como
   aceite final.
-- [x] `/restart` é conversa-only: não muda provider, modelo, rota nem identidade da sessão viva.
+- [x] `/restart` é restart real de sessão SDK: fecha o runtime atual e reabre pelo initializer.
+- [x] `/conversation-restart` é o comando conversa-only: reinicia apenas o dialog loop, sem mudar provider, modelo,
+  rota nem identidade SDK.
 - [x] Nova sessão só ocorre por pedido explícito humano ou por comando explícito dedicado a criar nova sessão.
 - [ ] Ao implementar qualquer item abaixo, atualizar este arquivo antes do commit.
 
@@ -51,7 +53,8 @@ Este arquivo passa a ser o novo guia operacional para as próximas etapas. O roa
 
 ### 2.2 O que ainda não está fechado
 
-- [ ] Promoção automática em `assistant.turn_end` ainda não existe.
+- [x] Promoção automática em `assistant.turn_end` existe para operações diferidas seguras, retryable e com
+  `deferReason=ACTIVE_DIALOG_LOOP_ROUTE_REATTACH_DEFERRED`.
 - [x] `model_gateway_runtime_reconcile` reconhece operação `same-session-route-switch:*` diferida e retorna plano seguro
   de promoção quando o reattach imediato não é seguro.
 - [ ] Ingress/proxy dinâmico do Model Gateway ainda não existe para providers que o SDK não rebindar diretamente.
@@ -144,19 +147,33 @@ A LLM-B deve conseguir:
 
 #### A.2 Scheduler em limite de turno
 
-- [ ] Definir evento canônico de promoção em `assistant.turn_end`.
-- [ ] Garantir que a promoção só roda depois de tool responses fechadas.
+- [x] Definir evento canônico de promoção em `assistant.turn_end`.
+- [x] Garantir que a promoção só roda depois de tool responses fechadas.
 - [ ] Exigir sinal explícito de autorização/política para aplicar promoção automática.
-- [ ] Preservar dialog loop e `sessionId` durante a promoção.
+- [x] Preservar dialog loop e `sessionId` durante a promoção.
 - [ ] Registrar transição `deferred_until_turn_boundary -> reattach_requested -> ... -> committed`.
 - [ ] Cobrir operação agendada, operação cancelada e operação expirada.
+  - Progresso: unit test cobre promoção válida e bloqueio por `deferReason` não autopromovível.
 
 #### A.3 UX e tools
 
 - [ ] `model_gateway_route_switch` deve explicar quando a LLM-B não deve tentar reaplicar imediatamente.
 - [ ] `model_gateway_workflow_plan` deve gerar etapa de promoção pós-turno quando apropriado.
 - [ ] `/activity`, `/byok` e `/tools diag` devem exibir operação diferida pendente sem sugerir nova sessão.
-- [ ] `/restart` deve continuar descrito como conversa-only em todos os pontos.
+- [x] `/restart` deve ser descrito como restart real de sessão SDK em todos os pontos do terminal.
+- [x] `/conversation-restart` deve ser descrito como conversa-only em todos os pontos do terminal.
+
+### Faixa A.4 — Comandos explícitos de lifecycle SDK
+
+- [x] `/restart` sem argumentos fecha o runtime atual e reabre via initializer, consumindo seleção pendente ou automática
+  sem forçar nova sessão.
+- [x] `/restart new` fecha a sessão atual e cria nova sessão SDK por pedido explícito.
+- [x] `/restart resume <id|#n|atual|última|primeiro-plano>` fecha a sessão atual e reabre tentando retomar a sessão
+  escolhida.
+- [x] `/restart auto` limpa diretiva explícita e reinicializa pelo padrão persistido.
+- [x] `/session restart ...` e `/session sdk restart ...` existem como comandos verbosos de operador.
+- [x] `/conversation-restart` e `/dialog-restart` preservam o antigo restart do dialog loop.
+- [ ] Adicionar live test validando que `/restart` consome `nextSdkSessionBoot` e altera/retoma o `sessionId` esperado.
 
 ### Faixa B — Reconcile de rota/provider, não só modelo
 

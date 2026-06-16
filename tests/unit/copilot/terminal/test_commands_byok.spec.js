@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeProofCommands, buildModelGatewayRuntimeStandbyPlan, buildModelGatewayRuntimeStandbyRoutes, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, buildModelGatewayRuntimeAutomationControllerStep, DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, explainModelGatewayRuntimeAutomationPolicySources, listModelGatewayRuntimeAutomationPolicyPresets, resolveModelGatewayRuntimeAutomationPolicyPreset, validateModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationEffectivePolicy, readModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationPolicyFile, writeModelGatewayRuntimeAutomationPolicyFile, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayProbeBackoff, planModelGatewayCatalogRefresh, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, mkdir, rm, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalConfigProjection, readTerminalConfiguredSessionFsState, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, scheduleTerminalSdkSessionBootSelection, setTerminalModelProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildEligibilityEvaluatedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeProofCommands, buildModelGatewayRuntimeStandbyPlan, buildModelGatewayRuntimeStandbyRoutes, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, buildModelGatewayRuntimeAutomationControllerStep, DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, explainModelGatewayRuntimeAutomationPolicySources, listModelGatewayRuntimeAutomationPolicyPresets, resolveModelGatewayRuntimeAutomationPolicyPreset, validateModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationEffectivePolicy, readModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationPolicyFile, writeModelGatewayRuntimeAutomationPolicyFile, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, materializeModelGatewayActiveByokProfileEnv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayProbeBackoff, planModelGatewayCatalogRefresh, readModelGatewayByokProfileCostHint, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, mkdir, rm, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalConfigProjection, readTerminalConfiguredSessionFsState, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, scheduleTerminalSdkSessionBootSelection, setTerminalModelProjection, switchTerminalRouteProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
         buildCatalogRefreshEventBatch: vi.fn((input) => {
             const changedKinds = [
@@ -21,6 +21,11 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
         buildCatalogRefreshStartedEvent: vi.fn((input) => ({
             type: 'model_gateway:catalog:import_started',
             importerIds: input.importerIds ?? [],
+        })),
+        buildEligibilityEvaluatedEvent: vi.fn((input) => ({
+            type: 'model_gateway:eligibility_evaluated',
+            modelCount: input?.summary?.modelCount ?? input?.run?.modelCount ?? 0,
+            eligibleCount: input?.summary?.eligibleCount ?? input?.run?.eligibleCount ?? 0,
         })),
         recommendCatalogDiffProbes: vi.fn(() => [
             {
@@ -1347,6 +1352,11 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
         rename: vi.fn(),
         rm: vi.fn(() => Promise.resolve()),
         setTerminalModelProjection: vi.fn(),
+        switchTerminalRouteProjection: vi.fn(() => ({
+            ok: true,
+            previousRoute: null,
+            nextRoute: { providerId: 'kilo-code', providerModel: 'kilo-auto/free' },
+        })),
         stat: vi.fn(),
         summarizeModelGatewayRefreshLogText: vi.fn(() => ({
             eventCount: 6,
@@ -1361,6 +1371,37 @@ const { buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildMod
             failures: [],
         })),
         toOpenAIModelCatalogList: vi.fn(() => ({ object: 'list', data: [] })),
+        activateModelGatewayByokProfileEnv: vi.fn((name, env = process.env) => {
+            env.COPILOT_BYOK_ENABLED = 'true';
+            env.COPILOT_BYOK_PROFILE = String(name);
+            return { ok: true, profileName: String(name) };
+        }),
+        materializeModelGatewayActiveByokProfileEnv: vi.fn((env = process.env) => {
+            const profile = String(env.COPILOT_BYOK_PROFILE ?? '');
+            const preset = profile.startsWith('groq') ? 'groq' : profile.startsWith('openrouter') ? 'openrouter' : 'kilo-code';
+            return {
+                env: {
+                    ...env,
+                    COPILOT_BYOK_ENABLED: 'true',
+                    COPILOT_BYOK_PROVIDER_PRESET: preset,
+                },
+                profile,
+            };
+        }),
+        readModelGatewayByokProfileCostHint: vi.fn((profileName) => {
+            const profile = String(profileName ?? '');
+            return profile.includes('free')
+                ? {
+                      profileFreeTier: true,
+                      profileCostSource: 'profile',
+                      profileCostDetail: '6k TPM observed on current plan',
+                  }
+                : {
+                      profileFreeTier: null,
+                      profileCostSource: null,
+                      profileCostDetail: null,
+                  };
+        }),
         writeFile: vi.fn(),
     }));
 
@@ -1424,6 +1465,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', (
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/model-selection/index.js', () => ({
     setTerminalModelProjection,
+    switchTerminalRouteProjection,
 }));
 
 vi.mock('#copilot/model-gateway', () => ({
@@ -1431,11 +1473,13 @@ vi.mock('#copilot/model-gateway', () => ({
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
+    activateModelGatewayByokProfileEnv,
     compareModelGatewaySelectionAudits,
     resolveModelGatewaySelectionPolicy,
     applyModelGatewayEligibilityToSnapshot,
     buildCatalogRefreshEventBatch,
     buildCatalogRefreshStartedEvent,
+    buildEligibilityEvaluatedEvent,
     buildModelGatewayPreBuildReadinessReport,
     buildModelGatewayPreKCompatibilityReport,
     buildModelGatewayRouteCandidates,
@@ -1457,6 +1501,7 @@ vi.mock('#copilot/model-gateway', () => ({
     buildModelGatewaySelectionDecisionTrace,
     buildProbeCompletedEvent: buildProbeCompletedEvent,
     buildRouteDecisionEvent,
+    materializeModelGatewayActiveByokProfileEnv,
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
     createDefaultModelGatewayCatalogImporters,
@@ -1485,6 +1530,7 @@ vi.mock('#copilot/model-gateway', () => ({
     persistModelGatewaySelectionDecisionTrace,
     planModelGatewayCatalogRefresh,
     planModelGatewayProbeBackoff,
+    readModelGatewayByokProfileCostHint,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,
@@ -1998,8 +2044,8 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('Uso: /byok | /byok reload | /byok auto');
         expect(ctx.output()).toContain('Preparada');
         expect(ctx.output()).toContain('Sessão viva');
-        expect(ctx.output()).toContain('/session sdk next new');
-        expect(ctx.output()).toContain('/restart reinicia só a conversa');
+        expect(ctx.output()).toContain('/restart reinicia a sessão SDK');
+        expect(ctx.output()).toContain('/conversation-restart reinicia só a conversa');
         expect(ctx.output()).not.toContain('dialog loop');
         expect(ctx.output()).not.toContain('secret');
     });
@@ -2077,8 +2123,8 @@ describe('terminal /byok command', () => {
 
         expect(ctx.output()).toContain('BYOK · perfil ollama-cloud');
         expect(ctx.output()).toContain('BYOK · perfil kilo');
-        expect(ctx.output()).toContain('cruza provedor ou perfil da sessão atual');
-        expect(ctx.output()).toContain('/session sdk next new');
+        expect(ctx.output()).toContain('cruza provedor ou perfil e requer reattach');
+        expect(ctx.output()).toContain('/restart reinicia a sessão SDK');
     });
 
     it('torna acionável o health falho da seleção BYOK ativa sem trocar modelo silenciosamente', async () => {
@@ -2599,7 +2645,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('openrouter/model-b');
         expect(ctx.output()).toContain('Shortlist');
         expect(ctx.output()).toContain('encerrada · aprovados 2/2');
-        expect(ctx.output()).not.toContain('ok=2/2');
+        expect(ctx.output()).toContain('Shortlist encerrada: ok=2/2 attempted=2/2');
         expect(ctx.output()).not.toContain('providerTentado=');
         expect(ctx.output()).toContain('/byok recommend ... safe');
         expect(ctx.output()).not.toContain('tmp-kilo-shortlist');
@@ -2670,7 +2716,7 @@ describe('terminal /byok command', () => {
         );
         expect(ctx.output()).toContain('Shortlist');
         expect(ctx.output()).toContain('encerrada · aprovados 1/1');
-        expect(ctx.output()).not.toContain('ok=1/1');
+        expect(ctx.output()).toContain('Shortlist encerrada: ok=1/1 attempted=1/1');
         expect(ctx.output()).not.toContain('providerTentado=');
         expect(ctx.output()).not.toContain("COPILOT_BYOK_PROFILE 'kilo-code'");
     });
@@ -3681,7 +3727,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('novo provedor');
         expect(ctx.output()).toContain('/byok probe agent provider:kilo-code model:kilo-auto/free timeout:20000');
         expect(ctx.output()).toContain('/byok model kilo-auto/free');
-        expect(ctx.output()).toContain('/session sdk next new && /byok provider kilo-code kilo-auto/free');
+        expect(ctx.output()).toContain('/byok provider kilo-code kilo-auto/free');
         expect(ctx.output()).toContain('/byok persist provider kilo-code kilo-auto/free');
         expect(ctx.output()).not.toContain('candidate alternative');
         expect(ctx.output()).not.toContain('new provider');
@@ -3951,12 +3997,11 @@ describe('terminal /byok command', () => {
         });
 
         expect(setTerminalModelProjection).toHaveBeenCalledWith('anthropic/claude-sonnet-4.5');
-        expect(scheduleTerminalSdkSessionBootSelection).toHaveBeenCalledWith({ mode: 'new' });
-        expect(result.applied).toHaveLength(2);
+        expect(scheduleTerminalSdkSessionBootSelection).not.toHaveBeenCalled();
+        expect(result.applied).toHaveLength(1);
         expect(result.applied.map(describeTerminalByokGatewayAutoEffect)).toEqual(
             expect.arrayContaining([
                 'modelo vivo solicitado anthropic/claude-sonnet-4.5 · confiança catálogo',
-                'novo boot SDK preparado para anthropic/claude-sonnet-4.5',
             ]),
         );
         expect(result.skipped).toEqual(
@@ -3999,8 +4044,8 @@ describe('terminal /byok command', () => {
                 expect.objectContaining({
                     decisionId: 'automation-1',
                     effectKind: 'prepare_new_sdk_session',
-                    status: 'applied',
-                    applied: true,
+                    status: 'implicit_new_session_forbidden',
+                    applied: false,
                 }),
             ]),
         );
@@ -4018,7 +4063,7 @@ describe('terminal /byok command', () => {
                 decisionId: 'automation-1',
                 routeProfile: 'repo_agent',
                 selectedRouteKey: 'openrouter:model-a',
-                status: 'boot_scheduled',
+                status: 'implicit_new_session_forbidden',
                 targetModel: 'anthropic/claude-sonnet-4.5',
             }),
         ]);
@@ -5064,8 +5109,8 @@ describe('terminal /byok command', () => {
 
         expect(setTerminalModelProjection).not.toHaveBeenCalled();
         expect(ctx.output()).toContain('Troca modelo');
-        expect(ctx.output()).toContain('sessão atual usa outro provedor/perfil');
-        expect(ctx.output()).toContain('sem troca cruzada na conversa viva');
+        expect(ctx.output()).toContain('seleção preparada cruza provedor ou perfil');
+        expect(ctx.output()).toContain('sem criar nova sessão');
         expect(ctx.output()).not.toContain('bound ao mesmo provider');
         expect(ctx.output()).toContain('BYOK modelo');
         expect(ctx.output()).not.toContain('BYOK status');
@@ -6751,6 +6796,6 @@ describe('terminal /byok command', () => {
         expect(written).not.toContain('COPILOT_BYOK_PROFILE=');
         expect(written).not.toContain('COPILOT_BYOK_MODEL=');
         expect(written).not.toContain('COPILOT_BYOK_PROVIDER_PRESET=');
-        expect(ctx.output()).toContain('SDK Copilot governará o próximo boot');
+        expect(ctx.output()).toContain('use /byok use sdk para aplicar o SDK Copilot na sessão atual');
     });
 });

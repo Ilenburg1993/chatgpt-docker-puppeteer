@@ -7,3 +7,4 @@ export {
     requestTerminalLiveByokModelSwitch,
     requestTerminalLiveByokRouteSwitch,
 } from '../live-model-switch.js';
+export { promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary } from '../deferred-route-promotion.js';

@@ -44,6 +44,7 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *     isDialogLoopActive?: (() => boolean) | undefined;
  *     isDialogLoopPaused?: (() => boolean) | undefined;
  *     start?: (() => Promise<void>) | undefined;
+ *     stop?: ((opts?: { shutdownTimeoutMs?: number; preserveDialogLoopIntent?: boolean }) => Promise<void>) | undefined;
  *     abortCurrentMessage?: (() => Promise<void>) | undefined;
  *     steerMessage?: ((prompt: string, opts?: { signal?: AbortSignal }) => Promise<string>) | undefined;
  *     answerPendingQuestion?: ((answer: string) => boolean) | undefined;
@@ -304,6 +305,16 @@ export function setRuntimePermissionMode(runtime, mode, opts = {}) {
 export async function startRuntime(runtime) {
     if (typeof runtime.start !== 'function') throw new Error('AGENT_RUNTIME_START_UNAVAILABLE');
     await runtime.start();
+}
+
+/**
+ * @param {AgentRuntimeControlsTarget} runtime
+ * @param {{ shutdownTimeoutMs?: number; preserveDialogLoopIntent?: boolean }} [opts]
+ * @returns {Promise<void>}
+ */
+export async function stopRuntime(runtime, opts = {}) {
+    if (typeof runtime.stop !== 'function') throw new Error('AGENT_RUNTIME_STOP_UNAVAILABLE');
+    await runtime.stop(opts);
 }
 
 /**

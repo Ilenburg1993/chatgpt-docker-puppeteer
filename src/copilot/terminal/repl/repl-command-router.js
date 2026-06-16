@@ -92,6 +92,7 @@ import {
 import {
     abortTerminalCurrentMessage,
     answerTerminalPendingQuestion,
+    listTerminalSdkSessionInventory,
     offTerminalAgentRuntimeEvent,
     onceTerminalAgentRuntimeEvent,
     pauseTerminalDialogLoop,
@@ -99,9 +100,13 @@ import {
     readTerminalRuntimeControlState,
     readTerminalRuntimeState,
     resumeTerminalDialogLoop,
+    scheduleTerminalSdkSessionBootSelection,
+    startTerminalAgentRuntime,
     steerTerminalMessage,
+    stopTerminalAgentRuntimeSession,
     stopTerminalDialogMode,
 } from '../frontend/gateways/index.js';
+import { promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary } from '../byok/index.js';
 import { clearRateLimiters } from '../state/repl-runtime/index.js';
 import { terminalThemeHeadline, terminalThemeRow, terminalThemeRows } from '../state/repl/index.js';
 import { deliverEntryAsTurnIfIdle } from '../wiring/mailbox/index.js';
@@ -194,11 +199,11 @@ async function _cmdEmergencyReset() {
     println(terminalThemeRow('Reset de emergência', 'limpando limitadores locais', { role: 'warn' }));
     clearRateLimiters();
     println(terminalThemeRow('Reset de emergência', 'reiniciando conversa', { role: 'warn' }));
-    await _cmdRestart();
+    await _cmdConversationRestart();
     println(terminalThemeRow('Reset de emergência', 'limitadores limpos e conversa reiniciada', { role: 'success' }));
 }
 
-async function _cmdRestart() {
+async function _cmdConversationRestart() {
     println(terminalThemeRow('Conversa', 'reiniciando', { role: 'muted' }));
     try {
         // Registrar 'dialog.ready' ANTES de stopDialogMode() para evitar race condition.
@@ -238,6 +243,164 @@ async function _cmdRestart() {
         await ensureDialogLoop().catch((e) => logSwallowed(e, 'terminal.repl.ensureDialogLoop'));
     }
     println(terminalThemeRow('Conversa', 'reiniciada', { role: 'success' }));
+}
+
+/**
+ * @param {string} target
+ * @param {{
+ *     currentSessionId: string | null;
+ *     lastSessionId: string | null;
+ *     foregroundSessionId: string | null;
+ *     sessions: { sessionId: string }[];
+ * }} inventory
+ * @returns {{ sessionId: string; source: string } | null}
+ */
+function resolveRestartSdkSessionResumeTarget(target, inventory) {
+    const clean = target.trim();
+    const normalized = clean.toLowerCase();
+    if ((normalized === 'current' || normalized === 'atual') && inventory.currentSessionId) {
+        return { sessionId: inventory.currentSessionId, source: 'atual' };
+    }
+    if ((normalized === 'last' || normalized === 'ultima' || normalized === 'última') && inventory.lastSessionId) {
+        return { sessionId: inventory.lastSessionId, source: 'última usada' };
+    }
+    if (
+        (normalized === 'foreground' || normalized === 'primeiro-plano' || normalized === 'primeiro_plano') &&
+        inventory.foregroundSessionId
+    ) {
+        return { sessionId: inventory.foregroundSessionId, source: 'primeiro plano' };
+    }
+    const indexed = /^#(?<index>\d+)$/u.exec(clean);
+    if (indexed?.groups?.['index']) {
+        const index = Number.parseInt(indexed.groups['index'], 10) - 1;
+        const entry = inventory.sessions[index];
+        return entry ? { sessionId: entry.sessionId, source: clean } : null;
+    }
+    return clean ? { sessionId: clean, source: 'id' } : null;
+}
+
+/**
+ * @param {string[]} tokens
+ * @returns {Promise<string | null>}
+ */
+async function scheduleRestartSdkSessionBootSelection(tokens) {
+    if (tokens.length === 0) {
+        return 'executar seleção SDK pendente/automática';
+    }
+    const [rawMode = '', ...modeRest] = tokens;
+    const mode = rawMode.toLowerCase();
+    if (mode === 'new') {
+        const result = await scheduleTerminalSdkSessionBootSelection({ mode: 'new' });
+        if (!result.ok) throw result.error;
+        return 'criar nova sessão SDK';
+    }
+    if (mode === 'resume') {
+        const target = modeRest.join(' ').trim();
+        if (!target) {
+            println(terminalThemeRow('Uso', '/restart resume <id|#n|atual|última|primeiro-plano>', { role: 'warn' }));
+            return null;
+        }
+        let resolved;
+        if (/^(?:#\d+|current|last|foreground|atual|ultima|última|primeiro[-_]plano)$/iu.test(target)) {
+            const inventory = await listTerminalSdkSessionInventory();
+            resolved = resolveRestartSdkSessionResumeTarget(target, inventory);
+        } else {
+            resolved = resolveRestartSdkSessionResumeTarget(target, {
+                currentSessionId: null,
+                lastSessionId: null,
+                foregroundSessionId: null,
+                sessions: [],
+            });
+        }
+        if (!resolved) {
+            println(terminalThemeRow('Sessão SDK', `não resolvida para ${target} · rode /session sdk para ver o inventário`, { role: 'warn' }));
+            return null;
+        }
+        const result = await scheduleTerminalSdkSessionBootSelection({
+            mode: 'resume',
+            sessionId: resolved.sessionId,
+        });
+        if (!result.ok) throw result.error;
+        return `retomar sessão SDK${resolved.source === 'id' ? ' informada' : ` ${resolved.source}`}`;
+    }
+    if (mode === 'auto' || mode === 'clear') {
+        const result = await scheduleTerminalSdkSessionBootSelection(null);
+        if (!result.ok) throw result.error;
+        return 'usar seleção automática de sessão SDK';
+    }
+    println(
+        terminalThemeRow(
+            'Uso',
+            '/restart [new|resume <id|#n|atual|última|primeiro-plano>|auto]',
+            { role: 'warn' },
+        ),
+    );
+    return null;
+}
+
+/**
+ * @param {string[] | string} args
+ * @returns {Promise<void>}
+ */
+async function _cmdRestartSdkSession(args = []) {
+    const tokens = Array.isArray(args) ? args.filter(Boolean) : args.split(/\s+/u).filter(Boolean);
+    try {
+        const selectionLabel = await scheduleRestartSdkSessionBootSelection(tokens);
+        if (!selectionLabel) return;
+        println(terminalThemeRow('Sessão SDK', `${selectionLabel} no restart`, { role: 'success' }));
+        const promoted = await promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary({
+            source: 'terminal.restart_sdk_session.route_promotion',
+        }).catch((error) => {
+            println(terminalThemeRow('BYOK', `promoção diferida ignorada · ${toError(error).message}`, { role: 'warn' }));
+            return null;
+        });
+        if (promoted && promoted.promoted > 0) {
+            println(terminalThemeRow('BYOK', `${promoted.promoted} rota(s) diferida(s) promovida(s) antes do restart`, { role: 'success' }));
+        }
+        println(terminalThemeRow('Sessão SDK', 'encerrando runtime atual', { role: 'muted' }));
+        const { promise: readyPromise, resolve: resolveReady, reject: rejectReady } = Promise.withResolvers();
+        /** @type {ReturnType<typeof setTimeout> | null} */
+        let timeout = setTimeout(
+            () => rejectReady(new Error(`Timeout aguardando sessão SDK (${RESTART_WAIT_TIMEOUT_MS}ms)`)),
+            RESTART_WAIT_TIMEOUT_MS,
+        );
+        let settled = false;
+        /** @returns {void} */
+        const cleanupReadyWait = () => {
+            if (timeout !== null) {
+                clearTimeout(timeout);
+                timeout = null;
+            }
+            offTerminalAgentRuntimeEvent(EMITTER_DIALOG_READY, onReady);
+        };
+        /** @returns {void} */
+        const onReady = () => {
+            if (settled) return;
+            settled = true;
+            cleanupReadyWait();
+            resolveReady(undefined);
+        };
+        onceTerminalAgentRuntimeEvent(EMITTER_DIALOG_READY, onReady);
+        await stopTerminalAgentRuntimeSession(null, { preserveDialogLoopIntent: true });
+        await startTerminalAgentRuntime();
+        if (!readTerminalRuntimeControlState().dialogLoopActive) {
+            await readyPromise;
+        } else {
+            settled = true;
+            cleanupReadyWait();
+        }
+        const state = readTerminalRuntimeControlState();
+        println(
+            terminalThemeRow(
+                'Sessão SDK',
+                `reiniciada · sessionId ${state.sessionId ?? 'n/d'} · modelo ${state.model}`,
+                { role: 'success' },
+            ),
+        );
+    } catch (e) {
+        println(terminalThemeRow('Sessão SDK', `falha ao reiniciar · ${toError(e).message}`, { role: 'error' }));
+        await ensureDialogLoop().catch((error) => logSwallowed(error, 'terminal.repl.restartSdkSession.ensureDialogLoop'));
+    }
 }
 
 async function _cmdPauseDialogLoop() {
@@ -652,7 +815,12 @@ async function _cmdQuit(rl, injectServer, cleanup) {
 async function _cmdSessionDispatch(subCmd, rest) {
     const parsed = parseTerminalSubcommand(subCmd, rest);
     const sub = parsed.subcommand.toLowerCase();
-    if (!sub || sub === 'sdk') {
+    const sdkRestart = sub === 'sdk' && parsed.rest[0]?.toLowerCase() === 'restart';
+    if (sdkRestart) {
+        await _cmdRestartSdkSession(parsed.rest.slice(1));
+    } else if (sub === 'restart') {
+        await _cmdRestartSdkSession(parsed.rest);
+    } else if (!sub || sub === 'sdk') {
         await _cmdSessionSdk({ println }, sub === 'sdk' ? parsed.rest.join(' ') : '');
     } else if (sub === 'save') {
         await _cmdSessionSave({ println }, parsed.rest.join(' ') || undefined);
@@ -667,6 +835,7 @@ async function _cmdSessionDispatch(subCmd, rest) {
                 [
                     '/session sdk [n]',
                     '/session sdk next <new|resume <id|#n|current|last|foreground>|auto>',
+                    '/session sdk restart <new|resume <id|#n|current|last|foreground>|auto>',
                     '/session save [reason]',
                     '/session list',
                     '/session restore <id>',
@@ -721,7 +890,8 @@ export const CMD_ROUTES = [
     [['answer'], (_, arg) => _cmdAnswer({ println }, arg)],
     [['clear-shadow'], () => _cmdClearShadow({ println })],
     [['count'], (ctx) => _cmdCount({ hubSessionId: ctx.hubSessionId, println })],
-    [['restart'], () => _cmdRestart()],
+    [['restart'], (_, arg) => _cmdRestartSdkSession(arg)],
+    [['conversation-restart', 'dialog-restart'], () => _cmdConversationRestart()],
     [['emergency-reset', 'ereset'], () => _cmdEmergencyReset()],
     [['model'], (_, arg) => _cmdModel({ println }, arg)],
     [['byok'], (ctx, arg) => _cmdByok({ println, eventBus: ctx.eventBus }, arg)],

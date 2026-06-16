@@ -89,9 +89,9 @@ export function buildTerminalSmartMenuEntries() {
     if (!control.dialogLoopActive || control.status === 'stopped') {
         entries.push({
             id: 'restart',
-            label: 'Reiniciar conversa',
+            label: 'Reiniciar sessão SDK',
             commandLine: '/restart',
-            description: 'Recupera conversa inativa ou parada',
+            description: 'Fecha a sessão atual e reabre via initializer',
             hot: true,
         });
     }

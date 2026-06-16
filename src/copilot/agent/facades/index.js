@@ -72,6 +72,7 @@ export {
     setRuntimeBackgroundCompactionThreshold,
     setRuntimePermissionMode,
     startRuntime,
+    stopRuntime,
     steerRuntimeMessage,
 } from './agent-runtime-controls.js';
 export { readAgentRuntimeEventBridgeSources, wireAgentRuntimeEventBusBridge } from './agent-runtime-event-bridge.js';

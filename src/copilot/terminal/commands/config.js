@@ -375,7 +375,7 @@ export async function cmdModel({ println }, arg) {
             terminalThemeRow('Próximo', 'A sessão SDK será revalidada no próximo turno. Use /status ou /sdk status para conferir o modelo efetivo.'),
         );
     }
-    println(terminalThemeRow('Nota', 'Use /restart apenas se quiser reiniciar a conversa; não é mais a confirmação primária de modelo.'));
+    println(terminalThemeRow('Nota', 'Use /conversation-restart se quiser reiniciar só a conversa; /restart reinicia a sessão SDK.'));
     println('');
 }
 

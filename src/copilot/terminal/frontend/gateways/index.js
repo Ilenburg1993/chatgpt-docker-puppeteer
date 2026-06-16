@@ -25,6 +25,7 @@ export {
     startTerminalAgentRuntime,
     steerTerminalMessage,
     stopTerminalAgentRuntime,
+    stopTerminalAgentRuntimeSession,
 } from './agent-runtime.js';
 export {
     clearTerminalHistoryFeed,

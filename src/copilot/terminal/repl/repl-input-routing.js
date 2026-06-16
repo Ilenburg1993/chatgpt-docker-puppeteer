@@ -10,7 +10,15 @@
 
 import { terminalThemeRow } from '../state/dialog/index.js';
 
-const TERMINAL_ESCAPE_COMMANDS = new Set(['quit', 'exit', 'restart', 'emergency-reset', 'ereset']);
+const TERMINAL_ESCAPE_COMMANDS = new Set([
+    'quit',
+    'exit',
+    'restart',
+    'conversation-restart',
+    'dialog-restart',
+    'emergency-reset',
+    'ereset',
+]);
 
 const TERMINAL_IMMEDIATE_COMMANDS = new Set([
     'abort',

@@ -93,7 +93,10 @@ import {
     readTerminalToolRegistrySnapshot,
 } from '../frontend/gateways/index.js';
 import { observeTerminalModelChangeProjection } from '../frontend/projections/index.js';
-import { consumeTerminalLiveByokModelSwitchConfirmation } from '../byok/live/index.js';
+import {
+    consumeTerminalLiveByokModelSwitchConfirmation,
+    promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary,
+} from '../byok/live/index.js';
 import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
 import {
     appendTerminalTranscriptTurn,
@@ -850,6 +853,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         // setBusy(false) do engine.js antes de verificar o estado de ociosidade.
         setImmediate(() => {
             drainMailboxToTurnIfIdle('turn_end');
+        });
+        setImmediate(() => {
+            void promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary({
+                source: 'terminal.assistant_turn_end.route_promotion',
+            });
         });
         refreshPromptIfIdle();
     };

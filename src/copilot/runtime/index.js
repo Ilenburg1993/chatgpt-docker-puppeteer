@@ -51,6 +51,7 @@ export {
     setDefaultAgentBackgroundCompactionThreshold,
     startAgentRuntime,
     steerAgentRuntimeMessage,
+    stopAgentRuntime,
     stopAgentRuntimeDialogLoopAuthorized,
     stopDefaultAgentDialogLoopAuthorized,
 } from '../presentation/runtime/controls.js';

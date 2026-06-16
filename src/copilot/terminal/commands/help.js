@@ -219,7 +219,8 @@ function renderFullHelp({ injectPort, println }) {
         { command: '/abort', description: 'aborta apenas o turno SDK ativo' },
         { command: '/clear', description: 'limpa histórico em memória' },
         { command: '/clear-shadow', description: 'limpa pergunta humana restaurada do disco' },
-        { command: '/restart', description: 'reinicia só a conversa' },
+        { command: '/restart [new|resume|auto]', description: 'reinicia a sessão SDK e reaplica o initializer' },
+        { command: '/conversation-restart', description: 'reinicia só a conversa/dialog loop' },
         { command: '/emergency-reset (/ereset)', description: 'limpa limitadores e reinicia a conversa' },
         { command: '/quit ou /exit', description: 'encerra terminal' },
     ]);
@@ -232,6 +233,7 @@ function renderFullHelp({ injectPort, println }) {
             description: 'histórico de perguntas, formulários e permissões no arquivo SSE',
         },
         { command: '/session sdk next <new|resume|auto>', description: 'agenda seleção de sessão SDK no próximo boot' },
+        { command: '/session sdk restart <new|resume|auto>', description: 'fecha a sessão atual e reabre via initializer' },
         { command: '/session sdk delete <id|#n>', description: 'apaga estado persistido SDK fora da sessão viva' },
     ]);
     renderHelpSection(println, 'Modelo, BYOK e quota', [

@@ -27,6 +27,7 @@ import {
     setAgentRuntimePermissionMode,
     startAgentRuntime,
     steerAgentRuntimeMessage,
+    stopAgentRuntime,
     stopAgentRuntimeDialogLoopAuthorized,
     readAgentRuntimeOverviewProjection,
 } from '#copilot/runtime';
@@ -130,6 +131,15 @@ export function setTerminalRuntimePermissionMode(mode, runtimeId) {
  */
 export async function startTerminalAgentRuntime(runtimeId) {
     await startAgentRuntime(runtimeId);
+}
+
+/**
+ * @param {string | null | undefined} [runtimeId]
+ * @param {{ shutdownTimeoutMs?: number; preserveDialogLoopIntent?: boolean }} [opts]
+ * @returns {Promise<void>}
+ */
+export async function stopTerminalAgentRuntimeSession(runtimeId, opts = {}) {
+    await stopAgentRuntime(runtimeId, opts);
 }
 
 /**
