@@ -78,6 +78,8 @@ Este arquivo passa a ser o novo guia operacional para as próximas etapas. O roa
   OpenAI-compatible com `fetch` injetável.
 - [x] Existe registry em memória e rota HTTP local `/v1/model-gateway-ingress/:routeId/chat/completions`, com auth local
   por rota e upstream auth injetada pelo registry.
+- [x] O contrato ingress aceita `sdkRouteKey` e `sdkVisibleModel`, permitindo base URL/modelo estáveis vistos pelo SDK
+  enquanto o target real muda no registry.
 - [ ] Ainda falta integrar criação/registro de rotas ingress ao `SessionBindingPlan` e à promoção/reconciliação runtime.
 - [ ] `terminal/commands/byok.js` segue monolítico e ainda concentra casos de uso.
 - [ ] Existem testes legados que ainda esperam `auto_prepare_new_session`, `prepare_new_sdk_session` e
@@ -307,8 +309,10 @@ A LLM-B deve conseguir:
   provider/modelo/capability.
 - [x] Desenhar e implementar contrato inicial `ModelGatewayIngressRoute` com `routeId`, `sessionId`, provider real,
   model real, base upstream, base SDK-facing, route target, TTL e timestamps.
-- [ ] Evoluir `ModelGatewayIngressRoute` para incluir profile materializado, route operation id, health policy e
-  secret refs redigidas, capabilities e TTL.
+- [x] Evoluir `ModelGatewayIngressRoute` para incluir `sdkRouteKey`, `sdkVisibleModel`, TTL e atualização de target sem
+  mudar a URL SDK-facing.
+- [ ] Evoluir `ModelGatewayIngressRoute` para incluir profile materializado, health policy, secret refs redigidas e
+  capabilities normalizadas.
 - [x] Criar módulo `src/copilot/model-gateway/ingress/` com helpers OpenAI-compatible server-agnostic.
 - [x] Criar servidor HTTP local estável visto pelo SDK como provider único.
 - [x] Builder de request upstream usa provider/model/profile da rota e remove auth do cliente antes de chamar upstream.
@@ -319,6 +323,8 @@ A LLM-B deve conseguir:
 - [ ] Validar `ask_user` e formatos de erro OpenAI-compatible no servidor HTTP contra um smoke de runtime vivo.
 - [ ] Registrar health por provider real e por route identity, não apenas pelo ingress local.
 - [ ] Integrar ingress ao `SessionBindingPlan` somente quando o provider não suportar rebind direto confiável.
+- [ ] Usar `sdkRouteKey` por sessão/perfil no `SessionBindingPlan` para permitir troca de provider por registry update
+  sem novo reattach quando o SDK já estiver apontado para o ingress.
 - [ ] Adicionar rollback e reconciliação para troca de rota via ingress.
 - [ ] Testar troca cross-provider sem recriar sessão usando ingress.
 - [x] Criar fixture unitária hermética do ingress antes de qualquer provider real.
@@ -427,3 +433,5 @@ A LLM-B deve conseguir:
   de rotas para a autenticação local por route key.
 - [x] `tests/unit/copilot/model-gateway/test_model_gateway_ingress_router.spec.js` cobre auth local, 404, bloqueio sem
   chave e proxy upstream com `fetch` injetado.
+- [x] `tests/unit/copilot/model-gateway/test_model_gateway_ingress.spec.js` cobre `sdkRouteKey` estável e update de target
+  no registry sem mudar `sdkBaseUrl`.

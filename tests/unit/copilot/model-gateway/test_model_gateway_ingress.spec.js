@@ -6,6 +6,7 @@ import {
     buildModelGatewayIngressSessionOverrides,
     buildModelGatewayIngressUpstreamRequest,
     createModelGatewayIngressRoute,
+    createModelGatewayIngressRouteRegistry,
     proxyModelGatewayIngressOpenAIChatCompletions,
     redactModelGatewayIngressRoute,
 } from '../../../../src/copilot/model-gateway/index.js';
@@ -68,6 +69,46 @@ describe('model gateway dynamic ingress', () => {
                 },
             }),
         ).toThrow(/UNSUPPORTED_PROTOCOL/u);
+    });
+
+    it('mantém rota SDK-facing estável enquanto o target upstream muda no registry', () => {
+        const baseInput = {
+            sessionId: 'sdk-session-1',
+            publicBaseUrl: 'http://127.0.0.1:4567',
+        };
+        const first = createModelGatewayIngressRoute({
+            ...baseInput,
+            route: {
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                sdkRouteKey: 'sdk-session-1:live-provider',
+                sdkVisibleModel: 'model-gateway-live',
+            },
+        });
+        const second = createModelGatewayIngressRoute({
+            ...baseInput,
+            route: {
+                providerId: 'groq',
+                providerModel: 'llama-test',
+                baseUrl: 'https://api.groq.com/openai/v1',
+                sdkRouteKey: 'sdk-session-1:live-provider',
+                sdkVisibleModel: 'model-gateway-live',
+            },
+        });
+        const registry = createModelGatewayIngressRouteRegistry();
+
+        registry.register({ ingressRoute: first, localApiKey: 'local-route-key' });
+        registry.register({ ingressRoute: second, localApiKey: 'local-route-key' });
+
+        expect(second.routeId).toBe(first.routeId);
+        expect(second.sdkBaseUrl).toBe(first.sdkBaseUrl);
+        expect(buildModelGatewayIngressSessionOverrides(second).model).toBe('model-gateway-live');
+        expect(registry.get(first.routeId)?.ingressRoute).toMatchObject({
+            providerId: 'groq',
+            providerModel: 'llama-test',
+            sdkVisibleModel: 'model-gateway-live',
+        });
     });
 
     it('reescreve model, remove auth do cliente e injeta auth upstream confiável', () => {

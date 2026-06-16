@@ -156,6 +156,8 @@ function joinUrlPath(baseUrl, path) {
  *   sessionId: string;
  *   providerId: string;
  *   providerModel: string;
+ *   sdkRouteKey: string | null;
+ *   sdkVisibleModel: string;
  *   upstreamBaseUrl: string;
  *   upstreamChatCompletionsUrl: string;
  *   sdkBaseUrl: string;
@@ -171,22 +173,31 @@ export function createModelGatewayIngressRoute(input) {
     if (!route) throw new Error('MODEL_GATEWAY_INGRESS_ROUTE_REQUIRED');
     const providerId = optionalString(route['providerId']);
     const providerModel = optionalString(route['providerModel']) ?? optionalString(route['selectorSyntax']);
+    const sdkRouteKey =
+        optionalString(route['sdkRouteKey']) ??
+        optionalString(route['ingressRouteKey']) ??
+        optionalString(route['routeOperationId']);
     if (!providerId) throw new Error('MODEL_GATEWAY_INGRESS_PROVIDER_ID_REQUIRED');
     if (!providerModel) throw new Error('MODEL_GATEWAY_INGRESS_PROVIDER_MODEL_REQUIRED');
+    const sdkVisibleModel = optionalString(route['sdkVisibleModel']) ?? providerModel;
 
     const upstreamBaseUrl = resolveRouteBaseUrl(route);
     const publicBaseUrl = normalizeBaseUrl(input.publicBaseUrl);
     const chatPath = optionalString(route['chatCompletionsPath']) ?? DEFAULT_CHAT_COMPLETIONS_PATH;
     const hash = createHash('sha256')
         .update(
-            JSON.stringify({
-                sessionId,
-                providerId,
-                providerModel,
-                upstreamBaseUrl,
-                routeProfile: route['routeProfile'] ?? null,
-                selectedRouteKey: route['selectedRouteKey'] ?? null,
-            }),
+            JSON.stringify(
+                sdkRouteKey
+                    ? { sessionId, sdkRouteKey }
+                    : {
+                          sessionId,
+                          providerId,
+                          providerModel,
+                          upstreamBaseUrl,
+                          routeProfile: route['routeProfile'] ?? null,
+                          selectedRouteKey: route['selectedRouteKey'] ?? null,
+                      },
+            ),
         )
         .digest('hex')
         .slice(0, 24);
@@ -203,6 +214,8 @@ export function createModelGatewayIngressRoute(input) {
         sessionId,
         providerId,
         providerModel,
+        sdkRouteKey,
+        sdkVisibleModel,
         upstreamBaseUrl,
         upstreamChatCompletionsUrl: joinUrlPath(upstreamBaseUrl, chatPath),
         sdkBaseUrl: `${publicBaseUrl}/v1/model-gateway-ingress/${routeId}`,
@@ -224,7 +237,7 @@ export function buildModelGatewayIngressSessionOverrides(ingressRoute, options =
           ? ingressRoute.targetRoute['capabilities']
           : null;
     return {
-        model: ingressRoute.providerModel,
+        model: ingressRoute.sdkVisibleModel,
         provider: {
             type: 'openai',
             baseUrl: ingressRoute.sdkBaseUrl,
@@ -317,6 +330,8 @@ export function redactModelGatewayIngressRoute(ingressRoute) {
         sessionId: ingressRoute.sessionId,
         providerId: ingressRoute.providerId,
         providerModel: ingressRoute.providerModel,
+        sdkRouteKey: ingressRoute.sdkRouteKey,
+        sdkVisibleModel: ingressRoute.sdkVisibleModel,
         upstreamBaseUrl: ingressRoute.upstreamBaseUrl,
         sdkBaseUrl: ingressRoute.sdkBaseUrl,
         createdAt: ingressRoute.createdAt,
