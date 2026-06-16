@@ -26,6 +26,23 @@ import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow } from
  */
 
 /**
+ * @param {string | undefined} arg
+ * @returns {{ limit: number; detail: boolean; json: boolean }}
+ */
+function parseErrorsArgs(arg) {
+    const tokens = String(arg ?? '')
+        .split(/\s+/u)
+        .map((token) => token.trim())
+        .filter(Boolean);
+    const limitToken = tokens.find((token) => /^\d+$/u.test(token));
+    return {
+        limit: limitToken ? Number(limitToken) : 10,
+        detail: tokens.some((token) => /^(detail|details|full|stack|stacks)$/iu.test(token)),
+        json: tokens.some((token) => /^(json|raw)$/iu.test(token)),
+    };
+}
+
+/**
  * @param {string} message
  * @returns {string | null}
  */
@@ -88,7 +105,7 @@ function renderErrorForOperator(err, ts) {
  * @returns {void}
  */
 export function cmdErrors({ println }, arg) {
-    const limit = Number(arg) || 10;
+    const { limit, detail, json } = parseErrorsArgs(arg);
     const { stats, recent } = readTerminalErrorsProjection(limit);
 
     println('');
@@ -103,10 +120,22 @@ export function cmdErrors({ println }, arg) {
         return;
     }
 
+    if (json) {
+        println(JSON.stringify({ stats, recent }, null, detail ? 2 : 0));
+        println('');
+        return;
+    }
+
     for (const err of recent) {
         const ts = formatTerminalTimeLabel(err.timestamp, { mode: 'dual' });
         const rendered = renderErrorForOperator(err, ts);
         println(terminalThemeRow(rendered.label, rendered.detail, { role: rendered.role, width: 20 }));
+        if (detail && err.stack) {
+            const stackLines = String(err.stack).split('\n').slice(0, 12);
+            for (const line of stackLines) {
+                println(terminalThemeRow('Stack', line.trim(), { role: 'muted', width: 20 }));
+            }
+        }
     }
     println('');
 }

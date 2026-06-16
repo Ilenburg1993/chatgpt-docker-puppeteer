@@ -2,7 +2,11 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { createRegistry, registerTool } from '#copilot/sdk/tools';
+import { createRegistry, registerTool, registerTools } from '#copilot/sdk/tools';
+import {
+    modelGatewayReadTools,
+    modelGatewayWriteTools,
+} from '../../../../src/copilot/tools/model-gateway/index.js';
 import {
     verifyToolOperationResultFieldsForCategory,
     verifyToolRegistryContracts,
@@ -155,5 +159,55 @@ describe('tool-contract-verifier', () => {
                 status: 'failure',
             }).map((issue) => issue.code),
         ).toContain('MISSING_OPERATION_RESULT_FIELD');
+    });
+
+    it('valida os contratos reais das 16 tools model-gateway', () => {
+        const registry = createRegistry();
+        registerTools(registry, modelGatewayReadTools, {
+            category: 'model-gateway',
+            tags: ['models', 'catalog', 'byok', 'routing', 'read'],
+            readOnly: true,
+        });
+        registerTools(registry, modelGatewayWriteTools, {
+            category: 'model-gateway',
+            tags: ['models', 'byok', 'runtime', 'switch', 'write'],
+            readOnly: false,
+        });
+
+        const report = verifyToolRegistryContracts(registry);
+        const modelGatewayIssues = report.issues.filter((issue) => issue.code.startsWith('MODEL_GATEWAY_'));
+
+        expect(registry.entries.size).toBe(16);
+        expect(report.ok).toBe(true);
+        expect(report.strictSchemaViolationCount).toBe(0);
+        expect(report.missingInstructionsCount).toBe(0);
+        expect(report.metadataCoverage).toMatchObject({
+            descriptionPct: 100,
+            parametersPct: 100,
+            categoryPct: 100,
+            tagsPct: 100,
+            instructionsPct: 100,
+        });
+        expect(modelGatewayIssues).toEqual([]);
+        expect(Object.keys(report.metadataByName).sort()).toEqual(
+            [
+                'model_gateway_catalog_refresh',
+                'model_gateway_catalog_search',
+                'model_gateway_control_plane_guide',
+                'model_gateway_maintenance',
+                'model_gateway_model_evaluate',
+                'model_gateway_model_switch',
+                'model_gateway_operation_status',
+                'model_gateway_overview',
+                'model_gateway_policy_propose',
+                'model_gateway_probe_execute',
+                'model_gateway_probe_plan',
+                'model_gateway_profile_manage',
+                'model_gateway_route_plan',
+                'model_gateway_route_switch',
+                'model_gateway_runtime_reconcile',
+                'model_gateway_workflow_plan',
+            ].sort(),
+        );
     });
 });

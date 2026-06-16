@@ -66,7 +66,7 @@ Common options:
   --byok-real-require-vision-probe
   --auto-probe
   --model-probe
-  --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip|file-patch-roundtrip>
+  --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip|file-patch-roundtrip|model-gateway-tools-readonly|model-gateway-tools-all-plan|model-gateway-tools-apply-safe|model-gateway-route-apply-minimal|model-gateway-admin-apply>
   --structured-input-cycle
   --menu-cycle
   --picker-interactive-cycle
@@ -211,7 +211,9 @@ function createLiveScenario({
     allowedTools = ['report_intent', 'read_file_content', 'ask_user'],
     expectedLifecycleTools = [],
     expectedOutputMarkers = [],
+    expectedPlainOutputMarkers = [],
     expectedTerminalRender = [],
+    postAnswerCommands = [],
     invalidChoiceExpected = false,
     recoverableToolErrorExpected = false,
 }) {
@@ -227,7 +229,9 @@ function createLiveScenario({
         allowedTools: Object.freeze(allowedTools),
         expectedLifecycleTools: Object.freeze(expectedLifecycleTools.map((tool) => Object.freeze({ ...tool }))),
         expectedOutputMarkers: Object.freeze(expectedOutputMarkers),
+        expectedPlainOutputMarkers: Object.freeze(expectedPlainOutputMarkers),
         expectedTerminalRender: Object.freeze(expectedTerminalRender.map((item) => Object.freeze({ ...item }))),
+        postAnswerCommands: Object.freeze(postAnswerCommands),
         invalidChoiceExpected,
         recoverableToolErrorExpected,
         askRenderedRe: buildAskRenderedRegex(askQuestion),
@@ -237,6 +241,8 @@ function createLiveScenario({
         finalAnswerRe: buildAnswerRegex(answerSteps.at(-1)?.answer ?? ''),
     });
 }
+
+const ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY = `live-route-minimal-${Date.now()}:route-switch-ollama-cloud`;
 
 const LIVE_SCENARIOS = Object.freeze({
     canonical: createLiveScenario({
@@ -380,6 +386,309 @@ const LIVE_SCENARIOS = Object.freeze({
             { toolName: 'delete_file', renderedName: 'Excluir arquivo', badge: 'EXCLUIR', forbiddenBadge: 'VER' },
         ],
     }),
+    'model-gateway-tools-readonly': createLiveScenario({
+        id: 'model-gateway-tools-readonly',
+        description: 'model-gateway control-plane guide e workflow planner via tool calls reais read-only',
+        askQuestion: 'ASK-MODEL-GATEWAY-TOOLS: responda SIM depois das tools read-only',
+        finalMarker: 'POST-ASK-MODEL-GATEWAY-TOOLS-FINAL: tools model-gateway read-only concluídas e usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        beforeDeltaInstructions: [
+            'Depois do read_file_content, invoque a ferramenta real model_gateway_control_plane_guide com objective="same_session_switch", includeTerminalCommands=true e includeApplyExamples=true.',
+            'Em seguida invoque a ferramenta real model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["chat","agent"], maxSnapshotAgeHours=720, maxCandidates=5, maxProbeCount=2, maxEstimatedCostUsd=0, idempotencyKeyPrefix="live-readonly-workflow-20260616", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true e requireRuntimeProof=true.',
+            'Não invoque model_gateway_probe_execute, model_gateway_route_switch, model_gateway_model_switch, model_gateway_runtime_reconcile nem qualquer outra tool mutável neste cenário; somente planeje e leia.',
+            'Aguarde as duas tools model-gateway read-only concluírem e só então escreva as oito linhas DELTA-CANONICAL.',
+        ],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-MODEL-GATEWAY-TOOLS: responda SIM depois das tools read-only". Use a opção SIM se o schema da tool expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-MODEL-GATEWAY-TOOLS-FINAL: tools model-gateway read-only concluídas e usuário confirmou SIM".',
+        allowedTools: [
+            'report_intent',
+            'read_file_content',
+            'model_gateway_control_plane_guide',
+            'model_gateway_workflow_plan',
+            'ask_user',
+        ],
+        expectedLifecycleTools: [
+            { name: 'model_gateway_control_plane_guide', renderedName: 'Guia Model Gateway' },
+            { name: 'model_gateway_workflow_plan', renderedName: 'Plano Model Gateway' },
+        ],
+        expectedOutputMarkers: ['control-plane.guide', 'workflow.plan', 'sameSessionByDefault'],
+        expectedTerminalRender: [
+            {
+                toolName: 'model_gateway_control_plane_guide',
+                renderedName: 'Guia Model Gateway',
+                badge: 'VER',
+                forbiddenBadge: 'EDITAR',
+            },
+            {
+                toolName: 'model_gateway_workflow_plan',
+                renderedName: 'Plano Model Gateway',
+                badge: 'VER',
+                forbiddenBadge: 'EDITAR',
+            },
+        ],
+    }),
+    'model-gateway-tools-all-plan': createLiveScenario({
+        id: 'model-gateway-tools-all-plan',
+        description: 'todas as tools model-gateway via chamadas reais; mutáveis somente em mode=plan',
+        askQuestion: 'ASK-MODEL-GATEWAY-ALL-TOOLS: responda SIM depois das 16 tools model-gateway',
+        finalMarker:
+            'POST-ASK-MODEL-GATEWAY-ALL-TOOLS-FINAL: 16 tools model-gateway chamadas em modo seguro e usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        beforeDeltaInstructions: [
+            'Depois do read_file_content, invoque exatamente as 16 tools model_gateway_* abaixo, nesta ordem, usando chamadas reais do SDK e os argumentos exatos informados.',
+            '1) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=5.',
+            '2) model_gateway_control_plane_guide com objective="all", includeTerminalCommands=true, includeApplyExamples=false.',
+            '3) model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=["nex-agi/nex-n2-pro:free"], preferredProbeKinds=["chat","agent"], maxSnapshotAgeHours=720, maxCandidates=5, maxProbeCount=2, maxEstimatedCostUsd=0, idempotencyKeyPrefix="live-all-tools-20260616", includeCatalogRefreshPlan=true, includeRouteSwitchPlan=true e requireRuntimeProof=true.',
+            '4) model_gateway_catalog_search com query="nex", providerId=null, onlyEligible=false, requireTools=false, requireStreaming=false, requireReasoning=false, limit=5.',
+            '5) model_gateway_route_plan com taskProfile="repo_agent", maxCandidates=5, evaluateEligibility=true.',
+            '6) model_gateway_operation_status com operationId=null, limit=5.',
+            '7) model_gateway_model_evaluate com modelIds=["nex-agi/nex-n2-pro:free"], taskProfile="repo_agent", maxResults=5.',
+            '8) model_gateway_policy_propose com objective="prefer_runtime_proved", taskProfile="repo_agent", candidateModelIds=["nex-agi/nex-n2-pro:free"], maxCandidates=5.',
+            '9) model_gateway_probe_plan com modelIds=["nex-agi/nex-n2-pro:free"], providerId="kilo-code", allowedProbeKinds=["chat","agent"], maxProbeCount=2, maxEstimatedCostUsd=0, unknownCostPolicy="allow", recommendationLimit=5, probeFailureCooldownSeconds=900.',
+            '10) model_gateway_probe_execute com mode="plan", probeKind="chat", providerId="kilo-code", modelId="nex-agi/nex-n2-pro:free", profileId="kilo", maxEstimatedCostUsd=0, timeoutMs=60000, idempotencyKey="live-all-tools-20260616:probe-plan", confirm=false.',
+            '11) model_gateway_model_switch com mode="plan", modelId="nex-agi/nex-n2-pro:free", runtimeId=null, idempotencyKey="live-all-tools-20260616:model-switch-plan", confirm=false.',
+            '12) model_gateway_route_switch com mode="plan", route={providerId:"kilo-code", providerModel:"nex-agi/nex-n2-pro:free", selectorSyntax:"nex-agi/nex-n2-pro:free", baseUrl:"https://api.kilo.ai/api/gateway", openAICompatibleBaseUrl:"https://api.kilo.ai/api/gateway", wireApi:"completions", providerProfile:"kilo", routeProfile:"repo_agent", selectedRouteKey:"live-all-tools-route-plan"}, runtimeId=null, timeoutMs=60000, idempotencyKey="live-all-tools-20260616:route-switch-plan", confirm=false.',
+            '13) model_gateway_catalog_refresh com mode="plan", includePublic=true, includeAuthenticated=false, force=false, sourceIds=[], refreshAccountOverlays=false, maxSourceResults=5, idempotencyKey="live-all-tools-20260616:catalog-refresh-plan", confirm=false.',
+            '14) model_gateway_runtime_reconcile com mode="plan", expectedModelId="nex-agi/nex-n2-pro:free", runtimeId=null, idempotencyKey="live-all-tools-20260616:runtime-reconcile-plan", confirm=false.',
+            '15) model_gateway_maintenance com mode="plan", maxRowsPerLedger=1000, confirm=false.',
+            '16) model_gateway_profile_manage com mode="plan", operation="upsert", profileName="live-all-tools-dry-run", profile={providerPreset:"openai", providerType:"openai", baseUrl:"https://example.invalid/v1", model:"dry-run-model", apiKeyEnv:"OPENAI_API_KEY", supportsReasoning:false, supportsVision:false, contextWindowTokens:8192, metadata:{purpose:"live-all-tools-plan-only"}}, confirm=false, idempotencyKey="live-all-tools-20260616:profile-plan".',
+            'Não use mode="apply", não use confirm=true e não chame provider real por probe_execute apply, catalog_refresh apply, route_switch apply, model_switch apply, runtime_reconcile apply, maintenance apply ou profile_manage apply.',
+            'Aguarde as 16 tools model-gateway concluírem e só então escreva as oito linhas DELTA-CANONICAL.',
+        ],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-MODEL-GATEWAY-ALL-TOOLS: responda SIM depois das 16 tools model-gateway". Use a opção SIM se o schema da tool expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-MODEL-GATEWAY-ALL-TOOLS-FINAL: 16 tools model-gateway chamadas em modo seguro e usuário confirmou SIM".',
+        allowedTools: [
+            'report_intent',
+            'read_file_content',
+            'model_gateway_overview',
+            'model_gateway_control_plane_guide',
+            'model_gateway_workflow_plan',
+            'model_gateway_catalog_search',
+            'model_gateway_route_plan',
+            'model_gateway_operation_status',
+            'model_gateway_model_evaluate',
+            'model_gateway_policy_propose',
+            'model_gateway_probe_plan',
+            'model_gateway_probe_execute',
+            'model_gateway_model_switch',
+            'model_gateway_route_switch',
+            'model_gateway_catalog_refresh',
+            'model_gateway_runtime_reconcile',
+            'model_gateway_maintenance',
+            'model_gateway_profile_manage',
+            'ask_user',
+        ],
+        expectedLifecycleTools: [
+            { name: 'model_gateway_overview', renderedName: 'Model Gateway overview' },
+            { name: 'model_gateway_control_plane_guide', renderedName: 'Guia Model Gateway' },
+            { name: 'model_gateway_workflow_plan', renderedName: 'Plano Model Gateway' },
+            { name: 'model_gateway_catalog_search', renderedName: 'Buscar catálogo de modelos' },
+            { name: 'model_gateway_route_plan', renderedName: 'Planejar rota de modelo' },
+            { name: 'model_gateway_operation_status', renderedName: 'Status de operação Model Gateway' },
+            { name: 'model_gateway_model_evaluate', renderedName: 'Avaliar modelos' },
+            { name: 'model_gateway_policy_propose', renderedName: 'Propor política Model Gateway' },
+            { name: 'model_gateway_probe_plan', renderedName: 'Planejar probes de modelo' },
+            { name: 'model_gateway_probe_execute', renderedName: 'Executar probe de modelo' },
+            { name: 'model_gateway_model_switch', renderedName: 'Trocar modelo runtime' },
+            { name: 'model_gateway_route_switch', renderedName: 'Trocar rota runtime' },
+            { name: 'model_gateway_catalog_refresh', renderedName: 'Atualizar catálogo de modelos' },
+            { name: 'model_gateway_runtime_reconcile', renderedName: 'Reconciliar runtime de modelo' },
+            { name: 'model_gateway_maintenance', renderedName: 'Manutenção Model Gateway' },
+            { name: 'model_gateway_profile_manage', renderedName: 'Gerir perfil BYOK' },
+        ],
+        expectedOutputMarkers: [
+            'control-plane.guide',
+            'workflow.plan',
+            'catalog.search',
+            'route.plan',
+            'operation.inspect',
+            'model.evaluate',
+            'policy.propose',
+            'probe.plan',
+            'probe.execute',
+            'model.switch',
+            'route.switch',
+            'catalog.refresh',
+            'runtime.reconcile',
+            'maintenance.retention',
+            'profile.manage',
+        ],
+    }),
+    'model-gateway-tools-apply-safe': createLiveScenario({
+        id: 'model-gateway-tools-apply-safe',
+        description: 'model-gateway mutating tools com apply confirmado e cleanup conservador',
+        askQuestion: 'ASK-MODEL-GATEWAY-APPLY: responda SIM depois dos applies seguros',
+        finalMarker:
+            'POST-ASK-MODEL-GATEWAY-APPLY-FINAL: applies model-gateway seguros concluídos e usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        beforeDeltaInstructions: [
+            'Autorização humana explícita para este teste: execute os passos mode="apply" com confirm=true listados abaixo. O escopo autorizado é somente o runtime vivo do teste, refresh público de catálogo sem overlays autenticados, retenção operacional com limite máximo conservador e perfil temporário live-apply-safe-temp com remoção imediata.',
+            'Não trate estes applies como irreversíveis: a troca de runtime deve ser reconciliada para nex-agi/nex-n2-pro:free, o perfil temporário deve ser removido no passo 15, e manutenção usa maxRowsPerLedger=500000 para evitar limpeza agressiva.',
+            'Depois do read_file_content, invoque as tools reais abaixo, nesta ordem, usando exatamente os argumentos indicados. Este cenário deve preservar a mesma sessão; não peça nem crie uma sessão nova.',
+            '1) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=10.',
+            '2) model_gateway_operation_status com operationId=null, limit=10.',
+            '3) model_gateway_model_switch com mode="plan", modelId="kilo-auto/free", runtimeId=null, idempotencyKey="live-apply-safe-20260616:model-switch-kilo-auto", confirm=false.',
+            '4) model_gateway_model_switch com mode="apply", modelId="kilo-auto/free", runtimeId=null, idempotencyKey="live-apply-safe-20260616:model-switch-kilo-auto", confirm=true.',
+            '5) model_gateway_route_switch com mode="plan", route={providerId:"ollama-cloud", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_apply_provider_switch", selectedRouteKey:"live-apply-safe:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="live-apply-safe-20260616:route-switch-ollama-cloud", confirm=false.',
+            '6) model_gateway_route_switch com mode="apply", route={providerId:"ollama-cloud", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_apply_provider_switch", selectedRouteKey:"live-apply-safe:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="live-apply-safe-20260616:route-switch-ollama-cloud", confirm=true.',
+            '7) model_gateway_runtime_reconcile com mode="plan", expectedModelId="nex-agi/nex-n2-pro:free", runtimeId=null, idempotencyKey="live-apply-safe-20260616:runtime-reconcile-nex", confirm=false.',
+            '8) model_gateway_runtime_reconcile com mode="apply", expectedModelId="nex-agi/nex-n2-pro:free", runtimeId=null, idempotencyKey="live-apply-safe-20260616:runtime-reconcile-nex", confirm=true.',
+            '9) model_gateway_catalog_refresh com mode="plan", includePublic=true, includeAuthenticated=false, force=false, sourceIds=[], refreshAccountOverlays=false, maxSourceResults=5, idempotencyKey="live-apply-safe-20260616:catalog-refresh", confirm=false.',
+            '10) model_gateway_catalog_refresh com mode="apply", includePublic=true, includeAuthenticated=false, force=false, sourceIds=[], refreshAccountOverlays=false, maxSourceResults=5, idempotencyKey="live-apply-safe-20260616:catalog-refresh", confirm=true.',
+            '11) model_gateway_maintenance com mode="plan", maxRowsPerLedger=500000, confirm=false.',
+            '12) model_gateway_maintenance com mode="apply", maxRowsPerLedger=500000, confirm=true.',
+            '13) model_gateway_profile_manage com mode="plan", operation="upsert", profileName="live-apply-safe-temp", profile={providerId:"openai", providerType:"openai", baseUrl:"https://api.openai.com/v1", model:"gpt-4.1-mini", apiKeyEnv:"OPENAI_API_KEY", supportsReasoning:false, supportsVision:false, contextWindowTokens:8192, metadata:{purpose:"live-apply-safe-temporary-profile"}}, confirm=false, idempotencyKey="live-apply-safe-20260616:profile-upsert".',
+            '14) model_gateway_profile_manage com mode="apply", operation="upsert", profileName="live-apply-safe-temp", profile={providerId:"openai", providerType:"openai", baseUrl:"https://api.openai.com/v1", model:"gpt-4.1-mini", apiKeyEnv:"OPENAI_API_KEY", supportsReasoning:false, supportsVision:false, contextWindowTokens:8192, metadata:{purpose:"live-apply-safe-temporary-profile"}}, confirm=true, idempotencyKey="live-apply-safe-20260616:profile-upsert".',
+            '15) model_gateway_profile_manage com mode="apply", operation="remove", profileName="live-apply-safe-temp", profile=null, confirm=true, idempotencyKey="live-apply-safe-20260616:profile-remove".',
+            '16) model_gateway_operation_status com operationId=null, limit=10.',
+            '17) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=10.',
+            'Aguarde os applies e o cleanup concluírem e só então escreva as oito linhas DELTA-CANONICAL.',
+        ],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-MODEL-GATEWAY-APPLY: responda SIM depois dos applies seguros". Use a opção SIM se o schema da tool expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-MODEL-GATEWAY-APPLY-FINAL: applies model-gateway seguros concluídos e usuário confirmou SIM".',
+        allowedTools: [
+            'report_intent',
+            'read_file_content',
+            'model_gateway_overview',
+            'model_gateway_operation_status',
+            'model_gateway_model_switch',
+            'model_gateway_route_switch',
+            'model_gateway_catalog_refresh',
+            'model_gateway_runtime_reconcile',
+            'model_gateway_maintenance',
+            'model_gateway_profile_manage',
+            'ask_user',
+        ],
+        expectedLifecycleTools: [
+            { name: 'model_gateway_overview', renderedName: 'Model Gateway overview', allowFocusTransitions: true },
+            { name: 'model_gateway_operation_status', renderedName: 'Status de operação Model Gateway', allowFocusTransitions: true },
+            { name: 'model_gateway_model_switch', renderedName: 'Trocar modelo runtime', allowFocusTransitions: true },
+            { name: 'model_gateway_route_switch', renderedName: 'Trocar rota runtime', allowFocusTransitions: true },
+            { name: 'model_gateway_runtime_reconcile', renderedName: 'Reconciliar runtime de modelo', allowFocusTransitions: true },
+            { name: 'model_gateway_catalog_refresh', renderedName: 'Atualizar catálogo de modelos', allowFocusTransitions: true },
+            { name: 'model_gateway_maintenance', renderedName: 'Manutenção Model Gateway', allowFocusTransitions: true },
+            { name: 'model_gateway_profile_manage', renderedName: 'Gerir perfil BYOK', allowFocusTransitions: true },
+        ],
+        expectedOutputMarkers: [
+            'operation.inspect',
+            'model.switch',
+            'route.switch',
+            'runtime.reconcile',
+            'catalog.refresh',
+            'maintenance.retention',
+            'profile.manage',
+            'committed',
+            'same_session',
+        ],
+    }),
+    'model-gateway-route-apply-minimal': createLiveScenario({
+        id: 'model-gateway-route-apply-minimal',
+        description: 'route_switch plan/apply mínimo prova deferimento seguro de reattach durante tool-turn ativo',
+        askQuestion: 'ASK-MODEL-GATEWAY-ROUTE-APPLY: responda SIM depois do route_switch mínimo',
+        finalMarker:
+            'POST-ASK-MODEL-GATEWAY-ROUTE-APPLY-FINAL: route_switch mínimo concluído e usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        beforeDeltaInstructions: [
+            'Autorização humana explícita para este teste: execute somente model_gateway_overview, model_gateway_operation_status e model_gateway_route_switch conforme listado. Não chame model_gateway_model_switch, model_gateway_runtime_reconcile, model_gateway_catalog_refresh, model_gateway_maintenance nem model_gateway_profile_manage.',
+            'O objetivo é provar que model_gateway_route_switch apply não trava quando solicitado dentro do tool-turn ativo: ele deve retornar resultado estruturado, preservando o mesmo sessionId, sem criar nova sessão e sem tentar reattach imediato se a capability indicar deferimento até o limite do turno.',
+            'Depois do read_file_content, invoque as tools reais abaixo, nesta ordem, usando exatamente os argumentos indicados.',
+            '1) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=10.',
+            '2) model_gateway_operation_status com operationId=null, limit=10.',
+            `3) model_gateway_route_switch com mode="plan", route={providerId:"ollama-cloud", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_minimal_provider_switch", selectedRouteKey:"live-route-minimal:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY}", confirm=false.`,
+            `4) model_gateway_route_switch com mode="apply", route={providerId:"ollama-cloud", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_minimal_provider_switch", selectedRouteKey:"live-route-minimal:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY}", confirm=true.`,
+            '5) model_gateway_operation_status com operationId=null, limit=10.',
+            '6) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=10.',
+            'Aguarde o route_switch apply e as inspeções finais concluírem e só então escreva as oito linhas DELTA-CANONICAL.',
+        ],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-MODEL-GATEWAY-ROUTE-APPLY: responda SIM depois do route_switch mínimo". Use a opção SIM se o schema da tool expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-MODEL-GATEWAY-ROUTE-APPLY-FINAL: route_switch mínimo concluído e usuário confirmou SIM".',
+        allowedTools: [
+            'report_intent',
+            'read_file_content',
+            'model_gateway_overview',
+            'model_gateway_operation_status',
+            'model_gateway_route_switch',
+            'ask_user',
+        ],
+        expectedLifecycleTools: [
+            { name: 'model_gateway_overview', renderedName: 'Model Gateway overview', allowFocusTransitions: true },
+            { name: 'model_gateway_operation_status', renderedName: 'Status de operação Model Gateway', allowFocusTransitions: true },
+            { name: 'model_gateway_route_switch', renderedName: 'Trocar rota runtime', allowFocusTransitions: true },
+        ],
+        postAnswerCommands: [
+            `/byok provider ollama-cloud qwen3-coder-next https://ollama.com/v1 wire:completions idempotency:${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY} force-deferred`,
+            '/byok',
+            '/activity 40',
+        ],
+        expectedOutputMarkers: [
+            'operation.inspect',
+            'route.switch',
+            'deferred_until_turn_boundary',
+            'same_session',
+        ],
+        expectedPlainOutputMarkers: ['rota viva confirmada na mesma sessão: ollama-cloud/qwen3-coder-next'],
+    }),
+    'model-gateway-admin-apply': createLiveScenario({
+        id: 'model-gateway-admin-apply',
+        description: 'catalog_refresh, maintenance e profile_manage com apply confirmado e cleanup',
+        askQuestion: 'ASK-MODEL-GATEWAY-ADMIN-APPLY: responda SIM depois dos applies administrativos',
+        finalMarker:
+            'POST-ASK-MODEL-GATEWAY-ADMIN-APPLY-FINAL: applies administrativos model-gateway concluídos e usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        beforeDeltaInstructions: [
+            'Autorização humana explícita para este teste: execute somente os applies administrativos listados abaixo. Não troque modelo, não troque provider, não chame model_gateway_route_switch, não chame model_gateway_model_switch e não chame model_gateway_runtime_reconcile.',
+            'O escopo autorizado é refresh público de catálogo sem overlays autenticados, retenção operacional com maxRowsPerLedger=500000 e perfil temporário live-admin-apply-temp com remoção imediata.',
+            'Depois do read_file_content, invoque as tools reais abaixo, nesta ordem, usando exatamente os argumentos indicados.',
+            '1) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=10.',
+            '2) model_gateway_operation_status com operationId=null, limit=10.',
+            '3) model_gateway_catalog_refresh com mode="plan", includePublic=true, includeAuthenticated=false, force=false, sourceIds=[], refreshAccountOverlays=false, maxSourceResults=5, idempotencyKey="live-admin-apply-20260616:catalog-refresh", confirm=false.',
+            '4) model_gateway_catalog_refresh com mode="apply", includePublic=true, includeAuthenticated=false, force=false, sourceIds=[], refreshAccountOverlays=false, maxSourceResults=5, idempotencyKey="live-admin-apply-20260616:catalog-refresh", confirm=true.',
+            '5) model_gateway_maintenance com mode="plan", maxRowsPerLedger=500000, confirm=false.',
+            '6) model_gateway_maintenance com mode="apply", maxRowsPerLedger=500000, confirm=true.',
+            '7) model_gateway_profile_manage com mode="plan", operation="upsert", profileName="live-admin-apply-temp", profile={providerId:"openai", providerType:"openai", baseUrl:"https://api.openai.com/v1", model:"gpt-4.1-mini", apiKeyEnv:"OPENAI_API_KEY", supportsReasoning:false, supportsVision:false, contextWindowTokens:8192, metadata:{purpose:"live-admin-apply-temporary-profile"}}, confirm=false, idempotencyKey="live-admin-apply-20260616:profile-upsert".',
+            '8) model_gateway_profile_manage com mode="apply", operation="upsert", profileName="live-admin-apply-temp", profile={providerId:"openai", providerType:"openai", baseUrl:"https://api.openai.com/v1", model:"gpt-4.1-mini", apiKeyEnv:"OPENAI_API_KEY", supportsReasoning:false, supportsVision:false, contextWindowTokens:8192, metadata:{purpose:"live-admin-apply-temporary-profile"}}, confirm=true, idempotencyKey="live-admin-apply-20260616:profile-upsert".',
+            '9) model_gateway_profile_manage com mode="apply", operation="remove", profileName="live-admin-apply-temp", profile=null, confirm=true, idempotencyKey="live-admin-apply-20260616:profile-remove".',
+            '10) model_gateway_operation_status com operationId=null, limit=10.',
+            '11) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=10.',
+            'Aguarde os applies e o cleanup concluírem e só então escreva as oito linhas DELTA-CANONICAL.',
+        ],
+        askToolInstruction:
+            'Por fim invoque a ferramenta real ask_user perguntando exatamente "ASK-MODEL-GATEWAY-ADMIN-APPLY: responda SIM depois dos applies administrativos". Use a opção SIM se o schema da tool expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-MODEL-GATEWAY-ADMIN-APPLY-FINAL: applies administrativos model-gateway concluídos e usuário confirmou SIM".',
+        allowedTools: [
+            'report_intent',
+            'read_file_content',
+            'model_gateway_overview',
+            'model_gateway_operation_status',
+            'model_gateway_catalog_refresh',
+            'model_gateway_maintenance',
+            'model_gateway_profile_manage',
+            'ask_user',
+        ],
+        expectedLifecycleTools: [
+            { name: 'model_gateway_overview', renderedName: 'Model Gateway overview', allowFocusTransitions: true },
+            { name: 'model_gateway_operation_status', renderedName: 'Status de operação Model Gateway', allowFocusTransitions: true },
+            { name: 'model_gateway_catalog_refresh', renderedName: 'Atualizar catálogo de modelos', allowFocusTransitions: true },
+            { name: 'model_gateway_maintenance', renderedName: 'Manutenção Model Gateway', allowFocusTransitions: true },
+            { name: 'model_gateway_profile_manage', renderedName: 'Gerir perfil BYOK', allowFocusTransitions: true },
+        ],
+        expectedOutputMarkers: [
+            'operation.inspect',
+            'catalog.refresh',
+            'maintenance.retention',
+            'profile.manage',
+            'committed',
+        ],
+    }),
 });
 
 function normalizeLiveScenarioId(value) {
@@ -457,6 +766,16 @@ function buildIncompleteExpectedToolRecoveryPrompt(
     if (missing.includes('delete_file')) {
         instructions.push(
             'Se delete_file ainda estiver faltando, invoque delete_file com path exatamente "data/copilot-terminal/live-scratch/TERMINAL-PERMISSION-ROUNDTRIP-moved.txt".',
+        );
+    }
+    if (missing.includes('model_gateway_control_plane_guide')) {
+        instructions.push(
+            'Se model_gateway_control_plane_guide ainda estiver faltando, invoque model_gateway_control_plane_guide com objective="same_session_switch", includeTerminalCommands=true e includeApplyExamples=true.',
+        );
+    }
+    if (missing.includes('model_gateway_workflow_plan')) {
+        instructions.push(
+            'Se model_gateway_workflow_plan ainda estiver faltando, invoque model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["chat","agent"], maxSnapshotAgeHours=720, maxCandidates=5, maxProbeCount=2, maxEstimatedCostUsd=0, idempotencyKeyPrefix="live-readonly-workflow-20260616", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true e requireRuntimeProof=true.',
         );
     }
     return [
@@ -1310,6 +1629,8 @@ function buildByokRealNoPrDiagnosticCommands() {
         '/metrics',
         '/events 60',
         '/events 100 --raw',
+        '/events 100 --json compact',
+        '/events sources',
         '/errors 10',
     ];
 }
@@ -4129,6 +4450,7 @@ function findAskBeforeRequiredPublicDeltas(events, scenario = LIVE_SCENARIOS[DEF
 function findUnexpectedScenarioTool(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
     const allowedTools = Array.isArray(scenario?.allowedTools) ? [...scenario.allowedTools] : [];
     if (allowedTools.length === 0 || !Array.isArray(events)) return null;
+    const expectedLifecycleTools = Array.isArray(scenario?.expectedLifecycleTools) ? scenario.expectedLifecycleTools : [];
     for (const evt of events) {
         if (evt?.event !== 'tool.lifecycle') continue;
         const payload = evt.data && typeof evt.data === 'object' ? evt.data : {};
@@ -4137,6 +4459,12 @@ function findUnexpectedScenarioTool(events, scenario = LIVE_SCENARIOS[DEFAULT_LI
         const toolName = normalizeLifecycleToolName(payload);
         if (!toolName || toolName.startsWith('io.')) continue;
         const allowed = allowedTools.some((expectedName) => isLifecycleTool(payload, expectedName));
+        const allowedByRenderedName = expectedLifecycleTools.some((tool) => {
+            const name = String(tool?.name ?? '').trim();
+            const renderedName = String(tool?.renderedName ?? '').trim();
+            return allowedTools.includes(name) && renderedName.length > 0 && toolName === renderedName.toLowerCase();
+        });
+        if (allowedByRenderedName) continue;
         if (allowed) continue;
         return {
             toolName,
@@ -5006,6 +5334,13 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         intentDetailSections
             .at(-1)
             ?.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/(?:tools|events|usage|errors|health|export|quit)\b/iu)[0] ?? '';
+    const eventsDefaultSections = beforeRawDiagnosticsPlain
+        .split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\s+\d+\b(?![^\n\r]*--raw)[^\n\r]*/iu)
+        .slice(1);
+    const latestEventsDefaultSection =
+        eventsDefaultSections
+            .at(-1)
+            ?.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/(?:events|errors|health|byok|export|quit)\b/iu)[0] ?? '';
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const canonicalEvents = [...sseSummary.events, ...archiveRawEvents];
     const canonicalToolLifecycle = summarizeCanonicalToolLifecycle(canonicalEvents);
@@ -5048,6 +5383,10 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     const scenarioOutputMarkers = scenario.expectedOutputMarkers.map((marker) => ({
         marker,
         observedInToolResult: scenarioMarkerObservedInToolResults(canonicalEvents, marker),
+    }));
+    const scenarioPlainOutputMarkers = scenario.expectedPlainOutputMarkers.map((marker) => ({
+        marker,
+        observedInPlainOutput: beforeRawDiagnosticsPlain.includes(marker),
     }));
     const scenarioTerminalRender = scenario.expectedTerminalRender.map((item) => {
         const toolName = String(item.toolName ?? '');
@@ -5325,6 +5664,11 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             pass: observedInToolResult,
             detail: `scenario output marker ${marker} ${observedInToolResult ? 'observed in tool result' : 'missing from tool results'}`,
         })),
+        ...scenarioPlainOutputMarkers.map(({ marker, observedInPlainOutput }) => ({
+            id: `scenario-plain-marker-${marker.toLowerCase().replace(/[^a-z0-9]+/gu, '-')}`,
+            pass: observedInPlainOutput,
+            detail: `scenario plain marker ${marker} ${observedInPlainOutput ? 'observed in terminal output' : 'missing from terminal output'}`,
+        })),
         ...scenarioTerminalRender.map(({ toolName, badge, forbiddenBadge, expectedRe, forbiddenRe }) => {
             const expectedObserved = expectedRe.test(plain);
             const forbiddenObserved = forbiddenRe ? forbiddenRe.test(plain) : false;
@@ -5477,12 +5821,12 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'sse-archive-human-source-labels',
             pass:
-                /LLM-B via SDK/u.test(beforeRawDiagnosticsPlain) &&
-                /pergunta ao operador/u.test(beforeRawDiagnosticsPlain) &&
-                /telemetria LLM/u.test(beforeRawDiagnosticsPlain) &&
-                /registro export/u.test(beforeRawDiagnosticsPlain) &&
+                /LLM-B via SDK/u.test(latestEventsDefaultSection) &&
+                /pergunta ao operador/u.test(latestEventsDefaultSection) &&
+                /telemetria LLM/u.test(latestEventsDefaultSection) &&
+                /registro export/u.test(latestEventsDefaultSection) &&
                 !/SDK assistant|pergunta humana SDK|agente\/usage|export envelope|Sessão SDK|Hook iniciado|Hook concluído/u.test(
-                    beforeRawDiagnosticsPlain,
+                    latestEventsDefaultSection,
                 ),
             detail:
                 '/events default rendered transcript/user/usage/export sources as operator-facing labels before raw diagnostics',
@@ -5501,10 +5845,10 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             id: 'sse-archive-human-operational-events',
             pass:
                 !/agent error|Info da sessão|terminal turn empty output|Operation cancelled by user|non[_ ]user[_ ]initiated|recoverable_model_call|model_call|errorOccurred/iu.test(
-                    beforeRawDiagnosticsPlain,
+                    latestEventsDefaultSection,
                 ) &&
-                (!/Erro do SDK sem mensagem estruturada|erro de provider BYOK/iu.test(beforeRawDiagnosticsPlain) ||
-                    /Erro BYOK|falha do provider BYOK/iu.test(beforeRawDiagnosticsPlain)),
+                (!/Erro do SDK sem mensagem estruturada|erro de provider BYOK/iu.test(latestEventsDefaultSection) ||
+                    /Erro BYOK|falha do provider BYOK/iu.test(latestEventsDefaultSection)),
             detail:
                 '/events default rendered provider failures, cancellations, empty turns, and usage classifications as human operational events',
         },
@@ -6469,6 +6813,18 @@ function evaluateByokRealOutput(
         liveScenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
     } = {},
 ) {
+    const renderedProfileRe = (candidate) => {
+        const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+        return new RegExp(
+            [
+                `profile:\\s+${escaped}`,
+                `Perfil\\s+${escaped}`,
+                `ativo\\s+${escaped}`,
+                `perfil\\s+${escaped}`,
+            ].join('|'),
+            'iu',
+        );
+    };
     const byokModels = [...new Set([model, altModel].filter((value) => typeof value === 'string' && value.length > 0))];
     const byokModelPrLines = byokModels.flatMap((candidate) => {
         const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
@@ -6480,7 +6836,9 @@ function evaluateByokRealOutput(
             /(?:^|\n)\s*│\s+DELTA-CANONICAL-\d/u.test(plain) ||
             liveScenario.askRenderedRe.test(plain));
     const byokUsageClassified =
-        /\bclasse=byok_user_message\b/u.test(plain) || /"classification"\s*:\s*"byok_user_message"/u.test(plain);
+        /\bclasse=byok_user_message\b/u.test(plain) ||
+        /"classification"\s*:\s*"byok_user_message"/u.test(plain) ||
+        (/"byokProvider"\s*:\s*true/u.test(plain) && /"premiumRequest"\s*:\s*false/u.test(plain));
     const byokAdmissionBlocked =
         /Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked|resultado:\s+admission-blocked/i.test(
             plain,
@@ -6510,10 +6868,7 @@ function evaluateByokRealOutput(
         },
         {
             id: 'byok-real-profile-active',
-            pass:
-                Boolean(runtimeRoute) ||
-                !profile ||
-                new RegExp(`profile:\\s+${profile.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u').test(plain),
+            pass: Boolean(runtimeRoute) || !profile || renderedProfileRe(profile).test(plain),
             detail: runtimeRoute
                 ? `runtime-selector route profile ${runtimeRoute.routeProfile ?? '(auto)'} superseded legacy BYOK profile activation`
                 : `active BYOK profile ${profile || '(auto)'} was rendered`,
@@ -6572,8 +6927,8 @@ function evaluateByokRealOutput(
             id: 'byok-real-route-decision',
             pass:
                 /BYOK model route/.test(plain) &&
-                (/\bdecision=route-/.test(plain) || /Nenhum candidato encontrado para roteamento/.test(plain)) &&
-                /fallback chain|Nenhum modelo passou|Nenhum candidato encontrado para roteamento/.test(plain),
+                (/\bdecision=route-/i.test(plain) || /nenhum candidato encontrado para roteamento/iu.test(plain)) &&
+                /fallback chain|nenhum modelo passou|nenhum candidato encontrado para roteamento/iu.test(plain),
             detail: 'BYOK preflight exercised model-gateway route decision ledger before probes/live promotion',
         },
         {
@@ -6606,7 +6961,7 @@ function evaluateByokRealOutput(
             pass:
                 /BYOK shortlist agent probe/.test(plain) &&
                 (/Shortlist encerrada: ok=\d+\/\d+/.test(plain) ||
-                    /Nenhum candidato cabe na shortlist atual/.test(plain)),
+                    /nenhum candidato cabe (?:na shortlist atual|nos filtros atuais)/iu.test(plain)),
             detail: 'BYOK preflight exercised a ranked disposable shortlist probe without mutating the live session',
         },
         {
@@ -6646,9 +7001,7 @@ function evaluateByokRealOutput(
         },
         {
             id: 'byok-real-alt-provider-switch',
-            pass:
-                !altProfile ||
-                new RegExp(`profile:\\s+${altProfile.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u').test(plain),
+            pass: !altProfile || renderedProfileRe(altProfile).test(plain),
             detail: altProfile
                 ? `alternate BYOK profile ${altProfile} was exercised`
                 : 'no alternate usable profile configured',
@@ -6691,7 +7044,9 @@ function evaluateByokRealOutput(
             id: 'byok-real-operator-health',
             pass:
                 !byokTurnOpened ||
-                (byokProviderBlocked ? /chat=failed/i.test(plain) : /chat=ok/i.test(plain) || /chat=\?/i.test(plain)),
+                (byokProviderBlocked
+                    ? /chat(?:=|\s+)falh(?:ou|a|ed)|chat=failed/i.test(plain)
+                    : /chat(?:=|\s+)ok|chat=\?/i.test(plain)),
             detail: byokProviderBlocked
                 ? 'BYOK provider failure was reflected in operator health'
                 : 'BYOK provider health cockpit rendered after live turn or stayed unknown before a turn',
@@ -7389,6 +7744,7 @@ async function main() {
         setTimeout(
             () => {
                 const diagnostics = [
+                    ...liveScenario.postAnswerCommands,
                     '/usage now',
                     '/activity 40',
                     '/intent 5',

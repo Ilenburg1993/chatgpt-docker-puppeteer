@@ -25,6 +25,7 @@ import { searchTools } from './search/index.js';
 import { gitTools } from './git/index.js';
 import { configureHookTools, hookTools } from './hook/index.js';
 import { hubTools, setHub } from './hub/index.js';
+import { modelGatewayReadTools, modelGatewayWriteTools } from './model-gateway/index.js';
 import {
     introspectionTools,
     registerForIntrospection,
@@ -82,6 +83,8 @@ export function getAllStaticTools() {
             reloadAgentProcessTool,
             ...hookTools,
             ...hubTools,
+            ...modelGatewayReadTools,
+            ...modelGatewayWriteTools,
             ...introspectionTools,
             ...(fileReadTools ?? []),
             ...(indexTools ?? []),
@@ -216,6 +219,18 @@ export function bootstrapTools(registry, mcpTools) {
         { tools: [reloadAgentProcessTool], category: 'process', tags: ['reload', 'restart', 'process'] },
         { tools: hookTools, category: 'hook', tags: ['audit', 'input', 'hooks'] },
         { tools: hubTools, category: 'hub', tags: ['conversation', 'llm-b', 'dialog', 'persistent'] },
+        {
+            tools: modelGatewayReadTools,
+            category: 'model-gateway',
+            tags: ['models', 'catalog', 'byok', 'routing', 'read'],
+            readOnly: true,
+        },
+        {
+            tools: modelGatewayWriteTools,
+            category: 'model-gateway',
+            tags: ['models', 'byok', 'runtime', 'switch', 'write'],
+            readOnly: false,
+        },
         { tools: introspectionTools, category: 'introspection', tags: ['meta', 'telemetry'], readOnly: true },
         { tools: searchTools, category: 'search', tags: ['filesystem', 'io', 'search'], readOnly: true },
         { tools: fileReadTools, category: 'file', tags: ['filesystem', 'io', 'read'], readOnly: true },

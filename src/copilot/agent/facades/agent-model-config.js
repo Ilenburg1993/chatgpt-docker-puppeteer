@@ -10,7 +10,11 @@
  */
 
 import { resolveModelSelectionMismatch, toError } from '#copilot/core';
+import {
+    executeModelGatewayRuntimeModelSwitch,
+} from '#copilot/model-gateway';
 import { describeAutoModelPolicy, listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
+import { setSessionModel } from '#copilot/sdk/session-runtime';
 import { log } from '../ports/logging/index.js';
 import { trySetLiveSessionModel } from '../runtime/contracts/index.js';
 import { readAgentRuntimeStatusSnapshot } from '../runtime/status-readers.js';
@@ -84,6 +88,64 @@ export function setModel(ctx, modelId) {
             description: 'Persist current runtime model after operator change',
         },
     );
+}
+
+/**
+ * Troca o modelo da sessão viva de forma transacional.
+ *
+ * O estado configurado só é alterado depois que o SDK confirma o modelo efetivo e a persistência termina.
+ * Em falha, o control plane tenta restaurar o modelo anterior.
+ *
+ * @param {import('../agent-context.js').AgentContext} ctx
+ * @param {string} modelId
+ * @param {{ idempotencyKey?: string; source?: string }} [options]
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export async function switchModelTransactional(ctx, modelId, options = {}) {
+    const session = ctx.getSessionSnapshot();
+    const previousModel = ctx.getModelSnapshot();
+    const reasoningEffort = ctx.getReasoningEffortSnapshot();
+    return executeModelGatewayRuntimeModelSwitch({
+        targetModel: modelId,
+        previousModel,
+        sessionId: session?.sessionId ?? null,
+        ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
+        source: options.source ?? 'agent.model-config',
+        ...(session
+            ? {
+                  switchSessionModel: (targetModel) =>
+                      setSessionModel(
+                          session,
+                          targetModel,
+                          targetModel === 'auto' || !reasoningEffort ? undefined : { reasoningEffort },
+                      ),
+              }
+            : {}),
+        commit: async () => {
+            const persisted = await persistAgentRuntimeStatePartial(
+                { model: modelId },
+                { label: 'runtime.config.model.transactional' },
+            );
+            if (!persisted.ok) throw persisted.error;
+            ctx.setModel(modelId);
+            const previousPrInfo = ctx.getLastPrInfoSnapshot?.() ?? null;
+            const effectiveModel = session ? Reflect.get(session, '__copilotEffectiveModel') : null;
+            const billedModel = typeof previousPrInfo?.model === 'string' ? previousPrInfo.model : undefined;
+            ctx.setLastPrInfo({
+                ...(previousPrInfo ?? {}),
+                configuredModel: modelId,
+                ...(typeof effectiveModel === 'string' ? { effectiveModel } : {}),
+                ...(billedModel ? { model: billedModel } : {}),
+                modelMismatch: resolveModelSelectionMismatch({
+                    configuredModel: modelId,
+                    billedModel,
+                    effectiveModel: typeof effectiveModel === 'string' ? effectiveModel : modelId,
+                }),
+                sessionId: session?.sessionId ?? null,
+                ts: Date.now(),
+            });
+        },
+    });
 }
 
 /**
@@ -244,6 +306,19 @@ export function readRuntimeModelSelection(runtime) {
 export function setRuntimeModel(runtime, modelId) {
     if (typeof runtime.setModel !== 'function') throw new Error('AGENT_RUNTIME_MODEL_SET_UNAVAILABLE');
     runtime.setModel(modelId);
+}
+
+/**
+ * @param {{ switchModel?: (modelId: string, options?: { idempotencyKey?: string; source?: string }) => Promise<Record<string, unknown>> }} runtime
+ * @param {string} modelId
+ * @param {{ idempotencyKey?: string; source?: string }} [options]
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export function switchRuntimeModelTransactional(runtime, modelId, options = {}) {
+    if (typeof runtime.switchModel !== 'function') {
+        throw new Error('AGENT_RUNTIME_TRANSACTIONAL_MODEL_SWITCH_UNAVAILABLE');
+    }
+    return runtime.switchModel(modelId, options);
 }
 
 /**

@@ -535,6 +535,10 @@
  * @property {() => string | null} getSessionId
  * @property {() => string} getModel
  * @property {(modelId: string) => void} [setModel]
+ * @property {(
+ *     modelId: string,
+ *     options?: { idempotencyKey?: string; source?: string },
+ * ) => Promise<Record<string, unknown>>} [switchModel]
  * @property {(task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>} [trackBackgroundTask]
  */
 
@@ -645,6 +649,16 @@
  * @property {((content: string) => Promise<object>) | undefined} updateSdkPlan - Atualiza o plan.md vanilla da sessão
  *   SDK
  * @property {(() => Promise<object>) | undefined} deleteSdkPlan - Remove o plan.md vanilla da sessão SDK
+ * @property {((modelId: string, options?: { idempotencyKey?: string; source?: string }) => Promise<Record<string, unknown>>)
+ *     | undefined} switchModel - Troca transacionalmente o modelo vivo e só commita após verificação.
+ * @property {(
+ *         (
+ *             route: Record<string, unknown>,
+ *             options?: { idempotencyKey?: string; timeoutMs?: number; source?: string },
+ *         ) => Promise<Record<string, unknown>>
+ *     )
+ *     | undefined} switchRoute
+ *   - Rebinda provider/model preservando o mesmo `sessionId`.
  * @property {(
  *     message: string,
  *     opts?: {

@@ -6,12 +6,13 @@
 import {
     BYOK_ENV_KEYS,
     readConfiguredByokModelsFromEnv,
-    readConfiguredByokProfileSummaries,
     readConfiguredByokSummary,
 } from '#copilot/config';
 import {
     buildEnvByokModelGatewaySnapshot,
     buildModelGatewayOperatorProjection,
+    materializeModelGatewayActiveByokProfileEnv,
+    readModelGatewayByokProfileSummaries,
     toCopilotModelInfoList,
 } from '#copilot/model-gateway';
 import {
@@ -22,6 +23,8 @@ import {
     readRuntimeModelStatsProjection,
     setRuntimeModelProjection,
     setRuntimeReasoningProjection,
+    switchRuntimeModelProjection,
+    switchRuntimeRouteProjection,
 } from '../../../presentation/runtime/index.js';
 import {
     getLastSdkPlanChangedAt,
@@ -136,25 +139,29 @@ export function readTerminalModelStatsProjection(runtimeId) {
  *     summary: ReturnType<typeof readConfiguredByokSummary>;
  *     models: ReturnType<typeof readConfiguredByokModelsFromEnv>;
  *     gatewayModels: ReturnType<typeof toCopilotModelInfoList>;
- *     profiles: ReturnType<typeof readConfiguredByokProfileSummaries>;
+ *     profiles: ReturnType<typeof readModelGatewayByokProfileSummaries>;
  *     envKeys: readonly string[];
  *     modelGateway: ReturnType<typeof buildEnvByokModelGatewaySnapshot>;
  *     modelGatewayProjection: ReturnType<typeof buildModelGatewayOperatorProjection>;
  * }}
  */
 export function readTerminalByokProjection() {
-    const summary = readConfiguredByokSummary();
-    const modelGateway = buildEnvByokModelGatewaySnapshot();
+    const materialized = materializeModelGatewayActiveByokProfileEnv(process.env);
+    const summary = {
+        ...readConfiguredByokSummary(materialized.env),
+        profile: materialized.profile?.name ?? process.env['COPILOT_BYOK_PROFILE'] ?? null,
+    };
+    const modelGateway = buildEnvByokModelGatewaySnapshot(materialized.env);
     return {
         summary,
-        models: readConfiguredByokModelsFromEnv(process.env, {
+        models: readConfiguredByokModelsFromEnv(materialized.env, {
             model: summary.model,
             contextWindowTokens: summary.capabilities.contextWindowTokens,
             supportsReasoning: summary.capabilities.reasoningEffort,
             supportsVision: summary.capabilities.vision,
         }),
         gatewayModels: toCopilotModelInfoList(modelGateway.models),
-        profiles: readConfiguredByokProfileSummaries(),
+        profiles: readModelGatewayByokProfileSummaries(),
         envKeys: BYOK_ENV_KEYS,
         modelGateway,
         modelGatewayProjection: buildModelGatewayOperatorProjection(modelGateway),
@@ -201,6 +208,40 @@ export function readTerminalByokGatewayProjectionFromEnv(env = process.env) {
 export function setTerminalModelProjection(modelId, runtimeId) {
     const { binding } = readTerminalRuntimeBase(runtimeId);
     const projected = setRuntimeModelProjection(modelId, runtimeId);
+    return {
+        ...projected,
+        binding,
+    };
+}
+
+/**
+ * @param {string} modelId
+ * @param {string | null | undefined} [runtimeId]
+ * @param {{ idempotencyKey?: string; source?: string }} [options]
+ */
+export async function switchTerminalModelProjection(modelId, runtimeId, options = {}) {
+    const { binding } = readTerminalRuntimeBase(runtimeId);
+    const projected = await switchRuntimeModelProjection(modelId, runtimeId, options);
+    return {
+        ...projected,
+        binding,
+    };
+}
+
+/**
+ * @param {Record<string, unknown>} route
+ * @param {string | null | undefined} [runtimeId]
+ * @param {{
+ *     idempotencyKey?: string;
+ *     timeoutMs?: number;
+ *     source?: string;
+ *     allowActiveDialogLoopReattach?: boolean;
+ *     forceApplyDeferred?: boolean;
+ * }} [options]
+ */
+export async function switchTerminalRouteProjection(route, runtimeId, options = {}) {
+    const { binding } = readTerminalRuntimeBase(runtimeId);
+    const projected = await switchRuntimeRouteProjection(route, runtimeId, options);
     return {
         ...projected,
         binding,

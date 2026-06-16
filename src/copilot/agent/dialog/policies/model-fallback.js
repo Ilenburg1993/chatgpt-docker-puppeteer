@@ -14,9 +14,20 @@
  * @see EventBus
  */
 
+import { randomUUID } from 'node:crypto';
 import { log } from '../../ports/logging/index.js';
 
-/** @typedef {{ getModel: () => string; setModel?: (model: string) => void }} AgentHostForFallback */
+/**
+ * @typedef {{
+ *   getModel: () => string;
+ *   getSessionId?: () => string | null;
+ *   setModel?: (model: string) => void;
+ *   switchModel?: (
+ *     model: string,
+ *     options?: { idempotencyKey?: string; source?: string },
+ *   ) => Promise<Record<string, unknown>>;
+ * }} AgentHostForFallback
+ */
 
 /**
  * Gerencia o estado de fallback de modelo para o dialog loop.
@@ -27,6 +38,12 @@ export class ModelFallbackState {
 
     /** @type {string | null} */
     #model;
+
+    /** @type {string} */
+    #operationNonce = randomUUID();
+
+    /** @type {number} */
+    #generation = 0;
 
     /**
      * @param {{ defaultModel: string | null }} options
@@ -40,6 +57,7 @@ export class ModelFallbackState {
      */
     setPending() {
         this.#pending = true;
+        this.#generation += 1;
     }
 
     /**
@@ -50,6 +68,7 @@ export class ModelFallbackState {
     schedule(model) {
         this.#model = model;
         this.#pending = true;
+        this.#generation += 1;
         log('INFO', `[ModelFallbackState] scheduleFallback: ${model} agendado para próximo boot.`);
     }
 
@@ -63,19 +82,44 @@ export class ModelFallbackState {
      *
      * @param {AgentHostForFallback} host
      * @param {(event: string, payload: Record<string, unknown>) => void} emitFn
-     * @returns {{ applied: boolean; previousModel?: string; newModel?: string }}
+     * @returns {{
+     *   applied: boolean;
+     *   previousModel?: string;
+     *   newModel?: string;
+     * } | Promise<{ applied: boolean; previousModel?: string; newModel?: string }>}
      */
     applyIfPending(host, emitFn) {
         if (!this.#pending || !this.#model) {
             return { applied: false };
         }
         const prev = host.getModel();
-        this.#pending = false;
-        if (typeof host.setModel === 'function') {
-            host.setModel(this.#model);
+        const target = this.#model;
+        const commit = () => {
+            this.#pending = false;
+            emitFn('model.fallback', { previousModel: prev, newModel: target, ts: Date.now() });
+            log('WARN', `[ModelFallbackState] Aplicando modelo fallback: ${prev} → ${target}`);
+            return { applied: true, previousModel: prev, newModel: target };
+        };
+        if (typeof host.switchModel === 'function') {
+            const sessionId = host.getSessionId?.() ?? 'no-session';
+            return host
+                .switchModel(target, {
+                    idempotencyKey:
+                        `dialog-model-fallback:${sessionId}:${target}:${this.#operationNonce}:${this.#generation}`,
+                    source: 'agent.dialog.model-fallback',
+                })
+                .then((operation) => {
+                    if (operation['state'] !== 'committed') {
+                        throw new Error(
+                            `DIALOG_MODEL_FALLBACK_NOT_COMMITTED: state=${String(operation['state'] ?? 'unknown')}`,
+                        );
+                    }
+                    return commit();
+                });
         }
-        emitFn('model.fallback', { previousModel: prev, newModel: this.#model, ts: Date.now() });
-        log('WARN', `[ModelFallbackState] Aplicando modelo fallback: ${prev} → ${this.#model}`);
-        return { applied: true, previousModel: prev, newModel: this.#model };
+        if (typeof host.setModel === 'function') {
+            host.setModel(target);
+        }
+        return commit();
     }
 }

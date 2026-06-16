@@ -22,7 +22,11 @@ export {
     setToolContractReport,
 } from './introspection-tools.js';
 
-export { createEmptyToolContractReport, verifyToolRegistryContracts } from './tool-contract-verifier.js';
+export {
+    createEmptyToolContractReport,
+    verifyToolOperationResultFieldsForCategory,
+    verifyToolRegistryContracts,
+} from './tool-contract-verifier.js';
 export {
     buildToolDefinitionMetadata,
     isHighImpactToolRisk,

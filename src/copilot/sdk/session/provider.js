@@ -86,6 +86,9 @@ const BYOK_MODEL_DISCOVERY_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 /** @type {readonly string[]} */
 export const BYOK_ENV_KEYS = Object.freeze([
+    'COPILOT_MODEL_GATEWAY_BINDING_SOURCE',
+    'COPILOT_MODEL_GATEWAY_PROVIDER_ID',
+    'COPILOT_MODEL_GATEWAY_PROVIDER_PROFILE',
     'COPILOT_BYOK_ENABLED',
     'COPILOT_BYOK_PROFILE',
     'COPILOT_BYOK_PROFILES_JSON',
@@ -1834,7 +1837,22 @@ export function resolveConfiguredByokSessionOverrides(env = process.env, request
     if (!state.ready || !state.provider || !state.model) {
         throw new Error(`[sdk/provider] BYOK is enabled but not ready: ${state.errors.join('; ') || 'invalid configuration'}`);
     }
-    const model = requestedModel && requestedModel !== 'auto' ? requestedModel : state.model;
+    let model = requestedModel && requestedModel !== 'auto' ? requestedModel : state.model;
+    /** @type {string | null} */
+    let blockedRequestedModel = null;
+    if (requestedModel && requestedModel !== 'auto' && requestedModel !== state.model) {
+        const configuredModels = readConfiguredByokModelsFromEnv(env, {
+            model: state.model,
+            contextWindowTokens: state.summary.capabilities.contextWindowTokens,
+            supportsReasoning: state.summary.capabilities.reasoningEffort,
+            supportsVision: state.summary.capabilities.vision,
+            ...state.summary.limits,
+        }).map((entry) => entry.id);
+        if (!configuredModels.includes(requestedModel)) {
+            blockedRequestedModel = requestedModel;
+            model = state.model;
+        }
+    }
     const sdkReasoningEffort =
         state.summary.capabilities.reasoningEffort && supportsSdkReasoningEffortForByokModel(model);
     return {
@@ -1856,6 +1874,12 @@ export function resolveConfiguredByokSessionOverrides(env = process.env, request
             ...state.summary,
             model,
             capabilities: { ...state.summary.capabilities, sdkReasoningEffort },
+            warnings: blockedRequestedModel
+                ? [
+                      ...state.summary.warnings,
+                      `requested model '${blockedRequestedModel}' was blocked because it is not in the active BYOK provider/profile catalog`,
+                  ]
+                : state.summary.warnings,
         },
     };
 }

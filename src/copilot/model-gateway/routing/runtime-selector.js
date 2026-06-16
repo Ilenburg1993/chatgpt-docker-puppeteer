@@ -17,6 +17,8 @@ import {
 } from '../health/provider-health.js';
 import { classifyByokProviderFailure } from '../health/provider-failure.js';
 import { evaluateModelGatewayProviderEnvRequirements } from '../secrets/requirements.js';
+import { resolveModelGatewayProviderSecretRefs } from '../secrets/requirements.js';
+import { resolveProviderEndpointInventory } from '../providers/endpoints/index.js';
 import { resolveModelGatewayAccountResetWindow } from '../account-access/reset-windows.js';
 import {
     createGatewayRuntimeHealthIndex,
@@ -28,6 +30,9 @@ import {
 const DEFAULT_MAX_RUNTIME_RETRY_DELAY_MS = 30_000;
 
 const RUNTIME_ROUTE_ENV_RESET_KEYS = Object.freeze([
+    'COPILOT_MODEL_GATEWAY_BINDING_SOURCE',
+    'COPILOT_MODEL_GATEWAY_PROVIDER_ID',
+    'COPILOT_MODEL_GATEWAY_PROVIDER_PROFILE',
     'COPILOT_BYOK_PROFILE',
     'COPILOT_BYOK_PROVIDER_PRESET',
     'COPILOT_BYOK_PROVIDER_TYPE',
@@ -153,12 +158,38 @@ function routeMetadataBoolean(selected, field) {
     const policy = optionalRecord(record?.['normalizedPolicy']);
     const routeProviderSpecific = optionalRecord(record?.['routeProviderSpecific']);
     const providerSpecific = optionalRecord(record?.['providerSpecific']);
+    const capabilities = optionalRecord(record?.['capabilities']);
     return (
         optionalBoolean(record?.[field]) ??
         optionalBoolean(routing?.[field]) ??
         optionalBoolean(policy?.[field]) ??
         optionalBoolean(routeProviderSpecific?.[field]) ??
-        optionalBoolean(providerSpecific?.[field])
+        optionalBoolean(providerSpecific?.[field]) ??
+        optionalBoolean(capabilities?.[field])
+    );
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} selected
+ * @param {string} field
+ * @returns {number | null}
+ */
+function routeMetadataNumber(selected, field) {
+    const record = optionalRecord(selected);
+    const routing = optionalRecord(record?.['routing']);
+    const policy = optionalRecord(record?.['normalizedPolicy']);
+    const routeProviderSpecific = optionalRecord(record?.['routeProviderSpecific']);
+    const providerSpecific = optionalRecord(record?.['providerSpecific']);
+    const capabilities = optionalRecord(record?.['capabilities']);
+    const limits = optionalRecord(record?.['limits']);
+    return (
+        optionalNumber(record?.[field]) ??
+        optionalNumber(routing?.[field]) ??
+        optionalNumber(policy?.[field]) ??
+        optionalNumber(routeProviderSpecific?.[field]) ??
+        optionalNumber(providerSpecific?.[field]) ??
+        optionalNumber(capabilities?.[field]) ??
+        optionalNumber(limits?.[field])
     );
 }
 
@@ -184,6 +215,56 @@ function routeSdkWireApi(selected) {
     const baseUrl = routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
     if (baseUrl && routeLayer && routeLayer.includes('openai_compatible')) return 'completions';
     return null;
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @param {string[]} refs
+ * @returns {string | null}
+ */
+function firstConfiguredEnvValue(env, refs) {
+    for (const ref of refs) {
+        const value = optionalString(env[ref]);
+        if (value) return value;
+    }
+    return null;
+}
+
+/**
+ * @param {string} providerId
+ * @param {Record<string, unknown> | null} selected
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | null}
+ */
+function resolveRuntimeRouteBaseUrl(providerId, selected, env) {
+    const explicit = routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
+    if (explicit) return explicit;
+    if (providerId === 'ollama-local' || providerId === 'ollama') {
+        const configured = optionalString(env['OLLAMA_LOCAL_BASE_URL']) ?? optionalString(env['OLLAMA_BASE_URL']);
+        return configured ? `${configured.replace(/\/+$/u, '').replace(/\/api$/u, '')}/v1` : 'http://localhost:11434/v1';
+    }
+    if (providerId === 'ollama-cloud') {
+        const configured = optionalString(env['OLLAMA_CLOUD_BASE_URL']);
+        return configured ? `${configured.replace(/\/+$/u, '').replace(/\/api$/u, '')}/v1` : 'https://ollama.com/v1';
+    }
+    const inventory = resolveProviderEndpointInventory(providerId);
+    const candidate = inventory?.baseUrls.find((url) => !url.includes('{')) ?? null;
+    if (candidate) return candidate;
+    if (providerId === 'cloudflare-workers-ai') {
+        const accountId = optionalString(env['CLOUDFLARE_ACCOUNT_ID']);
+        return accountId ? `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1` : null;
+    }
+    return null;
+}
+
+/**
+ * @param {string} providerId
+ * @returns {'openai' | 'azure' | 'anthropic'}
+ */
+function resolveRuntimeRouteProviderType(providerId) {
+    if (providerId === 'anthropic' || providerId === 'claude') return 'anthropic';
+    if (providerId === 'azure' || providerId === 'azure-openai') return 'azure';
+    return 'openai';
 }
 
 /**
@@ -333,13 +414,44 @@ export function buildModelGatewayRuntimeSelectorProbeEnv(selected, baseEnv = pro
     for (const key of RUNTIME_ROUTE_ENV_RESET_KEYS) delete env[key];
     const providerId = optionalString(selected?.['providerId']);
     const providerModel = optionalString(selected?.['providerModel']);
+    const providerProfile = optionalString(selected?.['providerProfile']);
     const baseUrl = routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
     const sdkWireApi = routeSdkWireApi(selected);
+    if (providerId === 'github-copilot-sdk') {
+        env['COPILOT_BYOK_ENABLED'] = 'false';
+        if (providerModel) env['COPILOT_BYOK_MODEL'] = providerModel;
+        return env;
+    }
     env['COPILOT_BYOK_ENABLED'] = 'true';
-    if (providerId) env['COPILOT_BYOK_PROVIDER_PRESET'] = providerId;
+    if (providerId) {
+        env['COPILOT_MODEL_GATEWAY_BINDING_SOURCE'] = 'gateway_route';
+        env['COPILOT_MODEL_GATEWAY_PROVIDER_ID'] = providerId;
+        env['COPILOT_BYOK_PROVIDER_PRESET'] = 'custom';
+        env['COPILOT_BYOK_PROVIDER_TYPE'] = resolveRuntimeRouteProviderType(providerId);
+        const routeBaseUrl = resolveRuntimeRouteBaseUrl(providerId, selected, baseEnv);
+        if (routeBaseUrl) env['COPILOT_BYOK_BASE_URL'] = routeBaseUrl;
+        const secretRefs = resolveModelGatewayProviderSecretRefs(providerId);
+        const bearerToken = firstConfiguredEnvValue(baseEnv, secretRefs.bearerTokenRefs);
+        const apiKey = firstConfiguredEnvValue(baseEnv, secretRefs.apiKeyRefs);
+        if (bearerToken) env['COPILOT_BYOK_BEARER_TOKEN'] = bearerToken;
+        else if (apiKey) env['COPILOT_BYOK_API_KEY'] = apiKey;
+    }
+    if (providerProfile) env['COPILOT_BYOK_PROFILE'] = providerProfile;
     if (providerModel) env['COPILOT_BYOK_MODEL'] = providerModel;
     if (baseUrl) env['COPILOT_BYOK_BASE_URL'] = baseUrl;
     if (sdkWireApi) env['COPILOT_BYOK_WIRE_API'] = sdkWireApi;
+    const supportsReasoning =
+        routeMetadataBoolean(selected, 'reasoningEffort') ?? routeMetadataBoolean(selected, 'supportsReasoning');
+    const supportsVision = routeMetadataBoolean(selected, 'vision') ?? routeMetadataBoolean(selected, 'supportsVision');
+    const contextWindowTokens =
+        routeMetadataNumber(selected, 'contextWindowTokens') ??
+        routeMetadataNumber(selected, 'maxContextWindowTokens') ??
+        routeMetadataNumber(selected, 'max_context_window_tokens');
+    if (supportsReasoning !== null) env['COPILOT_BYOK_SUPPORTS_REASONING'] = String(supportsReasoning);
+    if (supportsVision !== null) env['COPILOT_BYOK_SUPPORTS_VISION'] = String(supportsVision);
+    if (contextWindowTokens !== null && contextWindowTokens > 0) {
+        env['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'] = String(Math.floor(contextWindowTokens));
+    }
     return env;
 }
 
@@ -677,7 +789,7 @@ function runtimeSelectorRouteModel(selected) {
  *   liveModel: string | null;
  *   provider: string | null;
  *   persistProvider: string | null;
- *   newSession: string;
+ *   explicitNewSession: string;
  * }}
  */
 function runtimeSelectorStandbyCommands(selected, timeoutMs) {
@@ -690,29 +802,19 @@ function runtimeSelectorStandbyCommands(selected, timeoutMs) {
         liveModel: model ? `/byok model ${model}` : null,
         provider: providerId && model ? `/byok provider ${providerId} ${model}` : null,
         persistProvider: providerId && model ? `/byok persist provider ${providerId} ${model}` : null,
-        newSession: '/session sdk next new',
+        explicitNewSession: '/session sdk next new',
     };
 }
 
 /**
  * @param {{ hasRuntimeProof: boolean; standbyClass: 'selected_route' | 'new_model_same_provider' | 'new_provider'; commands: ReturnType<typeof runtimeSelectorStandbyCommands> }} row
- * @returns {{ action: 'probe_agent' | 'live_model' | 'new_session_provider' | 'unavailable'; command: string | null }}
+ * @returns {{ action: 'probe_agent' | 'live_model' | 'unavailable'; command: string | null }}
  */
 function runtimeSelectorStandbyRecommendation(row) {
     if (!row.hasRuntimeProof) {
         return {
             action: row.commands.probeAgent ? 'probe_agent' : 'unavailable',
             command: row.commands.probeAgent,
-        };
-    }
-    if (row.standbyClass === 'new_provider') {
-        const command =
-            row.commands.newSession && row.commands.provider
-                ? `${row.commands.newSession} && ${row.commands.provider}`
-                : row.commands.provider;
-        return {
-            action: command ? 'new_session_provider' : 'unavailable',
-            command,
         };
     }
     return {
@@ -739,7 +841,7 @@ function runtimeSelectorStandbyRecommendation(row) {
  *   hasRuntimeProof: boolean;
  *   needsProbe: boolean;
  *   standbyClass: 'selected_route' | 'new_model_same_provider' | 'new_provider';
- *   recommendedAction: 'probe_agent' | 'live_model' | 'new_session_provider' | 'unavailable';
+ *   recommendedAction: 'probe_agent' | 'live_model' | 'unavailable';
  *   recommendedCommand: string | null;
  *   runtimeEnvStatus: string | null;
  *   reasons: string[];

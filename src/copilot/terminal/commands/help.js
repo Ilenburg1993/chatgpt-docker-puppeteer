@@ -219,7 +219,7 @@ function renderFullHelp({ injectPort, println }) {
         { command: '/abort', description: 'aborta apenas o turno SDK ativo' },
         { command: '/clear', description: 'limpa histórico em memória' },
         { command: '/clear-shadow', description: 'limpa pergunta humana restaurada do disco' },
-        { command: '/restart', description: 'reinicia a conversa' },
+        { command: '/restart', description: 'reinicia só a conversa' },
         { command: '/emergency-reset (/ereset)', description: 'limpa limitadores e reinicia a conversa' },
         { command: '/quit ou /exit', description: 'encerra terminal' },
     ]);

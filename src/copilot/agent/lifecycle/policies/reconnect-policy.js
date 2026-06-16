@@ -57,6 +57,7 @@ import { startSpan } from '../../ports/tracing-port.js';
  *     jitterFn?: () => number;
  *     sessionLog?: (msg: string) => Promise<void>;
  *     shouldAbort?: () => boolean;
+ *     preserveDialogLoopOnReconnect?: boolean;
  * }} [opts]
  *   - Opções de tuning
  *
@@ -64,7 +65,14 @@ import { startSpan } from '../../ports/tracing-port.js';
  */
 export async function tryReconnect(originalError, client, currentStatus, callbacks, opts = {}) {
     // G1-DX-03: jitterFn injetável para testes determinísticos (default: Math.random).
-    const { maxAttempts = 5, baseDelayMs = 1_000, jitterFn = Math.random, sessionLog, shouldAbort } = opts;
+    const {
+        maxAttempts = 5,
+        baseDelayMs = 1_000,
+        jitterFn = Math.random,
+        sessionLog,
+        shouldAbort,
+        preserveDialogLoopOnReconnect = false,
+    } = opts;
     const { emit, initSession, dialogLoop, clearSessionEventUnsubs, updateClient, createClient, onSessionReady } =
         callbacks;
     const originalSdkPolicy = getAgentSdkRecoveryPolicy(originalError, 'session');
@@ -186,7 +194,12 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                     );
                     emit('ready', { sessionId: session.sessionId, isResumed, reconnected: true });
 
-                    if (dialogLoop.active) {
+                    if (dialogLoop.active && preserveDialogLoopOnReconnect) {
+                        log(
+                            'INFO',
+                            '[AlwaysAlive] Reconexão preservou dialog loop ativo por solicitação do chamador.',
+                        );
+                    } else if (dialogLoop.active) {
                         log(
                             'INFO',
                             '[AlwaysAlive] Reconexão com dialog loop ativo — emitindo dialog.stopped para restart automático.',

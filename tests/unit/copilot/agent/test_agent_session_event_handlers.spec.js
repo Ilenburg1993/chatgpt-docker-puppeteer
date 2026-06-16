@@ -132,6 +132,10 @@ function createMockSession() {
             for (const fn of listeners.get(event) || []) fn(evtObj);
             for (const fn of catchAll) fn(evtObj);
         },
+        /** @param {string} event @param {unknown} payload */
+        _emitRaw(event, payload) {
+            for (const fn of listeners.get(event) || []) fn(payload);
+        },
         getEvents: vi.fn(async () => [
             { id: 'm1', type: 'user', content: 'hello', createdAt: 1 },
             { id: 'm2', type: 'assistant', content: 'hi', createdAt: 2 },
@@ -613,5 +617,30 @@ describe('F43 — event-wirer.js wireSessionEvents', () => {
         for (const u of unsubs) {
             expect(() => u()).not.toThrow();
         }
+    });
+
+    it('converte evento raw error do SDK em session.error rastreável', async () => {
+        const { wireSessionEvents } = await import('#copilot/agent/session/wiring');
+        const session = createMockSession();
+        const callbacks = {
+            emit: vi.fn(),
+            getStatusSnapshot: vi.fn(),
+            onCheckpointPath: vi.fn(),
+            onContextState: vi.fn(),
+            onPrInfo: vi.fn(),
+            isProcessing: () => false,
+            dialogLoopActive: () => false,
+        };
+        wireSessionEvents(/** @type {any} */ (session), false, callbacks);
+
+        session._emitRaw('error', new Error('Client is not connected. Call start() first.'));
+
+        expect(callbacks.emit).toHaveBeenCalledWith(
+            'session.error',
+            expect.objectContaining({
+                errorType: 'raw_sdk_error',
+                message: 'Client is not connected. Call start() first.',
+            }),
+        );
     });
 });

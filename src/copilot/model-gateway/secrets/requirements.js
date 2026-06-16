@@ -56,6 +56,11 @@ export const MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS = Object.freeze([
     Object.freeze({ providerId: 'ollama-cloud', groups: Object.freeze([anySecret('api_key', ['OLLAMA_CLOUD_API_KEY'])]) }),
 ]);
 
+export const MODEL_GATEWAY_GENERIC_BYOK_SECRET_REFS = Object.freeze([
+    'COPILOT_BYOK_API_KEY',
+    'COPILOT_BYOK_BEARER_TOKEN',
+]);
+
 /**
  * @param {string} id
  * @param {readonly string[]} keys
@@ -91,6 +96,47 @@ function optionalString(value) {
 function providerAliases(entry) {
     const aliases = /** @type {{ providerAliases?: unknown }} */ (entry).providerAliases;
     return Array.isArray(aliases) ? aliases.map(optionalString).filter((item) => item !== null) : [];
+}
+
+/**
+ * Resolve the only secret references that may be associated with one provider record.
+ *
+ * Generic BYOK references are intentionally valid for every active provider. Provider-specific
+ * references come exclusively from the provider requirements registry.
+ *
+ * @param {string | null | undefined} providerId
+ * @param {{ requirements?: typeof MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS }} [options]
+ * @returns {{ apiKeyRefs: string[]; bearerTokenRefs: string[]; allowedRefs: string[] }}
+ */
+export function resolveModelGatewayProviderSecretRefs(providerId, options = {}) {
+    const normalized = optionalString(providerId)?.toLowerCase() ?? '';
+    const requirements = options.requirements ?? MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS;
+    const entry =
+        requirements.find((candidate) =>
+            [candidate.providerId, ...providerAliases(candidate)].some((id) => id.toLowerCase() === normalized),
+        ) ?? null;
+    const providerRefs = entry
+        ? entry.groups
+              .filter((group) => group.kind === 'secret')
+              .flatMap((group) => [...group.keys])
+        : [];
+    if (normalized === 'azure') providerRefs.push('AZURE_OPENAI_API_KEY');
+
+    const bearerTokenRefs = [
+        'COPILOT_BYOK_BEARER_TOKEN',
+        ...(normalized === 'kilo' || normalized === 'kilo-code' || normalized === 'kilo-gateway'
+            ? providerRefs
+            : []),
+    ];
+    const apiKeyRefs = [
+        'COPILOT_BYOK_API_KEY',
+        ...providerRefs.filter((ref) => !bearerTokenRefs.includes(ref)),
+    ];
+    return {
+        apiKeyRefs: [...new Set(apiKeyRefs)],
+        bearerTokenRefs: [...new Set(bearerTokenRefs)],
+        allowedRefs: [...new Set([...apiKeyRefs, ...bearerTokenRefs])],
+    };
 }
 
 /**

@@ -20,6 +20,7 @@ export {
     readTerminalLiveByokModelSwitchRequest,
     recordTerminalLiveByokModelSwitchDeferred,
     requestTerminalLiveByokModelSwitch,
+    requestTerminalLiveByokRouteSwitch,
 } from './live-model-switch.js';
 export {
     applyTerminalByokGatewayAutoEffects,

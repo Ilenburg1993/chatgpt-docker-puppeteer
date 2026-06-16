@@ -80,6 +80,8 @@ import {
     sessionLog,
     setModel,
     setReasoningEffort,
+    switchModelTransactional,
+    switchAgentRouteTransactional,
     updateSdkPlan,
 } from './runtime/root-surface/index.js';
 
@@ -552,6 +554,49 @@ export class AlwaysAliveAgent extends EventEmitter {
      */
     setModel(modelId) {
         setModel(this.ctx, modelId);
+    }
+
+    /**
+     * Troca o modelo vivo e só publica a configuração após verificação do SDK.
+     *
+     * @param {string} modelId
+     * @param {{ idempotencyKey?: string; source?: string }} [options]
+     * @returns {Promise<Record<string, unknown>>}
+     */
+    switchModel(modelId, options = {}) {
+        return switchModelTransactional(this.ctx, modelId, options);
+    }
+
+    /**
+     * Troca provider/rota preservando a identidade da sessão SDK.
+     *
+     * O lifecycle pode recriar o transporte e reanexar o mesmo sessionId; nunca cria outra sessão como fallback.
+     *
+     * @param {Record<string, unknown>} route
+     * @param {{
+     *     idempotencyKey?: string;
+     *     timeoutMs?: number;
+     *     source?: string;
+     *     allowActiveDialogLoopReattach?: boolean;
+     *     forceApplyDeferred?: boolean;
+     * }} [options]
+     */
+    switchRoute(route, options = {}) {
+        return switchAgentRouteTransactional(this.ctx, route, {
+            ...options,
+            reattach: async () => {
+                const reattached = await agentTryReconnect(
+                    this.ctx,
+                    this,
+                    new Error('MODEL_GATEWAY_SAME_SESSION_ROUTE_REATTACH'),
+                    { maxAttempts: 1, baseDelayMs: 0, preserveDialogLoopOnReconnect: true },
+                );
+                if (!reattached) throw new Error('SAME_SESSION_ROUTE_REATTACH_FAILED');
+                const session = this.ctx.getSessionSnapshot();
+                if (!session) throw new Error('SAME_SESSION_ROUTE_REATTACH_SESSION_MISSING');
+                return session;
+            },
+        });
     }
 
     /**

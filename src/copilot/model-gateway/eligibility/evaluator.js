@@ -16,6 +16,10 @@ import {
 } from './contracts.js';
 import { resolveModelGatewayEligibilityPolicy } from './policy-presets.js';
 import { resolveModelGatewayAccountAccess } from '../account-access/index.js';
+import {
+    MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS,
+    evaluateModelGatewayModelLifecycle,
+} from '../contracts/model-lifecycle.js';
 
 const BUDGET_PRICE_FIELDS = Object.freeze([
     Object.freeze({
@@ -429,8 +433,24 @@ export function evaluateModelGatewayEligibility(input) {
     if (routeIdentityTokens.some((token) => blockModels.has(token))) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_BLOCKED);
     if (projection['enabled'] === false) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_DISABLED);
 
-    const lifecycleStatus = optionalString(lifecycle(projection)['status']) ?? optionalString(projection['lifecycle']);
-    if (lifecycleStatus === 'retired' && policy['allowRetired'] !== true) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_RETIRED);
+    const lifecycleRecord = lifecycle(projection);
+    const lifecycleStatus = optionalString(lifecycleRecord['status']) ?? optionalString(projection['lifecycle']);
+    const canonicalLifecycle = evaluateModelGatewayModelLifecycle(
+        lifecycleStatus ? { ...projection, lifecycle: { ...lifecycleRecord, status: lifecycleStatus } } : projection,
+        { now: nowMs },
+    );
+    if (
+        canonicalLifecycle.status === MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS.RETIRED &&
+        policy['allowRetired'] !== true
+    ) {
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_RETIRED);
+    }
+    if (canonicalLifecycle.status === MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS.EXPIRED) {
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_EXPIRED);
+    }
+    if (canonicalLifecycle.status === MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS.DEPRECATED) {
+        soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.DEPRECATED_MODEL);
+    }
     if (lifecycleStatus === 'preview') soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.PREVIEW_MODEL);
 
     hard.push(...access.hardReasons);

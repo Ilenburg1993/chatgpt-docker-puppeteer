@@ -188,7 +188,15 @@ export function registerSessionCoreRoutes(router) {
             const runtimeSessionId =
                 typeof runtimeSnapshot?.['sessionId'] === 'string' ? runtimeSnapshot['sessionId'] : null;
             if (runtimeSessionId === id && verification.verifiedSwitch) {
-                routeDeps.sdkRuntimeProjection.setRuntimeModelProjection(effectiveModel, routeDeps.runtimeId);
+                routeDeps.sdkRuntimeProjection.observeRuntimeModelChangeProjection(
+                    {
+                        previousModel:
+                            typeof runtimeSnapshot?.['model'] === 'string' ? runtimeSnapshot['model'] : null,
+                        newModel: effectiveModel,
+                        ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
+                    },
+                    routeDeps.runtimeId,
+                );
                 if (reasoningEffort !== undefined) {
                     routeDeps.sdkRuntimeProjection.setRuntimeReasoningProjection(reasoningEffort, routeDeps.runtimeId);
                 }

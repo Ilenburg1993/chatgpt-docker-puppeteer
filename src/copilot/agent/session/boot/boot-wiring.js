@@ -170,6 +170,42 @@ function stepRegisterClientLifecycleHandlers(client, ctx, state) {
         return;
     }
 
+    const rawClientEvents = /** @type {{ on?: (...args: unknown[]) => unknown; off?: (...args: unknown[]) => void }} */ (
+        /** @type {unknown} */ (client)
+    );
+    if (typeof rawClientEvents.on === 'function') {
+        /** @param {unknown} rawError */
+        const onRawClientError = (rawError) => {
+            const error = toError(rawError);
+            log('WARN', `[AlwaysAlive] SDK client raw error: ${error.message}`);
+            try {
+                ctx.emit(EMITTER_SDK_LIFECYCLE, {
+                    type: 'client.error',
+                    message: error.message,
+                    ts: Date.now(),
+                });
+            } catch (emitError) {
+                log('WARN', `[AlwaysAlive] SDK client raw error emit falhou: ${toError(emitError).message}`);
+            }
+        };
+        try {
+            const maybeUnsubscribe = rawClientEvents.on.call(client, 'error', onRawClientError);
+            if (typeof maybeUnsubscribe === 'function') {
+                state.unsubs.push(/** @type {() => void} */ (maybeUnsubscribe));
+            } else {
+                state.unsubs.push(() => {
+                    try {
+                        rawClientEvents.off?.call(client, 'error', onRawClientError);
+                    } catch (error) {
+                        log('WARN', `[AlwaysAlive] SDK client raw error unsubscribe falhou: ${toError(error).message}`);
+                    }
+                });
+            }
+        } catch (error) {
+            log('WARN', `[AlwaysAlive] SDK client raw error listener indisponível: ${toError(error).message}`);
+        }
+    }
+
     const unsubLifecycle = attachAgentSdkBootLifecycleBridge(client, (event) => {
         const level = event.type === 'session.updated' ? 'DEBUG' : 'INFO';
         log(level, `[AlwaysAlive] SDK lifecycle: ${event.type} id=${event.sessionId}`);

@@ -24,6 +24,12 @@ export {
     BYOK_VISION_PROBE_MIME_TYPE,
     runConfiguredByokVisionProbe,
 } from './vision-probe.js';
+export {
+    MODEL_GATEWAY_PROBE_LOW_REQUEST_TOKEN_LIMIT,
+    MODEL_GATEWAY_PROBE_REQUEST_FLOOR_TOKENS,
+    MODEL_GATEWAY_PROBE_RESPONSE_RESERVE_TOKENS,
+    evaluateModelGatewayProbeAdmission,
+} from './admission.js';
 export { planModelGatewayProbeBackoff } from './backoff-planner.js';
 export { estimateProbeCostUsd, planCostBoundedCatalogProbes } from './planner.js';
 export {

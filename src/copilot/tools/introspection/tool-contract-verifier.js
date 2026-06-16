@@ -48,6 +48,7 @@ import {
  *     riskySkipPermissionCount: number;
  *     autonomySkipPermissionCount: number;
  *     mutableReadOnlyParameterCount: number;
+ *     strictSchemaViolationCount: number;
  *     noticeCount: number;
  *     decisionCount: number;
  *     permissionMode: import('./tool-metadata.js').ToolPermissionMode;
@@ -224,6 +225,7 @@ export function createEmptyToolContractReport() {
         riskySkipPermissionCount: 0,
         autonomySkipPermissionCount: 0,
         mutableReadOnlyParameterCount: 0,
+        strictSchemaViolationCount: 0,
         noticeCount: 0,
         decisionCount: 0,
         permissionMode: 'selective',
@@ -282,6 +284,7 @@ export function verifyToolRegistryContracts(registry, options = {}) {
     let riskySkipPermissionCount = 0;
     let autonomySkipPermissionCount = 0;
     let mutableReadOnlyParameterCount = 0;
+    let strictSchemaViolationCount = 0;
     /** @type {Record<string, import('./tool-metadata.js').ToolDefinitionMetadata>} */
     const metadataByName = {};
 
@@ -366,6 +369,29 @@ export function verifyToolRegistryContracts(registry, options = {}) {
             });
         }
 
+        if (category === 'model-gateway') {
+            const inputSchema = asRecord(parameters);
+            const outputSchema = asRecord(tool['outputSchema']);
+            if (inputSchema?.['additionalProperties'] !== false) {
+                strictSchemaViolationCount += 1;
+                issues.push({
+                    severity: 'error',
+                    code: 'MODEL_GATEWAY_INPUT_SCHEMA_NOT_CLOSED',
+                    toolName,
+                    message: 'Tool do Model Gateway deve declarar additionalProperties=false no input schema.',
+                });
+            }
+            if (!isUsableSchema(outputSchema) || outputSchema?.['additionalProperties'] !== false) {
+                strictSchemaViolationCount += 1;
+                issues.push({
+                    severity: 'error',
+                    code: 'MODEL_GATEWAY_OUTPUT_SCHEMA_NOT_CLOSED',
+                    toolName,
+                    message: 'Tool do Model Gateway deve possuir outputSchema utilizável e fechado.',
+                });
+            }
+        }
+
         const tags = Array.isArray(entry['tags'])
             ? entry['tags'].filter((tag) => typeof tag === 'string' && tag.trim().length > 0)
             : [];
@@ -444,6 +470,7 @@ export function verifyToolRegistryContracts(registry, options = {}) {
         riskySkipPermissionCount,
         autonomySkipPermissionCount,
         mutableReadOnlyParameterCount,
+        strictSchemaViolationCount,
         permissionMode,
         metadataCoverage: {
             descriptionPct: pct(withDescription, totalTools),

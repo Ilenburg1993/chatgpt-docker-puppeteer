@@ -80,6 +80,19 @@ import {
  * } | null} [byokSessionBinding]
  *   Identidade redigida do provider BYOK que criou/retomou a sessão SDK persistida. Nunca carrega segredos.
  * @property {{
+ *     providerId: string;
+ *     providerModel: string;
+ *     selectorSyntax?: string | null;
+ *     baseUrl?: string | null;
+ *     openAICompatibleBaseUrl?: string | null;
+ *     wireApi?: string | null;
+ *     providerProfile?: string | null;
+ *     routeProfile?: string | null;
+ *     selectedRouteKey?: string | null;
+ *     updatedAt: number;
+ * } | null} [modelGatewayActiveRoute]
+ *   Projeção redigida da rota que deve vincular a sessão atual. Credenciais continuam resolvidas por secret refs/env.
+ * @property {{
  *     outcome: 'created' | 'resumed';
  *     requestedMode: 'auto' | 'new' | 'resume';
  *     selectedSessionId: string;

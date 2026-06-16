@@ -8,6 +8,8 @@ export {
     readTerminalConfigProjection,
     readTerminalModelStatsProjection,
     setTerminalModelProjection,
+    switchTerminalModelProjection,
+    switchTerminalRouteProjection,
     setTerminalReasoningProjection,
 } from './config.js';
 export { readTerminalLiveFlowProjection } from './live.js';

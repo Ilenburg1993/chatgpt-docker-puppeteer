@@ -639,7 +639,7 @@ export async function agentStop(
  * @param {AgentContext} ctx
  * @param {LifecycleHost & import('node:events').EventEmitter} host
  * @param {Error} originalError
- * @param {{ maxAttempts?: number; baseDelayMs?: number }} [opts]
+ * @param {{ maxAttempts?: number; baseDelayMs?: number; preserveDialogLoopOnReconnect?: boolean }} [opts]
  * @returns {Promise<boolean>}
  */
 export async function agentTryReconnect(ctx, host, originalError, opts = {}) {

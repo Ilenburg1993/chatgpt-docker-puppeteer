@@ -132,7 +132,7 @@ function failBoot(input, bootErr) {
  * @returns {Promise<void>}
  */
 export async function runDialogLoopBoot(input) {
-    input.modelFallback.applyIfPending(input.host, input.emit);
+    await Promise.resolve(input.modelFallback.applyIfPending(input.host, input.emit));
 
     const metaPrompt = input.bootPrompt ?? DialogProtocol.buildBootPrompt();
     const bootPromise = waitForAgentSdkEvent(input.emitter, EMITTER_LOOP_READY, {

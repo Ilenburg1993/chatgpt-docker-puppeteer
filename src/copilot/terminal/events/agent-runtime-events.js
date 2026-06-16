@@ -689,12 +689,14 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                     recordHistory: false,
                 });
                 if (getShowToolActivity()) {
-                    const line =
+                    const historyLine =
                         `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(displayName, 32) : displayName)} ${terminalThemeText('muted', `ainda trabalhando · ${elapsed}s sem novo progresso`)}`.trimEnd();
+                    const inlineLine =
+                        `LLM-B ferramenta · ${terminalThemeText('tool', compactTerminalToolText(displayName, 32))} · ${elapsed}s`;
                     if (shouldPersistToolHeartbeatNarration()) {
-                        println(line);
+                        println(historyLine);
                     }
-                    writeInlineStatus(line);
+                    writeInlineStatus(inlineLine);
                 }
             }
         },

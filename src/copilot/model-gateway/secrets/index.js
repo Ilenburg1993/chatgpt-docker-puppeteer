@@ -13,8 +13,10 @@ export {
     createEnvSecretRegistry,
 } from './env-secret-registry.js';
 export {
+    MODEL_GATEWAY_GENERIC_BYOK_SECRET_REFS,
     MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS,
     evaluateModelGatewayProviderEnvRequirements,
+    resolveModelGatewayProviderSecretRefs,
     summarizeModelGatewayProviderEnvRequirements,
 } from './requirements.js';
 export {
@@ -24,3 +26,4 @@ export {
     summarizeModelGatewayRedactionAudits,
 } from './redaction-audit.js';
 export { redactSecretRecord, redactSecretText } from './redaction.js';
+export { diagnoseModelGatewayProviderSecretRefs } from './diagnostics.js';

@@ -8,7 +8,7 @@
  * @module copilot/terminal/byok/live-model-switch
  */
 
-import { setTerminalModelProjection } from '../frontend/projections/model-selection/index.js';
+import * as modelSelectionProjection from '../frontend/projections/model-selection/index.js';
 import { buildTerminalModelTransitionPresentation } from '../events/presenters/model/index.js';
 import { recordTerminalActivity } from '../state/index.js';
 
@@ -56,26 +56,46 @@ function renderLiveModelSwitchRequestDetail(previousModel, currentModel, reason,
  *     confidence?: string | null;
  *     updateCurrent?: boolean;
  * }} [options]
- * @returns {{
+ * @returns {Promise<{
  *     previousModel: string | null;
  *     currentModel: string;
  *     currentReasoningEffort: string | null;
  *     reasoningAdjusted: boolean;
  *     runtimeId: string | null;
- *     projection: ReturnType<typeof setTerminalModelProjection>;
+ *     projection: Awaited<ReturnType<typeof modelSelectionProjection.switchTerminalModelProjection>>
+ *       | ReturnType<typeof modelSelectionProjection.setTerminalModelProjection>;
  *     detail: string;
- * }}
+ * }>}
  */
-export function requestTerminalLiveByokModelSwitch(model, options = {}) {
-    const projection = options.runtimeId
-        ? setTerminalModelProjection(model, options.runtimeId)
-        : setTerminalModelProjection(model);
+export async function requestTerminalLiveByokModelSwitch(model, options = {}) {
+    const idempotencyKey = `terminal-model-switch:${options.runtimeId ?? 'default'}:${model}:${Date.now()}`;
+    const hasTransactionalProjection = Object.prototype.hasOwnProperty.call(
+        modelSelectionProjection,
+        'switchTerminalModelProjection',
+    );
+    const projection =
+        hasTransactionalProjection && typeof modelSelectionProjection.switchTerminalModelProjection === 'function'
+            ? await modelSelectionProjection.switchTerminalModelProjection(model, options.runtimeId, {
+                  idempotencyKey,
+                  source: options.source ?? 'terminal.byok_model',
+              })
+            : await Promise.resolve(
+                  options.runtimeId
+                      ? modelSelectionProjection.setTerminalModelProjection(model, options.runtimeId)
+                      : modelSelectionProjection.setTerminalModelProjection(model),
+              );
     const projected = /** @type {Record<string, unknown>} */ (projection ?? {});
     const previousModel = optionalText(projected['previousModel']);
     const currentModel = optionalText(projected['currentModel']) ?? model;
     const currentReasoningEffort = optionalText(projected['currentReasoningEffort']);
     const runtimeId = optionalText(projected['runtimeId']);
     const reasoningAdjusted = projected['reasoningAdjusted'] === true;
+    const operation = isRecord(projected['operation']) ? projected['operation'] : null;
+    if (operation && operation['state'] !== 'committed') {
+        throw new Error(
+            `MODEL_SWITCH_NOT_COMMITTED: state=${String(operation['state'] ?? 'unknown')} error=${String(operation['error'] ?? 'unknown')}`,
+        );
+    }
     const source = options.source ?? 'terminal.byok_model';
     const reason = optionalText(options.reason);
     const confidence = optionalText(options.confidence);
@@ -105,6 +125,61 @@ export function requestTerminalLiveByokModelSwitch(model, options = {}) {
         projection,
         detail,
     };
+}
+
+/**
+ * Solicita troca de provider/rota preservando o mesmo sessionId.
+ *
+ * @param {Record<string, unknown>} route
+ * @param {{
+ *     runtimeId?: string | null;
+ *     source?: string;
+ *     reason?: string | null;
+ *     timeoutMs?: number;
+ *     idempotencyKey?: string;
+ *     forceApplyDeferred?: boolean;
+ * }} [options]
+ */
+export async function requestTerminalLiveByokRouteSwitch(route, options = {}) {
+    const providerId = optionalText(route['providerId']);
+    const providerModel = optionalText(route['providerModel']) ?? optionalText(route['selectorSyntax']);
+    if (!providerId || !providerModel) throw new Error('LIVE_ROUTE_SWITCH_TARGET_INVALID');
+    const idempotencyKey =
+        optionalText(options.idempotencyKey) ??
+        `terminal-route-switch:${options.runtimeId ?? 'default'}:${providerId}:${providerModel}:${Date.now()}`;
+    const projection = await modelSelectionProjection.switchTerminalRouteProjection(route, options.runtimeId, {
+        idempotencyKey,
+        ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+        allowActiveDialogLoopReattach: true,
+        ...(options.forceApplyDeferred ? { forceApplyDeferred: true } : {}),
+        source: options.source ?? 'terminal.byok_route',
+    });
+    const projected = /** @type {Record<string, unknown>} */ (projection ?? {});
+    const operation = isRecord(projected['operation']) ? projected['operation'] : null;
+    if (!operation || operation['state'] !== 'committed') {
+        throw new Error(
+            `SAME_SESSION_ROUTE_SWITCH_NOT_COMMITTED: state=${String(operation?.['state'] ?? 'unknown')} error=${String(operation?.['error'] ?? 'unknown')}`,
+        );
+    }
+    const detail =
+        `rota viva confirmada na mesma sessão: ${providerId}/${providerModel}` +
+        (optionalText(options.reason) ? ` · ${optionalText(options.reason)}` : '');
+    recordTerminalActivity('model', 'Troca de rota confirmada', {
+        detail,
+        source: options.source ?? 'terminal.byok_route',
+        severity: 'info',
+        recordHistory: true,
+        updateCurrent: true,
+    });
+    return { projection, operation, detail };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**

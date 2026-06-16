@@ -17,6 +17,7 @@ import {
     sendSessionAndWait,
     withEphemeralSession,
 } from '#copilot/sdk/session';
+import { evaluateModelGatewayProbeAdmission } from './admission.js';
 
 const DEFAULT_CHAT_PROBE_PROMPT =
     'Responda somente com o texto BYOK_PROBE_OK. Nao use ferramentas, nao peca mais contexto e nao explique.';
@@ -55,10 +56,7 @@ function defaultFailureClassifier(value) {
  * @returns {{ shouldBlock: boolean; label: string }}
  */
 function defaultAdmission(summary, mode, prompt) {
-    void summary;
-    void mode;
-    void prompt;
-    return { shouldBlock: false, label: '' };
+    return evaluateModelGatewayProbeAdmission(summary, mode, prompt);
 }
 
 /**

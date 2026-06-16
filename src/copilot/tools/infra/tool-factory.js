@@ -217,17 +217,21 @@ function logToolFactory(level, message) {
  * @property {import('#copilot/sdk/types').ToolHandler<TArgs>} handler - Callback executor da ferramenta
  * @property {boolean} [requiresApproval] - Se `true` (default), skipPermission=false
  * @property {boolean} [overridesBuiltInTool] - Se sobrescreve ferramenta nativa do SDK
+ * @property {'warn' | 'throw'} [schemaFailurePolicy] - `throw` impede registro sem schema após falha de normalização.
+ * @property {Record<string, unknown>} [outputSchema] - Contrato local estruturado do resultado.
+ * @property {Record<string, unknown>} [annotations] - Annotations locais no estilo MCP.
  */
 
 /**
  * Normaliza o schema de parâmetros para o formato aceito pelo SDK. Aceita instâncias Zod (convertidas automaticamente)
- * ou JSON Schema direto. Se falhar na conversão, loga aviso e retorna undefined (permitindo tool sem parâmetros).
+ * ou JSON Schema direto.
  *
  * @param {import('#copilot/sdk/types').ToolParameterInput<any> | undefined} parameters
  * @param {string} [toolName='unknown'] Default is `'unknown'`
+ * @param {'warn' | 'throw'} [failurePolicy='warn'] Default is `'warn'`
  * @returns {Record<string, unknown> | undefined}
  */
-function normalizeParameters(parameters, toolName = 'unknown') {
+function normalizeParameters(parameters, toolName = 'unknown', failurePolicy = 'warn') {
     try {
         if (parameters === undefined) {
             return undefined;
@@ -244,6 +248,11 @@ function normalizeParameters(parameters, toolName = 'unknown') {
         );
     } catch (err) {
         const message = toError(err).message;
+        if (failurePolicy === 'throw') {
+            throw new TypeError(`[tool-factory] Falha ao normalizar parâmetros de '${toolName}': ${message}`, {
+                cause: err,
+            });
+        }
         logToolFactory(
             'WARN',
             `Falha ao normalizar parâmetros de '${toolName}': ${message}. Tool será registrada sem parâmetros.`,
@@ -325,8 +334,13 @@ export function buildTool({
     handler,
     requiresApproval = true,
     overridesBuiltInTool = false,
+    schemaFailurePolicy = 'warn',
+    outputSchema,
+    annotations,
 }) {
-    const jsonSchemaParams = normalizeParameters(parameters, name);
+    const jsonSchemaParams = normalizeParameters(parameters, name, schemaFailurePolicy);
+    const normalizedOutputSchema =
+        outputSchema !== undefined ? normalizeParameters(outputSchema, `${name}:output`, 'throw') : undefined;
     const failureAwareHandler = withToolFailureFeedback(name, handler, {
         parameters: jsonSchemaParams,
     });
@@ -340,11 +354,16 @@ export function buildTool({
         skipPermission: !requiresApproval,
         ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
     });
-    return /** @type {import('#copilot/sdk/types').Tool<TArgs>} */ (
-        typeof instructions === 'string' && instructions.trim().length > 0
-            ? { ...tool, instructions: instructions.trim() }
-            : tool
-    );
+    return /** @type {import('#copilot/sdk/types').Tool<TArgs>} */ ({
+        ...tool,
+        ...(typeof instructions === 'string' && instructions.trim().length > 0
+            ? { instructions: instructions.trim() }
+            : {}),
+        ...(normalizedOutputSchema !== undefined ? { outputSchema: normalizedOutputSchema } : {}),
+        ...(annotations && typeof annotations === 'object' && !Array.isArray(annotations)
+            ? { annotations: { ...annotations } }
+            : {}),
+    });
 }
 
 /**

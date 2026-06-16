@@ -93,10 +93,40 @@ function targetBoundary(route) {
     const runtimeEnv = record(route?.['runtimeEnv']);
     return {
         profile: text(runtimeEnv?.['profile']) ?? text(selected?.['byokProfile']),
-        preset: text(runtimeEnv?.['providerPreset']) ?? text(selected?.['providerId']),
+        preset:
+            text(runtimeEnv?.['providerId']) ??
+            text(selected?.['providerId']) ??
+            text(runtimeEnv?.['providerPreset']),
         providerType: text(selected?.['runtimeKind']) ?? text(selected?.['routeLayer']),
         baseUrl: text(selected?.['baseUrl']) ?? text(selected?.['openAICompatibleBaseUrl']),
         model: text(selected?.['selectorSyntax']) ?? text(selected?.['providerModel']) ?? text(selected?.['id']),
+    };
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} route
+ * @returns {Record<string, unknown> | null}
+ */
+function liveRouteTarget(route) {
+    const selected = selectedRoute(route);
+    if (!selected) return null;
+    const routing = record(selected['routing']) ?? {};
+    const policy = record(selected['normalizedPolicy']) ?? {};
+    const providerId = text(selected['providerId']);
+    const providerModel = text(selected['providerModel']) ?? text(selected['selectorSyntax']);
+    if (!providerId || !providerModel) return null;
+    return {
+        providerId,
+        providerModel,
+        selectorSyntax: text(selected['selectorSyntax']),
+        baseUrl: text(selected['baseUrl']) ?? text(routing['baseUrl']) ?? text(policy['baseUrl']),
+        openAICompatibleBaseUrl:
+            text(selected['openAICompatibleBaseUrl']) ??
+            text(routing['openAICompatibleBaseUrl']) ??
+            text(policy['openAICompatibleBaseUrl']),
+        wireApi: text(selected['wireApi']) ?? text(routing['wireApi']) ?? text(policy['wireApi']),
+        routeProfile: text(route?.['profileId']) ?? text(selected['routeProfile']),
+        selectedRouteKey: routeKey(route),
     };
 }
 
@@ -386,7 +416,7 @@ export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, pr
  *   schema: 'model-gateway-runtime-automation-decision';
  *   ok: boolean;
  *   status: 'ready' | 'blocked';
- *   action: 'keep_current' | 'apply_live_model' | 'prepare_new_session' | 'wait_for_reset' | 'manual_intervention';
+ *   action: 'keep_current' | 'apply_live_model' | 'apply_live_route' | 'wait_for_reset' | 'manual_intervention';
  *   selectedRouteKey: string | null;
  *   selectedRouteReasons: string[];
  *   selectedRouteConfidence: string | null;
@@ -394,10 +424,13 @@ export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, pr
  *   fallbackFromSelectedRouteKey: string | null;
  *   fallbackReason: string | null;
  *   canApplyLiveModel: boolean;
+ *   canApplyLiveRoute: boolean;
+ *   requiresProviderRebind: boolean;
  *   requiresNewSession: boolean;
  *   blockers: string[];
  *   currentBoundary: ReturnType<typeof liveBoundary>;
  *   targetBoundary: ReturnType<typeof targetBoundary>;
+ *   targetRoute: ReturnType<typeof liveRouteTarget>;
  *   cooldown: ReturnType<typeof routeCooldown>;
  *   blockerClass: ReturnType<typeof blockerClass>;
  *   nonActionReason: string | null;
@@ -409,6 +442,7 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
     const automationRoute = selectModelGatewayRuntimeAutomationRoute(input.runtimeSelectorPlan, input.profileId);
     const route = automationRoute.route ? routeWithPostTurnFallback(automationRoute.route, input.turnFailure) : automationRoute.route;
     const target = targetBoundary(route);
+    const targetRoute = liveRouteTarget(route);
     const current = liveBoundary(input.liveByokBinding);
     const cooldown = routeCooldown(route);
     const blockers = [
@@ -441,10 +475,13 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             routeProfile,
             ...fallbackDecisionFields,
             canApplyLiveModel: false,
+            canApplyLiveRoute: false,
+            requiresProviderRebind: false,
             requiresNewSession: false,
             blockers,
             currentBoundary: current,
             targetBoundary: target,
+            targetRoute,
             cooldown,
             blockerClass: currentBlockerClass,
             nonActionReason: sameRouteFailure !== null ? 'same_route_failed_this_turn' : wait ? 'route_wait_for_reset' : 'route_blocked',
@@ -463,22 +500,25 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             schema: 'model-gateway-runtime-automation-decision',
             ok: true,
             status: 'ready',
-            action: 'prepare_new_session',
+            action: 'manual_intervention',
             selectedRouteKey: selectedKey,
             selectedRouteReasons: selectedReasons,
             selectedRouteConfidence: selectedConfidence,
             routeProfile,
             ...fallbackDecisionFields,
             canApplyLiveModel: false,
-            requiresNewSession: true,
-            blockers: [],
+            canApplyLiveRoute: false,
+            requiresProviderRebind: false,
+            requiresNewSession: false,
+            blockers: ['live_session_unavailable'],
             currentBoundary: current,
             targetBoundary: target,
+            targetRoute,
             cooldown,
-            blockerClass: 'none',
-            nonActionReason: null,
-            nextCommands: ['/session sdk next new', target.model ? `/byok model ${target.model}` : '/byok auto apply'],
-            operatorSummary: 'Sem sessao viva; a rota selecionada pode ser preparada para o proximo boot.',
+            blockerClass: 'route_blocked',
+            nonActionReason: 'live_session_unavailable',
+            nextCommands: ['/session sdk status'],
+            operatorSummary: 'Sem sessao viva; a automacao preserva o estado e nao cria outra sessao implicitamente.',
         };
     }
     if (modelAlreadyCurrent) {
@@ -493,10 +533,13 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             routeProfile,
             ...fallbackDecisionFields,
             canApplyLiveModel: false,
+            canApplyLiveRoute: false,
+            requiresProviderRebind: false,
             requiresNewSession: false,
             blockers: [],
             currentBoundary: current,
             targetBoundary: target,
+            targetRoute,
             cooldown,
             blockerClass: 'none',
             nonActionReason: 'already_aligned',
@@ -516,41 +559,70 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             routeProfile,
             ...fallbackDecisionFields,
             canApplyLiveModel: true,
+            canApplyLiveRoute: false,
+            requiresProviderRebind: false,
             requiresNewSession: false,
             blockers: [],
             currentBoundary: current,
             targetBoundary: target,
+            targetRoute,
             cooldown,
             blockerClass: 'none',
             nonActionReason: null,
             nextCommands: target.model ? [`/byok model ${target.model}`] : ['/byok auto apply'],
-            operatorSummary: 'Mesmo provider BYOK; o modelo pode ser aplicado na sessao viva.',
+            operatorSummary: 'O modelo pode ser aplicado na sessao viva.',
         };
     }
-    const requiresNewSession = !sameBoundary;
+    if (!sameBoundary && input.policy?.allowLiveSetModel === true) {
+        return {
+            schema: 'model-gateway-runtime-automation-decision',
+            ok: true,
+            status: 'ready',
+            action: 'apply_live_route',
+            selectedRouteKey: selectedKey,
+            selectedRouteReasons: selectedReasons,
+            selectedRouteConfidence: selectedConfidence,
+            routeProfile,
+            ...fallbackDecisionFields,
+            canApplyLiveModel: false,
+            canApplyLiveRoute: true,
+            requiresProviderRebind: true,
+            requiresNewSession: false,
+            blockers: [],
+            currentBoundary: current,
+            targetBoundary: target,
+            targetRoute,
+            cooldown,
+            blockerClass: 'none',
+            nonActionReason: null,
+            nextCommands: ['/byok auto status'],
+            operatorSummary:
+                'A rota cruza provider e requer rebind transacional na sessao viva; nova sessao nao e alternativa implicita.',
+        };
+    }
     return {
         schema: 'model-gateway-runtime-automation-decision',
-        ok: input.policy?.allowNewSession === true || !requiresNewSession,
-        status: input.policy?.allowNewSession === true || !requiresNewSession ? 'ready' : 'blocked',
-        action: requiresNewSession ? (input.policy?.allowNewSession === true ? 'prepare_new_session' : 'manual_intervention') : 'manual_intervention',
+        ok: false,
+        status: 'blocked',
+        action: 'manual_intervention',
         selectedRouteKey: selectedKey,
         selectedRouteReasons: selectedReasons,
         selectedRouteConfidence: selectedConfidence,
         routeProfile,
         ...fallbackDecisionFields,
         canApplyLiveModel: false,
-        requiresNewSession,
-        blockers: requiresNewSession && input.policy?.allowNewSession !== true ? ['new_session_requires_explicit_policy'] : [],
+        canApplyLiveRoute: false,
+        requiresProviderRebind: !sameBoundary,
+        requiresNewSession: false,
+        blockers: ['live_set_model_policy_disabled'],
         currentBoundary: current,
         targetBoundary: target,
+        targetRoute,
         cooldown,
-        blockerClass: requiresNewSession && input.policy?.allowNewSession !== true ? 'new_session_policy' : 'none',
-        nonActionReason: requiresNewSession ? 'new_session_policy_required' : 'live_set_model_policy_disabled',
-        nextCommands: requiresNewSession
-            ? ['/session sdk next new', target.model ? `/byok model ${target.model}` : '/byok auto apply']
-            : ['/byok auto status'],
-        operatorSummary: requiresNewSession
-            ? 'A rota selecionada cruza provider/perfil; e necessario preparar nova sessao SDK.'
-            : 'Mesmo provider BYOK, mas troca live esta desabilitada pela policy.',
+        blockerClass: 'route_blocked',
+        nonActionReason: 'live_set_model_policy_disabled',
+        nextCommands: ['/byok auto status'],
+        operatorSummary:
+            'Troca na sessao viva esta desabilitada pela policy; nova sessao nao e inferida como alternativa.',
     };
 }

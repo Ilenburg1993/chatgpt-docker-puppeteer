@@ -47,7 +47,9 @@ export {
     listAvailableModels,
     setModel,
     setReasoningEffort,
+    switchModelTransactional,
 } from '../../facades/agent-model-config.js';
+export { switchAgentRouteTransactional } from '../../facades/agent-route-config.js';
 export {
     getRuntimeHandoffManager,
     readRuntimeContextFactoryCapabilities,

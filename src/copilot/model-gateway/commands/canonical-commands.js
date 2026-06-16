@@ -795,11 +795,11 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         summary: 'Enable LLM/operator guarded automation that advises and records decisions without applying effects.',
     },
     {
-        id: 'terminal.auto-on-new-session',
+        id: 'terminal.auto-on-same-session-route',
         phase: 'automation',
         surface: 'terminal',
-        command: '/byok auto on profile:repo_agent preset:auto_prepare_new_session',
-        summary: 'Enable persistent automation that may prepare a new SDK boot when provider boundary changes.',
+        command: '/byok auto on profile:repo_agent preset:auto_same_session_route',
+        summary: 'Enable persistent route automation that preserves the current SDK session across provider changes.',
     },
     {
         id: 'terminal.gateway-auto',

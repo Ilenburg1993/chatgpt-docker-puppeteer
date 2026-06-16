@@ -121,7 +121,7 @@ export function readTerminalToolStatsProjection() {
  * @param {number} limit
  * @returns {{
  *     stats: { total: number; buffered: number };
- *     recent: { timestamp: number; errorType?: string; source?: string; message: string }[];
+ *     recent: { timestamp: number; errorType?: string; source?: string; message: string; stack?: string }[];
  * }}
  */
 export function readTerminalErrorsProjection(limit) {

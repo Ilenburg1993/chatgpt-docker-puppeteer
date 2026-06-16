@@ -20,6 +20,7 @@ import {
     setTerminalModelProjection,
     setTerminalReasoningProjection,
 } from '../frontend/index.js';
+import * as terminalFrontend from '../frontend/index.js';
 import { buildTerminalModelTransitionPresentation } from '../events/presenters/model/index.js';
 import { recordTerminalActivity } from '../state/index.js';
 import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
@@ -295,23 +296,50 @@ export async function cmdModel({ println }, arg) {
         return;
     }
 
+    const hasTransactionalProjection =
+        Object.prototype.hasOwnProperty.call(terminalFrontend, 'switchTerminalModelProjection') &&
+        typeof terminalFrontend.switchTerminalModelProjection === 'function';
+    const projected = hasTransactionalProjection
+        ? await terminalFrontend.switchTerminalModelProjection(trimmed, runtimeId, {
+              idempotencyKey: `terminal-model-command:${runtimeId ?? 'default'}:${trimmed}:${Date.now()}`,
+              source: 'terminal.model',
+          })
+        : callWithRuntimeTarget(setTerminalModelProjection, runtimeId, trimmed);
+    const projectedRecord = /** @type {Record<string, unknown>} */ (projected);
+    const operation =
+        projectedRecord['operation'] && typeof projectedRecord['operation'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (projectedRecord['operation'])
+            : null;
+    if (operation && operation['state'] !== 'committed') {
+        println('');
+        println(
+            terminalThemeRow(
+                'Modelo não alterado',
+                `estado ${String(operation['state'] ?? 'unknown')} · ${String(operation['error'] ?? 'troca não confirmada')}`,
+                { role: 'error' },
+            ),
+        );
+        println(terminalThemeRow('Próximo', 'Use /status e /sdk status antes de tentar novamente.', { role: 'command' }));
+        println('');
+        return;
+    }
     const {
         previousModel: previous,
         previousReasoningEffort,
         currentReasoningEffort,
         reasoningAdjusted,
         modelMeta,
-    } = callWithRuntimeTarget(setTerminalModelProjection, runtimeId, trimmed);
+    } = projected;
     const runtimeState = callWithRuntimeTarget(readTerminalRuntimeState, runtimeId);
     const observed = resolveObservedModelState(runtimeState);
     const requestPresentation = buildTerminalModelTransitionPresentation({
         from: previous,
         to: trimmed,
-        kind: 'requested',
+        kind: operation ? 'confirmed' : 'requested',
         source: 'terminal',
-        reason: 'aguardando confirmação SDK ou próximo uso observado',
+        reason: operation ? 'troca verificada e commitada pelo model-gateway' : 'aguardando confirmação SDK ou próximo uso observado',
     });
-    recordTerminalActivity('system', 'Modelo solicitado', {
+    recordTerminalActivity('system', operation ? 'Modelo confirmado' : 'Modelo solicitado', {
         detail: requestPresentation.detail,
         source: 'terminal.model',
         recordHistory: true,
@@ -319,7 +347,7 @@ export async function cmdModel({ println }, arg) {
     });
 
     println('');
-    println(terminalThemeHeadline('assistant', 'Modelo solicitado', [requestPresentation.transition]));
+    println(terminalThemeHeadline('assistant', operation ? 'Modelo confirmado' : 'Modelo solicitado', [requestPresentation.transition]));
     if (trimmed === 'auto') {
         println(
             terminalThemeRow('Modo automático', 'roteamento nativo do Copilot; gpt-5.4/high é preferência local observável, não parâmetro oficial forçado.'),

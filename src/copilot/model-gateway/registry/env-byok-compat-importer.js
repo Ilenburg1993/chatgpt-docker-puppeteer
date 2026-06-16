@@ -11,26 +11,53 @@
 import { readConfiguredByokModelsFromEnv, readConfiguredByokState } from '#copilot/sdk/session';
 import { buildProviderModelId, createModelRecord, createProviderRecord, normalizeGatewayIdPart } from '../contracts/records.js';
 import { createEnvSecretRegistry } from '../secrets/env-secret-registry.js';
+import { resolveModelGatewayProviderSecretRefs } from '../secrets/requirements.js';
+import {
+    createModelGatewayEnvProfileStore,
+    materializeModelGatewayActiveByokProfileEnv,
+} from '../profiles/env-profile-store.js';
 
 /**
  * @param {ReturnType<typeof readConfiguredByokState>} state
+ * @param {Record<string, string | undefined>} env
  * @returns {string}
  */
-function resolveProviderId(state) {
+function resolveProviderId(state, env) {
+    const gatewayProviderId = env['COPILOT_MODEL_GATEWAY_PROVIDER_ID'];
+    if (typeof gatewayProviderId === 'string' && gatewayProviderId.trim()) return gatewayProviderId.trim().toLowerCase();
+    const activeProfile = createModelGatewayEnvProfileStore({ env }).getActive();
+    if (typeof activeProfile?.providerId === 'string' && activeProfile.providerId.trim()) {
+        return activeProfile.providerId.trim().toLowerCase();
+    }
     return normalizeGatewayIdPart(state.summary.preset ?? state.summary.providerType ?? 'byok-configured') || 'byok-configured';
 }
 
 /**
+ * @param {Record<string, string | undefined>} env
+ * @returns {'gateway_route' | 'gateway_profile' | 'env_compat'}
+ */
+function bindingSource(env) {
+    if (env['COPILOT_MODEL_GATEWAY_BINDING_SOURCE'] === 'gateway_route') return 'gateway_route';
+    if (env['COPILOT_MODEL_GATEWAY_BINDING_SOURCE'] === 'gateway_profile') return 'gateway_profile';
+    if (typeof env['COPILOT_MODEL_GATEWAY_PROVIDER_ID'] === 'string' && env['COPILOT_MODEL_GATEWAY_PROVIDER_ID']?.trim()) {
+        return 'gateway_route';
+    }
+    if (createModelGatewayEnvProfileStore({ env }).getActive()) return 'gateway_profile';
+    return 'env_compat';
+}
+
+/**
  * @param {string[]} refs
+ * @param {string} providerId
+ * @param {boolean} headersConfigured
  * @returns {{ apiKeyRefs: string[]; bearerTokenRefs: string[]; headersConfigured: boolean }}
  */
-function classifySecretRefs(refs) {
-    const bearerTokenRefs = refs.filter((ref) => /BEARER|KILO/u.test(ref));
-    const apiKeyRefs = refs.filter((ref) => !bearerTokenRefs.includes(ref));
+function classifySecretRefs(refs, providerId, headersConfigured) {
+    const allowed = resolveModelGatewayProviderSecretRefs(providerId);
     return {
-        apiKeyRefs,
-        bearerTokenRefs,
-        headersConfigured: false,
+        apiKeyRefs: refs.filter((ref) => allowed.apiKeyRefs.includes(ref)),
+        bearerTokenRefs: refs.filter((ref) => allowed.bearerTokenRefs.includes(ref)),
+        headersConfigured,
     };
 }
 
@@ -128,21 +155,33 @@ function modelInfoToRecord(modelInfo, providerId, state) {
  * @returns {{ provider: object | null; models: object[]; active: object; warnings: string[]; errors: string[] }}
  */
 export function importConfiguredByokFromEnv(env = process.env) {
-    const state = readConfiguredByokState(env);
+    const materialized = materializeModelGatewayActiveByokProfileEnv(env);
+    const effectiveEnv = materialized.env;
+    const state = readConfiguredByokState(effectiveEnv);
+    const source = bindingSource(effectiveEnv);
     if (!state.enabled) {
         return {
             provider: null,
             models: [],
-            active: { enabled: false, ready: false, providerId: null, modelId: null, providerModel: null },
+            active: {
+                enabled: false,
+                ready: false,
+                providerId: null,
+                modelId: null,
+                providerModel: null,
+                bindingSource: source,
+            },
             warnings: [],
             errors: [],
         };
     }
 
-    const providerId = resolveProviderId(state);
-    const configuredSecretRefs = createEnvSecretRegistry({ env })
+    const providerId = resolveProviderId(state, effectiveEnv);
+    const allowedSecretRefs = resolveModelGatewayProviderSecretRefs(providerId);
+    const configuredSecretRefs = createEnvSecretRegistry({ env: effectiveEnv, keys: allowedSecretRefs.allowedRefs })
         .listConfigured()
         .map((entry) => entry.ref);
+    const headersConfigured = state.summary.auth.headersConfigured;
     const provider = createProviderRecord({
         id: providerId,
         displayName: state.summary.preset ?? state.summary.providerType ?? providerId,
@@ -152,26 +191,42 @@ export function importConfiguredByokFromEnv(env = process.env) {
         enabled: true,
         configured: state.ready,
         secretRefs: configuredSecretRefs,
-        auth: classifySecretRefs(configuredSecretRefs),
+        auth: classifySecretRefs(configuredSecretRefs, providerId, headersConfigured),
         headers: state.provider?.headers ?? {},
         provenance: {
-            source: 'env_compat',
+            source,
             profile: state.summary.profile,
+            gatewayProfile: effectiveEnv['COPILOT_MODEL_GATEWAY_PROVIDER_PROFILE'] ?? null,
             preset: state.summary.preset,
         },
     });
 
-    const modelInfos = readConfiguredByokModelsFromEnv(env, {
+    const modelInfos = readConfiguredByokModelsFromEnv(effectiveEnv, {
         model: state.model,
         contextWindowTokens: state.summary.capabilities.contextWindowTokens,
         supportsReasoning: state.summary.capabilities.reasoningEffort,
         supportsVision: state.summary.capabilities.vision,
         ...state.summary.limits,
     });
+    const activeProviderModel = state.model ?? state.summary.model ?? null;
+    if (activeProviderModel && !modelInfos.some((model) => model.id === activeProviderModel)) {
+        modelInfos.unshift(
+            /** @type {any} */ ({
+                id: activeProviderModel,
+                name: activeProviderModel,
+                byok: {
+                    source: 'env_compat_active_model',
+                    supportsReasoning: state.summary.capabilities.reasoningEffort,
+                    supportsVision: state.summary.capabilities.vision,
+                    contextWindowTokens: state.summary.capabilities.contextWindowTokens,
+                    rateLimits: state.summary.limits,
+                },
+            }),
+        );
+    }
     const models = modelInfos
         .map((model) => modelInfoToRecord(model, providerId, state))
         .filter((model) => model !== null);
-    const activeProviderModel = state.model ?? state.summary.model ?? null;
     return {
         provider,
         models,
@@ -182,7 +237,9 @@ export function importConfiguredByokFromEnv(env = process.env) {
             modelId: activeProviderModel ? buildProviderModelId(providerId, activeProviderModel) : null,
             providerModel: activeProviderModel,
             profile: state.summary.profile,
+            gatewayProfile: effectiveEnv['COPILOT_MODEL_GATEWAY_PROVIDER_PROFILE'] ?? null,
             preset: state.summary.preset,
+            bindingSource: source,
         },
         warnings: [...state.warnings],
         errors: [...state.errors],

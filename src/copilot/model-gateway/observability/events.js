@@ -21,6 +21,7 @@ import {
     MODEL_GATEWAY_ROUTE_DECISION,
 } from '#copilot/events';
 import { summarizeCanonicalModelProjectionDiff } from '../catalog/import-runs.js';
+import { createModelGatewayModelIdentity } from '../contracts/model-identity.js';
 
 let routeDecisionSequence = 0;
 
@@ -249,6 +250,8 @@ function buildRouteDecisionId(timestamp, taskProfile, modelId, input) {
  *     mode?: string;
  *     source?: string;
  *     sessionId?: string | null;
+ *     snapshotId?: string | null;
+ *     providerProfile?: string | null;
  *     route: {
  *         selected?: Record<string, any> | null;
  *         candidates?: unknown[];
@@ -295,6 +298,17 @@ export function buildRouteDecisionEvent(input) {
     const mode = optionalString(input.mode) ?? 'unknown';
     const source = optionalString(input.source) ?? 'model-gateway';
     const failure = optionalString(input.failure);
+    const identity =
+        selected.providerId && selected.modelId
+            ? createModelGatewayModelIdentity({
+                  providerId: selected.providerId,
+                  providerModel: selected.modelId,
+                  canonicalModelId: selected.gatewayModelId,
+                  routeProfile,
+                  ...(input.providerProfile !== undefined ? { providerProfile: input.providerProfile } : {}),
+                  ...(input.snapshotId !== undefined ? { snapshotId: input.snapshotId } : {}),
+              })
+            : null;
     const event = {
         type: MODEL_GATEWAY_ROUTE_DECISION,
         timestamp,
@@ -308,6 +322,9 @@ export function buildRouteDecisionEvent(input) {
         gatewayModelId: selected.gatewayModelId,
         providerId: selected.providerId,
         modelId: selected.modelId,
+        modelIdentityKey: identity?.identityKey ?? null,
+        providerProfile: identity?.providerProfile ?? null,
+        snapshotId: identity?.snapshotId ?? null,
         score: selected.score,
         scoreBreakdown: selected.scoreBreakdown,
         reasons: selected.reasons,
@@ -335,6 +352,9 @@ export function buildRouteDecisionEvent(input) {
  *     gatewayModelId: string | null;
  *     providerId: string | null;
  *     modelId: string | null;
+ *     modelIdentityKey?: string | null;
+ *     providerProfile?: string | null;
+ *     snapshotId?: string | null;
  *     score: number | null;
  *     candidateCount: number;
  *     rejectedCount: number;
@@ -348,6 +368,13 @@ export function buildRouteDecisionTraceAttributes(event) {
         'llm.provider': event.providerId ?? 'none',
         'llm.model': event.modelId ?? 'none',
         'llm.gateway.model_id': event.gatewayModelId ?? 'none',
+        ...(event.providerProfile || event.snapshotId
+            ? {
+                  'llm.gateway.model_identity_key': event.modelIdentityKey ?? 'none',
+                  'llm.gateway.provider_profile': event.providerProfile ?? 'none',
+                  'llm.gateway.snapshot_id': event.snapshotId ?? 'none',
+              }
+            : {}),
         'llm.route.decision_id': event.decisionId,
         'llm.route.task_profile': event.taskProfile,
         'llm.route.profile': event.routeProfile ?? 'none',

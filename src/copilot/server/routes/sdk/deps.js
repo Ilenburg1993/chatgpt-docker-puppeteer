@@ -98,7 +98,7 @@ import {
     readAgentStatusSnapshotForRuntime,
     readAgentStatusValue,
     readAgentStatusValueForRuntime,
-    setRuntimeModelProjection,
+    observeRuntimeModelChangeProjection,
     setRuntimeReasoningProjection,
 } from '../../../presentation/runtime/index.js';
 import {
@@ -229,7 +229,7 @@ const sdkRuntimeProjectionOps = Object.freeze({
     readAgentStatusSnapshotForRuntime,
     readAgentStatusValue,
     readAgentStatusValueForRuntime,
-    setRuntimeModelProjection,
+    observeRuntimeModelChangeProjection,
     setRuntimeReasoningProjection,
 });
 

@@ -48,6 +48,28 @@ export function renderTerminalSdkProviderBinding(binding) {
 }
 
 /**
+ * Alias compacto e estável para automação/LLM-B. A copy humana principal pode evoluir; esta linha preserva chaves
+ * parseáveis para live tests e diagnóstico sem depender dos rótulos visuais do cockpit.
+ *
+ * @param {TerminalByokSummary} summary
+ * @param {Record<string, unknown> | null | undefined} binding
+ * @param {string | null | undefined} currentSessionId
+ * @param {string | null | undefined} [currentRuntimeModel]
+ * @returns {string}
+ */
+export function renderTerminalByokBindingMachineAlias(summary, binding, currentSessionId, currentRuntimeModel = null) {
+    const state = classifyTerminalByokSdkBinding(summary, binding, currentSessionId, currentRuntimeModel);
+    const livePreset = readBindingText(binding?.['preset']) ?? readBindingText(binding?.['providerType']);
+    const liveModel = readBindingText(binding?.['model']);
+    const preparedPreset = summary.preset ?? summary.providerType;
+    return [
+        `vínculo BYOK: preset: ${valueOrDash(livePreset)} model: ${valueOrDash(liveModel)}`,
+        `preparado: preset: ${valueOrDash(preparedPreset)} model: ${valueOrDash(summary.model)}`,
+        `limite BYOK: ${state.state}`,
+    ].join(' · ');
+}
+
+/**
  * @param {TerminalByokSummary} summary
  * @param {Record<string, unknown> | null | undefined} binding
  * @returns {boolean}
@@ -68,7 +90,7 @@ export function isSameTerminalByokProviderBoundary(summary, binding) {
  * @param {string | null | undefined} currentSessionId
  * @param {string | null | undefined} [currentRuntimeModel]
  * @returns {{
- *     state: 'no-live-session' | 'selection-incomplete' | 'aligned-sdk' | 'aligned-byok' | 'live-model-confirmed' | 'live-model-drift' | 'next-boot-required';
+ *     state: 'no-live-session' | 'selection-incomplete' | 'aligned-sdk' | 'aligned-byok' | 'live-model-confirmed' | 'live-model-drift' | 'same-session-reattach-required';
  *     preparedLabel: string;
  *     liveLabel: string;
  *     headline: string;
@@ -84,7 +106,7 @@ export function classifyTerminalByokSdkBinding(summary, binding, currentSessionI
             state: 'no-live-session',
             preparedLabel,
             liveLabel,
-            headline: 'sem sessão SDK viva; a seleção preparada será usada quando a próxima sessão nascer',
+            headline: 'sem sessão SDK viva; a seleção preparada aguarda uma sessão iniciada explicitamente',
             action: null,
             sameProviderBoundary: false,
         };
@@ -95,7 +117,7 @@ export function classifyTerminalByokSdkBinding(summary, binding, currentSessionI
             preparedLabel,
             liveLabel,
             headline: 'seleção BYOK preparada está incompleta; a sessão atual continua no vínculo existente',
-            action: '/byok env e /byok profiles mostram o que falta antes de novo boot',
+            action: '/byok env e /byok profiles mostram o que falta antes do reattach da sessão atual',
             sameProviderBoundary: false,
         };
     }
@@ -118,8 +140,8 @@ export function classifyTerminalByokSdkBinding(summary, binding, currentSessionI
                     state: 'live-model-confirmed',
                     preparedLabel,
                     liveLabel,
-                    headline: 'modelo preparado confirmado no runtime vivo; vínculo de boot original permanece até nova sessão',
-                    action: '/session sdk next new atualiza o vínculo de boot quando você quiser materializar a seleção preparada',
+                    headline: 'modelo preparado confirmado no runtime vivo e preservado na sessão atual',
+                    action: null,
                     sameProviderBoundary,
                 };
             }
@@ -142,11 +164,11 @@ export function classifyTerminalByokSdkBinding(summary, binding, currentSessionI
         };
     }
     return {
-        state: 'next-boot-required',
+        state: 'same-session-reattach-required',
         preparedLabel,
         liveLabel,
-        headline: 'seleção preparada cruza provedor ou perfil da sessão atual',
-        action: '/session sdk next new e reinício da task aplicam o novo vínculo; /restart só reinicia a conversa',
+        headline: 'seleção preparada cruza provedor ou perfil e requer reattach preservando a sessão atual',
+        action: 'reinicie/reatache a sessão atual para aplicar o novo vínculo; nova sessão só ocorre por solicitação explícita',
         sameProviderBoundary,
     };
 }

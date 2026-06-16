@@ -3,20 +3,22 @@
 `src/copilot/model-gateway` is the canonical domain for BYOK providers, provider-local models, capability metadata,
 probes, routing decisions, health and cost policy.
 
-The current canonical operational and code reference is
+The current canonical audit, target architecture and continuously updated implementation roadmap is
+[`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_LLM_B_CONTROL_PLANE_AUDIT_AND_ROADMAP_2026-06-15.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_LLM_B_CONTROL_PLANE_AUDIT_AND_ROADMAP_2026-06-15.md).
+Read and update it in the same increment before changing catalog authority, provider bindings, runtime switching,
+LLM-B tools, automation or readiness.
+
+The previous operational and code reference remains available as historical context at
 [`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AND_CODE_REFERENCE_2026-06-02.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATIONAL_AND_CODE_REFERENCE_2026-06-02.md).
-Read it first before changing code, operating auto mode or running live tests.
 
-The active terminal auto runtime roadmap is
+The previous terminal auto runtime roadmap remains available as historical context at
 [`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_TERMINAL_AUTO_RUNTIME_ROADMAP_2026-06-01.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_TERMINAL_AUTO_RUNTIME_ROADMAP_2026-06-01.md).
-Use it as the source of truth before changing importers, catalog storage, account access, eligibility, probes, runtime
-selection, terminal automation or live tests.
 
-The active operator/runtime playbook is
+The specialized operator/runtime playbook is
 [`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_RUNTIME_PLAYBOOK_2026-06-01.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_RUNTIME_PLAYBOOK_2026-06-01.md).
 Use it before operating auto mode, running terminal live tests or authorizing real BYOK provider calls.
 
-The active operator/code guide is
+The specialized operator/code guide is
 [`../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md`](../docs/model-gateway/CANONICAL_MODEL_GATEWAY_OPERATOR_AND_CODE_GUIDE_2026-06-01.md).
 Use it to understand the code layers, SQLite operational ledgers, command surfaces, configuration and test ladder.
 
@@ -70,6 +72,30 @@ The automation layer is split deliberately:
 - `terminal/byok/gateway-auto.js` adapts the pure decision to the live terminal inventory.
 - `/byok auto status` inspects, `/byok auto record` persists the decision, `/byok auto apply` applies only authorized
   terminal effects, and `/byok auto off` explains how to disable persistent policy.
+
+Provider and route changes preserve the current SDK `sessionId`. The runtime may rebuild its transport and resume the
+same session with a different provider binding, but it must never create a replacement session as an inferred fallback.
+`model_gateway_route_plan` returns the structured target and `model_gateway_route_switch` applies it transactionally
+with confirmation, idempotency, verification, rollback and durable operation records.
+
+Gateway-selected routes are projected to session boot as explicit provider bindings. The route carries an authoritative
+provider id while provider type, endpoint, wire API and an ephemeral generic credential projection are resolved before
+the SDK compatibility parser runs. This keeps migrated routes independent from provider-specific preset defaults.
+Operator-authored BYOK profiles are materialized by the gateway profile store into the same explicit env projection
+before the SDK boundary; the profile marker is removed from that ephemeral env so the SDK does not reinterpret the JSON
+profile. The terminal BYOK cockpit lists profiles and activates the current process through that same gateway store,
+preserving redaction and keeping the SDK profile parser out of operator-facing profile inventory. Legacy env-only BYOK
+remains an explicit compatibility path. Cost/free-tier hints and profile readiness displayed by the cockpit now come
+from the gateway profile store instead of the raw SDK profile JSON. New profile writes through the gateway store/tool
+reject inline secrets and reject `apiKeyEnv`/`bearerTokenEnv` references that are not in the selected provider's
+allowlist; already-authored legacy profiles remain readable for compatibility.
+
+The LLM-B Model Gateway surface currently contains 14 structured tools covering overview, catalog search, route planning,
+model evaluation, policy proposal, probe planning/execution, model and route switching, catalog refresh, reconciliation,
+operation status, maintenance and BYOK profile management. The overview also projects the selected runtime's public capability map, including
+transactional model switching and same-session provider route reattach, so planning does not infer live support from
+catalog metadata alone. It accepts an optional runtime id, includes the effective model/statistics for that runtime and
+lists redacted operator BYOK profiles through the gateway-owned profile store.
 
 The operational CLI cockpit is:
 

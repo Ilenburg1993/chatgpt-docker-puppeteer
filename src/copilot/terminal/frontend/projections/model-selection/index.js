@@ -1,3 +1,7 @@
 // @ts-check
 
-export { setTerminalModelProjection } from '../config.js';
+export {
+    setTerminalModelProjection,
+    switchTerminalModelProjection,
+    switchTerminalRouteProjection,
+} from '../config.js';

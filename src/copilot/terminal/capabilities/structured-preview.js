@@ -10,9 +10,14 @@
 
 import { spawnSync } from 'node:child_process';
 
-import yaml from 'js-yaml';
+import yamlModule from 'js-yaml';
 
 import { readTerminalExternalToolCapabilities, sanitizeTerminalExternalToolText } from './external-tools.js';
+
+const yaml = /** @type {{
+ *     load: (content: string) => unknown;
+ *     dump: (value: unknown, options?: { lineWidth?: number; noRefs?: boolean; sortKeys?: boolean }) => string;
+ * }} */ (/** @type {unknown} */ (yamlModule));
 
 /**
  * @typedef {'json' | 'yaml'} TerminalStructuredPreviewFormat

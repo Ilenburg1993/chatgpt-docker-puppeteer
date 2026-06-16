@@ -36,6 +36,7 @@ import {
 import { callWithRuntimeTarget, extractRuntimeTarget, renderRuntimeTargetLabel, withRuntimeTarget } from './runtime-target.js';
 import {
     classifyTerminalByokSdkBinding,
+    renderTerminalByokBindingMachineAlias,
     renderTerminalSdkProviderBinding,
 } from '../byok/binding/index.js';
 import {
@@ -2641,8 +2642,21 @@ export async function cmdSessionSdk({ println }, arg = '') {
         callWithRuntimeTarget(readTerminalConfigProjection, runtimeId).currentModel,
     );
     println(terminalThemeRow('Vínculo SDK', renderTerminalSdkProviderBinding(inventory.persistedByokBinding)));
+    println(terminalThemeRow('Vínculo BYOK', renderTerminalSdkProviderBinding(inventory.persistedByokBinding)));
     println(terminalThemeRow('Preparado', byokBinding.preparedLabel));
     println(terminalThemeRow('Limite BYOK', byokBinding.headline));
+    println(
+        terminalThemeRow(
+            'Alias BYOK',
+            renderTerminalByokBindingMachineAlias(
+                readTerminalByokProjection().summary,
+                inventory.persistedByokBinding,
+                inventory.currentSessionId,
+                callWithRuntimeTarget(readTerminalConfigProjection, runtimeId).currentModel,
+            ),
+            { role: 'muted' },
+        ),
+    );
     if (byokBinding.action) {
         println(terminalThemeRow('Ação BYOK', byokBinding.action));
     }

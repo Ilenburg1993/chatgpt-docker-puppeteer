@@ -9,6 +9,36 @@
  */
 
 export {
+    MODEL_GATEWAY_CONTROL_PLANE_RESULT_SCHEMA_VERSION,
+    MODEL_GATEWAY_EXECUTABLE_PROBE_KINDS,
+    MODEL_GATEWAY_MODEL_SWITCH_DEFAULT_TIMEOUT_MS,
+    MODEL_GATEWAY_MODEL_SWITCH_STATES,
+    MODEL_GATEWAY_READ_LATENCY_BUDGET_MS,
+    MODEL_GATEWAY_SAME_SESSION_ROUTE_SWITCH_DEFAULT_TIMEOUT_MS,
+    ModelGatewayCatalogControlPlane,
+    ModelGatewayReadControlPlane,
+    assertModelGatewayCatalogReadPort,
+    assertModelGatewayCatalogWritePort,
+    assertModelGatewayOperationStorePort,
+    assertModelGatewaySecretRegistryPort,
+    assertModelGatewaySessionRoutePort,
+    createModelGatewayCatalogControlPlane,
+    createModelGatewayControlPlaneResult,
+    createModelGatewayModelSwitchOperationId,
+    createModelGatewayProbeOperationId,
+    createModelGatewayReadControlPlane,
+    createModelGatewaySameSessionRouteSwitchOperationId,
+    createSqliteModelGatewayModelSwitchRecorder,
+    createSqliteSameSessionRouteSwitchRecorder,
+    executeModelGatewayModelSwitch,
+    executeModelGatewayProbe,
+    executeModelGatewayRuntimeModelSwitch,
+    executeModelGatewayRuntimeRouteSwitch,
+    executeModelGatewaySameSessionRouteSwitch,
+    readModelGatewayProbeOperation,
+} from './control-plane/index.js';
+
+export {
     DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
     MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV,
     MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESET_IDS,
@@ -231,15 +261,20 @@ export {
     renderModelGatewayCanonicalCommandLines,
 } from './commands/index.js';
 export {
+    MODEL_GATEWAY_MODEL_IDENTITY_SCHEMA_VERSION,
+    MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS,
     MODEL_GATEWAY_SCHEMA_VERSION,
     MODEL_GATEWAY_VERIFICATION_CONFIDENCE,
     buildProviderModelId,
+    createModelGatewayModelIdentity,
+    evaluateModelGatewayModelLifecycle,
     createModelRecord,
     createProviderRecord,
     normalizeCapabilityProfile,
     normalizeGatewayIdPart,
     normalizeModalities,
     normalizeVerification,
+    modelGatewayModelIdentityKey,
     optionalPositiveInteger,
     optionalString,
 } from './contracts/index.js';
@@ -256,13 +291,16 @@ export {
 export {
     DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS,
     EnvSecretRegistry,
+    MODEL_GATEWAY_GENERIC_BYOK_SECRET_REFS,
     MODEL_GATEWAY_SECRET_SCOPE_PRECEDENCE,
     MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS,
     auditModelGatewayValueRedaction,
     buildScopedSecretEnvKey,
     collectModelGatewaySecretAuditEnvValues,
     createEnvSecretRegistry,
+    diagnoseModelGatewayProviderSecretRefs,
     evaluateModelGatewayProviderEnvRequirements,
+    resolveModelGatewayProviderSecretRefs,
     redactModelGatewayAuditedValue,
     redactSecretRecord,
     redactSecretText,
@@ -337,6 +375,16 @@ export {
     resolveModelGatewayProviderAdapter,
 } from './providers/index.js';
 export {
+    activateModelGatewayByokProfileEnv,
+    createModelGatewayEnvProfileStore,
+    materializeModelGatewayActiveByokProfileEnv,
+    ModelGatewayEnvProfileStore,
+    readModelGatewayByokProfileCostHint,
+    readModelGatewayByokProfileSummaries,
+    removeModelGatewayByokProfileEnv,
+    upsertModelGatewayByokProfileEnv,
+} from './profiles/index.js';
+export {
     applyModelGatewaySelectionTraceRetention,
     buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorProbeRun,
@@ -391,6 +439,8 @@ export {
 } from './routing/index.js';
 export {
     buildModelGatewayOnListModelsHandler,
+    evaluateLiveRouteSwitchCapability,
+    resolveModelGatewaySessionBinding,
     toCopilotModelInfo,
     toCopilotModelInfoList,
     toCopilotRouteModelInfoList,
@@ -429,6 +479,10 @@ export {
     BYOK_VISION_PROBE_MIME_TYPE,
     MODEL_GATEWAY_IMPLEMENTED_PROBE_KINDS,
     MODEL_GATEWAY_PLANNED_PROBE_KINDS,
+    MODEL_GATEWAY_PROBE_LOW_REQUEST_TOKEN_LIMIT,
+    MODEL_GATEWAY_PROBE_REQUEST_FLOOR_TOKENS,
+    MODEL_GATEWAY_PROBE_RESPONSE_RESERVE_TOKENS,
+    evaluateModelGatewayProbeAdmission,
     estimateProbeCostUsd,
     listProviderWireProbeMatrix,
     planCostBoundedCatalogProbes,

@@ -31,9 +31,11 @@ import {
 import {
     listTerminalSdkSessionInventory,
     readTerminalConfiguredSessionFsState,
-    scheduleTerminalSdkSessionBootSelection,
 } from '../frontend/gateways/session/index.js';
-import { requestTerminalLiveByokModelSwitch } from './live-model-switch.js';
+import {
+    requestTerminalLiveByokModelSwitch,
+    requestTerminalLiveByokRouteSwitch,
+} from './live-model-switch.js';
 
 /**
  * @param {unknown} value
@@ -378,7 +380,7 @@ export async function applyTerminalByokGatewayAutoEffects(controllerStep) {
             continue;
         }
         if (effect['kind'] === 'set_live_model' && typeof effect['model'] === 'string' && effect['model'].trim()) {
-            const request = requestTerminalLiveByokModelSwitch(effect['model'], {
+            const request = await requestTerminalLiveByokModelSwitch(effect['model'], {
                 source: 'terminal.byok_auto',
                 reason: optionalScalarString(effect['reason']) ?? 'automação model-gateway',
                 confidence: optionalScalarString(effect['confidence']),
@@ -392,17 +394,29 @@ export async function applyTerminalByokGatewayAutoEffects(controllerStep) {
             });
             continue;
         }
-        if (effect['kind'] === 'prepare_new_sdk_session') {
-            const schedule = await scheduleTerminalSdkSessionBootSelection({ mode: 'new' });
-            if (schedule?.ok === true) {
-                applied.push({ ...effect, applied: true, sdkBootSelection: 'new' });
+        if (effect['kind'] === 'switch_live_route') {
+            const route =
+                effect['route'] && typeof effect['route'] === 'object'
+                    ? /** @type {Record<string, unknown>} */ (effect['route'])
+                    : null;
+            if (!route) {
+                skipped.push({ ...effect, skippedReason: 'live_route_target_missing' });
                 continue;
             }
-            skipped.push({
-                ...effect,
-                skippedReason: 'sdk_boot_selection_failed',
-                error: schedule?.error instanceof Error ? schedule.error.message : 'unknown_error',
+            const request = await requestTerminalLiveByokRouteSwitch(route, {
+                source: 'terminal.byok_auto',
+                reason: optionalScalarString(effect['reason']) ?? 'automação model-gateway',
             });
+            applied.push({
+                ...effect,
+                applied: true,
+                operationId: optionalScalarString(request.operation['operationId']),
+                sameSession: request.operation['requiresNewSession'] === false,
+            });
+            continue;
+        }
+        if (effect['kind'] === 'prepare_new_sdk_session') {
+            skipped.push({ ...effect, skippedReason: 'implicit_new_session_forbidden' });
             continue;
         }
         skipped.push({ ...effect, skippedReason: 'no_terminal_executor' });

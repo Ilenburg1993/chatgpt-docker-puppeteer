@@ -17,6 +17,8 @@ import {
     readSdkModelStats,
     setRuntimeModel,
     setRuntimeReasoningEffort,
+    switchRuntimeModelTransactional,
+    switchRuntimeRouteTransactional,
 } from '#copilot/agent/facades';
 import { requireAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 
@@ -100,6 +102,63 @@ export function setRuntimeModelProjection(modelId, runtimeId) {
         reasoningAdjusted,
         modelMeta,
         runtimeId: selection.runtimeId,
+    };
+}
+
+/**
+ * @param {string} modelId
+ * @param {string | null | undefined} [runtimeId]
+ * @param {{ idempotencyKey?: string; source?: string }} [options]
+ */
+export async function switchRuntimeModelProjection(modelId, runtimeId, options = {}) {
+    const selection = requireAgentRuntimeSelection(runtimeId);
+    const agent = selection.runtime;
+    const before = readRuntimeModelSelection(agent);
+    const modelMeta = readRuntimeModelMetadata(modelId);
+    const operation = await switchRuntimeModelTransactional(agent, modelId, options);
+    const committed = operation['state'] === 'committed';
+    let reasoningAdjusted = false;
+    if (committed && modelMeta?.supportsReasoning === false && before.reasoningEffort !== undefined) {
+        setRuntimeReasoningEffort(agent, undefined);
+        reasoningAdjusted = true;
+    }
+    const after = readRuntimeModelSelection(agent);
+    return {
+        previousModel: before.model,
+        previousReasoningEffort: String(before.reasoningEffort ?? 'off'),
+        currentModel: after.model,
+        currentReasoningEffort: String(after.reasoningEffort ?? 'off'),
+        reasoningAdjusted,
+        modelMeta,
+        runtimeId: selection.runtimeId,
+        operation,
+    };
+}
+
+/**
+ * Rebinda provider/model preservando o sessionId do runtime selecionado.
+ *
+ * @param {Record<string, unknown>} route
+ * @param {string | null | undefined} [runtimeId]
+ * @param {{
+ *     idempotencyKey?: string;
+ *     timeoutMs?: number;
+ *     source?: string;
+ *     allowActiveDialogLoopReattach?: boolean;
+ *     forceApplyDeferred?: boolean;
+ * }} [options]
+ */
+export async function switchRuntimeRouteProjection(route, runtimeId, options = {}) {
+    const selection = requireAgentRuntimeSelection(runtimeId);
+    const before = readRuntimeModelSelection(selection.runtime);
+    const operation = await switchRuntimeRouteTransactional(selection.runtime, route, options);
+    const after = readRuntimeModelSelection(selection.runtime);
+    return {
+        runtimeId: selection.runtimeId,
+        previousModel: before.model,
+        currentModel: after.model,
+        route,
+        operation,
     };
 }
 

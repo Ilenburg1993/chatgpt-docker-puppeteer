@@ -282,6 +282,31 @@ describe('reconnect-policy › dialog loop ativo durante reconexão', () => {
         assert.strictEqual(dialogStopped[1].authorized, false);
     });
 
+    it('preserva dialog loop ativo quando o chamador pede reattach interno sem restart', async () => {
+        let notified = false;
+        const cbs = makeCallbacks({
+            dialogLoop: {
+                active: true,
+                notifyReconnect: () => {
+                    notified = true;
+                },
+            },
+        });
+        const result = await tryReconnect(new Error('err'), {}, 'idle', cbs, {
+            ...FAST_OPTS,
+            preserveDialogLoopOnReconnect: true,
+        });
+
+        assert.strictEqual(result, true);
+        assert.strictEqual(notified, false, 'notifyReconnect não deve desativar o loop em reattach interno');
+        assert.strictEqual(
+            firstEvent(cbs._emitted, 'dialog.stopped'),
+            undefined,
+            'dialog.stopped não deve ser emitido em reattach interno de rota',
+        );
+        assert.ok(firstEvent(cbs._emitted, 'ready'), 'ready continua sendo emitido após reattach interno');
+    });
+
     it('não deve chamar notifyReconnect se dialog loop estava inativo', async () => {
         let notified = false;
         const cbs = makeCallbacks({

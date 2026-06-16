@@ -64,6 +64,27 @@ export {
 } from './hook/index.js';
 export { hubTools, resetHubForTests } from './hub/index.js';
 export {
+    modelGatewayCatalogRefreshTool,
+    modelGatewayCatalogSearchTool,
+    modelGatewayControlPlaneGuideTool,
+    modelGatewayModelEvaluateTool,
+    modelGatewayMaintenanceTool,
+    modelGatewayOperationStatusTool,
+    modelGatewayOverviewTool,
+    modelGatewayPolicyProposeTool,
+    modelGatewayProbeExecuteTool,
+    modelGatewayProbePlanTool,
+    modelGatewayReadTools,
+    modelGatewayRoutePlanTool,
+    modelGatewayRouteSwitchTool,
+    modelGatewayRuntimeReconcileTool,
+    modelGatewayModelSwitchTool,
+    modelGatewayTools,
+    modelGatewayWorkflowPlanTool,
+    modelGatewayWriteTools,
+    setModelGatewayRuntimeControl,
+} from './model-gateway/index.js';
+export {
     createEmptyToolContractReport,
     getDisabledToolRecords,
     getDisabledTools,

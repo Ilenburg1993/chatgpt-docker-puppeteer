@@ -124,6 +124,24 @@ function redactErrorEntry(entry) {
     return /** @type {ErrorEntry} */ (redactSecretRecord(/** @type {Record<string, unknown>} */ (entry)));
 }
 
+/**
+ * @returns {boolean}
+ */
+function shouldLogGlobalErrorStack() {
+    return /^(1|true|yes|on)$/iu.test(String(process.env['COPILOT_ERROR_TRACKER_LOG_STACK'] ?? ''));
+}
+
+/**
+ * @param {ErrorEntry} entry
+ * @param {'FATAL' | 'ERROR'} level
+ * @returns {void}
+ */
+function logStackWhenEnabled(entry, level) {
+    if (!shouldLogGlobalErrorStack() || !entry.stack) return;
+    const firstLines = entry.stack.split('\n').slice(0, 20).join('\n');
+    log(level, `[error-tracker] stack ${entry.source ?? 'unknown'}:\n${firstLines}`, undefined);
+}
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
 /**
@@ -226,11 +244,13 @@ export function createErrorTracker(opts = {}) {
         _uncaughtHandler = (err) => {
             const entry = trackError(err, { source: 'uncaughtException' });
             log('FATAL', `[error-tracker] uncaughtException: ${entry.message}`, undefined);
+            logStackWhenEnabled(entry, 'FATAL');
         };
 
         _rejectionHandler = (reason) => {
             const entry = trackError(reason, { source: 'unhandledRejection' });
             log('ERROR', `[error-tracker] unhandledRejection: ${entry.message}`, undefined);
+            logStackWhenEnabled(entry, 'ERROR');
         };
 
         process.on('uncaughtException', _uncaughtHandler);

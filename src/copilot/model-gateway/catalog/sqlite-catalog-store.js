@@ -40,6 +40,8 @@ let _sdkSessionHandoffSequence = 0;
 let _sdkSessionConfirmationSequence = 0;
 let _standbyPlanSequence = 0;
 let _liveScenarioRunSequence = 0;
+/** @type {WeakSet<import('better-sqlite3').Database>} */
+const initializedSqliteCatalogDatabases = new WeakSet();
 
 export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze({
     accountHistoryMaxRowsPerTable: 10_000,
@@ -818,11 +820,13 @@ export class SqliteModelGatewayCatalogStore {
      */
     constructor(options = {}) {
         this.#db = options.db ?? (options.dbPath ? new Database(options.dbPath) : getCopilotDb());
+        if (initializedSqliteCatalogDatabases.has(this.#db)) return;
         this.#db.pragma('foreign_keys = ON');
         ensureCompatibleSqliteSchemaVersion(this.#db);
         this.#db.exec(MODEL_GATEWAY_SQLITE_SCHEMA_SQL);
         migrateModelGatewaySqliteSchema(this.#db);
         this.#db.pragma(`user_version = ${MODEL_GATEWAY_SQLITE_SCHEMA_VERSION}`);
+        initializedSqliteCatalogDatabases.add(this.#db);
     }
 
     /**
@@ -855,6 +859,48 @@ export class SqliteModelGatewayCatalogStore {
             rawPayloadRefs: readPayloadRows(this.#db, 'copilot_model_gateway_raw_payload_refs', 'raw_payload_ref'),
             conflicts: readPayloadRows(this.#db, 'copilot_model_gateway_conflicts', 'conflict_key'),
             modelEligibilityRuns: readPayloadRows(this.#db, 'copilot_model_gateway_eligibility_runs', 'run_id'),
+            modelEligibilityDecisions: readPayloadRows(
+                this.#db,
+                'copilot_model_gateway_eligibility_decisions',
+                'decision_key',
+            ),
+        });
+    }
+
+    /**
+     * Reads only the relational layers required by routine search, routing, evaluation and probe planning.
+     *
+     * @param {{ includeImportRuns?: boolean }} [options]
+     * @returns {Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>}
+     */
+    async readRoutingSnapshot(options = {}) {
+        const meta = /** @type {{ payload_json: string } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT payload_json
+                        FROM copilot_model_gateway_snapshots
+                        WHERE snapshot_id = ?
+                        LIMIT 1
+                    `,
+                )
+                .get(ACTIVE_SNAPSHOT_ID)
+        );
+        const base = meta ? parsePayload(meta.payload_json) : {};
+        return normalizeStoredCatalogSnapshot({
+            ...base,
+            sources: readPayloadRows(this.#db, 'copilot_model_gateway_catalog_sources', 'source_id'),
+            routeOptions: readPayloadRows(this.#db, 'copilot_model_gateway_route_options', 'route_key'),
+            accountOverlays: readPayloadRows(this.#db, 'copilot_model_gateway_account_overlays', 'account_overlay_id'),
+            providerProjections: readPayloadRows(
+                this.#db,
+                'copilot_model_gateway_provider_projections',
+                'projection_key',
+            ),
+            projections: readPayloadRows(this.#db, 'copilot_model_gateway_model_projections', 'projection_key'),
+            importRuns: options.includeImportRuns
+                ? readPayloadRows(this.#db, 'copilot_model_gateway_import_runs', 'run_id')
+                : [],
             modelEligibilityDecisions: readPayloadRows(
                 this.#db,
                 'copilot_model_gateway_eligibility_decisions',
@@ -1997,6 +2043,52 @@ export class SqliteModelGatewayCatalogStore {
     }
 
     /**
+     * @param {string} runId
+     * @returns {Promise<Record<string, unknown> | null>}
+     */
+    async readRuntimeProbeRunRecord(runId) {
+        const row = /** @type {Record<string, any> | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT run_id, probe_profile, account_scope, status, started_at_ms, completed_at_ms,
+                               model_count, success_count, failure_count, skipped_count, payload_json
+                        FROM copilot_model_gateway_runtime_probe_runs
+                        WHERE run_id = ?
+                        LIMIT 1
+                    `,
+                )
+                .get(runId)
+        );
+        if (!row) return null;
+        const results = this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_runtime_probe_results
+                    WHERE run_id = ?
+                    ORDER BY observed_at_ms ASC, result_key ASC
+                `,
+            )
+            .all(runId)
+            .map((result) => parsePayload(/** @type {{ payload_json: string }} */ (result).payload_json));
+        return {
+            runId: optionalString(row['run_id']),
+            probeProfile: optionalString(row['probe_profile']),
+            accountScope: optionalString(row['account_scope']),
+            status: optionalString(row['status']),
+            startedAtMs: optionalInteger(row['started_at_ms']),
+            completedAtMs: optionalInteger(row['completed_at_ms']),
+            modelCount: optionalInteger(row['model_count']) ?? 0,
+            successCount: optionalInteger(row['success_count']) ?? 0,
+            failureCount: optionalInteger(row['failure_count']) ?? 0,
+            skippedCount: optionalInteger(row['skipped_count']) ?? 0,
+            payload: parsePayload(String(row['payload_json'] ?? '{}')),
+            results,
+        };
+    }
+
+    /**
      * @param {{ providerId?: string | null; providerModel?: string | null; routeProfile?: string | null }} input
      * @returns {Promise<{ health: Record<string, unknown> | null; probes: Record<string, unknown>[] }>}
      */
@@ -2519,6 +2611,26 @@ export class SqliteModelGatewayCatalogStore {
             )
             .all(limit)
             .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * @param {string} handoffId
+     * @returns {Promise<Record<string, unknown> | null>}
+     */
+    async readSdkSessionHandoffRecord(handoffId) {
+        const row = /** @type {{ payload_json: string } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT payload_json
+                        FROM copilot_model_gateway_sdk_session_handoffs
+                        WHERE handoff_id = ?
+                        LIMIT 1
+                    `,
+                )
+                .get(handoffId)
+        );
+        return row ? parsePayload(row.payload_json) : null;
     }
 
     /**

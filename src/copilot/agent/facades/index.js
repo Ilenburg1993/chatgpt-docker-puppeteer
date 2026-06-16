@@ -35,7 +35,13 @@ export {
     setReasoningEffort,
     setRuntimeModel,
     setRuntimeReasoningEffort,
+    switchModelTransactional,
+    switchRuntimeModelTransactional,
 } from './agent-model-config.js';
+export {
+    switchAgentRouteTransactional,
+    switchRuntimeRouteTransactional,
+} from './agent-route-config.js';
 export { readAgentRuntimeCapabilities } from './agent-runtime-capabilities.js';
 export {
     abortRuntimeCurrentMessage,

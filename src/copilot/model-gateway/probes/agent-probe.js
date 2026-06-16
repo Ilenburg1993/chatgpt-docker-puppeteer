@@ -18,6 +18,7 @@ import {
     withEphemeralSession,
 } from '#copilot/sdk/session';
 import { createTool } from '#copilot/sdk/tools';
+import { evaluateModelGatewayProbeAdmission } from './admission.js';
 
 export const BYOK_AGENT_PROBE_TOOL = 'terminal_byok_probe_marker';
 export const BYOK_AGENT_PROBE_READ_TOOL = 'read_file_content';
@@ -65,10 +66,7 @@ function defaultFailureClassifier(value) {
  * @returns {{ shouldBlock: boolean; label: string }}
  */
 function defaultAdmission(summary, mode, prompt) {
-    void summary;
-    void mode;
-    void prompt;
-    return { shouldBlock: false, label: '' };
+    return evaluateModelGatewayProbeAdmission(summary, mode, prompt);
 }
 
 /**

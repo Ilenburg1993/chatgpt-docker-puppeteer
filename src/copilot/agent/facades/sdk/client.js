@@ -167,6 +167,24 @@ export function onAgentSdkLifecycleEvents(handlers, client) {
 }
 
 /**
+ * Alguns handles do SDK 1.0 são getters vivos: `client.rpc`, por exemplo, lança enquanto o client está entre
+ * stop/start durante reattach. Snapshots de health devem degradar, não derrubar o processo.
+ *
+ * @template T
+ * @param {unknown} target
+ * @param {string} key
+ * @returns {T | null}
+ */
+function readSdkHandleValue(target, key) {
+    if (!target || typeof target !== 'object') return null;
+    try {
+        return /** @type {T | null} */ (Reflect.get(target, key) ?? null);
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Retorna os handles crus do SDK atualmente vinculados ao agent.
  *
  * @param {unknown} ctx
@@ -178,9 +196,9 @@ export function getSdkHandles(ctx) {
     return {
         client,
         session,
-        serverRpc: client?.rpc ?? null,
-        sessionRpc: session?.rpc ?? null,
-        workspacePath: session?.workspacePath ?? null,
+        serverRpc: readSdkHandleValue(client, 'rpc'),
+        sessionRpc: readSdkHandleValue(session, 'rpc'),
+        workspacePath: readSdkHandleValue(session, 'workspacePath'),
     };
 }
 

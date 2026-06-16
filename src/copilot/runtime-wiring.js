@@ -14,7 +14,13 @@ import { BRIDGE_AGENT, FALLBACK_AGENT, NERV_BRIDGE_AGENT, PERMISSION_AGENT } fro
 import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
 import { configureDefaultUserInputContext } from '#copilot/sdk';
-import { setHub, setPermissionAgent } from '#copilot/tools';
+import { setHub, setModelGatewayRuntimeControl, setPermissionAgent } from '#copilot/tools';
+import { readRuntimeCapabilitiesProjection } from './presentation/runtime/capabilities.js';
+import {
+    readRuntimeModelStatsProjection,
+    switchRuntimeModelProjection,
+    switchRuntimeRouteProjection,
+} from './presentation/runtime/models.js';
 import { setBridgeAgent } from './channel/client.js';
 import { conversationHub } from './conversation-hub/hub.js';
 import { setFallbackAgent } from './conversation-hub/orchestrator.js';
@@ -54,6 +60,12 @@ export function wireCopilotRuntimeDI({ broadcastSse }) {
     container.register(NERV_BRIDGE_AGENT, () => alwaysAliveAgent, 'singleton');
 
     setHub(conversationHub);
+    setModelGatewayRuntimeControl({
+        readCapabilities: readRuntimeCapabilitiesProjection,
+        readStats: readRuntimeModelStatsProjection,
+        switchModel: switchRuntimeModelProjection,
+        switchRoute: switchRuntimeRouteProjection,
+    });
     setPermissionAgent(alwaysAliveAgent);
     setFallbackAgent(alwaysAliveAgent);
     setBridgeAgent(alwaysAliveAgent);

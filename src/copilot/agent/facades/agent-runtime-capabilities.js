@@ -206,6 +206,10 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
     const bootOk = readBoolean(readPath(checks, ['boot', 'ok']));
     const sdkOk = readBoolean(readPath(checks, ['sdkResources', 'ok']));
     const quotaOk = readBoolean(readPath(checks, ['quota', 'ok']));
+    const dialogLoopActive = Boolean(health?.['dialogLoopActive'] ?? snap['dialogLoopActive']);
+    const routeSwitchAvailable = typeof agent.switchRoute === 'function';
+    const routeSwitchState =
+        routeSwitchAvailable && dialogLoopActive ? 'degraded' : stateFromCheck(sessionOk, routeSwitchAvailable);
 
     /** @type {AgentRuntimeCapability[]} */
     const list = [
@@ -239,6 +243,42 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
             },
         }),
         capability(
+            'sdk.model-switch',
+            'Transactional model switch',
+            'sdk',
+            typeof agent.switchModel === 'function',
+            stateFromCheck(sessionOk, typeof agent.switchModel === 'function'),
+            {
+                reason:
+                    typeof agent.switchModel === 'function'
+                        ? 'transactional_model_switch_available'
+                        : 'transactional_model_switch_unavailable',
+                details: { preservesSessionId: true },
+            },
+        ),
+        capability(
+            'sdk.same-session-route-reattach',
+            'Same-session provider route reattach',
+            'sdk',
+            routeSwitchAvailable,
+            routeSwitchState,
+            {
+                reason:
+                    routeSwitchAvailable && dialogLoopActive
+                        ? 'same_session_route_reattach_deferred_while_dialog_loop_active'
+                        : routeSwitchAvailable
+                          ? 'same_session_route_reattach_available'
+                          : 'same_session_route_reattach_unavailable',
+                details: {
+                    preservesSessionId: true,
+                    implicitNewSessionAllowed: false,
+                    dialogLoopActive,
+                    immediateApplyDuringActiveDialogLoop: false,
+                    deferredUntilTurnBoundary: routeSwitchAvailable && dialogLoopActive,
+                },
+            },
+        ),
+        capability(
             'sdk.resources',
             'SDK resource coverage',
             'sdk',
@@ -269,7 +309,7 @@ export function readAgentRuntimeCapabilities(agent, options = {}) {
             stateFromCheck(dialogOk, typeof agent.startDialogLoop === 'function'),
             {
                 details: {
-                    active: Boolean(health?.['dialogLoopActive'] ?? snap['dialogLoopActive']),
+                    active: dialogLoopActive,
                     paused: Boolean(readPath(checks, ['dialog', 'paused']) ?? snap['dialogPaused']),
                     pendingQuestion: Boolean(health?.['pendingQuestion']),
                     pendingQuestionKind: health?.['pendingQuestionKind'] ?? null,

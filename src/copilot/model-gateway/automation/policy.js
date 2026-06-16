@@ -49,7 +49,7 @@ export const MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESET_IDS = Object.freeze(
     'operator_manual',
     'llm_operator_guarded',
     'auto_same_boundary',
-    'auto_prepare_new_session',
+    'auto_same_session_route',
 ]);
 
 export const MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESETS = Object.freeze({
@@ -86,13 +86,13 @@ export const MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESETS = Object.freeze({
         allowLocalPrivate: false,
         accountWideFailureKinds: ['rate-limit', 'quota', 'credits'],
     }),
-    auto_prepare_new_session: Object.freeze({
-        preset: 'auto_prepare_new_session',
+    auto_same_session_route: Object.freeze({
+        preset: 'auto_same_session_route',
         enabled: true,
         policy: 'prefer_runtime_proved',
         profiles: [],
         allowLiveSetModel: true,
-        allowNewSession: true,
+        allowNewSession: false,
         allowProviderProbes: false,
         allowLocalPrivate: false,
         accountWideFailureKinds: ['rate-limit', 'quota', 'credits'],
@@ -232,9 +232,11 @@ function envPolicyPatch(env) {
 function policyPresetPatch(presetId) {
     const normalizedPresetId = optionalPresetId(presetId);
     if (!normalizedPresetId) return null;
+    const canonicalPresetId =
+        normalizedPresetId === 'auto_prepare_new_session' ? 'auto_same_session_route' : normalizedPresetId;
     return (
         /** @type {Record<string, unknown> | undefined} */ (
-            Reflect.get(MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESETS, normalizedPresetId)
+            Reflect.get(MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESETS, canonicalPresetId)
         ) ?? null
     );
 }

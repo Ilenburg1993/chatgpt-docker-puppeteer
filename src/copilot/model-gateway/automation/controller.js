@@ -165,19 +165,22 @@ export function buildModelGatewayRuntimeAutomationControllerStep(input) {
                 policyDeniedReason: 'live_set_model_not_allowed',
             }),
         });
-    } else if (action === 'prepare_new_session' || decision['requiresNewSession'] === true) {
+    } else if (action === 'apply_live_route' && decision['canApplyLiveRoute'] === true) {
         effects.push({
-            kind: 'prepare_new_sdk_session',
+            kind: 'switch_live_route',
             model,
+            route: record(decision['targetRoute']),
+            targetBoundary: record(decision['targetBoundary']),
+            currentBoundary: record(decision['currentBoundary']),
             routeKey,
             routeReasons,
             reason,
             confidence,
             ...effectAuthorization({
                 allowEffects,
-                allowedByPolicy: policy.allowNewSession === true,
-                policyGate: 'allowNewSession',
-                policyDeniedReason: 'new_session_not_allowed',
+                allowedByPolicy: policy.allowLiveSetModel === true,
+                policyGate: 'allowLiveSetModel',
+                policyDeniedReason: 'live_route_switch_not_allowed',
             }),
         });
     } else if (action === 'wait_for_reset') {

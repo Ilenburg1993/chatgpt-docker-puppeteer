@@ -50,6 +50,7 @@ import {
 } from '../../facades/sdk-access.js';
 import { defaultMetrics } from '../../ports/metrics-port.js';
 import { log } from '../../ports/logging/index.js';
+import { buildModelGatewayRuntimeSelectorProbeEnv } from '../../../model-gateway/routing/runtime-selector.js';
 import { buildHookSystemContextSafe } from '../context/index.js';
 
 // Re-exports para backward compatibility
@@ -149,6 +150,33 @@ async function resumeOrCreateWithConfigDiscoveryGuard(client, savedSessionId, op
         return resumeOrCreateAgentSdkSession(client, savedSessionId, {
             ...opts,
             enableConfigDiscovery: false,
+        });
+    }
+}
+
+/**
+ * Reanexa o mesmo sessionId com a configuração solicitada. Nunca cria uma sessão substituta.
+ *
+ * @param {CopilotClient} client
+ * @param {string} sessionId
+ * @param {Record<string, unknown>} opts
+ */
+async function resumeSameSessionWithConfigDiscoveryGuard(client, sessionId, opts) {
+    try {
+        return await resumeOrCreateAgentSdkSession(client, sessionId, { ...opts, requireSameSession: true });
+    } catch (error) {
+        if (opts['enableConfigDiscovery'] !== true || !isConfigDiscoveryToolCollisionError(error)) {
+            throw error;
+        }
+        log(
+            'WARN',
+            `[PersistentSession] Reattach da mesma sessao encontrou colisao de tools (${toError(error).message}). ` +
+                'Retentando o mesmo sessionId com descoberta automatica desligada.',
+        );
+        return resumeOrCreateAgentSdkSession(client, sessionId, {
+            ...opts,
+            enableConfigDiscovery: false,
+            requireSameSession: true,
         });
     }
 }
@@ -279,6 +307,18 @@ function buildByokSessionBinding(byok, model) {
         baseUrl: byok.summary.baseUrl ?? null,
         model,
     };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function readPersistedModelGatewayActiveRoute(value) {
+    if (!value || typeof value !== 'object') return null;
+    const route = /** @type {Record<string, unknown>} */ (value);
+    if (typeof route['providerId'] !== 'string' || !route['providerId'].trim()) return null;
+    if (typeof route['providerModel'] !== 'string' || !route['providerModel'].trim()) return null;
+    return route;
 }
 
 /**
@@ -502,8 +542,17 @@ export async function initOrResumeSession(client, sessionOptions) {
     await ensureAgentSdkToolsConfigLoaded();
 
     const state = await readAgentRuntimePersistedStateAsync();
-    const requestedModel = sessionOptions.model ?? AGENT_SDK_DEFAULT_MODEL;
-    const byok = resolveConfiguredByokSessionOverrides(process.env, requestedModel);
+    const persistedGatewayRoute = readPersistedModelGatewayActiveRoute(
+        state ? Reflect.get(state, 'modelGatewayActiveRoute') : null,
+    );
+    const sessionEnv = persistedGatewayRoute
+        ? buildModelGatewayRuntimeSelectorProbeEnv(persistedGatewayRoute, process.env)
+        : process.env;
+    const requestedModel =
+        (typeof persistedGatewayRoute?.['providerModel'] === 'string'
+            ? persistedGatewayRoute['providerModel']
+            : sessionOptions.model) ?? AGENT_SDK_DEFAULT_MODEL;
+    const byok = resolveConfiguredByokSessionOverrides(sessionEnv, requestedModel);
     const model = byok.enabled && byok.model ? byok.model : requestedModel;
     const sdkReasoningEffort =
         byok.enabled && byok.supportsReasoning === false ? undefined : sessionOptions.reasoningEffort;
@@ -609,13 +658,14 @@ export async function initOrResumeSession(client, sessionOptions) {
         }
     }
     const providerResumeDecision = validatePersistedSessionForProviderResume(state, byok, model);
+    let sameSessionReattachRequired = false;
     if (savedSessionId && !providerResumeDecision.ok && !nextSdkSessionBoot) {
         log(
             'INFO',
-            `[PersistentSession] Binding do provider exige nova sessão SDK — ${providerResumeDecision.reason}.`,
+            `[PersistentSession] Binding mudou; reattach do mesmo sessionId será tentado — ${providerResumeDecision.reason}.`,
         );
-        sdkSessionBootReason = `provider-boundary: ${providerResumeDecision.reason}`;
-        savedSessionId = null;
+        sdkSessionBootReason = `same-session-provider-rebind: ${providerResumeDecision.reason}`;
+        sameSessionReattachRequired = true;
     }
     const allowSessionRotation = Reflect.get(sessionOptions, 'allowSessionRotation') === true;
     if (savedSessionId && allowSessionRotation) {
@@ -634,8 +684,16 @@ export async function initOrResumeSession(client, sessionOptions) {
         }
     }
     const resumeCandidateSessionId = savedSessionId;
-    let result = await resumeOrCreateWithConfigDiscoveryGuard(client, savedSessionId, opts);
+    let result =
+        sameSessionReattachRequired && savedSessionId
+            ? await resumeSameSessionWithConfigDiscoveryGuard(client, savedSessionId, opts)
+            : await resumeOrCreateWithConfigDiscoveryGuard(client, savedSessionId, opts);
     if (result.isResumed && !(await _validateResumedSession(result.session))) {
+        if (sameSessionReattachRequired) {
+            throw new Error(
+                'SAME_SESSION_PROVIDER_REBIND_HEALTH_CHECK_FAILED: reattach preservou o sessionId, mas a sessão não passou no health-check',
+            );
+        }
         log('WARN', '[PersistentSession] Sessão retomada não passou no health-check — criando nova sessão.');
         sdkSessionBootReason = 'resumed-session-health-check-failed';
         result = await createWithConfigDiscoveryGuard(client, opts);
@@ -653,6 +711,8 @@ export async function initOrResumeSession(client, sessionOptions) {
         if (byok.summary.profile) Reflect.set(result.session, '__copilotByokProfile', byok.summary.profile);
         if (byok.summary.preset) Reflect.set(result.session, '__copilotByokPreset', byok.summary.preset);
         if (byok.summary.providerType) Reflect.set(result.session, '__copilotByokProviderType', byok.summary.providerType);
+    } else {
+        Reflect.set(result.session, '__copilotByokEnabled', false);
     }
 
     const requestedNativeAutoModel = model === 'auto';
@@ -663,6 +723,13 @@ export async function initOrResumeSession(client, sessionOptions) {
         : typeof result.model === 'string'
           ? result.model
           : (persistedConcreteModel ?? model);
+    Reflect.set(result.session, '__copilotConfiguredModel', model);
+    Reflect.set(result.session, '__copilotEffectiveModel', effectiveModel);
+    Reflect.set(
+        result.session,
+        '__copilotModelGatewayProviderId',
+        persistedGatewayRoute?.['providerId'] ?? byok.summary.preset ?? 'github-copilot-sdk',
+    );
     if (
         result.isResumed &&
         requestedNativeAutoModel &&

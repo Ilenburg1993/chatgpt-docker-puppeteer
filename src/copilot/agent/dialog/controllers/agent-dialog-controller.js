@@ -16,13 +16,13 @@ import { container, SessionError } from '#copilot/core';
 import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_DIALOG_RECOVERY, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
 import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '#copilot/config/agent';
 import { withAgentErrorPolicy } from '../../error/index.js';
+import { switchModelTransactional } from '../../facades/agent-model-config.js';
 import { log } from '../../ports/logging/index.js';
 import { METRICS_STORE } from '../../ports/metrics-port.js';
 import {
     assertEmitterHost,
     normalizeCompactionComplete,
     normalizeTokenBudgetWarning,
-    trySetLiveSessionModel,
 } from '../../runtime/contracts/index.js';
 import { wireDialogLoopEvents } from '../orchestrators/index.js';
 
@@ -275,10 +275,11 @@ export function ensureDialogLoopAttached(ctx, host) {
         off: (event, listener) => host.off(event, listener),
         getSessionId: () => host.sessionId,
         getModel: () => ctx.getModelSnapshot(),
-        setModel: (modelId) => {
-            ctx.setModel(modelId);
-            trySetLiveSessionModel(ctx.getSessionSnapshot(), modelId, 'AlwaysAlive');
-        },
+        switchModel: (modelId, options) =>
+            switchModelTransactional(ctx, modelId, {
+                ...options,
+                source: options?.source ?? 'agent.dialog.model-fallback',
+            }),
         hasPendingQuestion: () => ctx.hasPendingQuestion(),
         trackBackgroundTask: (task, meta) => ctx.trackBackgroundTask(task, meta),
     };

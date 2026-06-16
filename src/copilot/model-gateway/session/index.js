@@ -7,3 +7,5 @@
 
 export { toCopilotModelInfo, toCopilotModelInfoList, toCopilotRouteModelInfoList } from './copilot-model-projection.js';
 export { buildModelGatewayOnListModelsHandler } from './on-list-models.js';
+export { resolveModelGatewaySessionBinding } from './session-binding.js';
+export { evaluateLiveRouteSwitchCapability } from './live-route-switch-capability.js';

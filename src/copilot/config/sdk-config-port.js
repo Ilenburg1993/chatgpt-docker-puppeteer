@@ -36,13 +36,14 @@ export {
     readConfiguredByokSummary,
     redactProviderConfig,
     replaceSystemMessage,
-    resolveConfiguredByokSessionOverrides,
     sectionOverride,
     SYSTEM_MESSAGE_SECTIONS,
     SYSTEM_PROMPT_SECTIONS,
     supportsCustomizeMode,
     validateProviderConfig,
 } from '#copilot/sdk/session';
+
+export { resolveModelGatewaySessionBinding as resolveConfiguredByokSessionOverrides } from '../model-gateway/session/session-binding.js';
 
 export { resolvePersistentConfigFile } from '../sdk/persistent-paths.js';
 

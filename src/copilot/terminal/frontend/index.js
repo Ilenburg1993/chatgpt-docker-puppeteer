@@ -124,6 +124,8 @@ export {
     saveTerminalSnapshotProjection,
     searchTerminalTurnsProjection,
     setTerminalModelProjection,
+    switchTerminalModelProjection,
+    switchTerminalRouteProjection,
     setTerminalPlanModeProjection,
     setTerminalReasoningProjection,
     setTerminalSdkModeProjection,

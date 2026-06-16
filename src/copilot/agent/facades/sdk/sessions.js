@@ -14,6 +14,7 @@ import {
     getConfiguredSessionFsHandler,
     readConfiguredSessionFsState,
     listSessions,
+    resumeSession,
     resumeOrCreate,
 } from '#copilot/sdk/session';
 import { log } from '../../ports/logging/index.js';
@@ -106,6 +107,12 @@ export function readAgentConfiguredSessionFsState(sessionId) {
  * @returns {Promise<Awaited<ReturnType<typeof resumeOrCreate>>>}
  */
 export async function resumeOrCreateAgentSdkSession(client, sessionId, options) {
+    if (options['requireSameSession'] === true) {
+        if (!sessionId) throw new Error('SAME_SESSION_RESUME_ID_REQUIRED');
+        const resumeOptions = { ...options };
+        delete resumeOptions['requireSameSession'];
+        return resumeSession(client, sessionId, resumeOptions);
+    }
     return resumeOrCreate(client, sessionId ?? null, options);
 }
 

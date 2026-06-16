@@ -8,6 +8,7 @@
  */
 
 import { readAgentRuntimeCapabilities } from '#copilot/agent/facades';
+import { requireAgentRuntimeSelection } from '#copilot/presentation/agent/runtime';
 import { buildRuntimeRouteMetaPayload } from '../routing/index.js';
 import { getAgentHealthSnapshotCompat } from './health.js';
 
@@ -64,4 +65,15 @@ export function buildAgentRuntimeCapabilities(agent, meta) {
  */
 export function buildAgentRuntimeCapabilitiesFromRoute(deps) {
     return buildAgentRuntimeCapabilities(deps.agent, deps);
+}
+
+/**
+ * Lê capabilities do runtime selecionado para consumidores que não operam em uma rota HTTP.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {RuntimeCapabilitiesPayload}
+ */
+export function readRuntimeCapabilitiesProjection(runtimeId) {
+    const selection = requireAgentRuntimeSelection(runtimeId);
+    return buildAgentRuntimeCapabilities(selection.runtime, selection);
 }
