@@ -164,6 +164,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
         vi.clearAllMocks();
         process.env.COPILOT_BYOK_ENABLED = 'false';
         delete process.env.COPILOT_BYOK_PROFILE;
+        delete process.env.OPENROUTER_API_KEY;
     });
 
     it('injeta createSessionFsHandler configurado no fluxo initOrResumeSession', async () => {
@@ -346,7 +347,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
         expect(result).toEqual(expect.objectContaining({ model: 'auto', reasoningEffort: 'xhigh' }));
     });
 
-    it('nao retoma sessao SDK BYOK antiga quando o boot voltou ao SDK Copilot', async () => {
+    it('reattacha a mesma sessao SDK BYOK antiga quando o boot voltou ao SDK Copilot', async () => {
         const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
         mocks.readState.mockResolvedValueOnce({
             sessionId: 'byok-sess',
@@ -363,21 +364,37 @@ describe('agent/session/initializer — sessionFs wiring', () => {
                 model: 'shared-model',
             },
         });
+        mocks.resumeOrCreateAgentSdkSession.mockResolvedValueOnce({
+            session: {
+                sessionId: 'byok-sess',
+                getMessages: vi.fn(async () => []),
+            },
+            isResumed: true,
+            model: 'auto',
+        });
 
         await initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' });
 
-        expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledWith(expect.anything(), null, expect.any(Object));
+        expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledWith(
+            expect.anything(),
+            'byok-sess',
+            expect.objectContaining({
+                model: 'auto',
+                provider: undefined,
+                requireSameSession: true,
+            }),
+        );
         expect(mocks.persistState).toHaveBeenCalledWith(
             expect.objectContaining({
                 byokSessionBinding: null,
                 sdkSessionBootDecision: expect.objectContaining({
-                    outcome: 'created',
+                    outcome: 'resumed',
                     requestedMode: 'auto',
-                    resumeCandidateSessionId: null,
-                    reason: expect.stringContaining('provider-boundary:'),
+                    resumeCandidateSessionId: 'byok-sess',
+                    reason: expect.stringContaining('same-session-provider-rebind:'),
                 }),
             }),
-            expect.objectContaining({ label: 'session.initializer.create' }),
+            expect.objectContaining({ label: 'session.initializer.resume' }),
         );
     });
 
@@ -415,7 +432,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
         );
     });
 
-    it('cria sessao nova e persiste binding redigido quando BYOK ativo encontra estado antigo sem binding', async () => {
+    it('reattacha mesma sessao e persiste binding redigido quando BYOK ativo encontra estado antigo sem binding', async () => {
         const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
         const previous = Object.fromEntries(
             [
@@ -440,6 +457,14 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             resumedAt: Date.now(),
             resumeCount: 1,
         });
+        mocks.resumeOrCreateAgentSdkSession.mockResolvedValueOnce({
+            session: {
+                sessionId: 'legacy-byok-sess',
+                getMessages: vi.fn(async () => []),
+            },
+            isResumed: true,
+            model: 'shared-model',
+        });
 
         try {
             await initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' });
@@ -455,10 +480,11 @@ describe('agent/session/initializer — sessionFs wiring', () => {
 
         expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledWith(
             expect.anything(),
-            null,
+            'legacy-byok-sess',
             expect.objectContaining({
                 model: 'shared-model',
                 provider: expect.objectContaining({ baseUrl: 'https://provider-b.example/v1' }),
+                requireSameSession: true,
             }),
         );
         expect(mocks.persistState).toHaveBeenCalledWith(
@@ -472,13 +498,67 @@ describe('agent/session/initializer — sessionFs wiring', () => {
                     model: 'shared-model',
                 },
                 sdkSessionBootDecision: expect.objectContaining({
-                    outcome: 'created',
+                    outcome: 'resumed',
                     requestedMode: 'auto',
-                    resumeCandidateSessionId: null,
-                    reason: expect.stringContaining('provider-boundary:'),
+                    resumeCandidateSessionId: 'legacy-byok-sess',
+                    reason: expect.stringContaining('same-session-provider-rebind:'),
                 }),
             }),
-            expect.objectContaining({ label: 'session.initializer.create' }),
+            expect.objectContaining({ label: 'session.initializer.resume' }),
         );
+    });
+
+    it('projeta rota Model Gateway persistida por ingress local quando bindingStrategy=ingress', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        const { defaultModelGatewayIngressRouteRegistry } = await import(
+            '../../../src/copilot/model-gateway/ingress/index.js'
+        );
+        defaultModelGatewayIngressRouteRegistry.clear();
+        process.env.OPENROUTER_API_KEY = 'upstream-secret';
+        mocks.readState.mockResolvedValueOnce({
+            sessionId: 'saved-sess',
+            model: 'previous-model',
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 1,
+            modelGatewayActiveRoute: {
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                bindingStrategy: 'ingress',
+                sdkRouteKey: 'saved-sess:live-provider',
+                sdkVisibleModel: 'model-gateway-live',
+            },
+        });
+        mocks.resumeOrCreateAgentSdkSession.mockResolvedValueOnce({
+            session: {
+                sessionId: 'saved-sess',
+                getMessages: vi.fn(async () => []),
+            },
+            isResumed: true,
+        });
+
+        await initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' });
+
+        const options = mocks.resumeOrCreateAgentSdkSession.mock.calls.at(-1)?.[2];
+        const routes = defaultModelGatewayIngressRouteRegistry.listRedacted();
+        expect(options).toMatchObject({
+            model: 'model-gateway-live',
+            provider: {
+                type: 'openai',
+                apiKey: 'model-gateway-ingress-local',
+                baseUrl: expect.stringContaining('/v1/model-gateway-ingress/'),
+            },
+        });
+        expect(routes).toHaveLength(1);
+        expect(options.provider.baseUrl).toBe(routes[0].sdkBaseUrl);
+        expect(defaultModelGatewayIngressRouteRegistry.get(String(routes[0].routeId))).toMatchObject({
+            upstreamAuthHeaders: { authorization: 'Bearer upstream-secret' },
+            ingressRoute: {
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
+                sdkVisibleModel: 'model-gateway-live',
+            },
+        });
     });
 });

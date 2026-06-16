@@ -80,7 +80,10 @@ Este arquivo passa a ser o novo guia operacional para as próximas etapas. O roa
   por rota e upstream auth injetada pelo registry.
 - [x] O contrato ingress aceita `sdkRouteKey` e `sdkVisibleModel`, permitindo base URL/modelo estáveis vistos pelo SDK
   enquanto o target real muda no registry.
-- [ ] Ainda falta integrar criação/registro de rotas ingress ao `SessionBindingPlan` e à promoção/reconciliação runtime.
+- [x] O initializer SDK registra rota ingress e projeta provider local quando `modelGatewayActiveRoute` traz
+  `bindingStrategy=ingress` ou flags equivalentes.
+- [ ] Ainda falta seleção automática de ingress por matriz provider/capability e integração plena à promoção/reconciliação
+  runtime.
 - [ ] `terminal/commands/byok.js` segue monolítico e ainda concentra casos de uso.
 - [ ] Existem testes legados que ainda esperam `auto_prepare_new_session`, `prepare_new_sdk_session` e
   `/session sdk next new` como caminho normal.
@@ -322,8 +325,9 @@ A LLM-B deve conseguir:
 - [x] Preservar streaming real, JSON, tool-calling e `tool_choice` no servidor HTTP por forwarding de body/headers.
 - [ ] Validar `ask_user` e formatos de erro OpenAI-compatible no servidor HTTP contra um smoke de runtime vivo.
 - [ ] Registrar health por provider real e por route identity, não apenas pelo ingress local.
-- [ ] Integrar ingress ao `SessionBindingPlan` somente quando o provider não suportar rebind direto confiável.
-- [ ] Usar `sdkRouteKey` por sessão/perfil no `SessionBindingPlan` para permitir troca de provider por registry update
+- [x] Integrar ingress ao lifecycle SDK quando a rota persistida pede `bindingStrategy=ingress`.
+- [ ] Integrar ingress automaticamente ao `SessionBindingPlan` somente quando o provider não suportar rebind direto confiável.
+- [x] Usar `sdkRouteKey` por sessão/perfil no binding ingress para permitir troca de provider por registry update
   sem novo reattach quando o SDK já estiver apontado para o ingress.
 - [ ] Adicionar rollback e reconciliação para troca de rota via ingress.
 - [ ] Testar troca cross-provider sem recriar sessão usando ingress.
@@ -435,3 +439,5 @@ A LLM-B deve conseguir:
   chave e proxy upstream com `fetch` injetado.
 - [x] `tests/unit/copilot/model-gateway/test_model_gateway_ingress.spec.js` cobre `sdkRouteKey` estável e update de target
   no registry sem mudar `sdkBaseUrl`.
+- [x] `tests/unit/copilot/test_initializer_session_fs.spec.js` cobre rota persistida `bindingStrategy=ingress`, provider
+  local SDK-facing e auth upstream no registry sem segredo na URL.

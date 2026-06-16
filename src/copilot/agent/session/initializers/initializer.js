@@ -50,6 +50,12 @@ import {
 } from '../../facades/sdk-access.js';
 import { defaultMetrics } from '../../ports/metrics-port.js';
 import { log } from '../../ports/logging/index.js';
+import {
+    MODEL_GATEWAY_INGRESS_DEFAULT_LOCAL_API_KEY,
+    buildModelGatewayIngressSessionOverrides,
+    createModelGatewayIngressRoute,
+    defaultModelGatewayIngressRouteRegistry,
+} from '../../../model-gateway/ingress/index.js';
 import { buildModelGatewayRuntimeSelectorProbeEnv } from '../../../model-gateway/routing/runtime-selector.js';
 import { buildHookSystemContextSafe } from '../context/index.js';
 
@@ -311,6 +317,132 @@ function buildByokSessionBinding(byok, model) {
 
 /**
  * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalText(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function record(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
+}
+
+/**
+ * @param {Record<string, unknown> | null} route
+ * @returns {boolean}
+ */
+function shouldUseModelGatewayIngressRoute(route) {
+    if (!route) return false;
+    const strategy = optionalText(route['bindingStrategy'])?.toLowerCase();
+    return (
+        strategy === 'ingress' ||
+        route['useIngress'] === true ||
+        route['requiresIngress'] === true ||
+        route['modelGatewayIngress'] === true
+    );
+}
+
+/**
+ * @param {ReturnType<typeof readCopilotBootConfig>} bootConfig
+ * @returns {string}
+ */
+function resolveModelGatewayIngressPublicBaseUrl(bootConfig) {
+    const server = record(Reflect.get(bootConfig, 'server'));
+    const host = optionalText(server['host']) ?? '127.0.0.1';
+    const port = typeof server['port'] === 'number' && Number.isFinite(server['port']) ? server['port'] : 3009;
+    return `http://${host}:${port}`;
+}
+
+/**
+ * @param {Record<string, unknown>} provider
+ * @returns {Record<string, string>}
+ */
+function deriveModelGatewayIngressUpstreamAuthHeaders(provider) {
+    const headers = record(provider['headers']);
+    /** @type {Record<string, string>} */
+    const upstreamAuthHeaders = {};
+    for (const [key, value] of Object.entries(headers)) {
+        const text = optionalText(value);
+        if (text) upstreamAuthHeaders[key] = text;
+    }
+    const hasAuthorization = Object.keys(upstreamAuthHeaders).some((key) => key.toLowerCase() === 'authorization');
+    const apiKey = optionalText(provider['apiKey']);
+    if (apiKey && !hasAuthorization) upstreamAuthHeaders['authorization'] = `Bearer ${apiKey}`;
+    return upstreamAuthHeaders;
+}
+
+/**
+ * @param {object} input
+ * @param {ReturnType<typeof resolveConfiguredByokSessionOverrides>} input.byok
+ * @param {Record<string, unknown> | null} input.route
+ * @param {ReturnType<typeof readCopilotBootConfig>} input.bootConfig
+ * @param {string | null} input.sessionId
+ * @returns {ReturnType<typeof resolveConfiguredByokSessionOverrides>}
+ */
+function applyModelGatewayIngressSessionBinding(input) {
+    const route = input.route;
+    if (!shouldUseModelGatewayIngressRoute(route) || !input.byok.enabled || !input.byok.provider) return input.byok;
+    const provider = record(input.byok.provider);
+    const providerBaseUrl = optionalText(provider['baseUrl']);
+    const routeBaseUrl = optionalText(route?.['openAICompatibleBaseUrl']) ?? optionalText(route?.['baseUrl']) ?? providerBaseUrl;
+    if (!routeBaseUrl) return input.byok;
+
+    const providerModel =
+        optionalText(route?.['providerModel']) ?? optionalText(route?.['selectorSyntax']) ?? input.byok.model;
+    const sdkVisibleModel = optionalText(route?.['sdkVisibleModel']) ?? providerModel;
+    const sdkRouteKey =
+        optionalText(route?.['sdkRouteKey']) ??
+        `model-gateway-ingress:${input.sessionId ?? 'pending-session'}:${optionalText(route?.['routeProfile']) ?? 'default'}`;
+    const localApiKey = optionalText(route?.['localApiKey']) ?? MODEL_GATEWAY_INGRESS_DEFAULT_LOCAL_API_KEY;
+    const ingressRoute = createModelGatewayIngressRoute({
+        sessionId: input.sessionId ?? 'pending-session',
+        publicBaseUrl: resolveModelGatewayIngressPublicBaseUrl(input.bootConfig),
+        route: {
+            ...route,
+            providerModel,
+            sdkRouteKey,
+            sdkVisibleModel,
+            baseUrl: routeBaseUrl,
+        },
+    });
+    const overrides = buildModelGatewayIngressSessionOverrides(ingressRoute, { localApiKey });
+    defaultModelGatewayIngressRouteRegistry.register({
+        ingressRoute,
+        localApiKey,
+        upstreamAuthHeaders: deriveModelGatewayIngressUpstreamAuthHeaders(provider),
+        metadata: {
+            source: 'session.initializer',
+            bindingStrategy: 'ingress',
+            targetProviderId: ingressRoute.providerId,
+            targetProviderModel: ingressRoute.providerModel,
+        },
+    });
+
+    return {
+        ...input.byok,
+        provider: /** @type {import('#copilot/sdk/types').ProviderConfig} */ (overrides.provider),
+        model: overrides.model,
+        modelCapabilities: overrides.modelCapabilities ?? input.byok.modelCapabilities,
+        summary: {
+            ...input.byok.summary,
+            model: overrides.model,
+            baseUrl: overrides.provider.baseUrl,
+            auth: {
+                ...input.byok.summary.auth,
+                apiKeyConfigured: true,
+            },
+        },
+    };
+}
+
+/**
+ * @param {unknown} value
  * @returns {Record<string, unknown> | null}
  */
 function readPersistedModelGatewayActiveRoute(value) {
@@ -545,6 +677,7 @@ export async function initOrResumeSession(client, sessionOptions) {
     const persistedGatewayRoute = readPersistedModelGatewayActiveRoute(
         state ? Reflect.get(state, 'modelGatewayActiveRoute') : null,
     );
+    const persistedResumeSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
     const sessionEnv = persistedGatewayRoute
         ? buildModelGatewayRuntimeSelectorProbeEnv(persistedGatewayRoute, process.env)
         : process.env;
@@ -552,12 +685,17 @@ export async function initOrResumeSession(client, sessionOptions) {
         (typeof persistedGatewayRoute?.['providerModel'] === 'string'
             ? persistedGatewayRoute['providerModel']
             : sessionOptions.model) ?? AGENT_SDK_DEFAULT_MODEL;
-    const byok = resolveConfiguredByokSessionOverrides(sessionEnv, requestedModel);
+    const bootConfig = readCopilotBootConfig();
+    const byok = applyModelGatewayIngressSessionBinding({
+        byok: resolveConfiguredByokSessionOverrides(sessionEnv, requestedModel),
+        route: persistedGatewayRoute,
+        bootConfig,
+        sessionId: persistedResumeSessionId,
+    });
     const model = byok.enabled && byok.model ? byok.model : requestedModel;
     const sdkReasoningEffort =
         byok.enabled && byok.supportsReasoning === false ? undefined : sessionOptions.reasoningEffort;
     const injectContext = sessionOptions.injectHookContext !== false;
-    const bootConfig = readCopilotBootConfig();
     const bootSessionDefaults = bootConfig.sessionDefaults;
     const createSessionFsHandler = getAgentConfiguredSessionFsHandler();
 
@@ -635,7 +773,7 @@ export async function initOrResumeSession(client, sessionOptions) {
     // F43.2 (GAP-SD-03): rotação automática deixou de ser default do terminal LLM-B.
     // O princípio operacional atual é session-first: retomar a sessão anterior sempre que o SDK permitir.
     // Rotação continua disponível para fluxos explícitos via sessionOptions.allowSessionRotation.
-    let savedSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
+    let savedSessionId = persistedResumeSessionId;
     /** @type {'auto' | 'new' | 'resume'} */
     let requestedSdkSessionBootMode = 'auto';
     let sdkSessionBootReason = savedSessionId ? 'auto-resume-persisted-session' : 'auto-create-without-resume-candidate';
