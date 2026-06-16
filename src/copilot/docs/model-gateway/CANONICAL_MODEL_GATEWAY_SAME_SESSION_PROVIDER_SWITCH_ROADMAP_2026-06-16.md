@@ -72,9 +72,11 @@ Este arquivo passa a ser o novo guia operacional para as próximas etapas. O roa
   de promoção quando o reattach imediato não é seguro.
 - [ ] A promoção automática ainda não tem policy/consent ledger próprio; hoje ela promove somente operações que o
   executor marcou como autopromovíveis pelo `deferReason`.
-- [ ] Ingress/proxy dinâmico do Model Gateway ainda não existe para providers que o SDK não rebindar diretamente.
-- [ ] Não há módulo `model-gateway/ingress` nem proxy OpenAI-compatible local estável; existem adapters
-  OpenAI-compatible e specs de endpoint, mas não uma camada runtime de roteamento por operação.
+- [ ] Ingress/proxy dinâmico do Model Gateway ainda não está integrado ao runtime para providers que o SDK não
+  rebindar diretamente.
+- [x] Existe núcleo inicial `model-gateway/ingress` com contrato de rota, provider config SDK-facing e builder/proxy
+  OpenAI-compatible com `fetch` injetável.
+- [ ] Ainda falta montar servidor HTTP local estável, registry de rotas vivas e integração com `SessionBindingPlan`.
 - [ ] `terminal/commands/byok.js` segue monolítico e ainda concentra casos de uso.
 - [ ] Existem testes legados que ainda esperam `auto_prepare_new_session`, `prepare_new_sdk_session` e
   `/session sdk next new` como caminho normal.
@@ -101,7 +103,9 @@ Este arquivo passa a ser o novo guia operacional para as próximas etapas. O roa
 - [x] `src/copilot/model-gateway/control-plane/same-session-route-switch.js` grava estado
   `deferred_until_turn_boundary` sem chamar `reattach` quando o tool-turn/dialog loop ativo torna o reattach inseguro.
 - [x] `src/copilot/model-gateway/providers/openai-compatible-adapter.js` e specs de endpoints já sabem projetar
-  providers OpenAI-compatible para sessão SDK, mas não há ingress/proxy dinâmico.
+  providers OpenAI-compatible para sessão SDK.
+- [x] `src/copilot/model-gateway/ingress/openai-compatible-ingress.js` agora cria a rota ingress, monta o provider
+  local visto pelo SDK, reescreve `model` para o provider real, remove auth do cliente e injeta auth upstream confiável.
 - [ ] `/now` e `/health` ainda usam `readTerminalConfigProjection()` + `modelGatewayProjection`, não um
   `ModelGatewayReadiness` único; eles exibem contagens e rota ativa, mas não listam operações diferidas pendentes.
 - [ ] `/activity` exibe eventos e tools Model Gateway via presenters, mas não tem seção dedicada a route switches
@@ -293,22 +297,27 @@ A LLM-B deve conseguir:
 
 ### Faixa H — Ingress/proxy dinâmico
 
-- [x] Confirmar estado atual: não existe implementação de ingress/proxy dinâmico no Model Gateway; só adapters,
+- [x] Confirmar estado pré-incremento: não existia implementação de ingress/proxy dinâmico no Model Gateway; só adapters,
   specs de endpoints e fixture OpenAI-compatible local.
 - [ ] Definir se o SDK consegue rebindar todos os providers necessários via `resumeSession`, usando matriz por
   provider/modelo/capability.
-- [ ] Desenhar contrato `ModelGatewayIngressRoute` com `routeId`, `sessionId`, provider real, model real, profile,
+- [x] Desenhar e implementar contrato inicial `ModelGatewayIngressRoute` com `routeId`, `sessionId`, provider real,
+  model real, base upstream, base SDK-facing, route target, TTL e timestamps.
+- [ ] Evoluir `ModelGatewayIngressRoute` para incluir profile materializado, route operation id, health policy e
   secret refs redigidas, capabilities e TTL.
-- [ ] Criar módulo `src/copilot/model-gateway/ingress/` com servidor OpenAI-compatible local estável visto pelo SDK
-  como provider único.
-- [ ] Roteamento interno do ingress deve usar provider/model/profile/secret do Model Gateway, sem segredo no URL,
+- [x] Criar módulo `src/copilot/model-gateway/ingress/` com helpers OpenAI-compatible server-agnostic.
+- [ ] Criar servidor HTTP local estável visto pelo SDK como provider único.
+- [x] Builder de request upstream usa provider/model/profile da rota e remove auth do cliente antes de chamar upstream.
+- [ ] Roteamento interno do servidor deve usar provider/model/profile/secret do Model Gateway, sem segredo no URL,
   transcript, SSE ou ledger.
-- [ ] Preservar streaming, JSON, tool-calling, tool_choice, ask_user e erros OpenAI-compatible.
+- [x] Preservar corpo OpenAI-compatible no builder, incluindo `stream`, `messages`, `tools` e `tool_choice`.
+- [ ] Preservar streaming real, JSON, tool-calling, tool_choice, ask_user e erros OpenAI-compatible no servidor HTTP.
 - [ ] Registrar health por provider real e por route identity, não apenas pelo ingress local.
 - [ ] Integrar ingress ao `SessionBindingPlan` somente quando o provider não suportar rebind direto confiável.
 - [ ] Adicionar rollback e reconciliação para troca de rota via ingress.
 - [ ] Testar troca cross-provider sem recriar sessão usando ingress.
-- [ ] Criar fixture hermética do ingress para unidade/smoke antes de qualquer provider real.
+- [x] Criar fixture unitária hermética do ingress antes de qualquer provider real.
+- [ ] Criar smoke de servidor local sem provider real.
 
 ### Faixa I — Harness live, export e SSE
 
@@ -388,3 +397,17 @@ A LLM-B deve conseguir:
   configuração, não de um schema único `ModelGatewayReadiness`.
 - [x] Investigação pós-push confirmou que `/activity` reconhece tools Model Gateway, mas ainda não lista operações
   diferidas/promovíveis como uma seção própria.
+
+## 8. Evidência do incremento ingress core
+
+- [x] `src/copilot/model-gateway/ingress/openai-compatible-ingress.js` criado com:
+  `createModelGatewayIngressRoute`, `buildModelGatewayIngressSessionOverrides`,
+  `buildModelGatewayIngressUpstreamRequest`, `proxyModelGatewayIngressOpenAIChatCompletions` e redaction de rota.
+- [x] `src/copilot/model-gateway/ingress/index.js` criado e exportado por `src/copilot/model-gateway/index.js`.
+- [x] `tests/unit/copilot/model-gateway/test_model_gateway_ingress.spec.js` cobre criação de rota SDK-facing sem
+  credenciais, rejeição de URL insegura, rewrite de `model`, remoção de auth do cliente, injeção de auth upstream e
+  `fetch` injetável sem rede real.
+- [x] `npx eslint src/copilot/model-gateway/ingress/openai-compatible-ingress.js src/copilot/model-gateway/ingress/index.js src/copilot/model-gateway/index.js tests/unit/copilot/model-gateway/test_model_gateway_ingress.spec.js`
+  passou.
+- [x] `npx vitest run tests/unit/copilot/model-gateway/test_model_gateway_ingress.spec.js --reporter=dot` passou com
+  4/4 testes.

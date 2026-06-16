@@ -39,6 +39,18 @@ export {
 } from './control-plane/index.js';
 
 export {
+    MODEL_GATEWAY_INGRESS_DEFAULT_CHAT_COMPLETIONS_PATH,
+    MODEL_GATEWAY_INGRESS_DEFAULT_LOCAL_API_KEY,
+    MODEL_GATEWAY_INGRESS_HOP_BY_HOP_HEADERS,
+    MODEL_GATEWAY_INGRESS_SENSITIVE_FORWARD_HEADERS,
+    buildModelGatewayIngressSessionOverrides,
+    buildModelGatewayIngressUpstreamRequest,
+    createModelGatewayIngressRoute,
+    proxyModelGatewayIngressOpenAIChatCompletions,
+    redactModelGatewayIngressRoute,
+} from './ingress/index.js';
+
+export {
     DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
     MODEL_GATEWAY_RUNTIME_AUTOMATION_ENV,
     MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PRESET_IDS,
