@@ -15,6 +15,7 @@ import {
     removeModelGatewayByokProfileEnv,
     redactModelGatewayAuditedValue,
     resolveModelGatewaySessionBinding,
+    SqliteModelGatewayCatalogStore,
     upsertModelGatewayByokProfileEnv,
 } from '#copilot/model-gateway';
 import { buildTool } from '../infra/tool-factory.js';
@@ -95,7 +96,7 @@ const MODEL_GATEWAY_CONTROL_PLANE_TOOL_MATRIX = Object.freeze([
  *     readCapabilities: (runtimeId?: string | null) => Record<string, unknown>;
  *     readStats: (runtimeId?: string | null) => { currentModel: string; stats: unknown };
  *     switchModel: (modelId: string, runtimeId?: string | null, options?: { idempotencyKey?: string; source?: string }) => Promise<Record<string, any>>;
- *     switchRoute: (route: Record<string, unknown>, runtimeId?: string | null, options?: { idempotencyKey?: string; timeoutMs?: number; source?: string }) => Promise<Record<string, any>>;
+ *     switchRoute: (route: Record<string, unknown>, runtimeId?: string | null, options?: { idempotencyKey?: string; timeoutMs?: number; source?: string; allowActiveDialogLoopReattach?: boolean; forceApplyDeferred?: boolean }) => Promise<Record<string, any>>;
  * }} ModelGatewayRuntimeControl
  */
 
@@ -197,6 +198,74 @@ function asRecord(value) {
     return value && typeof value === 'object' && !Array.isArray(value)
         ? /** @type {Record<string, unknown>} */ (value)
         : {};
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalToolString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {Record<string, unknown>} operation
+ * @returns {Record<string, unknown> | null}
+ */
+function routeSwitchTargetRoute(operation) {
+    const route = asRecord(operation['targetRoute']);
+    return Object.keys(route).length > 0 ? route : null;
+}
+
+/**
+ * @param {string | null | undefined} runtimeId
+ * @returns {{ safe: boolean; capability: Record<string, unknown> | null; reason: string }}
+ */
+function readRouteReattachApplySafety(runtimeId) {
+    if (!runtimeControl) {
+        return {
+            safe: false,
+            capability: null,
+            reason: 'runtime_control_unavailable_for_route_promotion',
+        };
+    }
+    const snapshot = asRecord(runtimeControl.readCapabilities(runtimeId ?? undefined));
+    const capabilities = Array.isArray(snapshot['capabilities']) ? snapshot['capabilities'] : [];
+    const capability =
+        capabilities
+            .map((item) => asRecord(item))
+            .find((item) => item['id'] === 'sdk.same-session-route-reattach') ?? null;
+    const details = asRecord(capability?.['details']);
+    const deferredUntilTurnBoundary = details['deferredUntilTurnBoundary'] === true;
+    const dialogLoopActive = details['dialogLoopActive'] === true;
+    if (!capability) {
+        return { safe: false, capability: null, reason: 'same_session_route_reattach_capability_missing' };
+    }
+    if (capability['available'] !== true) {
+        return { safe: false, capability, reason: 'same_session_route_reattach_unavailable' };
+    }
+    if (deferredUntilTurnBoundary || dialogLoopActive || capability['state'] === 'degraded') {
+        return {
+            safe: false,
+            capability,
+            reason: 'same_session_route_reattach_deferred_until_turn_boundary',
+        };
+    }
+    return { safe: true, capability, reason: 'same_session_route_reattach_safe_now' };
+}
+
+/**
+ * @param {string} routeOperationId
+ * @returns {Promise<{ handoff: Record<string, unknown> | null; operation: Record<string, unknown> | null }>}
+ */
+async function readRouteSwitchOperation(routeOperationId) {
+    const store = new SqliteModelGatewayCatalogStore();
+    const handoff = await store.readSdkSessionHandoffRecord(routeOperationId);
+    const operation = asRecord(handoff?.['operation']);
+    return {
+        handoff,
+        operation: Object.keys(operation).length > 0 ? operation : null,
+    };
 }
 
 /**
@@ -1583,6 +1652,175 @@ export const modelGatewayRuntimeReconcileTool = buildTool({
     schemaFailurePolicy: 'throw',
     requiresApproval: true,
     handler: async (args) => {
+        const routeOperationId = optionalToolString(args.routeOperationId);
+        if (routeOperationId) {
+            const { handoff, operation } = await readRouteSwitchOperation(routeOperationId);
+            const operationState = optionalToolString(operation?.['state']) ?? 'missing';
+            const targetRoute = operation ? routeSwitchTargetRoute(operation) : null;
+            const routeIdempotencyKey =
+                optionalToolString(operation?.['idempotencyKey']) ?? args.idempotencyKey;
+            const safety = readRouteReattachApplySafety(args.runtimeId);
+            const deferred = operationState === 'deferred_until_turn_boundary';
+            const committed = operationState === 'committed';
+            const promotable = deferred && targetRoute !== null;
+            const operationMeta = toolOperationMeta('model_gateway_runtime_reconcile', {
+                idempotencyKey: routeIdempotencyKey,
+                correlationId: routeOperationId,
+                expectedResult: committed
+                    ? 'already_converged'
+                    : promotable
+                      ? 'same_session_route_promotion'
+                      : 'route_operation_inspection',
+            });
+
+            if (!operation || !targetRoute) {
+                return serializeResult(
+                    createModelGatewayControlPlaneResult({
+                        operation: 'runtime.reconcile',
+                        ok: false,
+                        status: operation ? 'route_operation_target_missing' : 'route_operation_not_found',
+                        dryRun: args.mode === 'plan',
+                        data: {
+                            runtimeId: args.runtimeId,
+                            routeOperationId,
+                            handoff,
+                            operation,
+                            operationMeta,
+                        },
+                        errors: [
+                            {
+                                code: operation
+                                    ? 'ROUTE_RECONCILE_TARGET_ROUTE_MISSING'
+                                    : 'ROUTE_RECONCILE_OPERATION_NOT_FOUND',
+                                message: operation
+                                    ? 'Operação de route switch não possui targetRoute estruturado para promoção.'
+                                    : 'Operação de route switch não encontrada no ledger.',
+                                retryable: false,
+                            },
+                        ],
+                        nextActions: ['inspect_operation_status', 'rerun_route_switch_plan'],
+                    }),
+                );
+            }
+
+            if (args.mode === 'plan' || committed || !promotable || !safety.safe) {
+                const planning = args.mode === 'plan';
+                const status = committed
+                    ? 'already_converged'
+                    : promotable
+                      ? safety.safe
+                          ? 'route_promotion_planned'
+                          : 'route_promotion_deferred_until_turn_boundary'
+                      : 'route_operation_not_promotable';
+                return serializeResult(
+                    createModelGatewayControlPlaneResult({
+                        operation: 'runtime.reconcile',
+                        ok: committed || (planning && promotable),
+                        status,
+                        dryRun: args.mode === 'plan',
+                        data: {
+                            runtimeId: args.runtimeId,
+                            expectedModel: args.expectedModelId,
+                            routeOperationId,
+                            routeOperationState: operationState,
+                            targetRoute,
+                            routeIdempotencyKey,
+                            promotion: {
+                                safeNow: safety.safe,
+                                reason: safety.reason,
+                                requiresNewSession: false,
+                                forceApplyDeferred: safety.safe,
+                            },
+                            handoff,
+                            operation,
+                            operationMeta,
+                        },
+                        warnings: [
+                            ...(committed ? ['route_switch_already_committed'] : []),
+                            ...(!committed && promotable && !safety.safe ? [safety.reason] : []),
+                            ...(!promotable ? [`route_operation_state_not_deferred:${operationState}`] : []),
+                        ],
+                        errors:
+                            args.mode === 'apply' && promotable && !safety.safe
+                                ? [
+                                      {
+                                          code: 'ROUTE_RECONCILE_PROMOTION_DEFERRED_UNTIL_TURN_BOUNDARY',
+                                          message:
+                                              'A operação diferida foi reconhecida, mas o reattach imediato ainda não é seguro no tool-turn ativo.',
+                                          retryable: true,
+                                      },
+                                  ]
+                                : [],
+                        nextActions: committed
+                            ? ['inspect_overview']
+                            : promotable && safety.safe
+                              ? ['apply_with_confirm_true_to_promote_route']
+                              : ['wait_for_turn_boundary_or_use_terminal_force_deferred', 'inspect_operation_status'],
+                    }),
+                );
+            }
+
+            if (!args.confirm) {
+                return serializeResult(
+                    createModelGatewayControlPlaneResult({
+                        operation: 'runtime.reconcile',
+                        ok: false,
+                        status: 'confirmation_required',
+                        data: {
+                            runtimeId: args.runtimeId,
+                            routeOperationId,
+                            routeIdempotencyKey,
+                            targetRoute,
+                            operationMeta,
+                        },
+                        errors: [
+                            {
+                                code: 'RUNTIME_RECONCILE_ROUTE_PROMOTION_CONFIRMATION_REQUIRED',
+                                message: 'Promoção de route switch diferido exige mode=apply e confirm=true.',
+                                retryable: true,
+                            },
+                        ],
+                        nextActions: ['review_route_operation_then_apply_with_confirm_true'],
+                    }),
+                );
+            }
+
+            const control = requireRuntimeControl();
+            const projection = await control.switchRoute(targetRoute, args.runtimeId ?? undefined, {
+                idempotencyKey: routeIdempotencyKey,
+                source: 'llm-b.model_gateway_runtime_reconcile.route',
+                allowActiveDialogLoopReattach: true,
+                forceApplyDeferred: true,
+            });
+            const promotedOperation = asRecord(projection['operation']);
+            const routeCommitted = promotedOperation['state'] === 'committed';
+            return serializeResult(
+                createModelGatewayControlPlaneResult({
+                    operation: 'runtime.reconcile',
+                    ok: routeCommitted,
+                    status: routeCommitted ? 'route_reconciled' : String(promotedOperation['state'] ?? 'failed'),
+                    data: {
+                        ...projection,
+                        routeOperationId,
+                        routeIdempotencyKey,
+                        expectedModel: args.expectedModelId,
+                        operationMeta,
+                    },
+                    warnings: routeCommitted ? [] : ['route_runtime_reconcile_not_committed'],
+                    errors: routeCommitted
+                        ? []
+                        : [
+                              {
+                                  code: 'ROUTE_RUNTIME_RECONCILE_NOT_COMMITTED',
+                                  message: String(promotedOperation['error'] ?? promotedOperation['state'] ?? 'unknown'),
+                                  retryable: true,
+                              },
+                          ],
+                    nextActions: ['inspect_operation_status', 'inspect_overview'],
+                }),
+            );
+        }
+
         const currentSnapshot = readOptionalRuntimeCurrentModel(args.runtimeId);
         const current = currentSnapshot.currentModel;
         const converged = currentSnapshot.available && current === args.expectedModelId;

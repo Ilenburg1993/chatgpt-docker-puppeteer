@@ -1,12 +1,17 @@
 // @ts-check
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const inspectOverview = vi.fn();
 const planRoute = vi.fn();
 const evaluateModels = vi.fn();
 const planProbes = vi.fn();
 const planRefresh = vi.fn();
+const readSdkSessionHandoffRecord = vi.fn();
+const readCapabilities = vi.fn();
+const readStats = vi.fn();
+const switchModel = vi.fn();
+const switchRoute = vi.fn();
 
 /**
  * @param {Record<string, unknown>} input
@@ -58,17 +63,31 @@ vi.mock('#copilot/model-gateway', () => ({
         ready: true,
         gatewayBinding: { providerId: 'kilo-code' },
     }),
+    SqliteModelGatewayCatalogStore: class {
+        readSdkSessionHandoffRecord = readSdkSessionHandoffRecord;
+    },
     upsertModelGatewayByokProfileEnv: vi.fn(),
 }));
 
 const {
     modelGatewayControlPlaneGuideTool,
     modelGatewayReadTools,
+    modelGatewayRuntimeReconcileTool,
     modelGatewayTools,
     modelGatewayWorkflowPlanTool,
+    setModelGatewayRuntimeControl,
 } = await import('../../../../src/copilot/tools/model-gateway/index.js');
 
 describe('model_gateway_workflow_plan', () => {
+    afterEach(() => {
+        setModelGatewayRuntimeControl(null);
+        readSdkSessionHandoffRecord.mockReset();
+        readCapabilities.mockReset();
+        readStats.mockReset();
+        switchModel.mockReset();
+        switchRoute.mockReset();
+    });
+
     it('expõe guia operacional same-session para a LLM-B', async () => {
         const raw = await modelGatewayControlPlaneGuideTool.handler({
             objective: 'same_session_switch',
@@ -228,5 +247,74 @@ describe('model_gateway_workflow_plan', () => {
         });
         expect(JSON.stringify(parsed)).not.toContain('"requiresNewSession":true');
         expect(JSON.stringify(parsed)).not.toContain('"apiKey":');
+    });
+
+    it('reconhece route switch diferido e evita promoção insegura durante tool-turn ativo', async () => {
+        readSdkSessionHandoffRecord.mockResolvedValue({
+            handoffId: 'same-session-route-switch:deferred',
+            operation: {
+                operationId: 'same-session-route-switch:deferred',
+                idempotencyKey: 'route-reconcile-deferred-key',
+                state: 'deferred_until_turn_boundary',
+                sessionId: 'session-stable',
+                targetRoute: {
+                    providerId: 'ollama-cloud',
+                    providerModel: 'qwen3-coder-next',
+                    selectorSyntax: 'qwen3-coder-next',
+                    baseUrl: 'https://ollama.com/v1',
+                    openAICompatibleBaseUrl: 'https://ollama.com/v1',
+                    wireApi: 'completions',
+                    providerProfile: 'ollama-cloud',
+                    routeProfile: 'repo_agent',
+                    selectedRouteKey: 'ollama-cloud:qwen3-coder-next:repo_agent',
+                },
+            },
+        });
+        readCapabilities.mockReturnValue({
+            capabilities: [
+                {
+                    id: 'sdk.same-session-route-reattach',
+                    available: true,
+                    state: 'degraded',
+                    details: {
+                        dialogLoopActive: true,
+                        deferredUntilTurnBoundary: true,
+                        implicitNewSessionAllowed: false,
+                    },
+                },
+            ],
+        });
+        readStats.mockReturnValue({ currentModel: 'nex-agi/nex-n2-pro:free', stats: {} });
+        setModelGatewayRuntimeControl({ readCapabilities, readStats, switchModel, switchRoute });
+
+        const raw = await modelGatewayRuntimeReconcileTool.handler({
+            mode: 'plan',
+            expectedModelId: 'qwen3-coder-next',
+            runtimeId: null,
+            routeOperationId: 'same-session-route-switch:deferred',
+            idempotencyKey: 'route-reconcile-deferred-key',
+            confirm: false,
+        });
+        const parsed = JSON.parse(String(raw));
+
+        expect(parsed).toMatchObject({
+            ok: true,
+            operation: 'runtime.reconcile',
+            status: 'route_promotion_deferred_until_turn_boundary',
+            dryRun: true,
+            data: {
+                routeOperationId: 'same-session-route-switch:deferred',
+                routeOperationState: 'deferred_until_turn_boundary',
+                promotion: {
+                    safeNow: false,
+                    reason: 'same_session_route_reattach_deferred_until_turn_boundary',
+                    requiresNewSession: false,
+                    forceApplyDeferred: false,
+                },
+            },
+            errors: [],
+        });
+        expect(parsed.nextActions).toContain('wait_for_turn_boundary_or_use_terminal_force_deferred');
+        expect(switchRoute).not.toHaveBeenCalled();
     });
 });

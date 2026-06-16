@@ -52,7 +52,8 @@ Este arquivo passa a ser o novo guia operacional para as próximas etapas. O roa
 ### 2.2 O que ainda não está fechado
 
 - [ ] Promoção automática em `assistant.turn_end` ainda não existe.
-- [ ] `model_gateway_runtime_reconcile` ainda reconcilia modelo, não operação `same-session-route-switch:*` diferida.
+- [x] `model_gateway_runtime_reconcile` reconhece operação `same-session-route-switch:*` diferida e retorna plano seguro
+  de promoção quando o reattach imediato não é seguro.
 - [ ] Ingress/proxy dinâmico do Model Gateway ainda não existe para providers que o SDK não rebindar diretamente.
 - [ ] `terminal/commands/byok.js` segue monolítico e ainda concentra casos de uso.
 - [ ] Existem testes legados que ainda esperam `auto_prepare_new_session`, `prepare_new_sdk_session` e
@@ -159,12 +160,14 @@ A LLM-B deve conseguir:
 
 ### Faixa B — Reconcile de rota/provider, não só modelo
 
-- [ ] Fazer `model_gateway_runtime_reconcile` aceitar `operationId` de route switch diferido.
-- [ ] Distinguir reconcile de modelo (`expectedModelId`) e reconcile de rota (`expectedRoute`/`operationId`).
-- [ ] Quando a operação estiver deferida, retornar plano de promoção em vez de `runtime_reconcile_not_committed`.
-- [ ] Quando a rota efetiva já estiver convergida, marcar `already_converged`.
-- [ ] Quando houver mismatch, aplicar o mesmo executor de route switch com rollback e identidade imutável.
-- [ ] Adicionar testes unitários para deferred -> committed via reconcile.
+- [x] Fazer `model_gateway_runtime_reconcile` aceitar `routeOperationId` de route switch diferido.
+- [x] Distinguir reconcile de modelo (`expectedModelId`) e reconcile de rota (`routeOperationId`).
+- [x] Quando a operação estiver deferida, retornar plano de promoção em vez de `runtime_reconcile_not_committed`.
+- [x] Quando a operação de rota já estiver `committed`, marcar `already_converged`.
+- [x] Quando a capability indicar reattach seguro, aplicar o mesmo executor de route switch com
+  `forceApplyDeferred=true`.
+- [x] Adicionar teste unitário para operação diferida reconhecida e não promovida durante tool-turn ativo.
+- [ ] Adicionar testes unitários para deferred -> committed via reconcile quando capability estiver segura.
 - [ ] Adicionar live mínimo: deferir route switch, promover por reconcile, continuar mesma sessão.
 
 ### Faixa C — Matar a dívida de nova sessão implícita
@@ -279,3 +282,10 @@ A LLM-B deve conseguir:
 - [x] `git diff --check --cached` passou.
 - [x] `git commit -m "feat(copilot): consolidate model gateway control plane"` criou `b211cb47`.
 - [x] `git push origin main` atualizou `origin/main`.
+- [x] `model_gateway_runtime_reconcile` passou a aceitar `routeOperationId`, inspecionar o ledger SQLite de handoffs e
+  retornar plano de promoção para operação `deferred_until_turn_boundary`.
+- [x] `npx eslint src/copilot/tools/model-gateway/model-gateway-tools.js src/copilot/tools/model-gateway/schemas.js tests/unit/copilot/tools/test_model_gateway_workflow_plan.spec.js`
+  passou.
+- [x] `npx vitest run tests/unit/copilot/tools/test_model_gateway_workflow_plan.spec.js --reporter=dot` passou com
+  3/3 testes.
+- [x] `npm run typecheck:node` passou.

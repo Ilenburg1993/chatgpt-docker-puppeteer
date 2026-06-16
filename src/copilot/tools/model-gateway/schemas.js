@@ -519,6 +519,9 @@ export const MODEL_GATEWAY_RUNTIME_RECONCILE_INPUT_SCHEMA = Object.freeze({
         mode: { type: 'string', enum: ['plan', 'apply'] },
         expectedModelId: { type: 'string', minLength: 1, maxLength: 300 },
         runtimeId: nullableString('Runtime alvo; null seleciona o runtime padrão.'),
+        routeOperationId: nullableString(
+            'Operation id de um same-session route switch diferido; quando presente, reconcile inspeciona/promove rota em vez de apenas modelo.',
+        ),
         idempotencyKey: {
             type: 'string',
             minLength: 8,
