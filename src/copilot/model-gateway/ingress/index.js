@@ -16,3 +16,9 @@ export {
     proxyModelGatewayIngressOpenAIChatCompletions,
     redactModelGatewayIngressRoute,
 } from './openai-compatible-ingress.js';
+
+export {
+    ModelGatewayIngressRouteRegistry,
+    createModelGatewayIngressRouteRegistry,
+    defaultModelGatewayIngressRouteRegistry,
+} from './route-registry.js';

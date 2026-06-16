@@ -17,6 +17,7 @@ import { createHealthModulesRouter } from './routes/health-modules.js';
 import { registerCopilotHealthChecks } from './routes/health-registry.js';
 import { createHealthRouter } from './routes/health.js';
 import { createMemoryRouter } from './routes/memory.js';
+import { createModelGatewayIngressRouter } from './routes/model-gateway-ingress.js';
 import { createObservabilityRouter } from './routes/observability.js';
 import { createSdkRouter } from './routes/sdk/index.js';
 import { createSessionsRouter } from './routes/sessions.js';
@@ -76,6 +77,7 @@ export function mountCopilotRoutes(app, opts) {
 
     // Rotas auth-exempt: health não precisa de token
     app.use(createHealthRouter());
+    app.use(createModelGatewayIngressRouter());
 
     // Onda 5.9: health checks per-domain
     registerCopilotHealthChecks();

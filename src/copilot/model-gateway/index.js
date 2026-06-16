@@ -45,7 +45,10 @@ export {
     MODEL_GATEWAY_INGRESS_SENSITIVE_FORWARD_HEADERS,
     buildModelGatewayIngressSessionOverrides,
     buildModelGatewayIngressUpstreamRequest,
+    createModelGatewayIngressRouteRegistry,
     createModelGatewayIngressRoute,
+    defaultModelGatewayIngressRouteRegistry,
+    ModelGatewayIngressRouteRegistry,
     proxyModelGatewayIngressOpenAIChatCompletions,
     redactModelGatewayIngressRoute,
 } from './ingress/index.js';

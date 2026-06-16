@@ -27,6 +27,11 @@ export function createAuthMiddleware(opts) {
     const TERMINAL_TOKEN = opts?.token ?? readCopilotBootConfig().server.token;
 
     return function authMiddleware(req, res, next) {
+        // Model Gateway ingress is SDK-facing and owns per-route local API key auth.
+        if (req.path.startsWith('/v1/model-gateway-ingress/')) {
+            return next();
+        }
+
         // Sem token configurado → acesso livre (dev mode)
         if (!TERMINAL_TOKEN) {
             return next();

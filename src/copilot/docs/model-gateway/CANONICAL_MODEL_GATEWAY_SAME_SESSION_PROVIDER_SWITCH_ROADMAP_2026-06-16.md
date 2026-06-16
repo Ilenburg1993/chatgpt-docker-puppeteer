@@ -76,7 +76,9 @@ Este arquivo passa a ser o novo guia operacional para as próximas etapas. O roa
   rebindar diretamente.
 - [x] Existe núcleo inicial `model-gateway/ingress` com contrato de rota, provider config SDK-facing e builder/proxy
   OpenAI-compatible com `fetch` injetável.
-- [ ] Ainda falta montar servidor HTTP local estável, registry de rotas vivas e integração com `SessionBindingPlan`.
+- [x] Existe registry em memória e rota HTTP local `/v1/model-gateway-ingress/:routeId/chat/completions`, com auth local
+  por rota e upstream auth injetada pelo registry.
+- [ ] Ainda falta integrar criação/registro de rotas ingress ao `SessionBindingPlan` e à promoção/reconciliação runtime.
 - [ ] `terminal/commands/byok.js` segue monolítico e ainda concentra casos de uso.
 - [ ] Existem testes legados que ainda esperam `auto_prepare_new_session`, `prepare_new_sdk_session` e
   `/session sdk next new` como caminho normal.
@@ -106,6 +108,8 @@ Este arquivo passa a ser o novo guia operacional para as próximas etapas. O roa
   providers OpenAI-compatible para sessão SDK.
 - [x] `src/copilot/model-gateway/ingress/openai-compatible-ingress.js` agora cria a rota ingress, monta o provider
   local visto pelo SDK, reescreve `model` para o provider real, remove auth do cliente e injeta auth upstream confiável.
+- [x] `src/copilot/server/routes/model-gateway-ingress.js` monta endpoint OpenAI-compatible local, autentica por chave
+  local do route registry e preserva streaming via pipe do `Response.body` quando o upstream retorna stream.
 - [ ] `/now` e `/health` ainda usam `readTerminalConfigProjection()` + `modelGatewayProjection`, não um
   `ModelGatewayReadiness` único; eles exibem contagens e rota ativa, mas não listam operações diferidas pendentes.
 - [ ] `/activity` exibe eventos e tools Model Gateway via presenters, mas não tem seção dedicada a route switches
@@ -306,18 +310,20 @@ A LLM-B deve conseguir:
 - [ ] Evoluir `ModelGatewayIngressRoute` para incluir profile materializado, route operation id, health policy e
   secret refs redigidas, capabilities e TTL.
 - [x] Criar módulo `src/copilot/model-gateway/ingress/` com helpers OpenAI-compatible server-agnostic.
-- [ ] Criar servidor HTTP local estável visto pelo SDK como provider único.
+- [x] Criar servidor HTTP local estável visto pelo SDK como provider único.
 - [x] Builder de request upstream usa provider/model/profile da rota e remove auth do cliente antes de chamar upstream.
-- [ ] Roteamento interno do servidor deve usar provider/model/profile/secret do Model Gateway, sem segredo no URL,
+- [x] Roteamento interno do servidor usa provider/model/profile/secret do route registry, sem segredo no URL,
   transcript, SSE ou ledger.
 - [x] Preservar corpo OpenAI-compatible no builder, incluindo `stream`, `messages`, `tools` e `tool_choice`.
-- [ ] Preservar streaming real, JSON, tool-calling, tool_choice, ask_user e erros OpenAI-compatible no servidor HTTP.
+- [x] Preservar streaming real, JSON, tool-calling e `tool_choice` no servidor HTTP por forwarding de body/headers.
+- [ ] Validar `ask_user` e formatos de erro OpenAI-compatible no servidor HTTP contra um smoke de runtime vivo.
 - [ ] Registrar health por provider real e por route identity, não apenas pelo ingress local.
 - [ ] Integrar ingress ao `SessionBindingPlan` somente quando o provider não suportar rebind direto confiável.
 - [ ] Adicionar rollback e reconciliação para troca de rota via ingress.
 - [ ] Testar troca cross-provider sem recriar sessão usando ingress.
 - [x] Criar fixture unitária hermética do ingress antes de qualquer provider real.
-- [ ] Criar smoke de servidor local sem provider real.
+- [x] Criar teste HTTP hermético de servidor local sem provider real.
+- [ ] Criar smoke de servidor local acoplado ao lifecycle SDK sem provider real.
 
 ### Faixa I — Harness live, export e SSE
 
@@ -411,3 +417,13 @@ A LLM-B deve conseguir:
   passou.
 - [x] `npx vitest run tests/unit/copilot/model-gateway/test_model_gateway_ingress.spec.js --reporter=dot` passou com
   4/4 testes.
+
+## 9. Evidência do incremento ingress HTTP
+
+- [x] `src/copilot/model-gateway/ingress/route-registry.js` criado com registry em memória, TTL pruning e listagem
+  redigida para operador/LLM-B.
+- [x] `src/copilot/server/routes/model-gateway-ingress.js` criado para `POST /v1/model-gateway-ingress/:routeId/chat/completions`.
+- [x] `src/copilot/server/router.js` monta o ingress local e `src/copilot/server/middleware/auth.js` delega essa família
+  de rotas para a autenticação local por route key.
+- [x] `tests/unit/copilot/model-gateway/test_model_gateway_ingress_router.spec.js` cobre auth local, 404, bloqueio sem
+  chave e proxy upstream com `fetch` injetado.
