@@ -4,7 +4,7 @@ Data canonica: 2026-06-16
 
 Ultima atualizacao material: 2026-06-17 — auditoria profunda do worktree, validacao ampla, live LLM-B
 `model-gateway-route-apply-minimal` PASS, correcao dos bloqueios de reattach/ask_user, `ops` rapido com timeouts por
-subgate e reconstrucao deste roadmap.
+subgate, `runtimeSelector` default `merged` restaurado e reconstrucao deste roadmap.
 
 Status: ativo, normativo e continuamente atualizavel.
 
@@ -150,17 +150,19 @@ qualquer desvio de identidade
   operacional default; `--deep-redaction` preserva a varredura profunda e passou em ~21,7s.
 - [x] `ops --json --subcommand-timeout-ms=500` retornou `ok=false` com falhas tipadas por subgate e `commands` parcial
   preservado, em vez de travar o cockpit.
-- [ ] Leitura SQLite runtime-health profunda por `listLatestRuntimeHealthRecords()` e lenta no banco atual: probes locais
-  observaram ~37s para `listRuntimeHealthRecords({limit:1500})` e ~45s para `listLatestRuntimeHealthRecords({limit:100})`.
+- [x] `runtimeSelector --json --profile=repo_agent` voltou a usar `runtimeSource=merged` por default e passou em ~3,9s;
+  `autoStatus --json --profile=repo_agent` passou em ~4,4s e `ops --json --profile=repo_agent` seguiu ok em ~17,1s.
+- [ ] A leitura SQLite runtime-health limitada deixou de bloquear `runtimeSelector`, mas comandos profundos e escala
+  futura ainda precisam de projecao/index/cached read model para evitar regressao em bancos maiores.
 
 ### 3.3 Bugs/gaps concretos encontrados
 
-- [ ] `listLatestRuntimeHealthRecords()` nao serve como dependencia de cockpit rapido no banco atual; precisa de tabela
-  materializada, indice covering ou cache/projecao incremental.
+- [ ] `listLatestRuntimeHealthRecords()` ainda precisa de tabela materializada, indice covering ou cache/projecao
+  incremental antes de virar dependencia irrestrita de cockpits profundos.
 - [ ] `model-gateway-live-readiness` agora ignora runtime-health SQLite por default para manter readiness praticavel; o
   modo profundo fica opt-in em `--sqlite-runtime-health`.
-- [ ] `model-gateway-runtime-selector` agora usa `runtimeSource=file` por default; `merged/sqlite` continuam opt-in, mas
-  precisam ser otimizados antes de voltarem a ser default.
+- [x] `model-gateway-runtime-selector` voltou para `runtimeSource=merged` por default apos prova operacional com limite
+  SQLite de runtime-health.
 - [x] `ops` tem modo rapido default com timeout por subgate (`--subcommand-timeout-ms`, default 20s) e falha parcial
   estruturada.
 - [x] A continuacao apos route switch real nao deve cair em BYOK provider failure/empty turn antes de `ask_user` quando a
@@ -280,7 +282,7 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] `ops --json` responde em budget curto no banco atual, com timeout por subgate e fallback parcial.
 - [x] `liveReadiness --json` usa auditoria SQLite de redaction amostrada por default e `--deep-redaction` para auditoria
   operacional profunda.
-- [ ] `runtimeSelector --runtime-source=merged|sqlite` precisa voltar a ser praticavel antes de ser default.
+- [x] `runtimeSelector --runtime-source=merged|sqlite` voltou a ser praticavel; `merged` e novamente o default.
 - [ ] `listLatestRuntimeHealthRecords` precisa de projecao/index/cached read model para 100k+ linhas.
 
 #### C.2 Readiness unica
@@ -353,7 +355,7 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 
 ## 6. Ordem recomendada a partir daqui
 
-1. Criar projecao SQLite runtime-health rapida e restaurar `runtimeSource=merged` como default quando comprovado.
+1. Criar projecao SQLite runtime-health rapida para retirar a dependencia remanescente de window scans em 100k+ linhas.
 2. Implementar readiness unica e alinhar `/health`, `/now`, `/byok`, `/activity`, `overview` e `ops`.
 3. Investigar e corrigir a reconciliacao `timeline=mixed/diverged` do export no live PASS.
 4. Adicionar testes end-to-end de ledger transicional e metricas de promocao.
@@ -390,3 +392,8 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   - `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent` passou em ~15,7s, com timings por subgate;
   - `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent --subcommand-timeout-ms=500` retornou JSON
     parcial com falhas `timedOut=true`.
+- Evidencia operacional da restauracao `runtimeSource=merged`:
+  - `node scripts/model-gateway/run.mjs runtimeSelector --json --profile=repo_agent` passou em ~3,9s com
+    `runtimeSource=merged`;
+  - `node scripts/model-gateway/run.mjs autoStatus --json --profile=repo_agent` passou em ~4,4s;
+  - `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent` permaneceu ok em ~17,1s.

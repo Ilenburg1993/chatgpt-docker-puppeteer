@@ -109,8 +109,8 @@ function selectedDispositions(selection) {
 }
 
 function runtimeSourceArg() {
-    const value = readArg('--runtime-source', 'file');
-    return ['file', 'sqlite', 'merged'].includes(value) ? value : 'file';
+    const value = readArg('--runtime-source', 'merged');
+    return ['file', 'sqlite', 'merged'].includes(value) ? value : 'merged';
 }
 
 function selectionPolicyArg(requireRuntimeProof) {
