@@ -6,6 +6,11 @@
  */
 
 export {
+    MODEL_GATEWAY_DIRECT_REBIND_EVIDENCE_DEFAULT_MAX_AGE_MS,
+    classifyModelGatewayDirectRebindEvidence,
+    readModelGatewayDirectRebindEvidence,
+} from './binding-evidence.js';
+export {
     MODEL_GATEWAY_READ_LATENCY_BUDGET_MS,
     ModelGatewayReadControlPlane,
     createModelGatewayReadControlPlane,
@@ -38,6 +43,12 @@ export {
     executeModelGatewaySameSessionRouteSwitch,
 } from './same-session-route-switch.js';
 export { executeModelGatewayRuntimeRouteSwitch } from './runtime-route-switch.js';
+export { promoteModelGatewayDeferredRouteSwitchAtTurnBoundary } from './deferred-route-promotion.js';
+export {
+    MODEL_GATEWAY_DEFERRED_ROUTE_PROMOTION_DEFAULT_MAX_AGE_MS,
+    MODEL_GATEWAY_DEFERRED_ROUTE_PROMOTION_POLICY,
+    classifyModelGatewayDeferredRouteOperation,
+} from './deferred-route-operation.js';
 export { createSqliteSameSessionRouteSwitchRecorder } from './sqlite-same-session-route-switch-recorder.js';
 export {
     assertModelGatewayCatalogReadPort,

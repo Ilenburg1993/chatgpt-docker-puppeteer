@@ -1,5 +1,5 @@
 // @ts-check
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock de dependências externas
 vi.mock('#copilot/observability/logger', () => ({
@@ -42,6 +42,10 @@ vi.mock('../../../src/copilot/agent/facades/sdk-access.js', () => ({
 }));
 vi.mock('../../../src/copilot/bridges/mcp-tool-bridge.js', () => ({ buildMcpTools: vi.fn(async () => []) }));
 vi.mock('../../../src/copilot/config/mcp-servers.js', () => ({ buildMcpConfig: vi.fn(() => ({})) }));
+vi.mock('#copilot/config', async (importOriginal) => ({
+    ...(await importOriginal()),
+    resolveConfiguredByokSessionOverrides: vi.fn(() => ({ enabled: false, ready: false, summary: {} })),
+}));
 vi.mock('#copilot/hooks/bus', () => ({ attachBus: vi.fn((h) => h) }));
 vi.mock('#copilot/hooks/factory', () => ({ createHooks: vi.fn((opts) => opts) }));
 vi.mock('#copilot/hooks/session-hooks', () => ({
@@ -74,6 +78,12 @@ import {
 import { buildMcpTools } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
 
 describe('session-setup (F63)', () => {
+    const previousByokEnv = {
+        COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
+        COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
+        COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
+    };
+
     /** @type {any} */
     let ctx;
     /** @type {any} */
@@ -81,6 +91,9 @@ describe('session-setup (F63)', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        process.env.COPILOT_BYOK_ENABLED = 'false';
+        delete process.env.COPILOT_BYOK_PROVIDER_PRESET;
+        delete process.env.COPILOT_BYOK_MODEL;
         ctx = {
             messagesCache: { invalidate: vi.fn() },
             toolsRegistry: null,
@@ -111,6 +124,16 @@ describe('session-setup (F63)', () => {
         host = {
             emit: vi.fn(),
         };
+    });
+
+    afterEach(() => {
+        for (const [key, value] of Object.entries(previousByokEnv)) {
+            if (value === undefined) {
+                delete process.env[key];
+            } else {
+                process.env[key] = value;
+            }
+        }
     });
 
     describe('buildSessionTools', () => {

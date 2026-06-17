@@ -229,7 +229,7 @@ describe('copilot MCP tools', () => {
         const tool = findTool('repo_search_text');
         const result = await tool.handler({
             pattern: 'Copilot MCP Server',
-            path: 'src/copilot/mcp',
+            path: 'src/copilot/mcp/README.md',
             contextLines: 2,
             maxResults: 5,
         });

@@ -15,7 +15,10 @@ vi.mock('../../../../../src/copilot/terminal/byok/live-model-switch.js', () => (
     requestTerminalLiveByokRouteSwitch,
 }));
 
-vi.mock('#copilot/model-gateway', () => ({
+vi.mock('#copilot/model-gateway', async () => ({
+    ...(await vi.importActual(
+        '../../../../../src/copilot/model-gateway/control-plane/deferred-route-operation.js'
+    )),
     SqliteModelGatewayCatalogStore: class {},
 }));
 
@@ -34,6 +37,13 @@ function deferredOperation() {
             retryable: true,
             deferReason: 'ACTIVE_DIALOG_LOOP_ROUTE_REATTACH_DEFERRED',
             createdAt: '2026-06-16T12:00:00.000Z',
+            sessionId: 'session-stable',
+            promotionAuthorization: {
+                authorized: true,
+                policy: 'authorized_after_turn_boundary',
+                source: 'confirmed_model_gateway_route_switch_apply',
+                expiresAt: '2026-06-16T12:10:00.000Z',
+            },
             targetRoute: {
                 providerId: 'ollama-cloud',
                 providerModel: 'qwen3-coder-next',
@@ -60,11 +70,12 @@ describe('promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary', () => {
 
     it('promove route switch diferido recente com a mesma idempotency key e sem nova sessão', async () => {
         const store = {
-            readSdkSessionHandoffRecords: vi.fn().mockResolvedValue([deferredOperation()]),
+            readDeferredSdkSessionHandoffRecords: vi.fn().mockResolvedValue([deferredOperation()]),
         };
 
         const result = await promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary({
             store,
+            sessionId: 'session-stable',
             now: Date.parse('2026-06-16T12:01:00.000Z'),
         });
 
@@ -94,11 +105,12 @@ describe('promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary', () => {
         const row = deferredOperation();
         row.operation.deferReason = 'MANUAL_DEFERRED_FOR_REVIEW';
         const store = {
-            readSdkSessionHandoffRecords: vi.fn().mockResolvedValue([row]),
+            readDeferredSdkSessionHandoffRecords: vi.fn().mockResolvedValue([row]),
         };
 
         const result = await promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary({
             store,
+            sessionId: 'session-stable',
             now: Date.parse('2026-06-16T12:01:00.000Z'),
         });
 

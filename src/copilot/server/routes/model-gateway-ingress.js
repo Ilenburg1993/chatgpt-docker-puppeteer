@@ -10,7 +10,9 @@
  */
 
 import express from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
+import { readBoundedResponseText } from '#copilot/infra/public/http-response';
 import {
     MODEL_GATEWAY_INGRESS_HOP_BY_HOP_HEADERS,
     defaultModelGatewayIngressRouteRegistry,
@@ -59,6 +61,18 @@ function readProvidedLocalApiKey(req) {
 }
 
 /**
+ * @param {string | null} provided
+ * @param {string} expected
+ * @returns {boolean}
+ */
+function localApiKeysMatch(provided, expected) {
+    if (!provided) return false;
+    const providedBytes = Buffer.from(provided);
+    const expectedBytes = Buffer.from(expected);
+    return providedBytes.length === expectedBytes.length && timingSafeEqual(providedBytes, expectedBytes);
+}
+
+/**
  * @param {import('express').Response} res
  * @param {unknown} upstreamResponse
  * @returns {Promise<void>}
@@ -94,7 +108,11 @@ async function sendUpstreamResponse(res, upstreamResponse) {
     }
 
     if (typeof /** @type {{ text?: unknown }} */ (upstreamResponse).text === 'function') {
-        res.send(await /** @type {{ text: () => Promise<string> }} */ (upstreamResponse).text());
+        res.send(
+            await readBoundedResponseText(/** @type {Response} */ (/** @type {unknown} */ (upstreamResponse)), {
+                maxBytes: 16 * 1024 * 1024,
+            }),
+        );
         return;
     }
 
@@ -135,7 +153,7 @@ export function createModelGatewayIngressRouter(options = {}) {
             }
 
             const providedApiKey = readProvidedLocalApiKey(req);
-            if (!providedApiKey || providedApiKey !== entry.localApiKey) {
+            if (!localApiKeysMatch(providedApiKey, entry.localApiKey)) {
                 res.status(401).json({ ok: false, error: 'MODEL_GATEWAY_INGRESS_UNAUTHORIZED' });
                 return;
             }

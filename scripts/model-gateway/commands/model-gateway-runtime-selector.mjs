@@ -33,7 +33,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-runtime-selector.mjs [--json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--allow-probe] [--allow-env-missing] [--prefer-provider-diversity] [--preferred-probes a,b] [--block-failed-probes a,b] [--require-agent-probe-profiles a,b] [--temporary-failure-cooldown-ms N] [--max-attempts N] [--max-attempts-per-provider N] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
+    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-runtime-selector.mjs [--json] [--full-json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--allow-probe] [--allow-env-missing] [--prefer-provider-diversity] [--preferred-probes a,b] [--block-failed-probes a,b] [--require-agent-probe-profiles a,b] [--runtime-health-limit N] [--temporary-failure-cooldown-ms N] [--max-attempts N] [--max-attempts-per-provider N] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
 
 Build the final model-gateway runtime selector plan. By default this is dry-run only: it reads metadata plus already
 observed health, validates route-aware BYOK env readiness, and does not execute providers. Provider calls require the
@@ -109,8 +109,8 @@ function selectedDispositions(selection) {
 }
 
 function runtimeSourceArg() {
-    const value = readArg('--runtime-source', 'merged');
-    return ['file', 'sqlite', 'merged'].includes(value) ? value : 'merged';
+    const value = readArg('--runtime-source', 'file');
+    return ['file', 'sqlite', 'merged'].includes(value) ? value : 'file';
 }
 
 function selectionPolicyArg(requireRuntimeProof) {
@@ -149,6 +149,7 @@ async function buildRuntimeSelectorContext({
     requireRuntimeEnvReady,
     selectionPolicy,
     runtimeSource,
+    runtimeHealthLimit,
     preferredProbeKinds = [],
     blockFailedProbeKinds = [],
     requireAgentProbeProfiles = [],
@@ -167,7 +168,7 @@ async function buildRuntimeSelectorContext({
     if (runtimeSource === 'sqlite' || runtimeSource === 'merged') {
         try {
             sqliteHealthRecords = await measured(timings, 'health.read_sqlite_store', () =>
-                new SqliteModelGatewayCatalogStore().listLatestRuntimeHealthRecords(),
+                new SqliteModelGatewayCatalogStore().listLatestRuntimeHealthRecords({ limit: runtimeHealthLimit }),
             );
         } catch (error) {
             sqliteRuntimeError = error instanceof Error ? error.message : String(error);
@@ -289,6 +290,7 @@ async function buildRuntimeSelectorContext({
 }
 
 const json = argSet.has('--json');
+const fullJson = argSet.has('--full-json');
 const execute = argSet.has('--execute');
 const fail = argSet.has('--fail');
 const strict = argSet.has('--strict') || !argSet.has('--allow-probe');
@@ -300,6 +302,7 @@ const preferredProbeKinds = readStringList('--preferred-probes');
 const blockFailedProbeKinds = readStringList('--block-failed-probes');
 const requireAgentProbeProfiles = readStringList('--require-agent-probe-profiles');
 const temporaryFailureCooldownMs = readInteger('--temporary-failure-cooldown-ms', 0);
+const runtimeHealthLimit = readInteger('--runtime-health-limit', 1_500);
 const runtimeProofWeights = readRuntimeProofWeights();
 const requestedExecutionProfile = readArg('--profile') || null;
 const fallbackExecutionProfiles = readArg('--fallback-profiles')
@@ -321,6 +324,7 @@ const context = await buildRuntimeSelectorContext({
     requireRuntimeEnvReady,
     selectionPolicy,
     runtimeSource,
+    runtimeHealthLimit,
     preferredProbeKinds,
     blockFailedProbeKinds,
     requireAgentProbeProfiles,
@@ -559,8 +563,145 @@ const summary = {
           ],
 };
 
+function compactHealthDecision(value) {
+    const row = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    if (!row) return null;
+    const health = row['health'] && typeof row['health'] === 'object' && !Array.isArray(row['health']) ? row['health'] : null;
+    return {
+        include: row['include'] === true,
+        reason: typeof row['reason'] === 'string' ? row['reason'] : null,
+        providerId: typeof health?.['providerId'] === 'string' ? health['providerId'] : null,
+        providerModel: typeof health?.['providerModel'] === 'string' ? health['providerModel'] : null,
+        lastStatus: typeof health?.['lastStatus'] === 'string' ? health['lastStatus'] : null,
+        agentProbeStatus: typeof health?.['agentProbeStatus'] === 'string' ? health['agentProbeStatus'] : null,
+        verifiedProbes: Array.isArray(health?.['verifiedProbes']) ? health['verifiedProbes'].slice(0, 8) : [],
+        failedProbes: Array.isArray(health?.['failedProbes']) ? health['failedProbes'].slice(0, 8) : [],
+    };
+}
+
+function compactProviderCooldown(value) {
+    const row = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    if (!row) return null;
+    return {
+        include: row['include'] === true,
+        reason: typeof row['reason'] === 'string' ? row['reason'] : null,
+        providerId: typeof row['providerId'] === 'string' ? row['providerId'] : null,
+        failureKinds: Array.isArray(row['failureKinds']) ? row['failureKinds'].slice(0, 8) : [],
+        failedModelCount: typeof row['failedModelCount'] === 'number' ? row['failedModelCount'] : null,
+        retryAfterSeconds: typeof row['retryAfterSeconds'] === 'number' ? row['retryAfterSeconds'] : null,
+        resetAt: typeof row['resetAt'] === 'string' ? row['resetAt'] : null,
+    };
+}
+
+function compactSelectedRoute(selected) {
+    const row = selected && typeof selected === 'object' && !Array.isArray(selected) ? selected : null;
+    if (!row) return null;
+    return {
+        id: typeof row['id'] === 'string' ? row['id'] : null,
+        providerId: typeof row['providerId'] === 'string' ? row['providerId'] : null,
+        providerModel: typeof row['providerModel'] === 'string' ? row['providerModel'] : null,
+        selectorSyntax: typeof row['selectorSyntax'] === 'string' ? row['selectorSyntax'] : null,
+        routeProfile: typeof row['routeProfile'] === 'string' ? row['routeProfile'] : null,
+        routeLayer: typeof row['routeLayer'] === 'string' ? row['routeLayer'] : null,
+        wireApi: typeof row['wireApi'] === 'string' ? row['wireApi'] : null,
+        baseUrl: typeof row['baseUrl'] === 'string' ? row['baseUrl'] : null,
+        openAICompatibleBaseUrl:
+            typeof row['openAICompatibleBaseUrl'] === 'string' ? row['openAICompatibleBaseUrl'] : null,
+        localPrivate: row['localPrivate'] === true,
+        score: typeof row['score'] === 'number' ? row['score'] : null,
+        hasRuntimeProof: row['hasRuntimeProof'] === true,
+        reasons: Array.isArray(row['reasons']) ? row['reasons'].slice(0, 12) : [],
+    };
+}
+
+function compactDecisionEvent(event) {
+    const row = event && typeof event === 'object' && !Array.isArray(event) ? event : null;
+    if (!row) return null;
+    return {
+        type: typeof row['type'] === 'string' ? row['type'] : null,
+        decisionId: typeof row['decisionId'] === 'string' ? row['decisionId'] : null,
+        taskProfile: typeof row['taskProfile'] === 'string' ? row['taskProfile'] : null,
+        routeProfile: typeof row['routeProfile'] === 'string' ? row['routeProfile'] : null,
+        mode: typeof row['mode'] === 'string' ? row['mode'] : null,
+        source: typeof row['source'] === 'string' ? row['source'] : null,
+        selected: row['selected'] === true,
+        providerId: typeof row['providerId'] === 'string' ? row['providerId'] : null,
+        modelId: typeof row['modelId'] === 'string' ? row['modelId'] : null,
+        failure: typeof row['failure'] === 'string' ? row['failure'] : null,
+    };
+}
+
+function compactSelectorRoute(route) {
+    return {
+        profileId: route.profileId,
+        status: route.status,
+        source: route.source,
+        selected: compactSelectedRoute(route.selected),
+        selectedRouteKey: route.selectedRouteKey,
+        hasRuntimeProof: route.hasRuntimeProof,
+        runtimeEnv: route.runtimeEnv,
+        runtimeHealth: compactHealthDecision(route.runtimeHealth),
+        providerCooldown: compactProviderCooldown(route.providerCooldown),
+        alternativeSummary: route.alternativeSummary,
+        candidateAlternatives: route.candidateAlternatives.slice(0, 12).map((candidate) => ({
+            profileId: candidate['profileId'],
+            status: candidate['status'],
+            source: candidate['source'],
+            selected: compactSelectedRoute(candidate['selected']),
+            selectedRouteKey: candidate['selectedRouteKey'],
+            hasRuntimeProof: candidate['hasRuntimeProof'] === true,
+            runtimeEnv: candidate['runtimeEnv'],
+            runtimeHealth: compactHealthDecision(candidate['runtimeHealth']),
+            providerCooldown: compactProviderCooldown(candidate['providerCooldown']),
+            reasons: Array.isArray(candidate['reasons']) ? candidate['reasons'].slice(0, 12) : [],
+            nextActions: Array.isArray(candidate['nextActions']) ? candidate['nextActions'].slice(0, 8) : [],
+            decisionEvent: compactDecisionEvent(candidate['decisionEvent']),
+        })),
+        reasons: route.reasons.slice(0, 16),
+        nextActions: route.nextActions.slice(0, 8),
+        decisionEvent: compactDecisionEvent(route.decisionEvent),
+    };
+}
+
+function compactRuntimeSelectorPlan(plan) {
+    return {
+        ...plan,
+        routes: plan.routes.map(compactSelectorRoute),
+    };
+}
+
+function compactPolicyResolution(policyResolution) {
+    return {
+        schema: policyResolution.schema,
+        ok: policyResolution.ok,
+        mode: policyResolution.mode,
+        summary: policyResolution.summary,
+        rows: policyResolution.rows.map((row) => ({
+            profileId: row['profileId'],
+            source: row['source'],
+            changedFromPreRuntime: row['changedFromPreRuntime'] === true,
+            hasRuntimeProof: row['hasRuntimeProof'] === true,
+            selected: compactSelectedRoute(row['selected']),
+            preSelected: compactSelectedRoute(row['preSelected']),
+            postSelected: compactSelectedRoute(row['postSelected']),
+            candidateAlternates: Array.isArray(row['candidateAlternates'])
+                ? row['candidateAlternates'].slice(0, 12).map(compactSelectedRoute)
+                : [],
+        })),
+    };
+}
+
+function compactSummaryForJson(value) {
+    if (fullJson) return value;
+    return {
+        ...value,
+        policyResolution: compactPolicyResolution(value.policyResolution),
+        runtimeSelectorPlan: compactRuntimeSelectorPlan(value.runtimeSelectorPlan),
+    };
+}
+
 if (json) {
-    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(compactSummaryForJson(summary), null, 2)}\n`);
 } else {
     process.stdout.write(
         `model-gateway runtime selector: ok=${summary.ok ? 'yes' : 'no'} runtime=${execute ? 'yes' : 'no'} mode=${summary.mode}\n`,

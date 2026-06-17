@@ -79,6 +79,10 @@ export function createProviderGatewayTraits(inventory, spec = null) {
     const baseUrls = stringList(inventory['baseUrls']);
     const specProviderIds = stringList(spec?.['providerIds']);
     const specGateway = spec?.['gateway'] && typeof spec['gateway'] === 'object' ? /** @type {Record<string, unknown>} */ (spec['gateway']) : {};
+    const specDirectBinding =
+        spec?.['directBinding'] && typeof spec['directBinding'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (spec['directBinding'])
+            : {};
     const catalogKinds = uniqueSorted(catalogSources.map((source) => optionalString(source?.['kind'])).filter((item) => item !== null));
     const runtimeKinds = uniqueSorted(runtimeEndpoints.map((endpoint) => optionalString(endpoint?.['kind'])).filter((item) => item !== null));
     const richnessSummaries = catalogSources.map((source) => normalizeProviderEndpointRichness(source?.['richness']));
@@ -129,6 +133,12 @@ export function createProviderGatewayTraits(inventory, spec = null) {
             batch: runtimeKinds.includes('batch'),
             management: runtimeKinds.some((kind) => /management/iu.test(kind)),
             openAICompatibleRuntime,
+        },
+        directBinding: {
+            configRepresentability:
+                optionalString(specDirectBinding['configRepresentability']) ?? 'full',
+            requiredHeaders: stringList(specDirectBinding['requiredHeaders']),
+            reason: optionalString(specDirectBinding['reason']),
         },
         routing: {
             supportsAutoSelection: routeSelectors.some((selector) => /auto|fastest|cheapest|preferred/iu.test(selector)),

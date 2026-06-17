@@ -9,12 +9,15 @@
  * @module copilot/terminal/byok/deferred-route-promotion
  */
 
-import { SqliteModelGatewayCatalogStore } from '#copilot/model-gateway';
+import {
+    MODEL_GATEWAY_DEFERRED_ROUTE_PROMOTION_DEFAULT_MAX_AGE_MS,
+    SqliteModelGatewayCatalogStore,
+    classifyModelGatewayDeferredRouteOperation,
+} from '#copilot/model-gateway';
 import { recordTerminalActivity } from '../state/index.js';
 import { requestTerminalLiveByokRouteSwitch } from './live-model-switch.js';
 
 const DEFAULT_LIMIT = 20;
-const DEFAULT_MAX_AGE_MS = 10 * 60_000;
 const inFlightPromotions = new Set();
 
 /**
@@ -34,69 +37,51 @@ function optionalString(value) {
 }
 
 /**
- * @param {unknown} value
- * @returns {number | null}
- */
-function dateMs(value) {
-    const text = optionalString(value);
-    if (!text) return null;
-    const ms = Date.parse(text);
-    return Number.isFinite(ms) ? ms : null;
-}
-
-/**
- * @param {Record<string, unknown>} operation
- * @param {number} now
- * @param {number} maxAgeMs
- * @returns {{ ok: boolean; reason: string; route: Record<string, unknown> | null; idempotencyKey: string | null }}
- */
-function classifyDeferredRoutePromotionCandidate(operation, now, maxAgeMs) {
-    if (operation['state'] !== 'deferred_until_turn_boundary') {
-        return { ok: false, reason: 'not_deferred_until_turn_boundary', route: null, idempotencyKey: null };
-    }
-    if (operation['requiresNewSession'] !== false) {
-        return { ok: false, reason: 'requires_new_session_not_false', route: null, idempotencyKey: null };
-    }
-    if (operation['retryable'] !== true) {
-        return { ok: false, reason: 'not_retryable', route: null, idempotencyKey: null };
-    }
-    if (operation['deferReason'] !== 'ACTIVE_DIALOG_LOOP_ROUTE_REATTACH_DEFERRED') {
-        return { ok: false, reason: 'defer_reason_not_auto_promotable', route: null, idempotencyKey: null };
-    }
-    const createdAtMs = dateMs(operation['createdAt']);
-    if (createdAtMs !== null && now - createdAtMs > maxAgeMs) {
-        return { ok: false, reason: 'deferred_operation_too_old', route: null, idempotencyKey: null };
-    }
-    const route = isRecord(operation['targetRoute']) ? operation['targetRoute'] : null;
-    const providerId = optionalString(route?.['providerId']);
-    const providerModel = optionalString(route?.['providerModel']) ?? optionalString(route?.['selectorSyntax']);
-    if (!route || !providerId || !providerModel) {
-        return { ok: false, reason: 'target_route_invalid', route: null, idempotencyKey: null };
-    }
-    const idempotencyKey = optionalString(operation['idempotencyKey']);
-    if (!idempotencyKey) {
-        return { ok: false, reason: 'idempotency_key_missing', route: null, idempotencyKey: null };
-    }
-    return { ok: true, reason: 'auto_promotable', route, idempotencyKey };
-}
-
-/**
  * @param {{
- *     store?: Pick<SqliteModelGatewayCatalogStore, 'readSdkSessionHandoffRecords'>;
+ *     store?: Pick<SqliteModelGatewayCatalogStore, 'readDeferredSdkSessionHandoffRecords'>;
+ *     sessionId?: string | null;
+ *     runtimeId?: string | null;
  *     limit?: number;
  *     maxAgeMs?: number;
  *     now?: number;
  *     source?: string;
  * }} [options]
- * @returns {Promise<{ scanned: number; promoted: number; skipped: number; errors: number; records: Record<string, unknown>[] }>}
+ * @returns {Promise<{ sessionId: string | null; scanned: number; promoted: number; skipped: number; errors: number; records: Record<string, unknown>[] }>}
  */
 export async function promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary(options = {}) {
+    const sessionId = optionalString(options.sessionId);
+    const source = options.source ?? 'terminal.byok_route_deferred_turn_end';
+    if (!sessionId) {
+        recordTerminalActivity('model', 'Promoção automática de rota não executada', {
+            detail: 'sessão SDK viva indisponível; nenhuma operação foi consultada',
+            source,
+            severity: 'info',
+            recordHistory: false,
+            updateCurrent: false,
+        });
+        return {
+            sessionId: null,
+            scanned: 0,
+            promoted: 0,
+            skipped: 0,
+            errors: 0,
+            records: [{ promoted: false, skippedReason: 'live_session_id_required' }],
+        };
+    }
+
     const store = options.store ?? new SqliteModelGatewayCatalogStore();
     const limit = Math.max(1, Math.min(Math.floor(options.limit ?? DEFAULT_LIMIT), 100));
-    const maxAgeMs = Math.max(1_000, Math.floor(options.maxAgeMs ?? DEFAULT_MAX_AGE_MS));
+    const maxAgeMs = Math.max(
+        1_000,
+        Math.floor(options.maxAgeMs ?? MODEL_GATEWAY_DEFERRED_ROUTE_PROMOTION_DEFAULT_MAX_AGE_MS),
+    );
     const now = options.now ?? Date.now();
-    const source = options.source ?? 'terminal.byok_route_deferred_turn_end';
-    const handoffs = await store.readSdkSessionHandoffRecords({ limit });
+    const handoffs = await store.readDeferredSdkSessionHandoffRecords({
+        sessionId,
+        limit,
+        now,
+        includeExpired: true,
+    });
     /** @type {Record<string, unknown>[]} */
     const records = [];
     let promoted = 0;
@@ -107,16 +92,25 @@ export async function promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary(opt
         const operation = isRecord(handoff['operation']) ? handoff['operation'] : null;
         if (!operation) {
             skipped += 1;
+            records.push({ promoted: false, skippedReason: 'operation_payload_missing' });
             continue;
         }
-        const operationId = optionalString(operation['operationId']) ?? optionalString(handoff['handoffId']);
-        const candidate = classifyDeferredRoutePromotionCandidate(operation, now, maxAgeMs);
-        if (!candidate.ok || !operationId || !candidate.route || !candidate.idempotencyKey) {
+        const classification = classifyModelGatewayDeferredRouteOperation(operation, {
+            now,
+            maxAgeMs,
+            expectedSessionId: sessionId,
+        });
+        const operationId = classification.operationId ?? optionalString(handoff['handoffId']);
+        if (!classification.promotable || !operationId || !classification.route || !classification.idempotencyKey) {
             skipped += 1;
             records.push({
                 operationId,
                 promoted: false,
-                skippedReason: candidate.reason,
+                classification: classification.classification,
+                skippedReason: classification.reason,
+                promotionPolicy: classification.promotionPolicy,
+                expiresAt: classification.expiresAt,
+                nextActions: classification.nextActions,
             });
             continue;
         }
@@ -127,11 +121,13 @@ export async function promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary(opt
         }
         inFlightPromotions.add(operationId);
         try {
-            const result = await requestTerminalLiveByokRouteSwitch(candidate.route, {
-                idempotencyKey: candidate.idempotencyKey,
+            const runtimeId = optionalString(options.runtimeId);
+            const result = await requestTerminalLiveByokRouteSwitch(classification.route, {
+                ...(runtimeId ? { runtimeId } : {}),
+                idempotencyKey: classification.idempotencyKey,
                 forceApplyDeferred: true,
                 source,
-                reason: 'promoção automática no limite seguro do turno',
+                reason: 'promoção automática autorizada no limite seguro do turno',
             });
             promoted += 1;
             records.push({
@@ -159,11 +155,27 @@ export async function promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary(opt
     }
     if (promoted > 0) {
         recordTerminalActivity('model', 'Rotas diferidas promovidas no fim do turno', {
-            detail: `${promoted} operação(ões) promovida(s) preservando a sessão`,
+            detail: `${promoted} operação(ões) promovida(s) na sessão ${sessionId}`,
             source,
             severity: 'info',
             recordHistory: true,
         });
+    } else {
+        const reasonCounts = new Map();
+        for (const record of records) {
+            const reason = optionalString(record['skippedReason']) ?? 'no_candidate';
+            reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+        }
+        recordTerminalActivity('model', 'Nenhuma rota diferida promovível', {
+            detail:
+                handoffs.length === 0
+                    ? `sessão ${sessionId}: nenhuma operação diferida pendente`
+                    : `sessão ${sessionId}: ${JSON.stringify(Object.fromEntries(reasonCounts))}`,
+            source,
+            severity: 'info',
+            recordHistory: false,
+            updateCurrent: false,
+        });
     }
-    return { scanned: handoffs.length, promoted, skipped, errors, records };
+    return { sessionId, scanned: handoffs.length, promoted, skipped, errors, records };
 }

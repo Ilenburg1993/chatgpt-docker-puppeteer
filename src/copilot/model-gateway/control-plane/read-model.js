@@ -8,6 +8,7 @@
  */
 
 import { importConfiguredByokFromEnv } from '../registry/env-byok-compat-importer.js';
+import { applyModelGatewayBindingStrategy } from '../ingress/binding-strategy.js';
 import { createModelGatewayModelIdentity } from '../contracts/model-identity.js';
 import { evaluateModelGatewayModelLifecycle } from '../contracts/model-lifecycle.js';
 import { searchModelGatewayCatalogEntries } from '../catalog/search.js';
@@ -31,6 +32,8 @@ import {
     readModelGatewayRuntimeAutomationEffectivePolicy,
     validateModelGatewayRuntimeAutomationPolicy,
 } from '../automation/policy.js';
+import { readModelGatewayDirectRebindEvidence } from './binding-evidence.js';
+import { classifyModelGatewayDeferredRouteOperation } from './deferred-route-operation.js';
 import { createModelGatewayControlPlaneResult } from './result-envelope.js';
 import {
     assertModelGatewayCatalogReadPort,
@@ -205,8 +208,9 @@ function buildPolicyProposalPatch(objective, taskProfile) {
 /**
  * @param {ReturnType<typeof importConfiguredByokFromEnv>} byok
  * @param {Record<string, any> | null} selectedModel
+ * @param {Record<string, unknown> | null} [bindingDecision]
  */
-function buildSessionTransitionPlan(byok, selectedModel) {
+function buildSessionTransitionPlan(byok, selectedModel, bindingDecision = null) {
     const active = isRecord(byok.active) ? byok.active : {};
     const provider = byok.provider && isRecord(byok.provider) ? byok.provider : {};
     const activeProviderId = optionalString(active['providerId']) ?? optionalString(provider['id']);
@@ -231,6 +235,31 @@ function buildSessionTransitionPlan(byok, selectedModel) {
             nextAction: 'review_route_rejections',
         };
     }
+    const bindingStrategy = optionalString(bindingDecision?.['strategy']);
+    if (bindingStrategy === 'blocked') {
+        const nextActions = Array.isArray(bindingDecision?.['nextActions'])
+            ? bindingDecision['nextActions'].map(String)
+            : [];
+        return {
+            status: 'blocked',
+            activeProviderId,
+            activeModelId,
+            selectedProviderId,
+            selectedModelId,
+            sameProviderBoundary: false,
+            sameSessionRequired: true,
+            liveRouteSwitchAllowed: false,
+            liveModelSwitchAllowed: false,
+            providerRebindRequired: true,
+            bindingStrategy,
+            bindingDecision,
+            requiresNewSession: false,
+            newSessionAllowedOnlyWhenExplicit: true,
+            autoLoopAllowed: false,
+            reason: 'selected_route_binding_strategy_blocked',
+            nextAction: nextActions[0] ?? 'review_binding_strategy',
+        };
+    }
     const sameProviderBoundary = activeProviderId !== null && activeProviderId === selectedProviderId;
     return {
         status: 'live_route_switch_candidate',
@@ -244,6 +273,8 @@ function buildSessionTransitionPlan(byok, selectedModel) {
         liveModelSwitchAllowed: sameProviderBoundary,
         providerRebindRequired: !sameProviderBoundary,
         providerRebindCapability: sameProviderBoundary ? 'not_required' : 'same_session_reattach_preferred',
+        bindingStrategy: bindingStrategy ?? 'direct',
+        bindingDecision,
         requiresNewSession: false,
         newSessionAllowedOnlyWhenExplicit: true,
         autoLoopAllowed: false,
@@ -271,9 +302,13 @@ function buildLiveRouteSwitchTarget(selectedModel, selectedRouteKey, taskProfile
         optionalString(selectedModel['selectorSyntax']) ??
         optionalString(selectedModel['id']);
     if (!providerId || !providerModel) return null;
-    return {
+    return applyModelGatewayBindingStrategy({
         providerId,
         providerModel,
+        providerType:
+            optionalString(selectedModel['providerType']) ??
+            optionalString(routing['providerType']) ??
+            optionalString(normalizedPolicy['providerType']),
         selectorSyntax: optionalString(selectedModel['selectorSyntax']),
         baseUrl:
             optionalString(selectedModel['baseUrl']) ??
@@ -283,6 +318,10 @@ function buildLiveRouteSwitchTarget(selectedModel, selectedRouteKey, taskProfile
             optionalString(selectedModel['openAICompatibleBaseUrl']) ??
             optionalString(routing['openAICompatibleBaseUrl']) ??
             optionalString(normalizedPolicy['openAICompatibleBaseUrl']),
+        openAICompatible:
+            selectedModel['openAICompatible'] === true ||
+            routing['openAICompatible'] === true ||
+            normalizedPolicy['openAICompatible'] === true,
         wireApi:
             optionalString(selectedModel['wireApi']) ??
             optionalString(routing['wireApi']) ??
@@ -291,9 +330,31 @@ function buildLiveRouteSwitchTarget(selectedModel, selectedRouteKey, taskProfile
             optionalString(selectedModel['providerProfile']) ??
             optionalString(routing['providerProfile']) ??
             optionalString(normalizedPolicy['providerProfile']),
+        directRebindReliability:
+            optionalString(selectedModel['directRebindReliability']) ??
+            optionalString(routing['directRebindReliability']) ??
+            optionalString(normalizedPolicy['directRebindReliability']),
+        directRebindSupported:
+            typeof selectedModel['directRebindSupported'] === 'boolean'
+                ? selectedModel['directRebindSupported']
+                : typeof routing['directRebindSupported'] === 'boolean'
+                  ? routing['directRebindSupported']
+                  : normalizedPolicy['directRebindSupported'],
+        directRebindReliable:
+            typeof selectedModel['directRebindReliable'] === 'boolean'
+                ? selectedModel['directRebindReliable']
+                : typeof routing['directRebindReliable'] === 'boolean'
+                  ? routing['directRebindReliable']
+                  : normalizedPolicy['directRebindReliable'],
+        bindingCapabilities:
+            (isRecord(selectedModel['bindingCapabilities']) && selectedModel['bindingCapabilities']) ||
+            (isRecord(routing['bindingCapabilities']) && routing['bindingCapabilities']) ||
+            (isRecord(normalizedPolicy['bindingCapabilities']) && normalizedPolicy['bindingCapabilities']) ||
+            null,
+        runtimeEvidence: isRecord(selectedModel['runtimeEvidence']) ? selectedModel['runtimeEvidence'] : null,
         routeProfile: taskProfile,
         selectedRouteKey,
-    };
+    });
 }
 
 /**
@@ -557,26 +618,70 @@ export class ModelGatewayReadControlPlane {
             evaluateEligibility: input.evaluateEligibility,
         });
         const explanation = explainGatewayRouteDecision(route);
-        const sessionTransition = buildSessionTransitionPlan(
-            importConfiguredByokFromEnv(this.#env),
+        const byok = importConfiguredByokFromEnv(this.#env);
+        const active = isRecord(byok.active) ? byok.active : {};
+        const activeProvider = byok.provider && isRecord(byok.provider) ? byok.provider : {};
+        const activeProviderId =
+            optionalString(active['providerId']) ?? optionalString(activeProvider['id']);
+        const selectedRouteBase = buildLiveRouteSwitchTarget(
             route.selected?.model ?? null,
+            explanation.selectedId,
+            input.taskProfile,
+        );
+        /** @type {Record<string, unknown> | null} */
+        let bindingEvidence = null;
+        let bindingEvidenceReadFailed = false;
+        if (selectedRouteBase) {
+            try {
+                const observedEvidence = await readModelGatewayDirectRebindEvidence({
+                    store: this.#sqliteStore,
+                    previousProviderId: activeProviderId,
+                    providerId: String(selectedRouteBase['providerId']),
+                    wireApi: optionalString(selectedRouteBase['wireApi']),
+                    now: this.#now(),
+                });
+                if (typeof observedEvidence['sampleSize'] === 'number' && observedEvidence['sampleSize'] > 0) {
+                    bindingEvidence = observedEvidence;
+                }
+            } catch {
+                bindingEvidenceReadFailed = true;
+            }
+        }
+        const selectedRoute = selectedRouteBase
+            ? applyModelGatewayBindingStrategy({
+                  ...selectedRouteBase,
+                  ...(bindingEvidence
+                      ? {
+                            runtimeEvidence: {
+                                ...(isRecord(selectedRouteBase['runtimeEvidence'])
+                                    ? selectedRouteBase['runtimeEvidence']
+                                    : {}),
+                                ...bindingEvidence,
+                            },
+                        }
+                      : {}),
+              })
+            : null;
+        const bindingDecision = isRecord(selectedRoute?.['bindingDecision']) ? selectedRoute['bindingDecision'] : null;
+        const bindingBlocked = bindingDecision?.['strategy'] === 'blocked';
+        const sessionTransition = buildSessionTransitionPlan(
+            byok,
+            route.selected?.model ?? null,
+            bindingDecision,
         );
         const latency = latencyObservation(startedAtMs, this.#now(), MODEL_GATEWAY_READ_LATENCY_BUDGET_MS.routePlan);
         return createModelGatewayControlPlaneResult({
             operation: 'route.plan',
-            ok: explanation.selected,
-            status: explanation.selected ? 'planned' : 'blocked',
+            ok: explanation.selected && !bindingBlocked,
+            status: explanation.selected && !bindingBlocked ? 'planned' : 'blocked',
             dryRun: true,
             data: {
                 snapshotId: snapshot.snapshotId,
                 latency,
                 taskProfile: input.taskProfile,
                 selectedId: explanation.selectedId,
-                selectedRoute: buildLiveRouteSwitchTarget(
-                    route.selected?.model ?? null,
-                    explanation.selectedId,
-                    input.taskProfile,
-                ),
+                selectedRoute,
+                bindingDecision,
                 sessionTransition,
                 summary: explanation.summary,
                 snapshotContext: route.snapshotContext,
@@ -590,8 +695,19 @@ export class ModelGatewayReadControlPlane {
                 ...explanation.topRejectedReasons,
                 ...(latency.withinBudget ? [] : ['route_plan_latency_budget_exceeded']),
                 ...(sessionTransition.providerRebindRequired ? ['selected_route_requires_live_provider_rebind'] : []),
+                ...(Array.isArray(bindingDecision?.['warnings']) ? bindingDecision['warnings'].map(String) : []),
+                ...(bindingEvidenceReadFailed ? ['direct_rebind_evidence_unavailable'] : []),
+                ...(bindingBlocked ? ['selected_route_binding_strategy_blocked'] : []),
             ],
-            nextActions: [...new Set([...explanation.nextActions, sessionTransition.nextAction])],
+            nextActions: [
+                ...new Set([
+                    ...explanation.nextActions,
+                    sessionTransition.nextAction,
+                    ...(Array.isArray(bindingDecision?.['nextActions'])
+                        ? bindingDecision['nextActions'].map(String)
+                        : []),
+                ]),
+            ],
         });
     }
 
@@ -854,12 +970,25 @@ export class ModelGatewayReadControlPlane {
                 .filter(isRecord)
                 .filter((row) => !input.operationId || hasOperationId(row, input.operationId))
                 .slice(0, input.limit);
+        const matchedHandoffs = filter(handoffs);
+        const deferredOperations = matchedHandoffs.flatMap((handoff) => {
+            const operation = isRecord(handoff['operation']) ? handoff['operation'] : null;
+            if (!operation || operation['state'] !== 'deferred_until_turn_boundary') return [];
+            return [classifyModelGatewayDeferredRouteOperation(operation, { now: this.#now() })];
+        });
         const data = {
             operationId: input.operationId,
             routeDecisions: filter(routeDecisions),
-            handoffs: filter(handoffs),
+            handoffs: matchedHandoffs,
             confirmations: filter(confirmations),
             runtimeProbeRuns: runtimeProbeRun ? [runtimeProbeRun] : [],
+            deferredOperations,
+            deferredSummary: {
+                total: deferredOperations.length,
+                promotable: deferredOperations.filter((entry) => entry.promotable).length,
+                expired: deferredOperations.filter((entry) => entry.expired).length,
+                reviewRequired: deferredOperations.filter((entry) => entry.requiresReview).length,
+            },
         };
         const matchCount =
             data.routeDecisions.length + data.handoffs.length + data.confirmations.length + data.runtimeProbeRuns.length;

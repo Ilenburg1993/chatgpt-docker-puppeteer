@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/catalog/sqlite-schema
  */
 
-export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 11;
+export const MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 13;
 
 export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_snapshots',
@@ -36,6 +36,7 @@ export const MODEL_GATEWAY_SQLITE_TABLES = Object.freeze([
     'copilot_model_gateway_automation_effect_applications',
     'copilot_model_gateway_recovery_attempts',
     'copilot_model_gateway_sdk_session_handoffs',
+    'copilot_model_gateway_sdk_session_handoff_transitions',
     'copilot_model_gateway_sdk_session_confirmations',
     'copilot_model_gateway_standby_plans',
     'copilot_model_gateway_live_scenario_runs',
@@ -407,33 +408,59 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
         ON copilot_model_gateway_recovery_attempts(recovery_scope, failure_kind, status, observed_at_ms DESC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_sdk_session_handoffs (
-        handoff_id         TEXT PRIMARY KEY,
-        decision_id        TEXT,
-        route_profile      TEXT NOT NULL DEFAULT 'default',
-        selected_route_key TEXT,
-        status             TEXT NOT NULL,
-        session_id         TEXT,
-        target_model       TEXT,
-        requested_at_ms    INTEGER NOT NULL,
-        confirmed_at_ms    INTEGER,
-        payload_json       TEXT NOT NULL
+        handoff_id           TEXT PRIMARY KEY,
+        decision_id          TEXT,
+        route_profile        TEXT NOT NULL DEFAULT 'default',
+        selected_route_key   TEXT,
+        status               TEXT NOT NULL,
+        session_id           TEXT,
+        target_model         TEXT,
+        operation_kind       TEXT NOT NULL DEFAULT 'unknown',
+        idempotency_key      TEXT,
+        provider_id          TEXT,
+        provider_model       TEXT,
+        defer_reason         TEXT,
+        promotion_policy     TEXT NOT NULL DEFAULT 'manual_review',
+        promotion_authorized INTEGER NOT NULL DEFAULT 0,
+        expires_at_ms        INTEGER,
+        requested_at_ms      INTEGER NOT NULL,
+        confirmed_at_ms      INTEGER,
+        payload_json         TEXT NOT NULL
     ) STRICT;
     CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_handoffs_route
         ON copilot_model_gateway_sdk_session_handoffs(route_profile, selected_route_key, requested_at_ms DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_handoffs_status
         ON copilot_model_gateway_sdk_session_handoffs(status, requested_at_ms DESC);
+    CREATE TABLE IF NOT EXISTS copilot_model_gateway_sdk_session_handoff_transitions (
+        transition_id TEXT PRIMARY KEY,
+        handoff_id     TEXT NOT NULL,
+        session_id     TEXT,
+        state          TEXT NOT NULL,
+        occurred_at_ms INTEGER NOT NULL,
+        payload_json   TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS idx_mg_sdk_handoff_transitions_handoff
+        ON copilot_model_gateway_sdk_session_handoff_transitions(handoff_id, occurred_at_ms ASC);
+    CREATE INDEX IF NOT EXISTS idx_mg_sdk_handoff_transitions_session_state
+        ON copilot_model_gateway_sdk_session_handoff_transitions(session_id, state, occurred_at_ms DESC);
 
     CREATE TABLE IF NOT EXISTS copilot_model_gateway_sdk_session_confirmations (
-        confirmation_id  TEXT PRIMARY KEY,
-        handoff_id       TEXT,
-        decision_id      TEXT,
-        session_id       TEXT,
-        previous_model   TEXT,
-        confirmed_model  TEXT NOT NULL,
-        reasoning_effort TEXT,
-        status           TEXT NOT NULL,
-        observed_at_ms   INTEGER NOT NULL,
-        payload_json     TEXT NOT NULL
+        confirmation_id     TEXT PRIMARY KEY,
+        handoff_id          TEXT,
+        decision_id         TEXT,
+        session_id          TEXT,
+        previous_provider_id TEXT,
+        provider_id         TEXT,
+        previous_model      TEXT,
+        confirmed_model     TEXT NOT NULL,
+        binding_strategy    TEXT NOT NULL DEFAULT 'unknown',
+        wire_api            TEXT,
+        selected_route_key  TEXT,
+        operation_state     TEXT,
+        reasoning_effort    TEXT,
+        status              TEXT NOT NULL,
+        observed_at_ms      INTEGER NOT NULL,
+        payload_json        TEXT NOT NULL
     ) STRICT;
     CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_confirmations_handoff
         ON copilot_model_gateway_sdk_session_confirmations(handoff_id, observed_at_ms DESC);

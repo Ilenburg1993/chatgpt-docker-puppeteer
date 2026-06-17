@@ -178,9 +178,11 @@ describe('FI-7 — deep-import guard (Faixa I enforcement)', () => {
     it('no prohibited deep imports in src/copilot/ JS files', async () => {
         const copilotDir = join(process.cwd(), 'src', 'copilot');
         const allFiles = await readdir(copilotDir, { recursive: true });
-        const jsFiles = allFiles.filter(
-            (/** @type {string} */ f) => String(f).endsWith('.js') && !String(f).includes('node_modules'),
-        );
+        const jsFiles = allFiles.filter((/** @type {string} */ f) => {
+            const file = String(f);
+            const hiddenSegment = file.split(/[\\/]/u).some((segment) => segment.startsWith('.'));
+            return file.endsWith('.js') && !file.includes('node_modules') && !hiddenSegment;
+        });
 
         const violations = [];
 

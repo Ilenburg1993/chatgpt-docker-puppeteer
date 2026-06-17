@@ -508,6 +508,205 @@ describe('agent/session/initializer — sessionFs wiring', () => {
         );
     });
 
+    it('seleciona ingress automaticamente quando o rebind direto foi marcado como não confiável', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        const { defaultModelGatewayIngressRouteRegistry } = await import(
+            '../../../src/copilot/model-gateway/ingress/index.js'
+        );
+        defaultModelGatewayIngressRouteRegistry.clear();
+        process.env.OPENROUTER_API_KEY = 'upstream-secret';
+        mocks.readState.mockResolvedValueOnce({
+            sessionId: 'saved-sess',
+            model: 'previous-model',
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 1,
+            modelGatewayActiveRoute: {
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                wireApi: 'completions',
+                directRebindReliable: false,
+                routeProfile: 'repo_agent',
+                updatedAt: Date.now(),
+            },
+        });
+        mocks.resumeOrCreateAgentSdkSession.mockResolvedValueOnce({
+            session: {
+                sessionId: 'saved-sess',
+                getMessages: vi.fn(async () => []),
+            },
+            isResumed: true,
+        });
+
+        await initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' });
+
+        const options = mocks.resumeOrCreateAgentSdkSession.mock.calls.at(-1)?.[2];
+        const routes = defaultModelGatewayIngressRouteRegistry.listRedacted();
+        expect(options).toMatchObject({
+            model: 'model-gateway-live',
+            provider: {
+                type: 'openai',
+                apiKey: expect.stringMatching(/^mgw-local-[A-Za-z0-9_-]{43}$/u),
+                baseUrl: expect.stringContaining('/v1/model-gateway-ingress/'),
+            },
+            requireSameSession: true,
+        });
+        expect(routes).toHaveLength(1);
+        expect(defaultModelGatewayIngressRouteRegistry.get(String(routes[0].routeId))).toMatchObject({
+            upstreamAuthHeaders: { authorization: 'Bearer upstream-secret' },
+            ingressRoute: {
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
+                sdkVisibleModel: 'model-gateway-live',
+            },
+        });
+        expect(mocks.persistState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                modelGatewayActiveRoute: expect.objectContaining({
+                    providerId: 'openrouter',
+                    providerModel: 'openrouter/free',
+                    bindingStrategy: 'ingress',
+                    sdkVisibleModel: 'model-gateway-live',
+                    requiresIngress: true,
+                    requiresNewSession: false,
+                    bindingDecision: expect.objectContaining({
+                        strategy: 'ingress',
+                        source: 'automatic_ingress_fallback',
+                    }),
+                }),
+            }),
+            expect.objectContaining({ label: 'session.initializer.resume' }),
+        );
+    });
+
+    it('remove binding ingress preparado quando resume/create falha antes de aceitar a sessão', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        const { defaultModelGatewayIngressRouteRegistry } = await import(
+            '../../../src/copilot/model-gateway/ingress/index.js'
+        );
+        defaultModelGatewayIngressRouteRegistry.clear();
+        process.env.OPENROUTER_API_KEY = 'upstream-secret';
+        mocks.readState.mockResolvedValueOnce({
+            sessionId: 'saved-sess',
+            model: 'previous-model',
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 1,
+            modelGatewayActiveRoute: {
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                wireApi: 'completions',
+                directRebindReliable: false,
+                routeProfile: 'repo_agent',
+                updatedAt: Date.now(),
+            },
+        });
+        mocks.resumeOrCreateAgentSdkSession.mockRejectedValueOnce(new Error('resume failed'));
+
+        await expect(initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' })).rejects.toThrow(
+            /resume failed/u,
+        );
+
+        expect(defaultModelGatewayIngressRouteRegistry.listRedacted()).toHaveLength(0);
+        expect(mocks.persistState).not.toHaveBeenCalledWith(
+            expect.objectContaining({ modelGatewayActiveRoute: expect.anything() }),
+            expect.objectContaining({ label: 'session.initializer.resume' }),
+        );
+    });
+
+    it('restaura binding ingress anterior quando a preparação substitutiva falha', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        const {
+            createModelGatewayIngressRoute,
+            defaultModelGatewayIngressRouteRegistry,
+        } = await import('../../../src/copilot/model-gateway/ingress/index.js');
+        defaultModelGatewayIngressRouteRegistry.clear();
+        const previousRoute = createModelGatewayIngressRoute({
+            sessionId: 'saved-sess',
+            publicBaseUrl: 'http://127.0.0.1:3009',
+            route: {
+                providerId: 'groq',
+                providerModel: 'llama-old',
+                baseUrl: 'https://api.groq.com/openai/v1',
+                sdkRouteKey: 'saved-sess:live-provider',
+                sdkVisibleModel: 'model-gateway-live',
+                bindingStrategy: 'ingress',
+            },
+        });
+        defaultModelGatewayIngressRouteRegistry.register({
+            ingressRoute: previousRoute,
+            localApiKey: 'previous-local-key',
+            upstreamAuthHeaders: { authorization: 'Bearer previous-upstream' },
+            expectedRevision: null,
+        });
+        process.env.OPENROUTER_API_KEY = 'replacement-upstream';
+        mocks.readState.mockResolvedValueOnce({
+            sessionId: 'saved-sess',
+            model: 'previous-model',
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 1,
+            modelGatewayActiveRoute: {
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                wireApi: 'completions',
+                bindingStrategy: 'ingress',
+                sdkRouteKey: 'saved-sess:live-provider',
+                sdkVisibleModel: 'model-gateway-live',
+                updatedAt: Date.now(),
+            },
+        });
+        mocks.resumeOrCreateAgentSdkSession.mockRejectedValueOnce(new Error('replacement resume failed'));
+
+        await expect(initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' })).rejects.toThrow(
+            /replacement resume failed/u,
+        );
+
+        expect(defaultModelGatewayIngressRouteRegistry.findBySdkRouteKey('saved-sess:live-provider')).toMatchObject({
+            revision: 3,
+            localApiKey: 'previous-local-key',
+            upstreamAuthHeaders: { authorization: 'Bearer previous-upstream' },
+            ingressRoute: {
+                providerId: 'groq',
+                providerModel: 'llama-old',
+            },
+            metadata: {
+                source: 'session.initializer.rollback',
+                restoredFromRevision: 1,
+                rollbackOfRevision: 2,
+            },
+        });
+    });
+
+    it('bloqueia rota sem binding seguro antes de chamar o SDK', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        mocks.readState.mockResolvedValueOnce({
+            sessionId: 'saved-sess',
+            model: 'previous-model',
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 1,
+            modelGatewayActiveRoute: {
+                providerId: 'openai',
+                providerModel: 'gpt-5.2-codex',
+                providerType: 'openai',
+                baseUrl: 'https://api.openai.com/v1',
+                wireApi: 'responses',
+                directRebindReliable: false,
+                updatedAt: Date.now(),
+            },
+        });
+
+        await expect(initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' })).rejects.toThrow(
+            /MODEL_GATEWAY_BINDING_STRATEGY_BLOCKED/u,
+        );
+        expect(mocks.resumeOrCreateAgentSdkSession).not.toHaveBeenCalled();
+        expect(mocks.createAgentSdkSessionByClient).not.toHaveBeenCalled();
+    });
+
     it('projeta rota Model Gateway persistida por ingress local quando bindingStrategy=ingress', async () => {
         const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
         const { defaultModelGatewayIngressRouteRegistry } = await import(
@@ -546,7 +745,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             model: 'model-gateway-live',
             provider: {
                 type: 'openai',
-                apiKey: 'model-gateway-ingress-local',
+                apiKey: expect.stringMatching(/^mgw-local-[A-Za-z0-9_-]{43}$/u),
                 baseUrl: expect.stringContaining('/v1/model-gateway-ingress/'),
             },
         });

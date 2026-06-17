@@ -9,10 +9,11 @@
  * @module copilot/model-gateway/ingress/openai-compatible-ingress
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 const DEFAULT_CHAT_COMPLETIONS_PATH = '/chat/completions';
 const DEFAULT_LOCAL_API_KEY = 'model-gateway-ingress-local';
+const LOCAL_API_KEY_PREFIX = 'mgw-local-';
 const HOP_BY_HOP_HEADERS = new Set([
     'connection',
     'keep-alive',
@@ -44,6 +45,39 @@ function isRecord(value) {
  */
 function optionalString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * Creates a process-local credential for one SDK-facing ingress binding.
+ *
+ * The value is intentionally never persisted or returned by redacted registry views. Callers should pass the same
+ * value to both the SDK ProviderConfig and the in-memory route registry.
+ *
+ * @param {{ randomBytesImpl?: typeof randomBytes }} [options]
+ * @returns {string}
+ */
+export function createModelGatewayIngressLocalApiKey(options = {}) {
+    const randomBytesImpl = options.randomBytesImpl ?? randomBytes;
+    return `${LOCAL_API_KEY_PREFIX}${randomBytesImpl(32).toString('base64url')}`;
+}
+
+/**
+ * Returns a connectable loopback URL for the SDK-facing ingress. Wildcard bind addresses are valid for listen(), but
+ * are not valid destinations for a client connection.
+ *
+ * @param {{ host?: string | null; port: number; protocol?: 'http' | 'https' }} input
+ * @returns {string}
+ */
+export function buildModelGatewayIngressPublicBaseUrl(input) {
+    const rawHost = optionalString(input.host) ?? '127.0.0.1';
+    const normalizedHost = ['0.0.0.0', '::', '[::]'].includes(rawHost) ? '127.0.0.1' : rawHost;
+    const hostForUrl = normalizedHost.includes(':') && !normalizedHost.startsWith('[')
+        ? `[${normalizedHost}]`
+        : normalizedHost;
+    const port = Number.isInteger(input.port) && input.port > 0 && input.port <= 65_535 ? input.port : null;
+    if (port === null) throw new Error('MODEL_GATEWAY_INGRESS_PUBLIC_PORT_INVALID');
+    const protocol = input.protocol === 'https' ? 'https' : 'http';
+    return `${protocol}://${hostForUrl}:${port}`;
 }
 
 /**
@@ -227,10 +261,12 @@ export function createModelGatewayIngressRoute(input) {
 
 /**
  * @param {ReturnType<typeof createModelGatewayIngressRoute>} ingressRoute
- * @param {{ localApiKey?: string }} [options]
+ * @param {{ localApiKey: string }} options
  * @returns {{ model: string; provider: { type: 'openai'; baseUrl: string; apiKey: string }; modelCapabilities?: Record<string, unknown> }}
  */
-export function buildModelGatewayIngressSessionOverrides(ingressRoute, options = {}) {
+export function buildModelGatewayIngressSessionOverrides(ingressRoute, options) {
+    const localApiKey = optionalString(options?.localApiKey);
+    if (!localApiKey) throw new Error('MODEL_GATEWAY_INGRESS_LOCAL_API_KEY_REQUIRED');
     const capabilities = isRecord(ingressRoute.targetRoute['modelCapabilities'])
         ? ingressRoute.targetRoute['modelCapabilities']
         : isRecord(ingressRoute.targetRoute['capabilities'])
@@ -241,7 +277,7 @@ export function buildModelGatewayIngressSessionOverrides(ingressRoute, options =
         provider: {
             type: 'openai',
             baseUrl: ingressRoute.sdkBaseUrl,
-            apiKey: optionalString(options.localApiKey) ?? DEFAULT_LOCAL_API_KEY,
+            apiKey: localApiKey,
         },
         ...(capabilities ? { modelCapabilities: capabilities } : {}),
     };

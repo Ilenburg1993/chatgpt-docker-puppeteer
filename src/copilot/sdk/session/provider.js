@@ -50,6 +50,7 @@ const BYOK_MODEL_DISCOVERY_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
  * @property {{ configured: boolean; count: number }} modelList
  * @property {{ reasoningEffort: boolean; sdkReasoningEffort?: boolean; vision: boolean; contextWindowTokens: number }} capabilities
  * @property {{ maxRequestTokens: number | null; tokensPerMinute: number | null; requestsPerMinute: number | null; dailyRequests: number | null }} limits
+ * @property {{ routeId: string; revision: number; targetFingerprint: string; sdkVisibleModel: string } | undefined} [modelGatewayIngress]
  * @property {string[]} warnings
  * @property {string[]} errors
  */

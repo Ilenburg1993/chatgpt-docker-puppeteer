@@ -1,6 +1,7 @@
 // @ts-check
 
 import {
+    classifyModelGatewayDeferredRouteOperation,
     collectModelGatewaySecretAuditEnvValues,
     createModelGatewayCatalogControlPlane,
     createModelGatewayControlPlaneResult,
@@ -410,13 +411,30 @@ function normalizeWorkflowRoute(selectedRoute) {
     return {
         providerId,
         providerModel,
+        providerType: optionalWorkflowString(selectedRoute['providerType']),
         selectorSyntax: optionalWorkflowString(selectedRoute['selectorSyntax']),
         baseUrl: optionalWorkflowString(selectedRoute['baseUrl']),
         openAICompatibleBaseUrl: optionalWorkflowString(selectedRoute['openAICompatibleBaseUrl']),
+        openAICompatible: selectedRoute['openAICompatible'] === true,
         wireApi: optionalWorkflowString(selectedRoute['wireApi']),
         providerProfile: optionalWorkflowString(selectedRoute['providerProfile']),
         routeProfile: optionalWorkflowString(selectedRoute['routeProfile']),
         selectedRouteKey: optionalWorkflowString(selectedRoute['selectedRouteKey']),
+        bindingStrategy: optionalWorkflowString(selectedRoute['bindingStrategy']),
+        sdkRouteKey: optionalWorkflowString(selectedRoute['sdkRouteKey']),
+        sdkVisibleModel: optionalWorkflowString(selectedRoute['sdkVisibleModel']),
+        directRebindReliability: optionalWorkflowString(selectedRoute['directRebindReliability']),
+        directRebindSupported:
+            typeof selectedRoute['directRebindSupported'] === 'boolean'
+                ? selectedRoute['directRebindSupported']
+                : null,
+        directRebindReliable:
+            typeof selectedRoute['directRebindReliable'] === 'boolean'
+                ? selectedRoute['directRebindReliable']
+                : null,
+        bindingDecision: Object.keys(asRecord(selectedRoute['bindingDecision'])).length > 0
+            ? asRecord(selectedRoute['bindingDecision'])
+            : null,
     };
 }
 
@@ -501,7 +519,8 @@ export const modelGatewayControlPlaneGuideTool = buildTool({
     instructions:
         'Use antes do primeiro workflow amplo ou quando estiver em dúvida sobre qual tool chamar. Depois use ' +
         'model_gateway_workflow_plan para gerar argumentos concretos. Esta guia é normativa para a superfície local: ' +
-        'troca de modelo/provider deve preservar a sessão por padrão; nova sessão só com pedido humano explícito.',
+        'troca de modelo/provider deve preservar a sessão por padrão; nova sessão só com pedido humano explícito. ' +
+        'Se uma troca retornar automaticContinuation.armed=true, encerre o turno sem novas tools de rota.',
     parameters: MODEL_GATEWAY_CONTROL_PLANE_GUIDE_INPUT_SCHEMA,
     outputSchema: MODEL_GATEWAY_TOOL_OUTPUT_SCHEMA,
     annotations: READ_ONLY_ANNOTATIONS,
@@ -584,9 +603,19 @@ export const modelGatewayControlPlaneGuideTool = buildTool({
                         sameSessionByDefault: true,
                         newSessionOnlyWhenExplicitlyRequested: true,
                         providerRouteSwitchUsesSameSessionReattach: true,
+                        deferredRouteSwitchOwnedByAgentAfterDialogTurnEnd: true,
+                        llmMustNotRetryArmedRouteSwitchInSameTurn: true,
                         applyRequiresConfirmTrue: true,
                         inlineSecretsForbidden: true,
                         catalogMetadataIsNotRuntimeProof: true,
+                    },
+                    turnBoundaryProtocol: {
+                        armedResultField: 'data.automaticContinuation.armed',
+                        armedResultValue: true,
+                        llmAction: 'finish_current_turn_without_additional_route_tools',
+                        runtimeOwner: 'agent_runtime',
+                        runtimeTrigger: 'dialog.turn_end',
+                        nextTurnVerificationTool: 'model_gateway_operation_status',
                     },
                     defaultSequence: [
                         'model_gateway_control_plane_guide',
@@ -596,7 +625,8 @@ export const modelGatewayControlPlaneGuideTool = buildTool({
                         'model_gateway_probe_execute:apply',
                         'model_gateway_route_switch:plan or model_gateway_model_switch:plan',
                         'model_gateway_route_switch:apply or model_gateway_model_switch:apply',
-                        'model_gateway_operation_status',
+                        'finish current turn when automaticContinuation.armed=true',
+                        'model_gateway_operation_status on a later turn',
                     ],
                     terminalCommands,
                     applyExamples,
@@ -623,8 +653,10 @@ export const modelGatewayWorkflowPlanTool = buildTool({
         'e troca/reconcile preservando a mesma sessão quando aplicável. Não chama providers, não troca modelo e não grava estado.',
     instructions:
         'Use como ponto de entrada de orquestração. Execute as etapas na ordem retornada; chamadas mode=apply exigem ' +
-        'uma chamada separada da tool indicada com confirm=true e a mesma idempotencyKey. Nunca crie sessão nova por ' +
-        'fallback: switches planejados aqui são same-session e nova sessão só pode ser decisão humana explícita fora deste plano.',
+        'uma chamada separada da tool indicada com confirm=true e a mesma idempotencyKey. Se o apply retornar ' +
+        'automaticContinuation.armed=true, encerre o turno imediatamente e só execute etapas marcadas notBefore em um ' +
+        'turno posterior. Nunca crie sessão nova por fallback: switches planejados aqui são same-session e nova sessão ' +
+        'só pode ser decisão humana explícita fora deste plano.',
     parameters: MODEL_GATEWAY_WORKFLOW_PLAN_INPUT_SCHEMA,
     outputSchema: MODEL_GATEWAY_TOOL_OUTPUT_SCHEMA,
     annotations: READ_ONLY_ANNOTATIONS,
@@ -818,7 +850,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
         if ((args.includeRouteSwitchPlan || args.objective === 'same_session_route_switch') && selectedRoute) {
             const routeKey = workflowIdempotencyKey(
                 args.idempotencyKeyPrefix,
-                `route-switch-${selectedRoute.providerId}-${selectedRoute.providerModel}`,
+                `route-switch-${selectedRoute['providerId']}-${selectedRoute['providerModel']}`,
             );
             steps.push(
                 workflowStep(
@@ -856,6 +888,22 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     ['route_switch_plan'],
                 ),
             );
+            const postTurnStatusStep = workflowStep(
+                order++,
+                'route_switch_post_turn_status',
+                'model_gateway_operation_status',
+                'read',
+                'Confirmar o resultado em um turno posterior; esta etapa não pertence ao mesmo turno do apply.',
+                {
+                    operationId: createModelGatewaySameSessionRouteSwitchOperationId(routeKey),
+                    limit: 10,
+                },
+                ['route_switch_apply'],
+            );
+            postTurnStatusStep['notBefore'] = 'next_llm_turn_after_dialog.turn_end';
+            postTurnStatusStep['sameTurnExecutionForbidden'] = true;
+            postTurnStatusStep['automaticPredecessor'] = 'agent_runtime_turn_boundary_promotion';
+            steps.push(postTurnStatusStep);
         }
         if (args.objective === 'same_session_model_switch' && selectedModelId) {
             const switchKey = workflowIdempotencyKey(args.idempotencyKeyPrefix, `model-switch-${selectedModelId}`);
@@ -1447,7 +1495,9 @@ export const modelGatewayRouteSwitchTool = buildTool({
         'outro provider. A operação pode reconstruir o transporte e reanexar a sessão, mas nunca cria sessão substituta.',
     instructions:
         'Chame mode=plan antes de apply. Copie a rota estruturada de model_gateway_route_plan, reutilize a mesma ' +
-        'idempotencyKey e só aplique com confirm=true. Considere sucesso apenas state=committed. ' +
+        'idempotencyKey e só aplique com confirm=true. Sucesso pode ser state=committed ou status=accepted_for_turn_boundary. ' +
+        'Quando automaticContinuation.armed=true, NÃO chame outra tool de route switch/reconcile no mesmo turno: finalize ' +
+        'a resposta para liberar dialog.turn_end; o Agent fará o reattach automaticamente preservando sessionId. ' +
         'requiresNewSession deve permanecer false em qualquer resultado.',
     parameters: MODEL_GATEWAY_ROUTE_SWITCH_INPUT_SCHEMA,
     outputSchema: MODEL_GATEWAY_TOOL_OUTPUT_SCHEMA,
@@ -1520,41 +1570,52 @@ export const modelGatewayRouteSwitchTool = buildTool({
         return serializeResult(
             createModelGatewayControlPlaneResult({
                 operation: 'route.switch',
-                ok: committed,
-                status: String(operation?.['state'] ?? 'failed'),
+                ok: committed || deferred,
+                status: deferred ? 'accepted_for_turn_boundary' : String(operation?.['state'] ?? 'failed'),
                 data: {
                     ...projection,
                     sameSessionRequired: true,
                     requiresNewSession: false,
+                    automaticContinuation: deferred
+                        ? {
+                              armed: true,
+                              owner: 'agent_runtime',
+                              trigger: 'dialog.turn_end',
+                              requiresFurtherToolCall: false,
+                              instruction: 'finish_current_turn_without_retrying_route_tools',
+                          }
+                        : {
+                              armed: false,
+                              owner: null,
+                              trigger: null,
+                              requiresFurtherToolCall: false,
+                          },
                     operationMeta: toolOperationMeta('model_gateway_route_switch', {
                         idempotencyKey: args.idempotencyKey,
                         correlationId: String(operation?.['operationId'] ?? correlationId),
-                        expectedResult: committed ? 'committed' : 'not_committed',
+                        expectedResult: committed ? 'committed' : deferred ? 'accepted_for_turn_boundary' : 'not_committed',
                     }),
                 },
                 warnings: committed
                     ? []
                     : deferred
                       ? [
-                            'same_session_route_switch_deferred_until_turn_boundary',
+                            'same_session_route_switch_armed_for_dialog_turn_end',
                             String(operation?.['deferReason'] ?? 'active_dialog_loop'),
                         ]
                       : [String(operation?.['error'] ?? 'same_session_route_switch_not_committed')],
-                errors: committed
-                    ? []
-                    : [
-                          {
-                              code: deferred
-                                  ? 'ROUTE_SWITCH_DEFERRED_UNTIL_TURN_BOUNDARY'
-                                  : 'SAME_SESSION_ROUTE_SWITCH_NOT_COMMITTED',
-                              message: deferred
-                                  ? 'Provider reattach foi adiado porque o dialog loop/tool turn ainda está ativo; nenhuma rota foi mutada.'
-                                  : String(operation?.['error'] ?? operation?.['state'] ?? 'unknown'),
-                              retryable: operation?.['state'] !== 'rolled_back',
-                          },
-                      ],
+                errors:
+                    committed || deferred
+                        ? []
+                        : [
+                              {
+                                  code: 'SAME_SESSION_ROUTE_SWITCH_NOT_COMMITTED',
+                                  message: String(operation?.['error'] ?? operation?.['state'] ?? 'unknown'),
+                                  retryable: operation?.['state'] !== 'rolled_back',
+                              },
+                          ],
                 nextActions: deferred
-                    ? ['inspect_operation_status', 'retry_route_switch_after_current_turn_or_use_terminal_runtime_apply']
+                    ? ['finish_current_turn_without_additional_route_tools', 'inspect_operation_status_on_next_turn']
                     : ['inspect_operation_status', 'inspect_overview'],
             }),
         );
@@ -1641,11 +1702,12 @@ export const modelGatewayCatalogRefreshTool = buildTool({
 export const modelGatewayRuntimeReconcileTool = buildTool({
     name: 'model_gateway_runtime_reconcile',
     description:
-        'Compara o modelo efetivo do runtime com o modelo esperado e, em apply confirmado, converge usando a mesma ' +
-        'operação transacional de troca com verificação e rollback.',
+        'Reconcilia modelo efetivo ou uma operação de rota persistida. Para routeOperationId diferido, o apply pode ' +
+        'armar a promoção automática no próximo dialog.turn_end, sempre preservando o mesmo sessionId.',
     instructions:
-        'Use mode=plan primeiro. Se converged=true, não aplique. Em mismatch, revise o modelo esperado e reutilize a ' +
-        'mesma idempotencyKey no apply confirmado.',
+        'Use mode=plan primeiro. Se converged=true, não aplique. Em mismatch, revise o alvo e reutilize a mesma ' +
+        'idempotencyKey no apply confirmado. Quando automaticContinuation.armed=true, finalize o turno; não tente ' +
+        'reconcile novamente no mesmo tool-turn, pois o Agent executará a promoção pós-turno.',
     parameters: MODEL_GATEWAY_RUNTIME_RECONCILE_INPUT_SCHEMA,
     outputSchema: MODEL_GATEWAY_TOOL_OUTPUT_SCHEMA,
     annotations: MUTATING_ANNOTATIONS,
@@ -1662,7 +1724,11 @@ export const modelGatewayRuntimeReconcileTool = buildTool({
             const safety = readRouteReattachApplySafety(args.runtimeId);
             const deferred = operationState === 'deferred_until_turn_boundary';
             const committed = operationState === 'committed';
-            const promotable = deferred && targetRoute !== null;
+            const deferredClassification = operation
+                ? classifyModelGatewayDeferredRouteOperation(operation, { now: Date.now() })
+                : null;
+            const promotable =
+                deferred && targetRoute !== null && deferredClassification?.promotable === true;
             const operationMeta = toolOperationMeta('model_gateway_runtime_reconcile', {
                 idempotencyKey: routeIdempotencyKey,
                 correlationId: routeOperationId,
@@ -1703,21 +1769,22 @@ export const modelGatewayRuntimeReconcileTool = buildTool({
                 );
             }
 
-            if (args.mode === 'plan' || committed || !promotable || !safety.safe) {
+            if (args.mode === 'plan' || committed || !promotable || (!safety.safe && args.confirm)) {
                 const planning = args.mode === 'plan';
+                const armedForTurnBoundary = !planning && args.confirm && !committed && promotable && !safety.safe;
                 const status = committed
                     ? 'already_converged'
-                    : promotable
-                      ? safety.safe
-                          ? 'route_promotion_planned'
-                          : 'route_promotion_deferred_until_turn_boundary'
-                      : 'route_operation_not_promotable';
+                    : armedForTurnBoundary
+                      ? 'route_promotion_armed_for_turn_boundary'
+                      : promotable
+                        ? 'route_promotion_planned'
+                        : 'route_operation_not_promotable';
                 return serializeResult(
                     createModelGatewayControlPlaneResult({
                         operation: 'runtime.reconcile',
-                        ok: committed || (planning && promotable),
+                        ok: committed || (planning && promotable) || armedForTurnBoundary,
                         status,
-                        dryRun: args.mode === 'plan',
+                        dryRun: planning,
                         data: {
                             runtimeId: args.runtimeId,
                             expectedModel: args.expectedModelId,
@@ -1729,33 +1796,60 @@ export const modelGatewayRuntimeReconcileTool = buildTool({
                                 safeNow: safety.safe,
                                 reason: safety.reason,
                                 requiresNewSession: false,
-                                forceApplyDeferred: safety.safe,
+                                forceApplyDeferred: safety.safe && !planning,
                             },
+                            automaticContinuation: armedForTurnBoundary
+                                ? {
+                                      armed: true,
+                                      owner: 'agent_runtime',
+                                      trigger: 'dialog.turn_end',
+                                      requiresFurtherToolCall: false,
+                                      instruction: 'finish_current_turn_without_retrying_route_tools',
+                                  }
+                                : {
+                                      armed: false,
+                                      owner: null,
+                                      trigger: null,
+                                      requiresFurtherToolCall: false,
+                                  },
+                            deferredClassification,
                             handoff,
                             operation,
                             operationMeta,
                         },
                         warnings: [
                             ...(committed ? ['route_switch_already_committed'] : []),
+                            ...(armedForTurnBoundary ? ['route_promotion_owned_by_agent_after_dialog_turn_end'] : []),
                             ...(!committed && promotable && !safety.safe ? [safety.reason] : []),
-                            ...(!promotable ? [`route_operation_state_not_deferred:${operationState}`] : []),
+                            ...(!promotable
+                                ? [
+                                      deferredClassification?.reason ??
+                                          `route_operation_state_not_deferred:${operationState}`,
+                                  ]
+                                : []),
                         ],
                         errors:
-                            args.mode === 'apply' && promotable && !safety.safe
+                            args.mode === 'apply' && !committed && !promotable
                                 ? [
                                       {
-                                          code: 'ROUTE_RECONCILE_PROMOTION_DEFERRED_UNTIL_TURN_BOUNDARY',
+                                          code: 'ROUTE_RECONCILE_OPERATION_NOT_PROMOTABLE',
                                           message:
-                                              'A operação diferida foi reconhecida, mas o reattach imediato ainda não é seguro no tool-turn ativo.',
-                                          retryable: true,
+                                              deferredClassification?.reason ??
+                                              `Operação no estado ${operationState} não pode ser promovida automaticamente.`,
+                                          retryable: false,
                                       },
                                   ]
                                 : [],
                         nextActions: committed
                             ? ['inspect_overview']
-                            : promotable && safety.safe
-                              ? ['apply_with_confirm_true_to_promote_route']
-                              : ['wait_for_turn_boundary_or_use_terminal_force_deferred', 'inspect_operation_status'],
+                            : armedForTurnBoundary
+                              ? [
+                                    'finish_current_turn_without_additional_route_tools',
+                                    'inspect_operation_status_on_next_turn',
+                                ]
+                              : promotable
+                                ? ['apply_with_confirm_true_to_arm_or_promote_route']
+                                : ['inspect_operation_status', 'rerun_route_switch_plan'],
                     }),
                 );
             }

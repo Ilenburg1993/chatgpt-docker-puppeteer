@@ -150,6 +150,16 @@ export const SERVER_ROUTE_MODULE_LAYOUT = Object.freeze([
         summary: 'Rotas de memoria via presentation/conversation-hub.',
     },
     {
+        path: 'model-gateway-ingress.js',
+        kind: 'file',
+        role: 'root-route',
+        surface: 'root',
+        tier: 'primary',
+        risk: 'watch',
+        public: false,
+        summary: 'Ingress local OpenAI-compatible governado pelo Model Gateway.',
+    },
+    {
         path: 'observability.js',
         kind: 'file',
         role: 'root-route',

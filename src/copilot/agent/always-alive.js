@@ -83,6 +83,7 @@ import {
     switchModelTransactional,
     switchAgentRouteTransactional,
     updateSdkPlan,
+    wireAgentModelGatewayTurnBoundaryPromotion,
 } from './runtime/root-surface/index.js';
 
 /**
@@ -150,6 +151,7 @@ export class AlwaysAliveAgent extends EventEmitter {
         this.#stateQueryFacade = new StateQueryFacade(this.ctx);
         this.#sdkQueryFacade = new SdkQueryFacade(this.ctx);
         this.#healthFacade = new HealthFacade(this.ctx, this);
+        wireAgentModelGatewayTurnBoundaryPromotion(this.ctx, this);
 
         // F35: MessageQueue emite EMITTER_PROCESS_QUEUE (Symbol interno) para disparar processamento.
         this.on(EMITTER_PROCESS_QUEUE, () => this.#processQueue());

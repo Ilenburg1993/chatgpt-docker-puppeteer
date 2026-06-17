@@ -108,6 +108,7 @@ export async function executeModelGatewaySameSessionRouteSwitch(input) {
                 deferred: true,
                 deferReason: input.deferReason,
                 deferDetails: input.deferDetails ?? {},
+                promotionAuthorization: input.deferDetails?.['promotionAuthorization'] ?? null,
                 retryable: true,
                 rollback: {
                     attempted: false,

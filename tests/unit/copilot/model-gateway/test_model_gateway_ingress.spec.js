@@ -3,8 +3,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+    buildModelGatewayIngressPublicBaseUrl,
     buildModelGatewayIngressSessionOverrides,
     buildModelGatewayIngressUpstreamRequest,
+    createModelGatewayIngressLocalApiKey,
     createModelGatewayIngressRoute,
     createModelGatewayIngressRouteRegistry,
     proxyModelGatewayIngressOpenAIChatCompletions,
@@ -12,6 +14,27 @@ import {
 } from '../../../../src/copilot/model-gateway/index.js';
 
 describe('model gateway dynamic ingress', () => {
+    it('gera credencial local não persistível e normaliza wildcard para loopback conectável', () => {
+        const localApiKey = createModelGatewayIngressLocalApiKey({
+            randomBytesImpl: (size) => Buffer.alloc(size, 0xab),
+        });
+
+        expect(localApiKey).toMatch(/^mgw-local-[A-Za-z0-9_-]{43}$/u);
+        expect(localApiKey).not.toBe('model-gateway-ingress-local');
+        expect(buildModelGatewayIngressPublicBaseUrl({ host: '0.0.0.0', port: 3009 })).toBe(
+            'http://127.0.0.1:3009',
+        );
+        expect(buildModelGatewayIngressPublicBaseUrl({ host: '::', port: 3009 })).toBe(
+            'http://127.0.0.1:3009',
+        );
+        expect(buildModelGatewayIngressPublicBaseUrl({ host: '::1', port: 3009 })).toBe(
+            'http://[::1]:3009',
+        );
+        expect(() => buildModelGatewayIngressPublicBaseUrl({ host: '127.0.0.1', port: 0 })).toThrow(
+            /PUBLIC_PORT_INVALID/u,
+        );
+    });
+
     it('cria rota SDK-facing OpenAI-compatible sem credenciais na URL', () => {
         const route = createModelGatewayIngressRoute({
             sessionId: 'sdk-session-1',
@@ -98,17 +121,136 @@ describe('model gateway dynamic ingress', () => {
         });
         const registry = createModelGatewayIngressRouteRegistry();
 
-        registry.register({ ingressRoute: first, localApiKey: 'local-route-key' });
-        registry.register({ ingressRoute: second, localApiKey: 'local-route-key' });
+        const firstEntry = registry.register({
+            ingressRoute: first,
+            localApiKey: 'local-route-key-v1',
+            expectedRevision: null,
+            now: Date.parse('2026-06-16T12:00:00.000Z'),
+        });
+        expect(() =>
+            registry.register({ ingressRoute: second, localApiKey: 'stale-writer-key' }),
+        ).toThrow(/REVISION_CONFLICT/u);
+        const secondEntry = registry.register({
+            ingressRoute: second,
+            localApiKey: 'local-route-key-v2',
+            expectedRevision: firstEntry.revision,
+            now: Date.parse('2026-06-16T12:00:01.000Z'),
+        });
 
         expect(second.routeId).toBe(first.routeId);
         expect(second.sdkBaseUrl).toBe(first.sdkBaseUrl);
-        expect(buildModelGatewayIngressSessionOverrides(second).model).toBe('model-gateway-live');
+        expect(
+            buildModelGatewayIngressSessionOverrides(second, { localApiKey: 'local-route-key-v2' }).model,
+        ).toBe('model-gateway-live');
+        expect(secondEntry).toMatchObject({
+            revision: 2,
+            registeredAt: '2026-06-16T12:00:00.000Z',
+            updatedAt: '2026-06-16T12:00:01.000Z',
+        });
         expect(registry.get(first.routeId)?.ingressRoute).toMatchObject({
             providerId: 'groq',
             providerModel: 'llama-test',
             sdkVisibleModel: 'model-gateway-live',
         });
+        expect(registry.listRedacted()[0]).toMatchObject({
+            revision: 2,
+            targetFingerprint: secondEntry.targetFingerprint,
+        });
+    });
+
+    it('restaura snapshot somente contra a revisão esperada e mantém revisão monotônica', () => {
+        const registry = createModelGatewayIngressRouteRegistry();
+        const first = createModelGatewayIngressRoute({
+            sessionId: 'sdk-session-rollback',
+            publicBaseUrl: 'http://127.0.0.1:4567',
+            route: {
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                sdkRouteKey: 'sdk-session-rollback:live-provider',
+                sdkVisibleModel: 'model-gateway-live',
+            },
+        });
+        const second = createModelGatewayIngressRoute({
+            sessionId: 'sdk-session-rollback',
+            publicBaseUrl: 'http://127.0.0.1:4567',
+            route: {
+                providerId: 'groq',
+                providerModel: 'llama-test',
+                baseUrl: 'https://api.groq.com/openai/v1',
+                sdkRouteKey: 'sdk-session-rollback:live-provider',
+                sdkVisibleModel: 'model-gateway-live',
+            },
+        });
+
+        const firstEntry = registry.register({
+            ingressRoute: first,
+            localApiKey: 'rollback-key-v1',
+            expectedRevision: null,
+            now: Date.parse('2026-06-16T12:00:00.000Z'),
+        });
+        const snapshot = registry.snapshot(first.routeId, {
+            now: Date.parse('2026-06-16T12:00:00.500Z'),
+        });
+        expect(snapshot).not.toBeNull();
+        const secondEntry = registry.register({
+            ingressRoute: second,
+            localApiKey: 'rollback-key-v2',
+            expectedRevision: firstEntry.revision,
+            now: Date.parse('2026-06-16T12:00:01.000Z'),
+        });
+
+        expect(() =>
+            registry.restore(/** @type {NonNullable<typeof snapshot>} */ (snapshot), {
+                expectedRevision: firstEntry.revision,
+            }),
+        ).toThrow(/REVISION_CONFLICT/u);
+
+        const restored = registry.restore(/** @type {NonNullable<typeof snapshot>} */ (snapshot), {
+            expectedRevision: secondEntry.revision,
+            now: Date.parse('2026-06-16T12:00:02.000Z'),
+            metadata: { source: 'unit.rollback' },
+        });
+
+        expect(restored).toMatchObject({
+            revision: 3,
+            localApiKey: 'rollback-key-v1',
+            ingressRoute: {
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
+            },
+            metadata: {
+                source: 'unit.rollback',
+                restoredFromRevision: 1,
+                rollbackOfRevision: 2,
+            },
+        });
+        expect(registry.listRedacted()[0]).not.toHaveProperty('localApiKey');
+        expect(registry.listRedacted()[0]).not.toHaveProperty('upstreamAuthHeaders');
+    });
+
+    it('exige credencial local explícita para overrides e registry', () => {
+        const route = createModelGatewayIngressRoute({
+            sessionId: 'sdk-session-key-required',
+            publicBaseUrl: 'http://127.0.0.1:4567',
+            route: {
+                providerId: 'openrouter',
+                providerModel: 'openrouter/free',
+                baseUrl: 'https://openrouter.ai/api/v1',
+            },
+        });
+        const registry = createModelGatewayIngressRouteRegistry();
+
+        expect(() => buildModelGatewayIngressSessionOverrides(route, /** @type {any} */ ({}))).toThrow(
+            /LOCAL_API_KEY_REQUIRED/u,
+        );
+        expect(() =>
+            registry.register({
+                ingressRoute: route,
+                localApiKey: '',
+                expectedRevision: null,
+            }),
+        ).toThrow(/LOCAL_API_KEY_REQUIRED/u);
     });
 
     it('reescreve model, remove auth do cliente e injeta auth upstream confiável', () => {

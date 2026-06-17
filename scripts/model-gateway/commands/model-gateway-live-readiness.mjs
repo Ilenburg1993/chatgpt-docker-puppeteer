@@ -42,11 +42,12 @@ const TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS = Object.freeze([
 ]);
 const TERMINAL_LIVE_REQUIRE_AGENT_PROBE_PROFILES = Object.freeze([]);
 const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
+const SQLITE_RUNTIME_HEALTH_READ_LIMIT = 1_500;
 const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning]
+    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning] [--sqlite-runtime-health]
 
 Check whether the model-gateway metadata database is ready for terminal llm-b live tests.
 This does not start the terminal, execute providers, run models or run runtime probes.
@@ -188,6 +189,7 @@ function summarizeTerminalLiveRoute(route) {
 const json = argSet.has('--json');
 const fail = argSet.has('--fail');
 const failOnSupplyWarning = argSet.has('--fail-on-supply-warning');
+const includeSqliteRuntimeHealth = argSet.has('--sqlite-runtime-health');
 if (json) {
     setDbLogger((level, message) => {
         if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
@@ -215,10 +217,12 @@ const secretRegistry = createEnvSecretRegistry();
 const fileHealthRecords = listByokProviderModelHealth();
 let sqliteHealthRecords = [];
 let sqliteRuntimeError = null;
-try {
-    sqliteHealthRecords = await sqliteStore.listLatestRuntimeHealthRecords();
-} catch (error) {
-    sqliteRuntimeError = error instanceof Error ? error.message : String(error);
+if (includeSqliteRuntimeHealth) {
+    try {
+        sqliteHealthRecords = await sqliteStore.listLatestRuntimeHealthRecords({ limit: SQLITE_RUNTIME_HEALTH_READ_LIMIT });
+    } catch (error) {
+        sqliteRuntimeError = error instanceof Error ? error.message : String(error);
+    }
 }
 const healthRecords = mergeByokProviderHealthRecords(fileHealthRecords, sqliteHealthRecords);
 const sqliteProbeOnlyRecords = sqliteHealthRecords.filter((record) => record?.['runtimeHealthStatus'] === 'probe-only');
@@ -441,6 +445,7 @@ const summary = {
         countMismatches: parity.countMismatches,
         keyMismatches: parity.keyMismatches,
         runtimeRows: sqliteDiagnostics.runtimeRows,
+        runtimeHealthReadLimit: SQLITE_RUNTIME_HEALTH_READ_LIMIT,
         healthObservations: sqliteDiagnostics.tableCounts.copilot_model_gateway_health_observations,
         runtimeProbeRuns: sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_runs,
         runtimeProbeResults: sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_results,

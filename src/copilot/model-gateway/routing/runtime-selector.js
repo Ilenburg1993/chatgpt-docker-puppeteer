@@ -431,8 +431,10 @@ export function buildModelGatewayRuntimeSelectorProbeEnv(selected, baseEnv = pro
         const routeBaseUrl = resolveRuntimeRouteBaseUrl(providerId, selected, baseEnv);
         if (routeBaseUrl) env['COPILOT_BYOK_BASE_URL'] = routeBaseUrl;
         const secretRefs = resolveModelGatewayProviderSecretRefs(providerId);
-        const bearerToken = firstConfiguredEnvValue(baseEnv, secretRefs.bearerTokenRefs);
-        const apiKey = firstConfiguredEnvValue(baseEnv, secretRefs.apiKeyRefs);
+        const routeBearerTokenRefs = secretRefs.bearerTokenRefs.filter((ref) => ref !== 'COPILOT_BYOK_BEARER_TOKEN');
+        const routeApiKeyRefs = secretRefs.apiKeyRefs.filter((ref) => ref !== 'COPILOT_BYOK_API_KEY');
+        const bearerToken = firstConfiguredEnvValue(baseEnv, [...routeBearerTokenRefs, 'COPILOT_BYOK_BEARER_TOKEN']);
+        const apiKey = firstConfiguredEnvValue(baseEnv, [...routeApiKeyRefs, 'COPILOT_BYOK_API_KEY']);
         if (bearerToken) env['COPILOT_BYOK_BEARER_TOKEN'] = bearerToken;
         else if (apiKey) env['COPILOT_BYOK_API_KEY'] = apiKey;
     }

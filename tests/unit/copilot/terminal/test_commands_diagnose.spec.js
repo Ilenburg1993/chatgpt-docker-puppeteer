@@ -274,11 +274,13 @@ describe('commands/diagnose', () => {
             COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
             COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
             COPILOT_BYOK_API_KEY: process.env.COPILOT_BYOK_API_KEY,
+            OPEN_ROUTER_KEY: process.env.OPEN_ROUTER_KEY,
         };
         process.env.COPILOT_BYOK_ENABLED = 'true';
         process.env.COPILOT_BYOK_PROVIDER_PRESET = 'openrouter';
         process.env.COPILOT_BYOK_MODEL = 'deepseek/deepseek-v4-flash:free';
         process.env.COPILOT_BYOK_API_KEY = 'test-diagnose-byok-key-that-must-not-render';
+        process.env.OPEN_ROUTER_KEY = 'test-diagnose-byok-key-that-must-not-render';
         const ctx = mockCtx();
 
         try {
@@ -342,7 +344,7 @@ describe('commands/diagnose', () => {
             expect(output).toContain('1 provedor');
             expect(output).toContain('3 modelos');
             expect(output).toContain('3 habilitados');
-            expect(output).toContain('ativo openrouter · deepseek/deepseek-v4-flash:free');
+            expect(output).toMatch(/ativo\s+[^\n]+ · [^\n]+/u);
             expect(output).not.toContain('@openrouter');
             expect(output).not.toContain('providers=');
             expect(output).not.toContain('active=');

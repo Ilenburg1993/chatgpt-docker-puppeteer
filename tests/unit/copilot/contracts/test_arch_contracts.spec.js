@@ -45,10 +45,16 @@ function readSrc(relPath) {
 function listJsFilesRecursive(dirAbs) {
     /** @type {string[]} */
     const out = [];
-    const entries = readdirSync(dirAbs);
+    const entries = readdirSync(dirAbs).filter((entry) => !entry.startsWith('.'));
     for (const entry of entries) {
         const abs = join(dirAbs, entry);
-        const st = statSync(abs);
+        let st;
+        try {
+            st = statSync(abs);
+        } catch (error) {
+            if (/** @type {NodeJS.ErrnoException} */ (error)?.code === 'ENOENT') continue;
+            throw error;
+        }
         if (st.isDirectory()) {
             out.push(...listJsFilesRecursive(abs));
         } else if (st.isFile() && entry.endsWith('.js')) {

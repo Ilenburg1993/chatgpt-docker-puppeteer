@@ -28,7 +28,7 @@ const SERVER_ROUTE_INVENTORY = {
         'webhooks.js',
     ],
     hubOnly: ['sessions.js', 'sse.js'],
-    serverOnly: ['health-modules.js', 'health-registry.js'],
+    serverOnly: ['health-modules.js', 'health-registry.js', 'model-gateway-ingress.js'],
     presentationBridge: ['agent.js', 'config.js', 'git.js', 'memory.js', 'observability.js'],
     routeAdapter: ['presentation-route.js'],
     routerInfra: [

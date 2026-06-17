@@ -248,7 +248,7 @@ function policyPresetPatch(presetId) {
 function expandPolicyPatchPreset(patch) {
     const normalized = normalizePolicyPatch(patch);
     const preset = policyPresetPatch(normalized['preset']);
-    return preset ? { ...preset, ...normalized } : normalized;
+    return preset ? { ...preset, ...normalized, preset: preset['preset'] } : normalized;
 }
 
 /**
@@ -280,7 +280,7 @@ export function resolveModelGatewayRuntimeAutomationPolicyPreset(presetId, overr
  * @returns {ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>}
  */
 export function mergeModelGatewayRuntimeAutomationPolicy(...patches) {
-    return /** @type {ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>} */ ({
+    const merged = {
         enabled: false,
         preset: 'operator_manual',
         policy: 'prefer_runtime_proved',
@@ -290,7 +290,11 @@ export function mergeModelGatewayRuntimeAutomationPolicy(...patches) {
         allowProviderProbes: false,
         allowLocalPrivate: false,
         accountWideFailureKinds: [],
-        ...patches.map(expandPolicyPatchPreset).reduce((merged, patch) => ({ ...merged, ...patch }), {}),
+        ...patches.map(expandPolicyPatchPreset).reduce((accumulator, patch) => ({ ...accumulator, ...patch }), {}),
+    };
+    return /** @type {ReturnType<typeof readModelGatewayRuntimeAutomationPolicy>} */ ({
+        ...merged,
+        allowNewSession: false,
     });
 }
 

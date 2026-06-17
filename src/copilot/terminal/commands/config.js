@@ -291,7 +291,7 @@ export async function cmdModel({ println }, arg) {
         println('');
         println(terminalThemeRow('BYOK', '/model <id> não troca provedor customizado em runtime.', { role: 'warn' }));
         println(terminalThemeRow('Modelo', `${byok.model ?? '(ausente)'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'}`));
-        println(terminalThemeRow('Ação', 'Use /byok model <id> no mesmo provedor; troca de provedor/perfil continua em /byok + /session sdk next new no próximo boot.', { role: 'command' }));
+        println(terminalThemeRow('Ação', 'Use /byok model <id> no mesmo provedor ou /byok provider <id> para reattach preservando a mesma sessão; nova sessão só por comando humano explícito.', { role: 'command' }));
         println('');
         return;
     }

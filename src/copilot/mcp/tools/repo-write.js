@@ -478,11 +478,16 @@ async function listQuarantineMetadata() {
     });
     /** @type {QuarantineMetadata[]} */
     const items = [];
-    for (const entry of entries) {
-        if (!entry.endsWith('.json')) continue;
-        const quarantineId = entry.slice(0, -'.json'.length);
-        const metadata = await readQuarantineMetadata(quarantineId);
-        if (metadata) items.push(metadata);
+    const metadataEntries = entries.filter((entry) => entry.endsWith('.json'));
+    const batchSize = 32;
+    for (let index = 0; index < metadataEntries.length; index += batchSize) {
+        const batch = metadataEntries.slice(index, index + batchSize);
+        const metadataBatch = await Promise.all(
+            batch.map((entry) => readQuarantineMetadata(entry.slice(0, -'.json'.length))),
+        );
+        for (const metadata of metadataBatch) {
+            if (metadata) items.push(metadata);
+        }
     }
     return items.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }

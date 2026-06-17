@@ -82,13 +82,30 @@ import {
  * @property {{
  *     providerId: string;
  *     providerModel: string;
+ *     providerType?: string | null;
  *     selectorSyntax?: string | null;
  *     baseUrl?: string | null;
  *     openAICompatibleBaseUrl?: string | null;
+ *     openAICompatible?: boolean | null;
  *     wireApi?: string | null;
  *     providerProfile?: string | null;
  *     routeProfile?: string | null;
  *     selectedRouteKey?: string | null;
+ *     bindingStrategy?: 'direct' | 'ingress' | 'blocked' | null;
+ *     sdkRouteKey?: string | null;
+ *     sdkVisibleModel?: string | null;
+ *     directRebindReliability?: string | null;
+ *     directRebindSupported?: boolean | null;
+ *     directRebindReliable?: boolean | null;
+ *     directConfigRepresentability?: string | null;
+ *     requiredDirectHeaders?: string[];
+ *     bindingCapabilities?: Record<string, unknown> | null;
+ *     bindingDecision?: Record<string, unknown> | null;
+ *     runtimeEvidence?: Record<string, unknown> | null;
+ *     requiresIngress?: boolean;
+ *     useIngress?: boolean;
+ *     modelGatewayIngress?: boolean;
+ *     requiresNewSession?: boolean;
  *     updatedAt: number;
  * } | null} [modelGatewayActiveRoute]
  *   Projeção redigida da rota que deve vincular a sessão atual. Credenciais continuam resolvidas por secret refs/env.

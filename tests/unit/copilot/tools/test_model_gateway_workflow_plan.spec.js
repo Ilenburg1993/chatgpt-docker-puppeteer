@@ -32,7 +32,33 @@ function result(input) {
     };
 }
 
+function classifyDeferredOperation(operation) {
+    const auth = operation?.promotionAuthorization;
+    const promotable =
+        auth?.authorized === true &&
+        auth?.policy === 'authorized_after_turn_boundary' &&
+        operation?.state === 'deferred_until_turn_boundary';
+    return {
+        classification: promotable ? 'promotable' : 'review_required',
+        promotable,
+        expired: false,
+        requiresReview: !promotable,
+        reason: promotable ? 'authorized_for_safe_turn_boundary_promotion' : 'automatic_promotion_not_authorized',
+        nextActions: promotable
+            ? ['promote_same_session_route_switch', 'inspect_operation_status']
+            : ['review_target_route'],
+        operationId: operation?.operationId ?? null,
+        sessionId: operation?.sessionId ?? null,
+        idempotencyKey: operation?.idempotencyKey ?? null,
+        route: operation?.targetRoute ?? null,
+        promotionPolicy: auth?.policy ?? 'manual_review',
+        authorizationSource: auth?.source ?? null,
+        expiresAt: auth?.expiresAt ?? null,
+    };
+}
+
 vi.mock('#copilot/model-gateway', () => ({
+    classifyModelGatewayDeferredRouteOperation: classifyDeferredOperation,
     collectModelGatewaySecretAuditEnvValues: () => [],
     createModelGatewayCatalogControlPlane: () => ({ planRefresh }),
     createModelGatewayControlPlaneResult: result,
@@ -146,13 +172,30 @@ describe('model_gateway_workflow_plan', () => {
                     selectedRoute: {
                         providerId: 'kilo-code',
                         providerModel: 'kilo-auto/free',
+                        providerType: 'openai',
                         selectorSyntax: 'kilo-auto/free',
                         baseUrl: null,
                         openAICompatibleBaseUrl: null,
+                        openAICompatible: true,
                         wireApi: 'openai_responses',
                         providerProfile: null,
                         routeProfile: 'repo_agent',
                         selectedRouteKey: 'kilo-code:kilo-auto/free:repo_agent',
+                        bindingStrategy: 'direct',
+                        directRebindReliability: 'documented',
+                        bindingDecision: {
+                            schemaVersion: 'model-gateway.binding-strategy-decision.v1',
+                            strategy: 'direct',
+                            requestedStrategy: 'auto',
+                            directRebindReliability: 'documented',
+                            ingressEligible: false,
+                            sameSessionRequired: true,
+                            requiresNewSession: false,
+                            source: 'sdk_provider_config',
+                            reasons: ['sdk_provider_config_documented:openai'],
+                            warnings: ['direct_rebind_documented_but_not_runtime_proven'],
+                            nextActions: ['observe_or_probe_same_session_rebind', 'apply_same_session_route_switch'],
+                        },
                     },
                 },
             }),
@@ -231,6 +274,16 @@ describe('model_gateway_workflow_plan', () => {
                 route: expect.objectContaining({
                     providerId: 'kilo-code',
                     providerModel: 'kilo-auto/free',
+                    providerType: 'openai',
+                    openAICompatible: true,
+                    bindingStrategy: 'direct',
+                    directRebindReliability: 'documented',
+                    bindingDecision: expect.objectContaining({
+                        strategy: 'direct',
+                        requestedStrategy: 'auto',
+                        ingressEligible: false,
+                        requiresNewSession: false,
+                    }),
                 }),
             },
         });
@@ -257,6 +310,16 @@ describe('model_gateway_workflow_plan', () => {
                 idempotencyKey: 'route-reconcile-deferred-key',
                 state: 'deferred_until_turn_boundary',
                 sessionId: 'session-stable',
+                requiresNewSession: false,
+                retryable: true,
+                deferReason: 'ACTIVE_DIALOG_LOOP_ROUTE_REATTACH_DEFERRED',
+                createdAt: '2099-06-16T12:00:00.000Z',
+                promotionAuthorization: {
+                    authorized: true,
+                    policy: 'authorized_after_turn_boundary',
+                    source: 'confirmed_model_gateway_route_switch_apply',
+                    expiresAt: '2099-06-16T12:10:00.000Z',
+                },
                 targetRoute: {
                     providerId: 'ollama-cloud',
                     providerModel: 'qwen3-coder-next',
@@ -295,12 +358,12 @@ describe('model_gateway_workflow_plan', () => {
             idempotencyKey: 'route-reconcile-deferred-key',
             confirm: false,
         });
-        const parsed = JSON.parse(String(raw));
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
 
         expect(parsed).toMatchObject({
             ok: true,
             operation: 'runtime.reconcile',
-            status: 'route_promotion_deferred_until_turn_boundary',
+            status: 'route_promotion_planned',
             dryRun: true,
             data: {
                 routeOperationId: 'same-session-route-switch:deferred',
@@ -314,7 +377,7 @@ describe('model_gateway_workflow_plan', () => {
             },
             errors: [],
         });
-        expect(parsed.nextActions).toContain('wait_for_turn_boundary_or_use_terminal_force_deferred');
+        expect(parsed.nextActions).toContain('apply_with_confirm_true_to_arm_or_promote_route');
         expect(switchRoute).not.toHaveBeenCalled();
     });
 });

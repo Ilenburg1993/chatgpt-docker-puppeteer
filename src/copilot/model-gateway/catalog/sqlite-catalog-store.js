@@ -54,6 +54,7 @@ export const DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION = Object.freeze(
     automationEffectApplicationMaxRows: 50_000,
     recoveryAttemptMaxRows: 50_000,
     sdkSessionHandoffMaxRows: 50_000,
+    sdkSessionHandoffTransitionMaxRows: 200000,
     sdkSessionConfirmationMaxRows: 50_000,
     standbyPlanMaxRows: 50_000,
     liveScenarioRunMaxRows: 50_000,
@@ -151,6 +152,109 @@ function sqliteTableHasColumn(db, table, column) {
  * @returns {void}
  */
 function migrateModelGatewaySqliteSchema(db) {
+    const handoffColumns = /** @type {Array<[string, string]>} */ ([
+        ['operation_kind', "TEXT NOT NULL DEFAULT 'unknown'"],
+        ['idempotency_key', 'TEXT'],
+        ['provider_id', 'TEXT'],
+        ['provider_model', 'TEXT'],
+        ['defer_reason', 'TEXT'],
+        ['promotion_policy', "TEXT NOT NULL DEFAULT 'manual_review'"],
+        ['promotion_authorized', 'INTEGER NOT NULL DEFAULT 0'],
+        ['expires_at_ms', 'INTEGER'],
+    ]);
+    for (const [column, definition] of handoffColumns) {
+        if (sqliteTableHasColumn(db, 'copilot_model_gateway_sdk_session_handoffs', column)) continue;
+        db.exec(`ALTER TABLE copilot_model_gateway_sdk_session_handoffs ADD COLUMN ${column} ${definition};`);
+    }
+    const confirmationColumns = /** @type {Array<[string, string]>} */ ([
+        ['previous_provider_id', 'TEXT'],
+        ['provider_id', 'TEXT'],
+        ['binding_strategy', "TEXT NOT NULL DEFAULT 'unknown'"],
+        ['wire_api', 'TEXT'],
+        ['selected_route_key', 'TEXT'],
+        ['operation_state', 'TEXT'],
+    ]);
+    for (const [column, definition] of confirmationColumns) {
+        if (sqliteTableHasColumn(db, 'copilot_model_gateway_sdk_session_confirmations', column)) continue;
+        db.exec(`ALTER TABLE copilot_model_gateway_sdk_session_confirmations ADD COLUMN ${column} ${definition};`);
+    }
+    db.exec(`
+        UPDATE copilot_model_gateway_sdk_session_handoffs
+        SET operation_kind = COALESCE(NULLIF(json_extract(payload_json, '$.operation.schemaVersion'), ''), operation_kind),
+            idempotency_key = COALESCE(NULLIF(json_extract(payload_json, '$.operation.idempotencyKey'), ''), idempotency_key),
+            provider_id = COALESCE(NULLIF(json_extract(payload_json, '$.operation.targetRoute.providerId'), ''), provider_id),
+            provider_model = COALESCE(
+                NULLIF(json_extract(payload_json, '$.operation.targetRoute.providerModel'), ''),
+                NULLIF(json_extract(payload_json, '$.operation.targetRoute.selectorSyntax'), ''),
+                provider_model
+            ),
+            defer_reason = COALESCE(NULLIF(json_extract(payload_json, '$.operation.deferReason'), ''), defer_reason),
+            promotion_policy = COALESCE(
+                NULLIF(json_extract(payload_json, '$.operation.promotionAuthorization.policy'), ''),
+                NULLIF(json_extract(payload_json, '$.operation.deferDetails.promotionAuthorization.policy'), ''),
+                promotion_policy
+            ),
+            promotion_authorized = CASE
+                WHEN json_extract(payload_json, '$.operation.promotionAuthorization.authorized') = 1
+                  OR json_extract(payload_json, '$.operation.deferDetails.promotionAuthorization.authorized') = 1
+                THEN 1 ELSE promotion_authorized
+            END,
+            expires_at_ms = COALESCE(
+                CAST(strftime('%s', json_extract(payload_json, '$.operation.promotionAuthorization.expiresAt')) AS INTEGER) * 1000,
+                CAST(strftime('%s', json_extract(payload_json, '$.operation.deferDetails.promotionAuthorization.expiresAt')) AS INTEGER) * 1000,
+                expires_at_ms
+            );
+        CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_handoffs_deferred_session
+            ON copilot_model_gateway_sdk_session_handoffs(session_id, status, requested_at_ms DESC);
+        CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_handoffs_idempotency
+            ON copilot_model_gateway_sdk_session_handoffs(idempotency_key, requested_at_ms DESC);
+        CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_handoffs_provider_route
+            ON copilot_model_gateway_sdk_session_handoffs(provider_id, provider_model, selected_route_key, requested_at_ms DESC);
+
+        UPDATE copilot_model_gateway_sdk_session_confirmations
+        SET previous_provider_id = COALESCE(
+                NULLIF(json_extract(payload_json, '$.previousProviderId'), ''),
+                previous_provider_id
+            ),
+            provider_id = COALESCE(
+                NULLIF(json_extract(payload_json, '$.providerId'), ''),
+                NULLIF(json_extract(payload_json, '$.targetProviderId'), ''),
+                NULLIF(json_extract(payload_json, '$.confirmedProviderId'), ''),
+                provider_id
+            ),
+            binding_strategy = COALESCE(
+                NULLIF(json_extract(payload_json, '$.bindingStrategy'), ''),
+                binding_strategy
+            ),
+            wire_api = COALESCE(
+                NULLIF(json_extract(payload_json, '$.wireApi'), ''),
+                wire_api
+            ),
+            selected_route_key = COALESCE(
+                NULLIF(json_extract(payload_json, '$.selectedRouteKey'), ''),
+                selected_route_key
+            ),
+            operation_state = COALESCE(
+                NULLIF(json_extract(payload_json, '$.operationState'), ''),
+                operation_state
+            );
+        CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_confirmations_binding
+            ON copilot_model_gateway_sdk_session_confirmations(
+                previous_provider_id,
+                provider_id,
+                binding_strategy,
+                wire_api,
+                observed_at_ms DESC
+            );
+        CREATE INDEX IF NOT EXISTS idx_mg_sdk_session_confirmations_route
+            ON copilot_model_gateway_sdk_session_confirmations(
+                provider_id,
+                selected_route_key,
+                binding_strategy,
+                wire_api,
+                observed_at_ms DESC
+            );
+    `);
     if (
         !sqliteTableHasColumn(
             db,
@@ -1635,6 +1739,26 @@ export class SqliteModelGatewayCatalogStore {
                 }),
                 maxRows: sdkSessionHandoffMaxRows,
             };
+            const sdkSessionHandoffTransitionMaxRows = Math.max(1, sdkSessionHandoffMaxRows * 5);
+            const orphanTransitionRows = this.#db
+                .prepare(`
+                    DELETE FROM copilot_model_gateway_sdk_session_handoff_transitions
+                    WHERE handoff_id NOT IN (
+                        SELECT handoff_id FROM copilot_model_gateway_sdk_session_handoffs
+                    )
+                `)
+                .run().changes;
+            tables['copilot_model_gateway_sdk_session_handoff_transitions'] = {
+                deletedRows:
+                    orphanTransitionRows +
+                    deleteRowsKeepingLatest(this.#db, {
+                        table: 'copilot_model_gateway_sdk_session_handoff_transitions',
+                        keyColumn: 'transition_id',
+                        orderColumn: 'occurred_at_ms',
+                        maxRows: sdkSessionHandoffTransitionMaxRows,
+                    }),
+                maxRows: sdkSessionHandoffTransitionMaxRows,
+            };
             tables['copilot_model_gateway_sdk_session_confirmations'] = {
                 deletedRows: deleteRowsKeepingLatest(this.#db, {
                     table: 'copilot_model_gateway_sdk_session_confirmations',
@@ -2558,9 +2682,10 @@ export class SqliteModelGatewayCatalogStore {
     async writeSdkSessionHandoffRecords(handoffs) {
         const insert = this.#db.prepare(`
             INSERT INTO copilot_model_gateway_sdk_session_handoffs
-                (handoff_id, decision_id, route_profile, selected_route_key, status, session_id,
-                 target_model, requested_at_ms, confirmed_at_ms, payload_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (handoff_id, decision_id, route_profile, selected_route_key, status, session_id, target_model,
+                 operation_kind, idempotency_key, provider_id, provider_model, defer_reason, promotion_policy,
+                 promotion_authorized, expires_at_ms, requested_at_ms, confirmed_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(handoff_id) DO UPDATE SET
                 decision_id = excluded.decision_id,
                 route_profile = excluded.route_profile,
@@ -2568,26 +2693,76 @@ export class SqliteModelGatewayCatalogStore {
                 status = excluded.status,
                 session_id = excluded.session_id,
                 target_model = excluded.target_model,
+                operation_kind = excluded.operation_kind,
+                idempotency_key = excluded.idempotency_key,
+                provider_id = excluded.provider_id,
+                provider_model = excluded.provider_model,
+                defer_reason = excluded.defer_reason,
+                promotion_policy = excluded.promotion_policy,
+                promotion_authorized = excluded.promotion_authorized,
+                expires_at_ms = excluded.expires_at_ms,
                 requested_at_ms = excluded.requested_at_ms,
                 confirmed_at_ms = excluded.confirmed_at_ms,
+                payload_json = excluded.payload_json
+        `);
+        const insertTransition = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_sdk_session_handoff_transitions
+                (transition_id, handoff_id, session_id, state, occurred_at_ms, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(transition_id) DO UPDATE SET
+                session_id = excluded.session_id,
+                state = excluded.state,
+                occurred_at_ms = excluded.occurred_at_ms,
                 payload_json = excluded.payload_json
         `);
         const writable = handoffs.filter(isRecord);
         const tx = this.#db.transaction(() => {
             for (const handoff of writable) {
                 const requestedAtMs = dateMs(handoff['requestedAt']) ?? dateMs(handoff['timestamp']) ?? Date.now();
+                const handoffId = optionalString(handoff['handoffId']) ?? createSdkSessionHandoffId(requestedAtMs);
+                const operation = isRecord(handoff['operation']) ? handoff['operation'] : {};
+                const targetRoute = isRecord(operation['targetRoute']) ? operation['targetRoute'] : {};
+                const deferDetails = isRecord(operation['deferDetails']) ? operation['deferDetails'] : {};
+                const promotionAuthorization = isRecord(operation['promotionAuthorization'])
+                    ? operation['promotionAuthorization']
+                    : isRecord(deferDetails['promotionAuthorization'])
+                      ? deferDetails['promotionAuthorization']
+                      : {};
+                const sessionId = optionalString(handoff['sessionId']) ?? optionalString(operation['sessionId']);
                 insert.run(
-                    optionalString(handoff['handoffId']) ?? createSdkSessionHandoffId(requestedAtMs),
+                    handoffId,
                     optionalString(handoff['decisionId']),
                     optionalString(handoff['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
                     optionalString(handoff['selectedRouteKey']) ?? optionalString(handoff['routeKey']),
                     optionalString(handoff['status']) ?? 'prepared',
-                    optionalString(handoff['sessionId']),
+                    sessionId,
                     optionalString(handoff['targetModel']) ?? optionalString(handoff['model']),
+                    optionalString(operation['schemaVersion']) ?? 'unknown',
+                    optionalString(operation['idempotencyKey']),
+                    optionalString(targetRoute['providerId']),
+                    optionalString(targetRoute['providerModel']) ?? optionalString(targetRoute['selectorSyntax']),
+                    optionalString(operation['deferReason']),
+                    optionalString(promotionAuthorization['policy']) ?? 'manual_review',
+                    promotionAuthorization['authorized'] === true ? 1 : 0,
+                    dateMs(promotionAuthorization['expiresAt']),
                     requestedAtMs,
                     dateMs(handoff['confirmedAt']),
                     operationalPayloadJson(handoff),
                 );
+                const transitions = Array.isArray(operation['transitions'])
+                    ? operation['transitions'].filter(isRecord)
+                    : [];
+                transitions.forEach((transition, index) => {
+                    const state = optionalString(transition['state']) ?? 'unknown';
+                    insertTransition.run(
+                        `${handoffId}:${index}:${state}`,
+                        handoffId,
+                        sessionId,
+                        state,
+                        dateMs(transition['timestamp']) ?? requestedAtMs,
+                        operationalPayloadJson(transition),
+                    );
+                });
             }
         });
         tx();
@@ -2610,6 +2785,134 @@ export class SqliteModelGatewayCatalogStore {
                 `,
             )
             .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * Indexed lookup for deferred same-session route operations. Automatic callers should always provide sessionId.
+     *
+     * @param {{ sessionId?: string | null; limit?: number; now?: number; includeExpired?: boolean }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readDeferredSdkSessionHandoffRecords(options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 50, 500));
+        const sessionId = optionalString(options.sessionId);
+        const now = optionalInteger(options.now) ?? Date.now();
+        const includeExpired = options.includeExpired !== false;
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_sdk_session_handoffs
+                    WHERE status = 'deferred_until_turn_boundary'
+                      AND (? IS NULL OR session_id = ?)
+                      AND (? = 1 OR expires_at_ms IS NULL OR expires_at_ms > ?)
+                    ORDER BY requested_at_ms DESC
+                    LIMIT ?
+                `,
+            )
+            .all(sessionId, sessionId, includeExpired ? 1 : 0, now, limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * Marks older deferred route intents for one session as superseded by the newest intent.
+     *
+     * @param {{ sessionId: string; exceptHandoffId: string; supersededBy: string; observedAt?: number }} input
+     * @returns {Promise<{ superseded: number }>}
+     */
+    async supersedeDeferredSdkSessionHandoffRecords(input) {
+        const sessionId = optionalString(input.sessionId);
+        const exceptHandoffId = optionalString(input.exceptHandoffId);
+        const supersededBy = optionalString(input.supersededBy);
+        if (!sessionId || !exceptHandoffId || !supersededBy) return { superseded: 0 };
+        const observedAt = optionalInteger(input.observedAt) ?? Date.now();
+        const observedAtIso = new Date(observedAt).toISOString();
+        const rows = /** @type {Array<{ handoff_id: string; payload_json: string }>} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT handoff_id, payload_json
+                        FROM copilot_model_gateway_sdk_session_handoffs
+                        WHERE session_id = ?
+                          AND status = 'deferred_until_turn_boundary'
+                          AND handoff_id <> ?
+                        ORDER BY requested_at_ms DESC
+                    `,
+                )
+                .all(sessionId, exceptHandoffId)
+        );
+        const update = this.#db.prepare(`
+            UPDATE copilot_model_gateway_sdk_session_handoffs
+            SET status = 'superseded', payload_json = ?
+            WHERE handoff_id = ? AND status = 'deferred_until_turn_boundary'
+        `);
+        const insertTransition = this.#db.prepare(`
+            INSERT INTO copilot_model_gateway_sdk_session_handoff_transitions
+                (transition_id, handoff_id, session_id, state, occurred_at_ms, payload_json)
+            VALUES (?, ?, ?, 'superseded', ?, ?)
+            ON CONFLICT(transition_id) DO NOTHING
+        `);
+        let superseded = 0;
+        const tx = this.#db.transaction(() => {
+            for (const row of rows) {
+                const payload = parsePayload(row.payload_json);
+                const operation = isRecord(payload['operation']) ? payload['operation'] : {};
+                const transition = {
+                    state: 'superseded',
+                    timestamp: observedAtIso,
+                    supersededBy,
+                    retryable: false,
+                };
+                const transitions = Array.isArray(operation['transitions'])
+                    ? [...operation['transitions'].filter(isRecord), transition]
+                    : [transition];
+                const nextPayload = {
+                    ...payload,
+                    status: 'superseded',
+                    operation: {
+                        ...operation,
+                        state: 'superseded',
+                        supersededBy,
+                        retryable: false,
+                        updatedAt: observedAtIso,
+                        transitions,
+                    },
+                };
+                const result = update.run(operationalPayloadJson(nextPayload), row.handoff_id);
+                if (result.changes === 0) continue;
+                insertTransition.run(
+                    `${row.handoff_id}:superseded:${supersededBy}`,
+                    row.handoff_id,
+                    sessionId,
+                    observedAt,
+                    operationalPayloadJson(transition),
+                );
+                superseded += 1;
+            }
+        });
+        tx();
+        return { superseded };
+    }
+
+    /**
+     * @param {string} handoffId
+     * @param {{ limit?: number }} [options]
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readSdkSessionHandoffTransitionRecords(handoffId, options = {}) {
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 100, 500));
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_sdk_session_handoff_transitions
+                    WHERE handoff_id = ?
+                    ORDER BY occurred_at_ms ASC, transition_id ASC
+                    LIMIT ?
+                `,
+            )
+            .all(handoffId, limit)
             .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
     }
 
@@ -2640,15 +2943,22 @@ export class SqliteModelGatewayCatalogStore {
     async writeSdkSessionConfirmationRecords(confirmations) {
         const insert = this.#db.prepare(`
             INSERT INTO copilot_model_gateway_sdk_session_confirmations
-                (confirmation_id, handoff_id, decision_id, session_id, previous_model, confirmed_model,
+                (confirmation_id, handoff_id, decision_id, session_id, previous_provider_id, provider_id,
+                 previous_model, confirmed_model, binding_strategy, wire_api, selected_route_key, operation_state,
                  reasoning_effort, status, observed_at_ms, payload_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(confirmation_id) DO UPDATE SET
                 handoff_id = excluded.handoff_id,
                 decision_id = excluded.decision_id,
                 session_id = excluded.session_id,
+                previous_provider_id = excluded.previous_provider_id,
+                provider_id = excluded.provider_id,
                 previous_model = excluded.previous_model,
                 confirmed_model = excluded.confirmed_model,
+                binding_strategy = excluded.binding_strategy,
+                wire_api = excluded.wire_api,
+                selected_route_key = excluded.selected_route_key,
+                operation_state = excluded.operation_state,
                 reasoning_effort = excluded.reasoning_effort,
                 status = excluded.status,
                 observed_at_ms = excluded.observed_at_ms,
@@ -2663,8 +2973,16 @@ export class SqliteModelGatewayCatalogStore {
                     optionalString(confirmation['handoffId']),
                     optionalString(confirmation['decisionId']),
                     optionalString(confirmation['sessionId']),
+                    optionalString(confirmation['previousProviderId']),
+                    optionalString(confirmation['providerId']) ??
+                        optionalString(confirmation['targetProviderId']) ??
+                        optionalString(confirmation['confirmedProviderId']),
                     optionalString(confirmation['previousModel']),
                     optionalString(confirmation['confirmedModel']) ?? optionalString(confirmation['newModel']) ?? 'unknown',
+                    optionalString(confirmation['bindingStrategy']) ?? 'unknown',
+                    optionalString(confirmation['wireApi']),
+                    optionalString(confirmation['selectedRouteKey']),
+                    optionalString(confirmation['operationState']),
                     optionalString(confirmation['reasoningEffort']),
                     optionalString(confirmation['status']) ?? 'observed',
                     observedAtMs,
@@ -2692,6 +3010,62 @@ export class SqliteModelGatewayCatalogStore {
                 `,
             )
             .all(limit)
+            .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
+    }
+
+    /**
+     * Reads bounded same-session binding evidence without scanning JSON payloads in application memory.
+     *
+     * @param {{
+     *   providerId: string;
+     *   previousProviderId?: string | null;
+     *   bindingStrategy?: string;
+     *   wireApi?: string | null;
+     *   selectedRouteKey?: string | null;
+     *   limit?: number;
+     *   maxAgeMs?: number;
+     *   now?: number;
+     * }} options
+     * @returns {Promise<Record<string, unknown>[]>}
+     */
+    async readSdkSessionBindingEvidenceRecords(options) {
+        const providerId = optionalString(options.providerId);
+        if (!providerId) throw new Error('MODEL_GATEWAY_BINDING_EVIDENCE_PROVIDER_ID_REQUIRED');
+        const previousProviderId = optionalString(options.previousProviderId);
+        const bindingStrategy = optionalString(options.bindingStrategy) ?? 'direct';
+        const wireApi = optionalString(options.wireApi);
+        const selectedRouteKey = optionalString(options.selectedRouteKey);
+        const limit = Math.max(1, Math.min(optionalInteger(options.limit) ?? 20, 200));
+        const now = optionalInteger(options.now) ?? Date.now();
+        const maxAgeMs = Math.max(1, optionalInteger(options.maxAgeMs) ?? 30 * 24 * 60 * 60_000);
+        const minObservedAtMs = Math.max(0, now - maxAgeMs);
+        return this.#db
+            .prepare(
+                `
+                    SELECT payload_json
+                    FROM copilot_model_gateway_sdk_session_confirmations
+                    WHERE provider_id = ?
+                      AND (? IS NULL OR previous_provider_id = ?)
+                      AND binding_strategy = ?
+                      AND (? IS NULL OR wire_api = ?)
+                      AND (? IS NULL OR selected_route_key = ?)
+                      AND observed_at_ms >= ?
+                    ORDER BY observed_at_ms DESC, confirmation_id DESC
+                    LIMIT ?
+                `,
+            )
+            .all(
+                providerId,
+                previousProviderId,
+                previousProviderId,
+                bindingStrategy,
+                wireApi,
+                wireApi,
+                selectedRouteKey,
+                selectedRouteKey,
+                minObservedAtMs,
+                limit,
+            )
             .map((row) => parsePayload(/** @type {{ payload_json: string }} */ (row).payload_json));
     }
 

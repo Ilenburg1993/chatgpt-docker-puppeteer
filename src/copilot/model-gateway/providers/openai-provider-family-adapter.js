@@ -18,6 +18,11 @@ import { OPENAI_PROVIDER_FAMILY_SPECS } from './specs/index.js';
  * @property {readonly string[]} [baseUrls]
  * @property {string} defaultBaseUrl
  * @property {Record<string, string>} [headers]
+ * @property {{
+ *   configRepresentability?: 'full' | 'lossy' | 'unsupported' | 'unknown';
+ *   requiredHeaders?: readonly string[];
+ *   reason?: string;
+ * }} [directBinding]
  * @property {Record<string, unknown>} [gateway]
  */
 

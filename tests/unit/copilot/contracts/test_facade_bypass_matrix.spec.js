@@ -23,6 +23,7 @@ const FACADE_OPERATION_MATRIX = {
     'agent-dialog-runtime.js': { role: 'lifecycle', allowedFacadeImports: [] },
     'agent-health-access.js': { role: 'query', allowedFacadeImports: [] },
     'agent-model-config.js': { role: 'mutation', allowedFacadeImports: ['agent-runtime-state.js'] },
+    'agent-route-config.js': { role: 'mutation', allowedFacadeImports: ['agent-runtime-state.js'] },
     'agent-runtime-capabilities.js': { role: 'projection', allowedFacadeImports: [] },
     'agent-runtime-controls.js': { role: 'mutation', allowedFacadeImports: [] },
     'agent-runtime-event-bridge.js': { role: 'infra', allowedFacadeImports: [] },

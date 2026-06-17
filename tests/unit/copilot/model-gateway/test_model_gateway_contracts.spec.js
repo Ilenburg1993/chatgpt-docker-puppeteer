@@ -1359,17 +1359,15 @@ describe('model-gateway foundation', () => {
             COPILOT_BYOK_GATEWAY_AUTO_ALLOW_LOCAL_PRIVATE: 'on',
             COPILOT_BYOK_GATEWAY_AUTO_ACCOUNT_WIDE_FAILURE_KINDS: 'auth,credits,rate-limit',
         });
-        assert.deepEqual(autoPolicy, {
-            enabled: true,
-            preset: 'auto_prepare_new_session',
-            policy: 'prefer_runtime_proved',
-            profiles: ['repo_agent', 'code'],
-            allowLiveSetModel: true,
-            allowNewSession: true,
-            allowProviderProbes: false,
-            allowLocalPrivate: true,
-            accountWideFailureKinds: ['auth', 'credits', 'rate-limit'],
-        });
+        assert.equal(autoPolicy.enabled, true);
+        assert.equal(autoPolicy.preset, 'auto_same_session_route');
+        assert.equal(autoPolicy.policy, 'prefer_runtime_proved');
+        assert.deepEqual(autoPolicy.profiles, ['repo_agent', 'code']);
+        assert.equal(autoPolicy.allowLiveSetModel, true);
+        assert.equal(autoPolicy.allowNewSession, false);
+        assert.equal(autoPolicy.allowProviderProbes, false);
+        assert.equal(autoPolicy.allowLocalPrivate, true);
+        assert.deepEqual(autoPolicy.accountWideFailureKinds, ['auth', 'credits', 'rate-limit']);
         const mergedPolicy = mergeModelGatewayRuntimeAutomationPolicy(
             { enabled: true, profiles: ['repo_agent'], allowLiveSetModel: true },
             { allowNewSession: true },
@@ -1378,13 +1376,13 @@ describe('model-gateway foundation', () => {
         assert.equal(mergedPolicy.preset, 'operator_manual');
         assert.equal(mergedPolicy.enabled, true);
         assert.equal(mergedPolicy.allowLiveSetModel, true);
-        assert.equal(mergedPolicy.allowNewSession, true);
+        assert.equal(mergedPolicy.allowNewSession, false);
         const presetIds = listModelGatewayRuntimeAutomationPolicyPresets().map((preset) => preset['preset']);
         assert.deepEqual(presetIds, [
             'operator_manual',
             'llm_operator_guarded',
             'auto_same_boundary',
-            'auto_prepare_new_session',
+            'auto_same_session_route',
         ]);
         const sameBoundaryPreset = resolveModelGatewayRuntimeAutomationPolicyPreset('auto-same-boundary', {
             profiles: ['repo_agent'],
@@ -1427,7 +1425,7 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(effectivePolicy.profiles, ['repo_agent']);
         assert.equal(effectivePolicy.preset, 'auto_same_boundary');
         assert.equal(effectivePolicy.allowLiveSetModel, true);
-        assert.equal(effectivePolicy.allowNewSession, true);
+        assert.equal(effectivePolicy.allowNewSession, false);
         const policySources = explainModelGatewayRuntimeAutomationPolicySources({
             filePolicy: { enabled: true, preset: 'operator_manual', allowLiveSetModel: true },
             env: {
@@ -1455,9 +1453,9 @@ describe('model-gateway foundation', () => {
             runtimeSelectorPlan,
             profileId: 'repo_agent',
         });
-        assert.equal(noLiveSessionDecision.action, 'prepare_new_session');
+        assert.equal(noLiveSessionDecision.action, 'manual_intervention');
         assert.equal(noLiveSessionDecision.ok, true);
-        assert.equal(noLiveSessionDecision.requiresNewSession, true);
+        assert.equal(noLiveSessionDecision.requiresNewSession, false);
 
         const liveSwitchDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan,
@@ -1526,8 +1524,9 @@ describe('model-gateway foundation', () => {
                 failureKind: 'rate-limit',
             },
         });
-        assert.equal(postTurnFallbackDecision.ok, true);
-        assert.equal(postTurnFallbackDecision.action, 'prepare_new_session');
+        assert.equal(postTurnFallbackDecision.ok, false);
+        assert.equal(postTurnFallbackDecision.action, 'manual_intervention');
+        assert.equal(postTurnFallbackDecision.requiresNewSession, false);
         assert.equal(postTurnFallbackDecision.selectedRouteKey, 'groq:fallback-model');
         assert.equal(postTurnFallbackDecision.fallbackFromSelectedRouteKey, 'openrouter:primary-model');
         assert.equal(postTurnFallbackDecision.fallbackReason, 'rate-limit');
@@ -1600,27 +1599,26 @@ describe('model-gateway foundation', () => {
             policy: { allowNewSession: false },
         });
         assert.equal(newSessionDecision.action, 'manual_intervention');
-        assert.equal(newSessionDecision.requiresNewSession, true);
-        assert.equal(newSessionDecision.blockerClass, 'new_session_policy');
-        assert.equal(newSessionDecision.nonActionReason, 'new_session_policy_required');
-        assert.equal(newSessionDecision.blockers.includes('new_session_requires_explicit_policy'), true);
+        assert.equal(newSessionDecision.requiresProviderRebind, true);
+        assert.equal(newSessionDecision.requiresNewSession, false);
+        assert.equal(newSessionDecision.blockerClass, 'route_blocked');
+        assert.equal(newSessionDecision.nonActionReason, 'live_set_model_policy_disabled');
+        assert.equal(newSessionDecision.blockers.includes('live_set_model_policy_disabled'), true);
         const newSessionControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
             phase: 'pre_turn',
             decision: newSessionDecision,
             policy: { allowEffects: false, allowNewSession: false },
         });
-        assert.equal(newSessionControllerStep.effects[0]['kind'], 'prepare_new_sdk_session');
-        assert.equal(newSessionControllerStep.effects[0]['execute'], false);
-        assert.equal(newSessionControllerStep.effects[0]['authorization'], 'dry_run');
-        assert.equal(newSessionControllerStep.effects[0]['policyGate'], 'allowNewSession');
-        assert.equal(newSessionControllerStep.effects[0]['blockedReason'], 'effects_not_enabled');
+        assert.equal(newSessionControllerStep.action, 'manual_intervention');
+        assert.equal(newSessionControllerStep.effects.length, 0);
+        assert.equal(newSessionControllerStep.blockers.includes('live_set_model_policy_disabled'), true);
         const newSessionDeniedControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
             phase: 'pre_turn',
             decision: newSessionDecision,
             policy: { allowEffects: true, allowNewSession: false },
         });
-        assert.equal(newSessionDeniedControllerStep.effects[0]['authorization'], 'policy_denied');
-        assert.equal(newSessionDeniedControllerStep.effects[0]['blockedReason'], 'new_session_not_allowed');
+        assert.equal(newSessionDeniedControllerStep.effects.length, 0);
+        assert.equal(newSessionDeniedControllerStep.blockers.includes('live_set_model_policy_disabled'), true);
 
         const localPrivateDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan: {
@@ -1754,11 +1752,12 @@ describe('model-gateway foundation', () => {
             OPENROUTER_API_KEY: 'openrouter-key',
         });
         assert.equal(routeProbeEnv['COPILOT_BYOK_ENABLED'], 'true');
-        assert.equal(routeProbeEnv['COPILOT_BYOK_PROVIDER_PRESET'], 'openrouter');
+        assert.equal(routeProbeEnv['COPILOT_BYOK_PROVIDER_PRESET'], 'custom');
+        assert.equal(routeProbeEnv['COPILOT_MODEL_GATEWAY_PROVIDER_ID'], 'openrouter');
         assert.equal(routeProbeEnv['COPILOT_BYOK_MODEL'], 'openai/gpt-oss-120b');
-        assert.equal(routeProbeEnv['COPILOT_BYOK_BASE_URL'], undefined);
+        assert.equal(routeProbeEnv['COPILOT_BYOK_BASE_URL'], 'https://openrouter.ai/api/v1');
         assert.equal(routeProbeEnv['COPILOT_BYOK_WIRE_API'], 'completions');
-        assert.equal(routeProbeEnv['COPILOT_BYOK_API_KEY'], undefined);
+        assert.equal(routeProbeEnv['COPILOT_BYOK_API_KEY'], 'openrouter-key');
         assert.equal(routeProbeEnv['OPENROUTER_API_KEY'], 'openrouter-key');
         const defaultOpenAiCompatibleWireEnv = buildModelGatewayRuntimeSelectorProbeEnv(
             {
@@ -2095,8 +2094,10 @@ describe('model-gateway foundation', () => {
             deps: {
                 runChatProbe: async (options = {}) => {
                     assert.equal(options.model, 'openai/gpt-oss-120b');
-                    assert.equal(options.env?.['COPILOT_BYOK_PROVIDER_PRESET'], 'openrouter');
-                    assert.equal(options.env?.['COPILOT_BYOK_BASE_URL'], undefined);
+                    assert.equal(options.env?.['COPILOT_BYOK_PROVIDER_PRESET'], 'custom');
+                    assert.equal(options.env?.['COPILOT_MODEL_GATEWAY_PROVIDER_ID'], 'openrouter');
+                    assert.equal(options.env?.['COPILOT_BYOK_BASE_URL'], 'https://openrouter.ai/api/v1');
+                    assert.equal(options.env?.['COPILOT_BYOK_API_KEY'], 'openrouter-key');
                     assert.equal(options.env?.['COPILOT_BYOK_WIRE_API'], 'completions');
                     assert.equal(typeof options.deps?.classifyProviderFailure, 'function');
                     return {
@@ -4515,7 +4516,7 @@ describe('model-gateway foundation', () => {
         assert.ok(commands.some((entry) => entry.command === '/byok gateway commands'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto on profile:repo_agent'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto on profile:repo_agent preset:llm_operator_guarded'));
-        assert.ok(commands.some((entry) => entry.command === '/byok auto on profile:repo_agent preset:auto_prepare_new_session'));
+        assert.ok(commands.some((entry) => entry.command === '/byok auto on profile:repo_agent preset:auto_same_session_route'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto apply profile:repo_agent allow-live-set-model'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto policy'));
         assert.ok(commands.some((entry) => entry.command === '/byok auto doctor profile:repo_agent'));
@@ -13190,12 +13191,19 @@ describe('model-gateway foundation', () => {
 
     it('builds an SDK onListModels handler from gateway records without exposing secrets', async () => {
         const secret = 'sk-or-v1-list-models-secret-that-must-not-leak';
-        const handler = buildModelGatewayOnListModelsHandler({
-            COPILOT_BYOK_ENABLED: 'true',
-            COPILOT_BYOK_PROVIDER_PRESET: 'openrouter',
-            COPILOT_BYOK_MODEL: 'deepseek/deepseek-v4-flash:free',
-            OPEN_ROUTER_KEY: secret,
-        });
+        const handler = buildModelGatewayOnListModelsHandler(
+            {
+                COPILOT_BYOK_ENABLED: 'true',
+                COPILOT_BYOK_PROVIDER_PRESET: 'openrouter',
+                COPILOT_BYOK_MODEL: 'deepseek/deepseek-v4-flash:free',
+                OPEN_ROUTER_KEY: secret,
+            },
+            {
+                catalogStore: /** @type {JsonModelGatewayCatalogStore} */ ({
+                    readSnapshot: async () => ({ projections: [], routeOptions: [], modelEligibilityDecisions: [] }),
+                }),
+            },
+        );
         assert.equal(typeof handler, 'function');
 
         const models = await handler?.();

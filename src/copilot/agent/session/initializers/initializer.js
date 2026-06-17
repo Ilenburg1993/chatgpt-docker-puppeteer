@@ -51,8 +51,10 @@ import {
 import { defaultMetrics } from '../../ports/metrics-port.js';
 import { log } from '../../ports/logging/index.js';
 import {
-    MODEL_GATEWAY_INGRESS_DEFAULT_LOCAL_API_KEY,
+    applyModelGatewayBindingStrategy,
+    buildModelGatewayIngressPublicBaseUrl,
     buildModelGatewayIngressSessionOverrides,
+    createModelGatewayIngressLocalApiKey,
     createModelGatewayIngressRoute,
     defaultModelGatewayIngressRouteRegistry,
 } from '../../../model-gateway/ingress/index.js';
@@ -163,13 +165,29 @@ async function resumeOrCreateWithConfigDiscoveryGuard(client, savedSessionId, op
 /**
  * Reanexa o mesmo sessionId com a configuração solicitada. Nunca cria uma sessão substituta.
  *
+ * @param {string} expectedSessionId
+ * @param {Awaited<ReturnType<typeof resumeOrCreateAgentSdkSession>>} result
+ * @returns {Awaited<ReturnType<typeof resumeOrCreateAgentSdkSession>>}
+ */
+function assertSameSessionReattachResult(expectedSessionId, result) {
+    const actualSessionId = result.session?.sessionId;
+    if (result.isResumed !== true || actualSessionId !== expectedSessionId) {
+        throw new Error('SAME_SESSION_REATTACH_INVARIANT_VIOLATED');
+    }
+    return result;
+}
+
+/**
  * @param {CopilotClient} client
  * @param {string} sessionId
  * @param {Record<string, unknown>} opts
  */
 async function resumeSameSessionWithConfigDiscoveryGuard(client, sessionId, opts) {
     try {
-        return await resumeOrCreateAgentSdkSession(client, sessionId, { ...opts, requireSameSession: true });
+        return assertSameSessionReattachResult(
+            sessionId,
+            await resumeOrCreateAgentSdkSession(client, sessionId, { ...opts, requireSameSession: true }),
+        );
     } catch (error) {
         if (opts['enableConfigDiscovery'] !== true || !isConfigDiscoveryToolCollisionError(error)) {
             throw error;
@@ -179,11 +197,14 @@ async function resumeSameSessionWithConfigDiscoveryGuard(client, sessionId, opts
             `[PersistentSession] Reattach da mesma sessao encontrou colisao de tools (${toError(error).message}). ` +
                 'Retentando o mesmo sessionId com descoberta automatica desligada.',
         );
-        return resumeOrCreateAgentSdkSession(client, sessionId, {
-            ...opts,
-            enableConfigDiscovery: false,
-            requireSameSession: true,
-        });
+        return assertSameSessionReattachResult(
+            sessionId,
+            await resumeOrCreateAgentSdkSession(client, sessionId, {
+                ...opts,
+                enableConfigDiscovery: false,
+                requireSameSession: true,
+            }),
+        );
     }
 }
 
@@ -349,17 +370,6 @@ function shouldUseModelGatewayIngressRoute(route) {
 }
 
 /**
- * @param {ReturnType<typeof readCopilotBootConfig>} bootConfig
- * @returns {string}
- */
-function resolveModelGatewayIngressPublicBaseUrl(bootConfig) {
-    const server = record(Reflect.get(bootConfig, 'server'));
-    const host = optionalText(server['host']) ?? '127.0.0.1';
-    const port = typeof server['port'] === 'number' && Number.isFinite(server['port']) ? server['port'] : 3009;
-    return `http://${host}:${port}`;
-}
-
-/**
  * @param {Record<string, unknown>} provider
  * @returns {Record<string, string>}
  */
@@ -383,15 +393,24 @@ function deriveModelGatewayIngressUpstreamAuthHeaders(provider) {
  * @param {Record<string, unknown> | null} input.route
  * @param {ReturnType<typeof readCopilotBootConfig>} input.bootConfig
  * @param {string | null} input.sessionId
- * @returns {ReturnType<typeof resolveConfiguredByokSessionOverrides>}
+ * @returns {{
+ *   byok: ReturnType<typeof resolveConfiguredByokSessionOverrides>;
+ *   ingressPreparation: {
+ *     routeId: string;
+ *     registeredRevision: number;
+ *     previousSnapshot: ReturnType<typeof defaultModelGatewayIngressRouteRegistry.snapshot>;
+ *   } | null;
+ * }}
  */
 function applyModelGatewayIngressSessionBinding(input) {
     const route = input.route;
-    if (!shouldUseModelGatewayIngressRoute(route) || !input.byok.enabled || !input.byok.provider) return input.byok;
+    if (!shouldUseModelGatewayIngressRoute(route) || !input.byok.enabled || !input.byok.provider) {
+        return { byok: input.byok, ingressPreparation: null };
+    }
     const provider = record(input.byok.provider);
     const providerBaseUrl = optionalText(provider['baseUrl']);
     const routeBaseUrl = optionalText(route?.['openAICompatibleBaseUrl']) ?? optionalText(route?.['baseUrl']) ?? providerBaseUrl;
-    if (!routeBaseUrl) return input.byok;
+    if (!routeBaseUrl) return { byok: input.byok, ingressPreparation: null };
 
     const providerModel =
         optionalText(route?.['providerModel']) ?? optionalText(route?.['selectorSyntax']) ?? input.byok.model;
@@ -399,10 +418,14 @@ function applyModelGatewayIngressSessionBinding(input) {
     const sdkRouteKey =
         optionalText(route?.['sdkRouteKey']) ??
         `model-gateway-ingress:${input.sessionId ?? 'pending-session'}:${optionalText(route?.['routeProfile']) ?? 'default'}`;
-    const localApiKey = optionalText(route?.['localApiKey']) ?? MODEL_GATEWAY_INGRESS_DEFAULT_LOCAL_API_KEY;
+    const localApiKey = createModelGatewayIngressLocalApiKey();
+    const server = record(Reflect.get(input.bootConfig, 'server'));
     const ingressRoute = createModelGatewayIngressRoute({
         sessionId: input.sessionId ?? 'pending-session',
-        publicBaseUrl: resolveModelGatewayIngressPublicBaseUrl(input.bootConfig),
+        publicBaseUrl: buildModelGatewayIngressPublicBaseUrl({
+            host: optionalText(server['host']),
+            port: typeof server['port'] === 'number' ? server['port'] : 3009,
+        }),
         route: {
             ...route,
             providerModel,
@@ -412,7 +435,11 @@ function applyModelGatewayIngressSessionBinding(input) {
         },
     });
     const overrides = buildModelGatewayIngressSessionOverrides(ingressRoute, { localApiKey });
-    defaultModelGatewayIngressRouteRegistry.register({
+    const currentRegistryEntry = defaultModelGatewayIngressRouteRegistry.get(ingressRoute.routeId);
+    const previousSnapshot = currentRegistryEntry
+        ? defaultModelGatewayIngressRouteRegistry.snapshot(ingressRoute.routeId)
+        : null;
+    const registeredIngressRoute = defaultModelGatewayIngressRouteRegistry.register({
         ingressRoute,
         localApiKey,
         upstreamAuthHeaders: deriveModelGatewayIngressUpstreamAuthHeaders(provider),
@@ -421,22 +448,38 @@ function applyModelGatewayIngressSessionBinding(input) {
             bindingStrategy: 'ingress',
             targetProviderId: ingressRoute.providerId,
             targetProviderModel: ingressRoute.providerModel,
+            previousRevision: currentRegistryEntry?.revision ?? null,
+            previousTargetFingerprint: currentRegistryEntry?.targetFingerprint ?? null,
         },
+        expectedRevision: currentRegistryEntry?.revision ?? null,
     });
 
     return {
-        ...input.byok,
-        provider: /** @type {import('#copilot/sdk/types').ProviderConfig} */ (overrides.provider),
-        model: overrides.model,
-        modelCapabilities: overrides.modelCapabilities ?? input.byok.modelCapabilities,
-        summary: {
-            ...input.byok.summary,
+        byok: {
+            ...input.byok,
+            provider: /** @type {import('#copilot/sdk/types').ProviderConfig} */ (overrides.provider),
             model: overrides.model,
-            baseUrl: overrides.provider.baseUrl,
-            auth: {
-                ...input.byok.summary.auth,
-                apiKeyConfigured: true,
+            modelCapabilities: overrides.modelCapabilities ?? input.byok.modelCapabilities,
+            summary: {
+                ...input.byok.summary,
+                model: overrides.model,
+                baseUrl: overrides.provider.baseUrl,
+                auth: {
+                    ...input.byok.summary.auth,
+                    apiKeyConfigured: true,
+                },
+                modelGatewayIngress: {
+                    routeId: registeredIngressRoute.ingressRoute.routeId,
+                    revision: registeredIngressRoute.revision,
+                    targetFingerprint: registeredIngressRoute.targetFingerprint,
+                    sdkVisibleModel: registeredIngressRoute.ingressRoute.sdkVisibleModel,
+                },
             },
+        },
+        ingressPreparation: {
+            routeId: registeredIngressRoute.ingressRoute.routeId,
+            registeredRevision: registeredIngressRoute.revision,
+            previousSnapshot,
         },
     };
 }
@@ -451,6 +494,58 @@ function readPersistedModelGatewayActiveRoute(value) {
     if (typeof route['providerId'] !== 'string' || !route['providerId'].trim()) return null;
     if (typeof route['providerModel'] !== 'string' || !route['providerModel'].trim()) return null;
     return route;
+}
+
+/**
+ * @param {Record<string, unknown> | null} route
+ * @returns {NonNullable<import('../../lifecycle/state/index.js').AliveAgentState['modelGatewayActiveRoute']> | null}
+ */
+function buildPersistedModelGatewayActiveRoute(route) {
+    if (!route) return null;
+    const providerId = optionalText(route['providerId']);
+    const providerModel = optionalText(route['providerModel']) ?? optionalText(route['selectorSyntax']);
+    if (!providerId || !providerModel) return null;
+    const bindingStrategy = optionalText(route['bindingStrategy']);
+    return {
+        providerId,
+        providerModel,
+        providerType: optionalText(route['providerType']),
+        selectorSyntax: optionalText(route['selectorSyntax']),
+        baseUrl: optionalText(route['baseUrl']),
+        openAICompatibleBaseUrl: optionalText(route['openAICompatibleBaseUrl']),
+        openAICompatible: typeof route['openAICompatible'] === 'boolean' ? route['openAICompatible'] : null,
+        wireApi: optionalText(route['wireApi']),
+        providerProfile: optionalText(route['providerProfile']),
+        routeProfile: optionalText(route['routeProfile']),
+        selectedRouteKey: optionalText(route['selectedRouteKey']),
+        bindingStrategy:
+            bindingStrategy === 'direct' || bindingStrategy === 'ingress' || bindingStrategy === 'blocked'
+                ? bindingStrategy
+                : null,
+        sdkRouteKey: optionalText(route['sdkRouteKey']),
+        sdkVisibleModel: optionalText(route['sdkVisibleModel']),
+        directRebindReliability: optionalText(route['directRebindReliability']),
+        directRebindSupported:
+            typeof route['directRebindSupported'] === 'boolean' ? route['directRebindSupported'] : null,
+        directRebindReliable:
+            typeof route['directRebindReliable'] === 'boolean' ? route['directRebindReliable'] : null,
+        directConfigRepresentability: optionalText(route['directConfigRepresentability']),
+        requiredDirectHeaders: Array.isArray(route['requiredDirectHeaders'])
+            ? route['requiredDirectHeaders'].map(String)
+            : [],
+        bindingCapabilities:
+            Object.keys(record(route['bindingCapabilities'])).length > 0 ? record(route['bindingCapabilities']) : null,
+        bindingDecision: Object.keys(record(route['bindingDecision'])).length > 0 ? record(route['bindingDecision']) : null,
+        runtimeEvidence: Object.keys(record(route['runtimeEvidence'])).length > 0 ? record(route['runtimeEvidence']) : null,
+        requiresIngress: route['requiresIngress'] === true,
+        useIngress: route['useIngress'] === true,
+        modelGatewayIngress: route['modelGatewayIngress'] === true,
+        requiresNewSession: false,
+        updatedAt:
+            typeof route['updatedAt'] === 'number' && Number.isFinite(route['updatedAt'])
+                ? route['updatedAt']
+                : Date.now(),
+    };
 }
 
 /**
@@ -678,20 +773,34 @@ export async function initOrResumeSession(client, sessionOptions) {
         state ? Reflect.get(state, 'modelGatewayActiveRoute') : null,
     );
     const persistedResumeSessionId = _validateSessionForResume(state?.sessionId, state?.resumedAt ?? state?.startedAt);
-    const sessionEnv = persistedGatewayRoute
-        ? buildModelGatewayRuntimeSelectorProbeEnv(persistedGatewayRoute, process.env)
+    const resolvedGatewayRoute = persistedGatewayRoute
+        ? applyModelGatewayBindingStrategy(persistedGatewayRoute, {
+              currentRoute: persistedGatewayRoute,
+              sessionId: persistedResumeSessionId,
+          })
+        : null;
+    const gatewayBindingDecision = record(resolvedGatewayRoute?.['bindingDecision']);
+    if (resolvedGatewayRoute?.['bindingStrategy'] === 'blocked') {
+        throw new Error(
+            `MODEL_GATEWAY_BINDING_STRATEGY_BLOCKED: ${Array.isArray(gatewayBindingDecision['reasons']) ? gatewayBindingDecision['reasons'].map(String).join(',') : 'no_safe_binding'}`,
+        );
+    }
+    const persistedResolvedGatewayRoute = buildPersistedModelGatewayActiveRoute(resolvedGatewayRoute);
+    const sessionEnv = resolvedGatewayRoute
+        ? buildModelGatewayRuntimeSelectorProbeEnv(resolvedGatewayRoute, process.env)
         : process.env;
     const requestedModel =
-        (typeof persistedGatewayRoute?.['providerModel'] === 'string'
-            ? persistedGatewayRoute['providerModel']
+        (typeof resolvedGatewayRoute?.['providerModel'] === 'string'
+            ? resolvedGatewayRoute['providerModel']
             : sessionOptions.model) ?? AGENT_SDK_DEFAULT_MODEL;
     const bootConfig = readCopilotBootConfig();
-    const byok = applyModelGatewayIngressSessionBinding({
+    const ingressBindingPreparation = applyModelGatewayIngressSessionBinding({
         byok: resolveConfiguredByokSessionOverrides(sessionEnv, requestedModel),
-        route: persistedGatewayRoute,
+        route: resolvedGatewayRoute,
         bootConfig,
         sessionId: persistedResumeSessionId,
     });
+    const byok = ingressBindingPreparation.byok;
     const model = byok.enabled && byok.model ? byok.model : requestedModel;
     const sdkReasoningEffort =
         byok.enabled && byok.supportsReasoning === false ? undefined : sessionOptions.reasoningEffort;
@@ -822,19 +931,44 @@ export async function initOrResumeSession(client, sessionOptions) {
         }
     }
     const resumeCandidateSessionId = savedSessionId;
-    let result =
-        sameSessionReattachRequired && savedSessionId
-            ? await resumeSameSessionWithConfigDiscoveryGuard(client, savedSessionId, opts)
-            : await resumeOrCreateWithConfigDiscoveryGuard(client, savedSessionId, opts);
-    if (result.isResumed && !(await _validateResumedSession(result.session))) {
-        if (sameSessionReattachRequired) {
-            throw new Error(
-                'SAME_SESSION_PROVIDER_REBIND_HEALTH_CHECK_FAILED: reattach preservou o sessionId, mas a sessão não passou no health-check',
-            );
+    const preparedIngressBinding = ingressBindingPreparation.ingressPreparation;
+    let result;
+    try {
+        result =
+            sameSessionReattachRequired && savedSessionId
+                ? await resumeSameSessionWithConfigDiscoveryGuard(client, savedSessionId, opts)
+                : await resumeOrCreateWithConfigDiscoveryGuard(client, savedSessionId, opts);
+        if (result.isResumed && !(await _validateResumedSession(result.session))) {
+            if (sameSessionReattachRequired) {
+                throw new Error(
+                    'SAME_SESSION_PROVIDER_REBIND_HEALTH_CHECK_FAILED: reattach preservou o sessionId, mas a sessão não passou no health-check',
+                );
+            }
+            log('WARN', '[PersistentSession] Sessão retomada não passou no health-check — criando nova sessão.');
+            sdkSessionBootReason = 'resumed-session-health-check-failed';
+            result = await createWithConfigDiscoveryGuard(client, opts);
         }
-        log('WARN', '[PersistentSession] Sessão retomada não passou no health-check — criando nova sessão.');
-        sdkSessionBootReason = 'resumed-session-health-check-failed';
-        result = await createWithConfigDiscoveryGuard(client, opts);
+    } catch (error) {
+        if (preparedIngressBinding) {
+            try {
+                if (preparedIngressBinding.previousSnapshot) {
+                    defaultModelGatewayIngressRouteRegistry.restore(preparedIngressBinding.previousSnapshot, {
+                        expectedRevision: preparedIngressBinding.registeredRevision,
+                        metadata: { source: 'session.initializer.rollback' },
+                    });
+                } else {
+                    defaultModelGatewayIngressRouteRegistry.delete(preparedIngressBinding.routeId, {
+                        expectedRevision: preparedIngressBinding.registeredRevision,
+                    });
+                }
+            } catch (cleanupError) {
+                log(
+                    'WARN',
+                    `[PersistentSession] Binding ingress preparado não foi revertido por conflito de revisão: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+                );
+            }
+        }
+        throw error;
     }
     const sdkSessionBootDecision = buildSdkSessionBootDecision(
         requestedSdkSessionBootMode,
@@ -866,7 +1000,7 @@ export async function initOrResumeSession(client, sessionOptions) {
     Reflect.set(
         result.session,
         '__copilotModelGatewayProviderId',
-        persistedGatewayRoute?.['providerId'] ?? byok.summary.preset ?? 'github-copilot-sdk',
+        resolvedGatewayRoute?.['providerId'] ?? byok.summary.preset ?? 'github-copilot-sdk',
     );
     if (
         result.isResumed &&
@@ -908,6 +1042,7 @@ export async function initOrResumeSession(client, sessionOptions) {
                 systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
                 reasoningEffort: effectiveReasoningEffort,
                 byokSessionBinding,
+                ...(persistedResolvedGatewayRoute ? { modelGatewayActiveRoute: persistedResolvedGatewayRoute } : {}),
                 sdkSessionBootDecision,
                 sdkSessionLocalMetadata,
                 dialogPaused: false,
@@ -934,6 +1069,7 @@ export async function initOrResumeSession(client, sessionOptions) {
                 systemPromptBinding: buildSystemPromptBindingSnapshot(systemPromptStatus, result.session.sessionId),
                 reasoningEffort: effectiveReasoningEffort,
                 byokSessionBinding,
+                ...(persistedResolvedGatewayRoute ? { modelGatewayActiveRoute: persistedResolvedGatewayRoute } : {}),
                 sdkSessionBootDecision,
                 sdkSessionLocalMetadata,
                 pendingQuestion: null,

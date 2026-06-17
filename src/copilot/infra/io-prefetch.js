@@ -145,7 +145,7 @@ async function warmSinglePath(filePath, textMode, cachedBytes, cachedText, signa
  */
 export async function warmCacheForPaths(paths, opts = {}) {
     const { concurrency = 8, textMode = true, silent = true, signal } = opts;
-    const t0 = Date.now();
+    const t0 = performance.now();
     let preloaded = 0;
     let failed = 0;
     let skipped = 0;
@@ -186,7 +186,7 @@ export async function warmCacheForPaths(paths, opts = {}) {
         ),
     );
 
-    return { preloaded, failed, skipped, durationMs: Date.now() - t0 };
+    return { preloaded, failed, skipped, durationMs: Math.max(0, performance.now() - t0) };
 }
 
 /**

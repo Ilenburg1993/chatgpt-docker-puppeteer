@@ -92,6 +92,13 @@ export const LIFECYCLE_MODULE_LAYOUT = Object.freeze([
         summary: 'Barrel puro de teardown de runtime.',
     },
     {
+        path: 'model-gateway-turn-boundary.js',
+        role: 'orchestrator',
+        tier: 'secondary',
+        public: false,
+        summary: 'Scheduler pós-turno de promoção same-session do Model Gateway, governado pelo Agent.',
+    },
+    {
         path: 'orchestrators/agent-lifecycle.js',
         role: 'orchestrator',
         tier: 'primary',

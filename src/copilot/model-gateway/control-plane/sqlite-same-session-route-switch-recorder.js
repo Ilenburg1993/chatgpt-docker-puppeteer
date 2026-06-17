@@ -22,8 +22,14 @@ export function createSqliteSameSessionRouteSwitchRecorder(options) {
             operation['previousRoute'] && typeof operation['previousRoute'] === 'object'
                 ? /** @type {Record<string, unknown>} */ (operation['previousRoute'])
                 : {};
+        const targetProviderId = String(targetRoute['providerId'] ?? 'unknown');
+        const previousProviderId = String(previousRoute['providerId'] ?? 'unknown');
         const targetModel = String(targetRoute['providerModel'] ?? targetRoute['selectorSyntax'] ?? 'unknown');
         const previousModel = String(previousRoute['providerModel'] ?? previousRoute['selectorSyntax'] ?? 'unknown');
+        const bindingStrategy = String(targetRoute['bindingStrategy'] ?? 'direct');
+        const wireApi = typeof targetRoute['wireApi'] === 'string' ? targetRoute['wireApi'] : null;
+        const selectedRouteKey =
+            typeof targetRoute['selectedRouteKey'] === 'string' ? targetRoute['selectedRouteKey'] : null;
         const updatedAt = String(operation['updatedAt'] ?? new Date().toISOString());
         await store.writeSdkSessionHandoffRecords([
             {
@@ -47,8 +53,17 @@ export function createSqliteSameSessionRouteSwitchRecorder(options) {
                     handoffId: operationId,
                     decisionId: operationId,
                     sessionId: options.sessionId,
+                    previousProviderId,
+                    providerId: targetProviderId,
+                    targetProviderId,
+                    confirmedProviderId: state === 'rolled_back' ? previousProviderId : targetProviderId,
                     previousModel,
                     confirmedModel: state === 'rolled_back' ? previousModel : targetModel,
+                    bindingStrategy,
+                    wireApi,
+                    selectedRouteKey,
+                    operationState: state,
+                    error: operation['error'] ?? null,
                     status:
                         state === 'verified'
                             ? 'route_confirmed_same_session'
