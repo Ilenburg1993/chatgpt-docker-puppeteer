@@ -16,10 +16,12 @@ Checkpoint de base desta revisao:
 
 - branch: `main`;
 - HEAD antes desta revisao: `fb7f27489f78` (`feat(copilot): bind sdk sessions through model gateway ingress`);
+- checkpoint publicado desta revisao: `b78c1c816` (`feat(copilot): harden same-session model gateway routing`);
 - worktree continha implementacao extensa ainda nao commitada para same-session route promotion, ingress adaptativo,
   SQLite v13, testes e este roadmap;
-- untracked externos e artefatos historicos existem no workspace e nao devem ser confundidos com codigo canonico sem
-  revisao explicita.
+- untracked externos e artefatos historicos permanecem no workspace e nao foram incluidos no checkpoint canonico sem
+  revisao explicita: `audit_externa_src_copilot`, `src/DOCUMENTACAO/...`, `src/copilot/.ai/rollback/` e
+  `workspaces/...`.
 
 ## 1. Regras de governanca continua
 
@@ -174,9 +176,9 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Executar LLM-B live pelo runner canonico.
 - [x] Recriar este roadmap com estado atual, situacao ideal e fases booleanas.
 - [x] Rodar validacao ampla `src/copilot` antes do commit de checkpoint.
-- [ ] Confirmar quais untracked externos pertencem ao commit e quais devem permanecer fora.
-- [ ] Commitar e pushar checkpoint documental/corretivo para `main`.
-- [ ] Apos push, atualizar este roadmap com commit/hash e estado limpo.
+- [x] Confirmar quais untracked externos pertencem ao commit e quais devem permanecer fora.
+- [x] Commitar e pushar checkpoint documental/corretivo para `main`.
+- [x] Apos push, atualizar este roadmap com commit/hash e estado limpo do codigo canonico.
 
 ### Faixa A — Same-session route switch e promocao pos-turno
 
@@ -296,20 +298,19 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 
 ### Faixa H — Aceite final
 
-- [ ] `src/copilot` typecheck strict, lint e unit suite ampla passam no checkpoint final.
+- [x] `src/copilot` typecheck strict, lint e unit suite ampla passam no checkpoint final.
 - [ ] Live LLM-B route switch + ask_user + final marker passa ponta a ponta.
 - [ ] Live rollback e reconcile passam.
 - [ ] Cockpits concordam sobre provider/modelo/sessao.
 - [ ] Runners read-only respondem dentro de budget documentado.
 - [ ] Profile management e duravel, auditavel e redigido.
-- [ ] Branch `main` fica commitada, pushada e sincronizada.
+- [x] Branch `main` fica commitada, pushada e sincronizada.
 
 ## 6. Ordem recomendada a partir daqui
 
-1. Fechar checkpoint atual: validacao ampla, commit e push dos arquivos de codigo/teste/doc dentro do escopo.
-2. Corrigir o bloqueio `assistant-empty-turn` apos reattach real e repetir o live route apply minimal ate PASS.
-3. Criar projecao SQLite runtime-health rapida e restaurar `runtimeSource=merged` como default quando comprovado.
-4. Implementar readiness unica e alinhar `/health`, `/now`, `/byok`, `/activity`, `overview` e `ops`.
+1. Corrigir o bloqueio `assistant-empty-turn` apos reattach real e repetir o live route apply minimal ate PASS.
+2. Criar projecao SQLite runtime-health rapida e restaurar `runtimeSource=merged` como default quando comprovado.
+3. Implementar readiness unica e alinhar `/health`, `/now`, `/byok`, `/activity`, `overview` e `ops`.
 5. Adicionar testes end-to-end de ledger transicional e metricas de promocao.
 6. Rodar live rollback/reconcile.
 7. Decompor `/byok`, finalizar perfis duraveis e golden path vanilla SDK.
