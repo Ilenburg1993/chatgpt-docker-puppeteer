@@ -7,7 +7,7 @@ const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-ops.mjs [--json] [--fail] [--profile ID]
+    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-ops.mjs [--json] [--fail] [--profile ID] [--subcommand-timeout-ms N]
 
 Read-only model-gateway cockpit for operators and LLM agents. It summarizes SQLite diagnostics, live readiness,
 canonical commands and the pure automation status without fetching providers, running models or mutating the terminal.
@@ -37,16 +37,41 @@ function optionalNumber(value) {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function readPositiveInteger(name, fallback) {
+    const raw = readArg(name);
+    if (!raw) return fallback;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function runJson(scriptId, scriptArgs = []) {
+    const startedAtMs = Date.now();
     const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS[scriptId], ...scriptArgs], {
         cwd: REPO_ROOT,
         encoding: 'utf8',
         maxBuffer: 32 * 1024 * 1024,
+        timeout: subcommandTimeoutMs,
     });
+    const durationMs = Date.now() - startedAtMs;
+    if (result.error) {
+        const timedOut = result.error.code === 'ETIMEDOUT';
+        return {
+            ok: false,
+            status: result.status,
+            durationMs,
+            timedOut,
+            error: timedOut
+                ? `${scriptId} exceeded ${subcommandTimeoutMs}ms`
+                : result.error.message,
+            json: null,
+        };
+    }
     if (result.status !== 0) {
         return {
             ok: false,
             status: result.status,
+            durationMs,
+            timedOut: false,
             error: result.stderr || result.stdout || `command failed with status ${result.status}`,
             json: null,
         };
@@ -55,6 +80,8 @@ function runJson(scriptId, scriptArgs = []) {
         return {
             ok: true,
             status: result.status,
+            durationMs,
+            timedOut: false,
             error: null,
             json: JSON.parse(result.stdout),
         };
@@ -62,6 +89,8 @@ function runJson(scriptId, scriptArgs = []) {
         return {
             ok: false,
             status: result.status,
+            durationMs,
+            timedOut: false,
             error: error instanceof Error ? error.message : String(error),
             json: null,
         };
@@ -179,6 +208,7 @@ function readCommandsSummary(commands) {
 
 const json = argSet.has('--json');
 const profile = readArg('--profile', 'repo_agent');
+const subcommandTimeoutMs = readPositiveInteger('--subcommand-timeout-ms', 20_000);
 const diagnostics = runJson('sqliteDiagnostics', ['--json']);
 const readiness = runJson('liveReadiness', ['--json']);
 const auto = runJson('autoStatus', ['--json', `--profile=${profile}`]);
@@ -188,14 +218,31 @@ const summary = {
     schema: 'model-gateway-ops',
     ok: diagnostics.ok && readiness.ok && auto.ok && commands.ok,
     profile,
+    subcommandTimeoutMs,
     database: readDatabaseSummary(diagnostics),
     readiness: readReadinessSummary(readiness),
     automation: readAutomationSummary(auto),
     commands: readCommandsSummary(commands),
+    timings: Object.fromEntries(
+        Object.entries({ diagnostics, readiness, auto, commands }).map(([key, result]) => [
+            key,
+            {
+                durationMs: result.durationMs,
+                timedOut: result.timedOut === true,
+            },
+        ]),
+    ),
     failures: Object.fromEntries(
         Object.entries({ diagnostics, readiness, auto, commands })
             .filter(([, result]) => !result.ok)
-            .map(([key, result]) => [key, result.error]),
+            .map(([key, result]) => [
+                key,
+                {
+                    error: result.error,
+                    durationMs: result.durationMs,
+                    timedOut: result.timedOut === true,
+                },
+            ]),
     ),
 };
 
@@ -222,8 +269,12 @@ if (json) {
     process.stdout.write(
         `  commands: total=${summary.commands.commandCount} package=${summary.commands.packageCommandCount} make=${summary.commands.makeCommandCount} terminal=${summary.commands.terminalCommandCount}\n`,
     );
+    process.stdout.write(
+        `  timings: diagnostics=${summary.timings.diagnostics.durationMs}ms readiness=${summary.timings.readiness.durationMs}ms auto=${summary.timings.auto.durationMs}ms commands=${summary.timings.commands.durationMs}ms timeout=${summary.subcommandTimeoutMs}ms\n`,
+    );
     for (const [key, error] of Object.entries(summary.failures)) {
-        process.stdout.write(`  ${key} failed: ${String(error).slice(0, 500)}\n`);
+        const failure = optionalRecord(error);
+        process.stdout.write(`  ${key} failed: ${String(failure?.['error'] ?? error).slice(0, 500)}\n`);
     }
 }
 

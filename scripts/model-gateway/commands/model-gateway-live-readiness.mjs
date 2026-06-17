@@ -43,16 +43,28 @@ const TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS = Object.freeze([
 const TERMINAL_LIVE_REQUIRE_AGENT_PROBE_PROFILES = Object.freeze([]);
 const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
 const SQLITE_RUNTIME_HEALTH_READ_LIMIT = 1_500;
+const DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 25;
+const DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 100_000;
 const args = process.argv.slice(2);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning] [--sqlite-runtime-health]
+    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning] [--sqlite-runtime-health] [--redaction-max-rows-per-table N] [--deep-redaction]
 
 Check whether the model-gateway metadata database is ready for terminal llm-b live tests.
 This does not start the terminal, execute providers, run models or run runtime probes.
 `);
     process.exit(0);
+}
+
+function readArg(name, fallback = '') {
+    const prefix = `${name}=`;
+    for (let index = 0; index < args.length; index += 1) {
+        const arg = args[index];
+        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
+        if (arg === name) return args[index + 1] ?? fallback;
+    }
+    return fallback;
 }
 
 /**
@@ -78,6 +90,21 @@ function optionalRecord(value) {
 function optionalNumber(value) {
     const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
     return Number.isFinite(number) ? number : 0;
+}
+
+/**
+ * @param {string[]} names
+ * @param {number} fallback
+ * @returns {number}
+ */
+function readPositiveInteger(names, fallback) {
+    for (const name of names) {
+        const raw = readArg(name);
+        if (!raw) continue;
+        const parsed = Number.parseInt(raw, 10);
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+    return fallback;
 }
 
 async function fileExists(filePath) {
@@ -190,6 +217,13 @@ const json = argSet.has('--json');
 const fail = argSet.has('--fail');
 const failOnSupplyWarning = argSet.has('--fail-on-supply-warning');
 const includeSqliteRuntimeHealth = argSet.has('--sqlite-runtime-health');
+const sqliteRedactionMaxRowsPerTable =
+    argSet.has('--deep-redaction') || argSet.has('--full-redaction')
+        ? DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE
+        : readPositiveInteger(
+              ['--redaction-max-rows-per-table', '--sqlite-redaction-max-rows-per-table'],
+              DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE,
+          );
 if (json) {
     setDbLogger((level, message) => {
         if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
@@ -212,6 +246,7 @@ const catalogRedaction = auditModelGatewayValueRedaction(sourceSnapshot, {
 });
 const sqliteRedaction = await sqliteStore.auditStoredPayloadRedaction({
     additionalSecrets: secretAuditValues,
+    maxRowsPerTable: sqliteRedactionMaxRowsPerTable,
 });
 const secretRegistry = createEnvSecretRegistry();
 const fileHealthRecords = listByokProviderModelHealth();
@@ -357,7 +392,7 @@ const checks = [
     {
         id: 'redaction_audit',
         ok: catalogRedaction.ok && sqliteRedaction.ok,
-        detail: `catalogLeaks=${catalogRedaction.leakCount}, sqliteLeaks=${sqliteRedaction.leakCount}`,
+        detail: `catalogLeaks=${catalogRedaction.leakCount}, sqliteLeaks=${sqliteRedaction.leakCount}, sqliteRowsPerTable=${sqliteRedactionMaxRowsPerTable}`,
     },
     {
         id: 'selection_allow_probe',
@@ -465,6 +500,7 @@ const summary = {
             leakCount: sqliteRedaction.leakCount,
             scannedStringCount: sqliteRedaction.scannedStringCount,
             tableCount: sqliteRedaction.tableCount,
+            maxRowsPerTable: sqliteRedactionMaxRowsPerTable,
         },
     },
     selection: {

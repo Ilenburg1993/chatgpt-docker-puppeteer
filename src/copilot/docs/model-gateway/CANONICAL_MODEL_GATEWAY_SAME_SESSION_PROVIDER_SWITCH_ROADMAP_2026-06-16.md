@@ -3,7 +3,8 @@
 Data canonica: 2026-06-16
 
 Ultima atualizacao material: 2026-06-17 — auditoria profunda do worktree, validacao ampla, live LLM-B
-`model-gateway-route-apply-minimal` PASS, correcao dos bloqueios de reattach/ask_user e reconstrucao deste roadmap.
+`model-gateway-route-apply-minimal` PASS, correcao dos bloqueios de reattach/ask_user, `ops` rapido com timeouts por
+subgate e reconstrucao deste roadmap.
 
 Status: ativo, normativo e continuamente atualizavel.
 
@@ -142,7 +143,12 @@ qualquer desvio de identidade
   - artefato `artifacts/test-runs/copilot/2026-06-17T23-44-25-650Z/summary.md`.
 - [ ] O export Markdown do live PASS ainda aparece com `timeline=mixed/diverged` e `sync=blocked:diverged-no-overlap`;
   os criterios funcionais passaram, mas a reconciliacao/exportacao historica ainda precisa de melhoria.
-- [ ] `ops --json` ainda e pesado para um timeout operacional de 30s, porque agrega readiness, auto status e comandos.
+- [x] `ops --json --profile=repo_agent` passou dentro de budget operacional curto: caiu de ~26,4s para ~15,7s no banco
+  atual e agora tem timeout por subgate com fallback JSON parcial.
+- [x] `liveReadiness --json` caiu de ~21,8s para ~12,8s ao trocar a auditoria SQLite de redaction profunda por amostra
+  operacional default; `--deep-redaction` preserva a varredura profunda e passou em ~21,7s.
+- [x] `ops --json --subcommand-timeout-ms=500` retornou `ok=false` com falhas tipadas por subgate e `commands` parcial
+  preservado, em vez de travar o cockpit.
 - [ ] Leitura SQLite runtime-health profunda por `listLatestRuntimeHealthRecords()` e lenta no banco atual: probes locais
   observaram ~37s para `listRuntimeHealthRecords({limit:1500})` e ~45s para `listLatestRuntimeHealthRecords({limit:100})`.
 
@@ -154,7 +160,8 @@ qualquer desvio de identidade
   modo profundo fica opt-in em `--sqlite-runtime-health`.
 - [ ] `model-gateway-runtime-selector` agora usa `runtimeSource=file` por default; `merged/sqlite` continuam opt-in, mas
   precisam ser otimizados antes de voltarem a ser default.
-- [ ] `ops` precisa de modo rapido com timeouts por subgate, ou uma readiness unica precomputada.
+- [x] `ops` tem modo rapido default com timeout por subgate (`--subcommand-timeout-ms`, default 20s) e falha parcial
+  estruturada.
 - [x] A continuacao apos route switch real nao deve cair em BYOK provider failure/empty turn antes de `ask_user` quando a
   rota alvo nao suporta reasoning effort SDK-facing e a promocao respeita a janela humana pos-ask.
 - [ ] Adicionar regressao focada para o export `timeline=mixed/diverged` do live PASS, distinguindo divergencia
@@ -269,7 +276,9 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] `autoStatus --json` volta a responder.
 - [x] `liveReadiness --json` passa em ~21s com SQLite runtime-health profundo desativado por default.
 - [x] `livePlan --json` passa e registra readiness ok.
-- [ ] `ops --json` deve responder em budget curto, com timeout por subgate e fallback parcial.
+- [x] `ops --json` responde em budget curto no banco atual, com timeout por subgate e fallback parcial.
+- [x] `liveReadiness --json` usa auditoria SQLite de redaction amostrada por default e `--deep-redaction` para auditoria
+  operacional profunda.
 - [ ] `runtimeSelector --runtime-source=merged|sqlite` precisa voltar a ser praticavel antes de ser default.
 - [ ] `listLatestRuntimeHealthRecords` precisa de projecao/index/cached read model para 100k+ linhas.
 
@@ -372,3 +381,11 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   - `npm run lint:copilot`;
   - `npm run test:copilot:unit`, resumo em
     `artifacts/test-runs/copilot/2026-06-17T23-44-25-650Z/summary.md`.
+- Evidencia operacional da correcao de runners:
+  - `node scripts/model-gateway/run.mjs liveReadiness --json` passou em ~12,8s com
+    `redaction.sqlite.maxRowsPerTable=25`;
+  - `node scripts/model-gateway/run.mjs liveReadiness --json --deep-redaction` passou em ~21,7s com
+    `redaction.sqlite.maxRowsPerTable=100000`;
+  - `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent` passou em ~15,7s, com timings por subgate;
+  - `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent --subcommand-timeout-ms=500` retornou JSON
+    parcial com falhas `timedOut=true`.
