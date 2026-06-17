@@ -10,6 +10,12 @@
  */
 
 import { promoteModelGatewayDeferredRouteSwitchAtTurnBoundary } from '#copilot/model-gateway';
+import {
+    EMITTER_QUESTION_ANSWERED,
+    EMITTER_QUESTION_PENDING,
+    EMITTER_USER_INPUT_COMPLETED,
+    EMITTER_USER_INPUT_REQUESTED,
+} from '#copilot/events';
 import { log } from '../ports/logging/index.js';
 
 /**
@@ -19,6 +25,7 @@ import { log } from '../ports/logging/index.js';
  *     task: Promise<unknown>,
  *     meta?: { label?: string; description?: string },
  *   ) => Promise<void>;
+ *   hasPendingQuestion?: () => boolean;
  * }} ModelGatewayTurnBoundaryContext
  *
  * @typedef {import('node:events').EventEmitter & {
@@ -40,15 +47,22 @@ import { log } from '../ports/logging/index.js';
  * @param {{
  *   promote?: typeof promoteModelGatewayDeferredRouteSwitchAtTurnBoundary;
  *   source?: string;
+ *   turnBoundarySettleMs?: number;
  * }} [options]
  * @returns {() => void}
  */
 export function wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, options = {}) {
     const promote = options.promote ?? promoteModelGatewayDeferredRouteSwitchAtTurnBoundary;
     const source = options.source ?? 'agent.dialog_turn_end.model_gateway_route_promotion';
+    const turnBoundarySettleMs = Math.max(0, Math.min(Math.floor(options.turnBoundarySettleMs ?? 750), 5_000));
     let running = false;
     let rerunRequested = false;
     let disposed = false;
+    let humanQuestionOpen = false;
+    let awaitingPostQuestionTurnEnd = false;
+
+    const shouldDelayForHumanQuestion = () =>
+        humanQuestionOpen || awaitingPostQuestionTurnEnd || ctx.hasPendingQuestion?.() === true;
 
     const schedule = () => {
         if (disposed) return;
@@ -59,6 +73,10 @@ export function wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, options = 
         running = true;
         const task = Promise.resolve()
             .then(async () => {
+                if (turnBoundarySettleMs > 0) {
+                    await new Promise((resolve) => setTimeout(resolve, turnBoundarySettleMs));
+                }
+                if (disposed || shouldDelayForHumanQuestion()) return null;
                 const session = ctx.getSessionSnapshot();
                 if (!session?.sessionId) return null;
                 const result = await promote({
@@ -103,10 +121,30 @@ export function wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, options = 
         });
     };
 
-    const onDialogTurnEnd = () => schedule();
+    const onDialogTurnEnd = () => {
+        if (awaitingPostQuestionTurnEnd) {
+            awaitingPostQuestionTurnEnd = false;
+        }
+        schedule();
+    };
+    const onQuestionPending = () => {
+        humanQuestionOpen = true;
+    };
+    const onQuestionAnswered = () => {
+        humanQuestionOpen = false;
+        awaitingPostQuestionTurnEnd = true;
+    };
     host.on('dialog.turn_end', onDialogTurnEnd);
+    host.on(EMITTER_QUESTION_PENDING, onQuestionPending);
+    host.on(EMITTER_USER_INPUT_REQUESTED, onQuestionPending);
+    host.on(EMITTER_QUESTION_ANSWERED, onQuestionAnswered);
+    host.on(EMITTER_USER_INPUT_COMPLETED, onQuestionAnswered);
     return () => {
         disposed = true;
         host.off('dialog.turn_end', onDialogTurnEnd);
+        host.off(EMITTER_QUESTION_PENDING, onQuestionPending);
+        host.off(EMITTER_USER_INPUT_REQUESTED, onQuestionPending);
+        host.off(EMITTER_QUESTION_ANSWERED, onQuestionAnswered);
+        host.off(EMITTER_USER_INPUT_COMPLETED, onQuestionAnswered);
     };
 }

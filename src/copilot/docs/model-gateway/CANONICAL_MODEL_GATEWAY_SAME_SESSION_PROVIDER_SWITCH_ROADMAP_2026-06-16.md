@@ -2,8 +2,8 @@
 
 Data canonica: 2026-06-16
 
-Ultima atualizacao material: 2026-06-17 — auditoria profunda do worktree, validacao focada, live LLM-B
-`model-gateway-route-apply-minimal`, correcao parcial dos runners operacionais e reconstrucao deste roadmap.
+Ultima atualizacao material: 2026-06-17 — auditoria profunda do worktree, validacao ampla, live LLM-B
+`model-gateway-route-apply-minimal` PASS, correcao dos bloqueios de reattach/ask_user e reconstrucao deste roadmap.
 
 Status: ativo, normativo e continuamente atualizavel.
 
@@ -17,6 +17,7 @@ Checkpoint de base desta revisao:
 - branch: `main`;
 - HEAD antes desta revisao: `fb7f27489f78` (`feat(copilot): bind sdk sessions through model gateway ingress`);
 - checkpoint publicado desta revisao: `b78c1c816` (`feat(copilot): harden same-session model gateway routing`);
+- checkpoint documental de sincronizacao: `12a746fb5` (`docs(copilot): record model gateway checkpoint push`);
 - worktree continha implementacao extensa ainda nao commitada para same-session route promotion, ingress adaptativo,
   SQLite v13, testes e este roadmap;
 - untracked externos e artefatos historicos permanecem no workspace e nao foram incluidos no checkpoint canonico sem
@@ -112,8 +113,34 @@ qualquer desvio de identidade
   `operation.inspect`, `route.switch`, `deferred_until_turn_boundary`, `same_session`.
 - [x] No live LLM-B, a rota viva foi confirmada na mesma sessao para `ollama-cloud/qwen3-coder-next`; o prompt mudou de
   `kilo-auto/free` para `qwen3-coder-next`.
-- [ ] O mesmo live LLM-B terminou `BLOCKED` por `assistant-empty-turn` antes do `ask_user` obrigatorio e final marker.
+- [x] O live LLM-B inicial terminou `BLOCKED` por `assistant-empty-turn` antes do `ask_user` obrigatorio e final marker,
+  expondo um bug real de continuidade pos-reattach.
   Artefato: `artifacts/terminal-live/2026-06-17T23-llmb-route-apply-minimal-codex/summary.md`.
+- [x] A causa tecnica do empty turn foi reduzida a dois defeitos:
+  - binding de sessao repassava `modelCapabilities.supports.reasoningEffort=true` para
+    `ollama-cloud/qwen3-coder-next`, mesmo quando a camada BYOK/SDK-facing indicava `sdkReasoningEffort=false`;
+  - o scheduler de turn boundary podia promover o reattach no mesmo `dialog.turn_end` que materializava `ask_user`,
+    interrompendo a janela de resposta humana e a continuacao pos-pergunta.
+- [x] `src/copilot/model-gateway/session/session-binding.js` agora preserva a decisao SDK-facing de reasoning effort:
+  `summary.capabilities.sdkReasoningEffort` e `modelCapabilities.supports.reasoningEffort` so ficam `true` quando o
+  legado e o binding adaptado concordam.
+- [x] `src/copilot/agent/lifecycle/model-gateway-turn-boundary.js` agora observa `question.pending`,
+  `user_input.requested`, `question.answered` e `user_input.completed`, aguarda uma pequena janela de settle e so
+  promove reattach depois do `dialog.turn_end` posterior a resposta humana.
+- [x] Live LLM-B repetido apos as correcoes terminou `PASS`, com 601 eventos SSE publicos, zero erros, pergunta
+  `ask_user`, resposta humana `SIM`, final marker pos-ask e correlacao SSE/export completa.
+  Artefato:
+  `artifacts/terminal-live/2026-06-18T00-llmb-route-apply-minimal-ask-boundary-fix/summary.md`.
+- [x] `/health full` no live corrigido alinhou prompt, BYOK e Gateway em `ollama-cloud/qwen3-coder-next`, com
+  raciocinio SDK-facing desligado.
+- [x] Checkpoint amplo pos-correcao passou:
+  - `npm run typecheck:strict:src.copilot`;
+  - `npm run lint:copilot`;
+  - `npm run test:copilot:unit` com 6.821 testes totais, 6.793 aprovados, zero falhas, 28 pendentes e 2.071 suites
+    aprovadas;
+  - artefato `artifacts/test-runs/copilot/2026-06-17T23-44-25-650Z/summary.md`.
+- [ ] O export Markdown do live PASS ainda aparece com `timeline=mixed/diverged` e `sync=blocked:diverged-no-overlap`;
+  os criterios funcionais passaram, mas a reconciliacao/exportacao historica ainda precisa de melhoria.
 - [ ] `ops --json` ainda e pesado para um timeout operacional de 30s, porque agrega readiness, auto status e comandos.
 - [ ] Leitura SQLite runtime-health profunda por `listLatestRuntimeHealthRecords()` e lenta no banco atual: probes locais
   observaram ~37s para `listRuntimeHealthRecords({limit:1500})` e ~45s para `listLatestRuntimeHealthRecords({limit:100})`.
@@ -127,12 +154,14 @@ qualquer desvio de identidade
 - [ ] `model-gateway-runtime-selector` agora usa `runtimeSource=file` por default; `merged/sqlite` continuam opt-in, mas
   precisam ser otimizados antes de voltarem a ser default.
 - [ ] `ops` precisa de modo rapido com timeouts por subgate, ou uma readiness unica precomputada.
-- [ ] A continuacao apos route switch real pode cair em BYOK provider failure/empty turn antes de `ask_user`; o reattach
-  e a rota foram provados, mas a experiencia end-to-end da LLM-B ainda nao esta aceita.
+- [x] A continuacao apos route switch real nao deve cair em BYOK provider failure/empty turn antes de `ask_user` quando a
+  rota alvo nao suporta reasoning effort SDK-facing e a promocao respeita a janela humana pos-ask.
+- [ ] Adicionar regressao focada para o export `timeline=mixed/diverged` do live PASS, distinguindo divergencia
+  historica inofensiva de perda real de transcript.
 - [ ] Eventos de `model-gateway.deferred-route-promotion` podem aparecer repetidamente no mesmo intervalo; falta metrica
   e coalescing/telemetria explicita para distinguir "no-op scan" de promocao real.
-- [ ] `/health full` ainda mostra "BYOK pronto preset kilo-code ... modelo kilo-auto/free" ao mesmo tempo em que a
-  sessao/prompt estao em `qwen3-coder-next`; precisa readiness unica para evitar cockpit divergente.
+- [x] `/health full` deixou de divergir no live route apply minimal corrigido; a lacuna residual e tornar essa visao
+  derivada de uma readiness unica compartilhada por todas as superficies.
 - [ ] `terminal/commands/byok.js` segue monolitico e concentra parsing, use-cases e rendering.
 - [ ] Profile management ainda e flexivel demais e sem mutacao duravel transacional/rollback.
 - [ ] Golden path vanilla GitHub Copilot SDK ainda nao tem cobertura explicita suficiente para provar ausencia de
@@ -200,12 +229,15 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Preservar `requiresNewSession=false`.
 - [ ] Reduzir eventos repetidos/no-op de background promotion ou classifica-los explicitamente.
 - [ ] Adicionar metricas por `promoted`, `skipped`, `expired`, `superseded`, `policy_denied`, `error`.
+- [x] Bloquear promocao durante `ask_user` pendente ou imediatamente apos resposta humana ate o proximo
+  `dialog.turn_end`, preservando a continuacao do SDK.
 
 #### A.3 UX LLM-B
 
 - [x] Tool result instrui a LLM-B a encerrar o turno quando `automaticContinuation.armed=true`.
 - [x] Workflow plan marca verificacao pos-turno como `sameTurnExecutionForbidden`.
-- [ ] Live LLM-B deve continuar para `ask_user` depois do reattach sem cair em empty turn.
+- [x] Live LLM-B continua para `ask_user` depois do reattach sem cair em empty turn no cenario
+  `model-gateway-route-apply-minimal`.
 - [ ] Quando provider falha logo apos reattach, terminal deve oferecer fallback/reconcile sem quebrar o protocolo do
   harness.
 - [ ] `/activity`, `/tools diag` e `/byok` devem listar handoffs diferidos/promoviveis como secao propria.
@@ -257,17 +289,19 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Provar chamadas reais de tools de leitura e Model Gateway.
 - [x] Provar `route_switch` plan/apply sem travar.
 - [x] Provar deferimento same-session e mudanca para `ollama-cloud/qwen3-coder-next`.
-- [ ] Fazer o mesmo cenario terminar PASS com `ask_user` e final marker.
-- [ ] Capturar e classificar falha BYOK pos-reattach sem gerar empty turn.
+- [x] Fazer o mesmo cenario terminar PASS com `ask_user` e final marker.
+- [x] Capturar e corrigir a falha BYOK pos-reattach causada por reasoning effort indevido e promocao na janela humana.
 - [ ] Adicionar live rollback induzido.
 - [ ] Adicionar live reconcile pos-mismatch.
 
 #### D.2 Export/SSE
 
-- [ ] Corrigir `export-sse-correlation` quando ask/final ocorrem apos reattach.
-- [ ] Garantir export Markdown com pergunta e resposta humana canônicas.
+- [x] Corrigir `export-sse-correlation` quando ask/final ocorrem apos reattach no cenario route apply minimal.
+- [x] Garantir export Markdown com pergunta e resposta humana canonicas no cenario route apply minimal.
 - [ ] Garantir `no-prompt-double-render` sem mascarar prompts legitimos.
 - [ ] Classificar BYOK usage real sem falso Premium Request.
+- [ ] Investigar `timeline=mixed/diverged`/`sync=blocked:diverged-no-overlap` no export mesmo quando SSE/export
+  correlacionam ask, answer e postAsk corretamente.
 
 ### Faixa E — Perfis BYOK duraveis
 
@@ -299,7 +333,7 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 ### Faixa H — Aceite final
 
 - [x] `src/copilot` typecheck strict, lint e unit suite ampla passam no checkpoint final.
-- [ ] Live LLM-B route switch + ask_user + final marker passa ponta a ponta.
+- [x] Live LLM-B route switch + ask_user + final marker passa ponta a ponta.
 - [ ] Live rollback e reconcile passam.
 - [ ] Cockpits concordam sobre provider/modelo/sessao.
 - [ ] Runners read-only respondem dentro de budget documentado.
@@ -308,12 +342,12 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 
 ## 6. Ordem recomendada a partir daqui
 
-1. Corrigir o bloqueio `assistant-empty-turn` apos reattach real e repetir o live route apply minimal ate PASS.
-2. Criar projecao SQLite runtime-health rapida e restaurar `runtimeSource=merged` como default quando comprovado.
-3. Implementar readiness unica e alinhar `/health`, `/now`, `/byok`, `/activity`, `overview` e `ops`.
-5. Adicionar testes end-to-end de ledger transicional e metricas de promocao.
-6. Rodar live rollback/reconcile.
-7. Decompor `/byok`, finalizar perfis duraveis e golden path vanilla SDK.
+1. Criar projecao SQLite runtime-health rapida e restaurar `runtimeSource=merged` como default quando comprovado.
+2. Implementar readiness unica e alinhar `/health`, `/now`, `/byok`, `/activity`, `overview` e `ops`.
+3. Investigar e corrigir a reconciliacao `timeline=mixed/diverged` do export no live PASS.
+4. Adicionar testes end-to-end de ledger transicional e metricas de promocao.
+5. Rodar live rollback/reconcile.
+6. Decompor `/byok`, finalizar perfis duraveis e golden path vanilla SDK.
 
 ## 7. Evidencias locais importantes
 
@@ -321,9 +355,19 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`: harness LLM-B canonico.
 - `artifacts/terminal-live/2026-06-17T23-llmb-route-apply-minimal-codex/summary.md`: live desta auditoria,
   `BLOCKED` por `assistant-empty-turn` apos provar route switch.
+- `artifacts/terminal-live/2026-06-18T00-llmb-route-apply-minimal-ask-boundary-fix/summary.md`: live corrigido,
+  `PASS` ponta a ponta com route switch same-session, `ask_user`, resposta `SIM`, final marker e correlacao SSE/export.
 - `node scripts/model-gateway/run.mjs liveRuns --json`: ledger SQLite registra o live como
   `terminal-live:2026-06-17T23-19-45-585Z:canonical_full_turn_model-gateway-route-apply-minimal`.
 - Validacao focada desta auditoria:
   - `npx eslint ...` nos modulos alterados de Model Gateway/Agent/tools/testes;
   - `npx vitest run --config vitest.copilot.config.js ...` com 10 specs e 62 testes;
   - `npm run typecheck:strict:src.copilot`.
+- Validacao focada das correcoes pos-live:
+  - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/agent/test_model_gateway_turn_boundary.spec.js tests/unit/copilot/model-gateway/test_session_binding.spec.js tests/unit/copilot/test_initializer_session_fs.spec.js tests/unit/copilot/terminal/byok/test_deferred_route_promotion.spec.js tests/unit/copilot/terminal/byok/test_live_model_switch.spec.js --reporter=dot`;
+  - `npx eslint src/copilot/agent/lifecycle/model-gateway-turn-boundary.js tests/unit/copilot/agent/test_model_gateway_turn_boundary.spec.js src/copilot/model-gateway/session/session-binding.js tests/unit/copilot/model-gateway/test_session_binding.spec.js`.
+- Validacao ampla das correcoes pos-live:
+  - `npm run typecheck:strict:src.copilot`;
+  - `npm run lint:copilot`;
+  - `npm run test:copilot:unit`, resumo em
+    `artifacts/test-runs/copilot/2026-06-17T23-44-25-650Z/summary.md`.

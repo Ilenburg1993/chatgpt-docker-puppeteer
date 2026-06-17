@@ -89,6 +89,49 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
         dispose();
     });
 
+    it('adiar promoção quando o turn_end abre ask_user até o turno pós-resposta concluir', async () => {
+        const host = new TestHost();
+        const tracked = [];
+        let pendingQuestion = false;
+        const ctx = {
+            getSessionSnapshot: () => ({ sessionId: 'session-stable' }),
+            hasPendingQuestion: () => pendingQuestion,
+            trackBackgroundTask: async (task) => {
+                tracked.push(task);
+                await task;
+            },
+        };
+        const promote = vi.fn().mockResolvedValue({
+            sessionId: 'session-stable',
+            scanned: 1,
+            promoted: 1,
+            superseded: 0,
+            skipped: 0,
+            errors: 0,
+            records: [],
+        });
+        const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, {
+            promote,
+            turnBoundarySettleMs: 20,
+        });
+
+        host.emit('dialog.turn_end', { durationMs: 100 });
+        pendingQuestion = true;
+        host.emit('question.pending', { question: 'continuar?' });
+        pendingQuestion = false;
+        host.emit('question.answered', { answer: 'SIM', hadPending: true });
+        await vi.waitFor(() => expect(tracked).toHaveLength(1));
+        await Promise.all(tracked.splice(0));
+
+        expect(promote).not.toHaveBeenCalled();
+
+        host.emit('dialog.turn_end', { durationMs: 20 });
+        await vi.waitFor(() => expect(promote).toHaveBeenCalledTimes(1));
+        await Promise.all(tracked);
+
+        dispose();
+    });
+
     it('remove o listener ao descartar o scheduler', async () => {
         const host = new TestHost();
         const ctx = {

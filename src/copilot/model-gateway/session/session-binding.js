@@ -99,6 +99,8 @@ export function resolveModelGatewaySessionBinding(env = process.env, requestedMo
     const adapterId = typeof adapter['id'] === 'string' ? adapter['id'] : 'openai-compatible';
     const adaptedCapabilities = record(adapted['modelCapabilities']);
     const supports = record(adaptedCapabilities['supports']);
+    const sdkReasoningEffort =
+        legacy.summary.capabilities.sdkReasoningEffort === true && supports['reasoningEffort'] === true;
     const active = record(imported.active);
     const bindingSource =
         active['bindingSource'] === 'gateway_route' || active['bindingSource'] === 'gateway_profile'
@@ -117,14 +119,22 @@ export function resolveModelGatewaySessionBinding(env = process.env, requestedMo
         ),
         model: adapted['model'],
         modelCapabilities:
-            Object.keys(adaptedCapabilities).length > 0 ? adaptedCapabilities : legacy.modelCapabilities,
-        supportsReasoning: Boolean(supports['reasoningEffort']),
+            Object.keys(adaptedCapabilities).length > 0
+                ? {
+                      ...adaptedCapabilities,
+                      supports: {
+                          ...supports,
+                          reasoningEffort: sdkReasoningEffort,
+                      },
+                  }
+                : legacy.modelCapabilities,
+        supportsReasoning: sdkReasoningEffort,
         summary: {
             ...legacy.summary,
             model: adapted['model'],
             capabilities: {
                 ...legacy.summary.capabilities,
-                sdkReasoningEffort: Boolean(supports['reasoningEffort']),
+                sdkReasoningEffort,
             },
         },
         gatewayBinding: {
