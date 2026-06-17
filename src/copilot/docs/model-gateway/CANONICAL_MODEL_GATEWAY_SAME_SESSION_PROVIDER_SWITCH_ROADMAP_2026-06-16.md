@@ -18,6 +18,7 @@ Checkpoint de base desta revisao:
 - HEAD antes desta revisao: `fb7f27489f78` (`feat(copilot): bind sdk sessions through model gateway ingress`);
 - checkpoint publicado desta revisao: `b78c1c816` (`feat(copilot): harden same-session model gateway routing`);
 - checkpoint documental de sincronizacao: `12a746fb5` (`docs(copilot): record model gateway checkpoint push`);
+- checkpoint live PASS e correcao pos-ask: `1834513ff` (`fix(copilot): preserve route switch ask continuation`);
 - worktree continha implementacao extensa ainda nao commitada para same-session route promotion, ingress adaptativo,
   SQLite v13, testes e este roadmap;
 - untracked externos e artefatos historicos permanecem no workspace e nao foram incluidos no checkpoint canonico sem
