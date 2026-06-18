@@ -130,6 +130,20 @@ vi.mock('../../../../src/copilot/terminal/frontend/projections/now.js', () => ({
     })),
 }));
 
+vi.mock('../../../../src/copilot/terminal/frontend/projections/config.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    readTerminalConfigProjection: vi.fn(() => ({
+        modelGatewayProjection: {
+            effectiveRoute: {
+                providerId: 'ollama-cloud',
+                providerModel: 'qwen3-coder-next',
+                modelId: 'ollama-cloud:qwen3-coder-next',
+                label: 'ollama-cloud · qwen3-coder-next',
+            },
+        },
+    })),
+}));
+
 vi.mock('../../../../src/copilot/terminal/events/projections/index.js', () => ({
     readTerminalIoActivityProjection: vi.fn(() => [
         {
@@ -173,6 +187,8 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).not.toContain('web_fetch');
         expect(ctx.output()).toContain('tela full');
         expect(ctx.output()).not.toContain('display=full');
+        expect(ctx.output()).toContain('Rota efetiva');
+        expect(ctx.output()).toContain('ollama-cloud · qwen3-coder-next');
         expect(ctx.output()).toContain('Estado');
         expect(ctx.output()).toContain('Evento');
         expect(ctx.output()).toContain('Ferramentas');

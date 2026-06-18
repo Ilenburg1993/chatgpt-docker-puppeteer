@@ -3,7 +3,7 @@
 import { readTerminalIoActivityProjection } from '../events/projections/index.js';
 import { renderTerminalQuestionActivityPhaseLabel } from '../events/presenters/question/index.js';
 import { renderTerminalTraceSummaryTitle } from '../events/index.js';
-import { readTerminalActivityProjection } from '../frontend/index.js';
+import { readTerminalActivityProjection, readTerminalConfigProjection } from '../frontend/index.js';
 import {
     formatTerminalElapsedDuration,
     formatTerminalTimeLabel,
@@ -226,6 +226,21 @@ function compactOperatorDetail(value) {
  */
 function compactActivityLabel(value) {
     return humanizeTerminalToolSurfaceText(compactHumanText(value));
+}
+
+/**
+ * @param {unknown} route
+ * @returns {string | null}
+ */
+function renderActivityEffectiveRoute(route) {
+    if (!route || typeof route !== 'object') return null;
+    const record = /** @type {Record<string, unknown>} */ (route);
+    if (typeof record['label'] === 'string' && record['label'].trim()) return record['label'].trim();
+    const provider = typeof record['providerId'] === 'string' ? record['providerId'].trim() : '';
+    const providerModel = typeof record['providerModel'] === 'string' ? record['providerModel'].trim() : '';
+    if (provider && providerModel) return `${provider} · ${providerModel}`;
+    const modelId = typeof record['modelId'] === 'string' ? record['modelId'].trim() : '';
+    return modelId || null;
 }
 
 /**
@@ -570,6 +585,8 @@ export function cmdActivity({ println }, arg) {
     const { limit, detail } = parseActivityArg(arg);
     const now = Date.now();
     const projection = readTerminalActivityProjection(limit);
+    const configProjection = readTerminalConfigProjection();
+    const effectiveRoute = renderActivityEffectiveRoute(configProjection.modelGatewayProjection?.effectiveRoute);
     const recentIo = readTerminalIoActivityProjection(limit);
     const current = projection.current;
     const activeTurnTrace = projection.turnTrace.current;
@@ -587,6 +604,9 @@ export function cmdActivity({ println }, arg) {
     );
     println(terminalThemeRow('Evento', `${compactActivityLabel(current.label)}${progressLabel}`));
     println(terminalThemeRow('Detalhe', current.detail ? compactOperatorDetail(current.detail) : '(nenhum)'));
+    if (effectiveRoute) {
+        println(terminalThemeRow('Rota efetiva', effectiveRoute));
+    }
     println(terminalThemeRow('Idade', formatTerminalElapsedDuration(current.ageMs)));
     println(terminalThemeDivider(37));
     if (detail) {

@@ -184,6 +184,8 @@ qualquer desvio de identidade
   `modelGateway.active` apenas como fallback.
 - [x] `/session sdk` agora mostra `Rota efetiva` a partir de `modelGatewayProjection.effectiveRoute`, reaproveitando
   `active` apenas indiretamente como fallback na projection.
+- [x] `/activity` agora mostra `Rota efetiva` a partir de `modelGatewayProjection.effectiveRoute` no painel de
+  atividade atual.
 
 ### 3.3 Bugs/gaps concretos encontrados
 
@@ -327,6 +329,7 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Alimentar `/health` com `modelGatewayProjection.effectiveRoute` quando disponivel.
 - [x] Alimentar `/byok status` com `modelGatewayProjection.effectiveRoute` quando disponivel.
 - [x] Alimentar `/session sdk` com `modelGatewayProjection.effectiveRoute` quando disponivel.
+- [x] Alimentar `/activity` com `modelGatewayProjection.effectiveRoute` quando disponivel.
 - [x] Alimentar `overview`/`model_gateway_overview` e `ops` com `pendingHandoffs.active/latest` a partir do ledger
   SQLite.
 - [ ] Incluir rota efetiva, binding efetivo, sessao logica, provider real, provider SDK-facing, pending handoffs,
@@ -476,4 +479,9 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   - teste focado
     `test_commands_session.spec.js -t "cmdSessionSdk expõe binding|cmdSessionSdk exibe rota efetiva"` passou;
   - validacao escopada: `npx eslint src/copilot/terminal/commands/session.js tests/unit/copilot/terminal/test_commands_session.spec.js`
+    e `npm run typecheck:strict:src.copilot`.
+- Evidencia de alinhamento `/activity` com `effectiveRoute`:
+  - `src/copilot/terminal/commands/activity.js` mostra `Rota efetiva` no painel atual;
+  - teste focado `test_commands_activity.spec.js -t "exibe atividade atual"` passou;
+  - validacao escopada: `npx eslint src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js`
     e `npm run typecheck:strict:src.copilot`.
