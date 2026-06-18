@@ -75,6 +75,57 @@ function runtimeHealthTags(runtime) {
 }
 
 /**
+ * @param {{ active?: Record<string, any>; source?: string }} snapshot
+ * @returns {{
+ *     enabled: boolean;
+ *     ready: boolean;
+ *     providerId: string | null;
+ *     providerModel: string | null;
+ *     modelId: string | null;
+ *     profile: string | null;
+ *     gatewayProfile: string | null;
+ *     preset: string | null;
+ *     bindingSource: string | null;
+ *     source: string;
+ *     label: string;
+ * }}
+ */
+export function buildModelGatewayEffectiveRouteProjection(snapshot) {
+    const active = snapshot.active && typeof snapshot.active === 'object' ? snapshot.active : {};
+    const providerId = typeof active['providerId'] === 'string' && active['providerId'].trim() ? active['providerId'] : null;
+    const providerModel =
+        typeof active['providerModel'] === 'string' && active['providerModel'].trim()
+            ? active['providerModel']
+            : null;
+    const modelId =
+        typeof active['modelId'] === 'string' && active['modelId'].trim()
+            ? active['modelId']
+            : providerId && providerModel
+              ? `${providerId}:${providerModel}`
+              : null;
+    const label = providerId && providerModel ? `${providerId} · ${providerModel}` : providerModel ?? modelId ?? '-';
+    return {
+        enabled: active['enabled'] === true,
+        ready: active['ready'] === true,
+        providerId,
+        providerModel,
+        modelId,
+        profile: typeof active['profile'] === 'string' && active['profile'].trim() ? active['profile'] : null,
+        gatewayProfile:
+            typeof active['gatewayProfile'] === 'string' && active['gatewayProfile'].trim()
+                ? active['gatewayProfile']
+                : null,
+        preset: typeof active['preset'] === 'string' && active['preset'].trim() ? active['preset'] : null,
+        bindingSource:
+            typeof active['bindingSource'] === 'string' && active['bindingSource'].trim()
+                ? active['bindingSource']
+                : null,
+        source: typeof snapshot.source === 'string' && snapshot.source.trim() ? snapshot.source : 'unknown',
+        label,
+    };
+}
+
+/**
  * @param {{ providers: Record<string, any>[]; models: Record<string, any>[]; active?: Record<string, any>; source?: string; generatedAt?: string }} snapshot
  * @param {{ routeProfile?: string | null }} [options]
  * @returns {{
@@ -84,6 +135,7 @@ function runtimeHealthTags(runtime) {
  *     providerCount: number;
  *     modelCount: number;
  *     enabledModelCount: number;
+ *     effectiveRoute: ReturnType<typeof buildModelGatewayEffectiveRouteProjection>;
  *     providers: Array<{ id: string; displayName: string; configured: boolean; modelCount: number; baseUrl: string | null }>;
  *     models: Array<{ id: string; providerId: string; providerModel: string; displayName: string; enabled: boolean; tags: string[]; runtime: ReturnType<typeof modelRuntimeHealth> }>;
  * }}
@@ -98,6 +150,7 @@ export function buildModelGatewayOperatorProjection(snapshot, options = {}) {
         providerCount: providers.length,
         modelCount: models.length,
         enabledModelCount: models.filter((model) => model['enabled'] !== false).length,
+        effectiveRoute: buildModelGatewayEffectiveRouteProjection(snapshot),
         providers: providers.map((provider) => ({
             id: String(provider['id'] ?? ''),
             displayName: String(provider['displayName'] ?? provider['id'] ?? ''),

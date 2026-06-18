@@ -28,6 +28,7 @@ import {
     MODEL_GATEWAY_CANONICAL_COMMAND_PHASES,
     listModelGatewayTaskProfiles,
     MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
+    ModelGatewayReadControlPlane,
     ModelGatewayRegistry,
     MODEL_GATEWAY_TASK_PROFILES,
     buildModelGatewayPreBuildReadinessReport,
@@ -12793,12 +12794,67 @@ describe('model-gateway foundation', () => {
         assert.equal(projection.providerCount, 1);
         assert.ok(projection.modelCount >= 1);
         assert.equal(projection.providers[0].id, 'gemini');
+        assert.deepEqual(projection.effectiveRoute, {
+            enabled: true,
+            ready: true,
+            providerId: 'gemini',
+            providerModel: 'gemini-2.5-flash',
+            modelId: 'gemini:gemini-2.5-flash',
+            profile: null,
+            gatewayProfile: null,
+            preset: 'gemini',
+            bindingSource: 'env_compat',
+            source: 'env_compat',
+            label: 'gemini · gemini-2.5-flash',
+        });
         assert.ok(projection.models.some((model) => model.providerModel === 'gemini-2.5-flash'));
         assert.ok(projection.models.some((model) => model.tags.includes('vision')));
         const model = projection.models.find((item) => item.providerModel === 'gemini-2.5-flash');
         assert.equal(model?.runtime.chat, 'ok');
         assert.ok(model?.tags.includes('runtime=proved'));
         assert.ok(model?.tags.includes('runtime.chat=ok'));
+    });
+
+    it('exposes the same effective route projection from overview readiness', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            const sqliteStore = new SqliteModelGatewayCatalogStore({ db });
+            const controlPlane = new ModelGatewayReadControlPlane({
+                sqliteStore,
+                catalogStore: sqliteStore,
+                now: () => 1_700_000_000_000,
+                env: {
+                    COPILOT_BYOK_ENABLED: 'true',
+                    COPILOT_BYOK_PROVIDER_PRESET: 'ollama-cloud',
+                    COPILOT_BYOK_MODEL: 'qwen3-coder-next',
+                    OLLAMA_CLOUD_API_KEY: 'unit-secret-that-must-not-render',
+                },
+            });
+
+            const overview = await controlPlane.inspectOverview({
+                maxSnapshotAgeHours: 720,
+                operationLimit: 10,
+            });
+
+            assert.deepEqual(overview.data.effectiveRoute, {
+                enabled: true,
+                ready: true,
+                providerId: 'ollama-cloud',
+                providerModel: 'qwen3-coder-next',
+                modelId: 'ollama-cloud:qwen3-coder-next',
+                profile: null,
+                gatewayProfile: null,
+                preset: 'ollama-cloud',
+                bindingSource: 'env_compat',
+                source: 'env_compat',
+                label: 'ollama-cloud · qwen3-coder-next',
+            });
+            assert.deepEqual(overview.data.modelGateway.effectiveRoute, overview.data.effectiveRoute);
+            assert.equal(JSON.stringify(overview).includes('unit-secret-that-must-not-render'), false);
+        } finally {
+            db.close();
+        }
     });
 
     it('resolves env secrets by reference without exposing values in descriptions', () => {

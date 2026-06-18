@@ -4,7 +4,8 @@ Data canonica: 2026-06-16
 
 Ultima atualizacao material: 2026-06-17 — auditoria profunda do worktree, validacao ampla, live LLM-B
 `model-gateway-route-apply-minimal` PASS, correcao dos bloqueios de reattach/ask_user, `ops` rapido com timeouts por
-subgate, `runtimeSelector` default `merged` restaurado, runtime-health SQLite indexado e reconstrucao deste roadmap.
+subgate, `runtimeSelector` default `merged` restaurado, runtime-health SQLite indexado, primeiro nucleo de readiness
+unica e reconstrucao deste roadmap.
 
 Status: ativo, normativo e continuamente atualizavel.
 
@@ -160,6 +161,9 @@ qualquer desvio de identidade
   - `idx_mg_runtime_probe_results_latest`.
 - [x] No banco atual, `listRuntimeHealthRecords({limit:1500})` caiu para ~27ms e
   `listLatestRuntimeHealthRecords({limit:1500})` ficou em ~0,8s; o selector `merged` segue ok em ~3,9s.
+- [x] Primeiro nucleo de readiness unica criado: `buildModelGatewayEffectiveRouteProjection()` agora normaliza a rota
+  efetiva em `modelGatewayProjection.effectiveRoute`; `model_gateway_overview`, `/status` e `/now` passam a consumir o
+  mesmo label provider/modelo.
 
 ### 3.3 Bugs/gaps concretos encontrados
 
@@ -179,6 +183,8 @@ qualquer desvio de identidade
   e coalescing/telemetria explicita para distinguir "no-op scan" de promocao real.
 - [x] `/health full` deixou de divergir no live route apply minimal corrigido; a lacuna residual e tornar essa visao
   derivada de uma readiness unica compartilhada por todas as superficies.
+- [x] O primeiro campo compartilhado dessa readiness unica e `effectiveRoute`, cobrindo provider/modelo/profile/source
+  efetivos entre control-plane e terminal.
 - [ ] `terminal/commands/byok.js` segue monolitico e concentra parsing, use-cases e rendering.
 - [ ] Profile management ainda e flexivel demais e sem mutacao duravel transacional/rollback.
 - [ ] Golden path vanilla GitHub Copilot SDK ainda nao tem cobertura explicita suficiente para provar ausencia de
@@ -293,9 +299,11 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 
 #### C.2 Readiness unica
 
-- [ ] Definir schema `ModelGatewayReadiness`.
-- [ ] Alimentar `model_gateway_overview` com o mesmo schema.
-- [ ] Alimentar `/byok`, `/session sdk`, `/now`, `/health`, `/activity` e `ops` com o mesmo schema.
+- [x] Definir primeiro nucleo de schema compartilhado: `effectiveRoute` com provider/modelo/profile/source/label
+  canonicos.
+- [x] Alimentar `model_gateway_overview` com `effectiveRoute`.
+- [ ] Alimentar `/byok`, `/session sdk`, `/health`, `/activity` e `ops` com o mesmo schema completo.
+- [x] Alimentar `/status` e `/now` com `modelGatewayProjection.effectiveRoute` quando disponivel.
 - [ ] Incluir rota efetiva, binding efetivo, sessao logica, provider real, provider SDK-facing, pending handoffs,
   freshness e mismatch.
 - [ ] Remover divergencia cockpit: prompt em `qwen3-coder-next` versus `/health full` ainda citando `kilo-auto/free`.
@@ -409,3 +417,10 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
     `idx_mg_health_observations_latest` e `idx_mg_runtime_probe_results_latest`;
   - teste focado `test_model_gateway_contracts.spec.js -t "latest-runtime-health indexes|SQLite catalog stores"`
     passou.
+- Evidencia do primeiro nucleo de readiness unica:
+  - `buildModelGatewayOperatorProjection()` expõe `effectiveRoute`;
+  - `ModelGatewayReadControlPlane.inspectOverview()` retorna `data.effectiveRoute` e
+    `data.modelGateway.effectiveRoute`;
+  - `/status` e `/now` renderizam o ativo do catálogo a partir de `effectiveRoute` quando disponivel;
+  - testes focados `test_model_gateway_contracts.spec.js -t "operator projection|overview readiness"` e
+    `test_commands_session.spec.js -t "cmdStatus|cmdNow"` passaram.

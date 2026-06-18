@@ -12,5 +12,5 @@ export {
     normalizeStoredRegistrySnapshot,
 } from './json-registry-store.js';
 export { ModelGatewayRegistry } from './model-registry.js';
-export { buildModelGatewayOperatorProjection } from './projection.js';
+export { buildModelGatewayEffectiveRouteProjection, buildModelGatewayOperatorProjection } from './projection.js';
 export { buildEnvByokModelGatewaySnapshot, persistEnvByokModelGatewaySnapshot } from './snapshot.js';

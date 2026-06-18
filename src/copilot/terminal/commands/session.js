@@ -627,8 +627,14 @@ function renderCompactSseLine(sse) {
  */
 function renderCompactGatewayActive(active) {
     if (!active) return '-';
+    if (typeof active['label'] === 'string' && active['label'].trim()) return active['label'];
     const provider = typeof active['providerId'] === 'string' ? active['providerId'] : '';
-    const rawModel = typeof active['modelId'] === 'string' ? active['modelId'] : '-';
+    const rawModel =
+        typeof active['providerModel'] === 'string'
+            ? active['providerModel']
+            : typeof active['modelId'] === 'string'
+              ? active['modelId']
+              : '-';
     const model = provider && rawModel.startsWith(`${provider}:`) ? rawModel.slice(provider.length + 1) : rawModel;
     return provider ? `${provider} · ${model}` : model;
 }
@@ -767,6 +773,12 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             modelCount: 0,
             enabledModelCount: 0,
         };
+        const gatewayActive =
+            gatewayProjection.effectiveRoute && typeof gatewayProjection.effectiveRoute === 'object'
+                ? gatewayProjection.effectiveRoute
+                : gatewayProjection.active && typeof gatewayProjection.active === 'object'
+                  ? gatewayProjection.active
+                  : null;
         const rawAction = projection.recommendedAction === 'none' ? null : projection.recommendedAction;
         const action = rawAction ?? (waitCount > 0 ? '/sdk waits' : '/menu');
         const modelLabel = renderTerminalModelSelectionLine(modelBilling, 'ver /status full');
@@ -792,7 +804,7 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         println(
             terminalThemeRow(
                 'Catálogo',
-                `${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados`,
+                `${pluralPt(gatewayProjection.providerCount, 'provedor', 'provedores')} · ${pluralPt(gatewayProjection.modelCount, 'modelo', 'modelos')} · ${gatewayProjection.enabledModelCount} habilitados · ativo ${renderCompactGatewayActive(gatewayActive)}`,
             ),
         );
         println(terminalThemeRow('Atividade', renderLiveActivitySummary(projection.activity)));
@@ -1235,7 +1247,11 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
         active: null,
     };
     const gatewayActive =
-        gatewayProjection.active && typeof gatewayProjection.active === 'object' ? gatewayProjection.active : null;
+        gatewayProjection.effectiveRoute && typeof gatewayProjection.effectiveRoute === 'object'
+            ? gatewayProjection.effectiveRoute
+            : gatewayProjection.active && typeof gatewayProjection.active === 'object'
+              ? gatewayProjection.active
+              : null;
 
     if (!detailMode) {
         const waitCount =

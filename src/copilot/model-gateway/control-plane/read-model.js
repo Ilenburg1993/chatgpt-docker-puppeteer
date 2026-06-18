@@ -8,6 +8,7 @@
  */
 
 import { importConfiguredByokFromEnv } from '../registry/env-byok-compat-importer.js';
+import { buildModelGatewayOperatorProjection } from '../registry/projection.js';
 import { applyModelGatewayBindingStrategy } from '../ingress/binding-strategy.js';
 import { createModelGatewayModelIdentity } from '../contracts/model-identity.js';
 import { evaluateModelGatewayModelLifecycle } from '../contracts/model-lifecycle.js';
@@ -489,6 +490,13 @@ export class ModelGatewayReadControlPlane {
         const startedAtMs = this.#now();
         const diagnostics = await this.#sqliteStore.readStorageDiagnostics();
         const byok = importConfiguredByokFromEnv(this.#env);
+        const byokProjection = buildModelGatewayOperatorProjection({
+            source: 'env_compat',
+            generatedAt: new Date(this.#now()).toISOString(),
+            active: byok.active,
+            providers: byok.provider ? [byok.provider] : [],
+            models: byok.models,
+        });
         const activeByok = isRecord(byok.active) ? byok.active : {};
         const activeProvider = byok.provider && isRecord(byok.provider) ? byok.provider : null;
         /** @type {Record<string, unknown>[]} */
@@ -525,6 +533,14 @@ export class ModelGatewayReadControlPlane {
                 readiness,
                 latency,
                 activeByok: byok.active,
+                effectiveRoute: byokProjection.effectiveRoute,
+                modelGateway: {
+                    source: byokProjection.source,
+                    providerCount: byokProjection.providerCount,
+                    modelCount: byokProjection.modelCount,
+                    enabledModelCount: byokProjection.enabledModelCount,
+                    effectiveRoute: byokProjection.effectiveRoute,
+                },
                 providerProfiles: {
                     count: providerProfiles.length,
                     active: activeProviderProfile,
