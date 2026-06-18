@@ -5782,6 +5782,38 @@ describe('model-gateway foundation', () => {
         }
     });
 
+    it('creates latest-runtime-health indexes for operational selectors', async () => {
+        const { default: Database } = await import('better-sqlite3');
+        const db = new Database(':memory:');
+        try {
+            new SqliteModelGatewayCatalogStore({ db });
+            const indexes = db
+                .prepare(
+                    `
+                        SELECT name
+                        FROM sqlite_master
+                        WHERE type = 'index'
+                          AND name IN (
+                              'idx_mg_health_observations_latest',
+                              'idx_mg_health_observations_observed',
+                              'idx_mg_runtime_probe_results_latest'
+                          )
+                        ORDER BY name
+                    `,
+                )
+                .all()
+                .map((row) => row.name);
+
+            assert.deepEqual(indexes, [
+                'idx_mg_health_observations_latest',
+                'idx_mg_health_observations_observed',
+                'idx_mg_runtime_probe_results_latest',
+            ]);
+        } finally {
+            db.close();
+        }
+    });
+
     it('round-trips a redacted catalog snapshot through the normalized SQLite store', async () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');

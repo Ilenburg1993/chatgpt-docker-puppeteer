@@ -307,6 +307,8 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
     ) STRICT;
     CREATE INDEX IF NOT EXISTS idx_mg_runtime_probe_results_model
         ON copilot_model_gateway_runtime_probe_results(provider_id, provider_model, route_profile, probe_kind);
+    CREATE INDEX IF NOT EXISTS idx_mg_runtime_probe_results_latest
+        ON copilot_model_gateway_runtime_probe_results(provider_id, provider_model, route_profile, probe_kind, observed_at_ms DESC, result_key DESC);
     CREATE INDEX IF NOT EXISTS idx_mg_runtime_probe_results_status
         ON copilot_model_gateway_runtime_probe_results(probe_kind, ok, status, observed_at_ms DESC);
 
@@ -324,6 +326,10 @@ export const MODEL_GATEWAY_SQLITE_SCHEMA_SQL = `
     ) STRICT;
     CREATE INDEX IF NOT EXISTS idx_mg_health_observations_model
         ON copilot_model_gateway_health_observations(provider_id, provider_model, route_profile, health_scope);
+    CREATE INDEX IF NOT EXISTS idx_mg_health_observations_latest
+        ON copilot_model_gateway_health_observations(provider_id, provider_model, route_profile, observed_at_ms DESC, observation_key DESC);
+    CREATE INDEX IF NOT EXISTS idx_mg_health_observations_observed
+        ON copilot_model_gateway_health_observations(observed_at_ms DESC, observation_key ASC);
     CREATE INDEX IF NOT EXISTS idx_mg_health_observations_status
         ON copilot_model_gateway_health_observations(status, observed_at_ms DESC);
 

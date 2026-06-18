@@ -4,7 +4,7 @@ Data canonica: 2026-06-16
 
 Ultima atualizacao material: 2026-06-17 — auditoria profunda do worktree, validacao ampla, live LLM-B
 `model-gateway-route-apply-minimal` PASS, correcao dos bloqueios de reattach/ask_user, `ops` rapido com timeouts por
-subgate, `runtimeSelector` default `merged` restaurado e reconstrucao deste roadmap.
+subgate, `runtimeSelector` default `merged` restaurado, runtime-health SQLite indexado e reconstrucao deste roadmap.
 
 Status: ativo, normativo e continuamente atualizavel.
 
@@ -153,13 +153,17 @@ qualquer desvio de identidade
   preservado, em vez de travar o cockpit.
 - [x] `runtimeSelector --json --profile=repo_agent` voltou a usar `runtimeSource=merged` por default e passou em ~3,9s;
   `autoStatus --json --profile=repo_agent` passou em ~4,4s e `ops --json --profile=repo_agent` seguiu ok em ~17,1s.
-- [ ] A leitura SQLite runtime-health limitada deixou de bloquear `runtimeSelector`, mas comandos profundos e escala
-  futura ainda precisam de projecao/index/cached read model para evitar regressao em bancos maiores.
+- [x] A leitura SQLite runtime-health recebeu indices operacionais canonicos:
+  - `idx_mg_health_observations_latest`;
+  - `idx_mg_health_observations_observed`;
+  - `idx_mg_runtime_probe_results_latest`.
+- [x] No banco atual, `listRuntimeHealthRecords({limit:1500})` caiu para ~27ms e
+  `listLatestRuntimeHealthRecords({limit:1500})` ficou em ~0,8s; o selector `merged` segue ok em ~3,9s.
 
 ### 3.3 Bugs/gaps concretos encontrados
 
-- [ ] `listLatestRuntimeHealthRecords()` ainda precisa de tabela materializada, indice covering ou cache/projecao
-  incremental antes de virar dependencia irrestrita de cockpits profundos.
+- [x] `listLatestRuntimeHealthRecords()` e `listRuntimeHealthRecords()` agora possuem indices de leitura operacional para
+  evitar regressao imediata em bancos com 100k+ linhas de runtime health/probes.
 - [ ] `model-gateway-live-readiness` agora ignora runtime-health SQLite por default para manter readiness praticavel; o
   modo profundo fica opt-in em `--sqlite-runtime-health`.
 - [x] `model-gateway-runtime-selector` voltou para `runtimeSource=merged` por default apos prova operacional com limite
@@ -284,7 +288,7 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] `liveReadiness --json` usa auditoria SQLite de redaction amostrada por default e `--deep-redaction` para auditoria
   operacional profunda.
 - [x] `runtimeSelector --runtime-source=merged|sqlite` voltou a ser praticavel; `merged` e novamente o default.
-- [ ] `listLatestRuntimeHealthRecords` precisa de projecao/index/cached read model para 100k+ linhas.
+- [x] `listLatestRuntimeHealthRecords` e `listRuntimeHealthRecords` possuem indices canonicos para 100k+ linhas.
 
 #### C.2 Readiness unica
 
@@ -356,12 +360,11 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 
 ## 6. Ordem recomendada a partir daqui
 
-1. Criar projecao SQLite runtime-health rapida para retirar a dependencia remanescente de window scans em 100k+ linhas.
-2. Implementar readiness unica e alinhar `/health`, `/now`, `/byok`, `/activity`, `overview` e `ops`.
-3. Investigar e corrigir a reconciliacao `timeline=mixed/diverged` do export no live PASS.
-4. Adicionar testes end-to-end de ledger transicional e metricas de promocao.
-5. Rodar live rollback/reconcile.
-6. Decompor `/byok`, finalizar perfis duraveis e golden path vanilla SDK.
+1. Implementar readiness unica e alinhar `/health`, `/now`, `/byok`, `/activity`, `overview` e `ops`.
+2. Investigar e corrigir a reconciliacao `timeline=mixed/diverged` do export no live PASS.
+3. Adicionar testes end-to-end de ledger transicional e metricas de promocao.
+4. Rodar live rollback/reconcile.
+5. Decompor `/byok`, finalizar perfis duraveis e golden path vanilla SDK.
 
 ## 7. Evidencias locais importantes
 
@@ -398,3 +401,10 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
     `runtimeSource=merged`;
   - `node scripts/model-gateway/run.mjs autoStatus --json --profile=repo_agent` passou em ~4,4s;
   - `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent` permaneceu ok em ~17,1s.
+- Evidencia operacional dos indices runtime-health:
+  - `listRuntimeHealthRecords({limit:1500})` passou em ~27ms com
+    `idx_mg_health_observations_observed`;
+  - `listLatestRuntimeHealthRecords({limit:1500})` passou em ~0,8s com
+    `idx_mg_health_observations_latest` e `idx_mg_runtime_probe_results_latest`;
+  - teste focado `test_model_gateway_contracts.spec.js -t "latest-runtime-health indexes|SQLite catalog stores"`
+    passou.
