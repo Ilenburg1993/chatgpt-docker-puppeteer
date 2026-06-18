@@ -181,6 +181,8 @@ qualquer desvio de identidade
   com `active` legado apenas como fallback, alinhando a fonte com `/status` e `/now`.
 - [x] `/byok status` agora usa `modelGatewayProjection` para counts e `effectiveRoute` para `Gateway ativo`, mantendo
   `modelGateway.active` apenas como fallback.
+- [x] `/session sdk` agora mostra `Rota efetiva` a partir de `modelGatewayProjection.effectiveRoute`, reaproveitando
+  `active` apenas indiretamente como fallback na projection.
 
 ### 3.3 Bugs/gaps concretos encontrados
 
@@ -323,6 +325,7 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Alimentar `/status` e `/now` com `modelGatewayProjection.effectiveRoute` quando disponivel.
 - [x] Alimentar `/health` com `modelGatewayProjection.effectiveRoute` quando disponivel.
 - [x] Alimentar `/byok status` com `modelGatewayProjection.effectiveRoute` quando disponivel.
+- [x] Alimentar `/session sdk` com `modelGatewayProjection.effectiveRoute` quando disponivel.
 - [x] Alimentar `overview`/`model_gateway_overview` e `ops` com `pendingHandoffs.active/latest` a partir do ledger
   SQLite.
 - [ ] Incluir rota efetiva, binding efetivo, sessao logica, provider real, provider SDK-facing, pending handoffs,
@@ -465,4 +468,11 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   - `src/copilot/terminal/commands/byok.js` usa `modelGatewayProjection` para counts e ativo;
   - teste focado `test_commands_byok.spec.js -t "effectiveRoute compartilhado|arquivo canônico"` passou;
   - validacao escopada: `npx eslint src/copilot/terminal/commands/byok.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+    e `npm run typecheck:strict:src.copilot`.
+- Evidencia de alinhamento `/session sdk` com `effectiveRoute`:
+  - `src/copilot/terminal/commands/session.js` mostra `Rota efetiva` a partir de
+    `modelGatewayProjection.effectiveRoute`;
+  - teste focado
+    `test_commands_session.spec.js -t "cmdSessionSdk expõe binding|cmdSessionSdk exibe rota efetiva"` passou;
+  - validacao escopada: `npx eslint src/copilot/terminal/commands/session.js tests/unit/copilot/terminal/test_commands_session.spec.js`
     e `npm run typecheck:strict:src.copilot`.

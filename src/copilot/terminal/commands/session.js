@@ -2651,24 +2651,36 @@ export async function cmdSessionSdk({ println }, arg = '') {
     println(terminalThemeRow('Próximo boot', nextLabel));
     println(terminalThemeRow('Arquivos', renderSdkSessionFsState(inventory.sessionFs)));
     println(terminalThemeRow('CommandDefinitions', await renderSdkCommandCatalogArchiveSummary()));
+    const byokProjection = readTerminalByokProjection();
+    const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
+    const gatewayProjection = configProjection.modelGatewayProjection ?? byokProjection.modelGatewayProjection ?? {
+        effectiveRoute: null,
+    };
+    const gatewayEffectiveRoute =
+        gatewayProjection.effectiveRoute && typeof gatewayProjection.effectiveRoute === 'object'
+            ? gatewayProjection.effectiveRoute
+            : null;
     const byokBinding = classifyTerminalByokSdkBinding(
-        readTerminalByokProjection().summary,
+        byokProjection.summary,
         inventory.persistedByokBinding,
         inventory.currentSessionId,
-        callWithRuntimeTarget(readTerminalConfigProjection, runtimeId).currentModel,
+        configProjection.currentModel,
     );
     println(terminalThemeRow('Vínculo SDK', renderTerminalSdkProviderBinding(inventory.persistedByokBinding)));
     println(terminalThemeRow('Vínculo BYOK', renderTerminalSdkProviderBinding(inventory.persistedByokBinding)));
     println(terminalThemeRow('Preparado', byokBinding.preparedLabel));
     println(terminalThemeRow('Limite BYOK', byokBinding.headline));
+    if (gatewayEffectiveRoute) {
+        println(terminalThemeRow('Rota efetiva', renderCompactGatewayActive(gatewayEffectiveRoute)));
+    }
     println(
         terminalThemeRow(
             'Alias BYOK',
             renderTerminalByokBindingMachineAlias(
-                readTerminalByokProjection().summary,
+                byokProjection.summary,
                 inventory.persistedByokBinding,
                 inventory.currentSessionId,
-                callWithRuntimeTarget(readTerminalConfigProjection, runtimeId).currentModel,
+                configProjection.currentModel,
             ),
             { role: 'muted' },
         ),

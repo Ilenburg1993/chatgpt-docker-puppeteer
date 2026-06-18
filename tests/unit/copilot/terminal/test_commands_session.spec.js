@@ -1172,6 +1172,18 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk expõe binding BYOK redigido e decisão do último boot SDK', async () => {
+        const previousEnv = {
+            COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
+            COPILOT_BYOK_PROFILE: process.env.COPILOT_BYOK_PROFILE,
+            COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
+            COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
+            GROQ_API_KEY: process.env.GROQ_API_KEY,
+        };
+        process.env.COPILOT_BYOK_ENABLED = 'true';
+        delete process.env.COPILOT_BYOK_PROFILE;
+        process.env.COPILOT_BYOK_PROVIDER_PRESET = 'groq';
+        process.env.COPILOT_BYOK_MODEL = 'qwen/qwen3-32b';
+        process.env.GROQ_API_KEY = 'test-session-sdk-groq-key-that-must-not-render';
         listTerminalSdkSessionInventory.mockResolvedValueOnce({
             currentSessionId: 'sdk-new',
             lastSessionId: 'sdk-new',
@@ -1193,16 +1205,72 @@ describe('commands/session — async commands', () => {
             sessions: [],
         });
         const ctx = mockCtx();
-        await cmdSessionSdk({ println: ctx.println }, '');
-        expect(ctx.output()).toContain('Vínculo SDK');
-        expect(ctx.output()).not.toContain('Vínculo BYOK BYOK');
-        expect(ctx.output()).toContain('BYOK · perfil groq-free');
-        expect(ctx.output()).toContain('Preparado');
-        expect(ctx.output()).not.toContain('BYOK pronto  BYOK');
-        expect(ctx.output()).toContain('Limite BYOK');
-        expect(ctx.output()).toContain('Último boot');
-        expect(ctx.output()).toContain('mudança de rota/modelo BYOK');
-        expect(ctx.output()).not.toContain('provider-boundary');
+        try {
+            await cmdSessionSdk({ println: ctx.println }, '');
+            expect(ctx.output()).toContain('Vínculo SDK');
+            expect(ctx.output()).not.toContain('Vínculo BYOK BYOK');
+            expect(ctx.output()).toContain('BYOK · perfil groq-free');
+            expect(ctx.output()).toContain('Preparado');
+            expect(ctx.output()).not.toContain('BYOK pronto  BYOK');
+            expect(ctx.output()).toContain('Limite BYOK');
+            expect(ctx.output()).toContain('Rota efetiva');
+            expect(ctx.output()).toContain('groq · qwen/qwen3-32b');
+            expect(ctx.output()).toContain('Último boot');
+            expect(ctx.output()).toContain('mudança de rota/modelo BYOK');
+            expect(ctx.output()).not.toContain('provider-boundary');
+            expect(ctx.output()).not.toContain('test-session-sdk-groq-key-that-must-not-render');
+        } finally {
+            for (const [key, value] of Object.entries(previousEnv)) {
+                if (value === undefined) {
+                    delete process.env[key];
+                } else {
+                    process.env[key] = value;
+                }
+            }
+        }
+    });
+
+    it('cmdSessionSdk exibe rota efetiva do Model Gateway compartilhado', async () => {
+        const previousEnv = {
+            COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
+            COPILOT_BYOK_PROFILE: process.env.COPILOT_BYOK_PROFILE,
+            COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
+            COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
+            OLLAMA_CLOUD_API_KEY: process.env.OLLAMA_CLOUD_API_KEY,
+        };
+        process.env.COPILOT_BYOK_ENABLED = 'true';
+        delete process.env.COPILOT_BYOK_PROFILE;
+        process.env.COPILOT_BYOK_PROVIDER_PRESET = 'ollama-cloud';
+        process.env.COPILOT_BYOK_MODEL = 'qwen3-coder-next';
+        process.env.OLLAMA_CLOUD_API_KEY = 'session-sdk-secret-that-must-not-render';
+        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+            currentSessionId: 'sdk-current',
+            lastSessionId: 'sdk-current',
+            foregroundSessionId: 'sdk-current',
+            persistedByokBinding: {
+                enabled: true,
+                preset: 'ollama-cloud',
+                providerType: 'openai',
+                model: 'qwen3-coder-next',
+            },
+            sessions: [],
+        });
+        const ctx = mockCtx();
+
+        try {
+            await cmdSessionSdk({ println: ctx.println }, '');
+            expect(ctx.output()).toContain('Rota efetiva');
+            expect(ctx.output()).toContain('ollama-cloud · qwen3-coder-next');
+            expect(ctx.output()).not.toContain('session-sdk-secret-that-must-not-render');
+        } finally {
+            for (const [key, value] of Object.entries(previousEnv)) {
+                if (value === undefined) {
+                    delete process.env[key];
+                } else {
+                    process.env[key] = value;
+                }
+            }
+        }
     });
 
     it('cmdSessionSdkEvents resume lifecycle e commands pelo archive SSE canônico', async () => {
