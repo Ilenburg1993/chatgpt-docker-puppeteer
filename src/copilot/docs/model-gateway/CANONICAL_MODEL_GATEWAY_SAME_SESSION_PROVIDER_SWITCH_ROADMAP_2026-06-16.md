@@ -27,6 +27,7 @@ Checkpoint de base desta revisao:
 - checkpoint effective route compartilhada: `12e7bdaa1` (`feat(copilot): share model gateway effective route`);
 - checkpoint pending handoffs compartilhados: `45f0d6c01` (`feat(copilot): surface pending model gateway handoffs`);
 - checkpoint `/health` effective route: `1eb06d588` (`fix(copilot): render health effective model gateway route`);
+- checkpoint `/byok status` effective route: `20b9afec9` (`fix(copilot): render byok effective gateway route`);
 - worktree continha implementacao extensa ainda nao commitada para same-session route promotion, ingress adaptativo,
   SQLite v13, testes e este roadmap;
 - untracked externos e artefatos historicos permanecem no workspace e nao foram incluidos no checkpoint canonico sem
