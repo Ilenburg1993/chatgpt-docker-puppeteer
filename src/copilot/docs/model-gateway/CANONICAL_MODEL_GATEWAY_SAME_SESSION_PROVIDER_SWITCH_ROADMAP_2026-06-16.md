@@ -175,6 +175,8 @@ qualquer desvio de identidade
     `database.latestDeferredHandoff`;
   - evidencia operacional atual: `ops` passou em ~17,5s e revelou 4 handoffs diferidos ativos no ledger, incluindo
     registro antigo sem `promotionAuthorized`, reforcando a necessidade da fase rollback/reconcile.
+- [x] `/health` compacto/full agora resolve o ativo do catálogo por `modelGatewayProjection.effectiveRoute` primeiro,
+  com `active` legado apenas como fallback, alinhando a fonte com `/status` e `/now`.
 
 ### 3.3 Bugs/gaps concretos encontrados
 
@@ -315,6 +317,7 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Alimentar `model_gateway_overview` com `effectiveRoute`.
 - [ ] Alimentar `/byok`, `/session sdk`, `/health`, `/activity` e `ops` com o mesmo schema completo.
 - [x] Alimentar `/status` e `/now` com `modelGatewayProjection.effectiveRoute` quando disponivel.
+- [x] Alimentar `/health` com `modelGatewayProjection.effectiveRoute` quando disponivel.
 - [x] Alimentar `overview`/`model_gateway_overview` e `ops` com `pendingHandoffs.active/latest` a partir do ledger
   SQLite.
 - [ ] Incluir rota efetiva, binding efetivo, sessao logica, provider real, provider SDK-facing, pending handoffs,
@@ -448,3 +451,8 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
     `npm run typecheck:strict:src.copilot`,
     `npx eslint src/copilot/model-gateway/catalog/sqlite-catalog-store.js src/copilot/model-gateway/control-plane/read-model.js scripts/model-gateway/commands/model-gateway-ops.mjs tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`,
     `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent`.
+- Evidencia de alinhamento `/health` com `effectiveRoute`:
+  - `src/copilot/terminal/commands/diagnose.js` usa `effectiveRoute` antes de `active`;
+  - teste focado `test_commands_diagnose.spec.js -t "health|Gateway|diagnóstico"` passou;
+  - validacao escopada: `npx eslint src/copilot/terminal/commands/diagnose.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`
+    e `npm run typecheck:strict:src.copilot`.

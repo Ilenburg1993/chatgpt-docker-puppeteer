@@ -273,9 +273,9 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         modelCount: 0,
         enabledModelCount: 0,
         active: null,
+        effectiveRoute: null,
     };
-    const gatewayActive =
-        gatewayProjection.active && typeof gatewayProjection.active === 'object' ? gatewayProjection.active : null;
+    const gatewayActive = resolveDiagnoseGatewayActive(gatewayProjection);
     const gatewayLine =
         gatewayProjection.providerCount > 0 || gatewayProjection.modelCount > 0
             ? diagnoseText(
@@ -677,7 +677,21 @@ function renderCompactAuthLabel(auth) {
 }
 
 /**
- * @param {{ providerCount: number; modelCount: number; enabledModelCount: number; active: unknown }} projection
+ * @param {{ effectiveRoute?: unknown; active?: unknown }} projection
+ * @returns {Record<string, unknown> | null}
+ */
+function resolveDiagnoseGatewayActive(projection) {
+    if (projection.effectiveRoute && typeof projection.effectiveRoute === 'object') {
+        return /** @type {Record<string, unknown>} */ (projection.effectiveRoute);
+    }
+    if (projection.active && typeof projection.active === 'object') {
+        return /** @type {Record<string, unknown>} */ (projection.active);
+    }
+    return null;
+}
+
+/**
+ * @param {{ providerCount: number; modelCount: number; enabledModelCount: number; active?: unknown; effectiveRoute?: unknown }} projection
  * @param {Record<string, unknown> | null} active
  * @returns {string}
  */
