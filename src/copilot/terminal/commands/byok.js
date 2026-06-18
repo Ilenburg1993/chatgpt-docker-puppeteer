@@ -470,6 +470,7 @@ function renderByokTokenLabel(value) {
         new_session_policy_required: 'política exige nova sessão explícita',
         new_session_requires_explicit_policy: 'nova sessão exige política explícita',
         boot_scheduled: 'novo boot agendado',
+        deferred_until_turn_boundary: 'diferido até limite do turno',
         model_mismatch: 'modelo divergente',
         apply_live_model: 'aplicar modelo vivo',
         prepare_new_session: 'preparar nova sessão',
@@ -6057,12 +6058,32 @@ async function renderByokGatewayAutoHandoffs(println, rest) {
         const status = optionalScalarString(row['status']) ?? '-';
         const model = optionalScalarString(row['targetModel']) ?? optionalScalarString(row['model']) ?? '-';
         const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
+        const sessionId = optionalScalarString(row['sessionId']) ?? '-';
+        const operation = row['operation'] && typeof row['operation'] === 'object' ? /** @type {Record<string, unknown>} */ (row['operation']) : {};
+        const targetRoute =
+            operation['targetRoute'] && typeof operation['targetRoute'] === 'object'
+                ? /** @type {Record<string, unknown>} */ (operation['targetRoute'])
+                : {};
+        const providerId = optionalScalarString(targetRoute['providerId']) ?? optionalScalarString(row['providerId']) ?? '-';
+        const providerModel =
+            optionalScalarString(targetRoute['providerModel']) ?? optionalScalarString(row['providerModel']) ?? '-';
+        const authorization =
+            operation['promotionAuthorization'] && typeof operation['promotionAuthorization'] === 'object'
+                ? /** @type {Record<string, unknown>} */ (operation['promotionAuthorization'])
+                : {};
+        const authorizationLabel =
+            authorization['authorized'] === true || row['promotionAuthorized'] === true
+                ? 'autorizada'
+                : authorization['authorized'] === false || row['promotionAuthorized'] === false
+                  ? 'não autorizada'
+                  : 'não informada';
+        const expiresAt = optionalScalarString(authorization['expiresAt']) ?? optionalScalarString(row['expiresAt']) ?? '-';
         const requestedAt = optionalScalarString(row['requestedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
         println(
             terminalThemeWrappedRow(
                 `${index + 1}. Handoff`,
-                `${renderByokTokenLabel(status)} · modelo ${model} · rota ${route} · solicitado ${requestedAt}`,
-                { role: status === 'completed' ? 'success' : 'muted', columns: 112 },
+                `${renderByokTokenLabel(status)} · modelo ${model} · rota ${route} · sessão ${sessionId} · provider ${providerId}:${providerModel} · promoção ${authorizationLabel} · expira ${expiresAt} · solicitado ${requestedAt}`,
+                { role: status === 'completed' || status === 'confirmed' ? 'success' : 'muted', columns: 112 },
             ),
         );
     });

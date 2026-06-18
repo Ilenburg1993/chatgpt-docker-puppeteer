@@ -1210,9 +1210,20 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                     Promise.resolve([
                         {
                             requestedAt: '2026-06-01T00:00:01.000Z',
-                            status: 'boot_scheduled',
+                            status: 'deferred_until_turn_boundary',
+                            sessionId: 'sdk-session-1',
                             targetModel: 'glm-4.5-flash',
                             selectedRouteKey: 'zai:glm-4.5-flash',
+                            operation: {
+                                targetRoute: {
+                                    providerId: 'zai',
+                                    providerModel: 'glm-4.5-flash',
+                                },
+                                promotionAuthorization: {
+                                    authorized: true,
+                                    expiresAt: '2026-06-01T00:05:01.000Z',
+                                },
+                            },
                         },
                     ]),
                 ),
@@ -3948,7 +3959,11 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: recoveriesCtx.println }, 'auto recoveries 5');
 
         expect(handoffsCtx.output()).toContain('Handoffs BYOK');
-        expect(handoffsCtx.output()).toContain('novo boot agendado');
+        expect(handoffsCtx.output()).toContain('diferido até limite do turno');
+        expect(handoffsCtx.output()).toContain('sessão');
+        expect(handoffsCtx.output()).toContain('sdk-session-1');
+        expect(handoffsCtx.output()).toContain('provider zai:glm-4.5-flash');
+        expect(handoffsCtx.output()).toContain('promoção autorizada');
         expect(handoffsCtx.output()).not.toContain('effect_not_authorized');
         expect(confirmationsCtx.output()).toContain('Confirmações BYOK');
         expect(confirmationsCtx.output()).toContain('matched handoff');

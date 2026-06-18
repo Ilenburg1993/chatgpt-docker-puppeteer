@@ -263,6 +263,8 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Classificar operacao deferida por autorizacao, expiracao, sessao, retryability e integridade da rota.
 - [x] Supersede intencoes antigas da mesma sessao.
 - [x] Expor estados deferidos em `model_gateway_operation_status`.
+- [x] `/byok auto handoffs` lista status humano, sessao, provider/model, autorizacao de promocao, expiracao, rota e
+  horario solicitado sem depender de payload cru.
 - [ ] Adicionar teste end-to-end unico para cadeia
   `deferred_until_turn_boundary -> reattach_requested -> reattached -> verified -> committed`.
 - [ ] Expor transicoes completas no cockpit humano sem depender de leitura JSON crua.
@@ -286,7 +288,9 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   `model-gateway-route-apply-minimal`.
 - [ ] Quando provider falha logo apos reattach, terminal deve oferecer fallback/reconcile sem quebrar o protocolo do
   harness.
-- [ ] `/activity`, `/tools diag` e `/byok` devem listar handoffs diferidos/promoviveis como secao propria.
+- [x] `/byok auto handoffs` lista handoffs diferidos/promoviveis como secao propria com provider/model, sessao,
+  autorizacao e expiracao.
+- [ ] `/activity` e `/tools diag` devem listar handoffs diferidos/promoviveis como secao propria.
 
 ### Faixa B — Binding adaptativo direct/ingress
 
@@ -485,4 +489,10 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   - `src/copilot/terminal/commands/activity.js` mostra `Rota efetiva` no painel atual;
   - teste focado `test_commands_activity.spec.js -t "exibe atividade atual"` passou;
   - validacao escopada: `npx eslint src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js`
+    e `npm run typecheck:strict:src.copilot`.
+- Evidencia de cockpit humano de handoffs:
+  - `/byok auto handoffs` humaniza `deferred_until_turn_boundary` e mostra sessao, provider/model, autorizacao de
+    promocao, expiracao, rota e horario solicitado;
+  - teste focado `test_commands_byok.spec.js -t "handoffs, confirmations"` passou;
+  - validacao escopada: `npx eslint src/copilot/terminal/commands/byok.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
     e `npm run typecheck:strict:src.copilot`.
