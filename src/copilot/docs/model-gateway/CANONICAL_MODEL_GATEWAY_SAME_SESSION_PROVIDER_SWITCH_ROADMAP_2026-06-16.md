@@ -24,6 +24,7 @@ Checkpoint de base desta revisao:
 - checkpoint ops/readiness rapido: `977bf61c6` (`fix(copilot): bound model gateway ops readiness`);
 - checkpoint runtime selector merged: `7bbf27fb3` (`fix(copilot): restore merged runtime selector default`);
 - checkpoint indices runtime-health: `45e87e31c` (`fix(copilot): index runtime health reads`);
+- checkpoint effective route compartilhada: `12e7bdaa1` (`feat(copilot): share model gateway effective route`);
 - worktree continha implementacao extensa ainda nao commitada para same-session route promotion, ingress adaptativo,
   SQLite v13, testes e este roadmap;
 - untracked externos e artefatos historicos permanecem no workspace e nao foram incluidos no checkpoint canonico sem
