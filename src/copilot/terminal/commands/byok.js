@@ -2610,6 +2610,42 @@ function compactByokModelAction(action) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function optionalCount(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+/**
+ * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @returns {Record<string, unknown> | null}
+ */
+function resolveByokGatewayActiveRoute(projection) {
+    const gatewayProjection = projection.modelGatewayProjection ?? {};
+    if (gatewayProjection['effectiveRoute'] && typeof gatewayProjection['effectiveRoute'] === 'object') {
+        return /** @type {Record<string, unknown>} */ (gatewayProjection['effectiveRoute']);
+    }
+    const active = projection.modelGateway?.active;
+    if (active && typeof active === 'object') return /** @type {Record<string, unknown>} */ (active);
+    return null;
+}
+
+/**
+ * @param {Record<string, unknown> | null} route
+ * @returns {string | null}
+ */
+function renderByokGatewayActiveRouteLabel(route) {
+    if (!route) return null;
+    if (typeof route['label'] === 'string' && route['label'].trim()) return route['label'].trim();
+    const provider = typeof route['providerId'] === 'string' ? route['providerId'].trim() : '';
+    const providerModel = typeof route['providerModel'] === 'string' ? route['providerModel'].trim() : '';
+    if (provider && providerModel) return `${provider} · ${providerModel}`;
+    const modelId = typeof route['modelId'] === 'string' ? route['modelId'].trim() : '';
+    return modelId || null;
+}
+
+/**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
  * @param {(text: string) => void} println
  * @returns {Promise<void>}
@@ -2693,15 +2729,23 @@ async function renderStatus(projection, println) {
             enabledModelCount: projection.models.length,
         },
     };
+    const gatewayProjection = projection.modelGatewayProjection ?? {};
+    const gatewayCounts = {
+        providerCount: optionalCount(gatewayProjection['providerCount']) ?? gateway.diagnostics.providerCount,
+        modelCount: optionalCount(gatewayProjection['modelCount']) ?? gateway.diagnostics.modelCount,
+        enabledModelCount:
+            optionalCount(gatewayProjection['enabledModelCount']) ?? gateway.diagnostics.enabledModelCount,
+    };
     println(
         terminalThemeRow(
             'Gateway',
-            `${gateway.diagnostics.providerCount} provedores · ${gateway.diagnostics.modelCount} modelos · ${gateway.diagnostics.enabledModelCount} habilitados · origem ${renderByokSourceLabel(gateway.source)}`,
+            `${gatewayCounts.providerCount} provedores · ${gatewayCounts.modelCount} modelos · ${gatewayCounts.enabledModelCount} habilitados · origem ${renderByokSourceLabel(gateway.source)}`,
         ),
     );
-    const gatewayActive = /** @type {{ modelId?: string | null }} */ (gateway.active);
-    if (gatewayActive.modelId) {
-        println(terminalThemeRow('Gateway ativo', gatewayActive.modelId));
+    const gatewayActive = resolveByokGatewayActiveRoute(projection);
+    const gatewayActiveLabel = renderByokGatewayActiveRouteLabel(gatewayActive);
+    if (gatewayActiveLabel) {
+        println(terminalThemeRow('Gateway ativo', gatewayActiveLabel));
     }
     try {
         const inventory = await listTerminalSdkSessionInventory();

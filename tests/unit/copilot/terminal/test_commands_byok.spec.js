@@ -2050,6 +2050,50 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).not.toContain('secret');
     });
 
+    it('usa effectiveRoute compartilhado no gateway do status BYOK', async () => {
+        mockProjection({
+            summary: {
+                ...BASE_PROJECTION.summary,
+                enabled: true,
+                ready: true,
+                profile: 'repo_agent',
+                preset: 'ollama-cloud',
+                providerType: 'openai',
+                model: 'qwen3-coder-next',
+                auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
+                modelList: { configured: true, count: 1 },
+            },
+            modelGateway: {
+                source: 'env_compat',
+                active: { modelId: 'legacy-provider:legacy-model' },
+                providers: [],
+                models: [],
+                diagnostics: { providerCount: 1, modelCount: 1, enabledModelCount: 1 },
+            },
+            modelGatewayProjection: {
+                providerCount: 2,
+                modelCount: 3,
+                enabledModelCount: 2,
+                providers: [],
+                models: [],
+                effectiveRoute: {
+                    providerId: 'ollama-cloud',
+                    providerModel: 'qwen3-coder-next',
+                    modelId: 'ollama-cloud:qwen3-coder-next',
+                    label: 'ollama-cloud · qwen3-coder-next',
+                },
+            },
+        });
+        const ctx = mockCtx();
+
+        await cmdByok({ println: ctx.println }, 'status');
+
+        expect(ctx.output()).toContain('2 provedores · 3 modelos · 2 habilitados');
+        expect(ctx.output()).toContain('Gateway ativo');
+        expect(ctx.output()).toContain('ollama-cloud · qwen3-coder-next');
+        expect(ctx.output()).not.toContain('legacy-provider:legacy-model');
+    });
+
     it('usa metadados remotos cacheados do modelo ativo no status sem herdar vision do provider', async () => {
         readConfiguredByokModelDiscoveryCacheFromEnv.mockReturnValue({
             models: [

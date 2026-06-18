@@ -178,6 +178,8 @@ qualquer desvio de identidade
     registro antigo sem `promotionAuthorized`, reforcando a necessidade da fase rollback/reconcile.
 - [x] `/health` compacto/full agora resolve o ativo do catálogo por `modelGatewayProjection.effectiveRoute` primeiro,
   com `active` legado apenas como fallback, alinhando a fonte com `/status` e `/now`.
+- [x] `/byok status` agora usa `modelGatewayProjection` para counts e `effectiveRoute` para `Gateway ativo`, mantendo
+  `modelGateway.active` apenas como fallback.
 
 ### 3.3 Bugs/gaps concretos encontrados
 
@@ -319,6 +321,7 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [ ] Alimentar `/byok`, `/session sdk`, `/health`, `/activity` e `ops` com o mesmo schema completo.
 - [x] Alimentar `/status` e `/now` com `modelGatewayProjection.effectiveRoute` quando disponivel.
 - [x] Alimentar `/health` com `modelGatewayProjection.effectiveRoute` quando disponivel.
+- [x] Alimentar `/byok status` com `modelGatewayProjection.effectiveRoute` quando disponivel.
 - [x] Alimentar `overview`/`model_gateway_overview` e `ops` com `pendingHandoffs.active/latest` a partir do ledger
   SQLite.
 - [ ] Incluir rota efetiva, binding efetivo, sessao logica, provider real, provider SDK-facing, pending handoffs,
@@ -456,4 +459,9 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   - `src/copilot/terminal/commands/diagnose.js` usa `effectiveRoute` antes de `active`;
   - teste focado `test_commands_diagnose.spec.js -t "health|Gateway|diagnóstico"` passou;
   - validacao escopada: `npx eslint src/copilot/terminal/commands/diagnose.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`
+    e `npm run typecheck:strict:src.copilot`.
+- Evidencia de alinhamento `/byok status` com `effectiveRoute`:
+  - `src/copilot/terminal/commands/byok.js` usa `modelGatewayProjection` para counts e ativo;
+  - teste focado `test_commands_byok.spec.js -t "effectiveRoute compartilhado|arquivo canônico"` passou;
+  - validacao escopada: `npx eslint src/copilot/terminal/commands/byok.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
     e `npm run typecheck:strict:src.copilot`.
