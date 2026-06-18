@@ -22,6 +22,7 @@ Checkpoint de base desta revisao:
 - checkpoint live PASS e correcao pos-ask: `1834513ff` (`fix(copilot): preserve route switch ask continuation`);
 - checkpoint ops/readiness rapido: `977bf61c6` (`fix(copilot): bound model gateway ops readiness`);
 - checkpoint runtime selector merged: `7bbf27fb3` (`fix(copilot): restore merged runtime selector default`);
+- checkpoint indices runtime-health: `45e87e31c` (`fix(copilot): index runtime health reads`);
 - worktree continha implementacao extensa ainda nao commitada para same-session route promotion, ingress adaptativo,
   SQLite v13, testes e este roadmap;
 - untracked externos e artefatos historicos permanecem no workspace e nao foram incluidos no checkpoint canonico sem
