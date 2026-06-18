@@ -349,6 +349,23 @@ function filterDivergentLiveTail(persistedTurns, liveTurns) {
 }
 
 /**
+ * Sem overlap por assinatura nem sempre significa divergência: depois de reattach/ask_user, a timeline viva pode conter
+ * apenas a cauda nova, temporalmente posterior ao Hub persistido. Esse caso é seguro para append/sync lazy.
+ *
+ * @param {TerminalTimelineTurn[]} persistedTurns
+ * @param {TerminalTimelineTurn[]} liveTurns
+ * @returns {boolean}
+ */
+function isForwardOnlyLiveTail(persistedTurns, liveTurns) {
+    if (persistedTurns.length === 0 || liveTurns.length === 0) return false;
+    const persistedLastTimestamp = Math.max(...persistedTurns.map((turn) => turn.timestamp));
+    const liveFirstTimestamp = Math.min(...liveTurns.map((turn) => turn.timestamp));
+    if (liveFirstTimestamp < persistedLastTimestamp) return false;
+    const persistedSignatures = new Set(persistedTurns.map(buildTimelineSignature));
+    return liveTurns.every((turn) => !persistedSignatures.has(buildTimelineSignature(turn)));
+}
+
+/**
  * @param {unknown} value
  * @returns {TerminalTimelineSyncPolicy}
  */
@@ -784,13 +801,21 @@ export function readTerminalTimelineProjection({
                     reconciliationStatus = 'aligned';
                 }
             } else {
-                reconciliationStatus = 'diverged';
                 liveBridgeTail = filterDivergentLiveTail(persistedTurns, liveTurns);
-                if (liveBridgeTail.length > 0) {
-                    turns = dedupeTimelineTurns([...persistedTurns, ...liveBridgeTail].sort((a, b) => a.timestamp - b.timestamp));
+                if (isForwardOnlyLiveTail(persistedTurns, liveBridgeTail)) {
+                    turns = [...persistedTurns, ...liveBridgeTail];
                     timelineSource = 'mixed';
                     timelineAuthority = 'reconciled';
                     liveBridgeTailCount = liveBridgeTail.length;
+                    reconciliationStatus = 'bridge_tail';
+                } else {
+                    reconciliationStatus = 'diverged';
+                    if (liveBridgeTail.length > 0) {
+                        turns = dedupeTimelineTurns([...persistedTurns, ...liveBridgeTail].sort((a, b) => a.timestamp - b.timestamp));
+                        timelineSource = 'mixed';
+                        timelineAuthority = 'reconciled';
+                        liveBridgeTailCount = liveBridgeTail.length;
+                    }
                 }
             }
         }

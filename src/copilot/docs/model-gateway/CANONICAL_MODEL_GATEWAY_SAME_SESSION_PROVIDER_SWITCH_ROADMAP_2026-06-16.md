@@ -152,8 +152,10 @@ qualquer desvio de identidade
   - `npm run test:copilot:unit` com 6.821 testes totais, 6.793 aprovados, zero falhas, 28 pendentes e 2.071 suites
     aprovadas;
   - artefato `artifacts/test-runs/copilot/2026-06-17T23-44-25-650Z/summary.md`.
-- [ ] O export Markdown do live PASS ainda aparece com `timeline=mixed/diverged` e `sync=blocked:diverged-no-overlap`;
-  os criterios funcionais passaram, mas a reconciliacao/exportacao historica ainda precisa de melhoria.
+- [x] A causa do export Markdown `timeline=mixed/diverged` no live PASS foi reduzida: a projection tratava cauda viva
+  posterior ao Hub persistido como divergencia quando nao havia overlap por assinatura.
+- [ ] O artifact historico do live PASS ainda contém `timeline=mixed/diverged`; falta reexecutar live/export para
+  substituir a evidencia ponta a ponta depois da correção focada.
 - [x] `ops --json --profile=repo_agent` passou dentro de budget operacional curto: caiu de ~26,4s para ~15,7s no banco
   atual e agora tem timeout por subgate com fallback JSON parcial.
 - [x] `liveReadiness --json` caiu de ~21,8s para ~12,8s ao trocar a auditoria SQLite de redaction profunda por amostra
@@ -201,7 +203,7 @@ qualquer desvio de identidade
   estruturada.
 - [x] A continuacao apos route switch real nao deve cair em BYOK provider failure/empty turn antes de `ask_user` quando a
   rota alvo nao suporta reasoning effort SDK-facing e a promocao respeita a janela humana pos-ask.
-- [ ] Adicionar regressao focada para o export `timeline=mixed/diverged` do live PASS, distinguindo divergencia
+- [x] Adicionar regressao focada para o export `timeline=mixed/diverged` do live PASS, distinguindo divergencia
   historica inofensiva de perda real de transcript.
 - [ ] Eventos de `model-gateway.deferred-route-promotion` podem aparecer repetidamente no mesmo intervalo; falta metrica
   e coalescing/telemetria explicita para distinguir "no-op scan" de promocao real.
@@ -361,8 +363,10 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Garantir export Markdown com pergunta e resposta humana canonicas no cenario route apply minimal.
 - [ ] Garantir `no-prompt-double-render` sem mascarar prompts legitimos.
 - [ ] Classificar BYOK usage real sem falso Premium Request.
-- [ ] Investigar `timeline=mixed/diverged`/`sync=blocked:diverged-no-overlap` no export mesmo quando SSE/export
-  correlacionam ask, answer e postAsk corretamente.
+- [x] Corrigir projection para tratar cauda viva temporalmente posterior ao Hub como `bridge_tail` sincronizável mesmo
+  sem overlap por assinatura.
+- [ ] Reexecutar live route apply minimal/export para provar que o Markdown novo nao carrega
+  `timeline=mixed/diverged`/`sync=blocked:diverged-no-overlap` quando SSE/export correlacionam ask, answer e postAsk.
 
 ### Faixa E — Perfis BYOK duraveis
 
@@ -496,4 +500,11 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
     promocao, expiracao, rota e horario solicitado;
   - teste focado `test_commands_byok.spec.js -t "handoffs, confirmations"` passou;
   - validacao escopada: `npx eslint src/copilot/terminal/commands/byok.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+    e `npm run typecheck:strict:src.copilot`.
+- Evidencia de correção focada do export timeline:
+  - `readTerminalTimelineProjection()` trata cauda viva posterior ao Hub persistido como `bridge_tail` sincronizável
+    quando nao há overlap por assinatura, preservando `diverged-no-overlap` para conflito temporal real;
+  - teste focado `test_timeline_projection.spec.js` passou;
+  - teste focado `test_commands_export.spec.js -t "preserva ask_user"` passou;
+  - validacao escopada: `npx eslint src/copilot/terminal/frontend/projections/timeline.js tests/unit/copilot/terminal/test_timeline_projection.spec.js`
     e `npm run typecheck:strict:src.copilot`.

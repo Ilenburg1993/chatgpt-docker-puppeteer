@@ -80,7 +80,7 @@ describe('terminal/frontend/projections/timeline', () => {
         gateways.readTerminalTranscriptFeed.mockReturnValue([]);
     });
 
-    it('preserva tail vivo quando o hub diverge, mas mantém sync bloqueado', () => {
+    it('trata cauda viva posterior ao hub como bridge_tail sincronizável mesmo sem overlap', async () => {
         gateways.readTerminalTranscriptFeed.mockReturnValue([
             {
                 role: 'system',
@@ -109,9 +109,9 @@ describe('terminal/frontend/projections/timeline', () => {
 
         expect(projection.timelineSource).toBe('mixed');
         expect(projection.timelineAuthority).toBe('reconciled');
-        expect(projection.reconciliationStatus).toBe('diverged');
-        expect(projection.sync.status).toBe('blocked');
-        expect(projection.syncBlockedReason).toBe('diverged-no-overlap');
+        expect(projection.reconciliationStatus).toBe('bridge_tail');
+        expect(projection.sync.status).toBe('scheduled');
+        expect(projection.syncBlockedReason).toBe(null);
         expect(projection.liveBridgeTailCount).toBe(3);
         expect(projection.turns.map((turn) => turn.content)).toEqual([
             'Pergunta original',
@@ -120,6 +120,28 @@ describe('terminal/frontend/projections/timeline', () => {
             'Resposta ao ask_user:\nSIM',
             'POST-ASK-CANONICAL-FINAL: usuário confirmou SIM',
         ]);
+        await vi.waitFor(() => expect(gateways.writeTerminalHubTimelineTurn).toHaveBeenCalledTimes(3));
+    });
+
+    it('mantém sync bloqueado quando a timeline viva sem overlap é temporalmente conflitante', () => {
+        gateways.readTerminalTranscriptFeed.mockReturnValue([
+            {
+                role: 'assistant',
+                rawRole: 'llm_b',
+                content: 'Resposta paralela antiga sem overlap',
+                timestamp: 1709999999000,
+                metadata: { assistantMessageEnvelope: { source: 'sdk/assistant.message', eventId: 280 } },
+            },
+        ]);
+
+        const projection = readTerminalTimelineProjection({ limitPairs: 10 });
+
+        expect(projection.timelineSource).toBe('mixed');
+        expect(projection.timelineAuthority).toBe('reconciled');
+        expect(projection.reconciliationStatus).toBe('diverged');
+        expect(projection.sync.status).toBe('blocked');
+        expect(projection.syncBlockedReason).toBe('diverged-no-overlap');
+        expect(projection.liveBridgeTailCount).toBe(1);
         expect(gateways.writeTerminalHubTimelineTurn).not.toHaveBeenCalled();
     });
 });
