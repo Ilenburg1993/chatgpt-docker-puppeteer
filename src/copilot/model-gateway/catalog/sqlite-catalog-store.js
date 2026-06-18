@@ -1050,6 +1050,7 @@ export class SqliteModelGatewayCatalogStore {
      *     automationEffectApplicationRows: number;
      *     recoveryAttemptRows: number;
      *     sdkSessionHandoffRows: number;
+     *     sdkSessionDeferredHandoffRows: number;
      *     sdkSessionConfirmationRows: number;
      *     standbyPlanRows: number;
      *     liveScenarioRunRows: number;
@@ -1057,7 +1058,8 @@ export class SqliteModelGatewayCatalogStore {
      *     latestAutomationPolicySnapshot: { enabled: boolean | null; policy: string | null; routeProfile: string | null; observedAtMs: number | null };
      *     latestAutomationEffectApplication: { effectKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
      *     latestRecoveryAttempt: { recoveryAttemptId: string | null; decisionId: string | null; routeProfile: string | null; selectedRouteKey: string | null; recoveryScope: string | null; failureKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
-     *     latestSdkSessionHandoff: { status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; requestedAtMs: number | null; confirmedAtMs: number | null };
+     *     latestSdkSessionHandoff: { handoffId: string | null; status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; providerId: string | null; providerModel: string | null; promotionAuthorized: boolean | null; expiresAtMs: number | null; requestedAtMs: number | null; confirmedAtMs: number | null };
+     *     latestDeferredSdkSessionHandoff: { handoffId: string | null; status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; providerId: string | null; providerModel: string | null; promotionAuthorized: boolean | null; expiresAtMs: number | null; requestedAtMs: number | null; confirmedAtMs: number | null } | null;
      *     latestSdkSessionConfirmation: { status: string | null; handoffId: string | null; decisionId: string | null; sessionId: string | null; previousModel: string | null; confirmedModel: string | null; observedAtMs: number | null };
      *     latestStandbyPlan: { standbyPlanId: string | null; status: string | null; routeProfile: string | null; routeCount: number | null; providerCount: number | null; runtimeProofCount: number | null; selectedRouteKey: string | null; source: string | null; generatedAtMs: number | null };
      *     latestLiveScenarioRun: { runId: string | null; scenarioKind: string | null; status: string | null; ok: boolean | null; completedAtMs: number | null; summaryPath: string | null };
@@ -1065,6 +1067,7 @@ export class SqliteModelGatewayCatalogStore {
      * }>}
      */
     async readStorageDiagnostics() {
+        const nowMs = Date.now();
         /** @type {Record<string, number>} */
         const tableCounts = {};
         for (const table of MODEL_GATEWAY_SQLITE_TABLES) {
@@ -1188,17 +1191,47 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
-        const latestSdkSessionHandoff = /** @type {{ status: string | null; route_profile: string | null; selected_route_key: string | null; session_id: string | null; target_model: string | null; requested_at_ms: number | null; confirmed_at_ms: number | null } | undefined} */ (
+        const latestSdkSessionHandoff = /** @type {{ handoff_id: string | null; status: string | null; route_profile: string | null; selected_route_key: string | null; session_id: string | null; target_model: string | null; provider_id: string | null; provider_model: string | null; promotion_authorized: number | null; expires_at_ms: number | null; requested_at_ms: number | null; confirmed_at_ms: number | null } | undefined} */ (
             this.#db
                 .prepare(
                     `
-                        SELECT status, route_profile, selected_route_key, session_id, target_model, requested_at_ms, confirmed_at_ms
+                        SELECT handoff_id, status, route_profile, selected_route_key, session_id, target_model,
+                               provider_id, provider_model, promotion_authorized, expires_at_ms,
+                               requested_at_ms, confirmed_at_ms
                         FROM copilot_model_gateway_sdk_session_handoffs
                         ORDER BY requested_at_ms DESC
                         LIMIT 1
                     `,
                 )
                 .get()
+        );
+        const sdkSessionDeferredHandoffRows = /** @type {{ count: number } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT COUNT(*) AS count
+                        FROM copilot_model_gateway_sdk_session_handoffs
+                        WHERE status = 'deferred_until_turn_boundary'
+                          AND (expires_at_ms IS NULL OR expires_at_ms > ?)
+                    `,
+                )
+                .get(nowMs)
+        );
+        const latestDeferredSdkSessionHandoff = /** @type {{ handoff_id: string | null; status: string | null; route_profile: string | null; selected_route_key: string | null; session_id: string | null; target_model: string | null; provider_id: string | null; provider_model: string | null; promotion_authorized: number | null; expires_at_ms: number | null; requested_at_ms: number | null; confirmed_at_ms: number | null } | undefined} */ (
+            this.#db
+                .prepare(
+                    `
+                        SELECT handoff_id, status, route_profile, selected_route_key, session_id, target_model,
+                               provider_id, provider_model, promotion_authorized, expires_at_ms,
+                               requested_at_ms, confirmed_at_ms
+                        FROM copilot_model_gateway_sdk_session_handoffs
+                        WHERE status = 'deferred_until_turn_boundary'
+                          AND (expires_at_ms IS NULL OR expires_at_ms > ?)
+                        ORDER BY requested_at_ms DESC
+                        LIMIT 1
+                    `,
+                )
+                .get(nowMs)
         );
         const latestSdkSessionConfirmation = /** @type {{ status: string | null; handoff_id: string | null; decision_id: string | null; session_id: string | null; previous_model: string | null; confirmed_model: string | null; observed_at_ms: number | null } | undefined} */ (
             this.#db
@@ -1272,6 +1305,7 @@ export class SqliteModelGatewayCatalogStore {
                 tableCounts['copilot_model_gateway_automation_effect_applications'] ?? 0,
             recoveryAttemptRows: tableCounts['copilot_model_gateway_recovery_attempts'] ?? 0,
             sdkSessionHandoffRows: tableCounts['copilot_model_gateway_sdk_session_handoffs'] ?? 0,
+            sdkSessionDeferredHandoffRows: optionalInteger(sdkSessionDeferredHandoffRows?.count) ?? 0,
             sdkSessionConfirmationRows:
                 tableCounts['copilot_model_gateway_sdk_session_confirmations'] ?? 0,
             standbyPlanRows: tableCounts['copilot_model_gateway_standby_plans'] ?? 0,
@@ -1327,14 +1361,45 @@ export class SqliteModelGatewayCatalogStore {
                 observedAtMs: optionalInteger(latestRecoveryAttempt?.observed_at_ms),
             },
             latestSdkSessionHandoff: {
+                handoffId: optionalString(latestSdkSessionHandoff?.handoff_id),
                 status: optionalString(latestSdkSessionHandoff?.status),
                 routeProfile: optionalString(latestSdkSessionHandoff?.route_profile),
                 selectedRouteKey: optionalString(latestSdkSessionHandoff?.selected_route_key),
                 sessionId: optionalString(latestSdkSessionHandoff?.session_id),
                 targetModel: optionalString(latestSdkSessionHandoff?.target_model),
+                providerId: optionalString(latestSdkSessionHandoff?.provider_id),
+                providerModel: optionalString(latestSdkSessionHandoff?.provider_model),
+                promotionAuthorized:
+                    latestSdkSessionHandoff?.promotion_authorized === 1
+                        ? true
+                        : latestSdkSessionHandoff?.promotion_authorized === 0
+                          ? false
+                          : null,
+                expiresAtMs: optionalInteger(latestSdkSessionHandoff?.expires_at_ms),
                 requestedAtMs: optionalInteger(latestSdkSessionHandoff?.requested_at_ms),
                 confirmedAtMs: optionalInteger(latestSdkSessionHandoff?.confirmed_at_ms),
             },
+            latestDeferredSdkSessionHandoff: latestDeferredSdkSessionHandoff
+                ? {
+                      handoffId: optionalString(latestDeferredSdkSessionHandoff.handoff_id),
+                      status: optionalString(latestDeferredSdkSessionHandoff.status),
+                      routeProfile: optionalString(latestDeferredSdkSessionHandoff.route_profile),
+                      selectedRouteKey: optionalString(latestDeferredSdkSessionHandoff.selected_route_key),
+                      sessionId: optionalString(latestDeferredSdkSessionHandoff.session_id),
+                      targetModel: optionalString(latestDeferredSdkSessionHandoff.target_model),
+                      providerId: optionalString(latestDeferredSdkSessionHandoff.provider_id),
+                      providerModel: optionalString(latestDeferredSdkSessionHandoff.provider_model),
+                      promotionAuthorized:
+                          latestDeferredSdkSessionHandoff.promotion_authorized === 1
+                              ? true
+                              : latestDeferredSdkSessionHandoff.promotion_authorized === 0
+                                ? false
+                                : null,
+                      expiresAtMs: optionalInteger(latestDeferredSdkSessionHandoff.expires_at_ms),
+                      requestedAtMs: optionalInteger(latestDeferredSdkSessionHandoff.requested_at_ms),
+                      confirmedAtMs: optionalInteger(latestDeferredSdkSessionHandoff.confirmed_at_ms),
+                  }
+                : null,
             latestSdkSessionConfirmation: {
                 status: optionalString(latestSdkSessionConfirmation?.status),
                 handoffId: optionalString(latestSdkSessionConfirmation?.handoff_id),

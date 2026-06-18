@@ -2,10 +2,10 @@
 
 Data canonica: 2026-06-16
 
-Ultima atualizacao material: 2026-06-17 — auditoria profunda do worktree, validacao ampla, live LLM-B
+Ultima atualizacao material: 2026-06-18 — auditoria profunda do worktree, validacao ampla, live LLM-B
 `model-gateway-route-apply-minimal` PASS, correcao dos bloqueios de reattach/ask_user, `ops` rapido com timeouts por
 subgate, `runtimeSelector` default `merged` restaurado, runtime-health SQLite indexado, primeiro nucleo de readiness
-unica e reconstrucao deste roadmap.
+unica, pending handoffs visiveis em `overview`/`ops` e reconstrucao deste roadmap.
 
 Status: ativo, normativo e continuamente atualizavel.
 
@@ -165,6 +165,15 @@ qualquer desvio de identidade
 - [x] Primeiro nucleo de readiness unica criado: `buildModelGatewayEffectiveRouteProjection()` agora normaliza a rota
   efetiva em `modelGatewayProjection.effectiveRoute`; `model_gateway_overview`, `/status` e `/now` passam a consumir o
   mesmo label provider/modelo.
+- [x] Segundo nucleo de readiness unica criado para handoffs pendentes:
+  - `readStorageDiagnostics()` expõe `sdkSessionDeferredHandoffRows` e `latestDeferredSdkSessionHandoff` filtrados por
+    `deferred_until_turn_boundary` ainda nao expirado;
+  - `ModelGatewayReadControlPlane.inspectOverview()` retorna `data.pendingHandoffs` e
+    `data.modelGateway.pendingHandoffs`;
+  - `ops --json --profile=repo_agent` retorna `database.sdkSessionDeferredHandoffRows` e
+    `database.latestDeferredHandoff`;
+  - evidencia operacional atual: `ops` passou em ~17,5s e revelou 4 handoffs diferidos ativos no ledger, incluindo
+    registro antigo sem `promotionAuthorized`, reforcando a necessidade da fase rollback/reconcile.
 
 ### 3.3 Bugs/gaps concretos encontrados
 
@@ -305,6 +314,8 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Alimentar `model_gateway_overview` com `effectiveRoute`.
 - [ ] Alimentar `/byok`, `/session sdk`, `/health`, `/activity` e `ops` com o mesmo schema completo.
 - [x] Alimentar `/status` e `/now` com `modelGatewayProjection.effectiveRoute` quando disponivel.
+- [x] Alimentar `overview`/`model_gateway_overview` e `ops` com `pendingHandoffs.active/latest` a partir do ledger
+  SQLite.
 - [ ] Incluir rota efetiva, binding efetivo, sessao logica, provider real, provider SDK-facing, pending handoffs,
   freshness e mismatch.
 - [ ] Remover divergencia cockpit: prompt em `qwen3-coder-next` versus `/health full` ainda citando `kilo-auto/free`.
@@ -425,3 +436,14 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   - `/status` e `/now` renderizam o ativo do catálogo a partir de `effectiveRoute` quando disponivel;
   - testes focados `test_model_gateway_contracts.spec.js -t "operator projection|overview readiness"` e
     `test_commands_session.spec.js -t "cmdStatus|cmdNow"` passaram.
+- Evidencia do segundo nucleo de readiness unica:
+  - `readStorageDiagnostics()` expõe handoffs diferidos ativos e ultimo handoff diferido com rota, sessao, provider e
+    modelo a partir de colunas normalizadas, sem depender de payload JSON cru;
+  - `ModelGatewayReadControlPlane.inspectOverview()` e `ops --json` consomem o mesmo sinal `pendingHandoffs`;
+  - testes focados:
+    `test_model_gateway_contracts.spec.js -t "SQLite catalog store persists"` e
+    `test_model_gateway_contracts.spec.js -t "exposes the same effective route projection"` passaram;
+  - validacao escopada:
+    `npm run typecheck:strict:src.copilot`,
+    `npx eslint src/copilot/model-gateway/catalog/sqlite-catalog-store.js src/copilot/model-gateway/control-plane/read-model.js scripts/model-gateway/commands/model-gateway-ops.mjs tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`,
+    `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent`.

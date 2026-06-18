@@ -104,6 +104,7 @@ function readDatabaseSummary(diagnostics) {
     const latestAutomationDecision = optionalRecord(json?.['latestAutomationDecision']);
     const latestStandbyPlan = optionalRecord(json?.['latestStandbyPlan']);
     const latestLiveScenarioRun = optionalRecord(json?.['latestLiveScenarioRun']);
+    const latestDeferredHandoff = optionalRecord(json?.['latestDeferredSdkSessionHandoff']);
     return {
         ok: diagnostics.ok && activeSnapshot?.['exists'] === true,
         schemaVersion: optionalNumber(json?.['schemaVersion']),
@@ -115,9 +116,27 @@ function readDatabaseSummary(diagnostics) {
         automationPolicySnapshotRows: optionalNumber(json?.['automationPolicySnapshotRows']),
         automationEffectApplicationRows: optionalNumber(json?.['automationEffectApplicationRows']),
         sdkSessionHandoffRows: optionalNumber(json?.['sdkSessionHandoffRows']),
+        sdkSessionDeferredHandoffRows: optionalNumber(json?.['sdkSessionDeferredHandoffRows']),
         sdkSessionConfirmationRows: optionalNumber(json?.['sdkSessionConfirmationRows']),
         standbyPlanRows: optionalNumber(json?.['standbyPlanRows']),
         liveScenarioRunRows: optionalNumber(json?.['liveScenarioRunRows']),
+        latestDeferredHandoff: {
+            handoffId: optionalString(latestDeferredHandoff?.['handoffId']),
+            routeProfile: optionalString(latestDeferredHandoff?.['routeProfile']),
+            selectedRouteKey: optionalString(latestDeferredHandoff?.['selectedRouteKey']),
+            sessionId: optionalString(latestDeferredHandoff?.['sessionId']),
+            targetModel: optionalString(latestDeferredHandoff?.['targetModel']),
+            providerId: optionalString(latestDeferredHandoff?.['providerId']),
+            providerModel: optionalString(latestDeferredHandoff?.['providerModel']),
+            promotionAuthorized:
+                latestDeferredHandoff?.['promotionAuthorized'] === true
+                    ? true
+                    : latestDeferredHandoff?.['promotionAuthorized'] === false
+                      ? false
+                      : null,
+            expiresAtMs: optionalNumber(latestDeferredHandoff?.['expiresAtMs']),
+            requestedAtMs: optionalNumber(latestDeferredHandoff?.['requestedAtMs']),
+        },
         latestStandbyPlan: {
             standbyPlanId: optionalString(latestStandbyPlan?.['standbyPlanId']),
             routeProfile: optionalString(latestStandbyPlan?.['routeProfile']),
@@ -251,12 +270,15 @@ if (json) {
 } else {
     process.stdout.write(`model-gateway ops: ok=${summary.ok ? 'yes' : 'no'} profile=${profile}\n`);
     process.stdout.write(
-        `  db: active=${summary.database.activeSnapshotExists ? 'yes' : 'no'} schema=${summary.database.schemaVersion ?? '-'} rows=${summary.database.catalogRows ?? '-'} routeDecisions=${summary.database.routeDecisionRows ?? '-'} automationDecisions=${summary.database.automationDecisionRows ?? '-'} policySnapshots=${summary.database.automationPolicySnapshotRows ?? '-'} effects=${summary.database.automationEffectApplicationRows ?? '-'} handoffs=${summary.database.sdkSessionHandoffRows ?? '-'} confirmations=${summary.database.sdkSessionConfirmationRows ?? '-'} standbyPlans=${summary.database.standbyPlanRows ?? '-'} liveRuns=${summary.database.liveScenarioRunRows ?? '-'}\n`,
+        `  db: active=${summary.database.activeSnapshotExists ? 'yes' : 'no'} schema=${summary.database.schemaVersion ?? '-'} rows=${summary.database.catalogRows ?? '-'} routeDecisions=${summary.database.routeDecisionRows ?? '-'} automationDecisions=${summary.database.automationDecisionRows ?? '-'} policySnapshots=${summary.database.automationPolicySnapshotRows ?? '-'} effects=${summary.database.automationEffectApplicationRows ?? '-'} handoffs=${summary.database.sdkSessionHandoffRows ?? '-'} deferredHandoffs=${summary.database.sdkSessionDeferredHandoffRows ?? '-'} confirmations=${summary.database.sdkSessionConfirmationRows ?? '-'} standbyPlans=${summary.database.standbyPlanRows ?? '-'} liveRuns=${summary.database.liveScenarioRunRows ?? '-'}\n`,
     );
     process.stdout.write(
         `  db-standby: latest=${summary.database.latestStandbyPlan.standbyPlanId ?? '-'} profile=${summary.database.latestStandbyPlan.routeProfile ?? '-'} routes=${summary.database.latestStandbyPlan.routeCount ?? '-'} providers=${summary.database.latestStandbyPlan.providerCount ?? '-'}\n`,
     );
     process.stdout.write(`  db-auto: latestAction=${summary.database.latestAutomationAction ?? '-'}\n`);
+    process.stdout.write(
+        `  db-handoff: deferred=${summary.database.sdkSessionDeferredHandoffRows ?? '-'} latest=${summary.database.latestDeferredHandoff.handoffId ?? '-'} route=${summary.database.latestDeferredHandoff.selectedRouteKey ?? '-'} session=${summary.database.latestDeferredHandoff.sessionId ?? '-'}\n`,
+    );
     process.stdout.write(
         `  db-live: latest=${summary.database.latestLiveScenarioRun.scenarioKind ?? '-'} status=${summary.database.latestLiveScenarioRun.status ?? '-'} summary=${summary.database.latestLiveScenarioRun.summaryPath ?? '-'}\n`,
     );

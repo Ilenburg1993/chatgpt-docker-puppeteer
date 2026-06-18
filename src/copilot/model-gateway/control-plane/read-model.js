@@ -524,6 +524,10 @@ export class ModelGatewayReadControlPlane {
             input.maxSnapshotAgeHours,
             this.#now(),
         );
+        const pendingHandoffs = {
+            active: diagnostics.sdkSessionDeferredHandoffRows,
+            latest: diagnostics.latestDeferredSdkSessionHandoff,
+        };
         const latency = latencyObservation(startedAtMs, this.#now(), MODEL_GATEWAY_READ_LATENCY_BUDGET_MS.overview);
         return createModelGatewayControlPlaneResult({
             operation: 'overview.inspect',
@@ -534,12 +538,14 @@ export class ModelGatewayReadControlPlane {
                 latency,
                 activeByok: byok.active,
                 effectiveRoute: byokProjection.effectiveRoute,
+                pendingHandoffs,
                 modelGateway: {
                     source: byokProjection.source,
                     providerCount: byokProjection.providerCount,
                     modelCount: byokProjection.modelCount,
                     enabledModelCount: byokProjection.enabledModelCount,
                     effectiveRoute: byokProjection.effectiveRoute,
+                    pendingHandoffs,
                 },
                 providerProfiles: {
                     count: providerProfiles.length,

@@ -6057,9 +6057,21 @@ describe('model-gateway foundation', () => {
                     decisionId: 'automation-1',
                     routeProfile: 'repo_agent',
                     selectedRouteKey: 'openrouter:model-a',
-                    status: 'prepared',
+                    status: 'deferred_until_turn_boundary',
+                    sessionId: 'session-1',
                     targetModel: 'model-a',
                     requestedAt: '2026-05-26T12:00:02.000Z',
+                    operation: {
+                        targetRoute: {
+                            providerId: 'openrouter',
+                            providerModel: 'model-a',
+                        },
+                        promotionAuthorization: {
+                            policy: 'turn_boundary',
+                            authorized: true,
+                            expiresAt: '2999-01-01T00:00:00.000Z',
+                        },
+                    },
                 },
             ]);
             await store.writeSdkSessionConfirmationRecords([
@@ -6206,6 +6218,7 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.automationEffectApplicationRows, 1);
             assert.equal(diagnostics.recoveryAttemptRows, 1);
             assert.equal(diagnostics.sdkSessionHandoffRows, 1);
+            assert.equal(diagnostics.sdkSessionDeferredHandoffRows, 1);
             assert.equal(diagnostics.sdkSessionConfirmationRows, 1);
             assert.equal(diagnostics.standbyPlanRows, 1);
             assert.equal(diagnostics.liveScenarioRunRows, 1);
@@ -6214,7 +6227,14 @@ describe('model-gateway foundation', () => {
             assert.equal(diagnostics.latestAutomationEffectApplication.effectKind, 'set_live_model');
             assert.equal(diagnostics.latestRecoveryAttempt.failureKind, 'rate-limit');
             assert.equal(diagnostics.latestRecoveryAttempt.recoveryScope, 'account');
+            assert.equal(diagnostics.latestSdkSessionHandoff.handoffId, 'handoff-1');
             assert.equal(diagnostics.latestSdkSessionHandoff.targetModel, 'model-a');
+            assert.equal(diagnostics.latestSdkSessionHandoff.providerId, 'openrouter');
+            assert.equal(diagnostics.latestSdkSessionHandoff.providerModel, 'model-a');
+            assert.equal(diagnostics.latestSdkSessionHandoff.promotionAuthorized, true);
+            assert.equal(diagnostics.latestDeferredSdkSessionHandoff?.handoffId, 'handoff-1');
+            assert.equal(diagnostics.latestDeferredSdkSessionHandoff?.sessionId, 'session-1');
+            assert.equal(diagnostics.latestDeferredSdkSessionHandoff?.providerId, 'openrouter');
             assert.equal(diagnostics.latestSdkSessionConfirmation.confirmedModel, 'model-a');
             assert.equal(diagnostics.latestStandbyPlan.routeProfile, 'repo_agent');
             assert.equal(diagnostics.latestStandbyPlan.routeCount, 2);
@@ -12831,6 +12851,28 @@ describe('model-gateway foundation', () => {
                     OLLAMA_CLOUD_API_KEY: 'unit-secret-that-must-not-render',
                 },
             });
+            await sqliteStore.writeSdkSessionHandoffRecords([
+                {
+                    handoffId: 'handoff-overview-1',
+                    routeProfile: 'repo_agent',
+                    selectedRouteKey: 'ollama-cloud:qwen3-coder-next',
+                    status: 'deferred_until_turn_boundary',
+                    sessionId: 'overview-session',
+                    targetModel: 'qwen3-coder-next',
+                    requestedAt: '2026-06-17T12:00:00.000Z',
+                    operation: {
+                        targetRoute: {
+                            providerId: 'ollama-cloud',
+                            providerModel: 'qwen3-coder-next',
+                        },
+                        promotionAuthorization: {
+                            policy: 'turn_boundary',
+                            authorized: true,
+                            expiresAt: '2999-01-01T00:00:00.000Z',
+                        },
+                    },
+                },
+            ]);
 
             const overview = await controlPlane.inspectOverview({
                 maxSnapshotAgeHours: 720,
@@ -12851,6 +12893,9 @@ describe('model-gateway foundation', () => {
                 label: 'ollama-cloud · qwen3-coder-next',
             });
             assert.deepEqual(overview.data.modelGateway.effectiveRoute, overview.data.effectiveRoute);
+            assert.equal(overview.data.pendingHandoffs.active, 1);
+            assert.equal(overview.data.pendingHandoffs.latest.handoffId, 'handoff-overview-1');
+            assert.deepEqual(overview.data.modelGateway.pendingHandoffs, overview.data.pendingHandoffs);
             assert.equal(JSON.stringify(overview).includes('unit-secret-that-must-not-render'), false);
         } finally {
             db.close();
