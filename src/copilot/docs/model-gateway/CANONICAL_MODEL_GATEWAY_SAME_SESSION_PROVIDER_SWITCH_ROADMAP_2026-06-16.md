@@ -2,10 +2,11 @@
 
 Data canonica: 2026-06-16
 
-Ultima atualizacao material: 2026-06-18 — auditoria profunda do worktree, validacao ampla, live LLM-B
-`model-gateway-route-apply-minimal` PASS, correcao dos bloqueios de reattach/ask_user, `ops` rapido com timeouts por
-subgate, `runtimeSelector` default `merged` restaurado, runtime-health SQLite indexado, primeiro nucleo de readiness
-unica, pending handoffs visiveis em `overview`/`ops` e reconstrucao deste roadmap.
+Ultima atualizacao material: 2026-06-19 — auditoria profunda do worktree, validacao ampla, live LLM-B
+`model-gateway-route-apply-minimal` PASS historico, correcao dos bloqueios de reattach/ask_user, `ops` rapido com
+timeouts por subgate, `runtimeSelector` default `merged` restaurado, runtime-health SQLite indexado, primeiro nucleo de
+readiness unica, pending handoffs visiveis em `overview`/`ops`, export `bridge_tail` validado isoladamente e novo
+bloqueio live identificado no boot SDK/modelo versus rota efetiva.
 
 Status: ativo, normativo e continuamente atualizavel.
 
@@ -33,6 +34,8 @@ Checkpoint de base desta revisao:
 - checkpoint cockpit handoffs BYOK: `64727e2e6` (`fix(copilot): clarify byok handoff cockpit`);
 - checkpoint timeline/export reconciliado: `fbe2ba137` (`fix(copilot): reconcile forward-only live timeline tails`);
 - checkpoint timeline/export intercalado: `d6b1d13c2` (`fix(copilot): reconcile interleaved live timeline exports`);
+- checkpoint harness live estrito e bloqueio boot registrado: este commit
+  (`test(copilot): harden model gateway live harness`);
 - worktree continha implementacao extensa ainda nao commitada para same-session route promotion, ingress adaptativo,
   SQLite v13, testes e este roadmap;
 - untracked externos e artefatos historicos permanecem no workspace e nao foram incluidos no checkpoint canonico sem
@@ -164,6 +167,30 @@ qualquer desvio de identidade
   Hub persistido + cauda viva. Esse run nao substitui o PASS de rota porque a LLM-B pulou as tools Model Gateway, e o
   harness o marcou `FAIL` nos criterios de scenario tools.
   Artefato: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-reconciled-export-rerun/summary.md`.
+- [x] Live LLM-B combinado em 2026-06-19 com prompt serializado e export pos-fix terminou `BLOCKED` por
+  `assistant-empty-turn`: executou `overview`, `operation_status` e apenas `route_switch:plan`; nao executou o
+  `route_switch:apply`, nao chegou ao `ask_user` e exportou somente tres mensagens com
+  `timeline=mixed/diverged`. A evidencia revelou um gap do harness: a lifecycle check antiga tratava uma unica
+  chamada `model_gateway_route_switch` como suficiente para um cenario que exige plan e apply separados.
+  Artefato: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-combined-rerun/summary.md`.
+- [x] Harness LLM-B endurecido em 2026-06-19:
+  - `model-gateway-route-apply-minimal` agora exige `minSuccessfulCalls=2` para `overview`, `operation_status` e
+    `route_switch`;
+  - a recuperacao de tools incompletas reconhece tambem o caso "todas as tools do cenario foram puladas";
+  - a recuperacao controlada inclui argumentos explicitos para `model_gateway_overview`,
+    `model_gateway_operation_status` e `model_gateway_route_switch:apply`;
+  - quando o prompt normal volta com cadeia incompleta, o runner tenta uma continuacao controlada antes do timeout;
+  - `COPILOT_LIVE_TEST_COPILOT_MODEL` permite parametrizar o modelo de boot do runner sem mudar producao.
+- [x] Dois reruns live posteriores ao endurecimento do harness terminaram `BLOCKED` antes de qualquer tool por falha de
+  model call BYOK/empty turn. O terminal bootou a sessao SDK como `qwen3-coder-next/high`, enquanto `/usage`,
+  `/activity` e `/health full` seguiam mostrando rota efetiva/Gateway `kilo-code · kilo-auto/free`; os eventos tambem
+  registraram `Aviso de quota · premium interactions · sem quota` e `Erro BYOK · provedor openai · perfil kilo · modelo
+  qwen3-coder-next`. A tentativa com `COPILOT_LIVE_TEST_COPILOT_MODEL=kilo-auto/free` nao alterou o modelo SDK
+  observado. Logo, o run unico combinado esta bloqueado no estado atual por desalinhamento boot SDK/modelo versus rota
+  efetiva e/ou quota do provider ativo, antes de testar novamente o route apply.
+  Artefatos:
+  `artifacts/terminal-live/2026-06-19T-route-apply-minimal-combined-recovery-rerun/summary.md` e
+  `artifacts/terminal-live/2026-06-19T-route-apply-minimal-boot-kilo-rerun/summary.md`.
 - [x] Checkpoint amplo pos-correcao passou:
   - `npm run typecheck:strict:src.copilot`;
   - `npm run lint:copilot`;
@@ -225,6 +252,9 @@ qualquer desvio de identidade
   historica inofensiva de perda real de transcript.
 - [ ] Eventos de `model-gateway.deferred-route-promotion` podem aparecer repetidamente no mesmo intervalo; falta metrica
   e coalescing/telemetria explicita para distinguir "no-op scan" de promocao real.
+- [ ] Boot live LLM-B pode iniciar a sessao SDK como `qwen3-coder-next/high` enquanto a rota efetiva/Gateway permanece
+  `kilo-code · kilo-auto/free`; quando o provider ativo retorna quota/model_call failure, o cenario bloqueia antes de
+  qualquer tool. Falta alinhar boot SDK, BYOK materializado, route projection e `COPILOT_MODEL` efetivo numa unica fonte.
 - [x] `/health full` deixou de divergir no live route apply minimal corrigido; a lacuna residual e tornar essa visao
   derivada de uma readiness unica compartilhada por todas as superficies.
 - [x] O primeiro campo compartilhado dessa readiness unica e `effectiveRoute`, cobrindo provider/modelo/profile/source
@@ -375,6 +405,12 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Endurecer o prompt do live route apply minimal para exigir serializacao: no maximo uma tool `model_gateway_*` por
   resposta de ferramenta do SDK, aguardando o resultado antes da proxima.
 - [x] Reexecutar o live route apply minimal com serializacao observada no transcript, sem lote paralelo misto.
+- [x] Endurecer os criterios do harness para exigir duas chamadas bem-sucedidas de `overview`, `operation_status` e
+  `route_switch`, distinguindo `route_switch:plan` isolado de plan/apply completo.
+- [x] Adicionar recuperacao controlada quando o prompt volta com tools esperadas incompletas ou quando `ask_user` aparece
+  sem nenhuma tool obrigatoria do cenario.
+- [ ] Corrigir o desalinhamento de boot live em que o SDK fica em `qwen3-coder-next/high`, mas a rota efetiva permanece
+  `kilo-code/kilo-auto-free`, causando BYOK model_call failure antes das tools.
 - [ ] Fazer um run unico combinado que termine `PASS` e exporte `timeline=mixed/bridge_tail` ou `aligned`.
 - [ ] Adicionar live rollback induzido.
 - [ ] Adicionar live reconcile pos-mismatch.
@@ -392,6 +428,8 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Reexecutar export live para provar que o Markdown novo nao carrega
   `timeline=mixed/diverged`/`sync=blocked:diverged-no-overlap` quando SSE/export correlacionam ask, answer e postAsk.
 - [ ] Repetir a prova em um run unico que tambem passe os criterios de `model_gateway_route_switch` plan/apply.
+- [ ] Depois de corrigir o boot/rota efetiva, repetir o run combinado e exigir simultaneamente:
+  `PASS`, `route_switch` plan/apply completo, `ask_user`/`SIM`/postAsk e export `bridge_tail` ou `aligned`.
 
 ### Faixa E — Perfis BYOK duraveis
 
@@ -432,11 +470,13 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 
 ## 6. Ordem recomendada a partir daqui
 
-1. Implementar readiness unica e alinhar `/health`, `/now`, `/byok`, `/activity`, `overview` e `ops`.
-2. Investigar e corrigir a reconciliacao `timeline=mixed/diverged` do export no live PASS.
-3. Adicionar testes end-to-end de ledger transicional e metricas de promocao.
-4. Rodar live rollback/reconcile.
-5. Decompor `/byok`, finalizar perfis duraveis e golden path vanilla SDK.
+1. Corrigir a fonte efetiva de boot live: SDK model, BYOK materializado, Gateway active route e prompt devem concordar
+   antes do primeiro model call.
+2. Repetir o live combinado exigindo ao mesmo tempo plan/apply, ask/final e export `bridge_tail` ou `aligned`.
+3. Completar readiness unica e alinhar `/health`, `/now`, `/byok`, `/activity`, `overview` e `ops`.
+4. Adicionar testes end-to-end de ledger transicional e metricas de promocao.
+5. Rodar live rollback/reconcile.
+6. Decompor `/byok`, finalizar perfis duraveis e golden path vanilla SDK.
 
 ## 7. Evidencias locais importantes
 
@@ -560,3 +600,21 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   - validacao escopada: `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_timeline_projection.spec.js --reporter=dot`,
     `npx eslint src/copilot/terminal/frontend/projections/timeline.js tests/unit/copilot/terminal/test_timeline_projection.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`
     e `npm run typecheck:strict:src.copilot`.
+- Evidencia do run combinado bloqueado por apply ausente:
+  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-combined-rerun/summary.md`: `BLOCKED` por
+    `assistant-empty-turn`;
+  - eventos SSE mostram `model_gateway_route_switch` chamado apenas com `mode:"plan"` e `confirm:false`;
+  - o export resultante tem somente tres mensagens e `timeline=mixed/diverged`, sem `ask_user`;
+  - correcao aplicada no harness: contagem minima por tool (`minSuccessfulCalls`) e recuperacao controlada para cadeia
+    incompleta.
+- Evidencia dos bloqueios por boot/model_call antes das tools:
+  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-combined-recovery-rerun/summary.md`: `BLOCKED` por
+    `assistant-empty-turn`, tools observadas `0`, erro BYOK antes da primeira tool;
+  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-boot-kilo-rerun/summary.md`: mesmo bloqueio apos tentar
+    `COPILOT_LIVE_TEST_COPILOT_MODEL=kilo-auto/free`;
+  - `/health full` desses runs mostra `Modelo qwen3-coder-next · raciocínio high`, mas BYOK/Gateway seguem
+    `kilo-code · kilo-auto/free`;
+  - validacao escopada do harness:
+    `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`,
+    `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs` e
+    `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "live scenario" --reporter=dot`.

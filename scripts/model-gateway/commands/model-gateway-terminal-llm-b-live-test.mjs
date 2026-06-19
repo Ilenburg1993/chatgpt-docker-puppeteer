@@ -112,6 +112,7 @@ function hasCommand(name) {
 
 const HUMAN_TERMINAL_SHUTDOWN_RE = /Terminal\s+fechado; API local permanece ativa até o processo encerrar/u;
 const LEGACY_TERMINAL_SHUTDOWN_RE = /\[terminal\]\s+(?:readline fechado|Encerrando sessão)/iu;
+const LIVE_TEST_COPILOT_MODEL = process.env.COPILOT_LIVE_TEST_COPILOT_MODEL || 'auto';
 
 function hasHumanTerminalShutdownCopy(plain) {
     const text = String(plain ?? '');
@@ -599,6 +600,7 @@ const LIVE_SCENARIOS = Object.freeze({
             'O objetivo é provar que model_gateway_route_switch apply não trava quando solicitado dentro do tool-turn ativo: ele deve retornar resultado estruturado, preservando o mesmo sessionId, sem criar nova sessão e sem tentar reattach imediato se a capability indicar deferimento até o limite do turno.',
             'Depois do read_file_content, invoque as tools reais abaixo, nesta ordem, usando exatamente os argumentos indicados.',
             'Serialização obrigatória: chame no máximo uma tool model_gateway_* por resposta de ferramenta do SDK. Aguarde o resultado de cada tool aparecer antes de chamar a próxima; não agrupe overview, operation_status e route_switch no mesmo tool-use batch.',
+            'Critério obrigatório de continuidade: não escreva DELTA-CANONICAL e não chame ask_user enquanto não tiver observado o retorno de sucesso das seis chamadas Model Gateway listadas abaixo. Se qualquer chamada for pulada, o teste deve ser considerado falho.',
             '1) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=10.',
             '2) model_gateway_operation_status com operationId=null, limit=10.',
             `3) model_gateway_route_switch com mode="plan", route={providerId:"ollama-cloud", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_minimal_provider_switch", selectedRouteKey:"live-route-minimal:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY}", confirm=false.`,
@@ -620,9 +622,24 @@ const LIVE_SCENARIOS = Object.freeze({
             'ask_user',
         ],
         expectedLifecycleTools: [
-            { name: 'model_gateway_overview', renderedName: 'Model Gateway overview', allowFocusTransitions: true },
-            { name: 'model_gateway_operation_status', renderedName: 'Status de operação Model Gateway', allowFocusTransitions: true },
-            { name: 'model_gateway_route_switch', renderedName: 'Trocar rota runtime', allowFocusTransitions: true },
+            {
+                name: 'model_gateway_overview',
+                renderedName: 'Model Gateway overview',
+                allowFocusTransitions: true,
+                minSuccessfulCalls: 2,
+            },
+            {
+                name: 'model_gateway_operation_status',
+                renderedName: 'Status de operação Model Gateway',
+                allowFocusTransitions: true,
+                minSuccessfulCalls: 2,
+            },
+            {
+                name: 'model_gateway_route_switch',
+                renderedName: 'Trocar rota runtime',
+                allowFocusTransitions: true,
+                minSuccessfulCalls: 2,
+            },
         ],
         postAnswerCommands: [
             `/byok provider ollama-cloud qwen3-coder-next https://ollama.com/v1 wire:completions idempotency:${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY} force-deferred`,
@@ -779,10 +796,26 @@ function buildIncompleteExpectedToolRecoveryPrompt(
             'Se model_gateway_workflow_plan ainda estiver faltando, invoque model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["chat","agent"], maxSnapshotAgeHours=720, maxCandidates=5, maxProbeCount=2, maxEstimatedCostUsd=0, idempotencyKeyPrefix="live-readonly-workflow-20260616", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true e requireRuntimeProof=true.',
         );
     }
+    if (missing.includes('model_gateway_overview')) {
+        instructions.push(
+            'Se model_gateway_overview ainda estiver faltando, invoque model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720 e operationLimit=10.',
+        );
+    }
+    if (missing.includes('model_gateway_operation_status')) {
+        instructions.push(
+            'Se model_gateway_operation_status ainda estiver faltando, invoque model_gateway_operation_status com operationId=null e limit=10.',
+        );
+    }
+    if (missing.includes('model_gateway_route_switch')) {
+        instructions.push(
+            `Se model_gateway_route_switch ainda estiver faltando ou só tiver retornado o plan, invoque a etapa pendente: primeiro plan somente se ele ainda não apareceu; depois obrigatoriamente apply com mode="apply", route={providerId:"ollama-cloud", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_minimal_provider_switch", selectedRouteKey:"live-route-minimal:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY}" e confirm=true.`,
+        );
+    }
     return [
         'Continue o teste canônico exatamente de onde parou.',
         `As tools esperadas ainda faltantes são: ${missing.join(', ') || 'nenhuma'}.`,
         'Não repita tools já concluídas; use somente as tools faltantes listadas acima.',
+        'Se houver mais de uma tool Model Gateway faltante, chame uma por vez e aguarde o resultado de cada uma antes da próxima chamada.',
         ...instructions,
         'Depois que as tools faltantes concluírem, escreva exatamente as oito linhas públicas DELTA-CANONICAL-1 até DELTA-CANONICAL-8.',
         'Não invoque ask_user antes dessas oito linhas públicas aparecerem no transcript.',
@@ -1764,7 +1797,7 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
         cwd: ROOT,
         env: {
             ...process.env,
-            COPILOT_MODEL: 'auto',
+            COPILOT_MODEL: LIVE_TEST_COPILOT_MODEL,
             COPILOT_REASONING_EFFORT: 'high',
             TERMINAL_DISPLAY_PRESET: process.env.TERMINAL_DISPLAY_PRESET ?? 'default',
             COPILOT_SDK_ENABLED: 'true',
@@ -2286,7 +2319,7 @@ async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, t
         cwd: ROOT,
         env: {
             ...process.env,
-            COPILOT_MODEL: 'auto',
+            COPILOT_MODEL: LIVE_TEST_COPILOT_MODEL,
             COPILOT_REASONING_EFFORT: 'high',
             TERMINAL_DISPLAY_PRESET: process.env.TERMINAL_DISPLAY_PRESET ?? 'default',
             COPILOT_SDK_ENABLED: 'true',
@@ -3916,24 +3949,31 @@ function findAssistantEndedAfterAskRecoveryWithoutAsk(plain, scenario = LIVE_SCE
     return { traceId: null, turnId: null, eventId: null };
 }
 
-function findIncompleteExpectedToolChain(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function findIncompleteExpectedToolChain(
+    events,
+    scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
+    { allowAllMissing = false } = {},
+) {
     const expectedTools = scenario.expectedLifecycleTools;
     if (expectedTools.length === 0) return null;
     const statuses = expectedTools.map((tool) => {
         const lifecycle = summarizeNamedToolLifecycle(events, tool.name);
         const expectsFailure = (tool.expectedOutcome ?? 'success') === 'failure';
+        const minSuccessfulCalls = Math.max(1, Math.floor(Number(tool.minSuccessfulCalls ?? 1)));
         return {
             name: tool.name,
             completed: expectsFailure
-                ? lifecycle.failed || lifecycle.postToolFailure
-                : lifecycle.done || lifecycle.postToolSuccess,
+                ? lifecycle.failedCallCount >= minSuccessfulCalls
+                : lifecycle.successfulCallCount >= minSuccessfulCalls,
             started: lifecycle.start,
             expectedOutcome: expectsFailure ? 'failure' : 'success',
+            minSuccessfulCalls,
+            observedSuccessfulCalls: expectsFailure ? lifecycle.failedCallCount : lifecycle.successfulCallCount,
         };
     });
     const completed = statuses.filter((tool) => tool.completed).map((tool) => tool.name);
     const missing = statuses.filter((tool) => !tool.completed).map((tool) => tool.name);
-    if (completed.length === 0 || missing.length === 0) return null;
+    if ((completed.length === 0 && !allowAllMissing) || missing.length === 0) return null;
     return { completed, missing };
 }
 
@@ -4836,6 +4876,13 @@ function summarizeNamedToolLifecycle(events, expectedName) {
         failed: false,
         postToolSuccess: false,
         postToolFailure: false,
+        postToolSuccessCount: 0,
+        postToolFailureCount: 0,
+        startCount: 0,
+        completionSuccessCount: 0,
+        completionFailureCount: 0,
+        successfulCallCount: 0,
+        failedCallCount: 0,
         resultTypes: [],
         exitCodes: [],
         matchedEventIds: [],
@@ -4848,8 +4895,14 @@ function summarizeNamedToolLifecycle(events, expectedName) {
         if (evt?.event === 'hook.start') {
             const postToolUse = summarizePostToolUseResult(payload, expectedName);
             if (!postToolUse) continue;
-            if (postToolUse.success) summary.postToolSuccess = true;
-            if (postToolUse.failure) summary.postToolFailure = true;
+            if (postToolUse.success) {
+                summary.postToolSuccess = true;
+                summary.postToolSuccessCount += 1;
+            }
+            if (postToolUse.failure) {
+                summary.postToolFailure = true;
+                summary.postToolFailureCount += 1;
+            }
             if (postToolUse.resultType) summary.resultTypes.push(postToolUse.resultType);
             if (Number.isFinite(postToolUse.exitCode)) summary.exitCodes.push(postToolUse.exitCode);
             const eventId = eventPublicId(evt);
@@ -4862,14 +4915,17 @@ function summarizeNamedToolLifecycle(events, expectedName) {
         const eventId = eventPublicId(evt);
         if (isLifecycleStartType(type)) {
             summary.start = true;
+            summary.startCount += 1;
             if (Number.isFinite(eventId)) summary.startEventIds.push(eventId);
         }
         if (isLifecycleCompletionType(type) && success) {
             summary.done = true;
+            summary.completionSuccessCount += 1;
             if (Number.isFinite(eventId)) summary.completionEventIds.push(eventId);
         }
         if (isLifecycleCompletionType(type) && !success) {
             summary.failed = true;
+            summary.completionFailureCount += 1;
             if (Number.isFinite(eventId)) summary.completionEventIds.push(eventId);
         }
         if (type === 'io_op' && success) summary.io = true;
@@ -4880,6 +4936,8 @@ function summarizeNamedToolLifecycle(events, expectedName) {
     summary.matchedEventIds = [...new Set(summary.matchedEventIds)].sort((a, b) => a - b);
     summary.startEventIds = [...new Set(summary.startEventIds)].sort((a, b) => a - b);
     summary.completionEventIds = [...new Set(summary.completionEventIds)].sort((a, b) => a - b);
+    summary.successfulCallCount = Math.max(summary.completionSuccessCount, summary.postToolSuccessCount);
+    summary.failedCallCount = Math.max(summary.completionFailureCount, summary.postToolFailureCount);
     return summary;
 }
 
@@ -5636,16 +5694,21 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             const expectedOutcome = tool.expectedOutcome === 'failure' ? 'failure' : 'success';
             const structuredFailure = tool.lifecycle.failed || tool.lifecycle.postToolFailure;
             const structuredSuccess = tool.lifecycle.done || tool.lifecycle.postToolSuccess;
+            const minSuccessfulCalls = Math.max(1, Math.floor(Number(tool.minSuccessfulCalls ?? 1)));
+            const observedSuccessfulCalls =
+                expectedOutcome === 'failure' ? tool.lifecycle.failedCallCount : tool.lifecycle.successfulCallCount;
             return {
                 id: `scenario-tool-${tool.name}-lifecycle`,
                 pass:
                     tool.lifecycle.start &&
+                    observedSuccessfulCalls >= minSuccessfulCalls &&
                     (expectedOutcome === 'failure'
                         ? structuredFailure && !tool.lifecycle.postToolSuccess
                         : structuredSuccess && rendered),
                 detail:
                     `${tool.name} lifecycle expected=${expectedOutcome} start=${tool.lifecycle.start ? 'yes' : 'no'} done=${tool.lifecycle.done ? 'yes' : 'no'} ` +
                     `failed=${tool.lifecycle.failed ? 'yes' : 'no'} postSuccess=${tool.lifecycle.postToolSuccess ? 'yes' : 'no'} postFailure=${tool.lifecycle.postToolFailure ? 'yes' : 'no'} ` +
+                    `calls=${observedSuccessfulCalls}/${minSuccessfulCalls} ` +
                     `resultTypes=${tool.lifecycle.resultTypes.join(',') || '-'} exitCodes=${tool.lifecycle.exitCodes.join(',') || '-'} ` +
                     `rendered=${rendered ? 'yes' : 'no'} events=${tool.lifecycle.matchedEventIds.slice(0, 8).join(',') || '-'}`,
             };
@@ -8105,7 +8168,9 @@ async function main() {
                 scheduleAskBeforeDeltasDiagnostics();
                 return;
             }
-            const incompleteExpectedTools = findIncompleteExpectedToolChain(sseCollector?.events ?? [], liveScenario);
+            const incompleteExpectedTools = findIncompleteExpectedToolChain(sseCollector?.events ?? [], liveScenario, {
+                allowAllMissing: true,
+            });
             if (incompleteExpectedTools) {
                 scheduleIncompleteExpectedToolDiagnostics(incompleteExpectedTools);
                 return;
@@ -8151,6 +8216,10 @@ async function main() {
             ).unref();
         }
         const scenarioTailPlain = scenarioSent ? plain.slice(scenarioPlainOffset) : '';
+        const incompleteExpectedToolsAfterPrompt =
+            scenarioSent && !answerSent && !postCommandsSent && !incompleteExpectedToolRecoverySent
+                ? findIncompleteExpectedToolChain(sseCollector?.events ?? [], liveScenario)
+                : null;
         if (
             scenarioSent &&
             !answerSent &&
@@ -8160,6 +8229,16 @@ async function main() {
             hasReturnedToNormalReplPrompt(plain, scenarioPlainOffset)
         ) {
             sendIncompleteExpectedToolRecovery(findIncompleteExpectedToolChain(sseCollector?.events ?? [], liveScenario));
+        }
+        if (
+            scenarioSent &&
+            !answerSent &&
+            !postCommandsSent &&
+            !incompleteExpectedToolRecoverySent &&
+            incompleteExpectedToolsAfterPrompt &&
+            hasReturnedToNormalReplPrompt(plain, scenarioPlainOffset)
+        ) {
+            sendIncompleteExpectedToolRecovery(incompleteExpectedToolsAfterPrompt);
         }
         if (
             byokReal &&
