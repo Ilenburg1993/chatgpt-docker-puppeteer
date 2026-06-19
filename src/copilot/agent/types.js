@@ -214,6 +214,8 @@
  *   Binding persistido do system prompt aplicado à sessão atual
  * @property {import('../config/system-prompt/freshness.js').SystemPromptFreshness | null} [systemPromptFreshness]
  *   Frescor avaliado do binding do system prompt em relação à revisão atual
+ * @property {import('./lifecycle/state/state-io.js').AliveAgentState['modelGatewayActiveRoute']} [modelGatewayActiveRoute]
+ *   Rota Model Gateway confirmada para a sessão viva
  */
 
 /**

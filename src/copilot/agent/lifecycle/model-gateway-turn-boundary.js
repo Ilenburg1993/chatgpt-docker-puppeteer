@@ -102,6 +102,9 @@ export function wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, options = 
                         `[ModelGateway] Promoção pós-turno não foi concluída ` +
                             `(session=${session.sessionId}): ${detail || 'unknown'}`,
                     );
+                    throw new Error(
+                        `MODEL_GATEWAY_DEFERRED_ROUTE_PROMOTION_FAILED: ${detail || 'unknown'}`,
+                    );
                 }
                 return result;
             })
@@ -110,6 +113,7 @@ export function wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, options = 
                     'WARN',
                     `[ModelGateway] Scheduler pós-turno falhou: ${error instanceof Error ? error.message : String(error)}`,
                 );
+                throw error;
             })
             .finally(() => {
                 running = false;

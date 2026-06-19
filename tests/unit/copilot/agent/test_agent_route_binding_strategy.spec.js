@@ -140,6 +140,68 @@ describe('agent route binding strategy authority', () => {
         expect(String(input.targetRoute.sdkRouteKey)).toContain('session-stable:repo_agent:model-gateway');
     });
 
+    it('verifica rota ingress pelo modelo visível ao SDK sem confundir com o modelo upstream', async () => {
+        mocks.executeRouteSwitch.mockImplementationOnce(async (input) => {
+            const candidate = await input.reattach(input.targetRoute);
+            const verified = await input.verify(candidate, input.targetRoute);
+            if (!verified) {
+                return {
+                    schemaVersion: 'model-gateway.same-session-route-switch.v1',
+                    state: 'rolled_back',
+                    sessionId: input.sessionId,
+                    error: 'SAME_SESSION_ROUTE_SWITCH_NOT_VERIFIED',
+                    requiresNewSession: false,
+                };
+            }
+            await input.commit(candidate, input.targetRoute);
+            return {
+                schemaVersion: 'model-gateway.same-session-route-switch.v1',
+                state: 'committed',
+                sessionId: input.sessionId,
+                targetRoute: input.targetRoute,
+                requiresNewSession: false,
+            };
+        });
+        const { switchAgentRouteTransactional } = await import(
+            '../../../../src/copilot/agent/facades/agent-route-config.js'
+        );
+
+        const result = await switchAgentRouteTransactional(
+            /** @type {any} */ (createContext()),
+            {
+                providerId: 'ollama-cloud',
+                providerType: 'openai',
+                providerModel: 'qwen3-coder-next',
+                baseUrl: 'https://ollama.com/v1',
+                openAICompatible: true,
+                wireApi: 'completions',
+                directRebindReliability: 'unreliable',
+                routeProfile: 'live_minimal_provider_switch',
+            },
+            {
+                idempotencyKey: 'agent-route-ingress-sdk-visible-model',
+                source: 'unit.agent.ingress-verification',
+                reattach: async (route) =>
+                    /** @type {any} */ ({
+                        sessionId: 'session-stable',
+                        __copilotModelGatewayProviderId: route['providerId'],
+                        __copilotConfiguredModel: route['sdkVisibleModel'],
+                        __copilotEffectiveModel: route['sdkVisibleModel'],
+                    }),
+            },
+        );
+
+        expect(result).toMatchObject({
+            state: 'committed',
+            targetRoute: {
+                providerId: 'ollama-cloud',
+                providerModel: 'qwen3-coder-next',
+                bindingStrategy: 'ingress',
+                sdkVisibleModel: 'model-gateway-live',
+            },
+        });
+    });
+
     it('aprende com falha direta recente e seleciona ingress para o mesmo par e wire API', async () => {
         mocks.readDirectEvidence.mockResolvedValueOnce({
             schemaVersion: 'model-gateway.direct-rebind-evidence.v1',

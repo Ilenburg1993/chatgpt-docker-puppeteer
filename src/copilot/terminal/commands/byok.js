@@ -2620,9 +2620,13 @@ function optionalCount(value) {
 
 /**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
+ * @param {ReturnType<typeof readTerminalConfigProjection>['modelGatewayProjection'] | null} runtimeProjection
  * @returns {Record<string, unknown> | null}
  */
-function resolveByokGatewayActiveRoute(projection) {
+function resolveByokGatewayActiveRoute(projection, runtimeProjection) {
+    if (runtimeProjection?.effectiveRoute && typeof runtimeProjection.effectiveRoute === 'object') {
+        return /** @type {Record<string, unknown>} */ (runtimeProjection.effectiveRoute);
+    }
     const gatewayProjection = projection.modelGatewayProjection ?? {};
     if (gatewayProjection['effectiveRoute'] && typeof gatewayProjection['effectiveRoute'] === 'object') {
         return /** @type {Record<string, unknown>} */ (gatewayProjection['effectiveRoute']);
@@ -2654,6 +2658,7 @@ function renderByokGatewayActiveRouteLabel(route) {
 async function renderStatus(projection, println) {
     const { summary } = projection;
     const statusCapabilities = resolveByokStatusCapabilities(projection);
+    const runtimeConfig = readTerminalConfigProjection();
     println('');
     println(terminalThemeHeadline('tool', 'BYOK status'));
     println(terminalThemeDivider(66));
@@ -2743,14 +2748,16 @@ async function renderStatus(projection, println) {
             `${gatewayCounts.providerCount} provedores · ${gatewayCounts.modelCount} modelos · ${gatewayCounts.enabledModelCount} habilitados · origem ${renderByokSourceLabel(gateway.source)}`,
         ),
     );
-    const gatewayActive = resolveByokGatewayActiveRoute(projection);
+    const gatewayActive = resolveByokGatewayActiveRoute(
+        projection,
+        runtimeConfig.modelGatewayProjection ?? null,
+    );
     const gatewayActiveLabel = renderByokGatewayActiveRouteLabel(gatewayActive);
     if (gatewayActiveLabel) {
         println(terminalThemeRow('Gateway ativo', gatewayActiveLabel));
     }
     try {
         const inventory = await listTerminalSdkSessionInventory();
-        const runtimeConfig = readTerminalConfigProjection();
         const binding = classifyTerminalByokSdkBinding(
             summary,
             inventory.persistedByokBinding,

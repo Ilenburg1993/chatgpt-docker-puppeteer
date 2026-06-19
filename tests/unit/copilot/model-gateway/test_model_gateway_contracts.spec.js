@@ -12835,6 +12835,38 @@ describe('model-gateway foundation', () => {
         assert.ok(model?.tags.includes('runtime.chat=ok'));
     });
 
+    it('prefers the confirmed runtime route over the prepared environment route', () => {
+        const snapshot = buildEnvByokModelGatewaySnapshot({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_PRESET: 'kilo-code',
+            COPILOT_BYOK_MODEL: 'kilo-auto/free',
+            COPILOT_BYOK_BASE_URL: 'https://api.kilo.ai/api/gateway',
+        });
+
+        const projection = buildModelGatewayOperatorProjection(snapshot, {
+            activeRoute: {
+                providerId: 'ollama-cloud',
+                providerModel: 'qwen3-coder-next',
+                bindingStrategy: 'ingress',
+                sdkVisibleModel: 'model-gateway-live',
+            },
+        });
+
+        assert.deepEqual(projection.effectiveRoute, {
+            enabled: true,
+            ready: true,
+            providerId: 'ollama-cloud',
+            providerModel: 'qwen3-coder-next',
+            modelId: 'ollama-cloud:qwen3-coder-next',
+            profile: null,
+            gatewayProfile: null,
+            preset: 'kilo-code',
+            bindingSource: 'runtime_state',
+            source: 'env_compat',
+            label: 'ollama-cloud · qwen3-coder-next',
+        });
+    });
+
     it('exposes the same effective route projection from overview readiness', async () => {
         const { default: Database } = await import('better-sqlite3');
         const db = new Database(':memory:');

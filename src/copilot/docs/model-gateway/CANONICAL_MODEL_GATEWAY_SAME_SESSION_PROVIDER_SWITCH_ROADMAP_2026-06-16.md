@@ -215,11 +215,30 @@ qualquer desvio de identidade
   executou `route_switch:apply` com resultado estruturado `status=accepted_for_turn_boundary`, expôs
   `deferred_until_turn_boundary` e `same_session`, executou `ask_user`, registrou `SIM` e materializou o marcador
   final. O run ainda ficou `FAIL` apenas por marcador textual antigo e criterio UX de comando diagnostico.
-- [ ] Bloqueador residual atual: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-final-marker-rerun/summary.md`
+- [x] O bloqueador historico de `artifacts/terminal-live/2026-06-19T-route-apply-minimal-final-marker-rerun/summary.md`
   completou a cadeia de tools, deltas, `ask_user`, `SIM` e final marker, mas houve `Erro BYOK` transitorio no meio do
   fluxo; depois da recuperacao, `/activity` e `/byok` voltaram a mostrar rota efetiva `kilo-code · kilo-auto/free`.
-  Isso invalida o aceite ponta a ponta atual ate corrigirmos a persistencia/promocao/reconcile da rota efetiva sob falha
-  de provider.
+  A auditoria posterior demonstrou que esse caso era rollback por verificacao ingress incorreta, ja corrigida.
+- [x] A causa exata do rollback no `final-marker-rerun` foi confirmada no ledger SQLite:
+  `same-session-route-switch:52cbba78158ca11521f50c9a` terminou `rolled_back` com
+  `SAME_SESSION_ROUTE_SWITCH_NOT_VERIFIED`; o target ingress havia reatado, mas o verificador comparava o modelo
+  SDK-facing `model-gateway-live` com o upstream `qwen3-coder-next`.
+- [x] `switchAgentRouteTransactional()` agora verifica rota ingress pelo `sdkVisibleModel`, preservando a identidade
+  upstream separada em `providerId/providerModel`. Teste focado prova commit com
+  `ollama-cloud/qwen3-coder-next -> sdkVisibleModel=model-gateway-live`.
+- [x] O scheduler de promocao agora rejeita a task quando `result.errors > 0`, permitindo que
+  `agent.background.completed` registre `status=error` em vez de falso `success`.
+- [x] Reexecutar o live apos a correcao e exigir operacao final `committed`, sem rollback:
+  `same-session-route-switch:0d1be7eacca45b4a928afaca` terminou `committed` e a confirmacao
+  `route_confirmed_same_session` preservou o mesmo `sessionId`.
+- [x] Corrigir a projection stale de rota efetiva: o snapshot observavel do agente agora inclui
+  `modelGatewayActiveRoute`, `buildModelGatewayOperatorProjection()` aceita override runtime com
+  `bindingSource=runtime_state`, e `/byok`, `/activity` e `/health` preferem essa rota confirmada ao `.env` preparado.
+- [x] Evidencia live funcional ponta a ponta:
+  `artifacts/terminal-live/2026-06-19T-route-apply-minimal-runtime-projection-fix-rerun/summary.md` aprovou todas as
+  tools, deferimento same-session, deltas, `ask_user`, `SIM`, final marker, ledger e marcador
+  `Rota efetiva  ollama-cloud · qwen3-coder-next`. O status global ficou `FAIL` somente por
+  `ux-diagnostic-commands-start-at-prompt`.
 - [ ] O harness ainda pode precisar de um criterio dedicado para distinguir "apply aceito/deferido e depois rollback ou
   regressao de rota efetiva" de falhas textuais de diagnostico, para nao misturar UX de REPL com integridade de rota.
 - [x] Checkpoint amplo pos-correcao passou:
@@ -286,10 +305,13 @@ qualquer desvio de identidade
 - [ ] Boot live LLM-B pode iniciar a sessao SDK como `qwen3-coder-next/high` enquanto a rota efetiva/Gateway permanece
   `kilo-code · kilo-auto/free`; quando o provider ativo retorna quota/model_call failure, o cenario bloqueia antes de
   qualquer tool. Falta alinhar boot SDK, BYOK materializado, route projection e `COPILOT_MODEL` efetivo numa unica fonte.
-- [ ] Mesmo apos boot fresco em `kilo-auto/free` e `route_switch:apply` aceito para `deferred_until_turn_boundary`, uma
-  falha BYOK transitoria durante a continuacao pode deixar o diagnostico final em `kilo-code · kilo-auto/free`. Falta
-  auditar se a promocao foi revertida, se o effective route projection preferiu uma fonte stale, ou se o reconcile
-  limpou a rota alvo apos erro recuperavel.
+- [x] A regressao para `kilo-code · kilo-auto/free` no `final-marker-rerun` foi explicada como rollback correto disparado
+  por verificacao incorreta do modelo ingress, nao como projection stale.
+- [x] Provar por regressao focada que ingress verifica `sdkVisibleModel` sem confundir a identidade upstream.
+- [ ] Adicionar um live forçado especificamente em binding ingress; os reruns posteriores acumularam evidencia de
+  direct rebind e selecionaram `bindingStrategy=direct`.
+- [x] Provar live que o apply promovido mantem `ollama-cloud/qwen3-coder-next` como rota efetiva final nas superficies
+  operacionais.
 - [ ] O comando diagnostico `/byok provider ... force-deferred` e o caminho de confirmacao textual antigo ainda podem
   montar rota incompleta sem `providerType/openAICompatible`, gerando `MODEL_GATEWAY_BINDING_STRATEGY_BLOCKED` apesar de
   o `model_gateway_route_switch` estruturado estar correto.
@@ -449,10 +471,12 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   sem nenhuma tool obrigatoria do cenario.
 - [ ] Corrigir o desalinhamento de boot live em que o SDK fica em `qwen3-coder-next/high`, mas a rota efetiva permanece
   `kilo-code/kilo-auto-free`, causando BYOK model_call failure antes das tools.
-- [ ] Corrigir a regressao pos-falha BYOK em que o apply deferido/promovido nao permanece como rota efetiva no
-  diagnostico final.
+- [x] Corrigir a verificacao ingress que causava rollback falso apos reattach bem-sucedido.
+- [x] Provar no live que o apply deferido/promovido permanece como rota efetiva no diagnostico final.
 - [ ] Fazer um run unico combinado que termine `PASS`, mantenha `Rota efetiva  ollama-cloud · qwen3-coder-next` no
   diagnostico final e exporte `timeline=mixed/bridge_tail` ou `aligned`.
+- [ ] Corrigir o unico criterio residual do ultimo run funcional:
+  `ux-diagnostic-commands-start-at-prompt`.
 - [ ] Adicionar live rollback induzido.
 - [ ] Adicionar live reconcile pos-mismatch.
 
@@ -676,7 +700,12 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
     `ask_user`, `SIM` e postAsk; falhou apenas marcador textual/UX antes do ajuste de diagnostico;
   - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-final-marker-rerun/summary.md`: completou tools/deltas
     ask/final, mas demonstrou o bloqueador residual de rota efetiva final regressando para `kilo-code/kilo-auto/free`
-    apos erro BYOK recuperavel.
+    apos erro BYOK recuperavel;
+  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-ingress-verification-fix-rerun-2/summary.md`: provou
+    operacao `committed` e sessao viva em `qwen3-coder-next`, isolando a projection stale de `/activity` e `/byok`;
+  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-runtime-projection-fix-rerun/summary.md`: aprovou a
+    cadeia funcional completa e mostrou `Gateway ativo`, `Rota efetiva` e `/health` em
+    `ollama-cloud/qwen3-coder-next`; restou apenas `ux-diagnostic-commands-start-at-prompt`.
 - Validacao escopada ja executada nesta continuacao:
   - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
   - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
@@ -684,4 +713,8 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_dialog_recovery_presenter.spec.js tests/unit/copilot/test_terminal_agent_wiring.spec.js --reporter=dot`;
   - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/tools/test_model_gateway_workflow_plan.spec.js -t "runtimeId|route_switch same-session" --reporter=dot`;
   - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/test_session_setup.spec.js -t "COPILOT_SDK_EXCLUDED_TOOLS" --reporter=dot`;
-  - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/agent/test_model_gateway_turn_boundary.spec.js --reporter=dot`.
+  - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/agent/test_model_gateway_turn_boundary.spec.js --reporter=dot`;
+  - `npm run typecheck:strict:src.copilot`;
+  - `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/test_status_snapshot.spec.js` com 15/15;
+  - `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/terminal/test_commands_byok.spec.js -t "usa effectiveRoute compartilhado no gateway do status BYOK"`;
+  - regressao focada de projection runtime e regressao ingress por `sdkVisibleModel`.

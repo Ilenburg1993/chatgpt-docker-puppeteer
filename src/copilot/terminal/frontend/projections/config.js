@@ -90,6 +90,10 @@ export function readTerminalConfigProjection(runtimeId) {
             : 'approve_all';
     const autoModelPolicy = readRuntimeAutoModelPolicyProjection(base.runtimeId);
     const modelGateway = buildEnvByokModelGatewaySnapshot();
+    const modelGatewayActiveRoute =
+        base.snap['modelGatewayActiveRoute'] && typeof base.snap['modelGatewayActiveRoute'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (base.snap['modelGatewayActiveRoute'])
+            : null;
     return {
         currentModel,
         currentReasoningEffort,
@@ -110,7 +114,9 @@ export function readTerminalConfigProjection(runtimeId) {
         runtimeFallbackWarning: base.runtimeFallbackWarning,
         byok: readConfiguredByokSummary(),
         modelGateway,
-        modelGatewayProjection: buildModelGatewayOperatorProjection(modelGateway),
+        modelGatewayProjection: buildModelGatewayOperatorProjection(modelGateway, {
+            activeRoute: modelGatewayActiveRoute,
+        }),
         agentRuntimes: base.agentRuntimes,
         runtimeSessionId: base.runtimeSessionId,
     };

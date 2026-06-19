@@ -341,6 +341,10 @@ export async function switchAgentRouteTransactional(ctx, targetRoute, options) {
             const live = /** @type {import('#copilot/sdk/types').CopilotSession} */ (candidate);
             const providerId = String(route['providerId'] ?? '');
             const providerModel = String(route['providerModel'] ?? route['selectorSyntax'] ?? '');
+            const expectedSdkModel =
+                route['bindingStrategy'] === 'ingress'
+                    ? String(route['sdkVisibleModel'] ?? providerModel)
+                    : providerModel;
             const nativeSdkRoute = providerId === 'github-copilot-sdk';
             const liveProvider = String(
                 Reflect.get(live, '__copilotModelGatewayProviderId') ??
@@ -355,7 +359,7 @@ export async function switchAgentRouteTransactional(ctx, targetRoute, options) {
             return (
                 live.sessionId === session.sessionId &&
                 (nativeSdkRoute ? Reflect.get(live, '__copilotByokEnabled') !== true : liveProvider === providerId) &&
-                liveModel === providerModel
+                liveModel === expectedSdkModel
             );
         },
         commit: async (candidate, route) => {

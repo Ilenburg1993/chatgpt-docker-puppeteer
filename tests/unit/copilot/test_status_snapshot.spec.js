@@ -97,6 +97,20 @@ describe('buildStatusSnapshot() › campos obrigatórios', () => {
         const snap = buildStatusSnapshot({ ...baseParams(), permissionMode: 'selective' });
         assert.equal(snap.permissionMode, 'selective');
     });
+
+    it('inclui a rota Model Gateway confirmada no snapshot observável', () => {
+        const modelGatewayActiveRoute = {
+            providerId: 'ollama-cloud',
+            providerModel: 'qwen3-coder-next',
+            bindingStrategy: 'ingress',
+            sdkVisibleModel: 'model-gateway-live',
+            updatedAt: 1_700_000_000_000,
+        };
+
+        const snap = buildStatusSnapshot({ ...baseParams(), modelGatewayActiveRoute });
+
+        assert.deepEqual(snap.modelGatewayActiveRoute, modelGatewayActiveRoute);
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

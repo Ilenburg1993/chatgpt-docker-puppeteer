@@ -127,7 +127,10 @@ export function buildModelGatewayEffectiveRouteProjection(snapshot) {
 
 /**
  * @param {{ providers: Record<string, any>[]; models: Record<string, any>[]; active?: Record<string, any>; source?: string; generatedAt?: string }} snapshot
- * @param {{ routeProfile?: string | null }} [options]
+ * @param {{
+ *     routeProfile?: string | null;
+ *     activeRoute?: Record<string, unknown> | null;
+ * }} [options]
  * @returns {{
  *     source: string;
  *     generatedAt: string | null;
@@ -143,14 +146,32 @@ export function buildModelGatewayEffectiveRouteProjection(snapshot) {
 export function buildModelGatewayOperatorProjection(snapshot, options = {}) {
     const providers = Array.isArray(snapshot.providers) ? snapshot.providers : [];
     const models = Array.isArray(snapshot.models) ? snapshot.models : [];
+    const runtimeRoute =
+        options.activeRoute && typeof options.activeRoute === 'object' ? options.activeRoute : null;
+    const active =
+        runtimeRoute &&
+        typeof runtimeRoute['providerId'] === 'string' &&
+        runtimeRoute['providerId'].trim() &&
+        typeof runtimeRoute['providerModel'] === 'string' &&
+        runtimeRoute['providerModel'].trim()
+            ? {
+                  ...(snapshot.active ?? {}),
+                  ...runtimeRoute,
+                  enabled: true,
+                  ready: true,
+                  modelId: `${runtimeRoute['providerId']}:${runtimeRoute['providerModel']}`,
+                  bindingSource: 'runtime_state',
+              }
+            : snapshot.active ?? {};
+    const effectiveSnapshot = { ...snapshot, active };
     return {
         source: snapshot.source ?? 'unknown',
         generatedAt: snapshot.generatedAt ?? null,
-        active: snapshot.active ?? {},
+        active,
         providerCount: providers.length,
         modelCount: models.length,
         enabledModelCount: models.filter((model) => model['enabled'] !== false).length,
-        effectiveRoute: buildModelGatewayEffectiveRouteProjection(snapshot),
+        effectiveRoute: buildModelGatewayEffectiveRouteProjection(effectiveSnapshot),
         providers: providers.map((provider) => ({
             id: String(provider['id'] ?? ''),
             displayName: String(provider['displayName'] ?? provider['id'] ?? ''),

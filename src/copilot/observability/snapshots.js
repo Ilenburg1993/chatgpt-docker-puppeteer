@@ -45,6 +45,7 @@ import { STARVATION_THRESHOLD_MS } from '../config/agent.js';
  * @property {'approve_all' | 'audit_only' | 'selective'} permissionMode - Modo de permissão ativo
  * @property {import('../config/system-prompt/freshness.js').SystemPromptBindingSnapshot | null} [systemPromptBinding]
  * @property {import('../config/system-prompt/freshness.js').SystemPromptFreshness | null} [systemPromptFreshness]
+ * @property {import('../agent/lifecycle/state/state-io.js').AliveAgentState['modelGatewayActiveRoute']} [modelGatewayActiveRoute]
  */
 
 /** Tempo máximo (ms) antes de considerar uma tarefa em starvation. */
@@ -77,6 +78,7 @@ export function buildStatusSnapshot(params) {
         permissionMode,
         systemPromptBinding = null,
         systemPromptFreshness = null,
+        modelGatewayActiveRoute = null,
     } = params;
 
     const now = Date.now();
@@ -109,5 +111,6 @@ export function buildStatusSnapshot(params) {
         permissionMode,
         systemPromptBinding,
         systemPromptFreshness,
+        modelGatewayActiveRoute,
     };
 }

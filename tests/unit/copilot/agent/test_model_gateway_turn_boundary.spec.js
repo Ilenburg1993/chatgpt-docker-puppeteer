@@ -173,6 +173,40 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
         dispose();
     });
 
+    it('propaga falha de promoção para a telemetria da tarefa em background', async () => {
+        const host = new TestHost();
+        const tracked = [];
+        const ctx = {
+            getSessionSnapshot: () => ({ sessionId: 'session-stable' }),
+            trackBackgroundTask: (task, meta) => {
+                tracked.push({ task, meta });
+                return Promise.resolve();
+            },
+        };
+        const promote = vi.fn().mockResolvedValue({
+            sessionId: 'session-stable',
+            scanned: 1,
+            promoted: 0,
+            superseded: 0,
+            skipped: 0,
+            errors: 1,
+            records: [{ error: 'SAME_SESSION_ROUTE_SWITCH_NOT_VERIFIED' }],
+        });
+        const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, {
+            promote,
+            turnBoundarySettleMs: 0,
+        });
+
+        host.emit('dialog.turn_end', {});
+        await vi.waitFor(() => expect(tracked).toHaveLength(1));
+
+        await expect(tracked[0].task).rejects.toThrow(
+            'MODEL_GATEWAY_DEFERRED_ROUTE_PROMOTION_FAILED: SAME_SESSION_ROUTE_SWITCH_NOT_VERIFIED',
+        );
+        expect(tracked[0].meta).toMatchObject({ label: 'model-gateway.deferred-route-promotion' });
+        dispose();
+    });
+
     it('remove o listener ao descartar o scheduler', async () => {
         const host = new TestHost();
         const ctx = {

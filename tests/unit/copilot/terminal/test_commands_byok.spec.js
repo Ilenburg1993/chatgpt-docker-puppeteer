@@ -2062,6 +2062,17 @@ describe('terminal /byok command', () => {
     });
 
     it('usa effectiveRoute compartilhado no gateway do status BYOK', async () => {
+        readTerminalConfigProjection.mockReturnValue({
+            currentModel: 'qwen3-coder-next',
+            modelGatewayProjection: {
+                effectiveRoute: {
+                    providerId: 'ollama-cloud',
+                    providerModel: 'qwen3-coder-next',
+                    modelId: 'ollama-cloud:qwen3-coder-next',
+                    label: 'ollama-cloud · qwen3-coder-next',
+                },
+            },
+        });
         mockProjection({
             summary: {
                 ...BASE_PROJECTION.summary,
@@ -2088,10 +2099,10 @@ describe('terminal /byok command', () => {
                 providers: [],
                 models: [],
                 effectiveRoute: {
-                    providerId: 'ollama-cloud',
-                    providerModel: 'qwen3-coder-next',
-                    modelId: 'ollama-cloud:qwen3-coder-next',
-                    label: 'ollama-cloud · qwen3-coder-next',
+                    providerId: 'kilo-code',
+                    providerModel: 'kilo-auto/free',
+                    modelId: 'kilo-code:kilo-auto/free',
+                    label: 'kilo-code · kilo-auto/free',
                 },
             },
         });

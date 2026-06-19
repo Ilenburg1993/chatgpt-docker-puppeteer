@@ -61,6 +61,7 @@ export function getStatusSnapshot(ctx, host) {
         permissionMode: ctx.getPermissionModeSnapshot(),
         systemPromptBinding,
         systemPromptFreshness,
+        modelGatewayActiveRoute: state?.modelGatewayActiveRoute ?? null,
     });
     ctx.cacheStatusSnapshot(snapshot);
     return snapshot;
