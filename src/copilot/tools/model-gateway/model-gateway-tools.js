@@ -206,7 +206,23 @@ function asRecord(value) {
  * @returns {string | null}
  */
 function optionalToolString(value) {
-    return typeof value === 'string' && value.trim() ? value.trim() : null;
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    const sentinel = text.toLowerCase();
+    if (
+        !text ||
+        sentinel === '__unset__' ||
+        sentinel === '__none__' ||
+        sentinel === '__null__' ||
+        sentinel === 'null' ||
+        sentinel === 'undefined' ||
+        sentinel === 'none' ||
+        sentinel === 'n/a' ||
+        sentinel === 'na'
+    ) {
+        return null;
+    }
+    return text;
 }
 
 /**
@@ -502,8 +518,11 @@ export const modelGatewayOverviewTool = buildTool({
     schemaFailurePolicy: 'throw',
     requiresApproval: false,
     handler: async (args) => {
-        const overview = await createModelGatewayReadControlPlane().inspectOverview(args);
-        const targetRuntimeId = typeof args['runtimeId'] === 'string' ? args['runtimeId'] : null;
+        const targetRuntimeId = optionalToolString(args['runtimeId']);
+        const overview = await createModelGatewayReadControlPlane().inspectOverview({
+            ...args,
+            runtimeId: targetRuntimeId,
+        });
         const control = requireRuntimeControl();
         const runtime = control.readCapabilities(targetRuntimeId);
         const model = control.readStats(targetRuntimeId);
@@ -1123,7 +1142,13 @@ export const modelGatewayOperationStatusTool = buildTool({
     annotations: READ_ONLY_ANNOTATIONS,
     schemaFailurePolicy: 'throw',
     requiresApproval: false,
-    handler: async (args) => serializeResult(await createModelGatewayReadControlPlane().inspectOperation(args)),
+    handler: async (args) =>
+        serializeResult(
+            await createModelGatewayReadControlPlane().inspectOperation({
+                ...args,
+                operationId: optionalToolString(args['operationId']),
+            }),
+        ),
 });
 
 export const modelGatewayModelEvaluateTool = buildTool({
@@ -1384,7 +1409,8 @@ export const modelGatewayModelSwitchTool = buildTool({
     schemaFailurePolicy: 'throw',
     requiresApproval: true,
     handler: async (args) => {
-        const currentSnapshot = readOptionalRuntimeCurrentModel(args.runtimeId);
+        const targetRuntimeId = optionalToolString(args.runtimeId);
+        const currentSnapshot = readOptionalRuntimeCurrentModel(targetRuntimeId);
         const current = currentSnapshot.currentModel;
         if (args.mode === 'plan') {
             return serializeResult(
@@ -1393,7 +1419,7 @@ export const modelGatewayModelSwitchTool = buildTool({
                     status: 'planned',
                     dryRun: true,
                     data: {
-                        runtimeId: args.runtimeId,
+                        runtimeId: targetRuntimeId,
                         previousModel: current,
                         targetModel: args.modelId,
                         sameSessionRequired: true,
@@ -1421,7 +1447,7 @@ export const modelGatewayModelSwitchTool = buildTool({
                     ok: false,
                     status: 'confirmation_required',
                     data: {
-                        runtimeId: args.runtimeId,
+                        runtimeId: targetRuntimeId,
                         previousModel: current,
                         targetModel: args.modelId,
                         sameSessionRequired: true,
@@ -1446,7 +1472,7 @@ export const modelGatewayModelSwitchTool = buildTool({
             );
         }
         const control = requireRuntimeControl();
-        const projection = await control.switchModel(args.modelId, args.runtimeId ?? undefined, {
+        const projection = await control.switchModel(args.modelId, targetRuntimeId ?? undefined, {
             idempotencyKey: args.idempotencyKey,
             source: 'llm-b.model_gateway_model_switch',
         });
@@ -1505,6 +1531,7 @@ export const modelGatewayRouteSwitchTool = buildTool({
     schemaFailurePolicy: 'throw',
     requiresApproval: true,
     handler: async (args) => {
+        const targetRuntimeId = optionalToolString(args.runtimeId);
         const correlationId = createModelGatewaySameSessionRouteSwitchOperationId(args.idempotencyKey);
         if (args.mode === 'plan') {
             return serializeResult(
@@ -1513,7 +1540,7 @@ export const modelGatewayRouteSwitchTool = buildTool({
                     status: 'planned',
                     dryRun: true,
                     data: {
-                        runtimeId: args.runtimeId,
+                        runtimeId: targetRuntimeId,
                         route: args.route,
                         sameSessionRequired: true,
                         requiresNewSession: false,
@@ -1537,7 +1564,7 @@ export const modelGatewayRouteSwitchTool = buildTool({
                     ok: false,
                     status: 'confirmation_required',
                     data: {
-                        runtimeId: args.runtimeId,
+                        runtimeId: targetRuntimeId,
                         route: args.route,
                         sameSessionRequired: true,
                         requiresNewSession: false,
@@ -1559,7 +1586,7 @@ export const modelGatewayRouteSwitchTool = buildTool({
             );
         }
         const control = requireRuntimeControl();
-        const projection = await control.switchRoute(args.route, args.runtimeId ?? undefined, {
+        const projection = await control.switchRoute(args.route, targetRuntimeId ?? undefined, {
             idempotencyKey: args.idempotencyKey,
             timeoutMs: args.timeoutMs,
             source: 'llm-b.model_gateway_route_switch',

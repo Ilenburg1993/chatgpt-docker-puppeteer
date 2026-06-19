@@ -26,6 +26,7 @@ import { log } from '../ports/logging/index.js';
  *     meta?: { label?: string; description?: string },
  *   ) => Promise<void>;
  *   hasPendingQuestion?: () => boolean;
+ *   getDialogTurnQueueDepth?: () => number;
  * }} ModelGatewayTurnBoundaryContext
  *
  * @typedef {import('node:events').EventEmitter & {
@@ -54,15 +55,17 @@ import { log } from '../ports/logging/index.js';
 export function wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, options = {}) {
     const promote = options.promote ?? promoteModelGatewayDeferredRouteSwitchAtTurnBoundary;
     const source = options.source ?? 'agent.dialog_turn_end.model_gateway_route_promotion';
-    const turnBoundarySettleMs = Math.max(0, Math.min(Math.floor(options.turnBoundarySettleMs ?? 750), 5_000));
+    const turnBoundarySettleMs = Math.max(0, Math.min(Math.floor(options.turnBoundarySettleMs ?? 3_000), 10_000));
     let running = false;
     let rerunRequested = false;
     let disposed = false;
     let humanQuestionOpen = false;
     let awaitingPostQuestionTurnEnd = false;
 
-    const shouldDelayForHumanQuestion = () =>
-        humanQuestionOpen || awaitingPostQuestionTurnEnd || ctx.hasPendingQuestion?.() === true;
+    const shouldDelayPromotion = () => {
+        const queueDepth = ctx.getDialogTurnQueueDepth?.() ?? 0;
+        return humanQuestionOpen || awaitingPostQuestionTurnEnd || ctx.hasPendingQuestion?.() === true || queueDepth > 0;
+    };
 
     const schedule = () => {
         if (disposed) return;
@@ -76,7 +79,7 @@ export function wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, options = 
                 if (turnBoundarySettleMs > 0) {
                     await new Promise((resolve) => setTimeout(resolve, turnBoundarySettleMs));
                 }
-                if (disposed || shouldDelayForHumanQuestion()) return null;
+                if (disposed || shouldDelayPromotion()) return null;
                 const session = ctx.getSessionSnapshot();
                 if (!session?.sessionId) return null;
                 const result = await promote({

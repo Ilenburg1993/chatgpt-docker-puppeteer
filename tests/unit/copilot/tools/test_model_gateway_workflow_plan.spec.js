@@ -97,7 +97,9 @@ vi.mock('#copilot/model-gateway', () => ({
 
 const {
     modelGatewayControlPlaneGuideTool,
+    modelGatewayOverviewTool,
     modelGatewayReadTools,
+    modelGatewayRouteSwitchTool,
     modelGatewayRuntimeReconcileTool,
     modelGatewayTools,
     modelGatewayWorkflowPlanTool,
@@ -107,6 +109,11 @@ const {
 describe('model_gateway_workflow_plan', () => {
     afterEach(() => {
         setModelGatewayRuntimeControl(null);
+        inspectOverview.mockReset();
+        planRoute.mockReset();
+        evaluateModels.mockReset();
+        planProbes.mockReset();
+        planRefresh.mockReset();
         readSdkSessionHandoffRecord.mockReset();
         readCapabilities.mockReset();
         readStats.mockReset();
@@ -155,6 +162,122 @@ describe('model_gateway_workflow_plan', () => {
         expect(parsed.data.terminalCommands).toContain('/session sdk');
         expect(JSON.stringify(parsed)).not.toContain('"apiKey":');
         expect(JSON.stringify(parsed)).not.toContain('"requiresNewSession":true');
+    });
+
+    it.each(['__UNSET__', '__none__'])(
+        'normaliza runtimeId %s como runtime default no overview',
+        async (runtimeId) => {
+        inspectOverview.mockResolvedValue(
+            result({
+                operation: 'overview',
+                data: { readiness: { ok: true } },
+            }),
+        );
+        readCapabilities.mockReturnValue({
+            capabilities: [
+                {
+                    id: 'sdk.same-session-route-reattach',
+                    available: true,
+                    state: 'ready',
+                },
+            ],
+        });
+        readStats.mockReturnValue({ currentModel: 'kilo-auto/free', stats: {} });
+        setModelGatewayRuntimeControl({ readCapabilities, readStats, switchModel, switchRoute });
+
+        const raw = await modelGatewayOverviewTool.handler({
+            runtimeId,
+            maxSnapshotAgeHours: 720,
+            operationLimit: 10,
+        });
+        const parsed = JSON.parse(String(raw));
+
+        expect(inspectOverview).toHaveBeenCalledWith(
+            expect.objectContaining({
+                runtimeId: null,
+                maxSnapshotAgeHours: 720,
+                operationLimit: 10,
+            }),
+        );
+        expect(readCapabilities).toHaveBeenCalledWith(null);
+        expect(readStats).toHaveBeenCalledWith(null);
+        expect(parsed).toMatchObject({
+            ok: true,
+            operation: 'overview',
+            data: {
+                runtime: {
+                    model: {
+                        currentModel: 'kilo-auto/free',
+                    },
+                },
+            },
+            errors: [],
+        });
+        expect(JSON.stringify(parsed)).not.toContain(runtimeId);
+        },
+    );
+
+    it('normaliza runtimeId __none__ antes de aplicar route_switch same-session', async () => {
+        const route = {
+            providerId: 'ollama-cloud',
+            providerModel: 'qwen3-coder-next',
+            selectorSyntax: 'qwen3-coder-next',
+            baseUrl: 'https://ollama.com/v1',
+            openAICompatibleBaseUrl: 'https://ollama.com/v1',
+            wireApi: 'completions',
+            providerProfile: 'ollama-cloud',
+            routeProfile: 'live_minimal_provider_switch',
+            selectedRouteKey: 'live-route-minimal:ollama-cloud:qwen3-coder-next',
+        };
+        switchRoute.mockResolvedValue({
+            runtimeId: null,
+            previousRoute: { providerId: 'kilo-code', providerModel: 'kilo-auto/free' },
+            currentRoute: route,
+            operation: {
+                operationId: 'same-session-route-switch:live-route-minimal',
+                state: 'deferred_until_turn_boundary',
+                deferReason: 'ACTIVE_DIALOG_LOOP_ROUTE_REATTACH_DEFERRED',
+                requiresNewSession: false,
+                targetRoute: route,
+            },
+        });
+        setModelGatewayRuntimeControl({ readCapabilities, readStats, switchModel, switchRoute });
+
+        const raw = await modelGatewayRouteSwitchTool.handler({
+            mode: 'apply',
+            route,
+            runtimeId: '__none__',
+            timeoutMs: 60000,
+            idempotencyKey: 'live-route-minimal:route-switch-ollama-cloud',
+            confirm: true,
+        });
+        const parsed = JSON.parse(String(raw));
+
+        expect(switchRoute).toHaveBeenCalledWith(
+            route,
+            undefined,
+            expect.objectContaining({
+                idempotencyKey: 'live-route-minimal:route-switch-ollama-cloud',
+                timeoutMs: 60000,
+            }),
+        );
+        expect(parsed).toMatchObject({
+            ok: true,
+            operation: 'route.switch',
+            status: 'accepted_for_turn_boundary',
+            data: {
+                runtimeId: null,
+                sameSessionRequired: true,
+                requiresNewSession: false,
+                automaticContinuation: {
+                    armed: true,
+                    owner: 'agent_runtime',
+                    trigger: 'dialog.turn_end',
+                },
+            },
+            errors: [],
+        });
+        expect(JSON.stringify(parsed)).not.toContain('__none__');
     });
 
     it('gera DAG same-session com probes antes de route switch confirmado', async () => {

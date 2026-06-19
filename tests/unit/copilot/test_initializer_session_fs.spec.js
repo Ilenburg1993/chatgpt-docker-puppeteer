@@ -275,6 +275,46 @@ describe('agent/session/initializer — sessionFs wiring', () => {
         );
     });
 
+    it('não reaproveita modelo concreto antigo quando next boot força sessão nova', async () => {
+        const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
+        mocks.readState.mockResolvedValueOnce({
+            sessionId: 'old-sess',
+            model: 'qwen3-coder-next',
+            startedAt: Date.now(),
+            resumedAt: Date.now(),
+            resumeCount: 3,
+            nextSdkSessionBoot: { mode: 'new' },
+        });
+        mocks.resumeOrCreateAgentSdkSession.mockResolvedValueOnce({
+            session: { sessionId: 'fresh-sess' },
+            isResumed: false,
+        });
+
+        const result = await initOrResumeSession(/** @type {any} */ ({}), {
+            model: 'kilo-auto/free',
+            reasoningEffort: 'high',
+        });
+
+        expect(mocks.resumeOrCreateAgentSdkSession).toHaveBeenCalledWith(
+            expect.anything(),
+            null,
+            expect.objectContaining({ model: 'kilo-auto/free' }),
+        );
+        expect(mocks.persistState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model: 'kilo-auto/free',
+                sdkSessionBootDecision: expect.objectContaining({
+                    outcome: 'created',
+                    requestedMode: 'new',
+                    reason: 'operator-next-boot-new-session',
+                }),
+                nextSdkSessionBoot: null,
+            }),
+            expect.objectContaining({ label: 'session.initializer.create' }),
+        );
+        expect(result).toEqual(expect.objectContaining({ model: 'kilo-auto/free' }));
+    });
+
     it('preserva model auto nativo ao retomar sessão com modelo concreto persistido', async () => {
         const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
         mocks.readState.mockResolvedValueOnce({

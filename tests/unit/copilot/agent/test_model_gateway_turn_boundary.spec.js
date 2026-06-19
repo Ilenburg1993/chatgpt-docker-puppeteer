@@ -42,7 +42,7 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
         });
         host.switchRoute.mockResolvedValue({ operation: { state: 'committed', sessionId: 'session-stable' } });
 
-        const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, { promote });
+        const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, { promote, turnBoundarySettleMs: 0 });
         expect(promote).not.toHaveBeenCalled();
 
         host.emit('dialog.turn_end', { durationMs: 100 });
@@ -79,7 +79,7 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
             },
         };
         const promote = vi.fn();
-        const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, { promote });
+        const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, { promote, turnBoundarySettleMs: 0 });
 
         host.emit('dialog.turn_end', {});
         await vi.waitFor(() => expect(tracked).toHaveLength(1));
@@ -132,6 +132,47 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
         dispose();
     });
 
+    it('adia promoção quando uma continuação já está enfileirada no limite do turno', async () => {
+        const host = new TestHost();
+        const tracked = [];
+        let queueDepth = 0;
+        const ctx = {
+            getSessionSnapshot: () => ({ sessionId: 'session-stable' }),
+            getDialogTurnQueueDepth: () => queueDepth,
+            trackBackgroundTask: async (task) => {
+                tracked.push(task);
+                await task;
+            },
+        };
+        const promote = vi.fn().mockResolvedValue({
+            sessionId: 'session-stable',
+            scanned: 1,
+            promoted: 1,
+            superseded: 0,
+            skipped: 0,
+            errors: 0,
+            records: [],
+        });
+        const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, {
+            promote,
+            turnBoundarySettleMs: 20,
+        });
+
+        host.emit('dialog.turn_end', { durationMs: 100 });
+        queueDepth = 1;
+        await vi.waitFor(() => expect(tracked).toHaveLength(1));
+        await Promise.all(tracked.splice(0));
+
+        expect(promote).not.toHaveBeenCalled();
+
+        queueDepth = 0;
+        host.emit('dialog.turn_end', { durationMs: 20 });
+        await vi.waitFor(() => expect(promote).toHaveBeenCalledTimes(1));
+        await Promise.all(tracked);
+
+        dispose();
+    });
+
     it('remove o listener ao descartar o scheduler', async () => {
         const host = new TestHost();
         const ctx = {
@@ -139,7 +180,7 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
             trackBackgroundTask: async (task) => void (await task),
         };
         const promote = vi.fn();
-        const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, { promote });
+        const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, { promote, turnBoundarySettleMs: 0 });
         dispose();
 
         host.emit('dialog.turn_end', {});

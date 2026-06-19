@@ -740,6 +740,10 @@ export class AgentContext {
     getDialogLoopManagerSnapshot() {
         return this.dialogLoop;
     }
+    getDialogTurnQueueDepth() {
+        const depth = this.dialogLoop?.queueDepth;
+        return typeof depth === 'number' && Number.isFinite(depth) ? depth : 0;
+    }
     /** @param {import('./types.js').DialogLoopHost} host */
     attachDialogLoop(host) {
         this.dialogLoop.attach(host);

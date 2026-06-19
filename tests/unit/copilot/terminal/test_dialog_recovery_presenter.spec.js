@@ -9,6 +9,7 @@ import {
     EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,
     buildEmptyAfterUserInputAutoRecoveryRows,
     buildEmptyAfterUserInputRecoveryRows,
+    buildEmptyAfterUserInputResumeMessage,
     summarizeAfterUserInputContinuation,
     summarizeEmptyAfterUserInputRecovery,
 } from '../../../../src/copilot/terminal/events/dialog-recovery-presenter.js';
@@ -80,5 +81,25 @@ describe('terminal/events/dialog-recovery-presenter', () => {
         expect(text).toContain('Turno: turno 3');
         expect(text).toContain(`Diagnóstico: ${EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS}`);
         expect(text).toContain('Se repetir: /byok model para trocar modelo');
+    });
+
+    it('monta prompt de recuperação pós-ask com pergunta e resposta para preservar marcador final', () => {
+        const message = buildEmptyAfterUserInputResumeMessage({
+            question: 'ASK-MODEL-GATEWAY-ROUTE-APPLY: responda SIM depois do route_switch mínimo',
+            answer: 'SIM',
+        });
+
+        expect(message).toContain('RECUPERACAO POS-ASK_USER DO TERMINAL');
+        expect(message).toContain(EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE);
+        expect(message).toContain(
+            'Pergunta humana respondida: "ASK-MODEL-GATEWAY-ROUTE-APPLY: responda SIM depois do route_switch mínimo".',
+        );
+        expect(message).toContain('Resposta humana registrada: "SIM".');
+        expect(message).toContain('Nao repita ask_user');
+        expect(message).toContain('marcador ou frase final pos-resposta');
+    });
+
+    it('mantém prompt legado quando não há contexto de pergunta humana', () => {
+        expect(buildEmptyAfterUserInputResumeMessage()).toBe(EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE);
     });
 });

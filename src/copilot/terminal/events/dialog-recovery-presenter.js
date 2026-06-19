@@ -30,6 +30,30 @@ export function compactTerminalRecoveryText(value, maxLength = 120) {
 
 /**
  * @param {{
+ *     question?: unknown;
+ *     answer?: unknown;
+ * }} [input]
+ * @returns {string}
+ */
+export function buildEmptyAfterUserInputResumeMessage(input = {}) {
+    const question = compactTerminalRecoveryText(input.question, 220);
+    const answer = compactTerminalRecoveryText(input.answer, 120);
+    if (!question && !answer) return EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE;
+    return [
+        'RECUPERACAO POS-ASK_USER DO TERMINAL:',
+        EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,
+        question ? `Pergunta humana respondida: "${question}".` : null,
+        answer ? `Resposta humana registrada: "${answer}".` : null,
+        'Nao repita ask_user, nao repita tools ja concluidas e nao explique a recuperacao.',
+        'Continue exatamente o passo posterior a resposta humana conforme a solicitacao original.',
+        'Se a solicitacao original especificou um marcador ou frase final pos-resposta, escreva somente esse texto publico agora e pare.',
+    ]
+        .filter(Boolean)
+        .join('\n');
+}
+
+/**
+ * @param {{
  *     detail?: unknown;
  *     answerPreview?: unknown;
  *     turnId?: unknown;

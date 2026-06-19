@@ -120,13 +120,29 @@ function hasHumanTerminalShutdownCopy(plain) {
 }
 
 function buildTerminalLlmbCommand(canUsePty) {
+    const bootstrapArgs = [
+        '--disable-warning=ExperimentalWarning',
+        '--strip-types',
+        'src/copilot/terminal/bootstrap.js',
+    ];
     if (canUsePty) {
         return {
             cmd: 'script',
-            args: ['-qfec', 'npm --silent run terminal:llm-b', '/dev/null'],
+            args: ['-qfec', `node ${bootstrapArgs.join(' ')}`, '/dev/null'],
         };
     }
-    return { cmd: 'npm', args: ['--silent', 'run', 'terminal:llm-b'] };
+    return { cmd: process.execPath, args: bootstrapArgs };
+}
+
+function appendCsvEnvValue(name, value) {
+    const entries = new Set(
+        String(process.env[name] ?? '')
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean),
+    );
+    entries.add(value);
+    return [...entries].join(',');
 }
 
 function canListenOnPort(port, host = '127.0.0.1') {
@@ -603,8 +619,8 @@ const LIVE_SCENARIOS = Object.freeze({
             'Critério obrigatório de continuidade: não escreva DELTA-CANONICAL e não chame ask_user enquanto não tiver observado o retorno de sucesso das seis chamadas Model Gateway listadas abaixo. Se qualquer chamada for pulada, o teste deve ser considerado falho.',
             '1) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=10.',
             '2) model_gateway_operation_status com operationId=null, limit=10.',
-            `3) model_gateway_route_switch com mode="plan", route={providerId:"ollama-cloud", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_minimal_provider_switch", selectedRouteKey:"live-route-minimal:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY}", confirm=false.`,
-            `4) model_gateway_route_switch com mode="apply", route={providerId:"ollama-cloud", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_minimal_provider_switch", selectedRouteKey:"live-route-minimal:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY}", confirm=true.`,
+            `3) model_gateway_route_switch com mode="plan", route={providerId:"ollama-cloud", providerType:"openai", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", openAICompatible:true, wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_minimal_provider_switch", selectedRouteKey:"live-route-minimal:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY}", confirm=false.`,
+            `4) model_gateway_route_switch com mode="apply", route={providerId:"ollama-cloud", providerType:"openai", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", openAICompatible:true, wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_minimal_provider_switch", selectedRouteKey:"live-route-minimal:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY}", confirm=true.`,
             '5) model_gateway_operation_status com operationId=null, limit=10.',
             '6) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=10.',
             'Aguarde o route_switch apply e as inspeções finais concluírem e só então escreva as oito linhas DELTA-CANONICAL.',
@@ -642,7 +658,6 @@ const LIVE_SCENARIOS = Object.freeze({
             },
         ],
         postAnswerCommands: [
-            `/byok provider ollama-cloud qwen3-coder-next https://ollama.com/v1 wire:completions idempotency:${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY} force-deferred`,
             '/byok',
             '/activity 40',
         ],
@@ -652,7 +667,7 @@ const LIVE_SCENARIOS = Object.freeze({
             'deferred_until_turn_boundary',
             'same_session',
         ],
-        expectedPlainOutputMarkers: ['rota viva confirmada na mesma sessão: ollama-cloud/qwen3-coder-next'],
+        expectedPlainOutputMarkers: ['Rota efetiva  ollama-cloud · qwen3-coder-next'],
     }),
     'model-gateway-admin-apply': createLiveScenario({
         id: 'model-gateway-admin-apply',
@@ -740,6 +755,9 @@ function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]
         'Cada uma dessas oito linhas deve conter somente o marcador exato da linha; por exemplo, a primeira linha deve ser exatamente "DELTA-CANONICAL-1" e nada mais.',
         'Essas oito linhas DELTA-CANONICAL devem ser texto puro: não use Markdown, HTML, links, imagens, tabelas, listas ou blocos de código nelas.',
         'Não invoque ask_user antes dessas 8 linhas públicas aparecerem no transcript.',
+        'A etapa dos deltas e a etapa ask_user são separadas: depois da última tool obrigatória, sua próxima saída pública deve conter somente as oito linhas DELTA-CANONICAL; só depois disso, em continuação posterior, invoque ask_user.',
+        'Não use contexto, descrição, prePublicResponse, texto da pergunta ou qualquer campo de ask_user como substituto para as oito linhas públicas DELTA-CANONICAL.',
+        'Se você chamar ask_user antes dessas oito linhas públicas, o teste falha mesmo que todas as tools tenham concluído.',
         scenario.askToolInstruction,
         scenario.finalInstruction,
         'Depois do marcador final, pare imediatamente: não chame outra ferramenta, não escreva outra mensagem e aguarde o próximo comando humano.',
@@ -1797,8 +1815,10 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
         cwd: ROOT,
         env: {
             ...process.env,
+            COPILOT_LOG_LEVEL: 'INFO',
             COPILOT_MODEL: LIVE_TEST_COPILOT_MODEL,
             COPILOT_REASONING_EFFORT: 'high',
+            COPILOT_SDK_EXCLUDED_TOOLS: appendCsvEnvValue('COPILOT_SDK_EXCLUDED_TOOLS', 'session_compact'),
             TERMINAL_DISPLAY_PRESET: process.env.TERMINAL_DISPLAY_PRESET ?? 'default',
             COPILOT_SDK_ENABLED: 'true',
             COPILOT_OPERATIONAL_PROFILE: 'production',
@@ -2319,8 +2339,10 @@ async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, t
         cwd: ROOT,
         env: {
             ...process.env,
+            COPILOT_LOG_LEVEL: 'INFO',
             COPILOT_MODEL: LIVE_TEST_COPILOT_MODEL,
             COPILOT_REASONING_EFFORT: 'high',
+            COPILOT_SDK_EXCLUDED_TOOLS: appendCsvEnvValue('COPILOT_SDK_EXCLUDED_TOOLS', 'session_compact'),
             TERMINAL_DISPLAY_PRESET: process.env.TERMINAL_DISPLAY_PRESET ?? 'default',
             COPILOT_SDK_ENABLED: 'true',
             COPILOT_OPERATIONAL_PROFILE: 'production',
@@ -4097,8 +4119,33 @@ function liveScenarioKind({
 async function scheduleFreshSdkSessionForCanonicalScenario({ enabled }) {
     if (!enabled) return { attempted: false, ok: true, reason: 'disabled' };
     try {
-        const { scheduleAgentSdkSessionBootSelection } =
-            await import('../../../src/copilot/presentation/runtime/sdk-session.js');
+        const [{ scheduleAgentSdkSessionBootSelection }, { persistAgentRuntimeStatePartial }] = await Promise.all([
+            import('../../../src/copilot/presentation/runtime/sdk-session.js'),
+            import('../../../src/copilot/agent/facades/agent-runtime-state.js'),
+        ]);
+        const clearedBinding = await persistAgentRuntimeStatePartial(
+            {
+                model: LIVE_TEST_COPILOT_MODEL,
+                byokSessionBinding: null,
+                modelGatewayActiveRoute: null,
+                sdkSessionBootDecision: null,
+            },
+            { label: 'terminal-live.canonical.fresh_session_binding_reset' },
+        );
+        if (clearedBinding?.ok === false) {
+            return {
+                attempted: true,
+                ok: false,
+                reason:
+                    clearedBinding.error instanceof Error
+                        ? clearedBinding.error.message
+                        : 'fresh-session-binding-reset-failed',
+                result: {
+                    bindingReset: { ok: false },
+                    persistedSelection: null,
+                },
+            };
+        }
         const result = await scheduleAgentSdkSessionBootSelection({ mode: 'new' });
         const resultValue = result && typeof result === 'object' ? result.value : null;
         const persistedSelection =
@@ -4107,6 +4154,7 @@ async function scheduleFreshSdkSessionForCanonicalScenario({ enabled }) {
                 : null;
         const resultSummary = {
             ok: result?.ok !== false,
+            bindingReset: { ok: true },
             persistedSelection,
         };
         if (result?.ok === false) {
@@ -7674,6 +7722,7 @@ async function main() {
     let missingRequiredAskRecoverySent = false;
     let missingRequiredAskRecoveryPlainOffset = 0;
     let incompleteExpectedToolRecoverySent = false;
+    let incompleteExpectedToolRecoveryPlainOffset = 0;
     let forcedKillTimer = null;
     const command = buildTerminalLlmbCommand(canUsePty);
 
@@ -7685,8 +7734,10 @@ async function main() {
             ...(byokFixture ? buildByokFixtureEnv({ baseUrl: byokFixtureBaseUrl }) : {}),
             ...(modelControlProbe ? { COPILOT_BYOK_ENABLED: 'false' } : {}),
             ...(realByok?.env ?? {}),
-            COPILOT_MODEL: 'auto',
+            COPILOT_LOG_LEVEL: 'INFO',
+            COPILOT_MODEL: LIVE_TEST_COPILOT_MODEL,
             COPILOT_REASONING_EFFORT: 'high',
+            COPILOT_SDK_EXCLUDED_TOOLS: appendCsvEnvValue('COPILOT_SDK_EXCLUDED_TOOLS', 'session_compact'),
             TERMINAL_DISPLAY_PRESET: process.env.TERMINAL_DISPLAY_PRESET ?? 'default',
             COPILOT_SDK_ENABLED: 'true',
             COPILOT_OPERATIONAL_PROFILE: 'production',
@@ -7918,6 +7969,11 @@ async function main() {
         console.warn('[terminal-live] cenário canônico: coletando diagnósticos após ask_user prematuro.');
         sendAskBeforeDeltasDiagnostics();
     };
+    const clearMissingRequiredAskDiagnosticTimer = () => {
+        if (!missingRequiredAskDiagnosticTimer) return;
+        clearTimeout(missingRequiredAskDiagnosticTimer);
+        missingRequiredAskDiagnosticTimer = null;
+    };
     const scheduleMissingRequiredAskDiagnostics = ({ delayMs = DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS } = {}) => {
         if (postCommandsSent || missingRequiredAskDiagnosticTimer) return;
         missingRequiredAskDiagnosticTimer = setTimeout(() => {
@@ -7954,6 +8010,8 @@ async function main() {
     const sendIncompleteExpectedToolRecovery = (incomplete) => {
         if (postCommandsSent || answerSent || incompleteExpectedToolRecoverySent || !incomplete) return;
         incompleteExpectedToolRecoverySent = true;
+        incompleteExpectedToolRecoveryPlainOffset = stripAnsi(raw).length;
+        clearMissingRequiredAskDiagnosticTimer();
         console.warn(
             `[terminal-live] cenário canônico: tools esperadas incompletas (${incomplete.missing.join(', ')}); enviando continuação controlada.`,
         );
@@ -8042,6 +8100,7 @@ async function main() {
         if (isFinalAnswer) {
             answerSent = true;
             answerPlainOffset = plain.length;
+            clearMissingRequiredAskDiagnosticTimer();
             armRunnerTimeout(
                 Math.max(60_000, postAskContinuationWaitMs + postAnswerDelayMs + 30_000),
                 'post-ask-continuation',
@@ -8175,10 +8234,7 @@ async function main() {
                 scheduleIncompleteExpectedToolDiagnostics(incompleteExpectedTools);
                 return;
             }
-            if (missingRequiredAskDiagnosticTimer) {
-                clearTimeout(missingRequiredAskDiagnosticTimer);
-                missingRequiredAskDiagnosticTimer = null;
-            }
+            clearMissingRequiredAskDiagnosticTimer();
             sendScenarioAnswerStep(plain, liveScenario.answerSteps[0]);
         }
         if (
@@ -8203,6 +8259,7 @@ async function main() {
         const afterAnswerPlain = answerSent ? plain.slice(answerPlainOffset) : '';
         if (answerSent && !postAskContinuationObserved && liveScenario.postAskFinalRe.test(afterAnswerPlain)) {
             postAskContinuationObserved = true;
+            clearMissingRequiredAskDiagnosticTimer();
         }
         if (postAskContinuationObserved && !postCommandsSent && TURN_SETTLED_AFTER_ASK_RE.test(afterAnswerPlain)) {
             schedulePostAnswerDiagnostics(500);
@@ -8216,9 +8273,17 @@ async function main() {
             ).unref();
         }
         const scenarioTailPlain = scenarioSent ? plain.slice(scenarioPlainOffset) : '';
-        const incompleteExpectedToolsAfterPrompt =
-            scenarioSent && !answerSent && !postCommandsSent && !incompleteExpectedToolRecoverySent
+        const missingRequiredAskTailPlain =
+            incompleteExpectedToolRecoveryPlainOffset > 0
+                ? plain.slice(incompleteExpectedToolRecoveryPlainOffset)
+                : scenarioTailPlain;
+        const incompleteExpectedToolsCurrent =
+            scenarioSent && !answerSent && !postCommandsSent
                 ? findIncompleteExpectedToolChain(sseCollector?.events ?? [], liveScenario)
+                : null;
+        const incompleteExpectedToolsAfterPrompt =
+            !incompleteExpectedToolRecoverySent && incompleteExpectedToolsCurrent
+                ? incompleteExpectedToolsCurrent
                 : null;
         if (
             scenarioSent &&
@@ -8252,8 +8317,13 @@ async function main() {
             scenarioSent &&
             !answerSent &&
             !postCommandsSent &&
+            !incompleteExpectedToolsCurrent &&
             (!missingRequiredAskRecoverySent
-                ? findAssistantEndedBeforeRequiredAsk(scenarioTailPlain, liveScenario, sseCollector?.events ?? [])
+                ? findAssistantEndedBeforeRequiredAsk(
+                      missingRequiredAskTailPlain,
+                      liveScenario,
+                      sseCollector?.events ?? [],
+                  )
                 : findAssistantEndedAfterAskRecoveryWithoutAsk(
                       plain.slice(missingRequiredAskRecoveryPlainOffset),
                       liveScenario,

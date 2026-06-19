@@ -333,6 +333,18 @@ function getHookAgentName(input, invocation) {
 }
 
 /**
+ * @param {string | undefined} value
+ * @returns {string[]}
+ */
+function parseExtraExcludedToolsEnv(value) {
+    if (typeof value !== 'string' || value.trim().length === 0) return [];
+    return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+/**
  * Constrói as opções de sessão SDK incluindo onUserInputRequest wiring.
  *
  * @param {SessionSetupContext} ctx
@@ -346,9 +358,10 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
     const bootConfig = readCopilotBootConfig();
     const byok = resolveConfiguredByokSessionOverrides(process.env, ctx.getModelSnapshot());
     const model = byok.enabled && byok.model ? byok.model : ctx.getModelSnapshot();
+    const extraExcludedTools = parseExtraExcludedToolsEnv(process.env['COPILOT_SDK_EXCLUDED_TOOLS']);
     const excludedTools = buildCanonicalLocalSurfaceExcludedTools(
         tools.map((tool) => tool.name),
-        DEFAULT_EXCLUDED_TOOLS,
+        [...DEFAULT_EXCLUDED_TOOLS, ...extraExcludedTools],
     );
     bindAgentSessionExcludedTools(excludedTools);
 

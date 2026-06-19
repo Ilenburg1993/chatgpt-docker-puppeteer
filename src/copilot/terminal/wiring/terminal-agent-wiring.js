@@ -37,8 +37,8 @@ import {
 } from '../dialog/index.js';
 import {
     buildEmptyAfterUserInputAutoRecoveryRows,
+    buildEmptyAfterUserInputResumeMessage,
     buildEmptyAfterUserInputRecoveryRows,
-    EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
     isTerminalAssistantTranscriptCovered,
@@ -58,6 +58,7 @@ import {
 import { markTerminalActivityIdle, readTerminalActivitySnapshot, recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
 import { terminalThemeBadge, terminalThemeHeadline, terminalThemeRow } from '../state/events/index.js';
 import { shouldSuppressTerminalAssistantMessageAsMaterializedTurn, withTerminalTurnCorrelation } from '../state/events/index.js';
+import { readTerminalUserInputSummary } from '../state/index.js';
 import { drainMailboxToTurnIfIdle } from './mailbox-drain.js';
 
 /** @type {boolean} */
@@ -524,7 +525,7 @@ export function registerAgentEventListeners(printBanner) {
     let lastStreamingReportAt = 0;
     /** @type {{ active: boolean; reason: string; at: number } | null} */
     let lastDialogLoopChangedSse = null;
-    /** @type {{ at: number; answerPreview: string | null; requestId: string | null } | null} */
+    /** @type {{ at: number; answerPreview: string | null; answer: string | null; question: string | null; requestId: string | null } | null} */
     let lastUserInputCompleted = null;
     /** @type {Set<string>} */
     const emptyAfterUserInputAutoRecoveryKeys = new Set();
@@ -540,9 +541,22 @@ export function registerAgentEventListeners(printBanner) {
         ) => {
             const at = typeof evt.timestamp === 'number' && Number.isFinite(evt.timestamp) ? evt.timestamp : Date.now();
             const answer = typeof evt.answer === 'string' && evt.answer.trim().length > 0 ? evt.answer.trim() : null;
+            const userInputSummary = readTerminalUserInputSummary();
+            const latestUserInput =
+                userInputSummary.latest &&
+                (!evt.requestId ||
+                    userInputSummary.latest.requestId === evt.requestId ||
+                    userInputSummary.latest.id === evt.requestId)
+                    ? userInputSummary.latest
+                    : null;
             lastUserInputCompleted = {
                 at,
                 answerPreview: answer ? answer.slice(0, 80) : null,
+                answer,
+                question:
+                    typeof latestUserInput?.question === 'string' && latestUserInput.question.trim().length > 0
+                        ? latestUserInput.question.trim()
+                        : null,
                 requestId: typeof evt.requestId === 'string' && evt.requestId.trim().length > 0 ? evt.requestId.trim() : null,
             };
         },
@@ -623,6 +637,10 @@ export function registerAgentEventListeners(printBanner) {
                             source: 'dialog.turn_end',
                             updateCurrent: false,
                         });
+                        const resumeMessage = buildEmptyAfterUserInputResumeMessage({
+                            question: lastUserInputCompleted?.question,
+                            answer: lastUserInputCompleted?.answer,
+                        });
                         broadcastSse(
                             'dialog.empty_after_user_input.auto_recovery',
                             withTerminalAgentSseEnvelope(
@@ -631,7 +649,7 @@ export function registerAgentEventListeners(printBanner) {
                                     detail,
                                     requestId: lastUserInputCompleted?.requestId ?? null,
                                     recoveryKey: autoRecovery.key,
-                                    resumeMessage: EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,
+                                    resumeMessage,
                                 },
                                 'terminal-agent-wiring/dialog.empty_after_user_input.auto_recovery',
                             ),
@@ -657,7 +675,7 @@ export function registerAgentEventListeners(printBanner) {
                             );
                         };
                         setImmediate(() => {
-                            void sendTurn(EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE, 'user')
+                            void sendTurn(resumeMessage, 'user')
                                 .then((result) => {
                                     if (result === null) {
                                         reportAutoRecoveryFailure('continuação automática não retornou resposta');

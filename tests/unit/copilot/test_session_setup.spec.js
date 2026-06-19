@@ -82,6 +82,7 @@ describe('session-setup (F63)', () => {
         COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
         COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
         COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
+        COPILOT_SDK_EXCLUDED_TOOLS: process.env.COPILOT_SDK_EXCLUDED_TOOLS,
     };
 
     /** @type {any} */
@@ -94,6 +95,7 @@ describe('session-setup (F63)', () => {
         process.env.COPILOT_BYOK_ENABLED = 'false';
         delete process.env.COPILOT_BYOK_PROVIDER_PRESET;
         delete process.env.COPILOT_BYOK_MODEL;
+        delete process.env.COPILOT_SDK_EXCLUDED_TOOLS;
         ctx = {
             messagesCache: { invalidate: vi.fn() },
             toolsRegistry: null,
@@ -275,6 +277,16 @@ describe('session-setup (F63)', () => {
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
 
             expect(options.excludedTools).toEqual(['glob', 'view']);
+        });
+
+        it('inclui denylist extra de tools da sessão via COPILOT_SDK_EXCLUDED_TOOLS', () => {
+            process.env.COPILOT_SDK_EXCLUDED_TOOLS = 'session_compact, custom_tool';
+            const tools = /** @type {any} */ ([{ name: 'read_file_content' }]);
+            const busHooks = /** @type {any} */ ({ mock: true });
+
+            const options = buildSessionOptions(ctx, host, { tools, busHooks });
+
+            expect(options.excludedTools).toEqual(expect.arrayContaining(['custom_tool', 'session_compact']));
         });
 
         it('omite reasoningEffort quando o modelo não suporta a capability e normaliza o ctx', () => {

@@ -25,6 +25,7 @@ export {
     AFTER_USER_INPUT_CONTINUATION_DIAGNOSTIC_COMMANDS,
     buildEmptyAfterUserInputAutoRecoveryRows,
     buildEmptyAfterUserInputRecoveryRows,
+    buildEmptyAfterUserInputResumeMessage,
     compactTerminalRecoveryText,
     summarizeAfterUserInputContinuation,
     summarizeEmptyAfterUserInputRecovery,

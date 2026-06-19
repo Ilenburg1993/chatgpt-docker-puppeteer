@@ -989,7 +989,9 @@ export async function initOrResumeSession(client, sessionOptions) {
 
     const requestedNativeAutoModel = model === 'auto';
     const persistedConcreteModel =
-        !requestedNativeAutoModel && typeof state?.model === 'string' && state.model !== 'auto' ? state.model : null;
+        result.isResumed && !requestedNativeAutoModel && typeof state?.model === 'string' && state.model !== 'auto'
+            ? state.model
+            : null;
     const effectiveModel = requestedNativeAutoModel
         ? 'auto'
         : typeof result.model === 'string'
