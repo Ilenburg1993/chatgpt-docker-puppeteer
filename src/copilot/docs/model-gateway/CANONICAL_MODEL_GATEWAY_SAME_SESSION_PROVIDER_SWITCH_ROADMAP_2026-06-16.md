@@ -147,6 +147,22 @@ qualquer desvio de identidade
   `artifacts/terminal-live/2026-06-18T00-llmb-route-apply-minimal-ask-boundary-fix/summary.md`.
 - [x] `/health full` no live corrigido alinhou prompt, BYOK e Gateway em `ollama-cloud/qwen3-coder-next`, com
   raciocinio SDK-facing desligado.
+- [x] Live LLM-B repetido em 2026-06-19 apos a correcao de timeline terminou `BLOCKED` por `live-timeout` antes de
+  `ask_user`/export, mas reduziu um gap novo: a LLM-B agrupou `model_gateway_overview`,
+  `model_gateway_operation_status` e `model_gateway_route_switch:plan` no mesmo tool-use batch; o SDK registrou
+  `tool.execution_start` e `preToolUse` OK, mas nao materializou `external_tool.requested`/`tool.execution_complete`
+  antes do timeout. Repro local dos tres handlers instrumentados em paralelo retornou em ~170ms, entao a falha ficou no
+  contrato live/SDK de lote paralelo, nao no backend das tools.
+  Artefato: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-timeline-rerun/summary.md`.
+- [x] Live LLM-B serializado em 2026-06-19 terminou `PASS` com tools Model Gateway chamadas uma por vez, `ask_user`,
+  resposta humana, final marker, rota viva confirmada e export criado. Esse run ainda foi antes do ajuste de
+  reconciliação intercalável e, por isso, o Markdown dele ainda mostrou `timeline=mixed/diverged`.
+  Artefato: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-serialized-rerun/summary.md`.
+- [x] Live LLM-B posterior ao ajuste de reconciliação intercalável gerou export Markdown com
+  `timeline=mixed/bridge_tail · sync=scheduled`, provando a correção do cabeçalho de export para ask/answer/postAsk com
+  Hub persistido + cauda viva. Esse run nao substitui o PASS de rota porque a LLM-B pulou as tools Model Gateway, e o
+  harness o marcou `FAIL` nos criterios de scenario tools.
+  Artefato: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-reconciled-export-rerun/summary.md`.
 - [x] Checkpoint amplo pos-correcao passou:
   - `npm run typecheck:strict:src.copilot`;
   - `npm run lint:copilot`;
@@ -355,6 +371,10 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [x] Provar deferimento same-session e mudanca para `ollama-cloud/qwen3-coder-next`.
 - [x] Fazer o mesmo cenario terminar PASS com `ask_user` e final marker.
 - [x] Capturar e corrigir a falha BYOK pos-reattach causada por reasoning effort indevido e promocao na janela humana.
+- [x] Endurecer o prompt do live route apply minimal para exigir serializacao: no maximo uma tool `model_gateway_*` por
+  resposta de ferramenta do SDK, aguardando o resultado antes da proxima.
+- [x] Reexecutar o live route apply minimal com serializacao observada no transcript, sem lote paralelo misto.
+- [ ] Fazer um run unico combinado que termine `PASS` e exporte `timeline=mixed/bridge_tail` ou `aligned`.
 - [ ] Adicionar live rollback induzido.
 - [ ] Adicionar live reconcile pos-mismatch.
 
@@ -366,8 +386,11 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
 - [ ] Classificar BYOK usage real sem falso Premium Request.
 - [x] Corrigir projection para tratar cauda viva temporalmente posterior ao Hub como `bridge_tail` sincronizável mesmo
   sem overlap por assinatura.
-- [ ] Reexecutar live route apply minimal/export para provar que o Markdown novo nao carrega
+- [x] Corrigir projection para tratar timeline intercalável sem overlap como `bridge_tail` quando há prefixos vivos de
+  sistema, cauda ask/answer/postAsk e turno vazio persistido posterior no Hub.
+- [x] Reexecutar export live para provar que o Markdown novo nao carrega
   `timeline=mixed/diverged`/`sync=blocked:diverged-no-overlap` quando SSE/export correlacionam ask, answer e postAsk.
+- [ ] Repetir a prova em um run unico que tambem passe os criterios de `model_gateway_route_switch` plan/apply.
 
 ### Faixa E — Perfis BYOK duraveis
 
@@ -508,4 +531,31 @@ catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viv
   - teste focado `test_timeline_projection.spec.js` passou;
   - teste focado `test_commands_export.spec.js -t "preserva ask_user"` passou;
   - validacao escopada: `npx eslint src/copilot/terminal/frontend/projections/timeline.js tests/unit/copilot/terminal/test_timeline_projection.spec.js`
+    e `npm run typecheck:strict:src.copilot`.
+- Evidencia do rerun live pos-timeline:
+  - `node scripts/model-gateway/run.mjs llmBLiveTest --live-scenario=model-gateway-route-apply-minimal --timeout-ms=240000 --out-dir=artifacts/terminal-live/2026-06-19T-route-apply-minimal-timeline-rerun`
+    terminou `BLOCKED` por `live-timeout`;
+  - `summary.json` registrou `ready`, `interactive-repl`, SSE conectado com 108 eventos e run SQLite gravado como
+    `terminal-live:2026-06-19T03-46-32-332Z:canonical_full_turn_model-gateway-route-apply-minimal`;
+  - nao houve `conversation-export.md`, logo a prova de `timeline=mixed/diverged` corrigido continua pendente;
+  - `var/logs/copilot/events.jsonl` mostrou que o lote paralelo das tres tools Model Gateway parou apos `preToolUse`;
+  - repro local com `bootstrapTools()` + `wireCopilotRuntimeDI()` executou os tres handlers em `Promise.all` em ~170ms;
+  - correcao aplicada: prompt do scenario `model-gateway-route-apply-minimal` agora exige serializacao de tools
+    `model_gateway_*`;
+  - validacao escopada: `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs` e
+    `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "live scenario" --reporter=dot`.
+- Evidencia do live serializado e da reconciliação intercalável:
+  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-serialized-rerun/summary.md`: `PASS`, 454 eventos SSE,
+    `model_gateway_overview`, `model_gateway_operation_status` e `model_gateway_route_switch` executados em chamadas
+    separadas, `ask_user`/`SIM`/postAsk correlacionados, rota viva `ollama-cloud/qwen3-coder-next` confirmada;
+  - o export desse PASS ainda saiu `timeline=mixed/diverged`, reduzindo a causa para prefixo vivo + cauda viva
+    intercalados com Hub persistido e turno vazio posterior;
+  - `readTerminalTimelineProjection()` agora trata esse formato como `bridge_tail`, sincronizando apenas a cauda viva
+    posterior ao último turno persistido substantivo;
+  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-reconciled-export-rerun/conversation-export.md` saiu com
+    `timeline=mixed/bridge_tail · sync=scheduled`;
+  - o segundo rerun terminou `FAIL` somente porque a LLM-B pulou as tools Model Gateway; ainda assim validou
+    ask/answer/postAsk e o cabeçalho de export reconciliado;
+  - validacao escopada: `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_timeline_projection.spec.js --reporter=dot`,
+    `npx eslint src/copilot/terminal/frontend/projections/timeline.js tests/unit/copilot/terminal/test_timeline_projection.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`
     e `npm run typecheck:strict:src.copilot`.

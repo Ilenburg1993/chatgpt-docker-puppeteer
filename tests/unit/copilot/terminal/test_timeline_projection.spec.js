@@ -144,4 +144,84 @@ describe('terminal/frontend/projections/timeline', () => {
         expect(projection.liveBridgeTailCount).toBe(1);
         expect(gateways.writeTerminalHubTimelineTurn).not.toHaveBeenCalled();
     });
+
+    it('reconcilia prefixo vivo e cauda ask_user quando hub tem turno vazio posterior', async () => {
+        gateways.countTerminalHubTurns.mockReturnValue(3);
+        gateways.readTerminalHubTurns.mockReturnValue([
+            {
+                id: 1,
+                role: 'user',
+                content: 'Prompt route apply',
+                created_at: 1710000001000,
+                metadata: JSON.stringify({ source: 'hub' }),
+            },
+            {
+                id: 2,
+                role: 'llm_b',
+                content: 'DELTA-CANONICAL-1\nDELTA-CANONICAL-2',
+                created_at: 1710000001100,
+                metadata: JSON.stringify({ source: 'hub' }),
+            },
+            {
+                id: 3,
+                role: 'user',
+                content: '',
+                created_at: 1710000005000,
+                metadata: JSON.stringify({ source: 'hub' }),
+            },
+        ]);
+        gateways.readTerminalTranscriptFeed.mockReturnValue([
+            {
+                role: 'system',
+                rawRole: 'intent',
+                content: '[intenção] terminal live canonical deltas',
+                timestamp: 1710000000000,
+                metadata: { envelope: { source: 'sdk/assistant.intent', eventId: 40 } },
+            },
+            {
+                role: 'system',
+                rawRole: 'ask_user',
+                content: 'ask_user solicitou resposta humana:\nASK-MODEL-GATEWAY-ROUTE-APPLY',
+                timestamp: 1710000001200,
+                metadata: { envelope: { source: 'sdk/user_input.requested', eventId: 403 } },
+            },
+            {
+                role: 'user',
+                rawRole: 'ask_user_answer',
+                content: 'Resposta ao ask_user:\nSIM',
+                timestamp: 1710000001300,
+                metadata: { envelope: { source: 'sdk/user_input.completed', eventId: 409 } },
+            },
+            {
+                role: 'assistant',
+                rawRole: 'llm_b',
+                content: 'POST-ASK-MODEL-GATEWAY-ROUTE-APPLY-FINAL',
+                timestamp: 1710000001400,
+                metadata: { assistantMessageEnvelope: { source: 'sdk/assistant.message', eventId: 430 } },
+            },
+        ]);
+
+        const projection = readTerminalTimelineProjection({ limitPairs: 10 });
+
+        expect(projection.timelineSource).toBe('mixed');
+        expect(projection.timelineAuthority).toBe('reconciled');
+        expect(projection.reconciliationStatus).toBe('bridge_tail');
+        expect(projection.sync.status).toBe('scheduled');
+        expect(projection.syncBlockedReason).toBe(null);
+        expect(projection.liveBridgeTailCount).toBe(3);
+        expect(projection.turns.map((turn) => turn.content)).toEqual([
+            '[intenção] terminal live canonical deltas',
+            'Prompt route apply',
+            'DELTA-CANONICAL-1\nDELTA-CANONICAL-2',
+            'ask_user solicitou resposta humana:\nASK-MODEL-GATEWAY-ROUTE-APPLY',
+            'Resposta ao ask_user:\nSIM',
+            'POST-ASK-MODEL-GATEWAY-ROUTE-APPLY-FINAL',
+            '',
+        ]);
+        await vi.waitFor(() => expect(gateways.writeTerminalHubTimelineTurn).toHaveBeenCalledTimes(3));
+        expect(gateways.writeTerminalHubTimelineTurn).not.toHaveBeenCalledWith(
+            'hub-1',
+            expect.objectContaining({ content: '[intenção] terminal live canonical deltas' }),
+        );
+    });
 });
