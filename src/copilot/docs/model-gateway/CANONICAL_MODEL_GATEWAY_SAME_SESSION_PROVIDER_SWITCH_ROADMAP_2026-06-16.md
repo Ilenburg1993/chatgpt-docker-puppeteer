@@ -32,6 +32,7 @@ Checkpoint de base desta revisao:
 - checkpoint `/activity` effective route: `24763e9ca` (`fix(copilot): render activity effective route`);
 - checkpoint cockpit handoffs BYOK: `64727e2e6` (`fix(copilot): clarify byok handoff cockpit`);
 - checkpoint timeline/export reconciliado: `fbe2ba137` (`fix(copilot): reconcile forward-only live timeline tails`);
+- checkpoint timeline/export intercalado: `d6b1d13c2` (`fix(copilot): reconcile interleaved live timeline exports`);
 - worktree continha implementacao extensa ainda nao commitada para same-session route promotion, ingress adaptativo,
   SQLite v13, testes e este roadmap;
 - untracked externos e artefatos historicos permanecem no workspace e nao foram incluidos no checkpoint canonico sem
