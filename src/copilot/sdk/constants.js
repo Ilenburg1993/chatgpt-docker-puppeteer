@@ -48,6 +48,7 @@ export const CONNECTION_STATES = /** @type {const} */ ({
 
 /** Nomes das seções do system prompt (subset documentado pelo SDK). */
 export const SYSTEM_PROMPT_SECTION_NAMES = /** @type {const} */ ({
+    PREAMBLE: 'preamble',
     IDENTITY: 'identity',
     TONE: 'tone',
     TOOL_EFFICIENCY: 'tool_efficiency',
@@ -168,6 +169,17 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     SESSION_REMOTE_STEERABLE_CHANGED: 'session.remote_steerable_changed',
     SESSION_SCHEDULE_CREATED: 'session.schedule_created',
     SESSION_SCHEDULE_CANCELLED: 'session.schedule_cancelled',
+    SESSION_SCHEDULE_REARMED: 'session.schedule_rearmed',
+    SESSION_AUTO_MODE_RESOLVED: 'session.auto_mode_resolved',
+    SESSION_MANAGED_SETTINGS_RESOLVED: 'session.managed_settings_resolved',
+    SESSION_MANAGED_SETTINGS_ENFORCED: 'session.managed_settings_enforced',
+    SESSION_LIMITS_CHANGED: 'session.session_limits_changed',
+    SESSION_LIMITS_EXHAUSTED_REQUESTED: 'session_limits_exhausted.requested',
+    SESSION_LIMITS_EXHAUSTED_COMPLETED: 'session_limits_exhausted.completed',
+    SESSION_TODOS_CHANGED: 'session.todos_changed',
+    SESSION_USAGE_CHECKPOINT: 'session.usage_checkpoint',
+    SESSION_CONTEXT_CLEARED: 'session.context_cleared',
+    SESSION_BINARY_ASSET: 'session.binary_asset',
 
     // ── Assistant ──
     ASSISTANT_TURN_START: 'assistant.turn_start',
@@ -176,6 +188,9 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     ASSISTANT_MESSAGE: 'assistant.message',
     ASSISTANT_MESSAGE_DELTA: 'assistant.message_delta',
     ASSISTANT_STREAMING_DELTA: 'assistant.streaming_delta',
+    ASSISTANT_SERVER_TOOL_PROGRESS: 'assistant.server_tool_progress',
+    ASSISTANT_TOOL_CALL_DELTA: 'assistant.tool_call_delta',
+    ASSISTANT_IDLE: 'assistant.idle',
     ASSISTANT_INTENT: 'assistant.intent',
     ASSISTANT_REASONING: 'assistant.reasoning',
     ASSISTANT_REASONING_DELTA: 'assistant.reasoning_delta',
@@ -190,6 +205,7 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     TOOL_EXECUTION_PROGRESS: 'tool.execution_progress',
     TOOL_EXECUTION_PARTIAL_RESULT: 'tool.execution_partial_result',
     TOOL_USER_REQUESTED: 'tool.user_requested',
+    TOOL_SEARCH_ACTIVATED: 'tool_search.activated',
 
     // ── Hook ──
     HOOK_START: 'hook.start',
@@ -251,7 +267,15 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     // ── MCP ──
     MCP_OAUTH_REQUIRED: 'mcp.oauth_required',
     MCP_OAUTH_COMPLETED: 'mcp.oauth_completed',
+    MCP_HEADERS_REFRESH_REQUIRED: 'mcp.headers_refresh_required',
+    MCP_HEADERS_REFRESH_COMPLETED: 'mcp.headers_refresh_completed',
+    MCP_TOOLS_LIST_CHANGED: 'mcp.tools.list_changed',
+    MCP_RESOURCES_LIST_CHANGED: 'mcp.resources.list_changed',
+    MCP_PROMPTS_LIST_CHANGED: 'mcp.prompts.list_changed',
     MCP_APP_TOOL_CALL_COMPLETE: 'mcp_app.tool_call_complete',
+
+    // ── Factory ──
+    FACTORY_RUN_UPDATED: 'factory.run_updated',
 
     // ── Model ──
     MODEL_CALL_FAILURE: 'model.call_failure',
@@ -264,6 +288,12 @@ export const SESSION_EVENTS = /** @type {const} */ ({
     // ── Pending Messages ──
     NEW_INBOX_MESSAGE: 'new_inbox_message',
     PENDING_MESSAGES_MODIFIED: 'pending_messages.modified',
+
+    // ── Canvas ──
+    SESSION_CANVAS_CLOSED: 'session.canvas.closed',
+    SESSION_CANVAS_UNAVAILABLE: 'session.canvas.unavailable',
+    SESSION_CANVAS_RECORDED: 'session.canvas.recorded',
+    SESSION_CANVAS_REMOVED: 'session.canvas.removed',
 
     // ── Abort ──
     ABORT: 'abort',

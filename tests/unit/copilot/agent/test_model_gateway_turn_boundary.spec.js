@@ -173,6 +173,47 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
         dispose();
     });
 
+    it('aguarda a recuperação pós-tools terminar antes de reanexar a rota', async () => {
+        const host = new TestHost();
+        const tracked = [];
+        let processing = false;
+        const ctx = {
+            getSessionSnapshot: () => ({ sessionId: 'session-stable' }),
+            isProcessing: () => processing,
+            trackBackgroundTask: async (task) => {
+                tracked.push(task);
+                await task;
+            },
+        };
+        const promote = vi.fn().mockResolvedValue({
+            sessionId: 'session-stable',
+            scanned: 1,
+            promoted: 1,
+            superseded: 0,
+            skipped: 0,
+            errors: 0,
+            records: [],
+        });
+        const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, {
+            promote,
+            turnBoundarySettleMs: 20,
+        });
+
+        host.emit('dialog.turn_end', { semanticOutcome: 'tool_only' });
+        processing = true;
+        await vi.waitFor(() => expect(tracked).toHaveLength(1));
+        await Promise.all(tracked.splice(0));
+
+        expect(promote).not.toHaveBeenCalled();
+
+        processing = false;
+        host.emit('dialog.turn_end', { semanticOutcome: 'public_reply' });
+        await vi.waitFor(() => expect(promote).toHaveBeenCalledTimes(1));
+        await Promise.all(tracked);
+
+        dispose();
+    });
+
     it('propaga falha de promoção para a telemetria da tarefa em background', async () => {
         const host = new TestHost();
         const tracked = [];

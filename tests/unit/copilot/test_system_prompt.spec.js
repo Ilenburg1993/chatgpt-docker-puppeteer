@@ -22,6 +22,7 @@ describe('system-prompt › exportações do módulo', () => {
     it('reexporta SYSTEM_PROMPT_SECTIONS com as seções SDK 1.0 esperadas', async () => {
         const { SYSTEM_PROMPT_SECTIONS } = await import('#copilot/config/system-prompt');
         const expected = [
+            'preamble',
             'identity',
             'tone',
             'tool_efficiency',

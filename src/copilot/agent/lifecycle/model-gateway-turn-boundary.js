@@ -27,6 +27,7 @@ import { log } from '../ports/logging/index.js';
  *   ) => Promise<void>;
  *   hasPendingQuestion?: () => boolean;
  *   getDialogTurnQueueDepth?: () => number;
+ *   isProcessing?: () => boolean;
  * }} ModelGatewayTurnBoundaryContext
  *
  * @typedef {import('node:events').EventEmitter & {
@@ -64,7 +65,13 @@ export function wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, options = 
 
     const shouldDelayPromotion = () => {
         const queueDepth = ctx.getDialogTurnQueueDepth?.() ?? 0;
-        return humanQuestionOpen || awaitingPostQuestionTurnEnd || ctx.hasPendingQuestion?.() === true || queueDepth > 0;
+        return (
+            humanQuestionOpen ||
+            awaitingPostQuestionTurnEnd ||
+            ctx.hasPendingQuestion?.() === true ||
+            ctx.isProcessing?.() === true ||
+            queueDepth > 0
+        );
     };
 
     const schedule = () => {

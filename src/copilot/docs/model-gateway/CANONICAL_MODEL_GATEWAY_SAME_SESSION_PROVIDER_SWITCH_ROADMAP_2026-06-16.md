@@ -4,13 +4,13 @@
 
 ## 1. Decisao Executiva
 
-Em 2026-08-14 a LLM-B respondeu de verdade. Nao foi encontrada uma quebra externa que impedisse o provider Kilo/SDK de responder. A causa percebida como "nao responde" era uma combinacao de tres fatores locais:
+Em 2026-08-14 a LLM-B respondeu de verdade. Nao foi encontrada uma quebra externa persistente que impedisse o provider Kilo/SDK de responder. A causa percebida como "nao responde" era uma combinacao de tres fatores locais:
 
 1. O boot podia anunciar `LLM-B pronta` sem repintar de forma garantida o prompt REPL. O primeiro comando automatico parecia sair de uma linha sem prompt.
 2. O harness de troca de rota encerrava o terminal antes do reattach diferido no limite do turno. Isso fabricava `SAME_SESSION_ROUTE_REATTACH_FAILED` durante o shutdown.
 3. O catalogo estava cerca de 59 dias vencido. A atualizacao de JSON nao espelhava o SQLite no caminho CLI, entao a readiness corretamente acusava paridade quebrada.
 
-As tres causas foram corrigidas e comprovadas por execucao viva. A configuracao padrao de `npm run terminal:llm-b` inicia com BYOK Kilo pronto; o alerta de quota Premium do Copilot permanece apenas telemetria lateral e nao bloqueia a rota BYOK.
+As tres causas foram corrigidas e comprovadas por execucao viva. A atualizacao para `@github/copilot-sdk` 1.0.9 tambem trouxe novos eventos e `assistant.turn_end` intermediarios em workflows com tools; os contratos e o scheduler foram ajustados. A configuracao padrao de `npm run terminal:llm-b` inicia com BYOK Kilo pronto; o alerta de quota Premium do Copilot permanece apenas telemetria lateral e nao bloqueia a rota BYOK.
 
 ## 2. Evidencia Atual
 
@@ -31,7 +31,9 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A configuracao 
 - [x] `ask_user` exibiu pergunta persistente, recebeu `SIM` de autoria humana e a LLM-B publicou o marcador final.
 - [x] O apply retornou deferimento seguro e a promocao posterior confirmou a mesma sessao no SQLite: `kilo-auto/free` para `ollama-cloud/qwen3-coder-next`.
 - [x] Nenhum erro SSE, nenhum erro do terminal, nenhum novo `sessionId` e nenhum fallback oculto foram observados.
-- Evidencia: `artifacts/terminal-live/2026-08-14T-llmb-route-promotion-verified/summary.md`.
+- [x] A repeticao apos SDK 1.0.9 completou tools reais, deltas, `ask_user`, resposta humana e marcador final, com rota efetiva `ollama-cloud/qwen3-coder-next`; a promocao ocorreu depois da recuperacao pos-tools, nao em concorrencia com ela.
+- [x] O verificador live foi atualizado para correlacionar lifecycle humanizado do SDK por `toolCallId` e para reconhecer o cartao de pergunta atual, sem depender do prompt visual legado.
+- Evidencias: `artifacts/terminal-live/2026-08-14T-llmb-route-promotion-verified/summary.md` e `artifacts/terminal-live/2026-08-14T-llmb-sdk-1-0-9-route-promotion-fixed-r3/summary.md`. O segundo artefato documenta o fluxo completo; seu unico FAIL foi a assercao de lifecycle que foi corrigida posteriormente por correlacao de `toolCallId`.
 
 ### 2.3 Catalogo e readiness
 
@@ -47,8 +49,22 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A configuracao 
 
 - [x] `npm run typecheck` passou em modo strict.
 - [x] `npm run lint` passou.
-- [x] `npm run test:copilot` passou: 6.856 aprovados, zero falhas e 33 pendentes declarados.
+- [x] `npm run test:copilot` passou apos a atualizacao: 6.858 aprovados, zero falhas e 33 pendentes declarados (6.891 testes no total).
 - [x] A fixture de `/history` que chamava uma timeline reconciliada de divergente foi corrigida; o caso agora exige a mensagem de bloqueio somente para o estado `diverged`.
+
+### 2.5 Skill de operacao autonoma
+
+- [x] Foram auditadas as skills existentes: `llm-b-comms` cobre transporte/saude e `llm-b-ops` cobre trabalho no workspace; nenhuma cobria selecao e promocao de rota.
+- [x] A skill `llm-b-route-operator` foi criada em `.github/skills`, diretorio descoberto pelo SDK, com modos inspect/recover/switch/prepare e referencia de protocolo.
+- [x] O prompt do terminal manda carregar a skill ao detectar indisponibilidade, falha ou pedido de troca BYOK.
+- [x] O handler real `invoke_skill` carregou a skill e o boot real `--no-pr` passou apos a mudanca.
+
+### 2.6 Compatibilidade SDK 1.0.9
+
+- [x] O system prompt passou a incluir a secao oficial `preamble`.
+- [x] O catalogo de eventos locais passou a cobrir os 25 eventos publicos novos do SDK, incluindo canvas, tools delta/progress, headers MCP, limites e agendamento.
+- [x] O teste de contrato passou a extrair somente interfaces de evento, evitando contar nomes incidentais no pacote SDK.
+- [x] A promocao de rota aguarda tambem `ctx.isProcessing()`, alem de fila e pergunta humana; um teste reproduz `tool_only -> recuperacao -> public_reply`.
 
 ## 3. Achados e Correcoes Aplicadas
 
@@ -59,6 +75,8 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A configuracao 
 | P0 | `model-gateway:refresh` deixava SQLite obsoleto. | O CLI agora espelha o snapshot commitado e devolve `sqlite.parityOk`. | `liveReadiness` voltou a verde apos refresh. |
 | P1 | `snapshotId` antigo sobrevivia a revisoes de conteudo. | Refresh recalcula o hash depois de elegibilidade e retencao. | Id mudou de `catalog:88612...` para `catalog:32d630...`. |
 | P1 | Um processo de teste orfao segurava a porta 3010. | Processo sem pai foi encerrado durante a auditoria. | Nenhuma instancia LLM-B de teste ficou ativa apos as validacoes. |
+| P0 | SDK 1.0.9 emite `assistant.turn_end` intermediario depois de tools; o reattach podia concorrer com a recuperacao de sintese. | O scheduler so promove quando pergunta, fila e `isProcessing()` estao ociosos. | Teste unitario de recuperacao pos-tools e execucao viva com promocao posterior ao texto publico. |
+| P1 | O SDK humaniza a conclusao de `report_intent` e a UI atual exibe cartao de pergunta sem o prompt legado. | Harness correlaciona lifecycle por `toolCallId` e aceita o cartao `[PERGUNTA]` com `/answer`. | SSE SDK 1.0.9 e teste sintatico do harness. |
 | P2 | A fixture de `/history` combinava estado `reconciliada` com expectativa exclusiva de `diverged`. | A expectativa passou a respeitar o contrato de apresentacao do estado. | Suite de comandos e suite maxima verdes. |
 
 ## 4. Arquitetura Alvo
@@ -81,9 +99,10 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A configuracao 
 
 ### Acompanhar, sem bloquear o uso
 
-- [ ] **P1 - Timeline/export:** o export do run completo preservou todo o conteudo correto, mas seu cabecalho ainda declarou `timeline=mixed/diverged` e `sync=blocked:diverged-no-overlap`. A regra e fail-closed e evita gravacao insegura, portanto nao e perda de conversa; falta reduzir falsos positivos e validar a reconciliacao depois de `ask_user` mais promocao de rota.
+- [ ] **P1 - Timeline/export:** o export do run completo preservou todo o conteudo correto, mas seu cabecalho ainda declarou `timeline=mixed/diverged` e `sync=blocked:diverged-no-overlap`. A reproducao mostrou eventos locais de `ask_user` entre duas mensagens Hub ja persistidas, sem chave canonica comum; a regra fail-closed esta correta e evita gravacao insegura, portanto nao ha perda de conversa. Falta correlacionar esses eventos por identidade/ordem antes de permitir reconciliacao.
 - [ ] **P1 - Resultado compacto de tool:** `model_gateway_overview` ainda pode entregar payload grande ao modelo. Criar visao resumida limitada para LLM-B, mantendo `detail/raw` somente em diagnostico, reduz pressao de contexto em workflows longos.
 - [ ] **P2 - Saude de alternativas:** o standby e baseado em evidencia e nao substitui probes recentes. Antes de promover uma alternativa em producao, executar probe autorizado para a rota escolhida.
+- [ ] **P2 - Variabilidade do provider inicial:** em uma repeticao, o modelo inicial tentou uma leitura auxiliar fora do roteiro e encerrou antes da cadeia de rota. O terminal registrou o turno vazio e preservou a sessao; o fluxo completo foi reproduzido na rodada seguinte. Investigar retries semanticos somente se a frequencia se tornar operacionalmente relevante; nao mascarar tool-calls invalidos como sucesso.
 
 ## 6. Roadmap Executavel
 
@@ -104,6 +123,7 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A configuracao 
 - [x] 1.4 Aguardar grace suficiente para `dialog.turn_end` e scheduler antes dos diagnosticos/`/quit`.
 - [x] 1.5 Provar `route_confirmed_same_session` no ledger vivo.
 - [ ] 1.6 Adicionar ao harness uma espera por estado `committed` (alem do grace temporal) para tornar a prova independente de latencia.
+- [x] 1.7 Bloquear promocao quando a recuperacao pos-tools ainda estiver em `processing`, preservando a proxima fronteira semantica.
 
 ### Faixa 2 - Catalogo, SQLite e Selecao
 
@@ -117,7 +137,7 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A configuracao 
 
 ### Faixa 3 - Contexto, Timeline e Export
 
-- [ ] 3.1 Reproduzir em fixture a sequencia `tool-turn -> deltas -> ask_user -> resposta -> promocao -> export` que hoje resulta em `diverged-no-overlap`.
+- [x] 3.1 Reproduzir em evidencia a sequencia `tool-turn -> deltas -> ask_user -> resposta -> promocao -> export` que hoje resulta em `diverged-no-overlap`; os eventos locais de `ask_user` ficam intercalados entre mensagens Hub sem identidade comum.
 - [ ] 3.2 Diferenciar cauda temporalmente segura de divergencia genuina, usando `traceId`, `turnId`, `requestId` e ordem SSE quando presentes.
 - [ ] 3.3 Manter bloqueio fail-closed para conflito real; nunca gravar ou deduplicar por heuristica fraca.
 - [ ] 3.4 Fazer o header do export comunicar estado humano, sem enums internos, e incluir causa tecnica apenas no modo diagnostico.
@@ -129,12 +149,14 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A configuracao 
 - [ ] 4.2 Limitar listas de perfis/operacoes na resposta injetada no modelo, sem limitar `/events --raw` ou APIs diagnosticas.
 - [ ] 4.3 Medir tokens de tool definitions e de resultados em cenarios de troca; fixar orcamento maximo no harness.
 - [ ] 4.4 Executar regressao viva com todas as tools Model Gateway em serializacao de uma tool por resposta.
+- [x] 4.5 Criar skill operacional para a LLM-B selecionar, provar e promover rota alternativa com participacao humana minima.
+- [x] 4.6 Fixar gatilho de skill no prompt e contrato de regressao para descoberta, plano, prova e same-session.
 
 ### Faixa 5 - Validacao e Governanca Continua
 
 - [x] 5.1 Validacao focada: syntax, ESLint e suites de contratos, turn boundary e promocao diferida.
 - [x] 5.2 Executar typecheck strict, lint e testes maximos de `src/copilot` antes de publicar a proxima leva.
-- [x] 5.3 Executar live full apos cada alteracao de scheduler, rota ou protocolo de pergunta.
+- [x] 5.3 Executar live full apos alteracao de scheduler, rota ou protocolo de pergunta; registrar tambem divergencia de provider sem confundi-la com sucesso.
 - [ ] 5.4 Atualizar este arquivo ao concluir cada subfase; marcar apenas evidencia observada, com caminho do artefato.
 
 ## 7. Comandos de Operacao

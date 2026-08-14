@@ -1,0 +1,4 @@
+interface:
+  display_name: "LLM-B Route Operator"
+  short_description: "Select and promote verified BYOK routes safely."
+  default_prompt: "Use $llm-b-route-operator to diagnose the current route, select a verified alternative, and apply it safely."

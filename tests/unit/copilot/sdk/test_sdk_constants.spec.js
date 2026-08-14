@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 // Mock SDK (necessário para barrel import que carrega system-message.js)
 const mocks = vi.hoisted(() => ({
     SYSTEM_MESSAGE_SECTIONS: {
+        preamble: { description: 'Preamble' },
         identity: { description: 'Identity' },
         tone: { description: 'Tone' },
         tool_efficiency: { description: 'Tool efficiency' },
@@ -97,7 +98,8 @@ describe('CONNECTION_STATES', () => {
 
 describe('SYSTEM_PROMPT_SECTION_NAMES', () => {
     it('contém as seções conhecidas do SDK 1.0', () => {
-        expect(Object.keys(SYSTEM_PROMPT_SECTION_NAMES)).toHaveLength(11);
+        expect(Object.keys(SYSTEM_PROMPT_SECTION_NAMES)).toHaveLength(12);
+        expect(SYSTEM_PROMPT_SECTION_NAMES.PREAMBLE).toBe('preamble');
         expect(SYSTEM_PROMPT_SECTION_NAMES.IDENTITY).toBe('identity');
         expect(SYSTEM_PROMPT_SECTION_NAMES.RUNTIME_INSTRUCTIONS).toBe('runtime_instructions');
         expect(SYSTEM_PROMPT_SECTION_NAMES.LAST_INSTRUCTIONS).toBe('last_instructions');
@@ -232,12 +234,16 @@ describe('SESSION_EVENTS', () => {
             'utf8',
         );
         const generated = [
-            ...new Set([...sessionEventsDts.matchAll(/type:\s*"([^"]+)"/g)].map((match) => match[1])),
+            ...new Set(
+                [...sessionEventsDts.matchAll(/export interface \w+Event \{[\s\S]*?\n\}/g)].flatMap((eventBlock) =>
+                    [...eventBlock[0].matchAll(/\n\s*type:\s*"([^"]+)"/g)].map((match) => match[1]),
+                ),
+            ),
         ].sort();
         const local = [...new Set(Object.values(SESSION_EVENTS))].sort();
         const missing = generated.filter((eventType) => !local.includes(eventType));
 
-        expect(generated).toHaveLength(108);
+        expect(generated).toHaveLength(113);
         expect(missing).toEqual([]);
         expect(local).toContain('custom');
     });

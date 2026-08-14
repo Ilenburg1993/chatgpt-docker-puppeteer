@@ -188,8 +188,10 @@ function buildAskRenderedRegex(question) {
 }
 
 function hasHumanQuestionInputPrompt(plain) {
-    return /voc[eê]\[[^\]\n]+(?:\/[^\]\n]+)?\](?:\[[^\]\n]+\])*\[PERG(?:UNTA)?\]›/iu.test(
-        String(plain ?? ''),
+    const text = String(plain ?? '');
+    return (
+        /voc[eê]\[[^\]\n]+(?:\/[^\]\n]+)?\](?:\[[^\]\n]+\])*\[PERG(?:UNTA)?\]›/iu.test(text) ||
+        /\[PERGUNTA\]\s+[^\n]+[\s\S]{0,1200}Atalhos\s+\[\s*\/answer\s+<texto>\s*\]/iu.test(text)
     );
 }
 
@@ -4900,6 +4902,7 @@ function summarizeCanonicalToolLifecycle(events) {
         toolLifecycleEvents: 0,
         matchedEventIds: [],
     };
+    const reportIntentCallIds = new Set();
     for (const evt of events) {
         const payload = eventPayload(evt);
         if (!payload) continue;
@@ -4917,9 +4920,22 @@ function summarizeCanonicalToolLifecycle(events) {
         const type = typeof payload.type === 'string' ? payload.type : '';
         const success = payload.success !== false;
         const eventId = eventPublicId(evt);
+        const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null;
         if (isLifecycleTool(payload, 'report_intent')) {
-            if (isLifecycleStartType(type)) summary.reportIntentStart = true;
+            if (isLifecycleStartType(type)) {
+                summary.reportIntentStart = true;
+                if (toolCallId) reportIntentCallIds.add(toolCallId);
+            }
             if (isLifecycleCompletionType(type) && success) summary.reportIntentDone = true;
+            if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+        } else if (
+            isLifecycleCompletionType(type) &&
+            success &&
+            toolCallId &&
+            reportIntentCallIds.has(toolCallId)
+        ) {
+            // SDK 1.0.9 humanizes some completion names, but preserves the originating tool call id.
+            summary.reportIntentDone = true;
             if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
         }
         if (isLifecycleTool(payload, 'read_file_content')) {
