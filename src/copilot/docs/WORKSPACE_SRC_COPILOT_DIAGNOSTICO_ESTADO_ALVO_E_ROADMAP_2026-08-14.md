@@ -3406,4 +3406,7 @@ Este follow-up fecha outro gargalo de autonomia exposto pela própria combinaç�
   - `copilot-fast`: job `9ce97a9e-0df9-4d73-b049-530a0202f6e3`, exit code `0`, ~`321,1s`.
   - `6.861` testes: `6.833` passed, `0` failed, `28` pending.
   - `2.080/2.080` suites passed; typecheck, lint, docs-contract e architecture-contract verdes.
-- [ ] publicar esta última reconciliação documental em `main`.
+- [x] publicar esta última reconciliação documental em `main`.
+  - commit publicado `500bab4d2665224dc04dd80e5e9551370fca238d` — `docs(copilot): record unattached job follow-up`.
+  - `origin/main` observado com `ahead=0`, `behind=0` após o push.
+  - houve um `CHATGPT_HOST_PRECALL_BLOCK` no primeiro `git_stage` documental: `mcp_host_block_diagnostics` confirmou que a chamada não chegou ao MCP; o retry da mesma operação bounded, com o mesmo path explícito e precondition, passou sem ampliar permissões.
