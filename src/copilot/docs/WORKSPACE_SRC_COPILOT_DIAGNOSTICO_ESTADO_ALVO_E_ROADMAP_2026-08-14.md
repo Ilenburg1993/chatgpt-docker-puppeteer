@@ -3543,3 +3543,162 @@ Portanto:
 - [ ] na próxima conversa/reconexão, confirmar que o host recebeu o novo schema e executar `unit-focused` somente nos arquivos causalmente relevantes.
 
 A revisão estática desta onda evitou duas regressões antes de validators: primeiro, uma 116ª tool desnecessária; depois, um schema público pesado demais. O novo princípio operacional fica estabelecido: **o validator precisa justificar seu custo marginal; amplitude não é sinônimo de confiança.**
+
+### 97.5 Focused-first também no autonomy runner
+
+O diagnóstico seguinte encontrou um resíduo da política anterior: `delegate_to_repo_autonomy_runner` ainda tratava `validate-mcp-full` como missão normal. A superfície existente foi reutilizada, sem criar nova tool.
+
+Commit:
+
+`0e7e30f7ca082e97d968c4b3bee7907f8682363f`
+
+Mensagem:
+
+`feat(copilot): delegate focused validation`
+
+- [x] missão `validate-focused` adicionada ao runner bounded.
+- [x] recebe somente um `testFile` explícito, reutilizando a mesma normalização/segurança de `unit-focused`.
+- [x] dry-run expõe `run_copilot_validator -> job_get_summary`, sem broad suite.
+- [x] execução real inicia somente `unit-focused` para aquele arquivo.
+- [x] `validate-mcp-full` permanece disponível, mas explicitamente classificado como broad escalation.
+- [x] nenhuma nova MCP tool foi adicionada.
+- [x] `CAPABILITIES_VERSION` avançou de `39` para `40`.
+
+Validação proporcional:
+
+- [x] `repo_find_orphan_imports` em `src/copilot/mcp/tools`: 41 arquivos, 101 imports locais, `0` órfãos, `0` parse errors.
+- [x] typecheck isolado `c16477d6-d97e-4597-a337-14842136d543`, exit code `0`, ~`7,8s`.
+- [x] nenhuma suíte de testes foi executada.
+
+Prova pós-publicação:
+
+- [x] self-reload `mcp-reload-bb5bb360-78eb-48bd-ad67-b3bb1f4cbbbc`, profile `quic`, exit code `0`.
+- [x] OAuth/registry/SSE verdes.
+- [x] registry `115/115`.
+- [x] `tools/list responseBytes=130.088`, apenas 36 bytes acima da versão compactada anterior.
+- [x] folga restante no envelope de 128 KiB: `984` bytes.
+- [x] `mcp_session_profile` passou a recomendar `validate-focused` como fluxo delegado padrão.
+
+## 98. Quinta onda — benchmark de transporte bounded e reprodutível
+
+O piloto QUIC/H2/auto anterior mostrou que o planner era melhor que o processo operacional: a troca de profiles, smoke, métricas e restauração ainda exigia uma sequência manual. A solução adotada **não** adiciona uma nova tool; reutiliza `delegate_to_repo_autonomy_runner` com uma missão fixa `benchmark-transport` e um runner detached.
+
+### 98.1 Correção metodológica do benchmark
+
+O piloto anterior usava `rpcClientLatency.count` como referência de amostragem. O baseline vivo mostrou novamente `rpcClientLatency.count=4`, coerente com as quatro conexões HA do cloudflared e inadequado como requisito de cinco amostras de tráfego.
+
+O novo contrato passa a usar:
+
+- [x] **cinco execuções idênticas do canonical OAuth/connector smoke por profile** como amostras primárias;
+- [x] duração wall-clock end-to-end de cada smoke como métrica comparável;
+- [x] p50/p95/p99 calculados sobre as cinco durações;
+- [x] métricas cloudflared de RPC/proxy latency, QUIC RTT, HA e counters como diagnósticos secundários;
+- [x] request-error delta medido antes/depois no mesmo processo cloudflared;
+- [x] delta positivo não é automaticamente declarado benigno: a janela fica `reviewRequired=true` e inelegível para decisão automática.
+
+A consequência é conceitualmente importante: o benchmark mede **o workload MCP que realmente nos interessa**, e não a cardinalidade incidental das conexões de edge.
+
+### 98.2 State machine detached
+
+Novo runner:
+
+`src/copilot/mcp/scripts/scheduled-transport-benchmark-runner.js`
+
+Novo estado fixo:
+
+`src/copilot/.ai/mcp/transport-benchmark-state.json`
+
+Propriedades de segurança:
+
+- [x] requestId é gerado pelo servidor.
+- [x] profiles possíveis continuam restritos a `quic`, `auto` e `http2`/`h2`.
+- [x] quantidade de amostras é fixa em `5`; não há parâmetro aberto ao usuário.
+- [x] não aceita shell, comando, path, env override ou profile candidato arbitrário.
+- [x] cada restart reutiliza `scheduled-restart-runner.js`, preservando a correlação `reload.completedAt -> connector smoke` do readiness.
+- [x] cada profile recebe restart limpo, warmup bounded, métricas before, 5 smokes e métricas after.
+- [x] smoke failure, restart failure, métricas indisponíveis após retry bounded ou `haConnections != 4` interrompem a sequência.
+- [x] request-error delta positivo não aborta o restante da coleta, mas torna a janela review-required.
+- [x] o profile de controle inicial é restaurado em `finally` mesmo após failure.
+- [x] falha de persistência do estado intermediário não pode impedir a rota de restore.
+- [x] o restore final executa um smoke adicional, fora da amostra, para reconciliar a geração restaurada.
+- [x] child processes possuem timeout, SIGTERM e fallback SIGKILL bounded.
+- [x] `autoPromotion=false` é persistido e retornado; o runner **nunca promove** um candidato.
+
+### 98.3 Planner e estado
+
+`mcp_cloudflare_transport_benchmark_plan` permanece read-only, mas agora:
+
+- [x] declara `sampleMetric=wall-clock duration of the canonical OAuth/connector smoke workload`.
+- [x] expõe a missão `benchmark-transport` como executor preferencial.
+- [x] mantém troca manual apenas como fallback.
+- [x] expõe `lastRun` a partir do state file fixo.
+- [x] compacta `lastRun`, omitindo cada registro individual de smoke e preservando p95/deltas/HA/diagnósticos essenciais.
+- [x] separa execução bem-sucedida de elegibilidade para decisão.
+- [x] mantém política de no máximo 10% de regressão p95 contra o controle para elegibilidade.
+
+### 98.4 Validação proporcional
+
+Nenhuma suíte ampla foi executada nesta onda.
+
+Inspeção estática:
+
+- [x] `repo_find_orphan_imports` em `src/copilot/mcp`: 102 arquivos, 259 imports locais, `0` órfãos e `0` parse errors.
+- [x] `repo_file_outline` do runner novo passou sem parse error.
+- [x] architecture contract passou a exigir a presença do runner detached.
+
+Typecheck isolado:
+
+- primeira execução `81118b42-b84a-409e-bd3f-a5bee1ebc961`, exit code `2`, ~`7,9s`;
+- único erro: tipo de `restoreSmoke.error` inferido como `string`, enquanto `runSmoke()` retorna `string | null`;
+- correção local por anotação JSDoc explícita;
+- rerun `8ef7eb03-c2b4-404f-afdc-267c03396829`, exit code `0`, ~`5,26s`.
+
+- [x] falha localizada -> correção localizada -> rerun somente do typecheck.
+- [x] nenhum `mcp-fast`, `mcp-full`, `copilot-fast`, `unit-mcp` ou `unit-copilot` foi executado.
+
+### 98.5 Publicação e prova live
+
+Commit:
+
+`38177b81b8b1c3daa0e4cc93d024c6d722dfb20c`
+
+Mensagem:
+
+`feat(copilot): automate bounded transport benchmark`
+
+- [x] 9 arquivos causais.
+- [x] 730 inserções / 20 remoções.
+- [x] `CAPABILITIES_VERSION` avançou de `40` para `41`.
+- [x] push upstream-only concluiu com `ahead=0`, `behind=0`.
+- [x] self-reload `mcp-reload-97bd4489-e8e6-4e2e-a118-36638fa1ba6d`, profile `quic`, exit code `0`.
+- [x] OAuth/registry/SSE pós-reload verdes.
+- [x] readiness `ready=true`, smoke posterior ao reload e reconciliado.
+- [x] registry remoto/local `115/115`.
+- [x] `tools/list responseBytes=130.110`.
+- [x] folga remanescente sob 128 KiB: `962` bytes.
+
+Planner vivo após publicação:
+
+- [x] controle atual `quic`.
+- [x] baseline `haConnections=4`.
+- [x] baseline `rpcClientLatency.count=4`, reforçando a correção metodológica.
+- [x] `lastRun=null` antes da primeira execução delegated.
+- [x] `minimumSamplesPerProtocol=5` agora se refere às cinco execuções do smoke, não ao contador RPC.
+- [x] `delegatedExecution.mission=benchmark-transport`.
+- [x] `delegatedExecution.autoPromotion=false`.
+- [x] `delegatedExecution.restoresInitialControl=true`.
+
+### 98.6 Limitação residual da sessão atual
+
+Assim como `unit-focused`, a missão `benchmark-transport` altera o enum de uma tool já carregada pelo host. Esta conversa ainda anuncia o schema anterior de `delegate_to_repo_autonomy_runner`, portanto uma chamada `mission=benchmark-transport` seria bloqueada pelo host antes de chegar ao MCP.
+
+- [x] o executor está publicado e carregado no servidor.
+- [x] o planner atualizado está comprovadamente live nesta conversa porque seu schema de entrada não mudou.
+- [ ] em uma nova conversa/reconexão, confirmar que o host recebeu `CAPABILITIES_VERSION=41`/schema novo.
+- [ ] executar primeiro `delegate_to_repo_autonomy_runner mission=benchmark-transport dryRun=true`.
+- [ ] se o plano estiver correto e a janela de múltiplos restarts for aceitável, executar `dryRun=false`.
+- [ ] acompanhar `lastRun.status` pelo planner, sem polling agressivo durante as trocas.
+- [ ] confirmar `restoredControl=true`, restore smoke verde e comparar as três janelas.
+- [ ] **não promover automaticamente** nenhum profile; qualquer mudança permanente continua evidence-gated e separada do benchmark.
+
+O gap residual do benchmark deixa de ser falta de executor. Passa a ser apenas a necessidade de executar a missão uma vez a partir de um host que já conheça o schema atualizado.
