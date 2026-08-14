@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { describe, it } from 'vitest';
 
 import {
+    cancelJob,
     pruneCompletedJobRecords,
     readJobOutput,
     resolveJobTimeoutMs,
@@ -129,6 +130,47 @@ describe('copilot MCP jobs', () => {
             assert.equal(result.job?.logFile, logFile);
             assert.equal(result.job?.manifestFile, manifestFile);
             assert.equal(result.output, 'safe-log-tail');
+        } finally {
+            await rm(manifestFile, { force: true });
+            await rm(logFile, { force: true });
+        }
+    });
+
+    it('marks persisted running manifests as unattached and refuses unsafe cancellation', async () => {
+        const id = randomUUID();
+        const jobsDir = join(process.cwd(), 'src/copilot/.ai/jobs');
+        const manifestFile = join(jobsDir, `${id}.json`);
+        const logFile = join(jobsDir, `${id}.log`);
+        await mkdir(jobsDir, { recursive: true });
+        try {
+            const command = resolveValidatorCommand('typecheck');
+            await writeFile(
+                manifestFile,
+                JSON.stringify({
+                    id,
+                    validator: 'typecheck',
+                    status: 'running',
+                    startedAt: Date.now() - 10_000,
+                    endedAt: null,
+                    exitCode: null,
+                    signal: null,
+                    command: command.command,
+                    args: command.args,
+                    timeoutMs: 60_000,
+                    timedOut: false,
+                }),
+            );
+            await writeFile(logFile, 'persisted-running-job');
+
+            const observed = await readJobOutput(id);
+            assert.equal(observed.job?.status, 'running');
+            assert.equal(observed.job?.runtimeAttached, false);
+
+            const cancelled = await cancelJob(id);
+            assert.equal(cancelled.ok, false);
+            assert.equal(cancelled.unattached, true);
+            assert.equal(cancelled.job?.runtimeAttached, false);
+            assert.match(cancelled.message, /not attached to the current MCP runtime/u);
         } finally {
             await rm(manifestFile, { force: true });
             await rm(logFile, { force: true });

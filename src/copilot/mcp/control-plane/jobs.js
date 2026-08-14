@@ -47,6 +47,10 @@ const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]
  * @property {string} logFile
  * @property {string} manifestFile
  * @property {import('node:child_process').ChildProcess | null} process
+ *
+ * @typedef {Omit<JobRecord, 'process'> & {
+ *     runtimeAttached: boolean | null;
+ * }} PublicJobRecord
  */
 
 /** @type {Map<string, JobRecord>} */
@@ -184,7 +188,7 @@ export function resolveJobTimeoutMs(timeoutMs) {
 /**
  * @param {CopilotValidatorName} validator
  * @param {{ timeoutMs?: number }} [options]
- * @returns {Promise<Omit<JobRecord, 'process'>>}
+ * @returns {Promise<PublicJobRecord>}
  */
 export async function spawnValidatorJob(validator, options = {}) {
     const id = randomUUID();
@@ -272,7 +276,7 @@ export async function spawnValidatorJob(validator, options = {}) {
 /**
  * @param {string} id
  * @param {number} [tailBytes]
- * @returns {Promise<{ job: Omit<JobRecord, 'process'> | null; output: string }>}
+ * @returns {Promise<{ job: PublicJobRecord | null; output: string }>}
  */
 export async function readJobOutput(id, tailBytes = 24_000) {
     if (!resolveJobArtifactPaths(id)) return { job: null, output: '' };
@@ -284,12 +288,25 @@ export async function readJobOutput(id, tailBytes = 24_000) {
 
 /**
  * @param {string} id
- * @returns {{ ok: boolean; job: Omit<JobRecord, 'process'> | null; message: string }}
+ * @returns {Promise<{ ok: boolean; job: PublicJobRecord | null; message: string; unattached?: boolean }>}
  */
-export function cancelJob(id) {
+export async function cancelJob(id) {
     if (!resolveJobArtifactPaths(id)) return { ok: false, job: null, message: 'Job not found.' };
     const record = JOBS.get(id);
-    if (!record) return { ok: false, job: null, message: 'Job not found.' };
+    if (!record) {
+        const persisted = await readJobManifest(id);
+        if (!persisted) return { ok: false, job: null, message: 'Job not found.' };
+        const job = publicJobRecord(persisted);
+        if (persisted.status === 'running') {
+            return {
+                ok: false,
+                job,
+                unattached: true,
+                message: 'Job is persisted as running but is not attached to the current MCP runtime.',
+            };
+        }
+        return { ok: false, job, message: `Job is ${persisted.status}.` };
+    }
     if (!record.process || record.status !== 'running') {
         return { ok: false, job: publicJobRecord(record), message: `Job is ${record.status}.` };
     }
@@ -310,7 +327,7 @@ export function cancelJob(id) {
  *     limit?: number;
  *     includeCompleted?: boolean;
  * }} [options]
- * @returns {Promise<Omit<JobRecord, 'process'>[]>}
+ * @returns {Promise<PublicJobRecord[]>}
  */
 export async function listJobs(options = {}) {
     const records = new Map();
@@ -338,11 +355,14 @@ export async function listJobs(options = {}) {
 
 /**
  * @param {JobRecord} record
- * @returns {Omit<JobRecord, 'process'>}
+ * @returns {PublicJobRecord}
  */
 function publicJobRecord(record) {
     const { process: _process, ...publicRecord } = record;
-    return publicRecord;
+    return {
+        ...publicRecord,
+        runtimeAttached: record.status === 'running' ? record.process !== null : null,
+    };
 }
 
 /**

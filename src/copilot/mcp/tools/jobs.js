@@ -31,17 +31,21 @@ const safeValidationSuiteSchema = z.enum(['mcp-fast', 'mcp-full', 'copilot-fast'
 const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
 
 /**
- * @param {Omit<import('../control-plane/jobs.js').JobRecord, 'process'>} job
+ * @param {import('../control-plane/jobs.js').PublicJobRecord} job
  * @returns {Record<string, unknown>}
  */
 function summarizeJob(job) {
     const durationMs = job.endedAt === null ? Date.now() - job.startedAt : job.endedAt - job.startedAt;
+    const runtimeAttached = 'runtimeAttached' in job ? job.runtimeAttached : null;
+    const orphaned = job.status === 'running' && runtimeAttached === false;
     return {
         id: job.id,
         validator: job.validator,
         status: job.status,
         passed: job.status === 'completed' && job.exitCode === 0,
-        running: job.status === 'running',
+        running: job.status === 'running' && !orphaned,
+        orphaned,
+        runtimeAttached,
         startedAt: new Date(job.startedAt).toISOString(),
         endedAt: job.endedAt === null ? null : new Date(job.endedAt).toISOString(),
         durationMs: Math.max(0, durationMs),
@@ -54,11 +58,11 @@ function summarizeJob(job) {
 }
 
 /**
- * @param {Omit<import('../control-plane/jobs.js').JobRecord, 'process'>[]} jobs
- * @returns {Record<string, Omit<import('../control-plane/jobs.js').JobRecord, 'process'>>}
+ * @param {import('../control-plane/jobs.js').PublicJobRecord[]} jobs
+ * @returns {Record<string, import('../control-plane/jobs.js').PublicJobRecord>}
  */
 function latestJobsByValidator(jobs) {
-    /** @type {Record<string, Omit<import('../control-plane/jobs.js').JobRecord, 'process'>>} */
+    /** @type {Record<string, import('../control-plane/jobs.js').PublicJobRecord>} */
     const latest = {};
     for (const job of jobs) {
         const current = latest[job.validator];
@@ -79,7 +83,7 @@ const EFFECTIVE_CHECKS_BY_VALIDATOR = {
 };
 
 /**
- * @param {Omit<import('../control-plane/jobs.js').JobRecord, 'process'>[]} jobs
+ * @param {import('../control-plane/jobs.js').PublicJobRecord[]} jobs
  * @returns {Record<string, Record<string, unknown>>}
  */
 function buildEffectiveValidationChecks(jobs) {
@@ -89,10 +93,17 @@ function buildEffectiveValidationChecks(jobs) {
     for (const job of sorted) {
         const checks = EFFECTIVE_CHECKS_BY_VALIDATOR[job.validator] ?? [job.validator];
         for (const check of checks) {
+            const orphaned = job.status === 'running' && job.runtimeAttached === false;
             effective[check] = {
                 check,
-                effectiveStatus: job.status === 'completed' && job.exitCode === 0 ? 'passed' : job.status,
+                effectiveStatus: orphaned
+                    ? 'orphaned'
+                    : job.status === 'completed' && job.exitCode === 0
+                      ? 'passed'
+                      : job.status,
                 passed: job.status === 'completed' && job.exitCode === 0,
+                orphaned,
+                runtimeAttached: job.runtimeAttached,
                 sourceValidator: job.validator,
                 sourceJobId: job.id,
                 startedAt: new Date(job.startedAt).toISOString(),
@@ -111,6 +122,7 @@ function buildEffectiveValidationChecks(jobs) {
  */
 function recommendValidationAction(effectiveChecks) {
     const entries = Object.values(effectiveChecks);
+    if (entries.some((check) => check['effectiveStatus'] === 'orphaned')) return 'inspect-orphaned-validation-job';
     if (entries.some((check) => check['effectiveStatus'] === 'running')) return 'wait-and-refresh-summary';
     if (entries.some((check) => check['passed'] === false)) return 'read-small-tail-for-failing-job';
     if (entries.length === 0) return 'run-validation-only-when-needed';
@@ -320,7 +332,12 @@ export const jobTools = [
             const includeDetails = options['includeDetails'] === true;
             const limit = typeof options['limit'] === 'number' ? options['limit'] : 80;
             const jobs = await listJobs({ includeCompleted: true, limit });
-            const running = jobs.filter((job) => job.status === 'running').map(summarizeJob);
+            const running = jobs
+                .filter((job) => job.status === 'running' && job.runtimeAttached !== false)
+                .map(summarizeJob);
+            const orphaned = jobs
+                .filter((job) => job.status === 'running' && job.runtimeAttached === false)
+                .map(summarizeJob);
             const latest = Object.values(latestJobsByValidator(jobs)).sort((left, right) =>
                 left.validator.localeCompare(right.validator),
             );
@@ -328,6 +345,7 @@ export const jobTools = [
             const base = {
                 success: true,
                 runningCount: running.length,
+                orphanedCount: orphaned.length,
                 latestCount: latest.length,
                 effectiveChecks,
                 recommendedNextAction: recommendValidationAction(effectiveChecks),
@@ -337,12 +355,14 @@ export const jobTools = [
                     .map((job) => job['id'])
                     .slice(0, 5),
                 runningJobIds: running.map((job) => job['id']).slice(0, 5),
+                orphanedJobIds: orphaned.map((job) => job['id']).slice(0, 5),
             };
             return okResult(
                 includeDetails
                     ? {
                           ...base,
                           runningJobs: includeRunning === false ? [] : running,
+                          orphanedJobs: includeRunning === false ? [] : orphaned,
                           latestJobs: includeLatest === false ? [] : latest.map(summarizeJob),
                           streamSafety: {
                               preferredFlow: [
@@ -382,9 +402,11 @@ export const jobTools = [
                 outputAvailable: Boolean(result.output),
                 outputSuppressed: true,
                 nextAction:
-                    result.job.status === 'failed'
-                        ? 'Use job_get_output with a small tailBytes value only if the compact summary is insufficient.'
-                        : 'No log read is needed unless debugging is required.',
+                    result.job.status === 'running' && result.job.runtimeAttached === false
+                        ? 'This persisted running manifest is not attached to the current MCP runtime; inspect the bounded log tail and rerun the focused validator if needed.'
+                        : result.job.status === 'failed'
+                          ? 'Use job_get_output with a small tailBytes value only if the compact summary is insufficient.'
+                          : 'No log read is needed unless debugging is required.',
             });
         },
     },
@@ -426,11 +448,18 @@ export const jobTools = [
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ jobId }) => {
-            const result = cancelJob(jobId);
+            const result = await cancelJob(jobId);
             if (!result.ok) {
+                const code = result.unattached
+                    ? 'ERR_JOB_UNATTACHED'
+                    : result.job
+                      ? 'ERR_JOB_NOT_RUNNING'
+                      : 'ERR_JOB_NOT_FOUND';
                 return errorResult(result.message, {
-                    code: result.job ? 'ERR_JOB_NOT_RUNNING' : 'ERR_JOB_NOT_FOUND',
-                    hint: 'Use job_cancel only for a running job created by run_copilot_validator.',
+                    code,
+                    hint: result.unattached
+                        ? 'The manifest says running, but this MCP runtime has no verified child-process handle. Inspect the bounded log tail and rerun the focused validator; do not kill an unverified PID.'
+                        : 'Use job_cancel only for a running job attached to the current MCP runtime.',
                     jobId,
                     job: result.job,
                 });
