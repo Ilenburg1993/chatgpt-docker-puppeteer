@@ -156,7 +156,7 @@ function buildValidatorAliasTool(validator, name, title, description) {
         title,
         description,
         inputSchema: {
-            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional job timeout in ms.'),
+            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Timeout ms.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ timeoutMs }) => {
@@ -191,13 +191,10 @@ export const jobTools = [
     {
         name: 'mcp_run_safe_validation_suite',
         title: 'Run safe MCP validation suite',
-        description:
-            'Start a fixed allowlisted validation suite as one job, reducing repeated ChatGPT approval prompts for common verification workflows.',
+        description: 'Run a fixed broad validation suite. Escalation-only for cross-cutting risk or release gates.',
         inputSchema: {
-            suite: safeValidationSuiteSchema.describe(
-                'Suite to run: mcp-fast (typecheck + MCP tests), mcp-full (typecheck + lint + MCP tests), or copilot-fast (typecheck + lint + unit-copilot).',
-            ),
-            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional job timeout in ms.'),
+            suite: safeValidationSuiteSchema.describe('Broad suite: mcp-fast, mcp-full, or copilot-fast.'),
+            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Timeout ms.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ suite, timeoutMs }) => {
@@ -216,9 +213,9 @@ export const jobTools = [
     {
         name: 'run_project_doctor',
         title: 'Run project doctor',
-        description: 'Return the canonical Copilot MCP project doctor report.',
+        description: 'Return the Copilot MCP project doctor report.',
         inputSchema: {
-            includeScripts: z.boolean().optional().describe('Include relevant npm scripts. Default: true.'),
+            includeScripts: z.boolean().optional().describe('Include scripts. Default: true.'),
         },
         annotations: readOnlyAnnotations(),
         handler: projectDoctorTool.handler,
@@ -226,9 +223,9 @@ export const jobTools = [
     {
         name: 'run_copilot_validator',
         title: 'Run Copilot validator',
-        description: 'Start an allowlisted validator. unit-focused runs one explicit Copilot unit-test file.',
+        description: 'Run an allowlisted validator; unit-focused runs one test file.',
         inputSchema: {
-            validator: validatorSchema.describe('Validator; prefer unit-focused for localized changes.'),
+            validator: validatorSchema.describe('Validator; prefer unit-focused.'),
             testFile: focusedTestFileSchema.optional(),
             timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional timeout in ms.'),
         },
@@ -267,15 +264,12 @@ export const jobTools = [
     {
         name: 'job_list',
         title: 'List validator jobs',
-        description: 'List active and recent validator jobs, including persisted manifests from previous MCP runs.',
+        description: 'List active and recent validator jobs, including persisted manifests.',
         inputSchema: {
-            status: jobStatusSchema.optional().describe('Optional job status filter.'),
-            validator: validatorSchema.optional().describe('Optional validator filter.'),
-            limit: z.number().int().min(1).max(200).optional().describe('Maximum jobs returned. Default: 50.'),
-            includeCompleted: z
-                .boolean()
-                .optional()
-                .describe('Include completed/failed/cancelled jobs. Default: true.'),
+            status: jobStatusSchema.optional().describe('Status filter.'),
+            validator: validatorSchema.optional().describe('Validator filter.'),
+            limit: z.number().int().min(1).max(200).optional().describe('Max jobs. Default: 50.'),
+            includeCompleted: z.boolean().optional().describe('Include finished jobs. Default: true.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ status, validator, limit, includeCompleted }) => {
@@ -290,21 +284,11 @@ export const jobTools = [
     {
         name: 'mcp_last_validation_summary',
         title: 'Last MCP validation summary',
-        description:
-            'Return the latest persisted validation job per validator without starting a new validator. Use when ChatGPT host blocks new validation jobs.',
+        description: 'Return the latest persisted job per validator without starting validation.',
         inputSchema: {
-            validator: validatorSchema.optional().describe('Optional validator filter.'),
-            includeOutputTail: z
-                .boolean()
-                .optional()
-                .describe('Include a short log tail for each returned job. Default: false.'),
-            tailBytes: z
-                .number()
-                .int()
-                .min(1000)
-                .max(20000)
-                .optional()
-                .describe('Output tail bytes when includeOutputTail=true.'),
+            validator: validatorSchema.optional().describe('Validator filter.'),
+            includeOutputTail: z.boolean().optional().describe('Include short log tails. Default: false.'),
+            tailBytes: z.number().int().min(1000).max(20000).optional().describe('Tail bytes.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ validator, includeOutputTail, tailBytes }) => {
@@ -349,13 +333,12 @@ export const jobTools = [
     {
         name: 'mcp_validation_dashboard',
         title: 'MCP validation dashboard',
-        description:
-            'Return compact validation status without starting jobs or returning long logs. Use this to avoid ChatGPT stream interruptions.',
+        description: 'Return compact validation status without starting jobs or long logs.',
         inputSchema: {
-            includeRunning: z.boolean().optional().describe('Include currently running jobs. Default: true.'),
-            includeLatest: z.boolean().optional().describe('Include latest compact job per validator. Default: true.'),
-            includeDetails: z.boolean().optional().describe('Include full running/latest job arrays and streamSafety. Default: false for compact responses.'),
-            limit: z.number().int().min(10).max(200).optional().describe('Maximum job manifests to inspect. Default: 80.'),
+            includeRunning: z.boolean().optional().describe('Include running jobs. Default: true.'),
+            includeLatest: z.boolean().optional().describe('Include latest jobs. Default: true.'),
+            includeDetails: z.boolean().optional().describe('Include job arrays. Default: false.'),
+            limit: z.number().int().min(10).max(200).optional().describe('Max manifests. Default: 80.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async (input = {}) => {
@@ -414,10 +397,9 @@ export const jobTools = [
     {
         name: 'job_get_summary',
         title: 'Get job summary',
-        description:
-            'Return compact status for one validator job without returning log output. Prefer this before job_get_output in ChatGPT web.',
+        description: 'Return compact status for one validator job; no log output.',
         inputSchema: {
-            jobId: z.string().min(1).describe('Job id returned by a validator tool.'),
+            jobId: z.string().min(1).describe('Validator job id.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ jobId }) => {
@@ -446,17 +428,10 @@ export const jobTools = [
     {
         name: 'job_get_output',
         title: 'Get job output',
-        description:
-            'Read a bounded log tail and status of a validator job. Prefer job_get_summary first; default tail is intentionally small for ChatGPT web.',
+        description: 'Read a bounded validator-job log tail and status.',
         inputSchema: {
-            jobId: z.string().min(1).describe('Job id returned by run_copilot_validator.'),
-            tailBytes: z
-                .number()
-                .int()
-                .min(1000)
-                .max(50000)
-                .optional()
-                .describe('Maximum bytes from the log tail. Default: 8000.'),
+            jobId: z.string().min(1).describe('Validator job id.'),
+            tailBytes: z.number().int().min(1000).max(50000).optional().describe('Tail bytes. Default: 8000.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ jobId, tailBytes }) => {
@@ -475,9 +450,9 @@ export const jobTools = [
     {
         name: 'job_cancel',
         title: 'Cancel job',
-        description: 'Cancel a running validator job.',
+        description: 'Cancel an attached running validator job.',
         inputSchema: {
-            jobId: z.string().min(1).describe('Job id returned by run_copilot_validator.'),
+            jobId: z.string().min(1).describe('Validator job id.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ jobId }) => {

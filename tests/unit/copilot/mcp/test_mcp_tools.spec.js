@@ -678,6 +678,22 @@ describe('copilot MCP tools', () => {
                 (workflow) => workflow[0] === 'repo_patch_batch_plan' && workflow[1] === 'repo_apply_patch_batch',
             ),
         );
+        assert.ok(
+            /** @type {string[][]} */ (approvalFrictionProfile['planFirstWorkflows']).some(
+                (workflow) => workflow[0] === 'mcp_validation_plan' && workflow[1] === 'run_copilot_validator',
+            ),
+        );
+        assert.ok(
+            /** @type {string[]} */ (approvalFrictionProfile['firstRememberApprovalWave']).includes(
+                'run_copilot_validator',
+            ),
+        );
+        assert.equal(
+            /** @type {string[]} */ (approvalFrictionProfile['firstRememberApprovalWave']).includes(
+                'mcp_run_safe_validation_suite',
+            ),
+            false,
+        );
         const tools = /**
          * @type {{
          *     name?: string;

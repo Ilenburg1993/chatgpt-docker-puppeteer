@@ -61,7 +61,7 @@ function buildApprovalFrictionProfile(summaries) {
                 'repo_move_file',
                 'repo_quarantine_file',
                 'repo_restore_quarantined_file',
-                'mcp_run_safe_validation_suite',
+                'run_copilot_validator',
             ].includes(name),
         ),
         rememberApprovalCandidates: remember,
@@ -73,7 +73,7 @@ function buildApprovalFrictionProfile(summaries) {
             ['repo_move_file_plan', 'repo_move_file'],
             ['repo_quarantine_file_plan', 'repo_quarantine_file'],
             ['repo_apply_file_batch_plan', 'repo_apply_file_batch'],
-            ['mcp_validation_plan', 'mcp_run_safe_validation_suite'],
+            ['mcp_validation_plan', 'run_copilot_validator'],
         ],
     };
 }
@@ -147,7 +147,7 @@ export const mcpToolsStatusTool = {
                     'ChatGPT host confirmation is separate from OAuth consent. Developer Mode requires confirmation for write actions by default; this MCP cannot disable that UI from the server side.',
                 approvalMinimizers: [
                     'Use read-only *_plan tools before write tools.',
-                    'Use mcp_run_safe_validation_suite instead of separate validator jobs.',
+                    'Use mcp_validation_plan first; prefer run_copilot_validator unit-focused and treat broad suites as escalation.',
                     'Use delegate_to_repo_autonomy_runner for fixed multi-step missions.',
                     'When ChatGPT offers it, remember approval for trusted bounded-write tools in the current conversation.',
                 ],
