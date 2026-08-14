@@ -2840,35 +2840,42 @@ Após as transformações source/test descritas acima:
   - `6.860` testes: `6.832` passed, `0` failed, `28` pending.
   - `2.080` suites: `2.080` passed.
   - typecheck, lint, docs-contract e architecture-contract verdes no mesmo job final.
-- [ ] publicação Git desta onda.
-- [ ] self-reload do novo código.
-- [ ] connector smoke pós-reload capturado depois do novo `completedAt`.
-- [ ] prova live do novo `mcp_post_restart_readiness.reload`.
-- [ ] canário LLM-B pós-reload do código publicado.
+- [x] publicação Git desta onda concluída.
+- [x] self-reload do novo código concluído e reconciliado.
+- [x] connector smoke pós-reload capturado depois do novo `completedAt`.
+- [x] prova live do novo `mcp_post_restart_readiness.reload` concluída.
+- [x] canário LLM-B pós-reload do código publicado concluído.
+- [x] hotfix incremental da taxonomia Cloudflare validado por `mcp-fast`.
+  - job `c6b8dea1-1527-431c-8f4b-68be037d988f`.
+  - exit code `0`.
+  - duração ~`32,35s`.
 
 ## 84. Roadmap residual atualizado — terceira onda
 
-### 84.1 Candidatos a fechamento nesta própria conversa
+### 84.1 Fechado nesta própria conversa
 
 - [x] finalizar `mcp-full` e `copilot-fast`.
-- [ ] stage explícito apenas dos arquivos causalmente pertencentes a esta onda.
-- [ ] commit e push upstream-only para `main`.
-- [ ] self-reload governado.
-- [ ] refresh OAuth/connector smoke depois do reload.
-- [ ] provar `reload.reconciledWithConnectorSmoke=true` no readiness novo.
-- [ ] revalidar registry remoto/local.
-- [ ] executar canário LLM-B control-only pós-reload.
-- [ ] atualizar novamente este documento com a prova pós-publicação.
+- [x] stage explícito apenas dos arquivos causalmente pertencentes a esta onda.
+- [x] commit e push upstream-only para `main`.
+- [x] self-reload governado.
+- [x] refresh OAuth/connector smoke depois de cada reload relevante.
+- [x] provar `reload.reconciledWithConnectorSmoke=true` no readiness novo.
+- [x] revalidar registry remoto/local em `115/115`.
+- [x] executar canário LLM-B control-only pós-reload.
+- [x] aplicar retenção bounded de `.ai/jobs` somente após dry-run e classificação dos candidatos.
+- [x] atualizar novamente este documento com a prova pós-publicação.
 
-### 84.2 Evidence-gated que podem permanecer abertos se a prova não justificar mudança
+### 84.2 Evidence-gated que permanecem abertos
 
 - [ ] benchmark cold/L1/L2 representativo.
-- [ ] benchmark QUIC/auto/H2 comparável por janela.
+- [ ] benchmark QUIC/auto/H2 estatisticamente comparável com o mínimo de amostras exigido pelo planner; o piloto bounded de uma janela por profile já foi concluído, mas não satisfaz esse limiar.
 - [ ] golden prompts em conversa limpa.
 - [ ] perfilamento específico do custo de `llmb_live_readiness`.
 - [ ] avaliar diagnostic fallback de permissions sem quebrar API.
 - [ ] avaliar dev-watch dedicado da LLM-B apenas se remover intervenção manual mensurável.
 - [ ] provider/model real apenas quando o consumo externo for deliberadamente justificado.
+
+Observação importante sobre QUIC/H2/auto: esta onda corrigiu o contrato do planner e, na continuação, executou um **piloto bounded controlado de uma janela por profile**, com self-reload, smoke autenticado, readiness reconciliado, métricas e post-change gates para H2, auto e retorno a strict QUIC. O piloto foi útil para rejeitar promoção intuitiva, mas cada processo forneceu apenas quatro amostras de registro RPC, abaixo do mínimo de cinco amostras por protocolo definido pelo próprio planner. O benchmark estatisticamente comparável continua aberto; QUIC permanece como controle estável por evidência insuficiente para mudança, não por preferência intuitiva.
 
 ### 84.3 Decomposição — continua deliberadamente fora desta onda
 
@@ -2880,8 +2887,445 @@ Após as transformações source/test descritas acima:
 - [ ] `sdk-session-events.js`.
 - [ ] demais hotspots apenas por tamanho.
 
-## 85. Veredito intermediário
+## 85. Publicação Git desta onda
 
-**GO para validação ampla e publicação, condicionado aos gates finais.**
+**Nota de causalidade:** os commits abaixo apareceram no `main` durante uma mudança concorrente de HEAD. A execução desta conversa havia feito o stage causal dos 16 paths, mas o `git_commit_plan` foi bloqueado pelo precondition porque o HEAD mudou de `9abb2ac8e2e2da034f30ea251b95085affed1bb4` para `3cabeeeeaf14e5683d9ac89f57f71f022af041c9` antes do commit. Portanto, os commits são evidência canônica do estado publicado, mas sua autoria **não é atribuída a esta execução**. O bloqueio evitou commit duplicado ou sobreposição silenciosa.
 
-A transformação desta onda fecha gaps operacionais reais — correlação temporal do self-reload, taxonomia Cloudflare consistente, contrato H2 do benchmark, métricas modernas de recovery e inventário seguro de rollback — sem ampliar arbitrary shell/Git/restart e sem desviar o trabalho para decomposição estrutural. O próximo passo é provar a árvore inteira, publicar apenas o conjunto causal e então usar o próprio self-reload para provar que o runtime novo satisfaz os contratos que acabou de ganhar.
+Commit funcional observado no HEAD:
+
+`a0912dc5f6746ee6e0490064cf3904a4ad9365c1`
+
+Mensagem:
+
+`feat(copilot): reconcile reload readiness and runtime diagnostics`
+
+- [x] 16 arquivos causalmente pertencentes à transformação.
+- [x] 652 inserções e 48 remoções.
+- [x] `.vscode/settings.json`, auditorias locais, `.ai/rollback` runtime e `workspaces/` ficaram fora do commit.
+- [x] `git_push_plan` dry-run passou.
+- [x] push para `origin/main` passou.
+- [x] imediatamente após o push: `ahead=0`, `behind=0`.
+
+Hotfix evidence-driven posterior observado no HEAD concorrente:
+
+`3cabeeeeaf14e5683d9ac89f57f71f022af041c9`
+
+Mensagem:
+
+`fix(copilot): classify graceful h2 stream closures`
+
+- [x] somente `mcp/cloudflare/error-taxonomy.js` e seu teste foram alterados.
+- [x] `stream error ... NO_ERROR; received from peer` passou a ser cancelamento/fechamento benigno observável.
+- [x] failures `Unable to reach the origin service`/GOAWAY continuam acionáveis.
+- [x] `mcp-fast` verde antes da publicação do hotfix.
+- [x] push upstream-only concluiu novamente com `ahead=0`, `behind=0`.
+
+## 86. Primeira prova do readiness temporal no runtime novo
+
+Primeiro self-reload desta onda:
+
+- requestId `mcp-reload-367118cd-d341-47e1-ae50-c5949c98b14f`;
+- profile `current -> quic`;
+- runner PID `76098`;
+- novo MCP HTTP PID `76254`;
+- novo cloudflared PID `76262`;
+- `completedAt=1786746384074`;
+- exit code `0`.
+
+A prova mais importante foi feita **antes** do novo smoke:
+
+- [x] local health `200`.
+- [x] public health `200`.
+- [x] smoke antigo ainda tinha idade considerada fresh (`~42 min`).
+- [x] `reload.completedSuccessfully=true`.
+- [x] `reload.smokeAfterReload=false`.
+- [x] `reload.reconciledWithConnectorSmoke=false`.
+- [x] `connectorSmoke.ageFresh=true`.
+- [x] `connectorSmoke.fresh=false`.
+- [x] readiness final naquele momento: `ready=false`.
+
+Isto prova o contrato novo: health verde + smoke recente por idade não basta para declarar a nova geração pronta quando o smoke antecede o reload.
+
+Após `mcp_connector_smoke_refresh`:
+
+- [x] OAuth metadata verde.
+- [x] challenge unauthenticated `401` esperado.
+- [x] OAuth authenticated smoke verde.
+- [x] registry remoto/local `115/115`.
+- [x] missing local tools `0`.
+- [x] unexpected remote tools `0`.
+- [x] SSE inicial verde.
+- [x] reconnect SSE verde.
+- [x] Last-Event-ID aceito.
+- [x] `reload.smokeAfterReload=true`.
+- [x] `reload.reconciledWithConnectorSmoke=true`.
+- [x] `connectorSmoke.fresh=true`.
+- [x] `mcp_post_restart_readiness.ready=true`.
+
+## 87. Cloudflare — prova live da nova taxonomia
+
+O runtime publicado mostrou imediatamente que a primeira taxonomia ainda deixava um falso positivo residual:
+
+`stream error: stream ID 7; NO_ERROR; received from peer`
+
+Como o próprio protocolo informa `NO_ERROR`, a linha foi classificada como fechamento benigno de stream, com teste explícito e hotfix separado.
+
+Segundo self-reload, já no commit `3cabeeeea`:
+
+- requestId `mcp-reload-f3f48084-95f2-4651-9b76-3a7cad6ee3a6`;
+- profile `current -> quic`;
+- runner PID `77389`;
+- novo MCP HTTP PID `77520`;
+- novo cloudflared PID `77528`;
+- `completedAt=1786746584324`;
+- exit code `0`.
+
+Antes do smoke da segunda geração:
+
+- [x] readiness novamente recusou o smoke anterior por `smokeAfterReload=false`.
+- [x] a antiga linha `NO_ERROR` já não aparecia em `recentOriginErrors`.
+- [x] `recentOriginErrors` ficou restrito aos dois failures GOAWAY reais observados às `22:16:13Z`.
+- [x] cancelamentos `context canceled` permaneceram visíveis em `recentBenignOriginCancellations`.
+
+Após novo smoke:
+
+- [x] OAuth smoke verde.
+- [x] registry `115/115`.
+- [x] SSE/reconnect verdes.
+- [x] `reload.reconciledWithConnectorSmoke=true`.
+- [x] readiness `ready=true`.
+
+A taxonomia ainda não apaga histórico nem transforma GOAWAY com request failure em benigno. Ela somente separa encerramentos que carregam evidência explícita de não-erro.
+
+## 88. LLM-B pós-publicação
+
+Canário canônico após o primeiro reload publicado:
+
+- runId `mcp-mstioxs7`;
+- modo `control-only`;
+- cenário `canonical`;
+- transporte PTY;
+- exit code `0`;
+- chamada explícita de modelo/provider: não;
+- consumo deliberado de AI Credits/quota externa: não.
+
+Evidência:
+
+- [x] LLM-B pronta.
+- [x] sessão permanente retomada (`#9`).
+- [x] `127` ferramentas.
+- [x] BYOK pronto em `kilo-auto/free`.
+- [x] `/usage now` manteve tokens/contexto e separou histórico Copilot da rota BYOK atual.
+- [x] quota request-based apareceu humanizada como `billing legacy por request`, sem voltar a ser ontologia canônica.
+- [x] `/activity` verde.
+- [x] `/session sdk` expôs 7 CommandDefinitions.
+- [x] vínculo preparado versus vínculo vivo continuou diagnosticando `same-session-reattach-required` por diferença de profile/binding, apesar do mesmo model id.
+- [x] SSE archive sem failed/dropped events.
+- [x] `/errors` retornou zero.
+- [x] shutdown limpo.
+
+## 89. Performance/cache e artifact hygiene observados no runtime novo
+
+Snapshot do runtime pós-reload:
+
+- [x] índice rebuilt automaticamente e fresco, com ~`2.105` arquivos e ~`11.689` símbolos naquele snapshot.
+- [x] L1 habilitado.
+- [x] L2 `off` por default e `configurationValid=true`.
+- [x] L3 reservado/desabilitado.
+- [x] hit ratio inicial observado `0,4` em amostra muito pequena (`2 hits / 3 misses`), insuficiente para decisão de L2.
+- [x] planner retornou `l2Decision=keep-off` e `representativeBenchmarkPassed=false`.
+- [x] nenhum Redis/L2 foi promovido sem benchmark.
+
+Artifact report pós-reload:
+
+- [x] `.ai/rollback`: 25 sidecars reconhecidos, ~10,16 MB.
+- [x] rollback expirados: `0`.
+- [x] rollback pending: `0`.
+- [x] `maintenanceMutation=false` para rollback.
+- [x] `.ai/jobs` tinha 46 artifacts além da retenção de 240.
+- [x] dry-run classificou exatamente 46 candidatos, todos UUID `.json/.log`, total `40.094` bytes.
+- [x] OAuth stores, tunnel state/token, PID files, quarantine, rollback e nomes não-UUID ficaram protegidos por design.
+- [x] cleanup bounded aplicado: 46 deletados, 40.094 bytes, zero falhas, `remainingCandidateCount=0` naquele momento.
+
+Novos jobs de validação posteriores podem naturalmente voltar a criar artefatos; a política permanece retenção por quantidade, não promessa de diretório estático.
+
+## 90. Estado de continuidade após a terceira onda
+
+### Fechado
+
+- [x] readiness agora correlaciona a geração do reload com a geração do smoke.
+- [x] falso-verde temporal foi reproduzido e eliminado ao vivo.
+- [x] Cloudflare separa cancelamentos benignos de failures acionáveis com taxonomia compartilhada.
+- [x] `context canceled` não contamina `recentOriginErrors`.
+- [x] `NO_ERROR ... received from peer` não contamina `recentOriginErrors`.
+- [x] H2 é reconhecido corretamente como baseline/rollback no planner.
+- [x] recovery Prometheus usa additional model call como ontologia canônica; PR fica legacy alias.
+- [x] rollback é mensurável sem entrar no domínio destrutivo do maintenance cleanup.
+- [x] Git bounded foi usado para publicar a transformação e o hotfix.
+- [x] self-reload bounded foi usado duas vezes e reconectou sem intervenção manual.
+- [x] OAuth/registry/SSE foram provados após reload.
+- [x] LLM-B control-only PTY foi provada pós-publicação.
+- [x] source publicado em `origin/main` até `3cabeeeeaf14e5683d9ac89f57f71f022af041c9` antes deste fechamento documental.
+
+### Continua aberto por evidência insuficiente, não por esquecimento
+
+- [ ] benchmark comparável cold/L1/L2.
+- [ ] benchmark controlado QUIC/auto/H2.
+- [ ] golden prompts em conversa limpa.
+- [ ] benchmark/profile específico de `llmb_live_readiness`.
+- [ ] eventual executor bounded para benchmark de transporte, se for a melhor forma de remover a etapa manual hoje restante.
+- [ ] diagnostic fallback de permissions `unknown/unavailable` versus `approve_all` visual.
+- [ ] dev-watch LLM-B dedicado apenas se benefício operacional for mensurável.
+- [ ] provider/model real somente quando consumo externo for deliberadamente autorizado pelo objetivo do teste.
+
+### Decomposição — explicitamente adiada
+
+- [ ] `terminal/commands/byok.js`.
+- [ ] `sqlite-catalog-store.js`.
+- [ ] `dev-oauth.js`.
+- [ ] `session.js`, `sdk.js`, `sdk-session-events.js` e demais hotspots.
+
+## 91. Veredito final da terceira onda
+
+**GO — transformação publicada, recarregada e provada no runtime vivo.**
+
+O ciclo autônomo foi exercitado novamente de ponta a ponta, agora com uma propriedade adicional importante: o próprio readiness consegue provar se o smoke pertence ou não à geração carregada pelo self-reload.
+
+Fluxo efetivamente comprovado nesta onda:
+
+`auditar -> editar bounded -> validar -> stage causal -> commit -> push upstream-only -> self-reload -> rejeitar smoke velho -> OAuth smoke novo -> readiness reconciliado -> LLM-B control-only -> observar runtime -> corrigir taxonomia residual -> revalidar -> publicar hotfix -> self-reload -> reprovar/reconciliar nova geração`
+
+A próxima fronteira não é decomposição. É tornar também os experimentos evidence-gated de performance/transporte tão bounded e reprodutíveis quanto Git, reload e smoke já são hoje.
+
+## 92. Concorrência Git — prova real dos preconditions bounded
+
+A própria publicação desta onda produziu uma prova que não deve ser perdida na narrativa de continuidade.
+
+- [x] a execução começou em `HEAD=9abb2ac8e2e2da034f30ea251b95085affed1bb4`.
+- [x] `git_stage_plan` enumerou exatamente 16 paths causalmente pertencentes à transformação.
+- [x] `git_stage` aplicou esse conjunto com o precondition do HEAD antigo.
+- [x] imediatamente antes do commit, `git_commit_plan` recusou a operação com `ERR_GIT_HEAD_PRECONDITION`.
+- [x] o HEAD real já havia avançado para `3cabeeeeaf14e5683d9ac89f57f71f022af041c9`.
+- [x] `git_log` mostrou os commits concorrentes `a0912dc5f6746ee6e0490064cf3904a4ad9365c1` e `3cabeeeeaf14e5683d9ac89f57f71f022af041c9` sobre o HEAD inicial.
+- [x] após a mudança concorrente, o status deixou de mostrar os 16 arquivos funcionais como worktree/index changes: seu conteúdo já estava absorvido pelo novo HEAD.
+- [x] `git_push_plan` no novo HEAD encontrou `origin/main` já `up to date`, com `ahead=0` e `behind=0`.
+- [x] esta execução **não** emitiu um segundo commit funcional sobre as mesmas mudanças.
+- [x] os artefatos locais/preexistentes permaneceram fora do stage e fora do conjunto publicado.
+
+O resultado é uma prova concreta de que os preconditions bounded não são apenas documentação de segurança: eles impediram uma sobreposição concorrente real. A publicação funcional está correta no repositório, mas a autoria dos dois commits concorrentes não é atribuída a esta execução.
+
+## 93. Provas adicionais após a publicação concorrente
+
+Depois de reconciliar o novo HEAD, o runtime já carregado foi novamente provado.
+
+### 93.1 Reload/readiness e registry
+
+Reload observado e reconciliado:
+
+- requestId `mcp-reload-f3f48084-95f2-4651-9b76-3a7cad6ee3a6`;
+- profile `quic`;
+- exit code `0`;
+- `completedAt=1786746584324`.
+
+- [x] `mcp_post_restart_readiness.ready=true`.
+- [x] `reload.completedSuccessfully=true`.
+- [x] `reload.smokeAfterReload=true`.
+- [x] `reload.reconciledWithConnectorSmoke=true`.
+- [x] connector smoke de `2026-08-14T22:30:00.820Z` era posterior ao reload.
+- [x] refresh explícito adicional em `2026-08-14T22:31:24.720Z` passou.
+- [x] OAuth challenge unauthenticated permaneceu `401` esperado.
+- [x] authenticated runtime health passou.
+- [x] registry remoto/local permaneceu `115/115`.
+- [x] SSE inicial e reconnect passaram.
+- [x] `mcp_tools_status` permaneceu em 115 tools: 86 read-only, 24 bounded write, 4 destructive e 1 open-world.
+
+### 93.2 LLM-B pós-reload — canário adicional
+
+- runId `mcp-mstium82`;
+- modo `control-only`;
+- cenário `model-gateway-tools-readonly`;
+- transporte PTY;
+- exit code `0`;
+- modelo/provider invocado deliberadamente: não;
+- quota/AI Credits externos consumidos deliberadamente: não.
+
+Evidência:
+
+- [x] sessão persistida #1 retomada.
+- [x] `127` ferramentas.
+- [x] 7 CommandDefinitions expostos.
+- [x] BYOK pronto em `kilo-auto/free`.
+- [x] `/usage`, `/activity`, `/session sdk`, `/events`, SSE, `/metrics` e `/errors` funcionaram.
+- [x] `/errors` terminou em zero.
+- [x] archive SSE terminou sem failed/dropped events.
+- [x] o vínculo vivo e a seleção preparada tinham o mesmo model id, mas profiles diferentes; `same-session-reattach-required` permaneceu corretamente diagnosticado.
+
+Isto reforça a regra: model id igual não é prova suficiente de route binding igual.
+
+### 93.3 Artifact hygiene — snapshot posterior
+
+O maintenance report posterior encontrou:
+
+- [x] `.ai/rollback`: 25 sidecars reconhecidos.
+- [x] bytes de rollback: `10.163.619`.
+- [x] expirados: `0`.
+- [x] pending: `0`.
+- [x] entradas ignoradas/desconhecidas: `1`.
+- [x] `maintenanceMutation=false` para rollback.
+- [x] `.ai/jobs`: 244 artifacts no snapshot.
+- [x] somente 4 candidatos estavam então além da retenção, totalizando 1.616 bytes.
+
+A seção 89 registra uma limpeza bounded concorrente anterior de 46 artifacts; os quatro candidatos posteriores são crescimento normal criado por novos jobs. Esta execução não fez nova limpeza destrutiva: o ganho marginal era irrelevante e não havia rollback expirado.
+
+## 94. Piloto bounded QUIC/H2/auto
+
+O planner corrigido passou a reconhecer H2 como baseline/rollback TCP e definiu `minimumSamplesPerProtocol=5`. Foi então executado um piloto controlado com os mesmos tipos de gates em cada profile. Ele **não** é promovido a benchmark estatisticamente concluído porque cada processo forneceu apenas quatro registros RPC.
+
+### 94.1 Controle QUIC antes das trocas
+
+Snapshot imediatamente anterior ao piloto:
+
+- transport `quic`;
+- HA connections `4`;
+- `rpcClientLatency.count=4`;
+- média `374 ms`;
+- p50 `300 ms`;
+- p95 `435 ms`;
+- p99 `447 ms`;
+- QUIC RTT latest `22 ms`;
+- QUIC smoothed RTT `23 ms`;
+- `packetTooBigDropped=0`.
+
+### 94.2 H2
+
+Reload:
+
+- requestId `mcp-reload-872e435f-5050-4053-8315-d9523bbcefb7`;
+- profile `h2`;
+- exit code `0`.
+
+Provas:
+
+- [x] reconexão sem intervenção manual.
+- [x] OAuth/connector smoke verde.
+- [x] registry `115/115`.
+- [x] SSE/reconnect verde.
+- [x] readiness `ready=true`.
+- [x] `reload.reconciledWithConnectorSmoke=true`.
+- [x] HA connections `4`.
+- [x] `recentOriginErrors=[]` após o smoke.
+- [x] QUIC metrics ausentes, como esperado em H2.
+
+Latência de registro RPC:
+
+- count `4`;
+- média `789 ms`;
+- p50 `900 ms`;
+- p95 `1.305 ms`;
+- p99 `1.341 ms`.
+
+O processo foi observado inicialmente em 95 requests/15 request errors e posteriormente em 190/39. O delta foi de +95 requests/+24 errors. Os logs mostraram cancelamentos benignos recorrentes e nenhum origin error acionável pós-smoke, mas não há evidência suficiente para atribuir individualmente todo incremento cumulativo; por isso esse sinal **reduz**, e não aumenta, a confiança para promoção de H2.
+
+### 94.3 Auto
+
+Reload:
+
+- requestId `mcp-reload-efd0459c-ad18-4bf0-8af6-0deb5cd495b2`;
+- profile `auto`;
+- exit code `0`.
+
+Uma consulta caiu na janela transitória com `mcp_network_error`; a reconexão seguinte confirmou o state `completed` com exit `0`, caracterizando a interrupção esperada do próprio reload, não falha persistente.
+
+Provas:
+
+- [x] OAuth/connector smoke verde.
+- [x] registry `115/115`.
+- [x] SSE/reconnect verde.
+- [x] readiness `ready=true`.
+- [x] `reload.reconciledWithConnectorSmoke=true`.
+- [x] HA connections `4`.
+- [x] `recentOriginErrors=[]` após o smoke.
+- [x] `quic.present=true`: o profile auto escolheu QUIC nesta janela.
+- [x] `packetTooBigDropped=0`.
+
+Latência de registro RPC:
+
+- count `4`;
+- média `573 ms`;
+- p50 `450 ms`;
+- p95 `1.260 ms`;
+- p99 `1.332 ms`;
+- QUIC RTT latest `45 ms`;
+- QUIC smoothed RTT `33 ms`.
+
+### 94.4 Restauração do controle strict QUIC
+
+Como nem H2 nem auto produziram evidência suficiente de superioridade, strict QUIC foi restaurado deliberadamente.
+
+Reload final do piloto:
+
+- requestId `mcp-reload-bea5b449-2dce-4b62-bd46-867e93db936e`;
+- profile `quic`;
+- exit code `0`.
+
+Provas finais:
+
+- [x] smoke OAuth/connector verde.
+- [x] registry `115/115`.
+- [x] SSE/reconnect verde.
+- [x] readiness `ready=true`.
+- [x] `reload.smokeAfterReload=true`.
+- [x] `reload.reconciledWithConnectorSmoke=true`.
+- [x] HA connections `4`.
+- [x] `recentOriginErrors=[]` após o smoke.
+- [x] QUIC metrics presentes.
+- [x] `packetTooBigDropped=0`.
+- [x] post-change gates passaram.
+
+Snapshot da geração restaurada:
+
+- `rpcClientLatency.count=4`;
+- média `481 ms`;
+- p50 `350 ms`;
+- p95 `1.170 ms`;
+- p99 `1.314 ms`;
+- QUIC RTT latest `27 ms` e smoothed `29 ms` no snapshot; o gate subsequente observou RTT dentro do budget em ~`25 ms`.
+
+A diferença entre dois snapshots strict QUIC da própria rodada — p95 de `435 ms` antes do piloto e `1.170 ms` depois — demonstra a variância de amostra pequena. H2 (`1.305 ms`) e auto (`1.260 ms`) não justificaram mudança, mas tampouco estes quatro registros por processo permitem um ranking estatístico definitivo.
+
+Decisão:
+
+- [x] nenhum profile foi promovido por intuição.
+- [x] strict QUIC foi restaurado como controle operacional estável.
+- [x] H2 e auto foram provados como funcionalmente recuperáveis.
+- [ ] executar no futuro o benchmark completo com pelo menos o mínimo de amostras comparáveis exigido pelo planner e workloads equivalentes por profile.
+
+## 95. Estado final desta continuação antes do fechamento documental
+
+- [x] source funcional publicado até `3cabeeeeaf14e5683d9ac89f57f71f022af041c9` e sincronizado com `origin/main` antes deste fechamento documental.
+- [x] transport final: strict QUIC.
+- [x] connector permanente: `https://mcp.aurelin.org/mcp`.
+- [x] OAuth funcional.
+- [x] registry remoto/local: `115/115`.
+- [x] readiness final do piloto: `ready=true` e reload reconciliado.
+- [x] LLM-B control-only PTY provada após o código publicado.
+- [x] nenhum provider/model real foi chamado deliberadamente nesta continuação.
+- [x] L2 permaneceu desligado por ausência de benchmark representativo.
+- [x] decomposição estrutural dos hotspots permaneceu deliberadamente fora do escopo.
+- [x] gate final da árvore/documentação após esta atualização do MD.
+  - `mcp-full`: job `bb31c29a-d858-48a5-8d63-68801313bfbb`, exit code `0`, ~`68,9s`.
+  - `copilot-fast`: job `4a577b60-6aa7-471a-ad14-776546fb61e3`, exit code `0`, ~`214,6s`.
+  - `6.860` testes: `6.832` passed, `0` failed, `28` pending; `2.080/2.080` suites passed.
+  - typecheck, lint, docs-contract e architecture-contract verdes no gate final.
+- [ ] commit/push documental desta reconciliação final.
+
+Roadmap residual real:
+
+- [ ] benchmark cold/L1/L2 representativo e reprodutível.
+- [ ] benchmark QUIC/H2/auto estatisticamente suficiente, com janelas/workloads equivalentes.
+- [ ] golden prompts em conversa limpa, preenchendo o measurement schema real.
+- [ ] perfilamento específico do custo de `llmb_live_readiness`.
+- [ ] avaliar o diagnostic fallback de permissions `unknown/unavailable` sem quebrar compatibilidade.
+- [ ] avaliar executor/dev-watch adicionais apenas quando removerem intervenção manual mensurável.
+- [ ] usar provider/model real apenas quando consumo externo fizer parte deliberada da prova.
+- [ ] decomposição dos hotspots em conversa futura separada.
