@@ -6,12 +6,24 @@
  */
 
 import { z } from 'zod';
-import { boundedWriteAnnotations, okResult, readMcpMetricsSnapshot, spawnValidatorJob } from '#copilot/mcp/control-plane';
+import {
+    boundedWriteAnnotations,
+    errorResult,
+    normalizeFocusedUnitTestFiles,
+    okResult,
+    readMcpMetricsSnapshot,
+    spawnValidatorJob,
+} from '#copilot/mcp/control-plane';
 import { buildMcpCapabilitiesSummary } from './meta.js';
 import { repoStatusHandler } from './repo-status.js';
 import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';
 
-const missionSchema = z.enum(['diagnose-mcp', 'validate-mcp-full', 'maintenance-safe-dry-run']);
+const missionSchema = z.enum([
+    'diagnose-mcp',
+    'validate-focused',
+    'validate-mcp-full',
+    'maintenance-safe-dry-run',
+]);
 
 /**
  * @param {string} mission
@@ -26,9 +38,15 @@ function buildMissionPlan(mission) {
             { step: 'mcp_runtime_health', effect: 'Read in-process MCP metrics.' },
         ];
     }
+    if (mission === 'validate-focused') {
+        return [
+            { step: 'run_copilot_validator', effect: 'Start one unit-focused validator job for an explicit Copilot test file.' },
+            { step: 'job_get_summary', effect: 'Caller reads compact focused-job status.' },
+        ];
+    }
     if (mission === 'validate-mcp-full') {
         return [
-            { step: 'mcp_run_safe_validation_suite', effect: 'Start suite-mcp-full validator job.' },
+            { step: 'mcp_run_safe_validation_suite', effect: 'Start suite-mcp-full only as explicit broad escalation.' },
             {
                 step: 'mcp_validation_dashboard',
                 effect: 'Caller reads compact validation status after the suite starts.',
@@ -49,34 +67,52 @@ function buildMissionPlan(mission) {
 export const delegateToRepoAutonomyRunnerTool = {
     name: 'delegate_to_repo_autonomy_runner',
     title: 'Delegate to repo autonomy runner',
-    description:
-        'Run or dry-run a fixed local autonomy workflow without arbitrary shell, arbitrary paths, or direct destructive actions.',
+    description: 'Run or dry-run a fixed local autonomy mission; no arbitrary shell, paths, or destructive actions.',
     inputSchema: {
-        mission: missionSchema.describe(
-            'Allowlisted mission: diagnose-mcp, validate-mcp-full, or maintenance-safe-dry-run.',
-        ),
-        dryRun: z
-            .boolean()
+        mission: missionSchema.describe('Fixed mission; prefer validate-focused for localized validation.'),
+        testFile: z
+            .string()
+            .min(1)
+            .max(1024)
             .optional()
-            .describe('Return the execution plan without running write-like steps. Default: true.'),
-        timeoutMs: z
-            .number()
-            .int()
-            .min(1000)
-            .max(3600000)
-            .optional()
-            .describe('Optional timeout for validator job missions.'),
+            .describe('Explicit Copilot .spec.js path for validate-focused.'),
+        dryRun: z.boolean().optional().describe('Plan only. Default: true.'),
+        timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Validator timeout ms.'),
     },
     annotations: boundedWriteAnnotations(),
-    handler: async ({ mission, dryRun, timeoutMs }) => {
+    handler: async ({ mission, testFile, dryRun, timeoutMs }) => {
         const selectedMission = String(mission);
+        const isFocused = selectedMission === 'validate-focused';
         const isDryRun = dryRun !== false;
+        /** @type {string | null} */
+        let focusedTestFile = null;
+        if (isFocused) {
+            if (!testFile) {
+                return errorResult('validate-focused requires testFile.', {
+                    code: 'ERR_FOCUSED_TEST_FILE_REQUIRED',
+                    hint: 'Pass one explicit tests/unit/copilot/**/*.spec.js path.',
+                });
+            }
+            try {
+                focusedTestFile = normalizeFocusedUnitTestFiles([testFile])[0] ?? null;
+            } catch (error) {
+                return errorResult('Invalid focused test file.', {
+                    code: 'ERR_INVALID_FOCUSED_TEST_FILE',
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
+        } else if (testFile) {
+            return errorResult('testFile is valid only with validate-focused.', {
+                code: 'ERR_UNEXPECTED_FOCUSED_TEST_FILE',
+            });
+        }
         const plan = buildMissionPlan(selectedMission);
 
         if (isDryRun) {
             return okResult({
                 success: true,
                 mission: selectedMission,
+                ...(focusedTestFile ? { testFile: focusedTestFile } : {}),
                 dryRun: true,
                 executed: false,
                 plan,
@@ -104,6 +140,28 @@ export const delegateToRepoAutonomyRunnerTool = {
                     smoke: smoke.structuredContent,
                     metrics: readMcpMetricsSnapshot(),
                 },
+            });
+        }
+
+        if (selectedMission === 'validate-focused') {
+            if (!focusedTestFile) {
+                return errorResult('Focused test file was not resolved.', {
+                    code: 'ERR_FOCUSED_TEST_FILE_REQUIRED',
+                });
+            }
+            const job = await spawnValidatorJob('unit-focused', {
+                testFiles: [focusedTestFile],
+                ...(timeoutMs === undefined ? {} : { timeoutMs: Number(timeoutMs) }),
+            });
+            return okResult({
+                success: true,
+                mission: selectedMission,
+                testFile: focusedTestFile,
+                dryRun: false,
+                executed: true,
+                plan,
+                job,
+                nextStep: 'Use job_get_summary with job.id; read a small job_get_output tail only on failure.',
             });
         }
 

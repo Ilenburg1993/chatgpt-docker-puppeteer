@@ -776,6 +776,21 @@ describe('copilot MCP tools', () => {
         assert.equal(result.structuredContent?.['constraints']?.['arbitraryShell'], false);
         const plan = /** @type {{ step?: string }[]} */ (result.structuredContent?.['plan']);
         assert.ok(plan.some((step) => step.step === 'mcp_smoke_workspace'));
+
+        const focused = await tool.handler({
+            mission: 'validate-focused',
+            testFile: 'tests/unit/copilot/mcp/test_mcp_tools.spec.js',
+            dryRun: true,
+        });
+        assert.equal(focused.isError, undefined);
+        assert.equal(focused.structuredContent?.['testFile'], 'tests/unit/copilot/mcp/test_mcp_tools.spec.js');
+        const focusedPlan = /** @type {{ step?: string }[]} */ (focused.structuredContent?.['plan']);
+        assert.ok(focusedPlan.some((step) => step.step === 'run_copilot_validator'));
+        assert.equal(focusedPlan.some((step) => step.step === 'mcp_run_safe_validation_suite'), false);
+
+        const missingFocusedFile = await tool.handler({ mission: 'validate-focused', dryRun: true });
+        assert.equal(missingFocusedFile.isError, true);
+        assert.equal(missingFocusedFile.structuredContent?.['code'], 'ERR_FOCUSED_TEST_FILE_REQUIRED');
     });
 
     it('mcp_golden_prompts returns real-ChatGPT measurement prompts', async () => {

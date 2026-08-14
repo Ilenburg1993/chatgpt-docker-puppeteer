@@ -124,10 +124,11 @@ export const mcpSessionProfileTool = {
                 {
                     task: 'delegated-longer-work',
                     flow: [
-                        'delegate_to_repo_autonomy_runner dryRun=true',
-                        'delegate_to_repo_autonomy_runner dryRun=false',
+                        'delegate_to_repo_autonomy_runner mission=validate-focused testFile=<causal .spec.js> dryRun=true',
+                        'delegate_to_repo_autonomy_runner mission=validate-focused testFile=<same file> dryRun=false',
+                        'use validate-mcp-full only as explicit broad escalation',
                     ],
-                    reason: 'The local runner executes only fixed missions and avoids arbitrary shell or destructive actions.',
+                    reason: 'The fixed runner keeps delegated validation file-scoped by default and avoids arbitrary shell or destructive actions.',
                 },
             ],
             approvalGuidance: {
