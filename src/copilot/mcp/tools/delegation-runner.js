@@ -5,10 +5,19 @@
  * @module copilot/mcp/tools/delegation-runner
  */
 
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import process from 'node:process';
 import { z } from 'zod';
 import {
+    TRANSPORT_BENCHMARK_STATE_PATH,
+    readCloudflareTunnelConfig,
+} from '#copilot/mcp/cloudflare';
+import {
+    appendMcpAuditEvent,
     boundedWriteAnnotations,
     errorResult,
+    getMcpWorkspaceRoot,
     normalizeFocusedUnitTestFiles,
     okResult,
     readMcpMetricsSnapshot,
@@ -18,9 +27,11 @@ import { buildMcpCapabilitiesSummary } from './meta.js';
 import { repoStatusHandler } from './repo-status.js';
 import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';
 
+const TRANSPORT_BENCHMARK_RUNNER = 'src/copilot/mcp/scripts/scheduled-transport-benchmark-runner.js';
 const missionSchema = z.enum([
     'diagnose-mcp',
     'validate-focused',
+    'benchmark-transport',
     'validate-mcp-full',
     'maintenance-safe-dry-run',
 ]);
@@ -42,6 +53,13 @@ function buildMissionPlan(mission) {
         return [
             { step: 'run_copilot_validator', effect: 'Start one unit-focused validator job for an explicit Copilot test file.' },
             { step: 'job_get_summary', effect: 'Caller reads compact focused-job status.' },
+        ];
+    }
+    if (mission === 'benchmark-transport') {
+        return [
+            { step: 'mcp_cloudflare_transport_benchmark_plan', effect: 'Read the fixed benchmark design and last persisted run.' },
+            { step: 'scheduled_transport_benchmark_runner', effect: 'Detached runner measures quic/auto/http2 and restores the initial control.' },
+            { step: 'mcp_cloudflare_transport_benchmark_plan', effect: 'Read persisted comparison after the runner completes.' },
         ];
     }
     if (mission === 'validate-mcp-full') {
@@ -162,6 +180,51 @@ export const delegateToRepoAutonomyRunnerTool = {
                 plan,
                 job,
                 nextStep: 'Use job_get_summary with job.id; read a small job_get_output tail only on failure.',
+            });
+        }
+
+        if (selectedMission === 'benchmark-transport') {
+            const config = readCloudflareTunnelConfig();
+            const controlProfile = config.transportProtocol;
+            const requestId = `mcp-transport-benchmark-${randomUUID()}`;
+            const child = spawn(
+                process.execPath,
+                [
+                    TRANSPORT_BENCHMARK_RUNNER,
+                    '--request-id',
+                    requestId,
+                    '--control-profile',
+                    controlProfile,
+                ],
+                {
+                    cwd: getMcpWorkspaceRoot(),
+                    env: process.env,
+                    detached: true,
+                    stdio: 'ignore',
+                },
+            );
+            child.unref();
+            await appendMcpAuditEvent({
+                event: 'mcp_transport_benchmark_scheduled',
+                tool: 'delegate_to_repo_autonomy_runner',
+                requestId,
+                controlProfile,
+                runnerPid: child.pid ?? null,
+            });
+            return okResult({
+                success: true,
+                mission: selectedMission,
+                dryRun: false,
+                executed: true,
+                scheduled: true,
+                plan,
+                requestId,
+                controlProfile,
+                stateFile: TRANSPORT_BENCHMARK_STATE_PATH,
+                runnerPid: child.pid ?? null,
+                autoPromotion: false,
+                note: 'The detached runner may cause transient connector interruptions while switching profiles; it always attempts to restore the initial control.',
+                nextStep: 'After the runner settles, call mcp_cloudflare_transport_benchmark_plan to read the persisted run and comparison.',
             });
         }
 

@@ -6,7 +6,12 @@
  */
 
 import { z } from 'zod';
-import { readCloudflaredMetricsSnapshot, readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare';
+import {
+    TRANSPORT_BENCHMARK_STATE_PATH,
+    readCloudflaredMetricsSnapshot,
+    readCloudflareTunnelConfig,
+    readTransportBenchmarkState,
+} from '#copilot/mcp/cloudflare';
 import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const CANDIDATES = ['http2', 'auto', 'quic'];
@@ -35,6 +40,7 @@ export const mcpCloudflareTransportBenchmarkPlanTool = {
 export async function buildCloudflareTransportBenchmarkPlan(input = {}) {
     const config = readCloudflareTunnelConfig();
     const metrics = input.includeMetricsBaseline === true ? await safeMetricsSnapshot(input.timeoutMs) : null;
+    const lastRun = summarizePersistedBenchmarkState(await readTransportBenchmarkState());
     const currentProtocol = config.transportProtocol;
     const candidates = CANDIDATES.map((candidate) => ({
         protocol: candidate,
@@ -58,27 +64,36 @@ export async function buildCloudflareTransportBenchmarkPlan(input = {}) {
         },
         candidates,
         metricsBaseline: metrics,
+        lastRun,
         benchmarkDesign: {
             minimumSamplesPerProtocol: DEFAULT_MIN_SAMPLES,
+            sampleMetric: 'wall-clock duration of the canonical OAuth/connector smoke workload',
             protocolOrder: buildProtocolOrder(currentProtocol),
             requiredGates: [
-                'mcp_connector_smoke_refresh ok=true after each protocol switch',
-                'mcp_tunnel_status shows permanent tunnel healthy and lastSmokeFresh=true',
-                'before/after cloudflared request-error counter delta for the measurement window is 0, or every increment is explained by a classified benign client/stream cancellation',
-                'haConnections remains 4',
-                `rpcClientLatency.p95Ms does not regress more than ${DEFAULT_MAX_P95_REGRESSION_PERCENT}% versus control`,
-                'no actionable origin errors are observed after the fresh connector smoke',
+                `${String(DEFAULT_MIN_SAMPLES)} successful identical connector-smoke samples per protocol`,
+                'OAuth/tools-list/SSE smoke exit code is 0 for every sample',
+                'before/after cloudflared request-error counter delta is 0 for a clean comparison window; positive deltas remain review-required rather than auto-classified',
+                'haConnections remains 4 after warmup',
+                `smokeLatency.p95Ms does not regress more than ${DEFAULT_MAX_P95_REGRESSION_PERCENT}% versus control for decision eligibility`,
+                'cloudflared RPC/proxy latency and QUIC RTT remain secondary diagnostics rather than the benchmark sample count',
             ],
             stopConditions: [
-                'OAuth failure',
-                'tool list mismatch',
-                'unexplained request-error counter increments during the measurement window',
-                'haConnections < 4 after warmup',
-                'repeated connector network errors',
-                'proxy/rpc p95 materially worse than the selected control protocol',
+                'connector smoke failure',
+                'restart failure',
+                'metrics endpoint unavailable after bounded retry',
+                'control profile cannot be restored',
             ],
-            manualProtocolSwitch: {
-                note: 'This plan is read-only. Protocol switching must be done by the existing Cloudflare restart/run workflow with explicit review.',
+            delegatedExecution: {
+                mission: 'benchmark-transport',
+                tool: 'delegate_to_repo_autonomy_runner',
+                detached: true,
+                autoPromotion: false,
+                restoresInitialControl: true,
+                stateFile: TRANSPORT_BENCHMARK_STATE_PATH,
+                workload: `${String(DEFAULT_MIN_SAMPLES)} canonical connector smokes per protocol`,
+            },
+            manualFallback: {
+                note: 'Manual protocol switching remains a fallback; the preferred executor is the detached bounded benchmark mission.',
                 env: 'COPILOT_MCP_CLOUDFLARE_PROTOCOL or TUNNEL_TRANSPORT_PROTOCOL',
                 values: CANDIDATES,
             },
@@ -102,8 +117,62 @@ export async function buildCloudflareTransportBenchmarkPlan(input = {}) {
                 'Cloudflare QUIC metrics remain present after restart',
             ],
         },
-        nextActions: nextActionsForProtocol(currentProtocol),
+        nextActions: [
+            'Use delegate_to_repo_autonomy_runner mission=benchmark-transport dryRun=true to review the fixed detached sequence.',
+            'Run the same mission with dryRun=false only when a controlled multi-restart measurement window is acceptable; the runner restores the initial control and never auto-promotes a candidate.',
+            ...nextActionsForProtocol(currentProtocol),
+        ],
     };
+}
+
+/**
+ * Keep persisted benchmark evidence compact in ChatGPT responses.
+ *
+ * @param {Record<string, unknown> | null} state
+ * @returns {Record<string, unknown> | null}
+ */
+export function summarizePersistedBenchmarkState(state) {
+    if (!state) return null;
+    const windows = Array.isArray(state['windows'])
+        ? state['windows'].map((value) => {
+              const window = recordOrEmpty(value);
+              return {
+                  profile: window['profile'] ?? null,
+                  smokeLatency: window['smokeLatency'] ?? null,
+                  metricDelta: window['metricDelta'] ?? null,
+                  metricsAfter: window['metricsAfter'] ?? null,
+                  allSmokesPassed: window['allSmokesPassed'] === true,
+                  comparable: window['comparable'] === true,
+                  clean: window['clean'] === true,
+                  reviewRequired: window['reviewRequired'] === true,
+              };
+          })
+        : [];
+    return {
+        schemaVersion: state['schemaVersion'] ?? null,
+        status: state['status'] ?? null,
+        requestId: state['requestId'] ?? null,
+        startedAt: state['startedAt'] ?? null,
+        completedAt: state['completedAt'] ?? null,
+        durationMs: state['durationMs'] ?? null,
+        controlProfile: state['controlProfile'] ?? null,
+        currentProfile: state['currentProfile'] ?? null,
+        profileOrder: state['profileOrder'] ?? null,
+        sampleCountPerProfile: state['sampleCountPerProfile'] ?? null,
+        windows,
+        comparison: state['comparison'] ?? null,
+        restoredControl: state['restoredControl'] ?? null,
+        restoreSmoke: state['restoreSmoke'] ?? null,
+        autoPromotion: state['autoPromotion'] === true,
+        error: state['error'] ?? null,
+    };
+}
+
+/** @param {unknown} value @returns {Record<string, unknown>} */
+function recordOrEmpty(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /**

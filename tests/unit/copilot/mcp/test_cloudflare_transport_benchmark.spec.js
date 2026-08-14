@@ -4,7 +4,10 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
 
-import { buildCloudflareTransportBenchmarkPlan } from '#copilot/mcp/tools/cloudflare-transport-benchmark.js';
+import {
+    buildCloudflareTransportBenchmarkPlan,
+    summarizePersistedBenchmarkState,
+} from '#copilot/mcp/tools/cloudflare-transport-benchmark.js';
 
 const previousProtocol = process.env['COPILOT_MCP_CLOUDFLARE_PROTOCOL'];
 const previousTunnelProtocol = process.env['TUNNEL_TRANSPORT_PROTOCOL'];
@@ -21,7 +24,7 @@ describe('Cloudflare transport benchmark plan', () => {
 
         const plan = await buildCloudflareTransportBenchmarkPlan();
         const candidates = /** @type {{ protocol: string; role: string; recommendation: string; risk: string }[]} */ (plan['candidates']);
-        const benchmarkDesign = /** @type {{ manualProtocolSwitch: { env: string } }} */ (plan['benchmarkDesign']);
+        const benchmarkDesign = /** @type {{ sampleMetric: string; delegatedExecution: { mission: string; stateFile: string; autoPromotion: boolean }; manualFallback: { env: string } }} */ (plan['benchmarkDesign']);
         const decisionPolicy = /** @type {{ keepQuicWhen: string[] }} */ (plan['decisionPolicy']);
         const nextActions = /** @type {string[]} */ (plan['nextActions']);
 
@@ -33,9 +36,45 @@ describe('Cloudflare transport benchmark plan', () => {
         assert.match(http2?.risk ?? '', /canonical TCP rollback baseline/u);
         assert.doesNotMatch(http2?.recommendation ?? '', /Unsupported candidate/u);
         assert.equal(candidates.find((candidate) => candidate.protocol === 'auto')?.role, 'fallback-capable-candidate');
-        assert.equal(benchmarkDesign.manualProtocolSwitch.env, 'COPILOT_MCP_CLOUDFLARE_PROTOCOL or TUNNEL_TRANSPORT_PROTOCOL');
+        assert.match(benchmarkDesign.sampleMetric, /wall-clock duration/u);
+        assert.equal(benchmarkDesign.delegatedExecution.mission, 'benchmark-transport');
+        assert.equal(benchmarkDesign.delegatedExecution.autoPromotion, false);
+        assert.equal(benchmarkDesign.delegatedExecution.stateFile, 'src/copilot/.ai/mcp/transport-benchmark-state.json');
+        assert.equal(benchmarkDesign.manualFallback.env, 'COPILOT_MCP_CLOUDFLARE_PROTOCOL or TUNNEL_TRANSPORT_PROTOCOL');
         assert.ok(decisionPolicy.keepQuicWhen.includes('Cloudflare QUIC metrics remain present after restart'));
+        assert.ok(nextActions.some((action) => action.includes('mission=benchmark-transport')));
         assert.ok(nextActions.some((action) => action.includes('Keep QUIC as the current control')));
+    });
+
+    it('compacts persisted benchmark evidence without returning individual smoke-run records', () => {
+        const summary = summarizePersistedBenchmarkState({
+            schemaVersion: 1,
+            status: 'completed',
+            requestId: 'mcp-transport-benchmark-example',
+            controlProfile: 'quic',
+            sampleCountPerProfile: 5,
+            restoredControl: true,
+            autoPromotion: false,
+            windows: [
+                {
+                    profile: 'quic',
+                    smokeRuns: [{ sample: 1, durationMs: 1000 }],
+                    smokeLatency: { count: 5, p95Ms: 1100 },
+                    metricDelta: { requestErrors: 0 },
+                    allSmokesPassed: true,
+                    comparable: true,
+                    clean: true,
+                    reviewRequired: false,
+                },
+            ],
+        });
+
+        assert.equal(summary?.['status'], 'completed');
+        assert.equal(summary?.['restoredControl'], true);
+        const windows = /** @type {Record<string, unknown>[]} */ (summary?.['windows']);
+        assert.equal(windows.length, 1);
+        assert.equal(windows[0]?.['profile'], 'quic');
+        assert.equal('smokeRuns' in (windows[0] ?? {}), false);
     });
 });
 

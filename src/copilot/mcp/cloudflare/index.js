@@ -24,3 +24,4 @@ export * from './routes.js';
 export * from './skip-audit.js';
 export * from './state.js';
 export * from './tunnel-origin-plan.js';
+export * from './transport-benchmark-state.js';
