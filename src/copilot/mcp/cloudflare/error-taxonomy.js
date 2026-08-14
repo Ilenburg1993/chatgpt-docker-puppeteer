@@ -8,7 +8,7 @@
 const HARD_ORIGIN_FAILURE_RE =
     /first record does not look like a tls handshake|connection refused|bad gateway|\b502\b|\b1033\b|unable to reach the origin service|tls:|x509:|certificate|no route to host|connection reset by peer/iu;
 const BENIGN_CLIENT_OR_STREAM_CLOSE_RE =
-    /context canceled|context cancelled|client disconnected|request canceled|request cancelled|stream closed|unexpected eof/iu;
+    /context canceled|context cancelled|client disconnected|request canceled|request cancelled|stream closed|unexpected eof|stream error:.*\bNO_ERROR\b.*received from peer/iu;
 
 /**
  * Client disconnects and normal stream cancellation can be logged by cloudflared at ERR level. They are operational

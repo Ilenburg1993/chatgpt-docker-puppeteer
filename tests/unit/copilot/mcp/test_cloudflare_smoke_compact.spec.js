@@ -40,12 +40,16 @@ describe('cloudflare connector smoke compact mode', () => {
         expect(isCloudflaredTunnelTransportErrorLine(transportLine)).toBe(true);
     });
 
-    it('keeps benign client cancellation observable without classifying it as an actionable origin failure', () => {
+    it('keeps benign client/stream closures observable without classifying them as actionable origin failures', () => {
         const cancellation =
             '2026-08-14T18:00:00Z ERR error="context canceled" connIndex=1 event=1 ingressRule=0 originService=https://127.0.0.1:3333';
+        const gracefulHttp2StreamClose =
+            '2026-08-14T18:00:01Z ERR error="stream error: stream ID 7; NO_ERROR; received from peer" connIndex=3 event=1 ingressRule=0 originService=https://127.0.0.1:3333';
 
-        expect(isCloudflaredOriginErrorLine(cancellation)).toBe(true);
-        expect(isCloudflaredBenignClientOrStreamCancellationLine(cancellation)).toBe(true);
-        expect(isCloudflaredActionableOriginErrorLine(cancellation)).toBe(false);
+        for (const line of [cancellation, gracefulHttp2StreamClose]) {
+            expect(isCloudflaredOriginErrorLine(line)).toBe(true);
+            expect(isCloudflaredBenignClientOrStreamCancellationLine(line)).toBe(true);
+            expect(isCloudflaredActionableOriginErrorLine(line)).toBe(false);
+        }
     });
 });
