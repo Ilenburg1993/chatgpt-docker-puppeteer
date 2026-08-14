@@ -3317,7 +3317,9 @@ Decisão:
   - `copilot-fast`: job `4a577b60-6aa7-471a-ad14-776546fb61e3`, exit code `0`, ~`214,6s`.
   - `6.860` testes: `6.832` passed, `0` failed, `28` pending; `2.080/2.080` suites passed.
   - typecheck, lint, docs-contract e architecture-contract verdes no gate final.
-- [ ] commit/push documental desta reconciliação final.
+- [x] commit/push documental da reconciliação principal concluído.
+  - commit publicado `e2a78c5958d6f6bc25a8ef72e8a013f49d811010` — `docs(copilot): record third-wave runtime evidence`.
+  - `origin/main` observado com `ahead=0` e `behind=0` após o push.
 
 Roadmap residual real:
 
