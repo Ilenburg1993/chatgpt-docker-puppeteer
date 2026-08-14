@@ -2390,18 +2390,19 @@ Isso transforma a correção de discovery em uma correção reprodutível de sou
 
 ## 63. Roadmap residual — excluindo decomposição
 
-### 63.1 Fechar nesta publicação
+### 63.1 Fechado nesta publicação
 
-- [ ] stage explícito do conjunto desta transformação.
-- [ ] `git_commit_plan` com diff staged explicável.
-- [ ] commit principal atômico.
-- [ ] `git_push_plan` no novo HEAD.
-- [ ] push real para `origin/main`.
-- [ ] self-reload real via `mcp_reload_schedule`.
-- [ ] reconexão + `mcp_reload_status`.
-- [ ] post-restart readiness/smoke verde.
-- [ ] confirmar que o adapter LLM-B carregado usa PTY por default.
-- [ ] fechamento documental pós-publicação com SHA e estado do upstream.
+- [x] stage explícito do conjunto desta transformação: 145 arquivos, sem capturar artefatos locais preexistentes.
+- [x] `git_commit_plan` revisado com staged diff explicável.
+- [x] commit principal atômico criado: `e2f69deaae16f17c67b3ebc6ae38926fe056a02f`.
+- [x] `git_push_plan` no novo HEAD passou via dry-run.
+- [x] push real para `origin/main` concluído; imediatamente após o push, ahead/behind = `0/0`.
+- [x] self-reload real executado via `mcp_reload_schedule`.
+- [x] reconexão automática + `mcp_reload_status` comprovados.
+- [x] post-restart smoke/readiness ficaram verdes após refresh do smoke OAuth.
+- [x] adapter LLM-B carregado usa PTY por default.
+- [x] live control-only pós-reload executado pelo default recém-carregado: `mcp-msth759q`, exitCode `0`.
+- [x] fechamento documental pós-publicação registrado nesta seção.
 
 ### 63.2 Permanecem como otimizações evidence-gated futuras
 
@@ -2418,9 +2419,9 @@ Isso transforma a correção de discovery em uma correção reprodutível de sou
 - [ ] decomposição de `dev-oauth.js`.
 - [ ] decomposição de `session.js`, `sdk.js`, `sdk-session-events.js` e demais hotspots.
 
-Esses itens não bloqueiam esta publicação.
+Esses itens não bloqueiam a publicação concluída.
 
-## 64. Definition of Done — snapshot pré-publicação
+## 64. Definition of Done — estado pós-publicação
 
 - [x] Premium Requests não são mais domínio canônico de usage/billing atual.
 - [x] AI Credits/session limits são configuráveis sem cap por default.
@@ -2434,10 +2435,156 @@ Esses itens não bloqueiam esta publicação.
 - [x] `mcp-full` final está verde.
 - [x] `copilot-fast` final está verde.
 - [x] deep live readiness está verde.
-- [x] live control-only PTY está verde.
+- [x] live control-only PTY está verde antes e depois do self-reload.
 - [x] decomposição adicional permaneceu fora do escopo conforme decisão do operador.
-- [ ] publicação Git principal concluída.
-- [ ] self-reload pós-publicação comprovado.
-- [ ] roadmap fechado com SHA/upstream pós-publicação.
+- [x] publicação Git principal concluída.
+- [x] self-reload pós-publicação comprovado.
+- [x] roadmap fechado com SHA principal/upstream pós-publicação.
 
-**Próxima ação canônica:** publicar este snapshot por stage/commit/push bounded; em seguida usar o próprio `mcp_reload_schedule` para carregar o commit publicado e produzir a evidência pós-reload que fechará esta Parte XV.
+---
+
+# Parte XVI — Prova de publicação, self-reload e autonomia operacional fechada
+
+## 65. Git publicado
+
+Commit funcional principal:
+
+`e2f69deaae16f17c67b3ebc6ae38926fe056a02f`
+
+Mensagem:
+
+`feat(copilot): expand autonomous control plane and modernize usage`
+
+- [x] 145 arquivos pertencentes à transformação entraram no commit.
+- [x] 6.062 inserções e 1.271 remoções no commit principal.
+- [x] `origin/main` recebeu `6f2707e5a..e2f69deaa`.
+- [x] após o push: `ahead=0`, `behind=0`.
+- [x] `.vscode/settings.json` e artefatos locais preexistentes permaneceram deliberadamente fora do commit.
+
+Este fechamento documental será publicado em commit docs-only subsequente. O SHA desse próprio commit não é autoembutido no arquivo para evitar uma cadeia autorreferente de commits apenas para registrar o próprio hash; o Git history é a autoridade para o SHA documental final.
+
+## 66. Self-reload real
+
+Request:
+
+`mcp-reload-c8ec34c2-9f24-4c1a-9e42-afabcd05ae0c`
+
+- [x] profile solicitado: `current`.
+- [x] profile resolvido: `quic`.
+- [x] delay: `2500ms`.
+- [x] runner detached PID: `60873`.
+- [x] houve janela 502 transitória durante a troca do origin/tunnel, como esperado.
+- [x] o conector voltou sem restart/reconnect manual do operador.
+- [x] `mcp_reload_status.status=completed`.
+- [x] runner exitCode `0`.
+- [x] novo MCP HTTP PID: `60956`.
+- [x] novo cloudflared PID: `60962`.
+
+Isso fecha o bootstrap operacional: mudanças futuras do MCP podem ser publicadas e carregadas pelo próprio control plane, desde que o processo atual ainda contenha a surface de reload válida.
+
+## 67. Smoke e readiness pós-reload
+
+`mcp_connector_smoke_refresh` após o reload:
+
+- [x] health público `200`.
+- [x] OAuth protected resource `200`.
+- [x] OAuth authorization server `200`.
+- [x] challenge unauthenticated `401` esperado e aceito.
+- [x] smoke OAuth autenticado passou.
+- [x] tools/list autenticado retornou **115 tools**.
+- [x] registry remoto = registry local: `115/115`.
+- [x] nenhuma tool local ausente.
+- [x] nenhuma tool remota inesperada.
+- [x] SSE inicial passou.
+- [x] reconnect SSE passou.
+- [x] Last-Event-ID foi aceito.
+
+`mcp_post_restart_readiness` depois do smoke refresh:
+
+- [x] `ready=true`.
+- [x] local health `200`.
+- [x] public health `200`.
+- [x] stateful runtime habilitado.
+- [x] connector smoke fresh.
+
+Os `context canceled` históricos permanecem classificados como ruído/stream cancellation a observar; os transport errors registrados às 21:44:18 coincidem com a própria janela deliberada de restart e não impediram reconnect, smoke ou readiness pós-reload.
+
+## 68. LLM-B pós-reload
+
+Primeiro, `llmb_live_test_plan` sem `transport` explícito retornou:
+
+`--transport=pty --control-only`
+
+Isso prova que o novo default foi realmente carregado pelo processo MCP reiniciado.
+
+Em seguida foi executado o harness sem especificar `transport`:
+
+- runId: `mcp-msth759q`;
+- artifacts: `artifacts/terminal-live/mcp-msth759q`;
+- modo: `control-only`;
+- cenário: `canonical`;
+- transporte efetivo: PTY;
+- model/provider explícito: não invocado;
+- exitCode: `0`.
+
+Evidência operacional:
+
+- [x] LLM-B ready.
+- [x] sessão SDK retomada.
+- [x] `127 ferramentas` disponíveis na sessão LLM-B observada.
+- [x] BYOK pronto em `kilo-auto/free`.
+- [x] `/usage now` moderno, sem Premium Requests como domínio corrente.
+- [x] `/metrics` mostra `Copilot histórico` e separa a rota BYOK atual.
+- [x] eventos legacy de quota aparecem humanizados como `billing legacy por request`.
+- [x] `/activity` verde.
+- [x] `/session sdk` verde.
+- [x] CommandDefinitions observáveis.
+- [x] `/events` default/raw/JSON verde.
+- [x] SSE archive íntegro.
+- [x] `/errors`: zero.
+- [x] `/quit`: shutdown limpo.
+- [x] nenhum turno explícito de modelo foi enviado.
+- [x] nenhuma quota provider/AI Credit foi deliberadamente consumida por este control-only.
+
+## 69. Estado operacional final desta onda
+
+### Concluído
+
+- [x] discovery/index blind spot corrigido.
+- [x] aliases/protected imports diagnosticados corretamente.
+- [x] default `approve_all` preservado e centralmente configurável.
+- [x] billing/usage modernizado para AI Credits/tokens/attribution.
+- [x] Premium Requests isolados como compatibilidade legacy.
+- [x] Git stage/commit/push governado disponível e usado com sucesso.
+- [x] self-reload governado disponível e usado com sucesso.
+- [x] MCP OAuth/Cloudflare retornou após self-reload sem intervenção manual.
+- [x] LLM-B control plane disponível via MCP.
+- [x] live readiness profundo verde.
+- [x] live control-only pós-reload verde.
+- [x] source principal publicado em `origin/main`.
+
+### Próximos passos que NÃO exigem decomposição
+
+- [ ] benchmark cold/L1/L2 com workload representativo.
+- [ ] benchmark QUIC/auto/H2 com amostras iguais e deltas por janela.
+- [ ] golden prompts em conversa limpa e métricas comparáveis.
+- [ ] integrar `mcp_reload_status` diretamente no readiness consolidado para tornar a evidência de reload de primeira classe.
+- [ ] avaliar uma surface dedicada para dev-watch/reload da LLM-B se houver ganho operacional real além do harness atual.
+- [ ] opcionalmente executar cenário LLM-B com modelo/provider real quando houver desejo explícito de consumir AI Credits/quota externa.
+
+### Decomposição — continuar adiada
+
+- [ ] `terminal/commands/byok.js`.
+- [ ] `sqlite-catalog-store.js`.
+- [ ] `dev-oauth.js`.
+- [ ] `session.js`, `sdk.js`, `sdk-session-events.js` e demais hotspots.
+
+## 70. Veredito final da segunda onda
+
+**GO — autonomia operacional ampliada e publicada.**
+
+O principal ganho não é apenas a adição de tools. O sistema agora possui um ciclo operacional fechado e comprovado:
+
+`investigar -> editar bounded -> validar -> stage explícito -> commit -> push upstream-only -> self-reload -> OAuth smoke -> readiness -> LLM-B live control-only`
+
+Esse ciclo reduz de forma material a dependência de intervenção manual sem abrir shell, force-push, remote arbitrário ou restart arbitrário. A próxima fronteira de melhoria, excluída conscientemente desta onda, é performance evidence-gated e, em outra oportunidade, decomposição dos hotspots.
