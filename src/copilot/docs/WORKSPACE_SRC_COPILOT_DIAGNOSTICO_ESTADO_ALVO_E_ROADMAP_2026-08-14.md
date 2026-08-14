@@ -3331,3 +3331,79 @@ Roadmap residual real:
 - [ ] avaliar executor/dev-watch adicionais apenas quando removerem intervenção manual mensurável.
 - [ ] usar provider/model real apenas quando consumo externo fizer parte deliberada da prova.
 - [ ] decomposição dos hotspots em conversa futura separada.
+
+## 96. Follow-up concorrente pós-fechamento — validator jobs não anexados
+
+Depois do commit documental `175a6565c5f60df36563aca2f09a01e93b66e818`, três mudanças source/test apareceram concorrentemente na worktree, fora da causalidade desta execução:
+
+- `src/copilot/mcp/control-plane/jobs.js`;
+- `src/copilot/mcp/tools/jobs.js`;
+- `tests/unit/copilot/mcp/test_mcp_jobs.spec.js`.
+
+A execução atual **não** as stageou nem as apropriou. O ator concorrente as validou e publicou posteriormente como:
+
+`c91de8d79dce228663f9f4d2336245906c95a637`
+
+Mensagem:
+
+`fix(copilot): surface unattached validator jobs`
+
+- [x] `origin/main` observado em `ahead=0`, `behind=0` após esse commit.
+- [x] typecheck concorrente `3b176812-4a21-4b74-96a1-edc29e0fc15e`, exit code `0`.
+- [x] `mcp-fast` concorrente `26a38525-013d-4d74-b0fc-8e6cb5baebd9`, exit code `0`, ~`33,2s`.
+
+O problema era real e foi observado nesta própria conversa: o manifest `38aba9a6-5f31-4e65-b6a6-4b45ab5aca00` permanecia persistido como `running` depois que o processo que o criara já não era o MCP runtime atual. Antes do follow-up, isso contaminava `runningCount` e poderia induzir ChatGPT a esperar indefinidamente ou tentar cancelar um job sem child-process handle verificável.
+
+Contrato novo provado no runtime:
+
+- [x] `PublicJobRecord` expõe `runtimeAttached`.
+- [x] manifest persistido em `running` sem processo anexado é classificado como `orphaned=true` e `runtimeAttached=false`.
+- [x] `mcp_validation_dashboard.runningCount=0` após o reload do novo código.
+- [x] `mcp_validation_dashboard.orphanedCount=1` para o manifest histórico conhecido.
+- [x] `runningJobIds=[]`.
+- [x] `orphanedJobIds=[38aba9a6-5f31-4e65-b6a6-4b45ab5aca00]`.
+- [x] os effective checks permanecem baseados em validators concluídos e verdes, não no manifest órfão.
+- [x] `recommendedNextAction=none` quando os checks efetivos estão verdes.
+
+A prova de segurança do cancelamento também foi executada:
+
+- [x] `job_cancel(38aba9a6-5f31-4e65-b6a6-4b45ab5aca00)` foi recusado.
+- [x] código retornado: `ERR_JOB_UNATTACHED`.
+- [x] nenhum PID não verificado foi sinalizado ou morto.
+- [x] o hint orienta inspeção bounded do log e rerun do validator, em vez de kill inseguro.
+
+Self-reload concorrente observado após o commit:
+
+- requestId `mcp-reload-42912f0d-d4b8-4a41-98ff-1655eb9ba65f`;
+- profile `quic`;
+- exit code `0`;
+- `completedAt=1786747512754`.
+
+Antes do smoke novo:
+
+- [x] health local/public permanecia verde.
+- [x] `reload.smokeAfterReload=false`.
+- [x] `reload.reconciledWithConnectorSmoke=false`.
+- [x] readiness recusou corretamente o smoke da geração anterior com `ready=false`.
+
+Após `mcp_connector_smoke_refresh`:
+
+- [x] OAuth smoke verde.
+- [x] authenticated registry remoto/local `115/115`.
+- [x] SSE inicial e reconnect verdes.
+- [x] `reload.smokeAfterReload=true`.
+- [x] `reload.reconciledWithConnectorSmoke=true`.
+- [x] `mcp_post_restart_readiness.ready=true`.
+- [x] `recentOriginErrors=[]`.
+- [x] transport permaneceu strict QUIC.
+
+Este follow-up fecha outro gargalo de autonomia exposto pela própria combinação de validator jobs persistidos + self-reload: o sistema agora distingue **estado persistido** de **processo ainda controlável pelo runtime atual**. A autoria do commit `c91de8d79` continua sendo atribuída apenas ao ator concorrente observado, não a esta execução.
+
+### 96.1 Gate final pós-follow-up
+
+- [x] executar gates finais sobre `c91de8d79` + esta atualização documental.
+  - `mcp-full`: job `3ba05271-5486-4b61-909f-1f1c30858164`, exit code `0`, ~`92,9s`.
+  - `copilot-fast`: job `9ce97a9e-0df9-4d73-b049-530a0202f6e3`, exit code `0`, ~`321,1s`.
+  - `6.861` testes: `6.833` passed, `0` failed, `28` pending.
+  - `2.080/2.080` suites passed; typecheck, lint, docs-contract e architecture-contract verdes.
+- [ ] publicar esta última reconciliação documental em `main`.
