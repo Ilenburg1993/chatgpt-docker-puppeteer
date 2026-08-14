@@ -3410,3 +3410,31 @@ Este follow-up fecha outro gargalo de autonomia exposto pela própria combinaç�
   - commit publicado `500bab4d2665224dc04dd80e5e9551370fca238d` — `docs(copilot): record unattached job follow-up`.
   - `origin/main` observado com `ahead=0`, `behind=0` após o push.
   - houve um `CHATGPT_HOST_PRECALL_BLOCK` no primeiro `git_stage` documental: `mcp_host_block_diagnostics` confirmou que a chamada não chegou ao MCP; o retry da mesma operação bounded, com o mesmo path explícito e precondition, passou sem ampliar permissões.
+
+## 97. Quarta onda — validação proporcional e focused-first
+
+Diretriz operacional explícita desta continuação: validadores passam a ser usados com **raridade muito maior**. O custo de validação faz parte da decisão técnica; `mcp-full` e `copilot-fast` deixam de funcionar como reflexo automático depois de pequenas alterações.
+
+Política de escalada adotada:
+
+1. inspeção estática do diff, imports, contratos e testes vizinhos;
+2. nenhum validator quando execução não acrescenta evidência material;
+3. teste unitário por arquivos explícitos quando houver superfície causal clara;
+4. typecheck isolado somente quando tipos/JSDoc/contrato público realmente o justificarem;
+5. suites amplas somente para mudanças transversais, regressão sem localização, ou release gate deliberado.
+
+Transformação source em andamento:
+
+- [x] `mcp_validation_plan` deixa de assumir `mcp-fast` quando chamado sem argumentos; o default passa a ser `inspect-first` + `no-validator-yet`.
+- [x] `mcp_validation_plan testFile=...` planeja execução file-scoped e explicita uma política de escalada.
+- [x] `run_copilot_validator` ganha `validator=unit-focused` com um único arquivo `.spec.js` explícito sob `tests/unit/copilot/` por job.
+- [x] glob, path traversal, paths não canônicos e final symlink são rejeitados; `realpath` também impede escape por diretório-pai symlinkado.
+- [x] a implementação reutiliza `run_copilot_validator` em vez de adicionar uma 116ª tool, preservando o orçamento de `tools/list` próximo de 128 KiB.
+- [x] guidance de session profile, connector smoke, golden prompts e capabilities foi alterado de broad-first para focused-first.
+- [x] `CAPABILITIES_VERSION` avançou de 38 para 39 porque o contrato de validação mudou, sem aumentar o número de tools.
+- [x] testes locais foram ajustados para path policy, command resolution, planner default/focused/broad e invariantes de input de `run_copilot_validator`.
+- [ ] executar apenas o gate proporcional mínimo antes de publicar; não usar `mcp-full`/`copilot-fast` por padrão nesta onda.
+- [ ] publicar o conjunto causal e self-reload.
+- [ ] provar ao vivo `unit-focused` usando somente os testes causalmente relevantes.
+
+A revisão estática já evitou uma regressão de design antes de qualquer validator: a primeira proposta adicionava uma tool nova, mas o `tools/list` atual já está muito próximo do budget de 128 KiB. A solução foi simplificada para ampliar a capacidade sem ampliar a superfície MCP.

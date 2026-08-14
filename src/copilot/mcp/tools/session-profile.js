@@ -107,14 +107,14 @@ export const mcpSessionProfileTool = {
                 {
                     task: 'validate-work',
                     flow: [
-                        'mcp_validation_plan suite=mcp-full',
-                        'mcp_run_safe_validation_suite suite=mcp-full',
-                        'mcp_validation_dashboard',
-                        'mcp_last_validation_summary includeOutputTail=false',
-                        'job_get_summary <jobId> when inspecting one job',
-                        'job_get_output tailBytes<=8000 only if the summary reports failure',
+                        'mcp_validation_plan with no suite -> inspect-first/no-validator by default',
+                        'mcp_validation_plan testFile=<explicit causal .spec.js file> when execution adds material evidence',
+                        'run_copilot_validator validator=unit-focused testFile=<same explicit file>',
+                        'run_typecheck_copilot only when types/public contracts changed materially',
+                        'mcp_run_safe_validation_suite only as explicit cross-cutting/release escalation',
+                        'job_get_summary <jobId>; job_get_output tailBytes<=8000 only on failure',
                     ],
-                    reason: 'One allowlisted job reduces repeated validator calls; summary-first avoids ChatGPT web stream interruptions from long logs.',
+                    reason: 'Validation cost is minimized by escalating from static evidence to file-scoped tests; broad suites are deliberately rare rather than the default.',
                 },
                 {
                     task: 'routine-maintenance',

@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 38;
+const CAPABILITIES_VERSION = 39;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -199,7 +199,7 @@ const IO_GUIDANCE = [
     'Use repo_find_orphan_imports before or after file moves to detect broken local imports.',
     'COPILOT_MCP_INDEX_AUTO_BUILD defaults to true so indexed navigation is warmed outside ChatGPT host calls.',
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
-    'Use mcp_run_safe_validation_suite suite="mcp-full" before separate validator calls when ChatGPT needs one canonical verification step.',
+    'Use mcp_validation_plan with no suite by default; prefer run_copilot_validator validator="unit-focused" with explicit causal .spec.js files, and escalate to mcp_run_safe_validation_suite only for cross-cutting risk or a deliberate release gate.',
     'Use mcp_validation_dashboard, mcp_last_validation_summary and job_get_summary before job_get_output; read job logs only with small tailBytes and only when needed.',
     'Use repo_root_tree or repo_tree path="." for the real workspace root.',
     'Use repo_root_redaction_status to audit hidden/protected root redaction without returning hidden names.',

@@ -945,9 +945,23 @@ describe('copilot MCP tools', () => {
         assert.equal(createPlan.structuredContent?.['plannedTool'], 'repo_create_file');
 
         const validationPlanTool = findTool('mcp_validation_plan');
-        const validationPlan = await validationPlanTool.handler({ suite: 'mcp-fast' });
-        assert.equal(validationPlan.isError, undefined);
-        assert.equal(validationPlan.structuredContent?.['validator'], 'suite-mcp-fast');
+        const inspectFirstPlan = await validationPlanTool.handler({});
+        assert.equal(inspectFirstPlan.isError, undefined);
+        assert.equal(inspectFirstPlan.structuredContent?.['recommendation'], 'no-validator-yet');
+        assert.equal(inspectFirstPlan.structuredContent?.['plannedTool'], null);
+
+        const focusedPlan = await validationPlanTool.handler({
+            testFile: 'tests/unit/copilot/mcp/test_mcp_jobs.spec.js',
+        });
+        assert.equal(focusedPlan.isError, undefined);
+        assert.equal(focusedPlan.structuredContent?.['plannedTool'], 'run_copilot_validator');
+        assert.equal(focusedPlan.structuredContent?.['validator'], 'unit-focused');
+        assert.equal(focusedPlan.structuredContent?.['breadth'], 'file-scoped');
+
+        const broadPlan = await validationPlanTool.handler({ suite: 'mcp-fast' });
+        assert.equal(broadPlan.isError, undefined);
+        assert.equal(broadPlan.structuredContent?.['validator'], 'suite-mcp-fast');
+        assert.equal(broadPlan.structuredContent?.['broadValidation'], true);
     });
 
     it('mcp_last_validation_summary reads persisted validator history without starting jobs', async () => {

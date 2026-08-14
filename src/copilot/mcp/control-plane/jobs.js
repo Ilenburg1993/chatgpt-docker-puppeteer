@@ -7,7 +7,7 @@
 
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readFile, readdir } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appendTextLocked, writeFileAtomic } from '#copilot/infra/public/io';
@@ -20,6 +20,9 @@ const MAX_JOB_TIMEOUT_MS = 60 * 60 * 1000;
 const MAX_IN_MEMORY_JOB_RECORDS = 200;
 const MAX_JOB_MANIFEST_BYTES = 128 * 1024;
 const MAX_JOB_OUTPUT_TAIL_BYTES = 1024 * 1024;
+const MAX_FOCUSED_UNIT_TEST_FILES = 12;
+const FOCUSED_UNIT_TEST_PREFIX = 'tests/unit/copilot/';
+const FOCUSED_UNIT_TEST_SUFFIX = '.spec.js';
 const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 /**
@@ -27,6 +30,7 @@ const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]
  *     | 'lint'
  *     | 'unit-mcp'
  *     | 'unit-copilot'
+ *     | 'unit-focused'
  *     | 'suite-mcp-fast'
  *     | 'suite-mcp-full'
  *     | 'suite-copilot-fast'} CopilotValidatorName
@@ -138,10 +142,84 @@ export function pruneCompletedJobRecords(records, maxEntries = MAX_IN_MEMORY_JOB
 }
 
 /**
- * @param {CopilotValidatorName} validator
+ * Normalize an explicit focused unit-test file list without accepting globs, directories or path traversal.
+ *
+ * @param {unknown} testFiles
+ * @returns {string[]}
+ */
+export function normalizeFocusedUnitTestFiles(testFiles) {
+    if (!Array.isArray(testFiles) || testFiles.length < 1 || testFiles.length > MAX_FOCUSED_UNIT_TEST_FILES) {
+        throw new Error(`Focused unit tests require 1-${MAX_FOCUSED_UNIT_TEST_FILES} explicit test files.`);
+    }
+    const normalized = [];
+    const seen = new Set();
+    for (const candidate of testFiles) {
+        if (
+            typeof candidate !== 'string' ||
+            candidate.length === 0 ||
+            candidate.includes('\\') ||
+            ['*', '?', '[', ']', '{', '}'].some((token) => candidate.includes(token))
+        ) {
+            throw new Error('Focused unit-test paths must be explicit canonical workspace-relative POSIX paths without globs.');
+        }
+        const canonical = path.posix.normalize(candidate);
+        if (
+            canonical !== candidate ||
+            path.posix.isAbsolute(candidate) ||
+            !candidate.startsWith(FOCUSED_UNIT_TEST_PREFIX) ||
+            !candidate.endsWith(FOCUSED_UNIT_TEST_SUFFIX)
+        ) {
+            throw new Error(
+                `Focused unit-test path must match ${FOCUSED_UNIT_TEST_PREFIX}**/*${FOCUSED_UNIT_TEST_SUFFIX}.`,
+            );
+        }
+        if (!seen.has(candidate)) {
+            seen.add(candidate);
+            normalized.push(candidate);
+        }
+    }
+    return normalized;
+}
+
+/**
+ * @param {unknown} testFiles
  * @returns {{ command: string; args: string[] }}
  */
-export function resolveValidatorCommand(validator) {
+export function resolveFocusedUnitTestCommand(testFiles) {
+    const files = normalizeFocusedUnitTestFiles(testFiles);
+    return {
+        command: 'npx',
+        args: ['vitest', '--config', 'vitest.copilot.config.js', 'run', ...files],
+    };
+}
+
+/**
+ * @param {string[]} testFiles
+ * @returns {Promise<void>}
+ */
+async function assertFocusedUnitTestFilesExist(testFiles) {
+    const workspaceRoot = await realpath(getMcpWorkspaceRoot());
+    const allowedRoot = await realpath(path.join(workspaceRoot, FOCUSED_UNIT_TEST_PREFIX));
+    for (const testFile of testFiles) {
+        const candidatePath = path.join(workspaceRoot, testFile);
+        const stats = await lstat(candidatePath);
+        if (stats.isSymbolicLink() || !stats.isFile()) {
+            throw new Error(`Focused unit-test path must resolve to a regular non-symlink file: ${testFile}`);
+        }
+        const resolved = await realpath(candidatePath);
+        const relativeToAllowedRoot = path.relative(allowedRoot, resolved);
+        if (relativeToAllowedRoot.startsWith('..') || path.isAbsolute(relativeToAllowedRoot)) {
+            throw new Error(`Focused unit-test path resolves outside ${FOCUSED_UNIT_TEST_PREFIX}: ${testFile}`);
+        }
+    }
+}
+
+/**
+ * @param {CopilotValidatorName} validator
+ * @param {{ testFiles?: string[] }} [options]
+ * @returns {{ command: string; args: string[] }}
+ */
+export function resolveValidatorCommand(validator, options = {}) {
     switch (validator) {
         case 'typecheck':
             return { command: 'npm', args: ['run', 'typecheck:strict:src.copilot'] };
@@ -154,6 +232,8 @@ export function resolveValidatorCommand(validator) {
             };
         case 'unit-copilot':
             return { command: 'npm', args: ['run', 'test:copilot:unit'] };
+        case 'unit-focused':
+            return resolveFocusedUnitTestCommand(options.testFiles);
         case 'suite-mcp-fast':
             return {
                 command: 'node',
@@ -187,12 +267,18 @@ export function resolveJobTimeoutMs(timeoutMs) {
 
 /**
  * @param {CopilotValidatorName} validator
- * @param {{ timeoutMs?: number }} [options]
+ * @param {{ timeoutMs?: number; testFiles?: string[] }} [options]
  * @returns {Promise<PublicJobRecord>}
  */
 export async function spawnValidatorJob(validator, options = {}) {
     const id = randomUUID();
-    const command = resolveValidatorCommand(validator);
+    const focusedTestFiles =
+        validator === 'unit-focused' ? normalizeFocusedUnitTestFiles(options.testFiles) : undefined;
+    if (focusedTestFiles) await assertFocusedUnitTestFilesExist(focusedTestFiles);
+    const command = resolveValidatorCommand(
+        validator,
+        focusedTestFiles ? { testFiles: focusedTestFiles } : {},
+    );
     const timeoutMs = resolveJobTimeoutMs(options.timeoutMs);
     const artifacts = resolveJobArtifactPaths(id);
     if (!artifacts) throw new Error('Generated validator job id is invalid.');

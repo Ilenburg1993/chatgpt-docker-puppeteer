@@ -14,6 +14,7 @@ import {
     getMcpWorkspaceRoot,
     okResult,
     readOnlyAnnotations,
+    resolveFocusedUnitTestCommand,
     resolveReadPath,
     resolveValidatorCommand,
     resolveWritePath,
@@ -333,34 +334,90 @@ export const repoPlanTools = [
     {
         name: 'mcp_validation_plan',
         title: 'Plan MCP validation',
-        description: 'Read-only plan for allowlisted validation suites. Does not start jobs.',
+        description: 'Plan validation escalation; defaults to inspect-first and no validator.',
         inputSchema: {
-            suite: z
-                .enum(['mcp-fast', 'mcp-full', 'copilot-fast'])
+            suite: z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']).optional().describe('Explicit broad escalation.'),
+            testFile: z
+                .string()
+                .min(1)
+                .max(1024)
                 .optional()
-                .describe('Suite to plan. Default: mcp-fast.'),
+                .describe('Explicit tests/unit/copilot/**/*.spec.js path.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ suite }) => {
-            const selectedSuite = suite ?? 'mcp-fast';
+        handler: async ({ suite, testFile }) => {
+            if (suite && testFile) {
+                return errorResult('Choose testFile or suite, not both.', {
+                    code: 'ERR_VALIDATION_PLAN_AMBIGUOUS',
+                    hint: 'Prefer testFile for localized changes; suite is escalation-only.',
+                });
+            }
+            const escalationPolicy = [
+                'inspect-static-evidence',
+                'run-one-focused-test-if-needed',
+                'run-typecheck-if-contracts-changed',
+                'run-broad-suite-only-for-cross-cutting-risk-or-release-gate',
+            ];
+            if (testFile) {
+                try {
+                    const command = resolveFocusedUnitTestCommand([testFile]);
+                    return okResult({
+                        success: true,
+                        strategy: 'focused-first',
+                        recommendation: 'run-focused-test',
+                        breadth: 'file-scoped',
+                        plannedTool: 'run_copilot_validator',
+                        validator: 'unit-focused',
+                        testFile,
+                        command: command.command,
+                        args: command.args,
+                        escalationPolicy,
+                        nextCall: {
+                            tool: 'run_copilot_validator',
+                            args: { validator: 'unit-focused', testFile },
+                        },
+                    });
+                } catch (error) {
+                    return errorResult('Focused validation plan rejected testFile.', {
+                        code: 'ERR_INVALID_FOCUSED_TEST_FILE',
+                        error: error instanceof Error ? error.message : String(error),
+                        testFile,
+                    });
+                }
+            }
+            if (!suite) {
+                return okResult({
+                    success: true,
+                    strategy: 'inspect-first',
+                    recommendation: 'no-validator-yet',
+                    breadth: 'none',
+                    plannedTool: null,
+                    escalationPolicy,
+                    nextCall: null,
+                    hint: 'Inspect the causal diff first; add testFile only when execution adds material evidence.',
+                });
+            }
             const validator =
-                selectedSuite === 'mcp-full'
+                suite === 'mcp-full'
                     ? 'suite-mcp-full'
-                    : selectedSuite === 'copilot-fast'
+                    : suite === 'copilot-fast'
                       ? 'suite-copilot-fast'
                       : 'suite-mcp-fast';
             const command = resolveValidatorCommand(validator);
             return okResult({
                 success: true,
+                strategy: 'explicit-broad-escalation',
+                recommendation: 'broad-suite-requested',
+                breadth: 'broad',
+                broadValidation: true,
                 plannedTool: 'mcp_run_safe_validation_suite',
-                suite: selectedSuite,
+                suite,
                 validator,
                 command: command.command,
                 args: command.args,
-                nextCall: {
-                    tool: 'mcp_run_safe_validation_suite',
-                    args: { suite: selectedSuite },
-                },
+                escalationPolicy,
+                nextCall: { tool: 'mcp_run_safe_validation_suite', args: { suite } },
+                warning: 'Broad suites are not the default; use only when focused evidence is insufficient.',
             });
         },
     },

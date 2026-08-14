@@ -11,8 +11,10 @@ import { describe, it } from 'vitest';
 
 import {
     cancelJob,
+    normalizeFocusedUnitTestFiles,
     pruneCompletedJobRecords,
     readJobOutput,
+    resolveFocusedUnitTestCommand,
     resolveJobTimeoutMs,
     resolveValidatorCommand,
 } from '#copilot/mcp/control-plane';
@@ -37,6 +39,21 @@ describe('copilot MCP jobs', () => {
             command: 'npx',
             args: ['vitest', '--config', 'vitest.copilot.config.js', 'run', 'tests/unit/copilot/mcp'],
         });
+        assert.deepEqual(
+            resolveValidatorCommand('unit-focused', {
+                testFiles: ['tests/unit/copilot/mcp/test_mcp_jobs.spec.js'],
+            }),
+            {
+                command: 'npx',
+                args: [
+                    'vitest',
+                    '--config',
+                    'vitest.copilot.config.js',
+                    'run',
+                    'tests/unit/copilot/mcp/test_mcp_jobs.spec.js',
+                ],
+            },
+        );
         assert.deepEqual(resolveValidatorCommand('suite-mcp-fast'), {
             command: 'node',
             args: ['src/copilot/mcp/scripts/run-safe-validation-suite.js', 'mcp-fast'],
@@ -53,6 +70,38 @@ describe('copilot MCP jobs', () => {
 
     it('rejects unsupported validators', () => {
         assert.throws(() => resolveValidatorCommand(/** @type {any} */ ('admin-command')), /Unsupported validator/);
+    });
+
+    it('keeps focused unit-test execution bounded to explicit canonical Copilot test files', () => {
+        assert.deepEqual(
+            normalizeFocusedUnitTestFiles([
+                'tests/unit/copilot/mcp/test_mcp_jobs.spec.js',
+                'tests/unit/copilot/mcp/test_mcp_jobs.spec.js',
+            ]),
+            ['tests/unit/copilot/mcp/test_mcp_jobs.spec.js'],
+        );
+        assert.deepEqual(resolveFocusedUnitTestCommand(['tests/unit/copilot/mcp/test_mcp_jobs.spec.js']), {
+            command: 'npx',
+            args: [
+                'vitest',
+                '--config',
+                'vitest.copilot.config.js',
+                'run',
+                'tests/unit/copilot/mcp/test_mcp_jobs.spec.js',
+            ],
+        });
+        assert.throws(
+            () => normalizeFocusedUnitTestFiles(['tests/unit/copilot/mcp/*.spec.js']),
+            /Focused unit-test path/u,
+        );
+        assert.throws(
+            () => normalizeFocusedUnitTestFiles(['tests/unit/copilot/mcp/../test_mcp_jobs.spec.js']),
+            /Focused unit-test path/u,
+        );
+        assert.throws(
+            () => normalizeFocusedUnitTestFiles(['src/copilot/mcp/tools/jobs.js']),
+            /Focused unit-test path/u,
+        );
     });
 
     it('resolves fixed safe validation suite steps', () => {
@@ -220,6 +269,22 @@ describe('copilot MCP jobs', () => {
         assert.ok(names.includes('run_project_doctor'));
         assert.ok(names.includes('mcp_run_safe_validation_suite'));
         assert.ok(names.includes('job_list'));
+    });
+
+    it('requires explicit focused files only for validator=unit-focused', async () => {
+        const tool = jobTools.find((candidate) => candidate.name === 'run_copilot_validator');
+        assert.ok(tool);
+
+        const missingFile = await tool.handler({ validator: 'unit-focused' });
+        assert.equal(missingFile.isError, true);
+        assert.equal(missingFile.structuredContent?.['code'], 'ERR_FOCUSED_TEST_FILE_REQUIRED');
+
+        const unexpectedFile = await tool.handler({
+            validator: 'typecheck',
+            testFile: 'tests/unit/copilot/mcp/test_mcp_jobs.spec.js',
+        });
+        assert.equal(unexpectedFile.isError, true);
+        assert.equal(unexpectedFile.structuredContent?.['code'], 'ERR_UNEXPECTED_FOCUSED_TEST_FILE');
     });
 
     it('job_list returns a structured job array', async () => {

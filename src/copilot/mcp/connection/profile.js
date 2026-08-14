@@ -629,7 +629,7 @@ function buildChatGptSmokePrompts() {
         'Leia src/copilot/mcp/registry.js linhas 1 a 120 com repo_read_file e informe o sha256.',
         'Faça repo_symbol_search name=registerCanonicalMcpTools path=src/copilot/mcp.',
         'Chame project_doctor.',
-        'Consulte mcp_validation_plan suite=mcp-full antes de iniciar validadores.',
+        'Consulte mcp_validation_plan sem suite: o default deve ser inspect-first/no-validator; forneça testFile explícito somente quando um teste focado agregar evidência.',
         'Inicie delegate_to_repo_autonomy_runner mission=diagnose-mcp dryRun=true.',
         'Chame mcp_runtime_health e mcp_tunnel_status.',
     ];
@@ -646,7 +646,7 @@ function buildClaudeSmokePrompts() {
         'Chame mcp_cloudflare_remote_audit e confirme que o origin remoto corresponde ao transport selecionado.',
         'Chame mcp_oauth_friction_audit e confirme refresh token persistence.',
         'Chame repo_tree path="src/copilot/mcp" maxDepth=2.',
-        'Chame mcp_validation_plan suite="mcp-full" antes de qualquer validação longa.',
+        'Chame mcp_validation_plan sem suite antes de validar; prefira um testFile explícito e escale para suite ampla apenas com justificativa transversal.',
     ];
 }
 

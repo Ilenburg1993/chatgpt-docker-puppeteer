@@ -23,10 +23,16 @@ const validatorSchema = z.enum([
     'lint',
     'unit-mcp',
     'unit-copilot',
+    'unit-focused',
     'suite-mcp-fast',
     'suite-mcp-full',
     'suite-copilot-fast',
 ]);
+const focusedTestFileSchema = z
+    .string()
+    .min(1)
+    .max(1024)
+    .describe('Explicit tests/unit/copilot/**/*.spec.js path for unit-focused.');
 const safeValidationSuiteSchema = z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']);
 const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
 
@@ -77,6 +83,7 @@ const EFFECTIVE_CHECKS_BY_VALIDATOR = {
     lint: ['lint'],
     'unit-mcp': ['unit-mcp'],
     'unit-copilot': ['unit-copilot'],
+    'unit-focused': ['unit-focused'],
     'suite-mcp-fast': ['typecheck', 'unit-mcp'],
     'suite-mcp-full': ['typecheck', 'lint', 'unit-mcp'],
     'suite-copilot-fast': ['typecheck', 'lint', 'unit-copilot'],
@@ -219,16 +226,42 @@ export const jobTools = [
     {
         name: 'run_copilot_validator',
         title: 'Run Copilot validator',
-        description:
-            'Start an allowlisted Copilot validator job. This can run typecheck, lint, focused MCP tests, or the full unit suite.',
+        description: 'Start an allowlisted validator. unit-focused runs one explicit Copilot unit-test file.',
         inputSchema: {
-            validator: validatorSchema.describe('Validator to run: typecheck, lint, unit-mcp, or unit-copilot.'),
-            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional job timeout in ms.'),
+            validator: validatorSchema.describe('Validator; prefer unit-focused for localized changes.'),
+            testFile: focusedTestFileSchema.optional(),
+            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional timeout in ms.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ validator, timeoutMs }) => {
-            const job = await spawnValidatorJob(validator, timeoutMs === undefined ? {} : { timeoutMs });
-            return okResult({ success: true, job }, `Started job ${job.id} (${validator}).`);
+        handler: async ({ validator, testFile, timeoutMs }) => {
+            const focused = validator === 'unit-focused';
+            if (focused && !testFile) {
+                return errorResult('unit-focused requires testFile.', {
+                    code: 'ERR_FOCUSED_TEST_FILE_REQUIRED',
+                    hint: 'Pass one explicit tests/unit/copilot/**/*.spec.js path.',
+                });
+            }
+            if (!focused && testFile) {
+                return errorResult('testFile is valid only with unit-focused.', {
+                    code: 'ERR_UNEXPECTED_FOCUSED_TEST_FILE',
+                    hint: 'Remove testFile or choose unit-focused.',
+                });
+            }
+            try {
+                const job = await spawnValidatorJob(validator, {
+                    ...(timeoutMs === undefined ? {} : { timeoutMs }),
+                    ...(focused ? { testFiles: [testFile] } : {}),
+                });
+                return okResult(
+                    { success: true, ...(focused ? { testFile } : {}), job },
+                    `Started job ${job.id} (${validator}).`,
+                );
+            } catch (error) {
+                return errorResult('Validator job was rejected.', {
+                    code: focused ? 'ERR_INVALID_FOCUSED_TEST_FILE' : 'ERR_VALIDATOR_JOB_REJECTED',
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
         },
     },
     {

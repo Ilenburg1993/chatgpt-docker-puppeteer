@@ -7,7 +7,7 @@
 
 import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
-const GOLDEN_PROMPTS_VERSION = 4;
+const GOLDEN_PROMPTS_VERSION = 5;
 
 const GOLDEN_PROMPTS = [
     {
@@ -35,10 +35,10 @@ const GOLDEN_PROMPTS = [
         expectedTools: ['repo_quarantine_file', 'repo_list_quarantine', 'repo_restore_quarantined_file'],
     },
     {
-        id: 'validation-one-job',
-        goal: 'Validate code through one allowlisted job instead of separate validator calls.',
-        prompt: 'Inicie mcp_run_safe_validation_suite suite=mcp-full, depois use mcp_validation_dashboard e job_get_summary; leia job_get_output com tailBytes pequeno apenas se houver falha.',
-        expectedTools: ['mcp_run_safe_validation_suite', 'mcp_validation_dashboard', 'job_get_summary'],
+        id: 'validation-focused-first',
+        goal: 'Validate only the smallest causal surface and escalate to broad suites only when justified.',
+        prompt: 'Chame mcp_validation_plan sem suite. Se houver um teste causal claro, planeje com testFile explícito e use run_copilot_validator validator=unit-focused com esse mesmo arquivo. Não execute mcp-full/copilot-fast salvo se a mudança for transversal ou a evidência focada for insuficiente.',
+        expectedTools: ['mcp_validation_plan', 'run_copilot_validator'],
     },
     {
         id: 'delegated-diagnostics',
@@ -105,7 +105,7 @@ export const mcpGoldenPromptsTool = {
             successCriteria: {
                 readInvestigation: 'No write approval prompts for read-only flows.',
                 validation:
-                    'One approval path for mcp_run_safe_validation_suite plus compact dashboard/summary reads; job_get_output only as a bounded failure fallback.',
+                    'Inspect-first by default; explicit file-scoped tests when execution adds evidence; broad suites only as justified escalation; job_get_output only as a bounded failure fallback.',
                 cleanup: 'Quarantine path is preferred over repo_remove_file.',
                 delegation: 'Dry-run plan is visible before real fixed-mission execution.',
                 oauthMaxPower:
