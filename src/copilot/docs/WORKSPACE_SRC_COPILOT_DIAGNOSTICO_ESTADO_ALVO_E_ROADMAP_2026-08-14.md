@@ -2588,3 +2588,300 @@ O principal ganho não é apenas a adição de tools. O sistema agora possui um 
 `investigar -> editar bounded -> validar -> stage explícito -> commit -> push upstream-only -> self-reload -> OAuth smoke -> readiness -> LLM-B live control-only`
 
 Esse ciclo reduz de forma material a dependência de intervenção manual sem abrir shell, force-push, remote arbitrário ou restart arbitrário. A próxima fronteira de melhoria, excluída conscientemente desta onda, é performance evidence-gated e, em outra oportunidade, decomposição dos hotspots.
+
+---
+
+# Parte XVII — Terceira onda: reconciliação temporal, diagnóstico live e governança operacional
+
+## 71. Auditoria fresca de continuidade
+
+Esta onda começou reconciliando o estado real com este documento, sem presumir que o fechamento anterior continuava válido.
+
+Estado observado no início da nova conversa:
+
+- [x] branch `main`.
+- [x] upstream `origin/main`.
+- [x] HEAD `9abb2ac8e2e2da034f30ea251b95085affed1bb4`.
+- [x] commit funcional anterior `e2f69deaae16f17c67b3ebc6ae38926fe056a02f` presente no histórico.
+- [x] `main` sem divergência causal nova conhecida em relação ao fechamento anterior.
+- [x] SHA-256 deste documento ainda era `6ffd6341fb886fcea2d1d7ecdebbde94a06ecd9389bf855a47eb2736844d574b` antes desta atualização.
+- [x] artefatos locais/preexistentes continuavam fora do escopo da transformação.
+
+Itens deliberadamente preservados e que **não devem ser capturados pelo stage desta onda**:
+
+- [x] `.vscode/settings.json`.
+- [x] `DOCUMENTAÇÃO/tracing-background-task-display-report.md`.
+- [x] `audit_externa_src_copilot`.
+- [x] arquivos preexistentes em `src/DOCUMENTAÇÃO/COPILOT/AUDITORIA-ARQUITETURAL-AMPLA/`.
+- [x] `src/copilot/.ai/rollback/` como estado local/runtime preexistente.
+- [x] `workspaces/`.
+
+A restrição de escopo permanece: esta onda não é campanha de decomposição dos grandes hotspots.
+
+## 72. Autonomia MCP — estado fresco
+
+A surface viva pré-transformação foi novamente auditada:
+
+- [x] connector permanente `https://mcp.aurelin.org/mcp` funcional.
+- [x] OAuth funcional.
+- [x] `115` tools MCP observadas antes do novo reload.
+- [x] `86` read-only.
+- [x] `24` bounded write.
+- [x] `4` destructive.
+- [x] `1` open-world: `llmb_live_test_run`.
+- [x] `mcp_post_restart_readiness.ready=true` no processo então carregado.
+- [x] último reload persistido estava `completed`, profile `quic`, exit code `0`.
+
+O `mcp_autonomy_power_score` observado nesta conversa foi **91/A**, abaixo do 96 histórico. Isso não foi interpretado como perda automática de autonomia: a principal penalidade deriva de `llmb_live_test_run` estar corretamente marcada com `openWorldHint=true`. A decisão desta onda é preservar a honestidade da classificação de risco em vez de manipular annotations apenas para elevar o score.
+
+## 73. LLM-B — provas live control-only desta onda
+
+A readiness profunda foi executada novamente com health do SQLite e permaneceu verde. Três canários novos foram executados por PTY, todos sem chamada deliberada de modelo/provider:
+
+### 73.1 Tools read-only
+
+- [x] runId `mcp-msthseiw`.
+- [x] cenário `model-gateway-tools-readonly`.
+- [x] modo `control-only`.
+- [x] PTY.
+- [x] exit code `0`.
+
+### 73.2 Route apply minimal
+
+- [x] runId `mcp-msthsrc1`.
+- [x] cenário `model-gateway-route-apply-minimal`.
+- [x] modo `control-only`.
+- [x] PTY.
+- [x] exit code `0`.
+
+### 73.3 Recoverable tool error
+
+- [x] runId `mcp-msti5tth`.
+- [x] cenário `recoverable-tool-error`.
+- [x] modo `control-only`.
+- [x] PTY.
+- [x] exit code `0`.
+
+Evidência comum aos canários:
+
+- [x] sessão persistida retomada.
+- [x] `127` ferramentas observadas na sessão LLM-B.
+- [x] BYOK pronto em `kilo-auto/free`.
+- [x] `/usage`, `/activity`, `/session sdk`, CommandDefinitions, SSE, `/metrics`, `/events` e `/errors` observáveis.
+- [x] nenhum consumo deliberado de AI Credits/quota externa nestes control-only.
+
+Achado importante: igualdade do **model id** não implica igualdade do vínculo efetivo. A seleção preparada pode apontar para `kilo-auto/free` e ainda assim a sessão viva exigir `same-session-reattach-required` quando perfil/provider binding não coincide integralmente. O diagnóstico correto deve comparar provider, profile/preset, endpoint/binding e modelo, não apenas a string do modelo.
+
+O histórico também preserva uma execução anterior de route apply com `106/107` critérios, cujo único gap foi o lifecycle de `report_intent`. Isso continua sendo uma evidência útil para futuros cenários reais, sem justificar consumo de provider por padrão.
+
+## 74. Readiness pós-reload — reconciliação temporal implementada
+
+Gap confirmado no início da onda: `mcp_post_restart_readiness` podia dizer que o connector smoke era fresh por idade, mas não provava que esse smoke tinha sido capturado **depois** do último self-reload.
+
+Implementação desta onda:
+
+- [x] novo `mcp/control-plane/reload-state.js` centraliza a leitura do state persistido.
+- [x] o summary distingue reload ausente, in-flight, failed e completed-successfully.
+- [x] reload completed com exit code não-zero é falha explícita.
+- [x] reload in-flight não pode ser reconciliado como ready.
+- [x] um reload concluído com sucesso exige connector smoke cujo `checkedAt >= completedAt`.
+- [x] `mcp_post_restart_readiness` agora expõe o objeto `reload` como evidência de primeira classe.
+- [x] `connectorSmoke.ageFresh` distingue frescor puramente temporal do frescor reconciliado.
+- [x] `connectorSmoke.fresh` passa a exigir idade válida **e** reconciliação com o último reload.
+- [x] next actions diferenciam reload em andamento, reload falho e smoke anterior ao reload.
+
+Isso fecha o item residual anterior “integrar `mcp_reload_status` diretamente no readiness consolidado” no nível de state reconciliation. A prova live do código recém-carregado ainda depende do self-reload desta própria onda.
+
+## 75. Cloudflare — taxonomia única para erros acionáveis e cancelamentos benignos
+
+A investigação reproduziu uma inconsistência diagnóstica: `context canceled` aparecia em `recentOriginErrors` no tunnel status, enquanto o post-change gate já o tratava como cancelamento benigno de client/stream.
+
+Correção:
+
+- [x] criado `mcp/cloudflare/error-taxonomy.js`.
+- [x] `context canceled/cancelled`, client disconnect, request cancellation, stream close e unexpected EOF passam por taxonomia compartilhada.
+- [x] falhas duras de origin continuam acionáveis.
+- [x] `tunnel-status` mantém `recentBenignOriginCancellations` visível para auditoria.
+- [x] `recentOriginErrors` passa a significar erro acionável, não todo log ERR que menciona origin.
+- [x] `cloudflare-post-change-gates` usa a mesma classificação compartilhada.
+- [x] teste dedicado prova que `context canceled` permanece observável sem virar falha acionável.
+
+O objetivo não é esconder erros; é impedir que encerramentos normais de stream contaminem a sinalização operacional.
+
+## 76. QUIC/auto/H2 — planner reconciliado antes do benchmark
+
+Foi encontrado drift de contrato no planner de benchmark:
+
+- `http2` aparecia simultaneamente como `tcp-rollback-candidate` e como `Unsupported candidate`.
+
+Correção:
+
+- [x] `http2` agora é explicitamente o baseline/rollback TCP.
+- [x] `auto` é descrito como candidato fallback-capable.
+- [x] `quic` é descrito como candidato estrito a comparar com H2/auto.
+- [x] teste impede regressão para `Unsupported candidate` no H2.
+
+A política permanece evidence-gated:
+
+- [ ] executar benchmark comparável QUIC/auto/H2 com janelas equivalentes após o novo código estar publicado e carregado.
+- [ ] mudar o protocolo preferido apenas se os deltas de latência/reliability justificarem.
+
+Nenhuma mudança de protocolo foi feita por intuição nesta etapa.
+
+## 77. Usage/billing — regressão Prometheus corrigida
+
+A busca por regressões da ontologia antiga encontrou um caso real no endpoint Prometheus: as métricas de recovery ainda tinham nomes/HELP centrados em Premium Requests.
+
+Correção:
+
+- [x] `llmb_dialog_recovery_without_additional_model_call_total` é métrica canônica.
+- [x] `llmb_dialog_recovery_with_additional_model_call_total` é métrica canônica.
+- [x] `llmb_dialog_recovery_zero_pr_total` permanece apenas como alias legacy/deprecated.
+- [x] `llmb_dialog_recovery_pr_total` permanece apenas como alias legacy/deprecated.
+- [x] HELP das métricas canônicas não eleva Premium Requests novamente à ontologia atual.
+- [x] teste impede que `Premium Request` volte ao output canônico desse handler.
+
+As ocorrências source restantes revisadas pertencem a taxonomia de erro/vendor, compatibilidade wire/SDK legado, documentação histórica ou parsers para labels antigos; não foram automaticamente apagadas porque parte delas é necessária à compatibilidade e ao diagnóstico de histórico.
+
+## 78. Artifact hygiene — rollback agora mensurável, sem ampliar poder destrutivo
+
+O maintenance report conhecia `.ai/jobs`, Cloudflare e MCP state, mas não fornecia inventário explícito dos sidecars de rollback.
+
+Implementado:
+
+- [x] contagem de sidecars reconhecidos em `.ai/rollback`.
+- [x] bytes totais.
+- [x] contagem/bytes de expirados pelo timestamp canônico no nome.
+- [x] contagem/bytes de `.pending-*`.
+- [x] contagem de entradas desconhecidas/ignoradas.
+- [x] oldest/newest mtime.
+- [x] ownership de cleanup declarado como `infra/io/fs/rollback-sidecar.js TTL cleanup`.
+- [x] `maintenanceMutation=false` explicitamente no report.
+- [x] teste com cleanup real prova que `mcp_cleanup_ai_artifacts` continua incapaz de apagar sidecars de rollback.
+
+A mutation domain de `mcp_cleanup_ai_artifacts` continua restrita a artefatos UUID `.json/.log` de `.ai/jobs`. Esta onda aumentou observabilidade, não destrutividade.
+
+## 79. Discovery/index — nova reconciliação
+
+Estado fresco do índice:
+
+- [x] schema `2` disponível.
+- [x] aproximadamente `2.087` arquivos indexados no momento da auditoria.
+- [x] aproximadamente `11.663` símbolos.
+- [x] aproximadamente `3.800` imports.
+- [x] `repo_find_orphan_imports` verificou `2.824` imports em `807` arquivos.
+- [x] `orphanCount=0`.
+- [x] `trueOrphan=0`.
+- [x] aliases/protected imports permanecem classificados sem falso orphan.
+- [x] `infra/public` continua descobrível.
+
+A revisão do `.gitignore` confirmou que o build output está ancorado em `/public/`, não em `public/` global. Nenhum novo blind spot equivalente foi comprovado nesta varredura.
+
+## 80. Performance e caches — decisão desta onda até aqui
+
+- [x] runtime em Node `v24.15.0` confirmado por project doctor.
+- [x] índice atual tem cerca de `2.087` arquivos, abaixo do sinal simples de pressão por tamanho `workspaceFiles > 3000` usado pelo planner de tiering.
+- [x] L2 continua preparado porém desligado.
+- [x] nenhum Redis/L2 foi habilitado por intuição.
+- [x] `llmb_live_readiness` apareceu como outlier de latência nesta conversa, na ordem de ~16 s, merecendo perfilamento futuro específico.
+
+Ainda aberto:
+
+- [ ] workload reprodutível cold versus L1 versus L2.
+- [ ] medir hit ratio e hotset ratio sob workload representativo.
+- [ ] separar custo de index/parser/file IO do custo de provider/SQLite/runtime probes.
+- [ ] só promover L2 se benchmark comparável mostrar ganho material sem regressão operacional.
+
+## 81. Golden prompts — medição honesta
+
+`mcp_golden_prompts` versão `4` continua fornecendo prompts e schema de medição explícito, incluindo approvals, OAuth linking, host blocks e completion.
+
+- [x] prompt set e measurement schema foram novamente inspecionados.
+- [x] esta conversa exercitou na prática o ciclo investigar → editar → validar via surfaces bounded.
+- [ ] **não** marcar os golden prompts como medidos em “conversa limpa” nesta conversa longa.
+- [ ] executar o protocolo em conversa realmente limpa e registrar os campos do schema sem inferência retroativa.
+
+A ausência de score fabricado é deliberada: o experimento exige condições de host/approval que este contexto já não satisfaz.
+
+## 82. Permissions — segurança sem reduzir autonomia
+
+A implementação central foi revisada novamente em `sdk/session/permission-controller.js`:
+
+- [x] `approve_all` permanece default deliberado e configurável por `AGENT_PERMISSION_MODE`.
+- [x] `selective` sem regras explícitas aplica baseline `denyShell=true`.
+- [x] denylist canônica cobre shell/npm/node script tools no baseline seletivo.
+- [x] mudança de modo permanece centralizada e auditável.
+- [x] nenhuma razão foi encontrada para transformar o default global em fail-closed sem contexto de ambiente.
+
+Gap menor de diagnóstico, não enforcement:
+
+- [ ] avaliar se endpoints de control devem reportar `unavailable/unknown` em vez de assumir visualmente `approve_all` quando `getPermissionMode` não existe. Qualquer mudança deve preservar compatibilidade de API e ser testada antes de alterar contrato.
+
+## 83. Validação intermediária desta onda
+
+Após as transformações source/test descritas acima:
+
+- [x] strict typecheck passou.
+  - job `ca6e669b-06e2-4fa1-8065-b7d42e09e39b`.
+  - exit code `0`.
+  - duração ~`9,64s`.
+- [x] `mcp-fast` passou.
+  - job `c5d4bf22-acac-43a8-8558-49151020a505`.
+  - exit code `0`.
+  - duração ~`32,6s`.
+- [x] `mcp-full` final desta árvore passou.
+  - job `2f405664-0c72-4623-bdc1-d332f6a56b0d`.
+  - exit code `0`.
+  - duração ~`103,0s`.
+- [x] `copilot-fast` final da árvore corrigida passou.
+  - primeira execução `caff7ae6-d6f7-46e5-a52f-0dbcb52063e0` detectou corretamente uma falha no teste novo: o teste chamava `handleMetrics()` sem bootstrap do token DI `METRICS_STORE`; runtime/source não falharam.
+  - o teste foi corrigido para validar o contrato Prometheus diretamente no source, sem instanciar singletons fora do bootstrap.
+  - rerun final `613ab004-8593-40ee-b424-e09bf908a707` passou com exit code `0` em ~`171,0s`.
+  - `6.860` testes: `6.832` passed, `0` failed, `28` pending.
+  - `2.080` suites: `2.080` passed.
+  - typecheck, lint, docs-contract e architecture-contract verdes no mesmo job final.
+- [ ] publicação Git desta onda.
+- [ ] self-reload do novo código.
+- [ ] connector smoke pós-reload capturado depois do novo `completedAt`.
+- [ ] prova live do novo `mcp_post_restart_readiness.reload`.
+- [ ] canário LLM-B pós-reload do código publicado.
+
+## 84. Roadmap residual atualizado — terceira onda
+
+### 84.1 Candidatos a fechamento nesta própria conversa
+
+- [x] finalizar `mcp-full` e `copilot-fast`.
+- [ ] stage explícito apenas dos arquivos causalmente pertencentes a esta onda.
+- [ ] commit e push upstream-only para `main`.
+- [ ] self-reload governado.
+- [ ] refresh OAuth/connector smoke depois do reload.
+- [ ] provar `reload.reconciledWithConnectorSmoke=true` no readiness novo.
+- [ ] revalidar registry remoto/local.
+- [ ] executar canário LLM-B control-only pós-reload.
+- [ ] atualizar novamente este documento com a prova pós-publicação.
+
+### 84.2 Evidence-gated que podem permanecer abertos se a prova não justificar mudança
+
+- [ ] benchmark cold/L1/L2 representativo.
+- [ ] benchmark QUIC/auto/H2 comparável por janela.
+- [ ] golden prompts em conversa limpa.
+- [ ] perfilamento específico do custo de `llmb_live_readiness`.
+- [ ] avaliar diagnostic fallback de permissions sem quebrar API.
+- [ ] avaliar dev-watch dedicado da LLM-B apenas se remover intervenção manual mensurável.
+- [ ] provider/model real apenas quando o consumo externo for deliberadamente justificado.
+
+### 84.3 Decomposição — continua deliberadamente fora desta onda
+
+- [ ] `terminal/commands/byok.js`.
+- [ ] `sqlite-catalog-store.js`.
+- [ ] `dev-oauth.js`.
+- [ ] `session.js`.
+- [ ] `sdk.js`.
+- [ ] `sdk-session-events.js`.
+- [ ] demais hotspots apenas por tamanho.
+
+## 85. Veredito intermediário
+
+**GO para validação ampla e publicação, condicionado aos gates finais.**
+
+A transformação desta onda fecha gaps operacionais reais — correlação temporal do self-reload, taxonomia Cloudflare consistente, contrato H2 do benchmark, métricas modernas de recovery e inventário seguro de rollback — sem ampliar arbitrary shell/Git/restart e sem desviar o trabalho para decomposição estrutural. O próximo passo é provar a árvore inteira, publicar apenas o conjunto causal e então usar o próprio self-reload para provar que o runtime novo satisfaz os contratos que acabou de ganhar.

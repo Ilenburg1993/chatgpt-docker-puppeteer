@@ -17,14 +17,15 @@ import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
     getMcpWorkspaceRoot,
+    MCP_RELOAD_STATE_FILE,
     okResult,
+    readMcpReloadState,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
 
 const MIN_DELAY_MS = 1000;
 const MAX_DELAY_MS = 60000;
 const DEFAULT_DELAY_MS = 2500;
-const RELOAD_STATE_FILE = 'src/copilot/.ai/mcp/mcp-reload-state.json';
 const RESTART_RUNNER = 'src/copilot/mcp/scripts/scheduled-restart-runner.js';
 const restartProfileSchema = z.enum(['current', 'quic', 'h2', 'auto']);
 const workspaceIo = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
@@ -55,7 +56,7 @@ function buildReloadPlan(profile, delayMs, reason) {
         requestedProfile: profile,
         resolvedProfile: resolveRestartProfile(profile),
         delayMs,
-        stateFile: RELOAD_STATE_FILE,
+        stateFile: MCP_RELOAD_STATE_FILE,
         runner: RESTART_RUNNER,
         currentPid: process.pid,
         reason,
@@ -73,18 +74,6 @@ function buildReloadPlan(profile, delayMs, reason) {
             'mcp_runtime_health',
         ],
     };
-}
-
-async function readReloadState() {
-    try {
-        const file = await workspaceIo.readText(RELOAD_STATE_FILE);
-        const parsed = JSON.parse(file.content);
-        return parsed && typeof parsed === 'object' ? parsed : null;
-    } catch (error) {
-        const code = /** @type {{ code?: unknown }} */ (error)?.code;
-        if (code === 'ENOENT') return null;
-        return { status: 'unavailable', error: error instanceof Error ? error.message : String(error) };
-    }
 }
 
 /** @type {import('../registry.js').McpToolDefinition} */
@@ -113,7 +102,7 @@ export const mcpReloadStatusTool = {
     inputSchema: {},
     annotations: readOnlyAnnotations(),
     handler: async () => {
-        const state = await readReloadState();
+        const state = await readMcpReloadState();
         return okResult({ success: true, state }, JSON.stringify({ success: true, state }, null, 2));
     },
 };
@@ -137,7 +126,7 @@ export const mcpReloadScheduleTool = {
         const requestId = `mcp-reload-${randomUUID()}`;
         const acceptedAt = Date.now();
         await workspaceIo.writeFileAtomic(
-            RELOAD_STATE_FILE,
+            MCP_RELOAD_STATE_FILE,
             `${JSON.stringify(
                 {
                     schemaVersion: 1,

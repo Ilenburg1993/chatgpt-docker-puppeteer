@@ -5,6 +5,7 @@
  * Testes para handlers/system-metrics.js — endpoints de history, git status/log. Foca nos handlers testáveis sem mocks
  * pesados de agent singletons.
  */
+import { readFile } from 'node:fs/promises';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -130,6 +131,19 @@ describe('handlers/system-metrics — thinking history', () => {
 
         expect(result.status).toBe(404);
         expect(body.ok).toBe(false);
+    });
+});
+
+describe('handlers/system-metrics — metrics usage ontology', () => {
+    it('publishes additional-model-call recovery metrics as canonical and keeps PR names only as legacy aliases', async () => {
+        const source = await readFile('src/copilot/presentation/system/metrics/handlers.js', 'utf8');
+
+        expect(source).toContain('llmb_dialog_recovery_without_additional_model_call_total');
+        expect(source).toContain('llmb_dialog_recovery_with_additional_model_call_total');
+        expect(source).toContain('# HELP llmb_dialog_recovery_zero_pr_total LEGACY deprecated alias');
+        expect(source).toContain('# HELP llmb_dialog_recovery_pr_total LEGACY deprecated alias');
+        expect(source).not.toContain('Recuperações sem consumir Premium Request');
+        expect(source).not.toContain('Recuperações que consumiram Premium Request');
     });
 });
 

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { cleanupAiArtifacts } from '../../../../src/copilot/mcp/control-plane/ai-artifacts.js';
+import { buildAiArtifactsReport, cleanupAiArtifacts } from '../../../../src/copilot/mcp/control-plane/ai-artifacts.js';
 
 const roots = [];
 
@@ -53,5 +53,34 @@ describe('MCP AI artifact cleanup', () => {
         expect(remaining).toHaveLength(names.length - 2);
         expect(remaining).toEqual(expect.arrayContaining(protectedNames));
         expect(applied['remainingCandidateCount']).toBe(1);
+    });
+
+    it('reports rollback sidecars read-only and never makes them cleanup targets', async () => {
+        const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'mcp-ai-rollback-report-'));
+        roots.push(workspaceRoot);
+        const rollbackDir = path.join(workspaceRoot, 'src/copilot/.ai/rollback');
+        await mkdir(rollbackDir, { recursive: true });
+
+        const uuid = '00000000-0000-4000-8000-000000000001';
+        const hash = 'a'.repeat(64);
+        const expired = `${Date.now() - 60_000}-${hash}-${uuid}.rollback`;
+        const active = `${Date.now() + 60_000}-${hash}-${uuid}.rollback`;
+        const pending = `.pending-${Date.now() + 60_000}-123-${uuid}`;
+        const unknown = 'manual-note.txt';
+        for (const name of [expired, active, pending, unknown]) {
+            await writeFile(path.join(rollbackDir, name), `${name}\n`);
+        }
+
+        const report = await buildAiArtifactsReport({ workspaceRoot });
+        const rollback = /** @type {Record<string, unknown>} */ (report['rollback']);
+        expect(rollback['sidecarCount']).toBe(2);
+        expect(rollback['expiredCount']).toBe(1);
+        expect(rollback['pendingCount']).toBe(1);
+        expect(rollback['ignoredEntryCount']).toBe(1);
+        expect(rollback['maintenanceMutation']).toBe(false);
+
+        const applied = await cleanupAiArtifacts({ workspaceRoot, dryRun: false, retainNewest: 20, maxDeleteCount: 10 });
+        expect(applied['deletedCount']).toBe(0);
+        expect((await readdir(rollbackDir)).sort()).toEqual([expired, active, pending, unknown].sort());
     });
 });

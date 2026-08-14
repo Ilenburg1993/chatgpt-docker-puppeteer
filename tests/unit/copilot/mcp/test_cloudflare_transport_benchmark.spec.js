@@ -20,14 +20,18 @@ describe('Cloudflare transport benchmark plan', () => {
         restoreEnv('TUNNEL_TRANSPORT_PROTOCOL', undefined);
 
         const plan = await buildCloudflareTransportBenchmarkPlan();
-        const candidates = /** @type {{ protocol: string; role: string }[]} */ (plan['candidates']);
+        const candidates = /** @type {{ protocol: string; role: string; recommendation: string; risk: string }[]} */ (plan['candidates']);
         const benchmarkDesign = /** @type {{ manualProtocolSwitch: { env: string } }} */ (plan['benchmarkDesign']);
         const decisionPolicy = /** @type {{ keepQuicWhen: string[] }} */ (plan['decisionPolicy']);
         const nextActions = /** @type {string[]} */ (plan['nextActions']);
 
         assert.equal(plan.current.transportProtocol, 'quic');
         assert.equal(candidates.find((candidate) => candidate.protocol === 'quic')?.role, 'control-current');
-        assert.equal(candidates.find((candidate) => candidate.protocol === 'http2')?.role, 'tcp-rollback-candidate');
+        const http2 = candidates.find((candidate) => candidate.protocol === 'http2');
+        assert.equal(http2?.role, 'tcp-rollback-candidate');
+        assert.match(http2?.recommendation ?? '', /TCP rollback\/baseline/u);
+        assert.match(http2?.risk ?? '', /canonical TCP rollback baseline/u);
+        assert.doesNotMatch(http2?.recommendation ?? '', /Unsupported candidate/u);
         assert.equal(candidates.find((candidate) => candidate.protocol === 'auto')?.role, 'fallback-capable-candidate');
         assert.equal(benchmarkDesign.manualProtocolSwitch.env, 'COPILOT_MCP_CLOUDFLARE_PROTOCOL or TUNNEL_TRANSPORT_PROTOCOL');
         assert.ok(decisionPolicy.keepQuicWhen.includes('Cloudflare QUIC metrics remain present after restart'));

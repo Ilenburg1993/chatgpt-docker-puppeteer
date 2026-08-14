@@ -13,6 +13,7 @@ export * from './edge-policy-apply.js';
 export * from './edge-policy-diff.js';
 export * from './edge-policy-plan.js';
 export * from './edge-snapshot.js';
+export * from './error-taxonomy.js';
 export * from './mcp-passthrough-plan.js';
 export * from './metrics.js';
 export * from './metrics-histograms.js';

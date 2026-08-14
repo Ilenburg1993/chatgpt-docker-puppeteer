@@ -175,8 +175,9 @@ function nextActionsForProtocol(currentProtocol) {
  */
 function recommendationForProtocol(candidate, currentProtocol) {
     if (candidate === currentProtocol) return 'Use as control baseline.';
-    if (candidate === 'auto') return 'Best first candidate; can try QUIC and fall back to HTTP/2.';
-    if (candidate === 'quic') return 'Test only after auto indicates UDP/QUIC is healthy.';
+    if (candidate === 'http2') return 'Use as the explicit TCP rollback/baseline candidate when comparing QUIC and auto.';
+    if (candidate === 'auto') return 'Best first fallback-capable candidate; can try QUIC and fall back to HTTP/2.';
+    if (candidate === 'quic') return 'Test strict QUIC against the comparable HTTP/2/auto baselines.';
     return 'Unsupported candidate.';
 }
 
@@ -185,7 +186,7 @@ function recommendationForProtocol(candidate, currentProtocol) {
  * @returns {string}
  */
 function riskForProtocol(candidate) {
-    if (candidate === 'http2') return 'lowest for DevContainer/TCP egress; current stable baseline';
+    if (candidate === 'http2') return 'lowest transport risk for DevContainer/TCP egress; canonical TCP rollback baseline';
     if (candidate === 'auto') return 'medium; should fall back when UDP is unavailable';
     if (candidate === 'quic') return 'highest; depends on stable UDP egress';
     return 'unknown';

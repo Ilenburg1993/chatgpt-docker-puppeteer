@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import {
+    isCloudflaredActionableOriginErrorLine,
+    isCloudflaredBenignClientOrStreamCancellationLine,
+} from '#copilot/mcp/cloudflare';
+import {
     isCloudflaredOriginErrorLine,
     isCloudflaredTunnelTransportErrorLine,
     parseConnectorSmokeJsonOutput,
@@ -34,5 +38,14 @@ describe('cloudflare connector smoke compact mode', () => {
         expect(isCloudflaredTunnelTransportErrorLine(originLine)).toBe(false);
         expect(isCloudflaredOriginErrorLine(transportLine)).toBe(false);
         expect(isCloudflaredTunnelTransportErrorLine(transportLine)).toBe(true);
+    });
+
+    it('keeps benign client cancellation observable without classifying it as an actionable origin failure', () => {
+        const cancellation =
+            '2026-08-14T18:00:00Z ERR error="context canceled" connIndex=1 event=1 ingressRule=0 originService=https://127.0.0.1:3333';
+
+        expect(isCloudflaredOriginErrorLine(cancellation)).toBe(true);
+        expect(isCloudflaredBenignClientOrStreamCancellationLine(cancellation)).toBe(true);
+        expect(isCloudflaredActionableOriginErrorLine(cancellation)).toBe(false);
     });
 });

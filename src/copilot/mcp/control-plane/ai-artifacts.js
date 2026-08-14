@@ -13,6 +13,8 @@ import path from 'node:path';
 import { getMcpWorkspaceRoot } from './paths.js';
 
 const STRICT_UUID_JOB_ARTIFACT_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(json|log)$/u;
+const ROLLBACK_SIDECAR_RE = /^(\d+)-([a-f0-9]{64})-([0-9a-f-]{36})\.rollback$/u;
+const ROLLBACK_PENDING_RE = /^\.pending-(\d+)-(\d+)-([0-9a-f-]{36})$/u;
 const DEFAULT_RETAIN_NEWEST = 240;
 const DEFAULT_CLOUDFLARE_LOG_THRESHOLD_BYTES = 2 * 1024 * 1024;
 const REPORT_CACHE_TTL_MS = 5 * 1000;
@@ -67,6 +69,7 @@ export async function buildAiArtifactsReport(options = {}) {
     const jobsDir = path.join(aiDir, 'jobs');
     const cloudflareDir = path.join(aiDir, 'cloudflare');
     const mcpDir = path.join(aiDir, 'mcp');
+    const rollbackDir = path.join(aiDir, 'rollback');
     const retainNewest = normalizePositiveInteger(options.retainNewest, DEFAULT_RETAIN_NEWEST, 20, 10_000);
     const cloudflareLogThresholdBytes = normalizePositiveInteger(
         options.cloudflareLogThresholdBytes,
@@ -107,6 +110,46 @@ export async function buildAiArtifactsReport(options = {}) {
         if (stats && stats.size > cloudflareLogThresholdBytes) oversizedCloudflareLogs.push({ name, bytes: stats.size });
     }
 
+    const rollbackEntries = await readdirSafe(rollbackDir);
+    const rollbackNowMs = Date.now();
+    let rollbackSidecarCount = 0;
+    let rollbackSidecarBytes = 0;
+    let rollbackExpiredCount = 0;
+    let rollbackExpiredBytes = 0;
+    let rollbackPendingCount = 0;
+    let rollbackPendingBytes = 0;
+    let ignoredRollbackEntryCount = 0;
+    let rollbackOldestMtimeMs = null;
+    let rollbackNewestMtimeMs = null;
+    for (const entry of rollbackEntries) {
+        if (!entry.isFile()) {
+            ignoredRollbackEntryCount += 1;
+            continue;
+        }
+        const sidecarMatch = ROLLBACK_SIDECAR_RE.exec(entry.name);
+        const pendingMatch = ROLLBACK_PENDING_RE.exec(entry.name);
+        if (!sidecarMatch && !pendingMatch) {
+            ignoredRollbackEntryCount += 1;
+            continue;
+        }
+        const stats = await statSafe(path.join(rollbackDir, entry.name));
+        if (!stats) continue;
+        rollbackOldestMtimeMs = rollbackOldestMtimeMs === null ? stats.mtimeMs : Math.min(rollbackOldestMtimeMs, stats.mtimeMs);
+        rollbackNewestMtimeMs = rollbackNewestMtimeMs === null ? stats.mtimeMs : Math.max(rollbackNewestMtimeMs, stats.mtimeMs);
+        if (sidecarMatch) {
+            rollbackSidecarCount += 1;
+            rollbackSidecarBytes += stats.size;
+            const expiresAtMs = Number(sidecarMatch[1]);
+            if (Number.isFinite(expiresAtMs) && expiresAtMs <= rollbackNowMs) {
+                rollbackExpiredCount += 1;
+                rollbackExpiredBytes += stats.size;
+            }
+            continue;
+        }
+        rollbackPendingCount += 1;
+        rollbackPendingBytes += stats.size;
+    }
+
     const mcpEntries = await readdirSafe(mcpDir);
     const report = {
         aiPath: path.relative(workspaceRoot, aiDir),
@@ -131,6 +174,20 @@ export async function buildAiArtifactsReport(options = {}) {
             entryCount: mcpEntries.length,
             protectedNames: ['oauth-clients.json', 'oauth-refresh-tokens.json'],
             appendOnlyHistories: ['latency-dashboard.jsonl'],
+        },
+        rollback: {
+            path: path.relative(workspaceRoot, rollbackDir),
+            sidecarCount: rollbackSidecarCount,
+            sidecarBytes: rollbackSidecarBytes,
+            expiredCount: rollbackExpiredCount,
+            expiredBytes: rollbackExpiredBytes,
+            pendingCount: rollbackPendingCount,
+            pendingBytes: rollbackPendingBytes,
+            ignoredEntryCount: ignoredRollbackEntryCount,
+            oldestMtimeMs: rollbackOldestMtimeMs,
+            newestMtimeMs: rollbackNewestMtimeMs,
+            cleanupOwnedBy: 'infra/io/fs/rollback-sidecar.js TTL cleanup',
+            maintenanceMutation: false,
         },
         cleanupPlan: {
             applyInsideMcp: true,

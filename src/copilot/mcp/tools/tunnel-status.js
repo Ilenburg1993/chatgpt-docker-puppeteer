@@ -11,6 +11,8 @@ import https from 'node:https';
 import { z } from 'zod';
 import { createBoundedProcessOutputCapture } from '#copilot/infra/public/process-output';
 import {
+    isCloudflaredActionableOriginErrorLine,
+    isCloudflaredBenignClientOrStreamCancellationLine,
     readCloudflareTunnelConfig,
     readConnectorSmokeState,
     readQuickTunnelState,
@@ -25,7 +27,9 @@ import {
     okResult,
     readMcpAuthConfig,
     readMcpHttpStatefulSessionPolicy,
+    readMcpReloadState,
     readOnlyAnnotations,
+    summarizeMcpReloadState,
 } from '#copilot/mcp/control-plane';
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
@@ -104,11 +108,16 @@ async function readCloudflaredOriginDiagnostics() {
             originUsesLocalhost: false,
             originUsesLoopbackIp: false,
             recentOriginErrors: [],
+            recentBenignOriginCancellations: [],
             recommendation: 'cloudflared log not found yet; run make copilot-mcp-restart and smoke after startup.',
         };
     }
     const logLines = text.split(/\r?\n/u);
-    const recentOriginErrors = logLines.filter(isCloudflaredOriginErrorLine).slice(-8);
+    const recentOriginErrorCandidates = logLines.filter(isCloudflaredOriginErrorLine);
+    const recentOriginErrors = recentOriginErrorCandidates.filter(isCloudflaredActionableOriginErrorLine).slice(-8);
+    const recentBenignOriginCancellations = recentOriginErrorCandidates
+        .filter(isCloudflaredBenignClientOrStreamCancellationLine)
+        .slice(-8);
     const recentTunnelTransportErrors = logLines.filter(isCloudflaredTunnelTransportErrorLine).slice(-8);
     const recentMetricsBindErrors = logLines.filter(isCloudflaredMetricsBindErrorLine).slice(-4);
     const originUsesLocalhost = /http:\/\/localhost:3333|\[::1\]:3333/iu.test(text);
@@ -118,6 +127,7 @@ async function readCloudflaredOriginDiagnostics() {
         originUsesLocalhost,
         originUsesLoopbackIp,
         recentOriginErrors,
+        recentBenignOriginCancellations,
         recentTunnelTransportErrors,
         recentMetricsBindErrors,
         recommendation: originUsesLocalhost
@@ -412,10 +422,12 @@ export const mcpPostRestartReadinessTool = {
             await readConnectorSmokeState(config.smokeStateFile),
             config.publicMcpUrl ?? null,
         );
-        const connectorSmokeFresh =
+        const reload = summarizeMcpReloadState(await readMcpReloadState(), connectorSmoke.checkedAt);
+        const connectorSmokeAgeFresh =
             connectorSmoke.ok === true &&
             typeof connectorSmoke.ageMinutes === 'number' &&
             connectorSmoke.ageMinutes <= CONNECTOR_SMOKE_STALE_AFTER_MINUTES;
+        const connectorSmokeFresh = connectorSmokeAgeFresh && reload.reconciledWithConnectorSmoke === true;
         const publicHealthUrl = config.publicMcpUrl ? new URL('/health', config.publicMcpUrl).toString() : null;
         const [mcpHttpProcess, cloudflaredProcess, localHealth, publicHealth] = await Promise.all([
             readPidFileStatus(config.mcpHttpPidFile),
@@ -448,8 +460,18 @@ export const mcpPostRestartReadinessTool = {
         } else if (!localHealth.ok && publicHealth.ok) {
             nextActions.push('Local HTTPS health probe failed, but public connector health is OK; inspect SNI/local TLS only if origin debugging is needed.');
         }
-        if (!connectorSmokeFresh)
-            nextActions.push('Run mcp_connector_smoke_refresh or make copilot-mcp-smoke-refresh.');
+        if (reload.inFlight) {
+            nextActions.push('Wait for mcp_reload_status to leave the in-flight state before trusting post-restart readiness.');
+        } else if (reload.failed) {
+            nextActions.push('Inspect mcp_reload_status: the latest controlled MCP reload did not complete successfully.');
+        }
+        if (!connectorSmokeFresh) {
+            if (reload.completedSuccessfully && reload.smokeAfterReload !== true) {
+                nextActions.push('Run mcp_connector_smoke_refresh after the latest completed reload to reconcile the new process/tunnel generation.');
+            } else {
+                nextActions.push('Run mcp_connector_smoke_refresh or make copilot-mcp-smoke-refresh.');
+            }
+        }
         if (ready) {
             nextActions.push('Start with mcp_session_profile, mcp_validation_dashboard and repo_status.');
         }
@@ -468,8 +490,10 @@ export const mcpPostRestartReadinessTool = {
             healthReady,
             originDiagnostics,
             statefulPolicy,
+            reload,
             connectorSmoke: {
                 ...connectorSmoke,
+                ageFresh: connectorSmokeAgeFresh,
                 fresh: connectorSmokeFresh,
                 staleAfterMinutes: CONNECTOR_SMOKE_STALE_AFTER_MINUTES,
             },
