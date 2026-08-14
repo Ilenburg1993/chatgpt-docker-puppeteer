@@ -11,7 +11,7 @@
 import { createCatalogImportRun, createCatalogModelTombstones, diffCanonicalModelProjections } from './import-runs.js';
 import { createProviderAccountOverlay } from './contracts.js';
 import { runCatalogImporters } from './importer-runner.js';
-import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
+import { createModelGatewayCatalogSnapshotId, normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { mergeModelMetadataEvidence, mergeProviderMetadataEvidence } from './merge.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
 import { resolveModelGatewayCatalogRefreshLockKey, withModelGatewayCatalogRefreshLock } from './refresh-lock.js';
@@ -429,7 +429,12 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         });
     }
     const retained = applyModelGatewayCatalogRetention(snapshotWithEligibility, input.retentionPolicy);
-    const snapshot = retained.snapshot;
+    const snapshot = /** @type {typeof retained.snapshot} */ ({
+        ...retained.snapshot,
+        // A catalog refresh is a new content revision. Do not retain the previous revision hash after
+        // projections, evidence, eligibility decisions or retention have changed the snapshot.
+        snapshotId: createModelGatewayCatalogSnapshotId(retained.snapshot),
+    });
     emitRefreshProgress(input.onProgress, {
         phase: 'retention_applied',
         elapsedMs: refreshElapsedMs(startedAt, now()),

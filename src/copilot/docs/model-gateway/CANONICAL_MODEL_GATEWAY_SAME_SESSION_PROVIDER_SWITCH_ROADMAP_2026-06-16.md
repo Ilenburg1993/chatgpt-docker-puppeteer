@@ -1,720 +1,165 @@
-# Model Gateway / BYOK / LLM-B — roadmap canonico de troca de provider na mesma sessao
+# Model Gateway e LLM-B: Diagnostico, Estado Ideal e Roadmap Canonico
 
-Data canonica: 2026-06-16
+> Reconstruido em 2026-08-14. Este arquivo substitui o diario incremental de junho como fonte canonica do estado, das decisoes e da continuidade. Evidencias operacionais dinamicas ficam em `artifacts/` e no SQLite local; nao contem segredos e nao entram no Git.
 
-Ultima atualizacao material: 2026-06-19 — auditoria profunda do worktree, live LLM-B repetido via
-`node scripts/model-gateway/run.mjs llmBLiveTest`, hardening do harness live, correcoes de boot/modelo fresco,
-normalizacao de sentinels de tool, recuperacao contextual pos-ask, denylist de `session_compact`, guardas de promocao
-em fila e novo bloqueio residual: promocao/rota efetiva ainda pode regredir para `kilo-code/kilo-auto/free` quando ha
-falha BYOK transitoria durante o fluxo.
+## 1. Decisao Executiva
 
-Status: ativo, normativo e continuamente atualizavel.
+Em 2026-08-14 a LLM-B respondeu de verdade. Nao foi encontrada uma quebra externa que impedisse o provider Kilo/SDK de responder. A causa percebida como "nao responde" era uma combinacao de tres fatores locais:
 
-Escopo de arquitetura: `src/copilot`.
+1. O boot podia anunciar `LLM-B pronta` sem repintar de forma garantida o prompt REPL. O primeiro comando automatico parecia sair de uma linha sem prompt.
+2. O harness de troca de rota encerrava o terminal antes do reattach diferido no limite do turno. Isso fabricava `SAME_SESSION_ROUTE_REATTACH_FAILED` durante o shutdown.
+3. O catalogo estava cerca de 59 dias vencido. A atualizacao de JSON nao espelhava o SQLite no caminho CLI, entao a readiness corretamente acusava paridade quebrada.
 
-Escopo de validacao solicitado: typecheck strict, lint e testes em `src/copilot` no maior escopo pratico, com execucao
-focada durante iteracao e suite ampla apenas nos checkpoints.
+As tres causas foram corrigidas e comprovadas por execucao viva. A configuracao padrao de `npm run terminal:llm-b` inicia com BYOK Kilo pronto; o alerta de quota Premium do Copilot permanece apenas telemetria lateral e nao bloqueia a rota BYOK.
 
-Checkpoint de base desta revisao:
+## 2. Evidencia Atual
 
-- branch: `main`;
-- HEAD antes desta revisao: `fb7f27489f78` (`feat(copilot): bind sdk sessions through model gateway ingress`);
-- checkpoint publicado desta revisao: `b78c1c816` (`feat(copilot): harden same-session model gateway routing`);
-- checkpoint documental de sincronizacao: `12a746fb5` (`docs(copilot): record model gateway checkpoint push`);
-- checkpoint live PASS e correcao pos-ask: `1834513ff` (`fix(copilot): preserve route switch ask continuation`);
-- checkpoint ops/readiness rapido: `977bf61c6` (`fix(copilot): bound model gateway ops readiness`);
-- checkpoint runtime selector merged: `7bbf27fb3` (`fix(copilot): restore merged runtime selector default`);
-- checkpoint indices runtime-health: `45e87e31c` (`fix(copilot): index runtime health reads`);
-- checkpoint effective route compartilhada: `12e7bdaa1` (`feat(copilot): share model gateway effective route`);
-- checkpoint pending handoffs compartilhados: `45f0d6c01` (`feat(copilot): surface pending model gateway handoffs`);
-- checkpoint `/health` effective route: `1eb06d588` (`fix(copilot): render health effective model gateway route`);
-- checkpoint `/byok status` effective route: `20b9afec9` (`fix(copilot): render byok effective gateway route`);
-- checkpoint `/session sdk` effective route: `c3702509f` (`fix(copilot): render session sdk effective route`);
-- checkpoint `/activity` effective route: `24763e9ca` (`fix(copilot): render activity effective route`);
-- checkpoint cockpit handoffs BYOK: `64727e2e6` (`fix(copilot): clarify byok handoff cockpit`);
-- checkpoint timeline/export reconciliado: `fbe2ba137` (`fix(copilot): reconcile forward-only live timeline tails`);
-- checkpoint timeline/export intercalado: `d6b1d13c2` (`fix(copilot): reconcile interleaved live timeline exports`);
-- checkpoint harness live estrito e bloqueio boot registrado: `ab552264c`
-  (`test(copilot): harden model gateway live harness`);
-- checkpoint atual desta continuacao: em preparacao, ainda nao publicado no momento desta edicao;
-- worktree continha implementacao extensa ainda nao commitada para same-session route promotion, ingress adaptativo,
-  SQLite v13, testes e este roadmap;
-- untracked externos e artefatos historicos permanecem no workspace e nao foram incluidos no checkpoint canonico sem
-  revisao explicita: `audit_externa_src_copilot`, `src/DOCUMENTACAO/...`, `src/copilot/.ai/rollback/` e
-  `workspaces/...`.
+### 2.1 Terminal padrao
 
-## 1. Regras de governanca continua
+- [x] `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000` passou em 2026-08-14.
+- [x] A sessao mostrou `LLM-B pronta`, prompt interativo, `kilo-auto/free`, BYOK pronto e 127 ferramentas.
+- [x] `/usage`, `/activity`, `/session sdk`, `/health`, `/events` e `/errors 10` responderam; erros rastreados: zero.
+- [x] O prompt apareceu antes de `/usage now`; nao houve pintura dupla no boot.
+- [x] O encerramento foi feito por `/quit`, sem processo de teste ativo remanescente.
+- Evidencia: `artifacts/terminal-live/2026-08-14T-llmb-default-boot-ready/summary.md`.
 
-- [x] Este arquivo e o guia operacional atual para a troca de provider/modelo na mesma sessao.
-- [x] Checkboxes so podem ser marcados como concluidos com codigo, teste, live run ou evidencia operacional.
-- [x] Trabalho parcial fica em `[ ]`, com nota de progresso quando relevante.
-- [x] Live run que prova parte do fluxo, mas falha criterio de harness ou continuacao, e registrado como evidencia
-  parcial, nao como aceite final.
-- [x] Nova sessao SDK nunca e fallback automatico do Model Gateway.
-- [x] `same-session` significa preservar o `sessionId` logico; o handle/runtime pode ser fechado e reconstruido.
-- [x] `dialog.turn_end` e o limite canonico para promover reattach deferido por tool-turn ativo.
-- [x] Ao mudar codigo relevante, atualizar este roadmap no mesmo incremento antes do commit.
+### 2.2 Fluxo vivo de troca de provider/modelo
 
-## 2. Modelo mental canonico
+- [x] `model-gateway-route-apply-minimal` passou em PTY com SDK e provider reais.
+- [x] A LLM-B chamou `report_intent`, `read_file_content`, duas vezes `model_gateway_overview`, duas vezes `model_gateway_operation_status` e `model_gateway_route_switch` em `plan` e `apply`.
+- [x] Os oito `DELTA-CANONICAL` foram publicados antes de `ask_user`.
+- [x] `ask_user` exibiu pergunta persistente, recebeu `SIM` de autoria humana e a LLM-B publicou o marcador final.
+- [x] O apply retornou deferimento seguro e a promocao posterior confirmou a mesma sessao no SQLite: `kilo-auto/free` para `ollama-cloud/qwen3-coder-next`.
+- [x] Nenhum erro SSE, nenhum erro do terminal, nenhum novo `sessionId` e nenhum fallback oculto foram observados.
+- Evidencia: `artifacts/terminal-live/2026-08-14T-llmb-route-promotion-verified/summary.md`.
 
-### 2.1 Identidades separadas
+### 2.3 Catalogo e readiness
 
-- Sessao logica SDK: identidade persistente representada por `sessionId`.
-- Handle/runtime vivo: objeto em memoria que pode ser encerrado e recriado.
-- Binding de transporte/provider: `provider`, `baseUrl`, credencial, wire API e modelo vistos pelo SDK.
-- Dialog loop: turno semantico em que a LLM e as tools ainda estao produzindo resposta.
-- Nova sessao: nova identidade SDK; permitida somente por comando humano explicito.
+- [x] Os 25 importadores vencidos foram atualizados em 2026-08-14.
+- [x] O refresh detectou mudanca externa real: 307 adicoes, 157 remocoes e 865 alteracoes de projecao na primeira rodada.
+- [x] A revisao atual e `catalog:32d63087aea2afdba080e6b6`; a data do snapshot foi renovada.
+- [x] O espelho JSON/SQLite passou com zero divergencias de contagem e chave.
+- [x] `liveReadiness --json` esta verde.
+- [x] `operatorReady --profile=repo_agent --json` esta verde: 9/9 checks, sem blockers ou warnings.
+- [x] O plano standby foi persistido: 12 rotas, 5 providers e 12 provas de runtime.
 
-### 2.2 Regra operacional
+### 2.4 Validacao de codigo
 
-```text
-mesmo provider + capability live setModel
-  -> trocar modelo no handle vivo
+- [x] `npm run typecheck` passou em modo strict.
+- [x] `npm run lint` passou.
+- [x] `npm run test:copilot` passou: 6.856 aprovados, zero falhas e 33 pendentes declarados.
+- [x] A fixture de `/history` que chamava uma timeline reconciliada de divergente foi corrigida; o caso agora exige a mensagem de bloqueio somente para o estado `diverged`.
 
-provider/base URL/wire API/binding incompatível
-  -> terminar o turno atual
-  -> reconstruir transporte/provider
-  -> resumeSession(sessionId original, novo binding)
-  -> exigir isResumed=true e sessionId retornado === sessionId original
+## 3. Achados e Correcoes Aplicadas
 
-qualquer desvio de identidade
-  -> falhar fechado; nunca criar sessao substituta
+| Prioridade | Achado | Correcao | Prova |
+| --- | --- | --- | --- |
+| P0 | Prompt podia faltar apos `LLM-B pronta`. | `engine.js` faz redraw forcado apos reattach pronto. | Boot padrao e criterio `ux-diagnostic-commands-start-at-prompt` passaram. |
+| P0 | O teste matava a sessao durante a promocao diferida. | Cenario de rota ganhou fase de deltas, continuacao separada para `ask_user` e grace de 15 s pos-final. | Handoff `committed` e confirmacao `route_confirmed_same_session`. |
+| P0 | `model-gateway:refresh` deixava SQLite obsoleto. | O CLI agora espelha o snapshot commitado e devolve `sqlite.parityOk`. | `liveReadiness` voltou a verde apos refresh. |
+| P1 | `snapshotId` antigo sobrevivia a revisoes de conteudo. | Refresh recalcula o hash depois de elegibilidade e retencao. | Id mudou de `catalog:88612...` para `catalog:32d630...`. |
+| P1 | Um processo de teste orfao segurava a porta 3010. | Processo sem pai foi encerrado durante a auditoria. | Nenhuma instancia LLM-B de teste ficou ativa apos as validacoes. |
+| P2 | A fixture de `/history` combinava estado `reconciliada` com expectativa exclusiva de `diverged`. | A expectativa passou a respeitar o contrato de apresentacao do estado. | Suite de comandos e suite maxima verdes. |
+
+## 4. Arquitetura Alvo
+
+1. **Boot previsivel:** banner, readiness e exatamente um prompt utilizavel; nenhum comando interno pode atravessar o limite visual do prompt.
+2. **Uma sessao SDK:** toda troca de model/provider usa a mesma sessao. Durante um tool-turn, o apply cria handoff autorizado; o scheduler promove somente apos `dialog.turn_end` estavel.
+3. **Commit verificavel:** `committed` significa reattach concluido, rota/projecao confirmada e ledger atualizado. `deferred_until_turn_boundary` nunca e apresentado como troca concluida.
+4. **Catalogo revisionado:** JSON redigido e SQLite sao um par atomico para a operacao. `snapshotId` identifica o conteudo e `generatedAt` identifica observacao; paridade e bloqueador de readiness.
+5. **Observabilidade humana:** SSE e ledger preservam ids tecnicos, enquanto a superficie REPL mostra estados, rotas e acoes compreensiveis sem segredos.
+6. **Teste vivo determinista:** o harness separa etapas que dependem de fronteira de turno, aguarda a promocao e falha por evidencia ausente, nao por encerramento prematuro do proprio teste.
+
+## 5. Estado Operacional e Riscos Residuais
+
+### Pronto agora
+
+- A rota default usa BYOK Kilo (`kilo-auto/free`) e respondeu no teste vivo.
+- A rota de teste `ollama-cloud/qwen3-coder-next` foi promovida na mesma sessao e confirmada.
+- O catalogo foi renovado, o SQLite esta em paridade e ha standby persistido.
+- A quota Premium do Copilot aparece como informacao lateral de conta. Ela nao foi usada para a chamada BYOK comprovada e nao e criterio de bloqueio da LLM-B.
+
+### Acompanhar, sem bloquear o uso
+
+- [ ] **P1 - Timeline/export:** o export do run completo preservou todo o conteudo correto, mas seu cabecalho ainda declarou `timeline=mixed/diverged` e `sync=blocked:diverged-no-overlap`. A regra e fail-closed e evita gravacao insegura, portanto nao e perda de conversa; falta reduzir falsos positivos e validar a reconciliacao depois de `ask_user` mais promocao de rota.
+- [ ] **P1 - Resultado compacto de tool:** `model_gateway_overview` ainda pode entregar payload grande ao modelo. Criar visao resumida limitada para LLM-B, mantendo `detail/raw` somente em diagnostico, reduz pressao de contexto em workflows longos.
+- [ ] **P2 - Saude de alternativas:** o standby e baseado em evidencia e nao substitui probes recentes. Antes de promover uma alternativa em producao, executar probe autorizado para a rota escolhida.
+
+## 6. Roadmap Executavel
+
+### Faixa 0 - Recuperacao e Verdade Operacional
+
+- [x] 0.1 Reproduzir boot da LLM-B em PTY com configuracao efetiva.
+- [x] 0.2 Inspecionar env sem revelar valores e confirmar rota BYOK preparada.
+- [x] 0.3 Rodar conversa viva com tools, `ask_user` e final publico.
+- [x] 0.4 Rodar troca real de provider/modelo na mesma sessao.
+- [x] 0.5 Limpar processo de teste orfao e conferir portas.
+- [x] 0.6 Atualizar catalogo vencido e persistir standby.
+
+### Faixa 1 - Confiabilidade de Boot e Promocao
+
+- [x] 1.1 Forcar a pintura do prompt no marco de readiness apos reattach.
+- [x] 1.2 Registrar teste unitario que protege o redraw forcado.
+- [x] 1.3 Separar deltas e `ask_user` no cenario que testa promocao de rota.
+- [x] 1.4 Aguardar grace suficiente para `dialog.turn_end` e scheduler antes dos diagnosticos/`/quit`.
+- [x] 1.5 Provar `route_confirmed_same_session` no ledger vivo.
+- [ ] 1.6 Adicionar ao harness uma espera por estado `committed` (alem do grace temporal) para tornar a prova independente de latencia.
+
+### Faixa 2 - Catalogo, SQLite e Selecao
+
+- [x] 2.1 Detectar expiracao real de todas as fontes e executar refresh controlado.
+- [x] 2.2 Espelhar cada refresh CLI commitado no SQLite.
+- [x] 2.3 Expor `sqlite.mirrored` e `sqlite.parityOk` no resumo do CLI.
+- [x] 2.4 Recalcular `snapshotId` para cada revisao material.
+- [x] 2.5 Validar integridade, paridade, `liveReadiness` e `operatorReady` apos refresh.
+- [x] 2.6 Tornar falha de paridade no CLI explicitamente nao-zero, preservando resumo redigido para diagnostico.
+- [ ] 2.7 Adicionar um teste de integracao do CLI com stores temporarios para cobrir refresh + mirror sem depender de rede.
+
+### Faixa 3 - Contexto, Timeline e Export
+
+- [ ] 3.1 Reproduzir em fixture a sequencia `tool-turn -> deltas -> ask_user -> resposta -> promocao -> export` que hoje resulta em `diverged-no-overlap`.
+- [ ] 3.2 Diferenciar cauda temporalmente segura de divergencia genuina, usando `traceId`, `turnId`, `requestId` e ordem SSE quando presentes.
+- [ ] 3.3 Manter bloqueio fail-closed para conflito real; nunca gravar ou deduplicar por heuristica fraca.
+- [ ] 3.4 Fazer o header do export comunicar estado humano, sem enums internos, e incluir causa tecnica apenas no modo diagnostico.
+- [ ] 3.5 Repetir o cenario vivo e exigir `bridge_tail` ou `aligned` quando a evidencia permitir.
+
+### Faixa 4 - Ergonomia e Carga de Contexto
+
+- [ ] 4.1 Definir contrato `summary`/`detail` para `model_gateway_overview` e `operation_status`.
+- [ ] 4.2 Limitar listas de perfis/operacoes na resposta injetada no modelo, sem limitar `/events --raw` ou APIs diagnosticas.
+- [ ] 4.3 Medir tokens de tool definitions e de resultados em cenarios de troca; fixar orcamento maximo no harness.
+- [ ] 4.4 Executar regressao viva com todas as tools Model Gateway em serializacao de uma tool por resposta.
+
+### Faixa 5 - Validacao e Governanca Continua
+
+- [x] 5.1 Validacao focada: syntax, ESLint e suites de contratos, turn boundary e promocao diferida.
+- [x] 5.2 Executar typecheck strict, lint e testes maximos de `src/copilot` antes de publicar a proxima leva.
+- [x] 5.3 Executar live full apos cada alteracao de scheduler, rota ou protocolo de pergunta.
+- [ ] 5.4 Atualizar este arquivo ao concluir cada subfase; marcar apenas evidencia observada, com caminho do artefato.
+
+## 7. Comandos de Operacao
+
+```bash
+# Uso cotidiano
+npm run terminal:llm-b
+
+# Boot e superficie sem consumir um turno de modelo
+node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000
+
+# Prova viva de troca same-session
+COPILOT_LIVE_TEST_COPILOT_MODEL=kilo-auto/free \
+  node scripts/model-gateway/run.mjs llmBLiveTest \
+  --live-scenario=model-gateway-route-apply-minimal --timeout-ms=420000
+
+# Estado operacional redigido
+node scripts/model-gateway/run.mjs liveReadiness --json
+node scripts/model-gateway/run.mjs operatorReady --profile=repo_agent --json
+
+# Atualizacao de catalogo com espelho SQLite automatico
+npm run model-gateway:refresh -- --commit
+node scripts/model-gateway/run.mjs catalogIntegrity --json
 ```
 
-## 3. Situacao atual auditada
+## 8. Criterio de Encerramento da Proxima Leva
 
-### 3.1 Ja esta forte
-
-- [x] Control plane existe em `src/copilot/model-gateway/control-plane/`.
-- [x] Tools locais `model_gateway_*` existem para a LLM-B, incluindo overview, operation status, route plan/switch e
-  workflow planner.
-- [x] `model_gateway_route_switch` aceita plano/aplicacao com idempotency key e retorna `requiresNewSession=false`.
-- [x] Quando o tool-turn esta ativo, o route switch e deferido para `deferred_until_turn_boundary` em vez de tentar
-  reattach destrutivo no meio da resposta.
-- [x] O Agent possui scheduler em `agent/lifecycle/model-gateway-turn-boundary.js`, acionado por `dialog.turn_end`.
-- [x] Operacoes deferidas sao classificadas de forma fail-closed por sessao, autorizacao, expiracao, retryability,
-  idempotencia e target route.
-- [x] A politica `newest intent wins` evita que uma intencao antiga reverta uma rota mais nova.
-- [x] SQLite schema v13 materializa evidencias de provider anterior/alvo, binding strategy, wire API, route key e estado.
-- [x] Ingress OpenAI Chat Completions existe com registry local, auth local por rota, auth upstream injetada, streaming e
-  rollback/CAS.
-- [x] A decisao de binding `direct|ingress|blocked` e compartilhada por route plan, route switch, initializer e facade.
-- [x] Direct rebind usa evidencia runtime relacional quando disponivel.
-- [x] Initializer exige `isResumed === true` e `sessionId` identico para reattach same-session.
-- [x] `/restart` e restart real do runtime/handle SDK; `/conversation-restart` e conversa-only.
-
-### 3.2 Evidencia desta auditoria — 2026-06-17
-
-- [x] O roadmap anterior foi lido integralmente antes desta reconstrução.
-- [x] `node scripts/model-gateway/run.mjs --list-json` confirmou o runner canonico e o comando `llmBLiveTest`.
-- [x] `npx eslint` focado nos modulos de Model Gateway/Agent/tools/testes alterados passou.
-- [x] `npx vitest run --config vitest.copilot.config.js` focado em 10 specs de binding, deferred route, ingress,
-  initializer e workflow passou: 10 arquivos, 62 testes.
-- [x] `npm run typecheck:strict:src.copilot` passou.
-- [x] Checkpoint amplo passou apos a reconstrução:
-  - `npm run lint:copilot`;
-  - `npm run typecheck:strict:src.copilot`;
-  - `npm run test:copilot:unit` com 6.819 testes totais, 6.791 aprovados, zero falhas, 28 pendentes e 2.069 suites
-    aprovadas;
-  - `npx eslint` nos scripts `model-gateway-live-readiness.mjs` e `model-gateway-runtime-selector.mjs`.
-- [x] `node scripts/model-gateway/run.mjs sqliteDiagnostics --json` passou e mostrou schema SQLite v13, snapshot ativo,
-  130.683 health observations, 102.963 probe results e ultimo live real anterior falhando 5 criterios.
-- [x] `node scripts/model-gateway/run.mjs runtimeSelector --json --profile=repo_agent` passou apos correção parcial do
-  runner; default operacional agora usa `runtimeSource=file` e JSON compacto.
-- [x] `node scripts/model-gateway/run.mjs autoStatus --json` passou apos a mesma correção; decisao retornou
-  `manual_intervention` por ausencia de sessao viva, sem nova sessao implicita.
-- [x] `node scripts/model-gateway/run.mjs liveReadiness --json` passou com timeout de 40s; readiness ok.
-- [x] `node scripts/model-gateway/run.mjs livePlan --json` passou e gerou plano live com readiness ok.
-- [x] Live LLM-B `llmBLiveTest --live-scenario=model-gateway-route-apply-minimal` executou tools reais:
-  `report_intent`, `read_file_content`, `model_gateway_overview`, `model_gateway_operation_status` e
-  `model_gateway_route_switch` plan/apply.
-- [x] No live LLM-B, `model_gateway_route_switch` retornou sem travar e os marcadores esperados apareceram no resultado:
-  `operation.inspect`, `route.switch`, `deferred_until_turn_boundary`, `same_session`.
-- [x] No live LLM-B, a rota viva foi confirmada na mesma sessao para `ollama-cloud/qwen3-coder-next`; o prompt mudou de
-  `kilo-auto/free` para `qwen3-coder-next`.
-- [x] O live LLM-B inicial terminou `BLOCKED` por `assistant-empty-turn` antes do `ask_user` obrigatorio e final marker,
-  expondo um bug real de continuidade pos-reattach.
-  Artefato: `artifacts/terminal-live/2026-06-17T23-llmb-route-apply-minimal-codex/summary.md`.
-- [x] A causa tecnica do empty turn foi reduzida a dois defeitos:
-  - binding de sessao repassava `modelCapabilities.supports.reasoningEffort=true` para
-    `ollama-cloud/qwen3-coder-next`, mesmo quando a camada BYOK/SDK-facing indicava `sdkReasoningEffort=false`;
-  - o scheduler de turn boundary podia promover o reattach no mesmo `dialog.turn_end` que materializava `ask_user`,
-    interrompendo a janela de resposta humana e a continuacao pos-pergunta.
-- [x] `src/copilot/model-gateway/session/session-binding.js` agora preserva a decisao SDK-facing de reasoning effort:
-  `summary.capabilities.sdkReasoningEffort` e `modelCapabilities.supports.reasoningEffort` so ficam `true` quando o
-  legado e o binding adaptado concordam.
-- [x] `src/copilot/agent/lifecycle/model-gateway-turn-boundary.js` agora observa `question.pending`,
-  `user_input.requested`, `question.answered` e `user_input.completed`, aguarda uma pequena janela de settle e so
-  promove reattach depois do `dialog.turn_end` posterior a resposta humana.
-- [x] Live LLM-B repetido apos as correcoes terminou `PASS`, com 601 eventos SSE publicos, zero erros, pergunta
-  `ask_user`, resposta humana `SIM`, final marker pos-ask e correlacao SSE/export completa.
-  Artefato:
-  `artifacts/terminal-live/2026-06-18T00-llmb-route-apply-minimal-ask-boundary-fix/summary.md`.
-- [x] `/health full` no live corrigido alinhou prompt, BYOK e Gateway em `ollama-cloud/qwen3-coder-next`, com
-  raciocinio SDK-facing desligado.
-- [x] Live LLM-B repetido em 2026-06-19 apos a correcao de timeline terminou `BLOCKED` por `live-timeout` antes de
-  `ask_user`/export, mas reduziu um gap novo: a LLM-B agrupou `model_gateway_overview`,
-  `model_gateway_operation_status` e `model_gateway_route_switch:plan` no mesmo tool-use batch; o SDK registrou
-  `tool.execution_start` e `preToolUse` OK, mas nao materializou `external_tool.requested`/`tool.execution_complete`
-  antes do timeout. Repro local dos tres handlers instrumentados em paralelo retornou em ~170ms, entao a falha ficou no
-  contrato live/SDK de lote paralelo, nao no backend das tools.
-  Artefato: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-timeline-rerun/summary.md`.
-- [x] Live LLM-B serializado em 2026-06-19 terminou `PASS` com tools Model Gateway chamadas uma por vez, `ask_user`,
-  resposta humana, final marker, rota viva confirmada e export criado. Esse run ainda foi antes do ajuste de
-  reconciliação intercalável e, por isso, o Markdown dele ainda mostrou `timeline=mixed/diverged`.
-  Artefato: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-serialized-rerun/summary.md`.
-- [x] Live LLM-B posterior ao ajuste de reconciliação intercalável gerou export Markdown com
-  `timeline=mixed/bridge_tail · sync=scheduled`, provando a correção do cabeçalho de export para ask/answer/postAsk com
-  Hub persistido + cauda viva. Esse run nao substitui o PASS de rota porque a LLM-B pulou as tools Model Gateway, e o
-  harness o marcou `FAIL` nos criterios de scenario tools.
-  Artefato: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-reconciled-export-rerun/summary.md`.
-- [x] Live LLM-B combinado em 2026-06-19 com prompt serializado e export pos-fix terminou `BLOCKED` por
-  `assistant-empty-turn`: executou `overview`, `operation_status` e apenas `route_switch:plan`; nao executou o
-  `route_switch:apply`, nao chegou ao `ask_user` e exportou somente tres mensagens com
-  `timeline=mixed/diverged`. A evidencia revelou um gap do harness: a lifecycle check antiga tratava uma unica
-  chamada `model_gateway_route_switch` como suficiente para um cenario que exige plan e apply separados.
-  Artefato: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-combined-rerun/summary.md`.
-- [x] Harness LLM-B endurecido em 2026-06-19:
-  - `model-gateway-route-apply-minimal` agora exige `minSuccessfulCalls=2` para `overview`, `operation_status` e
-    `route_switch`;
-  - a recuperacao de tools incompletas reconhece tambem o caso "todas as tools do cenario foram puladas";
-  - a recuperacao controlada inclui argumentos explicitos para `model_gateway_overview`,
-    `model_gateway_operation_status` e `model_gateway_route_switch:apply`;
-  - quando o prompt normal volta com cadeia incompleta, o runner tenta uma continuacao controlada antes do timeout;
-  - `COPILOT_LIVE_TEST_COPILOT_MODEL` permite parametrizar o modelo de boot do runner sem mudar producao.
-- [x] Dois reruns live posteriores ao endurecimento do harness terminaram `BLOCKED` antes de qualquer tool por falha de
-  model call BYOK/empty turn. O terminal bootou a sessao SDK como `qwen3-coder-next/high`, enquanto `/usage`,
-  `/activity` e `/health full` seguiam mostrando rota efetiva/Gateway `kilo-code · kilo-auto/free`; os eventos tambem
-  registraram `Aviso de quota · premium interactions · sem quota` e `Erro BYOK · provedor openai · perfil kilo · modelo
-  qwen3-coder-next`. A tentativa com `COPILOT_LIVE_TEST_COPILOT_MODEL=kilo-auto/free` nao alterou o modelo SDK
-  observado. Logo, o run unico combinado esta bloqueado no estado atual por desalinhamento boot SDK/modelo versus rota
-  efetiva e/ou quota do provider ativo, antes de testar novamente o route apply.
-  Artefatos:
-  `artifacts/terminal-live/2026-06-19T-route-apply-minimal-combined-recovery-rerun/summary.md` e
-  `artifacts/terminal-live/2026-06-19T-route-apply-minimal-boot-kilo-rerun/summary.md`.
-- [x] Continuação da auditoria em 2026-06-19 isolou e corrigiu contaminacao de modelo persistido no boot fresco: quando
-  `next new` força sessao nova e `COPILOT_MODEL` aponta para `kilo-auto/free`, o initializer nao reaproveita mais um
-  `state.model` concreto antigo como `qwen3-coder-next`.
-- [x] O harness live agora chama diretamente `src/copilot/terminal/bootstrap.js` com `node --strip-types`, reseta
-  `modelGatewayActiveRoute`, `byokSessionBinding`, `sdkSessionBootDecision` e `model` antes do `next new`, e passa
-  `COPILOT_MODEL=LIVE_TEST_COPILOT_MODEL`; isso reduziu falsos bloqueios em que o terminal bootava na rota alvo antiga.
-- [x] `model_gateway_*` agora normaliza sentinels comuns enviados pela LLM (`__UNSET__`, `__none__`, `__null__`,
-  `null`, `undefined`, `none`, `n/a`, `na`) como ausencia real de `runtimeId`/`operationId`, evitando falhas artificiais
-  quando a LLM escolhe strings sentinel em vez de JSON null.
-- [x] O live harness passa `COPILOT_SDK_EXCLUDED_TOOLS=session_compact`, preservando o allowlist do cenario e removendo
-  um falso bloqueio em que a LLM chamava `session_compact` depois dos deltas publicos.
-- [x] A recuperacao pos-`ask_user` vazia ficou contextual: quando a LLM volta sem texto depois de o operador responder,
-  a continuacao automatica inclui a pergunta e a resposta humanas e pede apenas o marcador final esperado, sem repetir
-  tools nem `ask_user`.
-- [x] A promocao deferida agora observa profundidade da fila do dialog loop e uma janela de settle maior antes de
-  promover reattach no `dialog.turn_end`, evitando competir com uma continuacao ja enfileirada.
-- [x] O cenario live minimo passou a explicitar `providerType:"openai"` e `openAICompatible:true` na rota
-  `ollama-cloud/qwen3-coder-next`; sem isso, a binding strategy podia cair em `providerType=unknown` e bloquear com
-  `MODEL_GATEWAY_BINDING_STRATEGY_BLOCKED` quando a evidencia de direct rebind estava ruim.
-- [x] Evidencia positiva recente: `artifacts/terminal-live/2026-06-19T-route-apply-minimal-provider-type-rerun/summary.md`
-  executou `route_switch:apply` com resultado estruturado `status=accepted_for_turn_boundary`, expôs
-  `deferred_until_turn_boundary` e `same_session`, executou `ask_user`, registrou `SIM` e materializou o marcador
-  final. O run ainda ficou `FAIL` apenas por marcador textual antigo e criterio UX de comando diagnostico.
-- [x] O bloqueador historico de `artifacts/terminal-live/2026-06-19T-route-apply-minimal-final-marker-rerun/summary.md`
-  completou a cadeia de tools, deltas, `ask_user`, `SIM` e final marker, mas houve `Erro BYOK` transitorio no meio do
-  fluxo; depois da recuperacao, `/activity` e `/byok` voltaram a mostrar rota efetiva `kilo-code · kilo-auto/free`.
-  A auditoria posterior demonstrou que esse caso era rollback por verificacao ingress incorreta, ja corrigida.
-- [x] A causa exata do rollback no `final-marker-rerun` foi confirmada no ledger SQLite:
-  `same-session-route-switch:52cbba78158ca11521f50c9a` terminou `rolled_back` com
-  `SAME_SESSION_ROUTE_SWITCH_NOT_VERIFIED`; o target ingress havia reatado, mas o verificador comparava o modelo
-  SDK-facing `model-gateway-live` com o upstream `qwen3-coder-next`.
-- [x] `switchAgentRouteTransactional()` agora verifica rota ingress pelo `sdkVisibleModel`, preservando a identidade
-  upstream separada em `providerId/providerModel`. Teste focado prova commit com
-  `ollama-cloud/qwen3-coder-next -> sdkVisibleModel=model-gateway-live`.
-- [x] O scheduler de promocao agora rejeita a task quando `result.errors > 0`, permitindo que
-  `agent.background.completed` registre `status=error` em vez de falso `success`.
-- [x] Reexecutar o live apos a correcao e exigir operacao final `committed`, sem rollback:
-  `same-session-route-switch:0d1be7eacca45b4a928afaca` terminou `committed` e a confirmacao
-  `route_confirmed_same_session` preservou o mesmo `sessionId`.
-- [x] Corrigir a projection stale de rota efetiva: o snapshot observavel do agente agora inclui
-  `modelGatewayActiveRoute`, `buildModelGatewayOperatorProjection()` aceita override runtime com
-  `bindingSource=runtime_state`, e `/byok`, `/activity` e `/health` preferem essa rota confirmada ao `.env` preparado.
-- [x] Evidencia live funcional ponta a ponta:
-  `artifacts/terminal-live/2026-06-19T-route-apply-minimal-runtime-projection-fix-rerun/summary.md` aprovou todas as
-  tools, deferimento same-session, deltas, `ask_user`, `SIM`, final marker, ledger e marcador
-  `Rota efetiva  ollama-cloud · qwen3-coder-next`. O status global ficou `FAIL` somente por
-  `ux-diagnostic-commands-start-at-prompt`.
-- [ ] O harness ainda pode precisar de um criterio dedicado para distinguir "apply aceito/deferido e depois rollback ou
-  regressao de rota efetiva" de falhas textuais de diagnostico, para nao misturar UX de REPL com integridade de rota.
-- [x] Checkpoint amplo pos-correcao passou:
-  - `npm run typecheck:strict:src.copilot`;
-  - `npm run lint:copilot`;
-  - `npm run test:copilot:unit` com 6.821 testes totais, 6.793 aprovados, zero falhas, 28 pendentes e 2.071 suites
-    aprovadas;
-  - artefato `artifacts/test-runs/copilot/2026-06-17T23-44-25-650Z/summary.md`.
-- [x] A causa do export Markdown `timeline=mixed/diverged` no live PASS foi reduzida: a projection tratava cauda viva
-  posterior ao Hub persistido como divergencia quando nao havia overlap por assinatura.
-- [ ] O artifact historico do live PASS ainda contém `timeline=mixed/diverged`; falta reexecutar live/export para
-  substituir a evidencia ponta a ponta depois da correção focada.
-- [x] `ops --json --profile=repo_agent` passou dentro de budget operacional curto: caiu de ~26,4s para ~15,7s no banco
-  atual e agora tem timeout por subgate com fallback JSON parcial.
-- [x] `liveReadiness --json` caiu de ~21,8s para ~12,8s ao trocar a auditoria SQLite de redaction profunda por amostra
-  operacional default; `--deep-redaction` preserva a varredura profunda e passou em ~21,7s.
-- [x] `ops --json --subcommand-timeout-ms=500` retornou `ok=false` com falhas tipadas por subgate e `commands` parcial
-  preservado, em vez de travar o cockpit.
-- [x] `runtimeSelector --json --profile=repo_agent` voltou a usar `runtimeSource=merged` por default e passou em ~3,9s;
-  `autoStatus --json --profile=repo_agent` passou em ~4,4s e `ops --json --profile=repo_agent` seguiu ok em ~17,1s.
-- [x] A leitura SQLite runtime-health recebeu indices operacionais canonicos:
-  - `idx_mg_health_observations_latest`;
-  - `idx_mg_health_observations_observed`;
-  - `idx_mg_runtime_probe_results_latest`.
-- [x] No banco atual, `listRuntimeHealthRecords({limit:1500})` caiu para ~27ms e
-  `listLatestRuntimeHealthRecords({limit:1500})` ficou em ~0,8s; o selector `merged` segue ok em ~3,9s.
-- [x] Primeiro nucleo de readiness unica criado: `buildModelGatewayEffectiveRouteProjection()` agora normaliza a rota
-  efetiva em `modelGatewayProjection.effectiveRoute`; `model_gateway_overview`, `/status` e `/now` passam a consumir o
-  mesmo label provider/modelo.
-- [x] Segundo nucleo de readiness unica criado para handoffs pendentes:
-  - `readStorageDiagnostics()` expõe `sdkSessionDeferredHandoffRows` e `latestDeferredSdkSessionHandoff` filtrados por
-    `deferred_until_turn_boundary` ainda nao expirado;
-  - `ModelGatewayReadControlPlane.inspectOverview()` retorna `data.pendingHandoffs` e
-    `data.modelGateway.pendingHandoffs`;
-  - `ops --json --profile=repo_agent` retorna `database.sdkSessionDeferredHandoffRows` e
-    `database.latestDeferredHandoff`;
-  - evidencia operacional atual: `ops` passou em ~17,5s e revelou 4 handoffs diferidos ativos no ledger, incluindo
-    registro antigo sem `promotionAuthorized`, reforcando a necessidade da fase rollback/reconcile.
-- [x] `/health` compacto/full agora resolve o ativo do catálogo por `modelGatewayProjection.effectiveRoute` primeiro,
-  com `active` legado apenas como fallback, alinhando a fonte com `/status` e `/now`.
-- [x] `/byok status` agora usa `modelGatewayProjection` para counts e `effectiveRoute` para `Gateway ativo`, mantendo
-  `modelGateway.active` apenas como fallback.
-- [x] `/session sdk` agora mostra `Rota efetiva` a partir de `modelGatewayProjection.effectiveRoute`, reaproveitando
-  `active` apenas indiretamente como fallback na projection.
-- [x] `/activity` agora mostra `Rota efetiva` a partir de `modelGatewayProjection.effectiveRoute` no painel de
-  atividade atual.
-
-### 3.3 Bugs/gaps concretos encontrados
-
-- [x] `listLatestRuntimeHealthRecords()` e `listRuntimeHealthRecords()` agora possuem indices de leitura operacional para
-  evitar regressao imediata em bancos com 100k+ linhas de runtime health/probes.
-- [ ] `model-gateway-live-readiness` agora ignora runtime-health SQLite por default para manter readiness praticavel; o
-  modo profundo fica opt-in em `--sqlite-runtime-health`.
-- [x] `model-gateway-runtime-selector` voltou para `runtimeSource=merged` por default apos prova operacional com limite
-  SQLite de runtime-health.
-- [x] `ops` tem modo rapido default com timeout por subgate (`--subcommand-timeout-ms`, default 20s) e falha parcial
-  estruturada.
-- [x] A continuacao apos route switch real nao deve cair em BYOK provider failure/empty turn antes de `ask_user` quando a
-  rota alvo nao suporta reasoning effort SDK-facing e a promocao respeita a janela humana pos-ask.
-- [x] Adicionar regressao focada para o export `timeline=mixed/diverged` do live PASS, distinguindo divergencia
-  historica inofensiva de perda real de transcript.
-- [ ] Eventos de `model-gateway.deferred-route-promotion` podem aparecer repetidamente no mesmo intervalo; falta metrica
-  e coalescing/telemetria explicita para distinguir "no-op scan" de promocao real.
-- [ ] Boot live LLM-B pode iniciar a sessao SDK como `qwen3-coder-next/high` enquanto a rota efetiva/Gateway permanece
-  `kilo-code · kilo-auto/free`; quando o provider ativo retorna quota/model_call failure, o cenario bloqueia antes de
-  qualquer tool. Falta alinhar boot SDK, BYOK materializado, route projection e `COPILOT_MODEL` efetivo numa unica fonte.
-- [x] A regressao para `kilo-code · kilo-auto/free` no `final-marker-rerun` foi explicada como rollback correto disparado
-  por verificacao incorreta do modelo ingress, nao como projection stale.
-- [x] Provar por regressao focada que ingress verifica `sdkVisibleModel` sem confundir a identidade upstream.
-- [ ] Adicionar um live forçado especificamente em binding ingress; os reruns posteriores acumularam evidencia de
-  direct rebind e selecionaram `bindingStrategy=direct`.
-- [x] Provar live que o apply promovido mantem `ollama-cloud/qwen3-coder-next` como rota efetiva final nas superficies
-  operacionais.
-- [ ] O comando diagnostico `/byok provider ... force-deferred` e o caminho de confirmacao textual antigo ainda podem
-  montar rota incompleta sem `providerType/openAICompatible`, gerando `MODEL_GATEWAY_BINDING_STRATEGY_BLOCKED` apesar de
-  o `model_gateway_route_switch` estruturado estar correto.
-- [x] `/health full` deixou de divergir no live route apply minimal corrigido; a lacuna residual e tornar essa visao
-  derivada de uma readiness unica compartilhada por todas as superficies.
-- [x] O primeiro campo compartilhado dessa readiness unica e `effectiveRoute`, cobrindo provider/modelo/profile/source
-  efetivos entre control-plane e terminal.
-- [ ] `terminal/commands/byok.js` segue monolitico e concentra parsing, use-cases e rendering.
-- [ ] Profile management ainda e flexivel demais e sem mutacao duravel transacional/rollback.
-- [ ] Golden path vanilla GitHub Copilot SDK ainda nao tem cobertura explicita suficiente para provar ausencia de
-  regressao quando o gateway esta desligado.
-
-## 4. Situacao ideal proposta
-
-### 4.1 Superficie unica
-
-Operador humano, terminal, tools, boot SDK, server routes e LLM-B devem consumir o mesmo read model:
-
-```text
-catalogo + perfis + secrets redigidos + runtime health + rota ativa + sessao viva + handoffs
-  -> ModelGatewayReadiness
-  -> overview / tools / byok / now / health / activity / ops / live-readiness
-```
-
-### 4.2 Troca natural de provider/modelo
-
-- Planejar a troca com rationale, binding decision e riscos.
-- Aplicar com idempotency key e `confirm=true`.
-- Se seguro, reattach imediato preservando `sessionId`.
-- Se tool-turn ativo, retornar `accepted_for_turn_boundary` e encerrar o turno.
-- O Agent promove no `dialog.turn_end`.
-- Proximo turno verifica por `operation_status` e readiness unica.
-- Fallback automatico nunca cria sessao nova.
-
-### 4.3 Observabilidade sem segredos
-
-- Secrets nunca entram em transcript, Markdown, SSE, ledgers ou URLs.
-- `sessionId`, provider/model, route key, operation id e idempotency key sao rastreaveis, mas redigidos quando necessario.
-- Health distingue estrutural, operacional, live, freshness, mismatch e pending handoffs.
-- Cockpits exibem a mesma rota efetiva e a mesma sessao efetiva.
-
-## 5. Roadmap executavel
-
-### Faixa 0 — Checkpoint, sincronizacao e higiene
-
-- [x] Ler integralmente este arquivo antes de editar.
-- [x] Auditar worktree e arquivos associados principais.
-- [x] Executar LLM-B live pelo runner canonico.
-- [x] Recriar este roadmap com estado atual, situacao ideal e fases booleanas.
-- [x] Rodar validacao ampla `src/copilot` antes do commit de checkpoint.
-- [x] Confirmar quais untracked externos pertencem ao commit e quais devem permanecer fora.
-- [x] Commitar e pushar checkpoint documental/corretivo para `main`.
-- [x] Apos push, atualizar este roadmap com commit/hash e estado limpo do codigo canonico.
-
-### Faixa A — Same-session route switch e promocao pos-turno
-
-#### A.1 Contrato e ledgers
-
-- [x] Persistir operacao `same-session-route-switch:*` com estado, sessionId, idempotency key e target route.
-- [x] Classificar operacao deferida por autorizacao, expiracao, sessao, retryability e integridade da rota.
-- [x] Supersede intencoes antigas da mesma sessao.
-- [x] Expor estados deferidos em `model_gateway_operation_status`.
-- [x] `/byok auto handoffs` lista status humano, sessao, provider/model, autorizacao de promocao, expiracao, rota e
-  horario solicitado sem depender de payload cru.
-- [ ] Adicionar teste end-to-end unico para cadeia
-  `deferred_until_turn_boundary -> reattach_requested -> reattached -> verified -> committed`.
-- [ ] Expor transicoes completas no cockpit humano sem depender de leitura JSON crua.
-
-#### A.2 Scheduler Agent-owned
-
-- [x] Mover promocao automatica para Agent em `dialog.turn_end`.
-- [x] Evitar reattach durante tool-turn ativo.
-- [x] Revalidar sessao viva exata antes da promocao.
-- [x] Preservar `requiresNewSession=false`.
-- [ ] Reduzir eventos repetidos/no-op de background promotion ou classifica-los explicitamente.
-- [ ] Adicionar metricas por `promoted`, `skipped`, `expired`, `superseded`, `policy_denied`, `error`.
-- [x] Bloquear promocao durante `ask_user` pendente ou imediatamente apos resposta humana ate o proximo
-  `dialog.turn_end`, preservando a continuacao do SDK.
-
-#### A.3 UX LLM-B
-
-- [x] Tool result instrui a LLM-B a encerrar o turno quando `automaticContinuation.armed=true`.
-- [x] Workflow plan marca verificacao pos-turno como `sameTurnExecutionForbidden`.
-- [x] Live LLM-B continua para `ask_user` depois do reattach sem cair em empty turn no cenario
-  `model-gateway-route-apply-minimal`.
-- [ ] Quando provider falha logo apos reattach, terminal deve oferecer fallback/reconcile sem quebrar o protocolo do
-  harness.
-- [x] `/byok auto handoffs` lista handoffs diferidos/promoviveis como secao propria com provider/model, sessao,
-  autorizacao e expiracao.
-- [ ] `/activity` e `/tools diag` devem listar handoffs diferidos/promoviveis como secao propria.
-
-### Faixa B — Binding adaptativo direct/ingress
-
-#### B.1 Decisao canonica
-
-- [x] Implementar `ModelGatewayBindingStrategyDecision` em `ingress/binding-strategy.js`.
-- [x] Separar confiabilidade de rebind direto, representabilidade de `ProviderConfig` e elegibilidade do ingress.
-- [x] Bloquear ingress automatico para Responses, Anthropic Messages e Azure nativo.
-- [x] Preservar ingress quando sessao atual ja esta em ingress e target e elegivel.
-- [ ] Incluir profile materializado, secret refs redigidas e health policy normalizada no contrato de ingress route.
-
-#### B.2 Registry e rollback
-
-- [x] Registry ingress tem route local key aleatoria, auth segura, revision monotonic, CAS e snapshot.
-- [x] Initializer restaura snapshot anterior quando preparacao do ingress falha.
-- [x] Facade verifica commit/rollback ingress e sinaliza reconciliationRequired.
-- [ ] Smoke local acoplado ao lifecycle SDK sem provider real.
-- [ ] Smoke real de streaming, erro OpenAI-compatible e `ask_user` apos ingress.
-
-### Faixa C — Runner, readiness e cockpits
-
-#### C.1 Runners operacionais
-
-- [x] `runtimeSelector --json --profile=repo_agent` volta a responder com JSON compacto.
-- [x] `autoStatus --json` volta a responder.
-- [x] `liveReadiness --json` passa em ~21s com SQLite runtime-health profundo desativado por default.
-- [x] `livePlan --json` passa e registra readiness ok.
-- [x] `ops --json` responde em budget curto no banco atual, com timeout por subgate e fallback parcial.
-- [x] `liveReadiness --json` usa auditoria SQLite de redaction amostrada por default e `--deep-redaction` para auditoria
-  operacional profunda.
-- [x] `runtimeSelector --runtime-source=merged|sqlite` voltou a ser praticavel; `merged` e novamente o default.
-- [x] `listLatestRuntimeHealthRecords` e `listRuntimeHealthRecords` possuem indices canonicos para 100k+ linhas.
-
-#### C.2 Readiness unica
-
-- [x] Definir primeiro nucleo de schema compartilhado: `effectiveRoute` com provider/modelo/profile/source/label
-  canonicos.
-- [x] Alimentar `model_gateway_overview` com `effectiveRoute`.
-- [ ] Alimentar `/byok`, `/session sdk`, `/health`, `/activity` e `ops` com o mesmo schema completo.
-- [x] Alimentar `/status` e `/now` com `modelGatewayProjection.effectiveRoute` quando disponivel.
-- [x] Alimentar `/health` com `modelGatewayProjection.effectiveRoute` quando disponivel.
-- [x] Alimentar `/byok status` com `modelGatewayProjection.effectiveRoute` quando disponivel.
-- [x] Alimentar `/session sdk` com `modelGatewayProjection.effectiveRoute` quando disponivel.
-- [x] Alimentar `/activity` com `modelGatewayProjection.effectiveRoute` quando disponivel.
-- [x] Alimentar `overview`/`model_gateway_overview` e `ops` com `pendingHandoffs.active/latest` a partir do ledger
-  SQLite.
-- [ ] Incluir rota efetiva, binding efetivo, sessao logica, provider real, provider SDK-facing, pending handoffs,
-  freshness e mismatch.
-- [ ] Remover divergencia cockpit: prompt em `qwen3-coder-next` versus `/health full` ainda citando `kilo-auto/free`.
-
-### Faixa D — Live LLM-B e harness end-to-end
-
-#### D.1 Cenario route apply minimal
-
-- [x] Executar `llmBLiveTest --live-scenario=model-gateway-route-apply-minimal`.
-- [x] Provar chamadas reais de tools de leitura e Model Gateway.
-- [x] Provar `route_switch` plan/apply sem travar.
-- [x] Provar deferimento same-session e mudanca para `ollama-cloud/qwen3-coder-next`.
-- [x] Fazer o mesmo cenario terminar PASS com `ask_user` e final marker.
-- [x] Capturar e corrigir a falha BYOK pos-reattach causada por reasoning effort indevido e promocao na janela humana.
-- [x] Endurecer o prompt do live route apply minimal para exigir serializacao: no maximo uma tool `model_gateway_*` por
-  resposta de ferramenta do SDK, aguardando o resultado antes da proxima.
-- [x] Reexecutar o live route apply minimal com serializacao observada no transcript, sem lote paralelo misto.
-- [x] Endurecer os criterios do harness para exigir duas chamadas bem-sucedidas de `overview`, `operation_status` e
-  `route_switch`, distinguindo `route_switch:plan` isolado de plan/apply completo.
-- [x] Adicionar recuperacao controlada quando o prompt volta com tools esperadas incompletas ou quando `ask_user` aparece
-  sem nenhuma tool obrigatoria do cenario.
-- [ ] Corrigir o desalinhamento de boot live em que o SDK fica em `qwen3-coder-next/high`, mas a rota efetiva permanece
-  `kilo-code/kilo-auto-free`, causando BYOK model_call failure antes das tools.
-- [x] Corrigir a verificacao ingress que causava rollback falso apos reattach bem-sucedido.
-- [x] Provar no live que o apply deferido/promovido permanece como rota efetiva no diagnostico final.
-- [ ] Fazer um run unico combinado que termine `PASS`, mantenha `Rota efetiva  ollama-cloud · qwen3-coder-next` no
-  diagnostico final e exporte `timeline=mixed/bridge_tail` ou `aligned`.
-- [ ] Corrigir o unico criterio residual do ultimo run funcional:
-  `ux-diagnostic-commands-start-at-prompt`.
-- [ ] Adicionar live rollback induzido.
-- [ ] Adicionar live reconcile pos-mismatch.
-
-#### D.2 Export/SSE
-
-- [x] Corrigir `export-sse-correlation` quando ask/final ocorrem apos reattach no cenario route apply minimal.
-- [x] Garantir export Markdown com pergunta e resposta humana canonicas no cenario route apply minimal.
-- [ ] Garantir `no-prompt-double-render` sem mascarar prompts legitimos.
-- [ ] Classificar BYOK usage real sem falso Premium Request.
-- [x] Corrigir projection para tratar cauda viva temporalmente posterior ao Hub como `bridge_tail` sincronizável mesmo
-  sem overlap por assinatura.
-- [x] Corrigir projection para tratar timeline intercalável sem overlap como `bridge_tail` quando há prefixos vivos de
-  sistema, cauda ask/answer/postAsk e turno vazio persistido posterior no Hub.
-- [x] Reexecutar export live para provar que o Markdown novo nao carrega
-  `timeline=mixed/diverged`/`sync=blocked:diverged-no-overlap` quando SSE/export correlacionam ask, answer e postAsk.
-- [ ] Repetir a prova em um run unico que tambem passe os criterios de `model_gateway_route_switch` plan/apply.
-- [ ] Depois de corrigir o boot/rota efetiva, repetir o run combinado e exigir simultaneamente:
-  `PASS`, `route_switch` plan/apply completo, `ask_user`/`SIM`/postAsk e export `bridge_tail` ou `aligned`.
-
-### Faixa E — Perfis BYOK duraveis
-
-- [ ] Decidir store duravel canonico: `.env.local` controlado, JSON dedicado ou SQLite.
-- [ ] `profile_manage` deve canonicalizar shape flexivel antes de qualquer escrita.
-- [ ] `plan` deve produzir diff redigido.
-- [ ] `apply` deve ser atomico e idempotente.
-- [ ] Implementar rollback de mutacao de perfil.
-- [ ] Bloquear refs arbitrarias fora da allowlist por provider, preservando leitura de legado.
-- [ ] Expor auditoria de mutacao em `operation_status`.
-
-### Faixa F — Decompor `/byok`
-
-- [ ] Mapear todos os casos ainda implementados em `terminal/commands/byok.js`.
-- [ ] Extrair parser puro.
-- [ ] Extrair renderers de status, provider, health, probes e recommendation.
-- [ ] Extrair use-cases que chamam control plane: profile, model, provider, probe, refresh, recommend.
-- [ ] Garantir que terminal e tools chamam servicos comuns.
-- [ ] Preservar aliases PT-BR/EN humanos sem tornar texto humano API primaria.
-
-### Faixa G — Golden path vanilla SDK
-
-- [ ] Golden test `createSession` sem BYOK/gateway.
-- [ ] Golden test `resumeSession` sem BYOK/gateway.
-- [ ] Provar que `onListModels` vanilla nao e sequestrado quando gateway esta inativo.
-- [ ] Provar que BYOK/gateway nao degrada sessao nativa.
-- [ ] Cobrir restart/resume/new com e sem next boot selection.
-
-### Faixa H — Aceite final
-
-- [x] `src/copilot` typecheck strict, lint e unit suite ampla passam no checkpoint final.
-- [x] Live LLM-B route switch + ask_user + final marker passa ponta a ponta.
-- [ ] Live rollback e reconcile passam.
-- [ ] Cockpits concordam sobre provider/modelo/sessao.
-- [ ] Runners read-only respondem dentro de budget documentado.
-- [ ] Profile management e duravel, auditavel e redigido.
-- [x] Branch `main` fica commitada, pushada e sincronizada.
-
-## 6. Ordem recomendada a partir daqui
-
-1. Auditar a cadeia `accepted_for_turn_boundary -> deferred-route-promotion -> effectiveRoute` sob erro BYOK
-   recuperavel, usando o artefato `final-marker-rerun` como repro.
-2. Corrigir a fonte efetiva de boot/live: SDK model, BYOK materializado, Gateway active route, prompt e diagnosticos
-   devem concordar antes e depois da promocao.
-3. Repetir o live combinado exigindo ao mesmo tempo plan/apply, rota efetiva final
-   `ollama-cloud/qwen3-coder-next`, ask/final e export `bridge_tail` ou `aligned`.
-4. Completar readiness unica e alinhar `/health`, `/now`, `/byok`, `/activity`, `overview` e `ops`.
-5. Adicionar testes end-to-end de ledger transicional e metricas de promocao.
-6. Rodar live rollback/reconcile.
-7. Decompor `/byok`, finalizar perfis duraveis e golden path vanilla SDK.
-
-## 7. Evidencias locais importantes
-
-- `scripts/model-gateway/run.mjs --list-json`: runner canonico disponivel.
-- `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`: harness LLM-B canonico.
-- `artifacts/terminal-live/2026-06-17T23-llmb-route-apply-minimal-codex/summary.md`: live desta auditoria,
-  `BLOCKED` por `assistant-empty-turn` apos provar route switch.
-- `artifacts/terminal-live/2026-06-18T00-llmb-route-apply-minimal-ask-boundary-fix/summary.md`: live corrigido,
-  `PASS` ponta a ponta com route switch same-session, `ask_user`, resposta `SIM`, final marker e correlacao SSE/export.
-- `node scripts/model-gateway/run.mjs liveRuns --json`: ledger SQLite registra o live como
-  `terminal-live:2026-06-17T23-19-45-585Z:canonical_full_turn_model-gateway-route-apply-minimal`.
-- Validacao focada desta auditoria:
-  - `npx eslint ...` nos modulos alterados de Model Gateway/Agent/tools/testes;
-  - `npx vitest run --config vitest.copilot.config.js ...` com 10 specs e 62 testes;
-  - `npm run typecheck:strict:src.copilot`.
-- Validacao focada das correcoes pos-live:
-  - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/agent/test_model_gateway_turn_boundary.spec.js tests/unit/copilot/model-gateway/test_session_binding.spec.js tests/unit/copilot/test_initializer_session_fs.spec.js tests/unit/copilot/terminal/byok/test_deferred_route_promotion.spec.js tests/unit/copilot/terminal/byok/test_live_model_switch.spec.js --reporter=dot`;
-  - `npx eslint src/copilot/agent/lifecycle/model-gateway-turn-boundary.js tests/unit/copilot/agent/test_model_gateway_turn_boundary.spec.js src/copilot/model-gateway/session/session-binding.js tests/unit/copilot/model-gateway/test_session_binding.spec.js`.
-- Validacao ampla das correcoes pos-live:
-  - `npm run typecheck:strict:src.copilot`;
-  - `npm run lint:copilot`;
-  - `npm run test:copilot:unit`, resumo em
-    `artifacts/test-runs/copilot/2026-06-17T23-44-25-650Z/summary.md`.
-- Evidencia operacional da correcao de runners:
-  - `node scripts/model-gateway/run.mjs liveReadiness --json` passou em ~12,8s com
-    `redaction.sqlite.maxRowsPerTable=25`;
-  - `node scripts/model-gateway/run.mjs liveReadiness --json --deep-redaction` passou em ~21,7s com
-    `redaction.sqlite.maxRowsPerTable=100000`;
-  - `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent` passou em ~15,7s, com timings por subgate;
-  - `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent --subcommand-timeout-ms=500` retornou JSON
-    parcial com falhas `timedOut=true`.
-- Evidencia operacional da restauracao `runtimeSource=merged`:
-  - `node scripts/model-gateway/run.mjs runtimeSelector --json --profile=repo_agent` passou em ~3,9s com
-    `runtimeSource=merged`;
-  - `node scripts/model-gateway/run.mjs autoStatus --json --profile=repo_agent` passou em ~4,4s;
-  - `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent` permaneceu ok em ~17,1s.
-- Evidencia operacional dos indices runtime-health:
-  - `listRuntimeHealthRecords({limit:1500})` passou em ~27ms com
-    `idx_mg_health_observations_observed`;
-  - `listLatestRuntimeHealthRecords({limit:1500})` passou em ~0,8s com
-    `idx_mg_health_observations_latest` e `idx_mg_runtime_probe_results_latest`;
-  - teste focado `test_model_gateway_contracts.spec.js -t "latest-runtime-health indexes|SQLite catalog stores"`
-    passou.
-- Evidencia do primeiro nucleo de readiness unica:
-  - `buildModelGatewayOperatorProjection()` expõe `effectiveRoute`;
-  - `ModelGatewayReadControlPlane.inspectOverview()` retorna `data.effectiveRoute` e
-    `data.modelGateway.effectiveRoute`;
-  - `/status` e `/now` renderizam o ativo do catálogo a partir de `effectiveRoute` quando disponivel;
-  - testes focados `test_model_gateway_contracts.spec.js -t "operator projection|overview readiness"` e
-    `test_commands_session.spec.js -t "cmdStatus|cmdNow"` passaram.
-- Evidencia do segundo nucleo de readiness unica:
-  - `readStorageDiagnostics()` expõe handoffs diferidos ativos e ultimo handoff diferido com rota, sessao, provider e
-    modelo a partir de colunas normalizadas, sem depender de payload JSON cru;
-  - `ModelGatewayReadControlPlane.inspectOverview()` e `ops --json` consomem o mesmo sinal `pendingHandoffs`;
-  - testes focados:
-    `test_model_gateway_contracts.spec.js -t "SQLite catalog store persists"` e
-    `test_model_gateway_contracts.spec.js -t "exposes the same effective route projection"` passaram;
-  - validacao escopada:
-    `npm run typecheck:strict:src.copilot`,
-    `npx eslint src/copilot/model-gateway/catalog/sqlite-catalog-store.js src/copilot/model-gateway/control-plane/read-model.js scripts/model-gateway/commands/model-gateway-ops.mjs tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`,
-    `node scripts/model-gateway/run.mjs ops --json --profile=repo_agent`.
-- Evidencia de alinhamento `/health` com `effectiveRoute`:
-  - `src/copilot/terminal/commands/diagnose.js` usa `effectiveRoute` antes de `active`;
-  - teste focado `test_commands_diagnose.spec.js -t "health|Gateway|diagnóstico"` passou;
-  - validacao escopada: `npx eslint src/copilot/terminal/commands/diagnose.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`
-    e `npm run typecheck:strict:src.copilot`.
-- Evidencia de alinhamento `/byok status` com `effectiveRoute`:
-  - `src/copilot/terminal/commands/byok.js` usa `modelGatewayProjection` para counts e ativo;
-  - teste focado `test_commands_byok.spec.js -t "effectiveRoute compartilhado|arquivo canônico"` passou;
-  - validacao escopada: `npx eslint src/copilot/terminal/commands/byok.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
-    e `npm run typecheck:strict:src.copilot`.
-- Evidencia de alinhamento `/session sdk` com `effectiveRoute`:
-  - `src/copilot/terminal/commands/session.js` mostra `Rota efetiva` a partir de
-    `modelGatewayProjection.effectiveRoute`;
-  - teste focado
-    `test_commands_session.spec.js -t "cmdSessionSdk expõe binding|cmdSessionSdk exibe rota efetiva"` passou;
-  - validacao escopada: `npx eslint src/copilot/terminal/commands/session.js tests/unit/copilot/terminal/test_commands_session.spec.js`
-    e `npm run typecheck:strict:src.copilot`.
-- Evidencia de alinhamento `/activity` com `effectiveRoute`:
-  - `src/copilot/terminal/commands/activity.js` mostra `Rota efetiva` no painel atual;
-  - teste focado `test_commands_activity.spec.js -t "exibe atividade atual"` passou;
-  - validacao escopada: `npx eslint src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js`
-    e `npm run typecheck:strict:src.copilot`.
-- Evidencia de cockpit humano de handoffs:
-  - `/byok auto handoffs` humaniza `deferred_until_turn_boundary` e mostra sessao, provider/model, autorizacao de
-    promocao, expiracao, rota e horario solicitado;
-  - teste focado `test_commands_byok.spec.js -t "handoffs, confirmations"` passou;
-  - validacao escopada: `npx eslint src/copilot/terminal/commands/byok.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
-    e `npm run typecheck:strict:src.copilot`.
-- Evidencia de correção focada do export timeline:
-  - `readTerminalTimelineProjection()` trata cauda viva posterior ao Hub persistido como `bridge_tail` sincronizável
-    quando nao há overlap por assinatura, preservando `diverged-no-overlap` para conflito temporal real;
-  - teste focado `test_timeline_projection.spec.js` passou;
-  - teste focado `test_commands_export.spec.js -t "preserva ask_user"` passou;
-  - validacao escopada: `npx eslint src/copilot/terminal/frontend/projections/timeline.js tests/unit/copilot/terminal/test_timeline_projection.spec.js`
-    e `npm run typecheck:strict:src.copilot`.
-- Evidencia do rerun live pos-timeline:
-  - `node scripts/model-gateway/run.mjs llmBLiveTest --live-scenario=model-gateway-route-apply-minimal --timeout-ms=240000 --out-dir=artifacts/terminal-live/2026-06-19T-route-apply-minimal-timeline-rerun`
-    terminou `BLOCKED` por `live-timeout`;
-  - `summary.json` registrou `ready`, `interactive-repl`, SSE conectado com 108 eventos e run SQLite gravado como
-    `terminal-live:2026-06-19T03-46-32-332Z:canonical_full_turn_model-gateway-route-apply-minimal`;
-  - nao houve `conversation-export.md`, logo a prova de `timeline=mixed/diverged` corrigido continua pendente;
-  - `var/logs/copilot/events.jsonl` mostrou que o lote paralelo das tres tools Model Gateway parou apos `preToolUse`;
-  - repro local com `bootstrapTools()` + `wireCopilotRuntimeDI()` executou os tres handlers em `Promise.all` em ~170ms;
-  - correcao aplicada: prompt do scenario `model-gateway-route-apply-minimal` agora exige serializacao de tools
-    `model_gateway_*`;
-  - validacao escopada: `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs` e
-    `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "live scenario" --reporter=dot`.
-- Evidencia do live serializado e da reconciliação intercalável:
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-serialized-rerun/summary.md`: `PASS`, 454 eventos SSE,
-    `model_gateway_overview`, `model_gateway_operation_status` e `model_gateway_route_switch` executados em chamadas
-    separadas, `ask_user`/`SIM`/postAsk correlacionados, rota viva `ollama-cloud/qwen3-coder-next` confirmada;
-  - o export desse PASS ainda saiu `timeline=mixed/diverged`, reduzindo a causa para prefixo vivo + cauda viva
-    intercalados com Hub persistido e turno vazio posterior;
-  - `readTerminalTimelineProjection()` agora trata esse formato como `bridge_tail`, sincronizando apenas a cauda viva
-    posterior ao último turno persistido substantivo;
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-reconciled-export-rerun/conversation-export.md` saiu com
-    `timeline=mixed/bridge_tail · sync=scheduled`;
-  - o segundo rerun terminou `FAIL` somente porque a LLM-B pulou as tools Model Gateway; ainda assim validou
-    ask/answer/postAsk e o cabeçalho de export reconciliado;
-  - validacao escopada: `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_timeline_projection.spec.js --reporter=dot`,
-    `npx eslint src/copilot/terminal/frontend/projections/timeline.js tests/unit/copilot/terminal/test_timeline_projection.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`
-    e `npm run typecheck:strict:src.copilot`.
-- Evidencia do run combinado bloqueado por apply ausente:
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-combined-rerun/summary.md`: `BLOCKED` por
-    `assistant-empty-turn`;
-  - eventos SSE mostram `model_gateway_route_switch` chamado apenas com `mode:"plan"` e `confirm:false`;
-  - o export resultante tem somente tres mensagens e `timeline=mixed/diverged`, sem `ask_user`;
-  - correcao aplicada no harness: contagem minima por tool (`minSuccessfulCalls`) e recuperacao controlada para cadeia
-    incompleta.
-- Evidencia dos bloqueios por boot/model_call antes das tools:
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-combined-recovery-rerun/summary.md`: `BLOCKED` por
-    `assistant-empty-turn`, tools observadas `0`, erro BYOK antes da primeira tool;
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-boot-kilo-rerun/summary.md`: mesmo bloqueio apos tentar
-    `COPILOT_LIVE_TEST_COPILOT_MODEL=kilo-auto/free`;
-  - `/health full` desses runs mostra `Modelo qwen3-coder-next · raciocínio high`, mas BYOK/Gateway seguem
-    `kilo-code · kilo-auto/free`;
-  - validacao escopada do harness:
-    `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`,
-    `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs` e
-    `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js -t "live scenario" --reporter=dot`.
-- Evidencia da continuacao de auditoria em 2026-06-19:
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-fresh-binding-rerun/summary.md`: boot em
-    `kilo-auto/free`, route apply deferido/promovido, `DELTA-CANONICAL` completo, bloqueado por final pos-ask ausente;
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-sentinel-runtime-rerun/summary.md`: mostrou que a LLM
-    enviava `runtimeId` sentinel (`__none__`/`__UNSET__`) e que a recuperacao pos-ask contextual emitia o final;
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-deny-session-compact-rerun/summary.md`: validou a
-    denylist de `session_compact`, mas revelou disputa entre promocao e continuacao/ask;
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-promotion-queue-guard-rerun/summary.md`: chegou a
-    `ask_user`/final, mas expôs recuperacao stale que chamava `read_briefing`;
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-provider-type-rerun/summary.md`: prova estruturada mais
-    forte ate aqui para o apply: `accepted_for_turn_boundary`, `deferred_until_turn_boundary`, `same_session`,
-    `ask_user`, `SIM` e postAsk; falhou apenas marcador textual/UX antes do ajuste de diagnostico;
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-final-marker-rerun/summary.md`: completou tools/deltas
-    ask/final, mas demonstrou o bloqueador residual de rota efetiva final regressando para `kilo-code/kilo-auto/free`
-    apos erro BYOK recuperavel;
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-ingress-verification-fix-rerun-2/summary.md`: provou
-    operacao `committed` e sessao viva em `qwen3-coder-next`, isolando a projection stale de `/activity` e `/byok`;
-  - `artifacts/terminal-live/2026-06-19T-route-apply-minimal-runtime-projection-fix-rerun/summary.md`: aprovou a
-    cadeia funcional completa e mostrou `Gateway ativo`, `Rota efetiva` e `/health` em
-    `ollama-cloud/qwen3-coder-next`; restou apenas `ux-diagnostic-commands-start-at-prompt`.
-- Validacao escopada ja executada nesta continuacao:
-  - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
-  - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
-  - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/test_initializer_session_fs.spec.js -t "next boot força sessão nova" --reporter=dot`;
-  - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_dialog_recovery_presenter.spec.js tests/unit/copilot/test_terminal_agent_wiring.spec.js --reporter=dot`;
-  - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/tools/test_model_gateway_workflow_plan.spec.js -t "runtimeId|route_switch same-session" --reporter=dot`;
-  - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/test_session_setup.spec.js -t "COPILOT_SDK_EXCLUDED_TOOLS" --reporter=dot`;
-  - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/agent/test_model_gateway_turn_boundary.spec.js --reporter=dot`;
-  - `npm run typecheck:strict:src.copilot`;
-  - `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/test_status_snapshot.spec.js` com 15/15;
-  - `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/terminal/test_commands_byok.spec.js -t "usa effectiveRoute compartilhado no gateway do status BYOK"`;
-  - regressao focada de projection runtime e regressao ingress por `sdkVisibleModel`.
+Somente considerar a proxima leva concluida quando os itens da Faixa 3 ou 4 escolhidos tiverem testes unitarios, lint e uma evidencia live pertinente. `PASS` de boot nao prova provider switch; `route_confirmed_same_session` nao prova catalogo fresco; e paridade de catalogo nao prova conversa. Cada criterio tem sua propria prova para evitar regressao por inferencia.

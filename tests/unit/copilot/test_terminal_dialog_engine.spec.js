@@ -234,6 +234,10 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(typeof mod.evaluateTerminalByokTurnBudget).toBe('function');
     });
 
+    it('repinta forçadamente o prompt após o reattach pronto', () => {
+        expect(src).toContain('scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { force: true })');
+    });
+
     it('bloqueia quando o limite BYOK declarado não comporta o envelope terminal', async () => {
         const result = mod.evaluateTerminalByokTurnBudget(
             {

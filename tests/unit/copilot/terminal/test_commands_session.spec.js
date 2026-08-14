@@ -708,7 +708,7 @@ describe('commands/session — sync commands', () => {
         expect(ctx.output()).toContain('Histórico');
         expect(ctx.output()).toContain('mista');
         expect(ctx.output()).toContain('reconciliada');
-        expect(ctx.output()).toContain('sem sobreposição segura');
+        expect(ctx.output()).not.toContain('sem sobreposição segura');
         expect(ctx.output()).not.toContain('diverged-no-overlap');
         expect(ctx.output()).toContain('LLM-B');
         expect(ctx.output()).not.toMatch(/\[\d{4}-\d{2}-\d{2}T/u);

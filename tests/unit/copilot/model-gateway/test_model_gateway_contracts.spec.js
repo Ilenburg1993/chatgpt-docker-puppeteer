@@ -4623,6 +4623,11 @@ describe('model-gateway foundation', () => {
                     final: 'POST-ASK-FILEWRITE-FINAL: arquivo criado, movido, deletado e usuário confirmou SIM',
                     extra: 'TERMINAL-PERMISSION-ROUNDTRIP',
                 },
+                {
+                    id: 'model-gateway-route-apply-minimal',
+                    stagedAsk: true,
+                    extra: 'Não invoque ask_user neste turno',
+                },
             ];
 
             for (const scenario of scenarios) {
@@ -4643,13 +4648,27 @@ describe('model-gateway foundation', () => {
                 const prompt = await readFile(join(outDir, 'prompt.txt'), 'utf8');
                 assert.ok(prompt.includes('report_intent'));
                 assert.ok(prompt.includes('read_file_content'));
-                assert.ok(prompt.includes(scenario.ask));
-                assert.ok(prompt.includes(scenario.final));
+                if (scenario.stagedAsk) {
+                    assert.ok(prompt.includes('encerre este turno e aguarde a continuação controlada'));
+                    assert.ok(!prompt.includes('Por fim invoque a ferramenta real ask_user'));
+                } else {
+                    assert.ok(prompt.includes(scenario.ask));
+                    assert.ok(prompt.includes(scenario.final));
+                }
                 if (scenario.extra) assert.ok(prompt.includes(scenario.extra));
             }
         } finally {
             await rm(tempDir, { recursive: true, force: true });
         }
+    });
+
+    it('keeps the committed refresh CLI synchronized with the SQLite catalog mirror', async () => {
+        const source = await readFile('scripts/model-gateway/commands/model-gateway-refresh.mjs', 'utf8');
+
+        assert.match(source, /mirrorModelGatewayCatalogSnapshotToSqlite/);
+        assert.match(source, /sqliteStore:\s*new SqliteModelGatewayCatalogStore\(\)/);
+        assert.match(source, /parityOk:\s*mirror\.parity\.ok/);
+        assert.match(source, /if \(mirror && !mirror\.parity\.ok\) process\.exitCode = 1/);
     });
 
     it('creates secret-safe universal catalog evidence contracts', () => {
@@ -11976,6 +11995,7 @@ describe('model-gateway foundation', () => {
                     createCanonicalModelProjection({ providerId: 'ollama', providerModel: 'local-model', displayName: 'Local Model' }),
                 ],
             });
+            const previousSnapshot = await store.readSnapshot();
             /** @type {Array<Record<string, any>>} */
             const progressEvents = [];
             const result = await refreshModelGatewayCatalog({
@@ -12011,6 +12031,8 @@ describe('model-gateway foundation', () => {
 
             assert.deepEqual(result.diff.added, ['openrouter:new-model:default']);
             assert.deepEqual(result.diff.removed, ['openrouter:old-model:default']);
+            assert.notEqual(result.snapshot.snapshotId, previousSnapshot.snapshotId);
+            assert.equal(stored.snapshotId, result.snapshot.snapshotId);
             assert.equal(result.snapshot.projections.some((projection) => projection.providerModel === 'local-model'), true);
             assert.equal(result.snapshot.projections.some((projection) => projection.providerModel === 'old-model'), false);
             assert.equal(stored.projections.length, 2);

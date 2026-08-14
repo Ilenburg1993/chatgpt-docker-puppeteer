@@ -1018,7 +1018,9 @@ async function _tryStartDialogLoop() {
     if (resumeSessionAttach) {
         markTerminalActivityIdle('Sessão retomada; aguardando próxima mensagem');
         const rl = getRl();
-        if (rl) scheduleTerminalPromptRedraw(rl, buildUserPrompt());
+        // The boot banner can have painted the initial readline prompt before the dialog is ready.
+        // A forced paint establishes the interactive boundary after the final ready message.
+        if (rl) scheduleTerminalPromptRedraw(rl, buildUserPrompt(), { force: true });
     }
 }
 

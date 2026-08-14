@@ -7,8 +7,10 @@ import {
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
+    mirrorModelGatewayCatalogSnapshotToSqlite,
     planModelGatewayCatalogRefresh,
     refreshModelGatewayCatalog,
+    SqliteModelGatewayCatalogStore,
 } from '../../../src/copilot/model-gateway/index.js';
 
 loadDotenv({ path: '.env.local', override: false, quiet: true });
@@ -48,7 +50,7 @@ Options:
   --force               Ignore TTL for selected incremental sources.
   --all                 Run all selected importers instead of TTL incremental planning.
   --preview             Do not write the catalog snapshot.
-  --commit              Write the catalog snapshot (default unless --preview is used).
+  --commit              Write the catalog snapshot and its SQLite mirror (default unless --preview is used).
   --json                Emit only the final JSON summary on stdout.
   --log=<path>          Write full JSONL progress log to a custom path.
 
@@ -183,6 +185,12 @@ const result = await refreshModelGatewayCatalog({
     },
     onProgress: recordProgress,
 });
+const mirror = commit
+    ? await mirrorModelGatewayCatalogSnapshotToSqlite({
+          sourceStore: store,
+          sqliteStore: new SqliteModelGatewayCatalogStore(),
+      })
+    : null;
 
 const summary = {
     schema: 'model-gateway-refresh-summary',
@@ -203,6 +211,13 @@ const summary = {
         removed: result.diff.removed.length,
         changed: result.diff.changed.length,
     },
+    sqlite: mirror
+        ? {
+              mirrored: true,
+              parityOk: mirror.parity.ok,
+              counts: mirror.sqliteCounts,
+          }
+        : { mirrored: false, parityOk: null, counts: null },
 };
 appendFileSync(logPath, `${JSON.stringify({ ts: new Date().toISOString(), ...summary })}\n`, 'utf8');
 
@@ -214,3 +229,4 @@ if (json) {
     );
     process.stdout.write(`full log: ${summary.logPath}\n`);
 }
+if (mirror && !mirror.parity.ok) process.exitCode = 1;

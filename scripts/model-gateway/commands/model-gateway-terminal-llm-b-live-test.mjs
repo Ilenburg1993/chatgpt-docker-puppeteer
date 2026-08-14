@@ -231,6 +231,8 @@ function createLiveScenario({
     expectedPlainOutputMarkers = [],
     expectedTerminalRender = [],
     postAnswerCommands = [],
+    deferAskUntilDeltaContinuation = false,
+    postCompletionGraceMs = 0,
     invalidChoiceExpected = false,
     recoverableToolErrorExpected = false,
 }) {
@@ -249,6 +251,8 @@ function createLiveScenario({
         expectedPlainOutputMarkers: Object.freeze(expectedPlainOutputMarkers),
         expectedTerminalRender: Object.freeze(expectedTerminalRender.map((item) => Object.freeze({ ...item }))),
         postAnswerCommands: Object.freeze(postAnswerCommands),
+        deferAskUntilDeltaContinuation,
+        postCompletionGraceMs: Math.max(0, Math.floor(Number(postCompletionGraceMs) || 0)),
         invalidChoiceExpected,
         recoverableToolErrorExpected,
         askRenderedRe: buildAskRenderedRegex(askQuestion),
@@ -661,6 +665,10 @@ const LIVE_SCENARIOS = Object.freeze({
             '/byok',
             '/activity 40',
         ],
+        // A route apply is deliberately deferred to the turn boundary. Keep this first turn free of a
+        // human question, then leave the process alive long enough for the scheduler to reattach.
+        deferAskUntilDeltaContinuation: true,
+        postCompletionGraceMs: 15_000,
         expectedOutputMarkers: [
             'operation.inspect',
             'route.switch',
@@ -745,6 +753,12 @@ function readLiveScenario() {
 }
 
 function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+    const stagedAskInstructions = scenario.deferAskUntilDeltaContinuation
+        ? [
+              'Depois da oitava linha DELTA-CANONICAL, encerre este turno e aguarde a continuação controlada do operador.',
+              'Não invoque ask_user neste turno, mesmo que a ferramenta esteja disponível. A pergunta obrigatória será solicitada em uma continuação posterior.',
+          ]
+        : [scenario.askToolInstruction, scenario.finalInstruction];
     return [
         'Faça um teste integrado canônico do terminal.',
         'Use chamadas de ferramenta reais do SDK; texto, Markdown, JSON, pseudo-tool e exemplos de tool_calls não contam.',
@@ -758,11 +772,14 @@ function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]
         'A etapa dos deltas e a etapa ask_user são separadas: depois da última tool obrigatória, sua próxima saída pública deve conter somente as oito linhas DELTA-CANONICAL; só depois disso, em continuação posterior, invoque ask_user.',
         'Não use contexto, descrição, prePublicResponse, texto da pergunta ou qualquer campo de ask_user como substituto para as oito linhas públicas DELTA-CANONICAL.',
         'Se você chamar ask_user antes dessas oito linhas públicas, o teste falha mesmo que todas as tools tenham concluído.',
-        scenario.askToolInstruction,
-        scenario.finalInstruction,
-        'Depois do marcador final, pare imediatamente: não chame outra ferramenta, não escreva outra mensagem e aguarde o próximo comando humano.',
-        `Antes da resposta humana final, não escreva, cite nem antecipe o marcador ${scenario.finalMarker}.`,
-        `A pergunta ${scenario.askQuestion.split(':')[0]} deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.`,
+        ...stagedAskInstructions,
+        ...(scenario.deferAskUntilDeltaContinuation
+            ? []
+            : [
+                  'Depois do marcador final, pare imediatamente: não chame outra ferramenta, não escreva outra mensagem e aguarde o próximo comando humano.',
+                  `Antes da resposta humana final, não escreva, cite nem antecipe o marcador ${scenario.finalMarker}.`,
+                  `A pergunta ${scenario.askQuestion.split(':')[0]} deve ser feita pela tool ask_user real; não a simule como texto, Markdown, JSON ou pseudo-tool no transcript público.`,
+              ]),
         'Nunca escreva um objeto tool_calls, uma chave function/args, nem diga que ações foram executadas sem a tool real aparecer no terminal.',
         'Nunca afirme que criou, editou, moveu, copiou ou excluiu arquivo antes de ver a respectiva tool real retornar sucesso.',
         `Não use outras tools além de ${scenario.allowedTools.join(', ')}.`,
@@ -7796,17 +7813,23 @@ async function main() {
             send();
         }
     };
-    const startPromptSynchronizedCommandSequence = (commands, onDrained = null) => {
+    const startPromptSynchronizedCommandSequence = (
+        commands,
+        onDrained = null,
+        { promptAfterOffset = null } = {},
+    ) => {
         promptSynchronizedCommands = [...commands];
         onPromptSynchronizedCommandsDrained = onDrained;
         waitingForPromptSynchronizedCommand = false;
         const plain = stripAnsi(raw);
-        if (hasReturnedToReplPrompt(plain, Math.max(0, plain.length - 512))) {
+        const promptSearchOffset =
+            Number.isFinite(promptAfterOffset) ? Math.max(0, Number(promptAfterOffset)) : Math.max(0, plain.length - 512);
+        if (hasReturnedToReplPrompt(plain, promptSearchOffset)) {
             sendNextPromptSynchronizedCommand();
             return;
         }
         waitingForPromptBeforeSynchronizedCommand = true;
-        promptSynchronizedCommandOutputOffset = plain.length;
+        promptSynchronizedCommandOutputOffset = promptSearchOffset;
         promptSynchronizedStartFallbackTimer = setTimeout(() => {
             promptSynchronizedStartFallbackTimer = null;
             if (waitingForPromptBeforeSynchronizedCommand && !waitingForPromptSynchronizedCommand) {
@@ -7876,7 +7899,7 @@ async function main() {
                 diagnostics.push(`/export ${exportArg}`);
                 startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: diagnostics.length * 2_000 });
             },
-            Math.max(0, delayMs),
+            Math.max(0, delayMs, liveScenario.postCompletionGraceMs),
         ).unref();
     };
     const scheduleByokPreflightDiagnostics = () => {
@@ -8152,15 +8175,21 @@ async function main() {
         }
         if (!readySent && /LLM-B pronta/.test(plain)) {
             readySent = true;
+            const readyMarker = 'LLM-B pronta';
+            const readyPromptOffset = Math.max(0, plain.lastIndexOf(readyMarker) + readyMarker.length);
             if (collectSse) {
                 sseCollector = startSseCollector({ port: Number.isFinite(ssePort) ? ssePort : terminalPort });
             }
             if (autoControlProbe) {
-                startPromptSynchronizedCommandSequence(buildAutoProbeCommands({ profile: autoProbeProfile }));
+                startPromptSynchronizedCommandSequence(buildAutoProbeCommands({ profile: autoProbeProfile }), null, {
+                    promptAfterOffset: readyPromptOffset,
+                });
                 return;
             }
             if (modelControlProbe) {
-                startPromptSynchronizedCommandSequence(buildModelProbeCommands());
+                startPromptSynchronizedCommandSequence(buildModelProbeCommands(), null, {
+                    promptAfterOffset: readyPromptOffset,
+                });
                 return;
             }
             if (byokControlProbe || noPr || byokReal) {
@@ -8178,32 +8207,40 @@ async function main() {
                             ...buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }),
                         ]
                       : ['/usage now', '/activity 12', ...buildNoPrProbeCommands()];
-                startPromptSynchronizedCommandSequence(commands, () => {
-                    if (byokReal && noPr) {
-                        if (!quitSent) {
-                            quitSent = true;
-                            byokNoPrCanQuit = true;
-                            write('/quit');
-                        }
-                        return;
-                    }
-                    if (byokReal && !noPr) {
-                        if (findByokRealPreflightProbeFailure(stripAnsi(raw))) {
-                            scheduleByokPreflightDiagnostics();
+                startPromptSynchronizedCommandSequence(
+                    commands,
+                    () => {
+                        if (byokReal && noPr) {
+                            if (!quitSent) {
+                                quitSent = true;
+                                byokNoPrCanQuit = true;
+                                write('/quit');
+                            }
                             return;
                         }
-                        scenarioPlainOffset = stripAnsi(raw).length;
-                        scenarioSent = true;
-                        write(buildScenarioPrompt(liveScenario));
-                    }
-                });
+                        if (byokReal && !noPr) {
+                            if (findByokRealPreflightProbeFailure(stripAnsi(raw))) {
+                                scheduleByokPreflightDiagnostics();
+                                return;
+                            }
+                            scenarioPlainOffset = stripAnsi(raw).length;
+                            scenarioSent = true;
+                            write(buildScenarioPrompt(liveScenario));
+                        }
+                    },
+                    { promptAfterOffset: readyPromptOffset },
+                );
                 return;
             }
-            startPromptSynchronizedCommandSequence(['/usage now', '/activity 12'], () => {
-                scenarioPlainOffset = stripAnsi(raw).length;
-                scenarioSent = true;
-                write(buildScenarioPrompt(liveScenario));
-            });
+            startPromptSynchronizedCommandSequence(
+                ['/usage now', '/activity 12'],
+                () => {
+                    scenarioPlainOffset = stripAnsi(raw).length;
+                    scenarioSent = true;
+                    write(buildScenarioPrompt(liveScenario));
+                },
+                { promptAfterOffset: readyPromptOffset },
+            );
         }
         if (
             !answerSent &&
