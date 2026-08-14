@@ -3423,18 +3423,123 @@ Política de escalada adotada:
 4. typecheck isolado somente quando tipos/JSDoc/contrato público realmente o justificarem;
 5. suites amplas somente para mudanças transversais, regressão sem localização, ou release gate deliberado.
 
-Transformação source em andamento:
+Transformação source concluída:
 
 - [x] `mcp_validation_plan` deixa de assumir `mcp-fast` quando chamado sem argumentos; o default passa a ser `inspect-first` + `no-validator-yet`.
 - [x] `mcp_validation_plan testFile=...` planeja execução file-scoped e explicita uma política de escalada.
 - [x] `run_copilot_validator` ganha `validator=unit-focused` com um único arquivo `.spec.js` explícito sob `tests/unit/copilot/` por job.
 - [x] glob, path traversal, paths não canônicos e final symlink são rejeitados; `realpath` também impede escape por diretório-pai symlinkado.
-- [x] a implementação reutiliza `run_copilot_validator` em vez de adicionar uma 116ª tool, preservando o orçamento de `tools/list` próximo de 128 KiB.
-- [x] guidance de session profile, connector smoke, golden prompts e capabilities foi alterado de broad-first para focused-first.
+- [x] a implementação reutiliza `run_copilot_validator` em vez de adicionar uma 116ª tool.
+- [x] guidance de session profile, connector smoke, golden prompts, capabilities e `mcp_tools_status` foi alterado de broad-first para focused-first.
 - [x] `CAPABILITIES_VERSION` avançou de 38 para 39 porque o contrato de validação mudou, sem aumentar o número de tools.
-- [x] testes locais foram ajustados para path policy, command resolution, planner default/focused/broad e invariantes de input de `run_copilot_validator`.
-- [ ] executar apenas o gate proporcional mínimo antes de publicar; não usar `mcp-full`/`copilot-fast` por padrão nesta onda.
-- [ ] publicar o conjunto causal e self-reload.
-- [ ] provar ao vivo `unit-focused` usando somente os testes causalmente relevantes.
+- [x] testes locais foram ajustados para path policy, command resolution, planner default/focused/broad, invariantes de input e approval workflow.
+- [x] usar apenas gate proporcional nesta onda; `mcp-full` e `copilot-fast` não foram executados.
+- [x] publicar o conjunto causal e self-reload.
+- [ ] provar end-to-end `unit-focused` em uma conversa/reconexão cujo host já tenha recarregado o novo input schema de `run_copilot_validator`.
 
-A revisão estática já evitou uma regressão de design antes de qualquer validator: a primeira proposta adicionava uma tool nova, mas o `tools/list` atual já está muito próximo do budget de 128 KiB. A solução foi simplificada para ampliar a capacidade sem ampliar a superfície MCP.
+### 97.1 Validação proporcional realmente usada
+
+A ordem real da evidência foi:
+
+1. revisão estática de diff, imports e contratos;
+2. `repo_find_orphan_imports` em `src/copilot/mcp`: 98 arquivos, 245 imports locais verificados, `0` orphans e `0` parse errors;
+3. um único bootstrap `mcp-fast` antes da compactação final do schema;
+4. depois da falha localizada, nenhum rerun da suíte: apenas typecheck isolado e provas live pós-reload.
+
+O bootstrap `mcp-fast` foi job `1e0ec4e5-82db-47ca-87b3-7d301e280a6c`, exit code `1`, ~`38,3s`:
+
+- [x] typecheck interno passou (~`8,9s`);
+- [x] `57/58` arquivos de teste MCP passaram;
+- [x] `303/304` testes passaram;
+- [x] a única falha foi `test_tool_payload_audit.spec.js`, porque o primeiro schema expandido ultrapassou o envelope de 128 KiB;
+- [x] a falha levou à redução do contrato público de `testFiles[]` para um único `testFile` e à decisão de não criar uma 116ª tool;
+- [x] **a suíte não foi repetida**.
+
+Depois da compactação, o único validator pré-publicação foi typecheck isolado:
+
+- job `c6458a67-93d0-4d95-a2d8-5c6b576e7967`;
+- exit code `0`;
+- duração ~`5,6s`.
+
+Isto é o padrão pretendido: falha localizada gera correção localizada, não escalada automática para validators mais amplos.
+
+### 97.2 Publicação e prova live
+
+Commit funcional principal:
+
+`b8fadd1352957679332af2d3cfae2fea8eabb005`
+
+Mensagem:
+
+`feat(copilot): make validation focused by default`
+
+- [x] 10 arquivos causais.
+- [x] 328 inserções / 45 remoções.
+- [x] push upstream-only concluído com `ahead=0`, `behind=0`.
+- [x] self-reload `mcp-reload-fcee3ad4-03b3-4f84-9d66-e7190e89d117`, profile `quic`, exit code `0`.
+- [x] OAuth smoke pós-reload verde.
+- [x] registry remoto/local permaneceu `115/115`.
+- [x] readiness reconciliado `ready=true`.
+
+Prova do planner no runtime publicado:
+
+- [x] `mcp_validation_plan {}` retornou `strategy=inspect-first`, `recommendation=no-validator-yet`, `plannedTool=null`.
+- [x] `mcp_validation_plan testFile=tests/unit/copilot/mcp/test_mcp_jobs.spec.js` retornou `strategy=focused-first`, `breadth=file-scoped`, `validator=unit-focused` e comando Vitest restrito àquele arquivo.
+
+### 97.3 Tool-schema budget e compactação posterior
+
+O primeiro smoke do código publicado mediu:
+
+- tools: `115`;
+- `tools/list responseBytes=130.921`;
+- teto: `131.072` bytes (`128 KiB`);
+- folga: apenas `151` bytes.
+
+Essa margem foi considerada operacionalmente frágil. Em vez de ignorá-la ou acrescentar outra suíte de validação, foi feita uma micro-onda estática de compactação dos descriptors de validação e correção do guidance de aprovação.
+
+Commit:
+
+`32ce0c8d1e51dfcb4a877d69632ba8b967124848`
+
+Mensagem:
+
+`chore(copilot): slim validation descriptors`
+
+- [x] `mcp_tools_status` passou a colocar `run_copilot_validator` — não `mcp_run_safe_validation_suite` — na primeira wave de approval.
+- [x] workflow de validação passou a ser `mcp_validation_plan -> run_copilot_validator`.
+- [x] broad suite continua disponível, mas somente como escalation.
+- [x] descriptors de jobs/validation foram encurtados sem remover semântica de segurança.
+- [x] nenhum validator foi executado para essa micro-onda descritiva.
+- [x] push upstream-only concluído.
+- [x] self-reload `mcp-reload-b19e6ca4-aafb-42df-94ae-da21aec677d8`, profile `quic`, exit code `0`.
+- [x] smoke OAuth/registry/SSE verde.
+- [x] readiness final `ready=true`.
+- [x] `recentOriginErrors=[]`.
+
+Após a compactação:
+
+- tools: `115`;
+- `tools/list responseBytes=130.052`;
+- folga: `1.020` bytes;
+- ganho de folga: `869` bytes, aproximadamente `6,75x` a margem anterior.
+
+### 97.4 Limitação residual desta conversa: schema cache do host
+
+A chamada live de `run_copilot_validator validator=unit-focused testFile=...` não chegou ao MCP porque o host desta conversa ainda mantém o schema anterior da tool, cujo enum não contém `unit-focused`.
+
+`mcp_host_block_diagnostics` classificou o episódio como:
+
+- `code=CHATGPT_HOST_PRECALL_BLOCK`;
+- `layer=chatgpt-host`;
+- `confidence=high`;
+- `mcpReachedServer=false`;
+- `schemaErrorPresent=true`.
+
+Portanto:
+
+- [x] não é failure do handler novo;
+- [x] não é failure do runtime MCP;
+- [x] não é justificativa para executar `unit-mcp`, `mcp-full` ou `copilot-fast` como substitutos;
+- [ ] na próxima conversa/reconexão, confirmar que o host recebeu o novo schema e executar `unit-focused` somente nos arquivos causalmente relevantes.
+
+A revisão estática desta onda evitou duas regressões antes de validators: primeiro, uma 116ª tool desnecessária; depois, um schema público pesado demais. O novo princípio operacional fica estabelecido: **o validator precisa justificar seu custo marginal; amplitude não é sinônimo de confiança.**
