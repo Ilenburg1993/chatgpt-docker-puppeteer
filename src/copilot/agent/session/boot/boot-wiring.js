@@ -61,15 +61,6 @@ import {
  * @property {() => import('../../types.js').AgentStatusSnapshot} getStatusSnapshot
  * @property {(path: string) => void} onCheckpointPath — Atualizar checkpoint path
  * @property {(state: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState
- * @property {(info: {
- *     model?: string;
- *     configuredModel?: string;
- *     modelMismatch?: boolean;
- *     sessionId?: string | null;
- *     cost?: number;
- *     quotaSnapshots?: Record<string, unknown>;
- *     ts: number;
- * }) => void} onPrInfo
  * @property {() => boolean} isProcessing — Retorna true se status === 'processing'
  * @property {() => boolean} dialogLoopActive — Retorna true se dialog loop ativo
  * @property {() => string | null} getSessionId — Retorna sessionId

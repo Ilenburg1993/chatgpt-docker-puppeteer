@@ -48,6 +48,7 @@ const DEFAULT_ORPHAN_IMPORT_MAX_FILES = 500;
 const MODULE_FILE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.json'];
 const MODULE_INDEX_CANDIDATES = MODULE_FILE_EXTENSIONS.map((extension) => `index${extension}`);
 const LOCAL_IMPORT_ALIAS_PREFIXES = ['#copilot'];
+const PACKAGE_JSON_PATH = join(WORKSPACE_ROOT, 'package.json');
 const IMPORT_TARGET_EXISTS_CACHE_TTL_MS = 5 * 60 * 1000;
 const IMPORT_TARGET_EXISTS_CACHE_MAX_ENTRIES = 10_000;
 /** @type {import('#copilot/mcp/control-plane').TtlCache<boolean>} */
@@ -121,15 +122,111 @@ function isLocalImportSource(source) {
     );
 }
 
+const PACKAGE_IMPORTS_CACHE_TTL_MS = 30_000;
+/** @type {Promise<Array<[string, unknown]>> | null} */
+let packageImportEntriesPromise = null;
+let packageImportEntriesExpiresAtMs = 0;
+
+/**
+ * Resolve the first usable string target from a Node.js package-import target.
+ * Conditional objects prefer import/node/default and then fall back to declaration order.
+ *
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function selectPackageImportTarget(value) {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) {
+        for (const candidate of value) {
+            const target = selectPackageImportTarget(candidate);
+            if (target) return target;
+        }
+        return null;
+    }
+    if (!value || typeof value !== 'object') return null;
+    const record = /** @type {Record<string, unknown>} */ (value);
+    for (const condition of ['import', 'node', 'default']) {
+        const target = selectPackageImportTarget(record[condition]);
+        if (target) return target;
+    }
+    for (const candidate of Object.values(record)) {
+        const target = selectPackageImportTarget(candidate);
+        if (target) return target;
+    }
+    return null;
+}
+
+/**
+ * @returns {Promise<Array<[string, unknown]>>}
+ */
+async function readPackageImportEntries() {
+    const now = Date.now();
+    if (!packageImportEntriesPromise || now >= packageImportEntriesExpiresAtMs) {
+        packageImportEntriesExpiresAtMs = now + PACKAGE_IMPORTS_CACHE_TTL_MS;
+        packageImportEntriesPromise = readText(PACKAGE_JSON_PATH)
+            .then((text) => {
+                const parsed = JSON.parse(text.content);
+                const imports = parsed && typeof parsed === 'object' ? parsed.imports : null;
+                return imports && typeof imports === 'object' ? Object.entries(imports) : [];
+            })
+            .catch(() => []);
+    }
+    return packageImportEntriesPromise;
+}
+
+/**
+ * @param {string} source
+ * @param {Array<[string, unknown]>} entries
+ * @returns {{ basePath: string; strategy: 'package-import-exact' | 'package-import-wildcard' } | null}
+ */
+function resolvePackageImportBasePath(source, entries) {
+    const exact = entries.find(([key]) => key === source);
+    if (exact) {
+        const target = selectPackageImportTarget(exact[1]);
+        if (target?.startsWith('./')) {
+            return { basePath: resolvePath(WORKSPACE_ROOT, target), strategy: 'package-import-exact' };
+        }
+    }
+
+    const wildcardMatches = entries
+        .map(([key, value]) => ({ key, value, starIndex: key.indexOf('*') }))
+        .filter(({ starIndex }) => starIndex >= 0)
+        .sort((a, b) => b.key.length - a.key.length);
+    for (const { key, value, starIndex } of wildcardMatches) {
+        const prefix = key.slice(0, starIndex);
+        const suffix = key.slice(starIndex + 1);
+        if (!source.startsWith(prefix) || !source.endsWith(suffix)) continue;
+        const wildcardValue = source.slice(prefix.length, source.length - suffix.length);
+        const target = selectPackageImportTarget(value);
+        if (!target?.startsWith('./')) continue;
+        const substituted = target.includes('*') ? target.replaceAll('*', wildcardValue) : target;
+        return { basePath: resolvePath(WORKSPACE_ROOT, substituted), strategy: 'package-import-wildcard' };
+    }
+    return null;
+}
+
 /**
  * @param {string} source
  * @param {string} importerPath
- * @returns {string | null}
+ * @returns {Promise<{ basePath: string; strategy: string } | null>}
  */
-function resolveImportBasePath(source, importerPath) {
-    if (source.startsWith('.')) return resolvePath(dirname(importerPath), source);
-    if (source === '#copilot') return join(WORKSPACE_ROOT, 'src/copilot');
-    if (source.startsWith('#copilot/')) return join(WORKSPACE_ROOT, 'src/copilot', source.slice('#copilot/'.length));
+async function resolveImportBasePath(source, importerPath) {
+    if (source.startsWith('.')) {
+        return { basePath: resolvePath(dirname(importerPath), source), strategy: 'relative' };
+    }
+    if (source.startsWith('#')) {
+        const mapped = resolvePackageImportBasePath(source, await readPackageImportEntries());
+        if (mapped) return mapped;
+    }
+    if (source === '#copilot') {
+        return { basePath: join(WORKSPACE_ROOT, 'src/copilot'), strategy: 'legacy-copilot-alias' };
+    }
+    if (source.startsWith('#copilot/')) {
+        return {
+            basePath: join(WORKSPACE_ROOT, 'src/copilot', source.slice('#copilot/'.length)),
+            strategy: 'legacy-copilot-alias',
+        };
+    }
     return null;
 }
 
@@ -178,28 +275,46 @@ async function cachedFileExists(filePath) {
 }
 
 /**
+ * Classify candidate targets without collapsing path-policy denial into filesystem absence.
+ *
  * @param {string[]} candidates
- * @returns {Promise<boolean>}
+ * @returns {Promise<{ status: 'exists' | 'missing' | 'protected'; protectedCandidateCount: number }>}
  */
-async function anyCandidateExists(candidates) {
+async function classifyCandidateTargets(candidates) {
+    let protectedCandidateCount = 0;
     for (const candidate of candidates) {
-        if (await cachedFileExists(candidate)) return true;
+        const workspaceRelativeCandidate = relative(WORKSPACE_ROOT, candidate);
+        const policy = await resolveReadPath(workspaceRelativeCandidate);
+        if (!policy.ok) {
+            if (policy.code === 'ERR_PATH_DENIED') protectedCandidateCount += 1;
+            continue;
+        }
+        if (await cachedFileExists(candidate)) {
+            return { status: 'exists', protectedCandidateCount };
+        }
     }
-    return false;
+    return {
+        status: protectedCandidateCount > 0 ? 'protected' : 'missing',
+        protectedCandidateCount,
+    };
 }
 
 /**
- * @param {{ file: string; line: number; source: string; dynamic: boolean; attemptedTargets: string[] }[]} rows
+ * @param {{ file: string; line: number; source: string; dynamic: boolean; attemptedTargets: string[]; resolutionStrategy: string }[]} rows
+ * @param {{ file: string; line: number; source: string; dynamic: boolean; resolutionStrategy: string }[]} protectedRows
  * @returns {string}
  */
-function formatOrphanImportRows(rows) {
-    return rows
-        .map((row) => {
-            const dynamic = row.dynamic ? ' dynamic' : '';
-            const attempted = row.attemptedTargets.slice(0, 3).join(', ');
-            return `${row.file}:${row.line}: import${dynamic} from '${row.source}' -> alvo local não encontrado (${attempted})`;
-        })
-        .join('\n');
+function formatOrphanImportRows(rows, protectedRows = []) {
+    const missingLines = rows.map((row) => {
+        const dynamic = row.dynamic ? ' dynamic' : '';
+        const attempted = row.attemptedTargets.slice(0, 3).join(', ');
+        return `${row.file}:${row.line}: import${dynamic} from '${row.source}' -> alvo local não encontrado (${attempted}); resolução=${row.resolutionStrategy}`;
+    });
+    const protectedLines = protectedRows.map((row) => {
+        const dynamic = row.dynamic ? ' dynamic' : '';
+        return `${row.file}:${row.line}: import${dynamic} from '${row.source}' -> protected/unverifiable; resolução=${row.resolutionStrategy}`;
+    });
+    return [...missingLines, ...protectedLines].join('\n');
 }
 
 /**
@@ -495,15 +610,19 @@ export const repoIndexTools = [
     source: string;
     dynamic: boolean;
     attemptedTargets: string[];
+    resolutionStrategy: string;
 }[]} */
             const orphanImports = [];
+            /** @type {{ file: string; line: number; source: string; dynamic: boolean; resolutionStrategy: string }[]} */
+            const protectedImports = [];
             /** @type {{ file: string; error: string }[]} */
             const parseErrors = [];
             let checkedImports = 0;
             let skippedExternalImports = 0;
             let skippedDynamicImports = 0;
+            let aliasResolutionGapCount = 0;
             let scannedEntries = 1;
-            const blockedEntries = 0;
+            let blockedEntries = 0;
             let hardLimitReached = false;
             let scannedFiles = 0;
             let totalCandidateFiles = 1;
@@ -528,17 +647,31 @@ export const repoIndexTools = [
                                 skippedExternalImports += 1;
                                 continue;
                             }
-                            const basePath = resolveImportBasePath(source, resolved.resolved);
-                            if (!basePath) continue;
-                            const candidates = buildModuleCandidatePaths(basePath);
+                            const resolution = await resolveImportBasePath(source, resolved.resolved);
+                            if (!resolution) continue;
+                            if (resolution.strategy === 'legacy-copilot-alias') aliasResolutionGapCount += 1;
+                            const candidates = buildModuleCandidatePaths(resolution.basePath);
                             checkedImports += 1;
-                            if (await anyCandidateExists(candidates)) continue;
+                            const targetState = await classifyCandidateTargets(candidates);
+                            if (targetState.status === 'exists') continue;
+                            if (targetState.status === 'protected') {
+                                blockedEntries += targetState.protectedCandidateCount;
+                                protectedImports.push({
+                                    file: resolved.relative,
+                                    line: Number(importEntry.line ?? 0),
+                                    source,
+                                    dynamic,
+                                    resolutionStrategy: resolution.strategy,
+                                });
+                                continue;
+                            }
                             orphanImports.push({
                                 file: resolved.relative,
                                 line: Number(importEntry.line ?? 0),
                                 source,
                                 dynamic,
                                 attemptedTargets: candidates.map((candidate) => relative(WORKSPACE_ROOT, candidate)),
+                                resolutionStrategy: resolution.strategy,
                             });
                         }
                     } catch (error) {
@@ -588,23 +721,38 @@ export const repoIndexTools = [
                         skippedExternalImports += 1;
                         continue;
                     }
-                    const basePath = resolveImportBasePath(source, String(row.filePath ?? ''));
-                    if (!basePath) continue;
-                    const candidates = buildModuleCandidatePaths(basePath);
+                    const resolution = await resolveImportBasePath(source, String(row.filePath ?? ''));
+                    if (!resolution) continue;
+                    if (resolution.strategy === 'legacy-copilot-alias') aliasResolutionGapCount += 1;
+                    const candidates = buildModuleCandidatePaths(resolution.basePath);
                     checkedImports += 1;
-                    if (await anyCandidateExists(candidates)) continue;
+                    const targetState = await classifyCandidateTargets(candidates);
+                    if (targetState.status === 'exists') continue;
+                    if (targetState.status === 'protected') {
+                        blockedEntries += targetState.protectedCandidateCount;
+                        protectedImports.push({
+                            file: String(row.relativePath ?? row.filePath),
+                            line: Number(row.line ?? 0),
+                            source,
+                            dynamic,
+                            resolutionStrategy: resolution.strategy,
+                        });
+                        continue;
+                    }
                     orphanImports.push({
                         file: String(row.relativePath ?? row.filePath),
                         line: Number(row.line ?? 0),
                         source,
                         dynamic,
                         attemptedTargets: candidates.map((candidate) => relative(WORKSPACE_ROOT, candidate)),
+                        resolutionStrategy: resolution.strategy,
                     });
                 }
             }
             const window = normalizeSearchWindow({ maxResults, cursor });
             const paged = paginateSearchItems(orphanImports, window);
-            const output = formatOrphanImportRows(paged.items);
+            const protectedPreview = protectedImports.slice(0, normalizePositiveInteger(maxResults, 50, 500));
+            const output = formatOrphanImportRows(paged.items, protectedPreview);
             return okResult(
                 {
                     success: true,
@@ -623,14 +771,19 @@ export const repoIndexTools = [
                     parseErrors,
                     orphanCount: paged.items.length,
                     totalOrphans: paged.totalItems,
+                    trueOrphanCount: orphanImports.length,
+                    protectedCount: protectedImports.length,
+                    aliasResolutionGapCount,
                     truncated:
                         paged.truncated ||
                         hardLimitReached ||
+                        protectedImports.length > protectedPreview.length ||
                         (stat.stats.isDirectory() && totalCandidateFiles > fileLimit),
                     nextCursor: paged.nextCursor,
                     cursorOffset: paged.cursorOffset,
                     output,
                     orphans: paged.items,
+                    protectedImports: protectedPreview,
                 },
                 output,
             );

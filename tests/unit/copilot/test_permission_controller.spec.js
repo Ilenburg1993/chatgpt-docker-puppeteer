@@ -124,4 +124,26 @@ describe('PermissionController › comportamento (G2-TEST-04/05)', async () => {
         assert.equal((await sdkHandler(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 's1' })).kind, 'reject');
         assert.equal(ctrl.handler, sdkHandler, 'referência do handler deve permanecer estável para o SDK');
     });
+
+    it('helper configurável preserva approve_all por default e aceita override por AGENT_PERMISSION_MODE', async () => {
+        const previous = process.env['AGENT_PERMISSION_MODE'];
+        try {
+            delete process.env['AGENT_PERMISSION_MODE'];
+            const defaultHandler = mod.createConfiguredPermissionHandler();
+            assert.equal(
+                (await defaultHandler(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 'default' })).kind,
+                'approve-once',
+            );
+
+            process.env['AGENT_PERMISSION_MODE'] = 'selective';
+            const selectiveHandler = mod.createConfiguredPermissionHandler();
+            assert.equal(
+                (await selectiveHandler(/** @type {any} */ ({ kind: 'shell' }), { sessionId: 'selective' })).kind,
+                'reject',
+            );
+        } finally {
+            if (previous === undefined) delete process.env['AGENT_PERMISSION_MODE'];
+            else process.env['AGENT_PERMISSION_MODE'] = previous;
+        }
+    });
 });

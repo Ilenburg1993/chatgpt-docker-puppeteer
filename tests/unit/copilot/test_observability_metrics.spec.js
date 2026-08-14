@@ -35,29 +35,31 @@ describe('createMetricsStore', () => {
         assert.ok(gauges !== null && typeof gauges === 'object', 'getGauges deve retornar objeto');
     });
 
-    it('recordDialogRecovery separa estratégias 0 PR e com PR', async () => {
+    it('recordDialogRecovery separa reuso e chamadas adicionais de modelo, mantendo aliases legacy', async () => {
         const { createMetricsStore } = await import('../../../src/copilot/observability/metrics.js');
         const store = createMetricsStore();
 
         store.recordDialogRecovery('input_channel_missing', {
-            strategy: 'restart_with_pr',
-            prConsumed: true,
+            strategy: 'restart_with_model_call',
+            additionalModelCall: true,
             success: true,
             durationMs: 12,
         });
         store.recordDialogRecovery('ready_present', {
-            strategy: 'zero_pr_ready',
-            prConsumed: false,
+            strategy: 'reuse_ready',
+            additionalModelCall: false,
             success: true,
             durationMs: 3,
         });
 
         const summary = store.getSummary();
         assert.equal(summary.dialogRecovery.total, 2);
-        assert.equal(summary.dialogRecovery.pr, 1);
-        assert.equal(summary.dialogRecovery.zeroPr, 1);
-        assert.equal(summary.dialogRecovery.byStrategy.restart_with_pr, 1);
-        assert.equal(summary.dialogRecovery.byStrategy.zero_pr_ready, 1);
+        assert.equal(summary.dialogRecovery.withAdditionalModelCall, 1);
+        assert.equal(summary.dialogRecovery.withoutAdditionalModelCall, 1);
+        assert.equal(summary.dialogRecovery.pr, 1); // legacy alias
+        assert.equal(summary.dialogRecovery.zeroPr, 1); // legacy alias
+        assert.equal(summary.dialogRecovery.byStrategy.restart_with_model_call, 1);
+        assert.equal(summary.dialogRecovery.byStrategy.reuse_ready, 1);
     });
 
     it('defaultMetrics é instância singleton exportada', async () => {

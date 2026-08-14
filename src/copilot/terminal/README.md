@@ -16,7 +16,7 @@ O terminal **não** implementa versões paralelas do SDK.
 Ele consome:
 
 - `agent/` para lifecycle e estado do agente;
-- `presentation/agent-runtime.js` como accessor compartilhado do runtime default;
+- `presentation/agent/runtime/` como accessor compartilhado do runtime default;
 - `sdk/` apenas por gateways terminal-owned quando precisar de contratos vanilla de sessão;
 - `frontend/` como camada de projeção/consumo do runtime;
 - `dialog/` como camada de render/prompt/espera/envio.
@@ -44,7 +44,7 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | `state/display-policy.js`                | presets de densidade visual e impacto em prompt/waiting                    |
 | `state/pending-question-answer.js`       | roteamento de respostas humanas para `ask_user` pendente sem deadlock      |
 | `state/pending-question-replay.js`       | dedupe/replay de perguntas pendentes após rewire/restart                   |
-| `presentation/runtime-ui-state-store.js` | estado de UI compartilhado usado pelo terminal e outras bordas             |
+| `presentation/state/ui-store/` | estado de UI compartilhado usado pelo terminal e outras bordas             |
 | `repl/repl-banner.js`                    | banner operacional do REPL e lista compacta de comandos/endpoints          |
 | `repl/repl-command-parser.js`            | parser puro de comandos slash e aliases resolvidos                         |
 | `repl/repl-input-routing.js`             | policy de comandos imediatos e fila durante input concorrente              |
@@ -68,6 +68,17 @@ também declara `risk` e scorecard para orientar a ordem de decomposição.
 | `events/agent-sse-passthrough.js`        | passthrough SSE explícito e estreito para eventos sem adapter dedicado     |
 | `wiring/terminal-agent-wiring.js`        | SSE + wiring de alto nível entre terminal e agent                          |
 | `index.js` / `bootstrap.js`              | boot do terminal                                                           |
+
+## Usage e billing atuais
+
+O terminal trata `assistant.usage`, tokens e `copilotUsage` como telemetria primária. `/usage` e `/usage-budget` devem
+falar em origem (`GitHub Copilot/AI Credits` versus `BYOK/provider`), attribution, tokens e chamadas do lifecycle.
+`/pr-budget` permanece somente como alias HTTP deprecated e eventos/snapshots `pr*` são apresentados como billing
+legacy quando reaparecem de estado/wire antigo. Nenhum `assistant.usage` novo é convertido localmente em Premium
+Request.
+
+No harness live, `--control-only` significa que não é aberto um turno explícito de modelo. `--no-pr` é aceito apenas
+como alias deprecated para automações históricas.
 
 ## Intervenção Imediata
 
@@ -165,13 +176,13 @@ arquitetural canônica agora é:
 
 ```text
 agent/
-	-> presentation/agent-runtime.js
+	-> presentation/agent/runtime/
 		-> terminal/frontend/
 			-> terminal/dialog/ e comandos
 ```
 
 Ou seja: sempre que o acesso ao runtime puder ser compartilhado com outras bordas, ele deve preferir
-passar por `presentation/agent-runtime.js`.
+passar por `presentation/agent/runtime/`.
 
 ## Critério prático: o que permanece no terminal
 
@@ -192,7 +203,7 @@ Deve sair do `terminal/` quando virar:
 
 - `/plan` usa somente `mode.get/set` e `plan.read/update/delete` do SDK;
 - o prompt dinâmico mostra `MODE:<SDK>` quando a sessão está fora de `interactive`;
-- `presentation/runtime-ui-state-store.js` não guarda mais um “plan mode local” paralelo — apenas a
+- `presentation/state/ui-store/` não guarda mais um “plan mode local” paralelo — apenas a
   última projeção observada do SDK;
 - `events/sdk-session-events.js` reflete sinais vanilla da sessão SDK ao operador;
 - comandos, status, state e adapters consomem helpers vanilla da sessão SDK via

@@ -2,9 +2,10 @@
 /**
  * Canonical live runner for `terminal:llm-b`.
  *
- * This is intentionally opt-in and not part of default CI: the default scenario talks to the real SDK and can consume a
- * Premium Request for the explicit user turn. Use `--no-pr` for a boot/resume/control-only probe that validates UX
- * telemetry without sending an LLM turn.
+ * This is intentionally opt-in and not part of default CI: the default scenario talks to the real SDK and can consume
+ * GitHub Copilot AI Credits/token usage or provider quota for the explicit user turn. Use `--control-only` for a
+ * boot/resume/control-plane probe that validates UX telemetry without sending an LLM turn. `--no-pr` remains only as a
+ * deprecated compatibility alias for older automation.
  */
 
 import { parse as parseDotenv } from 'dotenv';
@@ -50,7 +51,8 @@ Canonical Terminal LLM-B live harness. It starts a real terminal session unless 
 
 Common options:
   --dry-run
-  --no-pr
+  --control-only
+  --no-pr                         deprecated alias for --control-only
   --byok-real
   --byok-real-profile=<profile>
   --byok-real-model=<model>
@@ -862,7 +864,7 @@ function buildIncompleteExpectedToolRecoveryPrompt(
     ].join(' ');
 }
 
-function buildNoPrProbeCommands() {
+function buildControlOnlyProbeCommands() {
     return [
         '/usage now',
         '/activity 20',
@@ -1465,10 +1467,10 @@ async function recordByokLiveProtocolHealth({
     plain,
     startedAt,
     durationMs,
-    noPr,
+    controlOnly,
     byokControlProbe,
 }) {
-    if (!realByok || noPr || byokControlProbe)
+    if (!realByok || controlOnly || byokControlProbe)
         return { attempted: false, recorded: false, reason: 'not_full_byok_live_turn' };
     const identity = byokLiveRouteIdentity(realByok);
     if (!identity.providerId || !identity.providerModel) {
@@ -1690,7 +1692,7 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, 
     return commands;
 }
 
-function buildByokRealNoPrDiagnosticCommands() {
+function buildByokRealControlOnlyDiagnosticCommands() {
     return [
         '/usage now',
         '/activity 20',
@@ -3065,7 +3067,7 @@ function defaultUxCycleCriteria(boot) {
         plain.indexOf('Atenção       dados da janela de contexto', Math.max(0, nowStart)),
         plain.indexOf('\n  BYOK', Math.max(0, nowStart)),
         plain.indexOf('BYOK ativo', Math.max(0, nowStart)),
-        plain.indexOf('Pedido premium', Math.max(0, nowStart)),
+        plain.indexOf('Uso Copilot', Math.max(0, nowStart)),
     ]
         .filter((index) => index >= 0)
         .sort((a, b) => a - b)[0] ?? -1;
@@ -3317,7 +3319,7 @@ function defaultUxCycleCriteria(boot) {
                     ? /(?:Janela de contexto|Medição\s+SDK ainda não reportou tokens usados nesta sessão|Atenção\s+dados da janela de contexto)[\s\S]*Rota BYOK[\s\S]*Histórico\s+Copilot|Rota BYOK[\s\S]*Histórico\s+Copilot/iu.test(
                           usageSurface,
                       )
-                    : /(?:Janela de contexto|Medição\s+SDK ainda não reportou tokens usados nesta sessão|Atenção\s+dados da janela de contexto)[\s\S]*(?:Telemetria PR|Pedido premium)|Pedido premium/iu.test(
+                    : /(?:Janela de contexto|Medição\s+SDK ainda não reportou tokens usados nesta sessão|Atenção\s+dados da janela de contexto)[\s\S]*(?:Uso Copilot|Telemetria Copilot legacy|Origem\s+GitHub Copilot\/AI Credits)|Uso Copilot/iu.test(
                           usageSurface,
                       )) &&
                 !/Quota Copilot|side-channel|não é cobrança BYOK|BYOK ativo|BYOK\s+provedor|Histórico Copilot/iu.test(usageSurface),
@@ -4103,7 +4105,7 @@ function liveScenarioKind({
     byokControlProbe,
     byokFixture,
     byokReal,
-    noPr,
+    controlOnly,
     sessionCycle,
     structuredInputCycle,
     menuCycle,
@@ -4125,11 +4127,11 @@ function liveScenarioKind({
     if (operatorUxCycle) return 'operator_ux_cycle';
     if (modelControlProbe) return 'model_probe';
     if (autoControlProbe) return 'auto_probe';
-    if (byokFixture) return 'byok_fixture_no_pr';
-    if (byokControlProbe) return 'byok_control_no_pr';
-    if (byokReal && noPr) return 'byok_real_no_pr';
+    if (byokFixture) return 'byok_fixture_control_only';
+    if (byokControlProbe) return 'byok_control_only';
+    if (byokReal && controlOnly) return 'byok_real_control_only';
     if (byokReal) return 'byok_real_full';
-    if (noPr) return 'control_no_pr';
+    if (controlOnly) return 'control_only';
     if (liveScenario?.id && liveScenario.id !== DEFAULT_LIVE_SCENARIO_ID)
         return `canonical_full_turn_${liveScenario.id}`;
     return 'canonical_full_turn';
@@ -5949,14 +5951,12 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         {
             id: 'llm-usage-visible',
             pass:
-                /Uso BYOK sem Premium Request/.test(plain) ||
-                /Uso BYOK sem pedido premium/.test(plain) ||
-                /Telemetria LLM sem Premium Request/.test(plain) ||
-                /Telemetria LLM sem pedido premium/.test(plain) ||
+                /Uso GitHub Copilot\/AI Credits/.test(plain) ||
+                /Uso BYOK\/provider/.test(plain) ||
                 /Última telemetria LLM/.test(plain) ||
-                /Premium Request classificada/.test(plain) ||
-                /LLM\s+modelo [^\n\r]+(?:\n|\r\n?)\s*Pedido\s+sem pedido premium/iu.test(plain),
-            detail: 'llm.usage telemetry surfaced separately from PR with current or legacy labels',
+                /Origem\s+(?:GitHub Copilot\/AI Credits|BYOK\/provider)/u.test(plain) ||
+                /LLM\s+modelo [^\n\r]+/u.test(plain),
+            detail: 'llm.usage surfaced with attribution, AI-credit/token usage or BYOK/provider semantics',
         },
         {
             id: 'sse-archive-query-visible',
@@ -6424,7 +6424,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     ];
 }
 
-function evaluateNoPrOutput(plain, sseSummary) {
+function evaluateControlOnlyOutput(plain, sseSummary) {
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const archiveJsonDump = extractArchiveJsonDump(plain);
     return [
@@ -6441,15 +6441,14 @@ function evaluateNoPrOutput(plain, sseSummary) {
         {
             id: 'no-explicit-turn',
             pass: !/\[intervene→turn\]/.test(plain) && !/Processando mensagem/.test(plain),
-            detail: 'nenhum turno explícito de LLM foi aberto durante o probe --no-pr',
+            detail: 'nenhum turno explícito de LLM foi aberto durante o probe --control-only',
         },
         {
             id: 'usage-visible',
             pass:
-                /Premium Request:|Última (?:Premium Request|telemetria PR) classificada:|GitHub Copilot quota\/PR side-channel:|Histórico\s+Copilot último snapshot|Cobrança\s+GitHub PR/.test(
-                    plain,
-                ) && /Modo\s+SDK|Modo:\s*sdk=/.test(plain),
-            detail: '/usage now renderizou contexto, PR e telemetria de modo SDK',
+                /Histórico\s+Copilot|Uso Copilot|Telemetria Copilot legacy|Rota BYOK|Copilot histórico/.test(plain) &&
+                /Modo\s+SDK|Modo:\s*sdk=/.test(plain),
+            detail: '/usage now renderizou contexto, attribution/telemetria de uso e modo SDK',
         },
         {
             id: 'activity-visible',
@@ -6951,7 +6950,7 @@ function evaluateByokRealOutput(
         altProfile,
         model,
         altModel,
-        noPr = false,
+        controlOnly = false,
         runtimeSelector,
         runtimeRoute,
         requireVisionProbe = false,
@@ -6971,12 +6970,12 @@ function evaluateByokRealOutput(
         );
     };
     const byokModels = [...new Set([model, altModel].filter((value) => typeof value === 'string' && value.length > 0))];
-    const byokModelPrLines = byokModels.flatMap((candidate) => {
+    const byokModelLegacyRequestLines = byokModels.flatMap((candidate) => {
         const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
         return plain.match(new RegExp(`^\\s*\\[PR\\]\\s+modelo=${escaped}\\b.*$`, 'gmu')) ?? [];
     });
     const byokTurnOpened =
-        !noPr &&
+        !controlOnly &&
         (/\[intervene→turn\]/u.test(plain) ||
             /(?:^|\n)\s*│\s+DELTA-CANONICAL-\d/u.test(plain) ||
             liveScenario.askRenderedRe.test(plain));
@@ -7165,12 +7164,12 @@ function evaluateByokRealOutput(
             detail: `${secretValues.length} local secret value(s) checked against terminal output`,
         },
         {
-            id: 'byok-real-usage-not-pr',
-            pass: byokModelPrLines.length === 0,
+            id: 'byok-real-usage-attribution-safe',
+            pass: byokModelLegacyRequestLines.length === 0,
             detail:
-                byokModelPrLines.length > 0
-                    ? `BYOK model usage was rendered as PR: ${byokModelPrLines.slice(0, 2).join(' | ')}`
-                    : 'BYOK model usage was not rendered as Premium Request',
+                byokModelLegacyRequestLines.length > 0
+                    ? `BYOK model usage leaked a legacy request-based label: ${byokModelLegacyRequestLines.slice(0, 2).join(' | ')}`
+                    : 'BYOK model usage remained attributed to the provider path without request-based billing inference',
         },
         {
             id: 'byok-real-usage-classified',
@@ -7180,7 +7179,7 @@ function evaluateByokRealOutput(
                 : byokAdmissionBlocked
                   ? 'BYOK turn never reached provider usage because admission blocked the request envelope'
                   : byokProviderBlocked
-                    ? 'BYOK provider aborted before usage telemetry; no Premium Request was inferred'
+                    ? 'BYOK provider aborted before usage telemetry; no GitHub billing attribution was inferred'
                     : byokTurnOpened
                       ? `BYOK user-message usage classification observed=${byokUsageClassified ? 'yes' : 'no'}`
                       : 'no BYOK user turn opened in this probe',
@@ -7402,7 +7401,11 @@ async function main() {
     const outDir = path.resolve(ROOT, readArg('--out-dir', `artifacts/terminal-live/${nowStamp()}`));
     const requestedTransport = readArg('--transport', 'pty');
     const dryRun = hasFlag('--dry-run');
-    const noPr = hasFlag('--no-pr');
+    const legacyNoPrAlias = hasFlag('--no-pr');
+    const controlOnly = hasFlag('--control-only') || legacyNoPrAlias;
+    if (legacyNoPrAlias) {
+        console.warn('[terminal-live] --no-pr is deprecated; use --control-only.');
+    }
     const sessionCycle = hasFlag('--session-cycle');
     const structuredInputCycle = hasFlag('--structured-input-cycle');
     const menuCycle = hasFlag('--menu-cycle');
@@ -7428,7 +7431,7 @@ async function main() {
         byokControlProbe,
         byokFixture,
         byokReal,
-        noPr,
+        controlOnly,
         sessionCycle,
         structuredInputCycle,
         menuCycle,
@@ -7664,12 +7667,12 @@ async function main() {
                 : byokReal
                   ? [
                         ...buildByokRealPreflightCommands(realByok ?? {}),
-                        ...(noPr ? buildByokRealNoPrDiagnosticCommands() : [buildScenarioPrompt(liveScenario)]),
+                        ...(controlOnly ? buildByokRealControlOnlyDiagnosticCommands() : [buildScenarioPrompt(liveScenario)]),
                     ]
                         .filter(Boolean)
                         .join('\n')
-                  : noPr
-                    ? buildNoPrProbeCommands().join('\n')
+                  : controlOnly
+                    ? buildControlOnlyProbeCommands().join('\n')
                     : buildScenarioPrompt(liveScenario);
         await writeFile(path.join(outDir, 'prompt.txt'), `${prompt}\n`, 'utf8');
         console.log(
@@ -7680,7 +7683,7 @@ async function main() {
     }
 
     const shouldForceFreshSdkSession =
-        !reuseSdkSession && !noPr && !sessionCycle && !byokControlProbe && !autoControlProbe && !modelControlProbe;
+        !reuseSdkSession && !controlOnly && !sessionCycle && !byokControlProbe && !autoControlProbe && !modelControlProbe;
     const sdkSessionBootSelection = await scheduleFreshSdkSessionForCanonicalScenario({
         enabled: shouldForceFreshSdkSession,
     });
@@ -7729,7 +7732,7 @@ async function main() {
     let quitSent = false;
     let scenarioSent = false;
     let scenarioPlainOffset = 0;
-    let byokNoPrCanQuit = !(byokReal && noPr);
+    let byokControlOnlyCanQuit = !(byokReal && controlOnly);
     let exitCode = null;
     let sseCollector = null;
     let postAskContinuationObserved = false;
@@ -7787,7 +7790,7 @@ async function main() {
     });
     const write = (line) => {
         if (childClosed || child.stdin.destroyed || child.stdin.writableEnded) return false;
-        if (byokReal && noPr && String(line ?? '').trim() === '/quit' && !byokNoPrCanQuit) return false;
+        if (byokReal && controlOnly && String(line ?? '').trim() === '/quit' && !byokControlOnlyCanQuit) return false;
         try {
             return child.stdin.write(ensureLine(line));
         } catch (error) {
@@ -7863,7 +7866,7 @@ async function main() {
         startPromptSynchronizedCommandSequence(diagnostics, () => {
             if (!quitSent) {
                 quitSent = true;
-                byokNoPrCanQuit = true;
+                byokControlOnlyCanQuit = true;
                 write('/quit');
             }
         });
@@ -7937,7 +7940,7 @@ async function main() {
             () => {
                 if (!quitSent) {
                     quitSent = true;
-                    byokNoPrCanQuit = true;
+                    byokControlOnlyCanQuit = true;
                     write('/quit');
                 }
             },
@@ -7965,7 +7968,7 @@ async function main() {
             () => {
                 if (!quitSent) {
                     quitSent = true;
-                    byokNoPrCanQuit = true;
+                    byokControlOnlyCanQuit = true;
                     write('/quit');
                 }
             },
@@ -8097,7 +8100,7 @@ async function main() {
         /Resposta\s+não corresponde às opções da pergunta pendente|Resposta\s+inválida para a pergunta pendente|invalid_choice/iu;
     function handleRunnerTimeout() {
         timedOut = true;
-        byokNoPrCanQuit = true;
+        byokControlOnlyCanQuit = true;
         const scenarioTailPlain = scenarioSent ? stripAnsi(raw).slice(scenarioPlainOffset) : '';
         const endedBeforeAsk =
             scenarioSent &&
@@ -8208,13 +8211,13 @@ async function main() {
                 });
                 return;
             }
-            if (byokControlProbe || noPr || byokReal) {
+            if (byokControlProbe || controlOnly || byokReal) {
                 const commands = byokReal
                     ? [
                           '/usage now',
                           '/activity 12',
                           ...buildByokRealPreflightCommands(realByok ?? {}),
-                          ...(noPr ? buildByokRealNoPrDiagnosticCommands() : []),
+                          ...(controlOnly ? buildByokRealControlOnlyDiagnosticCommands() : []),
                       ]
                     : byokControlProbe
                       ? [
@@ -8222,19 +8225,19 @@ async function main() {
                             '/activity 12',
                             ...buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }),
                         ]
-                      : ['/usage now', '/activity 12', ...buildNoPrProbeCommands()];
+                      : ['/usage now', '/activity 12', ...buildControlOnlyProbeCommands()];
                 startPromptSynchronizedCommandSequence(
                     commands,
                     () => {
-                        if (byokReal && noPr) {
+                        if (byokReal && controlOnly) {
                             if (!quitSent) {
                                 quitSent = true;
-                                byokNoPrCanQuit = true;
+                                byokControlOnlyCanQuit = true;
                                 write('/quit');
                             }
                             return;
                         }
-                        if (byokReal && !noPr) {
+                        if (byokReal && !controlOnly) {
                             if (findByokRealPreflightProbeFailure(stripAnsi(raw))) {
                                 scheduleByokPreflightDiagnostics();
                                 return;
@@ -8392,7 +8395,7 @@ async function main() {
                 /erro de provider BYOK|\[cancellation\]\s+Operation cancelled by user|Turno não enviado ao provider BYOK|terminal\.byok\.admission_blocked|Turno\s+(?:terminou\s+)?sem saída pública|Turno vazio/i.test(
                     scenarioTailPlain,
                 )) &&
-            !(byokReal && noPr) &&
+            !(byokReal && controlOnly) &&
             (!byokReal || scenarioSent)
         ) {
             postCommandsSent = true;
@@ -8411,19 +8414,19 @@ async function main() {
         }
         if (!quitSent && /(?:^|\n)\s*Exportado\s+/u.test(plain)) {
             quitSent = true;
-            byokNoPrCanQuit = true;
+            byokControlOnlyCanQuit = true;
             setTimeout(() => write('/quit'), 500).unref();
         }
         if (
             byokReal &&
-            noPr &&
+            controlOnly &&
             !quitSent &&
             /Métricas da Sessão/.test(plain) &&
             /Eventos SSE/.test(plain) &&
             /Nenhum erro recente/.test(plain)
         ) {
             quitSent = true;
-            byokNoPrCanQuit = true;
+            byokControlOnlyCanQuit = true;
             setTimeout(() => write('/quit'), 500).unref();
         }
     };
@@ -8457,7 +8460,7 @@ async function main() {
         disabled: !collectSse,
     };
     const blocker =
-        noPr || byokControlProbe || autoControlProbe || modelControlProbe
+        controlOnly || byokControlProbe || autoControlProbe || modelControlProbe
             ? null
             : detectLiveBlocker(plain, {
                   timedOut,
@@ -8471,7 +8474,7 @@ async function main() {
               });
     const evaluateScenarioWithBlocker = shouldEvaluateScenarioDespiteBlocker(blocker);
     const exportSummary =
-        noPr || byokControlProbe || autoControlProbe || modelControlProbe || (blocker && !evaluateScenarioWithBlocker)
+        controlOnly || byokControlProbe || autoControlProbe || modelControlProbe || (blocker && !evaluateScenarioWithBlocker)
             ? null
             : await inspectExportedMarkdown(exportPath, liveScenario);
     const baseCriteria = blocker
@@ -8494,15 +8497,15 @@ async function main() {
             ? evaluateModelProbeOutput(plain, sseSummary)
             : byokControlProbe
               ? evaluateByokProbeOutput(plain, sseSummary, { fixture: byokFixture })
-              : noPr
-                ? evaluateNoPrOutput(plain, sseSummary)
+              : controlOnly
+                ? evaluateControlOnlyOutput(plain, sseSummary)
                 : evaluateOutput(plain, sseSummary, exportSummary, liveScenario);
     const criteria = [
         ...baseCriteria,
         ...(byokReal
             ? evaluateByokRealOutput(plain, secretValues, {
                   ...(realByok ?? {}),
-                  noPr,
+                  controlOnly,
                   requireVisionProbe: byokRealRequireVisionProbe,
                   liveScenario,
               })
@@ -8516,7 +8519,7 @@ async function main() {
         plain,
         startedAt,
         durationMs,
-        noPr,
+        controlOnly,
         byokControlProbe,
     });
     const preliminaryLiveScenarioRunRecord = await recordLiveScenarioRunToSqlite({
@@ -8632,7 +8635,7 @@ async function main() {
             blocker,
             outputPath: path.relative(ROOT, rawPath),
             plainOutputPath: path.relative(ROOT, plainPath),
-            exportPath: noPr || byokProbe || autoProbe ? null : path.relative(ROOT, exportPath),
+            exportPath: controlOnly || byokProbe || autoProbe ? null : path.relative(ROOT, exportPath),
             exportSummary,
             sseRawPath: path.relative(ROOT, sseRawPath),
             sseJsonlPath: path.relative(ROOT, sseJsonlPath),

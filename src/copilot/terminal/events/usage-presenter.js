@@ -23,8 +23,10 @@ export function renderTerminalLlmUsageClassification(value) {
     const text = normalizeUsageToken(value);
     if (text === 'ask_user_continuation') return 'continuação da pergunta humana';
     if (text === 'non_user_initiated') return 'iniciado pelo agente';
-    if (text === 'byok_user_message') return 'mensagem BYOK do operador';
-    if (text === 'premium_request') return 'pedido premium';
+    if (text === 'user_turn') return 'turno do operador · GitHub Copilot';
+    if (text === 'byok_user_turn') return 'turno BYOK do operador';
+    if (text === 'byok_user_message') return 'turno BYOK do operador · evento legacy';
+    if (text === 'premium_request') return 'turno do operador · billing legacy por request';
     if (text === 'tool_originated') return 'originado por ferramenta';
     if (text === 'unattributed_llm_usage') return 'uso LLM sem atribuição';
     return '';
@@ -42,9 +44,17 @@ export function renderTerminalLlmUsageReason(value) {
     if (text === 'pending_user_input_request') return 'pergunta pendente';
     if (text === 'parent_tool_call') return 'chamada originada por ferramenta';
     if (text === 'no_user_message') return 'sem mensagem do operador';
+    if (text === 'user_turn') return 'turno iniciado pelo operador';
+    if (text === 'byok_user_turn') return 'turno BYOK iniciado pelo operador';
     if (text.startsWith('initiator:')) return `iniciador ${text.slice('initiator:'.length).replace(/[_-]+/gu, ' ')}`;
+    if (text.startsWith('user_turn:')) {
+        return `turno do operador · ${text.slice('user_turn:'.length).replace(/[_-]+/gu, ' ')}`;
+    }
+    if (text.startsWith('byok_user_turn:')) {
+        return `turno BYOK do operador · ${text.slice('byok_user_turn:'.length).replace(/[_-]+/gu, ' ')}`;
+    }
     if (text.startsWith('byok_user_message:')) {
-        return `mensagem BYOK do operador · ${text.slice('byok_user_message:'.length).replace(/[_-]+/gu, ' ')}`;
+        return `turno BYOK legacy · ${text.slice('byok_user_message:'.length).replace(/[_-]+/gu, ' ')}`;
     }
     return '';
 }

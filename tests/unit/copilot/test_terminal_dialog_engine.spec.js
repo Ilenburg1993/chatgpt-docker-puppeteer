@@ -1066,9 +1066,10 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(src).toContain('timeout: timeoutDecision.timeoutMs');
     });
 
-    it('prefere telemetria LLM nao-PR no footer de usage do turno', () => {
+    it('prefere assistant.usage moderno no footer e usa snapshot request-based apenas como fallback legacy', () => {
         expect(src).toContain('latestRuntimeState.lastLlmUsage');
-        expect(src).toContain("llmUsage['premiumRequest'] === false");
-        expect(src).toContain('quota/PR histórico');
+        expect(src).toContain('const usageInfo = llmUsage ?? prInfo');
+        expect(src).toContain('billing/quota legacy');
+        expect(src).not.toContain("llmUsage['premiumRequest'] === false");
     });
 });

@@ -22,6 +22,7 @@
 import { readCopilotBootConfig } from '#copilot/boot';
 import {
     buildCustomAgentsConfig,
+    COPILOT_MAX_AI_CREDITS,
     DEFAULT_EXCLUDED_TOOLS,
     MAESTRO_AGENT_NAME,
     normalizeAgentToolList,
@@ -345,6 +346,21 @@ function parseExtraExcludedToolsEnv(value) {
 }
 
 /**
+ * Lê o soft cap opcional de AI Credits para sessões Copilot. Ausência mantém a sessão sem cap local; valor inválido é
+ * ignorado com warning para não bloquear chamadas de modelo por erro de configuração.
+ *
+ * @param {string | undefined} value
+ * @returns {number | null}
+ */
+function parseMaxAiCreditsEnv(value) {
+    if (typeof value !== 'string' || value.trim().length === 0) return null;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    log('WARN', `[session-setup] COPILOT_MAX_AI_CREDITS inválido '${value}' — limite local de AI Credits omitido.`);
+    return null;
+}
+
+/**
  * Constrói as opções de sessão SDK incluindo onUserInputRequest wiring.
  *
  * @param {SessionSetupContext} ctx
@@ -358,6 +374,7 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
     const bootConfig = readCopilotBootConfig();
     const byok = resolveConfiguredByokSessionOverrides(process.env, ctx.getModelSnapshot());
     const model = byok.enabled && byok.model ? byok.model : ctx.getModelSnapshot();
+    const maxAiCredits = parseMaxAiCreditsEnv(COPILOT_MAX_AI_CREDITS);
     const extraExcludedTools = parseExtraExcludedToolsEnv(process.env['COPILOT_SDK_EXCLUDED_TOOLS']);
     const excludedTools = buildCanonicalLocalSurfaceExcludedTools(
         tools.map((tool) => tool.name),
@@ -378,6 +395,16 @@ export function buildSessionOptions(ctx, host, { tools, busHooks }) {
         .excludedTools(excludedTools);
 
     builder.hooks(busHooks);
+    if (maxAiCredits !== null) {
+        if (byok.enabled) {
+            log(
+                'INFO',
+                '[session-setup] COPILOT_MAX_AI_CREDITS omitido para sessão BYOK — cobrança/limites pertencem ao provider configurado.',
+            );
+        } else {
+            builder.sessionLimits({ maxAiCredits });
+        }
+    }
     if (byok.enabled && byok.provider) {
         builder.provider(byok.provider);
         if (byok.modelCapabilities) {

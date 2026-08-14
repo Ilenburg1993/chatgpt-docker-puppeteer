@@ -2,15 +2,17 @@
 /** Process supervision helpers for Cloudflare MCP CLI. */
 import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, openSync } from 'node:fs';
-import { mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { moveFileLocked } from '#copilot/infra/public/io';
 import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 
 export const CLOUDFLARED_TOKEN_FILE_MIN_VERSION = '2025.4.0';
 const DEFAULT_STOP_TIMEOUT_MS = 5_000;
 const DEFAULT_KILL_TIMEOUT_MS = 2_000;
 const STOP_POLL_INTERVAL_MS = 100;
+const DEFAULT_DETACHED_LOG_ROTATE_BYTES = 2 * 1024 * 1024;
 
 /**
  * @typedef {{ ok: true; version: string; parsedVersion?: string } | { ok: false; error: string }} CloudflaredVersion
@@ -90,6 +92,35 @@ export async function readPidFileStatus(pidFile) {
 }
 
 /**
+ * Rotaciona apenas antes de um novo processo abrir o log. Isso evita renomear o inode atualmente mantido por um
+ * processo vivo e mantém uma única geração `.1` para diagnóstico pós-restart.
+ *
+ * @param {string} logFile
+ * @param {{ maxBytes?: number }} [options]
+ * @returns {Promise<{ rotated: boolean; previousBytes: number; rotatedPath: string | null }>}
+ */
+export async function rotateDetachedProcessLogIfOversized(logFile, options = {}) {
+    const maxBytes = Number.isFinite(options.maxBytes) && Number(options.maxBytes) > 0
+        ? Math.trunc(Number(options.maxBytes))
+        : DEFAULT_DETACHED_LOG_ROTATE_BYTES;
+    let currentStats;
+    try {
+        currentStats = await stat(logFile);
+    } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+            return { rotated: false, previousBytes: 0, rotatedPath: null };
+        }
+        throw error;
+    }
+    if (!currentStats.isFile() || currentStats.size <= maxBytes) {
+        return { rotated: false, previousBytes: currentStats.size, rotatedPath: null };
+    }
+    const rotatedPath = `${logFile}.1`;
+    await moveFileLocked(logFile, rotatedPath, { overwrite: true });
+    return { rotated: true, previousBytes: currentStats.size, rotatedPath };
+}
+
+/**
  * @param {DetachedProcessOptions} options
  * @returns {Promise<{ name: string; pidFile: string; logFile: string; metadataFile: string; pid: number; alreadyRunning: boolean; restarted: boolean }>}
  */
@@ -100,6 +131,7 @@ export async function ensureDetachedProcess(options) {
     if (existing.alive && existing.pid !== null) return { name: options.name, pidFile: options.pidFile, logFile: options.logFile, metadataFile, pid: existing.pid, alreadyRunning: true, restarted: false };
     await mkdir(path.dirname(options.pidFile), { recursive: true });
     await mkdir(path.dirname(options.logFile), { recursive: true });
+    await rotateDetachedProcessLogIfOversized(options.logFile);
     const out = openSync(options.logFile, 'a');
     let child;
     try {

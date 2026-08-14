@@ -42,7 +42,7 @@ export {
  * - GET /health (skipAuth)
  * - GET /hub-health (skipAuth)
  * - GET /metrics (skipAuth)
- * - GET /context, /quota, /pr-budget
+ * - GET /context, /quota, /usage-budget (`/pr-budget` é alias legacy)
  * - POST /inject (rate: inject)
  * - POST /pipeline (rate: write)
  * - POST /dialog/pause, /dialog/resume

@@ -14,11 +14,11 @@ import { waitForAgentSdkEvent } from '../../facades/agent-sdk-runtime.js';
 /**
  * @typedef {import('../../types.js').DialogLoopHost} AgentHost
  *
- * @typedef {'zero-pr-immediate' | 'zero-pr-preserved' | 'restart-with-pr'} DialogResumeStrategyKind
+ * @typedef {'reuse-immediate' | 'reuse-preserved' | 'restart-with-model-call'} DialogResumeStrategyKind
  *
  * @typedef {{
  *     kind: DialogResumeStrategyKind;
- *     prConsumed: boolean;
+ *     additionalModelCall: boolean;
  *     persistenceLabel: string | null;
  *     persistenceDescription: string | null;
  *     logMessage: string;
@@ -36,7 +36,8 @@ function isEventEmitterTarget(candidate) {
 /**
  * Decide a estratégia de resume do dialog loop.
  *
- * Estratégia A tenta preservar `ask_user` sem PR adicional; Estratégia B reinicia o boot prompt e consome 1 PR.
+ * Estratégia A tenta preservar `ask_user` sem nova chamada de modelo; Estratégia B reinicia o boot prompt e inicia
+ * uma nova chamada de modelo, sem inferir a unidade de billing do provider.
  *
  * @param {{
  *     host: AgentHost | null;
@@ -48,11 +49,11 @@ function isEventEmitterTarget(candidate) {
 export async function selectDialogResumeStrategy({ host, fallbackTarget, timeoutMs = RESUME_QUESTION_WAIT_MS }) {
     if (host?.hasPendingQuestion()) {
         return {
-            kind: 'zero-pr-immediate',
-            prConsumed: false,
-            persistenceLabel: 'dialog.prMetrics.resume_zero_pr',
-            persistenceDescription: 'Persist dialog loop PR metrics after zero-PR resume',
-            logMessage: '[DialogLoopManager] ask_user já disponível — retomada zero-PR imediata.',
+            kind: 'reuse-immediate',
+            additionalModelCall: false,
+            persistenceLabel: 'dialog.usageMetrics.resume_without_model_call',
+            persistenceDescription: 'Persist dialog usage metrics after resume without an additional model call',
+            logMessage: '[DialogLoopManager] ask_user já disponível — retomada imediata sem nova chamada de modelo.',
         };
     }
 
@@ -63,19 +64,19 @@ export async function selectDialogResumeStrategy({ host, fallbackTarget, timeout
 
     if (preserved) {
         return {
-            kind: 'zero-pr-preserved',
-            prConsumed: false,
-            persistenceLabel: 'dialog.prMetrics.resume_preserved',
-            persistenceDescription: 'Persist dialog loop PR metrics after preserved resume',
-            logMessage: '[DialogLoopManager] ask_user preservado — retomada zero-PR.',
+            kind: 'reuse-preserved',
+            additionalModelCall: false,
+            persistenceLabel: 'dialog.usageMetrics.resume_preserved',
+            persistenceDescription: 'Persist dialog usage metrics after preserved resume without a new model call',
+            logMessage: '[DialogLoopManager] ask_user preservado — retomada sem nova chamada de modelo.',
         };
     }
 
     return {
-        kind: 'restart-with-pr',
-        prConsumed: true,
-        persistenceLabel: 'dialog.prMetrics.resume_with_pr',
-        persistenceDescription: 'Persist dialog loop PR metrics after PR-consuming resume',
-        logMessage: '[DialogLoopManager] ask_user não encontrado — reenviando boot prompt (1 PR).',
+        kind: 'restart-with-model-call',
+        additionalModelCall: true,
+        persistenceLabel: 'dialog.usageMetrics.resume_with_model_call',
+        persistenceDescription: 'Persist dialog usage metrics after resume with an additional model call',
+        logMessage: '[DialogLoopManager] ask_user não encontrado — reenviando boot prompt com nova chamada de modelo.',
     };
 }

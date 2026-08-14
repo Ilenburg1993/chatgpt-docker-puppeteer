@@ -24,6 +24,7 @@ const RUN_TARGETS = new Set([
     'copilot:mcp:h2:up',
     'copilot:mcp:h2:restart',
     'copilot:mcp:h2:status',
+    'copilot:mcp:auto:restart',
     'copilot:mcp:cloudflare:smoke',
     'copilot:mcp:cloudflare:oauth-smoke',
 ]);

@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 37;
+const CAPABILITIES_VERSION = 38;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -65,7 +65,18 @@ const WRITE_TOOLS = [
     'repo_remove_file',
 ];
 
-const GIT_TOOLS = ['git_status', 'git_diff', 'git_log', 'git_branch_info'];
+const GIT_TOOLS = [
+    'git_status',
+    'git_diff',
+    'git_log',
+    'git_branch_info',
+    'git_stage_plan',
+    'git_stage',
+    'git_commit_plan',
+    'git_commit',
+    'git_push_plan',
+    'git_push',
+];
 
 const DEV_TOOLS = ['mcp_' + 'dev' + 'container_' + 'network_' + 'posture_' + 'audit'];
 
@@ -120,6 +131,13 @@ const RUNTIME_TOOLS = [
     'mcp_cloudflare_mcp_passthrough_apply',
     'mcp_connector_smoke_refresh',
     'mcp_post_restart_readiness',
+    'mcp_reload_plan',
+    'mcp_reload_status',
+    'mcp_reload_schedule',
+    'llmb_live_readiness',
+    'llmb_live_runs',
+    'llmb_live_test_plan',
+    'llmb_live_test_run',
     'mcp_capabilities_summary',
 ];
 
@@ -145,9 +163,11 @@ const SECURITY_POLICY = {
 };
 
 const ANNOTATION_PROFILE = {
-    readOnlyTools: 'readOnlyHint=true, idempotentHint=true, destructiveHint=false, openWorldHint=false',
-    boundedWriteTools: 'readOnlyHint=false, idempotentHint=false, destructiveHint=false, openWorldHint=false',
-    destructiveTools: 'readOnlyHint=false, idempotentHint=false, destructiveHint=true, openWorldHint=false',
+    readOnlyTools: 'readOnlyHint=true, idempotentHint=true, destructiveHint=false, openWorldHint=false by default',
+    boundedWriteTools: 'readOnlyHint=false, idempotentHint=false, destructiveHint=false, openWorldHint=false by default',
+    destructiveTools: 'readOnlyHint=false, idempotentHint=false, destructiveHint=true, openWorldHint=false by default',
+    openWorldExceptions:
+        'git_push_plan/git_push and llmb_live_test_run are explicitly open-world because they can contact configured upstream/provider services; their inputs remain closed/allowlisted.',
     hostControl:
         'ChatGPT host authorization prompts are controlled by chatgpt.com; this MCP can reduce friction with precise annotations and narrow tools, but cannot disable host safety UI.',
 };
@@ -198,8 +218,11 @@ const IO_GUIDANCE = [
     'Use mcp_cloudflare_edge_policy_apply dryRun=true first; real Cloudflare mutation requires dryRun=false and confirmApply=true.',
     'Use mcp_cloudflare_metrics_snapshot to inspect local cloudflared version, orchestration config version and registration counters.',
     'Use mcp_post_restart_readiness after any restart before starting heavy ChatGPT work.',
+    'Use mcp_reload_plan then mcp_reload_schedule only when a new MCP source version must become live; read mcp_reload_status after reconnect.',
+    'Use git_stage_plan/git_commit_plan/git_push_plan before their mutation counterparts; governed Git never accepts force, arbitrary remote or arbitrary refspec.',
+    'Use llmb_live_readiness and llmb_live_runs for read-only Model Gateway live evidence; llmb_live_test_run defaults control-only and requires explicit confirmation for real model/provider usage.',
     'Use claude_connector_profile when adding the same remote MCP server to claude.ai custom connectors.',
-    'LLM-B can consume MCP optionally, but does not depend on this MCP server.',
+    'LLM-B remains a separate runtime process, but the MCP exposes an allowlisted control/test plane over its canonical live harness.',
 ];
 
 /**

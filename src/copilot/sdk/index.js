@@ -193,7 +193,7 @@ export {
 export { attachBus, defaultBus as defaultHookBus, HookBus } from './session/hook-bus.js';
 export { clearHooksLogger, setHooksLogger } from './session/hook-logger.js';
 export { HookRegistry, SDK_HOOKS } from './session/hook-registry.js';
-export { PermissionController } from './session/permission-controller.js';
+export { createConfiguredPermissionHandler, PermissionController } from './session/permission-controller.js';
 export {
     classifyPermissionDecision,
     normalizePermissionCompletedEvent,

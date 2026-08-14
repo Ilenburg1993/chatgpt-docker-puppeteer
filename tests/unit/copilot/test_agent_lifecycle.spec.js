@@ -188,7 +188,7 @@ describe('agent-lifecycle › source contracts', () => {
 
     it('lifecycle delega I/O de runtime state e snapshot de shutdown para façades', () => {
         assert.ok(src.includes('resetAgentRuntimeGracefulShutdownFlag('));
-        assert.ok(src.includes('persistAgentRuntimePrConsumptionSnapshot('));
+        assert.ok(!src.includes('persistAgentRuntimePrConsumptionSnapshot('));
         assert.ok(src.includes('saveAgentRuntimeShutdownSnapshot('));
         assert.ok(!src.includes('readStateAsync('));
         assert.ok(!src.includes('persistStateWithPolicy('));

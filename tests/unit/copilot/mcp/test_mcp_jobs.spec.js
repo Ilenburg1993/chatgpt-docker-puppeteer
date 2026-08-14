@@ -61,11 +61,11 @@ describe('copilot MCP jobs', () => {
         );
         assert.deepEqual(
             resolveSafeValidationSuite('mcp-full').map((step) => step.name),
-            ['typecheck', 'lint', 'unit-mcp'],
+            ['typecheck', 'lint', 'docs-contract', 'architecture-contract', 'unit-mcp'],
         );
         assert.deepEqual(
             resolveSafeValidationSuite('copilot-fast').map((step) => step.name),
-            ['typecheck', 'lint', 'unit-copilot'],
+            ['typecheck', 'lint', 'docs-contract', 'architecture-contract', 'unit-copilot'],
         );
         assert.throws(
             () => resolveSafeValidationSuite(/** @type {any} */ ('admin-command')),

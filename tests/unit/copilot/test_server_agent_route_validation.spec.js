@@ -31,8 +31,9 @@ vi.mock('../../../src/copilot/presentation/agent/index.js', () => ({
 }));
 
 vi.mock('../../../src/copilot/presentation/system/index.js', () => ({
-    handleGetPrBudget: vi.fn(() => ({ status: 200, body: { ok: true } })),
+    handleGetPrBudget: vi.fn(() => ({ status: 200, body: { ok: true, deprecated: true } })),
     handleGetQuota: vi.fn(() => ({ status: 200, body: { ok: true } })),
+    handleGetUsageBudget: vi.fn(() => ({ status: 200, body: { ok: true } })),
 }));
 
 vi.mock('../../../src/copilot/server/middleware/rate-limiter.js', () => ({

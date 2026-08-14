@@ -556,7 +556,8 @@
  * @property {() => AgentStatusSnapshot} getStatusSnapshot
  * @property {() => Promise<void>} resumeDialogLoop
  * @property {(bootPrompt?: string, opts?: { resumeSessionAttach?: boolean }) => Promise<void>} startDialogLoop
- * @property {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null} dialogPrMetrics
+ * @property {import('./dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null} dialogUsageMetrics
+ * @property {import('./dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null} dialogPrMetrics - Legacy alias
  * @property {() => void} ensureDialogLoopAttached
  * @property {(msg: string, opts?: object) => Promise<string>} sendMessage
  * @property {(msg: string, opts?: object) => Promise<string>} sendMessageDialogBoot

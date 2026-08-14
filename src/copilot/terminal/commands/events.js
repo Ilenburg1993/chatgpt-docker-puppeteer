@@ -547,6 +547,7 @@ function humanPayloadKind(value) {
         return 'configuração do ambiente';
     }
     if (text === 'preflight') return 'checagem';
+    if (text === 'premium interactions' || text === 'premium_interactions') return 'billing legacy por request';
     const usageLabel = renderTerminalLlmUsageClassification(text) || renderTerminalLlmUsageReason(text);
     if (usageLabel) return usageLabel;
     if (text === 'session.created') return 'sessão criada';
@@ -581,7 +582,7 @@ function humanEventMessage(value) {
         .replace(/\bprovider BYOK\b/giu, 'rota BYOK')
         .replace(/\bprovider\/modelo\b/giu, 'rota/modelo')
         .replace(/\bprovider\b/giu, 'provedor')
-        .replace(/\bPremium Request\b/giu, 'pedido premium');
+        .replace(/\bPremium Requests?\b/giu, 'billing legacy por request');
 }
 
 /**

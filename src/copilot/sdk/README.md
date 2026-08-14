@@ -122,9 +122,22 @@ Importações proibidas por design:
   `terminal/frontend/gateways/sdk-session.js` concentra a ponte vanilla da sessão SDK.
 - O preflight do boot foi movido para `sdk/telemetry/preflight.js`; `agent/lifecycle` deixou de ser owner dessa checagem
   de CLI/auth/modelo.
-- A surface RPC local foi alinhada ao `@github/copilot-sdk@0.3.0` para `session.name`, permissões nativas
-  (`setApproveAll`, `resetSessionApprovals`), `mcp.config`, `skills.discover/config`, `sessions.fork`,
-  `mcp.oauth.login`, `history.truncate` e `usage.getMetrics`.
+- Histórico: a surface RPC local foi inicialmente alinhada ao `@github/copilot-sdk@0.3.0` para `session.name`,
+  permissões nativas (`setApproveAll`, `resetSessionApprovals`), `mcp.config`, `skills.discover/config`,
+  `sessions.fork`, `mcp.oauth.login`, `history.truncate` e `usage.getMetrics`.
+- Baseline atual do repositório: `@github/copilot-sdk@1.0.9` instalado via lockfile. Novas mudanças devem validar o
+  contrato 1.0.x real antes de preservar compatibilidade histórica por inércia.
+- Billing/usage corrente: o wrapper trata `assistant.usage`, tokens, `copilotUsage.totalNanoAiu` e os eventos
+  `session.usage_checkpoint`/`session_limits_*` como sinais canônicos. `sessionLimits.maxAiCredits` é suportado por
+  `SessionConfigBuilder.sessionLimits()` e pode ser ativado por `COPILOT_MAX_AI_CREDITS`; ausência mantém a sessão sem
+  cap local. Sessões BYOK não recebem esse cap, pois quota/cobrança pertencem ao provider externo.
+- Campos/eventos request-based como `totalPremiumRequests`, `premium_interactions` e `pr.consumed` são tratados apenas
+  como compatibilidade vendor/persistida **legacy** quando vierem explicitamente do SDK/runtime; `assistant.usage` não
+  é mais convertido localmente em Premium Request por inferência.
+- A política local de permissões tem um único fallback configurável: `AGENT_PERMISSION_MODE`. O default intencional do
+  produto continua `approve_all`; `audit_only` e `selective` podem ser ativados sem editar call sites. Builders,
+  lifecycle, preset AlwaysAlive e rotas SDK usam `createConfiguredPermissionHandler()` quando não recebem override
+  explícito; perfis que querem `approveAll` por contrato próprio podem continuar declarando-o diretamente.
 - `sdk/session` deixou de abrir `copilot.sqlite` ao ser importado: `hook-bus` e `permission-controller` agora usam
   módulos folha (`#copilot/events/hook-events`, `#copilot/config/env`) em vez dos barrels largos.
 - `sdk/config.js` foi removido; configuração de sessão é responsabilidade de `#copilot/config`

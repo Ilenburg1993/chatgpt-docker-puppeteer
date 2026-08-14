@@ -2033,7 +2033,7 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('token bearer configurado');
         expect(ctx.output()).toContain('Quota');
         expect(ctx.output()).toContain('BYOK usa quota/cobrança do provider externo');
-        expect(ctx.output()).toContain('GitHub Copilot/Premium Requests só valem para rotas');
+        expect(ctx.output()).toContain('GitHub Copilot/AI Credits e tokens');
         expect(ctx.output()).toContain('não-BYOK');
         expect(ctx.output()).not.toContain('ativo sim');
         expect(ctx.output()).not.toContain('pronto sim');

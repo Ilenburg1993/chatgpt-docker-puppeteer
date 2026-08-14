@@ -25,6 +25,7 @@ export {
     handleGetHistory,
     handleGetPrBudget,
     handleGetQuota,
+    handleGetUsageBudget,
     handleGetThinkingEntry,
     handleGetThinkingHistory,
     handleGetToolStats,

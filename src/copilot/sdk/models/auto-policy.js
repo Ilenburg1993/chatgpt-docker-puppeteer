@@ -33,19 +33,19 @@
 export const COPILOT_AUTO_MODEL_PUBLIC_CRITERIA = Object.freeze([
     'available_models',
     'real_time_system_health',
+    'task_complexity',
     'model_performance',
     'reduced_rate_limiting',
     'lower_latency_and_errors',
     'admin_model_policies',
     'subscription_or_plan',
-    'premium_multiplier_lte_1',
+    'usage_cost_efficiency',
 ]);
 
 /** @type {readonly string[]} */
 export const COPILOT_AUTO_MODEL_EXCLUDED_CLASSES = Object.freeze([
     'models_excluded_by_admin_policy',
     'models_unavailable_in_plan',
-    'models_with_premium_request_multiplier_gt_1',
 ]);
 
 /** @type {Readonly<AutoModelPreference>} */

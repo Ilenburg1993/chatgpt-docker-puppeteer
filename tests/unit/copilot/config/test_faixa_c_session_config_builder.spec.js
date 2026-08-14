@@ -88,6 +88,7 @@ vi.mock('../../../../src/copilot/config/sdk-config-port.js', async () => {
             XHIGH: 'xhigh',
         },
         approveAll: vi.fn(async () => ({ behavior: 'allow', updatedInput: undefined })),
+        createConfiguredPermissionHandler: vi.fn(() => vi.fn(async () => ({ kind: 'approve-once' }))),
         getCustomToolDefinitions: vi.fn(() => []),
         getToolsConfig: vi.fn(async () => ({ allowlist: null, denylist: [] })),
         patchToolsConfig: vi.fn(async () => ({ success: true })),
@@ -130,9 +131,12 @@ describe('SessionConfigBuilder', () => {
         expect(config.streaming).toBe(true);
     });
 
-    it('build() emite WARN quando onPermissionRequest não fornecido', () => {
+    it('build() registra a política default quando onPermissionRequest não é fornecido', () => {
         new SessionConfigBuilder().build();
-        expect(mocks.log).toHaveBeenCalledWith('WARN', expect.stringContaining('onPermissionRequest não fornecido'));
+        expect(mocks.log).toHaveBeenCalledWith(
+            'INFO',
+            expect.stringContaining("política padrão configurável 'approve_all'"),
+        );
     });
 
     it('model() define o modelo', () => {
@@ -158,6 +162,16 @@ describe('SessionConfigBuilder', () => {
     it('streaming(false) desativa streaming', () => {
         const config = new SessionConfigBuilder().streaming(false).build();
         expect(config.streaming).toBe(false);
+    });
+
+    it('sessionLimits() configura soft cap explícito de AI Credits', () => {
+        const config = new SessionConfigBuilder().sessionLimits({ maxAiCredits: 250 }).build();
+        expect(config.sessionLimits).toEqual({ maxAiCredits: 250 });
+    });
+
+    it('sessionLimits() rejeita caps não positivos ou não finitos', () => {
+        expect(() => new SessionConfigBuilder().sessionLimits({ maxAiCredits: 0 })).toThrow(/maxAiCredits/u);
+        expect(() => new SessionConfigBuilder().sessionLimits({ maxAiCredits: Number.NaN })).toThrow(/maxAiCredits/u);
     });
 
     it('tools() define ferramentas', () => {

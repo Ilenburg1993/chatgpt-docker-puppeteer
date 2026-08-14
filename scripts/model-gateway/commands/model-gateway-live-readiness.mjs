@@ -42,7 +42,9 @@ const TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS = Object.freeze([
 ]);
 const TERMINAL_LIVE_REQUIRE_AGENT_PROBE_PROFILES = Object.freeze([]);
 const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
-const SQLITE_RUNTIME_HEALTH_READ_LIMIT = 1_500;
+// Readiness needs a recent representative sample, not an exhaustive runtime-health replay. Keep this bounded so the
+// MCP adapter can request SQLite-backed health without turning a readiness probe into a long-running analytics job.
+const SQLITE_RUNTIME_HEALTH_READ_LIMIT = 500;
 const DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 25;
 const DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 100_000;
 const args = process.argv.slice(2);
@@ -458,9 +460,9 @@ const commands = [
     'npm run model-gateway:runtime-selector -- --fail',
     'npm run model-gateway:runtime-health:diff -- --write-snapshot',
     'npm run model-gateway:runtime-health:mirror',
-    'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000',
-    'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
-    `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`,
+    'npm run model-gateway:live:llm-b -- --control-only --timeout-ms=180000',
+    'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --control-only --timeout-ms=240000',
+    `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --control-only --timeout-ms=240000`,
     `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000`,
 ];
 const summary = {

@@ -12,9 +12,21 @@ describe('io-cache-tiering', () => {
         expect(Array.isArray(plan.recommendations)).toBe(true);
     });
 
-    it('recommends L2 for very large workspaces', () => {
-        const plan = buildIoCacheTierPlan({ workspaceFiles: 5000 });
-        expect(plan.recommendations.some((entry) => entry.includes('L2'))).toBe(true);
+    it('requires representative evidence before recommending L2 enablement', () => {
+        const plan = buildIoCacheTierPlan({ workspaceFiles: 5000, readHotsetRatio: 0.05 });
+        expect(plan.l2Decision).toBe('benchmark-required');
+        expect(plan.evidence.representativeBenchmarkPassed).toBe(false);
+        expect(plan.recommendations.some((entry) => entry.includes('evidence-gated'))).toBe(true);
+    });
+
+    it('supports L2 promotion only after a representative benchmark passes', () => {
+        const plan = buildIoCacheTierPlan({
+            workspaceFiles: 5000,
+            readHotsetRatio: 0.05,
+            representativeBenchmarkPassed: true,
+        });
+        expect(plan.l2Decision).toBe('enable-supported-by-benchmark');
+        expect(plan.recommendations.some((entry) => entry.includes('experimental profile'))).toBe(true);
     });
 
     it('aggregates hit/miss across tiers', () => {

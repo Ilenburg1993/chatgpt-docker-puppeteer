@@ -69,7 +69,9 @@ Replay de DPoP e `private_key_jwt` também sobrevive a restart no `copilot.sqlit
 chave de replay é persistido, separado por namespace e com expiração/limite por namespace.
 Use `COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true` apenas quando quiser forçar rotação da chave.
 Use `npm run copilot:mcp:cloudflare:remote-audit` para comparar a config remota Cloudflare contra o estado
-canonico local sem imprimir tokens. O serviço de origem remoto deve permanecer `http://127.0.0.1:3333`.
+canônico local sem imprimir tokens. O perfil remoto canônico do tunnel usa `https://127.0.0.1:3333`,
+`http2Origin=true` e `originServerName=mcp.aurelin.org`. O endpoint `http://127.0.0.1:3333` acima continua sendo
+uma superfície local/manual de compatibilidade e não deve ser confundido com o origin atual do Cloudflare Tunnel.
 Use `npm run copilot:mcp:cloudflare:edge-audit` para auditar, quando o token permitir, rulesets da zona
 que possam interferir em MCP/OAuth: cache, WAF, rate limit e transform rules. Se o token atual ainda nao
 tiver `Zone:Read`/`Zone Rulesets:Read`, o comando retorna estado parcial com permissoes faltantes em vez de
@@ -110,9 +112,11 @@ Veja também:
 - `src/copilot/docs/CLAUDE_MCP_CONNECTOR_RUNBOOK.md`
 - `src/copilot/docs/INVESTIGACAO-CLAUDE-MCP-OAUTH-CLOUDFLARE-STDIO-2026-06-11.md`
 
-## Primeira superfície
+## Superfície operacional
 
-Esta primeira faixa expõe leitura, escrita controlada, Git read-only, manutenção e diagnóstico:
+O registry atual expõe leitura, escrita controlada, Git governado, reload do próprio MCP, control plane LLM-B,
+manutenção e diagnóstico. `mcp_capabilities_summary` é a autoridade para a lista completa; os itens abaixo destacam as
+superfícies centrais, não um inventário exaustivo.
 
 - `repo_status`
 - `repo_tree`
@@ -136,6 +140,13 @@ Esta primeira faixa expõe leitura, escrita controlada, Git read-only, manutenç
 - `git_diff`
 - `git_log`
 - `git_branch_info`
+- `git_stage_plan` / `git_stage`
+- `git_commit_plan` / `git_commit`
+- `git_push_plan` / `git_push`
+- `mcp_reload_plan` / `mcp_reload_status` / `mcp_reload_schedule`
+- `llmb_live_readiness`
+- `llmb_live_runs`
+- `llmb_live_test_plan` / `llmb_live_test_run`
 - `project_doctor`
 - `run_copilot_validator`
 - `run_typecheck_copilot`
@@ -199,8 +210,31 @@ node src/copilot/mcp/cli.js --transport stdio
 ```
 
 By default `COPILOT_MCP_SERVERS` remains empty, so LLM-B boots normally when the MCP server is
-offline. The MCP server can also inspect active SDK sessions through read-only metadata tools; these
-tools do not start LLM-B and do not expose live session objects.
+offline. `copilot_sessions_list` continua descrevendo apenas sessões SDK registradas **no processo MCP atual**; o
+terminal externo é outro processo. Para evidência operacional desse runtime separado, use o control plane allowlisted:
+
+- `llmb_live_readiness`: executa somente o readiness canônico, sem provider/model turn;
+- `llmb_live_runs`: lê o histórico live persistido no SQLite;
+- `llmb_live_test_plan`: mostra script, cenário, transporte e se pode haver AI Credits/quota externa;
+- `llmb_live_test_run`: usa exclusivamente `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
+  o default é `control-only`; turn/provider real exige `confirmModelUsage=true`.
+
+O contrato canônico do harness é `--control-only`. `--no-pr` existe apenas como alias deprecated para automações
+anteriores ao billing usage-based de 2026.
+
+### Git governado
+
+Git mutation não é um shell Git. `git_stage` aceita apenas paths relativos explícitos e rejeita `.`, globs, pathspec
+magic e valores option-like. `git_commit` opera somente sobre o index já staged, com precondition de HEAD e identidade
+Git configurada. `git_push` não aceita remote/refspec/force: resolve exclusivamente o upstream existente da branch,
+executa `push --dry-run` antes do push real e exige `expectedHead`, `expectedUpstream` e `confirmPush=true`.
+
+### Reload do próprio MCP
+
+`mcp_reload_schedule` agenda um helper detached allowlisted e devolve a resposta JSON-RPC **antes** do restart. O helper
+aceita somente os perfis `quic`, `h2` ou `auto`, reutiliza o restart stateful/Cloudflare canônico e persiste o estado em
+`src/copilot/.ai/mcp/mcp-reload-state.json`. Não existe argumento de shell, comando, path ou env arbitrário. Após a
+reconexão, consulte `mcp_reload_status` e `mcp_post_restart_readiness`.
 
 As ferramentas usam a política de path existente e permanecem sob a raiz do workspace. As tools de
 escrita controlada retornam diff unificado, suportam `dryRun` quando aplicável e gravam metadados de

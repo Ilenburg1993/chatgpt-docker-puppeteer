@@ -215,7 +215,8 @@ tests/tmp/
 dist/
 build/
 out/
-public/
+# Root build output only. Keep canonical source directories such as src/copilot/infra/public discoverable.
+/public/
 
 *.tgz
 

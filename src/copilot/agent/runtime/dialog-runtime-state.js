@@ -9,14 +9,23 @@ import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/
 /**
  * Lê o bootstrap persistido do dialog loop para inicialização síncrona do runtime.
  *
- * @returns {{ dialogPaused: boolean; prMetrics: Record<string, unknown> | null }}
+ * @returns {{ dialogPaused: boolean; usageMetrics: Record<string, unknown> | null; prMetrics: Record<string, unknown> | null }}
  */
 export function readAgentRuntimeDialogBootstrapState() {
     const persistedState = readState();
+    const rawUsageMetrics = persistedState?.usageMetrics;
     const rawPrMetrics = persistedState?.prMetrics;
+    const usageMetrics =
+        rawUsageMetrics && typeof rawUsageMetrics === 'object'
+            ? rawUsageMetrics
+            : rawPrMetrics && typeof rawPrMetrics === 'object'
+              ? rawPrMetrics
+              : null;
     return {
         dialogPaused: Boolean(persistedState?.dialogPaused),
-        prMetrics: rawPrMetrics && typeof rawPrMetrics === 'object' ? rawPrMetrics : null,
+        usageMetrics,
+        // Alias somente para callers antigos; novos consumers devem preferir usageMetrics.
+        prMetrics: usageMetrics,
     };
 }
 
@@ -59,6 +68,8 @@ export async function persistAgentRuntimePendingTurnState(input) {
         {
             pendingTurnMessage: input.message,
             pendingTurnTs: input.ts,
+            pendingTurnAdditionalModelCallObserved: false,
+            // Compatibilidade de leitura com snapshots antigos; não representa billing atual.
             pendingTurnConsumedPR: false,
         },
         { label: 'dialog.turn.pending' },

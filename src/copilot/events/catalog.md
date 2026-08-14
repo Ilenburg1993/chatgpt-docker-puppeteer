@@ -98,8 +98,9 @@ infra-local=26
 
 - **`AGENT_EVENTS`**: Array de todas as strings de evento (legado SDK, para loop dinâmico de
   listeners)
-- **`PR_CONSUMING_EVENTS`**: Set de eventos que consomem Premium Requests
-- **`DIALOG_LOOP_EVENTS`**: Set de eventos do dialog loop (todos free)
+- **`MODEL_USAGE_LIFECYCLE_EVENTS`**: Set moderno de eventos de lifecycle que podem corresponder a uma chamada/tarefa de modelo
+- **`PR_CONSUMING_EVENTS`**: alias/set legado preservado para compatibilidade com consumers request-based antigos; não deve ser usado para inferir billing atual
+- **`DIALOG_LOOP_EVENTS`**: Set de eventos do dialog loop
 - **`HIGH_FREQUENCY_EVENTS`**: Set de eventos de alta frequência (hot-path)
 
 ---

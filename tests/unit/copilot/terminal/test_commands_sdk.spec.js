@@ -293,7 +293,7 @@ describe('terminal/commands/sdk', () => {
         expect(ctx.output()).not.toContain('2026-05-01');
     });
 
-    it('/sdk quota traduz Premium Requests como quota SDK, não como cobrança BYOK atual', async () => {
+    it('/sdk quota isola billing request-based legacy do SDK sem confundir com cobrança BYOK atual', async () => {
         runtimeMocks.getTerminalSdkQuota.mockResolvedValueOnce({
             quotaSnapshots: {
                 premium_interactions: { remainingPercentage: 0, resetDate: '2026-05-01' },
@@ -303,7 +303,7 @@ describe('terminal/commands/sdk', () => {
 
         await cmdSdk({ println: ctx.println }, 'quota');
 
-        expect(ctx.output()).toContain('Pedidos premium SDK');
+        expect(ctx.output()).toContain('Billing legacy por request (SDK)');
         expect(ctx.output()).toContain('limite do SDK');
         expect(ctx.output()).not.toContain('entitlement do SDK');
         expect(ctx.output()).not.toContain('Premium Requests');

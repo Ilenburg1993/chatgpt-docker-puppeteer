@@ -132,8 +132,8 @@ export function cmdUsage({ println }, arg) {
             } else {
                 println(
                     terminalThemeRow(
-                        'Telemetria PR',
-                        `${modelLabel} · custo ${cost} · histórica; não implica consumo neste boot/sonda`,
+                        'Telemetria Copilot legacy',
+                        `${modelLabel} · custo ${cost} · snapshot histórico; não define billing atual deste turno`,
                     ),
                 );
             }
@@ -147,7 +147,7 @@ export function cmdUsage({ println }, arg) {
             );
             println(terminalThemeRow('Histórico', 'Copilot sem snapshot histórico classificado'));
         } else {
-            println(terminalThemeRow('Pedido premium', 'sem snapshot histórico classificado'));
+            println(terminalThemeRow('Uso Copilot', 'sem snapshot histórico classificado'));
         }
         if (projection.llmUsage) {
             const llmCost =
@@ -157,29 +157,31 @@ export function cmdUsage({ println }, arg) {
                     ? projection.llmUsage['classification']
                     : 'unknown';
             const llmReason =
-                typeof projection.llmUsage['premiumRequestReason'] === 'string'
-                    ? projection.llmUsage['premiumRequestReason']
-                    : 'n/d';
-            const premiumRequest =
-                projection.llmUsage['premiumRequest'] === true
-                    ? 'com pedido premium nesta telemetria'
-                    : 'sem pedido premium';
+                typeof projection.llmUsage['attributionReason'] === 'string'
+                    ? projection.llmUsage['attributionReason']
+                    : typeof projection.llmUsage['premiumRequestReason'] === 'string'
+                      ? projection.llmUsage['premiumRequestReason']
+                      : 'n/d';
+            const billingSource =
+                projection.llmUsage['billingSource'] === 'byok' || projection.llmUsage['byokProvider'] === true
+                    ? 'BYOK/provider'
+                    : 'GitHub Copilot/AI Credits';
             const llmUsageKind = renderTerminalLlmUsageKind(llmClass, llmReason);
             if (detail) {
                 println(
                     terminalThemeRow(
                         'LLM',
-                        `modelo ${projection.llmUsageBilling.displayModel} · ${premiumRequest} · tipo ${llmUsageKind} · classe ${llmClass} · motivo ${llmReason} · custo ${llmCost}`,
+                        `modelo ${projection.llmUsageBilling.displayModel} · origem ${billingSource} · tipo ${llmUsageKind} · classe ${llmClass} · motivo ${llmReason} · custo bruto ${llmCost}`,
                     ),
                 );
             } else {
                 println(
                     terminalThemeRow(
                         'LLM',
-                        `modelo ${projection.llmUsageBilling.displayModel} · custo ${llmCost}`,
+                        `modelo ${projection.llmUsageBilling.displayModel} · custo bruto ${llmCost}`,
                     ),
                 );
-                println(terminalThemeRow('Pedido', premiumRequest));
+                println(terminalThemeRow('Origem', billingSource));
                 println(terminalThemeRow('Tipo', llmUsageKind));
                 println(terminalThemeRow('Mais detalhes', '/usage now detail para classe técnica', { role: 'command' }));
             }

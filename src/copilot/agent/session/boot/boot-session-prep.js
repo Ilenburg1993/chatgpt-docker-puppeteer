@@ -28,7 +28,6 @@ import { wireSessionEvents } from '../wiring/index.js';
  * @property {() => import('../../types.js').AgentStatusSnapshot} getStatusSnapshot
  * @property {(path: string) => void} onCheckpointPath
  * @property {(state: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState
- * @property {(info: { model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number }) => void} onPrInfo
  * @property {() => boolean} isProcessing
  * @property {() => boolean} dialogLoopActive
  * @property {() => string | null} getSessionId
@@ -103,7 +102,6 @@ export function stepWireSessionEvents(session, isResumed, ctx, state) {
         getStatusSnapshot: ctx.getStatusSnapshot,
         onCheckpointPath: ctx.onCheckpointPath,
         onContextState: ctx.onContextState,
-        onPrInfo: ctx.onPrInfo,
         isProcessing: ctx.isProcessing,
         dialogLoopActive: ctx.dialogLoopActive,
     });

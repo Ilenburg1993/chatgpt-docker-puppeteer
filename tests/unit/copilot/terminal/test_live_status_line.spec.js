@@ -656,7 +656,7 @@ describe('terminal/live-status-line', () => {
             ...mocks.activity,
             phase: 'error',
             label: 'Erro de provider BYOK',
-            detail: 'Erro do SDK sem mensagem estruturada. · erro de provider BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provider/modelo via /byok use ou /byok model; sem Premium Request · provider openai · perfil kilo · modelo kilo-auto/free',
+            detail: 'Erro do SDK sem mensagem estruturada. · erro de provider BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque provider/modelo via /byok use ou /byok model; sem uso do GitHub Copilot/AI Credits · provider openai · perfil kilo · modelo kilo-auto/free',
             source: 'agent',
             severity: 'warn',
             toolName: null,
@@ -690,7 +690,7 @@ describe('terminal/live-status-line', () => {
             phase: 'error',
             label: 'Falha da rota BYOK no turno',
             detail:
-                'rota BYOK ficou sem resposta dentro da janela esperada · sem Premium Request · perfil kilo · provedor kilo-code · modelo kilo-auto/free',
+                'rota BYOK ficou sem resposta dentro da janela esperada · sem uso do GitHub Copilot/AI Credits · perfil kilo · provedor kilo-code · modelo kilo-auto/free',
             source: 'dialog',
             severity: 'error',
             toolName: null,

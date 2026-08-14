@@ -64,15 +64,15 @@ export async function buildCloudflareTransportBenchmarkPlan(input = {}) {
             requiredGates: [
                 'mcp_connector_smoke_refresh ok=true after each protocol switch',
                 'mcp_tunnel_status shows permanent tunnel healthy and lastSmokeFresh=true',
-                'mcp_cloudflare_metrics_snapshot returns requestErrorRate=0',
+                'before/after cloudflared request-error counter delta for the measurement window is 0, or every increment is explained by a classified benign client/stream cancellation',
                 'haConnections remains 4',
                 `rpcClientLatency.p95Ms does not regress more than ${DEFAULT_MAX_P95_REGRESSION_PERCENT}% versus control`,
-                'recentOriginErrors remains empty',
+                'no actionable origin errors are observed after the fresh connector smoke',
             ],
             stopConditions: [
                 'OAuth failure',
                 'tool list mismatch',
-                'requestErrorRate > 0',
+                'unexplained request-error counter increments during the measurement window',
                 'haConnections < 4 after warmup',
                 'repeated connector network errors',
                 'proxy/rpc p95 materially worse than the selected control protocol',
@@ -92,12 +92,12 @@ export async function buildCloudflareTransportBenchmarkPlan(input = {}) {
             promoteAutoWhen: [
                 'strict QUIC is not required but UDP succeeds often enough to improve latency',
                 'smoke and OAuth remain stable',
-                'requestErrorRate remains 0',
+                'measurement-window request-error deltas remain zero or fully classified as benign cancellations',
                 'haConnections remains 4',
             ],
             keepQuicWhen: [
                 'strict QUIC canary passes after warmup',
-                'requestErrorRate remains 0',
+                'measurement-window request-error deltas remain zero or fully classified as benign cancellations',
                 'haConnections remains 4',
                 'Cloudflare QUIC metrics remain present after restart',
             ],
@@ -149,7 +149,7 @@ function roleForProtocol(candidate, currentProtocol) {
 function nextActionsForProtocol(currentProtocol) {
     if (currentProtocol === 'quic') {
         return [
-            'Keep QUIC as the current control only while smoke, OAuth, haConnections and requestErrorRate gates remain healthy.',
+            'Keep QUIC as the current control while smoke, OAuth, HA connections, actionable-origin diagnostics and measurement-window error deltas remain healthy.',
             'Use npm run copilot:mcp:quic:rollback if UDP or Cloudflare connector stability regresses.',
             'Record metrics before and after any protocol switch in the roadmap.',
         ];

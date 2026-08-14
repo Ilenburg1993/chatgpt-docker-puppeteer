@@ -507,8 +507,8 @@ describe('commands/metrics + usage', () => {
             effectiveModel: 'kilo-auto/free',
             cost: 0,
             classification: 'ask_user_continuation',
-            premiumRequest: false,
-            premiumRequestReason: 'user_input_completed_continuation',
+            attributionReason: 'user_input_completed_continuation',
+            billingSource: 'github_copilot',
             ts: Date.now(),
         };
         try {
@@ -516,13 +516,13 @@ describe('commands/metrics + usage', () => {
 
             cmdUsage({ println: ctx.println }, 'now');
 
-            expect(ctx.output()).toMatch(/LLM\s+modelo \S+ · custo 0\.0000/u);
+            expect(ctx.output()).toMatch(/LLM\s+modelo \S+ · custo bruto 0\.0000/u);
             expect(ctx.output()).not.toContain('Telemetria LLM');
+            expect(ctx.output()).toContain('Origem');
+            expect(ctx.output()).toContain('GitHub Copilot/AI Credits');
             expect(ctx.output()).toContain('Tipo');
             expect(ctx.output()).not.toContain('tipo=');
-            expect(ctx.output()).toContain('Pedido');
-            expect(ctx.output()).toContain('sem pedido premium');
-            expect(ctx.output()).not.toContain('Request');
+            expect(ctx.output()).not.toContain('Pedido');
             expect(ctx.output()).not.toContain('Premium Request');
             expect(ctx.output()).toContain('continuação da pergunta humana');
             expect(ctx.output()).not.toContain('ask_user_continuation');

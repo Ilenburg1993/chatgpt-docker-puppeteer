@@ -22,7 +22,9 @@ describe('sdk/models/auto-policy', () => {
         expect(policy.preferenceSatisfied).toBe(false);
         expect(policy.criteria).toEqual(COPILOT_AUTO_MODEL_PUBLIC_CRITERIA);
         expect(policy.criteria).toContain('real_time_system_health');
-        expect(policy.criteria).toContain('premium_multiplier_lte_1');
+        expect(policy.criteria).toContain('task_complexity');
+        expect(policy.criteria).toContain('usage_cost_efficiency');
+        expect(policy.criteria).not.toContain('premium_multiplier_lte_1');
     });
 
     it('permite preferência advisory por env sem alterar autoridade do SDK', () => {

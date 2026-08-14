@@ -88,6 +88,8 @@ export const COPILOT_ALLOWED_EXECUTABLES = envOpt('COPILOT_ALLOWED_EXECUTABLES')
 export const COPILOT_AUDIT_LOG_PATH = envOpt('COPILOT_AUDIT_LOG_PATH');
 export const COPILOT_FALLBACK_MODEL = envOpt('COPILOT_FALLBACK_MODEL') ?? null;
 export const COPILOT_HIGH_RISK_TOOLS = envOpt('COPILOT_HIGH_RISK_TOOLS');
+/** Soft cap opcional de AI Credits da sessão; parsing/validação semântica acontece no session setup. */
+export const COPILOT_MAX_AI_CREDITS = envOpt('COPILOT_MAX_AI_CREDITS');
 export const COPILOT_MODEL = envOpt('COPILOT_MODEL');
 export const COPILOT_NPM_SCRIPT_ALLOWLIST = envOpt('COPILOT_NPM_SCRIPT_ALLOWLIST');
 export const COPILOT_REASONING_EFFORT = envOpt('COPILOT_REASONING_EFFORT');

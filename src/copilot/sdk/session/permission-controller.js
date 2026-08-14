@@ -44,6 +44,17 @@ function readInitialPermissionMode() {
  * }} PermissionPolicySnapshot
  */
 
+/**
+ * Cria o handler de permissão configurado pelo ambiente. O default permanece deliberadamente `approve_all`; definir
+ * `AGENT_PERMISSION_MODE=audit_only|selective` altera a política sem exigir mudanças nos call sites de sessão.
+ *
+ * @param {{ onModeChanged?: (mode: PermissionMode) => void }} [opts]
+ * @returns {import('../types.js').PermissionHandler}
+ */
+export function createConfiguredPermissionHandler(opts = {}) {
+    return new PermissionController(opts).handler;
+}
+
 export class PermissionController {
     /** @type {import('../types.js').PermissionHandler} */
     #policyHandler = approveAll;

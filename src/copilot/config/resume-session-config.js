@@ -37,6 +37,8 @@ import { SessionConfigBuilder, sanitizeResumeSessionConfig } from './session-con
  *
  * @typedef {import('./sdk-config-port.js').InfiniteSessionConfig} InfiniteSessionConfig
  *
+ * @typedef {import('./sdk-config-port.js').SessionLimitsConfig} SessionLimitsConfig
+ *
  * @typedef {import('./sdk-config-port.js').SessionEventHandler} SessionEventHandler
  *
  * @typedef {import('./sdk-config-port.js').CreateSessionFsProvider} CreateSessionFsProvider
@@ -213,6 +215,12 @@ export class ResumeSessionConfigBuilder {
     /** @param {InfiniteSessionConfig} config @returns {this} */
     infiniteSessions(config) {
         this.#base.infiniteSessions(config);
+        return this;
+    }
+
+    /** @param {SessionLimitsConfig} limits @returns {this} */
+    sessionLimits(limits) {
+        this.#base.sessionLimits(limits);
         return this;
     }
 

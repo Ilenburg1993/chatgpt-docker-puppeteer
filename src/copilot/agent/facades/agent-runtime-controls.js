@@ -56,10 +56,8 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *     resumeDialogLoop?: (() => Promise<void>) | undefined;
  *     dialogLoopActive?: boolean | undefined;
  *     dialogPaused?: boolean | undefined;
- *     dialogPrMetrics?:
- *         | { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number }
- *         | null
- *         | undefined;
+ *     dialogUsageMetrics?: import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null | undefined;
+ *     dialogPrMetrics?: import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null | undefined;
      *     lastPrInfo?:
  *         | {
  *               model?: string;
@@ -102,7 +100,8 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *     sendCount: number;
  *     dialogLoopActive: boolean;
  *     sessionId: string | null;
- *     prMetrics: { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number };
+ *     usageMetrics: import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot;
+ *     prMetrics: import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot;
  *     lastPrInfo: {
  *         model?: string;
  *         configuredModel?: string;
@@ -197,17 +196,38 @@ export function readRuntimeControlState(runtime) {
  * @param {AgentRuntimeControlsTarget} runtime
  * @returns {AgentRuntimePrBudgetSnapshot}
  */
-export function readRuntimePrBudgetSnapshot(runtime) {
+export function readRuntimeUsageBudgetSnapshot(runtime) {
     const snap = readAgentRuntimeStatusSnapshot(/** @type {import('../types.js').IAlwaysAliveAgent} */ (runtime));
     const controlState = readRuntimeControlState(runtime);
+    const usageMetrics =
+        runtime.dialogUsageMetrics ??
+        runtime.dialogPrMetrics ?? {
+            boots: 0,
+            resumesWithAdditionalModelCall: 0,
+            resumesWithoutAdditionalModelCall: 0,
+            totalModelCalls: 0,
+            resumesWithPR: 0,
+            resumesZeroPR: 0,
+            totalPR: 0,
+        };
     return {
         sendCount: Number(snap['sendCount'] ?? 0),
         dialogLoopActive: controlState.dialogLoopActive,
         sessionId: controlState.sessionId,
-        prMetrics: runtime.dialogPrMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
+        usageMetrics,
+        prMetrics: usageMetrics,
         lastPrInfo: runtime.lastPrInfo ?? null,
         lastLlmUsage: runtime.lastLlmUsage ?? null,
     };
+}
+
+/**
+ * @deprecated Use readRuntimeUsageBudgetSnapshot().
+ * @param {AgentRuntimeControlsTarget} runtime
+ * @returns {AgentRuntimePrBudgetSnapshot}
+ */
+export function readRuntimePrBudgetSnapshot(runtime) {
+    return readRuntimeUsageBudgetSnapshot(runtime);
 }
 
 /**

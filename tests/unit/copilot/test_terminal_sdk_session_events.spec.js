@@ -47,6 +47,14 @@ const mocks = vi.hoisted(() => ({
     readSdkSessionHandoffRecords: vi.fn(() => Promise.resolve([])),
     writeSdkSessionConfirmationRecords: vi.fn(() => Promise.resolve({ sdkSessionConfirmations: 1 })),
     consumeTerminalLiveByokModelSwitchConfirmation: vi.fn(() => null),
+    promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary: vi.fn(async () => ({
+        sessionId: 'sdk-session-test',
+        scanned: 0,
+        promoted: 0,
+        skipped: 0,
+        errors: 0,
+        records: [],
+    })),
     runtimePermissionMode: 'approve_all',
 }));
 
@@ -161,6 +169,8 @@ vi.mock('../../../src/copilot/terminal/events/assistant-transcript-renderer.js',
 
 vi.mock('../../../src/copilot/terminal/byok/live/index.js', () => ({
     consumeTerminalLiveByokModelSwitchConfirmation: mocks.consumeTerminalLiveByokModelSwitchConfirmation,
+    promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary:
+        mocks.promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary,
 }));
 
 function createAgentHost() {
@@ -168,6 +178,7 @@ function createAgentHost() {
     const listeners = new Map();
 
     return {
+        sessionId: 'sdk-session-test',
         on(/** @type {string} */ event, /** @type {(...args: any[]) => void} */ handler) {
             const arr = listeners.get(event) ?? [];
             arr.push(handler);
@@ -253,7 +264,7 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
             'system',
             'Aviso da sessão · rate limit',
             expect.objectContaining({
-                detail: 'provedor warning without pedido premium evidence',
+                detail: 'provedor warning without billing legacy por request evidence',
                 source: 'sdk',
                 severity: 'warn',
             }),
@@ -553,7 +564,12 @@ describe('terminal/events/sdk-session-events.js — contrato', () => {
         agent.emit('assistant.turn_start', { turnId: 'turn-1' });
         agent.emit('session.workspace_file_changed', { operation: 'update', path: 'files/plan.md' });
         agent.emit('assistant.turn_end', { turnId: 'turn-1' });
+        await new Promise((resolve) => setImmediate(resolve));
 
+        expect(mocks.promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary).toHaveBeenCalledWith({
+            sessionId: 'sdk-session-test',
+            source: 'terminal.sdk.assistant_turn_end.route_promotion',
+        });
         expect(mocks.broadcastSse).toHaveBeenCalledWith(
             'assistant.turn_start',
             expect.objectContaining({

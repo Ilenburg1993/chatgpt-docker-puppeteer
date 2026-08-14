@@ -7,6 +7,16 @@
 **Runtime observado:** Node.js `v24.15.0` em Linux.  
 **Arquivo gerado por auditoria:** `src/copilot/docs/AUDITORIA-AMPLA-SRC-COPILOT-ROADMAP-2026-06-13.md`.
 
+> **Status em 2026-08-14: HISTÓRICO / SUPERADO PARCIALMENTE.** Este arquivo preserva a fotografia de 2026-06-13 e
+> não deve ser usado isoladamente como source of truth do `HEAD`. A coordenação vigente está em
+> `WORKSPACE_SRC_COPILOT_DIAGNOSTICO_ESTADO_ALVO_E_ROADMAP_2026-08-14.md` e `docs/INDEX.md`. Em particular: (1) o
+> runtime MCP atual é stateful; (2) `env-secret-registry.js` é protegido pela policy do WORKSPACE e não pode ser
+> classificado como ausente a partir de uma leitura negada; (3) o detector de imports agora resolve
+> `package.json#imports` e separa `protected/unverifiable` de true orphan; (4) `approve_all` permanece por decisão de
+> produto o default intencional de permissões, mas o fallback foi unificado e pode ser alterado por
+> `AGENT_PERMISSION_MODE=audit_only|selective`; (5) o baseline do Copilot SDK avançou para 1.0.9. As afirmações abaixo
+> continuam válidas como evidência do estado observado na data original, não como diagnóstico automático atual.
+
 ---
 
 ## 1. Sumário executivo

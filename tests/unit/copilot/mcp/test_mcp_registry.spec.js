@@ -29,13 +29,23 @@ describe('copilot MCP registry', () => {
             'delegate_to_repo_autonomy_runner',
             'fetch',
             'git_branch_info',
+            'git_commit',
+            'git_commit_plan',
             'git_diff',
             'git_log',
+            'git_push',
+            'git_push_plan',
+            'git_stage',
+            'git_stage_plan',
             'git_status',
             'job_cancel',
             'job_get_output',
             'job_get_summary',
             'job_list',
+            'llmb_live_readiness',
+            'llmb_live_runs',
+            'llmb_live_test_plan',
+            'llmb_live_test_run',
             'mcp_apps_sdk_readiness',
             'mcp_auth_profile',
             'mcp_autonomy_power_score',
@@ -70,6 +80,9 @@ describe('copilot MCP registry', () => {
             'mcp_oauth_friction_audit',
             'mcp_oauth_issuer_diagnostics',
             'mcp_post_restart_readiness',
+            'mcp_reload_plan',
+            'mcp_reload_schedule',
+            'mcp_reload_status',
             'mcp_run_safe_validation_suite',
             'mcp_runtime_health',
             'mcp_session_profile',
@@ -189,9 +202,10 @@ describe('copilot MCP registry', () => {
     it('uses explicit annotations on every initial tool', () => {
         const tools = getCanonicalMcpTools();
 
+        const expectedOpenWorld = new Set(['git_push_plan', 'git_push', 'llmb_live_test_run']);
         for (const tool of tools) {
             assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', tool.name);
-            assert.equal(tool.annotations.openWorldHint, false, tool.name);
+            assert.equal(tool.annotations.openWorldHint, expectedOpenWorld.has(tool.name), tool.name);
             assert.equal(typeof tool.annotations.destructiveHint, 'boolean', tool.name);
             assert.equal(typeof tool.annotations.idempotentHint, 'boolean', tool.name);
             assert.equal(tool.annotations.idempotentHint, tool.annotations.readOnlyHint === true, tool.name);

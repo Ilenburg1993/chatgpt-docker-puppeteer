@@ -128,7 +128,7 @@ describe('Block B — lifecycle ownership contracts', () => {
         assert.doesNotMatch(src, /createAgentSdkQuotaMonitor\(/);
         assert.match(lifecycle, /restoreAgentRuntimePersistentBootState\(/);
         assert.match(lifecycle, /resetAgentRuntimeGracefulShutdownFlag\(/);
-        assert.match(lifecycle, /persistAgentRuntimePrConsumptionSnapshot\(/);
+        assert.doesNotMatch(lifecycle, /persistAgentRuntimePrConsumptionSnapshot\(/);
         assert.match(lifecycle, /saveAgentRuntimeShutdownSnapshot\(/);
         assert.match(lifecycle, /persistAgentRuntimeGracefulShutdownState\(/);
         assert.doesNotMatch(lifecycle, /\breadStateAsync\(/);

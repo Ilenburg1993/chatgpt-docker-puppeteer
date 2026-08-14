@@ -217,12 +217,20 @@ export class DialogLoopManager extends EventEmitter {
     }
 
     /**
-     * F41B.8: Retorna métricas de PR consumidos pelo dialog loop (boots e resumes).
+     * Métricas canônicas de chamadas de modelo iniciadas pelo lifecycle do dialog loop.
      *
-     * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number }}
+     * @returns {import('../state/cost-ledger.js').DialogCostLedgerSnapshot}
+     */
+    get usageMetrics() {
+        return this.#costLedger.snapshot();
+    }
+
+    /**
+     * @deprecated Alias de compatibilidade para snapshots/consumers anteriores ao billing usage-based.
+     * @returns {import('../state/cost-ledger.js').DialogCostLedgerSnapshot}
      */
     get prMetrics() {
-        return this.#costLedger.snapshot();
+        return this.usageMetrics;
     }
 
     /**
@@ -250,7 +258,7 @@ export class DialogLoopManager extends EventEmitter {
     }
 
     /**
-     * Inicia o dialog loop. Boot com 1 PR — resolve quando o modelo emite READY.
+     * Inicia o dialog loop. O boot inicia uma chamada de modelo e resolve quando o modelo emite READY.
      *
      * @param {string} [bootPrompt] - Prompt de inicialização (default: DialogProtocol.buildBootPrompt())
      * @returns {Promise<void>}
@@ -304,7 +312,7 @@ export class DialogLoopManager extends EventEmitter {
                 ...(bootPrompt !== undefined && { bootPrompt }),
                 emit: (event, payload) => this.emit(event, payload),
                 trackPersistedState: (data, meta) => this.#trackPersistedState(data, meta),
-                persistPrMetrics: (label, description) => this.#persistPrMetrics(label, description),
+                persistUsageMetrics: (label, description) => this.#persistUsageMetrics(label, description),
                 endLoopSpan: (success) => this.#endLoopSpan(success),
             });
         } catch (err) {
@@ -319,8 +327,9 @@ export class DialogLoopManager extends EventEmitter {
     /**
      * Reanexa o terminal a uma sessão SDK retomada sem enviar boot prompt para dentro da conversa antiga.
      *
-     * Este caminho preserva continuidade: nenhum PR é gasto no startup, nenhum modelo recebe instrução fantasma, e o
-     * primeiro turno real pode ser despachado diretamente para a mesma sessão se o SDK não restaurar um READY vivo.
+     * Este caminho preserva continuidade: nenhuma chamada de modelo é adicionada no startup, nenhum modelo recebe
+     * instrução fantasma, e o primeiro turno real pode ser despachado diretamente para a mesma sessão se o SDK não
+     * restaurar um READY vivo.
      *
      * @returns {Promise<void>}
      */
@@ -338,20 +347,23 @@ export class DialogLoopManager extends EventEmitter {
         this.#directTurnDispatchEnabled = true;
         this.#state.activate();
         this.#watchdogSupervisor.start();
-        this.#costLedger.recordZeroPrResume();
+        this.#costLedger.recordResumeWithoutAdditionalModelCall();
         this.emit(EMITTER_LOOP_CHANGED, { active: true, ts: Date.now(), reason: 'resumed_session_attach' });
         void this.#trackPersistedState(
             { dialogLoopActive: true, dialogPaused: false },
             {
                 label: 'dialog.state.resumed_session_attach',
-                description: 'Persist dialogLoopActive=true after zero-PR resumed session attach',
+                description: 'Persist dialogLoopActive=true after resumed session attach without an additional model call',
             },
         );
-        void this.#persistPrMetrics(
-            'dialog.prMetrics.resume_session_attach',
-            'Persist dialog loop PR metrics after zero-PR resumed session attach',
+        void this.#persistUsageMetrics(
+            'dialog.usageMetrics.resume_session_attach',
+            'Persist dialog usage metrics after resumed session attach without an additional model call',
         );
-        log('INFO', '[DialogLoopManager] Sessão retomada reanexada em modo zero-PR; boot prompt automático omitido.');
+        log(
+            'INFO',
+            '[DialogLoopManager] Sessão retomada reanexada sem chamada adicional de modelo; boot prompt automático omitido.',
+        );
     }
 
     /**
@@ -544,7 +556,8 @@ export class DialogLoopManager extends EventEmitter {
     }
 
     /**
-     * Retoma o dialog loop após pause. Estratégia A (0 PR) ou B (1 PR).
+     * Retoma o dialog loop após pause. Estratégia A reutiliza a sessão sem nova chamada de modelo; Estratégia B
+     * reinicia o boot prompt e inicia uma chamada adicional.
      *
      * @returns {Promise<void>}
      */
@@ -568,17 +581,17 @@ export class DialogLoopManager extends EventEmitter {
             const strategy = await selectDialogResumeStrategy({ host: this.#host, fallbackTarget: this });
             log('INFO', strategy.logMessage);
 
-            if (strategy.kind !== 'restart-with-pr') {
+            if (strategy.kind !== 'restart-with-model-call') {
                 this.#watchdogSupervisor.start();
-                this.#costLedger.recordZeroPrResume();
+                this.#costLedger.recordResumeWithoutAdditionalModelCall();
                 if (strategy.persistenceLabel && strategy.persistenceDescription) {
-                    void this.#persistPrMetrics(strategy.persistenceLabel, strategy.persistenceDescription);
+                    void this.#persistUsageMetrics(strategy.persistenceLabel, strategy.persistenceDescription);
                 }
-                this.emit(EMITTER_LOOP_RESUMED, { prConsumed: strategy.prConsumed });
+                this.emit(EMITTER_LOOP_RESUMED, { additionalModelCall: strategy.additionalModelCall });
                 return;
             }
 
-            // Estratégia B: reenviar boot prompt (1 PR)
+            // Estratégia B: reenviar boot prompt, iniciando uma chamada adicional de modelo.
             // G1-BUG-07 (fix): parar watchdog atual antes de start() para evitar dois watchdogs simultâneos.
             this.#watchdogSupervisor.clear();
             this.#state.prepareResumeRestart();
@@ -590,13 +603,11 @@ export class DialogLoopManager extends EventEmitter {
                 logSwallowed(deactivated.error, 'agent.loopManager.writeState');
             }
             await this.start();
-            // F41B.8: contabilizar resume com PR
-            this.#costLedger.recordPrResume();
-            // F42.4: persistir prMetrics após resume com PR
+            this.#costLedger.recordResumeWithAdditionalModelCall();
             if (strategy.persistenceLabel && strategy.persistenceDescription) {
-                void this.#persistPrMetrics(strategy.persistenceLabel, strategy.persistenceDescription);
+                void this.#persistUsageMetrics(strategy.persistenceLabel, strategy.persistenceDescription);
             }
-            this.emit(EMITTER_LOOP_RESUMED, { prConsumed: strategy.prConsumed });
+            this.emit(EMITTER_LOOP_RESUMED, { additionalModelCall: strategy.additionalModelCall });
         } finally {
             this.#state.finishResume();
         }
@@ -791,14 +802,16 @@ export class DialogLoopManager extends EventEmitter {
     }
 
     /**
-     * Persiste o ledger de PR do dialog loop.
+     * Persiste o ledger moderno de chamadas de modelo. `prMetrics` é escrito em paralelo apenas como compatibilidade
+     * temporária para leitores/snapshots anteriores a 2026-06.
      *
      * @param {string} label
      * @param {string} description
      * @returns {Promise<void>}
      */
-    #persistPrMetrics(label, description) {
-        return this.#trackPersistedState({ prMetrics: this.#costLedger.snapshot() }, { label, description });
+    #persistUsageMetrics(label, description) {
+        const usageMetrics = this.#costLedger.snapshot();
+        return this.#trackPersistedState({ usageMetrics, prMetrics: usageMetrics }, { label, description });
     }
 
     /**

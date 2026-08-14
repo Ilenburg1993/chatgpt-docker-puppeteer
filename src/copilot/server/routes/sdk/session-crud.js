@@ -358,7 +358,7 @@ router.post(
 
             const session = await routeDeps.sdkSession.createClientSession(
                 /** @type {import('#copilot/sdk/types').SessionConfig} */ ({
-                    onPermissionRequest: routeDeps.sdkSession.approveAll,
+                    onPermissionRequest: routeDeps.sdkSession.createConfiguredPermissionHandler(),
                     ...sessionOptions,
                 }),
             );
@@ -652,7 +652,7 @@ router.post('/sessions/:id/resume', validateBody(ResumeSessionBodySchema), (req,
         const session = await routeDeps.sdkSession.resumeClientSession(
             id,
             /** @type {import('#copilot/sdk/types').ResumeSessionConfig} */ ({
-                onPermissionRequest: routeDeps.sdkSession.approveAll,
+                onPermissionRequest: routeDeps.sdkSession.createConfiguredPermissionHandler(),
                 ...resumeOptions,
             }),
         );

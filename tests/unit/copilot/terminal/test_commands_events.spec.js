@@ -2216,7 +2216,7 @@ describe('terminal/commands/events', () => {
         expect(previews[1]).toContain('standalone');
         expect(previews[1]).toContain('modelo auto');
         expect(previews[1]).not.toContain('{"timestamp"');
-        expect(previews[2]).toContain('premium interactions');
+        expect(previews[2]).toContain('billing legacy por request');
         expect(previews[2]).toContain('sem quota');
         expect(previews[2]).not.toContain('{"quotaId"');
         expect(previews[3]).toContain('estado concluído');

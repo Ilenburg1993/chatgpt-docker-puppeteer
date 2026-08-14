@@ -65,7 +65,7 @@ export function createDialogLoopRuntimeKit(options, handlers) {
 
     const persistedBootstrap = readAgentRuntimeDialogBootstrapState();
     const state = new DialogLoopStateMachine({ paused: persistedBootstrap.dialogPaused });
-    const saved = persistedBootstrap.prMetrics;
+    const saved = persistedBootstrap.usageMetrics ?? persistedBootstrap.prMetrics;
     const costLedger = new DialogCostLedger(saved && typeof saved === 'object' ? saved : null);
 
     return {

@@ -2,10 +2,9 @@
 /**
  * Classificação semântica de `assistant.usage`.
  *
- * O SDK emite `assistant.usage` para telemetria de chamada LLM (tokens, custo, modelo e quota). Isso não equivale,
- * por si só, a Premium Request consumido: continuações internas de `ask_user`, tool calls e sampling também podem
- * produzir usage. Este módulo mantém essa distinção explícita para impedir que a UX confunda "uso de LLM" com
- * "novo PR".
+ * O SDK emite `assistant.usage` para telemetria de chamada LLM (tokens, custo, modelo, quota e `copilotUsage`). No
+ * billing usage-based atual, a classificação local descreve **origem/attribution** do uso — não tenta inferir Premium
+ * Requests. Campos request-based eventualmente recebidos do runtime ficam restritos à compatibilidade legacy.
  *
  * @module copilot/event-handlers/usage-classifier
  */
@@ -13,8 +12,8 @@
 import { resolveModelSelectionMismatch } from '#copilot/core';
 
 export const LLM_USAGE_CLASSIFICATIONS = Object.freeze({
-    PREMIUM_REQUEST: 'premium_request',
-    BYOK_USER_MESSAGE: 'byok_user_message',
+    USER_TURN: 'user_turn',
+    BYOK_USER_TURN: 'byok_user_turn',
     ASK_USER_CONTINUATION: 'ask_user_continuation',
     TOOL_ORIGINATED: 'tool_originated',
     NON_USER_INITIATED: 'non_user_initiated',
@@ -123,11 +122,12 @@ export function normalizeAssistantUsageEvent(evt, session) {
         ...(billedModel ? { model: billedModel } : {}),
         ...(configuredModel ? { configuredModel } : {}),
         ...(effectiveModel ? { effectiveModel } : {}),
-        ...(modelMismatch ? { modelMismatch } : {}),
+        modelMismatch,
         ...(asNumber(data['cost']) !== undefined ? { cost: asNumber(data['cost']) } : {}),
         ...(asRecord(data['quotaSnapshots']) ? { quotaSnapshots: asRecord(data['quotaSnapshots']) } : {}),
         ...(asNumber(data['inputTokens']) !== undefined ? { inputTokens: asNumber(data['inputTokens']) } : {}),
         ...(asNumber(data['outputTokens']) !== undefined ? { outputTokens: asNumber(data['outputTokens']) } : {}),
+        ...(asNumber(data['reasoningTokens']) !== undefined ? { reasoningTokens: asNumber(data['reasoningTokens']) } : {}),
         ...(asNumber(data['cacheReadTokens']) !== undefined ? { cacheReadTokens: asNumber(data['cacheReadTokens']) } : {}),
         ...(asNumber(data['cacheWriteTokens']) !== undefined
             ? { cacheWriteTokens: asNumber(data['cacheWriteTokens']) }
@@ -136,6 +136,7 @@ export function normalizeAssistantUsageEvent(evt, session) {
         ...(asString(data['reasoningEffort']) ? { reasoningEffort: asString(data['reasoningEffort']) } : {}),
         ...(asString(data['initiator']) ? { initiator: asString(data['initiator']) } : {}),
         ...(asString(data['apiCallId']) ? { apiCallId: asString(data['apiCallId']) } : {}),
+        ...(asString(data['serviceRequestId']) ? { serviceRequestId: asString(data['serviceRequestId']) } : {}),
         ...(asString(data['providerCallId']) ? { providerCallId: asString(data['providerCallId']) } : {}),
         ...(asString(data['parentToolCallId']) ? { parentToolCallId: asString(data['parentToolCallId']) } : {}),
         ...(asRecord(data['copilotUsage']) ? { copilotUsage: asRecord(data['copilotUsage']) } : {}),
@@ -153,8 +154,8 @@ export function normalizeAssistantUsageEvent(evt, session) {
  *     recordUserInputCompleted: (evt?: unknown) => void;
  *     classify: (usage: Record<string, unknown>) => {
  *         classification: string;
- *         premiumRequest: boolean;
- *         premiumRequestReason: string;
+ *         attributionReason: string;
+ *         billingSource: 'github_copilot' | 'byok';
  *         pendingUserMessages: number;
  *         pendingAskUserContinuations: number;
  *         pendingUserInputRequests: number;
@@ -170,6 +171,22 @@ export function createAssistantUsageClassifier() {
     /** @type {Set<string>} */
     const userInputRequestsMatchedByUsage = new Set();
 
+    /**
+     * @param {string} classification
+     * @param {string} attributionReason
+     * @param {Record<string, unknown>} usage
+     * @param {{ askUserRequestId?: string }} [extra]
+     */
+    const result = (classification, attributionReason, usage, extra = {}) => ({
+        classification,
+        attributionReason,
+        billingSource: /** @type {'github_copilot' | 'byok'} */ (usage['byokProvider'] === true ? 'byok' : 'github_copilot'),
+        pendingUserMessages,
+        pendingAskUserContinuations,
+        pendingUserInputRequests: pendingUserInputRequests.size,
+        ...extra,
+    });
+
     return {
         recordUserMessage() {
             pendingUserMessages += 1;
@@ -183,9 +200,7 @@ export function createAssistantUsageClassifier() {
             const data = asRecord(/** @type {{ data?: unknown } | null | undefined} */ (evt)?.data) ?? {};
             const requestId = asString(data['requestId']) ?? asString(data['id']);
             if (requestId) pendingUserInputRequests.delete(requestId);
-            if (requestId && userInputRequestsMatchedByUsage.delete(requestId)) {
-                return;
-            }
+            if (requestId && userInputRequestsMatchedByUsage.delete(requestId)) return;
             pendingAskUserContinuations += 1;
         },
         classify(usage) {
@@ -193,89 +208,52 @@ export function createAssistantUsageClassifier() {
             const parentToolCallId = asString(usage['parentToolCallId']);
             if (pendingAskUserContinuations > 0) {
                 pendingAskUserContinuations -= 1;
-                return {
-                    classification: LLM_USAGE_CLASSIFICATIONS.ASK_USER_CONTINUATION,
-                    premiumRequest: false,
-                    premiumRequestReason: 'user_input_completed_continuation',
-                    pendingUserMessages,
-                    pendingAskUserContinuations,
-                    pendingUserInputRequests: pendingUserInputRequests.size,
-                };
+                return result(
+                    LLM_USAGE_CLASSIFICATIONS.ASK_USER_CONTINUATION,
+                    'user_input_completed_continuation',
+                    usage,
+                );
             }
             if (pendingUserMessages > 0 && (!initiator || initiator === 'user')) {
                 pendingUserMessages -= 1;
                 if (usage['byokProvider'] === true) {
-                    return {
-                        classification: LLM_USAGE_CLASSIFICATIONS.BYOK_USER_MESSAGE,
-                        premiumRequest: false,
-                        premiumRequestReason:
-                            initiator === 'user' ? 'byok_user_message:initiator:user' : 'byok_user_message',
-                        pendingUserMessages,
-                        pendingAskUserContinuations,
-                        pendingUserInputRequests: pendingUserInputRequests.size,
-                    };
+                    return result(
+                        LLM_USAGE_CLASSIFICATIONS.BYOK_USER_TURN,
+                        initiator === 'user' ? 'byok_user_turn:initiator:user' : 'byok_user_turn',
+                        usage,
+                    );
                 }
-                return {
-                    classification: LLM_USAGE_CLASSIFICATIONS.PREMIUM_REQUEST,
-                    premiumRequest: true,
-                    premiumRequestReason: initiator === 'user' ? 'user_message:initiator:user' : 'user_message',
-                    pendingUserMessages,
-                    pendingAskUserContinuations,
-                    pendingUserInputRequests: pendingUserInputRequests.size,
-                };
+                return result(
+                    LLM_USAGE_CLASSIFICATIONS.USER_TURN,
+                    initiator === 'user' ? 'user_turn:initiator:user' : 'user_turn',
+                    usage,
+                );
             }
             if (pendingUserInputRequests.size > 0) {
                 const requestId = pendingUserInputRequests.values().next().value;
                 if (!requestId) {
-                    return {
-                        classification: LLM_USAGE_CLASSIFICATIONS.UNATTRIBUTED,
-                        premiumRequest: false,
-                        premiumRequestReason: 'pending_user_input_request_without_id',
-                        pendingUserMessages,
-                        pendingAskUserContinuations,
-                        pendingUserInputRequests: pendingUserInputRequests.size,
-                    };
+                    return result(
+                        LLM_USAGE_CLASSIFICATIONS.UNATTRIBUTED,
+                        'pending_user_input_request_without_id',
+                        usage,
+                    );
                 }
                 pendingUserInputRequests.delete(requestId);
                 userInputRequestsMatchedByUsage.add(requestId);
-                return {
-                    classification: LLM_USAGE_CLASSIFICATIONS.ASK_USER_CONTINUATION,
-                    premiumRequest: false,
-                    premiumRequestReason: 'pending_user_input_request_continuation',
-                    pendingUserMessages,
-                    pendingAskUserContinuations,
-                    pendingUserInputRequests: pendingUserInputRequests.size,
-                    askUserRequestId: requestId,
-                };
+                return result(
+                    LLM_USAGE_CLASSIFICATIONS.ASK_USER_CONTINUATION,
+                    'pending_user_input_request_continuation',
+                    usage,
+                    { askUserRequestId: requestId },
+                );
             }
             if (parentToolCallId) {
-                return {
-                    classification: LLM_USAGE_CLASSIFICATIONS.TOOL_ORIGINATED,
-                    premiumRequest: false,
-                    premiumRequestReason: 'parent_tool_call',
-                    pendingUserMessages,
-                    pendingAskUserContinuations,
-                    pendingUserInputRequests: pendingUserInputRequests.size,
-                };
+                return result(LLM_USAGE_CLASSIFICATIONS.TOOL_ORIGINATED, 'parent_tool_call', usage);
             }
             if (initiator) {
-                return {
-                    classification: LLM_USAGE_CLASSIFICATIONS.NON_USER_INITIATED,
-                    premiumRequest: false,
-                    premiumRequestReason: `initiator:${initiator}`,
-                    pendingUserMessages,
-                    pendingAskUserContinuations,
-                    pendingUserInputRequests: pendingUserInputRequests.size,
-                };
+                return result(LLM_USAGE_CLASSIFICATIONS.NON_USER_INITIATED, `initiator:${initiator}`, usage);
             }
-            return {
-                classification: LLM_USAGE_CLASSIFICATIONS.UNATTRIBUTED,
-                premiumRequest: false,
-                premiumRequestReason: pendingUserInputRequests.size > 0 ? 'pending_user_input_request' : 'no_user_message',
-                pendingUserMessages,
-                pendingAskUserContinuations,
-                pendingUserInputRequests: pendingUserInputRequests.size,
-            };
+            return result(LLM_USAGE_CLASSIFICATIONS.UNATTRIBUTED, 'no_user_message', usage);
         },
     };
 }

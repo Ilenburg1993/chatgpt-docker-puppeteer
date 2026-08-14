@@ -1,17 +1,27 @@
 // @ts-check
 /**
  * @module copilot/agent/dialog/cost-ledger
- * @file Ledger pequeno de consumo de premium requests do dialog loop.
+ * @file Ledger de chamadas adicionais de modelo do dialog loop.
  *
- *   O DialogLoopManager continua decidindo quando boot/resume acontecem; este ledger só mantém contadores e snapshots
- *   para persistência/observabilidade.
+ * O ledger não estima billing. Ele registra apenas se boot/resume exigiram uma nova chamada de modelo. As chaves PR
+ * antigas continuam aceitas/emitidas como aliases de compatibilidade para snapshots persistidos antes do billing
+ * usage-based de 2026.
  */
 
 /**
- * @typedef {{ boots?: number; resumesWithPR?: number; resumesZeroPR?: number }} DialogCostLedgerInput
+ * @typedef {{
+ *     boots?: number;
+ *     resumesWithAdditionalModelCall?: number;
+ *     resumesWithoutAdditionalModelCall?: number;
+ *     resumesWithPR?: number;
+ *     resumesZeroPR?: number;
+ * }} DialogCostLedgerInput
  *
  * @typedef {{
  *     boots: number;
+ *     resumesWithAdditionalModelCall: number;
+ *     resumesWithoutAdditionalModelCall: number;
+ *     totalModelCalls: number;
  *     resumesWithPR: number;
  *     resumesZeroPR: number;
  *     totalPR: number;
@@ -28,10 +38,10 @@ function countFrom(value) {
 }
 
 /**
- * Ledger de PRs consumidos por boot/resume do dialog loop.
+ * Ledger de novas chamadas de modelo produzidas pelo lifecycle do dialog loop.
  */
 export class DialogCostLedger {
-    /** @type {{ boots: number; resumesWithPR: number; resumesZeroPR: number }} */
+    /** @type {{ boots: number; resumesWithAdditionalModelCall: number; resumesWithoutAdditionalModelCall: number }} */
     #counts;
 
     /**
@@ -40,13 +50,18 @@ export class DialogCostLedger {
     constructor(initial = null) {
         this.#counts = {
             boots: countFrom(initial?.boots),
-            resumesWithPR: countFrom(initial?.resumesWithPR),
-            resumesZeroPR: countFrom(initial?.resumesZeroPR),
+            resumesWithAdditionalModelCall: countFrom(
+                initial?.resumesWithAdditionalModelCall ?? initial?.resumesWithPR,
+            ),
+            resumesWithoutAdditionalModelCall: countFrom(
+                initial?.resumesWithoutAdditionalModelCall ?? initial?.resumesZeroPR,
+            ),
         };
     }
 
     /**
-     * Registra um boot completo do dialog loop. Boot sempre consome 1 PR.
+     * Registra um boot completo do dialog loop. O boot inicia uma nova chamada de modelo, sem afirmar a unidade de
+     * billing usada pelo provider.
      *
      * @returns {DialogCostLedgerSnapshot}
      */
@@ -55,33 +70,45 @@ export class DialogCostLedger {
         return this.snapshot();
     }
 
-    /**
-     * Registra resume preservado, sem PR adicional.
-     *
-     * @returns {DialogCostLedgerSnapshot}
-     */
+    /** @returns {DialogCostLedgerSnapshot} */
+    recordResumeWithoutAdditionalModelCall() {
+        this.#counts.resumesWithoutAdditionalModelCall++;
+        return this.snapshot();
+    }
+
+    /** @returns {DialogCostLedgerSnapshot} */
+    recordResumeWithAdditionalModelCall() {
+        this.#counts.resumesWithAdditionalModelCall++;
+        return this.snapshot();
+    }
+
+    /** @deprecated Use recordResumeWithoutAdditionalModelCall(). @returns {DialogCostLedgerSnapshot} */
     recordZeroPrResume() {
-        this.#counts.resumesZeroPR++;
-        return this.snapshot();
+        return this.recordResumeWithoutAdditionalModelCall();
     }
 
-    /**
-     * Registra resume com novo boot prompt, consumindo 1 PR.
-     *
-     * @returns {DialogCostLedgerSnapshot}
-     */
+    /** @deprecated Use recordResumeWithAdditionalModelCall(). @returns {DialogCostLedgerSnapshot} */
     recordPrResume() {
-        this.#counts.resumesWithPR++;
-        return this.snapshot();
+        return this.recordResumeWithAdditionalModelCall();
     }
 
     /**
-     * Snapshot estável usado por status, sessão e persistência.
+     * Snapshot moderno com aliases PR somente para leitura de consumers antigos durante a migração.
      *
      * @returns {DialogCostLedgerSnapshot}
      */
     snapshot() {
-        const { boots, resumesWithPR, resumesZeroPR } = this.#counts;
-        return { boots, resumesWithPR, resumesZeroPR, totalPR: boots + resumesWithPR };
+        const { boots, resumesWithAdditionalModelCall, resumesWithoutAdditionalModelCall } = this.#counts;
+        const totalModelCalls = boots + resumesWithAdditionalModelCall;
+        return {
+            boots,
+            resumesWithAdditionalModelCall,
+            resumesWithoutAdditionalModelCall,
+            totalModelCalls,
+            // Compatibilidade temporária com estado/UI anteriores a 2026-06.
+            resumesWithPR: resumesWithAdditionalModelCall,
+            resumesZeroPR: resumesWithoutAdditionalModelCall,
+            totalPR: totalModelCalls,
+        };
     }
 }

@@ -42,7 +42,6 @@ import { log } from '../../ports/logging/index.js';
 import { SHUTDOWN_TIMEOUT_MS, STOP_BOOT_WAIT_MS } from '#copilot/config/agent';
 import {
     persistAgentRuntimeGracefulShutdownState,
-    persistAgentRuntimePrConsumptionSnapshot,
     resetAgentRuntimeGracefulShutdownFlag,
     restoreAgentRuntimePersistentBootState,
     saveAgentRuntimeShutdownSnapshot,
@@ -191,32 +190,6 @@ async function wireAgentSessionRuntime(ctx, host, client, session, isResumed, op
             },
             onContextState: (state) => {
                 ctx.setContextState(state);
-            },
-            onPrInfo: (info) => {
-                const activeSessionId = host.sessionId;
-                if (info.sessionId && activeSessionId && info.sessionId !== activeSessionId) {
-                    log(
-                        'WARN',
-                        `[AlwaysAlive] PR snapshot descartado por sessão divergente: info.sessionId=${info.sessionId} active=${activeSessionId}`,
-                    );
-                    return;
-                }
-
-                const normalizedInfo = {
-                    ...info,
-                    ...(info.sessionId === undefined ? { sessionId: activeSessionId ?? null } : {}),
-                    ...(info.configuredModel === undefined
-                        ? { configuredModel: ctx.getModelSnapshot?.() ?? undefined }
-                        : {}),
-                };
-                ctx.setLastPrInfo(normalizedInfo);
-                void ctx.trackBackgroundTask(
-                    persistAgentRuntimePrConsumptionSnapshot(normalizedInfo).then(() => undefined),
-                    {
-                        label: 'state.pr_consumed.persist',
-                        description: 'Persist latest PR consumption snapshot',
-                    },
-                );
             },
             isProcessing: () => ctx.isProcessing(),
             dialogLoopActive: () => ctx.isDialogLoopActive(),

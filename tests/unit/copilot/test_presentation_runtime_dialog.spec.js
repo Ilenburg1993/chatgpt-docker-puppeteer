@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => {
         recoverDialogInputChannel: vi.fn(async () => ({
             recovered: true,
             reason: 'input_channel_missing',
-            strategy: 'restart_with_pr',
+            strategy: 'restart_with_model_call',
+            additionalModelCall: true,
             prConsumed: true,
             durationMs: 1,
         })),

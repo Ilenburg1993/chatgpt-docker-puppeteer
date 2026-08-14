@@ -49,7 +49,7 @@
  * `systemMessage?`, `availableTools?`, `excludedTools?`, `provider?`, `onPermissionRequest`, `onUserInputRequest?`,
  * `onElicitationRequest?`, `hooks?`, `workingDirectory?`, `streaming?`, `includeSubAgentStreamingEvents?`,
  * `mcpServers?`, `customAgents?`, `defaultAgent?`, `agent?`, `skillDirectories?`, `disabledSkills?`,
- * `infiniteSessions?`, `gitHubToken?`, `onEvent?` e `createSessionFsProvider?`.
+ * `infiniteSessions?`, `sessionLimits?`, `gitHubToken?`, `onEvent?` e `createSessionFsProvider?`.
  *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
  */
@@ -63,6 +63,13 @@
  * `suppressResumeEvent?` e `continuePendingWork?`.
  *
  * @typedef {import('@github/copilot-sdk').ResumeSessionConfig} ResumeSessionConfig
+ */
+
+/**
+ * Limites de usage por sessão. No billing usage-based atual, `maxAiCredits` define um soft cap para a janela contábil
+ * vigente; o runtime pode concluir a chamada de modelo corrente antes de bloquear a próxima.
+ *
+ * @typedef {import('@github/copilot-sdk').SessionLimitsConfig} SessionLimitsConfig
  */
 
 /**

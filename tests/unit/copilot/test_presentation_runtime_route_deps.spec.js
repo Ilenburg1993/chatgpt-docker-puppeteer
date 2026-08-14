@@ -185,6 +185,7 @@ vi.mock('#copilot/sdk/session', () => ({
     },
     abortSession: vi.fn(),
     approveAll: vi.fn(),
+    createConfiguredPermissionHandler: vi.fn(() => vi.fn()),
     createClientSession: vi.fn(),
     createToolSessionContext: vi.fn(() => ({})),
     defaultBus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },

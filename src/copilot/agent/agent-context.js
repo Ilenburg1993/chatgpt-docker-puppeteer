@@ -734,8 +734,13 @@ export class AgentContext {
     isDialogLoopPaused() {
         return Boolean(this.dialogLoop.paused);
     }
+    getDialogUsageMetricsSnapshot() {
+        return this.dialogLoop?.usageMetrics ?? null;
+    }
+
+    /** @deprecated Use getDialogUsageMetricsSnapshot(). */
     getDialogPrMetricsSnapshot() {
-        return this.dialogLoop?.prMetrics ?? null;
+        return this.getDialogUsageMetricsSnapshot();
     }
     getDialogLoopManagerSnapshot() {
         return this.dialogLoop;

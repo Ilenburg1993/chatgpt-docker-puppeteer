@@ -42,7 +42,8 @@ import {
  * Diferencia os dois limites públicos do Copilot:
  *
  * - limite de sessão: precisa aguardar reset;
- * - limite semanal/modelo: pode ser mitigado com seleção Auto quando a conta ainda tem premium requests.
+ * - limite semanal/modelo: pode, quando o próprio SDK permitir, ser mitigado pela seleção Auto sem assumir uma unidade
+ *   request-based de billing.
  *
  * Mantém `kind='rate_limit'` estável para retry/reconnect, mas permite uma UX mais correta.
  *

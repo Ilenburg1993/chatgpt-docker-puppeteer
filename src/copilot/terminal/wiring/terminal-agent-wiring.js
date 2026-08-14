@@ -318,6 +318,7 @@ export function registerAgentEventListeners(printBanner) {
              *     reason?: string;
              *     recovered?: boolean;
              *     strategy?: string;
+             *     additionalModelCall?: boolean;
              *     prConsumed?: boolean;
              *     durationMs?: number;
              *     success?: boolean;
@@ -325,22 +326,22 @@ export function registerAgentEventListeners(printBanner) {
              * }} */ evt,
         ) => {
             const recovered = evt.recovered === true;
-            const prConsumed = evt.prConsumed === true;
+            const additionalModelCall = evt.additionalModelCall === true || evt.prConsumed === true;
             const strategy = evt.strategy ?? 'unknown';
             const reason = evt.reason ?? 'unknown';
             const success = evt.success !== false;
-            const severity = success ? (prConsumed ? 'warn' : 'info') : 'error';
+            const severity = success ? (additionalModelCall ? 'warn' : 'info') : 'error';
             const duration = typeof evt.durationMs === 'number' ? `${evt.durationMs}ms` : 'duração n/d';
             recordTerminalActivity(
                 success && recovered ? 'system' : 'error',
                 recovered ? 'Conversa recuperada' : 'Recovery da conversa sem reanexo',
                 {
-                    detail: `${reason} · ${strategy} · ${prConsumed ? '1 PR' : 'zero-PR'} · ${duration}`,
+                    detail: `${reason} · ${strategy} · ${additionalModelCall ? 'nova chamada de modelo' : 'reuso sem chamada adicional'} · ${duration}`,
                     severity,
                     source: 'dialog',
                 },
             );
-            if (!success || prConsumed) {
+            if (!success || additionalModelCall) {
                 const label = success ? 'conversa recuperada com restart' : 'falha no recovery da conversa';
                 println('');
                 println(
@@ -357,7 +358,9 @@ export function registerAgentEventListeners(printBanner) {
                         reason,
                         recovered,
                         strategy,
-                        prConsumed,
+                        additionalModelCall,
+                        // Legacy alias for downstream consumers that have not migrated yet.
+                        prConsumed: additionalModelCall,
                     },
                     'terminal-agent-wiring/dialog.recovery',
                 ),

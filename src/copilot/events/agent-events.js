@@ -116,9 +116,9 @@ export const AGENT_CONTEXT_COMPACTED = 'agent:context:compacted';
 export const AGENT_METRICS = 'agent:metrics';
 /** @readonly */
 export const AGENT_PERMISSION_MODE_CHANGED = 'agent:permission:mode_changed';
-/** @readonly */
+/** @readonly @deprecated Legacy request-based billing event retained only for persisted/external compatibility. */
 export const AGENT_PR_CONSUMED = 'agent:pr:consumed';
-/** @readonly */
+/** @readonly @deprecated Legacy request-based billing event retained only for persisted/external compatibility. */
 export const AGENT_PR_FALLBACK_MODEL = 'agent:pr:fallback_model';
 /** @readonly */
 export const AGENT_QUESTION_PENDING = 'agent:question:pending';
@@ -365,7 +365,9 @@ export const AGENT_EVENTS = /** @type {const} */ ([
  */
 
 /**
- * Eventos que indicam consumo de Premium Requests (via sendMessage).
+ * Eventos que historicamente eram tratados como request-consuming. O nome é preservado como API legacy; no billing
+ * usage-based atual, `task.*` significa apenas lifecycle de uma chamada/tarefa e `pr.consumed` só pode representar um
+ * evento request-based explicitamente legado.
  *
  * @type {ReadonlySet<string>}
  */
@@ -373,8 +375,13 @@ export const PR_CONSUMING_EVENTS = /** @type {ReadonlySet<string>} */ (
     new Set(['task.started', 'task.completed', 'task.error', 'pr.consumed'])
 );
 
+/** @type {ReadonlySet<string>} */
+export const MODEL_USAGE_LIFECYCLE_EVENTS = /** @type {ReadonlySet<string>} */ (
+    new Set(['task.started', 'task.completed', 'task.error'])
+);
+
 /**
- * Eventos do dialog loop que NÃO consomem Premium Requests.
+ * Eventos do dialog loop que não implicam, por si só, uma nova chamada de modelo nem uma unidade de billing.
  *
  * @type {ReadonlySet<string>}
  */

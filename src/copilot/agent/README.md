@@ -119,7 +119,7 @@ sendo decisão das façades/capabilities, combinando metadata da factory com est
 
 Mas as bordas compartilhadas (`server/`, partes compartilhadas do `terminal/`) não devem decidir
 sozinhas como obter esse runtime. Essa função agora começa a ser centralizada em
-`presentation/agent-runtime.js`.
+`presentation/agent/runtime/`.
 
 ### Critério prático: o que fica em `agent/` e o que sobe para `presentation/`
 

@@ -54,17 +54,27 @@ import {
  * @property {number} [pausedAt] - Timestamp do pause (ms)
  * @property {string | null} [pendingTurnMessage] - Última mensagem enviada sem resposta confirmada
  * @property {number | null} [pendingTurnTs] - Timestamp do envio pendente (ms)
- * @property {boolean} [pendingTurnConsumedPR] - Se o turno já teve `assistant.usage` classificado como
- *   `premium_request`
- * @property {number} [lastPrConsumedAt] - Timestamp do último PR consumido (ms)
- * @property {string} [lastPrModel] - Modelo que consumiu o último PR
- * @property {string} [lastPrConfiguredModel] - Modelo configurado no runtime no momento do consumo
- * @property {string} [lastPrEffectiveModel] - Modelo efetivo observado na sessão viva / SDK
- * @property {boolean} [lastPrModelMismatch] - `true` quando modelo cobrado difere do configurado
- * @property {number} [lastPrCost] - Custo reportado pelo SDK no último PR
- * @property {Record<string, unknown> | null} [lastQuotaSnapshots] - Snapshots de cota do último PR classificado
- * @property {{ boots?: number; resumesWithPR?: number; resumesZeroPR?: number; totalPR?: number }} [prMetrics] -
- *   Contadores de consumo de Premium Requests do dialog loop
+ * @property {boolean} [pendingTurnAdditionalModelCallObserved] - Marcador moderno de observação do lifecycle; não é uma
+ *   unidade de billing.
+ * @property {boolean} [pendingTurnConsumedPR] - Campo legacy preservado apenas para snapshots anteriores ao billing
+ *   usage-based; novos eventos não o derivam de `assistant.usage`.
+ * @property {number} [lastPrConsumedAt] - Campo legacy: timestamp do último snapshot request-based persistido.
+ * @property {string} [lastPrModel] - Campo legacy do modelo request-based.
+ * @property {string} [lastPrConfiguredModel] - Campo legacy do modelo configurado.
+ * @property {string} [lastPrEffectiveModel] - Campo legacy do modelo efetivo.
+ * @property {boolean} [lastPrModelMismatch] - Campo legacy de divergência de modelo.
+ * @property {number} [lastPrCost] - Campo legacy de custo reportado pelo SDK antigo.
+ * @property {Record<string, unknown> | null} [lastQuotaSnapshots] - Campo legacy de quota request-based.
+ * @property {{
+ *     boots?: number;
+ *     resumesWithAdditionalModelCall?: number;
+ *     resumesWithoutAdditionalModelCall?: number;
+ *     totalModelCalls?: number;
+ *     resumesWithPR?: number;
+ *     resumesZeroPR?: number;
+ *     totalPR?: number;
+ * }} [usageMetrics] - Métricas canônicas de chamadas de modelo do lifecycle, com aliases legacy no próprio snapshot.
+ * @property {Record<string, unknown>} [prMetrics] - Alias persistido legacy de `usageMetrics` para leitores antigos.
  * @property {boolean} [gracefulShutdown] - F56.1: true se o último shutdown foi graceful (via stop()); false se
  *   crash/reboot
  * @property {number} [lastAskUserAt] - F56.2: timestamp do último ask_user recebido (ms)

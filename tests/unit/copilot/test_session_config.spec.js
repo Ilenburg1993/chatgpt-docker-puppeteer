@@ -51,8 +51,9 @@ describe('copilot/hooks/presets/profiles.js — structural', () => {
         assert.ok(PROFILES_SRC.includes('export function buildDiagnosticConfig'));
     });
 
-    it('AlwaysAlive deve usar approveAll como permissionHandler default', () => {
-        assert.ok(PROFILES_SRC.includes('approveAll'));
+    it('AlwaysAlive deve usar a política configurável com approve_all como default canônico', () => {
+        assert.ok(PROFILES_SRC.includes('createConfiguredPermissionHandler'));
+        assert.ok(PROFILES_SRC.includes('AGENT_PERMISSION_MODE'));
     });
 
     it('ReadOnly deve usar createPermissionHandler em modo audit', () => {

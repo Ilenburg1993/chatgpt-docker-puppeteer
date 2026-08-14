@@ -143,7 +143,7 @@ export const BUILTIN_SCHEMAS = [
     {
         type: 'agent:llm:usage',
         required: ['type', 'timestamp'],
-        description: 'Telemetria de uso LLM classificada, sem equivaler automaticamente a Premium Request',
+        description: 'Telemetria de uso LLM por attribution/origem, tokens e AI usage; billing request-based é somente legacy',
     },
 
     // ── Pending Messages ─────────────────────────────────

@@ -516,7 +516,7 @@ export async function handleGitLog({ n = 20 } = {}) {
 }
 
 /**
- * GET /quota — retorna dados de cota de PRs.
+ * GET /quota — retorna o último snapshot de usage/quota conhecido. Campos `lastPr*` são somente compatibilidade legacy.
  *
  * @param {Record<string, unknown>} [params]
  * @returns {{ status: number; body: object }}
@@ -527,8 +527,13 @@ export function handleGetQuota(params = {}) {
         runtimeId,
         dialogLoopActive,
         sessionId,
-        lastPrInfo: prInfo,
+        lastLlmUsage,
+        lastPrInfo: legacyPrInfo,
     } = readAgentRuntimeOverviewProjection(resolveRuntimeIdParam(params));
+    const copilotUsage =
+        lastLlmUsage?.['copilotUsage'] && typeof lastLlmUsage['copilotUsage'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (lastLlmUsage['copilotUsage'])
+            : null;
     return {
         status: 200,
         body: {
@@ -537,46 +542,83 @@ export function handleGetQuota(params = {}) {
             sendCount: Number(snapshot?.['sendCount'] ?? 0),
             dialogLoopActive,
             sessionId,
-            lastPrConsumedAt: prInfo?.['ts'] ?? null,
-            lastPrModel: prInfo?.['model'] ?? null,
-            lastPrConfiguredModel: prInfo?.['configuredModel'] ?? null,
-            lastPrModelMismatch: prInfo?.['modelMismatch'] ?? false,
-            lastPrCost: prInfo?.['cost'] ?? null,
-            lastQuotaSnapshots: prInfo?.['quotaSnapshots'] ?? null,
+            lastUsage: lastLlmUsage ?? null,
+            totalNanoAiu: typeof copilotUsage?.['totalNanoAiu'] === 'number' ? copilotUsage['totalNanoAiu'] : null,
+            legacyBilling: legacyPrInfo
+                ? {
+                      source: 'persisted_pre_usage_billing_state',
+                      lastRequestBasedSnapshot: legacyPrInfo,
+                  }
+                : null,
         },
     };
 }
 
 /**
- * GET /pr-budget — métricas detalhadas de consumo de Premium Requests.
+ * GET /usage-budget — métricas modernas de chamadas de modelo e último `assistant.usage` conhecido.
+ *
+ * Não converte `cost`/`nanoAIU` em moeda nem infere Premium Requests. O bloco `legacyBilling` existe somente quando
+ * estado antigo ainda está carregado no runtime.
  *
  * @param {Record<string, unknown>} [params]
  * @returns {{ status: number; body: object }}
  */
-export function handleGetPrBudget(params = {}) {
+export function handleGetUsageBudget(params = {}) {
     const {
         snap: snapshot,
         runtimeId,
         dialogLoopActive,
         sessionId,
-        dialogPrMetrics: prMetrics,
-        lastPrInfo: prInfo,
+        dialogUsageMetrics: usageMetrics,
+        lastLlmUsage,
+        lastPrInfo: legacyPrInfo,
     } = readAgentRuntimeOverviewProjection(resolveRuntimeIdParam(params));
+    const copilotUsage =
+        lastLlmUsage?.['copilotUsage'] && typeof lastLlmUsage['copilotUsage'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (lastLlmUsage['copilotUsage'])
+            : null;
     return {
         status: 200,
         body: {
             ok: true,
             runtimeId,
-            prMetrics: prMetrics ?? { boots: 0, resumesWithPR: 0, resumesZeroPR: 0, totalPR: 0 },
+            usageMetrics:
+                usageMetrics ?? {
+                    boots: 0,
+                    resumesWithAdditionalModelCall: 0,
+                    resumesWithoutAdditionalModelCall: 0,
+                    totalModelCalls: 0,
+                },
             sendCount: Number(snapshot?.['sendCount'] ?? 0),
             dialogLoopActive,
             sessionId,
-            lastPrConsumedAt: prInfo?.['ts'] ?? null,
-            lastPrModel: prInfo?.['model'] ?? null,
-            lastPrConfiguredModel: prInfo?.['configuredModel'] ?? null,
-            lastPrModelMismatch: prInfo?.['modelMismatch'] ?? false,
-            lastPrCost: prInfo?.['cost'] ?? null,
+            lastUsage: lastLlmUsage ?? null,
+            totalNanoAiu: typeof copilotUsage?.['totalNanoAiu'] === 'number' ? copilotUsage['totalNanoAiu'] : null,
+            legacyBilling: legacyPrInfo
+                ? {
+                      source: 'persisted_pre_usage_billing_state',
+                      lastRequestBasedSnapshot: legacyPrInfo,
+                  }
+                : null,
             uptime: Math.round(process.uptime()),
+        },
+    };
+}
+
+/**
+ * @deprecated GET /pr-budget é um alias transitório de `/usage-budget`.
+ * @param {Record<string, unknown>} [params]
+ * @returns {{ status: number; body: object }}
+ */
+export function handleGetPrBudget(params = {}) {
+    const result = handleGetUsageBudget(params);
+    return {
+        ...result,
+        body: {
+            ...result.body,
+            deprecated: true,
+            replacement: '/usage-budget',
+            legacyAlias: '/pr-budget',
         },
     };
 }

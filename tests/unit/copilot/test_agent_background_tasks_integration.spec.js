@@ -97,7 +97,7 @@ describe('agent › K4 background task tracker integration', () => {
         assert.ok(loopManagerSrc.includes('#trackBackgroundTask('));
         assert.ok(loopManagerSrc.includes('#trackPersistedState('));
         assert.ok(loopManagerSrc.includes('strategy.persistenceLabel'));
-        assert.ok(resumePolicySrc.includes('dialog.prMetrics.resume_with_pr'));
+        assert.ok(resumePolicySrc.includes('dialog.usageMetrics.resume_with_model_call'));
     });
 
     it('turn-executor roteia persistência de pending turn via trackBackgroundTask', () => {

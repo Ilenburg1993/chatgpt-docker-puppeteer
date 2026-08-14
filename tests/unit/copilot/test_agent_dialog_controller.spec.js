@@ -202,7 +202,7 @@ describe('agent-dialog-controller › dialogRecoverInputChannel', () => {
         return { ctx, host };
     }
 
-    it('usa READY pendente como recuperação 0 PR', async () => {
+    it('usa READY pendente como recuperação sem chamada adicional de modelo', async () => {
         const { ctx, host } = setupRecovery();
         /** @type {{ strategy?: string; success?: boolean } | null} */
         let recoveryPayload = null;
@@ -219,10 +219,12 @@ describe('agent-dialog-controller › dialogRecoverInputChannel', () => {
         });
 
         assert.equal(result.recovered, true);
-        assert.equal(result.strategy, 'zero_pr_ready');
-        assert.equal(result.prConsumed, false);
+        assert.equal(result.strategy, 'reuse_ready');
+        assert.equal(result.additionalModelCall, false);
+        assert.equal(result.prConsumed, false); // legacy alias
         assert.ok(recoveryPayload);
-        assert.equal(/** @type {any} */ (recoveryPayload).strategy, 'zero_pr_ready');
+        assert.equal(/** @type {any} */ (recoveryPayload).strategy, 'reuse_ready');
+        assert.equal(/** @type {any} */ (recoveryPayload).additionalModelCall, false);
     });
 
     it('reinicia com reason recovery_restart quando active+idle fica sem canal de input', async () => {
@@ -256,8 +258,9 @@ describe('agent-dialog-controller › dialogRecoverInputChannel', () => {
         });
 
         assert.equal(result.recovered, true);
-        assert.equal(result.strategy, 'restart_with_pr');
-        assert.equal(result.prConsumed, true);
+        assert.equal(result.strategy, 'restart_with_model_call');
+        assert.equal(result.additionalModelCall, true);
+        assert.equal(result.prConsumed, true); // legacy alias
         assert.deepEqual(stopOpts, { authorized: true, reason: 'recovery_restart' });
         assert.equal(started, true);
         assert.ok(recoveryPayload);

@@ -47,8 +47,8 @@ import {
 } from '#copilot/sdk/rpc';
 import {
     abortSession,
-    approveAll,
     createClientSession,
+    createConfiguredPermissionHandler,
     defaultBus as defaultHookBus,
     disconnectClientSession,
     forceStopClient,
@@ -112,7 +112,7 @@ import {
 } from '../../../presentation/sdk/index.js';
 
 const sdkSessionOps = Object.freeze({
-    approveAll,
+    createConfiguredPermissionHandler,
     createClientSession,
     disconnectClientSession,
     getClient,

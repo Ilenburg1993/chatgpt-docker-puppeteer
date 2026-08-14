@@ -57,6 +57,16 @@ const SAFE_VALIDATION_SUITES = {
             args: ['run', 'lint:copilot'],
         },
         {
+            name: 'docs-contract',
+            command: npmCommand,
+            args: ['run', 'copilot:docs:check'],
+        },
+        {
+            name: 'architecture-contract',
+            command: npmCommand,
+            args: ['run', 'copilot:architecture:check'],
+        },
+        {
             name: 'unit-mcp',
             command: npxCommand,
             args: ['vitest', '--config', 'vitest.copilot.config.js', 'run', 'tests/unit/copilot/mcp'],
@@ -72,6 +82,16 @@ const SAFE_VALIDATION_SUITES = {
             name: 'lint',
             command: npmCommand,
             args: ['run', 'lint:copilot'],
+        },
+        {
+            name: 'docs-contract',
+            command: npmCommand,
+            args: ['run', 'copilot:docs:check'],
+        },
+        {
+            name: 'architecture-contract',
+            command: npmCommand,
+            args: ['run', 'copilot:architecture:check'],
         },
         {
             name: 'unit-copilot',

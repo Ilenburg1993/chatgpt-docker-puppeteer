@@ -25,6 +25,7 @@ export {
     buildTerminalCopilotClientOptions,
     buildConfiguredByokModelListHandler,
     customizeSystemMessage,
+    createConfiguredPermissionHandler,
     discoverConfiguredByokModelsFromEnv,
     getSectionDescription,
     getSectionNames,
@@ -78,6 +79,8 @@ export {
  * @typedef {import('#copilot/sdk/types').DefaultAgentConfig} DefaultAgentConfig
  *
  * @typedef {import('#copilot/sdk/types').InfiniteSessionConfig} InfiniteSessionConfig
+ *
+ * @typedef {import('#copilot/sdk/types').SessionLimitsConfig} SessionLimitsConfig
  *
  * @typedef {import('#copilot/sdk/types').CommandDefinition} CommandDefinition
  *

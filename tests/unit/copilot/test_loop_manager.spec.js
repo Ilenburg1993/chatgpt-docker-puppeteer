@@ -578,7 +578,15 @@ describe('DialogLoopManager', () => {
                 watchdogStallMs: 120000,
             });
 
-            expect(fresh.prMetrics).toEqual({ boots: 2, resumesWithPR: 1, resumesZeroPR: 3, totalPR: 3 });
+            expect(fresh.usageMetrics).toEqual({
+                boots: 2,
+                resumesWithAdditionalModelCall: 1,
+                resumesWithoutAdditionalModelCall: 3,
+                totalModelCalls: 3,
+                resumesWithPR: 1,
+                resumesZeroPR: 3,
+                totalPR: 3,
+            });
         });
     });
 
@@ -659,7 +667,15 @@ describe('DialogCostLedger', () => {
     it('normaliza entradas persistidas e calcula totalPR sem contar zero-PR', () => {
         const ledger = new DialogCostLedger({ boots: 2, resumesWithPR: 1, resumesZeroPR: 4 });
 
-        expect(ledger.snapshot()).toEqual({ boots: 2, resumesWithPR: 1, resumesZeroPR: 4, totalPR: 3 });
+        expect(ledger.snapshot()).toEqual({
+            boots: 2,
+            resumesWithAdditionalModelCall: 1,
+            resumesWithoutAdditionalModelCall: 4,
+            totalModelCalls: 3,
+            resumesWithPR: 1,
+            resumesZeroPR: 4,
+            totalPR: 3,
+        });
     });
 });
 
@@ -718,8 +734,8 @@ describe('selectDialogResumeStrategy', () => {
             fallbackTarget: new DialogLoopManager(),
         });
 
-        expect(strategy.kind).toBe('zero-pr-immediate');
-        expect(strategy.prConsumed).toBe(false);
+        expect(strategy.kind).toBe('reuse-immediate');
+        expect(strategy.additionalModelCall).toBe(false);
     });
 
     it('seleciona restart com PR quando pending question não é preservado', async () => {
@@ -732,7 +748,7 @@ describe('selectDialogResumeStrategy', () => {
             timeoutMs: 1,
         });
 
-        expect(strategy.kind).toBe('restart-with-pr');
-        expect(strategy.prConsumed).toBe(true);
+        expect(strategy.kind).toBe('restart-with-model-call');
+        expect(strategy.additionalModelCall).toBe(true);
     });
 });

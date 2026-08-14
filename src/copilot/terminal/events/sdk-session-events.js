@@ -93,7 +93,10 @@ import {
     readTerminalToolRegistrySnapshot,
 } from '../frontend/gateways/index.js';
 import { observeTerminalModelChangeProjection } from '../frontend/projections/index.js';
-import { consumeTerminalLiveByokModelSwitchConfirmation } from '../byok/live/index.js';
+import {
+    consumeTerminalLiveByokModelSwitchConfirmation,
+    promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary,
+} from '../byok/live/index.js';
 import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
 import {
     appendTerminalTranscriptTurn,
@@ -310,7 +313,7 @@ function renderSdkOperatorMessage(value) {
         return 'falha temporária da API; tentando novamente';
     }
     return text
-        .replace(/\bPremium Request\b/giu, 'pedido premium')
+        .replace(/\bPremium Requests?\b/giu, 'billing legacy por request')
         .replace(/\bprovider\b/giu, 'provedor')
         .replace(/\bDisabled tools:/giu, 'ferramentas desativadas:');
 }
@@ -846,11 +849,29 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         renderTurnTraceSummary(trace);
         broadcastSse('assistant.turn_end', withSdkSessionSseEnvelope({ turnId }, 'sdk/assistant.turn_end'));
-        // Drenar entradas da fila de intervenção: se o modelo completou sem chamar ask_user,
-        // as entradas não serão consumidas automaticamente. Usar setImmediate para aguardar
-        // setBusy(false) do engine.js antes de verificar o estado de ociosidade.
+        // Promover primeiro qualquer route switch explicitamente diferido e só então drenar a próxima mensagem.
+        // O setImmediate permite que o engine finalize o turno/setBusy(false); a ordem evita iniciar a continuação
+        // seguinte na rota antiga enquanto uma promoção same-session autorizada está pendente.
         setImmediate(() => {
-            drainMailboxToTurnIfIdle('turn_end');
+            void (async () => {
+                try {
+                    await promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary({
+                        sessionId: agent.sessionId ?? null,
+                        source: 'terminal.sdk.assistant_turn_end.route_promotion',
+                    });
+                } catch (error) {
+                    recordTerminalActivity('model', 'Promoção pós-turno de rota diferida falhou', {
+                        detail: error instanceof Error ? error.message : String(error),
+                        source: 'sdk/assistant.turn_end',
+                        severity: 'warn',
+                        recordHistory: true,
+                    });
+                } finally {
+                    // Se o modelo completou sem chamar ask_user, as entradas da mailbox não seriam consumidas
+                    // automaticamente. Drenar somente depois da tentativa de promoção preserva a ordem de rota.
+                    drainMailboxToTurnIfIdle('turn_end');
+                }
+            })();
         });
         refreshPromptIfIdle();
     };

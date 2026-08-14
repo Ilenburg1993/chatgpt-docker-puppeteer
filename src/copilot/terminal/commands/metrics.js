@@ -279,8 +279,8 @@ export function cmdMetrics({ println }, arg = '') {
     const byokRouteLabel = byok?.preset ?? byok?.providerType ?? '-';
     const byokModelLabel = byok?.model ?? '-';
     const billingLine = byokActive
-        ? `GitHub PR lateral ${lastModel} · ${costStr} · ${billingStatus} ${terminalThemeText('muted', `(histórica; rota BYOK atual ${byokRouteLabel} · modelo ${byokModelLabel}; não é cobrança BYOK)`)}`
-        : `telemetria PR ${lastModel} · ${costStr} · ${billingStatus} ${terminalThemeText('muted', '(histórica)')}`;
+        ? `Copilot histórico ${lastModel} · ${costStr} · ${billingStatus} ${terminalThemeText('muted', `(telemetria anterior/lateral; rota BYOK atual ${byokRouteLabel} · modelo ${byokModelLabel}; não é cobrança BYOK)`)}`
+        : `telemetria Copilot histórica ${lastModel} · ${costStr} · ${billingStatus} ${terminalThemeText('muted', '(não define billing atual deste turno)')}`;
     const promptDigest = typeof systemPromptBinding?.['digest'] === 'string' ? systemPromptBinding['digest'] : null;
     const promptIsStale =
         typeof systemPromptFreshness?.['isStale'] === 'boolean' ? systemPromptFreshness['isStale'] : null;

@@ -359,6 +359,32 @@ function buildResolvedOriginRequestFieldSpecs(options) {
                     'HTTPS loopback origin must send an SNI/server name covered by the Cloudflare Origin CA certificate.',
             };
         }
+        if (httpsOrigin && field.key === 'matchSNItoHost') {
+            return {
+                ...field,
+                rationale:
+                    'originServerName is pinned explicitly for the HTTPS loopback origin, so deriving SNI from Host should remain unset.',
+            };
+        }
+        if (httpsOrigin && field.key === 'caPool') {
+            return {
+                ...field,
+                rationale:
+                    'Keep caPool unset while the configured Cloudflare origin certificate validates with the active trust path; pin a pool only for a private CA requirement.',
+            };
+        }
+        if (httpsOrigin && field.key === 'noTLSVerify') {
+            return {
+                ...field,
+                rationale: 'TLS verification is required for the canonical HTTPS loopback origin; do not weaken it.',
+            };
+        }
+        if (httpsOrigin && field.key === 'tlsTimeout') {
+            return {
+                ...field,
+                rationale: 'TLS is active on the canonical origin; keep the Cloudflare default timeout unless measurements justify pinning it.',
+            };
+        }
         if (field.key !== 'http2Origin') return field;
         if (!allowH2Origin) return field;
         return {

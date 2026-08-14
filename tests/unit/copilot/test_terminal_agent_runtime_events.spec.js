@@ -1152,7 +1152,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Pedido premium classificado com divergência de modelo',
+            'Billing legacy por request com divergência de modelo',
             expect.objectContaining({
                 detail: 'modelo configurado gpt-5 · modelo efetivo gpt-5-mini · modelo cobrado gpt-5-mini · custo 0.0123',
                 severity: 'warn',
@@ -1160,7 +1160,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
                 recordHistory: true,
             }),
         );
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('Pedido premium'));
+        expect(println).toHaveBeenCalledWith(expect.stringContaining('Billing legacy'));
         expect(println).toHaveBeenCalledWith(expect.stringContaining('modelo cobrado gpt-5-mini'));
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('modeloCobrado='));
         expect(broadcastSse).toHaveBeenCalledWith(
@@ -1203,14 +1203,14 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Pedido premium classificado com divergência de modelo',
+            'Billing legacy por request com divergência de modelo',
             expect.any(Object),
         );
         expect(println).not.toHaveBeenCalledWith(expect.stringContaining('Premium Request'));
         expect(broadcastSse).toHaveBeenCalledWith('pr.consumed', expect.any(Object));
     });
 
-    it('narra llm.usage sem pedido premium separadamente de pr.consumed', async () => {
+    it('narra llm.usage moderno separadamente do evento request-based legacy pr.consumed', async () => {
         const { setupTerminalAgentRuntimeEventListeners } =
             await import('../../../src/copilot/terminal/events/agent-runtime-events.js');
         const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } =
@@ -1241,7 +1241,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
 
         expect(recordTerminalActivity).toHaveBeenCalledWith(
             'system',
-            'Uso BYOK sem pedido premium',
+            'Uso GitHub Copilot/AI Credits',
             expect.objectContaining({
                 detail: 'modelo gpt-5.4 · tokens 10→4 · custo 0.0123',
                 source: 'agent',
@@ -1433,7 +1433,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             expect.objectContaining({
                 errorContext: 'model_call',
                 recoverable: true,
-                operatorMeaning: expect.stringContaining('sem pedido premium confirmado'),
+                operatorMeaning: expect.stringContaining('billing request-based não é inferido pela telemetria'),
                 handledAs: 'recoverable_model_call',
             }),
         );
@@ -1523,7 +1523,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             expect.objectContaining({
                 byokEnabled: true,
                 byokProviderType: 'gemini',
-                operatorMeaning: expect.stringContaining('sem pedido premium'),
+                operatorMeaning: expect.stringContaining('sem uso do GitHub Copilot/AI Credits'),
                 handledAs: 'recoverable_model_call',
             }),
         );
@@ -1578,7 +1578,7 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
             'Erro de sessão BYOK',
             expect.objectContaining({
                 severity: 'error',
-                detail: expect.stringContaining('sem pedido premium'),
+                detail: expect.stringContaining('sem uso do GitHub Copilot/AI Credits'),
             }),
         );
         expect(recordTerminalActivity).toHaveBeenCalledWith(

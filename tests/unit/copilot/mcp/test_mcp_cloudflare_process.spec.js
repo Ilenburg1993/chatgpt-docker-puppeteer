@@ -6,9 +6,28 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import { ensureDetachedProcess } from '../../../../src/copilot/mcp/cloudflare/cli-process.js';
+import {
+    ensureDetachedProcess,
+    rotateDetachedProcessLogIfOversized,
+} from '../../../../src/copilot/mcp/cloudflare/cli-process.js';
 
 describe('MCP Cloudflare detached process supervision', () => {
+    it('rotates an oversized detached-process log before a future restart', async () => {
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-log-rotation-'));
+        const logFile = path.join(dir, 'test.log');
+        try {
+            await fs.writeFile(logFile, 'abcdefghij', 'utf8');
+            const result = await rotateDetachedProcessLogIfOversized(logFile, { maxBytes: 5 });
+            assert.equal(result.rotated, true);
+            assert.equal(result.previousBytes, 10);
+            assert.equal(result.rotatedPath, `${logFile}.1`);
+            assert.equal(await fs.readFile(`${logFile}.1`, 'utf8'), 'abcdefghij');
+            await assert.rejects(fs.access(logFile), /ENOENT/u);
+        } finally {
+            await fs.rm(dir, { recursive: true, force: true });
+        }
+    });
+
     it('terminates the detached child when publishing the PID marker fails', async () => {
         const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-mcp-detached-rollback-'));
         const pidFile = path.join(dir, 'test.pid');

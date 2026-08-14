@@ -211,6 +211,7 @@ export function attachDialogTaskHandlers(ctx) {
                  * @type {{
                  *     reason?: string;
                  *     strategy?: string;
+                 *     additionalModelCall?: boolean;
                  *     prConsumed?: boolean;
                  *     success?: boolean;
                  *     durationMs?: number;
@@ -219,9 +220,10 @@ export function attachDialogTaskHandlers(ctx) {
             ) => {
                 const reason = evt?.reason ?? 'unknown';
                 const strategy = evt?.strategy ?? 'unknown';
+                const additionalModelCall = evt?.additionalModelCall === true || evt?.prConsumed === true;
                 metrics.recordDialogRecovery(reason, {
                     strategy,
-                    prConsumed: evt?.prConsumed === true,
+                    additionalModelCall,
                     success: evt?.success !== false,
                     durationMs: evt?.durationMs ?? 0,
                 });
@@ -230,7 +232,7 @@ export function attachDialogTaskHandlers(ctx) {
                 metrics.recordCounter(`dialog.recovery.strategy.${strategy}`);
                 log(
                     evt?.success === false ? 'WARN' : 'DEBUG',
-                    `[agent-event-observer] dialog.recovery reason=${reason} strategy=${strategy} pr=${evt?.prConsumed === true}`,
+                    `[agent-event-observer] dialog.recovery reason=${reason} strategy=${strategy} additionalModelCall=${additionalModelCall}`,
                 );
             },
             'dialog.recovery',
@@ -424,7 +426,7 @@ export function attachDialogTaskHandlers(ctx) {
         }, 'pr.fallback_model'),
     );
 
-    // ── pr.consumed ───────────────────────────────────────────────────────────
+    // ── pr.consumed (compatibilidade request-based legacy) ────────────────────
     on(
         agent,
         'pr.consumed',

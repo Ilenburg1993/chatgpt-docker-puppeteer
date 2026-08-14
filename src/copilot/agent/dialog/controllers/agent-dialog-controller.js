@@ -36,8 +36,9 @@ import { wireDialogLoopEvents } from '../orchestrators/index.js';
  * @typedef {object} DialogInputRecoveryResult
  * @property {boolean} recovered
  * @property {string} reason
- * @property {'not_needed' | 'paused' | 'zero_pr_ready' | 'restart_with_pr'} strategy
- * @property {boolean} prConsumed
+ * @property {'not_needed' | 'paused' | 'reuse_ready' | 'restart_with_model_call'} strategy
+ * @property {boolean} additionalModelCall
+ * @property {boolean} prConsumed - Legacy alias for compatibility; mirrors additionalModelCall and is not a billing claim.
  * @property {number} durationMs
  */
 
@@ -160,8 +161,8 @@ export async function dialogStop(ctx, host, opts) {
 /**
  * Recupera semanticamente o canal de input do dialog loop quando a borda detecta `active + idle + sem READY`.
  *
- * Regra de custo: se ainda houver `READY` pendente, a recuperação é 0 PR; só reiniciamos o loop quando o canal de input
- * está de fato ausente. A decisão pertence ao Agent, não à presentation.
+ * Regra operacional: se ainda houver `READY` pendente, a recuperação reutiliza a sessão sem nova chamada de modelo;
+ * só reiniciamos o loop quando o canal de input está de fato ausente. A decisão pertence ao Agent, não à presentation.
  *
  * @param {AgentContext} ctx
  * @param {DialogHost} host
@@ -188,20 +189,22 @@ export async function dialogRecoverInputChannel(ctx, host, opts = {}) {
         const durationMs = emitRecovery({
             recovered: false,
             strategy: 'paused',
+            additionalModelCall: false,
             prConsumed: false,
             success: true,
         });
-        return { recovered: false, reason, strategy: 'paused', prConsumed: false, durationMs };
+        return { recovered: false, reason, strategy: 'paused', additionalModelCall: false, prConsumed: false, durationMs };
     }
 
     if (ctx.isDialogLoopActive() && ctx.isWaitingForInput() && ctx.getPendingQuestionKind() === 'ready') {
         const durationMs = emitRecovery({
             recovered: true,
-            strategy: 'zero_pr_ready',
+            strategy: 'reuse_ready',
+            additionalModelCall: false,
             prConsumed: false,
             success: true,
         });
-        return { recovered: true, reason, strategy: 'zero_pr_ready', prConsumed: false, durationMs };
+        return { recovered: true, reason, strategy: 'reuse_ready', additionalModelCall: false, prConsumed: false, durationMs };
     }
 
     const mustRestart = ctx.isDialogLoopActive() && ctx.isIdle() && !ctx.hasPendingQuestion();
@@ -209,10 +212,11 @@ export async function dialogRecoverInputChannel(ctx, host, opts = {}) {
         const durationMs = emitRecovery({
             recovered: false,
             strategy: 'not_needed',
+            additionalModelCall: false,
             prConsumed: false,
             success: true,
         });
-        return { recovered: false, reason, strategy: 'not_needed', prConsumed: false, durationMs };
+        return { recovered: false, reason, strategy: 'not_needed', additionalModelCall: false, prConsumed: false, durationMs };
     }
 
     try {
@@ -220,15 +224,17 @@ export async function dialogRecoverInputChannel(ctx, host, opts = {}) {
         await dialogStart(ctx, host);
         const durationMs = emitRecovery({
             recovered: true,
-            strategy: 'restart_with_pr',
+            strategy: 'restart_with_model_call',
+            additionalModelCall: true,
             prConsumed: true,
             success: true,
         });
-        return { recovered: true, reason, strategy: 'restart_with_pr', prConsumed: true, durationMs };
+        return { recovered: true, reason, strategy: 'restart_with_model_call', additionalModelCall: true, prConsumed: true, durationMs };
     } catch (error) {
         emitRecovery({
             recovered: false,
-            strategy: 'restart_with_pr',
+            strategy: 'restart_with_model_call',
+            additionalModelCall: true,
             prConsumed: true,
             success: false,
         });

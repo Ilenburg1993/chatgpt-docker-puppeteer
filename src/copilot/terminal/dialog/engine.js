@@ -1709,15 +1709,15 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             const ctxWin = latestRuntimeState.contextWindow;
             const prInfo = /** @type {Record<string, unknown> | null} */ (latestRuntimeState.lastPrInfo);
             const llmUsage = /** @type {Record<string, unknown> | null} */ (latestRuntimeState.lastLlmUsage ?? null);
-            const prefersLlmUsage =
-                llmUsage !== null && (llmUsage['premiumRequest'] === false || llmUsage['byokProvider'] === true);
-            const usageInfo = prefersLlmUsage ? llmUsage : prInfo;
+            // `assistant.usage` é a telemetria canônica no billing usage-based. `lastPrInfo` permanece somente como
+            // fallback para snapshots persistidos por versões antigas do runtime.
+            const usageInfo = llmUsage ?? prInfo;
             if (ctxWin || usageInfo) {
                 const parts = [];
                 if (usageInfo) {
                     const modelBilling = normalizeTerminalModelBillingProjection(usageInfo, latestRuntimeState.model);
-                    if (!prefersLlmUsage && readConfiguredByokSummary().enabled) {
-                        parts.push('quota/PR histórico');
+                    if (llmUsage === null && readConfiguredByokSummary().enabled) {
+                        parts.push('billing/quota legacy');
                     }
                     if (modelBilling.mismatch) {
                         if (modelBilling.configuredModel) {
@@ -1728,7 +1728,7 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                         }
                     } else if (modelBilling.displayModel !== '-') {
                         parts.push(
-                            `${prefersLlmUsage ? 'LLM' : 'modelo'} ${terminalThemeText('assistant', modelBilling.displayModel)}`,
+                            `${llmUsage !== null ? 'LLM' : 'modelo legacy'} ${terminalThemeText('assistant', modelBilling.displayModel)}`,
                         );
                     }
                     if (modelBilling.cost !== null) {

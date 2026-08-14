@@ -312,9 +312,9 @@ function _handleSetPermissions(req, res, deps) {
  * GAP-SE-001b: Envia uma mensagem em modo steering (immediate) para redirecionar o agente mid-turn.
  *
  * Atenção arquitetural: esta rota é uma superfície direta do SDK (`agent.steerMessage()` → `session.send({ mode:
- * 'immediate' })`) e pode gerar `assistant.usage`; `pr.consumed` depende da classificacao causal dessa usage. Clientes
- * que precisam preservar zero-PR devem usar o contrato mediado por `/inject mode=queue|mailbox` ou pelo mailbox do
- * terminal, que só drena em
+ * 'immediate' })`) e pode gerar `assistant.usage`, tokens e AI usage. Clientes que precisam reutilizar interação
+ * humana sem abrir uma chamada adicional de modelo devem usar o contrato mediado por `/inject mode=queue|mailbox`
+ * ou pelo mailbox do terminal, que só drena em
  * `ask_user(kind=question)`.
  *
  * @param {Req} req

@@ -150,8 +150,8 @@ descartável e alimenta o mesmo runtime health que destrava candidatos `repo_age
 npm run model-gateway:live:readiness
 npm run model-gateway:live:plan
 npm run model-gateway:auto:scenarios
-npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000
-npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000
+npm run model-gateway:live:llm-b -- --control-only --timeout-ms=180000
+npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --control-only --timeout-ms=240000
 npm run model-gateway:live:auto-probe
 npm run model-gateway:live:runs
 ```

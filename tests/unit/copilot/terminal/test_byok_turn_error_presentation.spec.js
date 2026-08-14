@@ -24,7 +24,7 @@ describe('terminal/dialog/byok-turn-error-presentation', () => {
 
         expect(presentation.title).toBe('Rota BYOK');
         expect(presentation.summary).toContain('rota BYOK recusou a chamada por crédito');
-        expect(presentation.summary).toContain('sem Premium Request');
+        expect(presentation.summary).toContain('sem uso do GitHub Copilot/AI Credits');
         expect(presentation.destination).toBe('perfil chutes-ai · provedor kilo-code · modelo Qwen/Qwen3.5');
         expect(`${presentation.summary}\n${presentation.destination}\n${presentation.action}`).not.toContain(
             'dialog.byok_provider_credits',

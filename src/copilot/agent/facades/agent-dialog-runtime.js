@@ -37,9 +37,8 @@
  *         | undefined;
  *     pauseDialogLoop?: ((sessionId: string | null) => Promise<void>) | undefined;
  *     isDialogLoopPaused?: (() => boolean) | undefined;
- *     getDialogPrMetricsSnapshot?:
- *         | (() => { boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null)
- *         | undefined;
+ *     getDialogUsageMetricsSnapshot?: (() => import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null) | undefined;
+ *     getDialogPrMetricsSnapshot?: (() => import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null) | undefined;
  *     getLastPrInfoSnapshot?:
  *         | (() => { model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null)
  *         | undefined;
@@ -207,10 +206,20 @@ export function isAgentDialogLoopPaused(runtime) {
 
 /**
  * @param {AgentDialogContextTarget} runtime
- * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null}
+ * @returns {import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null}
+ */
+export function readAgentDialogUsageMetrics(runtime) {
+    if (typeof runtime.getDialogUsageMetricsSnapshot === 'function') return runtime.getDialogUsageMetricsSnapshot();
+    return typeof runtime.getDialogPrMetricsSnapshot === 'function' ? runtime.getDialogPrMetricsSnapshot() : null;
+}
+
+/**
+ * @deprecated Use readAgentDialogUsageMetrics().
+ * @param {AgentDialogContextTarget} runtime
+ * @returns {import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null}
  */
 export function readAgentDialogPrMetrics(runtime) {
-    return typeof runtime.getDialogPrMetricsSnapshot === 'function' ? runtime.getDialogPrMetricsSnapshot() : null;
+    return readAgentDialogUsageMetrics(runtime);
 }
 
 /**

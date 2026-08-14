@@ -12,7 +12,7 @@
 
 import { buildHookContextAppendMessage } from '#copilot/config';
 import { DEFAULT_DIAGNOSTIC_MODEL, DEFAULT_MODEL } from '#copilot/sdk/constants';
-import { approveAll, createPermissionHandler } from '#copilot/sdk/session';
+import { approveAll, createConfiguredPermissionHandler, createPermissionHandler } from '#copilot/sdk/session';
 import { createHooks } from '../factory.js';
 
 /**
@@ -38,7 +38,7 @@ const BASE_CONFIG = {
  *
  * Características:
  *
- * - approve-all para permissões de escrita (agente autônomo)
+ * - política de permissões configurável por `AGENT_PERMISSION_MODE`, com `approve_all` como default intencional
  * - infiniteSessions habilitado
  * - hooks de auditoria incluídos
  * - context hook injetado no systemMessage
@@ -46,7 +46,8 @@ const BASE_CONFIG = {
  * @param {object} options
  * @param {string} [options.model='auto'] - Modelo a usar. Default is `'auto'`
  * @param {Tool[]} [options.tools=[]] - Custom tools a registrar. Default is `[]`
- * @param {PermissionHandler} [options.onPermissionRequest] - Override do handler de permissões (default: approveAll)
+ * @param {PermissionHandler} [options.onPermissionRequest] - Override do handler de permissões; sem override usa
+ *   `AGENT_PERMISSION_MODE`, cujo default canônico é `approve_all`
  * @param {Function} [options.onUserInputRequest] - Handler para perguntas do modelo
  * @param {string} [options.hookContextContent] - Conteúdo do Hook System para injetar no systemMessage
  * @returns {SessionConfig}
@@ -55,7 +56,7 @@ export function buildAlwaysAliveConfig(options = {}) {
     const {
         model = DEFAULT_MODEL,
         tools = [],
-        onPermissionRequest = approveAll,
+        onPermissionRequest = createConfiguredPermissionHandler(),
         onUserInputRequest,
         hookContextContent,
     } = options;

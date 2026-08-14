@@ -64,6 +64,8 @@ export function classifySdkRateLimitScope(error) {
     const fp = getSdkErrorFingerprint(error);
     const haystack = `${fp.code} ${fp.errorType} ${fp.message}`;
 
+    // `premium request(s)` permanece somente como fingerprint de erro vendor/legacy que ainda pode chegar de contas
+    // anuais antigas; nunca é usado para inferir o billing de um evento moderno `assistant.usage`.
     if (
         haystack.includes('weekly') ||
         haystack.includes('7-day') ||

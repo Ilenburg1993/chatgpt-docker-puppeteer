@@ -20,6 +20,7 @@ const TIER_ORDER = /** @type {const} */ (['l1', 'l2', 'l3']);
  *     l3Enabled?: boolean;
  *     workspaceFiles?: number;
  *     readHotsetRatio?: number;
+ *     representativeBenchmarkPassed?: boolean | null;
  * }} [input]
  */
 export function buildIoCacheTierPlan(input = {}) {
@@ -29,6 +30,7 @@ export function buildIoCacheTierPlan(input = {}) {
 
     const workspaceFiles = Number.isFinite(input.workspaceFiles) ? Number(input.workspaceFiles) : 0;
     const readHotsetRatio = Number.isFinite(input.readHotsetRatio) ? Number(input.readHotsetRatio) : 0;
+    const representativeBenchmarkPassed = input.representativeBenchmarkPassed === true;
 
     /** @type {Record<IoCacheTier, TierStatus>} */
     const tiers = {
@@ -51,12 +53,18 @@ export function buildIoCacheTierPlan(input = {}) {
     };
 
     const recommendations = [];
+    const l2PressureObserved = workspaceFiles > 3000 || readHotsetRatio < 0.1;
+    let l2Decision = l2Enabled ? 'enabled' : 'keep-off';
 
-    if (!l2Enabled && workspaceFiles > 3000) {
-        recommendations.push('Consider enabling L2: workspace file count is high.');
+    if (!l2Enabled && l2PressureObserved && !representativeBenchmarkPassed) {
+        l2Decision = 'benchmark-required';
+        recommendations.push(
+            'L2 pressure signal observed, but enablement is evidence-gated: run a representative cold/warm workload benchmark before changing the default.',
+        );
     }
-    if (!l2Enabled && readHotsetRatio < 0.1) {
-        recommendations.push('Read hotset ratio is low: evaluate enabling L2 and reviewing cache sizing/workload.');
+    if (!l2Enabled && representativeBenchmarkPassed) {
+        l2Decision = 'enable-supported-by-benchmark';
+        recommendations.push('Representative benchmark supports L2 enablement; promote through the experimental profile first.');
     }
     if (l2Enabled && !l3Enabled && workspaceFiles > 20000) {
         recommendations.push('Prepare L3 design for multi-runtime sharing and cold-start reduction.');
@@ -65,6 +73,13 @@ export function buildIoCacheTierPlan(input = {}) {
     return {
         tierOrder: [...TIER_ORDER],
         tiers,
+        l2Decision,
+        evidence: {
+            representativeBenchmarkPassed,
+            l2PressureObserved,
+            workspaceFiles,
+            readHotsetRatio,
+        },
         recommendations,
     };
 }

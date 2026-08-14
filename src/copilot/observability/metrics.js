@@ -37,7 +37,7 @@ import { createToolTelemetryStore, defaultToolTelemetryStore } from './tool-stat
  * @property {(durationMs: number, success: boolean) => void} recordDialogTurn
  * @property {(
  *     reason: string,
- *     opts?: { strategy?: string; prConsumed?: boolean; success?: boolean; durationMs?: number },
+ *     opts?: { strategy?: string; additionalModelCall?: boolean; prConsumed?: boolean; success?: boolean; durationMs?: number },
  * ) => void} recordDialogRecovery
  * @property {(durationMs: number, success: boolean) => void} recordSdkDialogTurn
  * @property {(durationMs: number, success: boolean, outcome?: 'completed' | 'timeout' | 'error') => void} recordInjectTurn
@@ -102,6 +102,8 @@ export function createMetricsStore(options = {}) {
      *     total: number;
      *     success: number;
      *     failed: number;
+     *     withoutAdditionalModelCall: number;
+     *     withAdditionalModelCall: number;
      *     zeroPr: number;
      *     pr: number;
      *     byReason: Record<string, number>;
@@ -113,6 +115,8 @@ export function createMetricsStore(options = {}) {
         total: 0,
         success: 0,
         failed: 0,
+        withoutAdditionalModelCall: 0,
+        withAdditionalModelCall: 0,
         zeroPr: 0,
         pr: 0,
         byReason: {},
@@ -222,7 +226,7 @@ export function createMetricsStore(options = {}) {
      * Registra uma recuperação semântica do dialog loop.
      *
      * @param {string} reason
-     * @param {{ strategy?: string; prConsumed?: boolean; success?: boolean; durationMs?: number }} [opts]
+     * @param {{ strategy?: string; additionalModelCall?: boolean; prConsumed?: boolean; success?: boolean; durationMs?: number }} [opts]
      * @returns {void}
      */
     function recordDialogRecovery(reason, opts = {}) {
@@ -232,8 +236,14 @@ export function createMetricsStore(options = {}) {
         _dialogRecovery.total++;
         if (success) _dialogRecovery.success++;
         else _dialogRecovery.failed++;
-        if (opts.prConsumed) _dialogRecovery.pr++;
-        else _dialogRecovery.zeroPr++;
+        const additionalModelCall = opts.additionalModelCall === true || opts.prConsumed === true;
+        if (additionalModelCall) {
+            _dialogRecovery.withAdditionalModelCall++;
+            _dialogRecovery.pr++; // legacy alias
+        } else {
+            _dialogRecovery.withoutAdditionalModelCall++;
+            _dialogRecovery.zeroPr++; // legacy alias
+        }
         _dialogRecovery.byReason[normalizedReason] = (_dialogRecovery.byReason[normalizedReason] ?? 0) + 1;
         _dialogRecovery.byStrategy[strategy] = (_dialogRecovery.byStrategy[strategy] ?? 0) + 1;
         _dialogRecovery.histogram.record(Math.max(0, Math.round(opts.durationMs ?? 0)));
@@ -439,6 +449,8 @@ export function createMetricsStore(options = {}) {
                 total: _dialogRecovery.total,
                 success: _dialogRecovery.success,
                 failed: _dialogRecovery.failed,
+                withoutAdditionalModelCall: _dialogRecovery.withoutAdditionalModelCall,
+                withAdditionalModelCall: _dialogRecovery.withAdditionalModelCall,
                 zeroPr: _dialogRecovery.zeroPr,
                 pr: _dialogRecovery.pr,
                 byReason: { ..._dialogRecovery.byReason },
@@ -499,6 +511,8 @@ export function createMetricsStore(options = {}) {
         _dialogRecovery.total = 0;
         _dialogRecovery.success = 0;
         _dialogRecovery.failed = 0;
+        _dialogRecovery.withoutAdditionalModelCall = 0;
+        _dialogRecovery.withAdditionalModelCall = 0;
         _dialogRecovery.zeroPr = 0;
         _dialogRecovery.pr = 0;
         Object.keys(_dialogRecovery.byReason).forEach((k) => delete _dialogRecovery.byReason[k]);

@@ -3,8 +3,8 @@
  * Helpers de envio de mensagens para sessões SDK.
  *
  * Esta camada é deliberadamente direta: qualquer chamada aqui chega a `sendSession()` e pode produzir
- * `assistant.usage`; `pr.consumed` depende da classificação causal dessa usage. O caminho zero-PR do terminal é outro:
- * mailbox de intervenção + drenagem em `ask_user(kind=question)`.
+ * `assistant.usage`, tokens e AI usage. O caminho de reuso sem chamada adicional de modelo é outro: mailbox de
+ * intervenção + drenagem em `ask_user(kind=question)`.
  */
 
 /**

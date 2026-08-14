@@ -10,7 +10,12 @@
  */
 
 import { log } from '#copilot/observability/logger';
-import { approveAll, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, validateProviderConfig } from './sdk-config-port.js';
+import {
+    createConfiguredPermissionHandler,
+    INFINITE_SESSION_DEFAULTS,
+    REASONING_EFFORTS,
+    validateProviderConfig,
+} from './sdk-config-port.js';
 
 /**
  * @typedef {import('./sdk-config-port.js').SessionConfig} SessionConfig
@@ -30,6 +35,8 @@ import { approveAll, INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS, validateProvi
  * @typedef {import('./sdk-config-port.js').DefaultAgentConfig} DefaultAgentConfig
  *
  * @typedef {import('./sdk-config-port.js').InfiniteSessionConfig} InfiniteSessionConfig
+ *
+ * @typedef {import('./sdk-config-port.js').SessionLimitsConfig} SessionLimitsConfig
  *
  * @typedef {import('./sdk-config-port.js').CommandDefinition} CommandDefinition
  *
@@ -98,6 +105,7 @@ export const RESUME_SESSION_CONFIG_KEYS = Object.freeze([
     'instructionDirectories',
     'disabledSkills',
     'infiniteSessions',
+    'sessionLimits',
     'gitHubToken',
     'skipEmbeddingRetrieval',
     'embeddingCacheStorage',
@@ -142,7 +150,7 @@ export function sanitizeResumeSessionConfig(config) {
     }
 
     if (resume.onPermissionRequest === undefined) {
-        resume.onPermissionRequest = approveAll;
+        resume.onPermissionRequest = createConfiguredPermissionHandler();
     }
     if (resume.streaming === undefined) {
         resume.streaming = true;
@@ -159,7 +167,7 @@ export function sanitizeResumeSessionConfig(config) {
  *         .model('gpt-4.1')
  *         .clientName('my-app')
  *         .streaming(true)
- *         .onPermissionRequest(approveAll)
+ *         .onPermissionRequest(createConfiguredPermissionHandler())
  *         .excludedTools(['powershell', 'web_fetch'])
  *         .infiniteSessions({ enabled: true, backgroundCompactionThreshold: 0.8 })
  *         .build();
@@ -387,6 +395,22 @@ export class SessionConfigBuilder {
         return this;
     }
 
+    /**
+     * Define o soft cap de AI Credits da janela contábil da sessão. Omitir mantém o comportamento do SDK sem cap
+     * local; valores não positivos não são aceitos para evitar um bloqueio acidental de todas as chamadas de modelo.
+     *
+     * @param {SessionLimitsConfig} limits
+     * @returns {this}
+     */
+    sessionLimits(limits) {
+        const maxAiCredits = Number(limits?.maxAiCredits);
+        if (!Number.isFinite(maxAiCredits) || maxAiCredits <= 0) {
+            throw new TypeError('sessionLimits.maxAiCredits must be a finite number greater than zero.');
+        }
+        this.#config.sessionLimits = { maxAiCredits };
+        return this;
+    }
+
     // ─── Provider (BYOK) ─────────────────────────────────────────────────
 
     /**
@@ -546,14 +570,19 @@ export class SessionConfigBuilder {
     // ─── Build ────────────────────────────────────────────────────────────
 
     /**
-     * Constrói o `SessionConfig` final. Garante que `onPermissionRequest` está presente (fallback: `approveAll`).
+     * Constrói o `SessionConfig` final. Garante `onPermissionRequest` via política configurável; o default permanece
+     * `approve_all` e pode ser alterado por `AGENT_PERMISSION_MODE`.
      *
      * @returns {SessionConfig}
      */
     build() {
         if (!this.#config.onPermissionRequest) {
-            log('WARN', '[SessionConfigBuilder] onPermissionRequest não fornecido — usando approveAll como fallback');
-            this.#config.onPermissionRequest = approveAll;
+            const configuredMode = process.env['AGENT_PERMISSION_MODE']?.trim() || 'approve_all';
+            log(
+                'INFO',
+                `[SessionConfigBuilder] onPermissionRequest não fornecido — usando política padrão configurável '${configuredMode}' (default efetivo: approve_all).`,
+            );
+            this.#config.onPermissionRequest = createConfiguredPermissionHandler();
         }
         if (this.#config.streaming === undefined) {
             this.#config.streaming = true;

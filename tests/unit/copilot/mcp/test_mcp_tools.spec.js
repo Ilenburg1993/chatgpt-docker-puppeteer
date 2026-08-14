@@ -458,6 +458,9 @@ describe('copilot MCP tools', () => {
         assert.equal(orphanImports.isError, undefined);
         assert.equal(orphanImports.structuredContent?.['success'], true);
         assert.equal(orphanImports.structuredContent?.['totalOrphans'], 0);
+        assert.equal(orphanImports.structuredContent?.['trueOrphanCount'], 0);
+        assert.equal(orphanImports.structuredContent?.['protectedCount'], 0);
+        assert.equal(orphanImports.structuredContent?.['aliasResolutionGapCount'], 0);
         assert.equal(typeof orphanImports.structuredContent?.['checkedImports'], 'number');
 
         const orphanImportsDir = await orphanImportsTool.handler({
@@ -475,6 +478,53 @@ describe('copilot MCP tools', () => {
         assert.equal(importTargetCache?.ttlMs, 5 * 60 * 1000);
         assert.equal(importTargetCache?.maxEntries, 10_000);
         assert.ok(Number(importTargetCache?.size ?? 0) <= Number(importTargetCache?.maxEntries ?? 0));
+    });
+
+    it('repo_find_orphan_imports resolves package imports and classifies protected targets', async () => {
+        const orphanImportsTool = findTool('repo_find_orphan_imports');
+        const tempDir = await mkdtemp(join(process.cwd(), '.tmp-copilot-package-imports-'));
+        const importerPath = join(tempDir, 'importer.js');
+        const relativeImporterPath = relative(process.cwd(), importerPath);
+
+        try {
+            await writeFile(
+                importerPath,
+                [
+                    "import '#copilot/sdk/di';",
+                    "import '#copilot/sdk/agents';",
+                    "import '#copilot/sdk/session-runtime';",
+                    "await import('#copilot/infra/public/cache');",
+                    'export const value = 1;',
+                    '',
+                ].join('\n'),
+            );
+
+            const aliases = await orphanImportsTool.handler({
+                path: relativeImporterPath,
+                includeDynamic: true,
+                maxResults: 20,
+            });
+            assert.equal(aliases.isError, undefined);
+            assert.equal(aliases.structuredContent?.['success'], true);
+            assert.equal(aliases.structuredContent?.['trueOrphanCount'], 0);
+            assert.equal(aliases.structuredContent?.['protectedCount'], 0);
+            assert.equal(aliases.structuredContent?.['aliasResolutionGapCount'], 0);
+            assert.equal(aliases.structuredContent?.['checkedImports'], 4);
+
+            const protectedResult = await orphanImportsTool.handler({
+                path: 'src/copilot/model-gateway/registry/env-byok-compat-importer.js',
+                maxResults: 20,
+            });
+            assert.equal(protectedResult.isError, undefined);
+            assert.equal(protectedResult.structuredContent?.['success'], true);
+            assert.equal(protectedResult.structuredContent?.['trueOrphanCount'], 0);
+            assert.ok(Number(protectedResult.structuredContent?.['protectedCount'] ?? 0) >= 1);
+            assert.ok(
+                String(protectedResult.structuredContent?.['output'] ?? '').includes('protected/unverifiable'),
+            );
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
     });
 
     it('repo_find_orphan_imports clears cached import targets after invalidation', async () => {

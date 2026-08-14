@@ -19,15 +19,6 @@
  * @property {() => import('#copilot/agent/types').AgentStatusSnapshot} getStatusSnapshot
  * @property {(path: string) => void} onCheckpointPath
  * @property {(contextState: { tokens: number; tokenLimit: number; utilization: number } | null) => void} onContextState
- * @property {(prInfo: {
- *     model?: string;
- *     configuredModel?: string;
- *     modelMismatch?: boolean;
- *     sessionId?: string | null;
- *     cost?: number;
- *     quotaSnapshots?: Record<string, unknown>;
- *     ts: number;
- * }) => void} onPrInfo
  * @property {() => boolean} isProcessing
  * @property {() => boolean} dialogLoopActive
  */

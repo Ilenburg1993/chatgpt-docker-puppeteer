@@ -11,7 +11,7 @@ describe('MCP tools/list payload audit', () => {
 
         assert.equal(audit['ok'], true);
         assert.equal(audit['measurement'], 'sdk-in-memory-tools/list');
-        assert.equal(audit['toolCount'], 102);
+        assert.equal(audit['toolCount'], 115);
         assert.equal(audit['withinEnvelopeBudget'], true);
         assert.ok(Number(audit['totalEnvelopeBytes']) > 100_000);
         assert.ok(Number(audit['totalEnvelopeBytes']) < 128 * 1024);

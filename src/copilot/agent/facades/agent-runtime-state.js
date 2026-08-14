@@ -137,7 +137,7 @@ export function readAgentRuntimeSessionId(ctx) {
 /**
  * Lê o bootstrap persistido do dialog loop para inicialização síncrona do runtime.
  *
- * @returns {{ dialogPaused: boolean; prMetrics: Record<string, unknown> | null }}
+ * @returns {{ dialogPaused: boolean; usageMetrics: Record<string, unknown> | null; prMetrics: Record<string, unknown> | null }}
  */
 export function readAgentRuntimeDialogBootstrapState() {
     return readAgentRuntimeDialogBootstrapStateImpl();

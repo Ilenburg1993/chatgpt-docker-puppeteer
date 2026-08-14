@@ -41,7 +41,7 @@ import { log } from '../../ports/logging/index.js';
  *         data: Record<string, unknown>,
  *         meta: { label?: string; description?: string },
  *     ) => Promise<void>;
- *     persistPrMetrics: (label: string, description: string) => Promise<void>;
+ *     persistUsageMetrics: (label: string, description: string) => Promise<void>;
  *     endLoopSpan: (success: boolean) => void;
  * }} DialogBootRunInput
  */
@@ -177,7 +177,7 @@ export async function runDialogLoopBoot(input) {
         if (isBootTimeoutError(bootErr) && (await waitForLateBootReady(input))) {
             log(
                 'WARN',
-                `[DialogLoopManager] Boot READY recuperado dentro da janela zero-PR (${BOOT_LATE_PROTOCOL_GRACE_MS}ms).`,
+                `[DialogLoopManager] Boot READY recuperado dentro da janela sem chamada adicional (${BOOT_LATE_PROTOCOL_GRACE_MS}ms).`,
             );
         } else {
             failBoot(input, bootErr);
@@ -186,6 +186,9 @@ export async function runDialogLoopBoot(input) {
 
     input.bootCircuit.recordSuccess();
     input.costLedger.recordBoot();
-    void input.persistPrMetrics('dialog.prMetrics.boot', 'Persist dialog loop PR metrics after boot');
+    void input.persistUsageMetrics(
+        'dialog.usageMetrics.boot',
+        'Persist dialog usage metrics after boot model call',
+    );
     log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
 }

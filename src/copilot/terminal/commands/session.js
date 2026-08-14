@@ -2899,14 +2899,21 @@ export async function cmdSessionRestore({ println }, snapshotId) {
             println(terminalThemeRow('Expira em', formatTerminalTimeLabel(shadow.expiresAt, { mode: 'dual' })));
         }
     }
-    if (snap['prMetrics']) {
-        const prMetrics = /** @type {{ boots?: number; resumesWithPR?: number; resumesZeroPR?: number }} */ (
-            snap['prMetrics']
-        );
+    const rawUsageMetrics = snap['usageMetrics'] ?? snap['prMetrics'];
+    if (rawUsageMetrics && typeof rawUsageMetrics === 'object') {
+        const usageMetrics = /** @type {{
+         *   boots?: number;
+         *   resumesWithAdditionalModelCall?: number;
+         *   resumesWithoutAdditionalModelCall?: number;
+         *   resumesWithPR?: number;
+         *   resumesZeroPR?: number;
+         * }} */ (rawUsageMetrics);
+        const withCall = Number(usageMetrics.resumesWithAdditionalModelCall ?? usageMetrics.resumesWithPR ?? 0);
+        const withoutCall = Number(usageMetrics.resumesWithoutAdditionalModelCall ?? usageMetrics.resumesZeroPR ?? 0);
         println(
             terminalThemeRow(
-                'Premium Requests',
-                `boots ${Number(prMetrics.boots ?? 0)} · retomadas com PR ${Number(prMetrics.resumesWithPR ?? 0)} · retomadas zero PR ${Number(prMetrics.resumesZeroPR ?? 0)}`,
+                'Chamadas do lifecycle',
+                `boots ${Number(usageMetrics.boots ?? 0)} · retomadas com nova chamada ${withCall} · reuso sem chamada adicional ${withoutCall}`,
             ),
         );
     }

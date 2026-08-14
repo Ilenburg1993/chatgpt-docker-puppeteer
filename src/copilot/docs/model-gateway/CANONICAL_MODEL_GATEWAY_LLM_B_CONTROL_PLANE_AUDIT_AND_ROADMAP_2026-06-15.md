@@ -4,6 +4,13 @@ Data canônica: 2026-06-15
 
 Status: ativo, normativo e continuamente atualizado
 
+> **Reconciliação 2026-08-14:** o `HEAD` atual foi novamente comparado com os itens abertos abaixo. A promoção de
+> `deferred_until_turn_boundary` agora possui executor automático integrado a `assistant.turn_end` em
+> `terminal/events/sdk-session-events.js`, antes do drain da mailbox, usando
+> `terminal/byok/deferred-route-promotion.js`. A promoção continua fail-closed: mesma sessão SDK, mesma idempotency key,
+> autorização explícita registrada e TTL válido; não existe fallback implícito para sessão nova. Os checkboxes históricos
+> correspondentes foram atualizados nesta revisão, e itens sem evidência atual permanecem abertos.
+
 Escopo exclusivo: `src/copilot`
 
 ## 1. Propósito
@@ -1682,13 +1689,18 @@ As descriptions devem explicar à LLM-B:
   - a LLM-B continuou o mesmo turno, emitiu as oito DELTAs, chamou `ask_user`, recebeu `SIM` e encerrou com o marcador
     final esperado;
   - `/tools diag`, `/events`, `/errors 10`, `/health full` e export Markdown passaram sem erro terminal.
-- [ ] Próxima frente estrutural
+- [x] Próxima frente estrutural — promoção same-session no limite seguro do turno
   - [x] implementar comando/caminho terminal controlado para promover o deferimento `deferred_until_turn_boundary` a
     `committed` sem criar sessão nova;
-  - [ ] implementar executor automático em limite de turno para promover deferimentos explicitamente agendados;
-  - repetir `model-gateway-tools-apply-safe` após essa camada para validar troca real de provider/modelo como fluxo de
-    duas etapas naturais: tool-turn retorna deferido, runtime aplica no limite seguro e a próxima continuação permanece
-    na mesma sessão;
+  - [x] implementar executor automático em limite de turno para promover deferimentos explicitamente agendados;
+    - evidência 2026-08-14: `terminal/events/sdk-session-events.js` agenda a promoção em `assistant.turn_end` e só drena
+      a mailbox depois da tentativa; `terminal/byok/deferred-route-promotion.js` exige sessão viva compatível,
+      autorização, TTL e mesma idempotency key;
+    - cobertura: `tests/unit/copilot/terminal/byok/test_deferred_route_promotion.spec.js` e
+      `tests/unit/copilot/test_terminal_sdk_session_events.spec.js`;
+  - [ ] repetir `model-gateway-tools-apply-safe` após essa camada para validar troca real de provider/modelo como fluxo
+    de duas etapas naturais: tool-turn retorna deferido, runtime aplica no limite seguro e a próxima continuação
+    permanece na mesma sessão;
   - ajustar `model_gateway_runtime_reconcile` para reconhecer e completar operações deferidas, em vez de tratar o
     estado como falha genérica.
 
@@ -1765,8 +1777,9 @@ As descriptions devem explicar à LLM-B:
   - repetir o cenário mínimo uma vez com o harness corrigido para obter `PASS` formal, não apenas evidência operacional;
   - investigar os critérios auxiliares que ainda falharam no artefato (`sse-archive-human-source-labels`,
     `sse-archive-human-operational-events`, `byok-real-usage-classified`, `byok-real-operator-health`);
-  - mover a promoção terminal para scheduling automático em `assistant.turn_end` quando a LLM-B pedir explicitamente
-    uma operação `deferred_until_turn_boundary` com confirmação humana/política suficiente;
+  - [x] mover a promoção terminal para scheduling automático em `assistant.turn_end` quando a LLM-B pedir explicitamente
+    uma operação `deferred_until_turn_boundary` com confirmação humana/política suficiente — concluído em 2026-08-14,
+    com promoção antes do drain da próxima mensagem e sem criar sessão nova;
   - atualizar `model_gateway_runtime_reconcile` para inspecionar operações deferidas e explicar o caminho correto de
     promoção sem recomendar nova sessão.
 

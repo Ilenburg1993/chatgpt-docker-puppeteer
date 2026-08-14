@@ -118,6 +118,7 @@ export {
     readRuntimeModelSelection,
     readRuntimePermissionMode,
     readRuntimePrBudgetSnapshot,
+    readRuntimeUsageBudgetSnapshot,
     readSdkModelMetadata,
     readSdkModelStats,
     recoverAgentDialogInputChannel,

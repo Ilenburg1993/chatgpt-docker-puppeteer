@@ -79,6 +79,8 @@ export function summarizeCloudflaredOperationalCounters(samples) {
         totalRequests,
         requestErrors,
         requestErrorRate: requestErrors === null ? null : rateOrNull(requestErrors, totalRequests),
+        requestErrorRateSemantics:
+            'process-lifetime cumulative cloudflared counter; use before/after counter deltas plus fresh smoke/origin diagnostics for change-window health',
         activeTcpSessions,
         totalTcpSessions,
         activeUdpSessions,

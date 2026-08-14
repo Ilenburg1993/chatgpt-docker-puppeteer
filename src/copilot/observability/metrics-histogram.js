@@ -54,8 +54,10 @@
  * @property {number} total - Total de tentativas de recuperação semântica do dialog.
  * @property {number} success - Recuperações concluídas com sucesso.
  * @property {number} failed - Recuperações que falharam.
- * @property {number} zeroPr - Recuperações sem consumo de Premium Request.
- * @property {number} pr - Recuperações que consumiram Premium Request.
+ * @property {number} withoutAdditionalModelCall - Recuperações que reutilizaram o runtime sem nova chamada de modelo.
+ * @property {number} withAdditionalModelCall - Recuperações que precisaram iniciar uma nova chamada de modelo.
+ * @property {number} zeroPr - Alias legacy de withoutAdditionalModelCall.
+ * @property {number} pr - Alias legacy de withAdditionalModelCall.
  * @property {Record<string, number>} byReason - Contagem por motivo.
  * @property {Record<string, number>} byStrategy - Contagem por estratégia.
  * @property {LatencyHistogram} latency - Histograma de duração da recuperação.

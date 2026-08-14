@@ -78,9 +78,12 @@ jobs:
         id: l2_canary
         run: npm run check:copilot:io-l2-canary
 
-      - name: Validate workflow YAMLs
+      - name: Validate Copilot architecture, docs and workflow YAMLs
         id: yaml_check
-        run: node scripts/ci/validate-workflows.mjs
+        run: |
+          npm run copilot:docs:check
+          npm run copilot:architecture:check
+          node scripts/ci/validate-workflows.mjs
 
       - name: Build step summary
         if: always()

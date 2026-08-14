@@ -216,8 +216,8 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
         canonicalEmitter: 'terminal/events/agent-runtime-events.llm.usage',
         publicEvents: ['llm.usage', 'session.usage'],
         accepts: ['assistant.usage', 'session.usage_info', 'llm.usage', 'session.usage'],
-        suppresses: ['wording that implies Premium Request without pr.consumed evidence'],
-        fallback: 'usage is telemetry only; pr.consumed is the only public PR-consumption signal',
+        suppresses: ['wording that infers request-based billing from assistant.usage'],
+        fallback: 'usage is attributed by origin/tokens/AI usage; request-based fields are legacy-only when explicitly received',
         owner: 'event-handlers/usage-classifier.js + terminal/events/agent-runtime-events.js',
     },
     {

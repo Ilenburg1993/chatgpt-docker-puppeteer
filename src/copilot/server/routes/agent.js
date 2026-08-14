@@ -23,7 +23,7 @@ import {
     handlePipeline,
     handleRejectHandoff,
 } from '../../presentation/agent/index.js';
-import { handleGetPrBudget, handleGetQuota } from '../../presentation/system/index.js';
+import { handleGetPrBudget, handleGetQuota, handleGetUsageBudget } from '../../presentation/system/index.js';
 import { validate } from '../middleware/validate.js';
 import { createPresentationRoute } from './presentation-route.js';
 
@@ -108,7 +108,8 @@ export function createAgentRouter() {
     // GET — sem body
     router.get('/context', createPresentationRoute(handleGetContext));
     router.get('/quota', createPresentationRoute(handleGetQuota));
-    router.get('/pr-budget', createPresentationRoute(handleGetPrBudget));
+    router.get('/usage-budget', createPresentationRoute(handleGetUsageBudget));
+    router.get('/pr-budget', createPresentationRoute(handleGetPrBudget)); // deprecated compatibility alias
     router.get('/handoff', createPresentationRoute(handleGetHandoffs));
 
     // POST /inject — rate limit inject

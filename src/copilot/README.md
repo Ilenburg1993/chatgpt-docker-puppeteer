@@ -2,10 +2,19 @@
 
 Hub arquitetural do runtime Copilot local.
 
+Baseline operacional atual (2026-08): o runtime trata uso GitHub Copilot por **AI Credits/tokens/`copilotUsage`** e
+mantém conceitos request-based apenas como compatibilidade legacy quando explicitamente recebidos/restaurados. O MCP
+expõe um control plane governado para Git stage/commit/push, reload do próprio stack e execução/readiness do harness
+LLM-B sem abrir arbitrary shell.
+
 Este diretório tem uma regra simples:
 
 > sempre que existir um conceito análogo no `@github/copilot-sdk`, o código local deve **partir do
 > SDK vanilla** e só depois ampliar ergonomia, UX ou governança.
+
+A autoridade e a precedência dos documentos amplos ficam em [`docs/INDEX.md`](./docs/INDEX.md). Auditorias datadas são
+fotografias históricas até reconciliação explícita com o `HEAD`; este README e os READMEs locais descrevem a topologia
+canônica vigente.
 
 ## Fluxo canônico de ponta a ponta
 
@@ -22,7 +31,7 @@ terminal:llm-b
 Copilot SDK session
   -> event-handlers/               (tradução do vanilla para sinais internos estáveis)
     -> agent/                      (AlwaysAliveAgent + lifecycle/dialog/session)
-      -> presentation/agent-runtime.js (accessor compartilhado do runtime)
+      -> presentation/agent/runtime/ (accessor compartilhado do runtime)
         -> terminal/frontend/      (consumer layer / projections)
           -> terminal/dialog/      (prompt, waiting, render, SSE)
             -> terminal/repl/repl.js    (operador)
@@ -119,7 +128,7 @@ Em resumo:
 ### “Quero melhorar a UX do terminal”
 
 - se a verdade do runtime puder ser compartilhada com outras bordas, comece em
-  `presentation/agent-runtime.js`
+  `presentation/agent/runtime/`
 - se for consumo de runtime: `terminal/frontend/`
 - se for render/prompt/SSE: `terminal/dialog/`
 - se for reação visível a eventos do runtime: `terminal/repl/repl-listeners.js` e

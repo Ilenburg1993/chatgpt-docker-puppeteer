@@ -126,6 +126,7 @@ export function readAgentRuntimeOverview(runtimeId) {
  *     systemPromptFreshness: Record<string, unknown> | null;
  *     lastPrInfo: Record<string, any> | null;
  *     lastLlmUsage: Record<string, any> | null;
+ *     dialogUsageMetrics: Record<string, any> | null;
  *     dialogPrMetrics: Record<string, any> | null;
  * }}
  */
@@ -133,7 +134,9 @@ export function readAgentRuntimeOverviewProjection(runtimeId) {
     const base = readAgentRuntimeOverview(runtimeId);
     const controlState = readRuntimeControlState(base.agent);
     const interactionState = readRuntimeInteractionState(base.agent);
-    const prBudget = readRuntimePrBudgetSnapshot(base.agent);
+    // Compat seam: the legacy-named facade delegates to the modern usage-budget implementation and keeps strict
+    // Vitest mocks from older consumers working while public projections expose `usageMetrics` as canonical.
+    const usageBudget = readRuntimePrBudgetSnapshot(base.agent);
     const systemPromptBinding =
         base.snap['systemPromptBinding'] && typeof base.snap['systemPromptBinding'] === 'object'
             ? /** @type {Record<string, unknown>} */ (base.snap['systemPromptBinding'])
@@ -172,9 +175,10 @@ export function readAgentRuntimeOverviewProjection(runtimeId) {
         pendingQuestionShadowRemainingMs: interactionState.pendingQuestionShadowRemainingMs,
         systemPromptBinding,
         systemPromptFreshness,
-        lastPrInfo: /** @type {Record<string, any> | null} */ (prBudget.lastPrInfo),
-        lastLlmUsage: /** @type {Record<string, any> | null} */ (prBudget.lastLlmUsage),
-        dialogPrMetrics: /** @type {Record<string, any> | null} */ (prBudget.prMetrics),
+        lastPrInfo: /** @type {Record<string, any> | null} */ (usageBudget.lastPrInfo),
+        lastLlmUsage: /** @type {Record<string, any> | null} */ (usageBudget.lastLlmUsage),
+        dialogUsageMetrics: /** @type {Record<string, any> | null} */ (usageBudget.usageMetrics),
+        dialogPrMetrics: /** @type {Record<string, any> | null} */ (usageBudget.prMetrics),
     };
 }
 

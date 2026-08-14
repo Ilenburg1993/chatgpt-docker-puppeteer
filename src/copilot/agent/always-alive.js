@@ -1227,17 +1227,25 @@ export class AlwaysAliveAgent extends EventEmitter {
     }
 
     /**
-     * F41: Métricas de consumo de premium requests do dialog loop.
+     * Métricas canônicas de chamadas de modelo iniciadas pelo lifecycle do dialog loop.
      *
-     * @returns {{ boots: number; resumesWithPR: number; resumesZeroPR: number; totalPR: number } | null}
+     * @returns {import('./dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null}
      */
-    get dialogPrMetrics() {
+    get dialogUsageMetrics() {
         return readAgentDialogPrMetrics(this.ctx);
     }
 
     /**
-     * Último snapshot de billing do PR consumido. Atualizado apenas quando `assistant.usage` é classificado como
-     * `premium_request`; continuações de `ask_user` e usage interno ficam em `llm.usage`.
+     * @deprecated Alias para consumers/snapshots anteriores ao billing usage-based.
+     * @returns {import('./dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null}
+     */
+    get dialogPrMetrics() {
+        return this.dialogUsageMetrics;
+    }
+
+    /**
+     * Snapshot request-based legado eventualmente restaurado de estado antigo. Novos eventos `assistant.usage` não
+     * atualizam mais este campo por inferência.
      *
      * @returns {{ model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null}
      */

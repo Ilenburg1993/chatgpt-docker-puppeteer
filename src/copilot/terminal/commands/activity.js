@@ -330,7 +330,12 @@ function isRoutineDefaultTimelineEntry(entry) {
     if (entry.phase === 'boot') return true;
     if (entry.phase === 'idle') return true;
     if (entry.phase === 'streaming') return true;
-    if (entry.phase === 'system' && label.includes('uso byok sem premium request')) return true;
+    if (
+        entry.phase === 'system' &&
+        (label.includes('uso byok/provider') || label.includes('uso byok sem premium request'))
+    ) {
+        return true;
+    }
     if (entry.phase === 'turn' && (label.includes('processando mensagem') || label.includes('preparando resposta'))) {
         return true;
     }

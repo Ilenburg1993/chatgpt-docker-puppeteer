@@ -24,7 +24,7 @@ import { getSdkErrorFingerprint, getSdkRecoveryPolicy, toSdkOperationError } fro
 import { log } from '../logger.js';
 import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 import { setSessionAutoModelResolver } from './model-resolution-port.js';
-import { approveAll } from './permissions.js';
+import { createConfiguredPermissionHandler } from './permission-controller.js';
 
 export { setSessionAutoModelResolver };
 /**
@@ -74,7 +74,7 @@ export async function resolveSessionCreateModel(model, fallback = DEFAULT_MODEL)
  * @property {string} [model] - Modelo LLM (ex: 'gpt-4.1', 'claude-sonnet-4-5')
  * @property {string} [clientName] - Identificador do client no User-Agent do SDK
  * @property {ReasoningEffortLevel} [reasoningEffort] - Esforco de reasoning (modelos compatíveis)
- * @property {PermissionHandler} [onPermissionRequest] - Handler de permissoes (default: approveAll)
+ * @property {PermissionHandler} [onPermissionRequest] - Handler de permissões (default configurável; efetivo: approve_all)
  * @property {SessionConfig['onUserInputRequest']} [onUserInputRequest] - Handler de input interativo do usuario
  * @property {SessionConfig['onElicitationRequest']} [onElicitationRequest] - Handler de elicitation/form UI do SDK
  * @property {SessionConfig['hooks']} [hooks] - SessionHooks: onPreToolUse, onPostToolUse, onSessionStart, etc.
@@ -434,13 +434,17 @@ function getDefaultGpt5MiniReasoningEffort() {
  */
 function buildSessionConfig(opts, mode) {
     if (!opts.onPermissionRequest) {
-        log('WARN', '[lib/session] onPermissionRequest não fornecido — usando approveAll como fallback');
+        const configuredMode = process.env['AGENT_PERMISSION_MODE']?.trim() || 'approve_all';
+        log(
+            'INFO',
+            `[lib/session] onPermissionRequest não fornecido — usando política padrão configurável '${configuredMode}' (default efetivo: approve_all).`,
+        );
     }
 
     /** @type {Partial<import('@github/copilot-sdk').SessionConfig> & Partial<import('@github/copilot-sdk').ResumeSessionConfig> & { disableResume?: boolean }} */
     const cfg = {
         streaming: opts.streaming ?? true,
-        onPermissionRequest: opts.onPermissionRequest ?? approveAll,
+        onPermissionRequest: opts.onPermissionRequest ?? createConfiguredPermissionHandler(),
     };
     copySdk10SessionBasePassthroughOptions(
         /** @type {Record<string, unknown>} */ (opts),

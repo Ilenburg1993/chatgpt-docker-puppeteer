@@ -17,6 +17,10 @@ vi.mock('#copilot/events', async (importOriginal) => {
             USER_MESSAGE: 'user.message',
             USER_INPUT_REQUESTED: 'user_input.requested',
             USER_INPUT_COMPLETED: 'user_input.completed',
+            SESSION_LIMITS_CHANGED: 'session.session_limits_changed',
+            SESSION_USAGE_CHECKPOINT: 'session.usage_checkpoint',
+            SESSION_LIMITS_EXHAUSTED_REQUESTED: 'session.session_limits_exhausted.requested',
+            SESSION_LIMITS_EXHAUSTED_COMPLETED: 'session.session_limits_exhausted.completed',
         },
     };
 });
@@ -43,18 +47,17 @@ describe('event-handlers/usage wireUsageEvent', () => {
         });
         const { wireUsageEvent } = await import('../../../../src/copilot/event-handlers/usage.js');
         const emit = vi.fn();
-        const onPrInfo = vi.fn();
-        wireUsageEvent(/** @type {any} */ (session), { emit, onPrInfo });
-        return { emit, handlers, onPrInfo };
+        wireUsageEvent(/** @type {any} */ (session), { emit });
+        return { emit, handlers };
     }
 
-    it('emite llm.usage sempre e pr.consumed somente quando há user.message canônico', async () => {
+    it('classifica turno GitHub Copilot por attribution sem inferir Premium Request', async () => {
         const session = {
             sessionId: 'sdk-123',
             __copilotConfiguredModel: 'gpt-5.4',
             __copilotEffectiveModel: 'claude-haiku-4.5',
         };
-        const { emit, handlers, onPrInfo } = await setupUsageHarness(session);
+        const { emit, handlers } = await setupUsageHarness(session);
 
         handlers.get('user.message')?.({ data: { content: 'oi' } });
         handlers.get('assistant.usage')?.({
@@ -63,154 +66,91 @@ describe('event-handlers/usage wireUsageEvent', () => {
                 cost: 0.33,
                 inputTokens: 10,
                 outputTokens: 5,
-                quotaSnapshots: { premium_interactions: { remainingPercentage: 99.1 } },
+                reasoningTokens: 2,
+                serviceRequestId: 'srv-1',
+                copilotUsage: { totalNanoAiu: 1250000 },
             },
         });
 
-        expect(onPrInfo).toHaveBeenCalledTimes(1);
-        expect(onPrInfo).toHaveBeenCalledWith(
+        expect(emit).toHaveBeenCalledWith(
+            'llm.usage',
             expect.objectContaining({
                 model: 'claude-haiku-4.5',
                 configuredModel: 'gpt-5.4',
                 effectiveModel: 'claude-haiku-4.5',
                 modelMismatch: true,
                 sessionId: 'sdk-123',
-                cost: 0.33,
+                classification: 'user_turn',
+                attributionReason: 'user_turn',
+                billingSource: 'github_copilot',
                 inputTokens: 10,
                 outputTokens: 5,
-                quotaSnapshots: { premium_interactions: { remainingPercentage: 99.1 } },
-                classification: 'premium_request',
-                premiumRequest: true,
-                premiumRequestReason: 'user_message',
-                ts: expect.any(Number),
+                reasoningTokens: 2,
+                serviceRequestId: 'srv-1',
+                copilotUsage: { totalNanoAiu: 1250000 },
             }),
         );
-        expect(emit).toHaveBeenCalledWith(
-            'llm.usage',
-            expect.objectContaining({
-                model: 'claude-haiku-4.5',
-                classification: 'premium_request',
-                premiumRequest: true,
-            }),
-        );
-        expect(emit).toHaveBeenCalledWith(
-            'pr.consumed',
-            expect.objectContaining({
-                model: 'claude-haiku-4.5',
-                configuredModel: 'gpt-5.4',
-                effectiveModel: 'claude-haiku-4.5',
-                modelMismatch: true,
-            }),
-        );
+        expect(emit).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
         expect(mocks.log).toHaveBeenCalledWith('WARN', expect.stringContaining('[MODEL_MISMATCH]'));
     });
 
-    it('não contabiliza Premium Request para user.message em sessão BYOK', async () => {
+    it('classifica turno BYOK sem atribuir billing ao GitHub Copilot', async () => {
         const session = {
             sessionId: 'sdk-byok',
             model: 'kilo-auto/free',
-            config: {
-                model: 'kilo-auto/free',
-                provider: { type: 'openai', baseUrl: 'https://example.invalid/v1' },
-            },
+            config: { model: 'kilo-auto/free', provider: { type: 'openai', baseUrl: 'https://example.invalid/v1' } },
             __copilotEffectiveModel: 'kilo-auto/free',
             __copilotByokEnabled: true,
             __copilotByokProfile: 'kilo',
             __copilotByokPreset: 'kilo-code',
             __copilotByokProviderType: 'openai',
         };
-        const { emit, handlers, onPrInfo } = await setupUsageHarness(session);
-
+        const { emit, handlers } = await setupUsageHarness(session);
         handlers.get('user.message')?.({ data: { content: 'turno BYOK' } });
-        handlers.get('assistant.usage')?.({
-            data: {
-                model: 'kilo-auto/free',
-                cost: 0,
-                inputTokens: 100,
-                outputTokens: 20,
-                initiator: 'user',
-            },
-        });
+        handlers.get('assistant.usage')?.({ data: { model: 'kilo-auto/free', cost: 0, initiator: 'user' } });
 
-        expect(onPrInfo).not.toHaveBeenCalled();
         expect(emit).toHaveBeenCalledWith(
             'llm.usage',
             expect.objectContaining({
-                model: 'kilo-auto/free',
-                classification: 'byok_user_message',
-                premiumRequest: false,
-                premiumRequestReason: 'byok_user_message:initiator:user',
+                classification: 'byok_user_turn',
+                attributionReason: 'byok_user_turn:initiator:user',
+                billingSource: 'byok',
                 byokProvider: true,
                 byokProfile: 'kilo',
                 byokPreset: 'kilo-code',
-                byokProviderType: 'openai',
             }),
         );
         expect(emit).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
-        expect(mocks.log).toHaveBeenCalledWith('DEBUG', expect.stringContaining('Telemetria LLM sem Premium Request'));
     });
 
-    it('não contabiliza PR para continuação de ask_user', async () => {
-        const session = {
-            sessionId: 'sdk-456',
-            model: 'gpt-5.4',
-            __copilotEffectiveModel: 'gpt-5.4',
-        };
-        const { emit, handlers, onPrInfo } = await setupUsageHarness(session);
-
-        handlers.get('user_input.requested')?.({ data: { requestId: 'ask-1', question: 'Confirma?' } });
+    it('classifica continuação de ask_user sem nova atribuição de turno', async () => {
+        const { emit, handlers } = await setupUsageHarness({ sessionId: 'sdk-456', model: 'gpt-5.4' });
+        handlers.get('user_input.requested')?.({ data: { requestId: 'ask-1' } });
         handlers.get('user_input.completed')?.({ data: { requestId: 'ask-1', answer: 'SIM' } });
-        handlers.get('assistant.usage')?.({
-            data: {
-                model: 'gpt-5.4',
-                cost: 0.1,
-            },
-        });
+        handlers.get('assistant.usage')?.({ data: { model: 'gpt-5.4', cost: 0.1 } });
 
-        expect(onPrInfo).not.toHaveBeenCalled();
         expect(emit).toHaveBeenCalledWith(
             'llm.usage',
             expect.objectContaining({
-                model: 'gpt-5.4',
                 classification: 'ask_user_continuation',
-                premiumRequest: false,
-                premiumRequestReason: 'user_input_completed_continuation',
+                attributionReason: 'user_input_completed_continuation',
+                billingSource: 'github_copilot',
             }),
         );
-        expect(emit).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
-        expect(mocks.log).toHaveBeenCalledWith('DEBUG', expect.stringContaining('Telemetria LLM sem Premium Request'));
     });
 
-    it('classifica usage emitido antes de user_input.completed como continuação de ask_user sem duplicar completed tardio', async () => {
-        const { emit, handlers, onPrInfo } = await setupUsageHarness({
-            sessionId: 'sdk-late-ask',
-            model: 'gpt-5.4',
-        });
+    it('correlaciona usage anterior ao user_input.completed sem duplicar continuação tardia', async () => {
+        const { emit, handlers } = await setupUsageHarness({ sessionId: 'sdk-late-ask', model: 'gpt-5.4' });
+        handlers.get('user_input.requested')?.({ data: { requestId: 'ask-late' } });
+        handlers.get('assistant.usage')?.({ data: { model: 'gpt-5.4', initiator: 'agent' } });
+        handlers.get('user_input.completed')?.({ data: { requestId: 'ask-late' } });
+        handlers.get('assistant.usage')?.({ data: { model: 'gpt-5.4', initiator: 'agent' } });
 
-        handlers.get('user_input.requested')?.({ data: { requestId: 'ask-late', question: 'Confirma?' } });
-        handlers.get('assistant.usage')?.({
-            data: {
-                model: 'gpt-5.4',
-                cost: 0.1,
-                initiator: 'agent',
-            },
-        });
-        handlers.get('user_input.completed')?.({ data: { requestId: 'ask-late', answer: 'SIM' } });
-        handlers.get('assistant.usage')?.({
-            data: {
-                model: 'gpt-5.4',
-                cost: 0.2,
-                initiator: 'agent',
-            },
-        });
-
-        expect(onPrInfo).not.toHaveBeenCalled();
         expect(emit).toHaveBeenCalledWith(
             'llm.usage',
             expect.objectContaining({
                 classification: 'ask_user_continuation',
-                premiumRequest: false,
-                premiumRequestReason: 'pending_user_input_request_continuation',
+                attributionReason: 'pending_user_input_request_continuation',
                 askUserRequestId: 'ask-late',
             }),
         );
@@ -218,147 +158,70 @@ describe('event-handlers/usage wireUsageEvent', () => {
             'llm.usage',
             expect.objectContaining({
                 classification: 'non_user_initiated',
-                premiumRequest: false,
-                premiumRequestReason: 'initiator:agent',
-            }),
-        );
-        expect(emit).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
-    });
-
-    it('classifica initiator:user com user.message pendente como PR real', async () => {
-        const { emit, handlers, onPrInfo } = await setupUsageHarness({
-            sessionId: 'sdk-user',
-            model: 'gpt-5.3-codex',
-        });
-
-        handlers.get('user.message')?.({ data: { content: 'turno explícito' } });
-        handlers.get('assistant.usage')?.({
-            data: {
-                model: 'gpt-5.3-codex',
-                cost: 1,
-                initiator: 'user',
-            },
-        });
-
-        expect(onPrInfo).toHaveBeenCalledTimes(1);
-        expect(emit).toHaveBeenCalledWith(
-            'llm.usage',
-            expect.objectContaining({
-                classification: 'premium_request',
-                premiumRequest: true,
-                premiumRequestReason: 'user_message:initiator:user',
-                initiator: 'user',
-            }),
-        );
-        expect(emit).toHaveBeenCalledWith(
-            'pr.consumed',
-            expect.objectContaining({
-                classification: 'premium_request',
-                premiumRequest: true,
+                attributionReason: 'initiator:agent',
             }),
         );
     });
 
-    it('não contabiliza PR para usage com initiator ou parentToolCallId', async () => {
-        const { emit, handlers, onPrInfo } = await setupUsageHarness({
-            sessionId: 'sdk-tool',
-            model: 'gpt-5.4',
-        });
+    it('classifica usage de tool/sampling sem fabricar unidade de billing', async () => {
+        const { emit, handlers } = await setupUsageHarness({ sessionId: 'sdk-tool', model: 'gpt-5.4' });
+        handlers.get('assistant.usage')?.({ data: { model: 'gpt-5.4', initiator: 'mcp-sampling' } });
+        handlers.get('assistant.usage')?.({ data: { model: 'gpt-5.4', parentToolCallId: 'call_123' } });
 
-        handlers.get('assistant.usage')?.({
-            data: {
-                model: 'gpt-5.4',
-                cost: 0.1,
-                initiator: 'mcp-sampling',
-            },
-        });
-
-        handlers.get('assistant.usage')?.({
-            data: {
-                model: 'gpt-5.4',
-                cost: 0.2,
-                parentToolCallId: 'call_123',
-            },
-        });
-
-        expect(onPrInfo).not.toHaveBeenCalled();
         expect(emit).toHaveBeenCalledWith(
             'llm.usage',
-            expect.objectContaining({
-                model: 'gpt-5.4',
-                classification: 'non_user_initiated',
-                premiumRequest: false,
-                premiumRequestReason: 'initiator:mcp-sampling',
-            }),
+            expect.objectContaining({ classification: 'non_user_initiated', attributionReason: 'initiator:mcp-sampling' }),
         );
         expect(emit).toHaveBeenCalledWith(
             'llm.usage',
-            expect.objectContaining({
-                classification: 'tool_originated',
-                parentToolCallId: 'call_123',
-                premiumRequest: false,
-                premiumRequestReason: 'parent_tool_call',
-            }),
+            expect.objectContaining({ classification: 'tool_originated', attributionReason: 'parent_tool_call' }),
         );
-        expect(emit).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
     });
 
-    it('normaliza Auto como seleção efetiva em PR user-initiated, sem marcar mismatch', async () => {
-        const session = {
+    it('normaliza Auto como seleção efetiva sem marcar mismatch', async () => {
+        const { emit, handlers } = await setupUsageHarness({
             sessionId: 'sdk-auto',
             __copilotConfiguredModel: 'auto',
             __copilotEffectiveModel: 'auto',
-        };
-        const { emit, handlers, onPrInfo } = await setupUsageHarness(session);
-
-        handlers.get('user.message')?.({ data: { content: 'rode' } });
-        handlers.get('assistant.usage')?.({
-            data: {
-                model: 'claude-haiku-4.5',
-                cost: 0.33,
-            },
         });
+        handlers.get('user.message')?.({ data: { content: 'rode' } });
+        handlers.get('assistant.usage')?.({ data: { model: 'claude-haiku-4.5', cost: 0.33 } });
 
-        expect(onPrInfo).toHaveBeenCalledWith(
+        expect(emit).toHaveBeenCalledWith(
+            'llm.usage',
             expect.objectContaining({
-                model: 'claude-haiku-4.5',
                 configuredModel: 'auto',
                 effectiveModel: 'claude-haiku-4.5',
-                classification: 'premium_request',
-                premiumRequest: true,
-            }),
-        );
-        expect(onPrInfo.mock.calls[0]?.[0]?.modelMismatch ?? false).toBe(false);
-        expect(emit).toHaveBeenCalledWith(
-            'pr.consumed',
-            expect.objectContaining({
-                effectiveModel: 'claude-haiku-4.5',
+                modelMismatch: false,
+                classification: 'user_turn',
             }),
         );
     });
 
-    it('trata assistant.usage sem user.message como uso LLM não atribuído, sem PR', async () => {
-        const { emit, handlers, onPrInfo } = await setupUsageHarness({
-            sessionId: 'sdk-unattributed',
-            model: 'gpt-5.4',
-        });
+    it('encaminha checkpoints/limites de AI Credits e isola request-based wire fields em legacyBilling', async () => {
+        const { emit, handlers } = await setupUsageHarness({ sessionId: 'sdk-limits' });
 
-        handlers.get('assistant.usage')?.({
-            data: {
-                model: 'gpt-5.4',
-                cost: 0.1,
-            },
+        handlers.get('session.session_limits_changed')?.({ data: { sessionLimits: { maxAiCredits: 250 } } });
+        handlers.get('session.usage_checkpoint')?.({
+            data: { totalNanoAiu: 9_000_000, totalPremiumRequests: 4 },
         });
+        handlers.get('session.session_limits_exhausted.requested')?.({ data: { maxAiCredits: 250, usedAiCredits: 251 } });
 
-        expect(onPrInfo).not.toHaveBeenCalled();
         expect(emit).toHaveBeenCalledWith(
-            'llm.usage',
+            'session.limits_changed',
+            expect.objectContaining({ kind: 'limits_changed', maxAiCredits: 250 }),
+        );
+        expect(emit).toHaveBeenCalledWith(
+            'session.usage_checkpoint',
             expect.objectContaining({
-                classification: 'unattributed_llm_usage',
-                premiumRequest: false,
-                premiumRequestReason: 'no_user_message',
+                kind: 'checkpoint',
+                totalNanoAiu: 9_000_000,
+                legacyBilling: { totalPremiumRequests: 4, source: 'sdk_explicit' },
             }),
         );
-        expect(emit).not.toHaveBeenCalledWith('pr.consumed', expect.any(Object));
+        expect(emit).toHaveBeenCalledWith(
+            'session.limits_exhausted.requested',
+            expect.objectContaining({ kind: 'exhausted_requested', maxAiCredits: 250, usedAiCredits: 251 }),
+        );
     });
 });

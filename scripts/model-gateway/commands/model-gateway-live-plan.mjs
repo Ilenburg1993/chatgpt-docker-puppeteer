@@ -184,9 +184,9 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             purpose: 'Persist a fixed baseline of already-observed runtime health so every later live phase can be diffed against the same pre-live file.',
         },
         {
-            id: 'control_no_pr',
+            id: 'control_only',
             order: 3,
-            command: 'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000',
+            command: 'npm run model-gateway:live:llm-b -- --control-only --timeout-ms=180000',
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
@@ -195,17 +195,17 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         {
             id: 'byok_fixture_control_plane',
             order: 4,
-            command: 'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
+            command: 'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --control-only --timeout-ms=240000',
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
             purpose: 'Exercise BYOK control-plane commands against a local OpenAI-compatible fixture.',
         },
         {
-            id: 'byok_real_no_pr_probes',
+            id: 'byok_real_control_only_probes',
             order: 5,
             command:
-                `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`,
+                `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --control-only --timeout-ms=240000`,
             executesModelTurn: false,
             executesRuntimeProbes: true,
             consumesProviderQuota: true,

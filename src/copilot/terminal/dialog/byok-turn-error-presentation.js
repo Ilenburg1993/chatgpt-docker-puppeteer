@@ -83,7 +83,7 @@ export function presentByokTurnFailure(descriptor) {
         .join(' · ');
     return {
         title: 'Rota BYOK',
-        summary: `${humanizeByokFailureLabel(descriptor.failure.operatorLabel)} · sem Premium Request`,
+        summary: `${humanizeByokFailureLabel(descriptor.failure.operatorLabel)} · sem uso do GitHub Copilot/AI Credits`,
         destination: destination || 'destino BYOK não identificado',
         action: humanizeByokFailureLabel(descriptor.failure.operatorAction),
         window: windowParts.length > 0 ? windowParts.join(' · ') : null,

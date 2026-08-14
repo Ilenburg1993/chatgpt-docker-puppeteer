@@ -31,6 +31,10 @@ import {
     EMITTER_SESSION_COMPACTION_COMPLETE,
     EMITTER_SESSION_COMPACTION_START,
     EMITTER_SESSION_ERROR,
+    EMITTER_SESSION_LIMITS_CHANGED,
+    EMITTER_SESSION_LIMITS_EXHAUSTED_COMPLETED,
+    EMITTER_SESSION_LIMITS_EXHAUSTED_REQUESTED,
+    EMITTER_SESSION_USAGE_CHECKPOINT,
     EMITTER_STOPPED,
     EMITTER_SUBAGENT_COMPLETED,
     EMITTER_SUBAGENT_FAILED,
@@ -268,9 +272,9 @@ function renderRuntimeArgsLabel(args) {
 const TOOL_HEARTBEAT_INTERVAL_MS = 10_000;
 const RECOVERABLE_MODEL_ERROR_RENDER_THROTTLE_MS = 30_000;
 const RECOVERABLE_MODEL_CALL_OPERATOR_DETAIL =
-    'roteamento e retry delegados ao SDK; auto é a única recuperação permitida quando aplicável; sem pedido premium confirmado';
+    'roteamento e retry delegados ao SDK; auto é a única recuperação permitida quando aplicável; billing request-based não é inferido pela telemetria';
 const RECOVERABLE_BYOK_MODEL_CALL_OPERATOR_DETAIL =
-    'falha da rota BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque rota/modelo via /byok use ou /byok model; sem pedido premium';
+    'falha da rota BYOK; fallback para Copilot auto bloqueado por contrato; retry automático bloqueado para não prender o terminal; troque rota/modelo via /byok use ou /byok model; sem uso do GitHub Copilot/AI Credits';
 
 /**
  * @returns {boolean}
@@ -320,7 +324,7 @@ function renderProviderFailureMessageForOperator(value) {
     }
     return text
         .replace(/\bprovider\b/giu, 'provedor')
-        .replace(/\bPremium Request\b/giu, 'pedido premium')
+        .replace(/\bPremium Requests?\b/giu, 'billing legacy por request')
         .replace(/\s+/gu, ' ')
         .trim();
 }
@@ -344,7 +348,7 @@ function renderRecoverableByokModelCallErrorForOperator(evt, message) {
         '',
         terminalThemeRow('BYOK', `falha do provedor · ${operatorMessage}`, { role: 'warn' }),
         terminalThemeRow('Ação', 'troque provedor/modelo com /byok use ou /byok model', { role: 'command' }),
-        terminalThemeRow('Recuperação', 'Copilot auto bloqueado por contrato · sem pedido premium', {
+        terminalThemeRow('Recuperação', 'Copilot auto bloqueado por contrato · sem uso do GitHub Copilot/AI Credits', {
             role: 'muted',
         }),
         terminalThemeRow('Contexto', `provedor ${provider} · perfil ${profile} · modelo ${model}`, {
@@ -530,7 +534,7 @@ function resolveByokSessionErrorDescriptor({ errorType, message }) {
         provider ? `provedor ${provider}` : null,
         byok.profile ? `perfil ${byok.profile}` : null,
         model ? `modelo ${model}` : null,
-        'sem pedido premium',
+        'sem uso do GitHub Copilot/AI Credits',
         `ação: ${failure.operatorAction}`,
     ].filter(Boolean);
     return {
@@ -601,7 +605,7 @@ function formatUsageDetail(billing) {
 function formatLlmUsageDetail(evt, billing) {
     const parts = [formatUsageDetail(billing)];
     const classification = renderTerminalLlmUsageClassification(evt?.['classification']);
-    const reason = renderTerminalLlmUsageReason(evt?.['premiumRequestReason']);
+    const reason = renderTerminalLlmUsageReason(evt?.['attributionReason'] ?? evt?.['premiumRequestReason']);
     const inputTokens = typeof evt?.['inputTokens'] === 'number' ? evt['inputTokens'] : null;
     const outputTokens = typeof evt?.['outputTokens'] === 'number' ? evt['outputTokens'] : null;
     if (classification) parts.push(`classe ${classification}`);
@@ -1157,8 +1161,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const showUsage = getShowUsage();
         const shouldPersist = showUsage || billing.mismatch;
         const label = billing.mismatch
-            ? 'Pedido premium classificado com divergência de modelo'
-            : 'Pedido premium classificado';
+            ? 'Billing legacy por request com divergência de modelo'
+            : 'Billing legacy por request';
         recordTerminalActivity('system', label, {
             detail,
             source: 'agent',
@@ -1167,7 +1171,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         });
         if ((showUsage || billing.mismatch) && !isTerminalRenderLocked()) {
             println(
-                terminalThemeRow('Pedido premium', detail, {
+                terminalThemeRow('Billing legacy', detail, {
                     role: billing.mismatch ? 'warn' : 'muted',
                 }),
             );
@@ -1175,13 +1179,48 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         broadcastSse(AGENT_PR_CONSUMED_EVENT, withAgentSseEnvelope(evt, 'agent/pr.consumed'));
     };
 
-    const onLlmUsage = (/** @type {Record<string, unknown>} */ evt) => {
-        const premiumRequest = evt?.['premiumRequest'] === true;
-        const billing = normalizeUsageBilling(evt);
-        broadcastSse(EMITTER_LLM_USAGE, withAgentSseEnvelope(evt, 'agent/llm.usage'));
-        if (premiumRequest) return;
+    const onUsageControl = (/** @type {Record<string, unknown>} */ evt) => {
+        const kind = typeof evt?.['kind'] === 'string' ? evt['kind'] : 'usage';
+        const maxAiCredits = typeof evt?.['maxAiCredits'] === 'number' ? evt['maxAiCredits'] : null;
+        const usedAiCredits = typeof evt?.['usedAiCredits'] === 'number' ? evt['usedAiCredits'] : null;
+        const totalNanoAiu = typeof evt?.['totalNanoAiu'] === 'number' ? evt['totalNanoAiu'] : null;
+        const legacyBilling =
+            evt?.['legacyBilling'] && typeof evt['legacyBilling'] === 'object'
+                ? /** @type {Record<string, unknown>} */ (evt['legacyBilling'])
+                : null;
+        const parts = [];
+        if (usedAiCredits !== null || maxAiCredits !== null) {
+            parts.push(`AI Credits ${usedAiCredits ?? '?'} / ${maxAiCredits ?? 'sem cap local'}`);
+        }
+        if (totalNanoAiu !== null) parts.push(`nanoAIU ${totalNanoAiu}`);
+        if (typeof legacyBilling?.['totalPremiumRequests'] === 'number') {
+            parts.push(`legacy requests ${legacyBilling['totalPremiumRequests']}`);
+        }
+        const detail = parts.join(' · ') || 'usage checkpoint sem contadores numéricos';
+        const isExhausted = kind.startsWith('exhausted_');
+        recordTerminalActivity('system', `Usage Copilot · ${kind}`, {
+            detail,
+            source: 'agent',
+            severity: isExhausted ? 'warn' : 'info',
+            recordHistory: true,
+            updateCurrent: isExhausted,
+            focusMode: 'background',
+        });
+        if ((getShowUsage() || isExhausted) && !isTerminalRenderLocked()) {
+            println(
+                terminalThemeRow('AI Credits', detail, {
+                    role: isExhausted ? 'warn' : 'muted',
+                }),
+            );
+        }
+    };
 
-        if (evt?.['byokProvider'] === true) {
+    const onLlmUsage = (/** @type {Record<string, unknown>} */ evt) => {
+        const billing = normalizeUsageBilling(evt);
+        const billingSource = evt?.['billingSource'] === 'byok' || evt?.['byokProvider'] === true ? 'byok' : 'github_copilot';
+        broadcastSse(EMITTER_LLM_USAGE, withAgentSseEnvelope(evt, 'agent/llm.usage'));
+
+        if (billingSource === 'byok') {
             recordByokProviderModelCallSuccess({
                 routeProfile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
                 providerId:
@@ -1205,9 +1244,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         const operatorDetail = formatLlmUsageOperatorDetail(evt, billing);
         const showUsage = getShowUsage();
         const shouldPersist = showUsage || billing.mismatch;
-        const label = billing.mismatch
-            ? 'Uso BYOK sem pedido premium com divergência de modelo'
-            : 'Uso BYOK sem pedido premium';
+        const sourceLabel = billingSource === 'byok' ? 'Uso BYOK/provider' : 'Uso GitHub Copilot/AI Credits';
+        const label = billing.mismatch ? `${sourceLabel} com divergência de modelo` : sourceLabel;
         recordTerminalActivity('system', label, {
             detail: operatorDetail,
             source: 'agent',
@@ -1385,6 +1423,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
     agent.on(AGENT_SHELL_COMPLETED_EVENT, onShellCompleted);
     agent.on(AGENT_SHELL_DETACHED_COMPLETED_EVENT, onShellDetachedCompleted);
     agent.on(EMITTER_LLM_USAGE, onLlmUsage);
+    agent.on(EMITTER_SESSION_USAGE_CHECKPOINT, onUsageControl);
+    agent.on(EMITTER_SESSION_LIMITS_CHANGED, onUsageControl);
+    agent.on(EMITTER_SESSION_LIMITS_EXHAUSTED_REQUESTED, onUsageControl);
+    agent.on(EMITTER_SESSION_LIMITS_EXHAUSTED_COMPLETED, onUsageControl);
     agent.on(AGENT_PR_CONSUMED_EVENT, onPrConsumed);
     agent.on(AGENT_PR_FALLBACK_MODEL_EVENT, onPrFallbackModel);
     agent.on(EMITTER_DIALOG_BOOT_RECOVERY, onDialogBootRecovery);
@@ -1421,6 +1463,10 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
         agent.off(AGENT_SHELL_COMPLETED_EVENT, onShellCompleted);
         agent.off(AGENT_SHELL_DETACHED_COMPLETED_EVENT, onShellDetachedCompleted);
         agent.off(EMITTER_LLM_USAGE, onLlmUsage);
+        agent.off(EMITTER_SESSION_USAGE_CHECKPOINT, onUsageControl);
+        agent.off(EMITTER_SESSION_LIMITS_CHANGED, onUsageControl);
+        agent.off(EMITTER_SESSION_LIMITS_EXHAUSTED_REQUESTED, onUsageControl);
+        agent.off(EMITTER_SESSION_LIMITS_EXHAUSTED_COMPLETED, onUsageControl);
         agent.off(AGENT_PR_CONSUMED_EVENT, onPrConsumed);
         agent.off(AGENT_PR_FALLBACK_MODEL_EVENT, onPrFallbackModel);
         agent.off(EMITTER_DIALOG_BOOT_RECOVERY, onDialogBootRecovery);

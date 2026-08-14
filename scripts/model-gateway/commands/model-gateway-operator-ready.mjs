@@ -169,9 +169,9 @@ const liveCommands = [
     'npm run model-gateway:live:readiness -- --fail',
     'npm run model-gateway:live:runs -- --limit=8',
     'npm run model-gateway:live:auto-probe',
-    'npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000',
-    'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000',
-    `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=${profile} --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`,
+    'npm run model-gateway:live:llm-b -- --control-only --timeout-ms=180000',
+    'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --control-only --timeout-ms=240000',
+    `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=${profile} --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --control-only --timeout-ms=240000`,
 ];
 function buildPolicyPresetAction(preset) {
     const presetId = optionalString(preset['preset']) ?? 'operator_manual';
