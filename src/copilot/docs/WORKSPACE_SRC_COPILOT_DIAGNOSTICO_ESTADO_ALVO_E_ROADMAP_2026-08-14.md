@@ -3702,3 +3702,152 @@ Assim como `unit-focused`, a missão `benchmark-transport` altera o enum de uma 
 - [ ] **não promover automaticamente** nenhum profile; qualquer mudança permanente continua evidence-gated e separada do benchmark.
 
 O gap residual do benchmark deixa de ser falta de executor. Passa a ser apenas a necessidade de executar a missão uma vez a partir de um host que já conheça o schema atualizado.
+
+## 99. Sexta onda — benchmark representativo cold/L1/L2 isolado
+
+A investigação do cache mostrou que o gap era mais simples que o de transporte. O caminho canônico de `readText`/`readBytes` já implementa:
+
+`L1 -> L2 SQLite -> filesystem -> repopulação dos tiers`.
+
+Além disso, `IO_L2_CACHE_PROFILE` é process-local e `COPILOT_DB_PATH` permite um SQLite isolado. Portanto o benchmark não precisa reiniciar MCP/Cloudflare, nem tocar no `copilot.sqlite` operacional.
+
+### 99.1 Workload e metodologia
+
+Workload fixo do worker:
+
+- `package.json`;
+- `src/copilot/mcp/tools/runtime-health.js`;
+- `src/copilot/mcp/tools/jobs.js`;
+- `src/copilot/infra/io/fs/read-services.js`;
+- este roadmap canônico.
+
+Fases, sempre em processos auxiliares novos:
+
+1. **cold**: L2 `off`, uma leitura cronometrada do workload; cache esperado `l1-miss`;
+2. **L1**: L2 `off`, uma passagem de prime não cronometrada + segunda passagem cronometrada; cache esperado `l1-hit`;
+3. **L2 prime**: profile `experimental`, SQLite temporário próprio, prime do workload e flush;
+4. **L2 restart-style**: novo processo, mesmo SQLite temporário, primeira passagem cronometrada; cache esperado `l2-hit`.
+
+Cada fase comparável usa `5` amostras. O benchmark mede a duração wall-clock da passagem completa sobre o mesmo workload e calcula average/p50/p95/p99.
+
+Critério deliberadamente conservador:
+
+- [x] cinco amostras bem-sucedidas em cada fase;
+- [x] todos os arquivos precisam apresentar o cache-state esperado em cada fase;
+- [x] L2 precisa melhorar o p95 do cold em pelo menos `10%`;
+- [x] `representativeBenchmarkPassed` só fica true quando todas essas condições passam;
+- [x] `autoEnable=false` sempre;
+- [x] mesmo um benchmark favorável apenas suporta avaliação posterior do profile experimental; nunca habilita L2 automaticamente.
+
+Essa metodologia aceita explicitamente um resultado negativo. Se o page cache do SO tornar filesystem cold mais barato que SQLite L2, isso é evidência legítima para **manter L2 off**.
+
+### 99.2 Isolamento e segurança
+
+Novos componentes:
+
+- `src/copilot/mcp/control-plane/io-cache-benchmark-state.js`;
+- `src/copilot/mcp/scripts/io-cache-benchmark-worker.js`;
+- `src/copilot/mcp/scripts/scheduled-io-cache-benchmark-runner.js`.
+
+Propriedades:
+
+- [x] requestId gerado no servidor e validado por regex estrita;
+- [x] workload não é parametrizável pelo usuário;
+- [x] worker modes são allowlisted: `cold`, `l1`, `l2-prime`, `l2`;
+- [x] banco isolado sob `src/copilot/.ai/mcp/io-cache-benchmark/<requestId>/copilot.sqlite`;
+- [x] root e request dir precisam ser diretórios reais, não symlinks;
+- [x] `COPILOT_DB_PATH` e `IO_L2_CACHE_PROFILE` existem apenas no processo filho;
+- [x] banco operacional não é alterado;
+- [x] worker faz flush do L2 e fecha o SQLite;
+- [x] runner remove todo o diretório temporário em `finally`;
+- [x] child output é bounded;
+- [x] worker timeout é bounded, com SIGTERM e fallback SIGKILL;
+- [x] estado final persistido fica fora do diretório temporário;
+- [x] nenhuma nova MCP tool foi criada.
+
+### 99.3 Integração com autonomia e runtime health
+
+`delegate_to_repo_autonomy_runner` recebeu a missão fixa `benchmark-io-cache`:
+
+- dry-run descreve `mcp_runtime_health -> scheduled_io_cache_benchmark_runner -> mcp_runtime_health`;
+- execução real apenas agenda o runner detached;
+- não aceita path/workload/profile de cache arbitrário;
+- persiste audit event;
+- retorna `autoEnable=false` e `isolatedDb=true`.
+
+`mcp_runtime_health` agora expõe:
+
+- `metrics.ioCacheBenchmark` — resumo compacto do último estado persistido;
+- `metrics.ioCachePlanWithBenchmark` — `buildIoCacheTierPlan()` recalculado com a evidência real do benchmark e com o número real de arquivos do índice.
+
+Isto corrige uma limitação anterior: `ioRuntime.cache.plan` ainda era construído sem `workspaceFiles` e sem evidência persistida, enquanto a projeção nova consegue decidir sobre dados reais.
+
+### 99.4 Validação proporcional
+
+Nenhuma suíte ampla foi executada.
+
+Inspeção estática:
+
+- [x] `repo_find_orphan_imports` em `src/copilot/mcp`: 104 arquivos, 257 imports locais, `0` órfãos e `0` parse errors;
+- [x] worker e runner passaram em `repo_file_outline` sem parse error;
+- [x] architecture contract passou a exigir os dois scripts.
+
+Typecheck isolado foi usado somente por haver novos scripts `@ts-check`/JSDoc:
+
+- `e56ee4d0-c601-4695-ac39-ce9e4789df5f`: exit `2`, ~`8,38s`; somente implicit-any/narrowing/index-signature no código novo;
+- correções locais de JSDoc e tipo de `finalState`;
+- `6f2120f2-7ed0-4945-85ca-e41b8699064b`: exit `2`, ~`5,57s`; restaram somente 4 acessos TS4111 no mesmo `finally`;
+- correção mecânica para bracket notation;
+- `131597b2-8dc2-41fa-a602-72e65386a206`: exit `0`, ~`5,80s`.
+
+- [x] failure localizado -> correção localizada -> rerun apenas do typecheck;
+- [x] nenhum `unit-mcp`, `mcp-fast`, `mcp-full`, `unit-copilot` ou `copilot-fast` foi executado.
+
+### 99.5 Publicação e prova live
+
+Commit:
+
+`a29d6e7772e5f06b439f3cf937578fc502d82c6e`
+
+Mensagem:
+
+`feat(copilot): benchmark io cache tiers`
+
+- [x] 10 arquivos causais;
+- [x] 557 inserções / 1 remoção;
+- [x] `CAPABILITIES_VERSION` avançou de `41` para `42`;
+- [x] push upstream-only concluiu com `ahead=0`, `behind=0`;
+- [x] self-reload `mcp-reload-86119e06-af11-4d1a-b572-edcdb27423c9`, profile `quic`, exit code `0`;
+- [x] OAuth/registry/SSE pós-reload verdes;
+- [x] registry remoto/local `115/115`;
+- [x] `tools/list responseBytes=130.131`, margem de `941` bytes sob 128 KiB;
+- [x] runtime health final `ok=true`.
+
+Prova live antes da primeira execução:
+
+- [x] `ioCacheBenchmark=null`;
+- [x] L2 runtime continua `profile=off`, `configurationValid=true`;
+- [x] índice atual: `2.138` arquivos;
+- [x] `ioCachePlanWithBenchmark.evidence.workspaceFiles=2138`;
+- [x] `representativeBenchmarkPassed=false`;
+- [x] `l2Decision=benchmark-required`;
+- [x] nenhuma promoção foi inferida pela existência do executor.
+
+### 99.6 Limitação residual da sessão atual
+
+Uma nova consulta de schema ao connector confirmou que o host desta conversa continua expondo o enum antigo de `delegate_to_repo_autonomy_runner`:
+
+`diagnose-mcp | validate-mcp-full | maintenance-safe-dry-run`.
+
+Portanto `validate-focused`, `benchmark-transport` e `benchmark-io-cache` estão carregados no servidor, mas não são invocáveis por este host sem uma nova conversa/reconexão.
+
+- [x] não executar fallback manual para contornar o schema cache;
+- [x] não usar validator amplo como substituto;
+- [ ] em sessão fresca, confirmar `CAPABILITIES_VERSION=42` e o enum novo;
+- [ ] dry-run `benchmark-io-cache`;
+- [ ] executar `benchmark-io-cache` real;
+- [ ] ler `mcp_runtime_health.metrics.ioCacheBenchmark` até estado terminal sem polling agressivo;
+- [ ] confirmar `cleanedTemporaryDb=true`;
+- [ ] decidir L2 somente a partir do resultado real: `keep-off` ou avaliação separada do profile experimental.
+
+O gap cold/L1/L2 também deixa de ser falta de executor. Assim como no benchmark de transporte, o único bloqueio restante é o schema cache do host desta conversa.
