@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { access } from 'node:fs/promises';
+import { access, stat } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +53,27 @@ const DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 25;
 const DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 100_000;
 const args = process.argv.slice(2);
 const argSet = new Set(args);
+let readinessStoreContext = null;
+let catalogStaticReadinessCache = null;
+
+function getReadinessStores() {
+    if (readinessStoreContext) return readinessStoreContext;
+    readinessStoreContext = {
+        sourceStore: new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH }),
+        sqliteStore: new SqliteModelGatewayCatalogStore({ dbPath: DEFAULT_SQLITE_PATH }),
+    };
+    return readinessStoreContext;
+}
+
+async function catalogFileIdentity(filePath) {
+    try {
+        const info = await stat(filePath);
+        return `${info.size}:${Math.trunc(info.mtimeMs)}:${Math.trunc(info.ctimeMs)}`;
+    } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'unknown';
+        return `unavailable:${code}:${Date.now()}`;
+    }
+}
 
 let persistentRedactionRequestSequence = 0;
 /** @type {Map<string, { worker: Worker; pending: Map<string, { startedAt: number; timer: NodeJS.Timeout; resolve: Function; reject: Function }> }>} */
@@ -366,14 +387,29 @@ const redactionWorkersPromise = Promise.all([
     (results) => ({ results, error: null }),
     (error) => ({ results: null, error: error instanceof Error ? error : new Error(String(error)) }),
 );
-const sourceStore = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-const sqliteStore = new SqliteModelGatewayCatalogStore({ dbPath: DEFAULT_SQLITE_PATH });
+const { sourceStore, sqliteStore } = getReadinessStores();
+const sourceCatalogIdentity = await timedAsync('sourceCatalogIdentityRead', () => catalogFileIdentity(sourceStore.filePath));
+const cachedSourceCatalog =
+    catalogStaticReadinessCache && catalogStaticReadinessCache.identity === sourceCatalogIdentity
+        ? catalogStaticReadinessCache
+        : null;
+const sourceSnapshotPromise = cachedSourceCatalog
+    ? Promise.resolve(cachedSourceCatalog.sourceSnapshot)
+    : timedAsync('sourceSnapshotRead', () => sourceStore.readSnapshot());
+if (cachedSourceCatalog) phaseTimingsMs['sourceSnapshotRead'] = 0;
 const [sourceSnapshot, sqliteSnapshot, sqliteDiagnostics] = await Promise.all([
-    timedAsync('sourceSnapshotRead', () => sourceStore.readSnapshot()),
+    sourceSnapshotPromise,
     timedAsync('sqliteSnapshotRead', () => sqliteStore.readSnapshot()),
     timedAsync('sqliteStorageDiagnostics', () => sqliteStore.readStorageDiagnostics()),
 ]);
-const integrity = timedSync('catalogIntegrityAudit', () => auditModelGatewayCatalogSnapshotIntegrity(sourceSnapshot));
+const integrity = cachedSourceCatalog
+    ? cachedSourceCatalog.integrity
+    : timedSync('catalogIntegrityAudit', () => auditModelGatewayCatalogSnapshotIntegrity(sourceSnapshot));
+if (cachedSourceCatalog) phaseTimingsMs['catalogIntegrityAudit'] = 0;
+if (!cachedSourceCatalog) {
+    catalogStaticReadinessCache = { identity: sourceCatalogIdentity, sourceSnapshot, integrity };
+}
+const sourceCatalogStaticCacheHit = cachedSourceCatalog !== null;
 const parity = timedSync('catalogSqliteParity', () => compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot));
 const secretAuditValues = timedSync('secretAuditEnvCollection', () => collectModelGatewaySecretAuditEnvValues(process.env));
 const secretRegistry = createEnvSecretRegistry();
@@ -653,6 +689,9 @@ const summary = {
         totalMs: readinessTotalMs,
         phasesMs: phaseTimingsMs,
         slowestPhase,
+    },
+    cache: {
+        sourceCatalogStaticHit: sourceCatalogStaticCacheHit,
     },
     checks,
     integrity: {
