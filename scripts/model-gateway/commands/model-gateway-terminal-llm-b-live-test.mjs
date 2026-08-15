@@ -120,6 +120,8 @@ function hasCommand(name) {
 const HUMAN_TERMINAL_SHUTDOWN_RE = /Terminal\s+fechado; API local permanece ativa até o processo encerrar/u;
 const LEGACY_TERMINAL_SHUTDOWN_RE = /\[terminal\]\s+(?:readline fechado|Encerrando sessão)/iu;
 const LIVE_TEST_COPILOT_MODEL = process.env.COPILOT_LIVE_TEST_COPILOT_MODEL || 'auto';
+const MODEL_GATEWAY_CONTROL_PLANE_COPILOT_MODEL =
+    process.env.COPILOT_MODEL_GATEWAY_CONTROL_PLANE_MODEL || 'gpt-5-mini';
 
 function hasHumanTerminalShutdownCopy(plain) {
     const text = String(plain ?? '');
@@ -4324,7 +4326,7 @@ function liveScenarioKind({
     return 'canonical_full_turn';
 }
 
-async function scheduleFreshSdkSessionForCanonicalScenario({ enabled }) {
+async function scheduleFreshSdkSessionForCanonicalScenario({ enabled, model = LIVE_TEST_COPILOT_MODEL }) {
     if (!enabled) return { attempted: false, ok: true, reason: 'disabled' };
     try {
         const [{ scheduleAgentSdkSessionBootSelection }, { persistAgentRuntimeStatePartial }] = await Promise.all([
@@ -4333,7 +4335,7 @@ async function scheduleFreshSdkSessionForCanonicalScenario({ enabled }) {
         ]);
         const clearedBinding = await persistAgentRuntimeStatePartial(
             {
-                model: LIVE_TEST_COPILOT_MODEL,
+                model,
                 byokSessionBinding: null,
                 modelGatewayActiveRoute: null,
                 sdkSessionBootDecision: null,
@@ -8055,6 +8057,7 @@ async function main() {
         !reuseSdkSession && !controlOnly && !sessionCycle && !byokControlProbe && !autoControlProbe && !modelControlProbe;
     const sdkSessionBootSelection = await scheduleFreshSdkSessionForCanonicalScenario({
         enabled: shouldForceFreshSdkSession,
+        model: modelGatewayControlPlaneProbes ? MODEL_GATEWAY_CONTROL_PLANE_COPILOT_MODEL : LIVE_TEST_COPILOT_MODEL,
     });
     if (!sdkSessionBootSelection.ok) {
         const blocker = {
@@ -8140,7 +8143,9 @@ async function main() {
             ...(modelControlProbe ? { COPILOT_BYOK_ENABLED: 'false' } : {}),
             ...(realByok?.env ?? {}),
             COPILOT_LOG_LEVEL: 'INFO',
-            COPILOT_MODEL: LIVE_TEST_COPILOT_MODEL,
+            COPILOT_MODEL: modelGatewayControlPlaneProbes
+                ? MODEL_GATEWAY_CONTROL_PLANE_COPILOT_MODEL
+                : LIVE_TEST_COPILOT_MODEL,
             COPILOT_REASONING_EFFORT: 'high',
             COPILOT_SDK_EXCLUDED_TOOLS: appendCsvEnvValue('COPILOT_SDK_EXCLUDED_TOOLS', 'session_compact'),
             TERMINAL_DISPLAY_PRESET: process.env.TERMINAL_DISPLAY_PRESET ?? 'default',

@@ -416,6 +416,7 @@ export function buildModelGatewayControlPlaneHostEnv(baseEnv = process.env) {
     if (genericApiKey) env['COPILOT_BYOK_API_KEY'] = genericApiKey;
     if (genericBearerToken) env['COPILOT_BYOK_BEARER_TOKEN'] = genericBearerToken;
     env['COPILOT_BYOK_ENABLED'] = 'false';
+    env['COPILOT_TERMINAL_LOAD_DOTENV_LOCAL'] = 'false';
     return env;
 }
 
