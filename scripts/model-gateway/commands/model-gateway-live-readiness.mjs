@@ -1,5 +1,7 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process';
 import { access } from 'node:fs/promises';
+import { performance } from 'node:perf_hooks';
 import path from 'node:path';
 import { COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH, REPO_ROOT } from '../index.mjs';
 
@@ -8,7 +10,6 @@ import {
     JsonModelGatewayCatalogStore,
     SqliteModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
-    auditModelGatewayValueRedaction,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     buildModelGatewayRuntimeSelectorPlan,
@@ -33,6 +34,7 @@ loadModelGatewayDotenv();
 
 const ROOT = REPO_ROOT;
 const LIVE_RUNNER_PATH = COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH;
+const REDACTION_WORKER_PATH = path.join(ROOT, 'scripts/model-gateway/commands/model-gateway-live-redaction-worker.mjs');
 const DEFAULT_SQLITE_PATH = path.join(ROOT, 'data/copilot.sqlite');
 const TERMINAL_LIVE_ROUTE_PROFILES = Object.freeze(['repo_agent', 'code', 'tool_agent']);
 const TERMINAL_LIVE_PREFERRED_PROBE_KINDS = Object.freeze(['live_tool_protocol', 'live_ask_user']);
@@ -49,6 +51,108 @@ const DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 25;
 const DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 100_000;
 const args = process.argv.slice(2);
 const argSet = new Set(args);
+const readinessStartedAt = performance.now();
+/** @type {Record<string, number>} */
+const phaseTimingsMs = {};
+
+/** @template T @param {string} name @param {() => Promise<T>} task @returns {Promise<T>} */
+async function timedAsync(name, task) {
+    const startedAt = performance.now();
+    try {
+        return await task();
+    } finally {
+        phaseTimingsMs[name] = Number((performance.now() - startedAt).toFixed(3));
+    }
+}
+
+/** @template T @param {string} name @param {() => T} task @returns {T} */
+function timedSync(name, task) {
+    const startedAt = performance.now();
+    try {
+        return task();
+    } finally {
+        phaseTimingsMs[name] = Number((performance.now() - startedAt).toFixed(3));
+    }
+}
+
+/**
+ * Run one fixed redaction audit in an isolated process so catalog and SQLite scanning can use separate CPU cores.
+ * No paths, secrets or commands are passed through argv; the worker uses the same fixed stores and inherited env.
+ *
+ * @param {'catalog' | 'sqlite'} mode
+ * @param {number} maxRowsPerTable
+ * @returns {Promise<{ audit: { ok: boolean; leakCount: number; scannedStringCount: number; sampleCount: number; tableCount?: number }; durationMs: number; workerDurationMs: number; sourceSnapshotId: string | null }>}
+ */
+function runRedactionWorker(mode, maxRowsPerTable) {
+    return new Promise((resolvePromise, rejectPromise) => {
+        const startedAt = performance.now();
+        let stdout = '';
+        let stderr = '';
+        let settled = false;
+        let timedOut = false;
+        const child = spawn(
+            process.execPath,
+            [
+                REDACTION_WORKER_PATH,
+                `--mode=${mode}`,
+                `--sqlite-redaction-max-rows-per-table=${String(maxRowsPerTable)}`,
+            ],
+            {
+                cwd: ROOT,
+                env: process.env,
+                stdio: ['ignore', 'pipe', 'pipe'],
+            },
+        );
+        const appendBounded = (current, chunk) => (current + String(chunk)).slice(-64 * 1024);
+        child.stdout.on('data', (chunk) => {
+            stdout = appendBounded(stdout, chunk);
+        });
+        child.stderr.on('data', (chunk) => {
+            stderr = appendBounded(stderr, chunk);
+        });
+        const timer = setTimeout(() => {
+            timedOut = true;
+            child.kill('SIGTERM');
+        }, 30_000);
+        timer.unref?.();
+        const finish = (error = null) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (error) {
+                rejectPromise(error);
+                return;
+            }
+            try {
+                const line = stdout.trim().split('\n').filter(Boolean).at(-1) ?? '';
+                const parsed = line ? JSON.parse(line) : null;
+                if (!parsed || parsed.success !== true || !parsed.audit) {
+                    throw new Error((parsed?.error ?? stderr) || `redaction worker ${mode} returned no audit`);
+                }
+                resolvePromise({
+                    audit: parsed.audit,
+                    durationMs: Number((performance.now() - startedAt).toFixed(3)),
+                    workerDurationMs: Number(parsed.durationMs ?? 0),
+                    sourceSnapshotId: typeof parsed.sourceSnapshotId === 'string' ? parsed.sourceSnapshotId : null,
+                });
+            } catch (parseError) {
+                rejectPromise(parseError instanceof Error ? parseError : new Error(String(parseError)));
+            }
+        };
+        child.once('error', (error) => finish(error));
+        child.once('exit', (code, signal) => {
+            if (timedOut) {
+                finish(new Error(`redaction worker ${mode} timed out`));
+                return;
+            }
+            if (code !== 0) {
+                finish(new Error(stderr || `redaction worker ${mode} exited with ${String(code)}${signal ? ` (${signal})` : ''}`));
+                return;
+            }
+            finish();
+        });
+    });
+}
 
 if (argSet.has('--help') || argSet.has('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning] [--sqlite-runtime-health] [--redaction-max-rows-per-table N] [--deep-redaction]
@@ -233,35 +337,41 @@ if (json) {
         }
     });
 }
+const redactionWorkersPromise = Promise.all([
+    runRedactionWorker('catalog', sqliteRedactionMaxRowsPerTable),
+    runRedactionWorker('sqlite', sqliteRedactionMaxRowsPerTable),
+]).then(
+    (results) => ({ results, error: null }),
+    (error) => ({ results: null, error: error instanceof Error ? error : new Error(String(error)) }),
+);
 const sourceStore = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
 const sqliteStore = new SqliteModelGatewayCatalogStore({ dbPath: DEFAULT_SQLITE_PATH });
-const sourceSnapshot = await sourceStore.readSnapshot();
-const sqliteSnapshot = await sqliteStore.readSnapshot();
-const sqliteDiagnostics = await sqliteStore.readStorageDiagnostics();
-const integrity = auditModelGatewayCatalogSnapshotIntegrity(sourceSnapshot);
-const parity = compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot);
-const secretAuditValues = collectModelGatewaySecretAuditEnvValues(process.env);
-const catalogRedaction = auditModelGatewayValueRedaction(sourceSnapshot, {
-    surface: 'json:catalog',
-    rootPath: 'catalog',
-    additionalSecrets: secretAuditValues,
-});
-const sqliteRedaction = await sqliteStore.auditStoredPayloadRedaction({
-    additionalSecrets: secretAuditValues,
-    maxRowsPerTable: sqliteRedactionMaxRowsPerTable,
-});
+const [sourceSnapshot, sqliteSnapshot, sqliteDiagnostics] = await Promise.all([
+    timedAsync('sourceSnapshotRead', () => sourceStore.readSnapshot()),
+    timedAsync('sqliteSnapshotRead', () => sqliteStore.readSnapshot()),
+    timedAsync('sqliteStorageDiagnostics', () => sqliteStore.readStorageDiagnostics()),
+]);
+const integrity = timedSync('catalogIntegrityAudit', () => auditModelGatewayCatalogSnapshotIntegrity(sourceSnapshot));
+const parity = timedSync('catalogSqliteParity', () => compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot));
+const secretAuditValues = timedSync('secretAuditEnvCollection', () => collectModelGatewaySecretAuditEnvValues(process.env));
 const secretRegistry = createEnvSecretRegistry();
-const fileHealthRecords = listByokProviderModelHealth();
+const fileHealthRecords = timedSync('fileRuntimeHealthRead', () => listByokProviderModelHealth());
 let sqliteHealthRecords = [];
 let sqliteRuntimeError = null;
 if (includeSqliteRuntimeHealth) {
     try {
-        sqliteHealthRecords = await sqliteStore.listLatestRuntimeHealthRecords({ limit: SQLITE_RUNTIME_HEALTH_READ_LIMIT });
+        sqliteHealthRecords = await timedAsync('sqliteRuntimeHealthRead', () =>
+            sqliteStore.listLatestRuntimeHealthRecords({ limit: SQLITE_RUNTIME_HEALTH_READ_LIMIT }),
+        );
     } catch (error) {
         sqliteRuntimeError = error instanceof Error ? error.message : String(error);
     }
+} else {
+    phaseTimingsMs['sqliteRuntimeHealthRead'] = 0;
 }
-const healthRecords = mergeByokProviderHealthRecords(fileHealthRecords, sqliteHealthRecords);
+const healthRecords = timedSync('runtimeHealthMerge', () =>
+    mergeByokProviderHealthRecords(fileHealthRecords, sqliteHealthRecords),
+);
 const sqliteProbeOnlyRecords = sqliteHealthRecords.filter((record) => record?.['runtimeHealthStatus'] === 'probe-only');
 const sqliteRuntimeProbeProofRecords = sqliteHealthRecords.filter(
     (record) =>
@@ -271,6 +381,7 @@ const sqliteRuntimeProbeProofRecords = sqliteHealthRecords.filter(
         typeof record['probes'] === 'object' &&
         Object.values(record['probes']).some((probe) => probe && typeof probe === 'object' && probe['ok'] === true),
 );
+const eligibilityStartedAt = performance.now();
 const runtimeAccountOverlays = deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords);
 const evaluationNow = new Date();
 const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
@@ -299,62 +410,102 @@ const effectiveSnapshot = {
         effectiveEligibility.run,
     ],
 };
-const allowProbeSelection = auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
-    strict: false,
-    secretRegistry,
-});
-const strictAccessSelection = auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
-    strict: true,
-    secretRegistry,
-});
-const effectiveStrictSelection = auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
-    strict: true,
-    secretRegistry,
-});
-const postRuntimeEffectiveSelection = auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
-    strict: true,
-    secretRegistry,
-    runtimeHealthRecords: healthRecords,
-});
-const runtimeSelectionComparison = compareModelGatewaySelectionAudits(effectiveStrictSelection, postRuntimeEffectiveSelection);
-const runtimeSelectionPolicy = resolveModelGatewaySelectionPolicy(runtimeSelectionComparison, { mode: 'metadata_first' });
-const runtimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(runtimeSelectionPolicy, {
-    source: 'model-gateway-live-readiness',
-    requireRuntimeEnvReady: true,
-    env: process.env,
-});
-const terminalLiveBaseSelection = auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
-    strict: true,
-    secretRegistry,
-    profiles: TERMINAL_LIVE_ROUTE_PROFILES,
-});
-const terminalLivePostRuntimeSelection = auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
-    strict: true,
-    secretRegistry,
-    profiles: TERMINAL_LIVE_ROUTE_PROFILES,
-    runtimeHealthRecords: healthRecords,
-    preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
-    blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
-    temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
-});
-const terminalLiveRuntimeSelectionComparison = compareModelGatewaySelectionAudits(
-    terminalLiveBaseSelection,
-    terminalLivePostRuntimeSelection,
+phaseTimingsMs['eligibilityEvaluation'] = Number((performance.now() - eligibilityStartedAt).toFixed(3));
+const selectionStartedAt = performance.now();
+const allowProbeSelection = timedSync('selectionAllowProbeAudit', () =>
+    auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
+        strict: false,
+        secretRegistry,
+    }),
 );
-const terminalLiveRuntimeSelectionPolicy = resolveModelGatewaySelectionPolicy(terminalLiveRuntimeSelectionComparison, {
-    mode: 'prefer_runtime_proved',
-});
-const terminalLiveRuntimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(terminalLiveRuntimeSelectionPolicy, {
-    source: 'model-gateway-live-readiness:terminal-live',
-    requireRuntimeEnvReady: true,
-    requireAgentProbeProfiles: [...TERMINAL_LIVE_REQUIRE_AGENT_PROBE_PROFILES],
-    env: process.env,
-    runtimeHealthRecords: healthRecords,
-    preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
-    blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
-    temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
-});
-const runnerExists = await fileExists(LIVE_RUNNER_PATH);
+const strictAccessSelection = timedSync('selectionStrictAccessAudit', () =>
+    auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
+        strict: true,
+        secretRegistry,
+    }),
+);
+const effectiveStrictSelection = timedSync('selectionEffectiveStrictAudit', () =>
+    auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
+        strict: true,
+        secretRegistry,
+    }),
+);
+const postRuntimeEffectiveSelection = timedSync('selectionPostRuntimeAudit', () =>
+    auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
+        strict: true,
+        secretRegistry,
+        runtimeHealthRecords: healthRecords,
+    }),
+);
+const runtimeSelectionComparison = timedSync('runtimeSelectionComparison', () =>
+    compareModelGatewaySelectionAudits(effectiveStrictSelection, postRuntimeEffectiveSelection),
+);
+const runtimeSelectionPolicy = timedSync('runtimeSelectionPolicy', () =>
+    resolveModelGatewaySelectionPolicy(runtimeSelectionComparison, { mode: 'metadata_first' }),
+);
+const runtimeSelectorPlan = timedSync('runtimeSelectorPlan', () =>
+    buildModelGatewayRuntimeSelectorPlan(runtimeSelectionPolicy, {
+        source: 'model-gateway-live-readiness',
+        requireRuntimeEnvReady: true,
+        env: process.env,
+    }),
+);
+const terminalLiveBaseSelection = timedSync('terminalLiveBaseSelectionAudit', () =>
+    auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
+        strict: true,
+        secretRegistry,
+        profiles: TERMINAL_LIVE_ROUTE_PROFILES,
+    }),
+);
+const terminalLivePostRuntimeSelection = timedSync('terminalLivePostRuntimeAudit', () =>
+    auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
+        strict: true,
+        secretRegistry,
+        profiles: TERMINAL_LIVE_ROUTE_PROFILES,
+        runtimeHealthRecords: healthRecords,
+        preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
+        blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
+        temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
+    }),
+);
+const terminalLiveRuntimeSelectionComparison = timedSync('terminalLiveSelectionComparison', () =>
+    compareModelGatewaySelectionAudits(terminalLiveBaseSelection, terminalLivePostRuntimeSelection),
+);
+const terminalLiveRuntimeSelectionPolicy = timedSync('terminalLiveSelectionPolicy', () =>
+    resolveModelGatewaySelectionPolicy(terminalLiveRuntimeSelectionComparison, {
+        mode: 'prefer_runtime_proved',
+    }),
+);
+const terminalLiveRuntimeSelectorPlan = timedSync('terminalLiveSelectorPlan', () =>
+    buildModelGatewayRuntimeSelectorPlan(terminalLiveRuntimeSelectionPolicy, {
+        source: 'model-gateway-live-readiness:terminal-live',
+        requireRuntimeEnvReady: true,
+        requireAgentProbeProfiles: [...TERMINAL_LIVE_REQUIRE_AGENT_PROBE_PROFILES],
+        env: process.env,
+        runtimeHealthRecords: healthRecords,
+        preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
+        blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
+        temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
+    }),
+);
+phaseTimingsMs['selectionAndSelectorPlans'] = Number((performance.now() - selectionStartedAt).toFixed(3));
+const runnerExists = await timedAsync('liveRunnerPresenceCheck', () => fileExists(LIVE_RUNNER_PATH));
+const redactionWorkers = await redactionWorkersPromise;
+if (redactionWorkers.error || !redactionWorkers.results) {
+    throw redactionWorkers.error ?? new Error('redaction workers returned no results');
+}
+const [catalogRedactionWorker, sqliteRedactionWorker] = redactionWorkers.results;
+if (catalogRedactionWorker.sourceSnapshotId !== sourceSnapshot.snapshotId) {
+    throw new Error(
+        `catalog redaction worker snapshot mismatch: expected ${sourceSnapshot.snapshotId}, got ${String(catalogRedactionWorker.sourceSnapshotId)}`,
+    );
+}
+const catalogRedaction = catalogRedactionWorker.audit;
+const sqliteRedaction = sqliteRedactionWorker.audit;
+phaseTimingsMs['catalogRedactionAudit'] = catalogRedactionWorker.durationMs;
+phaseTimingsMs['sqliteRedactionAudit'] = sqliteRedactionWorker.durationMs;
+phaseTimingsMs['catalogRedactionWorkerCore'] = catalogRedactionWorker.workerDurationMs;
+phaseTimingsMs['sqliteRedactionWorkerCore'] = sqliteRedactionWorker.workerDurationMs;
 const strictSelectedDispositions = selectedDispositions(strictAccessSelection);
 const effectiveSelectedDispositions = selectedDispositions(effectiveStrictSelection);
 const postRuntimeSelectedDispositions = selectedDispositions(postRuntimeEffectiveSelection);
@@ -465,6 +616,10 @@ const commands = [
     `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --control-only --timeout-ms=240000`,
     `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000`,
 ];
+const readinessTotalMs = Number((performance.now() - readinessStartedAt).toFixed(3));
+const slowestPhase = Object.entries(phaseTimingsMs)
+    .sort((left, right) => right[1] - left[1])
+    .map(([name, durationMs]) => ({ name, durationMs }))[0] ?? null;
 const summary = {
     schema: 'model-gateway-live-readiness',
     ok: checks.every((check) => check.ok),
@@ -472,6 +627,11 @@ const summary = {
     sqlitePath: DEFAULT_SQLITE_PATH,
     snapshotId: sourceSnapshot.snapshotId,
     generatedAt: sourceSnapshot.generatedAt,
+    timing: {
+        totalMs: readinessTotalMs,
+        phasesMs: phaseTimingsMs,
+        slowestPhase,
+    },
     checks,
     integrity: {
         ok: integrity.ok,
