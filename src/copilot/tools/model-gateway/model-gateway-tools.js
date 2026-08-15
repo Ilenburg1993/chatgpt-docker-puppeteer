@@ -1709,8 +1709,17 @@ export const modelGatewayProbeExecuteTool = buildTool({
             probeFailureCooldownSeconds: 900,
         });
         const planData = /** @type {Record<string, any>} */ (plan['data']);
-        const selected = Array.isArray(planData['budget']?.['selected']) ? planData['budget']['selected'] : [];
-        const authorizedByPlan = selected.some((item) => item['kind'] === args.probeKind);
+        const executionRoutes = Array.isArray(planData['execution']?.['routes']) ? planData['execution']['routes'] : [];
+        const selectedExecution = executionRoutes.find((entry) => {
+            const route = asRecord(entry?.['route']);
+            return (
+                entry?.['kind'] === args.probeKind &&
+                optionalWorkflowString(route['providerId']) === args.providerId &&
+                optionalWorkflowString(route['providerModel']) === args.modelId
+            );
+        }) ?? null;
+        const authorizedRoute = selectedExecution ? asRecord(selectedExecution['route']) : null;
+        const authorizedByPlan = authorizedRoute !== null;
         if (args.mode === 'plan' || !authorizedByPlan) {
             return serializeResult(
                 createModelGatewayControlPlaneResult({
@@ -1723,6 +1732,7 @@ export const modelGatewayProbeExecuteTool = buildTool({
                         requested: args,
                         plan: planData,
                         authorizedByPlan,
+                        authorizedRoute,
                         operationMeta,
                     },
                     warnings: Array.isArray(plan['warnings']) ? plan['warnings'].map(String) : [],
@@ -1761,8 +1771,7 @@ export const modelGatewayProbeExecuteTool = buildTool({
         }
         const env = buildModelGatewayRuntimeSelectorProbeEnv(
             {
-                providerId: args.providerId,
-                providerModel: args.modelId,
+                ...authorizedRoute,
                 ...(args.profileId ? { providerProfile: args.profileId } : {}),
             },
             process.env,

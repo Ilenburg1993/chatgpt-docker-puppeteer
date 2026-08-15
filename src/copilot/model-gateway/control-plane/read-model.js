@@ -935,6 +935,17 @@ export class ModelGatewayReadControlPlane {
             maxEstimatedCostUsd: input.maxEstimatedCostUsd,
             unknownCostPolicy: input.unknownCostPolicy,
         });
+        const projectionsByKey = new Map(projections.map((projection) => [projectionKey(projection), projection]));
+        const executionRoutes = budget.selected.flatMap((selectedProbe) => {
+            const projection = projectionsByKey.get(selectedProbe.key) ?? null;
+            if (!projection) return [];
+            const route = buildLiveRouteSwitchTarget(
+                projection,
+                selectedProbe.key,
+                optionalString(projection['routeProfile']) ?? 'runtime_probe',
+            );
+            return route ? [{ key: selectedProbe.key, kind: selectedProbe.kind, route }] : [];
+        });
         const noCandidates = recommendations.length === 0;
         return createModelGatewayControlPlaneResult({
             operation: 'probe.plan',
@@ -965,6 +976,7 @@ export class ModelGatewayReadControlPlane {
                     supported: false,
                     reason: 'probe_plan_is_read_only',
                     executionTool: null,
+                    routes: executionRoutes,
                 },
             },
             warnings: [
