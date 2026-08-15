@@ -54,21 +54,90 @@ const DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 100_000;
 const args = process.argv.slice(2);
 const argSet = new Set(args);
 
+let persistentRedactionRequestSequence = 0;
+/** @type {Map<string, { worker: Worker; pending: Map<string, { startedAt: number; timer: NodeJS.Timeout; resolve: Function; reject: Function }> }>} */
+const persistentRedactionWorkers = new Map();
+
+function normalizeRedactionWorkerResult(mode, startedAt, result) {
+    if (!result || result.success !== true || !result.audit) {
+        throw new Error(result?.error ?? `redaction worker ${mode} returned no audit`);
+    }
+    return {
+        audit: result.audit,
+        durationMs: Number((performance.now() - startedAt).toFixed(3)),
+        workerDurationMs: Number(result.durationMs ?? 0),
+        sourceSnapshotId: typeof result.sourceSnapshotId === 'string' ? result.sourceSnapshotId : null,
+    };
+}
+
+function destroyPersistentRedactionWorker(mode, state, error) {
+    if (persistentRedactionWorkers.get(mode) === state) persistentRedactionWorkers.delete(mode);
+    for (const pending of state.pending.values()) {
+        clearTimeout(pending.timer);
+        pending.reject(error);
+    }
+    state.pending.clear();
+    void state.worker.terminate();
+}
+
+function getPersistentRedactionWorker(mode) {
+    const existing = persistentRedactionWorkers.get(mode);
+    if (existing) return existing;
+    const worker = new Worker(REDACTION_WORKER_PATH, { workerData: { mode, persistent: true } });
+    const state = { worker, pending: new Map() };
+    worker.on('message', (result) => {
+        const requestId = typeof result?.requestId === 'string' ? result.requestId : '';
+        const pending = state.pending.get(requestId);
+        if (!pending) return;
+        state.pending.delete(requestId);
+        clearTimeout(pending.timer);
+        try {
+            pending.resolve(normalizeRedactionWorkerResult(mode, pending.startedAt, result));
+        } catch (error) {
+            pending.reject(error);
+        }
+    });
+    worker.on('error', (error) => destroyPersistentRedactionWorker(mode, state, error));
+    worker.on('exit', (code) => {
+        if (persistentRedactionWorkers.get(mode) !== state) return;
+        destroyPersistentRedactionWorker(mode, state, new Error(`persistent redaction worker ${mode} exited with ${String(code)}`));
+    });
+    persistentRedactionWorkers.set(mode, state);
+    return state;
+}
+
+function runPersistentRedactionWorker(mode, maxRowsPerTable) {
+    const state = getPersistentRedactionWorker(mode);
+    const requestId = `redaction-${mode}-${Date.now()}-${++persistentRedactionRequestSequence}`;
+    return new Promise((resolvePromise, rejectPromise) => {
+        const startedAt = performance.now();
+        const timer = setTimeout(() => {
+            const pending = state.pending.get(requestId);
+            if (!pending) return;
+            state.pending.delete(requestId);
+            pending.reject(new Error(`persistent redaction worker ${mode} timed out`));
+            destroyPersistentRedactionWorker(mode, state, new Error(`persistent redaction worker ${mode} timed out`));
+        }, 30_000);
+        timer.unref?.();
+        state.pending.set(requestId, { startedAt, timer, resolve: resolvePromise, reject: rejectPromise });
+        state.worker.postMessage({ requestId, maxRowsPerTable });
+    });
+}
+
 /**
- * Run one fixed redaction audit in an isolated worker thread so catalog and SQLite scanning can use separate CPU cores
- * without paying full child-process startup cost. The worker still uses the same fixed stores and inherited environment.
+ * Run one fixed redaction audit in an isolated worker thread. MCP calls may reuse persistent workers; CLI calls remain
+ * one-shot so the command exits naturally.
  *
  * @param {'catalog' | 'sqlite'} mode
  * @param {number} maxRowsPerTable
- * @returns {Promise<{ audit: { ok: boolean; leakCount: number; scannedStringCount: number; sampleCount: number; tableCount?: number }; durationMs: number; workerDurationMs: number; sourceSnapshotId: string | null }>}
+ * @param {boolean} [reuseWorker]
  */
-function runRedactionWorker(mode, maxRowsPerTable) {
+function runRedactionWorker(mode, maxRowsPerTable, reuseWorker = false) {
+    if (reuseWorker) return runPersistentRedactionWorker(mode, maxRowsPerTable);
     return new Promise((resolvePromise, rejectPromise) => {
         const startedAt = performance.now();
         let settled = false;
-        const worker = new Worker(REDACTION_WORKER_PATH, {
-            workerData: { mode, maxRowsPerTable },
-        });
+        const worker = new Worker(REDACTION_WORKER_PATH, { workerData: { mode, maxRowsPerTable } });
         const timer = setTimeout(() => {
             if (settled) return;
             settled = true;
@@ -80,20 +149,12 @@ function runRedactionWorker(mode, maxRowsPerTable) {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
-            if (error) {
-                rejectPromise(error);
-                return;
+            if (error) return rejectPromise(error);
+            try {
+                resolvePromise(normalizeRedactionWorkerResult(mode, startedAt, result));
+            } catch (normalizeError) {
+                rejectPromise(normalizeError);
             }
-            if (!result || result.success !== true || !result.audit) {
-                rejectPromise(new Error(result?.error ?? `redaction worker ${mode} returned no audit`));
-                return;
-            }
-            resolvePromise({
-                audit: result.audit,
-                durationMs: Number((performance.now() - startedAt).toFixed(3)),
-                workerDurationMs: Number(result.durationMs ?? 0),
-                sourceSnapshotId: typeof result.sourceSnapshotId === 'string' ? result.sourceSnapshotId : null,
-            });
         };
         worker.once('message', (result) => finish(result));
         worker.once('error', (error) => finish(null, error));
@@ -263,7 +324,7 @@ function summarizeTerminalLiveRoute(route) {
  * Build the canonical read-only LLM-B / Model Gateway readiness snapshot without writing to stdout or terminating the process.
  * This function is safe to call from the MCP process; CPU-heavy redaction remains isolated in worker threads.
  *
- * @param {{ includeSqliteRuntimeHealth?: boolean; failOnSupplyWarning?: boolean; sqliteRedactionMaxRowsPerTable?: number }} [options]
+ * @param {{ includeSqliteRuntimeHealth?: boolean; failOnSupplyWarning?: boolean; sqliteRedactionMaxRowsPerTable?: number; reuseRedactionWorkers?: boolean }} [options]
  * @returns {Promise<Record<string, any>>}
  */
 export async function buildModelGatewayLiveReadiness(options = {}) {
@@ -272,6 +333,7 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
     const phaseTimingsMs = {};
     const includeSqliteRuntimeHealth = options.includeSqliteRuntimeHealth === true;
     const failOnSupplyWarning = options.failOnSupplyWarning === true;
+    const reuseRedactionWorkers = options.reuseRedactionWorkers === true;
     const sqliteRedactionMaxRowsPerTable = Math.max(
         1,
         Math.min(options.sqliteRedactionMaxRowsPerTable ?? DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE, 1_000_000),
@@ -298,8 +360,8 @@ export async function buildModelGatewayLiveReadiness(options = {}) {
     }
 
 const redactionWorkersPromise = Promise.all([
-    runRedactionWorker('catalog', sqliteRedactionMaxRowsPerTable),
-    runRedactionWorker('sqlite', sqliteRedactionMaxRowsPerTable),
+    runRedactionWorker('catalog', sqliteRedactionMaxRowsPerTable, reuseRedactionWorkers),
+    runRedactionWorker('sqlite', sqliteRedactionMaxRowsPerTable, reuseRedactionWorkers),
 ]).then(
     (results) => ({ results, error: null }),
     (error) => ({ results: null, error: error instanceof Error ? error : new Error(String(error)) }),

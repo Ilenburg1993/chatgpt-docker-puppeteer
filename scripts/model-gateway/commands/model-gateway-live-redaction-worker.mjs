@@ -7,6 +7,8 @@ import { isMainThread, parentPort, workerData } from 'node:worker_threads';
 const DEFAULT_SQLITE_PATH = 'data/copilot.sqlite';
 const MODES = new Set(['catalog', 'sqlite']);
 const workerStartedAt = performance.now();
+/** @type {Map<string, Promise<Record<string, any>>>} */
+const modeContexts = new Map();
 
 function readArg(name, fallback = '') {
     const prefix = `${name}=`;
@@ -44,39 +46,58 @@ function resolveInput() {
     };
 }
 
-async function main() {
-    const { mode, maxRowsPerTable } = resolveInput();
+async function loadModeContext(mode) {
+    let contextPromise = modeContexts.get(mode);
+    if (contextPromise) return contextPromise;
+    contextPromise = (async () => {
+        const redactionModule = await import('../../../src/copilot/model-gateway/secrets/redaction-audit.js');
+        if (mode === 'catalog') {
+            const { DEFAULT_MODEL_GATEWAY_CATALOG_PATH, JsonModelGatewayCatalogStore } =
+                await import('../../../src/copilot/model-gateway/catalog/json-catalog-store.js');
+            return {
+                redactionModule,
+                store: new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH }),
+            };
+        }
+        const [{ SqliteModelGatewayCatalogStore }, dbModule] = await Promise.all([
+            import('../../../src/copilot/model-gateway/catalog/sqlite-catalog-store.js'),
+            import('../../../src/copilot/db/sqlite.js'),
+        ]);
+        dbModule.setDbLogger(() => {});
+        return {
+            redactionModule,
+            store: new SqliteModelGatewayCatalogStore({ dbPath: DEFAULT_SQLITE_PATH }),
+        };
+    })();
+    modeContexts.set(mode, contextPromise);
+    try {
+        return await contextPromise;
+    } catch (error) {
+        modeContexts.delete(mode);
+        throw error;
+    }
+}
+
+async function runAudit(input) {
+    const mode = typeof input?.mode === 'string' ? input.mode : '';
+    const maxRowsPerTable = readPositiveInteger(input?.maxRowsPerTable, 25);
     if (!MODES.has(mode)) throw new Error('redaction worker mode must be catalog or sqlite');
     const boundedMaxRowsPerTable = Math.max(1, Math.min(maxRowsPerTable, 1_000_000));
-    const modeLoadStartedAt = performance.now();
-    const redactionModulePromise = import('../../../src/copilot/model-gateway/secrets/redaction-audit.js');
+    const requestStartedAt = performance.now();
+    const context = await loadModeContext(mode);
+    const additionalSecrets = context.redactionModule.collectModelGatewaySecretAuditEnvValues(process.env);
     let audit;
     let sourceSnapshotId = null;
     if (mode === 'catalog') {
-        const [{ DEFAULT_MODEL_GATEWAY_CATALOG_PATH, JsonModelGatewayCatalogStore }, redactionModule] =
-            await Promise.all([
-                import('../../../src/copilot/model-gateway/catalog/json-catalog-store.js'),
-                redactionModulePromise,
-            ]);
-        const additionalSecrets = redactionModule.collectModelGatewaySecretAuditEnvValues(process.env);
-        const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
-        const snapshot = await store.readSnapshot();
+        const snapshot = await context.store.readSnapshot();
         sourceSnapshotId = snapshot.snapshotId ?? null;
-        audit = redactionModule.auditModelGatewayValueRedaction(snapshot, {
+        audit = context.redactionModule.auditModelGatewayValueRedaction(snapshot, {
             surface: 'json:catalog',
             rootPath: 'catalog',
             additionalSecrets,
         });
     } else {
-        const [{ SqliteModelGatewayCatalogStore }, redactionModule, dbModule] = await Promise.all([
-            import('../../../src/copilot/model-gateway/catalog/sqlite-catalog-store.js'),
-            redactionModulePromise,
-            import('../../../src/copilot/db/sqlite.js'),
-        ]);
-        dbModule.setDbLogger(() => {});
-        const additionalSecrets = redactionModule.collectModelGatewaySecretAuditEnvValues(process.env);
-        const store = new SqliteModelGatewayCatalogStore({ dbPath: DEFAULT_SQLITE_PATH });
-        audit = await store.auditStoredPayloadRedaction({
+        audit = await context.store.auditStoredPayloadRedaction({
             additionalSecrets,
             maxRowsPerTable: boundedMaxRowsPerTable,
         });
@@ -85,29 +106,62 @@ async function main() {
         success: true,
         mode,
         sourceSnapshotId,
-        moduleLoadAndAuditMs: Number((performance.now() - modeLoadStartedAt).toFixed(3)),
-        durationMs: Number((performance.now() - workerStartedAt).toFixed(3)),
+        durationMs: Number((performance.now() - requestStartedAt).toFixed(3)),
+        workerUptimeMs: Number((performance.now() - workerStartedAt).toFixed(3)),
         audit: compactAudit(audit),
     };
 }
 
-main()
-    .then((result) => {
-        if (!isMainThread && parentPort) {
-            parentPort.postMessage(result);
-            return;
-        }
-        process.stdout.write(`${JSON.stringify(result)}\n`);
-    })
-    .catch((error) => {
-        const result = {
-            success: false,
-            error: error instanceof Error ? error.message : String(error),
-        };
-        if (!isMainThread && parentPort) {
-            parentPort.postMessage(result);
-            return;
-        }
-        process.stdout.write(`${JSON.stringify(result)}\n`);
-        process.exitCode = 1;
+async function runOneShot() {
+    return runAudit(resolveInput());
+}
+
+function postWorkerResult(result) {
+    if (parentPort) parentPort.postMessage(result);
+}
+
+if (!isMainThread && workerData?.persistent === true && parentPort) {
+    const fixedMode = typeof workerData.mode === 'string' ? workerData.mode : '';
+    let queue = Promise.resolve();
+    parentPort.on('message', (message) => {
+        const requestId = typeof message?.requestId === 'string' ? message.requestId : '';
+        queue = queue
+            .then(async () => {
+                try {
+                    const result = await runAudit({
+                        mode: fixedMode,
+                        maxRowsPerTable: message?.maxRowsPerTable,
+                    });
+                    postWorkerResult({ requestId, ...result });
+                } catch (error) {
+                    postWorkerResult({
+                        requestId,
+                        success: false,
+                        error: error instanceof Error ? error.message : String(error),
+                    });
+                }
+            })
+            .catch(() => {});
     });
+} else {
+    runOneShot()
+        .then((result) => {
+            if (!isMainThread && parentPort) {
+                postWorkerResult(result);
+                return;
+            }
+            process.stdout.write(`${JSON.stringify(result)}\n`);
+        })
+        .catch((error) => {
+            const result = {
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+            };
+            if (!isMainThread && parentPort) {
+                postWorkerResult(result);
+                return;
+            }
+            process.stdout.write(`${JSON.stringify(result)}\n`);
+            process.exitCode = 1;
+        });
+}

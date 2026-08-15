@@ -207,7 +207,7 @@ async function buildLiveReadinessFingerprint(includeSqliteRuntimeHealth) {
     return `${includeSqliteRuntimeHealth ? 'sqlite-health' : 'file-health'}:${catalogFile}:${sqliteLogical}:${byokHealthFile}`;
 }
 
-/** @type {Promise<((options?: { includeSqliteRuntimeHealth?: boolean }) => Promise<Record<string, any>>) | null> | null} */
+/** @type {Promise<((options?: { includeSqliteRuntimeHealth?: boolean; reuseRedactionWorkers?: boolean }) => Promise<Record<string, any>>) | null> | null} */
 let liveReadinessBuilderPromise = null;
 
 async function loadLiveReadinessBuilder() {
@@ -267,7 +267,7 @@ async function executeLiveReadiness(includeSqliteRuntimeHealth) {
         let execution = 'fresh-in-process';
         if (builder) {
             try {
-                parsed = await builder({ includeSqliteRuntimeHealth });
+                parsed = await builder({ includeSqliteRuntimeHealth, reuseRedactionWorkers: true });
             } catch (builderError) {
                 error = builderError instanceof Error ? builderError.message : String(builderError);
             }
