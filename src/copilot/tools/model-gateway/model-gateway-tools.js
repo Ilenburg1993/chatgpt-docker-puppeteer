@@ -377,10 +377,7 @@ function invalidProfileManageResult(options) {
  * @returns {string | null}
  */
 function optionalWorkflowString(value) {
-    if (typeof value !== 'string') return null;
-    const normalized = value.trim();
-    if (!normalized || normalized === '__UNSET__') return null;
-    return normalized;
+    return optionalToolString(value);
 }
 
 /**
@@ -1187,7 +1184,6 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     probeKind,
                     providerId: candidateProviderId,
                     modelId: candidateModelId,
-                    profileId: null,
                     maxEstimatedCostUsd: args.maxEstimatedCostUsd,
                     unknownCostPolicy: selectionGoal === 'quality_first' ? 'allow' : 'skip',
                     timeoutMs: 60000,
