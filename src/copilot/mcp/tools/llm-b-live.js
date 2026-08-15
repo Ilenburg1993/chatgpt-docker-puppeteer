@@ -9,6 +9,9 @@
  */
 
 import { execFile } from 'node:child_process';
+import { stat } from 'node:fs/promises';
+import { isAbsolute, join, resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import {
@@ -26,6 +29,12 @@ const LIVE_READINESS = 'scripts/model-gateway/commands/model-gateway-live-readin
 const LIVE_RUNS = 'scripts/model-gateway/commands/model-gateway-live-runs.mjs';
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const PROFILE_RE = /^[A-Za-z0-9_.:-]{1,120}$/u;
+const LIVE_READINESS_CACHE_TTL_MS = 5_000;
+const LIVE_READINESS_CACHE_MAX_ENTRIES = 8;
+/** @type {Map<string, { parsed: Record<string, unknown>; completedAtMs: number; durationMs: number }>} */
+const liveReadinessCache = new Map();
+/** @type {Map<string, Promise<Record<string, any>>>} */
+const liveReadinessInFlight = new Map();
 
 const liveScenarioSchema = z.enum([
     'canonical',
@@ -96,6 +105,111 @@ function parseJsonOutput(text) {
             }
         }
         return null;
+    }
+}
+
+/** @param {string} filePath */
+async function readinessFileFingerprint(filePath) {
+    try {
+        const info = await stat(filePath);
+        return `${info.size}:${Math.trunc(info.mtimeMs)}`;
+    } catch (error) {
+        const code = /** @type {NodeJS.ErrnoException} */ (error)?.code;
+        return code === 'ENOENT' ? 'missing' : `error:${code ?? 'unknown'}`;
+    }
+}
+
+/** @param {string} root */
+function readinessHealthPath(root) {
+    const configured = process.env['TERMINAL_BYOK_PROVIDER_HEALTH_PATH'];
+    if (typeof configured !== 'string' || !configured.trim()) {
+        return join(root, 'data', 'copilot-terminal', 'byok-provider-health.json');
+    }
+    return isAbsolute(configured) ? configured : resolve(root, configured);
+}
+
+/** @param {boolean} includeSqliteRuntimeHealth */
+async function buildLiveReadinessFingerprint(includeSqliteRuntimeHealth) {
+    const root = getMcpWorkspaceRoot();
+    const sqlitePath = join(root, 'data', 'copilot.sqlite');
+    const paths = [
+        join(root, 'data', 'copilot', 'model-gateway', 'catalog.json'),
+        sqlitePath,
+        `${sqlitePath}-wal`,
+        readinessHealthPath(root),
+    ];
+    const parts = await Promise.all(paths.map((filePath) => readinessFileFingerprint(filePath)));
+    return `${includeSqliteRuntimeHealth ? 'sqlite-health' : 'file-health'}:${parts.join('|')}`;
+}
+
+function pruneLiveReadinessCache() {
+    const now = Date.now();
+    for (const [key, entry] of liveReadinessCache.entries()) {
+        if (now - entry.completedAtMs > LIVE_READINESS_CACHE_TTL_MS) liveReadinessCache.delete(key);
+    }
+    while (liveReadinessCache.size > LIVE_READINESS_CACHE_MAX_ENTRIES) {
+        const oldestKey = liveReadinessCache.keys().next().value;
+        if (typeof oldestKey !== 'string') break;
+        liveReadinessCache.delete(oldestKey);
+    }
+}
+
+/** @param {boolean} includeSqliteRuntimeHealth */
+async function executeLiveReadiness(includeSqliteRuntimeHealth) {
+    const fingerprint = await buildLiveReadinessFingerprint(includeSqliteRuntimeHealth);
+    const key = fingerprint;
+    const now = Date.now();
+    pruneLiveReadinessCache();
+    const cached = liveReadinessCache.get(key);
+    if (cached && now - cached.completedAtMs <= LIVE_READINESS_CACHE_TTL_MS) {
+        return {
+            success: true,
+            parsed: cached.parsed,
+            stderr: '',
+            stdout: '',
+            execution: 'memory-cache',
+            cacheAgeMs: now - cached.completedAtMs,
+            durationMs: cached.durationMs,
+            error: null,
+        };
+    }
+    const existing = liveReadinessInFlight.get(key);
+    if (existing) {
+        const result = await existing;
+        return { ...result, execution: 'single-flight', cacheAgeMs: 0 };
+    }
+    const promise = (async () => {
+        const startedAt = performance.now();
+        const args = ['--json'];
+        if (includeSqliteRuntimeHealth) args.push('--sqlite-runtime-health');
+        const result = await execFixedNodeScript(LIVE_READINESS, args, 120_000);
+        const parsedValue = parseJsonOutput(result.stdout);
+        const parsed =
+            parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)
+                ? /** @type {Record<string, unknown>} */ (parsedValue)
+                : null;
+        const durationMs = Number((performance.now() - startedAt).toFixed(3));
+        const completedAtMs = Date.now();
+        if (result.success && parsed) {
+            liveReadinessCache.set(key, { parsed, completedAtMs, durationMs });
+            pruneLiveReadinessCache();
+        }
+        return {
+            success: result.success && parsed !== null,
+            parsed,
+            stderr: result.stderr,
+            stdout: result.stdout,
+            error: result.error,
+            execution: 'fresh-process',
+            cacheAgeMs: 0,
+            durationMs,
+        };
+    })();
+    liveReadinessInFlight.set(key, promise);
+    try {
+        return await promise;
+    } finally {
+        if (liveReadinessInFlight.get(key) === promise) liveReadinessInFlight.delete(key);
     }
 }
 
@@ -190,17 +304,24 @@ export const llmBLiveTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ includeSqliteRuntimeHealth }) => {
-            const args = ['--json'];
-            if (includeSqliteRuntimeHealth === true) args.push('--sqlite-runtime-health');
-            const result = await execFixedNodeScript(LIVE_READINESS, args, 120_000);
-            const parsed = parseJsonOutput(result.stdout);
-            if (!result.success || !parsed) {
-                return errorResult(result.error ?? 'LLM-B live readiness did not return valid JSON.', {
+            const execution = await executeLiveReadiness(includeSqliteRuntimeHealth === true);
+            if (!execution.success || !execution.parsed) {
+                return errorResult(execution.error ?? 'LLM-B live readiness did not return valid JSON.', {
                     code: 'ERR_LLMB_LIVE_READINESS',
-                    stderr: result.stderr,
-                    stdoutTail: result.stdout.slice(-8000),
+                    stderr: execution.stderr,
+                    stdoutTail: String(execution.stdout ?? '').slice(-8000),
                 });
             }
+            const parsed = {
+                ...execution.parsed,
+                mcpAdapter: {
+                    execution: execution.execution,
+                    cacheAgeMs: execution.cacheAgeMs,
+                    cacheTtlMs: LIVE_READINESS_CACHE_TTL_MS,
+                    subprocessDurationMs: execution.durationMs,
+                    invalidation: 'catalog+sqlite+wal+byok-health-fingerprint',
+                },
+            };
             return okResult(parsed, JSON.stringify(parsed, null, 2));
         },
     },

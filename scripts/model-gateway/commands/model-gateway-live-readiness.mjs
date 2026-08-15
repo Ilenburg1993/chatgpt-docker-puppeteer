@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import path from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH, REPO_ROOT } from '../index.mjs';
 
 import {
@@ -17,6 +17,7 @@ import {
     compareModelGatewayCatalogSnapshotParity,
     compareModelGatewaySelectionAudits,
     createEnvSecretRegistry,
+    createGatewayRuntimeHealthIndex,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     filterModelGatewayRuntimeEligibilityOverlayDecisions,
@@ -76,8 +77,8 @@ function timedSync(name, task) {
 }
 
 /**
- * Run one fixed redaction audit in an isolated process so catalog and SQLite scanning can use separate CPU cores.
- * No paths, secrets or commands are passed through argv; the worker uses the same fixed stores and inherited env.
+ * Run one fixed redaction audit in an isolated worker thread so catalog and SQLite scanning can use separate CPU cores
+ * without paying full child-process startup cost. The worker still uses the same fixed stores and inherited environment.
  *
  * @param {'catalog' | 'sqlite'} mode
  * @param {number} maxRowsPerTable
@@ -86,36 +87,18 @@ function timedSync(name, task) {
 function runRedactionWorker(mode, maxRowsPerTable) {
     return new Promise((resolvePromise, rejectPromise) => {
         const startedAt = performance.now();
-        let stdout = '';
-        let stderr = '';
         let settled = false;
-        let timedOut = false;
-        const child = spawn(
-            process.execPath,
-            [
-                REDACTION_WORKER_PATH,
-                `--mode=${mode}`,
-                `--sqlite-redaction-max-rows-per-table=${String(maxRowsPerTable)}`,
-            ],
-            {
-                cwd: ROOT,
-                env: process.env,
-                stdio: ['ignore', 'pipe', 'pipe'],
-            },
-        );
-        const appendBounded = (current, chunk) => (current + String(chunk)).slice(-64 * 1024);
-        child.stdout.on('data', (chunk) => {
-            stdout = appendBounded(stdout, chunk);
-        });
-        child.stderr.on('data', (chunk) => {
-            stderr = appendBounded(stderr, chunk);
+        const worker = new Worker(REDACTION_WORKER_PATH, {
+            workerData: { mode, maxRowsPerTable },
         });
         const timer = setTimeout(() => {
-            timedOut = true;
-            child.kill('SIGTERM');
+            if (settled) return;
+            settled = true;
+            void worker.terminate();
+            rejectPromise(new Error(`redaction worker ${mode} timed out`));
         }, 30_000);
         timer.unref?.();
-        const finish = (error = null) => {
+        const finish = (result, error = null) => {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
@@ -123,33 +106,21 @@ function runRedactionWorker(mode, maxRowsPerTable) {
                 rejectPromise(error);
                 return;
             }
-            try {
-                const line = stdout.trim().split('\n').filter(Boolean).at(-1) ?? '';
-                const parsed = line ? JSON.parse(line) : null;
-                if (!parsed || parsed.success !== true || !parsed.audit) {
-                    throw new Error((parsed?.error ?? stderr) || `redaction worker ${mode} returned no audit`);
-                }
-                resolvePromise({
-                    audit: parsed.audit,
-                    durationMs: Number((performance.now() - startedAt).toFixed(3)),
-                    workerDurationMs: Number(parsed.durationMs ?? 0),
-                    sourceSnapshotId: typeof parsed.sourceSnapshotId === 'string' ? parsed.sourceSnapshotId : null,
-                });
-            } catch (parseError) {
-                rejectPromise(parseError instanceof Error ? parseError : new Error(String(parseError)));
+            if (!result || result.success !== true || !result.audit) {
+                rejectPromise(new Error(result?.error ?? `redaction worker ${mode} returned no audit`));
+                return;
             }
+            resolvePromise({
+                audit: result.audit,
+                durationMs: Number((performance.now() - startedAt).toFixed(3)),
+                workerDurationMs: Number(result.durationMs ?? 0),
+                sourceSnapshotId: typeof result.sourceSnapshotId === 'string' ? result.sourceSnapshotId : null,
+            });
         };
-        child.once('error', (error) => finish(error));
-        child.once('exit', (code, signal) => {
-            if (timedOut) {
-                finish(new Error(`redaction worker ${mode} timed out`));
-                return;
-            }
-            if (code !== 0) {
-                finish(new Error(stderr || `redaction worker ${mode} exited with ${String(code)}${signal ? ` (${signal})` : ''}`));
-                return;
-            }
-            finish();
+        worker.once('message', (result) => finish(result));
+        worker.once('error', (error) => finish(null, error));
+        worker.once('exit', (code) => {
+            if (!settled && code !== 0) finish(null, new Error(`redaction worker ${mode} exited with ${String(code)}`));
         });
     });
 }
@@ -372,6 +343,7 @@ if (includeSqliteRuntimeHealth) {
 const healthRecords = timedSync('runtimeHealthMerge', () =>
     mergeByokProviderHealthRecords(fileHealthRecords, sqliteHealthRecords),
 );
+const runtimeHealthIndex = timedSync('runtimeHealthIndexBuild', () => createGatewayRuntimeHealthIndex(healthRecords));
 const sqliteProbeOnlyRecords = sqliteHealthRecords.filter((record) => record?.['runtimeHealthStatus'] === 'probe-only');
 const sqliteRuntimeProbeProofRecords = sqliteHealthRecords.filter(
     (record) =>
@@ -435,6 +407,7 @@ const postRuntimeEffectiveSelection = timedSync('selectionPostRuntimeAudit', () 
         strict: true,
         secretRegistry,
         runtimeHealthRecords: healthRecords,
+        runtimeHealthIndex,
     }),
 );
 const runtimeSelectionComparison = timedSync('runtimeSelectionComparison', () =>
@@ -463,6 +436,7 @@ const terminalLivePostRuntimeSelection = timedSync('terminalLivePostRuntimeAudit
         secretRegistry,
         profiles: TERMINAL_LIVE_ROUTE_PROFILES,
         runtimeHealthRecords: healthRecords,
+        runtimeHealthIndex,
         preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
         blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
         temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
@@ -483,6 +457,7 @@ const terminalLiveRuntimeSelectorPlan = timedSync('terminalLiveSelectorPlan', ()
         requireAgentProbeProfiles: [...TERMINAL_LIVE_REQUIRE_AGENT_PROBE_PROFILES],
         env: process.env,
         runtimeHealthRecords: healthRecords,
+        runtimeHealthIndex,
         preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
         blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
         temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,

@@ -9,7 +9,10 @@
  */
 
 import { explainGatewayRouteDecision } from './explain.js';
-import { routeModelGatewayCatalogSnapshot } from './policy-engine.js';
+import {
+    prepareModelGatewayCatalogRoutingSnapshot,
+    routePreparedModelGatewayCatalogSnapshot,
+} from './policy-engine.js';
 import { listModelGatewayTaskProfiles, resolveModelGatewayTaskProfile } from './task-profiles.js';
 
 export const MODEL_GATEWAY_SELECTION_POLICY_MODE = Object.freeze({
@@ -378,9 +381,12 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
     const requestedProfiles = new Set(stringList(options.profiles));
     const profileIds = resolveProfileIds(options);
     const runtimeRouteProfile = optionalString(options.runtimeRouteProfile);
+    const preparedSnapshot = prepareModelGatewayCatalogRoutingSnapshot(snapshot, {
+        includeProjectionOnly: options.includeProjectionOnly !== false,
+    });
     const profileAudits = profileIds.map((profileId) => {
         const effectiveRouteProfile = runtimeRouteProfile ?? (auditOptions.ignoreRuntimeHealth ? null : profileId);
-        /** @type {Parameters<typeof routeModelGatewayCatalogSnapshot>[2]} */
+        /** @type {Parameters<typeof routePreparedModelGatewayCatalogSnapshot>[2]} */
         const routeOptions = {
             evaluateEligibility: true,
             requireAgentProbeOk: false,
@@ -395,13 +401,12 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
             },
         };
         if (effectiveRouteProfile) routeOptions.routeProfile = effectiveRouteProfile;
-        if (options.includeProjectionOnly !== undefined) routeOptions.includeProjectionOnly = options.includeProjectionOnly;
         if (options.secretRegistry !== undefined) routeOptions.secretRegistry = options.secretRegistry;
         if (options.runtimeProofWeights !== undefined) routeOptions.runtimeProofWeights = options.runtimeProofWeights;
         if (Array.isArray(options.runtimeHealthRecords)) routeOptions.runtimeHealthRecords = options.runtimeHealthRecords;
         if (options.runtimeHealthIndex !== undefined) {
             routeOptions.runtimeHealthIndex =
-                /** @type {NonNullable<NonNullable<Parameters<typeof routeModelGatewayCatalogSnapshot>[2]>['runtimeHealthIndex']>} */ (
+                /** @type {NonNullable<NonNullable<Parameters<typeof routePreparedModelGatewayCatalogSnapshot>[2]>['runtimeHealthIndex']>} */ (
                     options.runtimeHealthIndex
                 );
         }
@@ -421,7 +426,7 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
         if (Array.isArray(options.preferredProbeKinds)) routeOptions.preferredProbeKinds = stringList(options.preferredProbeKinds);
         if (Array.isArray(options.blockFailedProbeKinds)) routeOptions.blockFailedProbeKinds = stringList(options.blockFailedProbeKinds);
         const profile = resolveModelGatewayTaskProfile(profileId);
-        const route = routeModelGatewayCatalogSnapshot(snapshot, profileId, routeOptions);
+        const route = routePreparedModelGatewayCatalogSnapshot(preparedSnapshot, profileId, routeOptions);
         const explanation = explainGatewayRouteDecision(route);
         const supply = capabilitySupply(route.candidates, profile);
         return {

@@ -1500,12 +1500,25 @@ export function routeGatewayModels(models, profileInput, options = {}) {
 }
 
 /**
+ * Prepare immutable catalog routing inputs once so repeated profile audits do not rebuild the same candidate universe.
+ *
  * @param {Record<string, any>} snapshot
- * @param {string | Record<string, any>} profileInput
- * @param {Parameters<typeof routeGatewayModels>[2] & { includeProjectionOnly?: boolean }} [options]
- * @returns {ReturnType<typeof routeGatewayModels> & { snapshotContext: Record<string, number> }}
+ * @param {{ includeProjectionOnly?: boolean }} [options]
+ * @returns {{
+ *   candidates: Record<string, any>[];
+ *   routeOptions: Record<string, any>[];
+ *   accountOverlays: Record<string, any>[];
+ *   eligibilityDecisions: Record<string, any>[];
+ *   baseSnapshotContext: {
+ *     projectionCount: number;
+ *     routeOptionCount: number;
+ *     accountOverlayCount: number;
+ *     eligibilityDecisionCount: number;
+ *     candidateCount: number;
+ *   };
+ * }}
  */
-export function routeModelGatewayCatalogSnapshot(snapshot, profileInput, options = {}) {
+export function prepareModelGatewayCatalogRoutingSnapshot(snapshot, options = {}) {
     const projections = Array.isArray(snapshot['projections']) ? snapshot['projections'].filter(isRecord) : [];
     const routeOptions = Array.isArray(snapshot['routeOptions']) ? snapshot['routeOptions'].filter(isRecord) : [];
     const accountOverlays = Array.isArray(snapshot['accountOverlays']) ? snapshot['accountOverlays'].filter(isRecord) : [];
@@ -1515,23 +1528,55 @@ export function routeModelGatewayCatalogSnapshot(snapshot, profileInput, options
     const candidates = buildModelGatewayRouteCandidates({
         projections,
         routeOptions,
-        includeProjectionOnly: options['includeProjectionOnly'] !== false,
+        includeProjectionOnly: options.includeProjectionOnly !== false,
     });
-    const route = routeGatewayModels(candidates, profileInput, {
-        ...options,
+    return {
+        candidates,
         routeOptions,
         accountOverlays,
         eligibilityDecisions,
-    });
-    return {
-        ...route,
-        snapshotContext: {
+        baseSnapshotContext: {
             projectionCount: projections.length,
             routeOptionCount: routeOptions.length,
             accountOverlayCount: accountOverlays.length,
             eligibilityDecisionCount: eligibilityDecisions.length,
-            candidateCount: candidates.length + route.runtimeOnlyCandidateCount,
+            candidateCount: candidates.length,
+        },
+    };
+}
+
+/**
+ * @param {ReturnType<typeof prepareModelGatewayCatalogRoutingSnapshot>} prepared
+ * @param {string | Record<string, any>} profileInput
+ * @param {Parameters<typeof routeGatewayModels>[2]} [options]
+ * @returns {ReturnType<typeof routeGatewayModels> & { snapshotContext: Record<string, number> }}
+ */
+export function routePreparedModelGatewayCatalogSnapshot(prepared, profileInput, options = {}) {
+    const route = routeGatewayModels(prepared.candidates, profileInput, {
+        ...options,
+        routeOptions: prepared.routeOptions,
+        accountOverlays: prepared.accountOverlays,
+        eligibilityDecisions: prepared.eligibilityDecisions,
+    });
+    return {
+        ...route,
+        snapshotContext: {
+            ...prepared.baseSnapshotContext,
+            candidateCount: prepared.candidates.length + route.runtimeOnlyCandidateCount,
             runtimeOnlyCandidateCount: route.runtimeOnlyCandidateCount,
         },
     };
+}
+
+/**
+ * @param {Record<string, any>} snapshot
+ * @param {string | Record<string, any>} profileInput
+ * @param {Parameters<typeof routeGatewayModels>[2] & { includeProjectionOnly?: boolean }} [options]
+ * @returns {ReturnType<typeof routeGatewayModels> & { snapshotContext: Record<string, number> }}
+ */
+export function routeModelGatewayCatalogSnapshot(snapshot, profileInput, options = {}) {
+    const prepared = prepareModelGatewayCatalogRoutingSnapshot(snapshot, {
+        ...(options['includeProjectionOnly'] === undefined ? {} : { includeProjectionOnly: options['includeProjectionOnly'] }),
+    });
+    return routePreparedModelGatewayCatalogSnapshot(prepared, profileInput, options);
 }
