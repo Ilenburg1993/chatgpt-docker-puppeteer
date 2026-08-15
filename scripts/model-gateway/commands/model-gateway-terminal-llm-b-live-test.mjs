@@ -68,7 +68,7 @@ Common options:
   --byok-real-require-vision-probe
   --auto-probe
   --model-probe
-  --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip|file-patch-roundtrip|model-gateway-tools-readonly|model-gateway-tools-all-plan|model-gateway-tools-apply-safe|model-gateway-route-apply-minimal|model-gateway-admin-apply>
+  --live-scenario=<canonical|freeform|invalid-choice|long-tool-heartbeat|recoverable-tool-error|file-write-roundtrip|file-patch-roundtrip|model-gateway-tools-readonly|model-gateway-adaptive-probe|model-gateway-tools-all-plan|model-gateway-tools-apply-safe|model-gateway-route-apply-minimal|model-gateway-admin-apply>
   --structured-input-cycle
   --menu-cycle
   --picker-interactive-cycle
@@ -453,6 +453,44 @@ const LIVE_SCENARIOS = Object.freeze({
                 forbiddenBadge: 'EDITAR',
             },
         ],
+    }),
+    'model-gateway-adaptive-probe': createLiveScenario({
+        id: 'model-gateway-adaptive-probe',
+        description: 'LLM-B seleciona e prova adaptativamente a melhor rota repo_agent sem promover antes da prova',
+        askQuestion: 'ASK-MODEL-GATEWAY-ADAPTIVE: responda SIM depois da seleção adaptativa',
+        finalMarker:
+            'POST-ASK-MODEL-GATEWAY-ADAPTIVE-FINAL: seleção adaptativa concluída e usuário confirmou SIM',
+        answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
+        beforeDeltaInstructions: [
+            'Você é o operador real de seleção do terminal:llm-b. Há autorização explícita para consumir chamadas BYOK necessárias. Não otimize por custo; otimize pela melhor rota plenamente funcional para repo_agent.',
+            'Depois do read_file_content, chame model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=24 e operationLimit=10.',
+            'Em seguida entre num ciclo adaptativo limitado a no máximo 8 model_gateway_probe_execute applies.',
+            'Em cada iteração chame model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["agent"], maxSnapshotAgeHours=24, maxCandidates=12, maxProbeCount=1, maxEstimatedCostUsd=10, idempotencyKeyPrefix="live-adaptive-route-20260814", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true, requireRuntimeProof=true, selectionGoal="quality_first", probeStrategy="aggressive" e maxRuntimeProofAgeHours=24.',
+            'Leia selectionDecision antes de agir. Se status="probe_required", extraia do próprio workflow o model_gateway_probe_execute mode=plan da candidata atual #1 e execute esse plan exatamente; depois execute mode=apply com confirm=true e a MESMA idempotencyKey/argumentos autorizados pelo plan.',
+            'Depois de TODO probe result, tanto sucesso quanto falha, descarte o ranking anterior e chame model_gateway_workflow_plan novamente. Não pergunte ao usuário se deve tentar a próxima candidata quando a falha for objetiva.',
+            'Se status="use_current" ou "switch_recommended", pare de sondar. NÃO chame model_gateway_route_switch/model_switch neste cenário.',
+            'Se atingir 8 applies ainda em probe_required, pare sem inventar sucesso e reporte ADAPTIVE-SELECTION-EXHAUSTED junto da candidata/razão atual.',
+            'Quando houver use_current ou switch_recommended, escreva uma linha pública no formato exato "ADAPTIVE-SELECTION-READY provider=<providerId> model=<providerModel> decision=<status>" usando a selectedRoute do workflow. Depois escreva as oito linhas DELTA-CANONICAL.',
+        ],
+        askToolInstruction:
+            'Depois da linha ADAPTIVE-SELECTION-READY e das oito DELTA-CANONICAL, invoque ask_user perguntando exatamente "ASK-MODEL-GATEWAY-ADAPTIVE: responda SIM depois da seleção adaptativa". Use a opção SIM se o schema expuser choices.',
+        finalInstruction:
+            'Depois que o usuário responder SIM, escreva uma última mensagem pública contendo exatamente "POST-ASK-MODEL-GATEWAY-ADAPTIVE-FINAL: seleção adaptativa concluída e usuário confirmou SIM".',
+        allowedTools: [
+            'report_intent',
+            'read_file_content',
+            'model_gateway_overview',
+            'model_gateway_workflow_plan',
+            'model_gateway_probe_execute',
+            'model_gateway_operation_status',
+            'ask_user',
+        ],
+        expectedLifecycleTools: [
+            { name: 'model_gateway_overview', renderedName: 'Model Gateway overview' },
+            { name: 'model_gateway_workflow_plan', renderedName: 'Plano Model Gateway' },
+        ],
+        expectedOutputMarkers: ['workflow.plan'],
+        expectedPlainOutputMarkers: ['ADAPTIVE-SELECTION-READY'],
     }),
     'model-gateway-tools-all-plan': createLiveScenario({
         id: 'model-gateway-tools-all-plan',

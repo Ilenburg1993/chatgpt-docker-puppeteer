@@ -62,6 +62,7 @@ const liveScenarioSchema = z.enum([
     'file-write-roundtrip',
     'file-patch-roundtrip',
     'model-gateway-tools-readonly',
+    'model-gateway-adaptive-probe',
     'model-gateway-tools-all-plan',
     'model-gateway-tools-apply-safe',
     'model-gateway-route-apply-minimal',
