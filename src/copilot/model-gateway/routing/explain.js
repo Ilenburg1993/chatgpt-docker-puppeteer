@@ -5,6 +5,8 @@
  * @module copilot/model-gateway/routing/explain
  */
 
+import { summarizeGatewayRuntimeProofFreshness } from './health-routing.js';
+
 /**
  * @param {unknown} value
  * @returns {string | null}
@@ -51,7 +53,13 @@ function reasonCounts(reasons) {
  *   agentProbeStatus: string | null;
  *   chatOk: boolean;
  *   agentProbeVerified: boolean;
+ *   freshProof: boolean;
+ *   historicalProof: boolean;
+ *   stale: boolean;
+ *   proofAgeMs: number | null;
+ *   proofMaxAgeMs: number;
  *   verifiedProbes: string[];
+ *   staleProbes: string[];
  *   failedProbes: string[];
  *   liveToolProtocolStatus: string | null;
  *   liveAskUserStatus: string | null;
@@ -59,11 +67,10 @@ function reasonCounts(reasons) {
  */
 function probeSummary(health) {
     const probes = isRecord(health?.['probes']) ? health['probes'] : {};
-    const verifiedProbes = [];
+    const runtimeProof = summarizeGatewayRuntimeProofFreshness(health);
     const failedProbes = [];
     for (const [kind, probe] of Object.entries(probes)) {
         if (!isRecord(probe)) continue;
-        if (probe['status'] === 'ok') verifiedProbes.push(kind);
         if (probe['status'] === 'failed') failedProbes.push(kind);
     }
     const status = optionalString(health?.['lastStatus']) ?? null;
@@ -71,12 +78,26 @@ function probeSummary(health) {
     return {
         status,
         agentProbeStatus,
-        chatOk: status === 'ok',
-        agentProbeVerified: agentProbeStatus === 'ok',
-        verifiedProbes: verifiedProbes.sort(),
+        chatOk: runtimeProof.chatFresh,
+        agentProbeVerified: runtimeProof.agentFresh,
+        freshProof: runtimeProof.hasFreshProof,
+        historicalProof: runtimeProof.hasHistoricalProof,
+        stale: runtimeProof.stale,
+        proofAgeMs: runtimeProof.ageMs,
+        proofMaxAgeMs: runtimeProof.maxAgeMs,
+        verifiedProbes: [...runtimeProof.freshProbeKinds],
+        staleProbes: [...runtimeProof.staleProbeKinds],
         failedProbes: failedProbes.sort(),
-        liveToolProtocolStatus: isRecord(probes['live_tool_protocol']) ? optionalString(probes['live_tool_protocol']['status']) : null,
-        liveAskUserStatus: isRecord(probes['live_ask_user']) ? optionalString(probes['live_ask_user']['status']) : null,
+        liveToolProtocolStatus: runtimeProof.freshProbeKinds.includes('live_tool_protocol')
+            ? 'ok'
+            : isRecord(probes['live_tool_protocol']) && probes['live_tool_protocol']['status'] === 'failed'
+              ? 'failed'
+              : null,
+        liveAskUserStatus: runtimeProof.freshProbeKinds.includes('live_ask_user')
+            ? 'ok'
+            : isRecord(probes['live_ask_user']) && probes['live_ask_user']['status'] === 'failed'
+              ? 'failed'
+              : null,
     };
 }
 

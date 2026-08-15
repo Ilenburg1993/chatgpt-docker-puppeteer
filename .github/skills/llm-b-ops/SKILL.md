@@ -117,43 +117,55 @@ list_directory({ path: 'tests/unit/copilot', recursive: false })
 
 ---
 
-## 4. Quality Gates para src/copilot
+## 4. Quality Gates para src/copilot — focused-first
 
-### 4.1 One-liner canônico
+Validação é evidência, não ritual. **Nunca rode uma suíte ampla apenas porque haverá commit/push.** Escolha o menor gate capaz de falsificar a mudança feita.
+
+### 4.1 Ordem canônica
+
+1. inspeção estática do diff/imports/outline;
+2. teste exato do arquivo/contrato alterado, quando existir;
+3. typecheck estrito somente quando JSDoc/tipos/import contracts foram afetados;
+4. lint somente quando a mudança ou erro indicar necessidade;
+5. suíte Copilot ampla apenas quando a mudança for transversal, houver falha não localizada, ou o usuário pedir validação/release ampla.
+
+### 4.2 Gates proporcionais
+
+| Situação | Gate preferido |
+|---|---|
+| Mudança de documentação/skill | inspeção do diff; nenhum validator por padrão |
+| JS local sem contrato tipado novo | parse/outline + teste focado, se existir |
+| JSDoc, exports, imports ou contratos | `npm run typecheck:strict:src.copilot` |
+| Comportamento com teste conhecido | Vitest do **arquivo spec exato** |
+| Formatação/regra ESLint específica | lint focado/necessário |
+| Refatoração transversal comprovada | ampliar somente até o menor conjunto que cobre a área |
+| Release/auditoria explícita | suíte ampla pode ser apropriada |
+
+### 4.3 O que NÃO fazer
 
 ```bash
+# ❌ Não usar como ritual pré-commit
 npm run validate:copilot
-```
 
-Equivale a: `lint:copilot && typecheck:node && test:copilot:unit` (com cache em todos os estágios).
-
-### 4.2 Scripts individuais
-
-| Propósito | Script | Escopo |
-|-----------|--------|--------|
-| Lint copilot | `npm run lint:copilot` | `src/copilot` + `tests/unit/copilot` |
-| Lint + autofix | `npm run lint:copilot:fix` | idem, com `--fix` |
-| TypeScript strict | `npm run typecheck:node` | Todo projeto (tsconfig.node.json) |
-| Tests copilot | `npm run test:copilot:unit` | `tests/unit/copilot/**/*.spec.js` |
-| Tests raw (debug) | `npm run test:copilot:raw` | idem, full vitest output |
-| Todos os gates | `npm run validate:copilot` | **use este por padrão** |
-
-### 4.3 Quando rodar cada gate
-
-- **Antes de commit/push:** `validate:copilot`
-- **Ciclo de desenvolvimento rápido:** só `test:copilot:unit` (mais rápido)
-- **Após editar tipos JSDoc:** `typecheck:node`
-- **Após reformatar código:** `lint:copilot`
-
-### 4.4 ⚠️ Anti-padrão crítico de testes
-
-```bash
-# ❌ NUNCA — 520 arquivos de todo o projeto, output 904KB
-npm run test:unit
-
-# ✅ SEMPRE — 213 arquivos copilot, output estruturado
+# ❌ Não usar uma suíte inteira só porque não conhece o teste correto
 npm run test:copilot:unit
+
+# ❌ Nunca subir para todo o projeto sem evidência concreta
+npm run test:unit
 ```
+
+Se um gate focado falhar, leia apenas o output necessário, corrija a causa e repita **o mesmo gate**. Não responda a um erro de typecheck executando uma suíte maior.
+
+### 4.4 Commit/push
+
+Antes de commit/push, confirme:
+
+- diff causal e somente arquivos pretendidos;
+- gate proporcional já verde, quando algum gate foi necessário;
+- artefatos locais/preexistentes não foram staged;
+- não há necessidade de repetir um validator que acabou de provar exatamente o mesmo contrato.
+
+Commit/push não cria uma obrigação adicional de `validate:copilot`.
 
 ---
 
@@ -161,12 +173,12 @@ npm run test:copilot:unit
 
 | # | Anti-padrão | Impacto | Correção |
 |---|-------------|---------|----------|
-| 1 | `npm run test:unit` em vez de `test:copilot:unit` | Output 4x maior, 2x mais lento | Sempre usar `test:copilot:unit` |
-| 2 | Leituras de arquivo sequenciais | 3x mais turn tokens, latência acumulada | Batch em uma resposta |
-| 3 | `list_directory` em dirs com 100+ entradas | Output 28KB+ irrelevante | `find` focado ou `workspace_index_search` |
-| 4 | `exec_command grep` quando há tool semântica | Ignora FTS5, mais lento | Níveis 1-4 da hierarquia de search |
-| 5 | Sem session init (index + scope) | Full-scan FS a cada busca | Init obrigatória no turno 1 |
-| 6 | `contextLines: 2` em buscas de símbolo | 3x mais output sem valor | `contextLines: 0` para symbol search |
+| 1 | Validator/suíte ampla por ritual pré-commit | Minutos gastos sem aumentar evidência causal | Começar por inspeção/teste exato/typecheck quando necessário |
+| 2 | `npm run test:unit` para mudança em `src/copilot` | Escopo enorme e output irrelevante | Localizar o spec exato; ampliar somente com motivo |
+| 3 | Leituras de arquivo sequenciais | 3x mais turn tokens, latência acumulada | Batch em uma resposta |
+| 4 | `list_directory` em dirs com 100+ entradas | Output 28KB+ irrelevante | `find` focado ou `workspace_index_search` |
+| 5 | `exec_command grep` quando há tool semântica | Ignora FTS5, mais lento | Níveis 1-4 da hierarquia de search |
+| 6 | Escalar após um erro focado | Troca um diagnóstico preciso por ruído amplo | Corrigir e repetir o mesmo gate |
 | 7 | Ler `package.json` inteiro para achar um script | Output 8000+ linhas | `read_file_content` com `startLine/endLine` |
 
 ---
@@ -243,8 +255,9 @@ npm run rag:health
 ## 8. Regras de Ouro (checklist de início de turno)
 
 - [ ] Session init: `workspace_index_build` + `workspace_scope_declare` (em paralelo)
-- [ ] Usar `validate:copilot` como quality gate padrão
-- [ ] Nunca usar `test:unit` — sempre `test:copilot:unit`
+- [ ] Validator focused-first: só o menor gate que pode falsificar a mudança
+- [ ] Não ampliar uma falha localizada; corrigir e repetir o mesmo gate
+- [ ] Commit/push não implica `validate:copilot`
 - [ ] Ler arquivos independentes em paralelo (uma resposta, N tool calls)
 - [ ] Buscas: FTS5 primeiro, regex depois
 - [ ] `contextLines: 0` para symbol search, `contextLines: 2` para entender contexto lógico

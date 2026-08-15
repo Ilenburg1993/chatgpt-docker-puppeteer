@@ -3,6 +3,7 @@
 import {
     classifyModelGatewayDeferredRouteOperation,
     collectModelGatewaySecretAuditEnvValues,
+    DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS,
     createModelGatewayCatalogControlPlane,
     createModelGatewayControlPlaneResult,
     createModelGatewayEnvProfileStore,
@@ -68,12 +69,12 @@ const MODEL_GATEWAY_CONTROL_PLANE_TOOL_MATRIX = Object.freeze([
     {
         phase: 'route',
         tools: ['model_gateway_route_plan', 'model_gateway_model_evaluate', 'model_gateway_policy_propose'],
-        purpose: 'Selecionar rota explicável, comparar modelos e propor política sem mutação.',
+        purpose: 'Separar ranking de qualidade/capacidade de ranking já certificado por prova runtime fresca.',
     },
     {
         phase: 'runtime-proof',
         tools: ['model_gateway_probe_plan', 'model_gateway_probe_execute'],
-        purpose: 'Planejar e executar probes descartáveis antes de promover rota/modelo.',
+        purpose: 'Provar a melhor candidata atual em sessão descartável; recalcular o workflow após todo resultado.',
     },
     {
         phase: 'same-session-runtime',
@@ -417,6 +418,47 @@ function resultWarnings(result) {
 }
 
 /**
+ * @param {unknown} goal
+ * @returns {Record<string, unknown>}
+ */
+function selectionGoalRouteOptions(goal) {
+    switch (goal) {
+        case 'quality_first':
+            return {
+                pricePenaltyWeight: 0,
+                latencyPenaltyWeight: 0.2,
+                runtimeProofWeights: {
+                    ...DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS,
+                    chatHealthOk: 0,
+                    agentProbeVerified: 0,
+                    genericProbeVerified: 0,
+                    preferredProbeVerified: 0,
+                    preferredLiveProtocolProbeVerified: 0,
+                    exactRouteProfileProof: 0,
+                    runtimeProvedPreference: 0,
+                },
+            };
+        case 'reliability_first':
+            return { pricePenaltyWeight: 0.25, latencyPenaltyWeight: 0.35 };
+        case 'latency_first':
+            return { pricePenaltyWeight: 0.5, latencyPenaltyWeight: 2 };
+        case 'cost_first':
+            return { pricePenaltyWeight: 2, latencyPenaltyWeight: 0.5 };
+        default:
+            return { pricePenaltyWeight: 1, latencyPenaltyWeight: 1 };
+    }
+}
+
+/**
+ * @param {unknown} policy
+ */
+function routeProofPolicyOptions(policy) {
+    if (policy === 'metadata_only') return { requireAgentProbeOk: false, requireRuntimeProof: false };
+    if (policy === 'fresh_runtime_required') return { requireRuntimeProof: true };
+    return {};
+}
+
+/**
  * @param {Record<string, unknown>} selectedRoute
  * @returns {Record<string, unknown> | null}
  */
@@ -474,6 +516,166 @@ function workflowStep(order, id, tool, mode, purpose, args, requires = []) {
         args,
         requires,
         confirmationRequired: mode === 'apply',
+    };
+}
+
+/**
+ * @param {Record<string, any>} candidate
+ * @param {number} rank
+ */
+function normalizeWorkflowCandidate(candidate, rank) {
+    const providerId = optionalWorkflowString(candidate['providerId']);
+    const providerModel = optionalWorkflowString(candidate['providerModel']) ?? optionalWorkflowString(candidate['id']);
+    if (!providerId || !providerModel) return null;
+    const probes = asRecord(candidate['probes']);
+    const freshProof = probes['freshProof'] === true;
+    const historicalProof = probes['historicalProof'] === true;
+    const stale = probes['stale'] === true;
+    const failedProbes = Array.isArray(probes['failedProbes']) ? probes['failedProbes'].map(String) : [];
+    return {
+        rank,
+        id: optionalWorkflowString(candidate['id']) ?? `${providerId}:${providerModel}`,
+        providerId,
+        providerModel,
+        score: typeof candidate['score'] === 'number' ? candidate['score'] : null,
+        proofState: freshProof ? 'fresh_proved' : stale ? 'historical_stale' : 'unproved',
+        freshProof,
+        historicalProof,
+        stale,
+        proofAgeMs: typeof probes['proofAgeMs'] === 'number' ? probes['proofAgeMs'] : null,
+        failedProbes,
+        positiveReasons: Array.isArray(candidate['positiveReasons']) ? candidate['positiveReasons'].map(String) : [],
+        rejectedReasons: Array.isArray(candidate['rejectedReasons']) ? candidate['rejectedReasons'].map(String) : [],
+    };
+}
+
+/**
+ * @param {Record<string, any>} routeData
+ * @param {{ candidateModelIds?: string[]; providerId?: string | null; maxCandidates: number; probeStrategy?: string }} input
+ */
+function buildWorkflowProbeCandidateChain(routeData, input) {
+    const routeCandidates = Array.isArray(routeData['candidates'])
+        ? routeData['candidates']
+              .map((candidate, index) => normalizeWorkflowCandidate(asRecord(candidate), index + 1))
+              .filter((candidate) => candidate !== null)
+        : [];
+    const explicitIds = Array.isArray(input.candidateModelIds) ? input.candidateModelIds.map(String) : [];
+    /** @type {Record<string, any>[]} */
+    let candidates = routeCandidates;
+    if (explicitIds.length > 0) {
+        const byId = new Map();
+        for (const candidate of routeCandidates) {
+            byId.set(String(candidate['id']), candidate);
+            byId.set(String(candidate['providerModel']), candidate);
+        }
+        candidates = explicitIds
+            .map((id, index) => {
+                const matched = byId.get(id);
+                if (matched) return { ...matched, rank: index + 1 };
+                const providerId = optionalWorkflowString(input.providerId);
+                return providerId
+                    ? {
+                          rank: index + 1,
+                          id: `${providerId}:${id}`,
+                          providerId,
+                          providerModel: id,
+                          score: null,
+                          proofState: 'unproved',
+                          freshProof: false,
+                          historicalProof: false,
+                          stale: false,
+                          proofAgeMs: null,
+                          failedProbes: [],
+                          positiveReasons: ['explicit_candidate'],
+                          rejectedReasons: [],
+                      }
+                    : null;
+            })
+            .filter((candidate) => candidate !== null);
+    }
+    const unique = [];
+    const seen = new Set();
+    for (const candidate of candidates) {
+        const key = `${candidate['providerId']}:${candidate['providerModel']}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(candidate);
+    }
+    const strategyLimit = input.probeStrategy === 'minimal' ? 1 : input.probeStrategy === 'aggressive' ? 5 : 3;
+    return unique.slice(0, Math.min(input.maxCandidates, strategyLimit));
+}
+
+/**
+ * @param {{
+ *   runtimeId?: string | null;
+ *   taskProfile: string;
+ *   selectionGoal: string;
+ *   requireRuntimeProof: boolean;
+ *   maxRuntimeProofAgeHours: number;
+ *   currentModel: string | null;
+ *   discoveryRoute: Record<string, any> | null;
+ *   provedRoute: Record<string, any> | null;
+ *   candidates: Record<string, any>[];
+ * }} input
+ */
+function buildWorkflowSelectionDecision(input) {
+    const discoveryCandidate = input.candidates[0] ?? null;
+    const discoveryProvider = optionalWorkflowString(discoveryCandidate?.['providerId']);
+    const discoveryModel = optionalWorkflowString(discoveryCandidate?.['providerModel']);
+    const provedProvider = optionalWorkflowString(input.provedRoute?.['providerId']);
+    const provedModel = optionalWorkflowString(input.provedRoute?.['providerModel']);
+    const discoveryMatchesProved =
+        discoveryProvider !== null &&
+        discoveryModel !== null &&
+        discoveryProvider === provedProvider &&
+        discoveryModel === provedModel;
+    const currentMatchesProved = provedModel !== null && input.currentModel === provedModel;
+    const betterDiscoveryNeedsProof =
+        input.requireRuntimeProof && discoveryCandidate !== null && !discoveryMatchesProved;
+    const status = betterDiscoveryNeedsProof
+        ? 'probe_required'
+        : input.provedRoute
+          ? currentMatchesProved
+              ? 'use_current'
+              : 'switch_recommended'
+          : discoveryCandidate
+            ? 'probe_required'
+            : 'blocked';
+    const confidence = status === 'use_current' || status === 'switch_recommended' ? 'high' : discoveryCandidate ? 'medium' : 'low';
+    const nextAction =
+        status === 'use_current'
+            ? 'continue_with_current_route'
+            : status === 'switch_recommended'
+              ? 'plan_same_session_switch'
+              : status === 'probe_required'
+                ? 'probe_ranked_candidates_until_first_success_then_rerun_workflow'
+                : 'refresh_catalog_or_relax_hard_constraints';
+    return {
+        status,
+        confidence,
+        taskProfile: input.taskProfile,
+        selectionGoal: input.selectionGoal,
+        currentModel: input.currentModel,
+        selectedRoute: input.provedRoute,
+        discoveryBestRoute: input.discoveryRoute,
+        nextCandidate: status === 'probe_required' ? discoveryCandidate : null,
+        runtimeProofRequired: input.requireRuntimeProof,
+        runtimeProofMaxAgeHours: input.maxRuntimeProofAgeHours,
+        candidateChain: input.candidates,
+        rationale: [
+            input.selectionGoal === 'quality_first'
+                ? 'quality_first:price_penalty_disabled'
+                : `selection_goal:${input.selectionGoal}`,
+            betterDiscoveryNeedsProof
+                ? 'higher_ranked_discovery_candidate_requires_fresh_functional_proof'
+                : input.provedRoute
+                  ? 'best_discovery_candidate_has_fresh_functional_proof'
+                  : discoveryCandidate
+                    ? 'best_metadata_candidate_requires_fresh_functional_proof'
+                    : 'no_eligible_discovery_candidate',
+            currentMatchesProved ? 'current_route_already_best_proved' : 'same_session_continuity_required',
+        ],
+        nextAction,
     };
 }
 
@@ -574,11 +776,12 @@ export const modelGatewayControlPlaneGuideTool = buildTool({
                       tool: 'model_gateway_probe_execute',
                       args: {
                           mode: 'apply',
-                          probeKind: 'chat',
+                          probeKind: 'agent',
                           providerId: '<provider-id>',
                           modelId: '<provider-model>',
                           profileId: null,
-                          maxEstimatedCostUsd: 0,
+                          maxEstimatedCostUsd: 10,
+                          unknownCostPolicy: 'allow',
                           timeoutMs: 60000,
                           idempotencyKey: '<stable-workflow-key>:probe-chat',
                           confirm: true,
@@ -627,6 +830,10 @@ export const modelGatewayControlPlaneGuideTool = buildTool({
                         applyRequiresConfirmTrue: true,
                         inlineSecretsForbidden: true,
                         catalogMetadataIsNotRuntimeProof: true,
+                        stalePositiveProofIsNotCurrentProof: true,
+                        recentFailureMayBlockButOldFailureIsReprobeable: true,
+                        qualityFirstDoesNotPenalizePrice: true,
+                        rerankAfterEveryProbeResult: true,
                     },
                     turnBoundaryProtocol: {
                         armedResultField: 'data.automaticContinuation.armed',
@@ -639,10 +846,12 @@ export const modelGatewayControlPlaneGuideTool = buildTool({
                     defaultSequence: [
                         'model_gateway_control_plane_guide',
                         'model_gateway_overview',
-                        'model_gateway_workflow_plan',
-                        'model_gateway_probe_execute:plan',
+                        'model_gateway_workflow_plan: read selectionDecision first',
+                        'when probe_required: model_gateway_probe_execute:plan for current top candidate',
                         'model_gateway_probe_execute:apply',
-                        'model_gateway_route_switch:plan or model_gateway_model_switch:plan',
+                        'rerun model_gateway_workflow_plan after every probe result',
+                        'continue automatically with the newly top-ranked candidate when still probe_required',
+                        'only when switch_recommended: model_gateway_route_switch:plan or model_gateway_model_switch:plan',
                         'model_gateway_route_switch:apply or model_gateway_model_switch:apply',
                         'finish current turn when automaticContinuation.armed=true',
                         'model_gateway_operation_status on a later turn',
@@ -668,14 +877,14 @@ export const modelGatewayControlPlaneGuideTool = buildTool({
 export const modelGatewayWorkflowPlanTool = buildTool({
     name: 'model_gateway_workflow_plan',
     description:
-        'Monta um roteiro read-only para a LLM-B operar o model-gateway: overview, refresh, rota, avaliação, probes ' +
-        'e troca/reconcile preservando a mesma sessão quando aplicável. Não chama providers, não troca modelo e não grava estado.',
+        'É o cérebro read-only de seleção da LLM-B: separa ranking por capacidade/qualidade de certificação runtime, ' +
+        'explica a decisão, prepara probes adaptativos em ordem e só planeja promoção same-session quando já existe prova fresca.',
     instructions:
-        'Use como ponto de entrada de orquestração. Execute as etapas na ordem retornada; chamadas mode=apply exigem ' +
-        'uma chamada separada da tool indicada com confirm=true e a mesma idempotencyKey. Se o apply retornar ' +
-        'automaticContinuation.armed=true, encerre o turno imediatamente e só execute etapas marcadas notBefore em um ' +
-        'turno posterior. Nunca crie sessão nova por fallback: switches planejados aqui são same-session e nova sessão ' +
-        'só pode ser decisão humana explícita fora deste plano.',
+        'Use como ponto de entrada de seleção e operação. Para máxima qualidade sem restrição de custo use ' +
+        'selectionGoal=quality_first, probeStrategy=aggressive, requireRuntimeProof=true e agent entre preferredProbeKinds ' +
+        'para perfis agente. Se selectionDecision.status=probe_required, execute a cadeia por rank e pare no primeiro sucesso; ' +
+        'então rode workflow_plan novamente antes de qualquer switch. Calls mode=apply exigem confirm=true. Se uma troca retornar ' +
+        'automaticContinuation.armed=true, encerre o turno e verifique em turno posterior. Nunca crie sessão nova por fallback.',
     parameters: MODEL_GATEWAY_WORKFLOW_PLAN_INPUT_SCHEMA,
     outputSchema: MODEL_GATEWAY_TOOL_OUTPUT_SCHEMA,
     annotations: READ_ONLY_ANNOTATIONS,
@@ -687,27 +896,68 @@ export const modelGatewayWorkflowPlanTool = buildTool({
             maxSnapshotAgeHours: args.maxSnapshotAgeHours,
             operationLimit: 10,
         });
-        const routePlan = await readPlane.planRoute({
+        const selectionGoal = optionalWorkflowString(args.selectionGoal) ?? 'balanced';
+        const probeStrategy = optionalWorkflowString(args.probeStrategy) ?? 'balanced';
+        const maxRuntimeProofAgeHours =
+            typeof args.maxRuntimeProofAgeHours === 'number' ? args.maxRuntimeProofAgeHours : 24;
+        const maxRuntimeProofAgeMs = maxRuntimeProofAgeHours * 60 * 60 * 1000;
+        const rankingWeights = selectionGoalRouteOptions(selectionGoal);
+        const discoveryRoutePlan = await readPlane.planRoute({
             taskProfile: args.taskProfile,
             maxCandidates: args.maxCandidates,
             evaluateEligibility: true,
+            requireAgentProbeOk: false,
+            requireRuntimeProof: false,
+            maxRuntimeProofAgeMs,
+            ...rankingWeights,
         });
-        const routeData = operationData(routePlan);
-        const selectedRoute = normalizeWorkflowRoute(asRecord(routeData['selectedRoute']));
+        const provedRoutePlan = await readPlane.planRoute({
+            taskProfile: args.taskProfile,
+            maxCandidates: args.maxCandidates,
+            evaluateEligibility: true,
+            ...(args.requireRuntimeProof ? { requireRuntimeProof: true } : {}),
+            maxRuntimeProofAgeMs,
+            ...rankingWeights,
+        });
+        const routeData = operationData(discoveryRoutePlan);
+        const provedRouteData = operationData(provedRoutePlan);
+        const discoverySelectedRoute = normalizeWorkflowRoute(asRecord(routeData['selectedRoute']));
+        const provedSelectedRoute = normalizeWorkflowRoute(asRecord(provedRouteData['selectedRoute']));
+        const candidateModelIds = Array.isArray(args.candidateModelIds) ? args.candidateModelIds.map(String) : [];
+        const probeCandidates = buildWorkflowProbeCandidateChain(routeData, {
+            candidateModelIds,
+            providerId: optionalWorkflowString(args.providerId),
+            maxCandidates: args.maxCandidates,
+            probeStrategy,
+        });
+        const currentRuntime = readOptionalRuntimeCurrentModel(optionalWorkflowString(args.runtimeId));
+        const selectionDecision = buildWorkflowSelectionDecision({
+            runtimeId: optionalWorkflowString(args.runtimeId),
+            taskProfile: args.taskProfile,
+            selectionGoal,
+            requireRuntimeProof: args.requireRuntimeProof,
+            maxRuntimeProofAgeHours,
+            currentModel: currentRuntime.currentModel,
+            discoveryRoute: discoverySelectedRoute,
+            provedRoute: provedSelectedRoute,
+            candidates: probeCandidates,
+        });
+        const selectedRoute = provedSelectedRoute ?? (args.requireRuntimeProof ? null : discoverySelectedRoute);
         const selectedProviderId = optionalWorkflowString(selectedRoute?.['providerId']);
         const selectedModelId = optionalWorkflowString(selectedRoute?.['providerModel']);
-        const candidateModelIds = Array.isArray(args.candidateModelIds) ? args.candidateModelIds.map(String) : [];
-        const modelIds = candidateModelIds.length > 0 ? candidateModelIds : selectedModelId ? [selectedModelId] : [];
-        const providerForProbe = optionalWorkflowString(args.providerId) ?? selectedProviderId;
-        const probeModelId = selectedModelId ?? modelIds[0] ?? null;
+        const modelIds = probeCandidates.map((candidate) => String(candidate['providerModel']));
+        const firstProbeCandidate = probeCandidates[0] ?? null;
+        const providerForProbe = optionalWorkflowString(firstProbeCandidate?.['providerId']);
+        const probeModelId = optionalWorkflowString(firstProbeCandidate?.['providerModel']);
         const shouldPlanCatalogRefresh = args.includeCatalogRefreshPlan || args.objective === 'catalog_refresh';
         const shouldPlanProbes =
-            modelIds.length > 0 &&
-            (args.objective === 'probe_shortlist' ||
-                args.objective === 'same_session_model_switch' ||
-                args.objective === 'same_session_route_switch' ||
-                args.objective === 'runtime_reconcile' ||
-                args.requireRuntimeProof);
+            probeCandidates.length > 0 &&
+            (selectionDecision.status === 'probe_required' ||
+                args.objective === 'probe_shortlist' ||
+                (!provedSelectedRoute &&
+                    (args.objective === 'same_session_model_switch' ||
+                        args.objective === 'same_session_route_switch' ||
+                        args.objective === 'runtime_reconcile')));
 
         const modelEvaluation =
             modelIds.length > 0
@@ -718,14 +968,14 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                   })
                 : null;
         const probePlan =
-            shouldPlanProbes && providerForProbe
+            shouldPlanProbes && providerForProbe && probeModelId
                 ? await readPlane.planProbes({
-                      modelIds,
+                      modelIds: [probeModelId],
                       providerId: providerForProbe,
                       allowedProbeKinds: args.preferredProbeKinds,
-                      maxProbeCount: args.maxProbeCount,
+                      maxProbeCount: Math.min(args.maxProbeCount, args.preferredProbeKinds.length),
                       maxEstimatedCostUsd: args.maxEstimatedCostUsd,
-                      unknownCostPolicy: 'skip',
+                      unknownCostPolicy: selectionGoal === 'quality_first' ? 'allow' : 'skip',
                       recommendationLimit: args.maxCandidates,
                       probeFailureCooldownSeconds: 900,
                   })
@@ -774,11 +1024,39 @@ export const modelGatewayWorkflowPlanTool = buildTool({
             );
         }
         steps.push(
-            workflowStep(order++, 'route_plan', 'model_gateway_route_plan', 'read', 'Selecionar rota local explicável para o perfil de tarefa.', {
-                taskProfile: args.taskProfile,
-                maxCandidates: args.maxCandidates,
-                evaluateEligibility: true,
-            }),
+            workflowStep(
+                order++,
+                'route_plan',
+                'model_gateway_route_plan',
+                'read',
+                'Rankear as melhores candidatas por capacidade/qualidade sem confundir ausência de prova fresca com inelegibilidade.',
+                {
+                    taskProfile: args.taskProfile,
+                    maxCandidates: args.maxCandidates,
+                    evaluateEligibility: true,
+                    selectionGoal,
+                    proofPolicy: 'metadata_only',
+                    maxRuntimeProofAgeHours,
+                },
+            ),
+        );
+        steps.push(
+            workflowStep(
+                order++,
+                'route_proved_plan',
+                'model_gateway_route_plan',
+                'read',
+                'Separar as rotas já certificadas pelo contrato funcional atual das candidatas que ainda precisam de probe.',
+                {
+                    taskProfile: args.taskProfile,
+                    maxCandidates: args.maxCandidates,
+                    evaluateEligibility: true,
+                    selectionGoal,
+                    proofPolicy: args.requireRuntimeProof ? 'fresh_runtime_required' : 'task_default',
+                    maxRuntimeProofAgeHours,
+                },
+                ['route_plan'],
+            ),
         );
         if (modelIds.length > 0) {
             steps.push(
@@ -806,12 +1084,12 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     'read',
                     'Planejar sondas descartáveis com orçamento e cooldown antes de qualquer promoção.',
                     {
-                        modelIds,
+                        modelIds: probeModelId ? [probeModelId] : [],
                         providerId: providerForProbe,
                         allowedProbeKinds: args.preferredProbeKinds,
-                        maxProbeCount: args.maxProbeCount,
+                        maxProbeCount: Math.min(args.maxProbeCount, args.preferredProbeKinds.length),
                         maxEstimatedCostUsd: args.maxEstimatedCostUsd,
-                        unknownCostPolicy: 'skip',
+                        unknownCostPolicy: selectionGoal === 'quality_first' ? 'allow' : 'skip',
                         recommendationLimit: args.maxCandidates,
                         probeFailureCooldownSeconds: 900,
                     },
@@ -822,50 +1100,61 @@ export const modelGatewayWorkflowPlanTool = buildTool({
 
         /** @type {string[]} */
         const runtimeProofStepIds = [];
-        if (shouldPlanProbes && providerForProbe && probeModelId) {
-            for (const probeKind of args.preferredProbeKinds.slice(0, args.maxProbeCount)) {
-                const suffix = `probe-${probeKind}-${providerForProbe}-${probeModelId}`;
-                const planId = `probe_execute_plan_${cleanWorkflowKeyPart(probeKind)}`;
-                const applyId = `probe_execute_apply_${cleanWorkflowKeyPart(probeKind)}`;
+        if (shouldPlanProbes && firstProbeCandidate) {
+            const candidateRank = Number(firstProbeCandidate['rank'] ?? 1);
+            const candidateProviderId = String(firstProbeCandidate['providerId']);
+            const candidateModelId = String(firstProbeCandidate['providerModel']);
+            const probeKinds = args.preferredProbeKinds.slice(0, args.maxProbeCount);
+            for (const probeKind of probeKinds) {
+                const suffix = `probe-r${candidateRank}-${probeKind}-${candidateProviderId}-${candidateModelId}`;
+                const idSuffix = `r${candidateRank}_${cleanWorkflowKeyPart(probeKind)}`;
+                const planId = `probe_execute_plan_${idSuffix}`;
+                const applyId = `probe_execute_apply_${idSuffix}`;
                 const commonProbeArgs = {
                     probeKind,
-                    providerId: providerForProbe,
-                    modelId: probeModelId,
+                    providerId: candidateProviderId,
+                    modelId: candidateModelId,
                     profileId: null,
                     maxEstimatedCostUsd: args.maxEstimatedCostUsd,
+                    unknownCostPolicy: selectionGoal === 'quality_first' ? 'allow' : 'skip',
                     timeoutMs: 60000,
                     idempotencyKey: workflowIdempotencyKey(args.idempotencyKeyPrefix, suffix),
                 };
-                steps.push(
-                    workflowStep(
-                        order++,
-                        planId,
-                        'model_gateway_probe_execute',
-                        'plan',
-                        `Planejar sonda ${probeKind} para prova runtime descartável.`,
-                        { ...commonProbeArgs, mode: 'plan', confirm: false },
-                        ['probe_plan'],
-                    ),
+                const planStep = workflowStep(
+                    order++,
+                    planId,
+                    'model_gateway_probe_execute',
+                    'plan',
+                    `Planejar sonda ${probeKind} para a melhor candidata atual #${candidateRank} ${candidateProviderId}/${candidateModelId}.`,
+                    { ...commonProbeArgs, mode: 'plan', confirm: false },
+                    ['model_evaluate'],
                 );
-                steps.push(
-                    workflowStep(
-                        order++,
-                        applyId,
-                        'model_gateway_probe_execute',
-                        'apply',
-                        `Executar sonda ${probeKind} somente após revisão do plano.`,
-                        { ...commonProbeArgs, mode: 'apply', confirm: true },
-                        [planId],
-                    ),
+                planStep['adaptiveSelection'] = {
+                    candidateRank,
+                    candidateChainVisible: true,
+                    recalculateAfterApply: true,
+                };
+                steps.push(planStep);
+                const applyStep = workflowStep(
+                    order++,
+                    applyId,
+                    'model_gateway_probe_execute',
+                    'apply',
+                    `Executar sonda ${probeKind}; depois do resultado, recalcular imediatamente o workflow antes de sondar outra candidata ou promover a rota.`,
+                    { ...commonProbeArgs, mode: 'apply', confirm: true },
+                    [planId],
                 );
+                applyStep['adaptiveSelection'] = {
+                    candidateRank,
+                    onSuccess: 'rerun_model_gateway_workflow_plan_before_switch',
+                    onFailure: 'rerun_model_gateway_workflow_plan_and_continue_without_user_prompt',
+                };
+                steps.push(applyStep);
                 runtimeProofStepIds.push(applyId);
             }
         }
 
-        const switchRequires = [
-            'route_plan',
-            ...(args.requireRuntimeProof ? runtimeProofStepIds : []),
-        ];
+        const switchRequires = ['route_proved_plan'];
         if ((args.includeRouteSwitchPlan || args.objective === 'same_session_route_switch') && selectedRoute) {
             const routeKey = workflowIdempotencyKey(
                 args.idempotencyKeyPrefix,
@@ -1025,13 +1314,14 @@ export const modelGatewayWorkflowPlanTool = buildTool({
 
         const warnings = [
             ...resultWarnings(overview),
-            ...resultWarnings(routePlan),
+            ...resultWarnings(discoveryRoutePlan),
+            ...resultWarnings(provedRoutePlan),
             ...(modelEvaluation ? resultWarnings(modelEvaluation) : []),
             ...(probePlan ? resultWarnings(probePlan) : []),
             ...(catalogRefreshPlan ? resultWarnings(catalogRefreshPlan) : []),
-            ...(selectedRoute ? [] : ['route_plan_selected_route_missing']),
+            ...(selectionDecision.status === 'probe_required' ? ['fresh_runtime_proof_required_before_promotion'] : []),
             ...(shouldPlanProbes && !providerForProbe ? ['probe_provider_missing'] : []),
-            ...(args.requireRuntimeProof && runtimeProofStepIds.length === 0
+            ...(selectionDecision.status === 'probe_required' && runtimeProofStepIds.length === 0
                 ? ['runtime_proof_required_but_no_probe_apply_step_planned']
                 : []),
         ];
@@ -1039,17 +1329,20 @@ export const modelGatewayWorkflowPlanTool = buildTool({
             args.objective,
         );
         const errors = [];
-        if (switchingObjective && !selectedModelId) {
+        if (switchingObjective && selectionDecision.status === 'blocked') {
             errors.push({
                 code: 'MODEL_GATEWAY_WORKFLOW_TARGET_MODEL_MISSING',
-                message: 'O plano de rota não retornou modelo alvo suficiente para planejar switch/reconcile.',
+                message: 'Nenhuma candidata elegível foi encontrada para provar e depois promover no runtime.',
                 retryable: true,
             });
         }
-        if ((args.includeRouteSwitchPlan || args.objective === 'same_session_route_switch') && !selectedRoute) {
+        if (
+            (args.includeRouteSwitchPlan || args.objective === 'same_session_route_switch') &&
+            selectionDecision.status === 'blocked'
+        ) {
             errors.push({
                 code: 'MODEL_GATEWAY_WORKFLOW_TARGET_ROUTE_MISSING',
-                message: 'O plano de rota não retornou rota estruturada suficiente para model_gateway_route_switch.',
+                message: 'Nenhuma rota estruturada elegível está disponível para model_gateway_route_switch.',
                 retryable: true,
             });
         }
@@ -1058,17 +1351,31 @@ export const modelGatewayWorkflowPlanTool = buildTool({
             createModelGatewayControlPlaneResult({
                 operation: 'workflow.plan',
                 ok: errors.length === 0,
-                status: errors.length === 0 ? 'planned' : 'attention_required',
+                status:
+                    errors.length > 0
+                        ? 'attention_required'
+                        : selectionDecision.status === 'probe_required'
+                          ? 'planned_probe_required'
+                          : selectionDecision.status === 'switch_recommended'
+                            ? 'planned_switch_recommended'
+                            : selectionDecision.status === 'use_current'
+                              ? 'planned_use_current'
+                              : 'planned',
                 dryRun: true,
                 data: {
                     objective: args.objective,
                     taskProfile: args.taskProfile,
                     runtimeId: args.runtimeId,
+                    selectionGoal,
+                    probeStrategy,
+                    maxRuntimeProofAgeHours,
+                    selectionDecision,
                     selectedRoute,
                     selectedProviderId,
                     selectedModelId,
                     providerForProbe,
                     modelIds,
+                    probeCandidates,
                     steps,
                     guardrails: {
                         sameSessionRequired: true,
@@ -1080,7 +1387,8 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     },
                     evidence: {
                         overview: operationData(overview),
-                        routePlan: routeData,
+                        discoveryRoutePlan: routeData,
+                        provedRoutePlan: provedRouteData,
                         modelEvaluation: modelEvaluation ? operationData(modelEvaluation) : null,
                         probePlan: probePlan ? operationData(probePlan) : null,
                         catalogRefreshPlan: catalogRefreshPlan ? operationData(catalogRefreshPlan) : null,
@@ -1089,9 +1397,18 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                 warnings,
                 errors,
                 nextActions:
-                    errors.length === 0
-                        ? ['execute_ordered_plan_steps', 'reuse_idempotency_keys', 'do_not_create_new_session']
-                        : ['refresh_catalog_or_adjust_candidates', 'rerun_workflow_plan'],
+                    errors.length > 0
+                        ? ['refresh_catalog_or_adjust_candidates', 'rerun_workflow_plan']
+                        : selectionDecision.status === 'probe_required'
+                          ? [
+                                'probe_current_top_ranked_candidate',
+                                'rerun_workflow_plan_after_every_probe_result',
+                                'continue_automatically_to_new_top_candidate_when_needed',
+                                'do_not_create_new_session',
+                            ]
+                          : selectionDecision.status === 'switch_recommended'
+                            ? ['review_same_session_switch_plan', 'apply_confirmed_switch', 'do_not_create_new_session']
+                            : ['continue_with_current_route', 'do_not_create_new_session'],
             }),
         );
     },
@@ -1116,17 +1433,33 @@ export const modelGatewayCatalogSearchTool = buildTool({
 export const modelGatewayRoutePlanTool = buildTool({
     name: 'model_gateway_route_plan',
     description:
-        'Gera um plano read-only explicável para um perfil de tarefa, com candidato selecionado, fallback e exclusões. ' +
-        'Não troca modelo, não cria sessão e não executa probes.',
+        'Gera um ranking read-only explicável para um perfil de tarefa. Permite separar melhor candidato por metadata ' +
+        'de melhor candidato já provado em runtime e escolher pesos quality/balanced/latency/cost. Não troca modelo nem executa probes.',
     instructions:
-        'Use depois de overview ou catalog_search. Verifique selectedId, warnings, rejectedReasonCounts e fallbackChain. ' +
-        'O resultado é dry-run e nunca deve ser descrito como uma troca aplicada.',
+        'Use proofPolicy=metadata_only para descobrir o melhor candidato sem confundir falta de prova com inelegibilidade; ' +
+        'use task_default ou fresh_runtime_required para certificação operacional. Quando custo não limitar a escolha, use ' +
+        'selectionGoal=quality_first. Resultado dry-run nunca significa troca aplicada.',
     parameters: MODEL_GATEWAY_ROUTE_PLAN_INPUT_SCHEMA,
     outputSchema: MODEL_GATEWAY_TOOL_OUTPUT_SCHEMA,
     annotations: READ_ONLY_ANNOTATIONS,
     schemaFailurePolicy: 'throw',
     requiresApproval: false,
-    handler: async (args) => serializeResult(await createModelGatewayReadControlPlane().planRoute(args)),
+    handler: async (args) => {
+        const selectionGoal = optionalWorkflowString(args.selectionGoal) ?? 'balanced';
+        const proofPolicy = optionalWorkflowString(args.proofPolicy) ?? 'task_default';
+        const maxRuntimeProofAgeHours =
+            typeof args.maxRuntimeProofAgeHours === 'number' ? args.maxRuntimeProofAgeHours : 24;
+        return serializeResult(
+            await createModelGatewayReadControlPlane().planRoute({
+                taskProfile: args.taskProfile,
+                maxCandidates: args.maxCandidates,
+                evaluateEligibility: args.evaluateEligibility,
+                ...selectionGoalRouteOptions(selectionGoal),
+                ...routeProofPolicyOptions(proofPolicy),
+                maxRuntimeProofAgeMs: maxRuntimeProofAgeHours * 60 * 60 * 1000,
+            }),
+        );
+    },
 });
 
 export const modelGatewayOperationStatusTool = buildTool({
@@ -1205,8 +1538,9 @@ export const modelGatewayProbeExecuteTool = buildTool({
         'Planeja ou executa uma única sonda SDK descartável com orçamento, backoff, confirmação e idempotência. ' +
         'apply pode chamar provider e persiste prova redigida, mas nunca troca a sessão viva.',
     instructions:
-        'Sempre use mode=plan primeiro. Só aplique quando o plano selecionar exatamente a sonda desejada; reutilize a ' +
-        'mesma idempotencyKey em retries. apply exige confirm=true e nunca deve ser tratado como troca de modelo.',
+        'Sempre use mode=plan primeiro. Para repo_agent/tool_agent prefira agent: ele valida geração, tool call, leitura sintética, ' +
+        'ask_user e eventos streaming/final em sessão descartável. Só aplique quando o plano selecionar exatamente a sonda; ' +
+        'reutilize a mesma idempotencyKey em retries. apply exige confirm=true e nunca é uma troca de modelo.',
     parameters: MODEL_GATEWAY_PROBE_EXECUTE_INPUT_SCHEMA,
     outputSchema: MODEL_GATEWAY_TOOL_OUTPUT_SCHEMA,
     annotations: { ...MUTATING_ANNOTATIONS, openWorldHint: true },
@@ -1257,7 +1591,7 @@ export const modelGatewayProbeExecuteTool = buildTool({
             allowedProbeKinds: [args.probeKind],
             maxProbeCount: 1,
             maxEstimatedCostUsd: args.maxEstimatedCostUsd,
-            unknownCostPolicy: 'skip',
+            unknownCostPolicy: args.unknownCostPolicy === 'allow' ? 'allow' : 'skip',
             recommendationLimit: 20,
             probeFailureCooldownSeconds: 900,
         });

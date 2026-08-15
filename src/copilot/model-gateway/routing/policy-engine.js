@@ -13,7 +13,7 @@ import {
     createGatewayRuntimeHealthIndex,
     evaluateGatewayProviderHealthCooldown,
     evaluateGatewayModelHealthRoute,
-    isGatewayModelProbeFailed,
+    isGatewayModelProbeActivelyFailed,
     isGatewayModelProbeFreshlyVerified,
 } from './health-routing.js';
 import { buildModelGatewayRouteCandidates } from './candidate-builder.js';
@@ -526,6 +526,8 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     maxPricePerMillion?: number;
  *     maxEstimatedCostPerMillion?: number;
  *     preferredMaxPricePerMillion?: number;
+ *     pricePenaltyWeight?: number;
+ *     latencyPenaltyWeight?: number;
  *     minimumConfidence?: string;
  *     preferredProbeKinds?: string[];
  *     requiredProbeKinds?: string[];
@@ -772,7 +774,14 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
                     : runtimeProofWeights.preferredProbeVerified;
                 score += weight;
                 reasons.push(`preferred_probe_verified:${kind}`);
-            } else if (isGatewayModelProbeFailed(healthDecision.health, kind)) {
+            } else if (
+                isGatewayModelProbeActivelyFailed(healthDecision.health, kind, {
+                    ...(options.now !== undefined ? { now: options.now } : {}),
+                    ...(typeof options.temporaryFailureCooldownMs === 'number'
+                        ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
+                        : {}),
+                })
+            ) {
                 const penalty = MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS.includes(kind)
                     ? runtimeProofWeights.preferredLiveProtocolProbeFailedPenalty
                     : runtimeProofWeights.preferredProbeFailedPenalty;
@@ -781,7 +790,16 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             }
         }
         for (const kind of blockFailedProbeKinds) {
-            if (isGatewayModelProbeFailed(healthDecision.health, kind)) rejectedReasons.push(`runtime_probe_failed:${kind}`);
+            if (
+                isGatewayModelProbeActivelyFailed(healthDecision.health, kind, {
+                    ...(options.now !== undefined ? { now: options.now } : {}),
+                    ...(typeof options.temporaryFailureCooldownMs === 'number'
+                        ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
+                        : {}),
+                })
+            ) {
+                rejectedReasons.push(`runtime_probe_failed:${kind}`);
+            }
         }
     }
     for (const kind of requiredProbeKinds) {
@@ -838,9 +856,11 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             score += 20;
             reasons.push(`price_within_preference:${price}<=${preferredMaxPrice}`);
         }
-        const pricePenalty = Math.min(60, Math.floor(price));
+        const pricePenaltyWeight = Math.max(0, Math.min(4, optionNumber(options.pricePenaltyWeight) ?? 1));
+        const pricePenalty = Math.round(Math.min(60, Math.floor(price)) * pricePenaltyWeight);
         score -= pricePenalty;
         reasons.push(`price_per_million:${price}`);
+        reasons.push(`price_penalty_weight:${pricePenaltyWeight}`);
     } else if (maxPrice !== null) {
         reasons.push('price_unknown_for_limit');
         if (options.noPaidModels === true) rejectedReasons.push('price_unknown_for_no_paid_models');
@@ -850,9 +870,11 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
 
     const latency = finiteNumber(options.latencyMsByModelId?.[String(model['id'] ?? '')]);
     if (latency !== null) {
-        const latencyPenalty = Math.min(50, Math.floor(latency / 1_000));
+        const latencyPenaltyWeight = Math.max(0, Math.min(4, optionNumber(options.latencyPenaltyWeight) ?? 1));
+        const latencyPenalty = Math.round(Math.min(50, Math.floor(latency / 1_000)) * latencyPenaltyWeight);
         score -= latencyPenalty;
         reasons.push(`latency_ms:${latency}`);
+        reasons.push(`latency_penalty_weight:${latencyPenaltyWeight}`);
     }
 
     return {

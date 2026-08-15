@@ -121,6 +121,22 @@ export const MODEL_GATEWAY_ROUTE_PLAN_INPUT_SCHEMA = Object.freeze({
             type: 'boolean',
             description: 'Reavalia elegibilidade localmente sem executar provider calls.',
         },
+        selectionGoal: {
+            type: 'string',
+            enum: ['quality_first', 'balanced', 'reliability_first', 'latency_first', 'cost_first'],
+            description: 'Define pesos de ranking. quality_first não penaliza preço e reduz fortemente a penalidade de latência.',
+        },
+        proofPolicy: {
+            type: 'string',
+            enum: ['metadata_only', 'task_default', 'fresh_runtime_required'],
+            description: 'Separa descoberta de candidatos de certificação runtime. task_default usa o contrato do taskProfile.',
+        },
+        maxRuntimeProofAgeHours: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 168,
+            description: 'Idade máxima de prova positiva para ser considerada funcional agora.',
+        },
     },
 });
 
@@ -427,6 +443,22 @@ export const MODEL_GATEWAY_WORKFLOW_PLAN_INPUT_SCHEMA = Object.freeze({
             type: 'boolean',
             description: 'Quando true, o plano exige probe positiva antes de qualquer apply de switch/reconcile.',
         },
+        selectionGoal: {
+            type: 'string',
+            enum: ['quality_first', 'balanced', 'reliability_first', 'latency_first', 'cost_first'],
+            description: 'Objetivo de ranking. quality_first é apropriado quando custo/uso não limitam a escolha.',
+        },
+        probeStrategy: {
+            type: 'string',
+            enum: ['aggressive', 'balanced', 'minimal'],
+            description: 'Quantas candidatas o plano prepara para sondagem adaptativa antes de pedir nova decisão.',
+        },
+        maxRuntimeProofAgeHours: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 168,
+            description: 'Janela máxima para prova positiva continuar valendo como funcionalidade atual.',
+        },
     },
 });
 
@@ -482,6 +514,11 @@ export const MODEL_GATEWAY_PROBE_EXECUTE_INPUT_SCHEMA = Object.freeze({
         modelId: { type: 'string', minLength: 1, maxLength: 300 },
         profileId: nullableString('Perfil BYOK configurado; null usa providerId como preset efêmero.'),
         maxEstimatedCostUsd: { type: 'number', minimum: 0, maximum: 10 },
+        unknownCostPolicy: {
+            type: 'string',
+            enum: ['skip', 'allow'],
+            description: 'quality_first pode usar allow; skip permanece o default conservador.',
+        },
         timeoutMs: { type: 'integer', minimum: 5000, maximum: 120000 },
         idempotencyKey: {
             type: 'string',

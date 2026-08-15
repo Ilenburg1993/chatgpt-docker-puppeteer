@@ -631,13 +631,20 @@ export class ModelGatewayReadControlPlane {
     }
 
     /**
-     * @param {{ taskProfile: string; maxCandidates: number; evaluateEligibility: boolean }} input
+     * @param {{ taskProfile: string; maxCandidates: number; evaluateEligibility: boolean; requireAgentProbeOk?: boolean; requireRuntimeProof?: boolean; maxRuntimeProofAgeMs?: number; ignoreRuntimeHealth?: boolean; pricePenaltyWeight?: number; latencyPenaltyWeight?: number; runtimeProofWeights?: Record<string, number> }} input
      */
     async planRoute(input) {
         const startedAtMs = this.#now();
         const snapshot = await this.#readRoutingSnapshot();
         const route = routeModelGatewayCatalogSnapshot(snapshot, input.taskProfile, {
             evaluateEligibility: input.evaluateEligibility,
+            ...(input.requireAgentProbeOk === undefined ? {} : { requireAgentProbeOk: input.requireAgentProbeOk }),
+            ...(input.requireRuntimeProof === undefined ? {} : { requireRuntimeProof: input.requireRuntimeProof }),
+            ...(typeof input.maxRuntimeProofAgeMs === 'number' ? { maxRuntimeProofAgeMs: input.maxRuntimeProofAgeMs } : {}),
+            ...(input.ignoreRuntimeHealth === undefined ? {} : { ignoreRuntimeHealth: input.ignoreRuntimeHealth }),
+            ...(typeof input.pricePenaltyWeight === 'number' ? { pricePenaltyWeight: input.pricePenaltyWeight } : {}),
+            ...(typeof input.latencyPenaltyWeight === 'number' ? { latencyPenaltyWeight: input.latencyPenaltyWeight } : {}),
+            ...(input.runtimeProofWeights ? { runtimeProofWeights: input.runtimeProofWeights } : {}),
         });
         const explanation = explainGatewayRouteDecision(route);
         const byok = importConfiguredByokFromEnv(this.#env);

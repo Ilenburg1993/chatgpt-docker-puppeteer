@@ -47,6 +47,25 @@ export function isGatewayModelAgentProbeHealthFailed(health) {
 }
 
 /**
+ * A failed agent probe is operationally blocking only during the temporary-failure cooldown. Older failures remain
+ * historical evidence and should trigger re-probing instead of permanently blacklisting the route.
+ *
+ * @param {{ agentProbeStatus?: 'failed' | 'ok' | null; lastAgentProbeFailureAt?: number | null; lastAgentProbeSuccessAt?: number | null }} health
+ * @param {{ now?: string | number | Date; temporaryFailureCooldownMs?: number }} [options]
+ * @returns {boolean}
+ */
+export function isGatewayModelAgentProbeHealthActivelyFailed(health, options = {}) {
+    if (!isGatewayModelAgentProbeHealthFailed(health)) return false;
+    const nowMs = dateMs(options.now) ?? Date.now();
+    const cooldownMs = positiveNumber(
+        options.temporaryFailureCooldownMs,
+        DEFAULT_MODEL_TEMPORARY_FAILURE_COOLDOWN_MS,
+    );
+    const failedAt = optionalNumber(health.lastAgentProbeFailureAt);
+    return failedAt !== null && failedAt <= nowMs && nowMs - failedAt <= cooldownMs;
+}
+
+/**
  * @param {{ agentProbeStatus?: 'failed' | 'ok' | null; lastAgentProbeFailureAt?: number | null; lastAgentProbeSuccessAt?: number | null }} health
  * @returns {boolean}
  */
@@ -346,9 +365,9 @@ export function createGatewayRuntimeHealthIndex(records) {
 }
 
 /**
- * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean }> } | null} health
+ * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean; lastAt?: number | null }> } | null} health
  * @param {string} kind
- * @returns {{ ok?: boolean; providerAttempted?: boolean } | null}
+ * @returns {{ ok?: boolean; providerAttempted?: boolean; lastAt?: number | null } | null}
  */
 export function readGatewayModelProbeHealth(health, kind) {
     const normalized = normalizeProbeKind(kind);
@@ -377,6 +396,25 @@ export function isGatewayModelProbeFailed(health, kind) {
 }
 
 /**
+ * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean; lastAt?: number | null }> } | null} health
+ * @param {string} kind
+ * @param {{ now?: string | number | Date; temporaryFailureCooldownMs?: number }} [options]
+ * @returns {boolean}
+ */
+export function isGatewayModelProbeActivelyFailed(health, kind, options = {}) {
+    if (!isGatewayModelProbeFailed(health, kind)) return false;
+    const probe = readGatewayModelProbeHealth(health, kind);
+    const failedAt = optionalNumber(probe?.lastAt);
+    if (failedAt === null) return false;
+    const nowMs = dateMs(options.now) ?? Date.now();
+    const cooldownMs = positiveNumber(
+        options.temporaryFailureCooldownMs,
+        DEFAULT_MODEL_TEMPORARY_FAILURE_COOLDOWN_MS,
+    );
+    return failedAt <= nowMs && nowMs - failedAt <= cooldownMs;
+}
+
+/**
  * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean }> } | null} health
  * @returns {string[]}
  */
@@ -392,7 +430,7 @@ export function listGatewayModelVerifiedProbeKinds(health) {
  * Convert historical positive health into a time-bounded proof that is meaningful for the current terminal session.
  * Historical successes remain observable, but only fresh successes may promote a route as runtime-proved.
  *
- * @param {ReturnType<typeof readGatewayModelHealth>} health
+ * @param {Record<string, any> | null} health
  * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
  * @returns {{
  *   hasHistoricalProof: boolean;
@@ -416,13 +454,13 @@ export function summarizeGatewayRuntimeProofFreshness(health, options = {}) {
         return at !== null && at > 0 && at <= nowMs && nowMs - at <= maxAgeMs;
     };
     const chatHistorical =
-        Boolean(health?.lastStatus === 'ok') &&
-        (optionalNumber(health?.lastSuccessAt) ?? 0) >= (optionalNumber(health?.lastFailureAt) ?? 0);
+        Boolean(health?.['lastStatus'] === 'ok') &&
+        (optionalNumber(health?.['lastSuccessAt']) ?? 0) >= (optionalNumber(health?.['lastFailureAt']) ?? 0);
     const agentHistorical = Boolean(health && isGatewayModelAgentProbeVerified(health));
-    const chatAt = chatHistorical ? optionalNumber(health?.lastSuccessAt) : null;
-    const agentAt = agentHistorical ? optionalNumber(health?.lastAgentProbeSuccessAt) : null;
-    const probeRows = health?.probes
-        ? Object.entries(health.probes)
+    const chatAt = chatHistorical ? optionalNumber(health?.['lastSuccessAt']) : null;
+    const agentAt = agentHistorical ? optionalNumber(health?.['lastAgentProbeSuccessAt']) : null;
+    const probeRows = health?.['probes']
+        ? Object.entries(health['probes'])
               .filter(([, probe]) => probe?.ok === true && probe.providerAttempted !== false)
               .map(([kind, probe]) => ({ kind, at: optionalNumber(probe.lastAt) }))
         : [];
@@ -453,7 +491,7 @@ export function summarizeGatewayRuntimeProofFreshness(health, options = {}) {
 }
 
 /**
- * @param {ReturnType<typeof readGatewayModelHealth>} health
+ * @param {Record<string, any> | null} health
  * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
  * @returns {boolean}
  */
@@ -462,7 +500,7 @@ export function hasFreshGatewayRuntimeProof(health, options = {}) {
 }
 
 /**
- * @param {ReturnType<typeof readGatewayModelHealth>} health
+ * @param {Record<string, any> | null} health
  * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
  * @returns {boolean}
  */
@@ -720,7 +758,7 @@ export function evaluateGatewayModelHealthRoute(model, options = {}) {
     if (
         options.excludeFailed !== false &&
         options.requireAgentProbeOk === true &&
-        isGatewayModelAgentProbeHealthFailed(effectiveHealth)
+        isGatewayModelAgentProbeHealthActivelyFailed(effectiveHealth, options)
     ) {
         return { include: false, reason: 'agent_probe_failed', health: effectiveHealth, runtimeProof };
     }

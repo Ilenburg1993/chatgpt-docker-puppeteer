@@ -1,71 +1,121 @@
 ---
 name: llm-b-route-operator
-description: Diagnose, select, prove and promote LLM-B BYOK provider/model routes through the Model Gateway while preserving the current SDK session. Use when LLM-B has no response, a BYOK/provider/model route is unhealthy, a fallback is needed, a same-session switch is requested, or an operator asks for autonomous route recovery.
+description: Diagnose, rank, prove and promote LLM-B BYOK provider/model routes through terminal:llm-b and the Model Gateway while preserving the current SDK session. Use for normal best-route selection, stale or failed routes, provider/model comparison, adaptive probing, fallback, or same-session promotion.
+user-invocable: true
 ---
 
 # LLM-B Route Operator
 
-## Objective
+## Mission
 
-Recover or improve the active LLM-B route with the least possible human intervention. Preserve the current SDK session, never expose secrets, and make a route change only from structured Model Gateway evidence.
+Treat `terminal:llm-b` as the canonical human/LLM cockpit for model selection. The goal is not merely to find an eligible model: select the **best model for the task that is demonstrably functional now**, explain why, and preserve the current SDK session when promoting it.
 
-Use `llm-b-comms` for terminal transport/health and `llm-b-ops` for workspace work. This skill owns only route selection and promotion.
+Use `llm-b-comms` for terminal transport/health and `llm-b-ops` for workspace work. This skill owns route/model selection, runtime proof and same-session promotion.
 
-## Operating Modes
+## The five states — never collapse them
 
-Classify the request before mutating anything.
+A model can be:
 
-| Mode | Trigger | Allowed outcome |
-| --- | --- | --- |
-| Inspect | “what is wrong?”, unknown availability | Explain readiness and propose a route; do not probe or switch. |
-| Recover | active route failed or no response | Select a proven fallback and attempt a same-session recovery when policy/approval permits. |
-| Switch | explicit provider/model preference | Plan and apply that route only after it is eligible and proved. |
-| Prepare | user wants resilience | Persist standby candidates; do not change the active route. |
+1. **eligible** — credentials/policy/capabilities permit it;
+2. **offered now** — the current provider/catalog actually exposes it;
+3. **task-best** — it ranks highly for the present task and operator preferences;
+4. **runtime-proved now** — required probes succeeded within the freshness window;
+5. **session-ready** — the route can be bound/rebound to the live SDK session safely.
 
-Default to **Inspect**. Treat explicit “recover automatically”, an established automatic BYOK policy, or an approved tool invocation as authorization for **Recover**. Never create a new SDK session unless the user explicitly requests one.
+`eligible` or `task-best` is never equivalent to `runtime-proved`. A positive probe older than the configured freshness horizon is **historical/stale**, not current proof. An old failure outside cooldown is historical risk, not a permanent blacklist: re-probe it if it becomes competitive again.
 
-## Mandatory Flow
+## Default selection policy in this workspace
 
-1. Load this skill with `invoke_skill` when it is not already in context.
-2. Call `model_gateway_control_plane_guide` for a new or uncertain workflow, then call `model_gateway_overview`.
-3. Call `model_gateway_workflow_plan` with the task profile and `includeRouteSwitchPlan=true`. Keep `requireRuntimeProof=true` unless the user explicitly accepts an unproved route.
-4. Read the returned selected route, blockers, proof status and exact step arguments. Do not invent provider ids, model ids, base URLs, headers, or a route object.
-5. For a route without accepted runtime proof, run `model_gateway_probe_execute` in `plan` first. Run `apply` only when the tool’s approval/policy permits it; a probe is disposable and must not switch the live session.
-6. Call `model_gateway_route_switch` in `plan` using the selected route and a stable idempotency key. Apply only the plan’s route with `confirm=true`.
-7. If apply reports `automaticContinuation.armed=true` or `deferred_until_turn_boundary`, stop route tool calls and finish the current turn. The terminal scheduler promotes the handoff at `assistant.turn_end`.
-8. On the next turn, call `model_gateway_operation_status` and `model_gateway_overview`. Report success only for `committed` plus same-session route confirmation.
+Unless the user explicitly asks to optimize cost or latency, use:
 
-Use a compact single-tool-at-a-time sequence for mutable Model Gateway calls. Do not bury a route promotion between unrelated tools or ask_user calls.
+- `selectionGoal="quality_first"`;
+- `requireRuntimeProof=true` for any promotion;
+- `probeStrategy="aggressive"` when the best candidate is not freshly proved;
+- `maxRuntimeProofAgeHours=24` unless the task needs a tighter window;
+- `preferredProbeKinds=["agent"]` for `repo_agent` and `tool_agent`.
 
-## Selection Rules
+`quality_first` means price does not silently lower a model's ranking. Functionality, capability, confidence and task fit remain decisive. The operator has explicitly allowed extensive LLM-B/provider probing, so do not conserve calls at the expense of choosing a worse or unproved route.
 
-- Prefer the workflow planner’s `selectedRoute` with runtime proof, then its ranked fallback candidates.
-- Reject a candidate marked blocked, denied access, missing required environment, stale without an allowed refresh, or with a recent blocking probe failure.
-- Prefer `prefer_runtime_proved` for normal recovery; use `require_runtime_proof` for guarded operation.
-- Keep the existing route when it is healthy. A different model is not an upgrade merely because it appears in the catalog.
-- Use `/byok auto standby profile:<profile>` or the returned standby command to prepare alternatives without activating them.
-- State the active route, selected route, proof source, operation id and final state in the response. Never state secret values.
+For `repo_agent`, the disposable **agent probe** is the primary functional certificate: it exercises real model generation, tool calling, the canonical synthetic file-read tool, `ask_user`, streaming/final events and the temporary SDK-session path. Add `json`, `vision`, etc. only when the task actually needs those capabilities.
 
-Read [references/route-protocol.md](references/route-protocol.md) for exact status handling, tool sequence and user-visible terminal commands.
+## Mandatory selection flow
 
-## Guardrails
+1. Call `model_gateway_overview` when runtime/catalog state is not already known.
+2. Call `model_gateway_workflow_plan` as the normal entry point. For best-route operation use `selectionGoal=quality_first`, `probeStrategy=aggressive`, `requireRuntimeProof=true`, and the task profile that matches the job.
+3. Read **`selectionDecision` first**. It is the concise authority for the next action:
+   - `use_current` — current route is already the best freshly proved route;
+   - `switch_recommended` — a better freshly proved route exists;
+   - `probe_required` — discovery found a better candidate but no acceptable fresh proof yet;
+   - `blocked` — no eligible candidate; inspect hard blockers/refresh.
+4. When `probe_required`, execute only the **current top candidate** returned as actionable. Use `model_gateway_probe_execute` `plan` first, then approved `apply` with the same idempotency key.
+5. After **every** probe result — success or failure — call `model_gateway_workflow_plan` again before probing another candidate or promoting anything. Health changed, so the ranking is stale by definition.
+6. On success, the rerun should turn that candidate into a freshly proved winner or reveal an even better candidate that still needs proof. On objective failure, the rerun should promote the next best candidate automatically. Do not use a pre-probe switch target.
+7. Only when the new `selectionDecision` is `switch_recommended` should you plan/apply `model_gateway_route_switch` (or the narrower model switch when appropriate).
+8. Preserve the same SDK `sessionId`. If an apply returns `automaticContinuation.armed=true`, `deferred_until_turn_boundary` or equivalent, stop route tools and finish the turn. Verify with `model_gateway_operation_status` on the next turn.
+9. Report success only after the operation is `committed` and the terminal/runtime confirms the same session on the new route.
 
-- Do not call `model_gateway_model_switch`, `model_gateway_route_switch`, `model_gateway_runtime_reconcile`, catalog refresh, or profile mutation in `apply` mode from a speculative diagnosis.
-- Do not retry an unknown or failed apply with a new idempotency key. Read `model_gateway_operation_status` first.
-- Do not claim success for `planned`, `confirmation_required`, `deferred_until_turn_boundary`, `accepted_for_turn_boundary`, or `restarting`.
-- Do not weaken a blocked proof, force a provider, or bypass approval merely to make the terminal respond.
-- Do not use a new session as fallback for a same-session failure. Surface the blocker and retain the existing session.
-- After two failed candidate probes, stop automatic exploration, summarize the structured failures, and request only the missing authorization or credential action.
+## Discovery ranking vs proved ranking
 
-## Completion Criteria
+Use `model_gateway_route_plan` directly when you need to inspect the two layers:
 
-For an inspection, return a concrete selected route or blocker with the next safe command. For recovery/switch, require all of:
+- `proofPolicy="metadata_only"` + `selectionGoal="quality_first"`: best candidates to **consider/probe**. Lack of positive proof must not erase a strong candidate.
+- `proofPolicy="task_default"`: enforce the task profile's normal runtime contract.
+- `proofPolicy="fresh_runtime_required"`: only current runtime-proved candidates may win.
 
-- a structured route plan and eligibility evidence;
-- a stable idempotency key and approved apply;
-- operation status `committed`;
-- the same SDK session id before and after the change;
-- no hidden fallback or new-session handoff;
-- a readable final status from `model_gateway_overview` or `/byok status`.
+When the metadata winner and proved winner differ, explain the gap. Typical language:
 
-If any condition is absent, report the current state honestly and leave the current route intact.
+> “GLM-X ranks first for this repo-agent task, but it has no fresh agent proof. Y is currently proved. I will probe GLM-X before recommending a switch.”
+
+Never call an unproved metadata winner “the best fully functional model.”
+
+## Adaptive failure handling
+
+A candidate probe failure is evidence, not a dead end.
+
+- Record/classify the failure through the normal probe tool; do not hide it.
+- Recent `auth`, `credits/payment`, rate-limit or protocol failures should block/penalize the candidate according to health policy.
+- After an objective failure, rerun `model_gateway_workflow_plan`; continue automatically with whatever candidate is now top-ranked.
+- Do **not** ask the user whether to try candidate #2 merely because candidate #1 failed; recalculation and continuation are objective and the operator has authorized extensive probing.
+- Ask the user only for genuinely subjective choices (for example, quality vs latency, local/privacy preference, or paying a provider when no usable credited route remains) or missing authorization/credentials that tools cannot resolve.
+
+If all planned candidates fail, summarize provider/model, probe stage, classified failure and the next best remediation. Do not fall back to a new SDK session.
+
+## Current-catalog evidence
+
+Treat “configured model no longer appears in the provider's authoritative current catalog” as strong negative availability evidence. Refresh/discovery failures themselves are not proof that the model disappeared; fail open on discovery transport errors, but fail closed when an authoritative provider catalog was successfully read and the model is absent.
+
+Human cockpit commands such as `/byok models refresh provider:<provider>` and `/byok models route <profile> active --show-rejected` should tell the same story as Model Gateway tools. If they disagree, prefer fresh structured evidence and investigate the projection mismatch before promotion.
+
+## Explanation contract
+
+Keep route explanations compact but explicit. Include:
+
+- current provider/model and whether it is healthy, stale or failed;
+- task profile and selection goal;
+- best discovery candidate;
+- best freshly proved candidate, if any;
+- proof kind and age;
+- why the winner beats the nearest alternatives;
+- exact next action: use, probe, switch, refresh, or ask the user.
+
+Do not expose tokens, secrets, authorization headers or raw provider payloads.
+
+## Same-session guardrails
+
+- Never create a new SDK session as an automatic fallback.
+- Never promote a candidate merely because catalog metadata is attractive.
+- Never treat stale positive proof as current proof.
+- Never retry a failed mutable apply under a new idempotency key before reading `model_gateway_operation_status`.
+- Never continue route-tool calls in the same turn after a deferred turn-boundary promotion is armed.
+- Never weaken eligibility/access/env constraints to make a preferred model win.
+
+Read [references/route-protocol.md](references/route-protocol.md) for the concrete tool sequence and state table.
+
+## Completion criteria
+
+A best-route selection is complete only when either:
+
+- the current route is shown to be the highest-ranked route satisfying the fresh functional contract; or
+- a better candidate has been freshly proved, re-ranked, promoted same-session, and confirmed `committed`.
+
+If neither is true, report the decision state as `probe_required` or `blocked`, not as success.

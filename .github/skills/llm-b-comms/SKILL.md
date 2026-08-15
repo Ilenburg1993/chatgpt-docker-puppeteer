@@ -21,6 +21,8 @@ separado, porta 3009). A comunicação se dá **exclusivamente via HTTP** usando
 **Regra fundamental**: Você (LLM-A) NUNCA fala diretamente com a LLM-B — toda comunicação é
 intermediada pelo Terminal Permanente ativo na porta 3009.
 
+**Identidade de modelo também pertence ao terminal**: não assuma que LLM-B é um modelo fixo. O Model Gateway pode manter ou promover uma rota BYOK diferente preservando a mesma sessão SDK. Para selecionar, provar ou trocar provider/model, carregue `llm-b-route-operator`; comunicação e seleção devem convergir no mesmo `terminal:llm-b`.
+
 ---
 
 ## Passo 1: Verificar se o Terminal está Ativo
@@ -294,7 +296,7 @@ Terminal Permanente LLM-B (processo separado: npm run terminal:llm-b)
 AlwaysAliveAgent → answerPendingQuestion(message) → Copilot SDK ask_user()
     │
     ▼
-LLM-B (modelo: gpt-5-mini, reasoning: high)
+LLM-B (rota/modelo efetivo selecionado pelo Model Gateway; reasoning conforme binding ativo)
     │
     │  ask_user("REPLY: <resposta>")
     ▼
