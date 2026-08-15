@@ -1324,7 +1324,9 @@ async function buildRealByokRuntime({
     const selectorInput = {
         profileId: runtimeSelectorProfile,
         fallbackProfiles,
-        execute: runtimeSelectorExecute,
+        // A disposable agent admission already subsumes a chat probe for Model Gateway cockpit scenarios.
+        // Keep selector execution for legacy/general BYOK flows, but avoid chat→agent duplication here.
+        execute: runtimeSelectorExecute && !requireAgentAdmission,
         allowProbe: runtimeSelectorAllowProbe,
         maxAttempts: runtimeSelectorMaxAttempts,
         maxAttemptsPerProvider: runtimeSelectorMaxAttemptsPerProvider,
@@ -7256,7 +7258,12 @@ function evaluateByokRealOutput(
     const postProbeResidueCount = sessionProbeResidueCounts[1];
     const byokVisionProbeStatus = findByokProbeResultStatus(plain, 'vision');
     const leanModelGatewayPreflight = isModelGatewayToolScenario(liveScenario);
-    const admissionExecutionOk = runtimeSelector?.executed === true && runtimeSelector?.summary?.execution?.ok === true;
+    const selectorPreparedBootstrap =
+        runtimeSelector?.requested === true && runtimeSelector?.ok === true && Boolean(runtimeRoute?.providerId && runtimeRoute?.providerModel);
+    const admissionExecutionOk =
+        agentAdmission?.required === true
+            ? selectorPreparedBootstrap
+            : runtimeSelector?.executed === true && runtimeSelector?.summary?.execution?.ok === true;
     const agentAdmissionAttempts = Array.isArray(agentAdmission?.attempts) ? agentAdmission.attempts : [];
     const successfulAgentAdmission = agentAdmissionAttempts.find(
         (attempt) =>
@@ -7346,8 +7353,10 @@ function evaluateByokRealOutput(
                       id: 'byok-real-admission-selector-proof',
                       pass: admissionExecutionOk,
                       detail: admissionExecutionOk
-                          ? `runtime-selector admission proved a responding bootstrap route ${runtimeRoute?.providerId ?? '-'}/${runtimeRoute?.providerModel ?? '-'}`
-                          : 'model-gateway tool scenario did not enter terminal through a successful runtime-selector admission probe',
+                          ? agentAdmission?.required === true
+                              ? `runtime-selector prepared bootstrap candidate ${runtimeRoute?.providerId ?? '-'}/${runtimeRoute?.providerModel ?? '-'} for agent admission`
+                              : `runtime-selector admission proved a responding bootstrap route ${runtimeRoute?.providerId ?? '-'}/${runtimeRoute?.providerModel ?? '-'}`
+                          : 'model-gateway tool scenario did not obtain a usable runtime-selector bootstrap candidate',
                   },
                   {
                       id: 'byok-real-agent-admission-proof',
