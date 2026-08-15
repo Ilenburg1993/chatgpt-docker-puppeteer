@@ -850,6 +850,25 @@ function buildMissingRequiredAskRecoveryPrompt(scenario = LIVE_SCENARIOS[DEFAULT
     ].join(' ');
 }
 
+function scenarioSpecificRecoveryInstructions(scenario, toolName) {
+    const normalizedToolName = String(toolName ?? '').trim().toLowerCase();
+    if (!normalizedToolName || !Array.isArray(scenario?.beforeDeltaInstructions)) return [];
+    return scenario.beforeDeltaInstructions.filter(
+        (instruction) =>
+            typeof instruction === 'string' && instruction.toLowerCase().includes(normalizedToolName),
+    );
+}
+
+function appendScenarioSpecificRecoveryInstructions(instructions, scenario, toolName) {
+    const specific = scenarioSpecificRecoveryInstructions(scenario, toolName);
+    if (specific.length === 0) return false;
+    instructions.push(
+        `Para ${toolName}, preserve a configuração específica deste cenário em vez de usar parâmetros genéricos:`,
+        ...specific,
+    );
+    return true;
+}
+
 function buildIncompleteExpectedToolRecoveryPrompt(
     scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
     missingTools = [],
@@ -872,29 +891,39 @@ function buildIncompleteExpectedToolRecoveryPrompt(
         );
     }
     if (missing.includes('model_gateway_control_plane_guide')) {
-        instructions.push(
-            'Se model_gateway_control_plane_guide ainda estiver faltando, invoque model_gateway_control_plane_guide com objective="same_session_switch", includeTerminalCommands=true e includeApplyExamples=true.',
-        );
+        if (!appendScenarioSpecificRecoveryInstructions(instructions, scenario, 'model_gateway_control_plane_guide')) {
+            instructions.push(
+                'Se model_gateway_control_plane_guide ainda estiver faltando, invoque model_gateway_control_plane_guide com objective="same_session_switch", includeTerminalCommands=true e includeApplyExamples=true.',
+            );
+        }
     }
     if (missing.includes('model_gateway_workflow_plan')) {
-        instructions.push(
-            'Se model_gateway_workflow_plan ainda estiver faltando, invoque model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["agent"], maxSnapshotAgeHours=720, maxCandidates=8, maxProbeCount=1, maxEstimatedCostUsd=10, idempotencyKeyPrefix="live-readonly-workflow-20260814", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true, requireRuntimeProof=true, selectionGoal="quality_first", probeStrategy="aggressive" e maxRuntimeProofAgeHours=24.',
-        );
+        if (!appendScenarioSpecificRecoveryInstructions(instructions, scenario, 'model_gateway_workflow_plan')) {
+            instructions.push(
+                'Se model_gateway_workflow_plan ainda estiver faltando, invoque model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["agent"], maxSnapshotAgeHours=720, maxCandidates=8, maxProbeCount=1, maxEstimatedCostUsd=10, idempotencyKeyPrefix="live-readonly-workflow-20260814", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true, requireRuntimeProof=true, selectionGoal="quality_first", probeStrategy="aggressive" e maxRuntimeProofAgeHours=24.',
+            );
+        }
     }
     if (missing.includes('model_gateway_overview')) {
-        instructions.push(
-            'Se model_gateway_overview ainda estiver faltando, invoque model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720 e operationLimit=10.',
-        );
+        if (!appendScenarioSpecificRecoveryInstructions(instructions, scenario, 'model_gateway_overview')) {
+            instructions.push(
+                'Se model_gateway_overview ainda estiver faltando, invoque model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720 e operationLimit=10.',
+            );
+        }
     }
     if (missing.includes('model_gateway_operation_status')) {
-        instructions.push(
-            'Se model_gateway_operation_status ainda estiver faltando, invoque model_gateway_operation_status com operationId=null e limit=10.',
-        );
+        if (!appendScenarioSpecificRecoveryInstructions(instructions, scenario, 'model_gateway_operation_status')) {
+            instructions.push(
+                'Se model_gateway_operation_status ainda estiver faltando, invoque model_gateway_operation_status com operationId=null e limit=10.',
+            );
+        }
     }
     if (missing.includes('model_gateway_route_switch')) {
-        instructions.push(
-            `Se model_gateway_route_switch ainda estiver faltando ou só tiver retornado o plan, invoque a etapa pendente: primeiro plan somente se ele ainda não apareceu; depois obrigatoriamente apply com mode="apply", route={providerId:"ollama-cloud", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_minimal_provider_switch", selectedRouteKey:"live-route-minimal:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY}" e confirm=true.`,
-        );
+        if (!appendScenarioSpecificRecoveryInstructions(instructions, scenario, 'model_gateway_route_switch')) {
+            instructions.push(
+                `Se model_gateway_route_switch ainda estiver faltando ou só tiver retornado o plan, invoque a etapa pendente: primeiro plan somente se ele ainda não apareceu; depois obrigatoriamente apply com mode="apply", route={providerId:"ollama-cloud", providerModel:"qwen3-coder-next", selectorSyntax:"qwen3-coder-next", baseUrl:"https://ollama.com/v1", openAICompatibleBaseUrl:"https://ollama.com/v1", wireApi:"completions", providerProfile:"ollama-cloud", routeProfile:"live_minimal_provider_switch", selectedRouteKey:"live-route-minimal:ollama-cloud:qwen3-coder-next"}, runtimeId=null, timeoutMs=60000, idempotencyKey="${ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY}" e confirm=true.`,
+            );
+        }
     }
     return [
         'Continue o teste canônico exatamente de onde parou.',
