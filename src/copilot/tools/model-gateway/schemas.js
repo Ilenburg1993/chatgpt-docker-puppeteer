@@ -459,6 +459,10 @@ export const MODEL_GATEWAY_WORKFLOW_PLAN_INPUT_SCHEMA = Object.freeze({
             maximum: 168,
             description: 'Janela máxima para prova positiva continuar valendo como funcionalidade atual.',
         },
+        includeDetailedEvidence: {
+            type: 'boolean',
+            description: 'Opt-in diagnóstico. Default false mantém a resposta compacta; true inclui snapshots/route plans completos.',
+        },
     },
 });
 

@@ -952,8 +952,9 @@ export const modelGatewayWorkflowPlanTool = buildTool({
     instructions:
         'Use como ponto de entrada de seleção e operação. Para máxima qualidade sem restrição de custo use ' +
         'selectionGoal=quality_first, probeStrategy=aggressive, requireRuntimeProof=true e agent entre preferredProbeKinds ' +
-        'para perfis agente. Se selectionDecision.status=probe_required, execute a cadeia por rank e pare no primeiro sucesso; ' +
-        'então rode workflow_plan novamente antes de qualquer switch. Calls mode=apply exigem confirm=true. Se uma troca retornar ' +
+        'para perfis agente. A resposta é compacta por padrão; use includeDetailedEvidence=true somente para diagnóstico profundo. ' +
+        'Se selectionDecision.status=probe_required, execute somente a candidata #1 atual e rode workflow_plan novamente após esse ' +
+        'resultado antes de tocar na próxima candidata ou fazer switch. Calls mode=apply exigem confirm=true. Se uma troca retornar ' +
         'automaticContinuation.armed=true, encerre o turno e verifique em turno posterior. Nunca crie sessão nova por fallback.',
     parameters: MODEL_GATEWAY_WORKFLOW_PLAN_INPUT_SCHEMA,
     outputSchema: MODEL_GATEWAY_TOOL_OUTPUT_SCHEMA,
@@ -1397,6 +1398,55 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                 ? ['runtime_proof_required_but_no_probe_apply_step_planned']
                 : []),
         ];
+        const compactEvidence = {
+            detailLevel: 'compact',
+            overview: {
+                ok: overview['ok'] === true,
+                status: optionalWorkflowString(overview['status']),
+                warningCount: resultWarnings(overview).length,
+            },
+            discovery: {
+                selectedRoute: discoverySelectedRoute,
+                candidateCount: Array.isArray(routeData['candidates']) ? routeData['candidates'].length : 0,
+                topCandidates: probeCandidates.slice(0, 4),
+            },
+            proved: {
+                selectedRoute: provedSelectedRoute,
+                candidateCount: Array.isArray(provedRouteData['candidates']) ? provedRouteData['candidates'].length : 0,
+                available: Boolean(provedSelectedRoute),
+            },
+            modelEvaluation: modelEvaluation
+                ? {
+                      included: true,
+                      status: optionalWorkflowString(modelEvaluation['status']),
+                      warningCount: resultWarnings(modelEvaluation).length,
+                  }
+                : null,
+            probePlan: probePlan
+                ? {
+                      included: true,
+                      status: optionalWorkflowString(probePlan['status']),
+                      warningCount: resultWarnings(probePlan).length,
+                  }
+                : null,
+            catalogRefreshPlan: catalogRefreshPlan
+                ? {
+                      included: true,
+                      status: optionalWorkflowString(catalogRefreshPlan['status']),
+                      warningCount: resultWarnings(catalogRefreshPlan).length,
+                  }
+                : null,
+        };
+        const detailedEvidence = args.includeDetailedEvidence
+            ? {
+                  overview: operationData(overview),
+                  discoveryRoutePlan: routeData,
+                  provedRoutePlan: provedRouteData,
+                  modelEvaluation: modelEvaluation ? operationData(modelEvaluation) : null,
+                  probePlan: probePlan ? operationData(probePlan) : null,
+                  catalogRefreshPlan: catalogRefreshPlan ? operationData(catalogRefreshPlan) : null,
+              }
+            : null;
         const switchingObjective = ['same_session_model_switch', 'same_session_route_switch', 'runtime_reconcile'].includes(
             args.objective,
         );
@@ -1457,14 +1507,9 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                         routeSwitchTool: 'model_gateway_route_switch',
                         modelSwitchTool: 'model_gateway_model_switch',
                     },
-                    evidence: {
-                        overview: operationData(overview),
-                        discoveryRoutePlan: routeData,
-                        provedRoutePlan: provedRouteData,
-                        modelEvaluation: modelEvaluation ? operationData(modelEvaluation) : null,
-                        probePlan: probePlan ? operationData(probePlan) : null,
-                        catalogRefreshPlan: catalogRefreshPlan ? operationData(catalogRefreshPlan) : null,
-                    },
+                    evidence: compactEvidence,
+                    evidenceDetail: args.includeDetailedEvidence ? 'detailed' : 'compact',
+                    detailedEvidence,
                 },
                 warnings,
                 errors,
