@@ -474,13 +474,7 @@ const runtimeSelectorPlan = timedSync('runtimeSelectorPlan', () =>
         env: process.env,
     }),
 );
-const terminalLiveBaseSelection = timedSync('terminalLiveBaseSelectionAudit', () =>
-    auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
-        strict: true,
-        secretRegistry,
-        profiles: TERMINAL_LIVE_ROUTE_PROFILES,
-    }),
-);
+phaseTimingsMs['terminalLiveBaseSelectionAudit'] = 0;
 const terminalLivePostRuntimeSelection = timedSync('terminalLivePostRuntimeAudit', () =>
     auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
         strict: true,
@@ -494,7 +488,9 @@ const terminalLivePostRuntimeSelection = timedSync('terminalLivePostRuntimeAudit
     }),
 );
 const terminalLiveRuntimeSelectionComparison = timedSync('terminalLiveSelectionComparison', () =>
-    compareModelGatewaySelectionAudits(terminalLiveBaseSelection, terminalLivePostRuntimeSelection),
+    compareModelGatewaySelectionAudits(effectiveStrictSelection, terminalLivePostRuntimeSelection, {
+        profiles: [...TERMINAL_LIVE_ROUTE_PROFILES],
+    }),
 );
 const terminalLiveRuntimeSelectionPolicy = timedSync('terminalLiveSelectionPolicy', () =>
     resolveModelGatewaySelectionPolicy(terminalLiveRuntimeSelectionComparison, {

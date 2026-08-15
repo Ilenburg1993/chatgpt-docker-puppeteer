@@ -18,6 +18,12 @@ const AUDIT_PROVIDER_SECRET_RE =
     /\b(?:hf_[A-Za-z0-9]{20,}|(?:(?:sk-(?:or-v1-)?|gsk[-_]|csk-|nvapi-|cpk[-_]|cfat[-_]|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}))\b/gu;
 const AUDIT_PROVIDER_SECRET_EXACT_RE =
     /^(?:hf_[A-Za-z0-9]{20,}|(?:(?:sk-(?:or-v1-)?|gsk[-_]|csk-|nvapi-|cpk[-_]|cfat[-_]|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}))$/u;
+const AUDIT_BEARER_TOKEN_TEST_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]{12,}\b/iu;
+const AUDIT_JWT_TOKEN_TEST_RE = /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/u;
+const AUDIT_PROVIDER_SECRET_TEST_RE =
+    /\b(?:hf_[A-Za-z0-9]{20,}|(?:(?:sk-(?:or-v1-)?|gsk[-_]|csk-|nvapi-|cpk[-_]|cfat[-_]|AIza|ya29\.|xoxb-|pat_|ghp_)[A-Za-z0-9._~+/=-]{8,}))\b/u;
+const AUDIT_SECRET_ASSIGNMENT_CANDIDATE_RE =
+    /(?:api[_-]?key|authorization|bearer[_-]?token|access[_-]?token|token|secret|password)\s*[:=]/iu;
 
 /**
  * @param {unknown} value
@@ -63,6 +69,32 @@ function looksLikeAssignedSecret(value) {
         /^eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}$/u.test(value) ||
         (value.length >= 20 && /[A-Za-z]/u.test(value) && /[0-9]/u.test(value))
     );
+}
+
+/** @param {string} value @returns {string} */
+function escapeRegexLiteral(value) {
+    return value.replace(/[\\^$.*+?()[\]{}|]/gu, '\\$&');
+}
+
+/**
+ * Build a cheap leak-candidate predicate once per audit. The expensive material redaction is only needed for candidate
+ * strings, which avoids repeated split/join allocations across healthy persisted catalogs.
+ *
+ * @param {readonly string[]} additionalSecrets
+ * @returns {(text: string) => boolean}
+ */
+function createAuditTextLeakCandidateDetector(additionalSecrets) {
+    const literalSecretPattern =
+        additionalSecrets.length > 0
+            ? new RegExp(additionalSecrets.map(escapeRegexLiteral).sort((left, right) => right.length - left.length).join('|'), 'u')
+            : null;
+    return (text) => {
+        if (literalSecretPattern?.test(text)) return true;
+        if (AUDIT_BEARER_TOKEN_TEST_RE.test(text)) return true;
+        if (AUDIT_JWT_TOKEN_TEST_RE.test(text)) return true;
+        if (AUDIT_PROVIDER_SECRET_TEST_RE.test(text)) return true;
+        return AUDIT_SECRET_ASSIGNMENT_CANDIDATE_RE.test(text);
+    };
 }
 
 /**
@@ -148,6 +180,7 @@ export function auditModelGatewayValueRedaction(value, options = {}) {
     const rootPath = optionalString(options.rootPath) ?? '$';
     const maxSamples = positiveInteger(options.maxSamples, DEFAULT_MAX_SAMPLES);
     const additionalSecrets = [...new Set((options.additionalSecrets ?? []).map(optionalString).filter((item) => item !== null))];
+    const isLeakCandidate = createAuditTextLeakCandidateDetector(additionalSecrets);
     /** @type {Array<{ path: string; redactedSnippet: string }>} */
     const samples = [];
     let scannedStringCount = 0;
@@ -161,6 +194,7 @@ export function auditModelGatewayValueRedaction(value, options = {}) {
     function visit(item, path) {
         if (typeof item === 'string') {
             scannedStringCount += 1;
+            if (!isLeakCandidate(item)) return;
             const redacted = redactAuditText(item, additionalSecrets, { includeAssignments: true });
             if (redacted !== item) {
                 leakCount += 1;

@@ -589,6 +589,7 @@ function profilesById(profiles) {
  *
  * @param {ReturnType<typeof auditModelGatewayPreRuntimeSelection>} preRuntimeSelection
  * @param {ReturnType<typeof auditModelGatewayPostRuntimeSelection>} postRuntimeSelection
+ * @param {{ profiles?: string[] }} [options]
  * @returns {{
  *   schema: 'model-gateway-selection-comparison';
  *   ok: boolean;
@@ -616,8 +617,13 @@ function profilesById(profiles) {
  *   }>;
  * }}
  */
-export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRuntimeSelection) {
-    const preProfiles = Array.isArray(preRuntimeSelection.profiles) ? preRuntimeSelection.profiles.filter(isRecord) : [];
+export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRuntimeSelection, options = {}) {
+    const requestedProfiles = new Set(stringList(options.profiles));
+    const allPreProfiles = Array.isArray(preRuntimeSelection.profiles) ? preRuntimeSelection.profiles.filter(isRecord) : [];
+    const preProfiles =
+        requestedProfiles.size > 0
+            ? allPreProfiles.filter((profile) => requestedProfiles.has(optionalString(profile['profileId']) ?? ''))
+            : allPreProfiles;
     const postProfiles = profilesById(Array.isArray(postRuntimeSelection.profiles) ? postRuntimeSelection.profiles.filter(isRecord) : []);
     const rows = preProfiles.map((preProfile) => {
         const profileId = optionalString(preProfile['profileId']) ?? 'unknown-profile';
@@ -646,9 +652,21 @@ export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRunt
         };
     });
     const changedCount = rows.filter((row) => row.changed).length;
+    const scopedOk =
+        requestedProfiles.size > 0
+            ? rows.length === requestedProfiles.size && rows.every((row) => row.preSelected !== null && row.postSelected !== null)
+            : preRuntimeSelection.ok === true && postRuntimeSelection.ok === true;
+    const postRuntimeHealthProofCount = rows.reduce((sum, row) => {
+        const value = row.postDecisionLayers['runtimeHealthProofCount'];
+        return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+    }, 0);
+    const postRuntimeProbeProofCount = rows.reduce((sum, row) => {
+        const value = row.postDecisionLayers['runtimeProbeProofCount'];
+        return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+    }, 0);
     return {
         schema: 'model-gateway-selection-comparison',
-        ok: preRuntimeSelection.ok === true && postRuntimeSelection.ok === true,
+        ok: scopedOk,
         summary: {
             profileCount: rows.length,
             changedCount,
@@ -656,8 +674,8 @@ export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRunt
             preSelectedCount: rows.filter((row) => row.preSelected !== null).length,
             postSelectedCount: rows.filter((row) => row.postSelected !== null).length,
             postRuntimeProofSelectedCount: rows.filter((row) => row.postSelectedHasRuntimeProof).length,
-            postRuntimeHealthProofCount: postRuntimeSelection.summary.runtimeHealthProofCount,
-            postRuntimeProbeProofCount: postRuntimeSelection.summary.runtimeProbeProofCount,
+            postRuntimeHealthProofCount,
+            postRuntimeProbeProofCount,
         },
         rows,
     };
