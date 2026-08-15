@@ -10,7 +10,7 @@
 
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, stat } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { promisify } from 'node:util';
@@ -118,6 +118,7 @@ async function execFixedNodeScript(script, args, timeoutMs) {
  * @property {number} pid
  * @property {number} startedAtMs
  * @property {string} outDir
+ * @property {string | undefined} [logPath]
  * @property {Record<string, unknown>} plan
  */
 
@@ -152,16 +153,27 @@ function isProcessAlive(pid) {
 async function spawnDetachedLiveRun(input) {
     const runId = `mcp-${randomUUID()}`;
     const outDir = `artifacts/terminal-live/${runId}`;
+    const absoluteOutDir = join(getMcpWorkspaceRoot(), outDir);
+    const logPath = `${outDir}/detached.runner.log`;
+    const absoluteLogPath = join(getMcpWorkspaceRoot(), logPath);
     const args = [...input.args, `--out-dir=${outDir}`];
     const stateDir = detachedLiveRunsDirectory();
     await mkdir(stateDir, { recursive: true });
-    const child = spawn(process.execPath, [LIVE_RUNNER, ...args], {
-        cwd: getMcpWorkspaceRoot(),
-        env: process.env,
-        detached: true,
-        stdio: 'ignore',
-    });
-    if (!child.pid) throw new Error('Detached LLM-B live harness did not expose a child pid.');
+    await mkdir(absoluteOutDir, { recursive: true });
+    const logHandle = await open(absoluteLogPath, 'a', 0o600);
+    /** @type {import('node:child_process').ChildProcess | null} */
+    let child = null;
+    try {
+        child = spawn(process.execPath, [LIVE_RUNNER, ...args], {
+            cwd: getMcpWorkspaceRoot(),
+            env: process.env,
+            detached: true,
+            stdio: ['ignore', logHandle.fd, logHandle.fd],
+        });
+    } finally {
+        await logHandle.close();
+    }
+    if (!child?.pid) throw new Error('Detached LLM-B live harness did not expose a child pid.');
     child.unref();
     /** @type {DetachedLiveRunManifest} */
     const manifest = {
@@ -170,6 +182,7 @@ async function spawnDetachedLiveRun(input) {
         pid: child.pid,
         startedAtMs: Date.now(),
         outDir,
+        logPath,
         plan: input.plan,
     };
     await writeFileAtomic(detachedLiveRunManifestPath(runId), `${JSON.stringify(manifest, null, 2)}\n`, {
@@ -658,6 +671,7 @@ export const llmBLiveTools = [
                         runId: manifest.runId,
                         pid: manifest.pid,
                         outDir: manifest.outDir,
+                        logPath: manifest.logPath,
                         plan,
                         next: 'Use llmb_live_runs to inspect detachedRuns and the persisted SQLite result; do not start a duplicate provider run while status=running.',
                     };

@@ -17,7 +17,7 @@ Use `terminal:llm-b` plus Model Gateway as one control plane. Normal best-route 
   "preferredProbeKinds": ["agent"],
   "maxSnapshotAgeHours": 24,
   "maxCandidates": 8,
-  "maxProbeCount": 5,
+  "maxProbeCount": 1,
   "maxEstimatedCostUsd": 10,
   "idempotencyKeyPrefix": "llmb-route-<stable-operation-id>",
   "includeCatalogRefreshPlan": false,
@@ -30,8 +30,8 @@ Use `terminal:llm-b` plus Model Gateway as one control plane. Normal best-route 
 ```
 
 3. Read `data.selectionDecision` before reading the long plan.
-4. If `status=probe_required`, execute the returned adaptive `model_gateway_probe_execute` plan/apply steps by candidate rank. Stop at first candidate satisfying the proof contract, then call `model_gateway_workflow_plan` again.
-5. Only a post-proof workflow may be used as authority for route promotion.
+4. If `status=probe_required`, execute only the **current top candidate** exposed by the returned `model_gateway_probe_execute` plan/apply steps. After that single success or failure, call `model_gateway_workflow_plan` again before touching candidate #2.
+5. Only the freshly recalculated post-probe workflow may choose the next probe or serve as authority for route promotion.
 
 The `agent` probe is the preferred `repo_agent`/`tool_agent` certificate. It exercises actual model generation, tool calling, a synthetic canonical file-read tool, `ask_user`, streaming/final assistant events and a disposable SDK session. `chat`, `json`, `vision` or `streaming` probes can be added when they test a capability the task actually needs.
 
