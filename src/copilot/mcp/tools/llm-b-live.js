@@ -14,6 +14,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { getCopilotDb } from '#copilot/db';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
@@ -31,6 +32,20 @@ const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const PROFILE_RE = /^[A-Za-z0-9_.:-]{1,120}$/u;
 const LIVE_READINESS_CACHE_TTL_MS = 30_000;
 const LIVE_READINESS_CACHE_MAX_ENTRIES = 8;
+const MODEL_GATEWAY_FINGERPRINT_TABLES = Object.freeze([
+    'copilot_model_gateway_catalog_sources',
+    'copilot_model_gateway_model_evidence',
+    'copilot_model_gateway_provider_evidence',
+    'copilot_model_gateway_model_projections',
+    'copilot_model_gateway_provider_projections',
+    'copilot_model_gateway_route_options',
+    'copilot_model_gateway_account_overlays',
+    'copilot_model_gateway_import_runs',
+    'copilot_model_gateway_raw_payload_refs',
+    'copilot_model_gateway_conflicts',
+    'copilot_model_gateway_eligibility_runs',
+    'copilot_model_gateway_eligibility_decisions',
+]);
 /** @type {Map<string, { parsed: Record<string, unknown>; completedAtMs: number; durationMs: number }>} */
 const liveReadinessCache = new Map();
 /** @type {Map<string, Promise<Record<string, any>>>} */
@@ -128,18 +143,66 @@ function readinessHealthPath(root) {
     return isAbsolute(configured) ? configured : resolve(root, configured);
 }
 
+function modelGatewaySqliteFingerprint() {
+    try {
+        const db = getCopilotDb();
+        const active = /** @type {{ generated_at_ms?: number | null; payload_bytes?: number | null } | undefined} */ (
+            db
+                .prepare(
+                    `SELECT generated_at_ms, length(payload_json) AS payload_bytes
+                     FROM copilot_model_gateway_snapshots
+                     WHERE snapshot_id = 'active'
+                     LIMIT 1`,
+                )
+                .get()
+        );
+        const runtime = /** @type {{ probe_runs?: number | null; probe_run_max?: number | null; probe_results?: number | null; probe_result_max?: number | null; health_rows?: number | null; health_max?: number | null } | undefined} */ (
+            db
+                .prepare(
+                    `SELECT
+                        (SELECT COUNT(*) FROM copilot_model_gateway_runtime_probe_runs) AS probe_runs,
+                        (SELECT MAX(completed_at_ms) FROM copilot_model_gateway_runtime_probe_runs) AS probe_run_max,
+                        (SELECT COUNT(*) FROM copilot_model_gateway_runtime_probe_results) AS probe_results,
+                        (SELECT MAX(observed_at_ms) FROM copilot_model_gateway_runtime_probe_results) AS probe_result_max,
+                        (SELECT COUNT(*) FROM copilot_model_gateway_health_observations) AS health_rows,
+                        (SELECT MAX(observed_at_ms) FROM copilot_model_gateway_health_observations) AS health_max`,
+                )
+                .get()
+        );
+        const catalogCounts = MODEL_GATEWAY_FINGERPRINT_TABLES.map((table) => {
+            const row = /** @type {{ count?: number | null } | undefined} */ (
+                db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get()
+            );
+            return Number(row?.count ?? -1);
+        });
+        return JSON.stringify({
+            activeGeneratedAtMs: Number(active?.generated_at_ms ?? 0),
+            activePayloadBytes: Number(active?.payload_bytes ?? 0),
+            catalogCounts,
+            runtime: {
+                probeRuns: Number(runtime?.probe_runs ?? 0),
+                probeRunMax: Number(runtime?.probe_run_max ?? 0),
+                probeResults: Number(runtime?.probe_results ?? 0),
+                probeResultMax: Number(runtime?.probe_result_max ?? 0),
+                healthRows: Number(runtime?.health_rows ?? 0),
+                healthMax: Number(runtime?.health_max ?? 0),
+            },
+        });
+    } catch {
+        // Disable reuse rather than risk a stale readiness result when the logical fingerprint cannot be observed.
+        return `unavailable:${Date.now()}`;
+    }
+}
+
 /** @param {boolean} includeSqliteRuntimeHealth */
 async function buildLiveReadinessFingerprint(includeSqliteRuntimeHealth) {
     const root = getMcpWorkspaceRoot();
-    const sqlitePath = join(root, 'data', 'copilot.sqlite');
-    const paths = [
-        join(root, 'data', 'copilot', 'model-gateway', 'catalog.json'),
-        sqlitePath,
-        `${sqlitePath}-wal`,
-        readinessHealthPath(root),
-    ];
-    const parts = await Promise.all(paths.map((filePath) => readinessFileFingerprint(filePath)));
-    return `${includeSqliteRuntimeHealth ? 'sqlite-health' : 'file-health'}:${parts.join('|')}`;
+    const [catalogFile, byokHealthFile] = await Promise.all([
+        readinessFileFingerprint(join(root, 'data', 'copilot', 'model-gateway', 'catalog.json')),
+        readinessFileFingerprint(readinessHealthPath(root)),
+    ]);
+    const sqliteLogical = modelGatewaySqliteFingerprint();
+    return `${includeSqliteRuntimeHealth ? 'sqlite-health' : 'file-health'}:${catalogFile}:${sqliteLogical}:${byokHealthFile}`;
 }
 
 function pruneLiveReadinessCache() {
@@ -320,7 +383,7 @@ export const llmBLiveTools = [
                     cacheAgeMs: execution.cacheAgeMs,
                     cacheTtlMs: LIVE_READINESS_CACHE_TTL_MS,
                     subprocessDurationMs: execution.durationMs,
-                    invalidation: 'catalog+sqlite+wal+byok-health-fingerprint',
+                    invalidation: 'catalog-file+model-gateway-sqlite-logical+byok-health-fingerprint',
                 },
             };
             return okResult(parsed, JSON.stringify(parsed, null, 2));
