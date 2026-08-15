@@ -331,8 +331,13 @@ function validateProfile(value, field) {
  * }} input
  */
 function buildLiveRunPlan(input) {
+    const requestedScenario = input.scenario;
+    const resolvedScenario =
+        input.mode === 'byok-real-turn' && requestedScenario === 'model-gateway-tools-apply-safe'
+            ? 'model-gateway-adaptive-probe'
+            : requestedScenario;
     const args = [
-        `--live-scenario=${input.scenario}`,
+        `--live-scenario=${resolvedScenario}`,
         `--transport=${input.transport}`,
         `--timeout-ms=${input.timeoutMs}`,
     ];
@@ -373,7 +378,9 @@ function buildLiveRunPlan(input) {
         script: LIVE_RUNNER,
         args,
         mode: input.mode,
-        scenario: input.scenario,
+        scenario: resolvedScenario,
+        requestedScenario,
+        resolvedScenario,
         invokesModel,
         invokesRealProvider,
         executesRuntimeProbes,
