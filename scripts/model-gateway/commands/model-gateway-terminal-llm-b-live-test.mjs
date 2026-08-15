@@ -1362,6 +1362,9 @@ async function buildRealByokRuntime({
             const providerId = optionalRuntimeSelectorString(selected.providerId) || runtimeRoute.providerId;
             const providerModel = optionalRuntimeSelectorString(selected.providerModel) || runtimeRoute.providerModel;
             const probeEnv = buildModelGatewayRuntimeSelectorProbeEnv(selected, mergedEnv);
+            console.warn(
+                `[terminal-live] agent admission ${attemptIndex + 1}/${maxAdmissionAttempts} start route=${providerId ?? '-'}/${providerModel ?? '-'}`,
+            );
             const probe = await runConfiguredByokAgentProbe({
                 env: probeEnv,
                 model: providerModel,
@@ -1384,6 +1387,9 @@ async function buildRealByokRuntime({
                 errorCount: probe.errors.length,
             };
             agentAdmissionAttempts.push(attempt);
+            console.warn(
+                `[terminal-live] agent admission ${attemptIndex + 1}/${maxAdmissionAttempts} ${probe.ok ? 'ok' : 'failed'} route=${providerId ?? '-'}/${providerModel ?? '-'} status=${probe.status} elapsed=${probe.elapsedMs}ms`,
+            );
             if (probe.ok) {
                 recordByokProviderModelAgentProbeSuccess(identity);
                 await flushByokProviderHealth();
