@@ -27,6 +27,7 @@ import {
 const execFileAsync = promisify(execFile);
 const LIVE_RUNNER = 'scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs';
 const LIVE_READINESS = 'scripts/model-gateway/commands/model-gateway-live-readiness.mjs';
+const LIVE_READINESS_MODULE_URL = new URL('../../../../scripts/model-gateway/commands/model-gateway-live-readiness.mjs', import.meta.url).href;
 const LIVE_RUNS = 'scripts/model-gateway/commands/model-gateway-live-runs.mjs';
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const PROFILE_RE = /^[A-Za-z0-9_.:-]{1,120}$/u;
@@ -46,9 +47,10 @@ const MODEL_GATEWAY_FINGERPRINT_TABLES = Object.freeze([
     'copilot_model_gateway_eligibility_runs',
     'copilot_model_gateway_eligibility_decisions',
 ]);
+/** @typedef {{ success: boolean; parsed: Record<string, any> | null; stderr: string; stdout: string; error: string | null; execution: string; cacheAgeMs: number; durationMs: number }} LiveReadinessExecution */
 /** @type {Map<string, { parsed: Record<string, unknown>; completedAtMs: number; durationMs: number }>} */
 const liveReadinessCache = new Map();
-/** @type {Map<string, Promise<Record<string, any>>>} */
+/** @type {Map<string, Promise<LiveReadinessExecution>>} */
 const liveReadinessInFlight = new Map();
 
 const liveScenarioSchema = z.enum([
@@ -205,6 +207,20 @@ async function buildLiveReadinessFingerprint(includeSqliteRuntimeHealth) {
     return `${includeSqliteRuntimeHealth ? 'sqlite-health' : 'file-health'}:${catalogFile}:${sqliteLogical}:${byokHealthFile}`;
 }
 
+/** @type {Promise<((options?: { includeSqliteRuntimeHealth?: boolean }) => Promise<Record<string, any>>) | null> | null} */
+let liveReadinessBuilderPromise = null;
+
+async function loadLiveReadinessBuilder() {
+    if (!liveReadinessBuilderPromise) {
+        liveReadinessBuilderPromise = import(LIVE_READINESS_MODULE_URL)
+            .then((module) =>
+                typeof module.buildModelGatewayLiveReadiness === 'function' ? module.buildModelGatewayLiveReadiness : null,
+            )
+            .catch(() => null);
+    }
+    return liveReadinessBuilderPromise;
+}
+
 function pruneLiveReadinessCache() {
     const now = Date.now();
     for (const [key, entry] of liveReadinessCache.entries()) {
@@ -217,7 +233,7 @@ function pruneLiveReadinessCache() {
     }
 }
 
-/** @param {boolean} includeSqliteRuntimeHealth */
+/** @param {boolean} includeSqliteRuntimeHealth @returns {Promise<LiveReadinessExecution>} */
 async function executeLiveReadiness(includeSqliteRuntimeHealth) {
     const fingerprint = await buildLiveReadinessFingerprint(includeSqliteRuntimeHealth);
     const key = fingerprint;
@@ -243,28 +259,47 @@ async function executeLiveReadiness(includeSqliteRuntimeHealth) {
     }
     const promise = (async () => {
         const startedAt = performance.now();
-        const args = ['--json'];
-        if (includeSqliteRuntimeHealth) args.push('--sqlite-runtime-health');
-        const result = await execFixedNodeScript(LIVE_READINESS, args, 120_000);
-        const parsedValue = parseJsonOutput(result.stdout);
-        const parsed =
-            parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)
-                ? /** @type {Record<string, unknown>} */ (parsedValue)
-                : null;
+        const builder = await loadLiveReadinessBuilder();
+        let parsed = null;
+        let stderr = '';
+        let stdout = '';
+        let error = null;
+        let execution = 'fresh-in-process';
+        if (builder) {
+            try {
+                parsed = await builder({ includeSqliteRuntimeHealth });
+            } catch (builderError) {
+                error = builderError instanceof Error ? builderError.message : String(builderError);
+            }
+        } else {
+            execution = 'fallback-subprocess';
+            const args = ['--json'];
+            if (includeSqliteRuntimeHealth) args.push('--sqlite-runtime-health');
+            const result = await execFixedNodeScript(LIVE_READINESS, args, 120_000);
+            const parsedValue = parseJsonOutput(result.stdout);
+            parsed =
+                parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)
+                    ? /** @type {Record<string, any>} */ (parsedValue)
+                    : null;
+            stderr = result.stderr;
+            stdout = result.stdout;
+            error = result.error ?? null;
+        }
         const durationMs = Number((performance.now() - startedAt).toFixed(3));
         const completedAtMs = Date.now();
-        if (result.success && parsed) {
+        const success = parsed !== null && error === null;
+        if (success && parsed) {
             const completedFingerprint = await buildLiveReadinessFingerprint(includeSqliteRuntimeHealth);
             liveReadinessCache.set(completedFingerprint, { parsed, completedAtMs, durationMs });
             pruneLiveReadinessCache();
         }
         return {
-            success: result.success && parsed !== null,
+            success,
             parsed,
-            stderr: result.stderr,
-            stdout: result.stdout,
-            error: result.error,
-            execution: 'fresh-process',
+            stderr,
+            stdout,
+            error,
+            execution,
             cacheAgeMs: 0,
             durationMs,
         };
@@ -382,7 +417,8 @@ export const llmBLiveTools = [
                     execution: execution.execution,
                     cacheAgeMs: execution.cacheAgeMs,
                     cacheTtlMs: LIVE_READINESS_CACHE_TTL_MS,
-                    subprocessDurationMs: execution.durationMs,
+                    durationMs: execution.durationMs,
+                    subprocessDurationMs: execution.execution === 'fallback-subprocess' ? execution.durationMs : null,
                     invalidation: 'catalog-file+model-gateway-sqlite-logical+byok-health-fingerprint',
                 },
             };

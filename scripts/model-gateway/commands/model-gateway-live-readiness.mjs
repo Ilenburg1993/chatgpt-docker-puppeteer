@@ -2,6 +2,7 @@
 import { access } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH, REPO_ROOT } from '../index.mjs';
 
@@ -52,29 +53,6 @@ const DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 25;
 const DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 100_000;
 const args = process.argv.slice(2);
 const argSet = new Set(args);
-const readinessStartedAt = performance.now();
-/** @type {Record<string, number>} */
-const phaseTimingsMs = {};
-
-/** @template T @param {string} name @param {() => Promise<T>} task @returns {Promise<T>} */
-async function timedAsync(name, task) {
-    const startedAt = performance.now();
-    try {
-        return await task();
-    } finally {
-        phaseTimingsMs[name] = Number((performance.now() - startedAt).toFixed(3));
-    }
-}
-
-/** @template T @param {string} name @param {() => T} task @returns {T} */
-function timedSync(name, task) {
-    const startedAt = performance.now();
-    try {
-        return task();
-    } finally {
-        phaseTimingsMs[name] = Number((performance.now() - startedAt).toFixed(3));
-    }
-}
 
 /**
  * Run one fixed redaction audit in an isolated worker thread so catalog and SQLite scanning can use separate CPU cores
@@ -123,15 +101,6 @@ function runRedactionWorker(mode, maxRowsPerTable) {
             if (!settled && code !== 0) finish(null, new Error(`redaction worker ${mode} exited with ${String(code)}`));
         });
     });
-}
-
-if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning] [--sqlite-runtime-health] [--redaction-max-rows-per-table N] [--deep-redaction]
-
-Check whether the model-gateway metadata database is ready for terminal llm-b live tests.
-This does not start the terminal, execute providers, run models or run runtime probes.
-`);
-    process.exit(0);
 }
 
 function readArg(name, fallback = '') {
@@ -290,24 +259,44 @@ function summarizeTerminalLiveRoute(route) {
     };
 }
 
-const json = argSet.has('--json');
-const fail = argSet.has('--fail');
-const failOnSupplyWarning = argSet.has('--fail-on-supply-warning');
-const includeSqliteRuntimeHealth = argSet.has('--sqlite-runtime-health');
-const sqliteRedactionMaxRowsPerTable =
-    argSet.has('--deep-redaction') || argSet.has('--full-redaction')
-        ? DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE
-        : readPositiveInteger(
-              ['--redaction-max-rows-per-table', '--sqlite-redaction-max-rows-per-table'],
-              DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE,
-          );
-if (json) {
-    setDbLogger((level, message) => {
-        if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
-            process.stderr.write(`[db][${level}] ${message}\n`);
+/**
+ * Build the canonical read-only LLM-B / Model Gateway readiness snapshot without writing to stdout or terminating the process.
+ * This function is safe to call from the MCP process; CPU-heavy redaction remains isolated in worker threads.
+ *
+ * @param {{ includeSqliteRuntimeHealth?: boolean; failOnSupplyWarning?: boolean; sqliteRedactionMaxRowsPerTable?: number }} [options]
+ * @returns {Promise<Record<string, any>>}
+ */
+export async function buildModelGatewayLiveReadiness(options = {}) {
+    const readinessStartedAt = performance.now();
+    /** @type {Record<string, number>} */
+    const phaseTimingsMs = {};
+    const includeSqliteRuntimeHealth = options.includeSqliteRuntimeHealth === true;
+    const failOnSupplyWarning = options.failOnSupplyWarning === true;
+    const sqliteRedactionMaxRowsPerTable = Math.max(
+        1,
+        Math.min(options.sqliteRedactionMaxRowsPerTable ?? DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE, 1_000_000),
+    );
+
+    /** @template T @param {string} name @param {() => Promise<T>} task @returns {Promise<T>} */
+    async function timedAsync(name, task) {
+        const startedAt = performance.now();
+        try {
+            return await task();
+        } finally {
+            phaseTimingsMs[name] = Number((performance.now() - startedAt).toFixed(3));
         }
-    });
-}
+    }
+
+    /** @template T @param {string} name @param {() => T} task @returns {T} */
+    function timedSync(name, task) {
+        const startedAt = performance.now();
+        try {
+            return task();
+        } finally {
+            phaseTimingsMs[name] = Number((performance.now() - startedAt).toFixed(3));
+        }
+    }
+
 const redactionWorkersPromise = Promise.all([
     runRedactionWorker('catalog', sqliteRedactionMaxRowsPerTable),
     runRedactionWorker('sqlite', sqliteRedactionMaxRowsPerTable),
@@ -726,19 +715,49 @@ const summary = {
         commands,
     },
 };
-
-if (json) {
-    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
-} else {
-    process.stdout.write(`model-gateway live readiness: ok=${summary.ok ? 'yes' : 'no'}\n`);
-    for (const check of checks) {
-        process.stdout.write(`  ${check.ok ? 'OK' : 'FAIL'} ${check.id}: ${check.detail}\n`);
-    }
-    if (localProviderOptIn.effectiveStrict.hasBlocks) {
-        process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.effectiveStrict.blockedProfileIds })}\n`);
-    }
-    process.stdout.write('\nrecommended live order:\n');
-    commands.forEach((command, index) => process.stdout.write(`  ${index + 1}. ${command}\n`));
+    return summary;
 }
 
-if (fail && !summary.ok) process.exit(1);
+const isDirectCli = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+if (isDirectCli) {
+    if (argSet.has('--help') || argSet.has('-h')) {
+        process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning] [--sqlite-runtime-health] [--redaction-max-rows-per-table N] [--deep-redaction]\n\nCheck whether the model-gateway metadata database is ready for terminal llm-b live tests.\nThis does not start the terminal, execute providers, run models or run runtime probes.\n`);
+    } else {
+        const json = argSet.has('--json');
+        const fail = argSet.has('--fail');
+        if (json) {
+            setDbLogger((level, message) => {
+                if (level === 'WARN' || level === 'ERROR' || level === 'FATAL') {
+                    process.stderr.write(`[db][${level}] ${message}\n`);
+                }
+            });
+        }
+        const sqliteRedactionMaxRowsPerTable =
+            argSet.has('--deep-redaction') || argSet.has('--full-redaction')
+                ? DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE
+                : readPositiveInteger(
+                      ['--redaction-max-rows-per-table', '--sqlite-redaction-max-rows-per-table'],
+                      DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE,
+                  );
+        const summary = await buildModelGatewayLiveReadiness({
+            includeSqliteRuntimeHealth: argSet.has('--sqlite-runtime-health'),
+            failOnSupplyWarning: argSet.has('--fail-on-supply-warning'),
+            sqliteRedactionMaxRowsPerTable,
+        });
+        if (json) {
+            process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+        } else {
+            process.stdout.write(`model-gateway live readiness: ok=${summary.ok ? 'yes' : 'no'}\n`);
+            for (const check of summary.checks) {
+                process.stdout.write(`  ${check.ok ? 'OK' : 'FAIL'} ${check.id}: ${check.detail}\n`);
+            }
+            const localProviderOptIn = summary.selection.effectiveStrict.localProviderOptIn;
+            if (localProviderOptIn.hasBlocks) {
+                process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`);
+            }
+            process.stdout.write('\nrecommended live order:\n');
+            summary.livePlan.commands.forEach((command, index) => process.stdout.write(`  ${index + 1}. ${command}\n`));
+        }
+        if (fail && !summary.ok) process.exitCode = 1;
+    }
+}
