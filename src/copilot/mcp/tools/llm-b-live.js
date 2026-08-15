@@ -8,13 +8,15 @@
  * @module copilot/mcp/tools/llm-b-live
  */
 
-import { execFile } from 'node:child_process';
-import { stat } from 'node:fs/promises';
+import { execFile, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, readdir, stat } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import { getCopilotDb } from '#copilot/db';
+import { writeFileAtomic } from '#copilot/infra/public/io';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
@@ -30,6 +32,9 @@ const LIVE_READINESS = 'scripts/model-gateway/commands/model-gateway-live-readin
 const LIVE_READINESS_MODULE_URL = new URL('../../../../scripts/model-gateway/commands/model-gateway-live-readiness.mjs', import.meta.url).href;
 const LIVE_RUNS = 'scripts/model-gateway/commands/model-gateway-live-runs.mjs';
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+const DETACHED_LIVE_RUNS_DIR = 'src/copilot/.ai/mcp/llmb-live-runs';
+const DETACHED_LIVE_RUN_ID_RE = /^mcp-[0-9a-f-]{36}$/u;
+const DETACHED_LIVE_RUN_MANIFEST_MAX_BYTES = 128 * 1024;
 const PROFILE_RE = /^[A-Za-z0-9_.:-]{1,120}$/u;
 const LIVE_READINESS_CACHE_TTL_MS = 30_000;
 const LIVE_READINESS_CACHE_MAX_ENTRIES = 8;
@@ -104,6 +109,123 @@ async function execFixedNodeScript(script, args, timeoutMs) {
             error: err.stderr || err.message,
         };
     }
+}
+
+/**
+ * @typedef {object} DetachedLiveRunManifest
+ * @property {'llmb-live-detached-run'} schema
+ * @property {string} runId
+ * @property {number} pid
+ * @property {number} startedAtMs
+ * @property {string} outDir
+ * @property {Record<string, unknown>} plan
+ */
+
+function detachedLiveRunsDirectory() {
+    return join(getMcpWorkspaceRoot(), DETACHED_LIVE_RUNS_DIR);
+}
+
+/** @param {string} runId */
+function detachedLiveRunManifestPath(runId) {
+    if (!DETACHED_LIVE_RUN_ID_RE.test(runId)) throw new Error('Invalid detached LLM-B live run id.');
+    return join(detachedLiveRunsDirectory(), `${runId}.json`);
+}
+
+/** @param {number} pid */
+function isProcessAlive(pid) {
+    if (!Number.isInteger(pid) || pid <= 0) return false;
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error) {
+        const code = /** @type {NodeJS.ErrnoException} */ (error)?.code;
+        return code === 'EPERM';
+    }
+}
+
+/**
+ * Launch the fixed canonical harness independently of the initiating MCP request. The harness writes its own artifacts and
+ * SQLite ledger; this manifest only makes the in-flight state observable and survives MCP reloads.
+ *
+ * @param {{ args: string[]; plan: Record<string, unknown>; timeoutMs: number }} input
+ */
+async function spawnDetachedLiveRun(input) {
+    const runId = `mcp-${randomUUID()}`;
+    const outDir = `artifacts/terminal-live/${runId}`;
+    const args = [...input.args, `--out-dir=${outDir}`];
+    const stateDir = detachedLiveRunsDirectory();
+    await mkdir(stateDir, { recursive: true });
+    const child = spawn(process.execPath, [LIVE_RUNNER, ...args], {
+        cwd: getMcpWorkspaceRoot(),
+        env: process.env,
+        detached: true,
+        stdio: 'ignore',
+    });
+    if (!child.pid) throw new Error('Detached LLM-B live harness did not expose a child pid.');
+    child.unref();
+    /** @type {DetachedLiveRunManifest} */
+    const manifest = {
+        schema: 'llmb-live-detached-run',
+        runId,
+        pid: child.pid,
+        startedAtMs: Date.now(),
+        outDir,
+        plan: input.plan,
+    };
+    await writeFileAtomic(detachedLiveRunManifestPath(runId), `${JSON.stringify(manifest, null, 2)}\n`, {
+        encoding: 'utf8',
+        mode: 0o600,
+        riskClass: 'medium',
+        failIfExists: true,
+        advisoryLimits: { domain: 'llmb-live-detached-manifest' },
+    });
+    return manifest;
+}
+
+/** @param {string} manifestPath */
+async function readDetachedLiveRunManifest(manifestPath) {
+    try {
+        const stats = await stat(manifestPath);
+        if (!stats.isFile() || stats.size > DETACHED_LIVE_RUN_MANIFEST_MAX_BYTES) return null;
+        const parsed = JSON.parse(await readFile(manifestPath, 'utf8'));
+        if (
+            parsed?.schema !== 'llmb-live-detached-run' ||
+            typeof parsed.runId !== 'string' ||
+            !DETACHED_LIVE_RUN_ID_RE.test(parsed.runId) ||
+            !Number.isInteger(parsed.pid) ||
+            typeof parsed.outDir !== 'string' ||
+            typeof parsed.startedAtMs !== 'number'
+        ) {
+            return null;
+        }
+        return /** @type {DetachedLiveRunManifest} */ (parsed);
+    } catch {
+        return null;
+    }
+}
+
+async function listDetachedLiveRuns() {
+    const directory = detachedLiveRunsDirectory();
+    await mkdir(directory, { recursive: true });
+    const entries = await readdir(directory).catch(() => []);
+    const rows = [];
+    for (const entry of entries) {
+        if (!entry.endsWith('.json')) continue;
+        const manifest = await readDetachedLiveRunManifest(join(directory, entry));
+        if (!manifest) continue;
+        const summaryPath = join(getMcpWorkspaceRoot(), manifest.outDir, 'summary.md');
+        const summaryReady = await stat(summaryPath).then((value) => value.isFile()).catch(() => false);
+        const pidAlive = isProcessAlive(manifest.pid);
+        rows.push({
+            ...manifest,
+            status: summaryReady ? 'artifacts_ready' : pidAlive ? 'running' : 'stopped_without_summary',
+            pidAlive,
+            summaryReady,
+            ageMs: Math.max(0, Date.now() - manifest.startedAtMs),
+            summaryPath: summaryReady ? `${manifest.outDir}/summary.md` : null,
+        });
+    }
+    return rows.sort((left, right) => right.startedAtMs - left.startedAtMs).slice(0, 20);
 }
 
 /** @param {string} text */
@@ -374,6 +496,10 @@ function buildLiveRunPlan(input) {
     }
 
     const requiresUsageConfirmation = invokesModel || invokesRealProvider;
+    const executionMode =
+        input.mode === 'byok-real-turn' && resolvedScenario === 'model-gateway-adaptive-probe'
+            ? 'detached'
+            : 'synchronous';
     return {
         script: LIVE_RUNNER,
         args,
@@ -381,6 +507,7 @@ function buildLiveRunPlan(input) {
         scenario: resolvedScenario,
         requestedScenario,
         resolvedScenario,
+        executionMode,
         invokesModel,
         invokesRealProvider,
         executesRuntimeProbes,
@@ -454,6 +581,7 @@ export const llmBLiveTools = [
                     stdoutTail: result.stdout.slice(-8000),
                 });
             }
+            parsed.detachedRuns = await listDetachedLiveRuns();
             return okResult(parsed, JSON.stringify(parsed, null, 2));
         },
     },
@@ -507,6 +635,33 @@ export const llmBLiveTools = [
                         code: 'ERR_LLMB_MODEL_USAGE_CONFIRMATION_REQUIRED',
                         plan,
                     });
+                }
+                if (plan.executionMode === 'detached') {
+                    const manifest = await spawnDetachedLiveRun({
+                        args: plan.args,
+                        plan,
+                        timeoutMs: effectiveTimeoutMs,
+                    });
+                    await appendMcpAuditEvent({
+                        event: 'llmb_live_test_detached_started',
+                        tool: 'llmb_live_test_run',
+                        runId: manifest.runId,
+                        mode: plan.mode,
+                        scenario: plan.scenario,
+                        invokesModel: plan.invokesModel,
+                        invokesRealProvider: plan.invokesRealProvider,
+                    });
+                    const structured = {
+                        success: true,
+                        accepted: true,
+                        detached: true,
+                        runId: manifest.runId,
+                        pid: manifest.pid,
+                        outDir: manifest.outDir,
+                        plan,
+                        next: 'Use llmb_live_runs to inspect detachedRuns and the persisted SQLite result; do not start a duplicate provider run while status=running.',
+                    };
+                    return okResult(structured, JSON.stringify(structured, null, 2));
                 }
                 const runId = `mcp-${Date.now().toString(36)}`;
                 const outDir = `artifacts/terminal-live/${runId}`;
