@@ -29,7 +29,7 @@ const LIVE_READINESS = 'scripts/model-gateway/commands/model-gateway-live-readin
 const LIVE_RUNS = 'scripts/model-gateway/commands/model-gateway-live-runs.mjs';
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const PROFILE_RE = /^[A-Za-z0-9_.:-]{1,120}$/u;
-const LIVE_READINESS_CACHE_TTL_MS = 5_000;
+const LIVE_READINESS_CACHE_TTL_MS = 30_000;
 const LIVE_READINESS_CACHE_MAX_ENTRIES = 8;
 /** @type {Map<string, { parsed: Record<string, unknown>; completedAtMs: number; durationMs: number }>} */
 const liveReadinessCache = new Map();
@@ -191,7 +191,8 @@ async function executeLiveReadiness(includeSqliteRuntimeHealth) {
         const durationMs = Number((performance.now() - startedAt).toFixed(3));
         const completedAtMs = Date.now();
         if (result.success && parsed) {
-            liveReadinessCache.set(key, { parsed, completedAtMs, durationMs });
+            const completedFingerprint = await buildLiveReadinessFingerprint(includeSqliteRuntimeHealth);
+            liveReadinessCache.set(completedFingerprint, { parsed, completedAtMs, durationMs });
             pruneLiveReadinessCache();
         }
         return {
