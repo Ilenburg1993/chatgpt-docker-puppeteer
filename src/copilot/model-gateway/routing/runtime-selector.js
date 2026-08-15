@@ -24,7 +24,7 @@ import {
     createGatewayRuntimeHealthIndex,
     evaluateGatewayModelHealthRoute,
     evaluateGatewayProviderHealthCooldown,
-    isGatewayModelProbeFailed,
+    isGatewayModelProbeActivelyFailed,
 } from './health-routing.js';
 
 const DEFAULT_MAX_RUNTIME_RETRY_DELAY_MS = 30_000;
@@ -1248,7 +1248,15 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             const runtimeHealthBlocked = runtimeHealth?.include === false;
             const providerCooldownBlocked = providerCooldown?.include === false;
             const failedProbeKinds = Array.isArray(options.blockFailedProbeKinds)
-                ? options.blockFailedProbeKinds.filter((kind) => runtimeHealth?.health && isGatewayModelProbeFailed(runtimeHealth.health, kind))
+                ? options.blockFailedProbeKinds.filter(
+                      (kind) =>
+                          runtimeHealth?.health &&
+                          isGatewayModelProbeActivelyFailed(runtimeHealth.health, kind, {
+                              ...(typeof options.temporaryFailureCooldownMs === 'number'
+                                  ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
+                                  : {}),
+                          }),
+                  )
                 : [];
             const runtimeProbeBlocked = failedProbeKinds.length > 0;
             return {

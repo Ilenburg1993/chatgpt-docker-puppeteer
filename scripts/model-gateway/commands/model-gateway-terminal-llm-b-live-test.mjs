@@ -32,7 +32,12 @@ const REPL_PROMPT_TAIL_RE = /(?:^|\n)voc[eê]\[[^\n]*?›\s*$/iu;
 const REPL_NORMAL_PROMPT_TAIL_RE = /(?:^|\n)voc[eê]\[[^\n\]]+\](?!\[PERG(?:UNTA)?\])›\s*$/iu;
 const LIVE_PROTOCOL_PROBE_KINDS = Object.freeze(['live_tool_protocol', 'live_ask_user']);
 const LIVE_TURN_PROBE_KIND = 'live_turn';
-const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([...LIVE_PROTOCOL_PROBE_KINDS, LIVE_TURN_PROBE_KIND]);
+const LIVE_AGENT_ADMISSION_PROBE_KIND = 'agent';
+const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
+    ...LIVE_PROTOCOL_PROBE_KINDS,
+    LIVE_TURN_PROBE_KIND,
+    LIVE_AGENT_ADMISSION_PROBE_KIND,
+]);
 
 /**
  * @typedef {{
@@ -1297,7 +1302,7 @@ function runtimeSelectorRouteDetails(runtimeSelector) {
     };
 }
 
-function buildRealByokRuntime({
+async function buildRealByokRuntime({
     dotenvEnv,
     requestedProfile,
     requestedAltProfile,
@@ -1312,10 +1317,11 @@ function buildRealByokRuntime({
     runtimeSelectorTemporaryFailureCooldownMs = 0,
     runtimeSelectorTimeoutMs = 45_000,
     runtimeSelectorSelectionPolicy = '',
+    requireAgentAdmission = false,
 }) {
     const mergedEnv = { ...process.env, ...dotenvEnv };
     const routeSelectorMandatory = Boolean(optionalRuntimeSelectorString(runtimeSelectorProfile));
-    const runtimeSelector = runRuntimeSelectorLiveRoute({
+    const selectorInput = {
         profileId: runtimeSelectorProfile,
         fallbackProfiles,
         execute: runtimeSelectorExecute,
@@ -1325,8 +1331,87 @@ function buildRealByokRuntime({
         temporaryFailureCooldownMs: runtimeSelectorTemporaryFailureCooldownMs,
         timeoutMs: runtimeSelectorTimeoutMs,
         selectionPolicy: runtimeSelectorSelectionPolicy,
-    });
-    const runtimeRoute = runtimeSelectorRouteDetails(runtimeSelector);
+    };
+    let runtimeSelector = runRuntimeSelectorLiveRoute(selectorInput);
+    let runtimeRoute = runtimeSelectorRouteDetails(runtimeSelector);
+    const agentAdmissionAttempts = [];
+    if (routeSelectorMandatory && runtimeSelectorExecute && requireAgentAdmission) {
+        const {
+            buildModelGatewayRuntimeSelectorProbeEnv,
+            classifyByokProviderFailure,
+            flushByokProviderHealth,
+            recordByokProviderModelAgentProbeFailure,
+            recordByokProviderModelAgentProbeSuccess,
+            recordByokProviderModelCallFailure,
+            runConfiguredByokAgentProbe,
+        } = await import('../../../src/copilot/model-gateway/index.js');
+        const maxAdmissionAttempts = Math.max(1, Math.trunc(runtimeSelectorMaxAttempts));
+        for (let attemptIndex = 0; runtimeRoute && attemptIndex < maxAdmissionAttempts; attemptIndex += 1) {
+            const selected = runtimeSelector?.selectedRoute?.selected;
+            if (!selected || typeof selected !== 'object') {
+                runtimeRoute = null;
+                break;
+            }
+            const routeProfile =
+                optionalRuntimeSelectorString(runtimeSelector?.selectedRoute?.profileId) ||
+                optionalRuntimeSelectorString(selected.routeProfile) ||
+                runtimeSelectorProfile ||
+                null;
+            const providerId = optionalRuntimeSelectorString(selected.providerId) || runtimeRoute.providerId;
+            const providerModel = optionalRuntimeSelectorString(selected.providerModel) || runtimeRoute.providerModel;
+            const probeEnv = buildModelGatewayRuntimeSelectorProbeEnv(selected, mergedEnv);
+            const probe = await runConfiguredByokAgentProbe({
+                env: probeEnv,
+                model: providerModel,
+                timeoutMs: Math.max(5_000, Math.min(120_000, Math.trunc(runtimeSelectorTimeoutMs))),
+                deps: { classifyProviderFailure: classifyByokProviderFailure },
+            });
+            const identity = { routeProfile, providerId, providerModel };
+            const attempt = {
+                attempt: attemptIndex + 1,
+                ...identity,
+                ok: probe.ok === true,
+                status: probe.status,
+                elapsedMs: probe.elapsedMs,
+                toolCallCount: probe.toolCallCount,
+                markerToolCallCount: probe.markerToolCallCount,
+                readToolCallCount: probe.readToolCallCount,
+                userInputRequestCount: probe.userInputRequestCount,
+                userInputAnswerCount: probe.userInputAnswerCount,
+                providerFailureKind: probe.providerFailure?.kind ?? null,
+                errorCount: probe.errors.length,
+            };
+            agentAdmissionAttempts.push(attempt);
+            if (probe.ok) {
+                recordByokProviderModelAgentProbeSuccess(identity);
+                await flushByokProviderHealth();
+                break;
+            }
+            const message = probe.errors.join(' | ') || `agent admission failed: ${probe.status}`;
+            recordByokProviderModelAgentProbeFailure({
+                ...identity,
+                message,
+                errorContext: `terminal_live_agent_admission:${probe.status}`,
+            });
+            if (probe.providerFailure) {
+                recordByokProviderModelCallFailure({
+                    ...identity,
+                    message: probe.providerFailure.message,
+                    errorContext: 'terminal_live_agent_admission',
+                    failureKind: probe.providerFailure.kind,
+                    failureStatusCode: probe.providerFailure.statusCode,
+                    retryAfterSeconds: probe.providerFailure.retryAfterSeconds,
+                    resetAt: probe.providerFailure.resetAt,
+                });
+            }
+            await flushByokProviderHealth();
+            runtimeSelector = runRuntimeSelectorLiveRoute(selectorInput);
+            runtimeRoute = runtimeSelectorRouteDetails(runtimeSelector);
+        }
+        if (!agentAdmissionAttempts.some((attempt) => attempt.ok === true)) {
+            runtimeRoute = null;
+        }
+    }
     const profile = routeSelectorMandatory ? '' : chooseRealByokProfile(mergedEnv, requestedProfile);
     const altProfile = routeSelectorMandatory
         ? ''
@@ -1362,6 +1447,15 @@ function buildRealByokRuntime({
         altProvider,
         runtimeSelector,
         runtimeRoute,
+        agentAdmission: {
+            required: requireAgentAdmission === true,
+            ok: requireAgentAdmission !== true || agentAdmissionAttempts.some((attempt) => attempt.ok === true),
+            attempts: agentAdmissionAttempts,
+            error:
+                requireAgentAdmission === true && !agentAdmissionAttempts.some((attempt) => attempt.ok === true)
+                    ? 'no_agent_capable_bootstrap_route'
+                    : null,
+        },
         redacted: {
             enabled: true,
             profile: profile || null,
@@ -1426,6 +1520,11 @@ function buildRealByokRuntime({
                       }
                     : null,
                 error: runtimeSelector.error ? runtimeSelector.error.slice(0, 800) : null,
+            },
+            agentAdmission: {
+                required: requireAgentAdmission === true,
+                ok: requireAgentAdmission !== true || agentAdmissionAttempts.some((attempt) => attempt.ok === true),
+                attempts: agentAdmissionAttempts,
             },
             dotenvLocalLoaded: Object.keys(dotenvEnv).length > 0,
             secretKeysPresent: collectSecretValues(mergedEnv)
@@ -7109,6 +7208,7 @@ function evaluateByokRealOutput(
         controlOnly = false,
         runtimeSelector,
         runtimeRoute,
+        agentAdmission,
         requireVisionProbe = false,
         liveScenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
     } = {},
@@ -7157,6 +7257,19 @@ function evaluateByokRealOutput(
     const byokVisionProbeStatus = findByokProbeResultStatus(plain, 'vision');
     const leanModelGatewayPreflight = isModelGatewayToolScenario(liveScenario);
     const admissionExecutionOk = runtimeSelector?.executed === true && runtimeSelector?.summary?.execution?.ok === true;
+    const agentAdmissionAttempts = Array.isArray(agentAdmission?.attempts) ? agentAdmission.attempts : [];
+    const successfulAgentAdmission = agentAdmissionAttempts.find(
+        (attempt) =>
+            attempt?.ok === true &&
+            attempt?.providerId === runtimeRoute?.providerId &&
+            attempt?.providerModel === runtimeRoute?.providerModel &&
+            Number(attempt?.markerToolCallCount ?? 0) > 0 &&
+            Number(attempt?.readToolCallCount ?? 0) > 0 &&
+            Number(attempt?.userInputRequestCount ?? 0) > 0 &&
+            Number(attempt?.userInputAnswerCount ?? 0) > 0,
+    );
+    const agentAdmissionOk =
+        agentAdmission?.required === true && agentAdmission?.ok === true && Boolean(successfulAgentAdmission);
     const criteria = [
         {
             id: 'byok-real-dotenv-reload',
@@ -7235,6 +7348,13 @@ function evaluateByokRealOutput(
                       detail: admissionExecutionOk
                           ? `runtime-selector admission proved a responding bootstrap route ${runtimeRoute?.providerId ?? '-'}/${runtimeRoute?.providerModel ?? '-'}`
                           : 'model-gateway tool scenario did not enter terminal through a successful runtime-selector admission probe',
+                  },
+                  {
+                      id: 'byok-real-agent-admission-proof',
+                      pass: agentAdmissionOk,
+                      detail: agentAdmissionOk
+                          ? `agent admission proved tool+read+ask_user bootstrap route ${runtimeRoute?.providerId ?? '-'}/${runtimeRoute?.providerModel ?? '-'} after ${agentAdmissionAttempts.length} attempt(s)`
+                          : `model-gateway bootstrap lacked a matching agent admission proof (attempts=${agentAdmissionAttempts.length})`,
                   },
                   {
                       id: 'byok-real-model-gateway-scenario-opened',
@@ -7667,7 +7787,7 @@ async function main() {
     const byokFixtureBaseUrl = byokFixtureProvider?.baseUrl ?? 'http://127.0.0.1:11434/v1';
     const dotenvEnv = byokReal ? await loadDotenvLocalEnv() : {};
     const realByok = byokReal
-        ? buildRealByokRuntime({
+        ? await buildRealByokRuntime({
               dotenvEnv,
               requestedProfile: byokRealProfile,
               requestedAltProfile: byokRealAltProfile,
@@ -7692,6 +7812,7 @@ async function main() {
                   ? byokRealRuntimeSelectorTimeoutMs
                   : 45_000,
               runtimeSelectorSelectionPolicy: byokRealRuntimeSelectorSelectionPolicy,
+              requireAgentAdmission: !controlOnly && isModelGatewayToolScenario(liveScenario),
           })
         : null;
     const secretValues = byokReal
@@ -7699,8 +7820,14 @@ async function main() {
         : [];
     if (byokReal && byokRealRuntimeSelectorProfile && !realByok?.runtimeRoute) {
         const blocker = {
-            id: 'byok-runtime-selector-route-unavailable',
-            detail: realByok?.runtimeSelector?.error || 'runtime selector did not produce an executable route',
+            id:
+                realByok?.agentAdmission?.required === true && realByok?.agentAdmission?.ok !== true
+                    ? 'byok-agent-admission-unavailable'
+                    : 'byok-runtime-selector-route-unavailable',
+            detail:
+                realByok?.agentAdmission?.error ||
+                realByok?.runtimeSelector?.error ||
+                'runtime selector did not produce an executable route',
         };
         await writeEarlyBlockedSummary({
             blocker,
