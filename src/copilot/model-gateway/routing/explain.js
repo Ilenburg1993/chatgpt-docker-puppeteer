@@ -48,6 +48,7 @@ function reasonCounts(reasons) {
 
 /**
  * @param {Record<string, any> | null} health
+ * @param {ReturnType<typeof summarizeGatewayRuntimeProofFreshness> | null} [precomputedRuntimeProof]
  * @returns {{
  *   status: string | null;
  *   agentProbeStatus: string | null;
@@ -65,9 +66,9 @@ function reasonCounts(reasons) {
  *   liveAskUserStatus: string | null;
  * }}
  */
-function probeSummary(health) {
+function probeSummary(health, precomputedRuntimeProof = null) {
     const probes = isRecord(health?.['probes']) ? health['probes'] : {};
-    const runtimeProof = summarizeGatewayRuntimeProofFreshness(health);
+    const runtimeProof = precomputedRuntimeProof ?? summarizeGatewayRuntimeProofFreshness(health);
     const failedProbes = [];
     for (const [kind, probe] of Object.entries(probes)) {
         if (!isRecord(probe)) continue;
@@ -137,7 +138,12 @@ function candidateSummary(candidate) {
                   overlayRefs: Array.isArray(eligibility['overlayRefs']) ? eligibility['overlayRefs'].map(String) : [],
               }
             : null,
-        probes: probeSummary(health),
+        probes: probeSummary(
+            health,
+            isRecord(candidate['runtimeProof'])
+                ? /** @type {ReturnType<typeof summarizeGatewayRuntimeProofFreshness>} */ (candidate['runtimeProof'])
+                : null,
+        ),
     };
 }
 

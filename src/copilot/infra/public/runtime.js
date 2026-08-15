@@ -25,4 +25,10 @@ export {
     serializeIoRollbackToken,
     verifyIoRollbackToken,
 } from '../runtime/index.js';
-export { listRollbackSidecars } from '../io/fs/rollback-sidecar.js';
+export {
+    cleanupRollbackSidecars,
+    getIoRollbackPolicy,
+    isIoRollbackEnabled,
+    listRollbackSidecars,
+    shouldCaptureIoRollback,
+} from '../io/fs/rollback-sidecar.js';

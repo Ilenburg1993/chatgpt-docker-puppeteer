@@ -5,14 +5,16 @@
  * @module copilot/mcp/scripts/io-cache-benchmark-worker
  */
 
-import { lstat, mkdir } from 'node:fs/promises';
+import { lstat } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(__filename), '../../../..');
+const workspaceIo = createWorkspaceIo({ workspaceRoot: repoRoot });
 const REQUEST_ID_RE = /^mcp-io-cache-benchmark-[a-z0-9-]{8,80}$/u;
 const MODES = Object.freeze(['cold', 'l1', 'l2-prime', 'l2']);
 const WORKLOAD = Object.freeze([
@@ -64,13 +66,13 @@ async function runPass(io) {
 async function main() {
     const { requestId, mode } = parseArgs(process.argv.slice(2));
     const benchmarkRoot = path.join(repoRoot, 'src/copilot/.ai/mcp/io-cache-benchmark');
-    await mkdir(benchmarkRoot, { recursive: true });
+    await workspaceIo.mkdirPathLocked(benchmarkRoot, { recursive: true });
     const rootStats = await lstat(benchmarkRoot);
     if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
         throw new Error('IO cache benchmark root must be a regular directory.');
     }
     const benchmarkDir = path.join(benchmarkRoot, requestId);
-    await mkdir(benchmarkDir, { recursive: true });
+    await workspaceIo.mkdirPathLocked(benchmarkDir, { recursive: true });
     const benchmarkStats = await lstat(benchmarkDir);
     if (benchmarkStats.isSymbolicLink() || !benchmarkStats.isDirectory()) {
         throw new Error('IO cache benchmark request directory must be a regular directory.');

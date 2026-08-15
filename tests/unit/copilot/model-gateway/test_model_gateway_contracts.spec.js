@@ -555,6 +555,7 @@ describe('model-gateway foundation', () => {
         const route = routeGatewayModels([openrouter, groq], 'repo_agent', {
             routeProfile: 'repo_agent',
             runtimeHealthRecords,
+            now: 50,
         });
 
         assert.equal(readGatewayModelHealthFromRecords(groq, runtimeHealthRecords, { routeProfile: 'repo_agent' })?.lastStatus, 'ok');
@@ -663,10 +664,12 @@ describe('model-gateway foundation', () => {
         const codeRoute = routeGatewayModels([model], 'code', {
             routeProfile: 'code',
             runtimeHealthRecords,
+            now: 130,
         });
         const agentRoute = routeGatewayModels([model], 'repo_agent', {
             routeProfile: 'repo_agent',
             runtimeHealthRecords,
+            now: 130,
         });
 
         assert.equal(codeRoute.selected?.model['id'], 'mistral:devstral-small-2507');
@@ -744,7 +747,7 @@ describe('model-gateway foundation', () => {
 
         assert.equal(readGatewayModelHealthFromIndex(model, runtimeHealthIndex)?.routeProfile, null);
         assert.equal(
-            evaluateGatewayModelHealthRoute(model, { runtimeHealthIndex, requireAgentProbeOk: true }).reason,
+            evaluateGatewayModelHealthRoute(model, { runtimeHealthIndex, requireAgentProbeOk: true, now: 210 }).reason,
             'health_allowed',
         );
         assert.equal(readGatewayModelHealthFromIndex(model, runtimeHealthIndex, { routeProfile: 'code' })?.routeProfile, 'code');
@@ -876,6 +879,7 @@ describe('model-gateway foundation', () => {
         const decision = routeGatewayModels([profilelessProved, exactProved], 'repo_agent', {
             routeProfile: 'repo_agent',
             runtimeHealthRecords,
+            now: 120,
         });
 
         assert.equal(decision.selected?.model['id'], 'zai:zzz-exact-agent');
@@ -1187,6 +1191,7 @@ describe('model-gateway foundation', () => {
                     probes: { agent: { status: 'ok', ok: true, providerAttempted: true, lastAt: 110 } },
                 },
             ],
+            now: 120,
         });
 
         assert.equal(postRuntimeAudit.schema, 'model-gateway-post-runtime-selection-audit');
@@ -1891,6 +1896,7 @@ describe('model-gateway foundation', () => {
                 },
             ],
             blockFailedProbeKinds: ['live_ask_user'],
+            now: 130,
         });
         assert.equal(liveProtocolBlockedPlan.ok, false);
         assert.equal(liveProtocolBlockedPlan.summary.runtimeProbeBlockedCount, 2);
@@ -3231,7 +3237,13 @@ describe('model-gateway foundation', () => {
             agentProbeStatus: null,
             chatOk: false,
             agentProbeVerified: false,
+            freshProof: false,
+            historicalProof: false,
+            stale: false,
+            proofAgeMs: null,
+            proofMaxAgeMs: 24 * 60 * 60 * 1000,
             verifiedProbes: [],
+            staleProbes: [],
             failedProbes: [],
             liveToolProtocolStatus: null,
             liveAskUserStatus: null,
@@ -3304,7 +3316,7 @@ describe('model-gateway foundation', () => {
             timestamp: 90,
         });
 
-        const decision = routeGatewayModels([failedVision, unprovedVision], 'vision', { routeProfile: 'vision' });
+        const decision = routeGatewayModels([failedVision, unprovedVision], 'vision', { routeProfile: 'vision', now: 100 });
 
         assert.equal(decision.selected?.model['id'], 'kilo:openrouter/free');
         assert.equal(decision.rejected.length, 0);
@@ -3329,6 +3341,22 @@ describe('model-gateway foundation', () => {
             limits: { contextWindowTokens: 128_000 },
             verification: { confidence: 'catalog', sources: ['authenticated_catalog'] },
         });
+        const ocr = createModelRecord({
+            providerId: 'zai',
+            providerModel: 'glm-ocr',
+            capabilities: { chat: true, streaming: true, tools: true, ocr: true },
+            modalities: { input: ['text', 'image'], output: ['text'] },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['provider_catalog'] },
+        });
+        const moderation = createModelRecord({
+            providerId: 'mistral',
+            providerModel: 'mistral-moderation-latest',
+            capabilities: { chat: true, streaming: true },
+            modalities: { input: ['text'], output: ['text'] },
+            limits: { contextWindowTokens: 128_000 },
+            verification: { confidence: 'catalog', sources: ['public_docs'] },
+        });
         const chat = createModelRecord({
             providerId: 'nvidia-nim',
             providerModel: 'openai/gpt-oss-120b',
@@ -3338,7 +3366,7 @@ describe('model-gateway foundation', () => {
             verification: { confidence: 'catalog', sources: ['authenticated_catalog'] },
         });
 
-        const decision = routeGatewayModels([embedding, rerank, chat], 'code', { requireAgentProbeOk: false });
+        const decision = routeGatewayModels([embedding, rerank, ocr, moderation, chat], 'code', { requireAgentProbeOk: false });
 
         assert.equal(decision.selected?.model['providerModel'], 'openai/gpt-oss-120b');
         assert.ok(
@@ -3353,6 +3381,20 @@ describe('model-gateway foundation', () => {
                 (candidate) =>
                     candidate.model['providerModel'] === '@cf/baai/bge-reranker-base' &&
                     candidate.rejectedReasons.includes('non_chat_model_family:rerank'),
+            ),
+        );
+        assert.ok(
+            decision.rejected.some(
+                (candidate) =>
+                    candidate.model['providerModel'] === 'glm-ocr' &&
+                    candidate.rejectedReasons.includes('non_chat_model_family:ocr'),
+            ),
+        );
+        assert.ok(
+            decision.rejected.some(
+                (candidate) =>
+                    candidate.model['providerModel'] === 'mistral-moderation-latest' &&
+                    candidate.rejectedReasons.includes('non_chat_model_family:moderation'),
             ),
         );
     });
@@ -3383,7 +3425,7 @@ describe('model-gateway foundation', () => {
             timestamp: 50,
         });
 
-        const decision = routeGatewayModels([weak, strong], 'repo_agent', { routeProfile: 'repo_agent' });
+        const decision = routeGatewayModels([weak, strong], 'repo_agent', { routeProfile: 'repo_agent', now: 60 });
 
         assert.equal(decision.selected?.model['id'], 'kilo:anthropic/claude-sonnet-4.5');
         assert.deepEqual(decision.fallbackChain, ['kilo:anthropic/claude-sonnet-4.5']);
@@ -3423,6 +3465,7 @@ describe('model-gateway foundation', () => {
 
         const decision = routeGatewayModels([catalogOnly, runtimeProved], 'json_extraction', {
             routeProfile: 'json_extraction',
+            now: 80,
         });
 
         assert.equal(decision.selected?.model['id'], 'kilo:json-runtime');
@@ -3461,6 +3504,7 @@ describe('model-gateway foundation', () => {
                 routeProfile: 'repo_agent',
                 runtimeHealthRecords,
                 requireRuntimeProof: true,
+                now: 130,
             },
         );
         const explanation = explainGatewayRouteDecision(route);
@@ -3488,6 +3532,7 @@ describe('model-gateway foundation', () => {
                 routeProfile: 'repo_agent',
                 runtimeHealthRecords,
                 requireRuntimeProof: true,
+                now: 130,
                 evaluateEligibility: true,
                 secretRegistry: { has: (ref) => ref === 'Z_AI_KEY' },
             },
@@ -3527,9 +3572,11 @@ describe('model-gateway foundation', () => {
 
         const defaultWeighted = routeGatewayModels([metadataFirst, runtimeProved], 'json_extraction', {
             routeProfile: 'json_extraction',
+            now: 80,
         });
         const neutralWeighted = routeGatewayModels([metadataFirst, runtimeProved], 'json_extraction', {
             routeProfile: 'json_extraction',
+            now: 80,
             runtimeProofWeights: {
                 genericProbeVerified: 0,
                 preferredProbeVerified: 0,
@@ -3578,6 +3625,7 @@ describe('model-gateway foundation', () => {
             routeProfile: 'code',
             blockFailedProbeKinds: ['live_ask_user'],
             preferredProbeKinds: ['live_tool_protocol', 'live_ask_user'],
+            now: 90,
         });
 
         assert.equal(decision.selected?.model['id'], 'openrouter:qwen/qwen3-coder:free');
@@ -3629,6 +3677,7 @@ describe('model-gateway foundation', () => {
             routeProfile: 'code',
             preferredProbeKinds: ['live_tool_protocol', 'live_ask_user'],
             blockFailedProbeKinds: ['live_tool_protocol', 'live_ask_user'],
+            now: 110,
         });
 
         assert.equal(decision.selected?.model['id'], 'zai:glm-4.5-flash');
@@ -3666,6 +3715,7 @@ describe('model-gateway foundation', () => {
         const decision = routeGatewayModels([unproved, proved], 'json_extraction', {
             routeProfile: 'json_extraction',
             requiredProbeKinds: ['json'],
+            now: 90,
         });
 
         assert.equal(decision.selected?.model['id'], 'kilo:json-proved');
@@ -3693,6 +3743,7 @@ describe('model-gateway foundation', () => {
         assert.equal(blocked.scoreBreakdown.hardGateCount, 1);
         assert.equal(blocked.scoreBreakdown.rejectedGroups.provider_blocked, 1);
         assert.equal(blocked.scoreBreakdown.groups.confidence, 1);
+        assert.ok(Object.hasOwn(blocked, 'runtimeProof'));
     });
 
     it('applies selector, auto route and gateway fallback policies before runtime', () => {
@@ -8796,6 +8847,7 @@ describe('model-gateway foundation', () => {
             '| Model | Input | Cached Input | Cache Write | Output |',
             '| --- | --- | --- | --- | --- |',
             '| GLM-5V-Turbo | $1.2 | $0.24 | Limited-time Free | $4 |',
+            '| GLM-OCR | $0.1 | $0.02 | Limited-time Free | $0.4 |',
         ].join('\n');
         const fakeFetch = /** @type {typeof fetch} */ (
             async (_url, init) => {
@@ -8819,11 +8871,20 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.sources[0].kind, 'public_docs');
         assert.equal(snapshot.sources[0].authMode, 'none');
         assert.equal(snapshot.sources[0].url, 'https://docs.z.ai/guides/overview/pricing.md');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['glm-5.1', 'glm-4.7-flash', 'glm-5v-turbo']);
+        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
+            'glm-5.1',
+            'glm-4.7-flash',
+            'glm-5v-turbo',
+            'glm-ocr',
+        ]);
         assert.equal(snapshot.accountOverlays[0].secretRef, 'Z_AI_KEY');
         assert.equal(snapshot.accountOverlays[0].providerMetadata.openAICompatible, true);
         assert.equal(snapshot.routeOptions.find((route) => route.providerModel === 'glm-5.1')?.normalizedPolicy.supportsThinking, true);
         assert.equal(snapshot.routeOptions.find((route) => route.providerModel === 'glm-5v-turbo')?.normalizedPolicy.visionFamily, true);
+        assert.equal(snapshot.routeOptions.find((route) => route.providerModel === 'glm-ocr')?.normalizedPolicy.supportsTools, false);
+        assert.equal(byModelPath.get('glm-ocr:capabilities.ocr'), true);
+        assert.equal(byModelPath.has('glm-ocr:capabilities.tools'), false);
+        assert.equal(byModelPath.has('glm-ocr:capabilities.streaming'), false);
         assert.equal(byModelPath.get('glm-5.1:displayName'), 'GLM-5.1');
         assert.equal(byModelPath.get('glm-5.1:pricing.inputUsdPerMillion'), 1.4);
         assert.equal(byModelPath.get('glm-5.1:pricing.cacheReadUsdPerMillion'), 0.26);
@@ -12829,7 +12890,7 @@ describe('model-gateway foundation', () => {
             providerId: 'gemini',
             providerModel: 'gemini-2.5-flash',
             successContext: 'projection-test',
-            timestamp: 1_700_000_000_000,
+            timestamp: Date.now(),
         });
 
         const projection = buildModelGatewayOperatorProjection(snapshot);

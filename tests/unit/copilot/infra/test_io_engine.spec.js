@@ -421,6 +421,7 @@ describe('infra/io-engine', () => {
         const destination = join(dir, 'copy-destination.txt');
         await writeFile(source, 'source-content', 'utf8');
         await writeFile(destination, 'old-destination', 'utf8');
+        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
 
         const result = await copyFileLocked(source, destination, { overwrite: true });
 
@@ -679,6 +680,7 @@ describe('infra/io-engine', () => {
         const destination = join(dir, 'move-destination.txt');
         await writeFile(source, 'incoming', 'utf8');
         await writeFile(destination, 'existing-destination', 'utf8');
+        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
 
         const result = await moveFileLocked(source, destination, { overwrite: true });
 
@@ -701,6 +703,7 @@ describe('infra/io-engine', () => {
         const dir = await createTempDir();
         const file = join(dir, 'patch-snapshot.txt');
         await writeFile(file, 'before patch', 'utf8');
+        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
 
         const result = await patchTextLocked(file, {
             oldString: 'before',
@@ -718,6 +721,7 @@ describe('infra/io-engine', () => {
         const file = join(dir, 'delete-large.bin');
         const payload = Buffer.alloc(300 * 1024, 'd');
         vi.stubEnv('COPILOT_IO_ROLLBACK_DIR', rollbackDirectory);
+        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
         await writeFile(file, payload);
 
         const result = await deleteFileLocked(file);
@@ -738,6 +742,7 @@ describe('infra/io-engine', () => {
         const file = join(dir, 'patch-large.txt');
         const content = `${'a'.repeat(300 * 1024)} before`;
         vi.stubEnv('COPILOT_IO_ROLLBACK_DIR', rollbackDirectory);
+        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
         await writeFile(file, content, 'utf8');
 
         const result = await patchTextLocked(file, {
@@ -755,6 +760,49 @@ describe('infra/io-engine', () => {
         await expect(readFile(file, 'utf8')).resolves.toBe(`${'a'.repeat(300 * 1024)} after`);
     });
 
+    it('patchTextLocked não materializa snapshot nem sidecar quando rollback automático está desligado', async () => {
+        const dir = await createTempDir();
+        const rollbackDirectory = join(dir, 'rollback-default-off');
+        const file = join(dir, 'patch-default-off.txt');
+        const content = `${'z'.repeat(300 * 1024)} before`;
+        vi.stubEnv('COPILOT_IO_ROLLBACK_DIR', rollbackDirectory);
+        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'false');
+        await writeFile(file, content, 'utf8');
+
+        const result = await patchTextLocked(file, {
+            oldString: 'before',
+            newString: 'after',
+            computeDiff: false,
+        });
+
+        expect(result.rollbackCaptureEnabled).toBe(false);
+        expect(result.previousSnapshotBase64).toBeNull();
+        expect(result.previousSnapshotTruncated).toBe(false);
+        expect(result.previousRollbackSidecar).toBeNull();
+        await expect(readdir(rollbackDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
+        await expect(readFile(file, 'utf8')).resolves.toBe(`${'z'.repeat(300 * 1024)} after`);
+    });
+
+    it('deleteFileLocked mantém hash/tamanho sem persistir rollback quando a política está desligada', async () => {
+        const dir = await createTempDir();
+        const rollbackDirectory = join(dir, 'rollback-delete-default-off');
+        const file = join(dir, 'delete-default-off.bin');
+        const payload = Buffer.alloc(300 * 1024, 'q');
+        vi.stubEnv('COPILOT_IO_ROLLBACK_DIR', rollbackDirectory);
+        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'false');
+        await writeFile(file, payload);
+
+        const result = await deleteFileLocked(file);
+
+        expect(result.previousHash).toBe(sha256(payload));
+        expect(result.previousBytes).toBe(payload.byteLength);
+        expect(result.previousSnapshotBase64).toBeNull();
+        expect(result.previousSnapshotTruncated).toBe(false);
+        expect(result.previousRollbackSidecar).toBeNull();
+        await expect(readdir(rollbackDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
+        await expect(readFile(file)).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
     it('patchTextLocked dry-run não cria sidecar para conteúdo grande', async () => {
         const dir = await createTempDir();
         const rollbackDirectory = join(dir, 'rollback-patch-dry-run');
@@ -770,7 +818,8 @@ describe('infra/io-engine', () => {
             dryRun: true,
         });
 
-        expect(result.previousSnapshotTruncated).toBe(true);
+        expect(result.rollbackCaptureEnabled).toBe(false);
+        expect(result.previousSnapshotTruncated).toBe(false);
         expect(result.previousRollbackSidecar).toBeNull();
         await expect(readdir(rollbackDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
         await expect(readFile(file, 'utf8')).resolves.toBe(content);

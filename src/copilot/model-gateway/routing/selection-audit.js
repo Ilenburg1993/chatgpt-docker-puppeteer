@@ -316,6 +316,8 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *   runtimeHealthIndex?: Record<string, any>;
  *   runtimeRouteProfile?: string | null;
  *   requireRuntimeProof?: boolean;
+ *   now?: string | number | Date;
+ *   maxRuntimeProofAgeMs?: number;
  *   runtimeProofWeights?: Partial<typeof import('./policy-engine.js').DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS>;
  *   temporaryFailureCooldownMs?: number;
  *   requiredProbeKinds?: string[];
@@ -403,6 +405,8 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
         if (effectiveRouteProfile) routeOptions.routeProfile = effectiveRouteProfile;
         if (options.secretRegistry !== undefined) routeOptions.secretRegistry = options.secretRegistry;
         if (options.runtimeProofWeights !== undefined) routeOptions.runtimeProofWeights = options.runtimeProofWeights;
+        if (options.now !== undefined) routeOptions.now = options.now;
+        if (typeof options.maxRuntimeProofAgeMs === 'number') routeOptions.maxRuntimeProofAgeMs = options.maxRuntimeProofAgeMs;
         if (Array.isArray(options.runtimeHealthRecords)) routeOptions.runtimeHealthRecords = options.runtimeHealthRecords;
         if (options.runtimeHealthIndex !== undefined) {
             routeOptions.runtimeHealthIndex =

@@ -10,11 +10,10 @@
 
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
 import process from 'node:process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     getTransportBenchmarkStateFile,
     readCloudflaredMetricsSnapshot,
@@ -22,6 +21,7 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(__filename), '../../../..');
+const workspaceIo = createWorkspaceIo({ workspaceRoot: repoRoot });
 const STATE_FILE = getTransportBenchmarkStateFile();
 const CANDIDATES = Object.freeze(['quic', 'auto', 'http2']);
 const RELOAD_PROFILES = Object.freeze({
@@ -45,10 +45,11 @@ function sleep(ms) {
 
 /** @param {Record<string, unknown>} state */
 async function writeState(state) {
-    await mkdir(dirname(STATE_FILE), { recursive: true });
-    await writeFileAtomicTrusted(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`, {
-        caller: 'mcp.scripts.scheduled-transport-benchmark-runner',
+    await workspaceIo.mkdirPathLocked(dirname(STATE_FILE), { recursive: true });
+    await workspaceIo.writeFileAtomic(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`, {
         mode: 0o600,
+        riskClass: 'medium',
+        advisoryLimits: { domain: 'mcp-transport-benchmark-state' },
     });
 }
 
@@ -307,7 +308,6 @@ async function main() {
     const windows = [];
     /** @type {string | null} */
     let fatalError = null;
-    let restoredControl = false;
 
     await writeState({
         schemaVersion: 1,
@@ -426,7 +426,7 @@ async function main() {
             await sleep(WARMUP_MS);
             restoreSmoke = await runSmoke();
         }
-        restoredControl = restore.exitCode === 0 && restoreSmoke.exitCode === 0;
+        const restoredControl = restore.exitCode === 0 && restoreSmoke.exitCode === 0;
         const completedAt = Date.now();
         const success = fatalError === null && restoredControl && windows.length === profileOrder.length;
         try {
@@ -454,9 +454,8 @@ async function main() {
             });
         } catch {
             process.exitCode = 1;
-            return;
         }
-        process.exitCode = success ? 0 : 1;
+        if (process.exitCode !== 1) process.exitCode = success ? 0 : 1;
     }
 }
 

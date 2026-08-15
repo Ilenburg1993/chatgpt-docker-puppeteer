@@ -174,6 +174,16 @@ function perMillionToPerToken(value) {
 function capabilitiesForRow(row) {
     const raw = row.id.toLowerCase();
     const modalities = modalitiesForRow(row);
+    if (raw.includes('ocr')) {
+        return {
+            ocr: true,
+            ...normalizeOpenAICompatibleModelCapabilities({
+                supportedParameters: [],
+                inputModalities: modalities.input,
+                outputModalities: modalities.output,
+            }),
+        };
+    }
     /** @type {Record<string, boolean>} */
     const capabilities = {
         chat: true,
@@ -186,7 +196,6 @@ function capabilitiesForRow(row) {
         }),
     };
     if (raw.includes('glm-5') || raw.includes('glm-4.6') || raw.includes('glm-4.7')) capabilities['reasoning'] = true;
-    if (raw.includes('ocr')) capabilities['ocr'] = true;
     return capabilities;
 }
 

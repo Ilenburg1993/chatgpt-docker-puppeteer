@@ -2,12 +2,14 @@
 /**
  * Diagnostics and bounded cleanup for transient MCP/ChatGPT artifacts under src/copilot/.ai.
  *
- * Cleanup is structurally restricted to strict UUID-named files under `.ai/jobs`, defaults to dry-run and preserves
- * OAuth stores, tunnel tokens, pid files, quarantine data and unknown names.
+ * Cleanup defaults to dry-run and is structurally restricted to strict UUID-named files under `.ai/jobs`. A second,
+ * explicit cleanup domain can purge only schema-valid rollback sidecars/pending files while automatic rollback is disabled.
+ * OAuth stores, tunnel tokens, pid files, quarantine data and unknown names remain protected.
  *
  * @module copilot/mcp/control-plane/ai-artifacts
  */
 
+import { cleanupRollbackSidecars, getIoRollbackPolicy } from '#copilot/infra/public/runtime';
 import { readdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { getMcpWorkspaceRoot } from './paths.js';
@@ -77,7 +79,8 @@ export async function buildAiArtifactsReport(options = {}) {
         256 * 1024,
         256 * 1024 * 1024,
     );
-    const cacheKey = JSON.stringify({ workspaceRoot, retainNewest, cloudflareLogThresholdBytes });
+    const rollbackPolicy = getIoRollbackPolicy();
+    const cacheKey = JSON.stringify({ workspaceRoot, retainNewest, cloudflareLogThresholdBytes, rollbackPolicy });
     if (cachedReport && cachedReport.key === cacheKey && cachedReport.expiresAt > Date.now()) return cachedReport.report;
 
     const jobsEntries = await readdirSafe(jobsDir);
@@ -177,6 +180,8 @@ export async function buildAiArtifactsReport(options = {}) {
         },
         rollback: {
             path: path.relative(workspaceRoot, rollbackDir),
+            enabled: rollbackPolicy.enabled,
+            policy: rollbackPolicy,
             sidecarCount: rollbackSidecarCount,
             sidecarBytes: rollbackSidecarBytes,
             expiredCount: rollbackExpiredCount,
@@ -186,20 +191,25 @@ export async function buildAiArtifactsReport(options = {}) {
             ignoredEntryCount: ignoredRollbackEntryCount,
             oldestMtimeMs: rollbackOldestMtimeMs,
             newestMtimeMs: rollbackNewestMtimeMs,
-            cleanupOwnedBy: 'infra/io/fs/rollback-sidecar.js TTL cleanup',
-            maintenanceMutation: false,
+            overBudgetCount: Math.max(0, rollbackSidecarCount - rollbackPolicy.maxEntries),
+            overBudgetBytes: Math.max(0, rollbackSidecarBytes - rollbackPolicy.maxBytes),
+            purgeCandidateCount: rollbackPolicy.enabled ? 0 : rollbackSidecarCount + rollbackPendingCount,
+            purgeCandidateBytes: rollbackPolicy.enabled ? 0 : rollbackSidecarBytes + rollbackPendingBytes,
+            cleanupOwnedBy: 'infra/io/fs/rollback-sidecar.js TTL + bounded retention cleanup',
+            maintenanceMutation: 'explicit-only',
         },
         cleanupPlan: {
             applyInsideMcp: true,
             tool: 'mcp_cleanup_ai_artifacts',
             defaultDryRun: true,
             maxDeleteCountPerCall: 500,
-            deletionDomain: 'strict UUID-named .json/.log files under src/copilot/.ai/jobs only',
+            deletionDomain:
+                'strict UUID-named .json/.log files under src/copilot/.ai/jobs; rollback sidecars only when explicitly requested while automatic rollback is disabled',
         },
         safety: {
             defaultAction: 'dry-run',
             cleanupPolicy:
-                'delete only strict UUID-named .json/.log validator artifacts beyond retention; never delete OAuth stores, tunnel token, pid files, quarantine, or unknown names',
+                'delete only allowlisted validator artifacts beyond retention; rollback purge is explicit and schema-restricted; never delete OAuth stores, tunnel token, pid files, quarantine, or unknown names',
         },
     };
     cachedReport = { key: cacheKey, expiresAt: Date.now() + REPORT_CACHE_TTL_MS, report };
@@ -211,10 +221,10 @@ export function clearAiArtifactsReportCache() {
 }
 
 /**
- * Delete only strict UUID-named validator artifacts beyond retention. Unknown names and all state outside `.ai/jobs`
- * are structurally unreachable from this operation.
+ * Delete strict UUID-named validator artifacts beyond retention. Rollback sidecars remain unreachable unless
+ * purgeDisabledRollback=true and the global automatic rollback policy is currently disabled.
  *
- * @param {AiArtifactsReportOptions & { dryRun?: boolean; maxDeleteCount?: number }} [options]
+ * @param {AiArtifactsReportOptions & { dryRun?: boolean; maxDeleteCount?: number; purgeDisabledRollback?: boolean }} [options]
  * @returns {Promise<Record<string, unknown>>}
  */
 export async function cleanupAiArtifacts(options = {}) {
@@ -223,7 +233,10 @@ export async function cleanupAiArtifacts(options = {}) {
     const retainNewest = normalizePositiveInteger(options.retainNewest, DEFAULT_RETAIN_NEWEST, 20, 10_000);
     const maxDeleteCount = normalizePositiveInteger(options.maxDeleteCount, 100, 1, 500);
     const dryRun = options.dryRun !== false;
+    const purgeDisabledRollback = options.purgeDisabledRollback === true;
+    const rollbackPolicy = getIoRollbackPolicy();
     const jobsDir = path.join(workspaceRoot, 'src/copilot/.ai/jobs');
+    const rollbackDir = path.join(workspaceRoot, 'src/copilot/.ai/rollback');
     const entries = await readdirSafe(jobsDir);
     const artifacts = [];
     for (const entry of entries) {
@@ -239,6 +252,24 @@ export async function cleanupAiArtifacts(options = {}) {
     const selected = candidates.slice(0, maxDeleteCount);
     const deleted = [];
     const failures = [];
+    const rollbackCandidates = [];
+    if (purgeDisabledRollback && !rollbackPolicy.enabled) {
+        for (const entry of await readdirSafe(rollbackDir)) {
+            if (!entry.isFile()) continue;
+            if (!ROLLBACK_SIDECAR_RE.test(entry.name) && !ROLLBACK_PENDING_RE.test(entry.name)) continue;
+            const stats = await statSafe(path.join(rollbackDir, entry.name));
+            if (!stats) continue;
+            rollbackCandidates.push({ name: entry.name, bytes: stats.size, mtimeMs: stats.mtimeMs });
+        }
+        rollbackCandidates.sort((left, right) => left.mtimeMs - right.mtimeMs || left.name.localeCompare(right.name));
+    } else if (purgeDisabledRollback && rollbackPolicy.enabled) {
+        failures.push({
+            name: 'rollback',
+            error: 'Rollback automático está habilitado; purge de sidecars ativos foi bloqueado.',
+        });
+    }
+    const selectedRollback = rollbackCandidates.slice(0, maxDeleteCount);
+    let rollbackCleanup = null;
 
     if (!dryRun) {
         for (const artifact of selected) {
@@ -250,6 +281,20 @@ export async function cleanupAiArtifacts(options = {}) {
                 failures.push({
                     name: artifact.name,
                     error: error instanceof Error ? error.message : String(error),
+                });
+            }
+        }
+        if (purgeDisabledRollback && !rollbackPolicy.enabled && selectedRollback.length > 0) {
+            rollbackCleanup = await cleanupRollbackSidecars({
+                directory: rollbackDir,
+                purgeAll: true,
+                enforceBudget: false,
+                scanLimit: maxDeleteCount,
+            });
+            if (rollbackCleanup.failed > 0) {
+                failures.push({
+                    name: 'rollback',
+                    error: `Falha ao remover ${rollbackCleanup.failed} sidecar(s) de rollback.`,
                 });
             }
         }
@@ -267,6 +312,25 @@ export async function cleanupAiArtifacts(options = {}) {
         selected: selected.map((artifact) => artifact.name),
         deletedCount: deleted.length,
         deletedBytes: deleted.reduce((sum, artifact) => sum + artifact.bytes, 0),
+        rollback: {
+            requested: purgeDisabledRollback,
+            allowed: purgeDisabledRollback && !rollbackPolicy.enabled,
+            policy: rollbackPolicy,
+            candidateCount: rollbackCandidates.length,
+            selectedCount: selectedRollback.length,
+            selectedBytes: selectedRollback.reduce((sum, artifact) => sum + artifact.bytes, 0),
+            cleanup: dryRun
+                ? {
+                      dryRun: true,
+                      wouldRemove: selectedRollback.length,
+                      wouldRemoveBytes: selectedRollback.reduce((sum, artifact) => sum + artifact.bytes, 0),
+                  }
+                : rollbackCleanup,
+            remainingSidecarCount:
+                /** @type {Record<string, unknown>} */ (after['rollback'] ?? {})['sidecarCount'] ?? null,
+            remainingSidecarBytes:
+                /** @type {Record<string, unknown>} */ (after['rollback'] ?? {})['sidecarBytes'] ?? null,
+        },
         failures,
         remainingCandidateCount:
             /** @type {Record<string, unknown>} */ (after['jobs'] ?? {})['cleanupCandidateCount'] ?? null,
@@ -276,7 +340,8 @@ export async function cleanupAiArtifacts(options = {}) {
             'tunnel tokens and state',
             'pid files',
             'quarantine data',
-            'all paths outside src/copilot/.ai/jobs',
+            'rollback names outside the strict sidecar/pending schema',
+            'all other paths outside the explicit cleanup domains',
         ],
     };
 }

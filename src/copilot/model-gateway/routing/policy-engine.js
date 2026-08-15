@@ -82,7 +82,15 @@ const NON_CONVERSATIONAL_CAPABILITY_KINDS = Object.freeze({
     image_generation: 'image-generation',
 });
 
-const NON_CONVERSATIONAL_MODALITIES = Object.freeze(['embedding', 'rerank', 'asr', 'tts', 'image-generation']);
+const NON_CONVERSATIONAL_MODALITIES = Object.freeze([
+    'embedding',
+    'rerank',
+    'asr',
+    'tts',
+    'image-generation',
+    'ocr',
+    'moderation',
+]);
 
 const NON_CONVERSATIONAL_WIRE_APIS = Object.freeze({
     openai_embeddings: 'embedding',
@@ -295,6 +303,8 @@ function inferNonConversationalModelFamily(model) {
     }
     if (/(?:^|-)(?:rerank|reranker)(?:-|$)/u.test(text)) return 'rerank';
     if (/(?:^|-)(?:whisper|parakeet|asr|stt|transcription|tts|speech)(?:-|$)/u.test(text)) return 'audio';
+    if (/(?:^|-)(?:ocr)(?:-|$)/u.test(text)) return 'ocr';
+    if (/(?:^|-)(?:moderation|moderate|safety-moderation)(?:-|$)/u.test(text)) return 'moderation';
     if (/(?:^|-)(?:text-to-image|image-generation|sdxl|flux)(?:-|$)/u.test(text)) return 'image-generation';
     if (capabilities['chat'] === false) return 'chat-disabled';
     return null;
@@ -565,6 +575,7 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     scoreBreakdown: ReturnType<typeof buildScoreBreakdown>;
  *     eligibility: Record<string, any> | null;
  *     health: ReturnType<typeof evaluateGatewayModelHealthRoute>['health'];
+ *     runtimeProof: ReturnType<typeof evaluateGatewayModelHealthRoute>['runtimeProof'];
  * }}
  */
 export function scoreGatewayModelCandidate(model, profile, options = {}) {
@@ -886,6 +897,7 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         scoreBreakdown: buildScoreBreakdown(reasons, rejectedReasons, 100, score),
         eligibility,
         health: healthDecision.health,
+        runtimeProof: healthDecision.runtimeProof,
     };
 }
 

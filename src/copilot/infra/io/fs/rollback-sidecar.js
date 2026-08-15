@@ -14,7 +14,10 @@ import { toOwnedBuffer } from '../../shared/buffer.js';
 import { sha256 } from '../../shared/hash.js';
 import { assertSuccessfulSync, syncParentDirectoryBestEffort } from './durability.js';
 
+const DEFAULT_ROLLBACK_ENABLED = false;
 const DEFAULT_ROLLBACK_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_ROLLBACK_MAX_ENTRIES = 32;
+const DEFAULT_ROLLBACK_MAX_BYTES = 32 * 1024 * 1024;
 const DEFAULT_CLEANUP_MAX_ENTRIES = 512;
 const SIDECAR_FILE_PATTERN = /^(\d+)-([a-f0-9]{64})-([0-9a-f-]{36})\.rollback$/;
 const PENDING_FILE_PATTERN = /^\.pending-(\d+)-(\d+)-([0-9a-f-]{36})$/;
@@ -37,6 +40,65 @@ const PENDING_FILE_PATTERN = /^\.pending-(\d+)-(\d+)-([0-9a-f-]{36})$/;
 function positiveIntegerOr(value, fallback) {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : fallback;
+}
+
+/**
+ * @param {unknown} value
+ * @param {boolean} fallback
+ * @returns {boolean}
+ */
+function booleanOr(value, fallback) {
+    const normalized = String(value ?? '')
+        .trim()
+        .toLowerCase();
+    if (!normalized) return fallback;
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+    return fallback;
+}
+
+/**
+ * Rollback automático de I/O é opt-in. O default off evita materializar snapshots de arquivos grandes em cada mutação.
+ * APIs explícitas de persistência/execução continuam disponíveis para fluxos que deliberadamente habilitem rollback.
+ *
+ * @returns {boolean}
+ */
+export function isIoRollbackEnabled() {
+    return booleanOr(process.env['COPILOT_IO_ROLLBACK_ENABLED'], DEFAULT_ROLLBACK_ENABLED);
+}
+
+/**
+ * @param {boolean} requested
+ * @returns {boolean}
+ */
+export function shouldCaptureIoRollback(requested = true) {
+    return requested === true && isIoRollbackEnabled();
+}
+
+/**
+ * @returns {number}
+ */
+export function getRollbackSidecarMaxEntries() {
+    return positiveIntegerOr(process.env['COPILOT_IO_ROLLBACK_MAX_ENTRIES'], DEFAULT_ROLLBACK_MAX_ENTRIES);
+}
+
+/**
+ * @returns {number}
+ */
+export function getRollbackSidecarMaxBytes() {
+    return positiveIntegerOr(process.env['COPILOT_IO_ROLLBACK_MAX_BYTES'], DEFAULT_ROLLBACK_MAX_BYTES);
+}
+
+/**
+ * @returns {{ enabled: boolean; ttlMs: number; maxEntries: number; maxBytes: number }}
+ */
+export function getIoRollbackPolicy() {
+    return {
+        enabled: isIoRollbackEnabled(),
+        ttlMs: getRollbackSidecarTtlMs(),
+        maxEntries: getRollbackSidecarMaxEntries(),
+        maxBytes: getRollbackSidecarMaxBytes(),
+    };
 }
 
 /**
@@ -138,7 +200,16 @@ export async function createRollbackSidecarWriter(options = {}) {
                 createdAtMs,
                 expiresAtMs,
             };
-            await cleanupExpiredRollbackSidecars({ directory, nowMs: createdAtMs }).catch(() => undefined);
+            if (isIoRollbackEnabled()) {
+                await cleanupRollbackSidecars({
+                    directory,
+                    nowMs: createdAtMs,
+                    preservePath: finalPath,
+                    enforceBudget: true,
+                }).catch(() => undefined);
+            } else {
+                await cleanupExpiredRollbackSidecars({ directory, nowMs: createdAtMs }).catch(() => undefined);
+            }
             return descriptor;
         },
 
@@ -285,20 +356,47 @@ export async function listRollbackSidecars(options = {}) {
     return {
         count: sidecars.length,
         limited: candidates.length > entries.length,
+        policy: getIoRollbackPolicy(),
         sidecars,
     };
 }
 
 /**
- * Remove apenas sidecars expirados cujo nome obedece ao schema, sob lock intra e multiprocess.
+ * Cleanup canônico de sidecars. Sempre remove expirados; opcionalmente purga todos os nomes válidos ou aplica budgets
+ * de quantidade/bytes aos sidecars ainda ativos. Nomes desconhecidos permanecem intocados.
  *
- * @param {{ directory?: string; nowMs?: number; maxEntries?: number }} [options]
- * @returns {Promise<{ scanned: number; removed: number; failed: number; limited: boolean }>}
+ * @param {{
+ *     directory?: string;
+ *     nowMs?: number;
+ *     scanLimit?: number;
+ *     maxEntries?: number;
+ *     maxBytes?: number;
+ *     purgeAll?: boolean;
+ *     enforceBudget?: boolean;
+ *     preservePath?: string;
+ * }} [options]
+ * @returns {Promise<{
+ *     scanned: number;
+ *     removed: number;
+ *     removedBytes: number;
+ *     expiredRemoved: number;
+ *     budgetRemoved: number;
+ *     purged: number;
+ *     failed: number;
+ *     remainingCount: number;
+ *     remainingBytes: number;
+ *     limited: boolean;
+ * }>}
  */
-export async function cleanupExpiredRollbackSidecars(options = {}) {
+export async function cleanupRollbackSidecars(options = {}) {
     const directory = path.resolve(options.directory ?? getRollbackSidecarDirectory());
     const nowMs = Math.trunc(options.nowMs ?? Date.now());
-    const maxEntries = positiveIntegerOr(options.maxEntries, DEFAULT_CLEANUP_MAX_ENTRIES);
+    const scanLimit = positiveIntegerOr(options.scanLimit, DEFAULT_CLEANUP_MAX_ENTRIES);
+    const maxEntries = positiveIntegerOr(options.maxEntries, getRollbackSidecarMaxEntries());
+    const maxBytes = positiveIntegerOr(options.maxBytes, getRollbackSidecarMaxBytes());
+    const purgeAll = options.purgeAll === true;
+    const enforceBudget = options.enforceBudget !== false;
+    const preservePath = options.preservePath ? path.resolve(options.preservePath) : null;
     await fs.mkdir(directory, { recursive: true, mode: 0o700 });
     const lease = await acquireIoResourceLock(path.join(directory, '.cleanup'), {
         fileLock: true,
@@ -309,23 +407,74 @@ export async function cleanupExpiredRollbackSidecars(options = {}) {
     try {
         return await lease.run(async () => {
             const entries = await fs.readdir(directory, { withFileTypes: true });
-            let scanned = 0;
-            let removed = 0;
-            let failed = 0;
-            let candidates = 0;
-
+            const recognizedCount = entries.filter(
+                (entry) => entry.isFile() && (SIDECAR_FILE_PATTERN.test(entry.name) || PENDING_FILE_PATTERN.test(entry.name)),
+            ).length;
+            const recognized = [];
             for (const entry of entries) {
-                if (!entry.isFile()) continue;
-                const match = SIDECAR_FILE_PATTERN.exec(entry.name) ?? PENDING_FILE_PATTERN.exec(entry.name);
+                if (!entry.isFile() || recognized.length >= scanLimit) continue;
+                const sidecarMatch = SIDECAR_FILE_PATTERN.exec(entry.name);
+                const pendingMatch = sidecarMatch ? null : PENDING_FILE_PATTERN.exec(entry.name);
+                const match = sidecarMatch ?? pendingMatch;
                 if (!match) continue;
-                candidates += 1;
-                if (scanned >= maxEntries) continue;
-                scanned += 1;
-                const expiresAtMs = Number(match[1]);
-                if (!Number.isSafeInteger(expiresAtMs) || expiresAtMs > nowMs) continue;
+                const filePath = path.join(directory, entry.name);
+                const stats = await fs.lstat(filePath).catch(() => null);
+                if (!stats?.isFile()) continue;
+                recognized.push({
+                    name: entry.name,
+                    path: filePath,
+                    bytes: stats.size,
+                    mtimeMs: stats.mtimeMs,
+                    expiresAtMs: Number(match[1]),
+                    sidecar: Boolean(sidecarMatch),
+                });
+            }
+
+            const activeSidecars = recognized
+                .filter((item) => item.sidecar && Number.isSafeInteger(item.expiresAtMs) && item.expiresAtMs > nowMs)
+                .sort((left, right) => right.mtimeMs - left.mtimeMs || right.name.localeCompare(left.name));
+            const retained = new Set();
+            if (!purgeAll && enforceBudget) {
+                let retainedCount = 0;
+                let retainedBytes = 0;
+                const preserved = preservePath
+                    ? activeSidecars.find((item) => path.resolve(item.path) === preservePath) ?? null
+                    : null;
+                if (preserved) {
+                    retained.add(preserved.path);
+                    retainedCount = 1;
+                    retainedBytes = preserved.bytes;
+                }
+                for (const item of activeSidecars) {
+                    if (preserved && item.path === preserved.path) continue;
+                    const fitsCount = retainedCount < maxEntries;
+                    const fitsBytes = retainedBytes + item.bytes <= maxBytes || retainedCount === 0;
+                    if (!fitsCount || !fitsBytes) continue;
+                    retained.add(item.path);
+                    retainedCount += 1;
+                    retainedBytes += item.bytes;
+                }
+            }
+
+            let removed = 0;
+            let removedBytes = 0;
+            let expiredRemoved = 0;
+            let budgetRemoved = 0;
+            let purged = 0;
+            let failed = 0;
+            const removedPaths = new Set();
+            for (const item of recognized) {
+                const expired = Number.isSafeInteger(item.expiresAtMs) && item.expiresAtMs <= nowMs;
+                const overBudget = item.sidecar && enforceBudget && !purgeAll && !expired && !retained.has(item.path);
+                if (!purgeAll && !expired && !overBudget) continue;
                 try {
-                    await fs.unlink(path.join(directory, entry.name));
+                    await fs.unlink(item.path);
                     removed += 1;
+                    removedBytes += item.bytes;
+                    removedPaths.add(item.path);
+                    if (purgeAll) purged += 1;
+                    else if (expired) expiredRemoved += 1;
+                    else budgetRemoved += 1;
                 } catch {
                     failed += 1;
                 }
@@ -338,9 +487,35 @@ export async function cleanupExpiredRollbackSidecars(options = {}) {
                     message: `Falha ao sincronizar cleanup de sidecars de rollback: ${directory}`,
                 });
             }
-            return { scanned, removed, failed, limited: candidates > scanned };
+            const remaining = recognized.filter((item) => !removedPaths.has(item.path));
+            return {
+                scanned: recognized.length,
+                removed,
+                removedBytes,
+                expiredRemoved,
+                budgetRemoved,
+                purged,
+                failed,
+                remainingCount: remaining.length,
+                remainingBytes: remaining.reduce((sum, item) => sum + item.bytes, 0),
+                limited: recognizedCount > recognized.length,
+            };
         });
     } finally {
         await lease.releaseAsync();
     }
+}
+
+/**
+ * Compatibilidade: cleanup estritamente por expiração, sem aplicar budgets aos sidecars ativos.
+ *
+ * @param {{ directory?: string; nowMs?: number; maxEntries?: number }} [options]
+ */
+export async function cleanupExpiredRollbackSidecars(options = {}) {
+    return cleanupRollbackSidecars({
+        ...(options.directory === undefined ? {} : { directory: options.directory }),
+        ...(options.nowMs === undefined ? {} : { nowMs: options.nowMs }),
+        scanLimit: positiveIntegerOr(options.maxEntries, DEFAULT_CLEANUP_MAX_ENTRIES),
+        enforceBudget: false,
+    });
 }

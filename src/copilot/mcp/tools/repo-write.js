@@ -353,7 +353,7 @@ async function writeQuarantineMetadata(metadata, metadataPath) {
  */
 async function removeFileIfPresent(filePath) {
     try {
-        await deleteFileLocked(filePath);
+        await deleteFileLocked(filePath, { captureRollback: false });
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
         if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
@@ -373,7 +373,7 @@ async function removeRegularFileIfPresent(filePath) {
         error.code = 'ERR_QUARANTINE_ARTIFACT_INVALID';
         throw error;
     }
-    await deleteFileLocked(filePath);
+    await deleteFileLocked(filePath, { captureRollback: false });
 }
 
 /**
@@ -908,6 +908,7 @@ async function applyPatchBatchOperation(operation, index) {
                 ? { expectedHash: operation['expectedHash'] }
                 : {}),
             dryRun: false,
+            captureRollback: false,
             allowNoop: operation['allowNoop'] === true,
             diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
             maxDiffLines: optionalInteger(operation['maxDiffLines']) ?? 160,
@@ -1108,6 +1109,7 @@ async function applyBatchFileOperation(operation, index) {
             deleted: removed.deleted,
             previousHash: removed.previousHash,
             previousBytes: removed.previousBytes,
+            rollbackCaptureEnabled: removed.rollbackCaptureEnabled,
             rollbackSnapshotAvailable:
                 typeof removed.previousSnapshotBase64 === 'string' || removed.previousRollbackSidecar != null,
             previousSnapshotTruncated: removed.previousSnapshotTruncated,
@@ -1675,6 +1677,7 @@ export const repoWriteTools = [
                         : {}),
                     ...(typeof expectedHash === 'string' && expectedHash ? { expectedHash } : {}),
                     dryRun: dryRun === true,
+                    captureRollback: false,
                     allowNoop: allowNoop === true,
                     diffContextLines: optionalInteger(diffContextLines) ?? 3,
                     maxDiffLines: optionalInteger(maxDiffLines) ?? 160,
@@ -2091,7 +2094,8 @@ export const repoWriteTools = [
     {
         name: 'repo_remove_file',
         title: 'Remove repository file',
-        description: 'Delete one workspace file. Requires confirm=true and returns rollback snapshot metadata.',
+        description:
+            'Delete one workspace file. Requires confirm=true and always returns prior hash/size; rollback snapshot metadata is available only when automatic I/O rollback is explicitly enabled.',
         inputSchema: {
             path: z.string().min(1).describe('Workspace-relative file path to delete.'),
             confirm: z.boolean().optional().describe('Must be true to delete.'),
@@ -2137,6 +2141,7 @@ export const repoWriteTools = [
                     path: resolved.relative,
                     previousHash: removed.previousHash,
                     previousBytes: removed.previousBytes,
+                    rollbackCaptureEnabled: removed.rollbackCaptureEnabled,
                     previousSnapshotTruncated: removed.previousSnapshotTruncated,
                     rollbackSidecarAvailable: removed.previousRollbackSidecar != null,
                     rollbackSidecarExpiresAtMs: removed.previousRollbackSidecar?.expiresAtMs ?? null,
@@ -2149,6 +2154,7 @@ export const repoWriteTools = [
                     deleted: removed.deleted,
                     previousHash: removed.previousHash,
                     previousBytes: removed.previousBytes,
+                    rollbackCaptureEnabled: removed.rollbackCaptureEnabled,
                     rollbackSnapshotAvailable:
                         typeof removed.previousSnapshotBase64 === 'string' || removed.previousRollbackSidecar != null,
                     previousSnapshotTruncated: removed.previousSnapshotTruncated,

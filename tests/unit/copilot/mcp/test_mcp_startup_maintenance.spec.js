@@ -36,6 +36,7 @@ describe('MCP startup maintenance', () => {
             setTimeoutFn,
             smokeRunner: async () => ({ success: true, status: 'ok' }),
             cleanupRunner: async () => ({ removed: true }),
+            rollbackCleanupRunner: async () => ({ removed: 0, expiredRemoved: 0, budgetRemoved: 0 }),
         });
 
         assert.equal(scheduled, true);

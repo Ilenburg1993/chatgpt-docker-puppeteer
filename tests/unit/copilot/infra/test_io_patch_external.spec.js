@@ -126,7 +126,9 @@ describe('patchTextLocked external writer precondition', () => {
         const rollbackDir = join(dir, 'rollback');
         const file = join(dir, 'shared.txt');
         const originalRollbackDir = process.env['COPILOT_IO_ROLLBACK_DIR'];
+        const originalRollbackEnabled = process.env['COPILOT_IO_ROLLBACK_ENABLED'];
         process.env['COPILOT_IO_ROLLBACK_DIR'] = rollbackDir;
+        process.env['COPILOT_IO_ROLLBACK_ENABLED'] = 'true';
         await writeFile(file, `${'x'.repeat(300_000)} value\n`, 'utf8');
         let replaced = false;
 
@@ -144,10 +146,16 @@ describe('patchTextLocked external writer precondition', () => {
             ).rejects.toMatchObject({ code: 'EEXPECTEDHASH' });
 
             await expect(readFile(file, 'utf8')).resolves.toBe('editor value\n');
-            expect((await readdir(rollbackDir)).filter((entry) => entry.endsWith('.rollback'))).toEqual([]);
+            const rollbackEntries = await readdir(rollbackDir).catch((error) => {
+                if (/** @type {{ code?: unknown }} */ (error)?.code === 'ENOENT') return [];
+                throw error;
+            });
+            expect(rollbackEntries.filter((entry) => entry.endsWith('.rollback'))).toEqual([]);
         } finally {
             if (originalRollbackDir === undefined) delete process.env['COPILOT_IO_ROLLBACK_DIR'];
             else process.env['COPILOT_IO_ROLLBACK_DIR'] = originalRollbackDir;
+            if (originalRollbackEnabled === undefined) delete process.env['COPILOT_IO_ROLLBACK_ENABLED'];
+            else process.env['COPILOT_IO_ROLLBACK_ENABLED'] = originalRollbackEnabled;
         }
     });
 });

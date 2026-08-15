@@ -6,15 +6,16 @@
  */
 
 import { spawn } from 'node:child_process';
-import { lstat, mkdir, rm } from 'node:fs/promises';
+import { lstat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { getIoCacheBenchmarkStateFile } from '#copilot/mcp/control-plane';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(__filename), '../../../..');
+const workspaceIo = createWorkspaceIo({ workspaceRoot: repoRoot });
 const STATE_FILE = getIoCacheBenchmarkStateFile();
 const WORKER = 'src/copilot/mcp/scripts/io-cache-benchmark-worker.js';
 const REQUEST_ID_RE = /^mcp-io-cache-benchmark-[a-z0-9-]{8,80}$/u;
@@ -25,10 +26,11 @@ const MIN_L2_COLD_P95_IMPROVEMENT_PERCENT = 10;
 
 /** @param {Record<string, unknown>} state */
 async function writeState(state) {
-    await mkdir(path.dirname(STATE_FILE), { recursive: true });
-    await writeFileAtomicTrusted(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`, {
-        caller: 'mcp.scripts.scheduled-io-cache-benchmark-runner',
+    await workspaceIo.mkdirPathLocked(path.dirname(STATE_FILE), { recursive: true });
+    await workspaceIo.writeFileAtomic(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`, {
         mode: 0o600,
+        riskClass: 'medium',
+        advisoryLimits: { domain: 'mcp-io-cache-benchmark-state' },
     });
 }
 
@@ -82,7 +84,7 @@ function runWorker(mode, requestId) {
                 const line = stdout.trim().split('\n').filter(Boolean).at(-1) ?? '';
                 parsed = line ? JSON.parse(line) : null;
             } catch {
-                parsed = null;
+                // Malformed worker output remains represented as a null result.
             }
             resolvePromise({
                 exitCode,
@@ -200,15 +202,15 @@ async function collectPhase(mode, requestId) {
 async function main() {
     const { requestId } = parseArgs(process.argv.slice(2));
     const benchmarkRoot = path.join(repoRoot, 'src/copilot/.ai/mcp/io-cache-benchmark');
-    await mkdir(benchmarkRoot, { recursive: true });
+    await workspaceIo.mkdirPathLocked(benchmarkRoot, { recursive: true });
     const rootStats = await lstat(benchmarkRoot);
     if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
         throw new Error('IO cache benchmark root must be a regular directory.');
     }
     const benchmarkDir = path.join(benchmarkRoot, requestId);
     const startedAt = Date.now();
-    await rm(benchmarkDir, { recursive: true, force: true });
-    await mkdir(benchmarkDir, { recursive: true });
+    await workspaceIo.removePathLocked(benchmarkDir, { recursive: true, force: true });
+    await workspaceIo.mkdirPathLocked(benchmarkDir, { recursive: true });
     await writeState({ schemaVersion: 1, status: 'running', requestId, startedAt, sampleCountPerPhase: SAMPLE_COUNT, autoEnable: false });
 
     /** @type {Record<string, any>} */
@@ -262,7 +264,7 @@ async function main() {
         };
     } finally {
         try {
-            await rm(benchmarkDir, { recursive: true, force: true });
+            await workspaceIo.removePathLocked(benchmarkDir, { recursive: true, force: true });
             finalState['cleanedTemporaryDb'] = true;
         } catch (error) {
             finalState['cleanedTemporaryDb'] = false;

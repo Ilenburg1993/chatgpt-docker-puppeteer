@@ -18,6 +18,7 @@ import { sha256 } from '../../shared/hash.js';
 import { invalidateIoCacheTiers } from '../invalidation/cache-tiers.js';
 import { appendFileUnlocked } from './append.js';
 import { mkdirPathUnlocked } from './mkdir.js';
+import { shouldCaptureIoRollback } from './rollback-sidecar.js';
 import { readBinaryMutationSnapshot } from './snapshot.js';
 import { normalizeWritePayload, writeAtomicFileUnlocked } from './write-atomic.js';
 
@@ -85,6 +86,7 @@ function normalizeCreateExclusiveError(filePath, error) {
  *     previousSnapshotBase64: string | null;
  *     previousSnapshotTruncated: boolean;
  *     previousRollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
+ *     rollbackCaptureEnabled: boolean;
  *     contentHash: string;
  *     durability: Awaited<ReturnType<typeof writeAtomicFileUnlocked>>;
  * }>}
@@ -96,6 +98,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
     const { payload, bytes } = normalizeWritePayload(filePath, content, options.encoding ?? 'utf8');
     const contentHash = sha256(payload);
     const riskClass = options.riskClass ?? 'medium';
+    const captureRollback = shouldCaptureIoRollback(options.captureRollback === true);
     const rollbackCleanup = { path: /** @type {string | null} */ (null) };
     try {
         const lease = await acquireIoResourceLock(filePath, {
@@ -133,12 +136,20 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                     let previousSnapshot = /** @type {Awaited<ReturnType<typeof readBinaryMutationSnapshot>> | null} */ (
                         null
                     );
-                    if (options.captureRollback || options.expectedHash) {
+                    if (captureRollback || options.expectedHash) {
                         try {
                             previousSnapshot = await readBinaryMutationSnapshot(filePath, {
-                                snapshotMaxBytes: options.captureRollback ? ROLLBACK_SNAPSHOT_MAX_BYTES : 0,
-                                rollbackSidecar: Boolean(options.captureRollback),
+                                snapshotMaxBytes: captureRollback ? ROLLBACK_SNAPSHOT_MAX_BYTES : 0,
+                                rollbackSidecar: captureRollback,
                             });
+                            if (!captureRollback) {
+                                previousSnapshot = {
+                                    ...previousSnapshot,
+                                    snapshotBase64: null,
+                                    snapshotTruncated: false,
+                                    rollbackSidecar: null,
+                                };
+                            }
                             rollbackCleanup.path = previousSnapshot.rollbackSidecar?.path ?? null;
                         } catch (error) {
                             const code = /** @type {{ code?: unknown }} */ (error)?.code;
@@ -167,6 +178,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                         previousSnapshotBase64: previousSnapshot?.snapshotBase64 ?? null,
                         previousSnapshotTruncated: previousSnapshot?.snapshotTruncated ?? false,
                         previousRollbackSidecar: previousSnapshot?.rollbackSidecar ?? null,
+                        rollbackCaptureEnabled: captureRollback,
                         contentHash,
                         durability,
                     };
@@ -193,6 +205,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                     lockWaitMs: waitMs,
                     expectedHash: options.expectedHash ?? null,
                     contentHash,
+                    rollbackCaptureEnabled: value.rollbackCaptureEnabled,
                     durability: value.durability,
                 },
             }),

@@ -8,7 +8,7 @@
  *   - atomicWrite, validatePath safety, export shape
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Readable } from 'node:stream';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -147,6 +147,7 @@ function stableStats(size) {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
     for (const mock of Object.values(fsMock)) mock.mockReset();
     fsMock.open.mockImplementation(async (filePath) => ({
         stat: async () => fsMock.stat(filePath),
@@ -157,6 +158,10 @@ beforeEach(() => {
     }));
     fsMock.stat.mockResolvedValue(stableStats(0));
     mocks.streamPayloads.clear();
+});
+
+afterEach(() => {
+    vi.unstubAllEnvs();
 });
 
 /**
@@ -206,6 +211,26 @@ describe('F35 — write_file_content (F181-F182)', () => {
         });
         expect(fsMock.writeFile).toHaveBeenCalledOnce();
         expect(fsMock.rename).toHaveBeenCalledOnce();
+    });
+
+    it('mantém rollback automático desligado por padrão/política sem impedir a escrita', async () => {
+        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'false');
+        pathOk('/workspace/file.txt');
+        fsMock.access.mockResolvedValue(undefined);
+        fsMock.writeFile.mockResolvedValue(undefined);
+        fsMock.rename.mockResolvedValue(undefined);
+
+        const result = await handler({ path: 'file.txt', content: 'hello', encoding: 'utf8' });
+
+        expect(result.success).toBe(true);
+        expect(result.changeSet?.rollback).toMatchObject({
+            enabled: false,
+            token: null,
+            stepCount: 0,
+            steps: [],
+            reason: 'disabled_by_default',
+            policy: expect.objectContaining({ enabled: false }),
+        });
     });
 
     it('escreve em base64', async () => {

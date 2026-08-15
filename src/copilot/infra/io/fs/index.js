@@ -31,12 +31,18 @@ export { readTextFileSnapshot } from './read-text.js';
 export { assertRecursiveRemovalConfirmed, deleteFileUnlocked, removePathUnlocked } from './remove.js';
 export {
     cleanupExpiredRollbackSidecars,
+    cleanupRollbackSidecars,
     createRollbackSidecarWriter,
+    getIoRollbackPolicy,
     getRollbackSidecarDirectory,
+    getRollbackSidecarMaxBytes,
+    getRollbackSidecarMaxEntries,
     getRollbackSidecarTtlMs,
+    isIoRollbackEnabled,
     listRollbackSidecars,
     persistRollbackSidecar,
     readVerifiedRollbackSidecar,
+    shouldCaptureIoRollback,
 } from './rollback-sidecar.js';
 export { readBinaryMutationSnapshot } from './snapshot.js';
 export { statPathSnapshot } from './stat.js';

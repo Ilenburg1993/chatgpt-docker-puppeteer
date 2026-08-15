@@ -4,10 +4,12 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
     cleanupExpiredRollbackSidecars,
+    cleanupRollbackSidecars,
+    getIoRollbackPolicy,
     persistRollbackSidecar,
     readBinaryMutationSnapshot,
     readBytesFileSnapshot,
@@ -40,6 +42,7 @@ process.on('message', async (message) => {
 `;
 
 afterEach(async () => {
+    vi.unstubAllEnvs();
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
         if (dir) await rm(dir, { recursive: true, force: true });
@@ -453,6 +456,53 @@ describe('infra/io/fs read line ports', () => {
         await expect(readFile(expired.path)).rejects.toMatchObject({ code: 'ENOENT' });
         await expect(readFile(active.path, 'utf8')).resolves.toBe('active');
         expect(await readdir(sidecarDirectory)).toContain('unknown.rollback');
+    });
+
+    it('mantém rollback automático opt-in e expõe budgets configuráveis', () => {
+        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', '');
+        vi.stubEnv('COPILOT_IO_ROLLBACK_TTL_MS', '1234');
+        vi.stubEnv('COPILOT_IO_ROLLBACK_MAX_ENTRIES', '7');
+        vi.stubEnv('COPILOT_IO_ROLLBACK_MAX_BYTES', '4096');
+        expect(getIoRollbackPolicy()).toEqual({ enabled: false, ttlMs: 1234, maxEntries: 7, maxBytes: 4096 });
+
+        vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
+        expect(getIoRollbackPolicy().enabled).toBe(true);
+    });
+
+    it('aplica budget de quantidade preservando explicitamente um sidecar sem ultrapassar o limite', async () => {
+        const dir = await createTempDir();
+        const sidecarDirectory = join(dir, 'rollback-budget');
+        const first = await persistRollbackSidecar(Buffer.from('first'), {
+            directory: sidecarDirectory,
+            ttlMs: 10_000,
+            nowMs: 100,
+        });
+        const second = await persistRollbackSidecar(Buffer.from('second'), {
+            directory: sidecarDirectory,
+            ttlMs: 10_000,
+            nowMs: 101,
+        });
+        const third = await persistRollbackSidecar(Buffer.from('third'), {
+            directory: sidecarDirectory,
+            ttlMs: 10_000,
+            nowMs: 102,
+        });
+        await writeFile(join(sidecarDirectory, 'manual-note.txt'), 'preserve', 'utf8');
+
+        const cleanup = await cleanupRollbackSidecars({
+            directory: sidecarDirectory,
+            nowMs: 200,
+            maxEntries: 1,
+            maxBytes: 1024,
+            preservePath: first.path,
+            enforceBudget: true,
+        });
+
+        expect(cleanup).toMatchObject({ removed: 2, budgetRemoved: 2, expiredRemoved: 0, remainingCount: 1 });
+        await expect(readFile(first.path, 'utf8')).resolves.toBe('first');
+        await expect(readFile(second.path)).rejects.toMatchObject({ code: 'ENOENT' });
+        await expect(readFile(third.path)).rejects.toMatchObject({ code: 'ENOENT' });
+        expect(await readdir(sidecarDirectory)).toContain('manual-note.txt');
     });
 
     it('persistRollbackSidecar rejeita hash que não corresponde aos bytes', async () => {

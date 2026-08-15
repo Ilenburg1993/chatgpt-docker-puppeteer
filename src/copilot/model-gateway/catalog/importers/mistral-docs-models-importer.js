@@ -139,11 +139,17 @@ function modalitiesForModel(providerModel) {
  */
 function capabilitiesForModel(providerModel, combinedWindow) {
     const lower = providerModel.toLowerCase();
+    const explicitToolCalling = /\b(?:function[- ]calling|tool[- ]calling|tool use|function calls?)\b/iu.test(combinedWindow);
     /** @type {Record<string, boolean>} */
     const capabilities = {};
     if (lower.includes('embed')) capabilities['embeddings'] = true;
     else if (lower.includes('ocr')) capabilities['ocr'] = true;
-    else {
+    else if (lower.includes('moderation')) capabilities['moderation'] = true;
+    else if (lower.includes('voxtral')) {
+        capabilities['chat'] = true;
+        capabilities['streaming'] = true;
+        if (explicitToolCalling) capabilities['tools'] = true;
+    } else {
         capabilities['chat'] = true;
         capabilities['streaming'] = true;
         capabilities['tools'] = true;

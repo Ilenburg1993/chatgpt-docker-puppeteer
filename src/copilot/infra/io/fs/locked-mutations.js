@@ -22,7 +22,7 @@ import { copyFileUnlocked } from './copy.js';
 import { mkdirPathUnlocked } from './mkdir.js';
 import { moveFileUnlocked } from './move.js';
 import { deleteFileUnlocked, removePathUnlocked } from './remove.js';
-import { persistRollbackSidecar } from './rollback-sidecar.js';
+import { persistRollbackSidecar, shouldCaptureIoRollback } from './rollback-sidecar.js';
 import { readBinaryMutationSnapshot } from './snapshot.js';
 import { writeAtomicFileUnlocked } from './write-atomic.js';
 
@@ -85,10 +85,18 @@ function windowTextPreview(text, options = {}) {
  * }>}
  */
 async function readMutationSnapshot(filePath, captureRollback = false) {
-    return readBinaryMutationSnapshot(filePath, {
-        snapshotMaxBytes: ROLLBACK_SNAPSHOT_MAX_BYTES,
+    const snapshot = await readBinaryMutationSnapshot(filePath, {
+        snapshotMaxBytes: captureRollback ? ROLLBACK_SNAPSHOT_MAX_BYTES : 0,
         rollbackSidecar: captureRollback,
     });
+    return captureRollback
+        ? snapshot
+        : {
+              ...snapshot,
+              snapshotBase64: null,
+              snapshotTruncated: false,
+              rollbackSidecar: null,
+          };
 }
 
 /**
@@ -171,7 +179,7 @@ async function discardRollbackSidecar(sidecar) {
  * Remove arquivo com lock por path.
  *
  * @param {string} filePath
- * @param {{ expectedHash?: string }} [options]
+ * @param {{ expectedHash?: string; captureRollback?: boolean }} [options]
  * @returns {Promise<{
  *     path: string;
  *     deleted: true;
@@ -182,12 +190,14 @@ async function discardRollbackSidecar(sidecar) {
  *     previousSnapshotBase64: string | null;
  *     previousSnapshotTruncated: boolean;
  *     previousRollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
+ *     rollbackCaptureEnabled: boolean;
  * }>}
  */
 export async function deleteFileLocked(filePath, options = {}) {
     assertValidIoFilePath(filePath);
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
+    const captureRollback = shouldCaptureIoRollback(options.captureRollback !== false);
     try {
         const lease = await acquireIoResourceLock(filePath, {
             operation: 'delete',
@@ -197,7 +207,7 @@ export async function deleteFileLocked(filePath, options = {}) {
         const value = await (async () => {
             try {
                 return await lease.run(async () => {
-                    const snapshot = await readMutationSnapshot(filePath, true);
+                    const snapshot = await readMutationSnapshot(filePath, captureRollback);
                     assertExpectedSha256Digest(snapshot.contentHash, options.expectedHash);
                     await deleteFileUnlocked(filePath);
                     return snapshot;
@@ -221,6 +231,7 @@ export async function deleteFileLocked(filePath, options = {}) {
                 advisoryLimits: {
                     lockWaitMs: waitMs,
                     previousHash: value.contentHash,
+                    rollbackCaptureEnabled: captureRollback,
                     rollbackSidecar: value.rollbackSidecar
                         ? {
                               available: true,
@@ -242,6 +253,7 @@ export async function deleteFileLocked(filePath, options = {}) {
                 previousSnapshotBase64: value.snapshotBase64,
                 previousSnapshotTruncated: value.snapshotTruncated,
                 previousRollbackSidecar: value.rollbackSidecar,
+                rollbackCaptureEnabled: captureRollback,
             },
             io,
         );
@@ -342,7 +354,7 @@ export async function removePathLocked(filePath, options = {}) {
  *
  * @param {string} source
  * @param {string} destination
- * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string }} [options]
+ * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string; captureRollback?: boolean }} [options]
  */
 export async function copyFileLocked(source, destination, options = {}) {
     assertValidIoFilePath(source);
@@ -350,6 +362,7 @@ export async function copyFileLocked(source, destination, options = {}) {
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
     const riskClass = options.overwrite ? 'high' : 'medium';
+    const captureRollback = shouldCaptureIoRollback(options.overwrite === true && options.captureRollback !== false);
     try {
         const lease = await acquireIoResourceLocks([source, destination], {
             operation: 'copy',
@@ -370,7 +383,7 @@ export async function copyFileLocked(source, destination, options = {}) {
                      */
                     let destinationSnapshot = null;
                     if (options.overwrite) {
-                        destinationSnapshot = await readOptionalMutationSnapshot(destination, true);
+                        destinationSnapshot = await readOptionalMutationSnapshot(destination, captureRollback);
                     } else {
                         await assertDestinationWritable(destination, options.overwrite);
                     }
@@ -429,6 +442,7 @@ export async function copyFileLocked(source, destination, options = {}) {
                     capacityPreflight: value.capacityPreflight,
                     overwrite: Boolean(options.overwrite),
                     destinationPreviousHash: value.destinationPreviousHash,
+                    rollbackCaptureEnabled: captureRollback,
                     destinationRollbackSidecar: value.destinationPreviousRollbackSidecar
                         ? {
                               available: true,
@@ -456,6 +470,7 @@ export async function copyFileLocked(source, destination, options = {}) {
             destinationPreviousSnapshotBase64: value.destinationPreviousSnapshotBase64,
             destinationPreviousSnapshotTruncated: value.destinationPreviousSnapshotTruncated,
             destinationPreviousRollbackSidecar: value.destinationPreviousRollbackSidecar,
+            rollbackCaptureEnabled: captureRollback,
             lockWaitMs: waitMs,
             io,
         };
@@ -482,13 +497,14 @@ export async function copyFileLocked(source, destination, options = {}) {
  *
  * @param {string} source
  * @param {string} destination
- * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string }} [options]
+ * @param {{ overwrite?: boolean; traceId?: string; expectedSourceHash?: string; captureRollback?: boolean }} [options]
  */
 export async function moveFileLocked(source, destination, options = {}) {
     assertValidIoFilePath(source);
     assertValidIoFilePath(destination);
     const traceId = options.traceId ?? createIoTraceId();
     const startedAt = nowIoMs();
+    const captureRollback = shouldCaptureIoRollback(options.overwrite === true && options.captureRollback !== false);
     try {
         const lease = await acquireIoResourceLocks([source, destination], {
             operation: 'move',
@@ -509,7 +525,7 @@ export async function moveFileLocked(source, destination, options = {}) {
                      */
                     let destinationSnapshot = null;
                     if (options.overwrite) {
-                        destinationSnapshot = await readOptionalMutationSnapshot(destination, true);
+                        destinationSnapshot = await readOptionalMutationSnapshot(destination, captureRollback);
                     } else {
                         await assertDestinationWritable(destination, options.overwrite);
                     }
@@ -561,6 +577,7 @@ export async function moveFileLocked(source, destination, options = {}) {
                     sourceHash: value.contentHash,
                     overwrite: Boolean(options.overwrite),
                     destinationPreviousHash: value.destinationPreviousHash,
+                    rollbackCaptureEnabled: captureRollback,
                     destinationRollbackSidecar: value.destinationPreviousRollbackSidecar
                         ? {
                               available: true,
@@ -591,6 +608,7 @@ export async function moveFileLocked(source, destination, options = {}) {
             destinationPreviousSnapshotBase64: value.destinationPreviousSnapshotBase64,
             destinationPreviousSnapshotTruncated: value.destinationPreviousSnapshotTruncated,
             destinationPreviousRollbackSidecar: value.destinationPreviousRollbackSidecar,
+            rollbackCaptureEnabled: captureRollback,
             crossDevice: value.crossDevice,
             duplicatedAfterCrossDeviceMove: value.duplicatedAfterCrossDeviceMove,
             sourceUnlinkErrorCode: value.sourceUnlinkErrorCode,
@@ -638,6 +656,7 @@ export async function moveFileLocked(source, destination, options = {}) {
  *     maxDiffLines?: number;
  *     maxDiffBytes?: number;
  *     computeDiff?: boolean;
+ *     captureRollback?: boolean;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
@@ -647,6 +666,7 @@ export async function patchTextLocked(filePath, options) {
     const traceId = createIoTraceId();
     const startedAt = nowIoMs();
     const riskClass = options.dryRun ? 'low' : 'high';
+    const captureRollback = shouldCaptureIoRollback(options.captureRollback !== false) && !options.dryRun;
     try {
         const lease = await acquireIoResourceLock(filePath, {
             operation: 'patch',
@@ -669,12 +689,13 @@ export async function patchTextLocked(filePath, options) {
                     void patchMs;
                     const { updated, replacedOccurrences, bytesWritten } = patch;
                     const contentHash = sha256(updated);
-                    const previousSnapshot = patch.noop
-                        ? { snapshotBase64: null, snapshotTruncated: false, rollbackSidecar: null }
-                        : await buildRollbackSnapshot(rawBuffer, {
-                              persistLarge: !options.dryRun,
-                              contentHash: previousHash,
-                          });
+                    const previousSnapshot =
+                        patch.noop || !captureRollback
+                            ? { snapshotBase64: null, snapshotTruncated: false, rollbackSidecar: null }
+                            : await buildRollbackSnapshot(rawBuffer, {
+                                  persistLarge: true,
+                                  contentHash: previousHash,
+                              });
                     const diffContextLines = options.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
                     const { firstMatchLine, lastMatchLine, lineDelta } = patch;
                     const shouldComputeDiff = options.computeDiff !== false;
@@ -725,6 +746,7 @@ export async function patchTextLocked(filePath, options) {
                         previousHash,
                         contentHash,
                         dryRun: Boolean(options.dryRun),
+                        rollbackCaptureEnabled: captureRollback,
                         previousSnapshotBase64: previousSnapshot.snapshotBase64,
                         previousSnapshotTruncated: previousSnapshot.snapshotTruncated,
                         previousRollbackSidecar: previousSnapshot.rollbackSidecar,
@@ -762,6 +784,7 @@ export async function patchTextLocked(filePath, options) {
                     projectedBytes: value.projectedBytes,
                     byteDelta: value.byteDelta,
                     capacityPreflight: value.capacityPreflight,
+                    rollbackCaptureEnabled: value.rollbackCaptureEnabled,
                     rollbackSidecar: value.previousRollbackSidecar
                         ? {
                               available: true,

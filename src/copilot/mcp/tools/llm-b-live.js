@@ -10,13 +10,13 @@
 
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdir, open, readFile, readdir, stat } from 'node:fs/promises';
+import { open, readFile, readdir, stat } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import { getCopilotDb } from '#copilot/db';
-import { writeFileAtomic } from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
@@ -126,6 +126,10 @@ function detachedLiveRunsDirectory() {
     return join(getMcpWorkspaceRoot(), DETACHED_LIVE_RUNS_DIR);
 }
 
+function llmbLiveWorkspaceIo() {
+    return createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+}
+
 /** @param {string} runId */
 function detachedLiveRunManifestPath(runId) {
     if (!DETACHED_LIVE_RUN_ID_RE.test(runId)) throw new Error('Invalid detached LLM-B live run id.');
@@ -158,11 +162,12 @@ async function spawnDetachedLiveRun(input) {
     const absoluteLogPath = join(getMcpWorkspaceRoot(), logPath);
     const args = [...input.args, `--out-dir=${outDir}`];
     const stateDir = detachedLiveRunsDirectory();
-    await mkdir(stateDir, { recursive: true });
-    await mkdir(absoluteOutDir, { recursive: true });
+    const workspaceIo = llmbLiveWorkspaceIo();
+    await workspaceIo.mkdirPathLocked(stateDir, { recursive: true });
+    await workspaceIo.mkdirPathLocked(absoluteOutDir, { recursive: true });
     const logHandle = await open(absoluteLogPath, 'a', 0o600);
-    /** @type {import('node:child_process').ChildProcess | null} */
-    let child = null;
+    /** @type {import('node:child_process').ChildProcess | undefined} */
+    let child;
     try {
         child = spawn(process.execPath, [LIVE_RUNNER, ...args], {
             cwd: getMcpWorkspaceRoot(),
@@ -185,7 +190,7 @@ async function spawnDetachedLiveRun(input) {
         logPath,
         plan: input.plan,
     };
-    await writeFileAtomic(detachedLiveRunManifestPath(runId), `${JSON.stringify(manifest, null, 2)}\n`, {
+    await llmbLiveWorkspaceIo().writeFileAtomic(detachedLiveRunManifestPath(runId), `${JSON.stringify(manifest, null, 2)}\n`, {
         encoding: 'utf8',
         mode: 0o600,
         riskClass: 'medium',
@@ -219,7 +224,7 @@ async function readDetachedLiveRunManifest(manifestPath) {
 
 async function listDetachedLiveRuns() {
     const directory = detachedLiveRunsDirectory();
-    await mkdir(directory, { recursive: true });
+    await llmbLiveWorkspaceIo().mkdirPathLocked(directory, { recursive: true });
     const entries = await readdir(directory).catch(() => []);
     const rows = [];
     for (const entry of entries) {

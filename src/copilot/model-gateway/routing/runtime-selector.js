@@ -1172,7 +1172,7 @@ function runtimeSelectorPlanForRouteAttempt(plan, route) {
 
 /**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
- * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; requireAgentProbeProfiles?: string[]; preferProviderDiversity?: boolean; avoidDuplicateRoutes?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; maxRuntimeProofAgeMs?: number; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
+ * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; requireAgentProbeProfiles?: string[]; preferProviderDiversity?: boolean; avoidDuplicateRoutes?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; now?: string | number | Date; maxRuntimeProofAgeMs?: number; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
  * @returns {{
  *   schema: 'model-gateway-runtime-selector-plan';
  *   ok: boolean;
@@ -1235,6 +1235,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                     ? evaluateGatewayModelHealthRoute(selected, {
                           routeProfile: profileId,
                           runtimeHealthIndex: runtimeHealthSource,
+                          ...(options.now !== undefined ? { now: options.now } : {}),
                           ...(typeof options.maxRuntimeProofAgeMs === 'number'
                               ? { maxRuntimeProofAgeMs: options.maxRuntimeProofAgeMs }
                               : {}),
@@ -1254,6 +1255,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             const providerCooldown =
                 selected && runtimeHealthSource
                     ? evaluateGatewayProviderHealthCooldown(selected, runtimeHealthSource, {
+                          ...(options.now !== undefined ? { now: options.now } : {}),
                           ...(typeof options.providerCooldownWindowMs === 'number'
                               ? { windowMs: options.providerCooldownWindowMs }
                               : {}),
@@ -1274,6 +1276,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                       (kind) =>
                           runtimeHealth?.health &&
                           isGatewayModelProbeActivelyFailed(runtimeHealth.health, kind, {
+                              ...(options.now !== undefined ? { now: options.now } : {}),
                               ...(typeof options.temporaryFailureCooldownMs === 'number'
                                   ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
                                   : {}),

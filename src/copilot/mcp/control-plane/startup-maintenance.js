@@ -5,6 +5,7 @@
  * @module copilot/mcp/control-plane/startup-maintenance
  */
 
+import { cleanupRollbackSidecars, getIoRollbackPolicy } from '#copilot/infra/public/runtime';
 import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
 import { cleanupStaleQuickTunnelState } from '../cloudflare/state.js';
 import { logMcp } from './audit.js';
@@ -32,6 +33,7 @@ let startupState = {
  *     setTimeoutFn?: typeof setTimeout;
  *     smokeRunner?: () => Promise<Record<string, unknown>>;
  *     cleanupRunner?: () => Promise<{ removed: boolean }>;
+ *     rollbackCleanupRunner?: () => Promise<Record<string, unknown> | null>;
  * }} [options]
  * @returns {boolean}
  */
@@ -44,6 +46,7 @@ export function scheduleMcpStartupMaintenance(options = {}) {
     const setTimeoutFn = options.setTimeoutFn ?? setTimeout;
     const smokeRunner = options.smokeRunner ?? runWorkspaceSmoke;
     const cleanupRunner = options.cleanupRunner ?? cleanupLegacyQuickTunnelState;
+    const rollbackCleanupRunner = options.rollbackCleanupRunner ?? cleanupRollbackStateAtStartup;
 
     startupState = {
         ...startupState,
@@ -52,7 +55,7 @@ export function scheduleMcpStartupMaintenance(options = {}) {
     };
     startupTimer = setTimeoutFn(() => {
         startupTimer = null;
-        void runStartupMaintenance(smokeRunner, cleanupRunner);
+        void runStartupMaintenance(smokeRunner, cleanupRunner, rollbackCleanupRunner);
     }, delayMs);
     if (typeof startupTimer?.unref === 'function') startupTimer.unref();
     return true;
@@ -87,8 +90,9 @@ export function resetMcpStartupMaintenanceForTests() {
 /**
  * @param {() => Promise<Record<string, unknown>>} smokeRunner
  * @param {() => Promise<{ removed: boolean }>} cleanupRunner
+ * @param {() => Promise<Record<string, unknown> | null>} rollbackCleanupRunner
  */
-async function runStartupMaintenance(smokeRunner, cleanupRunner) {
+async function runStartupMaintenance(smokeRunner, cleanupRunner, rollbackCleanupRunner) {
     startupState = {
         ...startupState,
         scheduled: false,
@@ -97,6 +101,14 @@ async function runStartupMaintenance(smokeRunner, cleanupRunner) {
     };
     try {
         const cleanup = await cleanupRunner();
+        let rollbackCleanup = null;
+        try {
+            rollbackCleanup = await rollbackCleanupRunner();
+        } catch (error) {
+            logMcp('WARN', 'MCP startup rollback cleanup failed without blocking workspace smoke.', {
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
         const smoke = await smokeRunner();
         const success = smoke['success'] === true;
         startupState = {
@@ -111,6 +123,7 @@ async function runStartupMaintenance(smokeRunner, cleanupRunner) {
         logMcp(success ? 'INFO' : 'WARN', 'MCP startup workspace smoke completed.', {
             success,
             staleQuickTunnelStateRemoved: cleanup.removed === true,
+            rollbackCleanup,
             status: smoke['status'] ?? null,
         });
     } catch (error) {
@@ -135,6 +148,22 @@ async function runWorkspaceSmoke() {
 async function cleanupLegacyQuickTunnelState() {
     const config = readCloudflareTunnelConfig();
     return cleanupStaleQuickTunnelState(config.stateFile, { staleAfterMs: config.staleAfterMs });
+}
+
+/**
+ * Remove expirados em qualquer modo e, quando rollback automático está habilitado, também aplica os budgets ativos.
+ * Sidecars válidos não expirados nunca são purgados silenciosamente quando o modo automático está desligado.
+ *
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function cleanupRollbackStateAtStartup() {
+    const policy = getIoRollbackPolicy();
+    const cleanup = await cleanupRollbackSidecars({
+        enforceBudget: policy.enabled,
+        maxEntries: policy.maxEntries,
+        maxBytes: policy.maxBytes,
+    });
+    return { policy, ...cleanup };
 }
 
 /**

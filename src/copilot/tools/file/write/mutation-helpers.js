@@ -13,6 +13,7 @@ import {
     completeIoOperationEnvelope,
     createIoRollbackToken,
     failIoOperationEnvelope,
+    getIoRollbackPolicy,
     recordIoMutationAudit,
     serializeIoRollbackToken,
 } from '#copilot/infra/public/runtime';
@@ -122,6 +123,7 @@ export async function failAndAuditMutation(operation, error, auditContext) {
  * }} input
  */
 export function buildMutationChangeSet(input) {
+    const rollbackPolicy = getIoRollbackPolicy();
     /**
      * @type {{
      *     action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
@@ -143,12 +145,17 @@ export function buildMutationChangeSet(input) {
     const entries = [];
 
     if (Array.isArray(input.entries) && input.entries.length > 0) {
-        entries.push(...input.entries);
+        entries.push(
+            ...input.entries.map((entry) => ({
+                ...entry,
+                rollback: rollbackPolicy.enabled ? entry.rollback ?? null : null,
+            })),
+        );
     } else if (input.action && Array.isArray(input.targets) && input.targets.length > 0) {
         entries.push({
             action: input.action,
             targets: input.targets,
-            rollback: input.rollback ?? null,
+            rollback: rollbackPolicy.enabled ? input.rollback ?? null : null,
             evidence: { ...(input.evidence ?? {}) },
         });
     }
@@ -177,16 +184,27 @@ export function buildMutationChangeSet(input) {
               evidence: { ...(input.evidence ?? {}) },
           });
 
-    const rollbackToken = createIoRollbackToken(changeSet);
+    const rollbackToken = rollbackPolicy.enabled ? createIoRollbackToken(changeSet) : null;
     return {
         id: changeSet.changeSetId,
         status: changeSet.status,
         entryCount: changeSet.entries.length,
-        rollback: {
-            token: serializeIoRollbackToken(rollbackToken),
-            stepCount: rollbackToken.stepCount,
-            steps: rollbackToken.steps,
-        },
+        rollback: rollbackToken
+            ? {
+                  enabled: true,
+                  token: serializeIoRollbackToken(rollbackToken),
+                  stepCount: rollbackToken.stepCount,
+                  steps: rollbackToken.steps,
+                  policy: rollbackPolicy,
+              }
+            : {
+                  enabled: false,
+                  token: null,
+                  stepCount: 0,
+                  steps: [],
+                  reason: 'disabled_by_default',
+                  policy: rollbackPolicy,
+              },
     };
 }
 

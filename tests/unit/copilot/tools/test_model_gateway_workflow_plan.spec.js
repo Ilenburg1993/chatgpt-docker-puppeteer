@@ -62,6 +62,17 @@ vi.mock('#copilot/model-gateway', () => ({
     collectModelGatewaySecretAuditEnvValues: () => [],
     createModelGatewayCatalogControlPlane: () => ({ planRefresh }),
     createModelGatewayControlPlaneResult: result,
+    DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS: {
+        chatHealthOk: 140,
+        agentProbeVerified: 140,
+        genericProbeVerified: 35,
+        preferredProbeVerified: 240,
+        preferredLiveProtocolProbeVerified: 420,
+        preferredProbeFailedPenalty: 120,
+        preferredLiveProtocolProbeFailedPenalty: 260,
+        exactRouteProfileProof: 60,
+        runtimeProvedPreference: 20,
+    },
     createModelGatewayEnvProfileStore: () => ({
         listTerminalSummaries: () => [],
         remove: vi.fn(),
@@ -280,7 +291,7 @@ describe('model_gateway_workflow_plan', () => {
         expect(JSON.stringify(parsed)).not.toContain('__none__');
     });
 
-    it('gera DAG same-session com probes antes de route switch confirmado', async () => {
+    it('gera DAG same-session sem probes redundantes quando a rota já tem prova fresca', async () => {
         inspectOverview.mockResolvedValue(
             result({
                 operation: 'overview',
@@ -368,7 +379,7 @@ describe('model_gateway_workflow_plan', () => {
         expect(parsed).toMatchObject({
             ok: true,
             operation: 'workflow.plan',
-            status: 'planned',
+            status: 'planned_switch_recommended',
             dryRun: true,
             data: {
                 selectedProviderId: 'kilo-code',
@@ -386,11 +397,7 @@ describe('model_gateway_workflow_plan', () => {
             tool: 'model_gateway_route_switch',
             mode: 'plan',
             confirmationRequired: false,
-            requires: expect.arrayContaining([
-                'route_plan',
-                'probe_execute_apply_chat',
-                'probe_execute_apply_agent',
-            ]),
+            requires: ['route_proved_plan'],
             args: {
                 mode: 'plan',
                 confirm: false,
@@ -421,8 +428,97 @@ describe('model_gateway_workflow_plan', () => {
                 idempotencyKey: 'workflow-test-20260616:route-switch-kilo-code-kilo-auto-free',
             },
         });
+        expect(steps.some((step) => String(step.id).startsWith('probe_execute_'))).toBe(false);
+        expect(parsed.data.selectionDecision.status).toBe('switch_recommended');
         expect(JSON.stringify(parsed)).not.toContain('"requiresNewSession":true');
         expect(JSON.stringify(parsed)).not.toContain('"apiKey":');
+    });
+
+    it('mantém probe_required sem route switch até existir prova funcional fresca', async () => {
+        const discoveryRoute = {
+            providerId: 'gemini',
+            providerModel: 'gemini-3.6-flash',
+            providerType: 'openai',
+            selectorSyntax: 'gemini-3.6-flash',
+            openAICompatible: true,
+            routeProfile: 'repo_agent',
+            selectedRouteKey: 'gemini:gemini-3.6-flash:repo_agent',
+        };
+        inspectOverview.mockResolvedValue(result({ operation: 'overview', data: { readiness: { ok: true } } }));
+        planRoute
+            .mockResolvedValueOnce(
+                result({
+                    operation: 'route.plan',
+                    data: {
+                        selectedRoute: discoveryRoute,
+                        candidates: [
+                            {
+                                id: 'gemini:gemini-3.6-flash',
+                                providerId: 'gemini',
+                                providerModel: 'gemini-3.6-flash',
+                                score: 900,
+                                probes: { freshProof: false, historicalProof: false, stale: false },
+                                positiveReasons: ['quality_rank_1'],
+                                rejectedReasons: [],
+                            },
+                        ],
+                    },
+                }),
+            )
+            .mockResolvedValueOnce(
+                result({
+                    operation: 'route.plan',
+                    data: { selectedRoute: null, candidates: [] },
+                }),
+            );
+        evaluateModels.mockResolvedValue(result({ operation: 'model.evaluate', data: { evaluated: [] } }));
+        planProbes.mockResolvedValue(
+            result({ operation: 'probe.plan', data: { budget: { selected: [{ kind: 'agent' }] } } }),
+        );
+
+        const raw = await modelGatewayWorkflowPlanTool.handler({
+            objective: 'same_session_route_switch',
+            taskProfile: 'repo_agent',
+            runtimeId: null,
+            providerId: null,
+            candidateModelIds: [],
+            preferredProbeKinds: ['agent'],
+            maxSnapshotAgeHours: 24,
+            maxCandidates: 5,
+            maxProbeCount: 1,
+            maxEstimatedCostUsd: 10,
+            idempotencyKeyPrefix: 'workflow-probe-required',
+            includeCatalogRefreshPlan: false,
+            includeRouteSwitchPlan: true,
+            requireRuntimeProof: true,
+            selectionGoal: 'quality_first',
+            probeStrategy: 'aggressive',
+            maxRuntimeProofAgeHours: 24,
+        });
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const steps = /** @type {Array<Record<string, any>>} */ (parsed.data?.steps ?? []);
+
+        expect(parsed).toMatchObject({
+            ok: true,
+            operation: 'workflow.plan',
+            status: 'planned_probe_required',
+            data: {
+                selectedProviderId: null,
+                selectedModelId: null,
+                selectionDecision: {
+                    status: 'probe_required',
+                    nextCandidate: {
+                        providerId: 'gemini',
+                        providerModel: 'gemini-3.6-flash',
+                    },
+                },
+            },
+        });
+        expect(steps.some((step) => step.id === 'probe_execute_plan_r1_agent')).toBe(true);
+        expect(steps.some((step) => step.id === 'probe_execute_apply_r1_agent')).toBe(true);
+        expect(steps.some((step) => step.id === 'route_switch_plan')).toBe(false);
+        expect(steps.some((step) => step.id === 'route_switch_apply')).toBe(false);
+        expect(parsed.warnings).toContain('fresh_runtime_proof_required_before_promotion');
     });
 
     it('reconhece route switch diferido e evita promoção insegura durante tool-turn ativo', async () => {

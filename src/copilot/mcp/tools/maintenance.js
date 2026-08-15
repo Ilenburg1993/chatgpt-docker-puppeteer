@@ -98,19 +98,24 @@ export const maintenanceTools = [
         name: 'mcp_cleanup_ai_artifacts',
         title: 'Cleanup MCP AI artifacts',
         description:
-            'Delete a bounded set of strict UUID-named validator artifacts beyond retention. Defaults to dry-run and cannot access OAuth, tunnel, pid or quarantine state.',
+            'Delete a bounded set of strict UUID-named validator artifacts beyond retention. Rollback sidecars can be purged only by explicit request while automatic rollback is disabled; OAuth, tunnel, pid and quarantine state stay unreachable.',
         inputSchema: {
             dryRun: z.boolean().optional().describe('Preview without deleting. Default: true.'),
             retainNewest: z.number().int().min(20).max(10_000).optional().describe('Number of newest artifacts to retain. Default: 240.'),
-            maxDeleteCount: z.number().int().min(1).max(500).optional().describe('Maximum files deleted in one call. Default: 100.'),
+            maxDeleteCount: z.number().int().min(1).max(500).optional().describe('Maximum files deleted in one cleanup domain per call. Default: 100.'),
+            purgeDisabledRollback: z
+                .boolean()
+                .optional()
+                .describe('Purge strict rollback sidecars/pending files only when automatic rollback is disabled. Default: false.'),
         },
         annotations: destructiveAnnotations(),
-        handler: async ({ dryRun, retainNewest, maxDeleteCount } = {}) =>
+        handler: async ({ dryRun, retainNewest, maxDeleteCount, purgeDisabledRollback } = {}) =>
             okResult(
                 await cleanupAiArtifacts({
                     dryRun,
                     retainNewest,
                     maxDeleteCount,
+                    purgeDisabledRollback,
                 }),
             ),
     },
