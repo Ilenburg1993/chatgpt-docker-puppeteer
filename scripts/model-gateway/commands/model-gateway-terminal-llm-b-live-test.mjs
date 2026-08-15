@@ -121,7 +121,7 @@ const HUMAN_TERMINAL_SHUTDOWN_RE = /Terminal\s+fechado; API local permanece ativ
 const LEGACY_TERMINAL_SHUTDOWN_RE = /\[terminal\]\s+(?:readline fechado|Encerrando sessão)/iu;
 const LIVE_TEST_COPILOT_MODEL = process.env.COPILOT_LIVE_TEST_COPILOT_MODEL || 'auto';
 const MODEL_GATEWAY_CONTROL_PLANE_COPILOT_MODEL =
-    process.env.COPILOT_MODEL_GATEWAY_CONTROL_PLANE_MODEL || 'gpt-5-mini';
+    process.env.COPILOT_MODEL_GATEWAY_CONTROL_PLANE_MODEL || 'auto';
 
 function hasHumanTerminalShutdownCopy(plain) {
     const text = String(plain ?? '');
