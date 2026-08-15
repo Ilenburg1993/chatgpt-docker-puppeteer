@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from 'node:crypto';
 import { access, stat } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import path from 'node:path';
@@ -73,6 +74,14 @@ async function catalogFileIdentity(filePath) {
         const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'unknown';
         return `unavailable:${code}:${Date.now()}`;
     }
+}
+
+function readinessEnvironmentIdentity(env = process.env) {
+    const hash = createHash('sha256');
+    for (const [key, value] of Object.entries(env).sort(([left], [right]) => left.localeCompare(right))) {
+        hash.update(key).update('\0').update(String(value ?? '')).update('\0');
+    }
+    return hash.digest('hex');
 }
 
 let persistentRedactionRequestSequence = 0;
@@ -413,6 +422,7 @@ const sourceCatalogStaticCacheHit = cachedSourceCatalog !== null;
 const parity = timedSync('catalogSqliteParity', () => compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot));
 const secretAuditValues = timedSync('secretAuditEnvCollection', () => collectModelGatewaySecretAuditEnvValues(process.env));
 const secretRegistry = createEnvSecretRegistry();
+const selectionEnvironmentIdentity = timedSync('selectionEnvironmentIdentity', () => readinessEnvironmentIdentity(process.env));
 const fileHealthRecords = timedSync('fileRuntimeHealthRead', () => listByokProviderModelHealth());
 let sqliteHealthRecords = [];
 let sqliteRuntimeError = null;
@@ -471,18 +481,37 @@ const effectiveSnapshot = {
 };
 phaseTimingsMs['eligibilityEvaluation'] = Number((performance.now() - eligibilityStartedAt).toFixed(3));
 const selectionStartedAt = performance.now();
-const allowProbeSelection = timedSync('selectionAllowProbeAudit', () =>
-    auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
-        strict: false,
-        secretRegistry,
-    }),
-);
-const strictAccessSelection = timedSync('selectionStrictAccessAudit', () =>
-    auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
-        strict: true,
-        secretRegistry,
-    }),
-);
+const cachedStaticSelections =
+    catalogStaticReadinessCache?.selectionEnvironmentIdentity === selectionEnvironmentIdentity &&
+    catalogStaticReadinessCache?.allowProbeSelection &&
+    catalogStaticReadinessCache?.strictAccessSelection
+        ? catalogStaticReadinessCache
+        : null;
+const allowProbeSelection = cachedStaticSelections
+    ? cachedStaticSelections.allowProbeSelection
+    : timedSync('selectionAllowProbeAudit', () =>
+          auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
+              strict: false,
+              secretRegistry,
+          }),
+      );
+const strictAccessSelection = cachedStaticSelections
+    ? cachedStaticSelections.strictAccessSelection
+    : timedSync('selectionStrictAccessAudit', () =>
+          auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
+              strict: true,
+              secretRegistry,
+          }),
+      );
+if (cachedStaticSelections) {
+    phaseTimingsMs['selectionAllowProbeAudit'] = 0;
+    phaseTimingsMs['selectionStrictAccessAudit'] = 0;
+} else if (catalogStaticReadinessCache) {
+    catalogStaticReadinessCache.selectionEnvironmentIdentity = selectionEnvironmentIdentity;
+    catalogStaticReadinessCache.allowProbeSelection = allowProbeSelection;
+    catalogStaticReadinessCache.strictAccessSelection = strictAccessSelection;
+}
+const sourceSelectionStaticCacheHit = cachedStaticSelections !== null;
 const effectiveStrictSelection = timedSync('selectionEffectiveStrictAudit', () =>
     auditModelGatewayPreRuntimeSelection(effectiveSnapshot, {
         strict: true,
@@ -692,6 +721,7 @@ const summary = {
     },
     cache: {
         sourceCatalogStaticHit: sourceCatalogStaticCacheHit,
+        sourceSelectionStaticHit: sourceSelectionStaticCacheHit,
     },
     checks,
     integrity: {
