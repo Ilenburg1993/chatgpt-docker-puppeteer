@@ -651,8 +651,74 @@ function buildWorkflowSelectionDecision(input) {
             : status === 'switch_recommended'
               ? 'plan_same_session_switch'
               : status === 'probe_required'
-                ? 'probe_ranked_candidates_until_first_success_then_rerun_workflow'
+                ? 'probe_current_top_candidate_then_rerun_workflow'
                 : 'refresh_catalog_or_relax_hard_constraints';
+    const provedCandidate = input.candidates.find(
+        (candidate) =>
+            optionalWorkflowString(candidate?.['providerId']) === provedProvider &&
+            optionalWorkflowString(candidate?.['providerModel']) === provedModel,
+    ) ?? null;
+    /** @param {Record<string, any> | null | undefined} candidate */
+    const proofAgeHours = (candidate) => {
+        const proofAgeMs = typeof candidate?.['proofAgeMs'] === 'number' ? candidate['proofAgeMs'] : null;
+        return proofAgeMs === null ? null : Math.round((proofAgeMs / (60 * 60 * 1000)) * 10) / 10;
+    };
+    /** @param {Record<string, any> | null | undefined} candidate */
+    const explainCandidate = (candidate) =>
+        candidate
+            ? {
+                  rank: typeof candidate['rank'] === 'number' ? candidate['rank'] : null,
+                  providerId: optionalWorkflowString(candidate['providerId']),
+                  model: optionalWorkflowString(candidate['providerModel']),
+                  score: typeof candidate['score'] === 'number' ? candidate['score'] : null,
+                  proofState: optionalWorkflowString(candidate['proofState']) ?? 'unproved',
+                  proofAgeHours: proofAgeHours(candidate),
+                  recentFailedProbes: Array.isArray(candidate['failedProbes']) ? candidate['failedProbes'].map(String) : [],
+              }
+            : null;
+    const headline =
+        status === 'use_current'
+            ? 'A rota atual já é a melhor opção com prova funcional fresca para esta tarefa.'
+            : status === 'switch_recommended'
+              ? 'Há uma rota melhor já comprovada; a próxima etapa é promover essa rota preservando a mesma sessão.'
+              : status === 'probe_required'
+                ? 'A melhor candidata por qualidade ainda precisa de prova funcional fresca antes de qualquer troca.'
+                : 'Nenhuma rota elegível está pronta para uso; é necessário resolver o bloqueio antes de selecionar.';
+    const why =
+        status === 'probe_required'
+            ? `O ranking ${input.selectionGoal} prefere ${discoveryProvider ?? 'provider desconhecido'}/${discoveryModel ?? 'modelo desconhecido'}, mas ela ainda não satisfaz o contrato de prova fresca de ${input.maxRuntimeProofAgeHours}h.`
+            : status === 'switch_recommended'
+              ? `${provedProvider ?? 'O provider vencedor'}/${provedModel ?? 'o modelo vencedor'} já satisfaz o contrato runtime e supera a rota atual para o perfil ${input.taskProfile}.`
+              : status === 'use_current'
+                ? `A rota atual ${provedProvider ?? 'provider atual'}/${provedModel ?? input.currentModel ?? 'modelo atual'} satisfaz o contrato runtime e continua no topo do ranking ${input.selectionGoal}.`
+                : `O discovery ranking não encontrou candidata elegível para o perfil ${input.taskProfile} sob as restrições atuais.`;
+    const operatorExplanation = {
+        language: 'pt-BR',
+        headline,
+        current: {
+            model: input.currentModel,
+            alreadyBestFreshlyProved: currentMatchesProved,
+        },
+        discoveryBest: explainCandidate(discoveryCandidate),
+        freshlyProvedBest: provedModel
+            ? {
+                  providerId: provedProvider,
+                  model: provedModel,
+                  proofState: optionalWorkflowString(provedCandidate?.['proofState']) ?? 'fresh_proved',
+                  proofAgeHours: proofAgeHours(provedCandidate),
+              }
+            : null,
+        why,
+        next:
+            status === 'use_current'
+                ? 'Continue na rota atual; não há mutação a fazer.'
+                : status === 'switch_recommended'
+                  ? 'Planeje e aplique a troca same-session usando exatamente a rota retornada pelo workflow.'
+                  : status === 'probe_required'
+                    ? 'Sonde somente a candidata #1 atual; depois descarte este ranking e execute o workflow novamente, independentemente de sucesso ou falha.'
+                    : 'Inspecione blockers, catálogo e credenciais; não enfraqueça restrições silenciosamente.',
+        alternatives: input.candidates.slice(0, 4).map(explainCandidate).filter((candidate) => candidate !== null),
+    };
     return {
         status,
         confidence,
@@ -665,6 +731,7 @@ function buildWorkflowSelectionDecision(input) {
         runtimeProofRequired: input.requireRuntimeProof,
         runtimeProofMaxAgeHours: input.maxRuntimeProofAgeHours,
         candidateChain: input.candidates,
+        operatorExplanation,
         rationale: [
             input.selectionGoal === 'quality_first'
                 ? 'quality_first:price_penalty_disabled'

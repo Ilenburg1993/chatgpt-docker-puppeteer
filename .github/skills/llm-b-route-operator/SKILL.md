@@ -42,7 +42,7 @@ For `repo_agent`, the disposable **agent probe** is the primary functional certi
 
 1. Call `model_gateway_overview` when runtime/catalog state is not already known.
 2. Call `model_gateway_workflow_plan` as the normal entry point. For best-route operation use `selectionGoal=quality_first`, `probeStrategy=aggressive`, `requireRuntimeProof=true`, and the task profile that matches the job.
-3. Read **`selectionDecision` first**. It is the concise authority for the next action:
+3. Read **`selectionDecision` first**. It is the concise authority for the next action. Use `selectionDecision.operatorExplanation` as the default user-facing explanation instead of translating machine rationale codes yourself:
    - `use_current` — current route is already the best freshly proved route;
    - `switch_recommended` — a better freshly proved route exists;
    - `probe_required` — discovery found a better candidate but no acceptable fresh proof yet;

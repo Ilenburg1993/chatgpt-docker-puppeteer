@@ -20,9 +20,10 @@ export const CONTENT = `\
 	monolíticos nem a parsers paralelos.
 - Ao mexer em runtime selection, inject, session, bridges ou routes mutáveis, remova fallback implícito, preserve erro \
 	semântico explícito e deixe diagnose/observability melhores do que antes.
-- Ao detectar indisponibilidade, falha ou pedido de troca de rota BYOK, carregue a skill \
-	\`llm-b-route-operator\` antes de selecionar ou promover provider/modelo; preserve a sessão SDK e siga sua sequência \
-	de prova, plano, apply e confirmação.`;
+- Sempre que houver seleção, comparação, dúvida de adequação/qualidade, proof stale, indisponibilidade, falha ou pedido de troca \
+	de rota/modelo BYOK, trate \`terminal:llm-b\` como cockpit canônico e carregue a skill \`llm-b-route-operator\` antes de \
+	selecionar, provar ou promover provider/modelo. Prefira \`quality_first\` quando custo/latência não forem objetivos explícitos, \
+	separe discovery ranking de fresh runtime proof, recalcule depois de cada probe e preserve a mesma sessão SDK.`;
 
 /**
  * Override action para mode 'customize'.
