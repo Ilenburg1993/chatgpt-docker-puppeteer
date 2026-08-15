@@ -313,8 +313,10 @@ describe('commands/diagnose', () => {
             expect(lowerOutput).toContain('permiss');
             expect(output).toContain('SDK');
             expect(output).toContain('interativo');
-            expect(output).toContain('automáticas');
-            expect(output).toContain('prompts SDK ignorados');
+            expect(output).toContain('não informado');
+            expect(output).toContain('fallback de compatibilidade automáticas');
+            expect(output).toContain('prompts SDK desconhecidos');
+            expect(output).not.toContain('prompts SDK ignorados');
             expect(output).toContain('Plano arquivo');
             expect(output).not.toContain('Status       idle');
             expect(output).not.toContain('Modo SDK     interactive');
@@ -390,6 +392,29 @@ describe('commands/diagnose', () => {
                     process.env[key] = value;
                 }
             }
+        }
+    });
+
+    it('distingue permission mode observado de fallback de compatibilidade', async () => {
+        const originalGetStatusSnapshot = defaultRuntime.getStatusSnapshot;
+        defaultRuntime.getStatusSnapshot = () => ({
+            status: 'processing',
+            model: 'gpt-5',
+            reasoningEffort: 'high',
+            permissionMode: 'selective',
+        });
+        const ctx = mockCtx();
+
+        try {
+            await cmdDiagnose({ hubSessionId: 'hub-1', println: ctx.println }, 'full');
+            const output = ctx.output();
+            expect(output).toContain('seletivas');
+            expect(output).toContain('prompts SDK seletivos');
+            expect(output).toContain('observado no runtime');
+            expect(output).not.toContain('fallback de compatibilidade');
+            expect(output).not.toContain('prompts SDK desconhecidos');
+        } finally {
+            defaultRuntime.getStatusSnapshot = originalGetStatusSnapshot;
         }
     });
 

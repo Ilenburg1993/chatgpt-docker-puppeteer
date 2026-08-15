@@ -263,7 +263,10 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         ? diagnoseText('assistant', renderDiagnoseSdkMode(configProjection.sdkSessionMode))
         : diagnoseText('muted', 'desconhecido');
     const permissionMode = normalizeDiagnosePermissionMode(configProjection.permissionMode);
-    const permissionLine = `${diagnoseText('assistant', renderDiagnosePermissionMode(permissionMode))} ${diagnoseText('muted', `· prompts SDK ${terminalPermissionModeSkipsSdkPrompts(permissionMode) ? 'ignorados' : 'seletivos'}`)}`;
+    const permissionModeObserved = configProjection.permissionModeObserved ?? null;
+    const permissionLine = permissionModeObserved
+        ? `${diagnoseText('assistant', renderDiagnosePermissionMode(permissionModeObserved))} ${diagnoseText('muted', `· prompts SDK ${terminalPermissionModeSkipsSdkPrompts(permissionModeObserved) ? 'ignorados' : 'seletivos'} · observado no runtime`)}`
+        : `${diagnoseText('muted', 'não informado')} ${diagnoseText('muted', `· fallback de compatibilidade ${renderDiagnosePermissionMode(permissionMode)} · prompts SDK desconhecidos`)}`;
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
     const byokLine = byok.enabled
         ? `${byok.ready ? diagnoseText('success', 'pronto') : diagnoseText('error', 'incompleto')} ${diagnoseText('muted', `preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · autenticação ${renderCompactAuthLabel(byok.auth)}`)}`
