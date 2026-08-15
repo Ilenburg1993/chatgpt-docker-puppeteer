@@ -7,9 +7,9 @@
 
 import {
     isGatewayModelAgentProbeHealthFailed,
-    isGatewayModelAgentProbeVerified,
     isGatewayModelChatHealthFailed,
     readGatewayModelHealth,
+    summarizeGatewayRuntimeProofFreshness,
 } from '../routing/index.js';
 
 /**
@@ -32,7 +32,7 @@ function modelTags(model) {
 /**
  * @param {Record<string, any>} model
  * @param {{ routeProfile?: string | null }} [options]
- * @returns {{ source: 'runtime'; chat: 'ok' | 'failed' | 'unknown'; agent: 'ok' | 'failed' | 'unknown'; proved: boolean; lastChatAt: number | null; lastAgentAt: number | null }}
+ * @returns {{ source: 'runtime'; chat: 'ok' | 'failed' | 'unknown'; agent: 'ok' | 'failed' | 'unknown'; proved: boolean; historicalProved: boolean; stale: boolean; proofAgeMs: number | null; proofMaxAgeMs: number; lastChatAt: number | null; lastAgentAt: number | null }}
  */
 function modelRuntimeHealth(model, options = {}) {
     const health = readGatewayModelHealth(model, options);
@@ -42,21 +42,26 @@ function modelRuntimeHealth(model, options = {}) {
             chat: 'unknown',
             agent: 'unknown',
             proved: false,
+            historicalProved: false,
+            stale: false,
+            proofAgeMs: null,
+            proofMaxAgeMs: 0,
             lastChatAt: null,
             lastAgentAt: null,
         };
     }
-    const chat = isGatewayModelChatHealthFailed(health) ? 'failed' : health.lastStatus === 'ok' ? 'ok' : 'unknown';
-    const agent = isGatewayModelAgentProbeHealthFailed(health)
-        ? 'failed'
-        : isGatewayModelAgentProbeVerified(health)
-          ? 'ok'
-          : 'unknown';
+    const runtimeProof = summarizeGatewayRuntimeProofFreshness(health);
+    const chat = isGatewayModelChatHealthFailed(health) ? 'failed' : runtimeProof.chatFresh ? 'ok' : 'unknown';
+    const agent = isGatewayModelAgentProbeHealthFailed(health) ? 'failed' : runtimeProof.agentFresh ? 'ok' : 'unknown';
     return {
         source: 'runtime',
         chat,
         agent,
-        proved: chat === 'ok' || agent === 'ok',
+        proved: runtimeProof.hasFreshProof,
+        historicalProved: runtimeProof.hasHistoricalProof,
+        stale: runtimeProof.stale,
+        proofAgeMs: runtimeProof.ageMs,
+        proofMaxAgeMs: runtimeProof.maxAgeMs,
         lastChatAt: Math.max(health.lastFailureAt ?? 0, health.lastSuccessAt ?? 0) || null,
         lastAgentAt: Math.max(health.lastAgentProbeFailureAt ?? 0, health.lastAgentProbeSuccessAt ?? 0) || null,
     };
@@ -70,7 +75,7 @@ function runtimeHealthTags(runtime) {
     return [
         `runtime.chat=${runtime.chat}`,
         `runtime.agent=${runtime.agent}`,
-        runtime.proved ? 'runtime=proved' : 'runtime=unproved',
+        runtime.proved ? 'runtime=proved' : runtime.stale ? 'runtime=stale' : 'runtime=unproved',
     ];
 }
 

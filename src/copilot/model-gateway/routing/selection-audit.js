@@ -618,11 +618,13 @@ function profilesById(profiles) {
  * }}
  */
 export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRuntimeSelection, options = {}) {
-    const requestedProfiles = new Set(stringList(options.profiles));
+    const requestedProfileIds = stringList(options.profiles);
+    const requestedProfiles = new Set(requestedProfileIds);
     const allPreProfiles = Array.isArray(preRuntimeSelection.profiles) ? preRuntimeSelection.profiles.filter(isRecord) : [];
+    const preProfilesById = profilesById(allPreProfiles);
     const preProfiles =
         requestedProfiles.size > 0
-            ? allPreProfiles.filter((profile) => requestedProfiles.has(optionalString(profile['profileId']) ?? ''))
+            ? requestedProfileIds.map((profileId) => preProfilesById.get(profileId)).filter((profile) => profile !== undefined)
             : allPreProfiles;
     const postProfiles = profilesById(Array.isArray(postRuntimeSelection.profiles) ? postRuntimeSelection.profiles.filter(isRecord) : []);
     const rows = preProfiles.map((preProfile) => {

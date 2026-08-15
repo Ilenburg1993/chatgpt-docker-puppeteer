@@ -607,8 +607,8 @@ function readRowsFromInput(input) {
  */
 function selectionReasons(selected, row) {
     const reasons = [`selection_source:${optionalString(row['source']) ?? 'unknown'}`];
-    if (row['hasRuntimeProof'] === true || selected?.['hasRuntimeProof'] === true) reasons.push('runtime_proof:present');
-    else reasons.push('runtime_proof:absent');
+    const proofPresent = selected ? selected['hasRuntimeProof'] === true : row['hasRuntimeProof'] === true;
+    reasons.push(proofPresent ? 'runtime_proof:present' : 'runtime_proof:absent');
     if (row['changedFromPreRuntime'] === true) reasons.push('changed_from_pre_runtime');
     return reasons;
 }
@@ -1150,7 +1150,7 @@ function runtimeSelectorPlanForRouteAttempt(plan, route) {
 
 /**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
- * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; requireAgentProbeProfiles?: string[]; preferProviderDiversity?: boolean; avoidDuplicateRoutes?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
+ * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; requireAgentProbeProfiles?: string[]; preferProviderDiversity?: boolean; avoidDuplicateRoutes?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; maxRuntimeProofAgeMs?: number; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
  * @returns {{
  *   schema: 'model-gateway-runtime-selector-plan';
  *   ok: boolean;
@@ -1206,19 +1206,29 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
         const profileId = optionalString(row['profileId']) ?? 'unknown';
         const candidateEvaluations = selectedCandidatesFromPolicyRow(row).map(({ label, selected: rawSelected }) => {
             const selected = runtimeRoute(rawSelected);
-            const hasRuntimeProof = row['hasRuntimeProof'] === true || selected?.['hasRuntimeProof'] === true;
+            const historicalRuntimeProof = row['hasRuntimeProof'] === true || selected?.['hasRuntimeProof'] === true;
             const runtimeEnv = selected ? evaluateModelGatewayRuntimeSelectorRouteEnv(selected, options.env) : null;
             const runtimeHealth =
                 selected && runtimeHealthSource
                     ? evaluateGatewayModelHealthRoute(selected, {
                           routeProfile: profileId,
                           runtimeHealthIndex: runtimeHealthSource,
+                          ...(typeof options.maxRuntimeProofAgeMs === 'number'
+                              ? { maxRuntimeProofAgeMs: options.maxRuntimeProofAgeMs }
+                              : {}),
                           ...(typeof options.temporaryFailureCooldownMs === 'number'
                               ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
                               : {}),
                           requireAgentProbeOk: runtimeSelectorProfileRequiresAgentProbe(profileId, options),
                       })
                     : null;
+            const hasRuntimeProof = runtimeHealthSource
+                ? runtimeHealth?.runtimeProof?.hasFreshProof === true
+                : historicalRuntimeProof;
+            const runtimeProofStale = runtimeHealthSource
+                ? runtimeHealth?.runtimeProof?.stale === true ||
+                  (historicalRuntimeProof && runtimeHealth?.runtimeProof?.hasFreshProof !== true)
+                : false;
             const providerCooldown =
                 selected && runtimeHealthSource
                     ? evaluateGatewayProviderHealthCooldown(selected, runtimeHealthSource, {
@@ -1245,6 +1255,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                 label,
                 selected,
                 hasRuntimeProof,
+                runtimeProofStale,
                 runtimeEnv,
                 runtimeHealth,
                 providerCooldown,
@@ -1292,6 +1303,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
         const alternativeSummary = summarizeRuntimeSelectorAlternatives(candidateEvaluations);
         const selectedForReasons = routeWithRuntimeProfile(chosen?.selected ?? runtimeRoute(selectedFromPolicyRow(row)), profileId);
         const hasRuntimeProof = chosen?.hasRuntimeProof === true;
+        const runtimeProofStale = chosen?.runtimeProofStale === true;
         const runtimeEnv = chosen?.runtimeEnv ?? null;
         const runtimeHealth = chosen?.runtimeHealth ?? null;
         const providerCooldown = chosen?.providerCooldown ?? null;
@@ -1312,6 +1324,7 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             if (providerId) selectedProviderIdsForPlan.add(providerId);
         }
         const reasons = selectionReasons(routeWithRuntimeProofFlag(selectedForReasons, hasRuntimeProof), row);
+        if (runtimeProofStale) reasons.push('runtime_proof:stale');
         if (chosen?.label && chosen.label !== 'selected') reasons.push(`runtime_selector_fallback:${chosen.label}`);
         if (blocked && !selected) reasons.push('blocked:no_selected_route');
         if (blocked && accountAccessBlocked) reasons.push('blocked:account_access_denies_attempt');
@@ -1333,9 +1346,11 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             .map((candidate) => {
                 const candidateSelected = routeWithRuntimeProfile(optionalRecord(candidate['selected']), profileId);
                 const candidateHasRuntimeProof = candidate['hasRuntimeProof'] === true;
+                const candidateRuntimeProofStale = candidate['runtimeProofStale'] === true;
                 const candidateSelectedWithProofFlag = routeWithRuntimeProofFlag(candidateSelected, candidateHasRuntimeProof);
                 const label = optionalString(candidate['label']);
                 const candidateReasons = selectionReasons(candidateSelectedWithProofFlag, row);
+                if (candidateRuntimeProofStale) candidateReasons.push('runtime_proof:stale');
                 if (label && label !== 'selected') candidateReasons.push(`runtime_selector_fallback:${label}`);
                 return {
                     profileId,
@@ -1344,6 +1359,8 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                     selected: candidateSelectedWithProofFlag,
                     selectedRouteKey: routeKey(candidateSelectedWithProofFlag),
                     hasRuntimeProof: candidateHasRuntimeProof,
+                    runtimeProofStale: candidateRuntimeProofStale,
+                    runtimeProof: optionalRecord(candidate['runtimeHealth'])?.['runtimeProof'] ?? null,
                     runtimeEnv: optionalRecord(candidate['runtimeEnv']),
                     runtimeHealth: optionalRecord(candidate['runtimeHealth']),
                     providerCooldown: optionalRecord(candidate['providerCooldown']),
@@ -1365,6 +1382,8 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             selected: blocked ? null : selectedWithProofFlag,
             selectedRouteKey: blocked ? null : routeKey(selectedWithProofFlag),
             hasRuntimeProof,
+            runtimeProofStale,
+            runtimeProof: runtimeHealth?.runtimeProof ?? null,
             runtimeEnv,
             runtimeHealth,
             providerCooldown,

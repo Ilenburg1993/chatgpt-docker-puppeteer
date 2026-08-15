@@ -13,10 +13,8 @@ import {
     createGatewayRuntimeHealthIndex,
     evaluateGatewayProviderHealthCooldown,
     evaluateGatewayModelHealthRoute,
-    isGatewayModelAgentProbeVerified,
     isGatewayModelProbeFailed,
-    isGatewayModelProbeVerified,
-    listGatewayModelVerifiedProbeKinds,
+    isGatewayModelProbeFreshlyVerified,
 } from './health-routing.js';
 import { buildModelGatewayRouteCandidates } from './candidate-builder.js';
 import { MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON } from './local-provider-opt-in.js';
@@ -542,6 +540,7 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
  *     runtimeHealthRecords?: Record<string, any>[];
  *     runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>;
  *     now?: string | number | Date;
+ *     maxRuntimeProofAgeMs?: number;
  *     temporaryFailureCooldownMs?: number;
  *     providerCooldownWindowMs?: number;
  *     providerCooldownMinFailedModels?: number;
@@ -704,13 +703,16 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
 
     const healthDecision =
         options.ignoreRuntimeHealth === true
-            ? { include: true, reason: 'runtime_health_ignored', health: null }
+            ? { include: true, reason: 'runtime_health_ignored', health: null, runtimeProof: null }
             : evaluateGatewayModelHealthRoute(model, {
                   routeProfile: options.routeProfile ?? null,
                   ...(options.excludeFailed !== undefined ? { excludeFailed: options.excludeFailed } : {}),
                   ...(Array.isArray(options.runtimeHealthRecords) ? { runtimeHealthRecords: options.runtimeHealthRecords } : {}),
                   ...(options.runtimeHealthIndex ? { runtimeHealthIndex: options.runtimeHealthIndex } : {}),
                   ...(options.now !== undefined ? { now: options.now } : {}),
+                  ...(typeof options.maxRuntimeProofAgeMs === 'number'
+                      ? { maxRuntimeProofAgeMs: options.maxRuntimeProofAgeMs }
+                      : {}),
                   ...(typeof options.temporaryFailureCooldownMs === 'number'
                       ? { temporaryFailureCooldownMs: options.temporaryFailureCooldownMs }
                       : {}),
@@ -734,30 +736,37 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     if (providerCooldownDecision?.include === false) {
         rejectedReasons.push(`provider_health_cooldown:${providerCooldownDecision.failureKinds.join('+') || 'temporary'}`);
     }
+    const runtimeProof = healthDecision.runtimeProof;
     if (healthDecision.health) {
         const runtimeProofWeights = resolveRuntimeProofWeights(options.runtimeProofWeights);
         const requestedRouteProfile = optionalString(options.routeProfile);
         const healthRouteProfile = runtimeHealthRouteProfile(healthDecision.health);
-        if (requestedRouteProfile && healthRouteProfile === requestedRouteProfile) {
+        if (runtimeProof?.hasFreshProof && requestedRouteProfile && healthRouteProfile === requestedRouteProfile) {
             score += runtimeProofWeights.exactRouteProfileProof;
             reasons.push('runtime_health_exact_route_profile');
         } else if (requestedRouteProfile && healthRouteProfile === null) {
             reasons.push('runtime_health_profileless_fallback');
         }
-        if (healthDecision.health.lastStatus === 'ok') {
+        if (runtimeProof?.chatFresh) {
             score += runtimeProofWeights.chatHealthOk;
             reasons.push('chat_health_ok');
         }
-        if (isGatewayModelAgentProbeVerified(healthDecision.health)) {
+        if (runtimeProof?.agentFresh) {
             score += runtimeProofWeights.agentProbeVerified;
             reasons.push('agent_probe_verified');
         }
-        for (const kind of listGatewayModelVerifiedProbeKinds(healthDecision.health)) {
+        for (const kind of runtimeProof?.freshProbeKinds ?? []) {
             score += runtimeProofWeights.genericProbeVerified;
             reasons.push(`runtime_probe_verified:${kind}`);
         }
+        if (runtimeProof?.stale) reasons.push(`runtime_proof_stale:${runtimeProof.ageMs ?? 'unknown'}ms`);
         for (const kind of preferredProbeKinds) {
-            if (isGatewayModelProbeVerified(healthDecision.health, kind)) {
+            if (
+                isGatewayModelProbeFreshlyVerified(healthDecision.health, kind, {
+                    ...(options.now !== undefined ? { now: options.now } : {}),
+                    ...(typeof options.maxRuntimeProofAgeMs === 'number' ? { maxAgeMs: options.maxRuntimeProofAgeMs } : {}),
+                })
+            ) {
                 const weight = MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS.includes(kind)
                     ? runtimeProofWeights.preferredLiveProtocolProbeVerified
                     : runtimeProofWeights.preferredProbeVerified;
@@ -776,10 +785,17 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         }
     }
     for (const kind of requiredProbeKinds) {
-        if (!isGatewayModelProbeVerified(healthDecision.health, kind)) rejectedReasons.push(`required_probe_missing:${kind}`);
+        if (
+            !isGatewayModelProbeFreshlyVerified(healthDecision.health, kind, {
+                ...(options.now !== undefined ? { now: options.now } : {}),
+                ...(typeof options.maxRuntimeProofAgeMs === 'number' ? { maxAgeMs: options.maxRuntimeProofAgeMs } : {}),
+            })
+        ) {
+            rejectedReasons.push(`required_probe_missing:${kind}`);
+        }
     }
-    if (options.requireRuntimeProof === true && !hasRuntimeProof(healthDecision.health)) {
-        rejectedReasons.push('runtime_proof_missing');
+    if (options.requireRuntimeProof === true && runtimeProof?.hasFreshProof !== true) {
+        rejectedReasons.push(runtimeProof?.hasHistoricalProof ? 'runtime_proof_stale' : 'runtime_proof_missing');
     }
 
     for (const preference of profile['prefers'] ?? []) {
@@ -791,7 +807,7 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             score += 20;
             reasons.push('preferred:large_context');
         }
-        if (preference === 'runtime_proved' && hasRuntimeProof(healthDecision.health)) {
+        if (preference === 'runtime_proved' && runtimeProof?.hasFreshProof === true) {
             const runtimeProofWeights = resolveRuntimeProofWeights(options.runtimeProofWeights);
             score += runtimeProofWeights.runtimeProvedPreference;
             reasons.push('preferred:runtime_proved');
@@ -1191,18 +1207,6 @@ function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
         });
     }
     return runtimeCandidates;
-}
-
-/**
- * @param {ReturnType<typeof evaluateGatewayModelHealthRoute>['health']} health
- * @returns {boolean}
- */
-function hasRuntimeProof(health) {
-    return (
-        Boolean(health?.lastStatus === 'ok') ||
-        Boolean(health && isGatewayModelAgentProbeVerified(health)) ||
-        listGatewayModelVerifiedProbeKinds(health).length > 0
-    );
 }
 
 /**

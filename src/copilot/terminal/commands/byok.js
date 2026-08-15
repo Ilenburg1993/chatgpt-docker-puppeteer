@@ -99,6 +99,7 @@ import {
     summarizeModelGatewayProviderEnvRequirements,
     summarizeModelGatewayProviderQuotaCapabilities,
     summarizeModelGatewayRefreshLogText,
+    summarizeGatewayRuntimeProofFreshness,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeProviderWireProbeMatrix,
     toOpenAIModelCatalogList,
@@ -1593,8 +1594,7 @@ function isByokModelKnownFailed(model) {
  */
 function isByokModelAgentProbeVerified(model) {
     const health = readHealthForByokModel(model);
-    if (!health || health.agentProbeStatus !== 'ok') return false;
-    return (health.lastAgentProbeSuccessAt ?? 0) >= (health.lastAgentProbeFailureAt ?? 0);
+    return health ? summarizeGatewayRuntimeProofFreshness(health).agentFresh : false;
 }
 
 /**
@@ -1636,7 +1636,9 @@ function renderByokHealthTag(health) {
         return `chat falhou (${failure}${renderByokChatHealthEvidence(health.lastErrorContext)} · ${formatByokHealthAge(health.lastFailureAt)}${limit}${health.failureCount > 1 ? ` · x${health.failureCount}` : ''})`;
     }
     if (health.lastStatus !== 'ok') return 'chat sem registro';
-    return `chat ok (${renderByokChatHealthEvidence(health.lastSuccessContext)} · ${formatByokHealthAge(health.lastSuccessAt)}${health.successCount > 1 ? ` · x${health.successCount}` : ''})`;
+    const proof = summarizeGatewayRuntimeProofFreshness(health);
+    const state = proof.chatFresh ? 'chat ok' : 'chat histórico/stale';
+    return `${state} (${renderByokChatHealthEvidence(health.lastSuccessContext)} · ${formatByokHealthAge(health.lastSuccessAt)}${health.successCount > 1 ? ` · x${health.successCount}` : ''})`;
 }
 
 /**
@@ -1648,7 +1650,9 @@ function renderByokAgentProbeHealthTag(health) {
     if (isByokAgentProbeCurrentlyFailed(health)) {
         return `agente falhou (${formatByokHealthAge(health.lastAgentProbeFailureAt)}${health.agentProbeFailureCount > 1 ? ` · x${health.agentProbeFailureCount}` : ''})`;
     }
-    return `agente ok (${formatByokHealthAge(health.lastAgentProbeSuccessAt)}${health.agentProbeSuccessCount > 1 ? ` · x${health.agentProbeSuccessCount}` : ''})`;
+    const proof = summarizeGatewayRuntimeProofFreshness(health);
+    const state = proof.agentFresh ? 'agente ok' : 'agente histórico/stale';
+    return `${state} (${formatByokHealthAge(health.lastAgentProbeSuccessAt)}${health.agentProbeSuccessCount > 1 ? ` · x${health.agentProbeSuccessCount}` : ''})`;
 }
 
 /**

@@ -24,6 +24,7 @@ export const MODEL_GATEWAY_PROVIDER_COOLDOWN_FAILURE_KINDS = Object.freeze([
 const DEFAULT_PROVIDER_COOLDOWN_WINDOW_MS = 15 * 60 * 1000;
 const DEFAULT_PROVIDER_COOLDOWN_MIN_FAILED_MODELS = 2;
 const DEFAULT_MODEL_TEMPORARY_FAILURE_COOLDOWN_MS = 15 * 60 * 1000;
+export const DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const TEMPORARY_MODEL_FAILURE_KINDS = Object.freeze(['timeout', 'network', 'upstream', 'rate-limit', 'unknown']);
 
 /**
@@ -388,6 +389,99 @@ export function listGatewayModelVerifiedProbeKinds(health) {
 }
 
 /**
+ * Convert historical positive health into a time-bounded proof that is meaningful for the current terminal session.
+ * Historical successes remain observable, but only fresh successes may promote a route as runtime-proved.
+ *
+ * @param {ReturnType<typeof readGatewayModelHealth>} health
+ * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
+ * @returns {{
+ *   hasHistoricalProof: boolean;
+ *   hasFreshProof: boolean;
+ *   stale: boolean;
+ *   maxAgeMs: number;
+ *   latestProofAt: number | null;
+ *   ageMs: number | null;
+ *   chatFresh: boolean;
+ *   agentFresh: boolean;
+ *   freshProbeKinds: string[];
+ *   staleProbeKinds: string[];
+ * }}
+ */
+export function summarizeGatewayRuntimeProofFreshness(health, options = {}) {
+    const nowMs = dateMs(options.now) ?? Date.now();
+    const maxAgeMs = positiveNumber(options.maxAgeMs, DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_MAX_AGE_MS);
+    /** @param {number | null} value */
+    const successIsFresh = (value) => {
+        const at = optionalNumber(value);
+        return at !== null && at > 0 && at <= nowMs && nowMs - at <= maxAgeMs;
+    };
+    const chatHistorical =
+        Boolean(health?.lastStatus === 'ok') &&
+        (optionalNumber(health?.lastSuccessAt) ?? 0) >= (optionalNumber(health?.lastFailureAt) ?? 0);
+    const agentHistorical = Boolean(health && isGatewayModelAgentProbeVerified(health));
+    const chatAt = chatHistorical ? optionalNumber(health?.lastSuccessAt) : null;
+    const agentAt = agentHistorical ? optionalNumber(health?.lastAgentProbeSuccessAt) : null;
+    const probeRows = health?.probes
+        ? Object.entries(health.probes)
+              .filter(([, probe]) => probe?.ok === true && probe.providerAttempted !== false)
+              .map(([kind, probe]) => ({ kind, at: optionalNumber(probe.lastAt) }))
+        : [];
+    const freshProbeKinds = probeRows.filter((row) => successIsFresh(row.at)).map((row) => row.kind).sort();
+    const staleProbeKinds = probeRows.filter((row) => !successIsFresh(row.at)).map((row) => row.kind).sort();
+    /** @type {number[]} */
+    const historicalTimes = [];
+    for (const value of [chatAt, agentAt, ...probeRows.map((row) => row.at)]) {
+        if (typeof value === 'number' && value > 0) historicalTimes.push(value);
+    }
+    const latestProofAt = historicalTimes.length > 0 ? Math.max(...historicalTimes) : null;
+    const chatFresh = chatHistorical && successIsFresh(chatAt);
+    const agentFresh = agentHistorical && successIsFresh(agentAt);
+    const hasHistoricalProof = chatHistorical || agentHistorical || probeRows.length > 0;
+    const hasFreshProof = chatFresh || agentFresh || freshProbeKinds.length > 0;
+    return {
+        hasHistoricalProof,
+        hasFreshProof,
+        stale: hasHistoricalProof && !hasFreshProof,
+        maxAgeMs,
+        latestProofAt,
+        ageMs: latestProofAt === null ? null : Math.max(0, nowMs - latestProofAt),
+        chatFresh,
+        agentFresh,
+        freshProbeKinds,
+        staleProbeKinds,
+    };
+}
+
+/**
+ * @param {ReturnType<typeof readGatewayModelHealth>} health
+ * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
+ * @returns {boolean}
+ */
+export function hasFreshGatewayRuntimeProof(health, options = {}) {
+    return summarizeGatewayRuntimeProofFreshness(health, options).hasFreshProof;
+}
+
+/**
+ * @param {ReturnType<typeof readGatewayModelHealth>} health
+ * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
+ * @returns {boolean}
+ */
+export function isGatewayModelAgentProbeFreshlyVerified(health, options = {}) {
+    return summarizeGatewayRuntimeProofFreshness(health, options).agentFresh;
+}
+
+/**
+ * @param {ReturnType<typeof readGatewayModelHealth>} health
+ * @param {string} kind
+ * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
+ * @returns {boolean}
+ */
+export function isGatewayModelProbeFreshlyVerified(health, kind, options = {}) {
+    const normalized = normalizeProbeKind(kind);
+    return normalized !== null && summarizeGatewayRuntimeProofFreshness(health, options).freshProbeKinds.includes(normalized);
+}
+
+/**
  * @param {ReturnType<typeof readGatewayModelHealth>} primary
  * @param {ReturnType<typeof readGatewayModelHealth>} fallback
  * @returns {ReturnType<typeof readGatewayModelHealth>}
@@ -581,8 +675,8 @@ export function evaluateGatewayProviderHealthCooldown(model, recordsOrIndex, opt
 
 /**
  * @param {Record<string, any>} model
- * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; now?: string | number | Date; temporaryFailureCooldownMs?: number; allowRouteProfileFallback?: boolean }} [options]
- * @returns {{ include: boolean; reason: string; health: ReturnType<typeof readGatewayModelHealth> }}
+ * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; now?: string | number | Date; maxRuntimeProofAgeMs?: number; temporaryFailureCooldownMs?: number; allowRouteProfileFallback?: boolean }} [options]
+ * @returns {{ include: boolean; reason: string; health: ReturnType<typeof readGatewayModelHealth>; runtimeProof: ReturnType<typeof summarizeGatewayRuntimeProofFreshness> | null }}
  */
 export function evaluateGatewayModelHealthRoute(model, options = {}) {
     const routeScopedOptions = {
@@ -599,11 +693,21 @@ export function evaluateGatewayModelHealthRoute(model, options = {}) {
             include: options.requireAgentProbeOk === true ? false : true,
             reason: options.requireAgentProbeOk === true ? 'agent_probe_missing' : 'health_unknown',
             health,
+            runtimeProof: null,
         };
     }
     const routeHealth = /** @type {NonNullable<typeof health>} */ (health);
+    const proofOptions = {
+        ...(options.now !== undefined ? { now: options.now } : {}),
+        ...(typeof options.maxRuntimeProofAgeMs === 'number' ? { maxAgeMs: options.maxRuntimeProofAgeMs } : {}),
+    };
     if (options.excludeFailed !== false && isGatewayModelChatHealthActivelyFailed(routeHealth, options)) {
-        return { include: false, reason: 'chat_health_failed', health: routeHealth };
+        return {
+            include: false,
+            reason: 'chat_health_failed',
+            health: routeHealth,
+            runtimeProof: summarizeGatewayRuntimeProofFreshness(routeHealth, proofOptions),
+        };
     }
     if (options.requireAgentProbeOk === true && optionalString(options.routeProfile)) {
         const fallback = readGatewayModelGlobalRuntimeHealth(model, options);
@@ -612,11 +716,24 @@ export function evaluateGatewayModelHealthRoute(model, options = {}) {
         }
     }
     const effectiveHealth = /** @type {NonNullable<typeof health>} */ (health);
-    if (options.excludeFailed !== false && options.requireAgentProbeOk === true && isGatewayModelAgentProbeHealthFailed(effectiveHealth)) {
-        return { include: false, reason: 'agent_probe_failed', health: effectiveHealth };
+    const runtimeProof = summarizeGatewayRuntimeProofFreshness(effectiveHealth, proofOptions);
+    if (
+        options.excludeFailed !== false &&
+        options.requireAgentProbeOk === true &&
+        isGatewayModelAgentProbeHealthFailed(effectiveHealth)
+    ) {
+        return { include: false, reason: 'agent_probe_failed', health: effectiveHealth, runtimeProof };
     }
     if (options.requireAgentProbeOk === true && !isGatewayModelAgentProbeVerified(effectiveHealth)) {
-        return { include: false, reason: 'agent_probe_not_verified', health: effectiveHealth };
+        return { include: false, reason: 'agent_probe_not_verified', health: effectiveHealth, runtimeProof };
     }
-    return { include: true, reason: 'health_allowed', health: effectiveHealth };
+    if (options.requireAgentProbeOk === true && !runtimeProof.agentFresh) {
+        return { include: false, reason: 'agent_probe_stale', health: effectiveHealth, runtimeProof };
+    }
+    return {
+        include: true,
+        reason: runtimeProof.stale ? 'health_allowed_runtime_proof_stale' : 'health_allowed',
+        health: effectiveHealth,
+        runtimeProof,
+    };
 }

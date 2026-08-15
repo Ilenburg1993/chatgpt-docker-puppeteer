@@ -8,17 +8,22 @@
 export { buildModelGatewayRouteCandidates } from './candidate-builder.js';
 export { explainGatewayRouteDecision } from './explain.js';
 export {
+    DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_MAX_AGE_MS,
     MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
     MODEL_GATEWAY_PROVIDER_COOLDOWN_FAILURE_KINDS,
     createGatewayRuntimeHealthIndex,
     evaluateGatewayModelHealthRoute,
     evaluateGatewayProviderHealthCooldown,
+    hasFreshGatewayRuntimeProof,
+    isGatewayModelAgentProbeFreshlyVerified,
     isGatewayModelAgentProbeHealthFailed,
     isGatewayModelAgentProbeVerified,
     isGatewayModelChatHealthFailed,
     isGatewayModelProbeFailed,
+    isGatewayModelProbeFreshlyVerified,
     isGatewayModelProbeVerified,
     listGatewayModelVerifiedProbeKinds,
+    summarizeGatewayRuntimeProofFreshness,
     readGatewayModelHealth,
     readGatewayModelHealthFromIndex,
     readGatewayModelHealthFromRecords,
