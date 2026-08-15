@@ -95,11 +95,15 @@ describe('copilot MCP runtime metrics', () => {
             phaseTotals: Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>;
             slowestPhases: Array<{ tool: string; phase: string; calls: number; averageMs: number | null }>;
             ioCache?: { lineOffsets?: Record<string, unknown> };
+            ioCacheBenchmark?: Record<string, unknown> | null;
+            ioCachePlanWithBenchmark?: { l2Decision?: string; evidence?: Record<string, unknown> };
             ioParser?: { fileContext?: Record<string, unknown> };
             aiArtifacts?: Record<string, unknown>;
         }} */ (result.structuredContent.metrics);
         assert.equal(metrics.totals.calls, 2);
         assert.equal(typeof metrics.ioCache?.lineOffsets?.['size'], 'number');
+        assert.ok(metrics.ioCachePlanWithBenchmark);
+        assert.equal(typeof metrics.ioCachePlanWithBenchmark?.l2Decision, 'string');
         assert.equal(typeof metrics.ioParser?.fileContext?.['size'], 'number');
         assert.equal(typeof metrics.aiArtifacts?.['aiPath'], 'string');
         assert.deepEqual(Object.keys(metrics.phaseTotals), ['handler', 'authorization']);

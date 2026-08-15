@@ -14,6 +14,7 @@ import {
     readCloudflareTunnelConfig,
 } from '#copilot/mcp/cloudflare';
 import {
+    IO_CACHE_BENCHMARK_STATE_PATH,
     appendMcpAuditEvent,
     boundedWriteAnnotations,
     errorResult,
@@ -28,9 +29,11 @@ import { repoStatusHandler } from './repo-status.js';
 import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';
 
 const TRANSPORT_BENCHMARK_RUNNER = 'src/copilot/mcp/scripts/scheduled-transport-benchmark-runner.js';
+const IO_CACHE_BENCHMARK_RUNNER = 'src/copilot/mcp/scripts/scheduled-io-cache-benchmark-runner.js';
 const missionSchema = z.enum([
     'diagnose-mcp',
     'validate-focused',
+    'benchmark-io-cache',
     'benchmark-transport',
     'validate-mcp-full',
     'maintenance-safe-dry-run',
@@ -53,6 +56,13 @@ function buildMissionPlan(mission) {
         return [
             { step: 'run_copilot_validator', effect: 'Start one unit-focused validator job for an explicit Copilot test file.' },
             { step: 'job_get_summary', effect: 'Caller reads compact focused-job status.' },
+        ];
+    }
+    if (mission === 'benchmark-io-cache') {
+        return [
+            { step: 'mcp_runtime_health', effect: 'Read current IO-cache posture and last persisted representative benchmark.' },
+            { step: 'scheduled_io_cache_benchmark_runner', effect: 'Detached runner measures cold/L1/L2 in isolated child processes and temporary SQLite.' },
+            { step: 'mcp_runtime_health', effect: 'Read persisted benchmark evidence and evidence-aware cache plan.' },
         ];
     }
     if (mission === 'benchmark-transport') {
@@ -180,6 +190,37 @@ export const delegateToRepoAutonomyRunnerTool = {
                 plan,
                 job,
                 nextStep: 'Use job_get_summary with job.id; read a small job_get_output tail only on failure.',
+            });
+        }
+
+        if (selectedMission === 'benchmark-io-cache') {
+            const requestId = `mcp-io-cache-benchmark-${randomUUID()}`;
+            const child = spawn(process.execPath, [IO_CACHE_BENCHMARK_RUNNER, '--request-id', requestId], {
+                cwd: getMcpWorkspaceRoot(),
+                env: process.env,
+                detached: true,
+                stdio: 'ignore',
+            });
+            child.unref();
+            await appendMcpAuditEvent({
+                event: 'mcp_io_cache_benchmark_scheduled',
+                tool: 'delegate_to_repo_autonomy_runner',
+                requestId,
+                runnerPid: child.pid ?? null,
+            });
+            return okResult({
+                success: true,
+                mission: selectedMission,
+                dryRun: false,
+                executed: true,
+                scheduled: true,
+                plan,
+                requestId,
+                stateFile: IO_CACHE_BENCHMARK_STATE_PATH,
+                runnerPid: child.pid ?? null,
+                autoEnable: false,
+                isolatedDb: true,
+                nextStep: 'Use mcp_runtime_health to read persisted benchmark evidence; do not enable L2 automatically.',
             });
         }
 

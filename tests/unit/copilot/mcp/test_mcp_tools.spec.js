@@ -792,6 +792,13 @@ describe('copilot MCP tools', () => {
         assert.equal(missingFocusedFile.isError, true);
         assert.equal(missingFocusedFile.structuredContent?.['code'], 'ERR_FOCUSED_TEST_FILE_REQUIRED');
 
+        const cacheBenchmark = await tool.handler({ mission: 'benchmark-io-cache', dryRun: true });
+        assert.equal(cacheBenchmark.isError, undefined);
+        assert.equal(cacheBenchmark.structuredContent?.['executed'], false);
+        const cacheBenchmarkPlan = /** @type {{ step?: string }[]} */ (cacheBenchmark.structuredContent?.['plan']);
+        assert.ok(cacheBenchmarkPlan.some((step) => step.step === 'scheduled_io_cache_benchmark_runner'));
+        assert.equal(cacheBenchmarkPlan.some((step) => step.step === 'mcp_run_safe_validation_suite'), false);
+
         const benchmark = await tool.handler({ mission: 'benchmark-transport', dryRun: true });
         assert.equal(benchmark.isError, undefined);
         assert.equal(benchmark.structuredContent?.['executed'], false);

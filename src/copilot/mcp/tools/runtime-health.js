@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { buildIoCacheTierPlan } from '#copilot/infra/public/cache';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/health';
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import {
@@ -22,6 +23,7 @@ import {
     okResult,
     readMcpAuthConfigCacheStats,
     readMcpAuthDecisionCacheStats,
+    readIoCacheBenchmarkState,
     readMcpHttpStatefulSessionPolicy,
     readMcpIndexAutoBuildState,
     readMcpMetricsSnapshot,
@@ -251,6 +253,64 @@ function readStatefulRuntimePolicySnapshot() {
     };
 }
 
+/** @param {unknown} value @returns {Record<string, unknown>} */
+function recordOrEmpty(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
+}
+
+/** @param {Record<string, unknown> | null} state */
+function summarizeIoCacheBenchmark(state) {
+    if (!state) return null;
+    const phases = recordOrEmpty(state['phases']);
+    /** @param {string} name */
+    const compactPhase = (name) => {
+        const phase = recordOrEmpty(phases[name]);
+        return {
+            allExpectedCacheHits: phase['allExpectedCacheHits'] === true,
+            successfulSamples: phase['successfulSamples'] ?? null,
+            latency: phase['latency'] ?? null,
+        };
+    };
+    return {
+        status: state['status'] ?? null,
+        requestId: state['requestId'] ?? null,
+        completedAt: state['completedAt'] ?? null,
+        durationMs: state['durationMs'] ?? null,
+        sampleCountPerPhase: state['sampleCountPerPhase'] ?? null,
+        phases: {
+            cold: compactPhase('cold'),
+            l1: compactPhase('l1'),
+            l2: compactPhase('l2'),
+        },
+        decision: state['decision'] ?? null,
+        isolatedDb: state['isolatedDb'] === true,
+        cleanedTemporaryDb: state['cleanedTemporaryDb'] === true,
+        autoEnable: state['autoEnable'] === true,
+        error: state['error'] ?? null,
+    };
+}
+
+/** @param {ReturnType<typeof readIoRuntimeHealthSnapshot>} ioRuntime @param {Record<string, unknown> | null} benchmarkState */
+function buildEvidenceAwareIoCachePlan(ioRuntime, benchmarkState) {
+    const cache = recordOrEmpty(ioRuntime.cache);
+    const aggregate = recordOrEmpty(cache['aggregate']);
+    const l2 = recordOrEmpty(cache['l2']);
+    const index = recordOrEmpty(ioRuntime.index);
+    const decision = recordOrEmpty(benchmarkState?.['decision']);
+    const workspaceFiles = Number(index['files'] ?? index['fileCount'] ?? 0);
+    const readHotsetRatio = Number(aggregate['hitRatio'] ?? 0);
+    return buildIoCacheTierPlan({
+        l1Enabled: true,
+        l2Enabled: l2['enabled'] === true,
+        l3Enabled: false,
+        workspaceFiles: Number.isFinite(workspaceFiles) ? workspaceFiles : 0,
+        readHotsetRatio: Number.isFinite(readHotsetRatio) ? readHotsetRatio : 0,
+        representativeBenchmarkPassed: decision['representativeBenchmarkPassed'] === true,
+    });
+}
+
 export const mcpRuntimeHealthTool = {
     name: 'mcp_runtime_health',
     title: 'MCP runtime health',
@@ -268,6 +328,9 @@ export const mcpRuntimeHealthTool = {
         const authDecisionCache = readMcpAuthDecisionCacheStats();
         const repoReadFileCache = readRepoReadFileResultCacheStats();
         const ioRuntime = readIoRuntimeHealthSnapshot();
+        const ioCacheBenchmarkState = await readIoCacheBenchmarkState();
+        const ioCacheBenchmark = summarizeIoCacheBenchmark(ioCacheBenchmarkState);
+        const ioCachePlanWithBenchmark = buildEvidenceAwareIoCachePlan(ioRuntime, ioCacheBenchmarkState);
         const aiArtifacts = await buildAiArtifactsReport();
         const tunnelConfig = readCloudflareTunnelConfig();
         const tunnelState = await readQuickTunnelState(tunnelConfig.stateFile);
@@ -367,6 +430,8 @@ export const mcpRuntimeHealthTool = {
                     authorizationCache: authDecisionCache,
                     repoReadFileCache,
                     ioCache: ioRuntime.cache,
+                    ioCacheBenchmark,
+                    ioCachePlanWithBenchmark,
                     ioParser: ioRuntime.parser,
                     aiArtifacts,
                 },
@@ -414,6 +479,8 @@ export const mcpRuntimeHealthTool = {
                 authorizationCache: authDecisionCache,
                 repoReadFileCache,
                 ioCache: ioRuntime.cache,
+                ioCacheBenchmark,
+                ioCachePlanWithBenchmark,
                 ioParser: ioRuntime.parser,
                 aiArtifacts,
             },

@@ -186,6 +186,8 @@ export async function runArchitectureContractCheck() {
         'src/copilot/mcp/tools/restart-control.js',
         'src/copilot/mcp/scripts/scheduled-restart-runner.js',
         'src/copilot/mcp/scripts/scheduled-transport-benchmark-runner.js',
+        'src/copilot/mcp/scripts/io-cache-benchmark-worker.js',
+        'src/copilot/mcp/scripts/scheduled-io-cache-benchmark-runner.js',
     ]) {
         const exists = await stat(resolve(ROOT, path))
             .then((value) => value.isFile())

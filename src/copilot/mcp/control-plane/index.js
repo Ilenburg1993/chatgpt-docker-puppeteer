@@ -14,6 +14,7 @@ export * from './dev-oauth.js';
 export * from './event-store.js';
 export * from './http-client.js';
 export * from './index-auto-build.js';
+export * from './io-cache-benchmark-state.js';
 export * from './jobs.js';
 export * from './latency-history.js';
 export * from './metrics.js';
