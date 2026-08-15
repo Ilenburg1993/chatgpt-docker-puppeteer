@@ -1,6 +1,7 @@
 // @ts-check
 
 import {
+    buildModelGatewayRuntimeSelectorProbeEnv,
     classifyModelGatewayDeferredRouteOperation,
     collectModelGatewaySecretAuditEnvValues,
     DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS,
@@ -12,7 +13,6 @@ import {
     createModelGatewayReadControlPlane,
     createModelGatewaySameSessionRouteSwitchOperationId,
     executeModelGatewayProbe,
-    materializeModelGatewayActiveByokProfileEnv,
     readModelGatewayProbeOperation,
     removeModelGatewayByokProfileEnv,
     redactModelGatewayAuditedValue,
@@ -1759,15 +1759,14 @@ export const modelGatewayProbeExecuteTool = buildTool({
                 }),
             );
         }
-        const rawEnv = {
-            ...process.env,
-            COPILOT_BYOK_ENABLED: 'true',
-            COPILOT_BYOK_MODEL: args.modelId,
-            ...(args.profileId
-                ? { COPILOT_BYOK_PROFILE: args.profileId, COPILOT_BYOK_PROVIDER_PRESET: undefined }
-                : { COPILOT_BYOK_PROFILE: undefined, COPILOT_BYOK_PROVIDER_PRESET: args.providerId }),
-        };
-        const env = materializeModelGatewayActiveByokProfileEnv(rawEnv).env;
+        const env = buildModelGatewayRuntimeSelectorProbeEnv(
+            {
+                providerId: args.providerId,
+                providerModel: args.modelId,
+                ...(args.profileId ? { providerProfile: args.profileId } : {}),
+            },
+            process.env,
+        );
         const binding = resolveModelGatewaySessionBinding(env, args.modelId);
         const boundProviderId = binding.gatewayBinding?.providerId ?? null;
         if (!binding.enabled || !binding.ready || boundProviderId !== args.providerId) {
