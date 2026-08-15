@@ -467,10 +467,10 @@ function validateProfile(value, field) {
  */
 function buildLiveRunPlan(input) {
     const requestedScenario = input.scenario;
-    const resolvedScenario =
-        input.mode === 'byok-real-turn' && requestedScenario === 'model-gateway-tools-apply-safe'
-            ? 'model-gateway-adaptive-probe'
-            : requestedScenario;
+    const adaptiveModelGatewayTurn =
+        (input.mode === 'byok-real-turn' || input.mode === 'canonical-turn') &&
+        requestedScenario === 'model-gateway-tools-apply-safe';
+    const resolvedScenario = adaptiveModelGatewayTurn ? 'model-gateway-adaptive-probe' : requestedScenario;
     const args = [
         `--live-scenario=${resolvedScenario}`,
         `--transport=${input.transport}`,
@@ -486,6 +486,11 @@ function buildLiveRunPlan(input) {
         args.push('--control-only');
     } else if (input.mode === 'canonical-turn') {
         invokesModel = true;
+        if (resolvedScenario === 'model-gateway-adaptive-probe') {
+            args.push('--model-gateway-control-plane-probes');
+            invokesRealProvider = true;
+            executesRuntimeProbes = true;
+        }
     } else if (input.mode === 'byok-fixture-control') {
         args.push('--byok-probe', '--byok-fixture', '--control-only');
         executesRuntimeProbes = true;
@@ -510,7 +515,8 @@ function buildLiveRunPlan(input) {
 
     const requiresUsageConfirmation = invokesModel || invokesRealProvider;
     const executionMode =
-        input.mode === 'byok-real-turn' && resolvedScenario === 'model-gateway-adaptive-probe'
+        resolvedScenario === 'model-gateway-adaptive-probe' &&
+        (input.mode === 'byok-real-turn' || input.mode === 'canonical-turn')
             ? 'detached'
             : 'synchronous';
     return {
@@ -525,11 +531,14 @@ function buildLiveRunPlan(input) {
         invokesRealProvider,
         executesRuntimeProbes,
         requiresUsageConfirmation,
-        billingNote: invokesRealProvider
-            ? 'BYOK/provider quota or billing may be consumed.'
-            : invokesModel
-              ? 'GitHub Copilot AI Credits/token usage may be consumed.'
-              : 'No explicit model turn is requested by this plan.',
+        billingNote:
+            invokesModel && invokesRealProvider
+                ? 'GitHub Copilot AI Credits/token usage and BYOK/provider quota or billing may be consumed.'
+                : invokesRealProvider
+                  ? 'BYOK/provider quota or billing may be consumed.'
+                  : invokesModel
+                    ? 'GitHub Copilot AI Credits/token usage may be consumed.'
+                    : 'No explicit model turn is requested by this plan.',
     };
 }
 

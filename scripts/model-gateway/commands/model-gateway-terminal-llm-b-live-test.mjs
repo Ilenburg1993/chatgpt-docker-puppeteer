@@ -7764,10 +7764,12 @@ async function main() {
     const modelProbe = hasFlag('--model-probe');
     const autoProbeProfile = readArg('--auto-probe-profile', 'repo_agent');
     const byokReal = hasFlag('--byok-real');
+    const liveScenario = readLiveScenario();
+    const modelGatewayControlPlaneProbes =
+        hasFlag('--model-gateway-control-plane-probes') && !byokReal && isModelGatewayToolScenario(liveScenario);
     const byokControlProbe = !byokReal && (byokProbe || byokFixture);
     const autoControlProbe = autoProbe && !byokReal && !byokControlProbe;
     const modelControlProbe = modelProbe && !byokReal && !byokControlProbe && !autoControlProbe;
-    const liveScenario = readLiveScenario();
     const scenarioKind = liveScenarioKind({
         autoControlProbe,
         modelControlProbe,
@@ -7829,7 +7831,13 @@ async function main() {
     const mdPath = path.join(outDir, 'summary.md');
     const byokFixtureProvider = byokFixture ? await startByokFixtureProviderServer() : null;
     const byokFixtureBaseUrl = byokFixtureProvider?.baseUrl ?? 'http://127.0.0.1:11434/v1';
-    const dotenvEnv = byokReal ? await loadDotenvLocalEnv() : {};
+    const dotenvEnv = byokReal || modelGatewayControlPlaneProbes ? await loadDotenvLocalEnv() : {};
+    const controlPlaneHostEnv = modelGatewayControlPlaneProbes
+        ? (await import('../../../src/copilot/model-gateway/index.js')).buildModelGatewayControlPlaneHostEnv({
+              ...process.env,
+              ...dotenvEnv,
+          })
+        : null;
     const realByok = byokReal
         ? await buildRealByokRuntime({
               dotenvEnv,
@@ -7859,8 +7867,13 @@ async function main() {
               requireAgentAdmission: !controlOnly && isModelGatewayToolScenario(liveScenario),
           })
         : null;
-    const secretValues = byokReal
-        ? collectSecretValues({ ...process.env, ...dotenvEnv, ...(realByok?.env ?? {}) })
+    const secretValues = byokReal || modelGatewayControlPlaneProbes
+        ? collectSecretValues({
+              ...process.env,
+              ...dotenvEnv,
+              ...(controlPlaneHostEnv ?? {}),
+              ...(realByok?.env ?? {}),
+          })
         : [];
     if (byokReal && byokRealRuntimeSelectorProfile && !realByok?.runtimeRoute) {
         const blocker = {
@@ -8117,12 +8130,12 @@ async function main() {
     let incompleteExpectedToolRecoveryPlainOffset = 0;
     let forcedKillTimer = null;
     const command = buildTerminalLlmbCommand(canUsePty);
+    const terminalInheritedEnv = controlPlaneHostEnv ?? { ...process.env, ...dotenvEnv };
 
     const child = spawn(command.cmd, command.args, {
         cwd: ROOT,
         env: {
-            ...process.env,
-            ...dotenvEnv,
+            ...terminalInheritedEnv,
             ...(byokFixture ? buildByokFixtureEnv({ baseUrl: byokFixtureBaseUrl }) : {}),
             ...(modelControlProbe ? { COPILOT_BYOK_ENABLED: 'false' } : {}),
             ...(realByok?.env ?? {}),

@@ -48,6 +48,7 @@ export {
     scoreGatewayModelCandidate,
 } from './policy-engine.js';
 export {
+    buildModelGatewayControlPlaneHostEnv,
     buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorProbeRun,
     buildModelGatewayRuntimeProofCommands,

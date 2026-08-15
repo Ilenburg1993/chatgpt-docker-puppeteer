@@ -415,6 +415,7 @@ export {
 } from './profiles/index.js';
 export {
     applyModelGatewaySelectionTraceRetention,
+    buildModelGatewayControlPlaneHostEnv,
     buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorProbeRun,
     buildModelGatewayRuntimeProofCommands,

@@ -399,6 +399,27 @@ function runtimeSelectorProfileRequiresAgentProbe(profileId, options = {}) {
 }
 
 /**
+ * Build the environment for a Model Gateway control-plane host that must stay on the native Copilot SDK while still
+ * retaining provider credentials for disposable BYOK probes.
+ *
+ * Active route/model/base-url materialization is removed. Generic BYOK credentials are restored only as dormant
+ * probe inputs; `COPILOT_BYOK_ENABLED=false` prevents them from becoming the controller session binding.
+ *
+ * @param {Record<string, string | undefined>} [baseEnv]
+ * @returns {Record<string, string | undefined>}
+ */
+export function buildModelGatewayControlPlaneHostEnv(baseEnv = process.env) {
+    const env = { ...baseEnv };
+    const genericApiKey = baseEnv['COPILOT_BYOK_API_KEY'];
+    const genericBearerToken = baseEnv['COPILOT_BYOK_BEARER_TOKEN'];
+    for (const key of RUNTIME_ROUTE_ENV_RESET_KEYS) delete env[key];
+    if (genericApiKey) env['COPILOT_BYOK_API_KEY'] = genericApiKey;
+    if (genericBearerToken) env['COPILOT_BYOK_BEARER_TOKEN'] = genericBearerToken;
+    env['COPILOT_BYOK_ENABLED'] = 'false';
+    return env;
+}
+
+/**
  * Build an isolated BYOK env for the selected runtime route.
  *
  * The configured terminal BYOK provider is often just the operator's current default. Runtime selection needs to test
