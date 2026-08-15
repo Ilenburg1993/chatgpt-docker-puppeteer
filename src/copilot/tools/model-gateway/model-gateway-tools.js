@@ -377,7 +377,10 @@ function invalidProfileManageResult(options) {
  * @returns {string | null}
  */
 function optionalWorkflowString(value) {
-    return typeof value === 'string' && value.trim() ? value.trim() : null;
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim();
+    if (!normalized || normalized === '__UNSET__') return null;
+    return normalized;
 }
 
 /**
@@ -896,6 +899,8 @@ export const modelGatewayWorkflowPlanTool = buildTool({
             maxSnapshotAgeHours: args.maxSnapshotAgeHours,
             operationLimit: 10,
         });
+        const runtimeId = optionalWorkflowString(args.runtimeId);
+        const preferredProviderId = optionalWorkflowString(args.providerId);
         const selectionGoal = optionalWorkflowString(args.selectionGoal) ?? 'balanced';
         const probeStrategy = optionalWorkflowString(args.probeStrategy) ?? 'balanced';
         const maxRuntimeProofAgeHours =
@@ -926,13 +931,13 @@ export const modelGatewayWorkflowPlanTool = buildTool({
         const candidateModelIds = Array.isArray(args.candidateModelIds) ? args.candidateModelIds.map(String) : [];
         const probeCandidates = buildWorkflowProbeCandidateChain(routeData, {
             candidateModelIds,
-            providerId: optionalWorkflowString(args.providerId),
+            providerId: preferredProviderId,
             maxCandidates: args.maxCandidates,
             probeStrategy,
         });
-        const currentRuntime = readOptionalRuntimeCurrentModel(optionalWorkflowString(args.runtimeId));
+        const currentRuntime = readOptionalRuntimeCurrentModel(runtimeId);
         const selectionDecision = buildWorkflowSelectionDecision({
-            runtimeId: optionalWorkflowString(args.runtimeId),
+            runtimeId,
             taskProfile: args.taskProfile,
             selectionGoal,
             requireRuntimeProof: args.requireRuntimeProof,
@@ -995,7 +1000,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
         let order = 1;
         steps.push(
             workflowStep(order++, 'overview', 'model_gateway_overview', 'read', 'Inspecionar readiness, BYOK, catálogo e runtime alvo.', {
-                runtimeId: args.runtimeId,
+                runtimeId,
                 maxSnapshotAgeHours: args.maxSnapshotAgeHours,
                 operationLimit: 10,
             }),
@@ -1170,7 +1175,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     {
                         mode: 'plan',
                         route: selectedRoute,
-                        runtimeId: args.runtimeId,
+                        runtimeId,
                         timeoutMs: 60000,
                         idempotencyKey: routeKey,
                         confirm: false,
@@ -1188,7 +1193,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     {
                         mode: 'apply',
                         route: selectedRoute,
-                        runtimeId: args.runtimeId,
+                        runtimeId,
                         timeoutMs: 60000,
                         idempotencyKey: routeKey,
                         confirm: true,
@@ -1225,7 +1230,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     {
                         mode: 'plan',
                         modelId: selectedModelId,
-                        runtimeId: args.runtimeId,
+                        runtimeId,
                         idempotencyKey: switchKey,
                         confirm: false,
                     },
@@ -1242,7 +1247,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     {
                         mode: 'apply',
                         modelId: selectedModelId,
-                        runtimeId: args.runtimeId,
+                        runtimeId,
                         idempotencyKey: switchKey,
                         confirm: true,
                     },
@@ -1262,7 +1267,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     {
                         mode: 'plan',
                         expectedModelId: selectedModelId,
-                        runtimeId: args.runtimeId,
+                        runtimeId,
                         idempotencyKey: reconcileKey,
                         confirm: false,
                     },
@@ -1279,7 +1284,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     {
                         mode: 'apply',
                         expectedModelId: selectedModelId,
-                        runtimeId: args.runtimeId,
+                        runtimeId,
                         idempotencyKey: reconcileKey,
                         confirm: true,
                     },
@@ -1365,7 +1370,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                 data: {
                     objective: args.objective,
                     taskProfile: args.taskProfile,
-                    runtimeId: args.runtimeId,
+                    runtimeId,
                     selectionGoal,
                     probeStrategy,
                     maxRuntimeProofAgeHours,

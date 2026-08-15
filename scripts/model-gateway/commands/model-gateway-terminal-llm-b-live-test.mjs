@@ -419,7 +419,7 @@ const LIVE_SCENARIOS = Object.freeze({
         answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
         beforeDeltaInstructions: [
             'Depois do read_file_content, invoque a ferramenta real model_gateway_control_plane_guide com objective="same_session_switch", includeTerminalCommands=true e includeApplyExamples=true.',
-            'Em seguida invoque a ferramenta real model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["chat","agent"], maxSnapshotAgeHours=720, maxCandidates=5, maxProbeCount=2, maxEstimatedCostUsd=0, idempotencyKeyPrefix="live-readonly-workflow-20260616", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true e requireRuntimeProof=true.',
+            'Em seguida invoque a ferramenta real model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["agent"], maxSnapshotAgeHours=720, maxCandidates=8, maxProbeCount=1, maxEstimatedCostUsd=10, idempotencyKeyPrefix="live-readonly-workflow-20260814", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true, requireRuntimeProof=true, selectionGoal="quality_first", probeStrategy="aggressive" e maxRuntimeProofAgeHours=24.',
             'Não invoque model_gateway_probe_execute, model_gateway_route_switch, model_gateway_model_switch, model_gateway_runtime_reconcile nem qualquer outra tool mutável neste cenário; somente planeje e leia.',
             'Aguarde as duas tools model-gateway read-only concluírem e só então escreva as oito linhas DELTA-CANONICAL.',
         ],
@@ -465,14 +465,14 @@ const LIVE_SCENARIOS = Object.freeze({
             'Depois do read_file_content, invoque exatamente as 16 tools model_gateway_* abaixo, nesta ordem, usando chamadas reais do SDK e os argumentos exatos informados.',
             '1) model_gateway_overview com runtimeId=null, maxSnapshotAgeHours=720, operationLimit=5.',
             '2) model_gateway_control_plane_guide com objective="all", includeTerminalCommands=true, includeApplyExamples=false.',
-            '3) model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=["nex-agi/nex-n2-pro:free"], preferredProbeKinds=["chat","agent"], maxSnapshotAgeHours=720, maxCandidates=5, maxProbeCount=2, maxEstimatedCostUsd=0, idempotencyKeyPrefix="live-all-tools-20260616", includeCatalogRefreshPlan=true, includeRouteSwitchPlan=true e requireRuntimeProof=true.',
+            '3) model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["agent"], maxSnapshotAgeHours=720, maxCandidates=8, maxProbeCount=1, maxEstimatedCostUsd=10, idempotencyKeyPrefix="live-all-tools-20260814", includeCatalogRefreshPlan=true, includeRouteSwitchPlan=true, requireRuntimeProof=true, selectionGoal="quality_first", probeStrategy="aggressive" e maxRuntimeProofAgeHours=24.',
             '4) model_gateway_catalog_search com query="nex", providerId=null, onlyEligible=false, requireTools=false, requireStreaming=false, requireReasoning=false, limit=5.',
-            '5) model_gateway_route_plan com taskProfile="repo_agent", maxCandidates=5, evaluateEligibility=true.',
+            '5) model_gateway_route_plan com taskProfile="repo_agent", maxCandidates=8, evaluateEligibility=true, selectionGoal="quality_first", proofPolicy="metadata_only" e maxRuntimeProofAgeHours=24.',
             '6) model_gateway_operation_status com operationId=null, limit=5.',
             '7) model_gateway_model_evaluate com modelIds=["nex-agi/nex-n2-pro:free"], taskProfile="repo_agent", maxResults=5.',
             '8) model_gateway_policy_propose com objective="prefer_runtime_proved", taskProfile="repo_agent", candidateModelIds=["nex-agi/nex-n2-pro:free"], maxCandidates=5.',
-            '9) model_gateway_probe_plan com modelIds=["nex-agi/nex-n2-pro:free"], providerId="kilo-code", allowedProbeKinds=["chat","agent"], maxProbeCount=2, maxEstimatedCostUsd=0, unknownCostPolicy="allow", recommendationLimit=5, probeFailureCooldownSeconds=900.',
-            '10) model_gateway_probe_execute com mode="plan", probeKind="chat", providerId="kilo-code", modelId="nex-agi/nex-n2-pro:free", profileId="kilo", maxEstimatedCostUsd=0, timeoutMs=60000, idempotencyKey="live-all-tools-20260616:probe-plan", confirm=false.',
+            '9) model_gateway_probe_plan com modelIds=["nex-agi/nex-n2-pro:free"], providerId="kilo-code", allowedProbeKinds=["agent"], maxProbeCount=1, maxEstimatedCostUsd=10, unknownCostPolicy="allow", recommendationLimit=5, probeFailureCooldownSeconds=900.',
+            '10) model_gateway_probe_execute com mode="plan", probeKind="agent", providerId="kilo-code", modelId="nex-agi/nex-n2-pro:free", profileId="kilo", maxEstimatedCostUsd=10, unknownCostPolicy="allow", timeoutMs=60000, idempotencyKey="live-all-tools-20260814:probe-plan", confirm=false.',
             '11) model_gateway_model_switch com mode="plan", modelId="nex-agi/nex-n2-pro:free", runtimeId=null, idempotencyKey="live-all-tools-20260616:model-switch-plan", confirm=false.',
             '12) model_gateway_route_switch com mode="plan", route={providerId:"kilo-code", providerModel:"nex-agi/nex-n2-pro:free", selectorSyntax:"nex-agi/nex-n2-pro:free", baseUrl:"https://api.kilo.ai/api/gateway", openAICompatibleBaseUrl:"https://api.kilo.ai/api/gateway", wireApi:"completions", providerProfile:"kilo", routeProfile:"repo_agent", selectedRouteKey:"live-all-tools-route-plan"}, runtimeId=null, timeoutMs=60000, idempotencyKey="live-all-tools-20260616:route-switch-plan", confirm=false.',
             '13) model_gateway_catalog_refresh com mode="plan", includePublic=true, includeAuthenticated=false, force=false, sourceIds=[], refreshAccountOverlays=false, maxSourceResults=5, idempotencyKey="live-all-tools-20260616:catalog-refresh-plan", confirm=false.',
@@ -832,7 +832,7 @@ function buildIncompleteExpectedToolRecoveryPrompt(
     }
     if (missing.includes('model_gateway_workflow_plan')) {
         instructions.push(
-            'Se model_gateway_workflow_plan ainda estiver faltando, invoque model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["chat","agent"], maxSnapshotAgeHours=720, maxCandidates=5, maxProbeCount=2, maxEstimatedCostUsd=0, idempotencyKeyPrefix="live-readonly-workflow-20260616", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true e requireRuntimeProof=true.',
+            'Se model_gateway_workflow_plan ainda estiver faltando, invoque model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["agent"], maxSnapshotAgeHours=720, maxCandidates=8, maxProbeCount=1, maxEstimatedCostUsd=10, idempotencyKeyPrefix="live-readonly-workflow-20260814", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true, requireRuntimeProof=true, selectionGoal="quality_first", probeStrategy="aggressive" e maxRuntimeProofAgeHours=24.',
         );
     }
     if (missing.includes('model_gateway_overview')) {
@@ -1648,7 +1648,14 @@ function buildRuntimeSelectorProviderCommand(runtimeRoute) {
         .join(' ');
 }
 
-function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, provider, altProvider, runtimeRoute }) {
+function isModelGatewayToolScenario(liveScenario) {
+    return typeof liveScenario?.id === 'string' && liveScenario.id.startsWith('model-gateway-');
+}
+
+function buildByokRealPreflightCommands(
+    { profile, altProfile, model, altModel, provider, altProvider, runtimeRoute },
+    { lean = false } = {},
+) {
     const commands = ['/session sdk 8', runtimeRoute ? '/byok reload --no-status' : '/byok reload'];
     const runtimeProviderCommand = buildRuntimeSelectorProviderCommand(runtimeRoute);
     if (runtimeProviderCommand) {
@@ -1658,17 +1665,20 @@ function buildByokRealPreflightCommands({ profile, altProfile, model, altModel, 
         if (model) commands.push(`/byok model ${model}`);
     }
     commands.push('/byok env', '/byok providers', '/byok health', '/byok profiles');
-    commands.push(
-        '/byok',
-        buildByokRouteCommand(provider, runtimeRoute?.routeProfile ?? 'repo_agent'),
-        '/byok probe timeout:45000',
-        '/byok probe streaming timeout:60000',
-        '/byok probe json timeout:60000',
-        '/byok probe vision timeout:60000',
-        '/byok probe agent timeout:60000',
-        '/session sdk 8',
-        ...buildByokCatalogCommands(provider),
-    );
+    commands.push('/byok', buildByokRouteCommand(provider, runtimeRoute?.routeProfile ?? 'repo_agent'));
+    if (!lean) {
+        commands.push(
+            '/byok probe timeout:45000',
+            '/byok probe streaming timeout:60000',
+            '/byok probe json timeout:60000',
+            '/byok probe vision timeout:60000',
+            '/byok probe agent timeout:60000',
+            '/session sdk 8',
+            ...buildByokCatalogCommands(provider),
+        );
+    } else {
+        commands.push('/byok models', '/session sdk 8');
+    }
     if (!runtimeRoute && altModel && altModel !== model) {
         commands.push(`/byok model ${altModel}`, '/byok');
     }
@@ -4359,6 +4369,14 @@ async function writeEarlyBlockedSummary({
 }
 
 function detectLiveBlocker(plain, runtime = {}) {
+    const scenario = runtime.liveScenario ?? LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID];
+    const scenarioCompleted =
+        runtime.answerSent === true &&
+        runtime.postAskContinuationObserved === true &&
+        scenario.postAskFinalRe.test(plain);
+    // A recovered provider/tool incident is no longer a live blocker once the scenario's terminal public marker has
+    // been observed after the required human answer. Diagnostics collected after completion must not resurrect it.
+    if (scenarioCompleted) return null;
     const rateLimitMatch = plain.match(
         /You've hit your rate limit\.[^\n]*(?:reset in ([^.]+)\.)?[^\n]*(?:Request ID: ([^)]+))?/i,
     );
@@ -4446,7 +4464,6 @@ function detectLiveBlocker(plain, runtime = {}) {
             detail: `BYOK provider turn failed and was contained without Copilot fallback${modelMatch?.[1] ? ` · model=${modelMatch[1]}` : ''}`,
         };
     }
-    const scenario = runtime.liveScenario ?? LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID];
     const askBeforeDeltas = findAskBeforeRequiredPublicDeltas(runtime.sseEvents, scenario);
     if (askBeforeDeltas) {
         return {
@@ -6999,6 +7016,8 @@ function evaluateByokRealOutput(
     const preflightProbeResidueCount = sessionProbeResidueCounts[0];
     const postProbeResidueCount = sessionProbeResidueCounts[1];
     const byokVisionProbeStatus = findByokProbeResultStatus(plain, 'vision');
+    const leanModelGatewayPreflight = isModelGatewayToolScenario(liveScenario);
+    const admissionExecutionOk = runtimeSelector?.executed === true && runtimeSelector?.summary?.execution?.ok === true;
     const criteria = [
         {
             id: 'byok-real-dotenv-reload',
@@ -7058,14 +7077,8 @@ function evaluateByokRealOutput(
                 preflightProbeResidueCount === postProbeResidueCount,
             detail:
                 sessionProbeResidueCounts.length >= 2
-                    ? `SDK probe-residue count stayed stable around disposable BYOK probes (${preflightProbeResidueCount} -> ${postProbeResidueCount})`
-                    : 'SDK session cockpit was not rendered before and after disposable BYOK probes',
-        },
-        {
-            id: 'byok-real-chat-probe',
-            pass:
-                /BYOK chat probe/.test(plain) && /BYOK agent probe/.test(plain) && /sessão SDK descartável/.test(plain),
-            detail: 'BYOK preflight exercised disposable chat and agent probes before the live operator turn',
+                    ? `SDK probe-residue count stayed stable across preflight (${preflightProbeResidueCount} -> ${postProbeResidueCount})`
+                    : 'SDK session cockpit was not rendered before and after preflight',
         },
         {
             id: 'byok-real-route-decision',
@@ -7073,68 +7086,95 @@ function evaluateByokRealOutput(
                 /BYOK model route/.test(plain) &&
                 (/\bdecision=route-/i.test(plain) || /nenhum candidato encontrado para roteamento/iu.test(plain)) &&
                 /fallback chain|nenhum modelo passou|nenhum candidato encontrado para roteamento/iu.test(plain),
-            detail: 'BYOK preflight exercised model-gateway route decision ledger before probes/live promotion',
+            detail: 'BYOK preflight rendered the model-gateway route decision before the live operator turn',
         },
-        {
-            id: 'byok-real-streaming-probe',
-            pass: byokAdmissionBlocked || /BYOK streaming probe[\s\S]{0,1800}resultado:\s+ok/.test(plain),
-            detail: byokAdmissionBlocked
-                ? 'BYOK streaming probe was admission-blocked before provider streaming'
-                : 'BYOK streaming probe validated assistant.message_delta on a disposable session',
-        },
-        {
-            id: 'byok-real-json-probe',
-            pass: byokAdmissionBlocked || /BYOK json probe[\s\S]{0,1800}resultado:\s+ok/.test(plain),
-            detail: byokAdmissionBlocked
-                ? 'BYOK JSON probe was admission-blocked before provider streaming'
-                : 'BYOK JSON probe validated parseable structured output on a disposable session',
-        },
-        {
-            id: 'byok-real-vision-probe',
-            pass: byokAdmissionBlocked || byokVisionProbeStatus === 'ok',
-            required: requireVisionProbe,
-            severity: requireVisionProbe ? 'error' : 'warning',
-            detail: byokAdmissionBlocked
-                ? 'BYOK vision probe was admission-blocked before provider streaming'
-                : byokVisionProbeStatus === 'ok'
-                  ? 'BYOK vision probe proved image attachment interpretation on the disposable session'
-                  : `BYOK vision probe recorded an explicit non-proving capability result (${byokVisionProbeStatus ?? 'missing'}) without degrading chat admission`,
-        },
-        {
-            id: 'byok-real-shortlist-probe',
-            pass:
-                /BYOK shortlist agent probe/.test(plain) &&
-                (/Shortlist encerrada: ok=\d+\/\d+/.test(plain) ||
-                    /nenhum candidato cabe (?:na shortlist atual|nos filtros atuais)/iu.test(plain)),
-            detail: 'BYOK preflight exercised a ranked disposable shortlist probe without mutating the live session',
-        },
-        {
-            id: 'byok-real-chat-probe-ok',
-            pass: byokAdmissionBlocked || /BYOK chat probe[\s\S]{0,1400}resultado:\s+ok/.test(plain),
-            detail: byokAdmissionBlocked
-                ? 'BYOK chat probe was admission-blocked before the provider because its declared budget is too small'
-                : 'BYOK chat probe produced a real disposable assistant response',
-        },
-        {
-            id: 'byok-real-agent-probe-ok',
-            pass: byokAdmissionBlocked || /BYOK agent probe[\s\S]{0,1800}resultado:\s+ok/.test(plain),
-            detail: byokAdmissionBlocked
-                ? 'BYOK agent probe was admission-blocked before tool/ask_user because its declared budget is too small'
-                : 'BYOK agent probe validated tool calling and ask_user on the disposable session',
-        },
-        {
-            id: 'byok-real-model-filtering',
-            pass: /BYOK models[\s\S]{0,1000}filtros=[^\n]*free[^\n]*reasoning[^\n]*safe/.test(plain),
-            detail: 'BYOK real probe exercised filtered model discovery',
-        },
-        {
-            id: 'byok-real-recommendation',
-            pass:
-                /BYOK recommend/.test(plain) &&
-                (/ok para uso geral|baixo para turno real|apertado para sessão longa/.test(plain) ||
-                    /Nenhum modelo atende aos filtros/.test(plain)),
-            detail: 'BYOK recommendation command rendered operational budget guidance',
-        },
+        ...(leanModelGatewayPreflight
+            ? [
+                  {
+                      id: 'byok-real-admission-selector-proof',
+                      pass: admissionExecutionOk,
+                      detail: admissionExecutionOk
+                          ? `runtime-selector admission proved a responding bootstrap route ${runtimeRoute?.providerId ?? '-'}/${runtimeRoute?.providerModel ?? '-'}`
+                          : 'model-gateway tool scenario did not enter terminal through a successful runtime-selector admission probe',
+                  },
+                  {
+                      id: 'byok-real-model-gateway-scenario-opened',
+                      pass: byokTurnOpened,
+                      detail: byokTurnOpened
+                          ? `LLM-B reached model-gateway scenario ${liveScenario.id}`
+                          : `LLM-B never opened model-gateway scenario ${liveScenario.id}`,
+                  },
+              ]
+            : [
+                  {
+                      id: 'byok-real-chat-probe',
+                      pass:
+                          /BYOK chat probe/.test(plain) &&
+                          /BYOK agent probe/.test(plain) &&
+                          /sessão SDK descartável/.test(plain),
+                      detail: 'BYOK preflight exercised disposable chat and agent probes before the live operator turn',
+                  },
+                  {
+                      id: 'byok-real-streaming-probe',
+                      pass: byokAdmissionBlocked || /BYOK streaming probe[\s\S]{0,1800}resultado:\s+ok/.test(plain),
+                      detail: byokAdmissionBlocked
+                          ? 'BYOK streaming probe was admission-blocked before provider streaming'
+                          : 'BYOK streaming probe validated assistant.message_delta on a disposable session',
+                  },
+                  {
+                      id: 'byok-real-json-probe',
+                      pass: byokAdmissionBlocked || /BYOK json probe[\s\S]{0,1800}resultado:\s+ok/.test(plain),
+                      detail: byokAdmissionBlocked
+                          ? 'BYOK JSON probe was admission-blocked before provider streaming'
+                          : 'BYOK JSON probe validated parseable structured output on a disposable session',
+                  },
+                  {
+                      id: 'byok-real-vision-probe',
+                      pass: byokAdmissionBlocked || byokVisionProbeStatus === 'ok',
+                      required: requireVisionProbe,
+                      severity: requireVisionProbe ? 'error' : 'warning',
+                      detail: byokAdmissionBlocked
+                          ? 'BYOK vision probe was admission-blocked before provider streaming'
+                          : byokVisionProbeStatus === 'ok'
+                            ? 'BYOK vision probe proved image attachment interpretation on the disposable session'
+                            : `BYOK vision probe recorded an explicit non-proving capability result (${byokVisionProbeStatus ?? 'missing'}) without degrading chat admission`,
+                  },
+                  {
+                      id: 'byok-real-shortlist-probe',
+                      pass:
+                          /BYOK shortlist agent probe/.test(plain) &&
+                          (/Shortlist encerrada: ok=\d+\/\d+/.test(plain) ||
+                              /nenhum candidato cabe (?:na shortlist atual|nos filtros atuais)/iu.test(plain)),
+                      detail: 'BYOK preflight exercised a ranked disposable shortlist probe without mutating the live session',
+                  },
+                  {
+                      id: 'byok-real-chat-probe-ok',
+                      pass: byokAdmissionBlocked || /BYOK chat probe[\s\S]{0,1400}resultado:\s+ok/.test(plain),
+                      detail: byokAdmissionBlocked
+                          ? 'BYOK chat probe was admission-blocked before the provider because its declared budget is too small'
+                          : 'BYOK chat probe produced a real disposable assistant response',
+                  },
+                  {
+                      id: 'byok-real-agent-probe-ok',
+                      pass: byokAdmissionBlocked || /BYOK agent probe[\s\S]{0,1800}resultado:\s+ok/.test(plain),
+                      detail: byokAdmissionBlocked
+                          ? 'BYOK agent probe was admission-blocked before tool/ask_user because its declared budget is too small'
+                          : 'BYOK agent probe validated tool calling and ask_user on the disposable session',
+                  },
+                  {
+                      id: 'byok-real-model-filtering',
+                      pass: /BYOK models[\s\S]{0,1000}filtros=[^\n]*free[^\n]*reasoning[^\n]*safe/.test(plain),
+                      detail: 'BYOK real probe exercised filtered model discovery',
+                  },
+                  {
+                      id: 'byok-real-recommendation',
+                      pass:
+                          /BYOK recommend/.test(plain) &&
+                          (/ok para uso geral|baixo para turno real|apertado para sessão longa/.test(plain) ||
+                              /Nenhum modelo atende aos filtros/.test(plain)),
+                      detail: 'BYOK recommendation command rendered operational budget guidance',
+                  },
+              ]),
         {
             id: 'byok-real-model-switch',
             pass:
@@ -7450,8 +7490,12 @@ async function main() {
     const byokRealRuntimeSelectorFallbackProfiles = runtimeSelectorFallbackProfiles(
         readArg('--byok-real-route-fallback-profiles', ''),
     );
-    const byokRealRuntimeSelectorExecute = hasFlag('--byok-real-route-execute') && !dryRun;
-    const byokRealRuntimeSelectorAllowProbe = hasFlag('--byok-real-route-allow-probe');
+    const byokRealRuntimeSelectorAutoAdmission =
+        byokReal && !controlOnly && !dryRun && Boolean(optionalRuntimeSelectorString(byokRealRuntimeSelectorProfile));
+    const byokRealRuntimeSelectorExecute =
+        (hasFlag('--byok-real-route-execute') || byokRealRuntimeSelectorAutoAdmission) && !dryRun;
+    const byokRealRuntimeSelectorAllowProbe =
+        hasFlag('--byok-real-route-allow-probe') || byokRealRuntimeSelectorAutoAdmission;
     const byokRealRuntimeSelectorMaxAttempts = Number(readArg('--byok-real-route-max-attempts', '8'));
     const byokRealRuntimeSelectorMaxAttemptsPerProvider = Number(
         readArg('--byok-real-route-max-attempts-per-provider', '4'),
@@ -7666,7 +7710,9 @@ async function main() {
                 ? buildByokProbeCommands({ fixtureBaseUrl: byokFixtureBaseUrl }).join('\n')
                 : byokReal
                   ? [
-                        ...buildByokRealPreflightCommands(realByok ?? {}),
+                        ...buildByokRealPreflightCommands(realByok ?? {}, {
+                            lean: isModelGatewayToolScenario(liveScenario),
+                        }),
                         ...(controlOnly ? buildByokRealControlOnlyDiagnosticCommands() : [buildScenarioPrompt(liveScenario)]),
                     ]
                         .filter(Boolean)
@@ -8216,7 +8262,9 @@ async function main() {
                     ? [
                           '/usage now',
                           '/activity 12',
-                          ...buildByokRealPreflightCommands(realByok ?? {}),
+                          ...buildByokRealPreflightCommands(realByok ?? {}, {
+                              lean: isModelGatewayToolScenario(liveScenario),
+                          }),
                           ...(controlOnly ? buildByokRealControlOnlyDiagnosticCommands() : []),
                       ]
                     : byokControlProbe

@@ -361,6 +361,9 @@ function buildLiveRunPlan(input) {
             executesRuntimeProbes = true;
         } else {
             invokesModel = true;
+            // The live runner automatically performs runtime-selector admission probing before a real LLM-B turn when
+            // a route profile is supplied. Keep the MCP plan truthful about provider calls even though no extra flag is needed.
+            executesRuntimeProbes = Boolean(input.routeProfile);
         }
     }
 
