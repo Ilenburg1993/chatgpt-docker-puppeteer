@@ -3851,3 +3851,52 @@ Portanto `validate-focused`, `benchmark-transport` e `benchmark-io-cache` estão
 - [ ] decidir L2 somente a partir do resultado real: `keep-off` ou avaliação separada do profile experimental.
 
 O gap cold/L1/L2 também deixa de ser falta de executor. Assim como no benchmark de transporte, o único bloqueio restante é o schema cache do host desta conversa.
+
+## 100. Sétima onda — provenance do diagnóstico de permissões
+
+A investigação do roadmap residual encontrou uma ambiguidade entre **modo efetivo de compatibilidade** e **estado realmente observado**.
+
+Antes desta onda, `readTerminalConfigProjection()` mantinha uma propriedade comportamental útil: quando o snapshot do runtime não informava `permissionMode`, a projeção retornava `approve_all` como fallback. O problema estava na camada diagnóstica: `/diagnose` interpretava esse fallback como se fosse observação do runtime e exibia `permissões automáticas · prompts SDK ignorados`.
+
+A política real não foi alterada. O contrato compatível `permissionMode` continua existindo e continua podendo cair em `approve_all`. A mudança foi acrescentar provenance paralela:
+
+- `permissionModeObserved`: modo realmente presente no snapshot, ou `null`;
+- `permissionModeSource`: `runtime-snapshot` ou `compatibility-fallback`.
+
+O `/diagnose` agora diferencia explicitamente:
+
+- [x] modo observado: renderiza o modo, o comportamento dos prompts e `observado no runtime`;
+- [x] ausência de observação: renderiza `não informado`, mostra o modo efetivo apenas como `fallback de compatibilidade` e marca `prompts SDK desconhecidos`;
+- [x] não afirma mais que prompts SDK são ignorados quando essa informação não foi observada;
+- [x] nenhuma permission policy, controller, SDK prompt policy ou runtime behavior foi modificada.
+
+Testes de contrato foram ajustados para os dois cenários:
+
+- fallback sem `permissionMode` no status snapshot;
+- snapshot observado com `permissionMode=selective`.
+
+### 100.1 Validação proporcional
+
+Nenhuma suíte ampla foi executada.
+
+- [x] `repo_find_orphan_imports` em `src/copilot/terminal`: 119 arquivos, 515 imports locais, `0` órfãos, `0` parse errors;
+- [x] revisão do diff confirmou que `permissionMode` efetivo permanece backward-compatible;
+- [x] typecheck isolado `7044cc80-01e0-4699-b21b-b706214609df`, exit code `0`, ~`6,99s`;
+- [x] nenhum `unit-copilot`, `copilot-fast`, `mcp-fast` ou suíte maior foi executado.
+
+### 100.2 Publicação
+
+Commit:
+
+`c59954eb9e2b7f69606607f83e8553c1eaae3cb5`
+
+Mensagem:
+
+`fix(copilot): distinguish observed permission state`
+
+- [x] 3 arquivos causais;
+- [x] 43 inserções / 7 remoções;
+- [x] push upstream-only concluído com `ahead=0`, `behind=0`;
+- [x] sem self-reload do MCP, porque a mudança pertence à apresentação/config projection do terminal e não altera a surface do servidor MCP.
+
+O gap de permissions fica fechado sem quebrar a API comportamental anterior: **o fallback continua funcionando, mas deixa de ser apresentado como conhecimento observado.**
