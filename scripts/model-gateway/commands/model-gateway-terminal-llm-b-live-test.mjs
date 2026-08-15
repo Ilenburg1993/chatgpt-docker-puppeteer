@@ -468,7 +468,9 @@ const LIVE_SCENARIOS = Object.freeze({
             'Em seguida entre num ciclo adaptativo limitado a no máximo 8 model_gateway_probe_execute applies.',
             `Em cada iteração chame model_gateway_workflow_plan com objective="same_session_route_switch", taskProfile="repo_agent", runtimeId=null, providerId=null, candidateModelIds=[], preferredProbeKinds=["agent"], maxSnapshotAgeHours=24, maxCandidates=12, maxProbeCount=1, maxEstimatedCostUsd=10, idempotencyKeyPrefix="${ADAPTIVE_PROBE_IDEMPOTENCY_PREFIX}", includeCatalogRefreshPlan=false, includeRouteSwitchPlan=true, requireRuntimeProof=true, selectionGoal="quality_first", probeStrategy="aggressive" e maxRuntimeProofAgeHours=24.`,
             'Leia selectionDecision antes de agir. Se status="probe_required", extraia do próprio workflow o model_gateway_probe_execute mode=plan da candidata atual #1 e execute esse plan exatamente; depois execute mode=apply com confirm=true e a MESMA idempotencyKey/argumentos autorizados pelo plan.',
+            'Um resultado probe.execute status="planned" não é prova funcional. Um apply com replayed=true apenas reproduz evidência anterior e não autoriza, por si só, ADAPTIVE-SELECTION-READY. Nunca altere/invente idempotencyKey ou idempotencyKeyPrefix para contornar replay; use somente o workflow fresco.',
             'Depois de TODO probe result, tanto sucesso quanto falha, descarte o ranking anterior e chame model_gateway_workflow_plan novamente. Não pergunte ao usuário se deve tentar a próxima candidata quando a falha for objetiva.',
+            'Somente um model_gateway_workflow_plan REAL retornando selectionDecision.status="use_current" ou "switch_recommended" autoriza ADAPTIVE-SELECTION-READY. Não infira esse status a partir de um probe plan, ranking, raciocínio próprio ou modelo que pareça melhor.',
             'Se status="use_current" ou "switch_recommended", pare de sondar. NÃO chame model_gateway_route_switch/model_switch neste cenário.',
             'Se atingir 8 applies ainda em probe_required, pare sem inventar sucesso e reporte ADAPTIVE-SELECTION-EXHAUSTED junto da candidata/razão atual.',
             'Quando houver use_current ou switch_recommended, escreva uma linha pública no formato exato "ADAPTIVE-SELECTION-READY provider=<providerId> model=<providerModel> decision=<status>" usando a selectedRoute do workflow. Depois escreva as oito linhas DELTA-CANONICAL.',
@@ -4927,6 +4929,88 @@ function parseToolResultPayload(toolResult) {
     }
 }
 
+function evaluateAdaptiveSelectionReadyEvidence(events) {
+    const readyRe = /(?:^|\n)ADAPTIVE-SELECTION-READY provider=([^\s]+) model=([^\s]+) decision=(use_current|switch_recommended)(?:\n|$)/u;
+    let latestAuthority = null;
+    let marker = null;
+    for (let index = 0; index < (Array.isArray(events) ? events.length : 0); index += 1) {
+        const evt = events[index];
+        const payload = eventPayload(evt);
+        if (payload?.hookType === 'postToolUse') {
+            const input = isObjectPayload(payload.input) ? payload.input : null;
+            if (input && isLifecycleTool({ toolName: input.toolName }, 'model_gateway_workflow_plan')) {
+                const parsed = parseToolResultPayload(isObjectPayload(input.toolResult) ? input.toolResult : null);
+                const data = isObjectPayload(parsed?.data) ? parsed.data : null;
+                const decision = isObjectPayload(data?.selectionDecision) ? data.selectionDecision : null;
+                const route = isObjectPayload(decision?.selectedRoute)
+                    ? decision.selectedRoute
+                    : isObjectPayload(data?.selectedRoute)
+                      ? data.selectedRoute
+                      : null;
+                const status = typeof decision?.status === 'string' ? decision.status : null;
+                const providerId = typeof route?.providerId === 'string' ? route.providerId : null;
+                const model = typeof route?.providerModel === 'string' ? route.providerModel : null;
+                const currentModel = typeof decision?.currentModel === 'string' ? decision.currentModel : null;
+                const terminalDecision = status === 'use_current' || status === 'switch_recommended';
+                const runtimeProofRequired = decision?.runtimeProofRequired === true;
+                const currentRouteConsistent = status !== 'use_current' || (currentModel !== null && currentModel === model);
+                latestAuthority = {
+                    index,
+                    eventId: eventPublicId(evt),
+                    status,
+                    providerId,
+                    model,
+                    currentModel,
+                    runtimeProofRequired,
+                    valid:
+                        parsed?.success !== false &&
+                        terminalDecision &&
+                        runtimeProofRequired &&
+                        providerId !== null &&
+                        model !== null &&
+                        currentRouteConsistent,
+                };
+            }
+        }
+        if (evt?.event === 'assistant.message') {
+            const content = typeof payload?.content === 'string' ? payload.content : '';
+            const match = content.match(readyRe);
+            if (match) {
+                marker = {
+                    index,
+                    eventId: eventPublicId(evt),
+                    providerId: match[1],
+                    model: match[2],
+                    status: match[3],
+                };
+                break;
+            }
+        }
+    }
+    const authority = marker && latestAuthority && latestAuthority.index < marker.index ? latestAuthority : null;
+    const matchesAuthority = Boolean(
+        marker &&
+            authority?.valid === true &&
+            marker.providerId === authority.providerId &&
+            marker.model === authority.model &&
+            marker.status === authority.status,
+    );
+    return {
+        marker,
+        authority,
+        pass: matchesAuthority,
+        detail: !marker
+            ? 'assistant did not emit an adaptive ready marker'
+            : !authority
+              ? `ready marker at SSE #${marker.eventId ?? '-'} had no preceding terminal workflow authority`
+              : authority.valid !== true
+                ? `preceding workflow at SSE #${authority.eventId ?? '-'} was not a valid fresh-proof terminal decision · status=${authority.status ?? '-'} current=${authority.currentModel ?? '-'} route=${authority.providerId ?? '-'}/${authority.model ?? '-'}`
+                : matchesAuthority
+                  ? `ready marker matched workflow authority · ${authority.providerId}/${authority.model} · ${authority.status} · workflow SSE #${authority.eventId ?? '-'} -> marker SSE #${marker.eventId ?? '-'}`
+                  : `ready marker diverged from workflow authority · marker=${marker.providerId}/${marker.model}/${marker.status} authority=${authority.providerId}/${authority.model}/${authority.status}`,
+    };
+}
+
 function summarizePostToolUseResult(payload, expectedName) {
     if (payload?.hookType !== 'postToolUse') return null;
     const input = isObjectPayload(payload.input) ? payload.input : null;
@@ -5578,13 +5662,20 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
             ),
         };
     });
+    const adaptiveReadyEvidence =
+        scenario.id === 'model-gateway-adaptive-probe'
+            ? evaluateAdaptiveSelectionReadyEvidence(sseSummary.events)
+            : null;
     const scenarioOutputMarkers = scenario.expectedOutputMarkers.map((marker) => ({
         marker,
         observedInToolResult: scenarioMarkerObservedInToolResults(canonicalEvents, marker),
     }));
     const scenarioPlainOutputMarkers = scenario.expectedPlainOutputMarkers.map((marker) => ({
         marker,
-        observedInPlainOutput: beforeRawDiagnosticsPlain.includes(marker),
+        observedInPlainOutput:
+            scenario.id === 'model-gateway-adaptive-probe' && marker === 'ADAPTIVE-SELECTION-READY'
+                ? Boolean(adaptiveReadyEvidence?.marker)
+                : beforeRawDiagnosticsPlain.includes(marker),
     }));
     const scenarioTerminalRender = scenario.expectedTerminalRender.map((item) => {
         const toolName = String(item.toolName ?? '');
@@ -5870,8 +5961,17 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
         ...scenarioPlainOutputMarkers.map(({ marker, observedInPlainOutput }) => ({
             id: `scenario-plain-marker-${marker.toLowerCase().replace(/[^a-z0-9]+/gu, '-')}`,
             pass: observedInPlainOutput,
-            detail: `scenario plain marker ${marker} ${observedInPlainOutput ? 'observed in terminal output' : 'missing from terminal output'}`,
+            detail: `scenario plain marker ${marker} ${observedInPlainOutput ? 'observed in assistant output' : 'missing from assistant output'}`,
         })),
+        ...(adaptiveReadyEvidence
+            ? [
+                  {
+                      id: 'adaptive-selection-ready-authorized-by-workflow',
+                      pass: adaptiveReadyEvidence.pass,
+                      detail: adaptiveReadyEvidence.detail,
+                  },
+              ]
+            : []),
         ...scenarioTerminalRender.map(({ toolName, badge, forbiddenBadge, expectedRe, forbiddenRe }) => {
             const expectedObserved = expectedRe.test(plain);
             const forbiddenObserved = forbiddenRe ? forbiddenRe.test(plain) : false;
