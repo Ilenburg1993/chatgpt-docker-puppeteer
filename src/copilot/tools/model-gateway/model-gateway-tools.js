@@ -1808,6 +1808,11 @@ export const modelGatewayProbeExecuteTool = buildTool({
             timeoutMs: args.timeoutMs,
             idempotencyKey: args.idempotencyKey,
             source: 'llm-b.model_gateway_probe_execute',
+            identity: {
+                routeProfile: optionalToolString(authorizedRoute?.['routeProfile']),
+                providerId: args.providerId,
+                providerModel: args.modelId,
+            },
         });
         const actualProviderId = executed.result?.['providerId'] ?? null;
         const providerMatches = actualProviderId === args.providerId;

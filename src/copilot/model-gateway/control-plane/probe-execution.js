@@ -57,15 +57,38 @@ function resolveProbeRunner(kind) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalIdentityString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/**
+ * @param {Record<string, any>} probe
+ * @param {Record<string, unknown> | null} [identityOverride]
+ * @returns {{ routeProfile: string | null; providerId: string | null; providerModel: string | null }}
+ */
+function probeExecutionIdentity(probe, identityOverride = null) {
+    const identity = isRecord(identityOverride) ? identityOverride : {};
+    return {
+        routeProfile: optionalIdentityString(identity['routeProfile']) ?? optionalIdentityString(probe['profile']),
+        providerId:
+            optionalIdentityString(identity['providerId']) ??
+            optionalIdentityString(probe['preset']) ??
+            optionalIdentityString(probe['providerType']),
+        providerModel: optionalIdentityString(identity['providerModel']) ?? optionalIdentityString(probe['model']),
+    };
+}
+
+/**
  * @param {string} kind
  * @param {Record<string, any>} probe
+ * @param {Record<string, unknown> | null} [identityOverride]
+ * @returns {Promise<boolean>}
  */
-async function recordProbeHealth(kind, probe) {
-    const identity = {
-        routeProfile: probe['profile'],
-        providerId: probe['preset'] ?? probe['providerType'],
-        providerModel: probe['model'],
-    };
+async function recordProbeHealth(kind, probe, identityOverride = null) {
+    const identity = probeExecutionIdentity(probe, identityOverride);
     const providerAttempted = probe['status'] !== 'admission-blocked';
     recordByokProviderModelProbeResult({
         ...identity,
@@ -110,13 +133,15 @@ async function recordProbeHealth(kind, probe) {
  * @param {string} kind
  * @param {boolean} providerAttempted
  * @param {string} observedAt
+ * @param {Record<string, unknown> | null} [identityOverride]
  */
-function persistedProbeResult(probe, kind, providerAttempted, observedAt) {
+function persistedProbeResult(probe, kind, providerAttempted, observedAt, identityOverride = null) {
+    const identity = probeExecutionIdentity(probe, identityOverride);
     return /** @type {Record<string, unknown>} */ (
         redactModelGatewayAuditedValue({
-            providerId: probe['preset'] ?? probe['providerType'] ?? 'unknown-provider',
-            providerModel: probe['model'] ?? 'unknown-model',
-            routeProfile: probe['profile'] ?? 'default',
+            providerId: identity.providerId ?? 'unknown-provider',
+            providerModel: identity.providerModel ?? 'unknown-model',
+            routeProfile: identity.routeProfile ?? 'default',
             kind,
             ok: probe['ok'] === true,
             status: String(probe['status'] ?? 'unknown'),
@@ -176,6 +201,7 @@ export async function readModelGatewayProbeOperation(idempotencyKey, options = {
  *   timeoutMs?: number;
  *   idempotencyKey: string;
  *   source?: string;
+ *   identity?: { routeProfile?: string | null; providerId?: string | null; providerModel?: string | null };
  *   deps?: {
  *     sqliteStore?: SqliteModelGatewayCatalogStore;
  *     evaluateAdmission?: (summary: any, mode: 'chat' | 'agent', prompt: string) => any;
@@ -183,7 +209,7 @@ export async function readModelGatewayProbeOperation(idempotencyKey, options = {
  *     emit?: (event: Record<string, unknown>) => void;
  *     now?: () => number;
  *     runProbe?: (options: Record<string, unknown>) => Promise<Record<string, any>>;
- *     recordHealth?: (kind: string, probe: Record<string, any>) => Promise<boolean>;
+ *     recordHealth?: (kind: string, probe: Record<string, any>, identity?: Record<string, unknown> | null) => Promise<boolean>;
  *     buildEvent?: (input: { probeKind: string; result: Record<string, any>; providerAttempted: boolean }) => Record<string, unknown>;
  *   };
  * }} input
@@ -207,13 +233,18 @@ export async function executeModelGatewayProbe(input) {
             classifyProviderFailure: input.deps?.classifyProviderFailure ?? classifyByokProviderFailure,
         },
     });
-    const providerAttempted = await (input.deps?.recordHealth ?? recordProbeHealth)(input.kind, probe);
+    const canonicalIdentity = probeExecutionIdentity(probe, input.identity ?? null);
+    const providerAttempted = await (input.deps?.recordHealth ?? recordProbeHealth)(
+        input.kind,
+        probe,
+        canonicalIdentity,
+    );
     const observedAt = new Date(input.deps?.now?.() ?? Date.now()).toISOString();
-    const result = persistedProbeResult(probe, input.kind, providerAttempted, observedAt);
+    const result = persistedProbeResult(probe, input.kind, providerAttempted, observedAt, canonicalIdentity);
     const status = probe['ok'] === true ? 'completed' : 'failed';
     const persistence = await sqliteStore.writeRuntimeProbeRun({
         runId: operationId,
-        probeProfile: probe['profile'] ?? 'default',
+        probeProfile: canonicalIdentity.routeProfile ?? probe['profile'] ?? 'default',
         status,
         startedAt: startedAtMs,
         completedAt: observedAt,
@@ -226,9 +257,15 @@ export async function executeModelGatewayProbe(input) {
         },
         results: [result],
     });
+    const eventProbe = {
+        ...probe,
+        profile: canonicalIdentity.routeProfile ?? probe['profile'] ?? null,
+        preset: canonicalIdentity.providerId ?? probe['preset'] ?? null,
+        model: canonicalIdentity.providerModel ?? probe['model'] ?? null,
+    };
     const event = (input.deps?.buildEvent ?? buildProbeCompletedEvent)({
         probeKind: input.kind,
-        result: probe,
+        result: eventProbe,
         providerAttempted,
     });
     try {
