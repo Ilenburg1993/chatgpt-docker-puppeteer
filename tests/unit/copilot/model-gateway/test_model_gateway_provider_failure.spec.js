@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { classifyByokProviderFailure } from '../../../../src/copilot/model-gateway/health/provider-failure.js';
+import { resolveModelGatewayRuntimeRetryDecision } from '../../../../src/copilot/model-gateway/routing/runtime-selector.js';
 
 describe('model-gateway BYOK provider failure taxonomy', () => {
     it('classifica 402 sem body como bloqueio externo de credito/cota', () => {
@@ -25,6 +26,11 @@ describe('model-gateway BYOK provider failure taxonomy', () => {
         expect(classifyByokProviderFailure('HTTP status code 404').kind).toBe('model-or-route');
         expect(
             classifyByokProviderFailure(
+                Object.assign(new Error('400 400 400 Invalid model: mistral-nemo-2407'), { status: 400 }),
+            ).kind,
+        ).toBe('model-or-route');
+        expect(
+            classifyByokProviderFailure(
                 Object.assign(
                     new Error(
                         "400 'messages.2' : for 'role:assistant' the following must be satisfied[('messages.2' : property 'parsed' is unsupported)]",
@@ -46,7 +52,38 @@ describe('model-gateway BYOK provider failure taxonomy', () => {
         expect(classifyByokProviderFailure(Object.assign(new Error('bad gateway'), { statusCode: 502 })).kind).toBe(
             'upstream',
         );
+        expect(
+            classifyByokProviderFailure(Object.assign(new Error('400 400 400 Bad Request'), { status: 400 })),
+        ).toEqual(
+            expect.objectContaining({
+                kind: 'invalid-request',
+                statusCode: 400,
+                errorContext: 'provider.invalid_request',
+            }),
+        );
         expect(classifyByokProviderFailure(new Error('unexpected provider envelope')).kind).toBe('unknown');
+    });
+
+    it('trata HTTP 400 residual como request permanente da rota, sem repetir a mesma chamada', () => {
+        const failure = classifyByokProviderFailure(Object.assign(new Error('400 400 400 Bad Request'), { status: 400 }));
+        const decision = resolveModelGatewayRuntimeRetryDecision(
+            /** @type {any} */ ({
+                ok: false,
+                status: 'failed',
+                failureScope: 'provider',
+                providerFailure: failure,
+                probe: null,
+            }),
+        );
+
+        expect(decision).toMatchObject({
+            retryRoute: false,
+            fallbackRoute: true,
+            permanent: true,
+            waitMs: 0,
+            reason: 'permanent_provider_failure:invalid-request',
+            failureKind: 'invalid-request',
+        });
     });
 
     it('preserva retry-after e headers de limite para health e exclusão temporária', () => {

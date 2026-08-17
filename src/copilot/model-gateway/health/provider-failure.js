@@ -13,7 +13,7 @@
 import { toError } from '#copilot/core';
 
 /**
- * @typedef {'credits' | 'rate-limit' | 'auth' | 'model-or-route' | 'capability-unsupported' | 'timeout' | 'network' | 'upstream' | 'unknown'} ByokProviderFailureKind
+ * @typedef {'credits' | 'rate-limit' | 'auth' | 'model-or-route' | 'capability-unsupported' | 'invalid-request' | 'timeout' | 'network' | 'upstream' | 'unknown'} ByokProviderFailureKind
  */
 
 /**
@@ -280,6 +280,16 @@ function textLooksLikeNetworkFailure(message, code) {
  * @param {string} message
  * @returns {boolean}
  */
+function textLooksLikeModelOrRouteFailure(message) {
+    return /\b(?:invalid|unknown|missing|unavailable|unsupported|not found|does not exist|doesn't exist|no such)\s+(?:model|deployment|route)\b|\b(?:model|deployment|route)\b[^\n]{0,80}\b(?:not found|does not exist|doesn't exist|is unavailable|is invalid)\b/iu.test(
+        message,
+    );
+}
+
+/**
+ * @param {string} message
+ * @returns {boolean}
+ */
 function textLooksLikeWireSchemaFailure(message) {
     return (
         /property ['"]?parsed['"]? is unsupported/iu.test(message) ||
@@ -378,6 +388,18 @@ function buildFailure(kind, statusCode, message, limitHints) {
                     'trate como falha da capability/probe, nao como indisponibilidade geral; tente rota sem essa capacidade ou modelo com suporte declarado',
                 external: true,
             };
+        case 'invalid-request':
+            return {
+                ...base,
+                kind,
+                message,
+                statusCode,
+                errorContext: 'provider.invalid_request',
+                operatorLabel: `provider BYOK rejeitou a forma da requisicao${http ? ` (${http})` : ''}`,
+                operatorAction:
+                    'nao repita a mesma rota sem alterar o request; tente outro modelo/adapter e preserve a mensagem para corrigir o contrato do provider',
+                external: true,
+            };
         case 'timeout':
             return {
                 ...base,
@@ -451,7 +473,7 @@ export function classifyByokProviderFailure(error) {
     if (statusCode === 401 || statusCode === 403 || textLooksLikeAuthFailure(message)) {
         return buildFailure('auth', statusCode, message, limitHints);
     }
-    if (statusCode === 404) {
+    if (statusCode === 404 || (statusCode === 400 && textLooksLikeModelOrRouteFailure(message))) {
         return buildFailure('model-or-route', statusCode, message, limitHints);
     }
     if (statusCode === 400 && textLooksLikeWireSchemaFailure(message)) {
@@ -459,6 +481,9 @@ export function classifyByokProviderFailure(error) {
     }
     if (statusCode === 400 && textLooksLikeUnsupportedCapabilityFailure(message)) {
         return buildFailure('capability-unsupported', statusCode, message, limitHints);
+    }
+    if (statusCode === 400) {
+        return buildFailure('invalid-request', statusCode, message, limitHints);
     }
     if (textLooksLikeTimeoutFailure(message)) {
         return buildFailure('timeout', statusCode, message, limitHints);

@@ -207,6 +207,7 @@ function normalizeFailureKind(value) {
     if (normalized === 'capability-unsupported' || normalized.includes('provider.capability_unsupported')) {
         return 'capability-unsupported';
     }
+    if (normalized === 'invalid-request' || normalized.includes('provider.invalid_request')) return 'invalid-request';
     if (normalized === 'credits' || normalized.includes('provider.credits')) return 'credits';
     if (normalized === 'rate-limit' || normalized.includes('rate_limit') || normalized.includes('rate-limit')) return 'rate-limit';
     if (normalized === 'auth' || normalized.includes('provider.auth')) return 'auth';

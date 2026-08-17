@@ -4626,3 +4626,19 @@ Cobertura de segurança adicionada:
 A prova live ocorreu no próprio leak histórico. Antes do reload, `llmb_live_runs` mostrava `mcp-7b16...` como `artifacts_ready_process_alive`, `pidAlive=true`, `pidPresent=true`, `processIdentity=verified`. Após ativar o reaper e aguardar a maintenance delayed, o mesmo manifesto passou a aparecer como **`artifacts_ready`, `pidAlive=false`, `pidPresent=false`, `processIdentity=process-not-alive`**. Nenhum PID foi informado manualmente e nenhum processo fora da identidade allowlisted foi tocado. O leak real, portanto, foi removido pelo caminho que futuras sessões usarão automaticamente.
 
 Essa mudança elimina uma classe de dependência entre **capacidade real do servidor** e **atualização tardia do schema pelo host**: o cancel explícito continua disponível quando o cliente o materializa, mas processos logicamente concluídos não dependem mais dele para cleanup eventual e seguro.
+
+### 104.20 Taxonomia BYOK: HTTP 400 deixa de ser retry genérico e passa a excluir corretamente a rota defeituosa
+
+A leitura do health persistido dos últimos probes reais mostrou uma segunda fonte de lentidão e desperdício: falhas como `400 ... Invalid model: mistral-nemo-2407` e `400 ... Bad Request` estavam chegando à taxonomia como `unknown`. Como `unknown` era tratado pelo runtime selector como falha potencialmente retryable, a mesma rota podia receber uma nova tentativa mesmo quando a própria resposta do provider já indicava que repetir o request idêntico não tinha valor.
+
+A taxonomia foi aprofundada sem transformar todo `400` em uma única classe:
+
+- [x] `400` cujo texto identifica `model`, `deployment` ou `route` inválido/inexistente passa a `model-or-route`;
+- [x] `400` com wire/schema incompatível continua `capability-unsupported`;
+- [x] `400` residual passa à nova classe `invalid-request`, preservando a mensagem original e `statusCode=400`;
+- [x] `invalid-request` é permanente para **a rota/request atual**: `retryRoute=false`, `fallbackRoute=true`, `waitMs=0`;
+- [x] `health-routing` reconhece `provider.invalid_request`, de modo que a evidência persistida participa do bloqueio/rerank subsequente em vez de cair novamente em `unknown`;
+- [x] a política continua permitindo fallback para outro modelo/provider; o que deixa de acontecer é pagar latência/quota repetindo cegamente a mesma forma de request;
+- [x] focused unit test cobre `Invalid model`, wire-schema, `Bad Request` residual e a decisão de retry permanente; strict typecheck também passou após a alteração.
+
+Essa mudança é particularmente importante para o fluxo adaptativo `repo_agent`: ela reduz tentativas sem informação nova, melhora a qualidade do health acumulado e aproxima a seleção real do princípio já adotado no control plane — **falha objetiva deve produzir avanço de candidato, não replay da mesma rota**.

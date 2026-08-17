@@ -1717,7 +1717,8 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
         failureKind === 'auth' ||
         failureKind === 'credits' ||
         failureKind === 'model-or-route' ||
-        failureKind === 'capability-unsupported'
+        failureKind === 'capability-unsupported' ||
+        failureKind === 'invalid-request'
     ) {
         return {
             schema: 'model-gateway-runtime-selector-retry-decision',
