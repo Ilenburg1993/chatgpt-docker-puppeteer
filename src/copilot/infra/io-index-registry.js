@@ -9,9 +9,12 @@
  */
 
 import { getCopilotDb } from '#copilot/db';
-import { resolve } from 'node:path';
+import { extname, resolve } from 'node:path';
 import { beginIoAdvisoryBudget } from './io-advisory-budget.js';
 import { registerInvalidationHook } from './io-cache.js';
+import { DEFAULT_INDEX_EXTENSIONS } from './index-store/index.js';
+import { readTextFileSnapshot } from './io/fs/read-text.js';
+import { statPathSnapshot } from './io/fs/stat.js';
 import { createIoIndexSqlite } from './io-index-sqlite.js';
 
 /** @type {ReturnType<typeof createIoIndexSqlite> | null} */
@@ -115,6 +118,88 @@ export async function buildIoIndexForDirectory(directory, options = {}) {
 
     if (mayCoalesce) _inflightIndexBuilds.set(key, buildPromise);
     return await buildPromise;
+}
+
+/**
+ * Refresh only explicit files in the shared index. Missing/non-indexable paths are invalidated. This is the primitive
+ * used by incremental startup so MCP/LLM-B edits do not require a directory-wide scan.
+ *
+ * @param {readonly string[]} filePaths
+ * @param {{ workspaceRoot: string; extensions?: readonly string[]; signal?: AbortSignal }} options
+ */
+export async function refreshIoIndexPaths(filePaths, options) {
+    const index = getIoIndex();
+    if (!index) return { available: false, requested: filePaths.length, indexed: 0, invalidated: 0, skipped: 0, failed: 0 };
+    const workspaceRoot = resolve(options.workspaceRoot);
+    const extensions = new Set((options.extensions ?? DEFAULT_INDEX_EXTENSIONS).map((value) => String(value).toLowerCase()));
+    let indexed = 0;
+    let invalidated = 0;
+    let unchanged = 0;
+    let skipped = 0;
+    let failed = 0;
+    const startedAt = Date.now();
+    for (const rawPath of new Set(filePaths.map((value) => resolve(value)))) {
+        options.signal?.throwIfAborted();
+        if (!extensions.has(extname(rawPath).toLowerCase())) {
+            if (index.invalidatePath(rawPath)) invalidated += 1;
+            skipped += 1;
+            continue;
+        }
+        try {
+            const stat = await statPathSnapshot(rawPath);
+            if (!stat.isFile()) {
+                if (index.invalidatePath(rawPath)) invalidated += 1;
+                skipped += 1;
+                continue;
+            }
+            if (
+                index.matchesFileFingerprint(rawPath, {
+                    sizeBytes: stat.size,
+                    mtimeMs: stat.mtimeMs,
+                    ctimeMs: stat.ctimeMs,
+                    dev: Number(stat.dev),
+                    ino: Number(stat.ino),
+                })
+            ) {
+                unchanged += 1;
+                continue;
+            }
+            const snapshot = await readTextFileSnapshot(rawPath, options.signal ? { signal: options.signal } : {});
+            await index.indexTextFile(
+                {
+                    filePath: rawPath,
+                    workspaceRoot,
+                    content: snapshot.content,
+                    sizeBytes: snapshot.sizeBytes,
+                    mtimeMs: snapshot.mtimeMs,
+                    ctimeMs: snapshot.ctimeMs,
+                    dev: snapshot.dev,
+                    ino: snapshot.ino,
+                    metadata: { refreshMode: 'explicit-path' },
+                },
+                options.signal ? { signal: options.signal } : {},
+            );
+            indexed += 1;
+        } catch (error) {
+            options.signal?.throwIfAborted();
+            const code = error && typeof error === 'object' && 'code' in error ? String(error.code ?? '') : '';
+            if (code === 'ENOENT' || code === 'ENOTDIR' || code === 'EISDIR') {
+                if (index.invalidatePath(rawPath)) invalidated += 1;
+                continue;
+            }
+            failed += 1;
+        }
+    }
+    return {
+        available: true,
+        requested: filePaths.length,
+        indexed,
+        invalidated,
+        unchanged,
+        skipped,
+        failed,
+        durationMs: Math.max(0, Date.now() - startedAt),
+    };
 }
 
 /**

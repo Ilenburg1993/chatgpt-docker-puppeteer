@@ -5,6 +5,12 @@
  * @module copilot/infra/io/invalidation/bus
  */
 
+import {
+    getCrossProcessInvalidationStats,
+    publishCrossProcessInvalidation,
+    resetCrossProcessInvalidationRuntimeForTest,
+    startCrossProcessInvalidationConsumer,
+} from './cross-process-journal.js';
 import { normalizeIoInvalidationEvent } from './events.js';
 
 /**
@@ -24,6 +30,7 @@ const _pendingInvalidations = new Map();
 /** @type {NodeJS.Timeout | null} */
 let _debounceTimer = null;
 let _shutdownHookInstalled = false;
+let _crossProcessConsumerStarted = false;
 
 /**
  * @param {ReturnType<typeof normalizeIoInvalidationEvent> | undefined} previous
@@ -41,8 +48,9 @@ function mergeInvalidationEvent(previous, next) {
 /**
  * @param {string} filePath
  * @param {ReturnType<typeof normalizeIoInvalidationEvent>} normalized
+ * @param {{ replicate?: boolean }} [options]
  */
-function dispatchInvalidation(filePath, normalized) {
+function dispatchInvalidation(filePath, normalized, options = {}) {
     for (const hook of [..._hooks]) {
         try {
             hook(filePath, normalized);
@@ -50,6 +58,17 @@ function dispatchInvalidation(filePath, normalized) {
             /* hooks de invalidação não devem derrubar a mutação canônica */
         }
     }
+    if (options.replicate === true) {
+        publishCrossProcessInvalidation(filePath, normalized);
+    }
+}
+
+function ensureCrossProcessConsumer() {
+    if (_crossProcessConsumerStarted) return;
+    _crossProcessConsumerStarted = true;
+    startCrossProcessInvalidationConsumer((filePath, event) => {
+        dispatchInvalidation(filePath, normalizeIoInvalidationEvent(event), { replicate: false });
+    });
 }
 
 /**
@@ -66,7 +85,7 @@ export function flushIoInvalidationQueue() {
     const batch = [..._pendingInvalidations.entries()];
     _pendingInvalidations.clear();
     for (const [filePath, normalized] of batch) {
-        dispatchInvalidation(filePath, normalized);
+        dispatchInvalidation(filePath, normalized, { replicate: true });
     }
 }
 
@@ -83,6 +102,7 @@ function ensureShutdownFlushHook() {
  * @returns {() => void}
  */
 export function registerIoInvalidationHook(hook) {
+    ensureCrossProcessConsumer();
     _hooks.push(hook);
     return () => {
         const index = _hooks.indexOf(hook);
@@ -96,9 +116,10 @@ export function registerIoInvalidationHook(hook) {
  */
 export function publishIoInvalidation(filePath, event = {}) {
     ensureShutdownFlushHook();
+    ensureCrossProcessConsumer();
     const normalized = normalizeIoInvalidationEvent(event);
     if (!(INVALIDATION_DEBOUNCE_MS > 0)) {
-        dispatchInvalidation(filePath, normalized);
+        dispatchInvalidation(filePath, normalized, { replicate: true });
         return;
     }
 
@@ -113,6 +134,18 @@ export function publishIoInvalidation(filePath, event = {}) {
 }
 
 /**
+ * Snapshot compacto da fila local e do journal cross-process.
+ */
+export function getIoInvalidationBusStats() {
+    return {
+        hooks: _hooks.length,
+        pending: _pendingInvalidations.size,
+        debounceMs: INVALIDATION_DEBOUNCE_MS,
+        crossProcess: getCrossProcessInvalidationStats(),
+    };
+}
+
+/**
  * Reset utilitário para testes.
  *
  * @returns {void}
@@ -124,4 +157,6 @@ export function resetIoInvalidationBusForTest() {
         clearTimeout(_debounceTimer);
         _debounceTimer = null;
     }
+    resetCrossProcessInvalidationRuntimeForTest();
+    _crossProcessConsumerStarted = false;
 }

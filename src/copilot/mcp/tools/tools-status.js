@@ -49,9 +49,7 @@ function buildApprovalFrictionProfile(summaries) {
         .map((tool) => tool.name)
         .sort();
     return {
-        hostPolicy:
-            'write actions may require ChatGPT confirmation; readOnlyHint and conversation-level remembered approvals reduce friction but do not disable host safety UI',
-        firstCalls: ['mcp_session_profile', 'mcp_tools_status', 'mcp_capabilities_summary'],
+        hostPolicy: 'plan -> bounded batch/write; remember trusted approvals when the host offers it',
         firstRememberApprovalWave: remember.filter((name) =>
             [
                 'repo_apply_patch',
@@ -64,14 +62,9 @@ function buildApprovalFrictionProfile(summaries) {
                 'run_copilot_validator',
             ].includes(name),
         ),
-        rememberApprovalCandidates: remember,
         neverRememberApproval: manual,
         planFirstWorkflows: [
-            ['repo_patch_plan', 'repo_apply_patch'],
             ['repo_patch_batch_plan', 'repo_apply_patch_batch'],
-            ['repo_create_file_plan', 'repo_create_file'],
-            ['repo_move_file_plan', 'repo_move_file'],
-            ['repo_quarantine_file_plan', 'repo_quarantine_file'],
             ['repo_apply_file_batch_plan', 'repo_apply_file_batch'],
             ['mcp_validation_plan', 'run_copilot_validator'],
         ],
@@ -116,7 +109,7 @@ export const mcpToolsStatusTool = {
     name: 'mcp_tools_status',
     title: 'MCP tools status',
     description:
-        'Return all MCP tools, annotations and risk classes so ChatGPT can choose low-friction tools and approval strategy.',
+        'Return compact MCP tool counts, risk classes and approval strategy without repeating the full tools/list registry.',
     inputSchema: {},
     annotations: readOnlyAnnotations(),
     handler: async () => {
@@ -128,6 +121,10 @@ export const mcpToolsStatusTool = {
         const openWorld = summaries.filter((tool) => tool.riskClass === 'open-world');
         const auth = readMcpAuthConfig();
         const maxPowerRepoScopesByDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
+        const outputSchemaCount = summaries.filter((tool) => tool.hasOutputSchema).length;
+        const securityMetadataCount = summaries.filter(
+            (tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0,
+        ).length;
         return okResult({
             success: true,
             totalTools: summaries.length,
@@ -136,6 +133,11 @@ export const mcpToolsStatusTool = {
             destructiveCount: destructive.length,
             openWorldCount: openWorld.length,
             idempotentReadCount: readOnly.filter((tool) => tool.annotations.idempotentHint).length,
+            metadataCoverage: {
+                outputSchemaCount,
+                securityMetadataCount,
+                complete: outputSchemaCount === summaries.length && securityMetadataCount === summaries.length,
+            },
             rememberApprovalCandidates: boundedWrite
                 .filter((tool) => tool.rememberApprovalCandidate && !requiresManualApproval(tool))
                 .map((tool) => tool.name),
@@ -143,17 +145,11 @@ export const mcpToolsStatusTool = {
             openWorldTools: openWorld.map((tool) => tool.name),
             hostApprovalProfile: {
                 oauthGrantsAllRepoScopesByDefault: maxPowerRepoScopesByDefault,
-                writeActionsMayStillPrompt:
-                    'ChatGPT host confirmation is separate from OAuth consent. Developer Mode requires confirmation for write actions by default; this MCP cannot disable that UI from the server side.',
-                approvalMinimizers: [
-                    'Use read-only *_plan tools before write tools.',
-                    'Use mcp_validation_plan first; prefer run_copilot_validator unit-focused and treat broad suites as escalation.',
-                    'Use delegate_to_repo_autonomy_runner for fixed multi-step missions.',
-                    'When ChatGPT offers it, remember approval for trusted bounded-write tools in the current conversation.',
-                ],
+                writeActionsMayStillPrompt: true,
+                preferredStrategy: 'plan once, apply a bounded batch, validate only when causal evidence requires it',
             },
             approvalFrictionProfile: buildApprovalFrictionProfile(summaries),
-            tools: summaries,
+            detailsTool: 'mcp_capabilities_summary',
         });
     },
 };

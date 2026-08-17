@@ -662,6 +662,37 @@ export function createIoIndexSqlite(options) {
     }
 
     return {
+        /**
+         * Fast fingerprint probe for explicit-path refreshes. This intentionally does not update refreshed_at_ms: a
+         * periodic full reconciliation remains responsible for the long-horizon content-hash safety check.
+         *
+         * @param {string} filePath
+         * @param {{ sizeBytes: number; mtimeMs: number; ctimeMs: number; dev: number; ino: number }} snapshot
+         */
+        matchesFileFingerprint(filePath, snapshot) {
+            const existing = /** @type {{ sizeBytes: number; mtimeMs: number; ctimeMs: number | null; dev: number | null; ino: number | null; status: string } | undefined} */ (
+                stmtGetFingerprint.get(normalizeIndexPath(filePath))
+            );
+            return Boolean(
+                existing &&
+                    existing.status === 'fresh' &&
+                    existing.ctimeMs != null &&
+                    existing.dev != null &&
+                    existing.ino != null &&
+                    richFingerprintMatches(
+                        {
+                            sizeBytes: existing.sizeBytes,
+                            mtimeMs: existing.mtimeMs,
+                            ctimeMs: existing.ctimeMs,
+                            dev: existing.dev,
+                            ino: existing.ino,
+                        },
+                        snapshot,
+                        { mtimeToleranceMs: 0 },
+                    ),
+            );
+        },
+
         /** @param {string} filePath */
         invalidatePath(filePath) {
             try {

@@ -5,8 +5,20 @@
  * @module copilot/mcp/control-plane/index-auto-build
  */
 
-import { buildIoIndexForDirectory, getIoIndexStats } from '#copilot/infra/public/indexing';
+import {
+    buildIoIndexForDirectory,
+    getIoIndexStats,
+    refreshIoIndexPaths,
+} from '#copilot/infra/public/indexing';
 import { WORKSPACE_ROOT } from '#copilot/tools';
+import { isAbsolute, relative, resolve } from 'node:path';
+import {
+    planIndexStartup,
+    readCommittedIndexChanges,
+    readIndexGitSnapshot,
+    readIndexStartupCheckpoint,
+    writeIndexStartupCheckpoint,
+} from './index-auto-build-checkpoint.js';
 import { resolveReadPath } from './paths.js';
 
 /**
@@ -17,6 +29,7 @@ import { resolveReadPath } from './paths.js';
  * @property {number} depth
  * @property {number} concurrency
  * @property {boolean} respectGitignore
+ * @property {number} fullReconcileIntervalMs
  */
 
 /**
@@ -35,6 +48,7 @@ const DEFAULT_AUTO_BUILD_PATH = 'src/copilot';
 const DEFAULT_AUTO_BUILD_MAX_FILES = 5000;
 const DEFAULT_AUTO_BUILD_DEPTH = 20;
 const DEFAULT_AUTO_BUILD_CONCURRENCY = 4;
+const DEFAULT_FULL_RECONCILE_INTERVAL_MS = 30 * 60 * 1000;
 
 /** @type {McpIndexAutoBuildState | null} */
 let autoBuildState = null;
@@ -100,6 +114,11 @@ export function readMcpIndexAutoBuildConfig(env = process.env) {
             max: 32,
         }),
         respectGitignore: !envBool(env['COPILOT_MCP_INDEX_AUTO_BUILD_IGNORE_GITIGNORE']),
+        fullReconcileIntervalMs: envInt(
+            env['COPILOT_MCP_INDEX_FULL_RECONCILE_INTERVAL_MS'],
+            DEFAULT_FULL_RECONCILE_INTERVAL_MS,
+            { min: 60_000, max: 24 * 60 * 60 * 1000 },
+        ),
     };
 }
 
@@ -201,19 +220,100 @@ async function runIndexAutoBuild(config) {
                 config,
             });
         }
-        const result = await buildIoIndexForDirectory(resolved.resolved, {
-            workspaceRoot: WORKSPACE_ROOT,
-            recursive: true,
-            depth: config.depth,
-            respectGitignore: config.respectGitignore,
-            maxFiles: config.maxFiles,
-            concurrency: config.concurrency,
+        const startupStartedAt = Date.now();
+        const indexStats = /** @type {Record<string, unknown>} */ (getIoIndexStats());
+        const schemaVersion = Number(indexStats['schemaVersion'] ?? 0);
+        const indexFiles = Number(indexStats['files'] ?? 0);
+        const gitSnapshot = await readIndexGitSnapshot({ workspaceRoot: WORKSPACE_ROOT, scopePath: config.path });
+        const checkpoint = readIndexStartupCheckpoint(config.path);
+        const plan = planIndexStartup({
+            checkpoint,
+            gitSnapshot,
+            schemaVersion,
+            indexFiles,
+            fullReconcileIntervalMs: config.fullReconcileIntervalMs,
         });
-        return makeState({
-            status: result.available === false ? 'failed' : 'completed',
-            reason: result.available === false ? 'index-unavailable' : 'completed',
-            result: /** @type {Record<string, unknown>} */ (result),
-            config,
+
+        if (plan.mode === 'skip' && gitSnapshot.head) {
+            writeIndexStartupCheckpoint({
+                scopePath: config.path,
+                head: gitSnapshot.head,
+                schemaVersion,
+                mode: 'skip',
+            });
+            return makeState({
+                status: 'skipped',
+                reason: plan.reason,
+                result: {
+                    available: true,
+                    mode: 'skip',
+                    scannedEntries: 0,
+                    candidateFiles: 0,
+                    indexed: 0,
+                    invalidated: 0,
+                    hashVerifications: 0,
+                    gitSnapshotDurationMs: gitSnapshot.durationMs,
+                    durationMs: Math.max(0, Date.now() - startupStartedAt),
+                },
+                config,
+            });
+        }
+
+        if (plan.mode === 'incremental' && gitSnapshot.head && checkpoint) {
+            let changes = [...plan.worktreeChanges];
+            let committedDiffDurationMs = 0;
+            if (plan.needsCommittedDiff) {
+                const committed = await readCommittedIndexChanges({
+                    workspaceRoot: WORKSPACE_ROOT,
+                    scopePath: config.path,
+                    fromHead: checkpoint.head,
+                    toHead: gitSnapshot.head,
+                });
+                committedDiffDurationMs = committed.durationMs;
+                if (!committed.available || committed.uncertain) {
+                    return await runFullReconcile(config, resolved.resolved, gitSnapshot, schemaVersion, startupStartedAt, {
+                        fallbackReason: 'committed-diff-uncertain',
+                        gitSnapshotDurationMs: gitSnapshot.durationMs,
+                    });
+                }
+                changes = [...changes, ...committed.changes];
+            }
+            const explicitPaths = normalizeGitChangePaths(changes, config.path);
+            const incremental = await refreshIoIndexPaths(explicitPaths, { workspaceRoot: WORKSPACE_ROOT });
+            if (incremental.available === false || incremental.failed > 0) {
+                return await runFullReconcile(config, resolved.resolved, gitSnapshot, schemaVersion, startupStartedAt, {
+                    fallbackReason: 'incremental-refresh-failed',
+                    gitSnapshotDurationMs: gitSnapshot.durationMs,
+                    incrementalFailed: incremental.failed,
+                });
+            }
+            writeIndexStartupCheckpoint({
+                scopePath: config.path,
+                head: gitSnapshot.head,
+                schemaVersion,
+                mode: 'incremental',
+            });
+            return makeState({
+                status: 'completed',
+                reason: plan.reason,
+                result: {
+                    ...incremental,
+                    mode: 'incremental',
+                    changedPathCount: explicitPaths.length,
+                    scannedEntries: 0,
+                    candidateFiles: explicitPaths.length,
+                    hashVerifications: 0,
+                    gitSnapshotDurationMs: gitSnapshot.durationMs,
+                    committedDiffDurationMs,
+                    durationMs: Math.max(0, Date.now() - startupStartedAt),
+                },
+                config,
+            });
+        }
+
+        return await runFullReconcile(config, resolved.resolved, gitSnapshot, schemaVersion, startupStartedAt, {
+            fallbackReason: plan.reason,
+            gitSnapshotDurationMs: gitSnapshot.durationMs,
         });
     } catch (error) {
         return makeState({
@@ -223,6 +323,62 @@ async function runIndexAutoBuild(config) {
             config,
         });
     }
+}
+
+/**
+ * @param {McpIndexAutoBuildConfig} config
+ * @param {string} resolvedPath
+ * @param {Awaited<ReturnType<typeof readIndexGitSnapshot>>} gitSnapshot
+ * @param {number} schemaVersion
+ * @param {number} startupStartedAt
+ * @param {Record<string, unknown>} evidence
+ */
+async function runFullReconcile(config, resolvedPath, gitSnapshot, schemaVersion, startupStartedAt, evidence) {
+    const result = await buildIoIndexForDirectory(resolvedPath, {
+        workspaceRoot: WORKSPACE_ROOT,
+        recursive: true,
+        depth: config.depth,
+        respectGitignore: config.respectGitignore,
+        maxFiles: config.maxFiles,
+        concurrency: config.concurrency,
+    });
+    if (result.available !== false && gitSnapshot.head && !gitSnapshot.uncertain) {
+        writeIndexStartupCheckpoint({
+            scopePath: config.path,
+            head: gitSnapshot.head,
+            schemaVersion,
+            mode: 'full-reconcile',
+        });
+    }
+    return makeState({
+        status: result.available === false ? 'failed' : 'completed',
+        reason: result.available === false ? 'index-unavailable' : 'full-reconcile',
+        result: /** @type {Record<string, unknown>} */ ({
+            ...result,
+            mode: 'full-reconcile',
+            ...evidence,
+            durationMs: Math.max(0, Date.now() - startupStartedAt),
+        }),
+        config,
+    });
+}
+
+/**
+ * Convert Git evidence into validated repo-absolute paths. Git output is internally generated and already scoped, but we
+ * still enforce scope containment before handing paths to the index refresh primitive.
+ *
+ * @param {Array<{ path: string }>} changes
+ * @param {string} scopePath
+ */
+function normalizeGitChangePaths(changes, scopePath) {
+    const scopeRoot = resolve(WORKSPACE_ROOT, scopePath);
+    const unique = new Set();
+    for (const change of changes) {
+        const candidate = resolve(WORKSPACE_ROOT, change.path);
+        const rel = relative(scopeRoot, candidate);
+        if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) unique.add(candidate);
+    }
+    return [...unique];
 }
 
 /**

@@ -15,6 +15,7 @@ import { getIoIndexStats } from './io-index-registry.js';
 import { getIoLockStats } from './io-locks.js';
 import { getIoDurabilityStats, getIoLatencyStats } from './io-observability.js';
 import { getLineOffsetCacheStats } from './io/fs/line-offset-cache.js';
+import { getIoInvalidationBusStats } from './io/invalidation/bus.js';
 import { getParserCacheStats } from './io-parser.js';
 import { getScopeStats, listScopes } from './io-session-scope.js';
 
@@ -57,6 +58,27 @@ function readParserHealthStats() {
     }
 }
 
+function readCoherenceHealthStats() {
+    try {
+        return getIoInvalidationBusStats();
+    } catch (error) {
+        return {
+            error: isError(error) ? /** @type {Error} */ (error).message : String(error),
+            hooks: 0,
+            pending: 0,
+            debounceMs: 0,
+            crossProcess: {
+                enabled: false,
+                initialized: false,
+                initializationErrors: 1,
+                writeErrors: 0,
+                readErrors: 0,
+                gapDetections: 0,
+            },
+        };
+    }
+}
+
 /**
  * @returns {{
  *     generatedAt: number;
@@ -73,6 +95,7 @@ function readParserHealthStats() {
  *         };
  *         l3: Record<string, unknown>;
  *         lineOffsets: ReturnType<typeof getLineOffsetCacheStats>;
+ *         coherence: ReturnType<typeof readCoherenceHealthStats>;
  *         aggregate: ReturnType<typeof aggregateIoCacheTierStats>;
  *         plan: ReturnType<typeof buildIoCacheTierPlan>;
  *     };
@@ -142,6 +165,7 @@ export function readIoRuntimeHealthSnapshot() {
                 ? Number(/** @type {{ lastInitErrorAtMs?: number }} */ (l2).lastInitErrorAtMs ?? 0) || null
                 : null,
     };
+    const coherence = readCoherenceHealthStats();
     const durability = safeCall(getIoDurabilityStats, {
         operationsObserved: 0,
         operationsWithMetadata: 0,
@@ -209,6 +233,25 @@ export function readIoRuntimeHealthSnapshot() {
             message: 'COPILOT_IO_FILE_LOCKS_ENABLED possui um perfil inválido; ativações automáticas estão desabilitadas.',
         });
     }
+    const crossProcess = /** @type {Record<string, unknown>} */ (coherence.crossProcess ?? {});
+    const crossProcessErrors =
+        Number(crossProcess['initializationErrors'] ?? 0) +
+        Number(crossProcess['writeErrors'] ?? 0) +
+        Number(crossProcess['readErrors'] ?? 0);
+    if (crossProcessErrors > 0) {
+        alerts.push({
+            code: 'IO_CROSS_PROCESS_INVALIDATION_ERROR',
+            severity: 'medium',
+            message: 'Cross-process cache invalidation journal observed an initialization/read/write error; filesystem fingerprints remain the fallback.',
+        });
+    }
+    if (Number(crossProcess['gapDetections'] ?? 0) > 0) {
+        alerts.push({
+            code: 'IO_CROSS_PROCESS_INVALIDATION_GAP',
+            severity: 'medium',
+            message: 'Cross-process invalidation consumer observed a journal sequence gap; a full index/cache reconciliation should be scheduled.',
+        });
+    }
     if (advisoryBudget.pressure) {
         alerts.push({
             code: 'IO_ADVISORY_BUDGET_PRESSURE',
@@ -242,6 +285,7 @@ export function readIoRuntimeHealthSnapshot() {
                 maxTextChars: 0,
                 maxBytes: 0,
             }),
+            coherence,
             aggregate,
             plan: buildIoCacheTierPlan({
                 l1Enabled: true,

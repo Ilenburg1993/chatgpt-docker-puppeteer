@@ -10,7 +10,12 @@ import { describe, it } from 'vitest';
 
 import { invalidateIoCachePath } from '#copilot/infra/io-cache.js';
 import { getCanonicalMcpTools } from '#copilot/mcp';
-import { getTtlCacheStats, resolveReadPath } from '#copilot/mcp/control-plane';
+import {
+    getTtlCacheStats,
+    recordMcpToolMetric,
+    resetMcpMetricsForTests,
+    resolveReadPath,
+} from '#copilot/mcp/control-plane';
 import {
     readRepoReadFileResultCacheStats,
     resetRepoReadResponseCacheForTest,
@@ -710,10 +715,7 @@ describe('copilot MCP tools', () => {
         assert.equal(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('job_cancel'), false);
         assert.ok(/** @type {string[]} */ (structured['destructiveTools']).includes('repo_remove_file'));
         const approvalFrictionProfile = /** @type {Record<string, unknown>} */ (structured['approvalFrictionProfile']);
-        assert.equal(
-            /** @type {string[]} */ (approvalFrictionProfile['rememberApprovalCandidates']).includes('job_cancel'),
-            false,
-        );
+        assert.equal('rememberApprovalCandidates' in approvalFrictionProfile, false);
         assert.ok(/** @type {string[]} */ (approvalFrictionProfile['neverRememberApproval']).includes('job_cancel'));
         assert.ok(
             /** @type {string[][]} */ (approvalFrictionProfile['planFirstWorkflows']).some(
@@ -736,23 +738,15 @@ describe('copilot MCP tools', () => {
             ),
             false,
         );
-        const tools = /**
-         * @type {{
-         *     name?: string;
-         *     annotations?: { idempotentHint?: boolean };
-         *     hasOutputSchema?: boolean;
-         *     securitySchemes?: { type?: string }[];
-         * }[]}
-         */ (structured['tools']);
-        assert.equal(tools.find((candidate) => candidate.name === 'repo_status')?.annotations?.idempotentHint, true);
-        assert.equal(tools.find((candidate) => candidate.name === 'repo_status')?.hasOutputSchema, true);
-        assert.ok(
-            tools
-                .find((candidate) => candidate.name === 'repo_status')
-                ?.securitySchemes?.some((scheme) => scheme.type === 'oauth2'),
-        );
+        assert.equal('tools' in structured, false);
+        const metadataCoverage = /** @type {Record<string, unknown>} */ (structured['metadataCoverage']);
+        assert.equal(metadataCoverage['outputSchemaCount'], getCanonicalMcpTools().length);
+        assert.equal(metadataCoverage['securityMetadataCount'], getCanonicalMcpTools().length);
+        assert.equal(metadataCoverage['complete'], true);
+        assert.equal(structured['detailsTool'], 'mcp_capabilities_summary');
         const hostApprovalProfile = /** @type {Record<string, unknown>} */ (structured['hostApprovalProfile']);
         assert.equal(hostApprovalProfile['oauthGrantsAllRepoScopesByDefault'], true);
+        assert.ok(Buffer.byteLength(JSON.stringify(structured)) < 15 * 1024);
     });
 
     it('mcp_session_profile returns the recommended ChatGPT autonomy profile', async () => {
@@ -762,7 +756,12 @@ describe('copilot MCP tools', () => {
         const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
         assert.equal(structured['success'], true);
         assert.equal(structured['profile'], 'chatgpt-max-autonomy-permanent-cloudflare-oauth');
-        assert.ok(/** @type {string[]} */ (structured['recommendedFirstCalls']).includes('mcp_tools_status'));
+        const recommendedFirstCalls = /** @type {string[]} */ (structured['recommendedFirstCalls']);
+        assert.deepEqual(recommendedFirstCalls, ['repo_status']);
+        assert.ok(recommendedFirstCalls.length <= 3);
+        assert.equal(recommendedFirstCalls.includes('mcp_cloudflare_remote_audit'), false);
+        const diagnosticsOnDemand = /** @type {Record<string, unknown>} */ (structured['diagnosticsOnDemand']);
+        assert.ok(/** @type {string[]} */ (diagnosticsOnDemand['cloudflare']).includes('mcp_cloudflare_remote_audit'));
         const approvalGuidance = /** @type {Record<string, unknown>} */ (structured['approvalGuidance']);
         assert.ok(
             /** @type {string[]} */ (approvalGuidance['avoidUnlessExplicitlyNeeded']).includes('repo_remove_file'),
@@ -770,6 +769,36 @@ describe('copilot MCP tools', () => {
         const tunnelGuidance = /** @type {Record<string, unknown>} */ (structured['tunnelGuidance']);
         assert.equal(tunnelGuidance['mode'], 'Cloudflare named permanent tunnel');
         assert.equal(tunnelGuidance['expectedUrlShape'], 'https://mcp.aurelin.org/mcp');
+        assert.ok(Buffer.byteLength(JSON.stringify(structured)) < 10 * 1024);
+        assert.equal('capabilities' in structured, false);
+        assert.equal('smokePrompts' in structured, false);
+    });
+
+    it('mcp_latency_dashboard ranks result payload size separately from handler latency', async () => {
+        resetMcpMetricsForTests();
+        recordMcpToolMetric('large-single-result', {
+            durationMs: 2,
+            isError: false,
+            resultSize: { strategy: 'stringify', bytes: 100_000 },
+        });
+        for (let index = 0; index < 3; index += 1) {
+            recordMcpToolMetric('chatty-result', {
+                durationMs: 1,
+                isError: false,
+                resultSize: { strategy: 'hint', bytes: 50_000 },
+            });
+        }
+        const tool = findTool('mcp_latency_dashboard');
+        const result = await tool.handler({ minSampleCalls: 1, maxRows: 5 });
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        const largest = /** @type {Record<string, unknown>[]} */ (structured['largestResultPayloads']);
+        const volume = /** @type {Record<string, unknown>[]} */ (structured['highestResultVolume']);
+        assert.equal(largest[0]?.['name'], 'large-single-result');
+        assert.equal(largest[0]?.['averageBytes'], 100_000);
+        assert.equal(volume[0]?.['name'], 'chatty-result');
+        assert.equal(volume[0]?.['totalBytes'], 150_000);
+        assert.equal(structured['summary']?.['largestAverageResultBytes'], 100_000);
+        resetMcpMetricsForTests();
     });
 
     it('mcp_post_restart_readiness reports compact permanent tunnel readiness', async () => {

@@ -12,6 +12,7 @@ export {
     findIoIndexSymbol,
     getIoIndexStats,
     invalidateIoIndexPath,
+    refreshIoIndexPaths,
     searchIoIndex,
 } from '../io-index-registry.js';
 

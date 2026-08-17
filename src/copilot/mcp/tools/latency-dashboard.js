@@ -93,6 +93,8 @@ export const mcpLatencyDashboardTool = {
         const toolRows = buildToolRows(metrics.tools, maxRows);
         const cumulativeCostRows = buildCumulativeCostRows(metrics.tools, metrics.totals.calls, maxRows);
         const callPressureRows = buildCallPressureRows(metrics.tools, metrics.totals.calls, maxRows);
+        const largestResultPayloads = buildLargestResultPayloadRows(metrics.tools, maxRows);
+        const highestResultVolume = buildResultVolumeRows(metrics.tools, maxRows);
         const phaseRows = buildPhaseRows(metrics.tools, maxRows);
         const phaseTotals = buildPhaseTotals(metrics.tools);
         const byteAccounting = buildByteAccounting(metrics.tools);
@@ -108,13 +110,19 @@ export const mcpLatencyDashboardTool = {
                 enoughSamples: metrics.totals.calls >= budgets.minSampleCalls,
             },
             budgets,
-            summary: assessment.summary,
+            summary: {
+                ...assessment.summary,
+                largestAverageResultBytes: largestResultPayloads[0]?.averageBytes ?? 0,
+                highestResultVolumeBytes: highestResultVolume[0]?.totalBytes ?? 0,
+            },
             critical: assessment.critical,
             warnings: assessment.warnings,
             passed: assessment.passed,
             ...(includeTools ? { slowestTools: toolRows } : {}),
             highestCumulativeCost: cumulativeCostRows,
             highestCallPressure: callPressureRows,
+            largestResultPayloads,
+            highestResultVolume,
             slowestPhases: phaseRows,
             phaseTotals,
             byteAccounting,
@@ -282,7 +290,68 @@ function buildCallPressureRows(tools, totalCalls, maxRows) {
             averageMs: metric.averageDurationMs,
         }))
         .filter((row) => row.calls > 0)
-        .sort((left, right) => right.calls - left.calls || right.totalDurationMs - left.totalDurationMs || left.name.localeCompare(right.name))
+        .sort(
+            (left, right) =>
+                right.calls - left.calls || right.totalDurationMs - left.totalDurationMs || left.name.localeCompare(right.name),
+        )
+        .slice(0, maxRows);
+}
+
+/**
+ * Rank tools by their average result payload. Handler latency alone misses tools that are cheap to execute but expensive
+ * to serialize, transport and inject into the model context.
+ *
+ * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric>} tools
+ * @param {number} maxRows
+ */
+function buildLargestResultPayloadRows(tools, maxRows) {
+    return Object.entries(tools)
+        .map(([name, metric]) => {
+            const resultCalls = metric.resultSize.hint + metric.resultSize.stringify + metric.resultSize.unknown;
+            return {
+                name,
+                calls: resultCalls,
+                totalBytes: metric.resultSize.totalBytes,
+                averageBytes: resultCalls > 0 ? Math.round(metric.resultSize.totalBytes / resultCalls) : 0,
+                lastBytes: metric.resultSize.lastBytes,
+                rejected: metric.resultSize.rejected,
+            };
+        })
+        .filter((row) => row.calls > 0)
+        .sort(
+            (left, right) =>
+                right.averageBytes - left.averageBytes ||
+                (right.lastBytes ?? 0) - (left.lastBytes ?? 0) ||
+                left.name.localeCompare(right.name),
+        )
+        .slice(0, maxRows);
+}
+
+/**
+ * Rank tools by cumulative result volume so a moderately sized response repeated many times is visible as a context and
+ * transport pressure source.
+ *
+ * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric>} tools
+ * @param {number} maxRows
+ */
+function buildResultVolumeRows(tools, maxRows) {
+    const totalResultBytes = Object.values(tools).reduce((sum, metric) => sum + metric.resultSize.totalBytes, 0);
+    return Object.entries(tools)
+        .map(([name, metric]) => {
+            const resultCalls = metric.resultSize.hint + metric.resultSize.stringify + metric.resultSize.unknown;
+            return {
+                name,
+                calls: resultCalls,
+                totalBytes: metric.resultSize.totalBytes,
+                averageBytes: resultCalls > 0 ? Math.round(metric.resultSize.totalBytes / resultCalls) : 0,
+                volumeShare: totalResultBytes > 0 ? roundRatio(metric.resultSize.totalBytes / totalResultBytes) : 0,
+            };
+        })
+        .filter((row) => row.calls > 0 && row.totalBytes > 0)
+        .sort(
+            (left, right) =>
+                right.totalBytes - left.totalBytes || right.calls - left.calls || left.name.localeCompare(right.name),
+        )
         .slice(0, maxRows);
 }
 
@@ -481,6 +550,7 @@ function buildNextActions(assessment, calls, budgets) {
     if (assessment.warnings.length > 0) {
         return [
             'Inspect highestCumulativeCost and highestCallPressure before optimizing isolated slow averages; repeated hot-tool calls often dominate interactive repo latency.',
+            'Inspect largestResultPayloads and highestResultVolume before adding diagnostics or registry detail to default workflows.',
             'Then inspect slowestPhases to distinguish handler, authorization and result-size bottlenecks.',
         ];
     }
