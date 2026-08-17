@@ -7,6 +7,7 @@
 
 export * from './config.js';
 export * from './config-audit.js';
+export * from './connector-smoke.js';
 export * from './edge-audit.js';
 export * from './edge-backup.js';
 export * from './edge-policy-apply.js';

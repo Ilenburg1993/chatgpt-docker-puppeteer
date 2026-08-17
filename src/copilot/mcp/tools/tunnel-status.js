@@ -5,15 +5,14 @@
  * @module copilot/mcp/tools/tunnel-status
  */
 
-import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import https from 'node:https';
 import { z } from 'zod';
-import { createBoundedProcessOutputCapture } from '#copilot/infra/public/process-output';
 import {
     isCloudflaredActionableOriginErrorLine,
     isCloudflaredBenignClientOrStreamCancellationLine,
     readCloudflareTunnelConfig,
+    runCanonicalConnectorSmoke,
     readConnectorSmokeState,
     readQuickTunnelState,
     summarizeConnectorSmokeState,
@@ -33,8 +32,6 @@ import {
 } from '#copilot/mcp/control-plane';
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
-const CONNECTOR_SMOKE_TIMEOUT_MS = 45_000;
-const CONNECTOR_SMOKE_OUTPUT_LIMIT = 256_000;
 const CLOUDFLARED_LOG_FILE = 'src/copilot/.ai/cloudflare/cloudflared.log';
 
 /**
@@ -195,12 +192,41 @@ function compactSmokeReport(value, includeRemoteToolNames) {
         report['toolsList'] && typeof report['toolsList'] === 'object' && !Array.isArray(report['toolsList'])
             ? { .../** @type {Record<string, unknown>} */ (report['toolsList']) }
             : report['toolsList'];
-    if (toolsList && typeof toolsList === 'object' && !Array.isArray(toolsList) && !includeRemoteToolNames) {
-        const toolsListRecord = /** @type {Record<string, unknown>} */ (toolsList);
-        delete toolsListRecord['remoteToolNames'];
-        toolsListRecord['remoteToolNamesSuppressed'] = true;
+    /** @type {Record<string, unknown> | null} */
+    const authenticatedOAuthSmoke =
+        report['authenticatedOAuthSmoke'] &&
+        typeof report['authenticatedOAuthSmoke'] === 'object' &&
+        !Array.isArray(report['authenticatedOAuthSmoke'])
+            ? { .../** @type {Record<string, unknown>} */ (report['authenticatedOAuthSmoke']) }
+            : null;
+    const authenticatedToolsList =
+        authenticatedOAuthSmoke &&
+        typeof authenticatedOAuthSmoke === 'object' &&
+        !Array.isArray(authenticatedOAuthSmoke) &&
+        authenticatedOAuthSmoke['authenticatedToolsList'] &&
+        typeof authenticatedOAuthSmoke['authenticatedToolsList'] === 'object' &&
+        !Array.isArray(authenticatedOAuthSmoke['authenticatedToolsList'])
+            ? { .../** @type {Record<string, unknown>} */ (authenticatedOAuthSmoke['authenticatedToolsList']) }
+            : null;
+    if (!includeRemoteToolNames) {
+        if (toolsList && typeof toolsList === 'object' && !Array.isArray(toolsList)) {
+            const toolsListRecord = /** @type {Record<string, unknown>} */ (toolsList);
+            if ('remoteToolNames' in toolsListRecord) {
+                delete toolsListRecord['remoteToolNames'];
+                toolsListRecord['remoteToolNamesSuppressed'] = true;
+            }
+        }
+        if (authenticatedToolsList) {
+            if ('remoteToolNames' in authenticatedToolsList) {
+                delete authenticatedToolsList['remoteToolNames'];
+                authenticatedToolsList['remoteToolNamesSuppressed'] = true;
+            }
+            if (authenticatedOAuthSmoke && typeof authenticatedOAuthSmoke === 'object' && !Array.isArray(authenticatedOAuthSmoke)) {
+                authenticatedOAuthSmoke['authenticatedToolsList'] = authenticatedToolsList;
+            }
+        }
     }
-    return { ...report, toolsList };
+    return { ...report, toolsList, authenticatedOAuthSmoke };
 }
 
 /**
@@ -216,80 +242,31 @@ async function runConnectorSmokeRefresh(input) {
         });
     }
     const includeRemoteToolNames = input.includeRemoteToolNames === true;
-    const child = spawn(process.execPath, ['src/copilot/mcp/cloudflare/cli.js', 'smoke'], {
-        cwd: process.cwd(),
-        env: {
-            ...process.env,
-            COPILOT_MCP_AUTH_MODE: process.env['COPILOT_MCP_AUTH_MODE'] ?? 'oauth',
-            COPILOT_MCP_AUTH_ENFORCEMENT: process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? 'all',
-            COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: config.publicMcpUrl,
-            COPILOT_MCP_SMOKE_COMPACT: '1',
-        },
-        stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const stdoutCapture = createBoundedProcessOutputCapture({
-        maxBytes: CONNECTOR_SMOKE_OUTPUT_LIMIT,
-        mode: 'tail',
-    });
-    const stderrCapture = createBoundedProcessOutputCapture({
-        maxBytes: CONNECTOR_SMOKE_OUTPUT_LIMIT,
-        mode: 'tail',
-    });
-    let timedOut = false;
-    const timeout = setTimeout(() => {
-        timedOut = true;
-        child.kill('SIGTERM');
-    }, CONNECTOR_SMOKE_TIMEOUT_MS);
-    timeout.unref?.();
-    child.stdout.on('data', (chunk) => {
-        stdoutCapture.append(chunk);
-    });
-    child.stderr.on('data', (chunk) => {
-        stderrCapture.append(chunk);
-    });
-    const exit = await new Promise((resolve) => {
-        child.on('error', (error) => resolve({ code: null, signal: null, error }));
-        child.on('close', (code, signal) => resolve({ code, signal, error: null }));
-    });
-    clearTimeout(timeout);
-    const stdout = stdoutCapture.toString();
-    const stderr = stderrCapture.toString();
-    if (timedOut) {
-        return errorResult('Cloudflare connector smoke refresh timed out.', {
-            code: 'ERR_CONNECTOR_SMOKE_TIMEOUT',
-            timeoutMs: CONNECTOR_SMOKE_TIMEOUT_MS,
-            connectorUrl: config.publicMcpUrl,
-            stderrTail: stderr.slice(-8000),
-        });
-    }
-    if (exit.error instanceof Error) {
-        return errorResult('Cloudflare connector smoke refresh failed to start.', {
-            code: 'ERR_CONNECTOR_SMOKE_START_FAILED',
-            error: exit.error.message,
-        });
-    }
-    let parsed;
+    let report;
     try {
-        parsed = parseConnectorSmokeJsonOutput(stdout);
+        report = await runCanonicalConnectorSmoke({
+            config,
+            env: {
+                ...process.env,
+                COPILOT_MCP_AUTH_MODE: process.env['COPILOT_MCP_AUTH_MODE'] ?? 'oauth',
+                COPILOT_MCP_AUTH_ENFORCEMENT: process.env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? 'all',
+                COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: config.publicMcpUrl,
+            },
+            persistState: true,
+        });
     } catch (error) {
-        return errorResult('Cloudflare connector smoke refresh did not return JSON.', {
-            code: 'ERR_CONNECTOR_SMOKE_INVALID_JSON',
-            exitCode: exit.code,
+        return errorResult('Cloudflare connector smoke refresh failed.', {
+            code: 'ERR_CONNECTOR_SMOKE_FAILED',
             connectorUrl: config.publicMcpUrl,
-            parseError: error instanceof Error ? error.message : String(error),
-            stdoutTail: stdout.slice(-8000),
-            stderrTail: stderr.slice(-8000),
+            error: error instanceof Error ? error.message : String(error),
         });
     }
-    const compact = compactSmokeReport(parsed, includeRemoteToolNames);
-    const ok = exit.code === 0 && Boolean(/** @type {Record<string, unknown>} */ (parsed)['ok']);
-    if (!ok) {
+    const compact = compactSmokeReport(report, includeRemoteToolNames);
+    if (report['ok'] !== true) {
         return errorResult('Cloudflare connector smoke refresh completed with failures.', {
             code: 'ERR_CONNECTOR_SMOKE_FAILED',
-            exitCode: exit.code,
-            signal: exit.signal,
+            connectorUrl: config.publicMcpUrl,
             report: compact,
-            stderrTail: stderr.slice(-8000),
         });
     }
     return okResult({

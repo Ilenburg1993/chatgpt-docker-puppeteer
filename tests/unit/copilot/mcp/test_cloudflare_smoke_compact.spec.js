@@ -11,17 +11,19 @@ import {
 } from '#copilot/mcp/tools';
 
 describe('cloudflare connector smoke compact mode', () => {
-    it('uses compact smoke output when the MCP tool refreshes connector smoke', async () => {
+    it('runs the canonical connector smoke in-process instead of paying child-process lifetime overhead', async () => {
         const source = await readFile('src/copilot/mcp/tools/tunnel-status.js', 'utf8');
 
-        expect(source).toContain("COPILOT_MCP_SMOKE_COMPACT: '1'");
+        expect(source).toContain('runCanonicalConnectorSmoke({');
+        expect(source).not.toContain("spawn(process.execPath, ['src/copilot/mcp/cloudflare/cli.js', 'smoke']");
     });
 
-    it('suppresses remote tool names only when compact smoke output is requested', async () => {
+    it('suppresses remote tool names from both legacy and authenticated tool-list projections', async () => {
         const source = await readFile('src/copilot/mcp/tools/tunnel-status.js', 'utf8');
 
         expect(source).toContain("delete toolsListRecord['remoteToolNames'];");
-        expect(source).toContain("toolsListRecord['remoteToolNamesSuppressed'] = true;");
+        expect(source).toContain("delete authenticatedToolsList['remoteToolNames'];");
+        expect(source).toContain("authenticatedToolsList['remoteToolNamesSuppressed'] = true;");
     });
 
     it('parses smoke JSON when startup logs are written before the report', () => {

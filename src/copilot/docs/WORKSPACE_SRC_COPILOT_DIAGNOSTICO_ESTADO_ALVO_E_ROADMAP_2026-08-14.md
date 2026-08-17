@@ -4478,3 +4478,115 @@ Correção em duas camadas:
 - [x] typecheck pós-lazy-import passou no job `addcbba8-24f3-423c-ad72-cf7239e074b8`.
 
 A aceitação operacional foi feita **sem novo consumo de provider**, por subprocesso real do próprio CLI. `test_runtime_selector_cli_liveness.spec.js` executa `model-gateway-runtime-selector.mjs --json --profile=repo_agent --runtime-source=file --selection-policy=metadata_first` em um Node limpo, com hard timeout de 8 s, e exige JSON válido do `model-gateway-runtime-selector-plan`. O primeiro ciclo de construção do teste já mostrou que o processo encerrava em ~2,2 s, falhando apenas por uma expectativa semântica incorreta sobre o campo `mode`; corrigida a asserção para `policyResolution.mode`, o job `db317374-286c-4bd0-a9a9-4104f3b1088f` passou integralmente em 2,859 s. Isso reduz a antiga retenção de ~45 s por child para uma ordem de poucos segundos e prova diretamente o caminho dry-run que causava a latência fantasma, sem tocar provider ou quota. Lint final, já incluindo o novo teste subprocessual, verde no job `f3e757ff-9d4c-48e7-be5c-eb1ff3513f99`.
+
+### 104.15 Autoavaliação operacional objetiva: MCP de ~8,3 s para <1 s no smoke canônico
+
+A solicitação para avaliar não só o produto, mas também **a própria velocidade e qualidade do agente operando sobre o WORKSPACE**, foi tratada como problema mensurável. A linha de base mostrou uma assimetria clara: operações locais do repositório já eram rápidas, enquanto uma única ferramenta de readiness distorcia todo o ciclo de trabalho.
+
+Baseline objetivo antes desta rodada:
+
+- `mcp_autonomy_power_score`: **91/100, grade A**; 116 tools publicadas, metadata/auth/validation fortes e apenas `llmb_live_test_run` corretamente mantida como `openWorld`;
+- Cloudflare/QUIC: RTT instantâneo **21 ms**, RTT suavizado **26 ms**, MTU 1344, quatro conexões HA, zero `packet-too-big` descartado;
+- index local: ~2,17 mil arquivos, ~11,9 mil símbolos e ~3,52 mil chunks, build/refresh em ~1,2 s;
+- leituras locais típicas: `repo_read_file` em poucos ms, `repo_search_text` em dezenas de ms e `repo_status` em ~50 ms;
+- gargalo dominante: `mcp_connector_smoke_refresh` em **8.252–8.282 s**, suficiente para degradar o dashboard apesar de auth/result-size/IO estarem dentro dos budgets.
+
+Essa evidência descartou a hipótese de que o túnel QUIC ou o filesystem fossem os culpados principais. O trabalho concentrou-se, portanto, na composição do smoke e em seu lifecycle.
+
+Foram encontrados **dois problemas de correção e vários problemas de latência**:
+
+1. o antigo `runSmoke` publicava `ok` baseado no smoke **não autenticado** e apenas aninhava o resultado OAuth autenticado; assim, uma challenge 401 saudável podia mascarar falha em DCR/tools/SSE;
+2. o estado persistido era escrito pelo smoke parcial antes da conclusão autenticada, portanto readiness podia consumir uma evidência epistemicamente incompleta;
+3. health, protected-resource e `tools/list` públicos eram serializados sem dependência entre si;
+4. smoke público e OAuth/DCR autenticado também eram serializados;
+5. `mcp_connector_smoke_refresh` abria um Node filho e esperava o processo inteiro morrer, embora o JSON útil já estivesse pronto; a diferença observada entre ~2,87 s de trabalho interno e ~8,31 s de handler expôs **~5,4 s de lifetime residual do child**;
+6. dentro do OAuth smoke, public discovery, metadata/JWKS, três checks MCP autenticados, DCR/PAR, token introspection/refresh e CIMD ainda carregavam serializações evitáveis.
+
+Transformação arquitetural aplicada:
+
+- [x] criado `mcp/cloudflare/connector-smoke.js` como **SSOT do smoke canônico completo**;
+- [x] o gate global passou a exigir simultaneamente `unauthenticated.ok && authenticatedOAuth.ok`;
+- [x] somente o resultado combinado grava `connector-smoke.json`; a projeção persistida de tools vem do `authenticatedToolsList`, não do 401 público esperado;
+- [x] `runCloudflareSmoke` ganhou `persistState=false` para poder ser reutilizado como subprova sem publicar estado parcial;
+- [x] dependências do canonical smoke são injetáveis em teste; há cobertura explícita provando que OAuth autenticado falho derruba `ok`, que o estado final usa o registry autenticado e que os dois ramos começam concorrentemente;
+- [x] o refresh MCP deixou de spawnar `cli.js smoke` e chama o canonical smoke **in-process**, removendo o lifetime residual do processo filho;
+- [x] compactação/redação cobre também o `authenticatedToolsList` aninhado;
+- [x] health, protected-resource e `tools/list` públicos rodam em `Promise.all`; metadata de authorization server permanece corretamente dependente do protected-resource;
+- [x] smoke público e OAuth/DCR rodam em paralelo;
+- [x] no OAuth smoke, public discovery concorrente e CORS/JWKS concorrentes preservam as dependências reais;
+- [x] `mcp_runtime_health`, authenticated `tools/list` e SSE são independentes e passaram a rodar em paralelo;
+- [x] CIMD inicia assim que a metadata do issuer existe e sobrepõe seu fluxo ao DCR, reduzindo sua contribuição crítica de ~354 ms para ~1 ms residual;
+- [x] authorization-code e PAR do mesmo public client usam transações independentes e agora são aguardados em paralelo;
+- [x] introspection e refresh, que consomem tokens independentes, são aguardados em paralelo;
+- [x] os runtime checks usam o access token DCR original e começam antes da conclusão de introspection/refresh, sobrepondo transport verification ao token lifecycle;
+- [x] `phaseTimings` foi incorporado ao OAuth smoke para que futuras otimizações sejam orientadas por dados, não por intuição.
+
+Progressão medida no **mesmo instrumento `mcp_latency_dashboard`**:
+
+| estágio | `mcp_connector_smoke_refresh` | OAuth autenticado | smoke combinado interno |
+|---|---:|---:|---:|
+| baseline pré-refactor | ~8.282 ms | ~2.854 ms no primeiro perfil paralelo observado | ~2.870 ms, ainda preso ao child |
+| canonical in-process | **2.711 ms** | 2.679 ms | 2.688 ms |
+| runtime/public concurrency | **1.673 ms** | 1.641 ms | 1.652 ms |
+| CIMD + auth/lifecycle overlap | **1.084 ms** | 1.039 ms | 1.048 ms |
+| runtime/token overlap final | **954 ms** | **920 ms** | **930 ms** |
+
+O resultado final representa redução de aproximadamente **88,5%** na latência da tool dominante em relação aos 8.282 ms de referência e uma aceleração de ~**8,7×**. No snapshot final, o `mcp_latency_dashboard` passou de `degraded` para **`ok`**, sem warnings: slowest tool 954 ms < budget de 1.000 ms, handler médio 361 ms < 750 ms, authorization 2 ms < 250 ms, result-size ~0 ms e error rate zero.
+
+O último `phaseTimings` autenticado foi: public discovery 136 ms; authorization metadata 119 ms; registration 73 ms; authorization flows 190 ms; token lifecycle 221 ms; runtime-check residual 180 ms; optional checks 1 ms. O número deve ser lido como **contribuição ao caminho crítico**, pois parte do trabalho agora é deliberadamente sobreposta. Isso é uma propriedade desejável da instrumentação: ela mede o que ainda alonga a wall-clock latency, e não soma artificialmente trabalho concorrente.
+
+Conclusão operacional: a maior oportunidade de velocidade nesta rodada não estava em “usar um túnel mais rápido” nem em reduzir garantias de auth, mas em **remover serialização artificial, side effects e lifetimes inúteis sem diminuir cobertura**. A ferramenta ficou simultaneamente mais rápida e semanticamente mais rigorosa.
+
+### 104.16 Benchmark do cache IO: correção de safety gate e decisão de manter L2 desligado
+
+A missão fixa `benchmark-io-cache` inicialmente falhou antes de medir qualquer coisa. A causa não era desempenho: o runner fazia cleanup recursivo com `removePathLocked(..., { recursive: true, force: true })`, mas a infraestrutura de IO havia evoluído para exigir `recursiveConfirmation` exatamente igual ao target resolvido. O benchmark, portanto, estava incompatível com o próprio safety contract do filesystem.
+
+Correção:
+
+- [x] os dois cleanups do `scheduled-io-cache-benchmark-runner.js` passaram a fornecer `recursiveConfirmation: benchmarkDir`;
+- [x] a missão seguinte (`mcp-io-cache-benchmark-9854e750-1e2a-4aaf-8c56-3c6edc0b9102`) concluiu em ~3,03 s, usando banco isolado e removendo o DB temporário ao final;
+- [x] cold read: média **12,233 ms**, p95 **12,879 ms**;
+- [x] L1: média **1,758 ms**, p95 **1,794 ms** — aproximadamente 7× mais rápido que cold neste perfil;
+- [x] L2: média **14,267 ms**, p95 **16,479 ms**;
+- [x] L2 teve **-27,95%** de “melhoria” p95 contra cold, isto é, foi materialmente pior no benchmark representativo;
+- [x] decisão: **não habilitar L2 por padrão**. `autoEnable=false` permanece correto.
+
+Esse resultado evita uma otimização meramente nominal. O sistema já possui um L1 extremamente efetivo no workload medido; promover L2 acrescentaria lookup/persistência sem benefício líquido. A política daqui em diante é reavaliar L2 somente se o workload, backend ou topologia de acesso mudarem e um novo benchmark reproduzível inverter essa relação.
+
+### 104.17 Retenção operacional dos artefatos de validação sem tocar rollback ou credenciais
+
+A própria rodada de profiling produziu e encontrou acúmulo legítimo de manifests/logs UUID antigos em `.ai/jobs`. A maintenance surface foi usada de forma estritamente allowlisted, preservando as fronteiras já endurecidas:
+
+- [x] dry-run encontrou **326** artefatos UUID além da retenção de 240 mais novos;
+- [x] primeiro lote removeu **300 arquivos / 1.094.742 bytes**;
+- [x] segundo lote removeu os **26 restantes / 33.754 bytes**;
+- [x] total removido: **326 arquivos / 1.128.496 bytes** (~1,08 MiB), com `remainingCandidateCount=0`;
+- [x] nenhum arquivo OAuth, token/tunnel state, PID, quarantine, nome não UUID ou path fora do domínio explícito ficou elegível;
+- [x] rollback não foi solicitado no cleanup e permaneceu separado: `enabled=false`, sidecars reconhecidos=0, bytes=0;
+- [x] o unknown entry historicamente protegido no domínio rollback continua intocado por design.
+
+A retenção, portanto, voltou ao regime previsto sem ampliar a superfície destrutiva nem reintroduzir captura automática de rollback.
+
+### 104.18 Budget de `tools/list`: crescimento do registry expôs regressão de 207 bytes e levou a compactação sem perda funcional
+
+O primeiro `mcp-fast` de release gate encontrou uma falha única e útil: `test_tool_payload_audit.spec.js` ainda fixava `toolCount=115`, enquanto o registry já publica **116** tools desde a introdução de `llmb_live_test_cancel`. Depois de remover esse número mágico e comparar contra `getCanonicalMcpTools().length`, o mesmo audit revelou a regressão real escondida pelo teste antigo:
+
+- envelope `tools/list`: **131.279 bytes**;
+- budget deliberado: **131.072 bytes (128 KiB)**;
+- excesso: **207 bytes**;
+- maior família: input schemas, **48.299 bytes**;
+- `_meta`: **22.490 bytes**;
+- descriptions: **12.663 bytes**;
+- output schemas: **16.523 bytes**.
+
+Não foi adotada a solução fácil de aumentar o budget. O envelope é enviado para todo cliente que lista tools; preservar disciplina abaixo de 128 KiB reduz custo de serialização, transporte e host parsing. A compactação foi feita na metadata **puramente apresentacional**, mantendo schemas, security schemes, annotations e contratos intactos:
+
+- [x] o status final padrão mudou de `${label} concluido` para `${label}: ok`, mais curto e linguisticamente mais claro para labels em gerúndio como `Lendo arquivo`/`Aplicando patch`;
+- [x] quando não existe label humano explícito, a invocation metadata deixa de repetir o `title` rico e usa o nome estável humanizado da tool; o `title` completo continua presente no campo top-level destinado à UI;
+- [x] a compatibilidade `_meta.securitySchemes` foi **preservada**; não se comprou payload removendo o espelho de autenticação usado por clientes antigos;
+- [x] o teste de payload passou novamente sob 128 KiB e agora exige também **>1 KiB de headroom**, impedindo que o próximo acréscimo marginal volte a encostar silenciosamente no limite;
+- [x] o teste de registry cobre tanto o label explícito (`Aplicando patch...` / `Aplicando patch: ok`) quanto o fallback compacto (`Connector smoke refresh...` / `Connector smoke refresh: ok`).
+
+O primeiro broad gate falhou somente por essa regressão de payload. Após a correção, o `mcp-fast` final `53c184de-5e5f-4e56-86fb-72b0890f39bc` ficou integralmente verde: **59/59 arquivos, 311/311 testes MCP**, typecheck incluído, duração total ~35,4 s. Isso fecha a rodada com uma propriedade importante: o aumento da autonomia para 116 tools não ficou autorizado a crescer indefinidamente o custo de descoberta do próprio agente.
+
+A prova remota pós-reload confirmou o efeito no wire real: `authenticatedToolsList.responseBytes` caiu de **131.470 para 129.918 bytes**, redução de **1.552 bytes**, mantendo 116/116 tools e zero missing/unexpected. Em quatro smokes completos consecutivos no mesmo processo, `mcp_connector_smoke_refresh` estabilizou em **929 ms de média**, último sample **877 ms**, e o dashboard voltou a `status=ok` com 10 chamadas observadas, error rate zero e nenhum warning. Esse sample múltiplo é mais representativo que a fotografia unitária de 954 ms usada na seção 104.15 e reforça a ordem de grandeza final: aproximadamente **8,9× mais rápido** que o baseline de 8.282 ms.

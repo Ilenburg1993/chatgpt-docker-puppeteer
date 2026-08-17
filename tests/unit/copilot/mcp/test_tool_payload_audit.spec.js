@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
+import { getCanonicalMcpTools } from '#copilot/mcp';
 import { buildToolPayloadAudit } from '#copilot/mcp/scripts';
 
 describe('MCP tools/list payload audit', () => {
@@ -11,8 +12,9 @@ describe('MCP tools/list payload audit', () => {
 
         assert.equal(audit['ok'], true);
         assert.equal(audit['measurement'], 'sdk-in-memory-tools/list');
-        assert.equal(audit['toolCount'], 115);
-        assert.equal(audit['withinEnvelopeBudget'], true);
+        assert.equal(audit['toolCount'], getCanonicalMcpTools().length);
+        assert.equal(audit['withinEnvelopeBudget'], true, JSON.stringify(audit, null, 2));
+        assert.ok(Number(audit['budgetHeadroomBytes']) > 1024, JSON.stringify(audit, null, 2));
         assert.ok(Number(audit['totalEnvelopeBytes']) > 100_000);
         assert.ok(Number(audit['totalEnvelopeBytes']) < 128 * 1024);
         assert.ok(Number(audit['budgetHeadroomBytes']) > 0);

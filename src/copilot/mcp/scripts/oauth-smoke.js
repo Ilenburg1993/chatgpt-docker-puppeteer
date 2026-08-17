@@ -98,6 +98,15 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  */
 export async function runMcpOAuthSmoke(options = {}) {
     const startedAtMs = Date.now();
+    /** @type {Record<string, number>} */
+    const phaseTimings = {};
+    let phaseStartedAtMs = startedAtMs;
+    /** @param {string} name */
+    const finishPhase = (name) => {
+        const nowMs = Date.now();
+        phaseTimings[name] = nowMs - phaseStartedAtMs;
+        phaseStartedAtMs = nowMs;
+    };
     const runtime = readSmokeRuntimeOptions(options);
     const config = readMcpAuthConfig();
     const resource = normalizeResource(
@@ -107,13 +116,18 @@ export async function runMcpOAuthSmoke(options = {}) {
 
     const protectedResourceUrl = buildProtectedResourceMetadataUrl(resource);
     const rootProtectedResourceUrl = buildRootProtectedResourceMetadataUrl(resource);
-    const protectedResource = await probeJsonWithRetry(protectedResourceUrl, { method: 'GET' }, runtime);
-    const rootProtectedResource =
+    // These probes share no mutable state and all target the pre-auth discovery surface. Running them concurrently keeps
+    // the smoke bounded by the slowest network leg instead of serially accumulating four public round trips.
+    const protectedResourcePromise = probeJsonWithRetry(protectedResourceUrl, { method: 'GET' }, runtime);
+    const [protectedResource, rootProtectedResource, protectedResourceCors, mcpChallenge] = await Promise.all([
+        protectedResourcePromise,
         rootProtectedResourceUrl === protectedResourceUrl
-            ? protectedResource
-            : await probeJsonWithRetry(rootProtectedResourceUrl, { method: 'GET' }, runtime);
-    const protectedResourceCors = await probeCorsPreflightWithRetry(protectedResourceUrl, 'GET', runtime);
-    const mcpChallenge = await probeMcpUnauthorizedChallenge(mcpUrl, runtime);
+            ? protectedResourcePromise
+            : probeJsonWithRetry(rootProtectedResourceUrl, { method: 'GET' }, runtime),
+        probeCorsPreflightWithRetry(protectedResourceUrl, 'GET', runtime),
+        probeMcpUnauthorizedChallenge(mcpUrl, runtime),
+    ]);
+    finishPhase('publicDiscovery');
 
     const authorizationServer =
         extractAuthorizationServer(protectedResource.body) ??
@@ -121,11 +135,13 @@ export async function runMcpOAuthSmoke(options = {}) {
         resource;
     const oauthDiscovery = await discoverAuthorizationServerMetadata(authorizationServer, runtime);
     const oauthMetadata = oauthDiscovery.probe;
-    const oauthMetadataCors = await probeCorsPreflightWithRetry(oauthDiscovery.url, 'GET', runtime);
     const metadata = asRecord(oauthMetadata.body);
     const jwksUri =
         typeof metadata?.['jwks_uri'] === 'string' ? metadata['jwks_uri'] : `${authorizationServer}/oauth/jwks.json`;
-    const jwks = await probeJsonWithRetry(jwksUri, { method: 'GET' }, runtime);
+    const [oauthMetadataCors, jwks] = await Promise.all([
+        probeCorsPreflightWithRetry(oauthDiscovery.url, 'GET', runtime),
+        probeJsonWithRetry(jwksUri, { method: 'GET' }, runtime),
+    ]);
 
     const profile = buildComplianceProfile({
         resource,
@@ -136,14 +152,30 @@ export async function runMcpOAuthSmoke(options = {}) {
         oauthMetadata,
         jwks,
     });
+    finishPhase('authorizationMetadata');
+
+    // CIMD is an independent client-identity flow once issuer metadata is known. Start it now so its metadata/token/
+    // refresh/userinfo round trips overlap the DCR path instead of extending the critical path after runtime checks.
+    const cimdAdvertised = metadata?.['client_id_metadata_document_supported'] === true;
+    const cimdFlowPromise = runCimdSmoke({
+        advertised: cimdAdvertised,
+        metadata,
+        authorizationServer,
+        resource,
+        runtime,
+    });
 
     const registration = await registerPublicClient(metadata, authorizationServer, runtime);
-    const dcrToken = registration.ok
-        ? await authorizeAndExchangeRegisteredClient(metadata, registration, resource, FULL_REPO_SCOPE, runtime)
-        : failure('registration failed');
-    const parToken = registration.ok
-        ? await authorizeAndExchangeRegisteredClientViaPar(metadata, registration, resource, FULL_REPO_SCOPE, runtime)
-        : failure('registration failed');
+    finishPhase('registration');
+    // The canonical authorization-code and PAR flows use independent authorization transactions for the same public
+    // client. Validate them concurrently so PAR coverage does not double the login/token critical path.
+    const [dcrToken, parToken] = registration.ok
+        ? await Promise.all([
+              authorizeAndExchangeRegisteredClient(metadata, registration, resource, FULL_REPO_SCOPE, runtime),
+              authorizeAndExchangeRegisteredClientViaPar(metadata, registration, resource, FULL_REPO_SCOPE, runtime),
+          ])
+        : [failure('registration failed'), failure('registration failed')];
+    finishPhase('authorizationFlows');
     const registrationBody = asRecord(registration.body);
     const dcrTokenBody = asRecord(dcrToken.body);
     const parTokenBody = asRecord(parToken.body);
@@ -160,27 +192,36 @@ export async function runMcpOAuthSmoke(options = {}) {
         expectedScopes: FULL_REPO_SCOPE,
         expectedClientId: String(registrationBody?.['client_id'] ?? ''),
     });
-    const dcrIntrospection =
+    const initialDcrAccessToken =
+        typeof dcrTokenBody?.['access_token'] === 'string' ? dcrTokenBody['access_token'] : null;
+    // Runtime MCP checks validate the original DCR access token and do not depend on introspection or refresh results.
+    // Start them now so token-lifecycle verification overlaps the authenticated MCP transport checks.
+    const runtimeChecksPromise = initialDcrAccessToken
+        ? runMcpToolRuntimeChecks(mcpUrl, initialDcrAccessToken, runtime)
+        : null;
+    // Introspection reads the issued access token while refresh rotates/renews from the independent refresh token.
+    // Neither result is an input to the other, so wait for both together.
+    const [dcrIntrospection, dcrRefreshToken] = await Promise.all([
         typeof dcrTokenBody?.['access_token'] === 'string'
-            ? await introspectToken(
+            ? introspectToken(
                   metadata,
                   resource,
                   String(registrationBody?.['client_id'] ?? ''),
                   dcrTokenBody['access_token'],
                   runtime,
               )
-            : failure('access_token missing');
-
-    const dcrRefreshToken =
+            : Promise.resolve(failure('access_token missing')),
         typeof dcrTokenBody?.['refresh_token'] === 'string'
-            ? await refreshToken(
+            ? refreshToken(
                   metadata,
                   resource,
                   String(registrationBody?.['client_id'] ?? ''),
                   dcrTokenBody['refresh_token'],
                   runtime,
               )
-            : failure('refresh_token missing');
+            : Promise.resolve(failure('refresh_token missing')),
+    ]);
+    finishPhase('tokenLifecycle');
     const dcrRefreshTokenBody = asRecord(dcrRefreshToken.body);
     const dcrRefreshTokenValidation = validateAccessTokenClaims(dcrRefreshTokenBody?.['access_token'], {
         expectedIssuer: String(metadata?.['issuer'] ?? authorizationServer),
@@ -189,15 +230,18 @@ export async function runMcpOAuthSmoke(options = {}) {
         expectedClientId: String(registrationBody?.['client_id'] ?? ''),
     });
     const dcrRuntimeAccessToken =
-        typeof dcrRefreshTokenBody?.['access_token'] === 'string'
-            ? dcrRefreshTokenBody['access_token']
-            : typeof dcrTokenBody?.['access_token'] === 'string'
-              ? dcrTokenBody['access_token']
-              : null;
-    const runtimeHealthUnusedRuntimeChecks =
-        typeof dcrRuntimeAccessToken === 'string'
-            ? await runMcpToolRuntimeChecks(mcpUrl, dcrRuntimeAccessToken, runtime)
-            : { runtimeHealth: failure('token missing'), authenticatedToolsList: failure('token missing'), authenticatedSse: failure('token missing') };
+        initialDcrAccessToken ??
+        (typeof dcrRefreshTokenBody?.['access_token'] === 'string' ? dcrRefreshTokenBody['access_token'] : null);
+    const runtimeHealthUnusedRuntimeChecks = runtimeChecksPromise
+        ? await runtimeChecksPromise
+        : typeof dcrRuntimeAccessToken === 'string'
+          ? await runMcpToolRuntimeChecks(mcpUrl, dcrRuntimeAccessToken, runtime)
+          : {
+                runtimeHealth: failure('token missing'),
+                authenticatedToolsList: failure('token missing'),
+                authenticatedSse: failure('token missing'),
+            };
+    finishPhase('runtimeChecks');
     const runtimeHealth =
         typeof dcrRuntimeAccessToken === 'string'
             ? runtimeHealthUnusedRuntimeChecks.runtimeHealth
@@ -212,14 +256,7 @@ export async function runMcpOAuthSmoke(options = {}) {
             ? await Promise.resolve(runtimeHealthUnusedRuntimeChecks.authenticatedSse)
             : failure('token missing');
 
-    const cimdAdvertised = metadata?.['client_id_metadata_document_supported'] === true;
-    const cimdFlow = await runCimdSmoke({
-        advertised: cimdAdvertised,
-        metadata,
-        authorizationServer,
-        resource,
-        runtime,
-    });
+    const cimdFlow = await cimdFlowPromise;
 
     const privateKeyJwtFlow = await runPrivateKeyJwtSmoke({
         metadata,
@@ -234,6 +271,7 @@ export async function runMcpOAuthSmoke(options = {}) {
         resource,
         runtime,
     });
+    finishPhase('optionalChecks');
 
     const checks = {
         protectedResource: protectedResource.ok,
@@ -269,6 +307,7 @@ export async function runMcpOAuthSmoke(options = {}) {
             version: OAUTH_SMOKE_IMPLEMENTATION_VERSION,
         },
         durationMs: Date.now() - startedAtMs,
+        phaseTimings,
         resource,
         mcpUrl,
         protectedResourceUrl,
@@ -1321,11 +1360,14 @@ function summarizeNegativeProbe(probe) {
  * @returns {Promise<{ runtimeHealth: ProbeResult; authenticatedToolsList: ProbeResult; authenticatedSse: ProbeResult }>}
  */
 async function runMcpToolRuntimeChecks(a, b, c) {
-    const one = await callMcpTool(a, b, 'mcp_runtime_health', c);
-    const two = await listMcpTools(a, b, c);
-    const three = await probeMcpSseStatefully(a, b, c);
+    // Each check creates and owns its own MCP request/session lifecycle. They validate independent surfaces and therefore
+    // should not serialize three remote round trips on the critical connector-readiness path.
+    const [one, two, three] = await Promise.all([
+        callMcpTool(a, b, 'mcp_runtime_health', c),
+        listMcpTools(a, b, c),
+        probeMcpSseStatefully(a, b, c),
+    ]);
     return { runtimeHealth: one, authenticatedToolsList: two, authenticatedSse: three };
-
 }
 
 /** @param {string} mcpUrl @param {string} accessToken @param {string} toolName @param {OAuthSmokeRuntimeOptions} runtime @returns {Promise<ProbeResult>} */

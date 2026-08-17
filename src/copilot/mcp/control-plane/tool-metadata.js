@@ -88,8 +88,9 @@ function trimInvocationStatus(value) {
 export function buildHumanMcpToolInvocationLabel(tool) {
     const explicit = TOOL_INVOCATION_LABELS.get(tool.name);
     if (explicit) return explicit;
-    const title = typeof tool.title === 'string' && tool.title.trim() ? tool.title : humanizeToolName(tool.name);
-    return sanitizeInvocationStatusText(title) || 'Tool';
+    // The top-level title already carries the richer UI label. Invocation metadata is repeated twice per tool on the
+    // wire, so derive its status from the stable compact tool name instead of duplicating the longer title.
+    return sanitizeInvocationStatusText(humanizeToolName(tool.name)) || 'Tool';
 }
 
 /**
@@ -99,7 +100,7 @@ export function buildHumanMcpToolInvocationLabel(tool) {
  */
 export function buildHumanMcpToolInvocationStatus(tool, phase) {
     const label = buildHumanMcpToolInvocationLabel(tool);
-    return trimInvocationStatus(phase === 'invoking' ? `${label}...` : `${label} concluido`);
+    return trimInvocationStatus(phase === 'invoking' ? `${label}...` : `${label}: ok`);
 }
 
 /**

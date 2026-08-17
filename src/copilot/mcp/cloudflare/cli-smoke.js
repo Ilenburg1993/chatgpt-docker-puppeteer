@@ -11,10 +11,10 @@ const DEFAULT_SMOKE_DELAY_MS = 1_000;
 const DEFAULT_CRITICAL_TOOL_NAMES = ['repo_status', 'repo_tree', 'repo_read_file', 'repo_search_text', 'repo_apply_file_batch', 'mcp_runtime_health', 'mcp_tunnel_status'];
 
 /**
- * @param {{ config?: import('./config.js').CloudflareTunnelConfig; authenticated?: boolean; env?: NodeJS.ProcessEnv }} [input]
+ * @param {{ config?: import('./config.js').CloudflareTunnelConfig; authenticated?: boolean; env?: NodeJS.ProcessEnv; persistState?: boolean }} [input]
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function runCloudflareSmoke({ config, authenticated = false, env = process.env } = {}) {
+export async function runCloudflareSmoke({ config, authenticated = false, env = process.env, persistState = true } = {}) {
     if (!config) throw new Error('Cloudflare smoke requires a resolved tunnel config.');
     const connectorUrl = resolveConnectorUrl(config, env);
     const protocolVersion = String(env['COPILOT_MCP_PROTOCOL_VERSION'] ?? DEFAULT_MCP_PROTOCOL_VERSION).trim();
@@ -27,11 +27,25 @@ export async function runCloudflareSmoke({ config, authenticated = false, env = 
             'Authenticated Cloudflare smoke requires a valid COPILOT_MCP_SMOKE_BEARER_TOKEN.',
         );
     }
-    const health = await probeJsonWithRetry(new URL('/health', connectorUrl).toString(), probeOptions);
-    const protectedResource = await probeJsonWithRetry(new URL('/.well-known/oauth-protected-resource', connectorUrl).toString(), probeOptions);
+    const startedAt = Date.now();
+    const discoveryStartedAt = Date.now();
+    const [health, protectedResource, toolsList] = await Promise.all([
+        probeJsonWithRetry(new URL('/health', connectorUrl).toString(), probeOptions),
+        probeJsonWithRetry(new URL('/.well-known/oauth-protected-resource', connectorUrl).toString(), probeOptions),
+        probeJsonWithRetry(connectorUrl, {
+            method: 'POST',
+            headers: buildToolsListSmokeHeaders(bearerToken, { protocolVersion }),
+            body: JSON.stringify({ jsonrpc: '2.0', id: 'cloudflare-smoke-tools-list', method: 'tools/list', params: {} }),
+            ...probeOptions,
+        }),
+    ]);
+    const discoveryParallelMs = Date.now() - discoveryStartedAt;
     const authorizationServer = extractAuthorizationServer(protectedResource);
-    const authorization = authorizationServer ? await probeJsonWithRetry(new URL('/.well-known/oauth-authorization-server', authorizationServer).toString(), probeOptions) : { ok: false, error: 'missing-authorization-server' };
-    const toolsList = await probeJsonWithRetry(connectorUrl, { method: 'POST', headers: buildToolsListSmokeHeaders(bearerToken, { protocolVersion }), body: JSON.stringify({ jsonrpc: '2.0', id: 'cloudflare-smoke-tools-list', method: 'tools/list', params: {} }), ...probeOptions });
+    const authorizationStartedAt = Date.now();
+    const authorization = authorizationServer
+        ? await probeJsonWithRetry(new URL('/.well-known/oauth-authorization-server', authorizationServer).toString(), probeOptions)
+        : { ok: false, error: 'missing-authorization-server' };
+    const authorizationServerMs = Date.now() - authorizationStartedAt;
     const tools = summarizeToolsListProbe(toolsList);
     const oauth = summarizeOAuthReadiness(protectedResource, authorization);
     const authConfig = readMcpAuthConfig(env);
@@ -45,34 +59,42 @@ export async function runCloudflareSmoke({ config, authenticated = false, env = 
         authenticated,
         authMode: authConfig.mode,
         probePolicy: { attempts: smokeAttempts, delayMs: smokeDelayMs },
+        timings: {
+            strategy: 'parallel-health-resource-tools-then-auth-metadata',
+            discoveryParallelMs,
+            authorizationServerMs,
+            totalMs: Date.now() - startedAt,
+        },
         health: summarizeProbeEnvelope(health),
         oauth,
         tools,
         authChallenge,
         criticalTools,
     };
-    try {
-        await writeConnectorSmokeState(config.smokeStateFile, {
-            connectorUrl,
-            checkedAt: new Date().toISOString(),
-            health: report.health,
-            toolsList: {
-                ok: toolsGateOk,
-                status: tools.status,
-                tools: tools.toolCount,
-                expectedLocalTools: getCanonicalMcpTools().length,
-                toolsMatchLocalRegistry: tools.ok,
-                criticalToolsPresent: criticalTools.ok,
-                missingCriticalTools: criticalTools.missing,
-                missingLocalTools: [],
-                unexpectedRemoteTools: [],
-                authChallenge: authChallenge.ok,
-            },
-            ok: report.ok,
-            oauth,
-        });
-    } catch {
-        /* smoke state persistence is best-effort */
+    if (persistState) {
+        try {
+            await writeConnectorSmokeState(config.smokeStateFile, {
+                connectorUrl,
+                checkedAt: new Date().toISOString(),
+                health: report.health,
+                toolsList: {
+                    ok: toolsGateOk,
+                    status: tools.status,
+                    tools: tools.toolCount,
+                    expectedLocalTools: getCanonicalMcpTools().length,
+                    toolsMatchLocalRegistry: tools.ok,
+                    criticalToolsPresent: criticalTools.ok,
+                    missingCriticalTools: criticalTools.missing,
+                    missingLocalTools: [],
+                    unexpectedRemoteTools: [],
+                    authChallenge: authChallenge.ok,
+                },
+                ok: report.ok,
+                oauth,
+            });
+        } catch {
+            /* smoke state persistence is best-effort */
+        }
     }
     return report;
 }

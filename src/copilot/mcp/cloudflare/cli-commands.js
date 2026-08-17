@@ -19,7 +19,7 @@ import { buildManagedTunnelArgs, buildQuickTunnelArgs, readCloudflareTunnelConfi
 import { isQuickTunnelState, readConnectorSmokeState, readQuickTunnelState, summarizeConnectorSmokeState, summarizeQuickTunnelState } from './state.js';
 import { assessCloudflaredCompatibility, readCloudflaredVersion, readPidFileStatus } from './cli-process.js';
 import { probeHealth } from './cli-probe.js';
-import { runMcpOAuthSmoke } from '../scripts/oauth-smoke.js';
+import { runCanonicalConnectorSmoke } from './connector-smoke.js';
 import { runCloudflareSmoke } from './cli-smoke.js';
 import { buildCloudflareLogReport, buildCloudflareMetricsReport, readRuntimeOriginSummary, runCloudflared, runQuickTunnel, selectMcpOriginTransport, startManagedStack, stopManagedStack } from './cli-runtime.js';
 
@@ -117,33 +117,7 @@ function runQuick({ env }) { runQuickTunnel(readCloudflareTunnelConfig(env), env
 /** @param {CloudflareCliContext} context */
 async function runSmoke({ env }) {
     const config = readCloudflareTunnelConfig(env);
-    const unauthenticated = await runCloudflareSmoke({ config, authenticated: false, env });
-    const oauth = await runMcpOAuthSmoke({
-        ...(config.publicMcpUrl ? { resource: new URL('/', config.publicMcpUrl).origin } : {}),
-        timeoutMs: 5_000,
-        retryAttempts: 2,
-        retryBaseDelayMs: 250,
-        retryMaxDelayMs: 1_000,
-        runPrivateKeyJwt: false,
-        runNegativeResourceChecks: false,
-    });
-    const oauthRecord = /** @type {Record<string, unknown>} */ (oauth);
-    const dcrFlow =
-        oauthRecord['dcrFlow'] && typeof oauthRecord['dcrFlow'] === 'object' && !Array.isArray(oauthRecord['dcrFlow'])
-            ? /** @type {Record<string, unknown>} */ (oauthRecord['dcrFlow'])
-            : {};
-    await writeJsonAndSetExit({
-        ...unauthenticated,
-        ok: Boolean(unauthenticated['ok']),
-        authenticatedOAuthSmoke: {
-            ok: Boolean(oauthRecord['ok']),
-            durationMs: oauthRecord['durationMs'],
-            failedChecks: oauthRecord['failedChecks'],
-            runtimeHealth: dcrFlow['runtimeHealth'] ?? null,
-            authenticatedToolsList: dcrFlow['authenticatedToolsList'] ?? null,
-            authenticatedSse: dcrFlow['authenticatedSse'] ?? null,
-        },
-    });
+    await writeJsonAndSetExit(await runCanonicalConnectorSmoke({ config, env, persistState: true }));
 }
 /** @param {CloudflareCliContext} context */
 async function runOAuthSmoke({ env }) { await writeJsonAndSetExit(await runCloudflareSmoke({ config: readCloudflareTunnelConfig(env), authenticated: true, env })); }

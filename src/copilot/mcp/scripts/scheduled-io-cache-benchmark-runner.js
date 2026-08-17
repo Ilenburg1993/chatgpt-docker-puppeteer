@@ -209,7 +209,11 @@ async function main() {
     }
     const benchmarkDir = path.join(benchmarkRoot, requestId);
     const startedAt = Date.now();
-    await workspaceIo.removePathLocked(benchmarkDir, { recursive: true, force: true });
+    await workspaceIo.removePathLocked(benchmarkDir, {
+        recursive: true,
+        force: true,
+        recursiveConfirmation: benchmarkDir,
+    });
     await workspaceIo.mkdirPathLocked(benchmarkDir, { recursive: true });
     await writeState({ schemaVersion: 1, status: 'running', requestId, startedAt, sampleCountPerPhase: SAMPLE_COUNT, autoEnable: false });
 
@@ -264,7 +268,11 @@ async function main() {
         };
     } finally {
         try {
-            await workspaceIo.removePathLocked(benchmarkDir, { recursive: true, force: true });
+            await workspaceIo.removePathLocked(benchmarkDir, {
+        recursive: true,
+        force: true,
+        recursiveConfirmation: benchmarkDir,
+    });
             finalState['cleanedTemporaryDb'] = true;
         } catch (error) {
             finalState['cleanedTemporaryDb'] = false;
