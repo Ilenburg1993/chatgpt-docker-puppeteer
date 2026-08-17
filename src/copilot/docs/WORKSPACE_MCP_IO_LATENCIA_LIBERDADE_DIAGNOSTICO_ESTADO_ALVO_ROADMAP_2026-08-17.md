@@ -1359,3 +1359,27 @@ Prova live:
 
 Próxima pressão indicada pelo dashboard: `mcp_latency_dashboard` tornou-se ele próprio um dos maiores payloads quando usado em modo detalhado (~10–12 KiB/call). O próximo lote deve separar default decision view de rankings detalhados, mantendo persist/history/detail sob demanda.
 
+### 22.15 Sublote — latency dashboard summary-first
+
+O dashboard estava correto como ferramenta de investigação, mas caro como primeira chamada: resultados reais chegaram a **13.531 bytes**, e em um snapshot ele respondeu por **56,8%** de todo o volume retornado pelas tools observadas. O problema era semântico: `includeTools` defaultava a true e, mesmo quando false, várias rankings (`highestCumulativeCost`, call pressure, payload/volume e phases) ainda eram emitidas integralmente.
+
+O contrato foi alterado sem criar nova tool:
+
+- `includeTools` passa a default **false**;
+- default continua calculando as rankings, mas retorna apenas uma decision view no `summary` com o top source de cada dimensão: cumulative cost, call pressure, largest payload, highest volume e slowest phase;
+- `phaseTotals`, `byteAccounting` e os counters agregados de round-trip continuam no default;
+- `roundTripAccounting.topCompressedTools` fica apenas no detail;
+- `includeTools=true` preserva as tabelas completas existentes;
+- teste novo exige default **<6 KiB** e prova ausência das arrays detalhadas, enquanto o teste antigo passou a solicitar explicitamente `includeTools=true`.
+
+Prova live após reload:
+
+- default medido pelo próprio result-size accounting: **4.953 bytes**, contra 13.531 bytes no último detail-heavy snapshot (**~−63,4%**);
+- segunda chamada default permaneceu em ~4,97 KiB;
+- `includeTools=true,maxRows=3` continuou devolvendo `slowestTools`, cumulative/call-pressure, payload/volume e slowest phases;
+- handler do dashboard permaneceu praticamente irrelevante (~0–1 ms no snapshot), portanto o ganho é quase integralmente de transporte/contexto;
+- focused MCP tools: **4,628 s**, passed;
+- strict typecheck: **8,258 s**, passed.
+
+Regra de uso: chamar `mcp_latency_dashboard` sem detail primeiro; somente se `status/summary` indicar pressão que exige decomposição, repetir com `includeTools=true` e `maxRows` pequeno.
+

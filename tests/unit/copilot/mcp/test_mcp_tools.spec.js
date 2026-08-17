@@ -894,7 +894,7 @@ describe('copilot MCP tools', () => {
             });
         }
         const tool = findTool('mcp_latency_dashboard');
-        const result = await tool.handler({ minSampleCalls: 1, maxRows: 5 });
+        const result = await tool.handler({ minSampleCalls: 1, maxRows: 5, includeTools: true });
         const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
         const largest = /** @type {Record<string, unknown>[]} */ (structured['largestResultPayloads']);
         const volume = /** @type {Record<string, unknown>[]} */ (structured['highestResultVolume']);
@@ -903,6 +903,31 @@ describe('copilot MCP tools', () => {
         assert.equal(volume[0]?.['name'], 'chatty-result');
         assert.equal(volume[0]?.['totalBytes'], 150_000);
         assert.equal(structured['summary']?.['largestAverageResultBytes'], 100_000);
+        resetMcpMetricsForTests();
+    });
+
+    it('mcp_latency_dashboard defaults to a compact decision view', async () => {
+        resetMcpMetricsForTests();
+        recordMcpToolMetric('hot-reader', {
+            durationMs: 12,
+            isError: false,
+            phases: { handler: 10, authorization: 2 },
+            resultSize: { strategy: 'hint', bytes: 8_000 },
+            execution: { logicalOperations: 6, mode: 'read-batch:best-effort' },
+        });
+        const tool = findTool('mcp_latency_dashboard');
+        const result = await tool.handler({ minSampleCalls: 1 });
+        const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
+        const summary = /** @type {Record<string, unknown>} */ (structured['summary']);
+        assert.equal('slowestTools' in structured, false);
+        assert.equal('highestCumulativeCost' in structured, false);
+        assert.equal('largestResultPayloads' in structured, false);
+        assert.equal(summary['highestCumulativeCost']?.['name'], 'hot-reader');
+        assert.equal(summary['largestResultPayload']?.['name'], 'hot-reader');
+        const roundTrips = /** @type {Record<string, unknown>} */ (structured['roundTripAccounting']);
+        assert.equal('topCompressedTools' in roundTrips, false);
+        assert.equal(roundTrips['logicalOperations'], 6);
+        assert.ok(Buffer.byteLength(JSON.stringify(structured)) < 6 * 1024);
         resetMcpMetricsForTests();
     });
 

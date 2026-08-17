@@ -50,7 +50,10 @@ export const mcpLatencyDashboardTool = {
             .max(10_000)
             .optional()
             .describe('Minimum total calls before strict SLO status is meaningful.'),
-        includeTools: z.boolean().optional().describe('Include per-tool rows. Defaults to true.'),
+        includeTools: z
+            .boolean()
+            .optional()
+            .describe('Include detailed per-tool/per-phase ranking rows. Default: false; summary still names each top pressure source.'),
         maxRows: z
             .number()
             .int()
@@ -88,17 +91,19 @@ export const mcpLatencyDashboardTool = {
         const options = /** @type {Record<string, unknown>} */ (input);
         const budgets = readLatencyDashboardBudgets(options);
         const maxRows = readBoundedInteger(options['maxRows'], MAX_ROWS, 1, 50);
-        const includeTools = options['includeTools'] !== false;
+        const includeTools = options['includeTools'] === true;
+        const rankingRows = includeTools ? maxRows : 1;
         const metrics = readMcpMetricsSnapshot();
-        const toolRows = buildToolRows(metrics.tools, maxRows);
-        const cumulativeCostRows = buildCumulativeCostRows(metrics.tools, metrics.totals.calls, maxRows);
-        const callPressureRows = buildCallPressureRows(metrics.tools, metrics.totals.calls, maxRows);
-        const largestResultPayloads = buildLargestResultPayloadRows(metrics.tools, maxRows);
-        const highestResultVolume = buildResultVolumeRows(metrics.tools, maxRows);
-        const phaseRows = buildPhaseRows(metrics.tools, maxRows);
+        const toolRows = includeTools ? buildToolRows(metrics.tools, maxRows) : [];
+        const cumulativeCostRows = buildCumulativeCostRows(metrics.tools, metrics.totals.calls, rankingRows);
+        const callPressureRows = buildCallPressureRows(metrics.tools, metrics.totals.calls, rankingRows);
+        const largestResultPayloads = buildLargestResultPayloadRows(metrics.tools, rankingRows);
+        const highestResultVolume = buildResultVolumeRows(metrics.tools, rankingRows);
+        const phaseRows = buildPhaseRows(metrics.tools, rankingRows);
         const phaseTotals = buildPhaseTotals(metrics.tools);
         const byteAccounting = buildByteAccounting(metrics.tools);
-        const roundTripAccounting = buildRoundTripAccounting(metrics.tools, maxRows);
+        const roundTripAccountingDetailed = buildRoundTripAccounting(metrics.tools, includeTools ? maxRows : 1);
+        const { topCompressedTools, ...roundTripAccounting } = roundTripAccountingDetailed;
         const assessment = assessLatencySnapshot(metrics, phaseTotals, budgets);
         const dashboard = {
             timestamp: new Date().toISOString(),
@@ -117,19 +122,41 @@ export const mcpLatencyDashboardTool = {
                 highestResultVolumeBytes: highestResultVolume[0]?.totalBytes ?? 0,
                 logicalOperations: roundTripAccounting.logicalOperations,
                 logicalOperationsPerCall: roundTripAccounting.logicalOperationsPerCall,
+                highestCumulativeCost: cumulativeCostRows[0]
+                    ? { name: cumulativeCostRows[0].name, totalDurationMs: cumulativeCostRows[0].totalDurationMs }
+                    : null,
+                highestCallPressure: callPressureRows[0]
+                    ? { name: callPressureRows[0].name, calls: callPressureRows[0].calls }
+                    : null,
+                largestResultPayload: largestResultPayloads[0]
+                    ? { name: largestResultPayloads[0].name, averageBytes: largestResultPayloads[0].averageBytes }
+                    : null,
+                highestResultVolume: highestResultVolume[0]
+                    ? { name: highestResultVolume[0].name, totalBytes: highestResultVolume[0].totalBytes }
+                    : null,
+                slowestPhase: phaseRows[0]
+                    ? { tool: phaseRows[0].tool, phase: phaseRows[0].phase, averageMs: phaseRows[0].averageMs }
+                    : null,
             },
             critical: assessment.critical,
             warnings: assessment.warnings,
             passed: assessment.passed,
-            ...(includeTools ? { slowestTools: toolRows } : {}),
-            highestCumulativeCost: cumulativeCostRows,
-            highestCallPressure: callPressureRows,
-            largestResultPayloads,
-            highestResultVolume,
-            slowestPhases: phaseRows,
+            ...(includeTools
+                ? {
+                      slowestTools: toolRows,
+                      highestCumulativeCost: cumulativeCostRows,
+                      highestCallPressure: callPressureRows,
+                      largestResultPayloads,
+                      highestResultVolume,
+                      slowestPhases: phaseRows,
+                  }
+                : {}),
             phaseTotals,
             byteAccounting,
-            roundTripAccounting,
+            roundTripAccounting: {
+                ...roundTripAccounting,
+                ...(includeTools ? { topCompressedTools } : {}),
+            },
             nextActions: buildNextActions(assessment, metrics.totals.calls, budgets),
         };
         const persistSnapshot = options['persistSnapshot'] === true;
