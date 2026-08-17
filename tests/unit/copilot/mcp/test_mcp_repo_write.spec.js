@@ -183,8 +183,52 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(applied.isError, undefined);
         assert.equal(applied.structuredContent.success, true);
         assert.equal(applied.structuredContent.operationCount, 2);
+        assert.equal(applied.structuredContent.applyMode, 'global-preflight');
+        assert.equal(applied.structuredContent.preflightSummary.ran, true);
+        assert.equal(applied.structuredContent.preflightSummary.plannedCount, 2);
+        assert.deepEqual(applied.structuredContent.planned, []);
         assert.equal(await fs.readFile(created, 'utf8'), 'batched\n');
         assert.equal(await fs.readFile(moved, 'utf8'), 'move in batch\n');
+    });
+
+    it('keeps global file-batch preflight zero-write and allows explicit sequential partial apply', async () => {
+        assert.ok(applyFileBatchTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const conservativeCreated = path.join(dir, 'conservative-created.txt');
+        const fastCreated = path.join(dir, 'fast-created.txt');
+        const missingSource = path.join(dir, 'missing-source.txt');
+        const destination = path.join(dir, 'never-moved.txt');
+
+        const conservative = await applyFileBatchTool.handler({
+            operations: [
+                { type: 'create_file', path: conservativeCreated, content: 'conservative\n' },
+                { type: 'move_file', source: missingSource, destination },
+            ],
+            confirmBatch: true,
+        });
+        assert.equal(conservative.isError, true);
+        const conservativeDetails = conservative.structuredContent.details;
+        assert.equal(conservativeDetails.phase, 'preflight');
+        assert.equal(conservativeDetails.partial, false);
+        assert.equal(conservativeDetails.failureIndex, 1);
+        assert.equal(await pathExists(conservativeCreated), false);
+
+        const fast = await applyFileBatchTool.handler({
+            operations: [
+                { type: 'create_file', path: fastCreated, content: 'fast\n' },
+                { type: 'move_file', source: missingSource, destination },
+            ],
+            confirmBatch: true,
+            applyMode: 'sequential-fast',
+        });
+        assert.equal(fast.isError, true);
+        const fastDetails = fast.structuredContent.details;
+        assert.equal(fastDetails.phase, 'apply');
+        assert.equal(fastDetails.partial, true);
+        assert.equal(fastDetails.appliedCount, 1);
+        assert.equal(fastDetails.failureIndex, 1);
+        assert.equal(fastDetails.preflightSummary.ran, false);
+        assert.equal(await fs.readFile(fastCreated, 'utf8'), 'fast\n');
     });
 
     it('supports dependent create then move operations in one file batch', async () => {

@@ -1383,3 +1383,39 @@ Prova live após reload:
 
 Regra de uso: chamar `mcp_latency_dashboard` sem detail primeiro; somente se `status/summary` indicar pressão que exige decomposição, repetir com `includeTools=true` e `maxRows` pequeno.
 
+### 22.16 Sublote — file batch com preflight conservador ou execução sequencial rápida
+
+A revisão seguinte atacou uma redundância interna que ainda restava em `repo_apply_file_batch`: toda aplicação real executava primeiro um preview global completo e depois repetia resolução/stat/preconditions na fase de apply, embora cada primitive de mutação já valide seu target no estado efetivo imediatamente antes de escrever. Esse comportamento oferece uma garantia legítima — nenhuma escrita começa se uma operação futura já é inválida — mas não deve ser custo obrigatório quando o caller aceita partial prefix explícito.
+
+A arquitetura foi separada em dois modos:
+
+- `global-preflight` continua default e preserva a garantia conservadora de **zero write** quando uma operação futura já falha no preview;
+- `sequential-fast` elimina o preview global duplicado e executa cada operação na ordem, sempre usando as primitives canônicas que revalidam o estado atual; se uma etapa falhar, o prefixo já aplicado permanece explícito e a resposta informa exatamente onde retomar;
+- `runFileBatchPreflight()` passou a preservar previews anteriores, `failureIndex`, erro e duração quando uma operação posterior falha, em vez de perder evidência no `catch` externo;
+- apply real bem-sucedido retorna `preflightSummary` e, por default, **não ecoa as rows completas do preview**; `includePreflightDetails=true` é opt-in;
+- respostas de falha mantêm o contrato canônico de `errorResult`: `code/error` no topo e `phase`, `partial`, `failureIndex`, `appliedCount`, `skippedCount`, `preflightSummary`, timings e next action em `structuredContent.details`;
+- `repo_apply_file_batch_plan` continua disponível, mas passa a ser recomendado apenas quando uma inspeção read-only separada é realmente útil; o apply conservador já faz preflight internamente.
+
+Provas focadas:
+
+- `global-preflight`: `create_file` válido seguido por `move_file` de source inexistente → erro em `failureIndex=1` e o primeiro arquivo **não é criado**;
+- `sequential-fast`: o mesmo padrão → primeiro create aplicado, segunda operação falha, `partial=true`, `appliedCount=1`, `failureIndex=1`, `preflightSummary.ran=false`;
+- dependências `create → move` continuam suportadas;
+- `tests/unit/copilot/mcp/test_mcp_repo_write.spec.js`: **21/21 passed**, 4,903 s;
+- strict typecheck após a integração: **9,098 s**, passed.
+
+Prova live após reload, usando apenas os campos já materializados pelo host desta conversa:
+
+- uma única chamada `repo_apply_file_batch` executou `create_file → move_file` com `confirmBatch=true`;
+- resposta do runtime novo: `dryRun=false`, `applyMode=global-preflight`, `operationCount=2`;
+- `preflightSummary`: `ran=true`, `plannedCount=2`, **4,15 ms**;
+- `planned=[]` no resultado real, eliminando a duplicação de payload;
+- apply: **74,92 ms**; total reportado **79,165 ms**;
+- ambas as operações aplicadas, incluindo a dependência virtual; o artefato final foi removido depois por quarentena reversível.
+
+O host desta conversa continua mostrando schema antigo para algumas tools já materializadas (`maxItems=10` e sem os campos novos), mesmo após reload. Isso é cache/materialização do cliente: source, testes e runtime já executam o contrato novo. Uma conversa/materialização futura deve receber `applyMode`, `includePreflightDetails` e os limites canônicos atualizados diretamente.
+
+`CAPABILITIES_VERSION` foi elevado para **47** e a guidance passa a tratar plan como opção de inspeção, não como ritual obrigatório antes de apply governado.
+
+Gate remoto pós-reload: connector smoke green, 119/119 tools em parity, authenticated `tools/list` **116.714 bytes** — apenas +622 bytes sobre os 116.092 anteriores e ainda ~14,3 KiB abaixo do envelope de 128 KiB — com OAuth e SSE initial/reconnect verdes.
+

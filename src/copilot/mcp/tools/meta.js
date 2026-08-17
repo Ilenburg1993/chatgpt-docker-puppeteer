@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 46;
+const CAPABILITIES_VERSION = 47;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -190,13 +190,13 @@ const IO_GUIDANCE = [
     'Use delegate_to_repo_autonomy_runner dryRun=true for fixed longer workflows before requesting real execution.',
     'Use mcp_golden_prompts when measuring real ChatGPT approval prompts and host blocks.',
     'Use mcp_host_block_diagnostics after any ChatGPT host-side block to classify it and select a lower-friction replacement.',
-    'Use plan-only tools such as repo_patch_plan includeDiffPreview=false, repo_quarantine_file_plan and repo_apply_file_batch_plan before write or destructive apply tools.',
+    'Use plan-only tools only when an explicit preview, human inspection or separate approval boundary is useful; governed apply tools revalidate their own preconditions and should not pay an automatic plan round-trip.',
     'Keep includeDiffPreview=false by default for repo_patch_plan, repo_create_file_plan, repo_apply_patch, repo_write_file, repo_create_file and repo_diff_files; request textual diffs only when explicitly needed.',
     'Prefer repo_read_file.batch for 2-32 independent small/medium reads and repo_search_text.batch for 2-32 independent searches. Use repo_bulk_inspect when read/search/stat work can be mixed in one call; all three preserve per-item failures and bounded output payloads.',
     'Use repo_patch_batch_plan before several exact-string repo_apply_patch calls to validate all patch preconditions in one read-only planning step.',
     'Use repo_apply_patch_batch for up to 64 exact-string patches across up to 32 targets. Keep global-preflight for conservative all-target validation, or use per-target-fast when independent targets may apply/fail separately; repeated paths stay sequential and atomic per file.',
     'When several exact-string edits target one file, keep them in one repo_apply_patch_batch so the server performs one lock/read/write/cache-invalidation cycle instead of one cycle per edit.',
-    'Use repo_apply_file_batch_plan first, then repo_apply_file_batch when several trusted file operations should be applied in one ChatGPT write confirmation.',
+    'Use repo_apply_file_batch directly for trusted multi-file operations: global-preflight is conservative default, while sequential-fast skips the duplicate global preview and reports partial prefix state. Use repo_apply_file_batch_plan only when a separate read-only preview is actually needed.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
     'Use repo_quarantine_file before repo_remove_file when reversible cleanup is acceptable.',
     'Use repo_read_file_chunks for large files instead of requesting entire content.',

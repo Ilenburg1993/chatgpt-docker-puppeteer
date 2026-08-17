@@ -1332,6 +1332,45 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
 }
 
 /**
+ * Run the global file-batch preview without discarding already-computed evidence when a later operation fails.
+ *
+ * @param {unknown[]} operations
+ * @returns {Promise<{
+ *   success: boolean;
+ *   previews: Record<string, unknown>[];
+ *   failureIndex: number;
+ *   error: string | null;
+ *   durationMs: number;
+ * }>}
+ */
+async function runFileBatchPreflight(operations) {
+    const startedAt = performance.now();
+    /** @type {Record<string, unknown>[]} */
+    const previews = [];
+    const previewContext = { virtualFiles: new Map() };
+    for (const [index, operation] of operations.entries()) {
+        try {
+            previews.push(await previewBatchFileOperation(operation, index, previewContext));
+        } catch (error) {
+            return {
+                success: false,
+                previews,
+                failureIndex: index,
+                error: error instanceof Error ? error.message : String(error),
+                durationMs: Math.round((performance.now() - startedAt) * 1000) / 1000,
+            };
+        }
+    }
+    return {
+        success: true,
+        previews,
+        failureIndex: -1,
+        error: null,
+        durationMs: Math.round((performance.now() - startedAt) * 1000) / 1000,
+    };
+}
+
+/**
  * @param {unknown} operation
  * @param {number} index
  * @returns {Promise<Record<string, unknown>>}
@@ -1754,39 +1793,40 @@ export const repoWriteTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ operations }) => {
-            try {
-                const previews = [];
-                const previewContext = { virtualFiles: new Map() };
-                for (const [index, operation] of operations.entries()) {
-                    previews.push(await previewBatchFileOperation(operation, index, previewContext));
-                }
-                await appendMcpAuditEvent({
-                    event: 'repo_apply_file_batch_plan',
-                    tool: 'repo_apply_file_batch_plan',
-                    operations: previews.map((preview) => preview['type']),
-                    operationCount: previews.length,
-                });
-                return okResult({
-                    success: true,
-                    plannedTool: 'repo_apply_file_batch',
-                    dryRun: true,
-                    operationCount: previews.length,
-                    operations: previews,
-                    applied: [],
-                    nextCall: {
-                        tool: 'repo_apply_file_batch',
-                        args: {
-                            operations,
-                            dryRun: false,
-                            confirmBatch: true,
-                        },
-                    },
-                });
-            } catch (error) {
-                return errorResult(error instanceof Error ? error.message : String(error), {
+            const preflight = await runFileBatchPreflight(operations);
+            if (!preflight.success) {
+                return errorResult(preflight.error ?? 'File-batch preflight failed.', {
                     code: 'ERR_BATCH_FILE_PLAN_FAILED',
+                    operationCount: operations.length,
+                    planned: preflight.previews,
+                    plannedCount: preflight.previews.length,
+                    failureIndex: preflight.failureIndex,
+                    durationMs: preflight.durationMs,
                 });
             }
+            const previews = preflight.previews;
+            await appendMcpAuditEvent({
+                event: 'repo_apply_file_batch_plan',
+                tool: 'repo_apply_file_batch_plan',
+                operations: previews.map((preview) => preview['type']),
+                operationCount: previews.length,
+            });
+            return okResult({
+                success: true,
+                plannedTool: 'repo_apply_file_batch',
+                dryRun: true,
+                operationCount: previews.length,
+                durationMs: preflight.durationMs,
+                operations: previews,
+                applied: [],
+                nextCall: {
+                    tool: 'repo_apply_file_batch',
+                    args: {
+                        operations,
+                        confirmBatch: true,
+                    },
+                },
+            });
         },
     },
     {
@@ -1807,88 +1847,123 @@ export const repoWriteTools = [
             confirmBatch: z
                 .boolean()
                 .optional()
-                .describe('Must be true when dryRun=false because this applies multiple file operations.'),
+                .describe('Must be true when applying file operations; confirmBatch=true also survives adapters that omit dryRun=false.'),
+            applyMode: z
+                .enum(['global-preflight', 'sequential-fast'])
+                .optional()
+                .describe('Default global-preflight. sequential-fast validates/applies each operation in order and may return partial success.'),
+            includePreflightDetails: z
+                .boolean()
+                .optional()
+                .describe('Include full successful preflight rows in a real apply response. Default: false.'),
         },
         annotations: destructiveAnnotations(),
-        handler: async ({ operations, dryRun, confirmBatch }) => {
+        handler: async ({ operations, dryRun, confirmBatch, applyMode, includePreflightDetails }) => {
+            const startedAt = performance.now();
             const isDryRun = resolveBatchDryRun(dryRun, confirmBatch);
+            const effectiveApplyMode = applyMode ?? 'global-preflight';
             if (!isDryRun && confirmBatch !== true) {
-                return errorResult('confirmBatch deve ser true quando dryRun=false.', {
+                return errorResult('confirmBatch deve ser true quando aplicando operações de arquivo.', {
                     code: 'ERR_BATCH_CONFIRM_REQUIRED',
+                    applyMode: effectiveApplyMode,
                 });
             }
-            /** @type {Record<string, unknown>[]} */
-            const previews = [];
-            /** @type {Record<string, unknown>[]} */
-            const applied = [];
-            let failureIndex = -1;
-            let phase = 'preflight';
-            try {
-                const previewContext = { virtualFiles: new Map() };
-                for (const [index, operation] of operations.entries()) {
-                    failureIndex = index;
-                    previews.push(await previewBatchFileOperation(operation, index, previewContext));
-                }
-                if (isDryRun) {
-                    await appendMcpAuditEvent({
-                        event: 'repo_apply_file_batch_dry_run',
-                        tool: 'repo_apply_file_batch',
-                        operations: previews.map((preview) => preview['type']),
-                        operationCount: previews.length,
-                    });
-                    const result = okResult({
-                        success: true,
-                        dryRun: true,
-                        operationCount: previews.length,
-                        operations: previews,
+
+            let preflight = null;
+            if (isDryRun || effectiveApplyMode === 'global-preflight') {
+                preflight = await runFileBatchPreflight(operations);
+                if (!preflight.success) {
+                    const skippedCount = Math.max(0, operations.length - preflight.previews.length - 1);
+                    const result = errorResult(preflight.error ?? 'File-batch preflight failed.', {
+                        code: 'ERR_BATCH_FILE_OPERATION_FAILED',
+                        phase: 'preflight',
+                        partial: false,
+                        dryRun: isDryRun,
+                        applyMode: effectiveApplyMode,
+                        operationCount: operations.length,
+                        planned: preflight.previews,
+                        plannedCount: preflight.previews.length,
                         applied: [],
+                        appliedCount: 0,
+                        failedCount: 1,
+                        failureIndex: preflight.failureIndex,
+                        skippedCount,
+                        timings: {
+                            totalMs: Math.round((performance.now() - startedAt) * 1000) / 1000,
+                            preflightMs: preflight.durationMs,
+                            applyMs: 0,
+                        },
+                        nextAction: 'No operation was applied; fix failureIndex and retry the batch.',
                     });
                     return withResultExecutionHint(result, {
                         logicalOperations: operations.length,
-                        mode: 'file-batch:dry-run',
+                        failedOperations: 1,
+                        skippedOperations: skippedCount,
+                        mode: 'file-batch:preflight-failure',
                     });
                 }
+            }
 
-                phase = 'apply';
+            if (isDryRun) {
+                const previews = preflight?.previews ?? [];
+                await appendMcpAuditEvent({
+                    event: 'repo_apply_file_batch_dry_run',
+                    tool: 'repo_apply_file_batch',
+                    operations: previews.map((preview) => preview['type']),
+                    operationCount: previews.length,
+                });
+                const result = okResult({
+                    success: true,
+                    dryRun: true,
+                    applyMode: effectiveApplyMode,
+                    operationCount: previews.length,
+                    durationMs: preflight?.durationMs ?? 0,
+                    operations: previews,
+                    applied: [],
+                });
+                return withResultExecutionHint(result, {
+                    logicalOperations: operations.length,
+                    mode: 'file-batch:dry-run',
+                });
+            }
+
+            const preflightSummary = {
+                ran: Boolean(preflight),
+                success: preflight?.success ?? null,
+                plannedCount: preflight?.previews.length ?? 0,
+                durationMs: preflight?.durationMs ?? 0,
+            };
+            const applyStartedAt = performance.now();
+            /** @type {Record<string, unknown>[]} */
+            const applied = [];
+            let failureIndex = -1;
+            try {
                 for (const [index, operation] of operations.entries()) {
                     failureIndex = index;
                     applied.push(await applyBatchFileOperation(operation, index));
                 }
-                await appendMcpAuditEvent({
-                    event: 'repo_apply_file_batch_applied',
-                    tool: 'repo_apply_file_batch',
-                    operations: applied.map((operation) => operation['type']),
-                    operationCount: applied.length,
-                });
-                const result = okResult({
-                    success: true,
-                    dryRun: false,
-                    operationCount: applied.length,
-                    planned: previews,
-                    applied,
-                    appliedCount: applied.length,
-                    failedCount: 0,
-                    skippedCount: 0,
-                });
-                return withResultExecutionHint(result, {
-                    logicalOperations: operations.length,
-                    mode: 'file-batch:apply-sequential',
-                });
             } catch (error) {
-                const skippedCount = Math.max(0, operations.length - applied.length - (phase === 'apply' ? 1 : 0));
+                const skippedCount = Math.max(0, operations.length - applied.length - 1);
                 const partial = applied.length > 0;
                 const result = errorResult(error instanceof Error ? error.message : String(error), {
                     code: 'ERR_BATCH_FILE_OPERATION_FAILED',
-                    phase,
+                    phase: 'apply',
                     partial,
+                    dryRun: false,
+                    applyMode: effectiveApplyMode,
                     operationCount: operations.length,
-                    planned: previews,
-                    plannedCount: previews.length,
+                    preflightSummary,
+                    planned: includePreflightDetails === true ? preflight?.previews ?? [] : [],
                     applied,
                     appliedCount: applied.length,
                     failedCount: 1,
                     failureIndex,
                     skippedCount,
+                    timings: {
+                        totalMs: Math.round((performance.now() - startedAt) * 1000) / 1000,
+                        preflightMs: preflightSummary.durationMs,
+                        applyMs: Math.round((performance.now() - applyStartedAt) * 1000) / 1000,
+                    },
                     nextAction: partial
                         ? 'Do not repeat already-applied operations; inspect failureIndex and retry only the failed/skipped suffix after reconciling current state.'
                         : 'No operation was applied; fix failureIndex and retry the batch.',
@@ -1897,9 +1972,38 @@ export const repoWriteTools = [
                     logicalOperations: operations.length,
                     failedOperations: 1,
                     skippedOperations: skippedCount,
-                    mode: `file-batch:${phase}-failure`,
+                    mode: `file-batch:${effectiveApplyMode}:apply-failure`,
                 });
             }
+
+            await appendMcpAuditEvent({
+                event: 'repo_apply_file_batch_applied',
+                tool: 'repo_apply_file_batch',
+                applyMode: effectiveApplyMode,
+                operations: applied.map((operation) => operation['type']),
+                operationCount: applied.length,
+            });
+            const result = okResult({
+                success: true,
+                dryRun: false,
+                applyMode: effectiveApplyMode,
+                operationCount: applied.length,
+                preflightSummary,
+                planned: includePreflightDetails === true ? preflight?.previews ?? [] : [],
+                applied,
+                appliedCount: applied.length,
+                failedCount: 0,
+                skippedCount: 0,
+                timings: {
+                    totalMs: Math.round((performance.now() - startedAt) * 1000) / 1000,
+                    preflightMs: preflightSummary.durationMs,
+                    applyMs: Math.round((performance.now() - applyStartedAt) * 1000) / 1000,
+                },
+            });
+            return withResultExecutionHint(result, {
+                logicalOperations: operations.length,
+                mode: `file-batch:${effectiveApplyMode}:apply`,
+            });
         },
     },
     {
