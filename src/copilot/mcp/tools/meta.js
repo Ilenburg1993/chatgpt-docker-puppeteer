@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 43;
+const CAPABILITIES_VERSION = 44;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -121,6 +121,7 @@ const RUNTIME_TOOLS = [
     'mcp_runtime_health',
     'mcp_session_profile',
     'mcp_smoke_workspace',
+    'mcp_tool_payload_audit',
     'mcp_autonomy_power_score',
     'mcp_tools_status',
     'mcp_tunnel_status',
@@ -174,7 +175,8 @@ const ANNOTATION_PROFILE = {
 };
 
 const METADATA_PROFILE = {
-    outputSchema: 'registry-wide minimal passthrough schema; tool-specific schemas are the next hardening band',
+    outputSchema:
+        'tool-specific only; generic passthrough output schemas are intentionally omitted because they add wire bytes without meaningful validation',
     securitySchemes: 'registry-wide OAuth securitySchemes with repo max-power scopes advertised by default for ChatGPT',
 };
 

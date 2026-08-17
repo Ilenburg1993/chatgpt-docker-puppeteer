@@ -740,9 +740,10 @@ describe('copilot MCP tools', () => {
         );
         assert.equal('tools' in structured, false);
         const metadataCoverage = /** @type {Record<string, unknown>} */ (structured['metadataCoverage']);
-        assert.equal(metadataCoverage['outputSchemaCount'], getCanonicalMcpTools().length);
+        assert.equal(metadataCoverage['outputSchemaPolicy'], 'specific-only');
+        assert.equal(metadataCoverage['specificOutputSchemaCount'], 2);
         assert.equal(metadataCoverage['securityMetadataCount'], getCanonicalMcpTools().length);
-        assert.equal(metadataCoverage['complete'], true);
+        assert.equal(metadataCoverage['securityComplete'], true);
         assert.equal(structured['detailsTool'], 'mcp_capabilities_summary');
         const hostApprovalProfile = /** @type {Record<string, unknown>} */ (structured['hostApprovalProfile']);
         assert.equal(hostApprovalProfile['oauthGrantsAllRepoScopesByDefault'], true);

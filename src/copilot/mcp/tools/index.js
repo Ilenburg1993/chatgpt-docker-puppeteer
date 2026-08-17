@@ -46,5 +46,6 @@ export * from './runtime-health.js';
 export * from './session-profile.js';
 export * from './smoke-workspace.js';
 export * from './tools-status.js';
+export * from './tool-payload-audit.js';
 export * from './tunnel-status.js';
 export * from './shared/index.js';

@@ -5,7 +5,6 @@
  * @module copilot/mcp/control-plane/tool-metadata
  */
 
-import { z } from 'zod';
 import { securitySchemesForMcpTool } from './auth.js';
 
 /**
@@ -104,23 +103,6 @@ export function buildHumanMcpToolInvocationStatus(tool, phase) {
 }
 
 /**
- * Minimal schema used until each tool gets a fully specific output schema.
- *
- * It is intentionally permissive because several legacy tools return structured objects that do not yet share one exact
- * shape. This removes the missing-schema class of issue while allowing the next roadmap band to tighten schemas tool by
- * tool.
- *
- * @returns {import('zod').ZodType}
- */
-export function baseMcpOutputSchema() {
-    return z
-        .object({
-            success: z.boolean().optional(),
-        })
-        .passthrough();
-}
-
-/**
  * @param {import('../registry.js').McpToolDefinition} tool
  * @returns {McpSecurityScheme[]}
  */
@@ -153,7 +135,6 @@ export function normalizeMcpToolDefinition(tool) {
     const securitySchemes = tool.securitySchemes ?? defaultSecuritySchemesForTool(tool);
     return {
         ...tool,
-        outputSchema: tool.outputSchema ?? baseMcpOutputSchema(),
         securitySchemes,
         _meta: buildToolMeta({ ...tool, securitySchemes }),
     };

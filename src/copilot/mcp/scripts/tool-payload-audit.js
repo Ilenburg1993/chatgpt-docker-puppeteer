@@ -33,13 +33,25 @@ export async function buildToolPayloadAudit(options = {}) {
     const toolRows = tools
         .map((tool) => {
             const totalBytes = jsonBytes(tool);
+            const inputSchemaBytes = jsonBytes(tool.inputSchema ?? null);
+            const inputSchemaWithoutDescriptionsBytes = jsonBytes(stripJsonDescriptions(tool.inputSchema ?? null));
+            const inputSchemaWith48CharDescriptionsBytes = jsonBytes(
+                compactJsonDescriptions(tool.inputSchema ?? null, 48),
+            );
+            const inputSchemaWith64CharDescriptionsBytes = jsonBytes(
+                compactJsonDescriptions(tool.inputSchema ?? null, 64),
+            );
             return {
                 name: tool.name,
                 totalBytes,
                 nameBytes: stringBytes(tool.name),
                 titleBytes: stringBytes(tool.title ?? ''),
                 descriptionBytes: stringBytes(tool.description ?? ''),
-                inputSchemaBytes: jsonBytes(tool.inputSchema ?? null),
+                inputSchemaBytes,
+                inputSchemaDescriptionBytes: Math.max(0, inputSchemaBytes - inputSchemaWithoutDescriptionsBytes),
+                inputSchemaWithoutDescriptionsBytes,
+                inputSchema48CharSavingsBytes: Math.max(0, inputSchemaBytes - inputSchemaWith48CharDescriptionsBytes),
+                inputSchema64CharSavingsBytes: Math.max(0, inputSchemaBytes - inputSchemaWith64CharDescriptionsBytes),
                 outputSchemaBytes: jsonBytes(tool.outputSchema ?? null),
                 annotationsBytes: jsonBytes(tool.annotations ?? null),
                 executionBytes: jsonBytes(tool.execution ?? null),
@@ -55,6 +67,10 @@ export async function buildToolPayloadAudit(options = {}) {
             acc.titleBytes += row.titleBytes;
             acc.descriptionBytes += row.descriptionBytes;
             acc.inputSchemaBytes += row.inputSchemaBytes;
+            acc.inputSchemaDescriptionBytes += row.inputSchemaDescriptionBytes;
+            acc.inputSchemaWithoutDescriptionsBytes += row.inputSchemaWithoutDescriptionsBytes;
+            acc.inputSchema48CharSavingsBytes += row.inputSchema48CharSavingsBytes;
+            acc.inputSchema64CharSavingsBytes += row.inputSchema64CharSavingsBytes;
             acc.outputSchemaBytes += row.outputSchemaBytes;
             acc.annotationsBytes += row.annotationsBytes;
             acc.executionBytes += row.executionBytes;
@@ -67,6 +83,10 @@ export async function buildToolPayloadAudit(options = {}) {
             titleBytes: 0,
             descriptionBytes: 0,
             inputSchemaBytes: 0,
+            inputSchemaDescriptionBytes: 0,
+            inputSchemaWithoutDescriptionsBytes: 0,
+            inputSchema48CharSavingsBytes: 0,
+            inputSchema64CharSavingsBytes: 0,
             outputSchemaBytes: 0,
             annotationsBytes: 0,
             executionBytes: 0,
@@ -155,6 +175,45 @@ function buildRecommendations(totals, totalEnvelopeBytes) {
  */
 function jsonBytes(value) {
     return Buffer.byteLength(JSON.stringify(value));
+}
+
+/**
+ * Remove only JSON Schema `description` keys for a counterfactual byte measurement. Validation keywords, enums,
+ * required arrays, bounds and schema shape are preserved exactly.
+ *
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function stripJsonDescriptions(value) {
+    if (Array.isArray(value)) return value.map(stripJsonDescriptions);
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(
+        Object.entries(/** @type {Record<string, unknown>} */ (value))
+            .filter(([key]) => key !== 'description')
+            .map(([key, child]) => [key, stripJsonDescriptions(child)]),
+    );
+}
+
+/** @param {unknown} value @param {number} maxChars @returns {unknown} */
+function compactJsonDescriptions(value, maxChars) {
+    if (Array.isArray(value)) return value.map((child) => compactJsonDescriptions(child, maxChars));
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(
+        Object.entries(/** @type {Record<string, unknown>} */ (value)).map(([key, child]) => {
+            if (key === 'description' && typeof child === 'string') return [key, compactDescription(child, maxChars)];
+            return [key, compactJsonDescriptions(child, maxChars)];
+        }),
+    );
+}
+
+/** @param {string} value @param {number} maxChars */
+function compactDescription(value, maxChars) {
+    const normalized = value.replace(/\s+/gu, ' ').trim();
+    if (normalized.length <= maxChars) return normalized;
+    const candidate = normalized.slice(0, maxChars + 1);
+    const lastBoundary = Math.max(candidate.lastIndexOf(' '), candidate.lastIndexOf(';'), candidate.lastIndexOf(','));
+    const cutoff = lastBoundary >= Math.floor(maxChars * 0.65) ? lastBoundary : maxChars;
+    return `${normalized.slice(0, cutoff).trimEnd()}…`;
 }
 
 /**

@@ -925,3 +925,53 @@ Gates do marco Lotes 1–3:
 - `mcp_smoke_workspace`: **136 ms / 13 checks**, sem critical;
 - connector smoke fresh: **927 ms** de orquestração, OAuth autenticado 911 ms, `tools/list=127.935 bytes`, **116/116** e parity integral.
 
+Provas adicionais após o commit `d881b5035`:
+
+- primeiro restart após a mudança de `HEAD`: `mode=incremental`, reason `head-changed`, **64 ms**, 12 paths, 1 indexed/11 unchanged, 0 hashes, Git snapshot 39 ms + committed diff 7 ms;
+- restart seguinte, `HEAD` estável e `src/copilot` limpo: `mode=skip`, **48 ms**, **0 candidates / 0 scans / 0 hashes / 0 reads**, Git snapshot 40 ms.
+
+### 21.4 Lote 4 — tools/list budget e metadata específica
+
+Foi criada uma auditoria wire in-memory baseada no próprio SDK MCP e tornada também observável pela tool existente `mcp_tools_status`, porque o host desta conversa não materializou o novo nome `mcp_tool_payload_audit` mesmo após reload. Esse fato confirma que capacidades novas devem ter contrato estável para sessões futuras, mas não podem depender de hot schema discovery do host atual.
+
+Baseline do audit com 117 tools:
+
+- envelope: **128.591 bytes**;
+- `inputSchema`: 48.997 bytes;
+- descriptions dentro dos input schemas: 19.835 bytes, porém truncar todas a 48 chars economizaria apenas 2.506 bytes;
+- `outputSchema`: **16.662 bytes**, quase integralmente 115 cópias do mesmo placeholder permissivo `success?: boolean`;
+- `_meta`: 18.659 bytes;
+- annotations: 10.465 bytes.
+
+Decisão: preservar integralmente input schemas e suas descrições; remover apenas o **output schema genérico**, mantendo output schemas específicos onde há validação real (`search` e `fetch`). `securitySchemes` continua 100% obrigatório. A métrica de autonomia foi corrigida para `outputSchemaPolicy=specific-only`, evitando que o score incentive metadata sem poder de validação.
+
+Prova live:
+
+- audit in-memory: **128.591 → 110.766 bytes** (-17.825; -13,9%);
+- authenticated remote `tools/list`: **128.782 → 110.957 bytes** com a nova audit tool já incluída;
+- tools: **117/117**, parity integral;
+- headroom interno: **20.306 bytes**;
+- autonomy score: **91/A**, inalterado;
+- focused registry/tools tests e strict typecheck passaram após a mudança.
+
+O objetivo ≤120 KiB foi superado sem reduzir input validation, OAuth/security metadata ou capacidade funcional.
+
+### 21.5 Lote 5 — latência dos validators
+
+Depois de reduzir read/search/index/bootstrap, os validators passaram a dominar o tempo de iteração. O strict project já declarava `tsBuildInfoFile`, mas não habilitava `incremental`; a opção foi ativada sem alterar nenhum strict check, include ou `noEmit`.
+
+Medição:
+
+- runs strict recentes antes da mudança: aproximadamente **8,10–9,33 s** (com runs anteriores chegando a 15 s em cold state);
+- primeiro run com `incremental=true`: **5,534 s**;
+- segundo run consecutivo: **5,493 s**;
+- ganho recorrente observado: aproximadamente **32–41%** sobre o baseline recente.
+
+O ESLint já usava cache persistente. Foi testado `--concurrency auto` de forma A/B:
+
+- concorrência auto: **20,506 s** em run verde;
+- concorrência removida, mesma cache: **13,739 s**;
+- decisão: **não habilitar concorrência** neste workload; a configuração original single-thread/cache é materialmente melhor.
+
+A regra desta frente permanece: otimização de validator só entra quando preserva o mesmo conjunto de checks e vence benchmark real; mudanças que apenas parecem mais paralelas não são mantidas.
+

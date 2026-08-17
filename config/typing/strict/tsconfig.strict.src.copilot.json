@@ -29,7 +29,8 @@
     "forceConsistentCasingInFileNames": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitOverride": true,
-    "noEmit": true
+    "noEmit": true,
+    "incremental": true
   },
   "include": ["../../../src/copilot/**/*"]
 }

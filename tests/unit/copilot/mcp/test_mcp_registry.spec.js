@@ -88,6 +88,7 @@ describe('copilot MCP registry', () => {
             'mcp_runtime_health',
             'mcp_session_profile',
             'mcp_smoke_workspace',
+            'mcp_tool_payload_audit',
             'mcp_tools_status',
             'mcp_tunnel_status',
             'mcp_validation_dashboard',
@@ -170,7 +171,14 @@ describe('copilot MCP registry', () => {
             const names = tools.map((tool) => tool.name);
             assert.ok(names.length > 0);
             assert.equal(new Set(names).size, names.length);
-            assert.ok(tools.every((tool) => tool.outputSchema && tool._meta));
+            assert.ok(
+                tools.every(
+                    (tool) =>
+                        tool._meta &&
+                        Array.isArray(tool._meta['securitySchemes']) &&
+                        tool._meta['securitySchemes'].length > 0,
+                ),
+            );
         },
     );
 
@@ -214,11 +222,12 @@ describe('copilot MCP registry', () => {
         assert.equal(tools.find((tool) => tool.name === 'repo_remove_file')?.annotations.destructiveHint, true);
     });
 
-    it('adds registry-wide output schema and security metadata to every tool', () => {
+    it('keeps security metadata registry-wide and output schemas only where they provide specific validation', () => {
         const tools = getCanonicalMcpTools();
+        const outputSchemaTools = tools.filter((tool) => tool.outputSchema !== undefined).map((tool) => tool.name).sort();
+        assert.deepEqual(outputSchemaTools, ['fetch', 'search']);
 
         for (const tool of tools) {
-            assert.ok(tool.outputSchema, `missing outputSchema: ${tool.name}`);
             assert.ok(tool._meta, `missing _meta: ${tool.name}`);
             assert.ok(Array.isArray(tool._meta?.['securitySchemes']), `missing securitySchemes: ${tool.name}`);
             const schemes = /** @type {{ type?: string }[]} */ (tool._meta?.['securitySchemes']);

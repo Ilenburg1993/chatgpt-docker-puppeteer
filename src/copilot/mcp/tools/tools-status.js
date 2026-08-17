@@ -125,6 +125,24 @@ export const mcpToolsStatusTool = {
         const securityMetadataCount = summaries.filter(
             (tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0,
         ).length;
+        let wirePayloadAudit;
+        try {
+            const { buildToolPayloadAudit } = await import('../scripts/tool-payload-audit.js');
+            const audit = /** @type {Record<string, any>} */ (await buildToolPayloadAudit({ top: 12 }));
+            wirePayloadAudit = {
+                toolCount: audit['toolCount'],
+                totalEnvelopeBytes: audit['totalEnvelopeBytes'],
+                maxEnvelopeBytes: audit['maxEnvelopeBytes'],
+                budgetHeadroomBytes: audit['budgetHeadroomBytes'],
+                fieldTotals: audit['fieldTotals'],
+                averageToolBytes: audit['averageToolBytes'],
+                p95ToolBytes: audit['p95ToolBytes'],
+                topTools: audit['topTools'],
+                recommendations: audit['recommendations'],
+            };
+        } catch (error) {
+            wirePayloadAudit = { error: error instanceof Error ? error.message : String(error) };
+        }
         return okResult({
             success: true,
             totalTools: summaries.length,
@@ -134,9 +152,10 @@ export const mcpToolsStatusTool = {
             openWorldCount: openWorld.length,
             idempotentReadCount: readOnly.filter((tool) => tool.annotations.idempotentHint).length,
             metadataCoverage: {
-                outputSchemaCount,
+                outputSchemaPolicy: 'specific-only',
+                specificOutputSchemaCount: outputSchemaCount,
                 securityMetadataCount,
-                complete: outputSchemaCount === summaries.length && securityMetadataCount === summaries.length,
+                securityComplete: securityMetadataCount === summaries.length,
             },
             rememberApprovalCandidates: boundedWrite
                 .filter((tool) => tool.rememberApprovalCandidate && !requiresManualApproval(tool))
@@ -149,6 +168,7 @@ export const mcpToolsStatusTool = {
                 preferredStrategy: 'plan once, apply a bounded batch, validate only when causal evidence requires it',
             },
             approvalFrictionProfile: buildApprovalFrictionProfile(summaries),
+            wirePayloadAudit,
             detailsTool: 'mcp_capabilities_summary',
         });
     },
@@ -181,8 +201,7 @@ export const mcpAutonomyPowerScoreTool = {
         const destructive = summaries.filter((tool) => tool.riskClass === 'destructive');
         const openWorld = summaries.filter((tool) => tool.riskClass === 'open-world');
         const planOnly = summaries.filter((tool) => tool.name.endsWith('_plan') || tool.name.includes('_plan_'));
-        const outputSchemaCoverage =
-            summaries.length === 0 ? 0 : summaries.filter((tool) => tool.hasOutputSchema).length / summaries.length;
+        const specificOutputSchemaCount = summaries.filter((tool) => tool.hasOutputSchema).length;
         const securityMetadataCoverage =
             summaries.length === 0
                 ? 0
@@ -197,7 +216,7 @@ export const mcpAutonomyPowerScoreTool = {
                 (boundedWrite.length > 0 ? 9 : 0) + (planOnly.length >= 5 ? 7 : planOnly.length),
                 16,
             ),
-            metadata: clampScore((outputSchemaCoverage + securityMetadataCoverage) * 10, 20),
+            metadata: clampScore(10 + securityMetadataCoverage * 10, 20),
             validation: clampScore(
                 [
                     'mcp_run_safe_validation_suite',
@@ -222,7 +241,6 @@ export const mcpAutonomyPowerScoreTool = {
         const score = Object.values(scoreParts).reduce((total, value) => total + value, 0);
         const blockers = [];
         if (openWorld.length > 0) blockers.push('Open-world tools increase host-side prompt friction.');
-        if (outputSchemaCoverage < 1) blockers.push('Some tools still lack outputSchema.');
         if (securityMetadataCoverage < 1) blockers.push('Some tools still lack securitySchemes metadata.');
         if (auth.enforcement !== 'off' && !auth.staticBearerConfigured && !(auth.expectedIssuer && auth.jwksUri)) {
             blockers.push('Auth enforcement is enabled without a configured static token or OAuth/JWKS verifier.');
@@ -244,7 +262,8 @@ export const mcpAutonomyPowerScoreTool = {
                 planOnly: planOnly.length,
             },
             coverage: {
-                outputSchema: outputSchemaCoverage,
+                outputSchemaPolicy: 'specific-only',
+                specificOutputSchemaCount,
                 securityMetadata: securityMetadataCoverage,
             },
             auth: {
