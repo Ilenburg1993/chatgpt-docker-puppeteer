@@ -1,6 +1,7 @@
 // @ts-check
 import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
 import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, evaluateIoPathPolicyAsync } from '#copilot/core';
+import { createValidatedReadWorkspacePath } from '../../infra/io/policy/validated-path.js';
 import { hasNullByte, normalizeWorkspaceRoot } from '#copilot/infra/public/policy';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -138,7 +139,12 @@ export const BLOCKED_PATTERNS_SECRETS = [
  *
  * @param {string} filePath - Caminho absoluto ou relativo
  * @param {{ mode?: 'read' | 'write' }} [opts] - Modo de operação (default: 'write' para máxima proteção)
- * @returns {Promise<{ ok: boolean; reason?: string; resolved: string }>}
+ * @returns {Promise<{
+ *   ok: boolean;
+ *   reason?: string;
+ *   resolved: string;
+ *   validatedReadPath?: ReturnType<typeof createValidatedReadWorkspacePath>;
+ * }>}
  */
 export async function validatePath(filePath, opts) {
     if (typeof filePath !== 'string' || filePath.trim().length === 0) {
@@ -162,7 +168,18 @@ export async function validatePath(filePath, opts) {
         };
     }
 
-    return { ok: true, resolved: policy.realPath };
+    return {
+        ok: true,
+        resolved: policy.realPath,
+        ...(mode === 'read'
+            ? {
+                  validatedReadPath: createValidatedReadWorkspacePath({
+                      realPath: policy.realPath,
+                      workspaceRoot: policy.workspaceRoot,
+                  }),
+              }
+            : {}),
+    };
 }
 
 // ---------------------------------------------------------------------------

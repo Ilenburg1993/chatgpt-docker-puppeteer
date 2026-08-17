@@ -9,7 +9,12 @@ import { WORKSPACE_ROOT, validatePath } from '#copilot/tools';
 import path from 'node:path';
 
 /**
- * @typedef {{ ok: true; resolved: string; relative: string }} McpPathOk
+ * @typedef {{
+ *   ok: true;
+ *   resolved: string;
+ *   relative: string;
+ *   validatedReadPath?: unknown;
+ * }} McpPathOk
  * @typedef {{
  *   ok: false;
  *   reason: string;
@@ -38,6 +43,7 @@ export async function resolveReadPath(filePath) {
         ok: true,
         resolved: result.resolved,
         relative: toWorkspaceRelativePath(result.resolved),
+        validatedReadPath: result.validatedReadPath,
     };
 }
 

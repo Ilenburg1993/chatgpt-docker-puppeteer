@@ -14,7 +14,9 @@ import { registerIoInvalidationHook } from '#copilot/infra/io/invalidation/bus';
 import { getMcpWorkspaceRoot } from '#copilot/mcp/control-plane';
 import path from 'node:path';
 
-const { readText, readTextChunks, statPath } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+const { readTextValidated, readTextChunksValidated, statPathValidated } = createWorkspaceIo({
+    workspaceRoot: getMcpWorkspaceRoot(),
+});
 
 const REPO_READ_FILE_CACHE_MAX_ENTRIES = 128;
 const DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
@@ -117,18 +119,23 @@ export function clearRepoReadFileResultCacheForResolvedSubtree(resolvedPath) {
 /**
  * Read a UTF-8 file/window and cache the already-shaped MCP payload.
  *
- * @param {{ resolved: string; relative: string }} resolved
+ * @param {{ resolved: string; relative: string; validatedReadPath?: unknown }} resolved
  * @param {number | undefined} startLine
  * @param {number | undefined} endLine
  * @returns {Promise<{ structured: Record<string, unknown>; text: string }>}
  */
 export async function readRepoFileWithValidatedResultCache(resolved, startLine, endLine) {
     const key = buildRepoReadFileCacheKey(resolved.resolved, startLine, endLine);
-    const cached = await getValidatedRepoReadCacheEntry(repoReadFileResultCache, key, resolved.resolved, {
-        hitStat: 'hits',
-        trustWindowHitStat: 'trustWindowHits',
-        staleStat: 'stale',
-    });
+    const cached = await getValidatedRepoReadCacheEntry(
+        repoReadFileResultCache,
+        key,
+        resolved.validatedReadPath,
+        {
+            hitStat: 'hits',
+            trustWindowHitStat: 'trustWindowHits',
+            staleStat: 'stale',
+        },
+    );
     if (cached) return { structured: cloneStructuredReadFileResult(cached.structured), text: cached.text };
 
     return runRepoReadSingleflight(repoReadFileInflight, key, {
@@ -137,7 +144,7 @@ export async function readRepoFileWithValidatedResultCache(resolved, startLine, 
         errorStat: 'singleflightErrors',
     }, async () => {
         repoReadCacheStats.misses += 1;
-        const snapshot = await readText(resolved.resolved, {
+        const snapshot = await readTextValidated(resolved.validatedReadPath, {
             ...(startLine !== undefined ? { startLine } : {}),
             ...(endLine !== undefined ? { endLine } : {}),
         });
@@ -170,7 +177,7 @@ export async function readRepoFileWithValidatedResultCache(resolved, startLine, 
 /**
  * Read line chunks and cache the already-shaped MCP payload.
  *
- * @param {{ resolved: string; relative: string }} resolved
+ * @param {{ resolved: string; relative: string; validatedReadPath?: unknown }} resolved
  * @param {number} effectiveStartLine
  * @param {number | undefined} endLine
  * @param {number} chunkLines
@@ -187,11 +194,16 @@ export async function readRepoFileChunksWithValidatedResultCache(
     cursor,
 ) {
     const key = buildRepoReadFileChunkCacheKey(resolved.resolved, effectiveStartLine, endLine, chunkLines, highWaterMark);
-    const cached = await getValidatedRepoReadCacheEntry(repoReadFileChunkCache, key, resolved.resolved, {
-        hitStat: 'chunkHits',
-        trustWindowHitStat: 'chunkTrustWindowHits',
-        staleStat: 'chunkStale',
-    });
+    const cached = await getValidatedRepoReadCacheEntry(
+        repoReadFileChunkCache,
+        key,
+        resolved.validatedReadPath,
+        {
+            hitStat: 'chunkHits',
+            trustWindowHitStat: 'chunkTrustWindowHits',
+            staleStat: 'chunkStale',
+        },
+    );
     if (cached) return { structured: cloneStructuredReadFileResult(cached.structured), text: cached.text };
 
     return runRepoReadSingleflight(repoReadFileChunkInflight, key, {
@@ -200,7 +212,7 @@ export async function readRepoFileChunksWithValidatedResultCache(
         errorStat: 'chunkSingleflightErrors',
     }, async () => {
         repoReadCacheStats.chunkMisses += 1;
-        const snapshot = await readTextChunks(resolved.resolved, {
+        const snapshot = await readTextChunksValidated(resolved.validatedReadPath, {
             startLine: effectiveStartLine,
             ...(endLine !== undefined ? { endLine } : {}),
             chunkLines,
@@ -305,11 +317,11 @@ function clearRepoReadCacheEntriesByPrefix(prefix) {
 /**
  * @param {Map<string, RepoReadCacheEntry>} cache
  * @param {string} key
- * @param {string} resolvedPath
+ * @param {unknown} validatedReadPath
  * @param {{ hitStat: 'hits' | 'chunkHits'; trustWindowHitStat: 'trustWindowHits' | 'chunkTrustWindowHits'; staleStat: 'stale' | 'chunkStale' }} stats
  * @returns {Promise<RepoReadCacheEntry | null>}
  */
-async function getValidatedRepoReadCacheEntry(cache, key, resolvedPath, stats) {
+async function getValidatedRepoReadCacheEntry(cache, key, validatedReadPath, stats) {
     const cached = cache.get(key);
     if (!cached) return null;
     const trustWindowMs = readRepoReadTrustWindowMs();
@@ -320,7 +332,7 @@ async function getValidatedRepoReadCacheEntry(cache, key, resolvedPath, stats) {
         cache.set(key, { ...cached, validatedAtMs: Date.now() });
         return cached;
     }
-    const current = await statPath(resolvedPath).catch(() => null);
+    const current = await statPathValidated(validatedReadPath).catch(() => null);
     const fileStats = current?.stats;
     if (fileStats?.isFile() && fileStats.size === cached.sizeBytes && fileStats.mtimeMs === cached.mtimeMs) {
         repoReadCacheStats[stats.hitStat] += 1;

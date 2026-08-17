@@ -1001,3 +1001,36 @@ O remote audit ainda aparecia como maior payload de diagnóstico: ~**51.284 byte
 
 Testes focados de edge audit, config, remote API/compact presentation e strict typecheck passaram. O diagnostic plane agora paga a rede uma vez por janela de investigação e reutiliza a mesma evidência sem enfraquecer `forceRefresh`.
 
+### 21.7 Lote 7 — batching materializado e capability opaca de path read-only
+
+Durante esta sessão o host finalmente materializou os campos `batch` já existentes em `repo_read_file` e `repo_search_text`. Um experimento de nova tool `repo_io_batch` foi implementado e testado localmente, mas **retirado integralmente antes de commit** quando ficou claro que seria redundante: acrescentava ~1,6 KiB ao registry sem aumentar a liberdade do host atual. A decisão correta foi reutilizar as tools existentes.
+
+Prova live do batching materializado:
+
+- uma chamada `repo_read_file(batch=...)` executou **4 leituras independentes**, `4/4` success, concurrency 4;
+- handler agregado warm: **6 ms** (prova anterior: 7 ms);
+- efeito estrutural: 4 unidades lógicas de read passam de quatro round-trips MCP para **um**.
+
+A investigação seguinte confirmou duplicação de path policy: `resolveReadPath` já executava `evaluateIoPathPolicyAsync`/realpath e, depois, `workspace-io` repetia a mesma policy ao receber o realPath absoluto. Foi criada uma capability interna read-only, com brand por `Symbol` privado, ligada ao workspace, à `IO_POLICY_VERSION` e a access=`read-only`. A capability é emitida no mesmo ponto do sucesso da policy canônica (`validatePath`) e só pode ser consumida por métodos internos explícitos para `read`, `search` e `stat`.
+
+Garantias preservadas:
+
+- input normal continua passando pela policy async completa;
+- objeto lookalike sem brand é rejeitado (`EINVALIDVALIDATEDPATH`);
+- capability de outro workspace é rejeitada (`EVALIDATEDPATHWORKSPACE`);
+- capability read-only em modo mutável é rejeitada (`EVALIDATEDPATHMODE`);
+- nenhum método validated existe para write/patch/delete;
+- testes existentes de symlink/containment continuam cobrindo o primeiro gate canônico.
+
+Observabilidade foi adicionada ao runtime health (`ioCache.validatedReadPath`). Prova live após reload:
+
+- 4 reads + 4 searches produziram **8 `accepted`**, isto é, oito segundas walks de policy/realpath foram eliminadas;
+- `rejectedUnbranded=0`, `rejectedWorkspace=0`, `rejectedMode=0` no uso normal;
+- batch warm de 4 reads: **6 ms** de handler;
+- batch de 4 searches: **9 ms** de handler;
+- focused `test_workspace_io.spec.js` passou com testes específicos de brand/workspace/mode;
+- focused `test_mcp_tools.spec.js` passou;
+- strict typecheck passou após integração.
+
+O ganho de latência absoluta por read é pequeno porque o hot path já estava em poucos milissegundos; o ganho principal é remover trabalho redundante em todas as chamadas read/search/stat sem enfraquecer a fronteira externa. O próximo critério continua sendo custo acumulado, round-trips e bytes, não micro-otimização isolada.
+

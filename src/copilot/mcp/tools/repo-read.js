@@ -25,7 +25,15 @@ import {
 } from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
 
-const { diffText, readBytes, readText, scanDirectory, searchText, searchWorkspaceSymbols, statPath } = createWorkspaceIo({
+const {
+    diffText,
+    readBytesValidated,
+    readTextValidated,
+    scanDirectory,
+    searchTextValidated,
+    searchWorkspaceSymbolsValidated,
+    statPathValidated,
+} = createWorkspaceIo({
     workspaceRoot: getMcpWorkspaceRoot(),
 });
 
@@ -216,7 +224,7 @@ async function runRepoSearchTextCall(input) {
     }
     const resolved = await resolveReadPath(normalizeOptionalRepoPath(input.path, DEFAULT_REPO_READ_PATH));
     if (!resolved.ok) return errorResult(resolved.reason, resolved);
-    const result = await searchText(resolved.resolved, {
+    const result = await searchTextValidated(resolved.validatedReadPath, {
         workspaceRoot: WORKSPACE_ROOT,
         pattern: effectivePattern,
         isRegex: input.isRegex === true,
@@ -488,12 +496,12 @@ export const repoReadTools = [
         handler: async ({ path, includeHash, maxHashBytes }) => {
             const resolved = await resolveReadPath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
-            const statSnapshot = await statPath(resolved.resolved);
+            const statSnapshot = await statPathValidated(resolved.validatedReadPath);
             const stats = statSnapshot.stats;
             const isFile = stats.isFile();
             const effectiveMaxHashBytes = maxHashBytes ?? 5 * 1024 * 1024;
             const shouldHash = includeHash === true && isFile && stats.size <= effectiveMaxHashBytes;
-            const bytes = shouldHash ? await readBytes(resolved.resolved) : null;
+            const bytes = shouldHash ? await readBytesValidated(resolved.validatedReadPath) : null;
             return okResult({
                 success: true,
                 path: resolved.relative,
@@ -744,7 +752,7 @@ export const repoReadTools = [
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const escaped = escapeForRegex(symbol);
             const pattern = wholeWord !== false ? `\\b${escaped}\\b` : escaped;
-            const result = await searchText(resolved.resolved, {
+            const result = await searchTextValidated(resolved.validatedReadPath, {
                 workspaceRoot: WORKSPACE_ROOT,
                 pattern,
                 isRegex: true,
@@ -800,7 +808,7 @@ export const repoReadTools = [
         handler: async ({ name, kind, path, includePattern, caseSensitive, exactMatch, maxResults, cursor }) => {
             const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
-            const result = await searchWorkspaceSymbols(resolved.resolved, {
+            const result = await searchWorkspaceSymbolsValidated(resolved.validatedReadPath, {
                 symbolName: name,
                 kind: kind ?? 'all',
                 includePattern,
@@ -860,7 +868,7 @@ export const repoReadTools = [
         }) => {
             const resolved = await resolveReadPath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
-            const snapshot = await readText(resolved.resolved);
+            const snapshot = await readTextValidated(resolved.validatedReadPath);
             const parsed = await parseFileForContext(resolved.resolved, snapshot.content);
             const windowed = windowFileContext(parsed, {
                 maxItems,

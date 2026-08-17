@@ -6,11 +6,18 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import {
+    createValidatedReadWorkspacePath,
+    getValidatedReadWorkspacePathStats,
+    resetValidatedReadWorkspacePathStatsForTest,
+    resolveValidatedReadWorkspacePath,
+} from '../../../../src/copilot/infra/io/policy/validated-path.js';
 
 /** @type {string[]} */
 const cleanupPaths = [];
 
 afterEach(async () => {
+    resetValidatedReadWorkspacePathStatsForTest();
     await Promise.all(cleanupPaths.splice(0).map((path) => rm(path, { force: true, recursive: true })));
 });
 
@@ -56,6 +63,50 @@ describe('workspace IO capability', () => {
         const snapshot = await io.readText(filePath);
 
         expect(snapshot.content).toBe('inside');
+    });
+
+    it('aceita capability opaca read-only e evita uma segunda policy async', async () => {
+        const { workspaceRoot, io } = await createWorkspaceFixture();
+        const filePath = join(workspaceRoot, 'inside.txt');
+        await io.writeFileAtomic(filePath, 'inside');
+        resetValidatedReadWorkspacePathStatsForTest();
+        const capability = createValidatedReadWorkspacePath({ realPath: filePath, workspaceRoot });
+
+        const [snapshot, statSnapshot] = await Promise.all([
+            io.readTextValidated(capability),
+            io.statPathValidated(capability),
+        ]);
+
+        expect(snapshot.content).toBe('inside');
+        expect(statSnapshot.stats.isFile()).toBe(true);
+        expect(getValidatedReadWorkspacePathStats()).toMatchObject({ issued: 1, accepted: 2 });
+    });
+
+    it('rejeita lookalike sem brand, workspace divergente e uso em modo mutável', async () => {
+        const { workspaceRoot, outsideRoot, io } = await createWorkspaceFixture();
+        const filePath = join(workspaceRoot, 'inside.txt');
+        await io.writeFileAtomic(filePath, 'inside');
+        const capability = createValidatedReadWorkspacePath({ realPath: filePath, workspaceRoot });
+
+        await expect(
+            io.readTextValidated({
+                realPath: filePath,
+                workspaceRoot,
+                policyVersion: capability.policyVersion,
+                access: 'read-only',
+            }),
+        ).rejects.toMatchObject({ code: 'EINVALIDVALIDATEDPATH' });
+
+        const otherWorkspaceCapability = createValidatedReadWorkspacePath({
+            realPath: filePath,
+            workspaceRoot: outsideRoot,
+        });
+        await expect(io.readTextValidated(otherWorkspaceCapability)).rejects.toMatchObject({
+            code: 'EVALIDATEDPATHWORKSPACE',
+        });
+        expect(() =>
+            resolveValidatedReadWorkspacePath(capability, { workspaceRoot, mode: 'write' }),
+        ).toThrowError(expect.objectContaining({ code: 'EVALIDATEDPATHMODE' }));
     });
 
     it('confirma remoção recursiva relativa e protege a raiz do workspace', async () => {
