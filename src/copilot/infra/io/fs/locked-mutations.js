@@ -640,6 +640,199 @@ export async function moveFileLocked(source, destination, options = {}) {
 }
 
 /**
+ * Apply several exact-text patches to one file under a single lock/read/write cycle. Operations are evaluated in order
+ * against the virtual content produced by the previous operation, so same-file patch batches are atomic and can safely
+ * depend on earlier replacements.
+ *
+ * @param {string} filePath
+ * @param {{
+ *     operations: Array<{
+ *         oldString: string;
+ *         newString: string;
+ *         replaceAll?: boolean;
+ *         expectedOccurrences?: number;
+ *         occurrenceIndex?: number;
+ *         expectedHash?: string;
+ *         allowNoop?: boolean;
+ *         diffContextLines?: number;
+ *         maxDiffLines?: number;
+ *         maxDiffBytes?: number;
+ *         computeDiff?: boolean;
+ *     }>;
+ *     dryRun?: boolean;
+ *     captureRollback?: boolean;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     advisoryLimits?: Record<string, unknown>;
+ * }} options
+ */
+export async function patchTextBatchLocked(filePath, options) {
+    assertValidIoFilePath(filePath);
+    if (!Array.isArray(options.operations) || options.operations.length === 0) {
+        const error = /** @type {TypeError & { code?: string }} */ (new TypeError('patch batch requires operations'));
+        error.code = 'ERR_PATCH_BATCH_EMPTY';
+        throw error;
+    }
+    const traceId = createIoTraceId();
+    const startedAt = nowIoMs();
+    const riskClass = options.dryRun ? 'low' : 'high';
+    const captureRollback = shouldCaptureIoRollback(options.captureRollback !== false) && !options.dryRun;
+    try {
+        const lease = await acquireIoResourceLock(filePath, {
+            operation: 'patch',
+            target: filePath,
+            riskClass,
+        });
+        const value = await (async () => {
+            try {
+                return await lease.run(async () => {
+                    const rawContent = await fs.readFile(filePath);
+                    const rawBuffer = typeof rawContent === 'string' ? toOwnedBuffer(rawContent) : rawContent;
+                    const initialContent = typeof rawContent === 'string' ? rawContent : decodeUtf8Buffer(rawContent);
+                    const previousHash = sha256(rawBuffer);
+                    let currentContent = initialContent;
+                    /** @type {Record<string, unknown>[]} */
+                    const operations = [];
+
+                    for (const [index, operation] of options.operations.entries()) {
+                        const operationPreviousHash = sha256(currentContent);
+                        assertExpectedSha256Digest(operationPreviousHash, operation.expectedHash);
+                        const patch = computeTextPatch(currentContent, operation);
+                        const updated = patch.updated;
+                        const operationContentHash = sha256(updated);
+                        const diffContextLines = operation.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
+                        const shouldComputeDiff = operation.computeDiff === true;
+                        const diff = shouldComputeDiff
+                            ? buildSimpleTextDiffAroundLineRange(currentContent, updated, {
+                                  firstMatchLine: patch.firstMatchLine,
+                                  lastMatchLine: patch.lastMatchLine,
+                                  lineDelta: patch.lineDelta,
+                                  contextLines: diffContextLines,
+                                  replacedOccurrences: patch.replacedOccurrences,
+                              })
+                            : { diff: '', contextLines: diffContextLines, rangeOptimized: false };
+                        const diffPreview = shouldComputeDiff
+                            ? windowTextPreview(diff.diff, {
+                                  maxLines: operation.maxDiffLines ?? DEFAULT_PATCH_DIFF_MAX_LINES,
+                                  maxBytes: operation.maxDiffBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES,
+                              })
+                            : { text: '', truncated: false, lines: 0, bytes: 0 };
+                        operations.push({
+                            index,
+                            occurrences: patch.occurrences,
+                            replacedOccurrences: patch.replacedOccurrences,
+                            previousBytes: patch.previousBytes,
+                            projectedBytes: patch.bytesWritten,
+                            byteDelta: patch.byteDelta,
+                            firstMatchLine: patch.firstMatchLine,
+                            lastMatchLine: patch.lastMatchLine,
+                            lineDelta: patch.lineDelta,
+                            occurrenceIndex: patch.occurrenceIndex,
+                            noop: patch.noop,
+                            previousHash: operationPreviousHash,
+                            contentHash: operationContentHash,
+                            diffPreview: diffPreview.text,
+                            diffPreviewTruncated: diffPreview.truncated,
+                            diffPreviewLines: diffPreview.lines,
+                            diffPreviewBytes: diffPreview.bytes,
+                            diffContextLines: diff.contextLines,
+                            diffRangeOptimized: diff.rangeOptimized === true,
+                        });
+                        currentContent = updated;
+                    }
+
+                    const finalNoop = currentContent === initialContent;
+                    const contentHash = sha256(currentContent);
+                    const projectedBytes = utf8ByteLength(currentContent, 'patch batch result');
+                    const previousSnapshot =
+                        finalNoop || !captureRollback
+                            ? { snapshotBase64: null, snapshotTruncated: false, rollbackSidecar: null }
+                            : await buildRollbackSnapshot(rawBuffer, {
+                                  persistLarge: true,
+                                  contentHash: previousHash,
+                              });
+                    let durability = null;
+                    if (!options.dryRun && !finalNoop) {
+                        try {
+                            durability = await writeAtomicFileUnlocked(filePath, currentContent, {
+                                expectedHash: previousHash,
+                                ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
+                            });
+                        } catch (error) {
+                            if (isUnpublishedSnapshotConflict(error)) {
+                                await discardRollbackSidecar(previousSnapshot.rollbackSidecar);
+                            }
+                            throw error;
+                        }
+                    }
+                    return {
+                        operations,
+                        operationCount: operations.length,
+                        previousBytes: rawBuffer.byteLength,
+                        projectedBytes,
+                        bytesWritten: options.dryRun || finalNoop ? 0 : projectedBytes,
+                        byteDelta: projectedBytes - rawBuffer.byteLength,
+                        previousHash,
+                        contentHash,
+                        noop: finalNoop,
+                        dryRun: Boolean(options.dryRun),
+                        rollbackCaptureEnabled: captureRollback,
+                        previousSnapshotBase64: previousSnapshot.snapshotBase64,
+                        previousSnapshotTruncated: previousSnapshot.snapshotTruncated,
+                        previousRollbackSidecar: previousSnapshot.rollbackSidecar,
+                        capacityPreflight: durability?.capacityPreflight ?? null,
+                    };
+                });
+            } finally {
+                await lease.releaseAsync();
+            }
+        })();
+        const waitMs = lease.waitMs;
+        if (!options.dryRun && !value.noop) invalidateIoCacheTiers(filePath);
+        const io = publishAndReturn(
+            buildIoMeta({
+                operation: 'patch',
+                target: filePath,
+                targetKind: 'file',
+                bytesWritten: value.bytesWritten,
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.patchTextBatchLocked',
+                riskClass,
+                traceId,
+                advisoryLimits: {
+                    ...(options.advisoryLimits ?? {}),
+                    lockWaitMs: waitMs,
+                    operationCount: value.operationCount,
+                    previousHash: value.previousHash,
+                    contentHash: value.contentHash,
+                    dryRun: Boolean(options.dryRun),
+                    projectedBytes: value.projectedBytes,
+                    byteDelta: value.byteDelta,
+                    capacityPreflight: value.capacityPreflight,
+                    rollbackCaptureEnabled: value.rollbackCaptureEnabled,
+                },
+            }),
+            true,
+        );
+        return { path: filePath, ...value, lockWaitMs: waitMs, io };
+    } catch (error) {
+        publishAndReturn(
+            buildIoMeta({
+                operation: 'patch',
+                target: filePath,
+                targetKind: 'file',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.patchTextBatchLocked',
+                riskClass,
+                traceId,
+            }),
+            false,
+            error,
+        );
+        throw error;
+    }
+}
+
+/**
  * Patch textual com read + write dentro do mesmo lock e preview otimizado quando seguro.
  *
  * @param {string} filePath

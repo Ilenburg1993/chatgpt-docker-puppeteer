@@ -288,6 +288,29 @@ describe('createIoIndexSqlite', () => {
         expect(symbols[0]?.symbolName).toBe('alphaHelper');
     });
 
+    it('busca substring literal exata no conteúdo bruto sem depender da tokenização FTS', async () => {
+        expect(tmpDir).toBeTruthy();
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+        const root = /** @type {string} */ (tmpDir);
+        await index.indexDirectory(root, { extensions: ['.js', '.md'], recursive: true });
+
+        const exact = index.searchLiteral('betaValue = 42', { caseSensitive: true });
+        expect(exact).toHaveLength(1);
+        expect(exact[0]?.relativePath).toContain('nested/beta.js');
+        expect(exact[0]?.snippet).toContain('betaValue = 42');
+
+        expect(index.searchLiteral('BETAVALUE = 42', { caseSensitive: true })).toEqual([]);
+        expect(index.searchLiteral('BETAVALUE = 42', { caseSensitive: false })).toHaveLength(1);
+
+        const scoped = index.searchLiteral('betaValue', {
+            pathPrefix: join(root, 'alpha.js'),
+            caseSensitive: true,
+        });
+        expect(scoped).toHaveLength(1);
+        expect(scoped[0]?.relativePath).toBe('alpha.js');
+    });
+
     it('retorna o chunk e a faixa de linhas que contêm o match', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');

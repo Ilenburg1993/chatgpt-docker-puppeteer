@@ -244,11 +244,11 @@ describe('copilot MCP registry', () => {
 
         const patch = tools.find((tool) => tool.name === 'repo_apply_patch');
         assert.equal(patch?._meta?.['openai/toolInvocation/invoking'], 'Aplicando patch...');
-        assert.equal(patch?._meta?.['openai/toolInvocation/invoked'], 'Aplicando patch: ok');
+        assert.equal(patch?._meta?.['openai/toolInvocation/invoked'], 'OK');
 
         const connectorSmoke = tools.find((tool) => tool.name === 'mcp_connector_smoke_refresh');
         assert.equal(connectorSmoke?._meta?.['openai/toolInvocation/invoking'], 'Connector smoke refresh...');
-        assert.equal(connectorSmoke?._meta?.['openai/toolInvocation/invoked'], 'Connector smoke refresh: ok');
+        assert.equal(connectorSmoke?._meta?.['openai/toolInvocation/invoked'], 'OK');
     });
 
     it('does not expose duplicate tool names', () => {

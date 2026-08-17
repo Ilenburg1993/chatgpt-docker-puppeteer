@@ -91,6 +91,8 @@ export const mcpLatencyDashboardTool = {
         const includeTools = options['includeTools'] !== false;
         const metrics = readMcpMetricsSnapshot();
         const toolRows = buildToolRows(metrics.tools, maxRows);
+        const cumulativeCostRows = buildCumulativeCostRows(metrics.tools, metrics.totals.calls, maxRows);
+        const callPressureRows = buildCallPressureRows(metrics.tools, metrics.totals.calls, maxRows);
         const phaseRows = buildPhaseRows(metrics.tools, maxRows);
         const phaseTotals = buildPhaseTotals(metrics.tools);
         const byteAccounting = buildByteAccounting(metrics.tools);
@@ -111,6 +113,8 @@ export const mcpLatencyDashboardTool = {
             warnings: assessment.warnings,
             passed: assessment.passed,
             ...(includeTools ? { slowestTools: toolRows } : {}),
+            highestCumulativeCost: cumulativeCostRows,
+            highestCallPressure: callPressureRows,
             slowestPhases: phaseRows,
             phaseTotals,
             byteAccounting,
@@ -221,6 +225,7 @@ function buildToolRows(tools, maxRows) {
             name,
             calls: metric.calls,
             errors: metric.errors,
+            totalDurationMs: metric.totalDurationMs,
             averageMs: metric.averageDurationMs,
             lastMs: metric.lastDurationMs,
             errorRate: metric.calls > 0 ? roundRatio(metric.errors / metric.calls) : 0,
@@ -230,6 +235,54 @@ function buildToolRows(tools, maxRows) {
             (left, right) =>
                 right.averageMs - left.averageMs || right.calls - left.calls || left.name.localeCompare(right.name),
         )
+        .slice(0, maxRows);
+}
+
+/**
+ * Rank tools by cumulative handler cost. Average-only rankings hide hot tools whose per-call latency is modest but whose
+ * repeated use dominates an interactive repo workflow.
+ *
+ * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric & { averageDurationMs: number }>} tools
+ * @param {number} totalCalls
+ * @param {number} maxRows
+ */
+function buildCumulativeCostRows(tools, totalCalls, maxRows) {
+    const totalDurationMs = Object.values(tools).reduce((sum, metric) => sum + metric.totalDurationMs, 0);
+    return Object.entries(tools)
+        .map(([name, metric]) => ({
+            name,
+            calls: metric.calls,
+            totalDurationMs: metric.totalDurationMs,
+            averageMs: metric.averageDurationMs,
+            callShare: totalCalls > 0 ? roundRatio(metric.calls / totalCalls) : 0,
+            durationShare: totalDurationMs > 0 ? roundRatio(metric.totalDurationMs / totalDurationMs) : 0,
+        }))
+        .filter((row) => row.calls > 0)
+        .sort(
+            (left, right) =>
+                right.totalDurationMs - left.totalDurationMs || right.calls - left.calls || left.name.localeCompare(right.name),
+        )
+        .slice(0, maxRows);
+}
+
+/**
+ * Rank tools by call count so round-trip pressure is visible even when server-side handler time is low.
+ *
+ * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric & { averageDurationMs: number }>} tools
+ * @param {number} totalCalls
+ * @param {number} maxRows
+ */
+function buildCallPressureRows(tools, totalCalls, maxRows) {
+    return Object.entries(tools)
+        .map(([name, metric]) => ({
+            name,
+            calls: metric.calls,
+            callShare: totalCalls > 0 ? roundRatio(metric.calls / totalCalls) : 0,
+            totalDurationMs: metric.totalDurationMs,
+            averageMs: metric.averageDurationMs,
+        }))
+        .filter((row) => row.calls > 0)
+        .sort((left, right) => right.calls - left.calls || right.totalDurationMs - left.totalDurationMs || left.name.localeCompare(right.name))
         .slice(0, maxRows);
 }
 
@@ -427,8 +480,8 @@ function buildNextActions(assessment, calls, budgets) {
     }
     if (assessment.warnings.length > 0) {
         return [
-            'Inspect slowestPhases first; optimize authorization/cache, handler logic or result size depending on the dominant phase.',
-            'Use mcp_cloudflare_transport_benchmark_plan before changing QUIC/auto/http2 transport.',
+            'Inspect highestCumulativeCost and highestCallPressure before optimizing isolated slow averages; repeated hot-tool calls often dominate interactive repo latency.',
+            'Then inspect slowestPhases to distinguish handler, authorization and result-size bottlenecks.',
         ];
     }
     return ['Keep collecting baseline samples before promoting Cloudflare edge or tunnel transport changes.'];

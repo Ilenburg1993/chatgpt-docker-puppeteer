@@ -126,6 +126,16 @@ export function searchIoIndex(query, options = {}) {
 }
 
 /**
+ * Search exact literal substrings in raw indexed chunks without spawning an external grep process.
+ *
+ * @param {string} query
+ * @param {Parameters<NonNullable<ReturnType<typeof getIoIndex>>['searchLiteral']>[1]} [options]
+ */
+export function searchIoIndexLiteral(query, options = {}) {
+    return getIoIndex()?.searchLiteral(query, options) ?? [];
+}
+
+/**
  * @param {string} name
  * @param {Parameters<NonNullable<ReturnType<typeof getIoIndex>>['findSymbol']>[1]} [options]
  */

@@ -90,6 +90,32 @@ export function formatIndexSearchRows(rows) {
 }
 
 /**
+ * Formata resultados de substring literal do índice como linhas exatas no mesmo formato do grep (`path:line:text`).
+ * O SQLite filtra os chunks candidatos; a expansão em JS preserva o contrato de `repo_search_text` sem subprocesso.
+ *
+ * @param {{ filePath: string; relativePath: string; startLine: number; content?: string }[]} rows
+ * @param {string} query
+ * @param {boolean} caseSensitive
+ * @returns {string}
+ */
+export function formatLiteralIndexSearchRows(rows, query, caseSensitive) {
+    const needle = caseSensitive ? query : query.toLowerCase();
+    /** @type {string[]} */
+    const output = [];
+    for (const row of rows) {
+        const path = row.relativePath || row.filePath;
+        const lines = String(row.content ?? '').split('\n');
+        for (let offset = 0; offset < lines.length; offset += 1) {
+            const line = lines[offset] ?? '';
+            const searchable = caseSensitive ? line : line.toLowerCase();
+            if (!searchable.includes(needle)) continue;
+            output.push(`${path}:${Number(row.startLine ?? 1) + offset}:${line}`);
+        }
+    }
+    return output.join('\n');
+}
+
+/**
  * Formata linhas do índice de imports para string de saída legível.
  *
  * @param {{

@@ -8,13 +8,18 @@
  */
 
 import { buildIoMeta, createIoTraceId, sanitizeIoTextOutput } from '#copilot/core';
-import { findIoIndexSymbol, getIoIndexStats, searchIoIndex } from '../../io-index-registry.js';
+import { findIoIndexSymbol, getIoIndexStats, searchIoIndex, searchIoIndexLiteral } from '../../io-index-registry.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { resolveIoSearchBudget } from '../../policy/budgets.js';
 import { hasNullByte } from '../../policy/path-resource.js';
 import { utf8ByteLength } from '../../shared/buffer.js';
 import { buildGrepArgs } from './grep-adapter.js';
-import { canUseIndexSearch, filterIndexRowsByGlob, formatIndexSearchRows } from './index-search.js';
+import {
+    canUseIndexSearch,
+    filterIndexRowsByGlob,
+    formatIndexSearchRows,
+    formatLiteralIndexSearchRows,
+} from './index-search.js';
 import { normalizeSearchWindow, paginateSearchText } from './result-paginator.js';
 import { isRipgrepAvailable, streamSearchFile } from './subprocess.js';
 import { buildSymbolPattern, formatIndexSymbolRows, kindToGlobs } from './symbol-search.js';
@@ -209,6 +214,14 @@ function publishAndReturn(io, success, error) {
     return io;
 }
 
+/** @param {string} value */
+function isAsciiLiteral(value) {
+    for (let index = 0; index < value.length; index += 1) {
+        if (value.charCodeAt(index) > 0x7f) return false;
+    }
+    return true;
+}
+
 /**
  * Busca texto/regex em arquivos já validados pelo adapter da tool.
  *
@@ -315,6 +328,73 @@ export async function searchText(targetPath, options) {
             ...(options.includePattern ? { includePattern: options.includePattern } : {}),
             ...(options.excludePattern ? { excludePattern: options.excludePattern } : {}),
         };
+
+        const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
+        const literalIndexEligible =
+            options.isRegex !== true &&
+            (options.contextLines ?? 0) === 0 &&
+            Boolean(indexStats?.available) &&
+            freshFiles > 0 &&
+            (options.caseSensitive === true || isAsciiLiteral(options.pattern));
+        if (literalIndexEligible) {
+            const literalRows = searchIoIndexLiteral(options.pattern, {
+                pathPrefix: targetPath,
+                ...(searchWindow.commandMaxCount === null ? {} : { maxResults: searchWindow.commandMaxCount }),
+                caseSensitive: options.caseSensitive === true,
+            });
+            const filteredLiteralRows = filterIndexRowsByGlob(
+                literalRows,
+                options.includePattern,
+                options.excludePattern,
+            );
+            if (filteredLiteralRows.length > 0) {
+                const literalOutput = formatLiteralIndexSearchRows(
+                    filteredLiteralRows,
+                    options.pattern,
+                    options.caseSensitive === true,
+                );
+                const sanitizedOutput = sanitizeSearchOutput(literalOutput);
+                const windowedOutput = paginateSearchText(sanitizedOutput.text, searchWindow);
+                const returnedMatchCount = countSearchOutputLines(windowedOutput.text);
+                const totalMatchCount = windowedOutput.originalLineCount;
+                const io = publishAndReturn(
+                    buildSearchIo(
+                        'io-engine.index.literal-search',
+                        utf8ByteLength(windowedOutput.text, 'search output'),
+                        {
+                            redactions: sanitizedOutput.redactions,
+                            countsPostSanitization: true,
+                            fallback: 'fts5-or-rg-on-index-literal-miss',
+                            truncated: windowedOutput.truncated,
+                            originalResultCount: totalMatchCount,
+                            nextCursor: windowedOutput.nextCursor,
+                        },
+                    ),
+                    true,
+                );
+                return {
+                    targetPath,
+                    pattern: options.pattern,
+                    output: windowedOutput.text,
+                    matchCount: returnedMatchCount,
+                    returnedMatchCount,
+                    returnedLineCount: returnedMatchCount,
+                    engine: 'sqlite-index-literal',
+                    sanitized: sanitizedOutput.sanitized,
+                    redactions: sanitizedOutput.redactions,
+                    truncated: windowedOutput.truncated,
+                    nextCursor: windowedOutput.nextCursor,
+                    cursorOffset: windowedOutput.cursorOffset,
+                    totalMatches: totalMatchCount,
+                    totalMatchCount,
+                    totalLineCount: totalMatchCount,
+                    countsPostSanitization: true,
+                    indexFallback: false,
+                    indexFallbackReason: null,
+                    io: { ...io, truncated: windowedOutput.truncated, policyVersion: sanitizedOutput.policyVersion },
+                };
+            }
+        }
 
         if (canUseIndexSearch(indexSearchOptions)) {
             const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;

@@ -30,6 +30,7 @@ const {
     createOrReplaceFileAtomic,
     deleteFileLocked,
     moveFileLocked,
+    patchTextBatchLocked,
     patchTextLocked,
     readText,
     withIoResourceLock,
@@ -964,6 +965,167 @@ async function applyPatchBatchOperation(operation, index) {
 }
 
 /**
+ * @param {Record<string, unknown>} operation
+ */
+function toLockedPatchBatchOperation(operation) {
+    return {
+        oldString: String(operation['old_string'] ?? ''),
+        newString: String(operation['new_string'] ?? ''),
+        replaceAll: operation['replace_all'] === true,
+        ...(optionalInteger(operation['expected_occurrences']) !== undefined
+            ? { expectedOccurrences: /** @type {number} */ (optionalInteger(operation['expected_occurrences'])) }
+            : {}),
+        ...(optionalInteger(operation['occurrence_index']) !== undefined
+            ? { occurrenceIndex: /** @type {number} */ (optionalInteger(operation['occurrence_index'])) }
+            : {}),
+        ...(typeof operation['expectedHash'] === 'string' && operation['expectedHash']
+            ? { expectedHash: operation['expectedHash'] }
+            : {}),
+        allowNoop: operation['allowNoop'] === true,
+        diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
+        maxDiffLines: optionalInteger(operation['maxDiffLines']) ?? 160,
+        computeDiff: operation['includeDiffPreview'] === true,
+    };
+}
+
+/**
+ * Run patch-batch planning/application while collapsing repeated same-file operations into one lock/read/write cycle.
+ * Same-file operations are sequential and atomic; distinct files preserve the existing partial-batch behavior.
+ *
+ * @param {Record<string, unknown>[]} operations
+ * @param {boolean} dryRun
+ * @returns {Promise<Record<string, unknown>[]>}
+ */
+async function runPatchBatchOperations(operations, dryRun) {
+    /** @type {Map<string, { operation: Record<string, unknown>; index: number }[]>} */
+    const groups = new Map();
+    for (const [index, operation] of operations.entries()) {
+        const key = String(operation['path'] ?? '');
+        const group = groups.get(key) ?? [];
+        group.push({ operation, index });
+        groups.set(key, group);
+    }
+
+    /** @type {Record<string, unknown>[]} */
+    const results = [];
+    for (const group of groups.values()) {
+        if (group.length === 1) {
+            const entry = /** @type {{ operation: Record<string, unknown>; index: number }} */ (group[0]);
+            results.push(
+                dryRun
+                    ? await planPatchBatchOperation(entry.operation, entry.index)
+                    : await applyPatchBatchOperation(entry.operation, entry.index),
+            );
+            if (results.at(-1)?.['success'] !== true && !dryRun) break;
+            continue;
+        }
+
+        const first = /** @type {{ operation: Record<string, unknown>; index: number }} */ (group[0]);
+        const resolved = await resolveWritePath(String(first.operation['path'] ?? ''));
+        if (!resolved.ok) {
+            for (const entry of group) {
+                results.push({
+                    index: entry.index,
+                    success: false,
+                    path: entry.operation['path'] ?? null,
+                    error: resolved.reason,
+                    code: resolved.code,
+                });
+            }
+            if (!dryRun) break;
+            continue;
+        }
+        const conflicting = group.find(
+            ({ operation }) => operation['replace_all'] === true && operation['occurrence_index'] !== undefined,
+        );
+        if (conflicting) {
+            for (const entry of group) {
+                results.push({
+                    index: entry.index,
+                    success: false,
+                    path: resolved.relative,
+                    error: 'Same-file patch group aborted because one operation mixes replace_all and occurrence_index.',
+                    code:
+                        entry.index === conflicting.index
+                            ? 'ERR_PATCH_CONFLICTING_MODE'
+                            : 'ERR_PATCH_BATCH_GROUP_ABORTED',
+                    groupedSameFile: true,
+                });
+            }
+            if (!dryRun) break;
+            continue;
+        }
+
+        try {
+            const patch = await patchTextBatchLocked(resolved.resolved, {
+                operations: group.map(({ operation }) => toLockedPatchBatchOperation(operation)),
+                dryRun,
+                captureRollback: false,
+                advisoryLimits: {
+                    tool: dryRun ? 'repo_patch_batch_plan' : 'repo_apply_patch_batch',
+                    groupedSameFile: true,
+                    operationCount: group.length,
+                },
+            });
+            if (!dryRun) clearRepoReadFileResultCacheForResolvedPath(resolved.resolved);
+            for (const [groupIndex, entry] of group.entries()) {
+                const operationResult = /** @type {Record<string, unknown>} */ (patch.operations[groupIndex] ?? {});
+                const includeDiffPreview = entry.operation['includeDiffPreview'] === true;
+                results.push({
+                    index: entry.index,
+                    success: true,
+                    path: resolved.relative,
+                    dryRun,
+                    occurrences: operationResult['occurrences'],
+                    replacedOccurrences: operationResult['replacedOccurrences'],
+                    previousBytes: operationResult['previousBytes'],
+                    projectedBytes: operationResult['projectedBytes'],
+                    ...(dryRun
+                        ? { projectedHash: operationResult['contentHash'] }
+                        : {
+                              bytesWritten: groupIndex === group.length - 1 ? patch.bytesWritten : 0,
+                              batchBytesWritten: patch.bytesWritten,
+                              contentHash: operationResult['contentHash'],
+                              traceId: patch.io.traceId ?? null,
+                          }),
+                    byteDelta: operationResult['byteDelta'],
+                    firstMatchLine: operationResult['firstMatchLine'],
+                    lastMatchLine: operationResult['lastMatchLine'],
+                    lineDelta: operationResult['lineDelta'],
+                    occurrenceIndex: operationResult['occurrenceIndex'],
+                    previousHash: operationResult['previousHash'],
+                    noop: operationResult['noop'],
+                    groupedSameFile: true,
+                    ...maybeDiffPreview(includeDiffPreview, {
+                        diff: String(operationResult['diffPreview'] ?? ''),
+                        truncated: operationResult['diffPreviewTruncated'] === true,
+                        lines: Number(operationResult['diffPreviewLines'] ?? 0),
+                        bytes: Number(operationResult['diffPreviewBytes'] ?? 0),
+                        contextLines: Number(operationResult['diffContextLines'] ?? 3),
+                    }),
+                });
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+            for (const entry of group) {
+                results.push({
+                    index: entry.index,
+                    success: false,
+                    path: resolved.relative,
+                    error: message,
+                    code,
+                    groupedSameFile: true,
+                    groupAborted: true,
+                });
+            }
+            if (!dryRun) break;
+        }
+    }
+    return results.sort((left, right) => Number(left['index'] ?? 0) - Number(right['index'] ?? 0));
+}
+
+/**
  * @param {unknown} operation
  * @param {number} index
  * @param {{ virtualFiles: Map<string, { relative: string; bytes: number }> }} [context]
@@ -1128,7 +1290,7 @@ export const repoWriteTools = [
         name: 'repo_patch_batch_plan',
         title: 'Plan repository patch batch',
         description:
-            'Plan a bounded batch of exact-string repository patches without modifying files. Use before several repo_apply_patch calls to reduce repeated planning.',
+            'Plan a bounded batch of exact-string repository patches without modifying files. Repeated paths are evaluated sequentially against one virtual file state.',
         inputSchema: {
             operations: z
                 .array(patchBatchOperationSchema)
@@ -1138,10 +1300,8 @@ export const repoWriteTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ operations }) => {
-            const planned = [];
-            for (const [index, operation] of operations.entries()) {
-                planned.push(await planPatchBatchOperation(/** @type {Record<string, unknown>} */ (operation), index));
-            }
+            const normalizedOperations = /** @type {Record<string, unknown>[]} */ (operations);
+            const planned = await runPatchBatchOperations(normalizedOperations, true);
             const failed = planned.filter((operation) => operation['success'] !== true);
             await appendMcpAuditEvent({
                 event: 'repo_patch_batch_plan',
@@ -1151,18 +1311,18 @@ export const repoWriteTools = [
             });
             const structured = {
                 success: failed.length === 0,
-                plannedTool: 'repo_apply_patch',
+                plannedTool: 'repo_apply_patch_batch',
                 dryRun: true,
                 operationCount: planned.length,
                 failedCount: failed.length,
                 operations: planned,
-                nextCalls:
+                nextCall:
                     failed.length === 0
-                        ? /** @type {Record<string, unknown>[]} */ (operations).map((operation) => ({
-                              tool: 'repo_apply_patch',
-                              args: { ...operation, dryRun: false },
-                          }))
-                        : [],
+                        ? {
+                              tool: 'repo_apply_patch_batch',
+                              args: { operations, dryRun: false, confirmBatch: true },
+                          }
+                        : null,
             };
             const text =
                 failed.length === 0
@@ -1179,7 +1339,7 @@ export const repoWriteTools = [
         name: 'repo_apply_patch_batch',
         title: 'Apply repository patch batch',
         description:
-            'Dry-run or apply a bounded batch of exact-string repository patches. Defaults to dryRun=true; real writes require confirmBatch=true and unique target paths.',
+            'Dry-run or apply a bounded exact-string patch batch. Real writes require confirmBatch=true; repeated paths are sequential and atomic per file.',
         inputSchema: {
             operations: z
                 .array(patchBatchOperationSchema)
@@ -1195,28 +1355,9 @@ export const repoWriteTools = [
         annotations: boundedWriteAnnotations(),
         handler: async ({ operations, dryRun, confirmBatch }) => {
             const isDryRun = dryRun !== false;
-            const planned = [];
-            for (const [index, operation] of operations.entries()) {
-                planned.push(await planPatchBatchOperation(/** @type {Record<string, unknown>} */ (operation), index));
-            }
+            const normalizedOperations = /** @type {Record<string, unknown>[]} */ (operations);
+            const planned = await runPatchBatchOperations(normalizedOperations, true);
             const failedPreflight = planned.filter((operation) => operation['success'] !== true);
-            const seenPaths = new Set();
-            const duplicatePaths = [];
-            for (const operation of planned) {
-                const plannedPath = typeof operation['path'] === 'string' ? operation['path'] : null;
-                if (!plannedPath) continue;
-                if (seenPaths.has(plannedPath)) duplicatePaths.push(plannedPath);
-                else seenPaths.add(plannedPath);
-            }
-            if (duplicatePaths.length > 0) {
-                failedPreflight.push({
-                    index: null,
-                    success: false,
-                    code: 'ERR_PATCH_BATCH_DUPLICATE_PATHS',
-                    error: 'repo_apply_patch_batch requires unique target paths per batch.',
-                    paths: [...new Set(duplicatePaths)],
-                });
-            }
             if (isDryRun || failedPreflight.length > 0) {
                 const structured = {
                     success: failedPreflight.length === 0,
@@ -1243,15 +1384,7 @@ export const repoWriteTools = [
                     operationCount: planned.length,
                 });
             }
-            const applied = [];
-            for (const [index, operation] of operations.entries()) {
-                const result = await applyPatchBatchOperation(
-                    /** @type {Record<string, unknown>} */ (operation),
-                    index,
-                );
-                applied.push(result);
-                if (result['success'] !== true) break;
-            }
+            const applied = await runPatchBatchOperations(normalizedOperations, false);
             const failedApply = applied.filter((operation) => operation['success'] !== true);
             await appendMcpAuditEvent({
                 event:

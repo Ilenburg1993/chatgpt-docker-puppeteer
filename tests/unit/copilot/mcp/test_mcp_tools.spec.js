@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { describe, it } from 'vitest';
 
@@ -81,6 +81,27 @@ describe('copilot MCP tools', () => {
         assert.equal(noHashes.structuredContent?.['hashMode'], 'none');
         assert.equal(noHashes.structuredContent?.['sha256'], undefined);
         assert.equal(noHashes.structuredContent?.['returnedSha256'], undefined);
+    });
+
+    it('repo_read_file batches several reads in one call without duplicating file bodies into legacy text', async () => {
+        const tool = findTool('repo_read_file');
+        const result = await tool.handler({
+            batch: [
+                { path: 'src/copilot/mcp/README.md', startLine: 1, endLine: 8, hashMode: 'returned' },
+                { path: 'src/copilot/mcp/tools/repo-read.js', startLine: 1, endLine: 8, hashMode: 'none' },
+            ],
+        });
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['batch'], true);
+        assert.equal(result.structuredContent?.['requestCount'], 2);
+        const results = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['results']);
+        assert.equal(results.length, 2);
+        assert.ok(String(results[0]?.['content'] ?? '').includes('Copilot MCP Server'));
+        assert.ok(String(results[1]?.['content'] ?? '').includes('@module copilot/mcp/tools/repo-read'));
+        const legacyText = String(result.content?.[0]?.text ?? '');
+        assert.ok(legacyText.includes('Read batch completed'));
+        assert.equal(legacyText.includes('Copilot MCP Server'), false);
     });
 
     it('repo_read_file returns identical results for repeated same-window reads through the extracted cache module', async () => {
@@ -252,6 +273,27 @@ describe('copilot MCP tools', () => {
         assert.equal(structured['pattern'], 'Copilot MCP Server');
         assert.equal(structured['query'], 'Copilot MCP Server');
         assert.ok(Number(structured['returnedMatchCount'] ?? 0) > 0);
+    });
+
+    it('repo_search_text batches several searches and keeps heavy outputs only in structured results', async () => {
+        const tool = findTool('repo_search_text');
+        const result = await tool.handler({
+            batch: [
+                { query: 'repo_read_file', path: 'src/copilot/mcp/tools', maxResults: 5 },
+                { query: 'repo_apply_patch', path: 'src/copilot/mcp/tools', maxResults: 5 },
+            ],
+        });
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['batch'], true);
+        assert.equal(result.structuredContent?.['requestCount'], 2);
+        const results = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['results']);
+        assert.equal(results.length, 2);
+        assert.ok(Number(results[0]?.['returnedMatchCount'] ?? 0) > 0);
+        assert.ok(Number(results[1]?.['returnedMatchCount'] ?? 0) > 0);
+        const legacyText = String(result.content?.[0]?.text ?? '');
+        assert.ok(legacyText.includes('Search batch completed'));
+        assert.equal(legacyText.includes('repo_read_file.js'), false);
     });
 
     it('repo_search_text returns match and line counts separately when context is included', async () => {
@@ -946,9 +988,9 @@ describe('copilot MCP tools', () => {
         });
         assert.equal(patchBatchPlan.isError, undefined);
         assert.equal(patchBatchPlan.structuredContent?.['success'], true);
-        assert.equal(patchBatchPlan.structuredContent?.['plannedTool'], 'repo_apply_patch');
+        assert.equal(patchBatchPlan.structuredContent?.['plannedTool'], 'repo_apply_patch_batch');
         assert.equal(patchBatchPlan.structuredContent?.['operationCount'], 1);
-        assert.ok(Array.isArray(patchBatchPlan.structuredContent?.['nextCalls']));
+        assert.equal(patchBatchPlan.structuredContent?.['nextCall']?.['tool'], 'repo_apply_patch_batch');
 
         const applyPatchBatchTool = findTool('repo_apply_patch_batch');
         const applyPatchBatchDryRun = await applyPatchBatchTool.handler({
@@ -1007,6 +1049,40 @@ describe('copilot MCP tools', () => {
         assert.equal(broadPlan.isError, undefined);
         assert.equal(broadPlan.structuredContent?.['validator'], 'suite-mcp-fast');
         assert.equal(broadPlan.structuredContent?.['broadValidation'], true);
+    });
+
+    it('repo_apply_patch_batch supports sequential atomic patches to the same file', async () => {
+        const jobsRoot = join(process.cwd(), 'src/copilot/.ai/jobs');
+        await mkdir(jobsRoot, { recursive: true });
+        const tempDir = await mkdtemp(join(jobsRoot, 'same-file-patch-batch-'));
+        const absolutePath = join(tempDir, 'sample.txt');
+        const repoPath = relative(process.cwd(), absolutePath).replaceAll('\\', '/');
+        await writeFile(absolutePath, 'alpha\nomega\n', 'utf8');
+        try {
+            const tool = findTool('repo_apply_patch_batch');
+            const operations = [
+                { path: repoPath, old_string: 'alpha', new_string: 'beta' },
+                { path: repoPath, old_string: 'beta', new_string: 'gamma' },
+            ];
+            const dryRun = await tool.handler({ operations });
+            assert.equal(dryRun.isError, undefined);
+            assert.equal(dryRun.structuredContent?.['success'], true);
+            const planned = /** @type {Record<string, unknown>[]} */ (dryRun.structuredContent?.['operations']);
+            assert.equal(planned.length, 2);
+            assert.equal(planned[0]?.['groupedSameFile'], true);
+            assert.equal(planned[1]?.['groupedSameFile'], true);
+
+            const applied = await tool.handler({ operations, dryRun: false, confirmBatch: true });
+            assert.equal(applied.isError, undefined);
+            assert.equal(applied.structuredContent?.['success'], true);
+            assert.equal(applied.structuredContent?.['appliedCount'], 2);
+            const appliedRows = /** @type {Record<string, unknown>[]} */ (applied.structuredContent?.['applied']);
+            assert.equal(appliedRows[0]?.['groupedSameFile'], true);
+            assert.equal(appliedRows[1]?.['groupedSameFile'], true);
+            assert.equal(await readFile(absolutePath, 'utf8'), 'gamma\nomega\n');
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
     });
 
     it('mcp_last_validation_summary reads persisted validator history without starting jobs', async () => {

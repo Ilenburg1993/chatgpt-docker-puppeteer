@@ -99,8 +99,8 @@ export function buildHumanMcpToolInvocationLabel(tool) {
  * @returns {string}
  */
 export function buildHumanMcpToolInvocationStatus(tool, phase) {
-    const label = buildHumanMcpToolInvocationLabel(tool);
-    return trimInvocationStatus(phase === 'invoking' ? `${label}...` : `${label}: ok`);
+    if (phase === 'invoked') return 'OK';
+    return trimInvocationStatus(`${buildHumanMcpToolInvocationLabel(tool)}...`);
 }
 
 /**

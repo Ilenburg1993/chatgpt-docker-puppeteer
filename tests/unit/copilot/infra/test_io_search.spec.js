@@ -9,6 +9,7 @@ import {
     filterIndexRowsByGlob,
     formatIndexSearchRows,
     formatIndexSymbolRows,
+    formatLiteralIndexSearchRows,
     kindToGlobs,
     normalizeSearchWindow,
     paginateSearchItems,
@@ -25,6 +26,21 @@ describe('infra/io/search', () => {
     it('formata linhas do índice com highlight markdown', () => {
         expect(formatIndexSearchRows([{ filePath: '/x/a.md', relativePath: 'a.md', snippet: '[alpha] token' }])).toBe(
             'a.md: **alpha** token',
+        );
+    });
+
+    it('expande chunks de busca literal em linhas exatas compatíveis com grep', () => {
+        const rows = [
+            {
+                filePath: '/x/a.js',
+                relativePath: 'a.js',
+                startLine: 201,
+                content: 'const first = 1;\nconst needleValue = 2;\nconst NEEDLEVALUE = 3;',
+            },
+        ];
+        expect(formatLiteralIndexSearchRows(rows, 'needleValue', true)).toBe('a.js:202:const needleValue = 2;');
+        expect(formatLiteralIndexSearchRows(rows, 'needlevalue', false)).toBe(
+            'a.js:202:const needleValue = 2;\na.js:203:const NEEDLEVALUE = 3;',
         );
     });
 

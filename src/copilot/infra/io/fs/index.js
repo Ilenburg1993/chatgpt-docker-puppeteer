@@ -16,6 +16,7 @@ export {
     copyFileLocked,
     deleteFileLocked,
     moveFileLocked,
+    patchTextBatchLocked,
     patchTextLocked,
     removePathLocked,
 } from './locked-mutations.js';

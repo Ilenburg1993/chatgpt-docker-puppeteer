@@ -94,6 +94,7 @@ function createStaleIndexSnapshotError(filePath, attempts) {
  *     endLine: number;
  *     snippet: string;
  *     rank: number;
+ *     content?: string;
  * }} IoIndexSearchResult
  *
  *
@@ -331,6 +332,72 @@ export function createIoIndexSqlite(options) {
         JOIN copilot_io_index_fts ON copilot_io_index_fts.rowid = scoped_chunks.id
         WHERE copilot_io_index_fts MATCH ?
         ORDER BY rank, scoped_chunks.relative_path, scoped_chunks.chunk_index
+        LIMIT ?
+    `);
+    const stmtLiteralSearch = db.prepare(`
+        SELECT
+            chunks.file_path as filePath,
+            files.relative_path as relativePath,
+            chunks.chunk_index as chunkIndex,
+            chunks.start_line as startLine,
+            chunks.end_line as endLine,
+            chunks.content as content,
+            substr(chunks.content, max(instr(chunks.content, ?) - 120, 1), 320) as snippet,
+            0 as rank
+        FROM copilot_io_index_chunks AS chunks
+        JOIN copilot_io_index_files AS files ON files.file_path = chunks.file_path
+        WHERE instr(chunks.content, ?) > 0
+        ORDER BY files.relative_path, chunks.chunk_index
+        LIMIT ?
+    `);
+    const stmtLiteralSearchScoped = db.prepare(`
+        SELECT
+            chunks.file_path as filePath,
+            files.relative_path as relativePath,
+            chunks.chunk_index as chunkIndex,
+            chunks.start_line as startLine,
+            chunks.end_line as endLine,
+            chunks.content as content,
+            substr(chunks.content, max(instr(chunks.content, ?) - 120, 1), 320) as snippet,
+            0 as rank
+        FROM copilot_io_index_chunks AS chunks
+        JOIN copilot_io_index_files AS files ON files.file_path = chunks.file_path
+        WHERE (chunks.file_path = ? OR (chunks.file_path >= ? AND chunks.file_path < ?))
+            AND instr(chunks.content, ?) > 0
+        ORDER BY files.relative_path, chunks.chunk_index
+        LIMIT ?
+    `);
+    const stmtLiteralSearchInsensitive = db.prepare(`
+        SELECT
+            chunks.file_path as filePath,
+            files.relative_path as relativePath,
+            chunks.chunk_index as chunkIndex,
+            chunks.start_line as startLine,
+            chunks.end_line as endLine,
+            chunks.content as content,
+            substr(chunks.content, max(instr(lower(chunks.content), lower(?)) - 120, 1), 320) as snippet,
+            0 as rank
+        FROM copilot_io_index_chunks AS chunks
+        JOIN copilot_io_index_files AS files ON files.file_path = chunks.file_path
+        WHERE instr(lower(chunks.content), lower(?)) > 0
+        ORDER BY files.relative_path, chunks.chunk_index
+        LIMIT ?
+    `);
+    const stmtLiteralSearchInsensitiveScoped = db.prepare(`
+        SELECT
+            chunks.file_path as filePath,
+            files.relative_path as relativePath,
+            chunks.chunk_index as chunkIndex,
+            chunks.start_line as startLine,
+            chunks.end_line as endLine,
+            chunks.content as content,
+            substr(chunks.content, max(instr(lower(chunks.content), lower(?)) - 120, 1), 320) as snippet,
+            0 as rank
+        FROM copilot_io_index_chunks AS chunks
+        JOIN copilot_io_index_files AS files ON files.file_path = chunks.file_path
+        WHERE (chunks.file_path = ? OR (chunks.file_path >= ? AND chunks.file_path < ?))
+            AND instr(lower(chunks.content), lower(?)) > 0
+        ORDER BY files.relative_path, chunks.chunk_index
         LIMIT ?
     `);
     const stmtImportSearch = db.prepare(`
@@ -962,6 +1029,41 @@ export function createIoIndexSqlite(options) {
             const range = buildIndexPathTreeRange(prefix);
             return /** @type {IoIndexSearchResult[]} */ (
                 stmtSearchScoped.all(range.exact, range.descendantStart, range.descendantEnd, safe, maxResults)
+            );
+        },
+
+        /**
+         * Exact literal substring search over indexed raw chunks. This avoids an `rg` subprocess for fixed-string queries
+         * that FTS tokenization cannot represent faithfully (punctuation-heavy source code is the common case).
+         *
+         * Case-insensitive mode is intentionally exposed for ASCII queries only by the higher-level search adapter because
+         * SQLite lower() is not a full Unicode case-fold implementation.
+         *
+         * @param {string} query
+         * @param {{ pathPrefix?: string; maxResults?: number; caseSensitive?: boolean }} [options]
+         */
+        searchLiteral(query, options = {}) {
+            stats.searches += 1;
+            const literal = String(query ?? '');
+            if (!literal) return /** @type {IoIndexSearchResult[]} */ ([]);
+            const maxResults = normalizeIndexMaxResults(options.maxResults);
+            const caseSensitive = options.caseSensitive === true;
+            if (!options.pathPrefix) {
+                const statement = caseSensitive ? stmtLiteralSearch : stmtLiteralSearchInsensitive;
+                return /** @type {IoIndexSearchResult[]} */ (statement.all(literal, literal, maxResults));
+            }
+            const prefix = normalizeIndexPath(options.pathPrefix);
+            const range = buildIndexPathTreeRange(prefix);
+            const statement = caseSensitive ? stmtLiteralSearchScoped : stmtLiteralSearchInsensitiveScoped;
+            return /** @type {IoIndexSearchResult[]} */ (
+                statement.all(
+                    literal,
+                    range.exact,
+                    range.descendantStart,
+                    range.descendantEnd,
+                    literal,
+                    maxResults,
+                )
             );
         },
 

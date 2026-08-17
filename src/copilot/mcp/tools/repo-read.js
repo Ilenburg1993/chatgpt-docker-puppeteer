@@ -30,6 +30,68 @@ const { diffText, readBytes, readText, scanDirectory, searchText, searchWorkspac
 });
 
 const DEFAULT_REPO_READ_PATH = 'src/copilot';
+const MAX_REPO_BATCH_REQUESTS = 10;
+const REPO_BATCH_CONCURRENCY = 4;
+
+const repoReadBatchItemSchema = z.object({
+    path: z.string().min(1),
+    startLine: z.number().int().min(1).optional(),
+    endLine: z.number().int().min(1).optional(),
+    hashMode: z.enum(['full', 'returned', 'none']).optional(),
+});
+
+const repoSearchBatchItemSchema = z.object({
+    pattern: z.string().min(1).optional(),
+    query: z.string().min(1).optional(),
+    path: z.string().optional(),
+    isRegex: z.boolean().optional(),
+    caseSensitive: z.boolean().optional(),
+    includePattern: z.string().optional(),
+    excludePattern: z.string().optional(),
+    contextLines: z.number().int().min(0).max(10).optional(),
+    maxResults: z.number().int().min(1).max(500).optional(),
+    cursor: z.string().optional(),
+});
+
+/**
+ * Run a small MCP batch with bounded concurrency. The concurrency cap protects the index/filesystem from a burst while
+ * collapsing several host/model/tool round trips into one MCP call.
+ *
+ * @template T,U
+ * @param {T[]} items
+ * @param {(item: T, index: number) => Promise<U>} worker
+ * @returns {Promise<U[]>}
+ */
+async function runBoundedRepoBatch(items, worker) {
+    /** @type {U[]} */
+    const results = new Array(items.length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(REPO_BATCH_CONCURRENCY, items.length) }, async () => {
+        while (true) {
+            const index = nextIndex;
+            nextIndex += 1;
+            if (index >= items.length) return;
+            results[index] = await worker(/** @type {T} */ (items[index]), index);
+        }
+    });
+    await Promise.all(workers);
+    return results;
+}
+
+/**
+ * Convert a normal MCP call result into one compact batch row. Heavy text remains only in structuredContent, so batch
+ * mode does not duplicate each read/search payload in legacy content text.
+ *
+ * @param {number} index
+ * @param {import('#copilot/mcp/control-plane').StructuredCallToolResult} result
+ */
+function compactBatchCallResult(index, result) {
+    return {
+        index,
+        isError: result.isError === true,
+        ...(result.structuredContent ?? {}),
+    };
+}
 
 /**
  * @param {unknown} value
@@ -118,6 +180,78 @@ export function applyRepoReadHashMode(structured, hashMode) {
     Reflect.deleteProperty(output, 'sha256');
     if (hashMode === 'none') Reflect.deleteProperty(output, 'returnedSha256');
     return output;
+}
+
+/**
+ * @param {{ path?: string | undefined; startLine?: number | undefined; endLine?: number | undefined; hashMode?: 'full' | 'returned' | 'none' | undefined }} input
+ */
+async function runRepoReadFileCall(input) {
+    const resolved = await resolveReadPath(input.path ?? '');
+    if (!resolved.ok) return errorResult(resolved.reason, resolved);
+    if (input.startLine !== undefined && input.endLine !== undefined && input.endLine < input.startLine) {
+        return errorResult('endLine must be greater than or equal to startLine.', {
+            code: 'ERR_INVALID_LINE_RANGE',
+            hint: 'Use endLine greater than or equal to startLine, or omit endLine.',
+        });
+    }
+    const { structured, text } = await readRepoFileWithValidatedResultCache(resolved, input.startLine, input.endLine);
+    const outputStructured = applyRepoReadHashMode(structured, input.hashMode ?? 'full');
+    return withResultSizeHint(okResult(outputStructured, text), {
+        bytes: estimateStructuredTextResultBytes(outputStructured, text),
+        strategy: 'conservative-estimate',
+        source: 'repo_read_file',
+    });
+}
+
+/**
+ * @param {{ pattern?: string | undefined; query?: string | undefined; path?: string | undefined; isRegex?: boolean | undefined; caseSensitive?: boolean | undefined; includePattern?: string | undefined; excludePattern?: string | undefined; contextLines?: number | undefined; maxResults?: number | undefined; cursor?: string | undefined }} input
+ */
+async function runRepoSearchTextCall(input) {
+    const effectivePattern = input.pattern ?? input.query;
+    if (!effectivePattern) {
+        return errorResult('Search pattern is required.', {
+            code: 'ERR_SEARCH_PATTERN_REQUIRED',
+            hint: 'Provide pattern or query.',
+        });
+    }
+    const resolved = await resolveReadPath(normalizeOptionalRepoPath(input.path, DEFAULT_REPO_READ_PATH));
+    if (!resolved.ok) return errorResult(resolved.reason, resolved);
+    const result = await searchText(resolved.resolved, {
+        workspaceRoot: WORKSPACE_ROOT,
+        pattern: effectivePattern,
+        isRegex: input.isRegex === true,
+        caseSensitive: input.caseSensitive === true,
+        ...(input.includePattern === undefined ? {} : { includePattern: input.includePattern }),
+        ...(input.excludePattern === undefined ? {} : { excludePattern: input.excludePattern }),
+        ...(input.maxResults === undefined ? {} : { maxResults: input.maxResults }),
+        contextLines: input.contextLines ?? 0,
+        ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+    });
+    const structured = {
+        success: true,
+        path: resolved.relative,
+        pattern: effectivePattern,
+        query: input.query ?? null,
+        contextLines: input.contextLines ?? 0,
+        cursor: input.cursor ?? null,
+        output: result.output,
+        matchCount: result.matchCount,
+        returnedMatchCount: result.returnedMatchCount ?? result.matchCount,
+        returnedLineCount: result.returnedLineCount ?? (result.output ? result.output.split('\n').length : 0),
+        totalMatches: result.totalMatches ?? result.matchCount,
+        totalMatchCount: result.totalMatchCount ?? result.totalMatches ?? result.matchCount,
+        totalLineCount: result.totalLineCount ?? null,
+        countsPostSanitization: result.countsPostSanitization,
+        truncated: result.truncated,
+        nextCursor: result.nextCursor ?? null,
+        cursorOffset: result.cursorOffset ?? 0,
+        engine: result.engine,
+    };
+    return withResultSizeHint(okResult(structured, result.output), {
+        bytes: estimateStructuredTextResultBytes(structured, result.output),
+        strategy: 'conservative-estimate',
+        source: 'repo_search_text',
+    });
 }
 
 /**
@@ -280,28 +414,55 @@ export const repoReadTools = [
         description:
             'Read a UTF-8 file inside the workspace, optionally using a line window. Returns SHA-256 hashes for safe follow-up writes.',
         inputSchema: {
-            path: z.string().min(1).describe('Workspace-relative file path.'),
+            path: z.string().min(1).optional().describe('Workspace-relative file path. Required outside batch mode.'),
             startLine: z.number().int().min(1).optional().describe('Optional 1-based first line.'),
             endLine: z.number().int().min(1).optional().describe('Optional 1-based last line.'),
             hashMode: z.enum(['full', 'returned', 'none']).optional().describe('Hash fields to return. Default full.'),
+            batch: z
+                .array(z.record(z.string(), z.unknown()))
+                .min(1)
+                .max(MAX_REPO_BATCH_REQUESTS)
+                .optional()
+                .describe('Batch up to 10 read requests using path/startLine/endLine/hashMode; do not mix with single mode.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, startLine, endLine, hashMode }) => {
-            const resolved = await resolveReadPath(path);
-            if (!resolved.ok) return errorResult(resolved.reason, resolved);
-            if (startLine !== undefined && endLine !== undefined && endLine < startLine) {
-                return errorResult('endLine must be greater than or equal to startLine.', {
-                    code: 'ERR_INVALID_LINE_RANGE',
-                    hint: 'Use endLine greater than or equal to startLine, or omit endLine.',
+        handler: async ({ path, startLine, endLine, hashMode, batch }) => {
+            if (batch !== undefined) {
+                if (path !== undefined || startLine !== undefined || endLine !== undefined || hashMode !== undefined) {
+                    return errorResult('Do not mix repo_read_file batch and single-request fields.', {
+                        code: 'ERR_BATCH_CONFLICTING_MODE',
+                    });
+                }
+                const parsedItems = [];
+                for (const [index, item] of batch.entries()) {
+                    const parsed = repoReadBatchItemSchema.safeParse(item);
+                    if (!parsed.success) {
+                        return errorResult(`Invalid repo_read_file batch item at index ${index}.`, {
+                            code: 'ERR_BATCH_INVALID_ITEM',
+                            index,
+                        });
+                    }
+                    parsedItems.push(parsed.data);
+                }
+                const calls = await runBoundedRepoBatch(parsedItems, (item) => runRepoReadFileCall(item));
+                const results = calls.map((result, index) => compactBatchCallResult(index, result));
+                const failedCount = results.filter((result) => result.isError).length;
+                const structured = {
+                    success: failedCount === 0,
+                    batch: true,
+                    requestCount: results.length,
+                    failedCount,
+                    concurrency: Math.min(REPO_BATCH_CONCURRENCY, results.length),
+                    results,
+                };
+                const text = `Read batch completed: ${results.length - failedCount}/${results.length} succeeded; payloads are in structuredContent.results.`;
+                return withResultSizeHint(okResult(structured, text), {
+                    bytes: estimateStructuredTextResultBytes(structured, text),
+                    strategy: 'conservative-estimate',
+                    source: 'repo_read_file.batch',
                 });
             }
-            const { structured, text } = await readRepoFileWithValidatedResultCache(resolved, startLine, endLine);
-            const outputStructured = applyRepoReadHashMode(structured, hashMode ?? 'full');
-            return withResultSizeHint(okResult(outputStructured, text), {
-                bytes: estimateStructuredTextResultBytes(outputStructured, text),
-                strategy: 'conservative-estimate',
-                source: 'repo_read_file',
-            });
+            return runRepoReadFileCall({ path, startLine, endLine, hashMode });
         },
     },
     {
@@ -472,6 +633,12 @@ export const repoReadTools = [
                 .describe('Lines of context around each match. Default: 0.'),
             maxResults: z.number().int().min(1).max(500).optional().describe('Maximum matches returned.'),
             cursor: z.string().optional().describe('Cursor returned by a previous repo_search_text call.'),
+            batch: z
+                .array(z.record(z.string(), z.unknown()))
+                .min(1)
+                .max(MAX_REPO_BATCH_REQUESTS)
+                .optional()
+                .describe('Batch up to 10 search requests using the normal fields; do not mix with single mode.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({
@@ -485,51 +652,65 @@ export const repoReadTools = [
             maxResults,
             cursor,
             query,
+            batch,
         }) => {
-            const effectivePattern = pattern ?? query;
-            if (!effectivePattern) {
-                return errorResult('Search pattern is required.', {
-                    code: 'ERR_SEARCH_PATTERN_REQUIRED',
-                    hint: 'Provide pattern or query.',
+            if (batch !== undefined) {
+                if (
+                    pattern !== undefined ||
+                    query !== undefined ||
+                    path !== undefined ||
+                    isRegex !== undefined ||
+                    caseSensitive !== undefined ||
+                    includePattern !== undefined ||
+                    excludePattern !== undefined ||
+                    contextLines !== undefined ||
+                    maxResults !== undefined ||
+                    cursor !== undefined
+                ) {
+                    return errorResult('Do not mix repo_search_text batch and single-request fields.', {
+                        code: 'ERR_BATCH_CONFLICTING_MODE',
+                    });
+                }
+                const parsedItems = [];
+                for (const [index, item] of batch.entries()) {
+                    const parsed = repoSearchBatchItemSchema.safeParse(item);
+                    if (!parsed.success || (!parsed.data.pattern && !parsed.data.query)) {
+                        return errorResult(`Invalid repo_search_text batch item at index ${index}.`, {
+                            code: 'ERR_BATCH_INVALID_ITEM',
+                            index,
+                        });
+                    }
+                    parsedItems.push(parsed.data);
+                }
+                const calls = await runBoundedRepoBatch(parsedItems, (item) => runRepoSearchTextCall(item));
+                const results = calls.map((result, index) => compactBatchCallResult(index, result));
+                const failedCount = results.filter((result) => result.isError).length;
+                const structured = {
+                    success: failedCount === 0,
+                    batch: true,
+                    requestCount: results.length,
+                    failedCount,
+                    concurrency: Math.min(REPO_BATCH_CONCURRENCY, results.length),
+                    results,
+                };
+                const text = `Search batch completed: ${results.length - failedCount}/${results.length} succeeded; outputs are in structuredContent.results.`;
+                return withResultSizeHint(okResult(structured, text), {
+                    bytes: estimateStructuredTextResultBytes(structured, text),
+                    strategy: 'conservative-estimate',
+                    source: 'repo_search_text.batch',
                 });
             }
-            const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
-            if (!resolved.ok) return errorResult(resolved.reason, resolved);
-            const result = await searchText(resolved.resolved, {
-                workspaceRoot: WORKSPACE_ROOT,
-                pattern: effectivePattern,
-                isRegex: isRegex === true,
-                caseSensitive: caseSensitive === true,
+            return runRepoSearchTextCall({
+                pattern,
+                query,
+                path,
+                isRegex,
+                caseSensitive,
                 includePattern,
                 excludePattern,
+                contextLines,
                 maxResults,
-                contextLines: contextLines ?? 0,
                 cursor,
-            });
-            const structured = {
-                success: true,
-                path: resolved.relative,
-                pattern: effectivePattern,
-                query: query ?? null,
-                contextLines: contextLines ?? 0,
-                cursor: cursor ?? null,
-                output: result.output,
-                matchCount: result.matchCount,
-                returnedMatchCount: result.returnedMatchCount ?? result.matchCount,
-                returnedLineCount: result.returnedLineCount ?? (result.output ? result.output.split('\n').length : 0),
-                totalMatches: result.totalMatches ?? result.matchCount,
-                totalMatchCount: result.totalMatchCount ?? result.totalMatches ?? result.matchCount,
-                totalLineCount: result.totalLineCount ?? null,
-                countsPostSanitization: result.countsPostSanitization,
-                truncated: result.truncated,
-                nextCursor: result.nextCursor ?? null,
-                cursorOffset: result.cursorOffset ?? 0,
-                engine: result.engine,
-            };
-            return withResultSizeHint(okResult(structured, result.output), {
-                bytes: estimateStructuredTextResultBytes(structured, result.output),
-                strategy: 'conservative-estimate',
-                source: 'repo_search_text',
             });
         },
     },
