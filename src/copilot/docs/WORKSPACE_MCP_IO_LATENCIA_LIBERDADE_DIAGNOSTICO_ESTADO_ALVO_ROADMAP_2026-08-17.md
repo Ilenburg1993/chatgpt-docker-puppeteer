@@ -1736,3 +1736,71 @@ A igualdade `issued == accepted` mostra que o novo opt-in não apenas reduz emis
 
 `CAPABILITIES_VERSION` permanece em **49**. O lote não adiciona tool, schema, annotation, permissão nem contrato MCP externo; apenas torna mais estrita e eficiente a passagem interna de autoridade já validada.
 
+### 22.21 Sublote — `mcp_runtime_health` como decision surface compacta
+
+Depois da publicação do 22.20, o dashboard detalhado mostrou que já não havia um gargalo interativo normal relevante em repo I/O: reads estavam na ordem de poucos milissegundos, Git status em dezenas de milissegundos e index search em ~100 ms. Validators, push e connector smoke continuavam dominados por trabalho real ou rede externa.
+
+O maior desperdício remanescente era de **contexto retornado**: `mcp_runtime_health` havia respondido por ~63,9% de todo o volume da faixa observada. Foram **10 chamadas, 140.383 bytes totais, média 14.038 bytes e último resultado 14.703 bytes**. A frequência foi inflada pelas provas de capability desta rodada, mas revelou uma regressão conceitual: uma tool cujo default deveria responder “está saudável, qual é o principal problema e o que merece ação?” ainda carregava um mini-dashboard de diagnóstico completo.
+
+A mudança preserva integralmente `includeDetails=true` e comprime apenas o default:
+
+- `slowestTools[5]` e `slowestPhases[6]` viraram `slowestTool` e `slowestPhase` — um culpado principal por dimensão;
+- `phaseTotals` default mantém somente `handler`, `authorization` e `resultSize` quando presentes;
+- TTL caches mantêm contagens/totais, sem lista de entries ativas;
+- auth caches mantêm hits/misses/size/disabled, sem counters administrativos de baixa utilidade na decisão imediata;
+- repo-read cache mantém hits/misses/stale/singleflight/chunk hits/misses/size/bytes;
+- I/O cache mantém L1, erros/gaps de coherence, counters de read/mutable capabilities e aggregate hit ratio, removendo timings e configuração detalhada do cross-process path;
+- benchmark L2 deixa o default e fica representado somente pela decisão `l2Decision` + `recommendationCount`;
+- parser mantém tamanho de file-context, queue pressure e failures/timeouts/fallbacks;
+- artifacts mantêm apenas pressão de cleanup e estado/sidecars de rollback;
+- o ramo detalhado continua retornando snapshots brutos de metrics/tools, index, TTL/auth caches, repo-read cache, I/O cache, parser, benchmark, artifacts e tunnel fallback.
+
+O objetivo é separar dois produtos distintos dentro da mesma tool:
+
+1. **default = decision surface** — barato o suficiente para uso recorrente;
+2. **`includeDetails=true` = forensics** — volumoso por intenção explícita, usado somente quando o resumo aponta algo a investigar.
+
+#### Contrato e gates
+
+O teste `test_mcp_runtime_metrics.spec.js` passou a exigir:
+
+- presença de `slowestTool` e `slowestPhase` singulares;
+- ausência das tabelas `slowestTools`, `slowestPhases` e `ioCacheBenchmark` no default;
+- preservation de `validatedMutablePath`, L1/coherence, decisão L2, parser failures e cleanup/rollback signals;
+- **structured payload default <6 KiB**, contra o budget anterior de <12 KiB;
+- `includeDetails=true` continua expondo `metrics.tools` e `metrics.ioCache` completos.
+
+Gates:
+
+- runtime metrics focused test: **passed em 3,379 s**;
+- strict typecheck: **passed em 17,132 s**.
+
+A variação maior do typecheck nesta execução foi tratada como custo de compilação/cache, não como evidência de regressão do handler runtime.
+
+#### Ativação e medição live
+
+Reload controlado em QUIC e gate pós-restart:
+
+- `mcp_connector_smoke_refresh`: `ready=true`;
+- OAuth/SSE green;
+- tools local/remoto **119/119**;
+- authenticated `tools/list`: **117.956 bytes**, sem crescimento de superfície;
+- connector smoke: **1.092 ms total**, authenticated OAuth **1.084 ms**, SSE **164 ms**.
+
+No processo novo, duas chamadas consecutivas do default preservaram todos os sinais operacionais e counters de capability. O dashboard posterior mediu:
+
+- `mcp_runtime_health` **8.579 bytes médios**;
+- último resultado: **8.924 bytes**;
+- volume: **25.738 bytes em 3 chamadas**;
+- handler médio: **111 ms**.
+
+Comparando a faixa anterior:
+
+- média de payload: **14.038 → 8.579 bytes (−38,9%)**;
+- último payload observado: **14.703 → 8.924 bytes (−39,3%)**;
+- handler médio observado: ~**181 → 111 ms (−38,7%)**, embora essa comparação de tempo não seja A/B perfeita porque o processo/cold state diferem.
+
+A chamada live `includeDetails=true` confirmou que a informação removida do default continua integralmente disponível sob demanda: auto-build/index completos, per-tool/per-phase metrics, TTL/auth caches, repo-read cache rico, I/O cache integral, parser completo, benchmark/plan L2, artifacts/cleanup e tunnel fallback. O resultado detalhado ficou na ordem de **56 KiB**, custo alto mas agora explicitamente opt-in e coerente com sua função de forensics.
+
+`CAPABILITIES_VERSION` permanece em **49**: não houve mudança de input schema, tool registry, annotation ou permissão; houve apenas separação mais rigorosa entre resposta operacional default e detalhe diagnóstico já existente.
+

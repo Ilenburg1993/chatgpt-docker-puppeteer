@@ -138,26 +138,28 @@ describe('copilot MCP runtime metrics', () => {
         const metrics = /** @type {{
             totals: { calls: number };
             phaseTotals: Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>;
-            slowestPhases: Array<{ tool: string; phase: string; calls: number; averageMs: number | null }>;
+            slowestTool: { name: string; calls: number; averageMs: number | null } | null;
+            slowestPhase: { tool: string; phase: string; calls: number; averageMs: number | null } | null;
             ioCache?: {
                 l1?: Record<string, unknown>;
-                coherence?: { crossProcess?: Record<string, unknown> };
+                coherence?: Record<string, unknown>;
                 validatedReadPath?: Record<string, unknown>;
                 validatedMutablePath?: Record<string, unknown>;
             };
-            ioCacheBenchmark?: Record<string, unknown> | null;
-            ioCachePlan?: { l2Decision?: string; evidence?: Record<string, unknown> };
-            ioParser?: { fileContext?: Record<string, unknown> };
+            ioCachePlan?: { l2Decision?: string; recommendationCount?: number };
+            ioParser?: { fileContextSize?: number; workerFailures?: number };
             aiArtifacts?: { jobs?: Record<string, unknown>; rollback?: Record<string, unknown> };
         }} */ (result.structuredContent.metrics);
         assert.equal(metrics.totals.calls, 2);
         assert.equal(typeof metrics.ioCache?.l1?.['size'], 'number');
-        assert.equal(typeof metrics.ioCache?.coherence?.crossProcess?.['pollMs'], 'number');
+        assert.equal(typeof metrics.ioCache?.coherence?.['gapDetections'], 'number');
         assert.equal(typeof metrics.ioCache?.validatedMutablePath?.['accepted'], 'number');
         assert.ok(metrics.ioCachePlan);
         assert.equal(typeof metrics.ioCachePlan?.l2Decision, 'string');
-        assert.equal(typeof metrics.ioParser?.fileContext?.['size'], 'number');
-        assert.equal(typeof metrics.aiArtifacts?.jobs?.['artifactCount'], 'number');
+        assert.equal(typeof metrics.ioCachePlan?.recommendationCount, 'number');
+        assert.equal(typeof metrics.ioParser?.fileContextSize, 'number');
+        assert.equal(typeof metrics.ioParser?.workerFailures, 'number');
+        assert.equal(typeof metrics.aiArtifacts?.jobs?.['cleanupCandidateCount'], 'number');
         assert.equal(typeof metrics.aiArtifacts?.rollback?.['enabled'], 'boolean');
         assert.deepEqual(Object.keys(metrics.phaseTotals), ['handler', 'authorization']);
         assert.deepEqual(metrics.phaseTotals['handler'], {
@@ -170,14 +172,18 @@ describe('copilot MCP runtime metrics', () => {
             totalDurationMs: 3,
             averageMs: 2,
         });
-        assert.deepEqual(metrics.slowestPhases[0], {
+        assert.deepEqual(metrics.slowestPhase, {
             tool: 'repo_status',
             phase: 'handler',
             calls: 1,
             averageMs: 8,
             lastMs: 8,
         });
-        assert.ok(Buffer.byteLength(JSON.stringify(result.structuredContent)) < 12 * 1024);
+        assert.equal(metrics.slowestTool?.name, 'repo_status');
+        assert.equal(result.structuredContent.metrics?.['slowestTools'], undefined);
+        assert.equal(result.structuredContent.metrics?.['slowestPhases'], undefined);
+        assert.equal(result.structuredContent.metrics?.['ioCacheBenchmark'], undefined);
+        assert.ok(Buffer.byteLength(JSON.stringify(result.structuredContent)) < 6 * 1024);
 
         const detailed = await mcpRuntimeHealthTool.handler({ includeDetails: true });
         assert.equal(detailed.isError, undefined);

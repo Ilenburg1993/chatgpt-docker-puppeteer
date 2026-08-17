@@ -278,26 +278,18 @@ function summarizeIoCacheBenchmark(state) {
 /** @param {ReturnType<typeof getTtlCacheStats>} caches */
 function summarizeTtlCaches(caches) {
     const rows = caches.map((cache) => ({
-        name: cache.name,
         size: cache.size,
         hits: cache.hits,
         misses: cache.misses,
-        inFlight: cache.inFlight,
     }));
-    const active = rows
-        .filter((row) => Number(row.size ?? 0) > 0 || Number(row.hits ?? 0) > 0 || Number(row.misses ?? 0) > 0)
-        .sort(
-            (left, right) =>
-                Number(right.hits ?? 0) + Number(right.misses ?? 0) -
-                (Number(left.hits ?? 0) + Number(left.misses ?? 0)),
-        );
     return {
         count: rows.length,
-        activeCount: active.length,
+        activeCount: rows.filter(
+            (row) => Number(row.size ?? 0) > 0 || Number(row.hits ?? 0) > 0 || Number(row.misses ?? 0) > 0,
+        ).length,
         totalSize: rows.reduce((sum, row) => sum + Number(row.size ?? 0), 0),
         totalHits: rows.reduce((sum, row) => sum + Number(row.hits ?? 0), 0),
         totalMisses: rows.reduce((sum, row) => sum + Number(row.misses ?? 0), 0),
-        active: active.slice(0, 3),
     };
 }
 
@@ -307,8 +299,6 @@ function summarizeAuthorizationCache(stats) {
         hits: stats['hits'] ?? 0,
         misses: stats['misses'] ?? 0,
         size: stats['size'] ?? 0,
-        evictions: stats['evictions'] ?? 0,
-        clears: stats['clears'] ?? 0,
         disabled: stats['disabled'] ?? false,
     };
 }
@@ -322,52 +312,28 @@ function summarizeRepoReadCache(stats) {
         singleflightJoins: stats['singleflightJoins'],
         chunkHits: stats['chunkHits'],
         chunkMisses: stats['chunkMisses'],
-        chunkStale: stats['chunkStale'],
-        chunkSingleflightJoins: stats['chunkSingleflightJoins'],
-        busInvalidations: stats['busInvalidations'],
-        recursiveInvalidations: stats['recursiveInvalidations'],
         size: stats['size'],
-        chunkSize: stats['chunkSize'],
         bytes: stats['bytes'],
-        chunkBytes: stats['chunkBytes'],
     };
 }
 
 /** @param {ReturnType<typeof readIoRuntimeHealthSnapshot>['cache']} cache */
 function summarizeIoCache(cache) {
     const l1 = recordOrEmpty(cache['l1']);
-    const l2 = recordOrEmpty(cache['l2']);
     const coherence = recordOrEmpty(cache['coherence']);
     const crossProcess = recordOrEmpty(coherence['crossProcess']);
     const aggregate = recordOrEmpty(cache['aggregate']);
     return {
         l1: {
-            enabled: l1['enabled'] ?? null,
             hits: l1['hits'] ?? 0,
             misses: l1['misses'] ?? 0,
             size: l1['size'] ?? 0,
             bytesStored: l1['bytesStored'] ?? 0,
-            ttlMs: l1['ttlMs'] ?? null,
-        },
-        l2: {
-            enabled: l2['enabled'] ?? false,
-            profile: l2['profile'] ?? null,
-            reason: l2['reason'] ?? null,
         },
         coherence: {
-            hooks: coherence['hooks'] ?? 0,
-            pending: coherence['pending'] ?? 0,
-            crossProcess: {
-                enabled: crossProcess['enabled'] ?? false,
-                published: crossProcess['published'] ?? 0,
-                received: crossProcess['received'] ?? 0,
-                gapDetections: crossProcess['gapDetections'] ?? 0,
-                writeErrors: crossProcess['writeErrors'] ?? 0,
-                readErrors: crossProcess['readErrors'] ?? 0,
-                averagePublishDurationMs: crossProcess['averagePublishDurationMs'] ?? null,
-                averagePollDurationMs: crossProcess['averagePollDurationMs'] ?? null,
-                pollMs: crossProcess['pollMs'] ?? null,
-            },
+            gapDetections: crossProcess['gapDetections'] ?? 0,
+            writeErrors: crossProcess['writeErrors'] ?? 0,
+            readErrors: crossProcess['readErrors'] ?? 0,
         },
         validatedReadPath: cache['validatedReadPath'] ?? null,
         validatedMutablePath: cache['validatedMutablePath'] ?? null,
@@ -383,17 +349,9 @@ function summarizeIoCache(cache) {
 function summarizeIoParser(parser) {
     const fileContext = recordOrEmpty(parser['fileContext']);
     return {
-        size: parser['size'] ?? 0,
-        fileContext: {
-            size: fileContext['size'] ?? 0,
-            hits: fileContext['hits'] ?? 0,
-            misses: fileContext['misses'] ?? 0,
-        },
-        workerEnabled: parser['workerEnabled'] ?? false,
-        workerPoolSize: parser['workerPoolSize'] ?? 0,
+        fileContextSize: fileContext['size'] ?? 0,
         workerQueueLength: parser['workerQueueLength'] ?? 0,
         workerQueueHighWater: parser['workerQueueHighWater'] ?? 0,
-        lastParseDurationMs: parser['lastParseDurationMs'] ?? null,
         workerFailures: parser['workerFailures'] ?? 0,
         workerTimeouts: parser['workerTimeouts'] ?? 0,
         workerFallbacks: parser['workerFallbacks'] ?? 0,
@@ -406,16 +364,12 @@ function summarizeAiArtifacts(artifacts) {
     const rollback = recordOrEmpty(artifacts['rollback']);
     return {
         jobs: {
-            artifactCount: jobs['artifactCount'] ?? 0,
-            artifactBytes: jobs['artifactBytes'] ?? 0,
             cleanupCandidateCount: jobs['cleanupCandidateCount'] ?? 0,
             cleanupCandidateBytes: jobs['cleanupCandidateBytes'] ?? 0,
         },
         rollback: {
             enabled: rollback['enabled'] ?? false,
             sidecarCount: rollback['sidecarCount'] ?? 0,
-            sidecarBytes: rollback['sidecarBytes'] ?? 0,
-            ignoredEntryCount: rollback['ignoredEntryCount'] ?? 0,
         },
     };
 }
@@ -560,18 +514,20 @@ export const mcpRuntimeHealthTool = {
                     startedAt: metrics.startedAt,
                     uptimeMs: metrics.uptimeMs,
                     totals: metrics.totals,
-                    slowestTools: summarizeSlowestTools(metrics.tools),
-                    slowestPhases: summarizeSlowestPhases(metrics.tools),
-                    phaseTotals: summarizePhaseTotals(metrics.tools),
+                    slowestTool: summarizeSlowestTools(metrics.tools)[0] ?? null,
+                    slowestPhase: summarizeSlowestPhases(metrics.tools)[0] ?? null,
+                    phaseTotals: Object.fromEntries(
+                        Object.entries(summarizePhaseTotals(metrics.tools)).filter(([phase]) =>
+                            ['handler', 'authorization', 'resultSize'].includes(phase),
+                        ),
+                    ),
                     ttlCaches: summarizeTtlCaches(ttlCaches),
                     authorizationConfigCache: summarizeAuthorizationCache(recordOrEmpty(authConfigCache)),
                     authorizationCache: summarizeAuthorizationCache(recordOrEmpty(authDecisionCache)),
                     repoReadFileCache: summarizeRepoReadCache(repoReadFileCache),
                     ioCache: summarizeIoCache(ioRuntime.cache),
-                    ioCacheBenchmark,
                     ioCachePlan: {
                         l2Decision: ioCachePlanWithBenchmark.l2Decision,
-                        evidence: ioCachePlanWithBenchmark.evidence,
                         recommendationCount: Array.isArray(ioCachePlanWithBenchmark.recommendations)
                             ? ioCachePlanWithBenchmark.recommendations.length
                             : 0,
