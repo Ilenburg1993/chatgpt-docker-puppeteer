@@ -11,6 +11,7 @@ import { describe, it } from 'vitest';
 
 import {
     cancelJob,
+    getResultExecutionHint,
     normalizeFocusedUnitTestFiles,
     pruneCompletedJobRecords,
     readJobOutput,
@@ -302,6 +303,44 @@ describe('copilot MCP jobs', () => {
         assert.equal(job['status'], 'completed');
         assert.equal(job['passed'], true);
         assert.match(String(result.structuredContent?.['nextAction'] ?? ''), /No job_get_summary/u);
+    }, 45_000);
+
+    it('run_copilot_validator batches focused gates and isolates one invalid item', async () => {
+        const tool = jobTools.find((candidate) => candidate.name === 'run_copilot_validator');
+        assert.ok(tool);
+        const result = await tool.handler({
+            batch: [
+                {
+                    validator: 'unit-focused',
+                    testFile: 'tests/unit/copilot/infra/does-not-exist-validator-batch.spec.js',
+                },
+                {
+                    validator: 'unit-focused',
+                    testFile: 'tests/unit/copilot/infra/test_bulk_executor.spec.js',
+                },
+            ],
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], false);
+        assert.equal(result.structuredContent?.['batch'], true);
+        assert.equal(result.structuredContent?.['requestCount'], 2);
+        assert.equal(result.structuredContent?.['succeededCount'], 1);
+        assert.equal(result.structuredContent?.['failedCount'], 1);
+        assert.equal(result.structuredContent?.['skippedCount'], 0);
+        assert.equal(result.structuredContent?.['concurrency'], 1);
+        assert.deepEqual(getResultExecutionHint(result), {
+            logicalOperations: 2,
+            failedOperations: 1,
+            skippedOperations: 0,
+            mode: 'validator-batch:best-effort:c1',
+        });
+        const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['results']);
+        assert.equal(rows[0]?.['success'], false);
+        assert.equal(rows[0]?.['code'], 'ERR_INVALID_FOCUSED_TEST_FILE');
+        assert.equal(rows[1]?.['success'], true);
+        const validJob = /** @type {Record<string, unknown>} */ (rows[1]?.['job']);
+        assert.equal(validJob['passed'], true);
     }, 45_000);
 
     it('job_list returns a structured job array', async () => {

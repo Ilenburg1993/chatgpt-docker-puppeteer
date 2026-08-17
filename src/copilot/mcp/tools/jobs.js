@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { runBoundedOperationBatch } from '#copilot/infra';
 import {
     boundedWriteAnnotations,
     cancelJob,
@@ -16,6 +17,7 @@ import {
     readOnlyAnnotations,
     spawnValidatorJob,
     waitForJobCompletion,
+    withResultExecutionHint,
 } from '#copilot/mcp/control-plane';
 import { projectDoctorTool } from './project-doctor.js';
 
@@ -34,6 +36,19 @@ const focusedTestFileSchema = z
     .min(1)
     .max(1024)
     .describe('Explicit tests/unit/copilot/**/*.spec.js path for unit-focused.');
+const validatorTimeoutMsSchema = z.number().int().min(1000).max(3600000);
+const validatorWaitMsSchema = z.number().int().min(0).max(120000);
+const validatorFailureTailBytesSchema = z.number().int().min(1000).max(12000);
+const validatorRequestSchema = z.object({
+    validator: validatorSchema,
+    testFile: focusedTestFileSchema.optional(),
+    timeoutMs: validatorTimeoutMsSchema.optional(),
+    waitForCompletion: z.boolean().optional(),
+    waitMs: validatorWaitMsSchema.optional(),
+    failureTailBytes: validatorFailureTailBytesSchema.optional(),
+});
+const MAX_VALIDATOR_BATCH_REQUESTS = 8;
+const MAX_VALIDATOR_BATCH_CONCURRENCY = 2;
 const safeValidationSuiteSchema = z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']);
 const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
 const DEFAULT_INLINE_WAIT_VALIDATORS = new Set(['typecheck', 'lint', 'unit-focused']);
@@ -146,6 +161,131 @@ const SAFE_VALIDATION_SUITE_TO_VALIDATOR = {
 };
 
 /**
+ * Execute one validator request through the canonical job manager. Single-call and batch modes share this exact path.
+ *
+ * @param {{
+ *   validator: import('../control-plane/jobs.js').CopilotValidatorName;
+ *   testFile?: string;
+ *   timeoutMs?: number;
+ *   waitForCompletion?: boolean;
+ *   waitMs?: number;
+ *   failureTailBytes?: number;
+ * }} request
+ * @returns {Promise<import('../control-plane/result.js').StructuredCallToolResult>}
+ */
+async function executeValidatorRequest(request) {
+    const { validator, testFile, timeoutMs, waitForCompletion, waitMs, failureTailBytes } = request;
+    const focused = validator === 'unit-focused';
+    if (focused && !testFile) {
+        return errorResult('unit-focused requires testFile.', {
+            code: 'ERR_FOCUSED_TEST_FILE_REQUIRED',
+            hint: 'Pass one explicit tests/unit/copilot/**/*.spec.js path.',
+        });
+    }
+    if (!focused && testFile) {
+        return errorResult('testFile is valid only with unit-focused.', {
+            code: 'ERR_UNEXPECTED_FOCUSED_TEST_FILE',
+            hint: 'Remove testFile or choose unit-focused.',
+        });
+    }
+    try {
+        const job = await spawnValidatorJob(validator, {
+            ...(timeoutMs === undefined ? {} : { timeoutMs }),
+            ...(focused ? { testFiles: [/** @type {string} */ (testFile)] } : {}),
+        });
+        const shouldWait =
+            waitForCompletion !== false &&
+            (waitForCompletion === true || waitMs !== undefined || DEFAULT_INLINE_WAIT_VALIDATORS.has(validator));
+        if (!shouldWait) {
+            return okResult(
+                { success: true, ...(focused ? { testFile } : {}), job },
+                `Started job ${job.id} (${validator}).`,
+            );
+        }
+        const effectiveWaitMs = waitMs ?? 30_000;
+        const waitedJob = await waitForJobCompletion(job.id, effectiveWaitMs);
+        if (!waitedJob) {
+            return errorResult('Validator job disappeared while waiting for completion.', {
+                code: 'ERR_VALIDATOR_JOB_WAIT_LOST',
+                jobId: job.id,
+            });
+        }
+        const summary = summarizeJob(waitedJob);
+        const completedWithinWait = waitedJob.status !== 'running';
+        const failed = waitedJob.status === 'failed';
+        const failureOutput = failed ? await readJobOutput(job.id, failureTailBytes ?? 4000) : { output: '' };
+        return okResult(
+            {
+                success: waitedJob.status === 'completed',
+                ...(focused ? { testFile } : {}),
+                completedWithinWait,
+                waitMs: effectiveWaitMs,
+                job: summary,
+                ...(failed && failureOutput.output ? { failureOutputTail: failureOutput.output } : {}),
+                nextAction: completedWithinWait
+                    ? failed
+                        ? 'Fix the reported validation failure; the bounded failure tail is already included.'
+                        : 'No job_get_summary call is needed; validation completed in this response.'
+                    : 'The bounded wait expired while the job kept running; use job_get_summary only if needed.',
+            },
+            completedWithinWait
+                ? `Validator ${validator} finished during the bounded wait.`
+                : `Validator ${validator} is still running after ${effectiveWaitMs}ms; job ${job.id}.`,
+        );
+    } catch (error) {
+        return errorResult('Validator job was rejected.', {
+            code: focused ? 'ERR_INVALID_FOCUSED_TEST_FILE' : 'ERR_VALIDATOR_JOB_REJECTED',
+            error: error instanceof Error ? error.message : String(error),
+        });
+    }
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof runBoundedOperationBatch<Record<string, unknown>, import('../control-plane/result.js').StructuredCallToolResult>>>} execution
+ * @param {Record<string, unknown>[]} requests
+ */
+function compactValidatorBatchResults(execution, requests) {
+    return execution.results.map((row) => {
+        const request = requests[row.index] ?? {};
+        const base = {
+            index: row.index,
+            validator: request['validator'] ?? null,
+            ...(typeof request['testFile'] === 'string' ? { testFile: request['testFile'] } : {}),
+            status: row.status,
+            durationMs: row.durationMs,
+        };
+        if (row.status === 'skipped') {
+            return { ...base, success: false, skipped: true, code: 'ERR_VALIDATOR_BATCH_SKIPPED', reason: row.reason };
+        }
+        if ('value' in row && row.value) {
+            const structured = row.value.structuredContent ?? {};
+            return {
+                ...base,
+                success: structured['success'] === true,
+                ...(structured['completedWithinWait'] === undefined
+                    ? {}
+                    : { completedWithinWait: structured['completedWithinWait'] }),
+                ...(structured['waitMs'] === undefined ? {} : { waitMs: structured['waitMs'] }),
+                ...(structured['job'] === undefined ? {} : { job: structured['job'] }),
+                ...(structured['failureOutputTail'] === undefined
+                    ? {}
+                    : { failureOutputTail: structured['failureOutputTail'] }),
+                ...(structured['nextAction'] === undefined ? {} : { nextAction: structured['nextAction'] }),
+                ...(structured['code'] === undefined ? {} : { code: structured['code'] }),
+                ...(structured['error'] === undefined ? {} : { error: structured['error'] }),
+                ...(structured['details'] === undefined ? {} : { details: structured['details'] }),
+            };
+        }
+        return {
+            ...base,
+            success: false,
+            code: row.status === 'failed' ? row.code ?? 'ERR_VALIDATOR_BATCH_EXECUTION' : 'ERR_VALIDATOR_BATCH_EXECUTION',
+            error: row.status === 'failed' ? row.error ?? 'Validator batch item failed.' : 'Validator batch item failed.',
+        };
+    });
+}
+
+/**
  * @param {import('../control-plane/jobs.js').CopilotValidatorName} validator
  * @param {string} name
  * @param {string} title
@@ -225,97 +365,156 @@ export const jobTools = [
     {
         name: 'run_copilot_validator',
         title: 'Run Copilot validator',
-        description: 'Run an allowlisted validator; unit-focused runs one test file.',
+        description:
+            'Run one allowlisted validator or batch up to 8 validator requests in one call. Batch defaults sequential to avoid CPU/memory contention.',
         inputSchema: {
-            validator: validatorSchema.describe('Validator; prefer unit-focused.'),
+            validator: validatorSchema.optional().describe('Single validator; required outside batch mode. Prefer unit-focused.'),
             testFile: focusedTestFileSchema.optional(),
-            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional validator timeout in ms.'),
+            timeoutMs: validatorTimeoutMsSchema.optional().describe('Optional validator timeout in ms.'),
             waitForCompletion: z
                 .boolean()
                 .optional()
                 .describe('Wait in this same call. Defaults true for typecheck/lint/unit-focused and false for broad suites.'),
-            waitMs: z
-                .number()
-                .int()
-                .min(0)
-                .max(120000)
+            waitMs: validatorWaitMsSchema
                 .optional()
                 .describe('Bounded completion wait. Default 30000ms when waitForCompletion=true.'),
-            failureTailBytes: z
-                .number()
-                .int()
-                .min(1000)
-                .max(12000)
+            failureTailBytes: validatorFailureTailBytesSchema
                 .optional()
                 .describe('Short log tail returned in the same call only when a waited validator fails. Default 4000.'),
+            batch: z
+                .array(validatorRequestSchema)
+                .min(1)
+                .max(MAX_VALIDATOR_BATCH_REQUESTS)
+                .optional()
+                .describe('Batch up to 8 validator requests; do not mix with single-validator fields.'),
+            batchFailureMode: z
+                .enum(['best-effort', 'fail-fast'])
+                .optional()
+                .describe('Batch failure policy. Default: best-effort.'),
+            batchConcurrency: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_VALIDATOR_BATCH_CONCURRENCY)
+                .optional()
+                .describe('Validators in flight. Default: 1 to avoid CPU thrashing; maximum: 2.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ validator, testFile, timeoutMs, waitForCompletion, waitMs, failureTailBytes }) => {
-            const focused = validator === 'unit-focused';
-            if (focused && !testFile) {
-                return errorResult('unit-focused requires testFile.', {
-                    code: 'ERR_FOCUSED_TEST_FILE_REQUIRED',
-                    hint: 'Pass one explicit tests/unit/copilot/**/*.spec.js path.',
-                });
-            }
-            if (!focused && testFile) {
-                return errorResult('testFile is valid only with unit-focused.', {
-                    code: 'ERR_UNEXPECTED_FOCUSED_TEST_FILE',
-                    hint: 'Remove testFile or choose unit-focused.',
-                });
-            }
-            try {
-                const job = await spawnValidatorJob(validator, {
-                    ...(timeoutMs === undefined ? {} : { timeoutMs }),
-                    ...(focused ? { testFiles: [testFile] } : {}),
-                });
-                const shouldWait =
-                    waitForCompletion !== false &&
-                    (waitForCompletion === true || waitMs !== undefined || DEFAULT_INLINE_WAIT_VALIDATORS.has(validator));
-                if (!shouldWait) {
-                    return okResult(
-                        { success: true, ...(focused ? { testFile } : {}), job },
-                        `Started job ${job.id} (${validator}).`,
-                    );
-                }
-                const effectiveWaitMs = waitMs ?? 30_000;
-                const waitedJob = await waitForJobCompletion(job.id, effectiveWaitMs);
-                if (!waitedJob) {
-                    return errorResult('Validator job disappeared while waiting for completion.', {
-                        code: 'ERR_VALIDATOR_JOB_WAIT_LOST',
-                        jobId: job.id,
+        handler: async ({
+            validator,
+            testFile,
+            timeoutMs,
+            waitForCompletion,
+            waitMs,
+            failureTailBytes,
+            batch,
+            batchFailureMode,
+            batchConcurrency,
+        }) => {
+            if (batch !== undefined) {
+                if (
+                    validator !== undefined ||
+                    testFile !== undefined ||
+                    timeoutMs !== undefined ||
+                    waitForCompletion !== undefined ||
+                    waitMs !== undefined ||
+                    failureTailBytes !== undefined
+                ) {
+                    return errorResult('Do not mix validator batch and single-validator fields.', {
+                        code: 'ERR_VALIDATOR_BATCH_CONFLICTING_MODE',
                     });
                 }
-                const summary = summarizeJob(waitedJob);
-                const completedWithinWait = waitedJob.status !== 'running';
-                const failed = waitedJob.status === 'failed';
-                const failureOutput = failed
-                    ? await readJobOutput(job.id, failureTailBytes ?? 4000)
-                    : { output: '' };
-                return okResult(
-                    {
-                        success: waitedJob.status === 'completed',
-                        ...(focused ? { testFile } : {}),
-                        completedWithinWait,
-                        waitMs: effectiveWaitMs,
-                        job: summary,
-                        ...(failed && failureOutput.output ? { failureOutputTail: failureOutput.output } : {}),
-                        nextAction: completedWithinWait
-                            ? failed
-                                ? 'Fix the reported validation failure; the bounded failure tail is already included.'
-                                : 'No job_get_summary call is needed; validation completed in this response.'
-                            : 'The bounded wait expired while the job kept running; use job_get_summary only if needed.',
-                    },
-                    completedWithinWait
-                        ? `Validator ${validator} finished during the bounded wait.`
-                        : `Validator ${validator} is still running after ${effectiveWaitMs}ms; job ${job.id}.`,
-                );
-            } catch (error) {
-                return errorResult('Validator job was rejected.', {
-                    code: focused ? 'ERR_INVALID_FOCUSED_TEST_FILE' : 'ERR_VALIDATOR_JOB_REJECTED',
-                    error: error instanceof Error ? error.message : String(error),
+                try {
+                    const requests = /** @type {Record<string, unknown>[]} */ (batch);
+                    const execution = await runBoundedOperationBatch(
+                        requests,
+                        async (raw, index) => {
+                            const parsed = validatorRequestSchema.safeParse(raw);
+                            if (!parsed.success) {
+                                return errorResult(`Invalid validator batch item at index ${index}.`, {
+                                    code: 'ERR_VALIDATOR_BATCH_INVALID_ITEM',
+                                    index,
+                                });
+                            }
+                            return executeValidatorRequest(
+                                /** @type {Parameters<typeof executeValidatorRequest>[0]} */ (parsed.data),
+                            );
+                        },
+                        {
+                            concurrency: batchConcurrency ?? 1,
+                            failureMode: batchFailureMode ?? 'best-effort',
+                            maxItems: MAX_VALIDATOR_BATCH_REQUESTS,
+                            maxInputBytes: 64 * 1024,
+                            estimateItemBytes: (item) => Buffer.byteLength(JSON.stringify(item), 'utf8') + 64,
+                            isFailure: (result) =>
+                                result.isError === true || result.structuredContent?.['success'] === false,
+                        },
+                    );
+                    const results = compactValidatorBatchResults(execution, requests);
+                    const structured = {
+                        success: execution.failedCount === 0 && execution.skippedCount === 0,
+                        batch: true,
+                        executionId: execution.executionId,
+                        failureMode: execution.failureMode,
+                        requestCount: execution.requestCount,
+                        attemptedCount: execution.attemptedCount,
+                        succeededCount: execution.succeededCount,
+                        failedCount: execution.failedCount,
+                        skippedCount: execution.skippedCount,
+                        concurrency: execution.concurrency,
+                        maxInFlight: execution.maxInFlight,
+                        durationMs: execution.durationMs,
+                        results,
+                        nextAction:
+                            execution.failedCount > 0
+                                ? 'Fix only failed validator items using their included job summary/tail; successful results remain valid.'
+                                : execution.skippedCount > 0
+                                  ? 'Retry only skipped validator items if they are still required.'
+                                  : 'All requested validators completed or started as requested; no status polling is needed for completed items.',
+                    };
+                    const result = okResult(
+                        structured,
+                        `Validator batch: ${execution.succeededCount}/${execution.requestCount} succeeded, ${execution.failedCount} failed, ${execution.skippedCount} skipped.`,
+                    );
+                    return withResultExecutionHint(result, {
+                        logicalOperations: execution.requestCount,
+                        failedOperations: execution.failedCount,
+                        skippedOperations: execution.skippedCount,
+                        mode: `validator-batch:${execution.failureMode}:c${execution.concurrency}`,
+                    });
+                } catch (error) {
+                    return errorResult('Validator batch was rejected.', {
+                        code:
+                            error && typeof error === 'object' && 'code' in error
+                                ? /** @type {{ code?: unknown }} */ (error).code
+                                : 'ERR_VALIDATOR_BATCH_REJECTED',
+                        error: error instanceof Error ? error.message : String(error),
+                    });
+                }
+            }
+
+            if (batchFailureMode !== undefined || batchConcurrency !== undefined) {
+                return errorResult('batchFailureMode/batchConcurrency require batch mode.', {
+                    code: 'ERR_VALIDATOR_BATCH_OPTIONS_WITHOUT_BATCH',
                 });
             }
+            const parsed = validatorRequestSchema.safeParse({
+                validator,
+                testFile,
+                timeoutMs,
+                waitForCompletion,
+                waitMs,
+                failureTailBytes,
+            });
+            if (!parsed.success) {
+                return errorResult('Single validator request is invalid.', {
+                    code: 'ERR_VALIDATOR_REQUEST_INVALID',
+                    hint: 'Provide validator, and testFile only when validator=unit-focused.',
+                });
+            }
+            return executeValidatorRequest(
+                /** @type {Parameters<typeof executeValidatorRequest>[0]} */ (parsed.data),
+            );
         },
     },
     {

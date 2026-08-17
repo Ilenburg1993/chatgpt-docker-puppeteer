@@ -1419,3 +1419,48 @@ O host desta conversa continua mostrando schema antigo para algumas tools já ma
 
 Gate remoto pós-reload: connector smoke green, 119/119 tools em parity, authenticated `tools/list` **116.714 bytes** — apenas +622 bytes sobre os 116.092 anteriores e ainda ~14,3 KiB abaixo do envelope de 128 KiB — com OAuth e SSE initial/reconnect verdes.
 
+### 22.17 Sublote — validators massivos no mesmo `run_copilot_validator`
+
+Depois de eliminar polling por validator, o próximo round-trip residual era o número de chamadas para gates finais: focused test(s), typecheck e lint ainda exigiam uma chamada cada. A solução foi ampliar a tool existente, sem adicionar um novo nome ao registry.
+
+`run_copilot_validator` agora suporta dois modos mutuamente exclusivos:
+
+- single: contrato anterior preservado;
+- batch: até **8** requests `{validator,testFile?,timeoutMs?,waitForCompletion?,waitMs?,failureTailBytes?}` em uma única chamada.
+
+O batch reutiliza o `runBoundedOperationBatch` compartilhado e, crucialmente, todos os itens passam pela mesma função `executeValidatorRequest()` usada pelo modo single. Não existe uma segunda implementação de rules/job lifecycle. Permanecem idênticos: allowlist, validação de focused path, `spawnValidatorJob`, timeout, bounded inline wait, job summary e failure tail.
+
+Política de execução:
+
+- `best-effort` default, `fail-fast` opt-in;
+- `batchConcurrency=1` default para evitar que lint/typecheck/vitest concorrentes degradem wall time por CPU/memory thrashing;
+- hard max de concorrência **2**, útil para focused tests realmente independentes;
+- broad suites preservam seu comportamento async por default, a menos que cada item peça wait explicitamente;
+- input total limitado a 64 KiB;
+- cada item retorna status/duration/job/error/tail sem invalidar resultados úteis dos demais;
+- result execution hint contabiliza `logicalOperations`, failed/skipped e modo `validator-batch:*`.
+
+Prova focada:
+
+- batch de 2 requests em concurrency=1;
+- item 0: `unit-focused` apontando para spec inexistente → falha localizada `ERR_INVALID_FOCUSED_TEST_FILE`;
+- item 1: `tests/unit/copilot/infra/test_bulk_executor.spec.js` → executado mesmo após a falha anterior e passed;
+- top-level: `requestCount=2`, `succeededCount=1`, `failedCount=1`, `skippedCount=0`;
+- execution hint: **2 logical operations / 1 MCP call**, `failedOperations=1`, `mode=validator-batch:best-effort:c1`;
+- `tests/unit/copilot/mcp/test_mcp_jobs.spec.js`: passed após a integração; última execução **6,853 s**;
+- strict typecheck após o código principal: **8,608 s**, passed;
+- registry focused gate: **3,225 s**, passed.
+
+O primeiro reload desta faixa falhou (`exitCode=1`) sem derrubar o origin antigo. A investigação reproduziu o startup por `test_mcp_registry.spec.js` e encontrou a causa: uma vírgula ausente numa string de `IO_GUIDANCE` modificada **depois** do typecheck anterior. Após corrigir, registry + strict typecheck foram executados novamente e o segundo reload concluiu normalmente. Regra nova de processo: qualquer alteração posterior a metadata/registry-facing source invalida o gate de startup anterior e exige parse/registry gate antes de reload.
+
+Superfície remota pós-reload:
+
+- 119/119 tools, parity integral;
+- authenticated `tools/list`: **117.809 bytes**;
+- crescimento de ~1,1 KiB pelo schema batch, ainda com ~13,3 KiB de headroom sob 128 KiB;
+- OAuth/SSE green.
+
+O host desta conversa continua materializando a versão antiga do schema de `run_copilot_validator`; portanto o batch não pode ser invocado diretamente por esta sessão apesar de estar ativo no servidor e no `tools/list` remoto. Novas materializações devem receber o batch. Até lá, single mode continua operacional e os testes exercitam o handler canônico batch.
+
+`CAPABILITIES_VERSION` foi elevado para **48** e a guidance recomenda agrupar gates causais numa única chamada, mantendo concorrência baixa por default.
+
