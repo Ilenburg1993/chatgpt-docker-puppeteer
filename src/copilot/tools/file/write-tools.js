@@ -33,8 +33,29 @@ import {
 } from './write/index.js';
 import { dryRunPatchPlan, normalizePatchPlan } from './write/patch-plan.js';
 
-const { copyFileLocked, createOrReplaceFileAtomic, deleteFileLocked, moveFileLocked, writeFileAtomic } =
-    createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+const {
+    copyFileLocked,
+    createOrReplaceFileAtomic,
+    createOrReplaceFileAtomicValidated,
+    deleteFileLocked,
+    moveFileLocked,
+    writeFileAtomic,
+    writeFileAtomicValidated,
+} = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+
+/** @param {unknown} validatedWritePath @param {string} resolved @param {Parameters<typeof writeFileAtomic>[1]} content @param {Parameters<typeof writeFileAtomic>[2]} options */
+function writeValidatedOrString(validatedWritePath, resolved, content, options) {
+    return validatedWritePath
+        ? writeFileAtomicValidated(validatedWritePath, content, options)
+        : writeFileAtomic(resolved, content, options);
+}
+
+/** @param {unknown} validatedWritePath @param {string} resolved @param {Parameters<typeof createOrReplaceFileAtomic>[1]} content @param {Parameters<typeof createOrReplaceFileAtomic>[2]} options */
+function createValidatedOrString(validatedWritePath, resolved, content, options) {
+    return validatedWritePath
+        ? createOrReplaceFileAtomicValidated(validatedWritePath, content, options)
+        : createOrReplaceFileAtomic(resolved, content, options);
+}
 
 // ---------------------------------------------------------------------------
 // Tool: patch_bundle_plan (read-only)
@@ -98,7 +119,7 @@ const writeFileContentTool = buildTool({
             .describe('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, a escrita falha sem aplicar.'),
     }),
     handler: async ({ path: filePath, content, encoding, expectedHash }) => {
-        const { ok, reason, resolved } = await validatePath(filePath, { mode: 'write' });
+        const { ok, reason, resolved, validatedWritePath } = await validatePath(filePath, { mode: 'write', issueMutableCapability: true });
         if (!ok) {
             return pathFailureResult('write_file_content', reason ?? 'Caminho inválido.', {
                 path: filePath,
@@ -135,7 +156,7 @@ const writeFileContentTool = buildTool({
                     },
                 });
             }
-            const writeResult = await writeFileAtomic(resolved, buf, {
+            const writeResult = await writeValidatedOrString(validatedWritePath, resolved, buf, {
                 requireExists: true,
                 captureRollback: true,
                 ...(expectedHash ? { expectedHash } : {}),
@@ -236,7 +257,7 @@ const createFileTool = buildTool({
             .describe('Se true, sobrescreve o arquivo se já existir (⚠️ destrutivo)'),
     }),
     handler: async ({ path: filePath, content, encoding, createParentDirs, overwrite }) => {
-        const { ok, reason, resolved } = await validatePath(filePath, { mode: 'write' });
+        const { ok, reason, resolved, validatedWritePath } = await validatePath(filePath, { mode: 'write', issueMutableCapability: true });
         if (!ok) {
             return pathFailureResult('create_file', reason ?? 'Caminho inválido.', {
                 path: filePath,
@@ -276,7 +297,7 @@ const createFileTool = buildTool({
                 });
             }
             const contentBytes = payload.byteLength;
-            const writeResult = await createOrReplaceFileAtomic(resolved, payload, {
+            const writeResult = await createValidatedOrString(validatedWritePath, resolved, payload, {
                 createParentDirs,
                 failIfExists: !overwrite,
                 captureRollback: overwrite,

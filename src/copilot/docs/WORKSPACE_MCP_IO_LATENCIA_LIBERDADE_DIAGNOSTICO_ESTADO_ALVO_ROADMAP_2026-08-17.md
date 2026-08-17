@@ -1515,3 +1515,82 @@ Durante o gate, a regra pós-metadata capturou uma nova vírgula ausente em `IO_
 
 `CAPABILITIES_VERSION` foi elevado para **49**. O fluxo operacional normal pós-reload passa de três chamadas de verificação para **uma**.
 
+### 22.19 Sublote — capability mutável validada para write/patch e reforço da path policy
+
+A assimetria restante no hot path de filesystem estava nas mutações single-target: reads/search/stat já conseguiam transportar uma capability opaca emitida pela policy canônica e evitar uma segunda resolução `realpath`; write/create/patch ainda faziam `validatePath/evaluateIoPathPolicyAsync` no adapter e, depois, repetiam a mesma policy ao entrar novamente em `createWorkspaceIo` com uma string absoluta.
+
+A solução mantém a mesma fronteira arquitetural adotada para reads, mas com um tipo de capability separado e mais restrito:
+
+- brand privado próprio para mutable paths, impossível de reconstruir por objeto vindo do input da tool;
+- capability ligada a `workspaceRoot`, `realPath`, `access='mutable'`, `policyClass='write'` e à versão da **path policy efetivamente responsável pela autorização**;
+- consumers iniciais aceitos apenas em `write | patch`;
+- `append`, `delete`, `move`, `copy` e demais operações com invariantes adicionais permanecem no caminho completo e não recebem esse fast path neste lote;
+- `createWorkspaceIo` ganhou métodos explicitamente separados (`writeFileAtomicValidated`, `createOrReplaceFileAtomicValidated`, `patchTextLockedValidated`, `patchTextBatchLockedValidated`); as APIs de string continuam executando a policy canônica integralmente;
+- adapters MCP e tools locais da LLM-B fazem feature detection da capability e mantêm fallback para o caminho string seguro, preservando mocks/callers legados;
+- runtime health passou a expor `validatedMutablePath` com `issued`, `accepted` e rejeições por brand/workspace/mode.
+
+#### Revisão de segurança antes da ativação
+
+A revisão do caminho completo revelou uma lacuna anterior à capability: `resolveRealTargetForPolicy()` tentava `realpath(target)` e, quando o target não existia, apenas `realpath(parent)`. Se target **e parent imediato** ainda não existissem, a função voltava ao path lexical. Assim, um create profundo como `escape/missing/deep/file.txt`, quando `escape` era um symlink existente para fora do workspace, podia deixar de enxergar o symlink porque os níveis intermediários ainda não existiam.
+
+A policy foi fortalecida antes de confiar no fast path mutável:
+
+- a resolução agora sobe até o **ancestral existente mais próximo**;
+- resolve `realpath` desse ancestral;
+- reconstrói apenas o sufixo ainda inexistente;
+- containment e blocked-path checks continuam sendo aplicados sobre o real target reconstruído;
+- nova regressão cria um symlink do workspace para um diretório externo e valida um target dois níveis abaixo ainda inexistente; o resultado esperado e observado é `PATH_SYMLINK_OUTSIDE`.
+
+Também foi encontrado um drift de versionamento: `validated-path.js` importava `IO_POLICY_VERSION` do barrel, que corresponde ao contrato geral de metadata de I/O (`io-contracts.js`), enquanto a autorização real vinha de `io-policy.js`, exportada pelo barrel como `IO_PATH_POLICY_VERSION`. A capability era branded e segura, mas seu campo de versão não invalidaria automaticamente uma mudança da path policy.
+
+Correção:
+
+- read e mutable capabilities agora usam **`IO_PATH_POLICY_VERSION`**;
+- a path policy fortalecida foi versionada como **`2026-08-17.r3.nearest-ancestor.v1`**;
+- testes exigem que ambas as capabilities carreguem exatamente essa versão canônica.
+
+Isso não pretende tornar corridas TOCTOU de filesystem matematicamente impossíveis. A fronteira continua sendo: policy async completa antes da emissão, capability efêmera interna, locks/preconditions/hash quando aplicáveis e publicação atômica nas primitives. O ganho deste lote é remover uma **segunda avaliação idêntica**; não transformar um path previamente validado em confiança pública ou reutilizável fora do fluxo controlado.
+
+#### Gates e prova live
+
+Gate completo retomado do ponto em que a conversa anterior terminou:
+
+- workspace I/O: **passed em 1,377 s**;
+- MCP repo-write: **passed em 5,341 s**;
+- runtime metrics: **passed em 3,556 s**;
+- LLM-B bulk file tools: **passed em 2,072 s**;
+- LLM-B write tools: **passed em 2,242 s**;
+- strict typecheck inicial: **passed em 5,040 s**.
+
+Após o reforço de ancestral existente:
+
+- core I/O policy: **passed em 0,959 s**;
+- workspace I/O: **passed em 1,572 s**;
+- strict typecheck: **passed em 19,065 s** após invalidar uma faixa maior do cache incremental.
+
+Após corrigir o vínculo de versão da capability:
+
+- workspace I/O: **passed em 1,594 s**;
+- core I/O policy: **passed em 0,861 s**;
+- strict typecheck: **passed em 17,727 s**.
+
+Ativação final:
+
+- reload controlado em QUIC: completed;
+- post-reload em uma única `mcp_connector_smoke_refresh`: `ready=true`;
+- OAuth e SSE initial/reconnect: green;
+- tools local/remoto: **119/119**, parity integral;
+- authenticated `tools/list`: **117.956 bytes**, exatamente sem crescimento de superfície pelo novo fast path;
+- smoke total: **1.009 ms**, authenticated OAuth **996 ms**.
+
+Prova causal no processo final:
+
+1. baseline `validatedMutablePath`: **0 issued / 0 accepted / 0 rejects**;
+2. uma chamada real de `repo_apply_patch` em `dryRun=true` com no-op permitido atravessou o adapter MCP;
+3. a operação reportou **9 ms de I/O** e o handler **17 ms**;
+4. novo health: **1 issued / 1 accepted / 0 rejects**.
+
+Portanto uma operação MCP real em patch eliminou exatamente uma segunda walk de path policy/realpath, e o resultado é observável em produção em vez de inferido apenas pela estrutura do código.
+
+`CAPABILITIES_VERSION` permanece em **49**: nenhuma tool, schema, permissão, annotation ou contrato MCP externo mudou; a transformação é interna ao plano de I/O. Uma elevação aqui confundiria versão de superfície anunciada com versão de implementação. A versão relevante para invalidação da capability é `IO_PATH_POLICY_VERSION=2026-08-17.r3.nearest-ancestor.v1`.
+

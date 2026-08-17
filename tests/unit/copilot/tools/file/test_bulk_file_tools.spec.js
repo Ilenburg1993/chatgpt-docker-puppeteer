@@ -7,6 +7,10 @@ import { describe, it } from 'vitest';
 
 import { readFilesBatchTool } from '../../../../../src/copilot/tools/file/read/index.js';
 import { patchFilesBatchTool } from '../../../../../src/copilot/tools/file/write/index.js';
+import {
+    getValidatedMutableWorkspacePathStats,
+    resetValidatedMutableWorkspacePathStatsForTest,
+} from '../../../../../src/copilot/infra/io/policy/validated-path.js';
 
 async function createFixture() {
     const jobsDir = join(process.cwd(), 'src/copilot/.ai/jobs');
@@ -46,6 +50,31 @@ describe('local LLM-B bulk file tools', () => {
             assert.equal(result.results[2]?.success, true);
             assert.match(String(result.results[2]?.content ?? ''), /two/u);
         } finally {
+            await rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('patch_files_batch reuses the mutable validated-path capability', async () => {
+        const root = await createFixture();
+        const a = join(root, 'validated.txt');
+        await writeFile(a, 'stable\n', 'utf8');
+        resetValidatedMutableWorkspacePathStatsForTest();
+        try {
+            const result = await patchFilesBatchTool.handler({
+                operations: [{ path: relativePath(a), old_string: 'stable', new_string: 'stable', allowNoop: true }],
+                dryRun: true,
+                failureMode: 'best-effort',
+                targetConcurrency: 1,
+            });
+            assert.equal(result.success, true);
+            const stats = getValidatedMutableWorkspacePathStats();
+            assert.equal(stats.issued, 1);
+            assert.equal(stats.accepted, 1);
+            assert.equal(stats.rejectedUnbranded, 0);
+            assert.equal(stats.rejectedWorkspace, 0);
+            assert.equal(stats.rejectedMode, 0);
+        } finally {
+            resetValidatedMutableWorkspacePathStatsForTest();
             await rm(root, { recursive: true, force: true });
         }
     });

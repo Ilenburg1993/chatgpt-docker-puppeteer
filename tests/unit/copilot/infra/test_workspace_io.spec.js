@@ -5,11 +5,16 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { IO_PATH_POLICY_VERSION } from '#copilot/core';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
+    createValidatedMutableWorkspacePath,
     createValidatedReadWorkspacePath,
+    getValidatedMutableWorkspacePathStats,
     getValidatedReadWorkspacePathStats,
+    resetValidatedMutableWorkspacePathStatsForTest,
     resetValidatedReadWorkspacePathStatsForTest,
+    resolveValidatedMutableWorkspacePath,
     resolveValidatedReadWorkspacePath,
 } from '../../../../src/copilot/infra/io/policy/validated-path.js';
 
@@ -18,6 +23,7 @@ const cleanupPaths = [];
 
 afterEach(async () => {
     resetValidatedReadWorkspacePathStatsForTest();
+    resetValidatedMutableWorkspacePathStatsForTest();
     await Promise.all(cleanupPaths.splice(0).map((path) => rm(path, { force: true, recursive: true })));
 });
 
@@ -71,6 +77,7 @@ describe('workspace IO capability', () => {
         await io.writeFileAtomic(filePath, 'inside');
         resetValidatedReadWorkspacePathStatsForTest();
         const capability = createValidatedReadWorkspacePath({ realPath: filePath, workspaceRoot });
+        expect(capability.policyVersion).toBe(IO_PATH_POLICY_VERSION);
 
         const [snapshot, statSnapshot] = await Promise.all([
             io.readTextValidated(capability),
@@ -80,6 +87,55 @@ describe('workspace IO capability', () => {
         expect(snapshot.content).toBe('inside');
         expect(statSnapshot.stats.isFile()).toBe(true);
         expect(getValidatedReadWorkspacePathStats()).toMatchObject({ issued: 1, accepted: 2 });
+    });
+
+    it('aceita capability mutável opaca em write/patch sem revalidar a path no workspace facade', async () => {
+        const { workspaceRoot, io } = await createWorkspaceFixture();
+        const filePath = join(workspaceRoot, 'mutable.txt');
+        await io.writeFileAtomic(filePath, 'before');
+        resetValidatedMutableWorkspacePathStatsForTest();
+        const capability = createValidatedMutableWorkspacePath({ realPath: filePath, workspaceRoot });
+        expect(capability.policyVersion).toBe(IO_PATH_POLICY_VERSION);
+
+        await io.writeFileAtomicValidated(capability, 'middle', { requireExists: true });
+        const patch = await io.patchTextLockedValidated(capability, {
+            oldString: 'middle',
+            newString: 'after',
+        });
+
+        expect(patch.replacedOccurrences).toBe(1);
+        await expect(readFile(filePath, 'utf8')).resolves.toBe('after');
+        expect(getValidatedMutableWorkspacePathStats()).toMatchObject({ issued: 1, accepted: 2 });
+    });
+
+    it('rejeita capability mutável sem brand, de outro workspace e em modo incompatível', async () => {
+        const { workspaceRoot, outsideRoot, io } = await createWorkspaceFixture();
+        const filePath = join(workspaceRoot, 'mutable.txt');
+        await io.writeFileAtomic(filePath, 'inside');
+        const capability = createValidatedMutableWorkspacePath({ realPath: filePath, workspaceRoot });
+
+        await expect(
+            io.patchTextLockedValidated({
+                realPath: filePath,
+                workspaceRoot,
+                policyVersion: capability.policyVersion,
+                access: 'mutable',
+                policyClass: 'write',
+            }, { oldString: 'inside', newString: 'outside' }),
+        ).rejects.toMatchObject({ code: 'EINVALIDVALIDATEDMUTABLEPATH' });
+
+        const otherWorkspaceCapability = createValidatedMutableWorkspacePath({
+            realPath: filePath,
+            workspaceRoot: outsideRoot,
+        });
+        await expect(io.writeFileAtomicValidated(otherWorkspaceCapability, 'outside')).rejects.toMatchObject({
+            code: 'EVALIDATEDMUTABLEPATHWORKSPACE',
+        });
+        expect(() =>
+            resolveValidatedMutableWorkspacePath(capability, { workspaceRoot, mode: 'delete' }),
+        ).toThrowError(expect.objectContaining({ code: 'EVALIDATEDMUTABLEPATHMODE' }));
+        await expect(io.readTextValidated(capability)).rejects.toMatchObject({ code: 'EINVALIDVALIDATEDPATH' });
+        await expect(readFile(filePath, 'utf8')).resolves.toBe('inside');
     });
 
     it('rejeita lookalike sem brand, workspace divergente e uso em modo mutável', async () => {

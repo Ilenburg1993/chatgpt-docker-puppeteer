@@ -211,6 +211,10 @@ describe('F35 — write_file_content (F181-F182)', () => {
         });
         expect(fsMock.writeFile).toHaveBeenCalledOnce();
         expect(fsMock.rename).toHaveBeenCalledOnce();
+        expect(mockValidatePath).toHaveBeenCalledWith('file.txt', {
+            mode: 'write',
+            issueMutableCapability: true,
+        });
     });
 
     it('mantém rollback automático desligado por padrão/política sem impedir a escrita', async () => {
@@ -347,6 +351,10 @@ describe('F35 — create_file (F184)', () => {
         });
         expect(result.bytesWritten).toBe(11);
         expect(fsMock.mkdir).toHaveBeenCalledWith(expect.any(String), { recursive: true });
+        expect(mockValidatePath).toHaveBeenCalledWith('new.txt', {
+            mode: 'write',
+            issueMutableCapability: true,
+        });
     });
 
     it('falha se arquivo já existe e overwrite=false', async () => {
@@ -511,6 +519,7 @@ describe('F35 — delete_file (F185)', () => {
         expect(result.changeSet?.rollback?.stepCount).toBeGreaterThanOrEqual(1);
         expect(result.changeSet?.rollback?.steps?.[0]?.snapshotBase64).toBeTypeOf('string');
         expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/doomed.txt');
+        expect(mockValidatePath).toHaveBeenCalledWith('doomed.txt', { mode: 'write' });
     });
 
     it('falha se é diretório', async () => {
@@ -1015,8 +1024,8 @@ describe('F35 — patch_file (F187)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F35 — fileWriteTools export shape (F188)', () => {
-    it('exporta array com 9 tools', () => {
-        expect(fileWriteTools).toHaveLength(9);
+    it('exporta array com 10 tools', () => {
+        expect(fileWriteTools).toHaveLength(10);
     });
 
     it('cada tool tem name, description, handler', () => {

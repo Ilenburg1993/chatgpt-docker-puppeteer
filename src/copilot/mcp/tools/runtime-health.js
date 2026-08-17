@@ -370,6 +370,7 @@ function summarizeIoCache(cache) {
             },
         },
         validatedReadPath: cache['validatedReadPath'] ?? null,
+        validatedMutablePath: cache['validatedMutablePath'] ?? null,
         aggregate: {
             hits: aggregate['hits'] ?? 0,
             misses: aggregate['misses'] ?? 0,

@@ -14,6 +14,7 @@ import path from 'node:path';
  *   resolved: string;
  *   relative: string;
  *   validatedReadPath?: unknown;
+ *   validatedWritePath?: unknown;
  * }} McpPathOk
  * @typedef {{
  *   ok: false;
@@ -49,15 +50,20 @@ export async function resolveReadPath(filePath) {
 
 /**
  * @param {string} filePath
+ * @param {{ issueMutableCapability?: boolean }} [options]
  * @returns {Promise<McpPathOk | McpPathError>}
  */
-export async function resolveWritePath(filePath) {
-    const result = await validatePath(filePath, { mode: 'write' });
+export async function resolveWritePath(filePath, options = {}) {
+    const result = await validatePath(filePath, {
+        mode: 'write',
+        issueMutableCapability: options.issueMutableCapability === true,
+    });
     if (!result.ok) return pathError(filePath, 'write', result.reason ?? 'Path denied.');
     return {
         ok: true,
         resolved: result.resolved,
         relative: toWorkspaceRelativePath(result.resolved),
+        validatedWritePath: result.validatedWritePath,
     };
 }
 

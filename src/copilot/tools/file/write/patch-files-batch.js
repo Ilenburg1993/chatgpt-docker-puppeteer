@@ -14,7 +14,17 @@ import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
 import { validatePath, WORKSPACE_ROOT } from '../shared.js';
 
-const { patchTextBatchLocked } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+const { patchTextBatchLocked, patchTextBatchLockedValidated } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+
+/**
+ * @param {{ resolved: string; validatedWritePath?: unknown }} target
+ * @param {Parameters<typeof patchTextBatchLocked>[1]} options
+ */
+function patchBatchValidatedOrString(target, options) {
+    return target.validatedWritePath
+        ? patchTextBatchLockedValidated(target.validatedWritePath, options)
+        : patchTextBatchLocked(target.resolved, options);
+}
 
 const MAX_PATCH_OPERATIONS = 64;
 const MAX_PATCH_TARGETS = 32;
@@ -104,7 +114,7 @@ export const patchFilesBatchTool = buildTool({
         const execution = await runBoundedOperationBatch(
             groups,
             async (group) => {
-                const resolved = await validatePath(group.path, { mode: 'write' });
+                const resolved = await validatePath(group.path, { mode: 'write', issueMutableCapability: true });
                 if (!resolved.ok) {
                     return {
                         success: false,
@@ -141,7 +151,7 @@ export const patchFilesBatchTool = buildTool({
                     };
                 }
                 try {
-                    const patch = await patchTextBatchLocked(resolved.resolved, {
+                    const patch = await patchBatchValidatedOrString(resolved, {
                         operations: group.entries.map(({ operation }) => ({
                             oldString: operation.old_string,
                             newString: operation.new_string,

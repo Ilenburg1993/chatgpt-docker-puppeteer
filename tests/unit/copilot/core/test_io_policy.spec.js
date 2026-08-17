@@ -76,6 +76,21 @@ describe('core/io-policy evaluateIoPathPolicyAsync', () => {
         expect(result.code).toBe('PATH_SYMLINK_OUTSIDE');
     });
 
+    it('rejects symlink traversal through the nearest existing ancestor when deeper parents do not exist', async () => {
+        const workspaceRoot = await createTempDir();
+        const outsideRoot = await createTempDir();
+        await symlink(outsideRoot, path.join(workspaceRoot, 'escape'));
+
+        const result = await evaluateIoPathPolicyAsync('escape/missing/deep/file.txt', {
+            workspaceRoot,
+            mode: 'write',
+        });
+
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.code).toBe('PATH_SYMLINK_OUTSIDE');
+    });
+
     it('resolves symlink target inside workspace and exposes realPath', async () => {
         const workspaceRoot = await createTempDir();
         await writeFile(path.join(workspaceRoot, 'target.txt'), 'ok', 'utf8');

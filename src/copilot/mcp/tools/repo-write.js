@@ -30,13 +30,17 @@ import { clearRepoReadFileResultCacheForResolvedPath } from './repo-read-cache.j
 
 const {
     createOrReplaceFileAtomic,
+    createOrReplaceFileAtomicValidated,
     deleteFileLocked,
     moveFileLocked,
     patchTextBatchLocked,
+    patchTextBatchLockedValidated,
     patchTextLocked,
+    patchTextLockedValidated,
     readText,
     withIoResourceLock,
     writeFileAtomic,
+    writeFileAtomicValidated,
 } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
@@ -49,6 +53,51 @@ const MAX_PATCH_BATCH_INPUT_BYTES = 1536 * 1024;
 const DEFAULT_PATCH_PLAN_CONCURRENCY = 4;
 const DEFAULT_PATCH_FAST_CONCURRENCY = 4;
 const MAX_PATCH_TARGET_CONCURRENCY = 8;
+
+/**
+ * Use the opaque validated mutable capability when the upstream path adapter supplied one; keep the canonical string
+ * method as a compatibility fallback for internal mocks/legacy callers.
+ *
+ * @param {{ resolved: string; validatedWritePath?: unknown }} resolved
+ * @param {Parameters<typeof patchTextLocked>[1]} options
+ */
+function patchResolvedTarget(resolved, options) {
+    return resolved.validatedWritePath
+        ? patchTextLockedValidated(resolved.validatedWritePath, options)
+        : patchTextLocked(resolved.resolved, options);
+}
+
+/**
+ * @param {{ resolved: string; validatedWritePath?: unknown }} resolved
+ * @param {Parameters<typeof patchTextBatchLocked>[1]} options
+ */
+function patchResolvedTargetBatch(resolved, options) {
+    return resolved.validatedWritePath
+        ? patchTextBatchLockedValidated(resolved.validatedWritePath, options)
+        : patchTextBatchLocked(resolved.resolved, options);
+}
+
+/**
+ * @param {{ resolved: string; validatedWritePath?: unknown }} resolved
+ * @param {Parameters<typeof createOrReplaceFileAtomic>[1]} content
+ * @param {Parameters<typeof createOrReplaceFileAtomic>[2]} options
+ */
+function createResolvedTarget(resolved, content, options) {
+    return resolved.validatedWritePath
+        ? createOrReplaceFileAtomicValidated(resolved.validatedWritePath, content, options)
+        : createOrReplaceFileAtomic(resolved.resolved, content, options);
+}
+
+/**
+ * @param {{ resolved: string; validatedWritePath?: unknown }} resolved
+ * @param {Parameters<typeof writeFileAtomic>[1]} content
+ * @param {Parameters<typeof writeFileAtomic>[2]} options
+ */
+function writeResolvedTarget(resolved, content, options) {
+    return resolved.validatedWritePath
+        ? writeFileAtomicValidated(resolved.validatedWritePath, content, options)
+        : writeFileAtomic(resolved.resolved, content, options);
+}
 
 /**
  * Resolve batch write intent defensively. Some connector/host adapters may omit an optional boolean when its value is
@@ -829,7 +878,7 @@ async function restoreQuarantinedFile(quarantineId, destination, overwrite) {
  * @returns {Promise<Record<string, unknown>>}
  */
 async function planPatchBatchOperation(operation, index) {
-    const resolved = await resolveWritePath(String(operation['path'] ?? ''));
+    const resolved = await resolveWritePath(String(operation['path'] ?? ''), { issueMutableCapability: true });
     if (!resolved.ok)
         return { index, success: false, path: operation['path'] ?? null, error: resolved.reason, code: resolved.code };
     if (operation['replace_all'] === true && operation['occurrence_index'] !== undefined) {
@@ -842,7 +891,7 @@ async function planPatchBatchOperation(operation, index) {
         };
     }
     try {
-        const patch = await patchTextLocked(resolved.resolved, {
+        const patch = await patchResolvedTarget(resolved, {
             oldString: String(operation['old_string'] ?? ''),
             newString: String(operation['new_string'] ?? ''),
             replaceAll: operation['replace_all'] === true,
@@ -913,11 +962,11 @@ async function planPatchBatchOperation(operation, index) {
  * @returns {Promise<Record<string, unknown>>}
  */
 async function applyPatchBatchOperation(operation, index) {
-    const resolved = await resolveWritePath(String(operation['path'] ?? ''));
+    const resolved = await resolveWritePath(String(operation['path'] ?? ''), { issueMutableCapability: true });
     if (!resolved.ok)
         return { index, success: false, path: operation['path'] ?? null, error: resolved.reason, code: resolved.code };
     try {
-        const patch = await patchTextLocked(resolved.resolved, {
+        const patch = await patchResolvedTarget(resolved, {
             oldString: String(operation['old_string'] ?? ''),
             newString: String(operation['new_string'] ?? ''),
             replaceAll: operation['replace_all'] === true,
@@ -1043,7 +1092,7 @@ async function runPatchBatchOperations(operations, dryRun) {
         }
 
         const first = /** @type {{ operation: Record<string, unknown>; index: number }} */ (group[0]);
-        const resolved = await resolveWritePath(String(first.operation['path'] ?? ''));
+        const resolved = await resolveWritePath(String(first.operation['path'] ?? ''), { issueMutableCapability: true });
         if (!resolved.ok) {
             for (const entry of group) {
                 results.push({
@@ -1079,7 +1128,7 @@ async function runPatchBatchOperations(operations, dryRun) {
         }
 
         try {
-            const patch = await patchTextBatchLocked(resolved.resolved, {
+            const patch = await patchResolvedTargetBatch(resolved, {
                 operations: group.map(({ operation }) => toLockedPatchBatchOperation(operation)),
                 dryRun,
                 captureRollback: false,
@@ -1379,10 +1428,10 @@ async function applyBatchFileOperation(operation, index) {
     const item = /** @type {Record<string, unknown>} */ (operation);
     const type = String(item['type'] ?? '');
     if (type === 'create_file') {
-        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        const resolved = await resolveWritePath(String(item['path'] ?? ''), { issueMutableCapability: true });
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
         const content = String(item['content'] ?? '');
-        const write = await createOrReplaceFileAtomic(resolved.resolved, content, {
+        const write = await createResolvedTarget(resolved, content, {
             encoding: 'utf8',
             createParentDirs: item['createParentDirs'] !== false,
             failIfExists: true,
@@ -2033,7 +2082,7 @@ export const repoWriteTools = [
             maxDiffLines,
             includeDiffPreview,
         }) => {
-            const resolved = await resolveWritePath(path);
+            const resolved = await resolveWritePath(path, { issueMutableCapability: dryRun !== true });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
 
             try {
@@ -2062,7 +2111,7 @@ export const repoWriteTools = [
                     );
                 }
 
-                const write = await writeFileAtomic(resolved.resolved, content, {
+                const write = await writeResolvedTarget(resolved, content, {
                     requireExists: true,
                     ...(typeof expectedHash === 'string' && expectedHash ? { expectedHash } : {}),
                     riskClass: 'high',
@@ -2129,7 +2178,7 @@ export const repoWriteTools = [
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ path, content, createParentDirs, dryRun, maxDiffLines, includeDiffPreview }) => {
-            const resolved = await resolveWritePath(path);
+            const resolved = await resolveWritePath(path, { issueMutableCapability: dryRun !== true });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const initialContent = typeof content === 'string' ? content : '';
             const diff = buildInlineDiffPreview('', initialContent, {
@@ -2158,7 +2207,7 @@ export const repoWriteTools = [
                     );
                 }
 
-                const write = await createOrReplaceFileAtomic(resolved.resolved, initialContent, {
+                const write = await createResolvedTarget(resolved, initialContent, {
                     encoding: 'utf8',
                     createParentDirs: createParentDirs !== false,
                     failIfExists: true,
@@ -2255,7 +2304,7 @@ export const repoWriteTools = [
             maxDiffLines,
             includeDiffPreview,
         }) => {
-            const resolved = await resolveWritePath(path);
+            const resolved = await resolveWritePath(path, { issueMutableCapability: true });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             if (replace_all === true && occurrence_index !== undefined) {
                 return errorResult('Use replace_all ou occurrence_index, nao ambos na mesma chamada.', {
@@ -2264,7 +2313,7 @@ export const repoWriteTools = [
             }
 
             try {
-                const patch = await patchTextLocked(resolved.resolved, {
+                const patch = await patchResolvedTarget(resolved, {
                     oldString: old_string,
                     newString: new_string,
                     replaceAll: replace_all === true,

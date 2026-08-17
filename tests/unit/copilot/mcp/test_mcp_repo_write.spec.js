@@ -10,6 +10,10 @@ import path from 'node:path';
 import { afterEach, describe, it } from 'vitest';
 
 import { repoWriteTestHarness, repoWriteTools } from '#copilot/mcp/tools';
+import {
+    getValidatedMutableWorkspacePathStats,
+    resetValidatedMutableWorkspacePathStatsForTest,
+} from '../../../../src/copilot/infra/io/policy/validated-path.js';
 
 const applyPatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_patch');
 const applyFileBatchPlanTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch_plan');
@@ -26,6 +30,51 @@ const removeFileTool = repoWriteTools.find((tool) => tool.name === 'repo_remove_
 describe('copilot MCP repo write tools', () => {
     afterEach(() => {
         repoWriteTestHarness.resetQuarantineMetadataWriter();
+        resetValidatedMutableWorkspacePathStatsForTest();
+    });
+
+    it('reuses the write-policy capability in MCP patch instead of revalidating inside workspace IO', async () => {
+        assert.ok(applyPatchTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const filePath = path.join(dir, 'validated-patch.txt');
+        await fs.writeFile(filePath, 'stable\n', 'utf8');
+        resetValidatedMutableWorkspacePathStatsForTest();
+
+        const result = await applyPatchTool.handler({
+            path: filePath,
+            old_string: 'stable',
+            new_string: 'stable',
+            allowNoop: true,
+            dryRun: true,
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent.success, true);
+        assert.deepEqual(getValidatedMutableWorkspacePathStats(), {
+            issued: 1,
+            accepted: 1,
+            rejectedUnbranded: 0,
+            rejectedWorkspace: 0,
+            rejectedMode: 0,
+            compatibleModes: ['write', 'patch'],
+            policyVersion: getValidatedMutableWorkspacePathStats().policyVersion,
+        });
+    });
+
+    it('does not mint mutable capabilities for destructive paths that cannot consume them', async () => {
+        assert.ok(removeFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const filePath = path.join(dir, 'no-capability-remove.txt');
+        await fs.writeFile(filePath, 'keep me\n', 'utf8');
+        resetValidatedMutableWorkspacePathStatsForTest();
+
+        const result = await removeFileTool.handler({ path: filePath });
+
+        assert.equal(result.isError, true);
+        const stats = getValidatedMutableWorkspacePathStats();
+        assert.equal(stats.issued, 0);
+        assert.equal(stats.accepted, 0);
+        assert.equal(await fs.readFile(filePath, 'utf8'), 'keep me\n');
     });
 
     it('writes existing files with diff previews', async () => {

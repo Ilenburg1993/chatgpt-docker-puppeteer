@@ -1,7 +1,10 @@
 // @ts-check
 import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
 import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, evaluateIoPathPolicyAsync } from '#copilot/core';
-import { createValidatedReadWorkspacePath } from '../../infra/io/policy/validated-path.js';
+import {
+    createValidatedMutableWorkspacePath,
+    createValidatedReadWorkspacePath,
+} from '../../infra/io/policy/validated-path.js';
 import { hasNullByte, normalizeWorkspaceRoot } from '#copilot/infra/public/policy';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -138,13 +141,14 @@ export const BLOCKED_PATTERNS_SECRETS = [
  * Verifica se um caminho está dentro do workspace autorizado e não é um arquivo bloqueado.
  *
  * @param {string} filePath - Caminho absoluto ou relativo
- * @param {{ mode?: 'read' | 'write' }} [opts] - Modo de operação (default: 'write' para máxima proteção)
+ * @param {{ mode?: 'read' | 'write'; issueMutableCapability?: boolean }} [opts] - Modo de operação; capability mutável exige opt-in explícito.
  * @returns {Promise<{
  *   ok: boolean;
  *   reason?: string;
  *   resolved: string;
  *   validatedReadPath?: ReturnType<typeof createValidatedReadWorkspacePath>;
- * }>}
+ *   validatedWritePath?: ReturnType<typeof createValidatedMutableWorkspacePath>;
+ * }>} 
  */
 export async function validatePath(filePath, opts) {
     if (typeof filePath !== 'string' || filePath.trim().length === 0) {
@@ -178,7 +182,14 @@ export async function validatePath(filePath, opts) {
                       workspaceRoot: policy.workspaceRoot,
                   }),
               }
-            : {}),
+            : opts?.issueMutableCapability === true
+              ? {
+                    validatedWritePath: createValidatedMutableWorkspacePath({
+                        realPath: policy.realPath,
+                        workspaceRoot: policy.workspaceRoot,
+                    }),
+                }
+              : {}),
     };
 }
 

@@ -24,7 +24,18 @@ import {
 } from './mutation-helpers.js';
 import { buildPatchFailureTerminalSummary, PATCH_FEEDBACK_FIX } from './patch-feedback.js';
 
-const { patchTextLocked } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+const { patchTextLocked, patchTextLockedValidated } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+
+/**
+ * Dispatch a patch through the validated mutable fast path when available, otherwise preserve the canonical string path.
+ * @param {{ resolved: string; validatedWritePath?: unknown }} target
+ * @param {Parameters<typeof patchTextLocked>[1]} options
+ */
+function patchValidatedOrString(target, options) {
+    return target.validatedWritePath
+        ? patchTextLockedValidated(target.validatedWritePath, options)
+        : patchTextLocked(target.resolved, options);
+}
 
 /**
  * @param {{
@@ -191,7 +202,7 @@ export const patchFileTool = buildTool({
         diffContextLines,
         maxDiffLines,
     }) => {
-        const v = await validatePath(filePath, { mode: 'write' });
+        const v = await validatePath(filePath, { mode: 'write', issueMutableCapability: true });
         const receivedParameters = {
             path: filePath,
             old_string,
@@ -232,7 +243,7 @@ export const patchFileTool = buildTool({
         });
 
         try {
-            const patchResult = await patchTextLocked(v.resolved, {
+            const patchResult = await patchValidatedOrString(v, {
                 oldString: old_string,
                 newString: new_string,
                 replaceAll: replace_all,

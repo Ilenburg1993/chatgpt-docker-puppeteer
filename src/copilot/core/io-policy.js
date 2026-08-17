@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { validateUrlString } from './security/url-validator.js';
 
-export const IO_POLICY_VERSION = '2026-05-06.r2.a10.1';
+export const IO_POLICY_VERSION = '2026-08-17.r3.nearest-ancestor.v1';
 
 /**
  * Número máximo de redirects HTTP permitidos por política canônica. O valor é informativo; adaptadores que suportam
@@ -391,14 +391,26 @@ function findBlockedPathPattern(filePath, blockedPatterns) {
  * @returns {Promise<{ realPath: string }>}
  */
 async function resolveRealTargetForPolicy(absolutePath) {
-    try {
-        return { realPath: await realpath(absolutePath) };
-    } catch {
+    const unresolvedSegments = [];
+    let candidate = absolutePath;
+
+    while (true) {
         try {
-            const parent = await realpath(path.dirname(absolutePath));
-            return { realPath: path.join(parent, path.basename(absolutePath)) };
-        } catch {
-            return { realPath: absolutePath };
+            const realAncestor = await realpath(candidate);
+            return {
+                realPath:
+                    unresolvedSegments.length === 0
+                        ? realAncestor
+                        : path.join(realAncestor, ...unresolvedSegments.reverse()),
+            };
+        } catch (error) {
+            const code = String(/** @type {{ code?: unknown }} */ (error)?.code ?? '');
+            if (code !== 'ENOENT' && code !== 'ENOTDIR') return { realPath: absolutePath };
+
+            const parent = path.dirname(candidate);
+            if (parent === candidate) return { realPath: absolutePath };
+            unresolvedSegments.push(path.basename(candidate));
+            candidate = parent;
         }
     }
 }

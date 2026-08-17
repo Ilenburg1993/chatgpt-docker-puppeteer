@@ -143,6 +143,7 @@ describe('copilot MCP runtime metrics', () => {
                 l1?: Record<string, unknown>;
                 coherence?: { crossProcess?: Record<string, unknown> };
                 validatedReadPath?: Record<string, unknown>;
+                validatedMutablePath?: Record<string, unknown>;
             };
             ioCacheBenchmark?: Record<string, unknown> | null;
             ioCachePlan?: { l2Decision?: string; evidence?: Record<string, unknown> };
@@ -152,6 +153,7 @@ describe('copilot MCP runtime metrics', () => {
         assert.equal(metrics.totals.calls, 2);
         assert.equal(typeof metrics.ioCache?.l1?.['size'], 'number');
         assert.equal(typeof metrics.ioCache?.coherence?.crossProcess?.['pollMs'], 'number');
+        assert.equal(typeof metrics.ioCache?.validatedMutablePath?.['accepted'], 'number');
         assert.ok(metrics.ioCachePlan);
         assert.equal(typeof metrics.ioCachePlan?.l2Decision, 'string');
         assert.equal(typeof metrics.ioParser?.fileContext?.['size'], 'number');

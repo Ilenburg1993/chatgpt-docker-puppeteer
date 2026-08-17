@@ -16,7 +16,10 @@ import { getIoLockStats } from './io-locks.js';
 import { getIoDurabilityStats, getIoLatencyStats } from './io-observability.js';
 import { getLineOffsetCacheStats } from './io/fs/line-offset-cache.js';
 import { getIoInvalidationBusStats } from './io/invalidation/bus.js';
-import { getValidatedReadWorkspacePathStats } from './io/policy/validated-path.js';
+import {
+    getValidatedMutableWorkspacePathStats,
+    getValidatedReadWorkspacePathStats,
+} from './io/policy/validated-path.js';
 import { getParserCacheStats } from './io-parser.js';
 import { getScopeStats, listScopes } from './io-session-scope.js';
 
@@ -98,6 +101,7 @@ function readCoherenceHealthStats() {
  *         lineOffsets: ReturnType<typeof getLineOffsetCacheStats>;
  *         coherence: ReturnType<typeof readCoherenceHealthStats>;
  *         validatedReadPath: ReturnType<typeof getValidatedReadWorkspacePathStats>;
+ *         validatedMutablePath: ReturnType<typeof getValidatedMutableWorkspacePathStats>;
  *         aggregate: ReturnType<typeof aggregateIoCacheTierStats>;
  *         plan: ReturnType<typeof buildIoCacheTierPlan>;
  *     };
@@ -289,6 +293,7 @@ export function readIoRuntimeHealthSnapshot() {
             }),
             coherence,
             validatedReadPath: getValidatedReadWorkspacePathStats(),
+            validatedMutablePath: getValidatedMutableWorkspacePathStats(),
             aggregate,
             plan: buildIoCacheTierPlan({
                 l1Enabled: true,
