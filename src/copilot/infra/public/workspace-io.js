@@ -175,6 +175,37 @@ function bindValidatedMutableOperation(operation, mode, context) {
 }
 
 /**
+ * Compose two independently authorized read-only capabilities without introducing a pair brand.
+ * Each side keeps its own workspace/policy-version checks before the canonical two-path operation runs.
+ *
+ * @template {unknown[]} Args
+ * @template Result
+ * @param {(pathA: string, pathB: string, ...args: Args) => Promise<Result>} operation
+ * @param {WorkspaceIoContext} context
+ * @returns {(pathACapability: unknown, pathBCapability: unknown, ...args: Args) => Promise<Result>}
+ */
+function bindValidatedReadPairOperation(operation, context) {
+    return async (pathACapability, pathBCapability, ...args) => {
+        const pathA = resolveValidatedReadWorkspacePath(pathACapability, {
+            workspaceRoot: context.workspaceRoot,
+            mode: 'read',
+        });
+        const pathB = resolveValidatedReadWorkspacePath(pathBCapability, {
+            workspaceRoot: context.workspaceRoot,
+            mode: 'read',
+        });
+        if (!pathA || !pathB) {
+            const error = /** @type {Error & { code?: string }} */ (
+                new Error('Validated workspace read pair requires two opaque read capabilities.')
+            );
+            error.code = 'EVALIDATEDREADPAIRREQUIRED';
+            throw error;
+        }
+        return operation(pathA, pathB, ...args);
+    };
+}
+
+/**
  * Compose an already-validated read source with an already-validated write destination. Used only for copy semantics;
  * no new capability class is introduced and each side retains the policy that originally authorized it.
  *
@@ -341,6 +372,7 @@ export function createWorkspaceIo(context) {
     const readTextValidated = bindValidatedReadOperation(readText, 'read', context);
     const readTextChunksValidated = bindValidatedReadOperation(readTextChunks, 'read', context);
     const statPathValidated = bindValidatedReadOperation(statPath, 'stat', context);
+    const diffTextValidated = bindValidatedReadPairOperation(diffText, context);
     const scanDirectoryValidated = bindValidatedReadOperation(
         async (targetPath, options = {}) =>
             scanDirectory(targetPath, {
@@ -383,6 +415,7 @@ export function createWorkspaceIo(context) {
         createOrReplaceFileAtomicValidated,
         deleteFileLocked: bindWorkspacePathOperation(deleteFileLocked, 'delete', context),
         diffText: bindWorkspacePathPairOperation(diffText, 'read', 'read', context),
+        diffTextValidated,
         mkdirPathLocked: bindWorkspacePathOperation(mkdirPathLocked, 'mkdir', context),
         moveFileLocked: bindWorkspacePathPairOperation(moveFileLocked, 'move', 'write', context),
         moveFileLockedValidated,

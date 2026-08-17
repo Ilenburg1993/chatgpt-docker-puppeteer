@@ -1804,3 +1804,55 @@ A chamada live `includeDetails=true` confirmou que a informação removida do de
 
 `CAPABILITIES_VERSION` permanece em **49**: não houve mudança de input schema, tool registry, annotation ou permissão; houve apenas separação mais rigorosa entre resposta operacional default e detalhe diagnóstico já existente.
 
+### 22.22 Sublote — read-pair capability para diff e fechamento dos read tools locais
+
+Depois do 22.21, uma pequena frente read permaneceu no worktree. A revisão mostrou que ela não era uma mudança lateral: fechava dois hot paths ainda assimétricos em relação ao modelo de capability já adotado.
+
+O primeiro era `diffText`: adapters validavam `pathA` e `pathB` como read e depois chamavam `diffText` pela facade string, reexecutando policy/realpath nos dois operands. O segundo era a camada local da LLM-B (`list_directory` e `diff_files`), que ainda podia voltar ao scan/diff string mesmo depois de validar os paths.
+
+A solução reutiliza exclusivamente authority já existente:
+
+- `createWorkspaceIo` ganhou um binder read→read que compõe **duas read capabilities independentes**, sem nova pair brand;
+- `diffTextValidated` resolve cada capability contra o mesmo workspace e `IO_PATH_POLICY_VERSION` e então chama a primitive canônica `diffText`;
+- `repo_diff_files` passa a pedir `issueReadCapability:true` nos dois operands e usar `diffTextValidated`;
+- `list_directory` local pede read capability e usa `scanDirectoryValidated` quando ela está disponível, mantendo fallback string para mocks/callers legados;
+- `diff_files` local pede read capability nos dois paths e usa `diffTextValidated`, também com fallback seguro;
+- nenhum novo modo, schema, permission ou annotation foi criado.
+
+A facade ganhou uma regressão explícita: duas capabilities read branded são consumidas por `diffTextValidated`; o diff permanece canônico e os counters fecham em **2 issued / 2 accepted**.
+
+#### Gates
+
+- workspace I/O focused: **passed em 1,353 s**;
+- MCP tools: **passed em 4,558 s**;
+- LLM-B read tools: **passed em 2,082 s**;
+- strict typecheck: **passed em 5,180 s**.
+
+#### Ativação e prova live
+
+Reload controlado em QUIC:
+
+- connector smoke: **1.004 ms total**;
+- authenticated OAuth: **993 ms**;
+- SSE initial/reconnect: green em **137 ms**;
+- `ready=true`;
+- tools local/remoto **119/119**;
+- authenticated `tools/list`: **117.956 bytes**.
+
+A primeira tentativa de medir o delta de `repo_diff_files` cruzou a execução automática do startup maintenance. O baseline estava em **0/0**, e o health posterior mostrou **10 issued / 10 accepted**. O próprio estado do runtime mostrou que o maintenance havia concluído nesse intervalo e executado o smoke in-process, já conhecido por consumir 8 read capabilities. Assim, a decomposição era exatamente:
+
+- **8** capabilities do smoke automático;
+- **2** capabilities do `repo_diff_files`.
+
+Para eliminar a variável concorrente, a prova foi repetida depois de `startupMaintenance.completed=true`:
+
+1. baseline estável: **10 issued / 10 accepted**;
+2. uma chamada real de `repo_diff_files` sobre dois arquivos do repo;
+3. health posterior: **12 issued / 12 accepted**;
+4. delta isolado: **+2 issued / +2 accepted**;
+5. zero rejects de brand/workspace/mode.
+
+Portanto o diff real agora elimina exatamente as **duas** avaliações redundantes de path que antes reapareciam ao atravessar a facade string. A mesma primitive continua responsável pelo diff e pelo tratamento de context lines; apenas a policy já validada deixa de ser recalculada.
+
+`CAPABILITIES_VERSION` permanece em **49**: a mudança é interna ao plano de I/O e não altera a superfície MCP externa.
+

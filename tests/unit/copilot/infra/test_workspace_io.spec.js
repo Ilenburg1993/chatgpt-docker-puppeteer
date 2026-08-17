@@ -106,6 +106,23 @@ describe('workspace IO capability', () => {
         });
     });
 
+    it('compõe duas capabilities read em diff sem segunda policy async', async () => {
+        const { workspaceRoot, io } = await createWorkspaceFixture();
+        const pathA = join(workspaceRoot, 'diff-a.txt');
+        const pathB = join(workspaceRoot, 'diff-b.txt');
+        await Promise.all([writeFile(pathA, 'alpha\n', 'utf8'), writeFile(pathB, 'beta\n', 'utf8')]);
+        resetValidatedReadWorkspacePathStatsForTest();
+        const capA = createValidatedReadWorkspacePath({ realPath: pathA, workspaceRoot });
+        const capB = createValidatedReadWorkspacePath({ realPath: pathB, workspaceRoot });
+
+        const diff = await io.diffTextValidated(capA, capB, { contextLines: 1 });
+
+        expect(diff.identical).toBe(false);
+        expect(diff.diff).toContain('-alpha');
+        expect(diff.diff).toContain('+beta');
+        expect(getValidatedReadWorkspacePathStats()).toMatchObject({ issued: 2, accepted: 2 });
+    });
+
     it('aceita capability mutável opaca em write/patch sem revalidar a path no workspace facade', async () => {
         const { workspaceRoot, io } = await createWorkspaceFixture();
         const filePath = join(workspaceRoot, 'mutable.txt');

@@ -24,7 +24,21 @@ import {
     WORKSPACE_ROOT,
 } from './shared.js';
 
-const { diffText, scanDirectory } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+const { diffText, diffTextValidated, scanDirectory, scanDirectoryValidated } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+
+/** @param {{ resolved: string; validatedReadPath?: unknown }} target @param {Parameters<typeof scanDirectory>[1]} options */
+function scanValidatedOrString(target, options) {
+    return target.validatedReadPath
+        ? scanDirectoryValidated(target.validatedReadPath, options)
+        : scanDirectory(target.resolved, options);
+}
+
+/** @param {{ resolved: string; validatedReadPath?: unknown }} pathA @param {{ resolved: string; validatedReadPath?: unknown }} pathB @param {Parameters<typeof diffText>[2]} options */
+function diffValidatedPairOrString(pathA, pathB, options) {
+    return pathA.validatedReadPath && pathB.validatedReadPath
+        ? diffTextValidated(pathA.validatedReadPath, pathB.validatedReadPath, options)
+        : diffText(pathA.resolved, pathB.resolved, options);
+}
 
 export { readFileContentTool, readFilesBatchTool } from './read/index.js';
 
@@ -61,8 +75,9 @@ export const listDirectoryTool = buildTool({
         cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
     }),
     handler: async ({ path: dirPath, recursive, depth, showHidden, filter, maxEntries, cursor }) => {
-        const { ok, reason, resolved } = await validatePath(dirPath, { mode: 'read' });
-        if (!ok) return { success: false, error: reason };
+        const validated = await validatePath(dirPath, { mode: 'read', issueReadCapability: true });
+        if (!validated.ok) return { success: false, error: validated.reason };
+        const { resolved } = validated;
 
         log('INFO', `[copilot/list_directory] ${resolved} (recursive=${recursive}, depth=${depth})`);
 
@@ -78,8 +93,7 @@ export const listDirectoryTool = buildTool({
         try {
             const stats = await fsStat(resolved);
             if (!stats.isDirectory()) return { success: false, error: 'Não é um diretório, use read_file_content.' };
-            const scan = await scanDirectory(resolved, {
-                workspaceRoot: WORKSPACE_ROOT,
+            const scan = await scanValidatedOrString(validated, {
                 recursive,
                 depth,
                 showHidden,
@@ -159,13 +173,13 @@ export const diffFilesTool = buildTool({
             .describe('Número de linhas de contexto exibidas ao redor de cada mudança (padrão histórico: 3)'),
     }),
     handler: async ({ path_a, path_b, context_lines }) => {
-        const va = await validatePath(path_a, { mode: 'read' });
+        const va = await validatePath(path_a, { mode: 'read', issueReadCapability: true });
         if (!va.ok) return { success: false, error: `path_a: ${va.reason}` };
-        const vb = await validatePath(path_b, { mode: 'read' });
+        const vb = await validatePath(path_b, { mode: 'read', issueReadCapability: true });
         if (!vb.ok) return { success: false, error: `path_b: ${vb.reason}` };
 
         try {
-            const diff = await diffText(va.resolved, vb.resolved, { contextLines: context_lines ?? 3 });
+            const diff = await diffValidatedPairOrString(va, vb, { contextLines: context_lines ?? 3 });
             const diffOutput = truncateUtf8Text(
                 diff.diff,
                 FILE_TOOLS_OUTPUT_POLICY.maxDiffOutputBytes,

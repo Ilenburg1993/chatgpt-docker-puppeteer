@@ -28,7 +28,7 @@ import {
 import { repoStatusHandler } from './repo-status.js';
 
 const {
-    diffText,
+    diffTextValidated,
     readBytesValidated,
     readTextValidated,
     scanDirectoryValidated,
@@ -909,11 +909,13 @@ export const repoReadTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ pathA, pathB, contextLines, includeDiffPreview }) => {
-            const resolvedA = await resolveReadPath(pathA);
+            const resolvedA = await resolveReadPath(pathA, { issueReadCapability: true });
             if (!resolvedA.ok) return errorResult(`pathA: ${resolvedA.reason}`, { ...resolvedA, field: 'pathA' });
-            const resolvedB = await resolveReadPath(pathB);
+            const resolvedB = await resolveReadPath(pathB, { issueReadCapability: true });
             if (!resolvedB.ok) return errorResult(`pathB: ${resolvedB.reason}`, { ...resolvedB, field: 'pathB' });
-            const diff = await diffText(resolvedA.resolved, resolvedB.resolved, { contextLines: contextLines ?? 3 });
+            const diff = await diffTextValidated(resolvedA.validatedReadPath, resolvedB.validatedReadPath, {
+                contextLines: contextLines ?? 3,
+            });
             return okResult(
                 {
                     success: true,
