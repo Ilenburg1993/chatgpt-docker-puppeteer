@@ -9,7 +9,9 @@ import { readFilesBatchTool } from '../../../../../src/copilot/tools/file/read/i
 import { patchFilesBatchTool } from '../../../../../src/copilot/tools/file/write/index.js';
 import {
     getValidatedMutableWorkspacePathStats,
+    getValidatedReadWorkspacePathStats,
     resetValidatedMutableWorkspacePathStatsForTest,
+    resetValidatedReadWorkspacePathStatsForTest,
 } from '../../../../../src/copilot/infra/io/policy/validated-path.js';
 
 async function createFixture() {
@@ -28,6 +30,7 @@ describe('local LLM-B bulk file tools', () => {
         const a = join(root, 'a.txt');
         const b = join(root, 'b.txt');
         await Promise.all([writeFile(a, 'alpha\none\n', 'utf8'), writeFile(b, 'beta\ntwo\n', 'utf8')]);
+        resetValidatedReadWorkspacePathStatsForTest();
         try {
             const result = await readFilesBatchTool.handler({
                 requests: [
@@ -49,7 +52,12 @@ describe('local LLM-B bulk file tools', () => {
             assert.equal(result.results[1]?.success, false);
             assert.equal(result.results[2]?.success, true);
             assert.match(String(result.results[2]?.content ?? ''), /two/u);
+            const readStats = getValidatedReadWorkspacePathStats();
+            assert.equal(readStats.issued, 3);
+            assert.equal(readStats.accepted, 3);
+            assert.equal(readStats.rejectedUnbranded, 0);
         } finally {
+            resetValidatedReadWorkspacePathStatsForTest();
             await rm(root, { recursive: true, force: true });
         }
     });

@@ -40,7 +40,9 @@ import { WORKSPACE_ROOT } from '#copilot/tools';
 import { dirname, extname, join, relative, resolve as resolvePath } from 'node:path';
 import { z } from 'zod';
 
-const { readText, statPath } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+const { readText, readTextValidated, statPath, statPathValidated } = createWorkspaceIo({
+    workspaceRoot: getMcpWorkspaceRoot(),
+});
 
 const DEFAULT_INDEX_PATH = 'src/copilot';
 const DEFAULT_ORPHAN_IMPORT_SCAN_PATH = 'src/copilot';
@@ -600,9 +602,11 @@ export const repoIndexTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, recursive, depth, includeDynamic, maxFiles, maxResults, cursor }) => {
-            const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_ORPHAN_IMPORT_SCAN_PATH));
+            const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_ORPHAN_IMPORT_SCAN_PATH), {
+                issueReadCapability: true,
+            });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
-            const stat = await statPath(resolved.resolved);
+            const stat = await statPathValidated(resolved.validatedReadPath);
             const fileLimit = normalizePositiveInteger(maxFiles, DEFAULT_ORPHAN_IMPORT_MAX_FILES, 5000);
             /** @type {{
     file: string;
@@ -634,7 +638,7 @@ export const repoIndexTools = [
                 if (isAnalyzableModuleFile(resolved.resolved)) {
                     scannedFiles = 1;
                     try {
-                        const text = await readText(resolved.resolved);
+                        const text = await readTextValidated(resolved.validatedReadPath);
                         const parsed = await parseFileForContext(resolved.resolved, text.content);
                         for (const importEntry of parsed.symbols.imports) {
                             const source = String(importEntry.source ?? '');

@@ -16,7 +16,6 @@ import {
     getMcpWorkspaceRoot,
     okResult,
     readOnlyAnnotations,
-    resolveReadPath,
     resolveWritePath,
     toWorkspaceRelativePath,
     withResultExecutionHint,
@@ -33,6 +32,7 @@ const {
     createOrReplaceFileAtomicValidated,
     deleteFileLocked,
     moveFileLocked,
+    moveFileLockedValidated,
     patchTextBatchLocked,
     patchTextBatchLockedValidated,
     patchTextLocked,
@@ -97,6 +97,20 @@ function writeResolvedTarget(resolved, content, options) {
     return resolved.validatedWritePath
         ? writeFileAtomicValidated(resolved.validatedWritePath, content, options)
         : writeFileAtomic(resolved.resolved, content, options);
+}
+
+/**
+ * Move through the pair-capability path only when both sides were independently authorized by canonical write policy.
+ * Legacy/mocked callers without capabilities keep the string facade and therefore retain full policy validation.
+ *
+ * @param {{ resolved: string; validatedWritePath?: unknown }} source
+ * @param {{ resolved: string; validatedWritePath?: unknown }} destination
+ * @param {Parameters<typeof moveFileLocked>[2]} options
+ */
+function moveResolvedTargets(source, destination, options) {
+    return source.validatedWritePath && destination.validatedWritePath
+        ? moveFileLockedValidated(source.validatedWritePath, destination.validatedWritePath, options)
+        : moveFileLocked(source.resolved, destination.resolved, options);
 }
 
 /**
@@ -1331,7 +1345,9 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
         };
     }
     if (type === 'move_file') {
-        const source = await resolveReadPath(String(item['source'] ?? ''));
+        // A move mutates the source as well as the destination. Preflight must therefore use write policy on both sides,
+        // matching the actual move facade instead of producing a read-only false green for the source.
+        const source = await resolveWritePath(String(item['source'] ?? ''));
         if (!source.ok) throw new Error(`operation ${index}: ${source.reason}`);
         const destination = await resolveWritePath(String(item['destination'] ?? ''));
         if (!destination.ok) throw new Error(`operation ${index}: ${destination.reason}`);
@@ -1448,14 +1464,14 @@ async function applyBatchFileOperation(operation, index) {
         };
     }
     if (type === 'move_file') {
-        const source = await resolveReadPath(String(item['source'] ?? ''));
+        const source = await resolveWritePath(String(item['source'] ?? ''), { issueMutableCapability: true });
         if (!source.ok) throw new Error(`operation ${index}: ${source.reason}`);
-        const destination = await resolveWritePath(String(item['destination'] ?? ''));
+        const destination = await resolveWritePath(String(item['destination'] ?? ''), { issueMutableCapability: true });
         if (!destination.ok) throw new Error(`operation ${index}: ${destination.reason}`);
         if (item['overwrite'] === true && item['confirmOverwrite'] !== true) {
             throw new Error(`operation ${index}: confirmOverwrite must be true when overwrite=true`);
         }
-        const moved = await moveFileLocked(source.resolved, destination.resolved, {
+        const moved = await moveResolvedTargets(source, destination, {
             overwrite: item['overwrite'] === true,
         });
         return {
@@ -2418,9 +2434,10 @@ export const repoWriteTools = [
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ source, destination, overwrite, confirmOverwrite, dryRun }) => {
-            const src = await resolveReadPath(source);
+            const issueMutableCapability = dryRun !== true;
+            const src = await resolveWritePath(source, { issueMutableCapability });
             if (!src.ok) return errorResult(src.reason, { ...src, field: 'source' });
-            const dst = await resolveWritePath(destination);
+            const dst = await resolveWritePath(destination, { issueMutableCapability });
             if (!dst.ok) return errorResult(dst.reason, { ...dst, field: 'destination' });
             if (overwrite === true && confirmOverwrite !== true) {
                 return errorResult('confirmOverwrite deve ser true quando overwrite=true.', {
@@ -2453,7 +2470,7 @@ export const repoWriteTools = [
                     });
                 }
 
-                const moved = await moveFileLocked(src.resolved, dst.resolved, { overwrite: overwrite === true });
+                const moved = await moveResolvedTargets(src, dst, { overwrite: overwrite === true });
                 await appendMcpAuditEvent({
                     event: 'repo_move_file_applied',
                     tool: 'repo_move_file',

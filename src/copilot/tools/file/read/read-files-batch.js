@@ -86,7 +86,7 @@ export const readFilesBatchTool = buildTool({
                         error: 'endLine must be greater than or equal to startLine.',
                     };
                 }
-                const resolved = await validatePath(input.path, { mode: 'read' });
+                const resolved = await validatePath(input.path, { mode: 'read', issueReadCapability: true });
                 if (!resolved.ok || !resolved.validatedReadPath) {
                     return {
                         success: false,

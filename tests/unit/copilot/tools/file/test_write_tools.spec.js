@@ -582,7 +582,8 @@ describe('F35 — copy_file (F186)', () => {
             expect.any(Number),
         );
         expect(fsMock.link).toHaveBeenCalledWith(expect.stringContaining('.dst.txt.'), '/workspace/dst.txt');
-        expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write' });
+        expect(mockValidatePath.mock.calls[0]?.[1]).toEqual({ mode: 'read', issueReadCapability: true });
+        expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write', issueMutableCapability: true });
     });
 
     it('aplica expectedSourceHash antes de publicar a cópia', async () => {
@@ -678,7 +679,8 @@ describe('F35 — move_file (F186)', () => {
         expect(fsMock.link).toHaveBeenCalledWith('/workspace/old.txt', '/workspace/new.txt');
         expect(fsMock.rename).not.toHaveBeenCalled();
         expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/old.txt');
-        expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write' });
+        expect(mockValidatePath.mock.calls[0]?.[1]).toEqual({ mode: 'write', issueMutableCapability: true });
+        expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write', issueMutableCapability: true });
     });
 
     it('falha se destino existe sem overwrite', async () => {

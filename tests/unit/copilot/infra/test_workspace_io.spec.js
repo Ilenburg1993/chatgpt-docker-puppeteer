@@ -89,6 +89,23 @@ describe('workspace IO capability', () => {
         expect(getValidatedReadWorkspacePathStats()).toMatchObject({ issued: 1, accepted: 2 });
     });
 
+    it('aceita capability read-only para scan de diretório sem segunda policy async', async () => {
+        const { workspaceRoot, io } = await createWorkspaceFixture();
+        await mkdir(join(workspaceRoot, 'nested'));
+        await writeFile(join(workspaceRoot, 'nested', 'entry.txt'), 'entry', 'utf8');
+        resetValidatedReadWorkspacePathStatsForTest();
+        const capability = createValidatedReadWorkspacePath({ realPath: join(workspaceRoot, 'nested'), workspaceRoot });
+
+        const scan = await io.scanDirectoryValidated(capability, { depth: 1, maxEntries: 10 });
+
+        expect(scan.entries.some((entry) => entry.name === 'entry.txt')).toBe(true);
+        expect(getValidatedReadWorkspacePathStats()).toMatchObject({
+            issued: 1,
+            accepted: 1,
+            compatibleModes: ['read', 'search', 'stat', 'scan'],
+        });
+    });
+
     it('aceita capability mutável opaca em write/patch sem revalidar a path no workspace facade', async () => {
         const { workspaceRoot, io } = await createWorkspaceFixture();
         const filePath = join(workspaceRoot, 'mutable.txt');
@@ -106,6 +123,39 @@ describe('workspace IO capability', () => {
         expect(patch.replacedOccurrences).toBe(1);
         await expect(readFile(filePath, 'utf8')).resolves.toBe('after');
         expect(getValidatedMutableWorkspacePathStats()).toMatchObject({ issued: 1, accepted: 2 });
+    });
+
+    it('compõe capabilities pair sem revalidar copy/move e mantém read/write separados', async () => {
+        const { workspaceRoot, io } = await createWorkspaceFixture();
+        const sourcePath = join(workspaceRoot, 'pair-source.txt');
+        const copiedPath = join(workspaceRoot, 'pair-copied.txt');
+        const movedPath = join(workspaceRoot, 'pair-moved.txt');
+        await io.writeFileAtomic(sourcePath, 'pair-content');
+        resetValidatedReadWorkspacePathStatsForTest();
+        resetValidatedMutableWorkspacePathStatsForTest();
+
+        const copySource = createValidatedReadWorkspacePath({ realPath: sourcePath, workspaceRoot });
+        const copyDestination = createValidatedMutableWorkspacePath({ realPath: copiedPath, workspaceRoot });
+        const copied = await io.copyFileLockedValidated(copySource, copyDestination, { overwrite: false });
+        expect(copied.sourceHash).toBeTruthy();
+        await expect(readFile(copiedPath, 'utf8')).resolves.toBe('pair-content');
+
+        const moveSource = createValidatedMutableWorkspacePath({ realPath: copiedPath, workspaceRoot });
+        const moveDestination = createValidatedMutableWorkspacePath({ realPath: movedPath, workspaceRoot });
+        const moved = await io.moveFileLockedValidated(moveSource, moveDestination, { overwrite: false });
+        expect(moved.sourceHash).toBeTruthy();
+        await expect(readFile(movedPath, 'utf8')).resolves.toBe('pair-content');
+        await expect(stat(copiedPath)).rejects.toMatchObject({ code: 'ENOENT' });
+
+        expect(getValidatedReadWorkspacePathStats()).toMatchObject({ issued: 1, accepted: 1 });
+        expect(getValidatedMutableWorkspacePathStats()).toMatchObject({ issued: 3, accepted: 3 });
+
+        await expect(io.copyFileLockedValidated(copyDestination, moveDestination)).rejects.toMatchObject({
+            code: 'EINVALIDVALIDATEDPATH',
+        });
+        await expect(io.moveFileLockedValidated(copySource, moveDestination)).rejects.toMatchObject({
+            code: 'EINVALIDVALIDATEDMUTABLEPATH',
+        });
     });
 
     it('rejeita capability mutável sem brand, de outro workspace e em modo incompatível', async () => {

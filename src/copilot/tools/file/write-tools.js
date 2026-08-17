@@ -35,10 +35,12 @@ import { dryRunPatchPlan, normalizePatchPlan } from './write/patch-plan.js';
 
 const {
     copyFileLocked,
+    copyFileLockedValidated,
     createOrReplaceFileAtomic,
     createOrReplaceFileAtomicValidated,
     deleteFileLocked,
     moveFileLocked,
+    moveFileLockedValidated,
     writeFileAtomic,
     writeFileAtomicValidated,
 } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
@@ -55,6 +57,20 @@ function createValidatedOrString(validatedWritePath, resolved, content, options)
     return validatedWritePath
         ? createOrReplaceFileAtomicValidated(validatedWritePath, content, options)
         : createOrReplaceFileAtomic(resolved, content, options);
+}
+
+/** @param {{ resolved: string; validatedReadPath?: unknown }} source @param {{ resolved: string; validatedWritePath?: unknown }} destination @param {Parameters<typeof copyFileLocked>[2]} options */
+function copyValidatedPairOrString(source, destination, options) {
+    return source.validatedReadPath && destination.validatedWritePath
+        ? copyFileLockedValidated(source.validatedReadPath, destination.validatedWritePath, options)
+        : copyFileLocked(source.resolved, destination.resolved, options);
+}
+
+/** @param {{ resolved: string; validatedWritePath?: unknown }} source @param {{ resolved: string; validatedWritePath?: unknown }} destination @param {Parameters<typeof moveFileLocked>[2]} options */
+function moveValidatedPairOrString(source, destination, options) {
+    return source.validatedWritePath && destination.validatedWritePath
+        ? moveFileLockedValidated(source.validatedWritePath, destination.validatedWritePath, options)
+        : moveFileLocked(source.resolved, destination.resolved, options);
 }
 
 // ---------------------------------------------------------------------------
@@ -484,7 +500,7 @@ const copyFileTool = buildTool({
             .describe('SHA-256 esperado da origem. Se ela mudou, a cópia falha sem publicar o destino.'),
     }),
     handler: async ({ source, destination, overwrite, expectedSourceHash }) => {
-        const src = await validatePath(source, { mode: 'read' });
+        const src = await validatePath(source, { mode: 'read', issueReadCapability: true });
         if (!src.ok) {
             return pathFailureResult(
                 'copy_file',
@@ -494,7 +510,7 @@ const copyFileTool = buildTool({
             );
         }
 
-        const dst = await validatePath(destination, { mode: 'write' });
+        const dst = await validatePath(destination, { mode: 'write', issueMutableCapability: true });
         if (!dst.ok) {
             return pathFailureResult(
                 'copy_file',
@@ -514,7 +530,7 @@ const copyFileTool = buildTool({
         });
 
         try {
-            const copyResult = await copyFileLocked(src.resolved, dst.resolved, {
+            const copyResult = await copyValidatedPairOrString(src, dst, {
                 overwrite,
                 ...(expectedSourceHash ? { expectedSourceHash } : {}),
             });
@@ -630,7 +646,7 @@ const moveFileTool = buildTool({
         overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
     }),
     handler: async ({ source, destination, overwrite }) => {
-        const src = await validatePath(source, { mode: 'read' });
+        const src = await validatePath(source, { mode: 'write', issueMutableCapability: true });
         if (!src.ok) {
             return pathFailureResult(
                 'move_file',
@@ -640,7 +656,7 @@ const moveFileTool = buildTool({
             );
         }
 
-        const dst = await validatePath(destination, { mode: 'write' });
+        const dst = await validatePath(destination, { mode: 'write', issueMutableCapability: true });
         if (!dst.ok) {
             return pathFailureResult(
                 'move_file',
@@ -660,7 +676,7 @@ const moveFileTool = buildTool({
         });
 
         try {
-            const moveResult = await moveFileLocked(src.resolved, dst.resolved, { overwrite });
+            const moveResult = await moveValidatedPairOrString(src, dst, { overwrite });
             return withIoMeta(
                 {
                     success: true,

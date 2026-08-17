@@ -1626,3 +1626,113 @@ Gates após o refinamento de autoridade mínima:
 
 `CAPABILITIES_VERSION` permanece em **49**: nenhuma tool, schema, permissão, annotation ou contrato MCP externo mudou; a transformação é interna ao plano de I/O. Uma elevação aqui confundiria versão de superfície anunciada com versão de implementação. A versão relevante para invalidação da capability é `IO_PATH_POLICY_VERSION=2026-08-17.r3.nearest-ancestor.v1`.
 
+### 22.20 Sublote — emissão read explícita, scan validado e capabilities pair para copy/move
+
+Depois do 22.19, o dashboard já não mostrava um novo gargalo interativo comparável aos anteriores: fora compiladores/linter, publish Git e smoke remoto, as repo tools estavam em dezenas de milissegundos. A próxima otimização foi então escolhida por **duplicação estrutural de policy/realpath**, e não por latência bruta de uma chamada isolada.
+
+Duas assimetrias ainda permaneciam:
+
+1. a capability read era emitida implicitamente por muitos `validatePath(..., {mode:'read'})`, inclusive em callers que não a consumiam; ao mesmo tempo, alguns scans ainda retornavam para a facade string e repetiam a policy;
+2. copy/move validavam source/destination no adapter e depois chamavam `copyFileLocked`/`moveFileLocked` pela facade string, que revalidava os dois paths. Um move pagava portanto **duas avaliações de path redundantes por operação**.
+
+A arquitetura final preserva autoridade mínima e não cria novas brands/modos:
+
+- read capability passa a exigir `issueReadCapability:true`, simetricamente ao opt-in já adotado para mutable capability;
+- `resolveReadPath()` também recebe esse opt-in; callers que só precisam do path validado não ganham capability desnecessária;
+- `scan` foi incorporado aos modos compatíveis da capability read, e `createWorkspaceIo` ganhou `scanDirectoryValidated`;
+- repo tree/root tree, read, stats, text search, symbol usages/search, outline, orphan-import inspection e o smoke canônico passaram a pedir capability apenas quando entram numa primitive validated;
+- `read_files_batch` local da LLM-B também pede explicitamente read capability e reutiliza a mesma resolução;
+- copy reutiliza **read(source) + mutable/write(destination)**;
+- move reutiliza **mutable/write(source) + mutable/write(destination)**;
+- nenhum novo tipo de capability pair foi criado: a facade apenas compõe duas capabilities independentes já autorizadas e branded;
+- `copyFileLockedValidated` e `moveFileLockedValidated` continuam delegando para as mesmas primitives canônicas, portanto locks de dois recursos, hashes, overwrite, rollback/snapshots, publicação atômica e fallback cross-device permanecem intactos;
+- APIs string continuam existindo como fallback para mocks/callers legados e continuam executando policy completa.
+
+#### Correção de fidelidade da policy em move
+
+A investigação encontrou uma diferença semântica importante: copy **lê** a origem; move **muta** a origem. A facade string original já refletia isso — copy source usa policy `read`, enquanto move source usa `move`, normalizada pela core policy para a classe `write`.
+
+Alguns adapters, contudo, faziam preflight de move com `resolveReadPath(source)` e só descobriam a write-policy mais tarde dentro da primitive. Isso permitia um **falso-verde de plan/dry-run**: uma origem legível porém proibida para escrita podia passar o preview e falhar no apply.
+
+Correções:
+
+- `repo_move_file_plan` usa write policy na origem e destino;
+- `repo_apply_file_batch` usa write policy na origem do move tanto no preflight quanto no apply;
+- `repo_move_file` single usa write policy nos dois lados e só emite mutable capabilities quando `dryRun !== true`;
+- `move_file` local da LLM-B usa `mode:'write', issueMutableCapability:true` em source e destination;
+- regressão explícita usa uma origem `.sh`: a extensão é legível pela família read, mas bloqueada por `DEFAULT_BLOCKED_WRITE_PATH_PATTERNS`; `repo_move_file(..., dryRun:true)` agora a recusa sem mover o arquivo e sem emitir mutable capability.
+
+#### Reconciliação de duas frentes simultâneas
+
+Durante a implementação, outra frente no mesmo workspace começou a migrar os consumidores read/scan para emissão explícita. As preconditions SHA-256 impediram múltiplas sobrescritas stale. Em particular:
+
+- `validated-path.js` ganhou `scan` em `READ_ONLY_MODES` enquanto esta frente estava aberta;
+- `workspace-io.js`, `repo-plan.js`, `write-tools.js` e testes tiveram hashes alterados entre read/preflight e apply;
+- chamadas stale foram recusadas por `EEXPECTEDHASH`, sem write parcial;
+- a mudança foi então relida e reconciliada semanticamente em vez de sobrescrita;
+- essa reconciliação encontrou uma interação real: depois de read capability tornar-se opt-in, `copy_file` continuaria correto por fallback string, mas perderia o fast path. O handler foi ajustado para pedir `issueReadCapability:true` na origem, preservando o ganho pair.
+
+O resultado é um lote integrado, não duas implementações concorrentes do mesmo conceito: **capability só é emitida quando o caller vai consumi-la, e uma capability emitida cruza a fronteira até a primitive sem segunda policy idêntica**.
+
+Uma tentativa inicial de aplicar um patch batch grande à facade foi bloqueada antes de chegar ao MCP pelo host da OpenAI. `mcp_host_block_diagnostics` classificou o evento como `CHATGPT_HOST_PRECALL_BLOCK`, `layer=chatgpt-host`, confidence high; o MCP não recebeu a chamada e nenhum arquivo foi alterado. O mesmo plano foi aplicado por patches menores/governados e, posteriormente, batches menores voltaram a funcionar. Portanto o incidente foi de classificação host-side, não falha da policy ou do executor MCP.
+
+#### Gates causais
+
+Pair mutation:
+
+- workspace I/O: **passed em 1,808 s**;
+- MCP repo-write: **passed em 5,361 s**;
+- LLM-B write tools: **passed em 2,225 s**;
+- regressão adicional de move-source write-policy: MCP repo-write **passed em 5,229 s**.
+
+Validated-read/scan integrado:
+
+- MCP tools/end-to-end smoke unitário: **passed em 4,388 s**;
+- LLM-B bulk file tools: **passed em 2,107 s**;
+- LLM-B write/copy/move após reconciliar `issueReadCapability`: **passed em 2,105 s**;
+- strict typecheck final antes da ativação: **passed em 5,517 s**.
+
+Um strict typecheck intermediário falhou durante uma janela de edição concorrente em `repo-index.js` e também apontou `resolveReadPath` órfão em `repo-write.js`. O import órfão foi removido; a frente concorrente completou a migração de `repo-index.js`; o typecheck subsequente ficou integralmente verde. Isso foi tratado como evidência de concorrência real e não como justificativa para sobrescrever arquivos por snapshot stale.
+
+#### Prova live — pair move
+
+No processo ativado antes da integração read final:
+
+1. o processo já tinha atividade anterior, então a prova usou **deltas**, não valores absolutos;
+2. após criar o source temporário, `validatedMutablePath` estava em **7 issued / 7 accepted**;
+3. uma chamada real de `repo_move_file` moveu 26 bytes com I/O **40 ms** e handler ~**54 ms**;
+4. health imediatamente posterior mostrou **9 issued / 9 accepted**, zero rejects;
+5. delta do move: **+2 issued / +2 accepted**, exatamente source + destination;
+6. o destino de prova foi removido do workspace por quarentena reversível.
+
+Isso demonstra que o move real eliminou as duas reavaliações de path que antes ocorriam ao atravessar a facade string.
+
+#### Ativação final integrada e prova live read/scan
+
+Reload final controlado em QUIC:
+
+- `mcp_connector_smoke_refresh`: **893 ms total**;
+- authenticated OAuth: **891 ms**;
+- SSE initial/reconnect: green, **160 ms**;
+- post-restart readiness: `ready=true`, reload completed/reconciled;
+- tools local/remoto: **119/119**, zero missing/unexpected;
+- authenticated `tools/list`: **117.956 bytes**, sem qualquer crescimento de superfície.
+
+No novo processo, antes do smoke in-process:
+
+- `validatedReadPath`: **0 issued / 0 accepted / 0 rejects**;
+- `validatedMutablePath`: **0 issued / 0 accepted / 0 rejects**.
+
+`mcp_smoke_workspace` executou em **265 ms** e passou todos os checks funcionais: repo status, tree, root redaction, secret-read denial, read, stat, text search, symbol usages, symbol search, outline, index status, project doctor e runtime health. O único warning foi `WORKSPACE_DIRTY`, esperado durante desenvolvimento.
+
+Health após o smoke:
+
+- `validatedReadPath`: **8 issued / 8 accepted / 0 rejects**;
+- modos: `read | search | stat | scan`;
+- `validatedMutablePath`: permaneceu **0 / 0 / 0**;
+- policy version: `2026-08-17.r3.nearest-ancestor.v1`.
+
+A igualdade `issued == accepted` mostra que o novo opt-in não apenas reduz emissão de autoridade: **toda capability read criada nessa prova foi efetivamente consumida por uma primitive validated**.
+
+`CAPABILITIES_VERSION` permanece em **49**. O lote não adiciona tool, schema, annotation, permissão nem contrato MCP externo; apenas torna mais estrita e eficiente a passagem interna de autoridade já validada.
+

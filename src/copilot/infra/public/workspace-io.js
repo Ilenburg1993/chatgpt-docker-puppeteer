@@ -117,7 +117,7 @@ function bindWorkspacePathOperation(operation, mode, context) {
  * @template {unknown[]} Args
  * @template Result
  * @param {(filePath: string, ...args: Args) => Promise<Result>} operation
- * @param {'read' | 'search' | 'stat'} mode
+ * @param {'read' | 'search' | 'stat' | 'scan'} mode
  * @param {WorkspaceIoContext} context
  * @returns {(capability: unknown, ...args: Args) => Promise<Result>}
  */
@@ -168,6 +168,84 @@ function bindValidatedMutableOperation(operation, mode, context) {
         });
         try {
             return await operation(resolvedPath, ...args);
+        } finally {
+            budget.finish();
+        }
+    };
+}
+
+/**
+ * Compose an already-validated read source with an already-validated write destination. Used only for copy semantics;
+ * no new capability class is introduced and each side retains the policy that originally authorized it.
+ *
+ * @template {unknown[]} Args
+ * @template Result
+ * @param {(source: string, destination: string, ...args: Args) => Promise<Result>} operation
+ * @param {WorkspaceIoContext} context
+ * @returns {(sourceCapability: unknown, destinationCapability: unknown, ...args: Args) => Promise<Result>}
+ */
+function bindValidatedReadMutablePairOperation(operation, context) {
+    return async (sourceCapability, destinationCapability, ...args) => {
+        const source = resolveValidatedReadWorkspacePath(sourceCapability, {
+            workspaceRoot: context.workspaceRoot,
+            mode: 'read',
+        });
+        const destination = resolveValidatedMutableWorkspacePath(destinationCapability, {
+            workspaceRoot: context.workspaceRoot,
+            mode: 'write',
+        });
+        if (!source || !destination) {
+            const error = /** @type {Error & { code?: string }} */ (
+                new Error('Validated workspace copy requires opaque read-source and mutable-destination capabilities.')
+            );
+            error.code = 'EVALIDATEDPAIRREQUIRED';
+            throw error;
+        }
+        const budget = beginIoAdvisoryBudget({
+            operation: 'workspace.read-write.validated',
+            estimatedBytes: estimateMutationBytes(args),
+        });
+        try {
+            return await operation(source, destination, ...args);
+        } finally {
+            budget.finish();
+        }
+    };
+}
+
+/**
+ * Compose two independently write-validated capabilities for move semantics. Source and destination both use the write
+ * policy class, matching the existing string facade where move-source resolves through mode `move` -> write policy.
+ *
+ * @template {unknown[]} Args
+ * @template Result
+ * @param {(source: string, destination: string, ...args: Args) => Promise<Result>} operation
+ * @param {WorkspaceIoContext} context
+ * @returns {(sourceCapability: unknown, destinationCapability: unknown, ...args: Args) => Promise<Result>}
+ */
+function bindValidatedMutablePairOperation(operation, context) {
+    return async (sourceCapability, destinationCapability, ...args) => {
+        const source = resolveValidatedMutableWorkspacePath(sourceCapability, {
+            workspaceRoot: context.workspaceRoot,
+            mode: 'write',
+        });
+        const destination = resolveValidatedMutableWorkspacePath(destinationCapability, {
+            workspaceRoot: context.workspaceRoot,
+            mode: 'write',
+        });
+        if (!source || !destination) {
+            const error = /** @type {Error & { code?: string }} */ (
+                new Error('Validated workspace move requires opaque mutable source and destination capabilities.')
+            );
+            error.code = 'EVALIDATEDPAIRREQUIRED';
+            throw error;
+        }
+        const budget = beginIoAdvisoryBudget({
+            operation: 'workspace.write-write.validated',
+            estimatedBytes: estimateMutationBytes(args),
+        });
+        try {
+            return await operation(source, destination, ...args);
         } finally {
             budget.finish();
         }
@@ -263,7 +341,18 @@ export function createWorkspaceIo(context) {
     const readTextValidated = bindValidatedReadOperation(readText, 'read', context);
     const readTextChunksValidated = bindValidatedReadOperation(readTextChunks, 'read', context);
     const statPathValidated = bindValidatedReadOperation(statPath, 'stat', context);
+    const scanDirectoryValidated = bindValidatedReadOperation(
+        async (targetPath, options = {}) =>
+            scanDirectory(targetPath, {
+                .../** @type {Parameters<typeof scanDirectory>[1]} */ (options),
+                workspaceRoot: context.workspaceRoot,
+            }),
+        'scan',
+        context,
+    );
+    const copyFileLockedValidated = bindValidatedReadMutablePairOperation(copyFileLocked, context);
     const createOrReplaceFileAtomicValidated = bindValidatedMutableOperation(createOrReplaceFileAtomic, 'write', context);
+    const moveFileLockedValidated = bindValidatedMutablePairOperation(moveFileLocked, context);
     const patchTextBatchLockedValidated = bindValidatedMutableOperation(patchTextBatchLocked, 'patch', context);
     const patchTextLockedValidated = bindValidatedMutableOperation(patchTextLocked, 'patch', context);
     const writeFileAtomicValidated = bindValidatedMutableOperation(writeFileAtomic, 'write', context);
@@ -289,12 +378,14 @@ export function createWorkspaceIo(context) {
     return Object.freeze({
         appendTextLocked: bindWorkspacePathOperation(appendTextLocked, 'append', context),
         copyFileLocked: bindWorkspacePathPairOperation(copyFileLocked, 'read', 'write', context),
+        copyFileLockedValidated,
         createOrReplaceFileAtomic: bindWorkspacePathOperation(createOrReplaceFileAtomic, 'write', context),
         createOrReplaceFileAtomicValidated,
         deleteFileLocked: bindWorkspacePathOperation(deleteFileLocked, 'delete', context),
         diffText: bindWorkspacePathPairOperation(diffText, 'read', 'read', context),
         mkdirPathLocked: bindWorkspacePathOperation(mkdirPathLocked, 'mkdir', context),
         moveFileLocked: bindWorkspacePathPairOperation(moveFileLocked, 'move', 'write', context),
+        moveFileLockedValidated,
         patchTextBatchLocked: bindWorkspacePathOperation(patchTextBatchLocked, 'patch', context),
         patchTextBatchLockedValidated,
         patchTextLocked: bindWorkspacePathOperation(patchTextLocked, 'patch', context),
@@ -308,6 +399,7 @@ export function createWorkspaceIo(context) {
         readTextChunksValidated,
         removePathLocked: bindWorkspaceRemovePathOperation(removePathLocked, context),
         scanDirectory: scanWorkspaceDirectory,
+        scanDirectoryValidated,
         searchText: searchWorkspaceText,
         searchTextValidated,
         searchWorkspaceSymbols: searchBoundWorkspaceSymbols,

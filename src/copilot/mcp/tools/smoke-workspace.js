@@ -20,9 +20,13 @@ import {
 import { projectDoctorTool } from './project-doctor.js';
 import { repoStatusHandler } from './repo-status.js';
 
-const { readText, scanDirectory, searchText, searchWorkspaceSymbols, statPath } = createWorkspaceIo({
-    workspaceRoot: WORKSPACE_ROOT,
-});
+const {
+    readTextValidated,
+    scanDirectoryValidated,
+    searchTextValidated,
+    searchWorkspaceSymbolsValidated,
+    statPathValidated,
+} = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
 /**
  * @type {import('../registry.js').McpToolDefinition}
@@ -47,16 +51,15 @@ export const mcpSmokeWorkspaceTool = {
             return { dirty };
         });
         await runCheck(checks, 'repo_tree_default', async () => {
-            const resolved = await resolveReadPath('src/copilot');
+            const resolved = await resolveReadPath('src/copilot', { issueReadCapability: true });
             if (!resolved.ok) throw new Error(resolved.reason);
-            const scan = await scanDirectory(resolved.resolved, { workspaceRoot: WORKSPACE_ROOT, depth: 1 });
+            const scan = await scanDirectoryValidated(resolved.validatedReadPath, { depth: 1 });
             return { entries: scan.entries.length, blockedEntries: scan.blockedEntries };
         });
         await runCheck(checks, 'repo_root_tree_redaction', async () => {
-            const resolved = await resolveReadPath('.');
+            const resolved = await resolveReadPath('.', { issueReadCapability: true });
             if (!resolved.ok) throw new Error(resolved.reason);
-            const scan = await scanDirectory(resolved.resolved, {
-                workspaceRoot: WORKSPACE_ROOT,
+            const scan = await scanDirectoryValidated(resolved.validatedReadPath, {
                 depth: 1,
                 showHidden: true,
             });
@@ -68,21 +71,21 @@ export const mcpSmokeWorkspaceTool = {
             return { code: denied.code };
         });
         await runCheck(checks, 'repo_read_file', async () => {
-            const resolved = await resolveReadPath('src/copilot/mcp/README.md');
+            const resolved = await resolveReadPath('src/copilot/mcp/README.md', { issueReadCapability: true });
             if (!resolved.ok) throw new Error(resolved.reason);
-            const snapshot = await readText(resolved.resolved, { startLine: 1, endLine: 8 });
+            const snapshot = await readTextValidated(resolved.validatedReadPath, { startLine: 1, endLine: 8 });
             return { bytes: snapshot.bytesRead, sha256: snapshot.contentHash };
         });
         await runCheck(checks, 'repo_file_stats', async () => {
-            const resolved = await resolveReadPath('src/copilot/mcp/README.md');
+            const resolved = await resolveReadPath('src/copilot/mcp/README.md', { issueReadCapability: true });
             if (!resolved.ok) throw new Error(resolved.reason);
-            const snapshot = await statPath(resolved.resolved);
+            const snapshot = await statPathValidated(resolved.validatedReadPath);
             return { sizeBytes: snapshot.stats.size, engine: snapshot.io.engine };
         });
         await runCheck(checks, 'repo_search_text', async () => {
-            const resolved = await resolveReadPath('src/copilot/mcp');
+            const resolved = await resolveReadPath('src/copilot/mcp', { issueReadCapability: true });
             if (!resolved.ok) throw new Error(resolved.reason);
-            const result = await searchText(resolved.resolved, {
+            const result = await searchTextValidated(resolved.validatedReadPath, {
                 workspaceRoot: WORKSPACE_ROOT,
                 pattern: 'registerCanonicalMcpTools',
                 contextLines: 2,
@@ -91,9 +94,9 @@ export const mcpSmokeWorkspaceTool = {
             return { returnedMatchCount: result.returnedMatchCount ?? result.matchCount };
         });
         await runCheck(checks, 'repo_find_symbol_usages', async () => {
-            const resolved = await resolveReadPath('src/copilot/mcp/tools/repo-read.js');
+            const resolved = await resolveReadPath('src/copilot/mcp/tools/repo-read.js', { issueReadCapability: true });
             if (!resolved.ok) throw new Error(resolved.reason);
-            const result = await searchText(resolved.resolved, {
+            const result = await searchTextValidated(resolved.validatedReadPath, {
                 workspaceRoot: WORKSPACE_ROOT,
                 pattern: '\\brepoReadTools\\b',
                 isRegex: true,
@@ -105,18 +108,18 @@ export const mcpSmokeWorkspaceTool = {
             return { matchCount: result.matchCount };
         });
         await runCheck(checks, 'repo_symbol_search', async () => {
-            const resolved = await resolveReadPath('src/copilot/mcp');
+            const resolved = await resolveReadPath('src/copilot/mcp', { issueReadCapability: true });
             if (!resolved.ok) throw new Error(resolved.reason);
-            const result = await searchWorkspaceSymbols(resolved.resolved, {
+            const result = await searchWorkspaceSymbolsValidated(resolved.validatedReadPath, {
                 symbolName: 'registerCanonicalMcpTools',
                 maxResults: 10,
             });
             return { matchCount: result.matchCount };
         });
         await runCheck(checks, 'repo_file_outline', async () => {
-            const resolved = await resolveReadPath('src/copilot/mcp/registry.js');
+            const resolved = await resolveReadPath('src/copilot/mcp/registry.js', { issueReadCapability: true });
             if (!resolved.ok) throw new Error(resolved.reason);
-            const snapshot = await readText(resolved.resolved);
+            const snapshot = await readTextValidated(resolved.validatedReadPath);
             const parsed = await parseFileForContext(resolved.resolved, snapshot.content);
             return { symbols: parsed.symbols.symbols.length, exports: parsed.symbols.exports.length };
         });

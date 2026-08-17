@@ -148,6 +148,7 @@ describe('copilot MCP repo write tools', () => {
         const source = path.join(dir, 'source.txt');
         const destination = path.join(dir, 'destination.txt');
         await fs.writeFile(source, 'move me\n', 'utf8');
+        resetValidatedMutableWorkspacePathStatsForTest();
 
         const result = await moveFileTool.handler({
             source,
@@ -158,6 +159,34 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(result.structuredContent.success, true);
         assert.equal(await fs.readFile(destination, 'utf8'), 'move me\n');
         await assert.rejects(() => fs.access(source));
+        assert.deepEqual(getValidatedMutableWorkspacePathStats(), {
+            issued: 2,
+            accepted: 2,
+            rejectedUnbranded: 0,
+            rejectedWorkspace: 0,
+            rejectedMode: 0,
+            compatibleModes: ['write', 'patch'],
+            policyVersion: getValidatedMutableWorkspacePathStats().policyVersion,
+        });
+    });
+
+    it('uses write policy for move source even during dry-run', async () => {
+        assert.ok(moveFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const source = path.join(dir, 'blocked-source.sh');
+        const destination = path.join(dir, 'destination.txt');
+        await fs.writeFile(source, '#!/bin/sh\necho blocked\n', 'utf8');
+        resetValidatedMutableWorkspacePathStatsForTest();
+
+        const result = await moveFileTool.handler({ source, destination, dryRun: true });
+
+        assert.equal(result.isError, true);
+        assert.match(String(result.structuredContent?.error ?? result.content?.[0]?.text ?? ''), /blocked|denied|negado/i);
+        assert.equal(await fs.readFile(source, 'utf8'), '#!/bin/sh\necho blocked\n');
+        await assert.rejects(() => fs.access(destination));
+        const stats = getValidatedMutableWorkspacePathStats();
+        assert.equal(stats.issued, 0);
+        assert.equal(stats.accepted, 0);
     });
 
     it('requires confirmation for remove file', async () => {

@@ -35,10 +35,14 @@ export function getMcpWorkspaceRoot() {
 
 /**
  * @param {string} filePath
+ * @param {{ issueReadCapability?: boolean }} [options]
  * @returns {Promise<McpPathOk | McpPathError>}
  */
-export async function resolveReadPath(filePath) {
-    const result = await validatePath(filePath, { mode: 'read' });
+export async function resolveReadPath(filePath, options = {}) {
+    const result = await validatePath(filePath, {
+        mode: 'read',
+        issueReadCapability: options.issueReadCapability === true,
+    });
     if (!result.ok) return pathError(filePath, 'read', result.reason ?? 'Path denied.');
     return {
         ok: true,

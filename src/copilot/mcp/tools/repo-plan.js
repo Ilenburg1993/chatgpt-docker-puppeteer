@@ -20,7 +20,7 @@ import {
     resolveWritePath,
 } from '#copilot/mcp/control-plane';
 
-const { readText, statPath } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
+const { readTextValidated, statPath } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 160;
@@ -188,9 +188,9 @@ export const repoPlanTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, old_string, new_string, replace_all, diffContextLines, maxDiffLines, includeDiffPreview }) => {
-            const resolved = await resolveReadPath(path);
+            const resolved = await resolveReadPath(path, { issueReadCapability: true });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
-            const snapshot = await readText(resolved.resolved);
+            const snapshot = await readTextValidated(resolved.validatedReadPath);
             const occurrences = countOccurrences(snapshot.content, old_string);
             if (occurrences === 0) {
                 return errorResult('old_string not found.', {
@@ -270,7 +270,8 @@ export const repoPlanTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ source, destination, overwrite }) => {
-            const src = await resolveReadPath(source);
+            // A move mutates its source; the plan must use the same write-policy class as the eventual apply.
+            const src = await resolveWritePath(source);
             if (!src.ok) return errorResult(src.reason, { ...src, field: 'source' });
             const dst = await resolveWritePath(destination);
             if (!dst.ok) return errorResult(dst.reason, { ...dst, field: 'destination' });

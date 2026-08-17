@@ -34,7 +34,12 @@ describe('copilot MCP tools', () => {
         assert.equal(ok.ok, true);
         if (ok.ok) {
             assert.equal(ok.relative, 'src/copilot/mcp/README.md');
+            assert.equal(ok.validatedReadPath, undefined);
         }
+
+        const withCapability = await resolveReadPath('src/copilot/mcp/README.md', { issueReadCapability: true });
+        assert.equal(withCapability.ok, true);
+        if (withCapability.ok) assert.ok(withCapability.validatedReadPath);
 
         const denied = await resolveReadPath('../package.json');
         assert.equal(denied.ok, false);

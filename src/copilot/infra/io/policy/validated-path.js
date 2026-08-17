@@ -14,7 +14,7 @@ import path from 'node:path';
 
 const VALIDATED_READ_PATH_BRAND = Symbol('copilot.validated-read-workspace-path');
 const VALIDATED_MUTABLE_PATH_BRAND = Symbol('copilot.validated-mutable-workspace-path');
-const READ_ONLY_MODES = new Set(['read', 'search', 'stat']);
+const READ_ONLY_MODES = new Set(['read', 'search', 'stat', 'scan']);
 // Initial mutable fast path is intentionally narrower than the current core write-policy equivalence class.
 // Pair/destructive operations keep full policy evaluation until their additional invariants are migrated explicitly.
 const VALIDATED_MUTABLE_MODES = new Set(['write', 'patch']);
