@@ -4,11 +4,11 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { describe, it } from 'vitest';
 
-import { invalidateIoCachePath } from '#copilot/infra/io-cache.js';
+import { getIoL1Cache, invalidateIoCachePath } from '#copilot/infra/io-cache.js';
 import { getCanonicalMcpTools } from '#copilot/mcp';
 import {
     getTtlCacheStats,
@@ -236,6 +236,36 @@ describe('copilot MCP tools', () => {
         assert.equal(afterInvalidation.busInvalidations, 1);
         assert.equal(afterInvalidation.clears, 1);
         assert.equal(afterInvalidation.size, 0);
+    });
+
+    it('repo_read_file invalida cache shaped por fingerprint rico mesmo com size+mtime preservados externamente', async () => {
+        resetRepoReadResponseCacheForTest();
+        const tool = findTool('repo_read_file');
+        const tempDir = await mkdtemp(join(process.cwd(), '.tmp-copilot-read-fingerprint-'));
+        const filePath = join(tempDir, 'same-size.txt');
+        const relativePath = relative(process.cwd(), filePath);
+        try {
+            await writeFile(filePath, 'alpha\n', 'utf8');
+            const originalStats = await stat(filePath);
+            const first = await tool.handler({ path: relativePath });
+            assert.equal(first.structuredContent?.['content'], 'alpha\n');
+
+            // Bypass canonical invalidation deliberately, keep size and mtime equal, but let ctime identify the mutation.
+            await writeFile(filePath, 'omega\n', 'utf8');
+            await utimes(filePath, originalStats.atime, originalStats.mtime);
+            // Clear only the lower process-local L1 so this regression isolates the shaped response cache. No bus event
+            // is published here, therefore the response cache must reject its own stale entry by rich fingerprint.
+            getIoL1Cache().clear();
+
+            const second = await tool.handler({ path: relativePath });
+            const cacheStats = readRepoReadFileResultCacheStats();
+            assert.equal(second.structuredContent?.['content'], 'omega\n');
+            assert.equal(cacheStats.stale, 1);
+            assert.equal(cacheStats.misses, 2);
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+            resetRepoReadResponseCacheForTest();
+        }
     });
 
     it('repo_read_file coalesces concurrent same-window reads through singleflight', async () => {

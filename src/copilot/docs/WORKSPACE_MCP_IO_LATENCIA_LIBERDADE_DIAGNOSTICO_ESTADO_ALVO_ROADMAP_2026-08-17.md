@@ -2312,26 +2312,31 @@ Liberdade adicional deve vir de **políticas nomeadas e observáveis**, não de 
 
 ---
 
-## Fase 23.6 — Read Response Cache V2
+## Fase 23.6 — Read Response Cache V2 — **concluída sem ampliar trust window**
 
 ### 23.6.1 Baseline
 
-- [ ] repeated same-window reads com trust=0;
-- [ ] medir stat cost e cache hit wall time;
-- [ ] medir singleflight em batch duplicado.
+- [x] repeated same-window reads com `trust=0`;
+- [x] oito hits shaped simultâneos, concurrency 8: **7,479 ms no batch inteiro** (~6,45–6,83 ms por chamada observada);
+- [x] cache/singleflight já existentes preservados; runtime health confirmou hits sem stale;
+- [x] custo do `stat` validado é pequeno demais para justificar, no estado atual, uma janela de confiança default.
 
 ### 23.6.2 Freshness lease/generation
 
-- [ ] comparar 100/250/500 ms;
-- [ ] canonical invalidation continua imediata;
-- [ ] external mutation test define janela máxima real.
+- [x] hipótese 100/250/500 ms avaliada contra o baseline e **rejeitada como default** antes de ampliar a janela: o ganho máximo plausível é de poucos milissegundos enquanto a stale window externa cresceria deliberadamente;
+- [x] `COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS` continua disponível como opção explícita e defaulta em **0**;
+- [x] canonical invalidation continua imediata via bus/journal;
+- [x] nenhuma alteração no stale-probe L1 default de 2 s neste sublote.
 
 ### 23.6.3 Rich fingerprint
 
-- [ ] shaped cache deve guardar ctime/dev/ino se continuar fazendo probe;
-- [ ] evitar regressão para mtime+size apenas.
+- [x] `readText()` passa a propagar `ctimeMs/dev/ino` já presentes no L1/L2/fs snapshot, sem syscall adicional;
+- [x] `readTextChunks()`/byte-line-index/stream materializado também propagam fingerprint rico;
+- [x] shaped cache guarda e compara `size + mtime + ctime + dev + ino`;
+- [x] regressão externa escreve conteúdo **same-size**, restaura o `mtime` anterior e, sem publicar invalidation canônica, prova que o shaped cache rejeita a entrada por fingerprint rico;
+- [x] `test_mcp_tools`: verde em ~**4,471 s**; `test_io_engine`: verde em ~**2,497 s**; strict typecheck: verde em ~**14,863 s**.
 
-**Gate:** default só muda se A/B justificar; segurança externa documentada.
+**Decisão:** manter `trustWindowMs=0` por default e melhorar a qualidade da evidência, não trocar consistência por micro-latência. Uma futura lease só deve voltar à pauta se o profile real mostrar call pressure muito maior ou `stat` materialmente mais caro em outro filesystem.
 
 ---
 

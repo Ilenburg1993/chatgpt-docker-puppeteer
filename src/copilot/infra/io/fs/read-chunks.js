@@ -316,6 +316,9 @@ function trimByteLineIndexCache() {
  *     snapshotVersion: string | null;
  *     sizeBytes: number | null;
  *     mtimeMs: number | null;
+ *     ctimeMs: number | null;
+ *     dev: number | null;
+ *     ino: number | null;
  * }} [state]
  * @returns {AsyncGenerator<TextLineChunk, void, void>}
  */
@@ -330,6 +333,9 @@ async function* iterateTextLineChunks(
         snapshotVersion: null,
         sizeBytes: null,
         mtimeMs: null,
+        ctimeMs: null,
+        dev: null,
+        ino: null,
     },
 ) {
     const chunkLines =
@@ -357,6 +363,9 @@ async function* iterateTextLineChunks(
     state.snapshotVersion = snapshotVersion;
     state.sizeBytes = before.size;
     state.mtimeMs = before.mtimeMs;
+    state.ctimeMs = before.ctimeMs;
+    state.dev = Number(before.dev);
+    state.ino = Number(before.ino);
     const baseStream = handle.createReadStream({
         autoClose: false,
         ...(highWaterMark !== undefined ? { highWaterMark } : {}),
@@ -506,6 +515,9 @@ async function* iterateTextLineChunks(
  *     snapshotVersion: string;
  *     sizeBytes: number;
  *     mtimeMs: number;
+ *     ctimeMs: number;
+ *     dev: number;
+ *     ino: number;
  *     consistent: true;
  * } | null>}
  */
@@ -535,6 +547,9 @@ async function readTextLineChunksByByteIndex(filePath, options = {}) {
             snapshotVersion: byteIndex.snapshotVersion,
             sizeBytes: byteIndex.sizeBytes,
             mtimeMs: byteIndex.mtimeMs,
+            ctimeMs: byteIndex.ctimeMs,
+            dev: byteIndex.dev,
+            ino: byteIndex.ino,
             consistent: true,
         };
     }
@@ -565,6 +580,9 @@ async function readTextLineChunksByByteIndex(filePath, options = {}) {
         snapshotVersion: byteIndex.snapshotVersion,
         sizeBytes: byteIndex.sizeBytes,
         mtimeMs: byteIndex.mtimeMs,
+        ctimeMs: byteIndex.ctimeMs,
+        dev: byteIndex.dev,
+        ino: byteIndex.ino,
         consistent: true,
     };
 }
@@ -708,6 +726,9 @@ function buildTextLineChunks(lines, startLine, chunkLines) {
  *     snapshotVersion: string;
  *     sizeBytes: number;
  *     mtimeMs: number;
+ *     ctimeMs: number;
+ *     dev: number;
+ *     ino: number;
  *     attempts: number;
  *     consistent: true;
  * }>}
@@ -735,12 +756,22 @@ export async function readTextLineChunks(filePath, options = {}) {
                 snapshotVersion: /** @type {string | null} */ (null),
                 sizeBytes: /** @type {number | null} */ (null),
                 mtimeMs: /** @type {number | null} */ (null),
+                ctimeMs: /** @type {number | null} */ (null),
+                dev: /** @type {number | null} */ (null),
+                ino: /** @type {number | null} */ (null),
             };
             const arrayFromAsync = /** @type {{
              *     fromAsync: <T>(items: AsyncIterable<T> | Iterable<T>) => Promise<T[]>;
              * }} */ (/** @type {unknown} */ (Array)).fromAsync;
             const chunks = await arrayFromAsync(iterateTextLineChunks(filePath, attemptOptions, state));
-            if (!state.snapshotVersion || state.sizeBytes === null || state.mtimeMs === null) {
+            if (
+                !state.snapshotVersion ||
+                state.sizeBytes === null ||
+                state.mtimeMs === null ||
+                state.ctimeMs === null ||
+                state.dev === null ||
+                state.ino === null
+            ) {
                 throw createStaleChunkSnapshotError(filePath, attempt);
             }
 
@@ -768,6 +799,9 @@ export async function readTextLineChunks(filePath, options = {}) {
                 snapshotVersion: state.snapshotVersion,
                 sizeBytes: state.sizeBytes,
                 mtimeMs: state.mtimeMs,
+                ctimeMs: state.ctimeMs,
+                dev: state.dev,
+                ino: state.ino,
                 attempts: attempt,
                 consistent: true,
             };
@@ -803,6 +837,9 @@ export function readTextLineChunksStream(filePath, options = {}) {
         snapshotVersion: /** @type {string | null} */ (null),
         sizeBytes: /** @type {number | null} */ (null),
         mtimeMs: /** @type {number | null} */ (null),
+        ctimeMs: /** @type {number | null} */ (null),
+        dev: /** @type {number | null} */ (null),
+        ino: /** @type {number | null} */ (null),
     };
     const iterable = iterateTextLineChunks(filePath, { ...options, attempt: 1, deliveryMode: 'stream' }, state);
     const readableStreamFrom = /** @type {{

@@ -23,7 +23,7 @@ const DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
 const HARD_REPO_READ_FILE_CACHE_MAX_BYTES = 64 * 1024 * 1024;
 
 /**
- * @typedef {{ sizeBytes: number; mtimeMs: number; validatedAtMs: number; structured: Record<string, unknown>; text: string; weightBytes: number }} RepoReadCacheEntry
+ * @typedef {{ sizeBytes: number; mtimeMs: number; ctimeMs: number; dev: number; ino: number; validatedAtMs: number; structured: Record<string, unknown>; text: string; weightBytes: number }} RepoReadCacheEntry
  */
 
 /** @type {Map<string, RepoReadCacheEntry>} */
@@ -160,10 +160,16 @@ export async function readRepoFileWithValidatedResultCache(resolved, startLine, 
         };
         const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
         const mtimeMs = Number(snapshot.mtimeMs);
-        if (Number.isFinite(sizeBytes) && Number.isFinite(mtimeMs)) {
+        const ctimeMs = Number(snapshot.ctimeMs);
+        const dev = Number(snapshot.dev);
+        const ino = Number(snapshot.ino);
+        if ([sizeBytes, mtimeMs, ctimeMs, dev, ino].every(Number.isFinite)) {
             rememberRepoReadFileCacheEntry(key, {
                 sizeBytes,
                 mtimeMs,
+                ctimeMs,
+                dev,
+                ino,
                 validatedAtMs: Date.now(),
                 structured,
                 text: snapshot.content,
@@ -245,10 +251,16 @@ export async function readRepoFileChunksWithValidatedResultCache(
         };
         const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
         const mtimeMs = Number(snapshot.mtimeMs);
-        if (Number.isFinite(sizeBytes) && Number.isFinite(mtimeMs)) {
+        const ctimeMs = Number(snapshot.ctimeMs);
+        const dev = Number(snapshot.dev);
+        const ino = Number(snapshot.ino);
+        if ([sizeBytes, mtimeMs, ctimeMs, dev, ino].every(Number.isFinite)) {
             rememberRepoReadFileChunkCacheEntry(key, {
                 sizeBytes,
                 mtimeMs,
+                ctimeMs,
+                dev,
+                ino,
                 validatedAtMs: Date.now(),
                 structured,
                 text,
@@ -334,7 +346,14 @@ async function getValidatedRepoReadCacheEntry(cache, key, validatedReadPath, sta
     }
     const current = await statPathValidated(validatedReadPath).catch(() => null);
     const fileStats = current?.stats;
-    if (fileStats?.isFile() && fileStats.size === cached.sizeBytes && fileStats.mtimeMs === cached.mtimeMs) {
+    if (
+        fileStats?.isFile() &&
+        fileStats.size === cached.sizeBytes &&
+        fileStats.mtimeMs === cached.mtimeMs &&
+        fileStats.ctimeMs === cached.ctimeMs &&
+        Number(fileStats.dev) === cached.dev &&
+        Number(fileStats.ino) === cached.ino
+    ) {
         repoReadCacheStats[stats.hitStat] += 1;
         cache.delete(key);
         cache.set(key, { ...cached, validatedAtMs: Date.now() });
