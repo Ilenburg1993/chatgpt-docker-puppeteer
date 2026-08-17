@@ -37,6 +37,7 @@ describe('MCP startup maintenance', () => {
             smokeRunner: async () => ({ success: true, status: 'ok' }),
             cleanupRunner: async () => ({ removed: true }),
             rollbackCleanupRunner: async () => ({ removed: 0, expiredRemoved: 0, budgetRemoved: 0 }),
+            detachedLiveReaper: async () => ({ reapedCount: 2, failureCount: 0 }),
         });
 
         assert.equal(scheduled, true);
@@ -49,6 +50,41 @@ describe('MCP startup maintenance', () => {
         assert.equal(state.completed, true);
         assert.equal(state.success, true);
         assert.equal(state.staleQuickTunnelStateRemoved, true);
+        assert.equal(state.detachedLiveRunsReaped, 2);
+        assert.equal(state.detachedLiveRunReaperFailures, 0);
+    });
+
+    it('keeps workspace smoke successful when detached live reaping fails non-fatally', async () => {
+        /** @type {(() => void) | null} */
+        let callback = null;
+        const setTimeoutFn = /** @type {typeof setTimeout} */ (
+            (fn) => {
+                callback = /** @type {() => void} */ (fn);
+                return /** @type {NodeJS.Timeout} */ ({ unref() {} });
+            }
+        );
+        const scheduled = scheduleMcpStartupMaintenance({
+            enabled: true,
+            delayMs: 0,
+            setTimeoutFn,
+            smokeRunner: async () => ({ success: true, status: 'ok' }),
+            cleanupRunner: async () => ({ removed: false }),
+            rollbackCleanupRunner: async () => ({ removed: 0, expiredRemoved: 0, budgetRemoved: 0 }),
+            detachedLiveReaper: async () => {
+                throw new Error('simulated detached reaper failure');
+            },
+        });
+
+        assert.equal(scheduled, true);
+        assert.ok(callback);
+        callback();
+        await new Promise((resolve) => setImmediate(resolve));
+        const state = readMcpStartupMaintenanceState();
+        assert.equal(state.completed, true);
+        assert.equal(state.success, true);
+        assert.equal(state.error, null);
+        assert.equal(state.detachedLiveRunsReaped, 0);
+        assert.equal(state.detachedLiveRunReaperFailures, 1);
     });
 
     it('removes only stale quick-tunnel state with a dead process', async () => {

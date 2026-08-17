@@ -290,8 +290,13 @@ async function readDetachedLiveRunManifest(manifestPath, expectedRunId = null) {
     }
 }
 
-async function listDetachedLiveRuns() {
+/**
+ * @param {{ limit?: number; nowMs?: number }} [options]
+ */
+async function listDetachedLiveRuns(options = {}) {
     const directory = detachedLiveRunsDirectory();
+    const limit = Math.max(1, Math.min(500, Math.trunc(options.limit ?? 20)));
+    const nowMs = Number.isFinite(options.nowMs) ? Number(options.nowMs) : Date.now();
     await llmbLiveWorkspaceIo().mkdirPathLocked(directory, { recursive: true });
     const entries = await readdir(directory).catch(() => []);
     const rows = [];
@@ -302,7 +307,8 @@ async function listDetachedLiveRuns() {
         const manifest = await readDetachedLiveRunManifest(join(directory, entry), expectedRunId);
         if (!manifest) continue;
         const summaryPath = join(getMcpWorkspaceRoot(), manifest.outDir, 'summary.md');
-        const summaryReady = await stat(summaryPath).then((value) => value.isFile()).catch(() => false);
+        const summaryStats = await stat(summaryPath).catch(() => null);
+        const summaryReady = summaryStats?.isFile() === true;
         const processIdentity = await inspectDetachedLiveRunProcessIdentity(manifest);
         // `kill(pid, 0)` also reports zombies/recycled PIDs as present. On POSIX, only an exact harness command-line
         // match is allowed to count as an actually running detached run. Keep the raw PID-presence bit separately for
@@ -324,11 +330,80 @@ async function listDetachedLiveRuns() {
             pidPresent,
             processIdentity: processIdentity.reason,
             summaryReady,
-            ageMs: Math.max(0, Date.now() - manifest.startedAtMs),
+            ageMs: Math.max(0, nowMs - manifest.startedAtMs),
+            summaryAgeMs: summaryReady ? Math.max(0, nowMs - Number(summaryStats?.mtimeMs ?? nowMs)) : null,
             summaryPath: summaryReady ? `${manifest.outDir}/summary.md` : null,
         });
     }
-    return rows.sort((left, right) => right.startedAtMs - left.startedAtMs).slice(0, 20);
+    return rows.sort((left, right) => right.startedAtMs - left.startedAtMs).slice(0, limit);
+}
+
+const DEFAULT_COMPLETED_LIVE_RUN_REAP_GRACE_MS = 30_000;
+
+/**
+ * Reap only harness processes that have already produced their authoritative summary, have remained alive beyond a
+ * small cleanup grace period, and still pass the exact process-identity check. The default cancel path re-reads the
+ * manifest and re-verifies identity immediately before signaling, so a PID recycled between scan and reap is harmless.
+ *
+ * @param {{
+ *   nowMs?: number;
+ *   graceMs?: number;
+ *   deps?: {
+ *     listRuns?: () => Promise<Record<string, any>[]>;
+ *     cancelRun?: (runId: string) => Promise<{ cancelled: boolean; alreadyStopped?: boolean }>;
+ *   };
+ * }} [options]
+ */
+export async function reapCompletedDetachedLiveRuns(options = {}) {
+    const nowMs = Number.isFinite(options.nowMs) ? Number(options.nowMs) : Date.now();
+    const graceMs = Math.max(5_000, Math.min(10 * 60_000, Math.trunc(options.graceMs ?? DEFAULT_COMPLETED_LIVE_RUN_REAP_GRACE_MS)));
+    const listRuns = options.deps?.listRuns ?? (() => listDetachedLiveRuns({ limit: 500, nowMs }));
+    const cancelRun =
+        options.deps?.cancelRun ??
+        (async (runId) => {
+            const manifest = await readDetachedLiveRunManifest(detachedLiveRunManifestPath(runId), runId);
+            if (!manifest) return { cancelled: false, alreadyStopped: true };
+            const result = await cancelDetachedLiveRun(manifest);
+            if (result.cancelled) {
+                await appendMcpAuditEvent({
+                    event: 'llmb_live_test_completed_process_reaped',
+                    tool: 'mcp_startup_maintenance',
+                    runId,
+                    pid: manifest.pid,
+                    outDir: manifest.outDir,
+                });
+            }
+            return result;
+        });
+    const rows = await listRuns();
+    const candidates = rows.filter(
+        (row) =>
+            row?.['status'] === 'artifacts_ready_process_alive' &&
+            row?.['processIdentity'] === 'verified' &&
+            typeof row?.['summaryAgeMs'] === 'number' &&
+            row['summaryAgeMs'] >= graceMs,
+    );
+    const reapedRunIds = [];
+    const failures = [];
+    for (const row of candidates) {
+        const runId = typeof row?.runId === 'string' ? row.runId : '';
+        if (!DETACHED_LIVE_RUN_ID_RE.test(runId)) continue;
+        try {
+            const result = await cancelRun(runId);
+            if (result.cancelled) reapedRunIds.push(runId);
+        } catch (error) {
+            failures.push({ runId, error: error instanceof Error ? error.message : String(error) });
+        }
+    }
+    return {
+        scannedCount: rows.length,
+        candidateCount: candidates.length,
+        reapedCount: reapedRunIds.length,
+        reapedRunIds,
+        failureCount: failures.length,
+        failures,
+        graceMs,
+    };
 }
 
 /** @param {string} text */

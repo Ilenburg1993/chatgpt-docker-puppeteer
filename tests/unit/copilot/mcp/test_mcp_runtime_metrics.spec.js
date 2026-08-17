@@ -12,6 +12,7 @@ import {
     recordMcpToolMetric,
     resetMcpIndexAutoBuildStateForTests,
     resetMcpMetricsForTests,
+    resetMcpStartupMaintenanceForTests,
     resetMcpWorkspaceSmokeSummaryForTests,
 } from '#copilot/mcp/control-plane';
 import { mcpRuntimeHealthTool } from '#copilot/mcp/tools';
@@ -20,6 +21,7 @@ describe('copilot MCP runtime metrics', () => {
     beforeEach(() => {
         resetMcpMetricsForTests();
         resetMcpIndexAutoBuildStateForTests();
+        resetMcpStartupMaintenanceForTests();
         resetMcpWorkspaceSmokeSummaryForTests();
     });
 
@@ -89,6 +91,19 @@ describe('copilot MCP runtime metrics', () => {
         assert.equal(typeof result.structuredContent.workspaceRoot, 'string');
         assert.ok(result.structuredContent.operationalSignals);
         assert.ok(result.structuredContent.operationalSignals.indexAutoBuild);
+        assert.deepEqual(result.structuredContent.operationalSignals.startupMaintenance, {
+            scheduled: false,
+            running: false,
+            completed: false,
+            scheduledAt: null,
+            startedAt: null,
+            completedAt: null,
+            success: null,
+            error: null,
+            staleQuickTunnelStateRemoved: false,
+            detachedLiveRunsReaped: 0,
+            detachedLiveRunReaperFailures: 0,
+        });
         assert.ok(result.structuredContent.indexStats);
         const metrics = /** @type {{
             totals: { calls: number };

@@ -24,6 +24,8 @@ let startupState = {
     success: /** @type {boolean | null} */ (null),
     error: /** @type {string | null} */ (null),
     staleQuickTunnelStateRemoved: false,
+    detachedLiveRunsReaped: 0,
+    detachedLiveRunReaperFailures: 0,
 };
 
 /**
@@ -34,6 +36,7 @@ let startupState = {
  *     smokeRunner?: () => Promise<Record<string, unknown>>;
  *     cleanupRunner?: () => Promise<{ removed: boolean }>;
  *     rollbackCleanupRunner?: () => Promise<Record<string, unknown> | null>;
+ *     detachedLiveReaper?: () => Promise<{ reapedCount?: number; failureCount?: number } | null>;
  * }} [options]
  * @returns {boolean}
  */
@@ -47,6 +50,7 @@ export function scheduleMcpStartupMaintenance(options = {}) {
     const smokeRunner = options.smokeRunner ?? runWorkspaceSmoke;
     const cleanupRunner = options.cleanupRunner ?? cleanupLegacyQuickTunnelState;
     const rollbackCleanupRunner = options.rollbackCleanupRunner ?? cleanupRollbackStateAtStartup;
+    const detachedLiveReaper = options.detachedLiveReaper ?? reapCompletedDetachedLiveRunsAtStartup;
 
     startupState = {
         ...startupState,
@@ -55,7 +59,7 @@ export function scheduleMcpStartupMaintenance(options = {}) {
     };
     startupTimer = setTimeoutFn(() => {
         startupTimer = null;
-        void runStartupMaintenance(smokeRunner, cleanupRunner, rollbackCleanupRunner);
+        void runStartupMaintenance(smokeRunner, cleanupRunner, rollbackCleanupRunner, detachedLiveReaper);
     }, delayMs);
     if (typeof startupTimer?.unref === 'function') startupTimer.unref();
     return true;
@@ -84,6 +88,8 @@ export function resetMcpStartupMaintenanceForTests() {
         success: null,
         error: null,
         staleQuickTunnelStateRemoved: false,
+        detachedLiveRunsReaped: 0,
+        detachedLiveRunReaperFailures: 0,
     };
 }
 
@@ -91,8 +97,9 @@ export function resetMcpStartupMaintenanceForTests() {
  * @param {() => Promise<Record<string, unknown>>} smokeRunner
  * @param {() => Promise<{ removed: boolean }>} cleanupRunner
  * @param {() => Promise<Record<string, unknown> | null>} rollbackCleanupRunner
+ * @param {() => Promise<{ reapedCount?: number; failureCount?: number } | null>} detachedLiveReaper
  */
-async function runStartupMaintenance(smokeRunner, cleanupRunner, rollbackCleanupRunner) {
+async function runStartupMaintenance(smokeRunner, cleanupRunner, rollbackCleanupRunner, detachedLiveReaper) {
     startupState = {
         ...startupState,
         scheduled: false,
@@ -109,6 +116,15 @@ async function runStartupMaintenance(smokeRunner, cleanupRunner, rollbackCleanup
                 error: error instanceof Error ? error.message : String(error),
             });
         }
+        let detachedLiveReap = null;
+        try {
+            detachedLiveReap = await detachedLiveReaper();
+        } catch (error) {
+            detachedLiveReap = { reapedCount: 0, failureCount: 1 };
+            logMcp('WARN', 'MCP startup detached LLM-B reaper failed without blocking workspace smoke.', {
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
         const smoke = await smokeRunner();
         const success = smoke['success'] === true;
         startupState = {
@@ -119,11 +135,14 @@ async function runStartupMaintenance(smokeRunner, cleanupRunner, rollbackCleanup
             success,
             error: success ? null : 'workspace-smoke-reported-failure',
             staleQuickTunnelStateRemoved: cleanup.removed === true,
+            detachedLiveRunsReaped: Number(detachedLiveReap?.reapedCount ?? 0),
+            detachedLiveRunReaperFailures: Number(detachedLiveReap?.failureCount ?? 0),
         };
         logMcp(success ? 'INFO' : 'WARN', 'MCP startup workspace smoke completed.', {
             success,
             staleQuickTunnelStateRemoved: cleanup.removed === true,
             rollbackCleanup,
+            detachedLiveReap,
             status: smoke['status'] ?? null,
         });
     } catch (error) {
@@ -148,6 +167,11 @@ async function runWorkspaceSmoke() {
 async function cleanupLegacyQuickTunnelState() {
     const config = readCloudflareTunnelConfig();
     return cleanupStaleQuickTunnelState(config.stateFile, { staleAfterMs: config.staleAfterMs });
+}
+
+async function reapCompletedDetachedLiveRunsAtStartup() {
+    const { reapCompletedDetachedLiveRuns } = await import('../tools/llm-b-live.js');
+    return reapCompletedDetachedLiveRuns();
 }
 
 /**

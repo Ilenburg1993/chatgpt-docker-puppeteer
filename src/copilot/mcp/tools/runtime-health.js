@@ -27,6 +27,7 @@ import {
     readMcpHttpStatefulSessionPolicy,
     readMcpIndexAutoBuildState,
     readMcpMetricsSnapshot,
+    readMcpStartupMaintenanceState,
     readMcpWorkspaceSmokeSummary,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
@@ -344,6 +345,7 @@ export const mcpRuntimeHealthTool = {
         const indexStats = getIoIndexStats();
         const index = summarizeIndexHealth(indexStats);
         const indexAutoBuild = readMcpIndexAutoBuildState();
+        const startupMaintenance = readMcpStartupMaintenanceState();
         const lastWorkspaceSmoke = readMcpWorkspaceSmokeSummary();
         const statefulPolicy = readStatefulRuntimePolicySnapshot();
         const warnings = [];
@@ -379,6 +381,14 @@ export const mcpRuntimeHealthTool = {
         }
         if (!lastWorkspaceSmoke) warnings.push('No in-process mcp_smoke_workspace result has been recorded.');
         if (lastWorkspaceSmoke?.success === false) critical.push('Last mcp_smoke_workspace failed.');
+        if (Number(startupMaintenance.detachedLiveRunReaperFailures ?? 0) > 0) {
+            warnings.push('Startup maintenance could not reap one or more stale completed LLM-B harness processes.');
+        }
+        if (Number(startupMaintenance.detachedLiveRunsReaped ?? 0) > 0) {
+            informational.push(
+                `Startup maintenance reaped ${Number(startupMaintenance.detachedLiveRunsReaped)} stale completed LLM-B harness process(es).`,
+            );
+        }
         const aiJobs = aiArtifacts['jobs'];
         const aiJobsExtraCount =
             aiJobs && typeof aiJobs === 'object' && !Array.isArray(aiJobs)
@@ -408,6 +418,7 @@ export const mcpRuntimeHealthTool = {
                     workspace,
                     index,
                     indexAutoBuild: summarizeIndexAutoBuild(indexAutoBuild),
+                    startupMaintenance,
                     tunnel: {
                         mode: tunnelConfig.mode,
                         publicMcpUrl: tunnelConfig.publicMcpUrl ?? tunnel.connectorUrl ?? null,
@@ -450,6 +461,7 @@ export const mcpRuntimeHealthTool = {
                 workspace,
                 index,
                 indexAutoBuild,
+                startupMaintenance,
                 lastWorkspaceSmoke,
                 tunnel: {
                     mode: tunnelConfig.mode,

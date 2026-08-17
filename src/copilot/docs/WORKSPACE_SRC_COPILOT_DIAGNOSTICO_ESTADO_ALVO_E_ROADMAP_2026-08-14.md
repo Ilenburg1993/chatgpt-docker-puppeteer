@@ -4560,7 +4560,9 @@ A própria rodada de profiling produziu e encontrou acúmulo legítimo de manife
 - [x] dry-run encontrou **326** artefatos UUID além da retenção de 240 mais novos;
 - [x] primeiro lote removeu **300 arquivos / 1.094.742 bytes**;
 - [x] segundo lote removeu os **26 restantes / 33.754 bytes**;
-- [x] total removido: **326 arquivos / 1.128.496 bytes** (~1,08 MiB), com `remainingCandidateCount=0`;
+- [x] total removido nessa primeira consolidação: **326 arquivos / 1.128.496 bytes** (~1,08 MiB), com `remainingCandidateCount=0`;
+- [x] as validações adicionais do reaper/startup produziram novo excesso de 36 artifacts; um cleanup final removeu **36 / 378.469 bytes**, novamente com `remainingCandidateCount=0`;
+- [x] acumulado removido nesta rodada ampliada: **362 arquivos / 1.506.965 bytes** (~1,44 MiB);
 - [x] nenhum arquivo OAuth, token/tunnel state, PID, quarantine, nome não UUID ou path fora do domínio explícito ficou elegível;
 - [x] rollback não foi solicitado no cleanup e permaneceu separado: `enabled=false`, sidecars reconhecidos=0, bytes=0;
 - [x] o unknown entry historicamente protegido no domínio rollback continua intocado por design.
@@ -4590,3 +4592,37 @@ Não foi adotada a solução fácil de aumentar o budget. O envelope é enviado 
 O primeiro broad gate falhou somente por essa regressão de payload. Após a correção, o `mcp-fast` final `53c184de-5e5f-4e56-86fb-72b0890f39bc` ficou integralmente verde: **59/59 arquivos, 311/311 testes MCP**, typecheck incluído, duração total ~35,4 s. Isso fecha a rodada com uma propriedade importante: o aumento da autonomia para 116 tools não ficou autorizado a crescer indefinidamente o custo de descoberta do próprio agente.
 
 A prova remota pós-reload confirmou o efeito no wire real: `authenticatedToolsList.responseBytes` caiu de **131.470 para 129.918 bytes**, redução de **1.552 bytes**, mantendo 116/116 tools e zero missing/unexpected. Em quatro smokes completos consecutivos no mesmo processo, `mcp_connector_smoke_refresh` estabilizou em **929 ms de média**, último sample **877 ms**, e o dashboard voltou a `status=ok` com 10 chamadas observadas, error rate zero e nenhum warning. Esse sample múltiplo é mais representativo que a fotografia unitária de 954 ms usada na seção 104.15 e reforça a ordem de grandeza final: aproximadamente **8,9× mais rápido** que o baseline de 8.282 ms.
+
+### 104.19 Reaper automático seguro para harnesses LLM-B logicamente concluídos
+
+A instrumentação de detached runs já havia encontrado um vazamento real: `mcp-7b16c6a1-7dfc-47f5-bc50-c7e84170f6a9` possuía summary final persistido, mas o runner continuava vivo e com identidade exata verificável muito depois do encerramento lógico. A tool `llmb_live_test_cancel` existe no registry do servidor e é auditada como destructive, porém o host ChatGPT desta sessão continuou sem materializar seu schema callable mesmo com o smoke remoto confirmando **116/116** tools. Portanto havia uma dependência operacional indevida: um leak detectável pelo servidor podia sobreviver indefinidamente apenas porque o cliente não havia atualizado sua superfície de execução.
+
+A correção não torna cancelamento arbitrário automático. Foi criado um reaper estreito, cuja elegibilidade exige simultaneamente:
+
+- [x] manifesto estrito `mcp-<UUID>` já validado pelo parser existente;
+- [x] `summary.md` presente, isto é, o harness já publicou sua saída autoritativa;
+- [x] processo ainda vivo **e** `/proc/<pid>/cmdline` correspondendo ao runner allowlisted e ao `--out-dir=<manifest.outDir>` exato;
+- [x] summary com idade mínima de **30 s**, preservando uma janela de grace para shutdown natural;
+- [x] nova leitura do manifesto e **nova verificação de identidade imediatamente antes do `SIGTERM`**, fechando a janela de PID reuse entre scan e reap;
+- [x] ausência de PID, signal, path, command ou env fornecido externamente ao reaper;
+- [x] falha em um candidato é isolada e contabilizada; não bloqueia cleanup dos demais nem o workspace smoke;
+- [x] em plataformas sem identidade `/proc` verificável, o reaper automático não promove `pidPresent` a candidato seguro.
+
+O reaper foi integrado à `scheduleMcpStartupMaintenance`, depois dos cleanups de quick-tunnel/rollback e antes do workspace smoke. O estado de startup agora contabiliza `detachedLiveRunsReaped` e `detachedLiveRunReaperFailures`; `mcp_runtime_health` também expõe esse estado e transforma falhas de reap em warning observável, sem transformar um cleanup auxiliar em indisponibilidade falsa do MCP.
+
+Cobertura de segurança adicionada:
+
+- [x] teste de autonomia injeta cinco detached rows e prova que somente `artifacts_ready_process_alive + processIdentity=verified + summaryAge>=grace` é elegível;
+- [x] candidato jovem, PID/command mismatch e run ainda ativo são preservados;
+- [x] falha simulada de um reap é agregada sem impedir o candidato independente;
+- [x] startup maintenance registra reap bem-sucedido;
+- [x] exceção do reaper permanece não fatal ao workspace smoke, mas aparece como `detachedLiveRunReaperFailures=1`;
+- [x] focused tests verdes; strict typecheck verde após corrigir acesso index-signature; lint verde;
+- [x] broad `mcp-fast` pós-reload `bedf9776-bdec-4e16-b9f5-2c29142cd9e3`: **59/59 arquivos e 313/313 testes**, typecheck incluído, ~34,0 s;
+- [x] `mcp_runtime_health` passou a expor `operationalSignals.startupMaintenance`, incluindo os dois contadores do reaper e warning explícito quando houver failure;
+- [x] release gate final, já incluindo essa observabilidade, `d610cabe-a37f-4df8-827d-c0744840ae0f`: **59/59 arquivos, 313/313 testes**, typecheck incluído, ~38,3 s;
+- [x] runtime live pós-reload mostrou `startupMaintenance.completed=true`, `success=true`, `detachedLiveRunReaperFailures=0` e health global `status=ok`.
+
+A prova live ocorreu no próprio leak histórico. Antes do reload, `llmb_live_runs` mostrava `mcp-7b16...` como `artifacts_ready_process_alive`, `pidAlive=true`, `pidPresent=true`, `processIdentity=verified`. Após ativar o reaper e aguardar a maintenance delayed, o mesmo manifesto passou a aparecer como **`artifacts_ready`, `pidAlive=false`, `pidPresent=false`, `processIdentity=process-not-alive`**. Nenhum PID foi informado manualmente e nenhum processo fora da identidade allowlisted foi tocado. O leak real, portanto, foi removido pelo caminho que futuras sessões usarão automaticamente.
+
+Essa mudança elimina uma classe de dependência entre **capacidade real do servidor** e **atualização tardia do schema pelo host**: o cancel explícito continua disponível quando o cliente o materializa, mas processos logicamente concluídos não dependem mais dele para cleanup eventual e seguro.

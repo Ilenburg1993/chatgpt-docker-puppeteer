@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import { gitWriteTools } from '../../../../src/copilot/mcp/tools/git-write.js';
-import { llmBLiveTools } from '../../../../src/copilot/mcp/tools/llm-b-live.js';
+import {
+    llmBLiveTools,
+    reapCompletedDetachedLiveRuns,
+} from '../../../../src/copilot/mcp/tools/llm-b-live.js';
 import { mcpReloadTools } from '../../../../src/copilot/mcp/tools/restart-control.js';
 
 function tool(definitions, name) {
@@ -87,5 +90,62 @@ describe('MCP governed autonomy mutations', () => {
         const missing = await cancelTool.handler({ runId: 'mcp-00000000-0000-0000-0000-000000000000' });
         assert.equal(missing.isError, true);
         assert.equal(missing.structuredContent?.['code'], 'ERR_LLMB_LIVE_CANCEL_NOT_FOUND');
+    });
+
+    it('reaps only completed verified detached live runs after the cleanup grace period', async () => {
+        const cancelled = [];
+        const oldVerified = 'mcp-11111111-1111-4111-8111-111111111111';
+        const failingVerified = 'mcp-22222222-2222-4222-8222-222222222222';
+        const result = await reapCompletedDetachedLiveRuns({
+            nowMs: 100_000,
+            graceMs: 30_000,
+            deps: {
+                listRuns: async () => [
+                    {
+                        runId: oldVerified,
+                        status: 'artifacts_ready_process_alive',
+                        processIdentity: 'verified',
+                        summaryAgeMs: 60_000,
+                    },
+                    {
+                        runId: failingVerified,
+                        status: 'artifacts_ready_process_alive',
+                        processIdentity: 'verified',
+                        summaryAgeMs: 50_000,
+                    },
+                    {
+                        runId: 'mcp-33333333-3333-4333-8333-333333333333',
+                        status: 'artifacts_ready_process_alive',
+                        processIdentity: 'verified',
+                        summaryAgeMs: 5_000,
+                    },
+                    {
+                        runId: 'mcp-44444444-4444-4444-8444-444444444444',
+                        status: 'artifacts_ready_process_alive',
+                        processIdentity: 'command-line-mismatch',
+                        summaryAgeMs: 80_000,
+                    },
+                    {
+                        runId: 'mcp-55555555-5555-4555-8555-555555555555',
+                        status: 'running',
+                        processIdentity: 'verified',
+                        summaryAgeMs: null,
+                    },
+                ],
+                cancelRun: async (runId) => {
+                    cancelled.push(runId);
+                    if (runId === failingVerified) throw new Error('simulated reap failure');
+                    return { cancelled: true };
+                },
+            },
+        });
+
+        assert.deepEqual(cancelled, [oldVerified, failingVerified]);
+        assert.equal(result.scannedCount, 5);
+        assert.equal(result.candidateCount, 2);
+        assert.equal(result.reapedCount, 1);
+        assert.deepEqual(result.reapedRunIds, [oldVerified]);
+        assert.equal(result.failureCount, 1);
+        assert.equal(result.failures[0]?.runId, failingVerified);
     });
 });
