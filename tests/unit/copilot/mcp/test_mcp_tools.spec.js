@@ -844,7 +844,14 @@ describe('copilot MCP tools', () => {
         assert.equal(structured['detailsTool'], 'mcp_capabilities_summary');
         const hostApprovalProfile = /** @type {Record<string, unknown>} */ (structured['hostApprovalProfile']);
         assert.equal(hostApprovalProfile['oauthGrantsAllRepoScopesByDefault'], true);
-        assert.ok(Buffer.byteLength(JSON.stringify(structured)) < 15 * 1024);
+        const wirePayloadAudit = /** @type {Record<string, unknown>} */ (structured['wirePayloadAudit']);
+        assert.equal(wirePayloadAudit['detailsTool'], 'mcp_tool_payload_audit');
+        assert.equal('fieldTotals' in wirePayloadAudit, false);
+        assert.equal('topTools' in wirePayloadAudit, false);
+        assert.equal('recommendations' in wirePayloadAudit, false);
+        assert.ok(Array.isArray(wirePayloadAudit['largestDescriptors']));
+        assert.ok(/** @type {unknown[]} */ (wirePayloadAudit['largestDescriptors']).length <= 3);
+        assert.ok(Buffer.byteLength(JSON.stringify(structured)) < 8 * 1024);
     });
 
     it('mcp_session_profile returns the recommended ChatGPT autonomy profile', async () => {

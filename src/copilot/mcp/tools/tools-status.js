@@ -27,6 +27,49 @@ export function bindMcpToolsStatusProvider(provider) {
 
 const NEVER_REMEMBER_APPROVAL_TOOLS = new Set(['job_cancel']);
 
+/** @type {Promise<Record<string, unknown>> | null} */
+let wirePayloadSummaryPromise = null;
+
+/**
+ * tools/list metadata is immutable for the lifetime of one MCP process. Cache the compact summary so frequent status
+ * calls do not rebuild an in-memory SDK client/server pair or transport descriptor detail that belongs in the dedicated
+ * mcp_tool_payload_audit tool.
+ *
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function readCompactWirePayloadSummary() {
+    if (!wirePayloadSummaryPromise) {
+        wirePayloadSummaryPromise = (async () => {
+            const { buildToolPayloadAudit } = await import('../scripts/tool-payload-audit.js');
+            const audit = /** @type {Record<string, any>} */ (await buildToolPayloadAudit({ top: 3 }));
+            const fieldTotals = /** @type {Record<string, number>} */ (audit['fieldTotals'] ?? {});
+            const largestField = Object.entries(fieldTotals)
+                .filter(([name]) => name !== 'totalBytes')
+                .sort((left, right) => Number(right[1] ?? 0) - Number(left[1] ?? 0))[0] ?? ['unknown', 0];
+            return {
+                toolCount: audit['toolCount'],
+                totalEnvelopeBytes: audit['totalEnvelopeBytes'],
+                maxEnvelopeBytes: audit['maxEnvelopeBytes'],
+                budgetHeadroomBytes: audit['budgetHeadroomBytes'],
+                withinEnvelopeBudget: audit['withinEnvelopeBudget'],
+                averageToolBytes: audit['averageToolBytes'],
+                p50ToolBytes: audit['p50ToolBytes'],
+                p95ToolBytes: audit['p95ToolBytes'],
+                largestField: { name: largestField[0], bytes: largestField[1] },
+                largestDescriptors: (Array.isArray(audit['topTools']) ? audit['topTools'] : []).slice(0, 3).map((row) => ({
+                    name: row['name'],
+                    totalBytes: row['totalBytes'],
+                })),
+                detailsTool: 'mcp_tool_payload_audit',
+            };
+        })().catch((error) => {
+            wirePayloadSummaryPromise = null;
+            throw error;
+        });
+    }
+    return wirePayloadSummaryPromise;
+}
+
 /**
  * @param {{ name: string; riskClass: string }} tool
  * @returns {boolean}
@@ -127,21 +170,12 @@ export const mcpToolsStatusTool = {
         ).length;
         let wirePayloadAudit;
         try {
-            const { buildToolPayloadAudit } = await import('../scripts/tool-payload-audit.js');
-            const audit = /** @type {Record<string, any>} */ (await buildToolPayloadAudit({ top: 12 }));
-            wirePayloadAudit = {
-                toolCount: audit['toolCount'],
-                totalEnvelopeBytes: audit['totalEnvelopeBytes'],
-                maxEnvelopeBytes: audit['maxEnvelopeBytes'],
-                budgetHeadroomBytes: audit['budgetHeadroomBytes'],
-                fieldTotals: audit['fieldTotals'],
-                averageToolBytes: audit['averageToolBytes'],
-                p95ToolBytes: audit['p95ToolBytes'],
-                topTools: audit['topTools'],
-                recommendations: audit['recommendations'],
-            };
+            wirePayloadAudit = await readCompactWirePayloadSummary();
         } catch (error) {
-            wirePayloadAudit = { error: error instanceof Error ? error.message : String(error) };
+            wirePayloadAudit = {
+                error: error instanceof Error ? error.message : String(error),
+                detailsTool: 'mcp_tool_payload_audit',
+            };
         }
         return okResult({
             success: true,

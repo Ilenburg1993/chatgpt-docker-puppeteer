@@ -1296,3 +1296,25 @@ R6: **evidence-gated / não necessário no estado atual**.
 
 Próximos ganhos de latência devem ser escolhidos pelo novo `highestCumulativeCost`, `highestCallPressure`, `highestResultVolume` e `roundTripAccounting`, evitando voltar ao padrão de otimizar apenas a chamada individual mais lenta.
 
+### 22.13 Sublote pós-R5 — `mcp_tools_status` volta a ser status, não audit dump
+
+O primeiro snapshot do novo dashboard mostrou que `mcp_tools_status` havia voltado a ser o maior payload do hot control plane: **17.886 bytes por chamada**. A causa não era a informação operacional de counts/risks/approvals, mas a inclusão integral de `fieldTotals`, 12 rows detalhadas de `topTools` e recomendações da auditoria wire. Além disso, cada chamada reconstruía um par MCP SDK client/server em memória para medir `tools/list`, embora o registry seja imutável durante a vida do processo.
+
+Correção:
+
+- `mcp_tools_status` mantém apenas summary wire: tool count, envelope/headroom, average/p50/p95, maior família de bytes e os 3 maiores descriptors apenas com `name + totalBytes`;
+- `fieldTotals`, decomposição completa por descriptor e recomendações permanecem integralmente disponíveis em `mcp_tool_payload_audit`;
+- summary wire ganhou cache por processo; erro invalida a promise para permitir retry, mas chamadas normais não reconstroem novamente o transport SDK in-memory;
+- teste passou a impor payload de `mcp_tools_status` **<8 KiB** e a proibir `fieldTotals`, `topTools` e `recommendations` no status compacto.
+
+Prova live após reload:
+
+- payload por `mcp_tools_status`: **17.886 → 6.157 bytes** (**-65,6%**);
+- duas chamadas consecutivas: 66 ms de handler acumulado, média 33 ms, porém **segunda chamada = 0 ms** de handler, provando o hot cache;
+- dashboard global: slowest average tool **48 → 33 ms**; handler médio **32 → 23 ms** no snapshot comparável;
+- strict typecheck: **6,045 s**, passed;
+- focused MCP tools: **4,737 s**, passed;
+- connector smoke pós-reload: **119/119**, parity integral, authenticated tools/list **116.092 bytes**, SSE green e orquestração **1.095 s**.
+
+A regra operacional fica explícita: status frequente deve trazer apenas informação necessária para decisão imediata; diagnóstico volumoso fica em tool dedicada sob demanda.
+
