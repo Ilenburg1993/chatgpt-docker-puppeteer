@@ -8,6 +8,7 @@ import {
     isCloudflaredOriginErrorLine,
     isCloudflaredTunnelTransportErrorLine,
     parseConnectorSmokeJsonOutput,
+    summarizeConnectorSmokeReport,
 } from '#copilot/mcp/tools';
 
 describe('cloudflare connector smoke compact mode', () => {
@@ -30,6 +31,60 @@ describe('cloudflare connector smoke compact mode', () => {
         const parsed = parseConnectorSmokeJsonOutput('[db][INFO] ready\n{"ok":true,"toolsList":{"tools":85}}');
 
         expect(parsed).toMatchObject({ ok: true, toolsList: { tools: 85 } });
+    });
+
+    it('projects a compact decision summary without losing OAuth, tools parity or SSE readiness', () => {
+        const summary = summarizeConnectorSmokeReport({
+            ok: true,
+            protocolVersion: '2025-11-25',
+            authMode: 'oauth',
+            orchestrationTimings: { totalMs: 1044, unauthenticatedMs: 234, authenticatedOauthMs: 1035 },
+            health: { ok: true, status: 200 },
+            oauth: {
+                protectedResource: { ok: true, status: 200 },
+                authorizationServer: { ok: true, status: 200 },
+            },
+            authChallenge: { ok: true, status: 401 },
+            authenticatedOAuthSmoke: {
+                ok: true,
+                durationMs: 1035,
+                phaseTimings: { publicDiscovery: 149, tokenLifecycle: 211 },
+                failedChecks: [],
+                runtimeHealth: { ok: true, status: 200 },
+                authenticatedToolsList: {
+                    ok: true,
+                    status: 200,
+                    responseBytes: 117809,
+                    tools: 119,
+                    expectedLocalTools: 119,
+                    toolsMatchLocalRegistry: true,
+                    missingLocalTools: [],
+                    unexpectedRemoteTools: [],
+                    remoteToolNames: ['a', 'b'],
+                },
+                authenticatedSse: {
+                    ok: true,
+                    status: 200,
+                    durationMs: 159,
+                    initialOk: true,
+                    reconnectOk: true,
+                    lastEventIdAccepted: true,
+                },
+            },
+        });
+
+        expect(summary).toMatchObject({
+            ok: true,
+            protocolVersion: '2025-11-25',
+            authenticated: {
+                ok: true,
+                toolsList: { tools: 119, expectedLocalTools: 119, toolsMatchLocalRegistry: true },
+                sse: { ok: true, initialOk: true, reconnectOk: true, lastEventIdAccepted: true },
+            },
+        });
+        expect(JSON.stringify(summary)).not.toContain('phaseTimings');
+        expect(JSON.stringify(summary)).not.toContain('remoteToolNames');
+        expect(Buffer.byteLength(JSON.stringify(summary))).toBeLessThan(2 * 1024);
     });
 
     it('classifies origin errors separately from recovered tunnel transport errors', () => {

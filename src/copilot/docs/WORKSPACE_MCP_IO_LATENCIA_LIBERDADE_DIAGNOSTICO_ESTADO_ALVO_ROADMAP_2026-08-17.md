@@ -1464,3 +1464,54 @@ O host desta conversa continua materializando a versão antiga do schema de `run
 
 `CAPABILITIES_VERSION` foi elevado para **48** e a guidance recomenda agrupar gates causais numa única chamada, mantendo concorrência baixa por default.
 
+### 22.18 Sublote — pós-reload em uma chamada e smoke summary-first
+
+O workflow de reload ainda exigia, na prática, várias chamadas após o processo voltar: `mcp_reload_status`, `mcp_post_restart_readiness` e `mcp_connector_smoke_refresh`. Além do round-trip, o smoke externo devolvia ~8 KiB apesar de a maior parte do report detalhado só ser útil em diagnóstico.
+
+A composição foi movida para `mcp_connector_smoke_refresh`, que já era bounded-write por persistir o smoke e portanto é o local correto para agregar o gate pós-restart sem tornar `mcp_post_restart_readiness` mutável.
+
+Mudanças:
+
+- `mcp_connector_smoke_refresh` executa/persiste o smoke canônico e, **na mesma chamada**, calcula post-restart readiness com o smoke recém-gravado;
+- readiness compartilhado foi extraído para `buildPostRestartReadinessSnapshot()`; a tool read-only `mcp_post_restart_readiness` reutiliza a mesma primitive;
+- quando chamado pelo smoke, o snapshot pula a leitura diagnóstica do log cloudflared (`includeDiagnostics=false`), pois origin log detail não participa da decisão de readiness;
+- novo `summarizeConnectorSmokeReport()` mantém health, OAuth discovery/challenge, runtime health, tools-list parity/bytes e SSE initial/reconnect, removendo phase timings, nomes completos e outras estruturas diagnósticas do default;
+- `includeDetails=true` preserva o report completo; `includeRemoteToolNames=true` implica detail;
+- o smoke default agora também retorna `postRestartReadiness` compacto com processos, reload state, reconciliation/freshness e next actions;
+- `mcp_reload_plan` passa a declarar `expectedFollowUp: ['mcp_connector_smoke_refresh']`; `mcp_reload_status`, `mcp_post_restart_readiness` e `mcp_runtime_health` ficam em `diagnosticFallback`.
+
+Provas unitárias:
+
+- summary puro preserva OAuth/tools parity/SSE e fica **<2 KiB** no fixture, sem `phaseTimings` ou `remoteToolNames`;
+- reload plan prova exatamente um follow-up normal;
+- `test_cloudflare_smoke_compact.spec.js`: **passed em 2,772 s**;
+- `test_mcp_reload_state.spec.js`: **passed em 2,753 s**;
+- registry parse gate após metadata: **passed em 3,923 s**;
+- strict typecheck: **passed em 8,936 s**.
+
+Prova live do workflow real:
+
+1. `mcp_reload_schedule(delayMs=1000)`;
+2. **sem chamar** `mcp_reload_status` ou `mcp_post_restart_readiness`;
+3. primeira e única chamada pós-restart: `mcp_connector_smoke_refresh`.
+
+A resposta mostrou simultaneamente:
+
+- smoke `ok=true`;
+- OAuth discovery/challenge green;
+- authenticated runtime health green;
+- tools-list **119/119**, `toolsMatchLocalRegistry=true`, zero missing/unexpected;
+- authenticated tools-list **117.956 bytes**;
+- SSE initial/reconnect green;
+- `postRestartReadiness.ready=true`;
+- reload `status=completed`, `completedSuccessfully=true`, `smokeAfterReload=true`, `reconciledWithConnectorSmoke=true`;
+- processos MCP/cloudflared vivos e `healthReady=true`.
+
+Payload externo do smoke composto: **4.026 bytes**, contra **8.150 bytes** no snapshot anterior (~**−50,6%**) apesar de agora incluir também readiness. O `mcp_runtime_health` de ~10.176 bytes observado no mesmo dashboard foi uma chamada **interna** feita pelo smoke OAuth contra o servidor e não o payload retornado por `mcp_connector_smoke_refresh`.
+
+`mcp_reload_plan` no processo novo confirmou live `expectedFollowUp=['mcp_connector_smoke_refresh']` e o array separado de fallbacks diagnósticos.
+
+Durante o gate, a regra pós-metadata capturou uma nova vírgula ausente em `IO_GUIDANCE` **antes do reload**, demonstrando que o parse/registry gate adotado após o incidente anterior previne lifecycle failures. Corrigido, o registry e o typecheck voltaram a verde antes da ativação.
+
+`CAPABILITIES_VERSION` foi elevado para **49**. O fluxo operacional normal pós-reload passa de três chamadas de verificação para **uma**.
+

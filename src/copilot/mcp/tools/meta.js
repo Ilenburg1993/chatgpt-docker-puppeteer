@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 48;
+const CAPABILITIES_VERSION = 49;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -215,7 +215,7 @@ const IO_GUIDANCE = [
     'Use mcp_auth_profile to confirm OAuth max-power scopes and WWW-Authenticate challenge metadata.',
     'Use mcp_oauth_issuer_diagnostics before changing issuer, CIMD, OIDC or Cloudflare OAuth settings.',
     'Use mcp_oauth_friction_audit after OAuth or connector changes to detect reauth risk and metadata drift.',
-    'Use mcp_connector_smoke_refresh after MCP/Cloudflare restarts to refresh the permanent connector smoke cache.',
+    'After an MCP/Cloudflare reload, use mcp_connector_smoke_refresh as the single normal post-restart gate: it refreshes OAuth/tools/SSE smoke and returns reconciled post-restart readiness in the same response. Keep includeDetails=false unless deep smoke diagnostics are needed.',
     'Use mcp_cloudflare_remote_audit to compare the Cloudflare-hosted tunnel config, DNS CNAME and expected local origin without exposing API tokens.',
     'Use mcp_cloudflare_edge_audit to inspect Cloudflare zone rulesets for cache, WAF, rate-limit and transform interference with MCP/OAuth.',
     'Use mcp_cloudflare_edge_policy_plan before proposing Cloudflare edge changes; it is plan-only and does not mutate rulesets.',
@@ -225,8 +225,8 @@ const IO_GUIDANCE = [
     'Use mcp_cloudflare_edge_backups_list to find the latest rollback reference before and after Cloudflare policy changes.',
     'Use mcp_cloudflare_edge_policy_apply dryRun=true first; real Cloudflare mutation requires dryRun=false and confirmApply=true.',
     'Use mcp_cloudflare_metrics_snapshot to inspect local cloudflared version, orchestration config version and registration counters.',
-    'Use mcp_post_restart_readiness after any restart before starting heavy ChatGPT work.',
-    'Use mcp_reload_plan then mcp_reload_schedule only when a new MCP source version must become live; read mcp_reload_status after reconnect.',
+    'Use mcp_post_restart_readiness as a read-only diagnostic fallback when you do not want to refresh connector smoke; it is no longer a mandatory step after a successful smoke refresh.',
+    'Use mcp_reload_plan then mcp_reload_schedule only when a new MCP source version must become live; after reconnect prefer one mcp_connector_smoke_refresh call. Read mcp_reload_status separately only when reload/smoke reports failure or ambiguity.',
     'Use git_publish_changes when a clean-index set of explicit paths should be staged, committed and optionally pushed in one governed call. Keep git_stage_plan/git_commit_plan/git_push_plan as granular fallback; governed Git never accepts force, arbitrary remote or arbitrary refspec.',
     'Use llmb_live_readiness and llmb_live_runs for read-only Model Gateway live evidence; llmb_live_test_run defaults control-only and requires explicit confirmation for real model/provider usage.',
     'Use claude_connector_profile when adding the same remote MCP server to claude.ai custom connectors.',

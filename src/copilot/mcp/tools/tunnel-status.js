@@ -229,8 +229,211 @@ function compactSmokeReport(value, includeRemoteToolNames) {
     return { ...report, toolsList, authenticatedOAuthSmoke };
 }
 
+/** @param {unknown} value */
+function smokeRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
+}
+
 /**
- * @param {{ includeRemoteToolNames?: boolean }} input
+ * Decision-oriented projection of the connector smoke. Full phase/check detail remains available via includeDetails.
+ *
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+export function summarizeConnectorSmokeReport(value) {
+    const report = smokeRecord(value);
+    const orchestration = smokeRecord(report['orchestrationTimings']);
+    const health = smokeRecord(report['health']);
+    const oauth = smokeRecord(report['oauth']);
+    const protectedResource = smokeRecord(oauth['protectedResource']);
+    const authorizationServer = smokeRecord(oauth['authorizationServer']);
+    const authChallenge = smokeRecord(report['authChallenge']);
+    const authenticated = smokeRecord(report['authenticatedOAuthSmoke']);
+    const runtimeHealth = smokeRecord(authenticated['runtimeHealth']);
+    const toolsList = smokeRecord(authenticated['authenticatedToolsList']);
+    const sse = smokeRecord(authenticated['authenticatedSse']);
+    const failedChecks = Array.isArray(authenticated['failedChecks']) ? authenticated['failedChecks'] : [];
+    const missingLocalTools = Array.isArray(toolsList['missingLocalTools']) ? toolsList['missingLocalTools'] : [];
+    const unexpectedRemoteTools = Array.isArray(toolsList['unexpectedRemoteTools']) ? toolsList['unexpectedRemoteTools'] : [];
+    return {
+        ok: report['ok'] === true,
+        protocolVersion: report['protocolVersion'] ?? null,
+        authMode: report['authMode'] ?? null,
+        timings: {
+            totalMs: orchestration['totalMs'] ?? smokeRecord(report['timings'])['totalMs'] ?? null,
+            unauthenticatedMs: orchestration['unauthenticatedMs'] ?? null,
+            authenticatedOauthMs: orchestration['authenticatedOauthMs'] ?? authenticated['durationMs'] ?? null,
+        },
+        health: { ok: health['ok'] === true, status: health['status'] ?? null },
+        oauth: {
+            protectedResourceOk: protectedResource['ok'] === true,
+            authorizationServerOk: authorizationServer['ok'] === true,
+            challengeOk: authChallenge['ok'] === true,
+            challengeStatus: authChallenge['status'] ?? null,
+        },
+        authenticated: {
+            ok: authenticated['ok'] === true,
+            durationMs: authenticated['durationMs'] ?? null,
+            failedCheckCount: failedChecks.length,
+            runtimeHealth: { ok: runtimeHealth['ok'] === true, status: runtimeHealth['status'] ?? null },
+            toolsList: {
+                ok: toolsList['ok'] === true,
+                status: toolsList['status'] ?? null,
+                responseBytes: toolsList['responseBytes'] ?? null,
+                tools: toolsList['tools'] ?? null,
+                expectedLocalTools: toolsList['expectedLocalTools'] ?? null,
+                toolsMatchLocalRegistry: toolsList['toolsMatchLocalRegistry'] === true,
+                missingCount: missingLocalTools.length,
+                unexpectedCount: unexpectedRemoteTools.length,
+            },
+            sse: {
+                ok: sse['ok'] === true,
+                status: sse['status'] ?? null,
+                durationMs: sse['durationMs'] ?? null,
+                initialOk: sse['initialOk'] === true,
+                reconnectOk: sse['reconnectOk'] === true,
+                lastEventIdAccepted: sse['lastEventIdAccepted'] === true,
+            },
+        },
+    };
+}
+
+/**
+ * @param {Record<string, unknown>} snapshot
+ * @returns {Record<string, unknown>}
+ */
+function summarizePostRestartReadiness(snapshot) {
+    const processes = smokeRecord(snapshot['processes']);
+    const mcpHttp = smokeRecord(processes['mcpHttp']);
+    const cloudflared = smokeRecord(processes['cloudflared']);
+    const reload = smokeRecord(snapshot['reload']);
+    const connectorSmoke = smokeRecord(snapshot['connectorSmoke']);
+    return {
+        ready: snapshot['ready'] === true,
+        mode: snapshot['mode'] ?? null,
+        connectorUrl: snapshot['connectorUrl'] ?? null,
+        healthReady: snapshot['healthReady'] === true,
+        processes: {
+            mcpHttpAlive: mcpHttp['alive'] === true,
+            cloudflaredAlive: cloudflared['alive'] === true,
+        },
+        reload: {
+            status: reload['status'] ?? null,
+            completedSuccessfully: reload['completedSuccessfully'] === true,
+            failed: reload['failed'] === true,
+            inFlight: reload['inFlight'] === true,
+            smokeAfterReload: reload['smokeAfterReload'] === true,
+            reconciledWithConnectorSmoke: reload['reconciledWithConnectorSmoke'] === true,
+        },
+        connectorSmoke: {
+            ok: connectorSmoke['ok'] === true,
+            fresh: connectorSmoke['fresh'] === true,
+            checkedAt: connectorSmoke['checkedAt'] ?? null,
+            ageMinutes: connectorSmoke['ageMinutes'] ?? null,
+        },
+        nextActions: Array.isArray(snapshot['nextActions']) ? snapshot['nextActions'] : [],
+    };
+}
+
+/**
+ * @param {{ includeDiagnostics?: boolean }} [options]
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function buildPostRestartReadinessSnapshot(options = {}) {
+    const config = readCloudflareTunnelConfig();
+    const publicUrlValidation = validateConfiguredPublicUrl(config) ?? null;
+    const connectorSmoke = summarizeConnectorSmokeState(
+        await readConnectorSmokeState(config.smokeStateFile),
+        config.publicMcpUrl ?? null,
+    );
+    const reload = summarizeMcpReloadState(await readMcpReloadState(), connectorSmoke.checkedAt);
+    const connectorSmokeAgeFresh =
+        connectorSmoke.ok === true &&
+        typeof connectorSmoke.ageMinutes === 'number' &&
+        connectorSmoke.ageMinutes <= CONNECTOR_SMOKE_STALE_AFTER_MINUTES;
+    const connectorSmokeFresh = connectorSmokeAgeFresh && reload.reconciledWithConnectorSmoke === true;
+    const publicHealthUrl = config.publicMcpUrl ? new URL('/health', config.publicMcpUrl).toString() : null;
+    const [mcpHttpProcess, cloudflaredProcess, localHealth, publicHealth] = await Promise.all([
+        readPidFileStatus(config.mcpHttpPidFile),
+        readPidFileStatus(config.managedTunnelPidFile),
+        probeHealth(config.healthUrl),
+        publicHealthUrl ? probeHealth(publicHealthUrl) : Promise.resolve({ ok: false, error: 'public MCP URL not configured' }),
+    ]);
+    const originDiagnostics = options.includeDiagnostics === false ? null : await readCloudflaredOriginDiagnostics();
+    const statefulPolicy = {
+        ...readMcpHttpStatefulSessionPolicy(),
+        postSessionContractEnforced: process.env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'] === 'true',
+        sessionIdHashSecretPresent:
+            typeof process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'] === 'string' &&
+            process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'].trim().length >= 32,
+    };
+    const permanentUrlReady =
+        config.mode === 'named-permanent' && Boolean(config.publicMcpUrl) && publicUrlValidation?.ok === true;
+    const healthReady = localHealth.ok || publicHealth.ok;
+    const ready =
+        permanentUrlReady &&
+        mcpHttpProcess.alive &&
+        cloudflaredProcess.alive &&
+        healthReady &&
+        connectorSmokeFresh;
+    const nextActions = [];
+    if (!permanentUrlReady)
+        nextActions.push('Fix COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or public hostname configuration.');
+    if (!mcpHttpProcess.alive || !cloudflaredProcess.alive || !healthReady) {
+        nextActions.push('Run make copilot-mcp-restart.');
+    } else if (!localHealth.ok && publicHealth.ok) {
+        nextActions.push(
+            'Local HTTPS health probe failed, but public connector health is OK; inspect SNI/local TLS only if origin debugging is needed.',
+        );
+    }
+    if (reload.inFlight) {
+        nextActions.push('Wait for mcp_reload_status to leave the in-flight state before trusting post-restart readiness.');
+    } else if (reload.failed) {
+        nextActions.push('Inspect mcp_reload_status: the latest controlled MCP reload did not complete successfully.');
+    }
+    if (!connectorSmokeFresh) {
+        if (reload.completedSuccessfully && reload.smokeAfterReload !== true) {
+            nextActions.push(
+                'Run mcp_connector_smoke_refresh after the latest completed reload to reconcile the new process/tunnel generation.',
+            );
+        } else {
+            nextActions.push('Run mcp_connector_smoke_refresh or make copilot-mcp-smoke-refresh.');
+        }
+    }
+    if (ready) nextActions.push('Start with mcp_session_profile, mcp_validation_dashboard and repo_status.');
+    return {
+        success: true,
+        ready,
+        mode: config.mode,
+        connectorUrl: config.publicMcpUrl ?? null,
+        publicUrlValidation,
+        processes: { mcpHttp: mcpHttpProcess, cloudflared: cloudflaredProcess },
+        localHealth,
+        publicHealth,
+        healthReady,
+        ...(originDiagnostics === null ? {} : { originDiagnostics }),
+        statefulPolicy,
+        reload,
+        connectorSmoke: {
+            ...connectorSmoke,
+            ageFresh: connectorSmokeAgeFresh,
+            fresh: connectorSmokeFresh,
+            staleAfterMinutes: CONNECTOR_SMOKE_STALE_AFTER_MINUTES,
+        },
+        chatgpt: {
+            authentication: formatChatGptConnectorAuthentication(readMcpAuthConfig()),
+            recommendedFirstCalls: ready
+                ? ['mcp_session_profile', 'mcp_validation_dashboard', 'repo_status']
+                : ['mcp_tunnel_status', 'mcp_connector_smoke_refresh'],
+        },
+        nextActions,
+    };
+}
+
+/**
+ * @param {{ includeRemoteToolNames?: boolean; includeDetails?: boolean }} input
  * @returns {Promise<import('../control-plane/result.js').StructuredCallToolResult>}
  */
 async function runConnectorSmokeRefresh(input) {
@@ -242,6 +445,7 @@ async function runConnectorSmokeRefresh(input) {
         });
     }
     const includeRemoteToolNames = input.includeRemoteToolNames === true;
+    const includeDetails = input.includeDetails === true || includeRemoteToolNames;
     let report;
     try {
         report = await runCanonicalConnectorSmoke({
@@ -261,24 +465,34 @@ async function runConnectorSmokeRefresh(input) {
             error: error instanceof Error ? error.message : String(error),
         });
     }
-    const compact = compactSmokeReport(report, includeRemoteToolNames);
+    const detailedReport = compactSmokeReport(report, includeRemoteToolNames);
+    const reportSummary = summarizeConnectorSmokeReport(detailedReport);
     if (report['ok'] !== true) {
         return errorResult('Cloudflare connector smoke refresh completed with failures.', {
             code: 'ERR_CONNECTOR_SMOKE_FAILED',
             connectorUrl: config.publicMcpUrl,
-            report: compact,
+            report: includeDetails ? detailedReport : reportSummary,
+            detailsAvailable: !includeDetails,
         });
     }
+    const readiness = await buildPostRestartReadinessSnapshot({ includeDiagnostics: false });
+    const readinessSummary = summarizePostRestartReadiness(readiness);
     return okResult({
         success: true,
         connectorUrl: config.publicMcpUrl,
         smokeStateFile: config.smokeStateFile,
         refreshedAt: new Date().toISOString(),
-        report: compact,
-        next: [
-            'Call mcp_tunnel_status to confirm lastSmokeFresh=true.',
-            'Use the ChatGPT connector URL https://mcp.aurelin.org/mcp.',
-        ],
+        report: includeDetails ? detailedReport : reportSummary,
+        postRestartReadiness: readinessSummary,
+        detailsAvailable: !includeDetails,
+        next: readinessSummary['ready'] === true
+            ? [
+                  'Post-restart readiness is reconciled in this response; no separate reload_status/readiness call is needed.',
+                  'Use the ChatGPT connector URL https://mcp.aurelin.org/mcp.',
+              ]
+            : Array.isArray(readinessSummary['nextActions'])
+              ? readinessSummary['nextActions']
+              : [],
     });
 }
 
@@ -375,8 +589,12 @@ export const mcpConnectorSmokeRefreshTool = {
             .boolean()
             .optional()
             .describe(
-                'Include the full remote tool-name list in the response. Default: false to keep ChatGPT streams compact.',
+                'Include the full remote tool-name list in the response. This implies detailed output.',
             ),
+        includeDetails: z
+            .boolean()
+            .optional()
+            .describe('Include the full smoke report. Default: false; compact decision summary plus post-restart readiness is returned.'),
     },
     annotations: boundedWriteAnnotations(),
     handler: runConnectorSmokeRefresh,
@@ -392,95 +610,5 @@ export const mcpPostRestartReadinessTool = {
         'Return a compact post-restart readiness snapshot for the permanent Cloudflare MCP connector before ChatGPT starts heavier work.',
     inputSchema: {},
     annotations: readOnlyAnnotations(),
-    handler: async () => {
-        const config = readCloudflareTunnelConfig();
-        const publicUrlValidation = validateConfiguredPublicUrl(config) ?? null;
-        const connectorSmoke = summarizeConnectorSmokeState(
-            await readConnectorSmokeState(config.smokeStateFile),
-            config.publicMcpUrl ?? null,
-        );
-        const reload = summarizeMcpReloadState(await readMcpReloadState(), connectorSmoke.checkedAt);
-        const connectorSmokeAgeFresh =
-            connectorSmoke.ok === true &&
-            typeof connectorSmoke.ageMinutes === 'number' &&
-            connectorSmoke.ageMinutes <= CONNECTOR_SMOKE_STALE_AFTER_MINUTES;
-        const connectorSmokeFresh = connectorSmokeAgeFresh && reload.reconciledWithConnectorSmoke === true;
-        const publicHealthUrl = config.publicMcpUrl ? new URL('/health', config.publicMcpUrl).toString() : null;
-        const [mcpHttpProcess, cloudflaredProcess, localHealth, publicHealth] = await Promise.all([
-            readPidFileStatus(config.mcpHttpPidFile),
-            readPidFileStatus(config.managedTunnelPidFile),
-            probeHealth(config.healthUrl),
-            publicHealthUrl ? probeHealth(publicHealthUrl) : Promise.resolve({ ok: false, error: 'public MCP URL not configured' }),
-        ]);
-        const originDiagnostics = await readCloudflaredOriginDiagnostics();
-        const statefulPolicy = {
-            ...readMcpHttpStatefulSessionPolicy(),
-            postSessionContractEnforced: process.env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'] === 'true',
-            sessionIdHashSecretPresent:
-                typeof process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'] === 'string' &&
-                process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'].trim().length >= 32,
-        };
-        const permanentUrlReady =
-            config.mode === 'named-permanent' && Boolean(config.publicMcpUrl) && publicUrlValidation?.ok === true;
-        const healthReady = localHealth.ok || publicHealth.ok;
-        const ready =
-            permanentUrlReady &&
-            mcpHttpProcess.alive &&
-            cloudflaredProcess.alive &&
-            healthReady &&
-            connectorSmokeFresh;
-        const nextActions = [];
-        if (!permanentUrlReady)
-            nextActions.push('Fix COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or public hostname configuration.');
-        if (!mcpHttpProcess.alive || !cloudflaredProcess.alive || !healthReady) {
-            nextActions.push('Run make copilot-mcp-restart.');
-        } else if (!localHealth.ok && publicHealth.ok) {
-            nextActions.push('Local HTTPS health probe failed, but public connector health is OK; inspect SNI/local TLS only if origin debugging is needed.');
-        }
-        if (reload.inFlight) {
-            nextActions.push('Wait for mcp_reload_status to leave the in-flight state before trusting post-restart readiness.');
-        } else if (reload.failed) {
-            nextActions.push('Inspect mcp_reload_status: the latest controlled MCP reload did not complete successfully.');
-        }
-        if (!connectorSmokeFresh) {
-            if (reload.completedSuccessfully && reload.smokeAfterReload !== true) {
-                nextActions.push('Run mcp_connector_smoke_refresh after the latest completed reload to reconcile the new process/tunnel generation.');
-            } else {
-                nextActions.push('Run mcp_connector_smoke_refresh or make copilot-mcp-smoke-refresh.');
-            }
-        }
-        if (ready) {
-            nextActions.push('Start with mcp_session_profile, mcp_validation_dashboard and repo_status.');
-        }
-        return okResult({
-            success: true,
-            ready,
-            mode: config.mode,
-            connectorUrl: config.publicMcpUrl ?? null,
-            publicUrlValidation,
-            processes: {
-                mcpHttp: mcpHttpProcess,
-                cloudflared: cloudflaredProcess,
-            },
-            localHealth,
-            publicHealth,
-            healthReady,
-            originDiagnostics,
-            statefulPolicy,
-            reload,
-            connectorSmoke: {
-                ...connectorSmoke,
-                ageFresh: connectorSmokeAgeFresh,
-                fresh: connectorSmokeFresh,
-                staleAfterMinutes: CONNECTOR_SMOKE_STALE_AFTER_MINUTES,
-            },
-            chatgpt: {
-                authentication: formatChatGptConnectorAuthentication(readMcpAuthConfig()),
-                recommendedFirstCalls: ready
-                    ? ['mcp_session_profile', 'mcp_validation_dashboard', 'repo_status']
-                    : ['mcp_tunnel_status', 'mcp_connector_smoke_refresh'],
-            },
-            nextActions,
-        });
-    },
+    handler: async () => okResult(await buildPostRestartReadinessSnapshot({ includeDiagnostics: true })),
 };

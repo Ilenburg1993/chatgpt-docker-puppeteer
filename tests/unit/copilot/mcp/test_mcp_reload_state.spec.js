@@ -3,8 +3,20 @@
 import { describe, expect, it } from 'vitest';
 
 import { summarizeMcpReloadState } from '../../../../src/copilot/mcp/control-plane/reload-state.js';
+import { mcpReloadPlanTool } from '#copilot/mcp/tools';
 
 describe('MCP reload state reconciliation', () => {
+    it('reduces the normal post-reload workflow to one connector smoke call', async () => {
+        const result = await mcpReloadPlanTool.handler({ profile: 'current', delayMs: 1200 });
+        expect(result.isError).toBeUndefined();
+        expect(result.structuredContent?.['expectedFollowUp']).toEqual(['mcp_connector_smoke_refresh']);
+        expect(result.structuredContent?.['diagnosticFallback']).toEqual([
+            'mcp_reload_status',
+            'mcp_post_restart_readiness',
+            'mcp_runtime_health',
+        ]);
+    });
+
     it('requires connector smoke captured after the latest successful reload', () => {
         const completedAt = Date.parse('2026-08-14T18:00:00.000Z');
         const state = {

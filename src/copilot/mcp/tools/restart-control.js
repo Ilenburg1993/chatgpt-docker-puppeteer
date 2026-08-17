@@ -67,12 +67,8 @@ function buildReloadPlan(profile, delayMs, reason) {
             allowedProfiles: ['quic', 'h2', 'auto'],
             responseBeforeRestart: true,
         },
-        expectedFollowUp: [
-            'mcp_reload_status',
-            'mcp_post_restart_readiness',
-            'mcp_connector_smoke_refresh',
-            'mcp_runtime_health',
-        ],
+        expectedFollowUp: ['mcp_connector_smoke_refresh'],
+        diagnosticFallback: ['mcp_reload_status', 'mcp_post_restart_readiness', 'mcp_runtime_health'],
     };
 }
 
