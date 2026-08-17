@@ -64,6 +64,26 @@ describe('presentation/sdk-recovery-policy', () => {
         expect(message.actionHint).toContain('Reautentique');
     });
 
+    it('classifica indisponibilidade 5xx do validador GitHub como rede mesmo quando o SDK prefixa Authentication failed', () => {
+        const error = new Error(
+            'Authentication failed: Failed to validate SDK token (503): GitHub returned: No server is currently available to service your request. Sorry about that.',
+        );
+        const policy = getSdkRecoveryPolicy(error, 'session');
+        const message = describeSdkRecoveryPolicy(policy, error);
+
+        expect(policy).toMatchObject({
+            kind: 'network',
+            retryable: true,
+            allowReconnect: true,
+        });
+        expect(message.label).toBe('[sdk rede]');
+        expect(message.detail).toContain('Falha transitória');
+        expect(message.actionHint).not.toContain('Reautentique');
+        expect(getSdkRecoveryPolicy(new Error('Authentication failed: token validation upstream (502)'), 'session').kind).toBe(
+            'network',
+        );
+    });
+
     it('classifica bloqueios de conta e modelo sem sugerir reconnect local', () => {
         const accountPolicy = getSdkRecoveryPolicy(
             { status: 402, message: 'payment required for this account' },

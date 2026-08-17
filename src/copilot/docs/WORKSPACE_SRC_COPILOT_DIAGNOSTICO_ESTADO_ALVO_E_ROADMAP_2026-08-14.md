@@ -815,7 +815,7 @@ A situação ideal não é “zero arquivos grandes” nem “100% de autonomia 
 | G-05 | fallback de permissão divergente | P1 | **Fechado na policy central** | `approve_all` preservado como default intencional; `AGENT_PERMISSION_MODE` permite override; call sites e gate unificados |
 | G-06 | drift de READMEs/roadmaps | P1 | **Fechado nos hubs prioritários** | READMEs centrais corrigidos; INDEX criado; June audit e Model Gateway roadmap reconciliados; long tail histórico é sob demanda |
 | G-07 | `byok.js` extremo | P1 | **Em redução** | primeira extração removeu ~13,7 KB/~344 linhas; rendering ganhou módulo/barrel/testes; ceiling impede regressão |
-| G-08 | jobs/rollback/log retention | P1 | **Majoritariamente fechado** | jobs limpos; rollback TTL/count já existiam; rotação pre-start >2 MiB implementada; rollover físico aguarda próximo restart |
+| G-08 | jobs/rollback/log retention | P1 | **Rollback fechado; logs parcialmente abertos** | incidente de 108 sidecars/52.151.184 bytes provou que o antigo `scanLimit=512` não era retenção; captura automática agora é opt-in/default-off, modo opt-in tem TTL 24 h + budgets 32/32 MiB, maintenance purge explícito removeu todos os sidecars reconhecidos e patch pós-reload em arquivo ~684 KiB manteve zero sidecars; rotação pre-start >2 MiB existe, mas rollover físico dos logs segue como evidência pendente |
 | G-09 | orphan detector sem package imports/protected state | P2 | **Source/test fechado; reload live pendente** | aliases/wildcards/conditionals resolvidos e protected separado no código; processo MCP atual ainda serve módulo antigo até restart controlado |
 | G-10 | SDK docs/contract defasados | P2 | **Parcialmente fechado** | README 1.0.9 + declared/installed/alias gates; matriz semântica completa de capabilities ainda aberta |
 | G-11 | L2 sem benchmark representativo | P2 | **Decisão segura implementada** | default continua off; planner exige benchmark; canary funcional existe; performance cold/L1/L2 ainda aberta |
@@ -1266,11 +1266,19 @@ A situação ideal não é “zero arquivos grandes” nem “100% de autonomia 
 ### Fase 11.2 — Rollback sidecars
 
 - [x] Identificar owner/lifecycle em `infra/io/fs/rollback-sidecar.js`.
-- [x] Confirmar TTL canônico existente de 24 horas e `expiresAt` persistido.
-- [x] Confirmar cleanup limitado a 512 entradas e executado sob locks após commits.
-- [x] Preservar sidecars ainda válidos; não apagar por tamanho isoladamente.
-- [ ] Adicionar report explícito de bytes/count/idade dos sidecars ao maintenance plan para observabilidade centralizada.
-- [ ] Definir budget de bytes apenas se medições mostrarem necessidade além do TTL/count já existentes.
+- [x] Confirmar TTL canônico de 24 horas e `expiresAt` persistido para sidecars explicitamente produzidos.
+- [x] Corrigir a premissa anterior de que já existia retenção por "count": o limite de 512 era apenas `scanLimit` de cleanup, não um budget de retenção.
+- [x] Tornar a captura automática de rollback **opt-in**, desligada por padrão quando `COPILOT_IO_ROLLBACK_ENABLED` está ausente/falso.
+- [x] Preservar a API explícita de rollback/sidecar e o executor de tokens para fluxos que deliberadamente habilitem ou persistam rollback.
+- [x] Em modo habilitado, impor budgets configuráveis — defaults de 32 sidecars e 32 MiB — além do TTL de 24 h (`COPILOT_IO_ROLLBACK_MAX_ENTRIES`, `COPILOT_IO_ROLLBACK_MAX_BYTES`, `COPILOT_IO_ROLLBACK_TTL_MS`).
+- [x] Fazer cleanup de expirados no startup; em modo habilitado, o startup também aplica os budgets, sem purgar silenciosamente sidecars válidos quando o modo automático está desligado.
+- [x] Desabilitar captura de rollback em `repo_apply_patch`/batch independentemente da policy global: o MCP não expõe ali um token executável e a captura integral do preimage só gerava custo sem mecanismo de consumo correspondente.
+- [x] Fazer write/delete/copy/move/patch respeitarem a policy central e exporem `rollbackCaptureEnabled` onde relevante; quando desligada, hashes/preconditions continuam disponíveis sem materializar snapshot/sidecar.
+- [x] Adicionar report central de policy, bytes/count/idade, over-budget e purge candidates ao maintenance plan.
+- [x] Adicionar purge **explícito e schema-bounded** via `mcp_cleanup_ai_artifacts(purgeDisabledRollback=true)`, permitido apenas com rollback automático desligado; nomes desconhecidos, OAuth, tunnel, pid e quarantine permanecem fora do domínio destrutivo.
+- [x] Incidente observado em 2026-08-15: antes da correção havia 108 sidecars ativos, 52.151.184 bytes, 0 expirados e 1 entrada desconhecida protegida. O crescimento vinha de patches pequenos em arquivos grandes: cada patch podia persistir o preimage integral (>256 KiB), demonstrando que TTL sozinho não controla crescimento dentro da janela de 24 h.
+- [x] Após reload controlado, purgar os 108 sidecars reconhecidos (52.151.184 bytes) com zero falhas e preservar a entrada desconhecida; report pós-cleanup: `sidecarCount=0`, `sidecarBytes=0`, `ignoredEntryCount=1`.
+- [x] Prova de aceitação pós-reload: aplicar patch real em `tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js` com ~684 KiB e confirmar imediatamente que `sidecarCount=0`/`sidecarBytes=0` permanecem inalterados.
 - [x] Preferir preservação/quarantine quando houver incerteza sobre rollback ainda utilizável.
 
 ### Fase 11.3 — Logs
@@ -3900,3 +3908,513 @@ Mensagem:
 - [x] sem self-reload do MCP, porque a mudança pertence à apresentação/config projection do terminal e não altera a surface do servidor MCP.
 
 O gap de permissions fica fechado sem quebrar a API comportamental anterior: **o fallback continua funcionando, mas deixa de ser apresentado como conhecimento observado.**
+
+## 101. Oitava onda — `llmb_live_readiness` como caminho operacional rápido e reutilizável
+
+Depois do fechamento do gap de permissões, o foco passou para o custo real da readiness da LLM-B. A medição inicial instrumentada mostrou um custo total de aproximadamente **16,46 s** por execução fresca. O perfil revelou que o custo não estava concentrado em um único check: snapshots, redaction integral e seleção/selector plans acumulavam trabalho relevante.
+
+A otimização foi conduzida por medição e preservando a cobertura de segurança. Nenhum check foi removido para produzir números melhores.
+
+### 101.1 Sequência de otimização medida
+
+- baseline instrumentado: ~`16,46 s`;
+- leitura concorrente de source snapshot, SQLite snapshot e diagnostics: ~`13,38 s`;
+- redaction integral de catálogo + SQLite movida para execução paralela: ~`7,58 s` em medição válida;
+- uma medição aparente de ~`7,18 s` foi **rejeitada** porque o worker havia usado um path de catálogo incorreto e varrido apenas 2 strings; ela não conta como evidência;
+- após correção do path, a cobertura integral voltou a ser comprovada;
+- worker threads substituíram child processes para o caminho in-process;
+- pool persistente passou a reutilizar workers/módulos/store/conexão entre readiness frescas;
+- fast-path algorítmico de redaction eliminou materialização cara em strings que não podiam conter candidato a segredo;
+- o trabalho interno dos audits caiu aproximadamente de `3,8–4,3 s` para `1,7–1,9 s` por audit no cenário saudável;
+- a contenção de CPU passou a dominar mais que bootstrap de worker, razão pela qual o wall-clock total não cai linearmente com a redução do core-time de redaction.
+
+Cobertura preservada nas medições válidas:
+
+- [x] catálogo: `945.249` strings auditadas;
+- [x] SQLite: `1.069.621` strings auditadas;
+- [x] leaks: `0` em ambos;
+- [x] redaction continua full-scan; não foi trocada por sampling.
+
+### 101.2 Readiness in-process e caches evidence-aware
+
+O antigo adapter MCP abria um novo processo Node para cada readiness. A implementação foi convertida em módulo reutilizável:
+
+- `buildModelGatewayLiveReadiness(options)` concentra a implementação canônica;
+- o CLI permanece como adaptador fino;
+- o MCP usa lazy dynamic import e executa `fresh-in-process`;
+- subprocesso ficou apenas como fallback de carregamento, nunca como tentativa de “curar” um check logicamente falho.
+
+O adapter ganhou ainda:
+
+- [x] single-flight para chamadas idênticas concorrentes;
+- [x] cache curto de resposta integral;
+- [x] invalidação por fingerprint **lógico do Model Gateway**, e não por qualquer escrita incidental no SQLite compartilhado;
+- [x] fingerprint inclui catálogo, watermarks/tabelas relevantes do Model Gateway e health BYOK;
+- [x] falha ao observar a evidência lógica desabilita o reaproveitamento em vez de reutilizar estado possivelmente stale;
+- [x] prova live de segunda chamada como `memory-cache`, com a mesma fotografia lógica.
+
+Também foram adicionados tiers estáticos conservadores:
+
+- source catalog + integrity audit;
+- seleções metadata-only que dependem apenas do catálogo/ambiente;
+- runtime health, overlays, post-runtime selection, SQLite parity e checks voláteis continuam frescos.
+
+Commits principais desta onda:
+
+- `d410d2699d530529aa7590e88be22e1061a10b00` — `perf(model-gateway): parallelize readiness audits`;
+- `a27797db4eac984ba7e383c053ba8b2438144541` — compartilhamento de preparação/routing/runtime-health e cache MCP inicial;
+- `57d7d2ad6` / `bcdfce222` — estabilização e fingerprint lógico da readiness;
+- `f2cd2a40d` — readiness in-process;
+- `96860ba0c` — workers persistentes;
+- `f1085afd6` — fast-path de redaction e poda de recomputações;
+- `6d71b1063` — static source tier;
+- `e25e5ad12` — static selection tier.
+
+### 101.3 Validação proporcional
+
+- [x] medições live da própria readiness foram usadas como prova funcional principal;
+- [x] parse/outline e inspeção de imports foram usados durante a refatoração;
+- [x] typecheck isolado foi executado apenas quando contratos JSDoc/import mudaram;
+- [x] nenhuma suíte ampla foi usada para “certificar” cada micro-otimização;
+- [x] a política focused-first introduzida nas ondas anteriores foi mantida.
+
+Pendência de performance:
+
+- [ ] medir de forma controlada a `fresh warm` final com os tiers estáticos atuais, separando source static hit, selection static hit e custo estritamente volátil;
+- [ ] continuar reduzindo recomputação do caminho volátil apenas quando o perfil demonstrar retorno material.
+
+## 102. Nona onda — epistemologia temporal de proof e seleção `quality_first`
+
+Uma prova real com `terminal:llm-b` expôs um erro mais grave que simples score: a sessão podia nascer em uma rota cuja prova positiva era antiga e cujo modelo já não constava no catálogo remoto atual. O caso observado foi `mistral/devstral-medium-2507`: discovery atual não o oferecia e probes reais retornaram `Invalid model`, mas estado histórico ainda podia contribuir para `runtime_proved`.
+
+A correção foi feita no ponto de verdade, não apenas na apresentação.
+
+### 102.1 Proof é temporal
+
+O Model Gateway passou a separar:
+
+- prova histórica positiva;
+- prova positiva **fresca**;
+- falha recente/cooldown;
+- falha antiga re-probeable.
+
+Default operacional inicial:
+
+- `maxRuntimeProofAgeHours=24`.
+
+Semântica:
+
+- [x] sucesso antigo permanece disponível para diagnóstico, mas não satisfaz `requireRuntimeProof`;
+- [x] sucesso stale não recebe bônus de `runtime_proved`;
+- [x] `requireAgentProbeOk` exige agent proof fresco;
+- [x] falha recente continua bloqueando/penalizando conforme policy/cooldown;
+- [x] falha antiga não vira blacklist eterna e pode ser sondada novamente;
+- [x] policy engine, runtime selector e projeções operator-facing consomem a mesma noção de frescor;
+- [x] quando health records atuais existem, eles são autoridade sobre booleanos históricos do selection trace;
+- [x] `/byok` e tools passaram a distinguir `proved` de `stale`.
+
+Commit-base:
+
+`4a2aeea0e` — `fix(model-gateway): expire stale runtime proof`.
+
+### 102.2 `quality_first`
+
+A investigação do score mostrou outro viés incompatível com a política do operador: preço era penalizado incondicionalmente, inclusive em tarefas como `repo_agent` e `deep_reasoning`.
+
+Foi criado `selectionGoal="quality_first"`:
+
+- [x] custo não reduz score;
+- [x] latência tem peso apenas secundário;
+- [x] capacidade, adequação à tarefa, elegibilidade e funcionamento permanecem centrais;
+- [x] proof funcional atua como **gate/certificação**, não como substituto de qualidade intelectual;
+- [x] falha recente continua sendo evidência operacional negativa;
+- [x] `balanced`/cost/latency policies continuam disponíveis quando o operador realmente quiser esses trade-offs.
+
+Isto implementa explicitamente a política desta operação: **não há limitação de uso da LLM-B por custo ou quantidade de chamadas; não selecionar um modelo inferior apenas para economizar quota.**
+
+## 103. Décima onda — `model_gateway_workflow_plan` como cérebro adaptativo de seleção
+
+Em vez de criar mais uma tool, `model_gateway_workflow_plan` foi promovido a ponto canônico de decisão da LLM-B.
+
+O workflow agora separa duas perguntas que antes ficavam misturadas:
+
+1. **discovery ranking** — qual é a melhor candidata para a tarefa, mesmo que ainda não tenha proof fresco;
+2. **proved ranking** — qual candidata já satisfaz agora o contrato runtime exigido.
+
+A diferença entre as duas gera `selectionDecision` com estados operator-facing:
+
+- `use_current`;
+- `switch_recommended`;
+- `probe_required`;
+- `blocked`.
+
+Protocolo adaptativo:
+
+1. rankear por `quality_first`;
+2. se o winner discovery não estiver provado, executar somente o **candidato acionável #1**;
+3. usar `agent` como certificado principal de `repo_agent`/`tool_agent`;
+4. após **todo** probe, sucesso ou falha, recalcular `model_gateway_workflow_plan`;
+5. nunca executar candidato #2 usando ranking calculado antes da evidência do candidato #1;
+6. continuar automaticamente diante de falhas objetivas, sem perguntar ao usuário se deve “tentar o próximo”;
+7. só recomendar promoção depois de proof fresco;
+8. preservar a mesma SDK session durante a promoção.
+
+A skill `.github/skills/llm-b-route-operator/SKILL.md` e sua referência passaram a ensinar a mesma semântica. `llm-b-ops` também foi reconciliada com a política de validators focused-first, removendo validação ampla ritualística como default.
+
+Commit principal:
+
+`aed1c1f731c064a2b476a2b98e40b770cece3bc8` — `feat(model-gateway): make llm-b route selection adaptive`.
+
+- [x] `terminal:llm-b` é tratado explicitamente como cockpit humano/LLM central;
+- [x] usuário e LLM-B recebem os mesmos conceitos de estado/proof;
+- [x] a rota ativa, discovery winner, proved winner, idade/kind do proof e next action fazem parte do explanation contract;
+- [x] `selectionDecision.operatorExplanation` fornece a projeção humana da **mesma decisão**, com headline, current/discovery/proved, proof age, alternativas e próximo passo, evitando que LLM-B/usuário precisem traduzir `rationale` técnico;
+- [x] o system prompt agora carrega `llm-b-route-operator` também em seleção/comparação/dúvida de adequação ou qualidade, não apenas em falha/troca;
+- [x] optional SDK sentinel `__UNSET__` é normalizado na fronteira do workflow, evitando interpretar ausência como runtime/provider literal.
+
+Follow-up publicado:
+
+`9fec11659cbfd7bf166575b55b8a8b05f781b251` — `feat(llm-b): explain adaptive route decisions`.
+
+## 104. Décima primeira onda — harness real, admission proof e execução adaptativa durável
+
+O harness real ainda refletia um paradigma antigo: antes de deixar a LLM-B usar as tools, rodava uma bateria fixa de chat/streaming/JSON/vision/agent probes. Isso podia consumir toda a janela em uma rota ruim e impedir que a própria inteligência adaptativa entrasse em ação.
+
+A arquitetura foi separada em dois contratos:
+
+- **admission proof**: probe real mínimo suficiente para abrir `terminal:llm-b` em uma rota respondente;
+- **task proof**: prova funcional forte definida pela tarefa; para `repo_agent`, agent probe adaptativo.
+
+Mudanças:
+
+- [x] cenários Model Gateway usam preflight enxuto;
+- [x] `byok-real-turn + routeProfile` ativa o runtime-selector como admission gate;
+- [x] rota respondente de bootstrap não é automaticamente declarada “melhor repo-agent”;
+- [x] falso blocker após final marker foi corrigido: conclusão terminal é barreira causal e diagnósticos históricos posteriores não reclassificam o turno;
+- [x] cenário read-only real provou que a LLM-B abre o cockpit, chama Model Gateway tools, executa `ask_user` e conclui o turno;
+- [x] `kilo-code/kilo-auto/free` foi observado como rota de **bootstrap respondente**, não como winner final quality-first;
+- [x] `model-gateway-adaptive-probe` foi criado para `workflow -> agent probe -> rerank`, bounded a no máximo 8 tentativas e sem promoção durante a fase de seleção;
+- [x] host com enum stale ganhou bridge auditável: no modo `byok-real-turn`, o valor legado aceito pelo host resolve internamente para o cenário adaptativo e o plano expõe `requestedScenario`/`resolvedScenario`.
+
+Commits:
+
+- `f4d85fa497294ceeda48ff995e9729874164eb3c` — `fix(llm-b): align adaptive admission harness`;
+- `6a3e5f4299e202e57ca8d605d4acf7e08f9f70f5` — `feat(llm-b): add adaptive route probe scenario`;
+- `66d44b19b` — `fix(llm-b): bridge stale host scenario schema`.
+
+### 104.1 Live runs longos deixam de depender do timeout do request MCP
+
+A primeira tentativa de executar o cenário adaptativo mostrou um gargalo de transporte/orquestração: o request ChatGPT -> MCP expirou antes de um fluxo legítimo com vários providers terminar. A execução parcial criou `artifacts/terminal-live/mcp-msublf39`, mas não chegou a produzir um summary persistido.
+
+A solução não foi aumentar timeout indefinidamente. O cenário adaptativo passou a usar execução detached e observável:
+
+- [x] o harness canônico continua sendo a única implementação;
+- [x] `llmb_live_test_plan` declara `executionMode=detached` para o cenário adaptativo real;
+- [x] `llmb_live_test_run` lança diretamente o harness fixo como processo detached e retorna `runId`, PID e `outDir` imediatamente;
+- [x] manifesto persistido usa runId UUID restrito e não aceita shell/path/env arbitrário;
+- [x] `llmb_live_runs` reconcilia manifests por PID vivo + presença de `summary.md` e continua mostrando o ledger SQLite histórico;
+- [x] o processo sobrevive ao término do request que o iniciou e pode continuar atravessando providers;
+- [x] demais cenários permanecem síncronos, preservando compatibilidade.
+
+Commits desta camada:
+
+- `8dab31c47aa114bdd1df2c9eefc0fe062551c083` — `feat(llm-b): detach adaptive live selection runs`;
+- `4285a01a0e15066180c4a90abf3899f7563f2a1c` — `feat(llm-b): expose detached selection progress`.
+
+O segundo commit acrescenta `detached.runner.log` progressivo para **novos** runs detached, mantendo compatibilidade com manifests antigos sem `logPath`. O log fica no próprio `outDir`, com stdout/stderr do harness, sem criar uma nova tool nem um segundo protocolo de execução.
+
+Validação proporcional desta mudança:
+
+- [x] `repo_file_outline` sem parse error;
+- [x] typecheck estrito `f94b620e-bbf1-4870-84f4-87091def15ac`, exit `0`, ~`21,3 s`;
+- [x] nenhum validator amplo executado.
+
+Prova operacional após reload:
+
+- [x] OAuth/connector smoke autenticado verde;
+- [x] registry remoto/local `115/115`;
+- [x] SSE/reconnect verde;
+- [x] plano adaptativo retorna `executionMode=detached`;
+- [x] lançamento real retornou imediatamente com `detached=true`;
+- [x] run atual: `mcp-0e4185a7-1cab-4601-9dce-995abf8dd7b1`;
+- [x] PID `21849` observado vivo após o lançamento;
+- [x] `llmb_live_runs.detachedRuns.status=running` durante a seleção;
+- [x] o mesmo PID/run permaneceu vivo após publicação de `4285a01a0`, self-reload completo do MCP e novo smoke OAuth/registry/SSE, provando que a seleção detached sobrevive ao ciclo de vida do origin que a iniciou;
+- [x] novos runs detached passam a expor `logPath` progressivo; o run atual, iniciado antes de `4285a01a0`, permanece sem esse arquivo por compatibilidade temporal esperada;
+- [x] o primeiro run detached fechou em `blocked/byok-provider-credits` após ~15m27s, **sem winner** e sem autorização para promoção;
+- [x] a análise causal do SSE mostrou que `model_gateway_workflow_plan` produziu `73.653 bytes` (`71,9 KB`), foi desviado pelo SDK para `/tmp/...copilot-tool-output...`, e `read_file_content` não pôde abrir esse path (`ERR_READ_PATH_INVALID`);
+- [x] privados dos argumentos exatos do workflow, os turns seguintes materializaram calls inválidos de `model_gateway_probe_execute` (snake_case indevido, `providerId/modelId=null` ou vazios), confirmando que o protocolo se perdeu **antes** do blocker 402 final;
+- [ ] registrar a cadeia final de agent probes, falhas classificadas e winner quality-first em um run pós-correção compact-first;
+- [ ] se `selectionDecision=switch_recommended`, executar promoção same-session em etapa separada e confirmar `committed`;
+- [ ] se `selectionDecision=use_current`, registrar que o bootstrap/current route também venceu a prova quality-first;
+
+### 104.2 `workflow_plan` compact-first — decisão executável sem fallback para `/tmp`
+
+O run anterior demonstrou que um cérebro de seleção não pode devolver dezenas de kilobytes antes de a LLM-B executar a próxima ação. A evidência profunda continuava correta, mas seu volume quebrava a comunicação com o operador LLM.
+
+A solução publicada em `2faee0e7475b2ea5860f516e0480735bfa7804e1` (`perf(llm-b): compact adaptive workflow decisions`) torna o workflow **compact-first por padrão**:
+
+- [x] `selectionDecision`, `operatorExplanation`, shortlist/ranking curto, guardrails e passos executáveis continuam no retorno normal;
+- [x] `evidence` padrão passa a ser uma projeção compacta com status/contagens/top candidates;
+- [x] snapshots, route plans e avaliações completas só são serializados quando `includeDetailedEvidence=true`;
+- [x] a skill `llm-b-route-operator` ensina que detailed evidence é opt-in diagnóstico, não caminho normal;
+- [x] as regras de ranking/proof/probe não foram enfraquecidas; a transformação reduz apenas material serializado de volta para a LLM;
+- [x] typecheck estrito pós-transformação: `d0142a04-5237-4d92-b52b-61cf3a3548f1`, exit `0`, ~`12,5 s`;
+- [x] nenhuma suíte ampla foi executada.
+
+Prova live pós-compact-first:
+
+- [x] novo run detached `mcp-208d3eaa-b382-4ef9-8f99-2796ffe6628b` iniciado após `2faee0e74`;
+- [x] logging progressivo disponível em `artifacts/terminal-live/mcp-208d3eaa-b382-4ef9-8f99-2796ffe6628b/detached.runner.log`;
+- [x] o primeiro `workflow_plan` chegou diretamente à LLM-B, sem `Output too large`, sem `/tmp` e sem `read_file_content` auxiliar;
+- [x] o workflow retornou `status=planned_probe_required`, discovery #1 `gemini/gemini-3.6-flash` e `operatorExplanation` coerente;
+- [x] `model_gateway_probe_execute` plan foi chamado com `probeKind=agent`, `providerId=gemini`, `modelId=gemini-3.6-flash`, `maxEstimatedCostUsd=10`, `timeoutMs=60000`, `unknownCostPolicy=allow`, `confirm=false` e a idempotency key fornecida pelo workflow;
+- [x] o apply seguinte usou os mesmos argumentos e `confirm=true`;
+- [x] a LLM-B voltou imediatamente a `model_gateway_workflow_plan` após o resultado, provando o rerank loop que faltava no run anterior;
+- [x] o apply revelou outro problema independente: `replayed=true`, reaproveitando operação/falha anterior porque o cenário usava um `idempotencyKeyPrefix` fixo entre runs;
+- [x] este replay **não conta** como nova prova agent desta execução;
+- [x] `5a818eef104a7a0d01e11d35bfda9707b86179cd` (`fix(llm-b): refresh adaptive probe identity`) passa a gerar prefixo único por processo/run, estável apenas dentro daquela seleção;
+- [x] o mesmo commit unifica `optionalWorkflowString` com o normalizador que trata `none/null/__UNSET__` como ausência e deixa de serializar `profileId:null` nos passos de probe;
+- [x] typecheck estrito da correção de identidade: `8e25ed4e-c9cc-469c-be1d-10ef6848b26b`, exit `0`, ~`8,1 s`;
+- [ ] executar run pós-`5a818eef1` e registrar probes **frescos**, winner ou exhaustion real.
+
+### 104.3 READY é evidência derivada, não autoridade textual
+
+O segundo run compact-first expôs um falso fechamento narrativo: depois de um `probe_execute` apenas planejado, a bootstrap LLM emitiu `ADAPTIVE-SELECTION-READY provider=anthropic model=claude-haiku-4-5-20251001 decision=use_current`, embora a rota viva fosse `kilo-code/openrouter/free` e nenhum workflow real tivesse retornado esse estado terminal.
+
+A correção publicada em `612b6052bfcafe7a450eac466cebeaef8a75c370` (`test(llm-b): require workflow authority for adaptive ready`) transforma o harness em verificador cruzado:
+
+- [x] `READY` só pode vir de `assistant.message`; o marker presente no próprio prompt não satisfaz o critério;
+- [x] deve existir um `postToolUse` anterior de `model_gateway_workflow_plan` com `selectionDecision.status` terminal (`use_current` ou `switch_recommended`);
+- [x] `runtimeProofRequired` deve ser `true`;
+- [x] provider/model/status do texto público devem coincidir exatamente com a decisão estruturada da tool;
+- [x] `use_current` exige ainda `currentModel === selectedRoute.providerModel`;
+- [x] o novo critério `adaptive-selection-ready-authorized-by-workflow` torna impossível um marker narrativo sozinho aprovar a seleção;
+- [x] o prompt do cenário explicita que `planned` não é proof, `replayed=true` não é nova prova e apenas workflow terminal real autoriza READY;
+- [x] nenhuma suíte ampla foi usada; o harness teve parse/outline limpo.
+
+### 104.4 Binding de probe: a rota candidata não pode herdar a rota de bootstrap
+
+A terceira execução expôs uma contaminação de binding anterior à versão corrigida: um agent probe pedido para `gemini/gemini-3.6-flash` registrou falha de autenticação contra `https://api.kilo.ai/api/gateway`. A candidata Gemini estava herdando campos materializados da rota viva Kilo.
+
+Causa:
+
+- o antigo `model_gateway_probe_execute` copiava `process.env`, mudava `COPILOT_BYOK_PROVIDER_PRESET`/modelo, mas deixava vivos `COPILOT_MODEL_GATEWAY_PROVIDER_ID`, `COPILOT_BYOK_BASE_URL`, wire/auth e demais campos da sessão atual;
+- `importConfiguredByokFromEnv` dá precedência a `COPILOT_MODEL_GATEWAY_PROVIDER_ID`, portanto um probe nominalmente Gemini podia continuar bound a `kilo-code`.
+
+Primeira correção:
+
+- `f6ce0f8ad73c7ff683b2f6b6f26e297ae0c11acd` — `fix(model-gateway): isolate llm-b probe binding`;
+- `probe_execute` passou a reutilizar `buildModelGatewayRuntimeSelectorProbeEnv`, a mesma função canônica do admission selector que reseta os campos da rota ativa e resolve provider/model/auth do alvo;
+- typecheck `0e379ecb-bb9d-4d68-bb8a-56d66428a08c`, exit `0`, ~`5,7 s`.
+
+A auditoria seguinte mostrou que uma rota “magra” `{providerId, providerModel}` ainda podia exigir inferência de endpoint. Para Gemini, por exemplo, o inventory contém endpoint nativo e OpenAI-compatible; não é desejável reconstruir essa escolha no executor.
+
+Solução forte publicada em `17d0aa5919b838e61ceef8731bd0028a51a325cc` (`fix(model-gateway): bind probes to planned routes`):
+
+- [x] `planProbes` associa cada probe escolhido à **rota sanitizada exata** derivada da projeção canônica via `buildLiveRouteSwitchTarget`;
+- [x] `data.execution.routes` transporta provider/model/profile/routeProfile/baseUrl/openAICompatibleBaseUrl/wireApi/binding metadata, sem segredos;
+- [x] `probe_execute` não autoriza mais apenas por `kind`; exige coincidência de `kind + providerId + providerModel` com uma rota retornada pelo plan;
+- [x] o plan expõe `authorizedRoute` para operador/LLM-B;
+- [x] o apply usa `buildModelGatewayRuntimeSelectorProbeEnv(authorizedRoute, process.env)`, preservando exatamente a rota autorizada e isolando a rota de bootstrap;
+- [x] o primeiro typecheck encontrou apenas um typo local (`isRecord` vs `asRecord`), corrigido sem escalar validação;
+- [x] typecheck final `b9558d6c-89fe-43a7-a42b-967b4e5af4fb`, exit `0`, ~`5,5 s`;
+- [x] nenhuma suíte ampla foi executada.
+
+A terceira execução detached `mcp-82ed345b-b1d9-49e2-ac31-e2069925e33c` nasceu **antes** dessas correções de binding. Ela serve para validar idempotência única e a barreira de READY, mas suas falhas de provider não certificam `17d0aa591`.
+
+- [ ] aguardar o terceiro run encerrar sem duplicar provider calls;
+- [ ] executar um quarto run a partir de `17d0aa591` e exigir `replayed=false`, provider real coincidente e endpoint da rota candidata;
+- [ ] registrar winner ou exhaustion apenas a partir dessa prova fresca.
+
+### 104.5 Bootstrap do cockpit exige prova agente, não apenas chat
+
+A terceira execução `mcp-82ed345b-b1d9-49e2-ac31-e2069925e33c` encerrou em `blocked/live-timeout` após ~`960 s`. A admissão anterior havia declarado `cerebras/gemma-4-31b` respondente por chat, mas a LLM-B nunca chegou a abrir `model-gateway-adaptive-probe`: o terminal permaneceu em `modelo solicitado` até o timeout.
+
+Conclusão causal:
+
+- [x] chat success prova apenas que a rota respondeu a uma chamada simples;
+- [x] para hospedar o cockpit Model Gateway, o bootstrap precisa provar **tool calling + leitura + `ask_user` + resposta + finalização**;
+- [x] portanto `chat-admission` não pode ser confundido com `agent-admission`.
+
+A correção publicada em `aa8ca639898a4542ec0f87c3e74e513569dac199` (`fix(llm-b): require agent-capable bootstrap admission`) adiciona essa fronteira:
+
+- [x] `buildRealByokRuntime` tornou-se assíncrono apenas para permitir o preflight agente antes de abrir o PTY;
+- [x] em cenários Model Gateway reais, a rota candidata passa por `runConfiguredByokAgentProbe` em sessão descartável;
+- [x] o probe exige marker tool, `read_file_content`, `ask_user`, resposta sintética e output final;
+- [x] sucesso/falha são persistidos na health store com identidade `routeProfile + providerId + providerModel` e flush explícito antes do rerank;
+- [x] falha agent recente entra em `blockFailedProbeKinds`, mas a seleção agora usa `isGatewayModelProbeActivelyFailed`, evitando blacklist permanente por falhas históricas;
+- [x] se nenhuma rota agent-capable for encontrada, o harness fecha cedo com `byok-agent-admission-unavailable` em vez de abrir um cockpit condenado a timeout;
+- [x] o relatório ganhou `byok-real-agent-admission-proof`, que só passa se a **mesma rota final** tiver marker tool, leitura e ciclo `ask_user` completos;
+- [x] parse/outline limpo e nenhum import órfão;
+- [x] typecheck estrito `ddc9c070-7609-4112-91d2-20cde047efed`, exit `0`, ~`12,7 s`;
+- [x] nenhuma suíte ampla executada.
+
+Prova live iniciada sobre `aa8ca6398`:
+
+- [x] run detached `mcp-89b8c8d2-b3aa-4e25-8998-20dda7c1af62`, PID `46644`;
+- [x] `cerebras/gemma-4-31b`: chat success anterior, mas **agent admission falhou por timeout de 45 s**;
+- [x] `mistral/devstral-2512`: **agent admission falhou com HTTP 422**;
+- [x] `mistral/mistral-medium-2505`: **agent admission falhou com HTTP 422**;
+- [x] `mistral/mistral-medium-2508`: **agent admission falhou com HTTP 422**;
+- [x] rotas Chutes foram descartadas por `402 Payment Required` antes de agent admission;
+- [x] várias rotas Groq foram descartadas por `413 Request too large` / TPM antes de agent admission;
+- [x] essas exclusões são persistidas e reranqueadas; o run não ficou preso no primeiro chat-success;
+- [x] a quinta admissão funcional encontrou `zai/glm-4.7-flash`: `agentProbeStatus=ok`, marker tool + leitura + `ask_user` completos;
+- [x] o terminal abriu realmente bound a `zai/glm-4.7-flash`, provando que o gate eliminou o falso-green de chat admission;
+- [x] o run encerrou como `blocked/byok-route-no-response` após ~`583,5 s`, sem winner: durante o primeiro turno do cenário Z.ai retornou overload `code=1305` antes do primeiro `workflow_plan`;
+- [x] o relatório persistido marcou `byok-real-agent-admission-proof=true` e `byok-real-model-gateway-scenario-opened=false`; portanto bootstrap comprovado **não foi confundido** com seleção adaptativa concluída.
+
+### 104.6 Admissão agent-only: remover duplicação chat → agent
+
+A prova acima também expôs custo redundante: para cada bootstrap, o runtime selector executava chat e, se houvesse sucesso, o harness executava um agent probe mais forte. Como o agent probe já materializa um turno real e `lastAgentProbeSuccessAt` participa de `latestProviderSuccessAt`, não é necessário duplicar a chamada.
+
+A otimização publicada em `6861ec774031011e6fb5dab0b84ebbbc8037b034` (`perf(llm-b): use agent-only cockpit admission`) muda somente os cenários Model Gateway:
+
+- [x] runtime selector vira **dry selector** para escolher a próxima candidata elegível;
+- [x] `runConfiguredByokAgentProbe` passa a ser a única chamada real de admissão daquela candidata;
+- [x] falha agent é persistida e força novo dry rerank;
+- [x] cenários BYOK comuns/control-only preservam o fluxo anterior;
+- [x] o critério `byok-real-admission-selector-proof` passa a significar candidato de bootstrap preparado pelo selector, enquanto `byok-real-agent-admission-proof` permanece a autoridade funcional;
+- [x] parse/outline limpo; nenhuma suíte ampla necessária porque a onda altera apenas o harness operacional `.mjs`;
+- [x] `71106b207af3cfaf5e639dc49b0b406f9d5a729c` (`chore(llm-b): log cockpit admission progress`) acrescenta logging sanitizado progressivo `start/ok/failed`, rota, status e duração no `detached.runner.log`, sem payloads/secrets.
+
+### 104.7 Recovery de tools precisa preservar o cenário ativo
+
+O primeiro turno já hospedado em `zai/glm-4.7-flash` sofreu overload transitório antes de `model_gateway_workflow_plan`. O harness acionou a continuação de tools incompletas, mas `buildIncompleteExpectedToolRecoveryPrompt` ainda carregava parâmetros fixos do antigo cenário readonly (`maxSnapshotAgeHours=720`, `maxCandidates=8`, prefixo `live-readonly-workflow-20260814`).
+
+Isso quebrava a continuidade epistemológica da seleção adaptativa: um recovery não pode trocar silenciosamente proof window, candidate budget nem identidade de idempotência do run.
+
+Correção publicada em `aec0c3867f4a2594c449230a7762971de4e9ea8f` (`fix(llm-b): preserve adaptive recovery context`):
+
+- [x] o recovery procura primeiro instruções da tool faltante em `scenario.beforeDeltaInstructions`;
+- [x] portanto `model-gateway-adaptive-probe` preserva o prefixo único do processo, `maxSnapshotAgeHours=24`, `maxCandidates=12`, `quality_first`, rerank após todo probe e autoridade READY do workflow;
+- [x] hardcodes antigos permanecem apenas como fallback para cenários que não fornecem instrução específica;
+- [x] não foi criado um segundo contrato de workflow nem duplicada a lógica de seleção;
+- [x] parse/outline limpo; nenhuma suíte ampla executada.
+
+### 104.8 Prova agent-only + atribuição canônica de health
+
+A execução `mcp-bf9b3cf0-d016-4a2a-8102-40a4b02ae1b8` nasceu sobre `aec0c3867` e provou a geração completa de bootstrap/recovery:
+
+- [x] `agent admission 1/8 start route=kilo-code/openrouter/free` apareceu imediatamente no log progressivo;
+- [x] `kilo-code/openrouter/free` passou o agent admission na **primeira tentativa**, em ~`31,8 s`;
+- [x] não houve chat probe anterior: `dry selector → agent admission` ficou provado live;
+- [x] o cenário `model-gateway-adaptive-probe` abriu de fato;
+- [x] primeiro `workflow_plan` ~`20,1 s` → probe plan ~`2,7 s` → apply ~`3,5 s`;
+- [x] depois do probe, houve rerank obrigatório: segundo workflow ~`17,5 s`;
+- [x] não houve `/tmp`, replay de prefixo antigo nem recovery readonly.
+
+O run também revelou uma falha independente na atribuição de health:
+
+- [x] `buildModelGatewayRuntimeSelectorProbeEnv` já preservava `COPILOT_MODEL_GATEWAY_PROVIDER_ID` e endpoint/auth da rota autorizada;
+- [x] porém `recordProbeHealth()` derivava `providerId` de `probe.preset`/`providerType`;
+- [x] para rotas gateway, o preset operacional é deliberadamente `custom`, então uma falha de `gemini/gemini-3.6-flash` foi persistida como `custom|gemini-3.6-flash`;
+- [x] a própria tool detectou `provider_result_mismatch`, portanto a falha **não virou sucesso**, mas o reranker não recebia a falha sob a identidade Gemini correta;
+- [x] a LLM posteriormente escreveu `ADAPTIVE-SELECTION-READY provider=gemini model=gemini-3.6-flash decision=probe_required`; o harness não aceitou esse texto como prova terminal e entrou em diagnóstico;
+- [x] o run encerrou `blocked/byok-route-no-response`, sem winner.
+
+Correção publicada em `22362cb356f34141a7b65ab14da499cce1c6cfe5` (`fix(model-gateway): attribute probes to authorized routes`):
+
+- [x] `executeModelGatewayProbe` aceita identidade canônica opcional;
+- [x] `model_gateway_probe_execute` passa `routeProfile + providerId + providerModel` da `authorizedRoute`;
+- [x] health, resultado SQLite, `probeProfile` e evento usam essa identidade canônica;
+- [x] chamadas legadas sem identity preservam fallback anterior;
+- [x] primeiro typecheck focado encontrou apenas fronteiras JSDoc/tipo (`251024e5...`), corrigidas localmente;
+- [x] rerun estrito `6a87e26c-0bf0-4614-8d84-22befd2d5bb1`, exit `0`, ~`33,7 s`;
+- [x] nenhuma suíte ampla executada.
+
+### 104.9 Roadmap residual atualizado
+
+- [x] concluir o run `mcp-89b8c8d2...` e registrar seu estado terminal (`blocked/byok-route-no-response`, sem winner);
+- [x] executar prova sobre `aec0c3867`; ela validou agent-only/recovery, mas revelou atribuição `custom` e não produziu winner;
+- [ ] executar uma única nova seleção adaptativa sobre `22362cb35`, exigindo health canônica por authorizedRoute;
+- [x] exigir bootstrap agent-capable antes de abrir o cockpit;
+- [ ] no ciclo quality-first interno, exigir probes frescos, binding autorizado, health canônica e READY validado pelo workflow;
+- [ ] registrar o winner plenamente funcional ou exhaustion real;
+- [ ] provar promoção same-session do winner quando aplicável;
+- [ ] medir `fresh warm` final da readiness com static tiers atuais;
+- [ ] reduzir o custo de `model_gateway_workflow_plan` (~15–17 s) somente após fechar a correção funcional, privilegiando shared routing snapshot/context em vez de paralelismo especulativo;
+- [ ] executar benchmark representativo cold/L1/L2 a partir de host/schema capaz de invocar a missão publicada;
+- [ ] executar benchmark QUIC/H2/auto com amostras estatisticamente suficientes;
+- [ ] golden prompts em conversa limpa;
+- [ ] decomposição estrutural dos hotspots permanece deliberadamente para conversa separada.
+
+### 104.10 `require_runtime_proof` não pode impedir a geração da própria prova
+
+A retomada de 2026-08-17 revelou um deadlock de bootstrap introduzido pela combinação correta, porém incompleta, de duas garantias: `require_runtime_proof` como policy estrita e agent admission obrigatório antes de abrir o cockpit. O primeiro run pós-restart, `mcp-9d9d4102-e3cf-4e0f-a9c0-825a27de7c9f`, fechou em ~4,3 s como `byok-agent-admission-unavailable/no_agent_capable_bootstrap_route` **sem sequer existir uma candidata selecionada**.
+
+Causa causal:
+
+- [x] o selector recebia `require_runtime_proof` também na fase de descoberta pré-prova;
+- [x] sem proof pré-existente, nenhuma rota podia ser selecionada;
+- [x] sem rota selecionada, o agent admission não podia rodar;
+- [x] portanto o sistema exigia como pré-condição a evidência que somente o próprio gate seguinte poderia produzir.
+
+Correção local:
+
+- [x] criado `control-plane/runtime-admission-policy.js` com `resolveModelGatewayAdmissionCandidateSelectionPolicy`;
+- [x] a policy solicitada continua `require_runtime_proof` para admissão/promoção;
+- [x] apenas a **descoberta da candidata descartável** usa `prefer_runtime_proved` quando agent admission é obrigatório;
+- [x] o relatório preserva explicitamente `requestedSelectionPolicy`, `candidateSelectionPolicy` e `selectionPolicyRelaxedForAdmission`;
+- [x] reranks após falha agent usam a mesma policy de descoberta, sem degradar a policy final;
+- [x] teste focado `test_runtime_admission_policy.spec.js` verde.
+
+Prova real subsequente, run `mcp-7b16c6a1-7dfc-47f5-bc50-c7e84170f6a9`:
+
+- [x] solicitado `require_runtime_proof`, mas a fronteira registrada ficou `candidateSelectionPolicy=prefer_runtime_proved` e `selectionPolicyRelaxedForAdmission=true`;
+- [x] o selector avançou de fato por candidatas distintas em vez de morrer sem rota ou repetir replay: `zai/glm-4.5-air` → `zai/glm-4.6v` → `gemini/gemini-3.5-flash-lite` → `gemini/gemini-3.5-live-translate-preview` → `mistral/mistral-nemo-2407`;
+- [x] todas as tentativas preservaram `routeProfile=repo_agent`;
+- [x] nenhuma passou o agent admission nesta fotografia de health/provider, então o run fechou cedo e corretamente como `byok-agent-admission-unavailable`, sem abrir um cockpit não funcional;
+- [x] essa execução prova a remoção do deadlock e o avanço real entre candidatas, mas **não** constitui winner da seleção quality-first interna.
+
+### 104.11 Falha 503 do GitHub não é credencial inválida e não deve consumir 15 minutos do harness
+
+A tentativa seguinte deslocou a prova para o substrate nativo do Copilot, run detached `mcp-96eb9f95-78f3-47e2-9740-afe51c6543d9`. O `session.create` recebeu do upstream:
+
+`Authentication failed: Failed to validate SDK token (503): GitHub returned: No server is currently available to service your request.`
+
+O prefixo textual `Authentication failed` fez a taxonomia anterior classificar o incidente como `auth` e a UX recomendar reautenticação, apesar de a causa concreta ser indisponibilidade 503 do GitHub. Além disso, o terminal corretamente permanecia vivo para diagnóstico humano, mas o harness automatizado continuaria aguardando todo o budget de `900000 ms` mesmo sabendo que o cenário jamais havia sido despachado.
+
+Correções implementadas enquanto o run antigo ainda estava vivo:
+
+- [x] `core/sdk-error-taxonomy.js` agora classifica 5xx e fingerprints explícitos de indisponibilidade upstream como `network` **antes** de fingerprints genéricos de autenticação;
+- [x] 401/403 continuam explicitamente `auth`;
+- [x] teste com a mensagem real do incidente exige `network`, retry/reconnect permitido e mensagem `[sdk rede]`, sem recomendar `Reautentique`;
+- [x] criado `model-gateway-terminal-live-blocker.mjs`, classificador puro de falhas de startup já declaradas pelo terminal;
+- [x] o classificador distingue `sdk-upstream-unavailable`, `sdk-auth-failed` e `sdk-network-unavailable`, e não reage a uma linha auth isolada antes de o boot estar efetivamente bloqueado;
+- [x] o harness passou a detectar esse blocker **antes do envio do cenário**, coletar apenas diagnósticos locais bounded (`/status`, `/activity`, `/errors`, `/health`, export), pedir `/quit` e manter kill garantido com janela curta;
+- [x] testes focados de recovery policy e startup blocker verdes;
+- [x] typecheck estrito verde (`aee97ab8-9cd5-45cb-beeb-f9ee2c1dd247`);
+- [x] lint final verde (`f36bec51-9a82-4873-98d2-a8c75b14d378`).
+
+O run `mcp-96eb9f95...` foi iniciado **antes** dessas correções e terminou após ~902 s como `live-timeout`, sem o cenário ter sido despachado. Uma execução posterior, `mcp-16849ee8-4206-4949-9784-2dfd9bf3cb23`, já provou em runtime a correção da taxonomia: o mesmo 503 passou a aparecer como `kind=network, retryable=true, reconnect=true`, não mais como `auth`.
+
+Essa segunda execução revelou, porém, uma lacuna adicional de reconhecimento do estado terminal. Após esgotar os retries, a superfície real emitiu exatamente as formas `ensureDialogLoop falhou após 3 tentativas`, `Boot        falha ao iniciar conversa` e `Dialog loop bootstrap error`. A primeira versão do classificador ainda não reconhecia essas três formas, de modo que o run já iniciado continuou sob a lógica anterior de timeout. O classificador foi então ampliado para essas expressões reais, e `test_llmb_live_startup_blocker.spec.js` passou a reproduzir literalmente esse envelope 503; validação focada verde no job `307e9c3c-c231-4992-a7ea-52bb4587fe43`.
+
+A aceitação final foi obtida no run novo `mcp-d5a1fdc4-b73d-4cf0-bb93-54851b91ba2f`, já nascido com a versão ampliada do classificador. O GitHub continuava devolvendo o mesmo 503; o runtime manteve a classificação correta `kind=network, retryable=true, reconnect=true`, esgotou as três tentativas locais e, ao aparecer `ensureDialogLoop falhou após 3 tentativas`, o harness reconheceu imediatamente `sdk-upstream-unavailable`, iniciou os diagnósticos bounded e **não despachou o prompt do cenário**. O ledger persistido fechou em `56.503 ms`, contra `901.040 ms` do run anterior `mcp-16849...`, redução de ~93,7% no tempo desperdiçado pelo mesmo blocker externo. O detached process também encerrou normalmente (`process-not-alive`) após a criação do summary. Portanto a saída antecipada por indisponibilidade upstream está agora provada em runtime; a execução do ciclo adaptativo interno continua naturalmente dependente de recuperação do substrate Copilot SDK.
+
+### 104.12 Cancelamento governado de runs LLM-B detached
+
+A espera longa também expôs um gap de autonomia operacional: `llmb_live_test_run` podia criar um processo detached observável por `llmb_live_runs`, mas não existia uma superfície governada para encerrá-lo. Foi acrescentada `llmb_live_test_cancel` com contrato deliberadamente estreito:
+
+- [x] aceita somente `runId` estrito no formato `mcp-<UUID>`; não aceita PID, sinal, path, shell, comando ou env arbitrário;
+- [x] resolve o PID exclusivamente pelo manifesto persistido do próprio harness;
+- [x] antes de sinalizar, em POSIX lê `/proc/<pid>/cmdline` e exige simultaneamente o runner allowlisted e o `--out-dir=<manifest.outDir>` exato, fechando o risco de PID reciclado apontar para processo alheio;
+- [x] quando a identidade é válida, encerra o process group detached com `SIGTERM`, contendo também PTY/descendentes do harness;
+- [x] registra eventos de auditoria específicos e usa annotation `destructive`, sem `openWorld`;
+- [x] MCP capabilities version avançou para 43; README e registry foram atualizados;
+- [x] testes `test_mcp_autonomy_mutations.spec.js` e `test_mcp_registry.spec.js` verdes (`79dbc807-a47b-4b41-a5a1-b458113b3172` e `7f30a042-0c5b-4afd-8049-9b2a0b1382ef`);
+- [x] hot reload `mcp-reload-851804f5-1f6d-4f97-a2f3-0b68d6ce586e` concluído; smoke autenticado confirmou **116/116 tools**, sem missing/unexpected, e `mcp_tools_status` classifica `llmb_live_test_cancel` como destructive/admin.
+
+Hardening adicional feito após a primeira publicação:
+
+- [x] o manifesto detached passou a ser aceito somente quando `runId`, nome do arquivo, PID positivo, timestamp finito, `outDir=artifacts/terminal-live/<runId>` e `logPath=<outDir>/detached.runner.log` concordam exatamente; isso impede que um manifesto adulterado redirecione inspeção/cancelamento para paths alheios;
+- [x] `llmb_live_runs` deixou de tratar `kill(pid, 0)` como prova suficiente: em POSIX expõe separadamente `pidPresent`, `pidAlive` e `processIdentity`, e só chama de vivo o PID cujo `/proc/<pid>/cmdline` ainda corresponde ao runner e ao `out-dir` esperados;
+- [x] um summary já persistido não mascara mais processo órfão: se a identidade exata ainda estiver viva, o status pode ser `artifacts_ready_process_alive` e `llmb_live_test_cancel` pode reaproveitar o mesmo gate de identidade para fazer cleanup explícito;
+- [x] essa instrumentação encontrou uma fuga real histórica no run BYOK `mcp-7b16c6a1-7dfc-47f5-bc50-c7e84170f6a9`: summary pronto, porém o próprio runner ainda vivo e verificável muito depois do fechamento lógico;
+- [x] o caminho de early-block BYOK passou, depois de todas as escritas/ledger/fixture close, a agendar `process.exit(1)` com grace de 2 s em timer `unref()`: o shutdown natural continua preferido, mas handles de health/provider não podem manter indefinidamente um CLI já finalizado;
+- [x] teste de autonomia final após o hardening verde (`805a8411-d6c1-4b3e-b646-8ba4adb4fdda`), registry final verde (`0d1d22f2-b8bf-4690-9522-11a6a92531aa`), recovery-policy final verde (`f0274afd-3fe4-4a94-b1eb-ab9d1c8d2aca`), typecheck final verde (`18499ec2-35a1-4340-b576-568d5a218eeb`) e lint final verde (`45e097eb-9233-4b58-9f0b-64b824757efe`);
+- [x] hot reload final `mcp-reload-14d13bfb-b405-4166-92f6-4ab66928b37e` concluído; readiness reconciliado e smoke OAuth autenticado confirmou novamente **116/116 tools**, sem missing/unexpected; `mcp_tools_status` mostra `llmb_live_test_cancel` entre as cinco tools destructive e sem `openWorld`.
+
+Limitação externa observada nesta própria conversa: o servidor publica e audita a 116ª tool, mas o snapshot de schemas executáveis materializado pelo host ChatGPT nesta sessão ainda não expõe `llmb_live_test_cancel` como callable direto, mesmo quando a descoberta textual do MCP confirma sua existência. Portanto o ganho está ativo e provado no servidor, porém não foi correto contornar a limitação do host com shell, PID ou chamada arbitrária. A próxima sessão que materializar o schema atualizado poderá usá-la diretamente.

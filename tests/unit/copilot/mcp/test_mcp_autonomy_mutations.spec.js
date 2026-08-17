@@ -77,5 +77,15 @@ describe('MCP governed autonomy mutations', () => {
         assert.equal(blocked.structuredContent?.['code'], 'ERR_LLMB_MODEL_USAGE_CONFIRMATION_REQUIRED');
         assert.equal('command' in runTool.inputSchema, false);
         assert.equal('script' in runTool.inputSchema, false);
+
+        const cancelTool = tool(llmBLiveTools, 'llmb_live_test_cancel');
+        assert.deepEqual(Object.keys(cancelTool.inputSchema).sort(), ['runId']);
+        assert.equal('pid' in cancelTool.inputSchema, false);
+        assert.equal('signal' in cancelTool.inputSchema, false);
+        assert.equal(cancelTool.annotations?.destructiveHint, true);
+        assert.equal(cancelTool.annotations?.openWorldHint, false);
+        const missing = await cancelTool.handler({ runId: 'mcp-00000000-0000-0000-0000-000000000000' });
+        assert.equal(missing.isError, true);
+        assert.equal(missing.structuredContent?.['code'], 'ERR_LLMB_LIVE_CANCEL_NOT_FOUND');
     });
 });

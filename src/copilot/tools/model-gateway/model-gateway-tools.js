@@ -545,6 +545,8 @@ export const modelGatewayWorkflowPlanTool = buildTool({
             requireAgentProbeOk: false,
             requireRuntimeProof: false,
             maxRuntimeProofAgeMs,
+            preferredProbeKinds: args.preferredProbeKinds,
+            blockFailedProbeKinds: args.preferredProbeKinds,
             ...rankingWeights,
         });
         const provedRoutePlan = await readPlane.planRoute({
@@ -553,6 +555,8 @@ export const modelGatewayWorkflowPlanTool = buildTool({
             evaluateEligibility: true,
             ...(args.requireRuntimeProof ? { requireRuntimeProof: true } : {}),
             maxRuntimeProofAgeMs,
+            preferredProbeKinds: args.preferredProbeKinds,
+            blockFailedProbeKinds: args.preferredProbeKinds,
             ...rankingWeights,
         });
         const routeData = operationData(discoveryRoutePlan);
@@ -608,6 +612,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                 ? await readPlane.planProbes({
                       modelIds: [probeModelId],
                       providerId: providerForProbe,
+                      routeProfile: args.taskProfile,
                       allowedProbeKinds: args.preferredProbeKinds,
                       maxProbeCount: Math.min(args.maxProbeCount, args.preferredProbeKinds.length),
                       maxEstimatedCostUsd: args.maxEstimatedCostUsd,
@@ -722,6 +727,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     {
                         modelIds: probeModelId ? [probeModelId] : [],
                         providerId: providerForProbe,
+                        routeProfile: args.taskProfile,
                         allowedProbeKinds: args.preferredProbeKinds,
                         maxProbeCount: Math.min(args.maxProbeCount, args.preferredProbeKinds.length),
                         maxEstimatedCostUsd: args.maxEstimatedCostUsd,
@@ -742,7 +748,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
             const candidateModelId = String(firstProbeCandidate['providerModel']);
             const probeKinds = args.preferredProbeKinds.slice(0, args.maxProbeCount);
             for (const probeKind of probeKinds) {
-                const suffix = `probe-r${candidateRank}-${probeKind}-${candidateProviderId}-${candidateModelId}`;
+                const suffix = `probe-${args.taskProfile}-r${candidateRank}-${probeKind}-${candidateProviderId}-${candidateModelId}`;
                 const idSuffix = `r${candidateRank}_${cleanWorkflowKeyPart(probeKind)}`;
                 const planId = `probe_execute_plan_${idSuffix}`;
                 const applyId = `probe_execute_apply_${idSuffix}`;
@@ -750,6 +756,7 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                     probeKind,
                     providerId: candidateProviderId,
                     modelId: candidateModelId,
+                    routeProfile: args.taskProfile,
                     maxEstimatedCostUsd: args.maxEstimatedCostUsd,
                     unknownCostPolicy: selectionGoal === 'quality_first' ? 'allow' : 'skip',
                     timeoutMs: 60000,
@@ -1218,8 +1225,9 @@ export const modelGatewayProbeExecuteTool = buildTool({
         'apply pode chamar provider e persiste prova redigida, mas nunca troca a sessão viva.',
     instructions:
         'Sempre use mode=plan primeiro. Para repo_agent/tool_agent prefira agent: ele valida geração, tool call, leitura sintética, ' +
-        'ask_user e eventos streaming/final em sessão descartável. Só aplique quando o plano selecionar exatamente a sonda; ' +
-        'reutilize a mesma idempotencyKey em retries. apply exige confirm=true e nunca é uma troca de modelo.',
+        'ask_user e eventos streaming/final em sessão descartável. Preserve exatamente o routeProfile funcional retornado pelo workflow; ' +
+        'só aplique quando o plano selecionar exatamente a sonda. Reutilize a mesma idempotencyKey apenas em retries da mesma operação; ' +
+        'apply exige confirm=true e nunca é uma troca de modelo.',
     parameters: MODEL_GATEWAY_PROBE_EXECUTE_INPUT_SCHEMA,
     outputSchema: MODEL_GATEWAY_TOOL_OUTPUT_SCHEMA,
     annotations: { ...MUTATING_ANNOTATIONS, openWorldHint: true },
@@ -1267,6 +1275,7 @@ export const modelGatewayProbeExecuteTool = buildTool({
         const plan = await createModelGatewayReadControlPlane().planProbes({
             modelIds: [args.modelId],
             providerId: args.providerId,
+            routeProfile: optionalToolString(args.routeProfile),
             allowedProbeKinds: [args.probeKind],
             maxProbeCount: 1,
             maxEstimatedCostUsd: args.maxEstimatedCostUsd,
@@ -1375,7 +1384,8 @@ export const modelGatewayProbeExecuteTool = buildTool({
             idempotencyKey: args.idempotencyKey,
             source: 'llm-b.model_gateway_probe_execute',
             identity: {
-                routeProfile: optionalToolString(authorizedRoute?.['routeProfile']),
+                routeProfile:
+                    optionalToolString(authorizedRoute?.['routeProfile']) ?? optionalToolString(args.routeProfile),
                 providerId: args.providerId,
                 providerModel: args.modelId,
             },

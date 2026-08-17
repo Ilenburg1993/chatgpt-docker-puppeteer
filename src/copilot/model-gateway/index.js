@@ -41,9 +41,18 @@ export {
     executeModelGatewayRuntimeRouteSwitch,
     executeModelGatewaySameSessionRouteSwitch,
     promoteModelGatewayDeferredRouteSwitchAtTurnBoundary,
+    parseModelGatewayAdaptiveSelectionOutcome,
+    resolveModelGatewayAdmissionCandidateSelectionPolicy,
     readModelGatewayDirectRebindEvidence,
     readModelGatewayProbeOperation,
 } from './control-plane/index.js';
+
+export {
+    MODEL_GATEWAY_CONTROLLER_SELECTION_STATUS,
+    MODEL_GATEWAY_CONTROLLER_SUBSTRATES,
+    buildModelGatewayControllerSelectionPlan,
+    resolveModelGatewayNativeControllerSelection,
+} from './controller/index.js';
 
 export {
     MODEL_GATEWAY_BINDING_STRATEGIES,

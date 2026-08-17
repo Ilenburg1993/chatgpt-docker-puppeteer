@@ -44,6 +44,7 @@ describe('copilot MCP registry', () => {
             'job_list',
             'llmb_live_readiness',
             'llmb_live_runs',
+            'llmb_live_test_cancel',
             'llmb_live_test_plan',
             'llmb_live_test_run',
             'mcp_apps_sdk_readiness',

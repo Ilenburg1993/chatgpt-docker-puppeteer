@@ -17,6 +17,9 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { modelGatewayScriptPath } from '../index.mjs';
+import { classifyModelGatewayTerminalStartupBlocker } from './model-gateway-terminal-live-blocker.mjs';
+import { parseModelGatewayAdaptiveSelectionOutcome } from '../../../src/copilot/model-gateway/control-plane/adaptive-selection-outcome.js';
+import { resolveModelGatewayAdmissionCandidateSelectionPolicy } from '../../../src/copilot/model-gateway/control-plane/runtime-admission-policy.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const DEFAULT_TIMEOUT_MS = 180_000;
@@ -479,7 +482,7 @@ const LIVE_SCENARIOS = Object.freeze({
             'Depois de TODO probe result, tanto sucesso quanto falha, descarte o ranking anterior e chame model_gateway_workflow_plan novamente. Não pergunte ao usuário se deve tentar a próxima candidata quando a falha for objetiva.',
             'Somente um model_gateway_workflow_plan REAL retornando selectionDecision.status="use_current" ou "switch_recommended" autoriza ADAPTIVE-SELECTION-READY. Não infira esse status a partir de um probe plan, ranking, raciocínio próprio ou modelo que pareça melhor.',
             'Se status="use_current" ou "switch_recommended", pare de sondar. NÃO chame model_gateway_route_switch/model_switch neste cenário.',
-            'Se atingir 8 applies ainda em probe_required, pare sem inventar sucesso e reporte ADAPTIVE-SELECTION-EXHAUSTED junto da candidata/razão atual.',
+            'Se atingir 8 applies ainda em probe_required, pare sem inventar sucesso e escreva uma única linha pública no formato exato "ADAPTIVE-SELECTION-EXHAUSTED provider=<providerId> model=<providerModel> reason=<razão-sem-quebra-de-linha>". EXHAUSTED é terminal negativo válido deste cenário: depois dele não escreva DELTA-CANONICAL e não invoque ask_user.',
             'Quando houver use_current ou switch_recommended, escreva uma linha pública no formato exato "ADAPTIVE-SELECTION-READY provider=<providerId> model=<providerModel> decision=<status>" usando a selectedRoute do workflow. Depois escreva as oito linhas DELTA-CANONICAL.',
         ],
         askToolInstruction:
@@ -519,8 +522,8 @@ const LIVE_SCENARIOS = Object.freeze({
             '6) model_gateway_operation_status com operationId=null, limit=5.',
             '7) model_gateway_model_evaluate com modelIds=["nex-agi/nex-n2-pro:free"], taskProfile="repo_agent", maxResults=5.',
             '8) model_gateway_policy_propose com objective="prefer_runtime_proved", taskProfile="repo_agent", candidateModelIds=["nex-agi/nex-n2-pro:free"], maxCandidates=5.',
-            '9) model_gateway_probe_plan com modelIds=["nex-agi/nex-n2-pro:free"], providerId="kilo-code", allowedProbeKinds=["agent"], maxProbeCount=1, maxEstimatedCostUsd=10, unknownCostPolicy="allow", recommendationLimit=5, probeFailureCooldownSeconds=900.',
-            '10) model_gateway_probe_execute com mode="plan", probeKind="agent", providerId="kilo-code", modelId="nex-agi/nex-n2-pro:free", profileId="kilo", maxEstimatedCostUsd=10, unknownCostPolicy="allow", timeoutMs=60000, idempotencyKey="live-all-tools-20260814:probe-plan", confirm=false.',
+            '9) model_gateway_probe_plan com modelIds=["nex-agi/nex-n2-pro:free"], providerId="kilo-code", routeProfile="repo_agent", allowedProbeKinds=["agent"], maxProbeCount=1, maxEstimatedCostUsd=10, unknownCostPolicy="allow", recommendationLimit=5, probeFailureCooldownSeconds=900.',
+            '10) model_gateway_probe_execute com mode="plan", probeKind="agent", providerId="kilo-code", modelId="nex-agi/nex-n2-pro:free", routeProfile="repo_agent", profileId="kilo", maxEstimatedCostUsd=10, unknownCostPolicy="allow", timeoutMs=60000, idempotencyKey="live-all-tools-20260814:probe-plan", confirm=false.',
             '11) model_gateway_model_switch com mode="plan", modelId="nex-agi/nex-n2-pro:free", runtimeId=null, idempotencyKey="live-all-tools-20260616:model-switch-plan", confirm=false.',
             '12) model_gateway_route_switch com mode="plan", route={providerId:"kilo-code", providerModel:"nex-agi/nex-n2-pro:free", selectorSyntax:"nex-agi/nex-n2-pro:free", baseUrl:"https://api.kilo.ai/api/gateway", openAICompatibleBaseUrl:"https://api.kilo.ai/api/gateway", wireApi:"completions", providerProfile:"kilo", routeProfile:"repo_agent", selectedRouteKey:"live-all-tools-route-plan"}, runtimeId=null, timeoutMs=60000, idempotencyKey="live-all-tools-20260616:route-switch-plan", confirm=false.',
             '13) model_gateway_catalog_refresh com mode="plan", includePublic=true, includeAuthenticated=false, force=false, sourceIds=[], refreshAccountOverlays=false, maxSourceResults=5, idempotencyKey="live-all-tools-20260616:catalog-refresh-plan", confirm=false.',
@@ -1365,7 +1368,16 @@ async function buildRealByokRuntime({
         timeoutMs: runtimeSelectorTimeoutMs,
         selectionPolicy: runtimeSelectorSelectionPolicy,
     };
-    let runtimeSelector = runRuntimeSelectorLiveRoute(selectorInput);
+    const admissionSelectionPolicy = resolveModelGatewayAdmissionCandidateSelectionPolicy(
+        runtimeSelectorSelectionPolicy,
+        { requireAgentAdmission },
+    );
+    const admissionSelectorInput = {
+        ...selectorInput,
+        selectionPolicy: admissionSelectionPolicy.candidateSelectionPolicy,
+    };
+    const agentAdmissionRequired = routeSelectorMandatory && runtimeSelectorExecute && requireAgentAdmission;
+    let runtimeSelector = runRuntimeSelectorLiveRoute(agentAdmissionRequired ? admissionSelectorInput : selectorInput);
     let runtimeRoute = runtimeSelectorRouteDetails(runtimeSelector);
     const agentAdmissionAttempts = [];
     if (routeSelectorMandatory && runtimeSelectorExecute && requireAgentAdmission) {
@@ -1444,7 +1456,7 @@ async function buildRealByokRuntime({
                 });
             }
             await flushByokProviderHealth();
-            runtimeSelector = runRuntimeSelectorLiveRoute(selectorInput);
+            runtimeSelector = runRuntimeSelectorLiveRoute(admissionSelectorInput);
             runtimeRoute = runtimeSelectorRouteDetails(runtimeSelector);
         }
         if (!agentAdmissionAttempts.some((attempt) => attempt.ok === true)) {
@@ -1489,6 +1501,9 @@ async function buildRealByokRuntime({
         agentAdmission: {
             required: requireAgentAdmission === true,
             ok: requireAgentAdmission !== true || agentAdmissionAttempts.some((attempt) => attempt.ok === true),
+            requestedSelectionPolicy: admissionSelectionPolicy.requestedSelectionPolicy || null,
+            candidateSelectionPolicy: admissionSelectionPolicy.candidateSelectionPolicy || null,
+            selectionPolicyRelaxedForAdmission: admissionSelectionPolicy.relaxedForAdmission,
             attempts: agentAdmissionAttempts,
             error:
                 requireAgentAdmission === true && !agentAdmissionAttempts.some((attempt) => attempt.ok === true)
@@ -1563,6 +1578,9 @@ async function buildRealByokRuntime({
             agentAdmission: {
                 required: requireAgentAdmission === true,
                 ok: requireAgentAdmission !== true || agentAdmissionAttempts.some((attempt) => attempt.ok === true),
+                requestedSelectionPolicy: admissionSelectionPolicy.requestedSelectionPolicy || null,
+                candidateSelectionPolicy: admissionSelectionPolicy.candidateSelectionPolicy || null,
+                selectionPolicyRelaxedForAdmission: admissionSelectionPolicy.relaxedForAdmission,
                 attempts: agentAdmissionAttempts,
             },
             dotenvLocalLoaded: Object.keys(dotenvEnv).length > 0,
@@ -4556,6 +4574,22 @@ function detectLiveBlocker(plain, runtime = {}) {
     // A recovered provider/tool incident is no longer a live blocker once the scenario's terminal public marker has
     // been observed after the required human answer. Diagnostics collected after completion must not resurrect it.
     if (scenarioCompleted) return null;
+    const adaptiveOutcome =
+        runtime.adaptiveSelectionOutcome ??
+        (scenario?.id === 'model-gateway-adaptive-probe' ? parseModelGatewayAdaptiveSelectionOutcome(plain) : null);
+    if (adaptiveOutcome?.status === 'exhausted') {
+        return {
+            id: 'adaptive-selection-exhausted',
+            detail:
+                'adaptive selection exhausted its bounded probe budget without an authorized winner' +
+                `${adaptiveOutcome.providerId ? ` · provider=${adaptiveOutcome.providerId}` : ''}` +
+                `${adaptiveOutcome.providerModel ? ` · model=${adaptiveOutcome.providerModel}` : ''}` +
+                `${adaptiveOutcome.reason ? ` · reason=${adaptiveOutcome.reason}` : ''}`,
+            outcome: adaptiveOutcome,
+        };
+    }
+    const startupBlocker = classifyModelGatewayTerminalStartupBlocker(plain);
+    if (startupBlocker) return startupBlocker;
     const rateLimitMatch = plain.match(
         /You've hit your rate limit\.[^\n]*(?:reset in ([^.]+)\.)?[^\n]*(?:Request ID: ([^)]+))?/i,
     );
@@ -7552,6 +7586,8 @@ function evaluateByokRealOutput(
 function evaluateBlockedOutput(plain, sseSummary, blocker) {
     const blockedByByokProvider =
         blocker?.id === 'byok-provider-turn-failed' || blocker?.id === 'byok-route-no-response';
+    const adaptiveExhausted = blocker?.id === 'adaptive-selection-exhausted';
+    const adaptiveOutcome = adaptiveExhausted && blocker?.outcome && typeof blocker.outcome === 'object' ? blocker.outcome : null;
     return [
         {
             id: 'ready',
@@ -7568,6 +7604,25 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
             pass: false,
             detail: blocker.detail,
         },
+        ...(adaptiveExhausted
+            ? [
+                  {
+                      id: 'adaptive-selection-exhausted-observed',
+                      pass: adaptiveOutcome?.status === 'exhausted',
+                      detail: 'bounded adaptive probe cycle terminated explicitly as exhausted',
+                  },
+                  {
+                      id: 'adaptive-selection-no-winner',
+                      pass: adaptiveOutcome?.winner === false,
+                      detail: 'exhaustion remained a negative terminal result and did not authorize promotion',
+                  },
+                  {
+                      id: 'adaptive-selection-not-timeout',
+                      pass: !/live-timeout|runner timeout/iu.test(String(blocker.detail ?? '')),
+                      detail: 'bounded exhaustion closed before the generic scenario timeout path',
+                  },
+              ]
+            : []),
         {
             id: 'sse-connected',
             pass: sseSummary.connected,
@@ -7595,7 +7650,9 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
         {
             id: 'root-cause-not-ux-duplication',
             pass: true,
-            detail: 'scenario criteria skipped because the blocker prevented assistant/tool/ask_user streaming',
+            detail: adaptiveExhausted
+                ? 'scenario ended by the explicit bounded exhaustion contract; success-only delta/ask steps were not expected'
+                : 'scenario criteria skipped because the blocker prevented assistant/tool/ask_user streaming',
         },
     ];
 }
@@ -7907,6 +7964,10 @@ async function main() {
         console.error(`[terminal-live] BLOCKED: ${blocker.id}`);
         process.exitCode = 1;
         await byokFixtureProvider?.close();
+        // Direct BYOK admission can leave provider/runtime-health handles referenced after every artifact and ledger
+        // write has completed. Prefer natural shutdown, but if such a handle survives, terminate this finalized CLI
+        // after a short grace period instead of leaking a detached harness indefinitely.
+        setTimeout(() => process.exit(1), 2_000).unref();
         return;
     }
 
@@ -8131,6 +8192,7 @@ async function main() {
     let missingRequiredAskRecoveryPlainOffset = 0;
     let incompleteExpectedToolRecoverySent = false;
     let incompleteExpectedToolRecoveryPlainOffset = 0;
+    let adaptiveSelectionOutcome = null;
     let forcedKillTimer = null;
     const command = buildTerminalLlmbCommand(canUsePty);
     const terminalInheritedEnv = controlPlaneHostEnv ?? { ...process.env, ...dotenvEnv };
@@ -8263,6 +8325,45 @@ async function main() {
             diagnostics.splice(6, 0, '/byok providers', '/byok health', '/byok recommend reasoning safe 8');
         }
         startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: Math.max(30_000, diagnostics.length * 3_000) });
+        return true;
+    };
+    const scheduleStartupBlockerDiagnostics = (blocker) => {
+        if (postCommandsSent || !blocker) return false;
+        postCommandsSent = true;
+        clearMissingRequiredAskDiagnosticTimer();
+        if (timeout) clearTimeout(timeout);
+        console.warn(`[terminal-live] startup bloqueado: ${blocker.id} · ${blocker.detail}`);
+        const diagnostics = ['/status', '/activity 20', '/errors 10', '/health full', `/export ${exportArg}`];
+        startDiagnosticCommandSequenceThenQuit(diagnostics, {
+            forceKillDelayMs: Math.max(18_000, diagnostics.length * 2_500),
+        });
+        // Startup blockers can leave the terminal at an idle local prompt indefinitely. Guarantee bounded harness exit
+        // even if prompt synchronization or /quit itself cannot complete.
+        scheduleForcedKill(Math.max(20_000, diagnostics.length * 3_000));
+        return true;
+    };
+    const scheduleAdaptiveExhaustionDiagnostics = (outcome) => {
+        if (postCommandsSent || outcome?.status !== 'exhausted') return false;
+        postCommandsSent = true;
+        clearMissingRequiredAskDiagnosticTimer();
+        if (timeout) clearTimeout(timeout);
+        console.warn(
+            `[terminal-live] seleção adaptativa esgotou o budget sem winner · provider=${outcome.providerId ?? '-'} · model=${outcome.providerModel ?? '-'} · reason=${outcome.reason ?? 'unknown'}`,
+        );
+        const diagnostics = [
+            '/activity 40',
+            '/intent 5',
+            '/tools diag',
+            '/events 80',
+            '/events 120 --raw',
+            '/errors 10',
+            '/health full',
+            `/export ${exportArg}`,
+        ];
+        if (byokReal) diagnostics.splice(6, 0, '/byok providers', '/byok health');
+        startDiagnosticCommandSequenceThenQuit(diagnostics, {
+            forceKillDelayMs: Math.max(24_000, diagnostics.length * 2_500),
+        });
         return true;
     };
     const schedulePostAnswerDiagnostics = (delayMs = postAnswerDelayMs) => {
@@ -8533,6 +8634,23 @@ async function main() {
         raw += text;
         process.stdout.write(text);
         const plain = stripAnsi(raw);
+        if (!scenarioSent && !postCommandsSent) {
+            const startupBlocker = classifyModelGatewayTerminalStartupBlocker(plain);
+            if (startupBlocker && scheduleStartupBlockerDiagnostics(startupBlocker)) return;
+        }
+        if (
+            scenarioSent &&
+            liveScenario.id === 'model-gateway-adaptive-probe' &&
+            !adaptiveSelectionOutcome &&
+            !postCommandsSent
+        ) {
+            const outcome = parseModelGatewayAdaptiveSelectionOutcome(plain.slice(scenarioPlainOffset));
+            if (outcome.status === 'exhausted') {
+                adaptiveSelectionOutcome = outcome;
+                scheduleAdaptiveExhaustionDiagnostics(outcome);
+                return;
+            }
+        }
         if (
             waitingForPromptBeforeSynchronizedCommand &&
             hasReturnedToReplPrompt(plain, promptSynchronizedCommandOutputOffset)
@@ -8845,6 +8963,7 @@ async function main() {
                   answerSent,
                   postAskContinuationObserved,
                   postCommandsSent,
+                  adaptiveSelectionOutcome,
                   sseEvents: sseSummary.events,
                   liveScenario,
               });

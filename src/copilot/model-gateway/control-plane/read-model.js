@@ -631,7 +631,7 @@ export class ModelGatewayReadControlPlane {
     }
 
     /**
-     * @param {{ taskProfile: string; maxCandidates: number; evaluateEligibility: boolean; requireAgentProbeOk?: boolean; requireRuntimeProof?: boolean; maxRuntimeProofAgeMs?: number; ignoreRuntimeHealth?: boolean; pricePenaltyWeight?: number; latencyPenaltyWeight?: number; runtimeProofWeights?: Record<string, number> }} input
+     * @param {{ taskProfile: string; maxCandidates: number; evaluateEligibility: boolean; requireAgentProbeOk?: boolean; requireRuntimeProof?: boolean; maxRuntimeProofAgeMs?: number; ignoreRuntimeHealth?: boolean; pricePenaltyWeight?: number; latencyPenaltyWeight?: number; runtimeProofWeights?: Record<string, number>; preferredProbeKinds?: string[]; blockFailedProbeKinds?: string[]; temporaryFailureCooldownMs?: number }} input
      */
     async planRoute(input) {
         const startedAtMs = this.#now();
@@ -645,6 +645,11 @@ export class ModelGatewayReadControlPlane {
             ...(typeof input.pricePenaltyWeight === 'number' ? { pricePenaltyWeight: input.pricePenaltyWeight } : {}),
             ...(typeof input.latencyPenaltyWeight === 'number' ? { latencyPenaltyWeight: input.latencyPenaltyWeight } : {}),
             ...(input.runtimeProofWeights ? { runtimeProofWeights: input.runtimeProofWeights } : {}),
+            ...(Array.isArray(input.preferredProbeKinds) ? { preferredProbeKinds: input.preferredProbeKinds } : {}),
+            ...(Array.isArray(input.blockFailedProbeKinds) ? { blockFailedProbeKinds: input.blockFailedProbeKinds } : {}),
+            ...(typeof input.temporaryFailureCooldownMs === 'number'
+                ? { temporaryFailureCooldownMs: input.temporaryFailureCooldownMs }
+                : {}),
         });
         const explanation = explainGatewayRouteDecision(route);
         const byok = importConfiguredByokFromEnv(this.#env);
@@ -893,6 +898,7 @@ export class ModelGatewayReadControlPlane {
      * @param {{
      *   modelIds: string[];
      *   providerId: string | null;
+     *   routeProfile?: string | null;
      *   allowedProbeKinds: string[];
      *   maxProbeCount: number;
      *   maxEstimatedCostUsd: number;
@@ -912,13 +918,18 @@ export class ModelGatewayReadControlPlane {
             input.modelIds.length > 0
                 ? { added: requestedKeys, removed: [], changed: [] }
                 : normalizeCatalogDiff(latestRun?.['diff']);
+        const requestedRouteProfile = optionalString(input.routeProfile);
         const recommendations = recommendCatalogDiffProbes({
             diff,
             projections,
             eligibilityDecisions: snapshot.modelEligibilityDecisions,
             requireEligibilityDecision: snapshot.modelEligibilityDecisions.length > 0,
             limit: input.recommendationLimit,
-        }).filter((recommendation) => !input.providerId || recommendation.providerId === input.providerId);
+        })
+            .filter((recommendation) => !input.providerId || recommendation.providerId === input.providerId)
+            .map((recommendation) =>
+                requestedRouteProfile ? { ...recommendation, routeProfile: requestedRouteProfile } : recommendation,
+            );
         const backoff = planModelGatewayProbeBackoff({
             recommendations,
             accountOverlays: snapshot.accountOverlays,
@@ -942,7 +953,7 @@ export class ModelGatewayReadControlPlane {
             const route = buildLiveRouteSwitchTarget(
                 projection,
                 selectedProbe.key,
-                optionalString(projection['routeProfile']) ?? 'runtime_probe',
+                requestedRouteProfile ?? optionalString(projection['routeProfile']) ?? 'runtime_probe',
             );
             return route ? [{ key: selectedProbe.key, kind: selectedProbe.kind, route }] : [];
         });
@@ -960,7 +971,9 @@ export class ModelGatewayReadControlPlane {
                 unresolvedModelIds:
                     input.modelIds.length > 0 && requestedKeys.length === 0 ? [...input.modelIds] : [],
                 providerId: input.providerId,
+                routeProfile: requestedRouteProfile,
                 constraints: {
+                    routeProfile: requestedRouteProfile,
                     allowedProbeKinds: input.allowedProbeKinds,
                     maxProbeCount: input.maxProbeCount,
                     maxEstimatedCostUsd: input.maxEstimatedCostUsd,

@@ -339,6 +339,9 @@ export const MODEL_GATEWAY_PROBE_PLAN_INPUT_SCHEMA = Object.freeze({
             description: 'Shortlist explícita; array vazio usa o diff do último refresh de catálogo.',
         },
         providerId: nullableString('Provider exato; null permite todos os providers.'),
+        routeProfile: nullableString(
+            'Perfil funcional alvo da prova (por exemplo repo_agent); quando informado, backoff e health usam essa identidade canônica.',
+        ),
         allowedProbeKinds: {
             type: 'array',
             minItems: 1,
@@ -516,6 +519,9 @@ export const MODEL_GATEWAY_PROBE_EXECUTE_INPUT_SCHEMA = Object.freeze({
         probeKind: { type: 'string', enum: ['chat', 'streaming', 'json', 'agent', 'vision'] },
         providerId: { type: 'string', minLength: 1, maxLength: 160 },
         modelId: { type: 'string', minLength: 1, maxLength: 300 },
+        routeProfile: nullableString(
+            'Perfil funcional alvo da prova; use exatamente o routeProfile retornado pelo workflow para preservar health/backoff canônicos.',
+        ),
         profileId: nullableString('Perfil BYOK configurado; null usa providerId como preset efêmero.'),
         maxEstimatedCostUsd: { type: 'number', minimum: 0, maximum: 10 },
         unknownCostPolicy: {

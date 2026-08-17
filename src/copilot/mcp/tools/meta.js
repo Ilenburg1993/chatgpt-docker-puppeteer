@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 42;
+const CAPABILITIES_VERSION = 43;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -136,6 +136,7 @@ const RUNTIME_TOOLS = [
     'mcp_reload_schedule',
     'llmb_live_readiness',
     'llmb_live_runs',
+    'llmb_live_test_cancel',
     'llmb_live_test_plan',
     'llmb_live_test_run',
     'mcp_capabilities_summary',

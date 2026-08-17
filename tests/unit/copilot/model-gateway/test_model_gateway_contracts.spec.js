@@ -281,6 +281,7 @@ import {
     applyModelGatewayCatalogRetention,
     auditModelGatewayCatalogSnapshotIntegrity,
     isModelGatewayCatalogRefreshLocked,
+    parseModelGatewayAdaptiveSelectionOutcome,
     resolveModelDeprecationAlias,
 } from '../../../../src/copilot/model-gateway/index.js';
 
@@ -350,6 +351,60 @@ const PROVIDER_FAMILY_ENV_FIXTURES = Object.freeze([
         expectedAdapter: 'zai',
     },
 ]);
+
+describe('model-gateway adaptive selection outcome', () => {
+    it('parses READY as an authorized winner', () => {
+        assert.deepEqual(
+            parseModelGatewayAdaptiveSelectionOutcome(
+                'ADAPTIVE-SELECTION-READY provider=gemini model=gemini-3.6-flash decision=switch_recommended',
+            ),
+            {
+                status: 'ready',
+                terminal: true,
+                winner: true,
+                providerId: 'gemini',
+                providerModel: 'gemini-3.6-flash',
+                decision: 'switch_recommended',
+                reason: null,
+                marker: 'ADAPTIVE-SELECTION-READY provider=gemini model=gemini-3.6-flash decision=switch_recommended',
+            },
+        );
+    });
+
+    it('parses EXHAUSTED as terminal without authorizing a winner', () => {
+        const outcome = parseModelGatewayAdaptiveSelectionOutcome(
+            'ADAPTIVE-SELECTION-EXHAUSTED provider=gemini model=gemini-3.6-flash reason=8_probes_applied;still_probe_required',
+        );
+        assert.equal(outcome.status, 'exhausted');
+        assert.equal(outcome.terminal, true);
+        assert.equal(outcome.winner, false);
+        assert.equal(outcome.providerId, 'gemini');
+        assert.equal(outcome.providerModel, 'gemini-3.6-flash');
+        assert.equal(outcome.reason, '8_probes_applied;still_probe_required');
+        assert.equal(outcome.decision, null);
+    });
+
+    it('parses terminal-rendered EXHAUSTED lines and normalizes the marker', () => {
+        const outcome = parseModelGatewayAdaptiveSelectionOutcome(
+            '  │  ADAPTIVE-SELECTION-EXHAUSTED provider=gemini model=gemini-3.6-flash reason=8_probes_applied;failed\r\n',
+        );
+        assert.equal(outcome.status, 'exhausted');
+        assert.equal(outcome.reason, '8_probes_applied;failed');
+        assert.equal(
+            outcome.marker,
+            'ADAPTIVE-SELECTION-EXHAUSTED provider=gemini model=gemini-3.6-flash reason=8_probes_applied;failed',
+        );
+    });
+
+    it('does not treat prompt instructions as a terminal marker', () => {
+        assert.equal(
+            parseModelGatewayAdaptiveSelectionOutcome(
+                'Se atingir 8 applies ainda em probe_required, reporte ADAPTIVE-SELECTION-EXHAUSTED junto da candidata/razão atual.',
+            ).status,
+            'pending',
+        );
+    });
+});
 
 describe('model-gateway foundation', () => {
     afterEach(() => {
@@ -563,6 +618,51 @@ describe('model-gateway foundation', () => {
         assert.ok(route.selected?.reasons.includes('agent_probe_verified'));
         assert.ok(route.rejected.some((candidate) => candidate.rejectedReasons.includes('chat_health_failed')));
         assert.equal(listByokProviderModelHealth().length, 0);
+    });
+
+    it('hard-blocks a candidate with a recent failed preferred agent probe and advances to the next route', () => {
+        const failedTopCandidate = createModelRecord({
+            providerId: 'gemini',
+            providerModel: 'gemini-3.6-flash',
+            capabilities: { streaming: true, tools: true, reasoningEffort: true },
+            limits: { contextWindowTokens: 1_000_000 },
+        });
+        const fallbackCandidate = createModelRecord({
+            providerId: 'groq',
+            providerModel: 'openai/gpt-oss-120b',
+            capabilities: { streaming: true, tools: true },
+            limits: { contextWindowTokens: 128_000 },
+        });
+        const runtimeHealthRecords = [
+            {
+                routeProfile: 'repo_agent',
+                providerId: 'gemini',
+                providerModel: 'gemini-3.6-flash',
+                probes: {
+                    agent: {
+                        kind: 'agent',
+                        status: 'failed',
+                        ok: false,
+                        providerAttempted: true,
+                        lastAt: 900,
+                    },
+                },
+            },
+        ];
+
+        const route = routeGatewayModels([failedTopCandidate, fallbackCandidate], 'repo_agent', {
+            routeProfile: 'repo_agent',
+            runtimeHealthRecords,
+            requireAgentProbeOk: false,
+            preferredProbeKinds: ['agent'],
+            blockFailedProbeKinds: ['agent'],
+            now: 1_000,
+            temporaryFailureCooldownMs: 15 * 60 * 1000,
+        });
+
+        assert.equal(route.selected?.model['id'], 'groq:openai/gpt-oss-120b');
+        const failed = route.rejected.find((candidate) => candidate.model['id'] === 'gemini:gemini-3.6-flash');
+        assert.ok(failed?.rejectedReasons.includes('runtime_probe_failed:agent'));
     });
 
     it('routes against an indexed runtime health view with the same profile/global precedence', () => {
@@ -5370,6 +5470,54 @@ describe('model-gateway foundation', () => {
                 .map((item) => [item.probeKind, item.retryAfterSeconds, item.resetAt]),
             [['agent', 840, '2026-05-25T00:15:00.000Z']],
         );
+    });
+
+    it('matches probe-failure backoff against the requested functional routeProfile, not a generic runtime profile', () => {
+        const recommendation = {
+            key: 'gemini:gemini-3.6-flash:default',
+            providerId: 'gemini',
+            providerModel: 'gemini-3.6-flash',
+            routeProfile: 'repo_agent',
+            probeKinds: ['agent'],
+            reasons: ['agentic_capability'],
+        };
+        const matchingFailure = {
+            providerId: 'gemini',
+            providerModel: 'gemini-3.6-flash',
+            routeProfile: 'repo_agent',
+            probes: {
+                agent: {
+                    kind: 'agent',
+                    status: 'failed',
+                    ok: false,
+                    providerAttempted: true,
+                    lastAt: Date.parse('2026-05-25T00:00:00.000Z'),
+                },
+            },
+        };
+        const genericProfileFailure = {
+            ...matchingFailure,
+            routeProfile: 'runtime_probe',
+        };
+
+        const matching = planModelGatewayProbeBackoff({
+            recommendations: [recommendation],
+            healthRecords: [matchingFailure],
+            now: '2026-05-25T00:01:00.000Z',
+            probeFailureCooldownSeconds: 900,
+        });
+        const mismatched = planModelGatewayProbeBackoff({
+            recommendations: [recommendation],
+            healthRecords: [genericProfileFailure],
+            now: '2026-05-25T00:01:00.000Z',
+            probeFailureCooldownSeconds: 900,
+        });
+
+        assert.equal(matching.summary.deferred, 1);
+        assert.equal(matching.deferred[0]?.reason, 'runtime_probe_failed_recent');
+        assert.equal(matching.deferred[0]?.probeKind, 'agent');
+        assert.equal(mismatched.summary.ready, 1);
+        assert.equal(mismatched.summary.deferred, 0);
     });
 
     it('summarizes metadata coverage by provider before runtime', () => {

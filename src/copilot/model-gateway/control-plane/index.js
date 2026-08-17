@@ -5,6 +5,8 @@
  * @module copilot/model-gateway/control-plane
  */
 
+export { parseModelGatewayAdaptiveSelectionOutcome } from './adaptive-selection-outcome.js';
+export { resolveModelGatewayAdmissionCandidateSelectionPolicy } from './runtime-admission-policy.js';
 export {
     MODEL_GATEWAY_DIRECT_REBIND_EVIDENCE_DEFAULT_MAX_AGE_MS,
     classifyModelGatewayDirectRebindEvidence,

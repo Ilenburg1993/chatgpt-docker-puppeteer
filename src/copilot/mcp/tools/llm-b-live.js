@@ -20,6 +20,7 @@ import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
+    destructiveAnnotations,
     errorResult,
     getMcpWorkspaceRoot,
     okResult,
@@ -149,6 +150,65 @@ function isProcessAlive(pid) {
 }
 
 /**
+ * Verify that a manifest pid still belongs to the exact allowlisted live harness before any signal is sent. This closes
+ * the PID-reuse gap inherent in `kill(pid, 0)`: a recycled pid must never make an old manifest capable of terminating an
+ * unrelated process.
+ *
+ * @param {DetachedLiveRunManifest} manifest
+ */
+async function inspectDetachedLiveRunProcessIdentity(manifest) {
+    if (!isProcessAlive(manifest.pid)) {
+        return { alive: false, verified: false, reason: 'process-not-alive', argv: [] };
+    }
+    if (process.platform === 'win32') {
+        return { alive: true, verified: false, reason: 'process-identity-unavailable-on-win32', argv: [] };
+    }
+    try {
+        const cmdline = await readFile(`/proc/${manifest.pid}/cmdline`, 'utf8');
+        const argv = cmdline.split('\0').filter(Boolean);
+        const expectedOutDirArg = `--out-dir=${manifest.outDir}`;
+        const runnerMatch = argv.some(
+            (arg) => arg === LIVE_RUNNER || arg.endsWith(`/${LIVE_RUNNER}`),
+        );
+        const outDirMatch = argv.includes(expectedOutDirArg);
+        return {
+            alive: true,
+            verified: runnerMatch && outDirMatch,
+            reason: runnerMatch && outDirMatch ? 'verified' : 'command-line-mismatch',
+            argv,
+        };
+    } catch (error) {
+        return {
+            alive: true,
+            verified: false,
+            reason: `process-identity-read-failed:${/** @type {NodeJS.ErrnoException} */ (error)?.code ?? 'unknown'}`,
+            argv: [],
+        };
+    }
+}
+
+/** @param {DetachedLiveRunManifest} manifest */
+async function cancelDetachedLiveRun(manifest) {
+    const identity = await inspectDetachedLiveRunProcessIdentity(manifest);
+    if (!identity.alive) return { cancelled: false, alreadyStopped: true, identity };
+    if (!identity.verified) {
+        throw Object.assign(new Error(`Detached LLM-B live run process identity could not be verified (${identity.reason}).`), {
+            code: 'ERR_LLMB_LIVE_CANCEL_IDENTITY_MISMATCH',
+        });
+    }
+    try {
+        // The detached runner is its own process-group leader on POSIX. Terminating the group also contains any PTY/
+        // terminal descendants started by the harness instead of leaving provider work orphaned.
+        process.kill(-manifest.pid, 'SIGTERM');
+    } catch (error) {
+        const code = /** @type {NodeJS.ErrnoException} */ (error)?.code;
+        if (code !== 'ESRCH') throw error;
+        process.kill(manifest.pid, 'SIGTERM');
+    }
+    return { cancelled: true, alreadyStopped: false, identity };
+}
+
+/**
  * Launch the fixed canonical harness independently of the initiating MCP request. The harness writes its own artifacts and
  * SQLite ledger; this manifest only makes the in-flight state observable and survives MCP reloads.
  *
@@ -200,8 +260,11 @@ async function spawnDetachedLiveRun(input) {
     return manifest;
 }
 
-/** @param {string} manifestPath */
-async function readDetachedLiveRunManifest(manifestPath) {
+/**
+ * @param {string} manifestPath
+ * @param {string | null} [expectedRunId]
+ */
+async function readDetachedLiveRunManifest(manifestPath, expectedRunId = null) {
     try {
         const stats = await stat(manifestPath);
         if (!stats.isFile() || stats.size > DETACHED_LIVE_RUN_MANIFEST_MAX_BYTES) return null;
@@ -210,12 +273,17 @@ async function readDetachedLiveRunManifest(manifestPath) {
             parsed?.schema !== 'llmb-live-detached-run' ||
             typeof parsed.runId !== 'string' ||
             !DETACHED_LIVE_RUN_ID_RE.test(parsed.runId) ||
+            (expectedRunId !== null && parsed.runId !== expectedRunId) ||
             !Number.isInteger(parsed.pid) ||
-            typeof parsed.outDir !== 'string' ||
-            typeof parsed.startedAtMs !== 'number'
+            parsed.pid <= 0 ||
+            typeof parsed.startedAtMs !== 'number' ||
+            !Number.isFinite(parsed.startedAtMs)
         ) {
             return null;
         }
+        const expectedOutDir = `artifacts/terminal-live/${parsed.runId}`;
+        const expectedLogPath = `${expectedOutDir}/detached.runner.log`;
+        if (parsed.outDir !== expectedOutDir || parsed.logPath !== expectedLogPath) return null;
         return /** @type {DetachedLiveRunManifest} */ (parsed);
     } catch {
         return null;
@@ -229,15 +297,32 @@ async function listDetachedLiveRuns() {
     const rows = [];
     for (const entry of entries) {
         if (!entry.endsWith('.json')) continue;
-        const manifest = await readDetachedLiveRunManifest(join(directory, entry));
+        const expectedRunId = entry.slice(0, -'.json'.length);
+        if (!DETACHED_LIVE_RUN_ID_RE.test(expectedRunId)) continue;
+        const manifest = await readDetachedLiveRunManifest(join(directory, entry), expectedRunId);
         if (!manifest) continue;
         const summaryPath = join(getMcpWorkspaceRoot(), manifest.outDir, 'summary.md');
         const summaryReady = await stat(summaryPath).then((value) => value.isFile()).catch(() => false);
-        const pidAlive = isProcessAlive(manifest.pid);
+        const processIdentity = await inspectDetachedLiveRunProcessIdentity(manifest);
+        // `kill(pid, 0)` also reports zombies/recycled PIDs as present. On POSIX, only an exact harness command-line
+        // match is allowed to count as an actually running detached run. Keep the raw PID-presence bit separately for
+        // diagnostics; on Windows retain the legacy liveness fallback because `/proc` identity is unavailable.
+        const pidPresent = processIdentity.alive;
+        const pidAlive = process.platform === 'win32' ? pidPresent : processIdentity.verified;
         rows.push({
             ...manifest,
-            status: summaryReady ? 'artifacts_ready' : pidAlive ? 'running' : 'stopped_without_summary',
+            status: summaryReady
+                ? pidAlive
+                    ? 'artifacts_ready_process_alive'
+                    : 'artifacts_ready'
+                : pidAlive
+                  ? 'running'
+                  : pidPresent
+                    ? 'stopped_or_unverified_pid'
+                    : 'stopped_without_summary',
             pidAlive,
+            pidPresent,
+            processIdentity: processIdentity.reason,
             summaryReady,
             ageMs: Math.max(0, Date.now() - manifest.startedAtMs),
             summaryPath: summaryReady ? `${manifest.outDir}/summary.md` : null,
@@ -610,6 +695,91 @@ export const llmBLiveTools = [
             }
             parsed.detachedRuns = await listDetachedLiveRuns();
             return okResult(parsed, JSON.stringify(parsed, null, 2));
+        },
+    },
+    {
+        name: 'llmb_live_test_cancel',
+        title: 'Cancel detached LLM-B live test',
+        description: 'Cancel one allowlisted detached LLM-B live harness by its strict run id after verifying the manifest pid still belongs to that exact harness.',
+        inputSchema: {
+            runId: z.string().regex(DETACHED_LIVE_RUN_ID_RE),
+        },
+        annotations: destructiveAnnotations(),
+        handler: async ({ runId }) => {
+            try {
+                const manifest = await readDetachedLiveRunManifest(detachedLiveRunManifestPath(runId), runId);
+                if (!manifest) {
+                    return errorResult('Detached LLM-B live run manifest was not found or is invalid.', {
+                        code: 'ERR_LLMB_LIVE_CANCEL_NOT_FOUND',
+                        runId,
+                    });
+                }
+                const summaryPath = join(getMcpWorkspaceRoot(), manifest.outDir, 'summary.md');
+                const summaryReady = await stat(summaryPath).then((value) => value.isFile()).catch(() => false);
+                if (summaryReady) {
+                    const processIdentity = await inspectDetachedLiveRunProcessIdentity(manifest);
+                    if (!processIdentity.verified) {
+                        const structured = {
+                            success: true,
+                            runId,
+                            cancelled: false,
+                            alreadyCompleted: true,
+                            pid: manifest.pid,
+                            outDir: manifest.outDir,
+                            processIdentity: processIdentity.reason,
+                            summaryPath: `${manifest.outDir}/summary.md`,
+                        };
+                        return okResult(structured, JSON.stringify(structured, null, 2));
+                    }
+                    // A summary is authoritative for result persistence, but a verified harness process can still be
+                    // stranded afterward (for example while a PTY descendant refuses to close). Explicit cancellation
+                    // should be able to reap that verified leftover instead of returning a misleading no-op.
+                    const cancellation = await cancelDetachedLiveRun(manifest);
+                    await appendMcpAuditEvent({
+                        event: 'llmb_live_test_completed_process_cancelled',
+                        tool: 'llmb_live_test_cancel',
+                        runId,
+                        pid: manifest.pid,
+                        outDir: manifest.outDir,
+                    });
+                    const structured = {
+                        success: true,
+                        runId,
+                        cancelled: cancellation.cancelled,
+                        alreadyCompleted: true,
+                        lingeringCompletedProcess: true,
+                        pid: manifest.pid,
+                        outDir: manifest.outDir,
+                        processIdentity: cancellation.identity.reason,
+                        summaryPath: `${manifest.outDir}/summary.md`,
+                    };
+                    return okResult(structured, JSON.stringify(structured, null, 2));
+                }
+                const cancellation = await cancelDetachedLiveRun(manifest);
+                await appendMcpAuditEvent({
+                    event: cancellation.cancelled ? 'llmb_live_test_detached_cancelled' : 'llmb_live_test_detached_already_stopped',
+                    tool: 'llmb_live_test_cancel',
+                    runId,
+                    pid: manifest.pid,
+                    outDir: manifest.outDir,
+                });
+                const structured = {
+                    success: true,
+                    runId,
+                    cancelled: cancellation.cancelled,
+                    alreadyStopped: cancellation.alreadyStopped,
+                    pid: manifest.pid,
+                    outDir: manifest.outDir,
+                    processIdentity: cancellation.identity.reason,
+                };
+                return okResult(structured, JSON.stringify(structured, null, 2));
+            } catch (error) {
+                const code =
+                    typeof error === 'object' && error !== null && typeof /** @type {any} */ (error).code === 'string'
+                        ? /** @type {any} */ (error).code
+                        : 'ERR_LLMB_LIVE_CANCEL';
+                return errorResult(error instanceof Error ? error.message : String(error), { code, runId });
+            }
         },
     },
     {

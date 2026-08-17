@@ -215,6 +215,7 @@ terminal externo é outro processo. Para evidência operacional desse runtime se
 
 - `llmb_live_readiness`: executa somente o readiness canônico, sem provider/model turn;
 - `llmb_live_runs`: lê o histórico live persistido no SQLite;
+- `llmb_live_test_cancel`: cancela somente um run detached pelo `runId` estrito depois de verificar em `/proc` que o PID ainda pertence ao harness e ao `out-dir` registrados, evitando o risco de PID reciclado;
 - `llmb_live_test_plan`: mostra script, cenário, transporte e se pode haver AI Credits/quota externa;
 - `llmb_live_test_run`: usa exclusivamente `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
   o default é `control-only`; turn/provider real exige `confirmModelUsage=true`.

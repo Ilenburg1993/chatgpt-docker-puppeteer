@@ -131,6 +131,24 @@ export function classifySdkError(error) {
     ) {
         return 'account';
     }
+    // An upstream 5xx may be wrapped by the SDK in text such as "Authentication failed" even though the credential
+    // itself was never rejected. Treat service unavailability as transport before generic auth fingerprints so the
+    // recovery layer does not incorrectly tell the operator to reauthenticate on a GitHub outage.
+    if (
+        (fp.status !== null && fp.status >= 500 && fp.status <= 599) ||
+        /(?:\bstatus(?:\s+code)?\s*[:=]?\s*5\d\d\b|\(5\d\d\)|\bhttp\s+5\d\d\b)/.test(haystack) ||
+        ['econnrefused', 'econnreset', 'epipe', 'eai_again', 'err_ipc_channel_closed', 'err_ipc_disconnected'].includes(
+            fp.code,
+        ) ||
+        haystack.includes('network error') ||
+        haystack.includes('fetch failed') ||
+        haystack.includes('socket hang up') ||
+        haystack.includes('service unavailable') ||
+        haystack.includes('temporarily unavailable') ||
+        haystack.includes('no server is currently available')
+    ) {
+        return 'network';
+    }
     if (
         haystack.includes('unsupported model') ||
         haystack.includes('model unsupported') ||
@@ -145,6 +163,8 @@ export function classifySdkError(error) {
         return 'model_unsupported';
     }
     if (
+        fp.status === 401 ||
+        fp.status === 403 ||
         haystack.includes('unauthorized') ||
         haystack.includes('forbidden') ||
         haystack.includes('authentication') ||
@@ -154,16 +174,6 @@ export function classifySdkError(error) {
     }
     if (haystack.includes('timeout') || fp.code === 'etimedout' || fp.code === 'time_out') {
         return 'timeout';
-    }
-    if (
-        ['econnrefused', 'econnreset', 'epipe', 'eai_again', 'err_ipc_channel_closed', 'err_ipc_disconnected'].includes(
-            fp.code,
-        ) ||
-        haystack.includes('network error') ||
-        haystack.includes('fetch failed') ||
-        haystack.includes('socket hang up')
-    ) {
-        return 'network';
     }
     return 'unknown';
 }

@@ -514,8 +514,35 @@ describe('model_gateway_workflow_plan', () => {
                 },
             },
         });
-        expect(steps.some((step) => step.id === 'probe_execute_plan_r1_agent')).toBe(true);
-        expect(steps.some((step) => step.id === 'probe_execute_apply_r1_agent')).toBe(true);
+        const probePlanStep = steps.find((step) => step.id === 'probe_execute_plan_r1_agent');
+        const probeApplyStep = steps.find((step) => step.id === 'probe_execute_apply_r1_agent');
+        expect(probePlanStep).toMatchObject({
+            args: {
+                routeProfile: 'repo_agent',
+                idempotencyKey: 'workflow-probe-required:probe-repo_agent-r1-agent-gemini-gemini-3.6-flash',
+            },
+        });
+        expect(probeApplyStep).toMatchObject({
+            args: {
+                routeProfile: 'repo_agent',
+                idempotencyKey: 'workflow-probe-required:probe-repo_agent-r1-agent-gemini-gemini-3.6-flash',
+            },
+        });
+        expect(planRoute).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({
+                taskProfile: 'repo_agent',
+                preferredProbeKinds: ['agent'],
+                blockFailedProbeKinds: ['agent'],
+            }),
+        );
+        expect(planProbes).toHaveBeenCalledWith(
+            expect.objectContaining({
+                providerId: 'gemini',
+                routeProfile: 'repo_agent',
+                allowedProbeKinds: ['agent'],
+            }),
+        );
         expect(steps.some((step) => step.id === 'route_switch_plan')).toBe(false);
         expect(steps.some((step) => step.id === 'route_switch_apply')).toBe(false);
         expect(parsed.warnings).toContain('fresh_runtime_proof_required_before_promotion');
