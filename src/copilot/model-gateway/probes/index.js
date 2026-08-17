@@ -9,6 +9,7 @@
  */
 
 export { runConfiguredByokChatProbe } from './chat-probe.js';
+export { classifyConfiguredByokProbeFailureScope, didConfiguredByokProbeAttemptProvider } from './attribution.js';
 export {
     BYOK_AGENT_PROBE_ANSWER,
     BYOK_AGENT_PROBE_QUESTION,

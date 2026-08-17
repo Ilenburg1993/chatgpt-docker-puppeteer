@@ -1,5 +1,6 @@
 // @ts-check
 
+import { execFile } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
     MODEL_GATEWAY_CONTROLLER_SELECTION_STATUS,
@@ -255,4 +256,28 @@ describe('Model Gateway native controller runtime adapter', () => {
             cleanupErrorCount: 1,
         });
     });
+
+    it('keeps the top-level Model Gateway barrel import process-exitable without eagerly booting the Copilot SDK client', async () => {
+        const result = await new Promise((resolve, reject) => {
+            execFile(
+                process.execPath,
+                [
+                    '--input-type=module',
+                    '--eval',
+                    "await import('./src/copilot/model-gateway/index.js'); process.stdout.write('MODEL_GATEWAY_IMPORT_OK\\n');",
+                ],
+                { cwd: process.cwd(), timeout: 8_000, maxBuffer: 1024 * 1024 },
+                (error, stdout, stderr) => {
+                    if (error) {
+                        reject(Object.assign(error, { stdout, stderr }));
+                        return;
+                    }
+                    resolve({ stdout, stderr });
+                },
+            );
+        });
+
+        expect(result).toMatchObject({ stdout: 'MODEL_GATEWAY_IMPORT_OK\n' });
+        expect(result.stderr).toBe('');
+    }, 10_000);
 });

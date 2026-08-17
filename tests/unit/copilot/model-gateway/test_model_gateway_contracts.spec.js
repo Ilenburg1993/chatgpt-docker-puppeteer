@@ -2673,14 +2673,34 @@ describe('model-gateway foundation', () => {
         const rateLimitRuntimeExecution = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlan, {
             profileId: 'repo_agent',
             deps: {
-                runChatProbe: async () => {
-                    throw Object.assign(new Error('HTTP 429 provider asked to slow down'), {
-                        status: 429,
-                        headers: { 'retry-after': '42' },
-                    });
-                },
+                runChatProbe: async () => ({
+                    ok: false,
+                    status: 'failed',
+                    providerAttempted: true,
+                    elapsedMs: 10,
+                    model: 'openai/gpt-oss-120b',
+                    profile: 'repo_agent',
+                    preset: 'openrouter',
+                    providerType: 'openai-compatible',
+                    deltaCount: 0,
+                    deltaChars: 0,
+                    finalChars: 0,
+                    finalContent: '',
+                    observedFinalEvent: false,
+                    sessionId: 'unit-runtime-rate-limit',
+                    errors: ['HTTP 429 provider asked to slow down'],
+                    warnings: [],
+                    providerFailure: {
+                        kind: 'rate-limit',
+                        statusCode: 429,
+                        retryAfterSeconds: 42,
+                        resetAt: null,
+                        errorContext: 'runtime_selector_chat',
+                        message: 'HTTP 429 provider asked to slow down',
+                    },
+                }),
                 recordSuccess: () => {
-                    throw new Error('recordSuccess should not be called for thrown runtime execution');
+                    throw new Error('recordSuccess should not be called for failed runtime execution');
                 },
                 recordFailure: (input) => {
                     assert.equal(input.routeProfile, 'repo_agent');
@@ -2701,7 +2721,7 @@ describe('model-gateway foundation', () => {
         assert.equal(rateLimitRuntimeExecution.routeDecisionRecordedCount, 2);
         assert.deepEqual(rateLimitRouteDecisionEvents.map((event) => event.failure), [
             null,
-            'runtime_provider_failure:rate-limit',
+            'runtime_probe_failed:failed',
         ]);
         const rateLimitDecision = resolveModelGatewayRuntimeRetryDecision(rateLimitRuntimeExecution, {
             maxRetryDelayMs: 1_000,

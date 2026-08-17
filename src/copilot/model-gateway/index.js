@@ -528,6 +528,8 @@ export {
     MODEL_GATEWAY_PROBE_LOW_REQUEST_TOKEN_LIMIT,
     MODEL_GATEWAY_PROBE_REQUEST_FLOOR_TOKENS,
     MODEL_GATEWAY_PROBE_RESPONSE_RESERVE_TOKENS,
+    classifyConfiguredByokProbeFailureScope,
+    didConfiguredByokProbeAttemptProvider,
     evaluateModelGatewayProbeAdmission,
     estimateProbeCostUsd,
     listProviderWireProbeMatrix,

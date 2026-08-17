@@ -1212,11 +1212,19 @@ function runRuntimeSelectorLiveRoute({
     if (temporaryFailureCooldownMs > 0) {
         args.push(`--temporary-failure-cooldown-ms=${Math.max(1, Math.trunc(temporaryFailureCooldownMs))}`);
     }
+    const childTimeoutMs = execute
+        ? Math.min(
+              600_000,
+              Math.max(30_000, Math.trunc(timeoutMs) * Math.max(1, Math.trunc(maxAttempts)) + 15_000),
+          )
+        : Math.min(45_000, Math.max(10_000, Math.trunc(timeoutMs)));
     const result = spawnSync(process.execPath, args, {
         cwd: ROOT,
         encoding: 'utf8',
         env: process.env,
         maxBuffer: 16 * 1024 * 1024,
+        timeout: childTimeoutMs,
+        killSignal: 'SIGTERM',
     });
     const summary = parseRuntimeSelectorJsonOutput(result.stdout);
     const selectedRoute = summary ? selectRuntimeSelectorEffectiveRoute(summary, requestedProfile) : null;
@@ -1231,7 +1239,8 @@ function runRuntimeSelectorLiveRoute({
         optionalRuntimeSelectorString(summary?.runtimeHealthPersistence?.error) ||
         optionalRuntimeSelectorString(
             summary?.runtimeSelectorPlan?.routes?.find?.((route) => route?.status === 'blocked')?.reasons?.join(', '),
-        );
+        ) ||
+        (result.error instanceof Error ? result.error.message : null);
     return {
         requested: true,
         ok: routeUsable,
@@ -1380,10 +1389,13 @@ async function buildRealByokRuntime({
     let runtimeSelector = runRuntimeSelectorLiveRoute(agentAdmissionRequired ? admissionSelectorInput : selectorInput);
     let runtimeRoute = runtimeSelectorRouteDetails(runtimeSelector);
     const agentAdmissionAttempts = [];
+    let agentAdmissionError = null;
     if (routeSelectorMandatory && runtimeSelectorExecute && requireAgentAdmission) {
         const {
             buildModelGatewayRuntimeSelectorProbeEnv,
             classifyByokProviderFailure,
+            classifyConfiguredByokProbeFailureScope,
+            didConfiguredByokProbeAttemptProvider,
             flushByokProviderHealth,
             recordByokProviderModelAgentProbeFailure,
             recordByokProviderModelAgentProbeSuccess,
@@ -1415,11 +1427,15 @@ async function buildRealByokRuntime({
                 deps: { classifyProviderFailure: classifyByokProviderFailure },
             });
             const identity = { routeProfile, providerId, providerModel };
+            const providerAttempted = didConfiguredByokProbeAttemptProvider(probe);
+            const failureScope = classifyConfiguredByokProbeFailureScope(probe);
             const attempt = {
                 attempt: attemptIndex + 1,
                 ...identity,
                 ok: probe.ok === true,
                 status: probe.status,
+                providerAttempted,
+                failureScope,
                 elapsedMs: probe.elapsedMs,
                 toolCallCount: probe.toolCallCount,
                 markerToolCallCount: probe.markerToolCallCount,
@@ -1431,11 +1447,19 @@ async function buildRealByokRuntime({
             };
             agentAdmissionAttempts.push(attempt);
             console.warn(
-                `[terminal-live] agent admission ${attemptIndex + 1}/${maxAdmissionAttempts} ${probe.ok ? 'ok' : 'failed'} route=${providerId ?? '-'}/${providerModel ?? '-'} status=${probe.status} elapsed=${probe.elapsedMs}ms`,
+                `[terminal-live] agent admission ${attemptIndex + 1}/${maxAdmissionAttempts} ${probe.ok ? 'ok' : 'failed'} route=${providerId ?? '-'}/${providerModel ?? '-'} status=${probe.status} scope=${failureScope ?? '-'} providerAttempted=${providerAttempted} elapsed=${probe.elapsedMs}ms`,
             );
             if (probe.ok) {
                 recordByokProviderModelAgentProbeSuccess(identity);
                 await flushByokProviderHealth();
+                break;
+            }
+            if (!providerAttempted) {
+                agentAdmissionError =
+                    failureScope === 'controller_substrate'
+                        ? 'controller_substrate_unavailable'
+                        : `agent_admission_${failureScope ?? 'preflight'}_blocked`;
+                runtimeRoute = null;
                 break;
             }
             const message = probe.errors.join(' | ') || `agent admission failed: ${probe.status}`;
@@ -1507,7 +1531,7 @@ async function buildRealByokRuntime({
             attempts: agentAdmissionAttempts,
             error:
                 requireAgentAdmission === true && !agentAdmissionAttempts.some((attempt) => attempt.ok === true)
-                    ? 'no_agent_capable_bootstrap_route'
+                    ? agentAdmissionError || 'no_agent_capable_bootstrap_route'
                     : null,
         },
         redacted: {
@@ -1582,6 +1606,10 @@ async function buildRealByokRuntime({
                 candidateSelectionPolicy: admissionSelectionPolicy.candidateSelectionPolicy || null,
                 selectionPolicyRelaxedForAdmission: admissionSelectionPolicy.relaxedForAdmission,
                 attempts: agentAdmissionAttempts,
+                error:
+                    requireAgentAdmission === true && !agentAdmissionAttempts.some((attempt) => attempt.ok === true)
+                        ? agentAdmissionError || 'no_agent_capable_bootstrap_route'
+                        : null,
             },
             dotenvLocalLoaded: Object.keys(dotenvEnv).length > 0,
             secretKeysPresent: collectSecretValues(mergedEnv)
@@ -7938,7 +7966,9 @@ async function main() {
         const blocker = {
             id:
                 realByok?.agentAdmission?.required === true && realByok?.agentAdmission?.ok !== true
-                    ? 'byok-agent-admission-unavailable'
+                    ? realByok?.agentAdmission?.error === 'controller_substrate_unavailable'
+                        ? 'byok-agent-admission-controller-substrate-unavailable'
+                        : 'byok-agent-admission-unavailable'
                     : 'byok-runtime-selector-route-unavailable',
             detail:
                 realByok?.agentAdmission?.error ||

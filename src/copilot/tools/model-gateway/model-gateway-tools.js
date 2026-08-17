@@ -1244,6 +1244,8 @@ export const modelGatewayProbeExecuteTool = buildTool({
             ? await readModelGatewayProbeOperation(args.idempotencyKey)
             : null;
         if (replay) {
+            const replayFailureScope =
+                optionalToolString(replay.failureScope) ?? optionalToolString(replay.result?.['failureScope']);
             return serializeResult(
                 createModelGatewayControlPlaneResult({
                     operation: 'probe.execute',
@@ -1253,22 +1255,37 @@ export const modelGatewayProbeExecuteTool = buildTool({
                         operationId,
                         replayed: true,
                         providerAttempted: replay.providerAttempted,
+                        failureScope: replayFailureScope,
                         result: replay.result,
                         persistence: replay.persistence,
                         operationMeta,
                     },
-                    warnings: replay.ok === true ? ['idempotent_replay'] : ['idempotent_replay_of_failed_probe'],
+                    warnings:
+                        replay.ok === true
+                            ? ['idempotent_replay']
+                            : [
+                                  'idempotent_replay_of_failed_probe',
+                                  ...(replayFailureScope === 'controller_substrate'
+                                      ? ['controller_substrate_failed_before_provider_call']
+                                      : []),
+                              ],
                     errors:
                         replay.ok === true
                             ? []
                             : [
                                   {
-                                      code: 'MODEL_GATEWAY_PROBE_FAILED',
+                                      code:
+                                          replayFailureScope === 'controller_substrate'
+                                              ? 'MODEL_GATEWAY_PROBE_CONTROLLER_SUBSTRATE_UNAVAILABLE'
+                                              : 'MODEL_GATEWAY_PROBE_FAILED',
                                       message: String(replay.result?.['status'] ?? replay.status ?? 'unknown'),
                                       retryable: true,
                                   },
                               ],
-                    nextActions: ['inspect_operation_status', 'inspect_route_plan'],
+                    nextActions:
+                        replayFailureScope === 'controller_substrate'
+                            ? ['retry_controller_substrate_before_changing_provider', 'inspect_operation_status']
+                            : ['inspect_operation_status', 'inspect_route_plan'],
                 }),
             );
         }
@@ -1392,6 +1409,8 @@ export const modelGatewayProbeExecuteTool = buildTool({
         });
         const actualProviderId = executed.result?.['providerId'] ?? null;
         const providerMatches = actualProviderId === args.providerId;
+        const failureScope =
+            optionalToolString(executed.failureScope) ?? optionalToolString(executed.result?.['failureScope']);
         const executionOk = executed.ok === true && providerMatches;
         return serializeResult(
             createModelGatewayControlPlaneResult({
@@ -1402,6 +1421,7 @@ export const modelGatewayProbeExecuteTool = buildTool({
                     operationId,
                     replayed: executed.replayed,
                     providerAttempted: executed.providerAttempted,
+                    failureScope,
                     providerMatches,
                     result: executed.result,
                     persistence: executed.persistence,
@@ -1409,6 +1429,9 @@ export const modelGatewayProbeExecuteTool = buildTool({
                 },
                 warnings: [
                     ...(executed.ok === true ? [] : ['probe_did_not_produce_positive_runtime_proof']),
+                    ...(failureScope === 'controller_substrate'
+                        ? ['controller_substrate_failed_before_provider_call']
+                        : []),
                     ...(providerMatches ? [] : ['probe_result_provider_mismatch']),
                 ],
                 errors:
@@ -1416,16 +1439,21 @@ export const modelGatewayProbeExecuteTool = buildTool({
                         ? []
                         : [
                               {
-                                  code: providerMatches
-                                      ? 'MODEL_GATEWAY_PROBE_FAILED'
-                                      : 'MODEL_GATEWAY_PROBE_RESULT_PROVIDER_MISMATCH',
+                                  code: !providerMatches
+                                      ? 'MODEL_GATEWAY_PROBE_RESULT_PROVIDER_MISMATCH'
+                                      : failureScope === 'controller_substrate'
+                                        ? 'MODEL_GATEWAY_PROBE_CONTROLLER_SUBSTRATE_UNAVAILABLE'
+                                        : 'MODEL_GATEWAY_PROBE_FAILED',
                                   message: providerMatches
                                       ? String(executed.result?.['status'] ?? executed.status ?? 'unknown')
                                       : `Esperado ${args.providerId}, observado ${String(actualProviderId ?? 'unknown')}.`,
                                   retryable: providerMatches,
                               },
                           ],
-                nextActions: ['inspect_operation_status', 'inspect_route_plan'],
+                nextActions:
+                    failureScope === 'controller_substrate'
+                        ? ['retry_controller_substrate_before_changing_provider', 'inspect_operation_status']
+                        : ['inspect_operation_status', 'inspect_route_plan'],
             }),
         );
     },

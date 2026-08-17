@@ -8,8 +8,6 @@
  * @module copilot/model-gateway/controller/native-controller-runtime
  */
 
-import { CopilotClientManager, createTerminalCopilotClient } from '#copilot/sdk/session/client';
-import { getQuota } from '#copilot/sdk/telemetry/health';
 import { buildModelGatewayControllerSelectionPlan } from './controller-selection.js';
 
 /**
@@ -21,16 +19,26 @@ import { buildModelGatewayControllerSelectionPlan } from './controller-selection
  *   maxAgentProofAgeMs?: number;
  *   allowOpaqueSdkAutoFallback?: boolean;
  *   deps?: {
- *     createManager?: () => CopilotClientManager;
- *     readQuota?: typeof getQuota;
+ *     createManager?: () => { getClient: () => Promise<any>; stopClient: () => Promise<any[]> };
+ *     readQuota?: (client: any) => Promise<any>;
  *   };
  * }} [options]
  */
 export async function resolveModelGatewayNativeControllerSelection(options = {}) {
-    const createManager =
-        options.deps?.createManager ??
-        (() => new CopilotClientManager({ createClient: createTerminalCopilotClient }));
-    const readQuota = options.deps?.readQuota ?? getQuota;
+    let createManager = options.deps?.createManager;
+    let readQuota = options.deps?.readQuota;
+    if (!createManager || !readQuota) {
+        // Keep the controller's pure selection plane cheap to import. Pulling the SDK client into the top-level
+        // model-gateway barrel can retain SDK resources even for metadata-only CLI commands that never need a client.
+        // The native substrate is therefore loaded only when this runtime adapter is actually invoked.
+        const [clientModule, healthModule] = await Promise.all([
+            import('#copilot/sdk/session/client'),
+            import('#copilot/sdk/telemetry/health'),
+        ]);
+        createManager ??= () =>
+            new clientModule.CopilotClientManager({ createClient: clientModule.createTerminalCopilotClient });
+        readQuota ??= healthModule.getQuota;
+    }
     const manager = createManager();
     let clientConnected = false;
     /** @type {any[]} */

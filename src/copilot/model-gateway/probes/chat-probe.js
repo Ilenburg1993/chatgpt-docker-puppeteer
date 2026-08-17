@@ -80,6 +80,7 @@ function defaultAdmission(summary, mode, prompt) {
  * @returns {Promise<{
  *     ok: boolean;
  *     status: 'ok' | 'unavailable' | 'admission-blocked' | 'empty' | 'failed';
+ *     providerAttempted: boolean;
  *     elapsedMs: number;
  *     model: string | null;
  *     profile: string | null;
@@ -113,6 +114,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
         return {
             ok: false,
             status: 'unavailable',
+            providerAttempted: false,
             elapsedMs: Date.now() - startedAt,
             model: byokState.model ?? byokState.summary.model ?? null,
             profile: byokState.summary.profile ?? null,
@@ -153,6 +155,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
         return {
             ok: false,
             status: 'admission-blocked',
+            providerAttempted: false,
             elapsedMs: Date.now() - startedAt,
             ...baseResult,
             deltaCount: 0,
@@ -171,6 +174,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
     let finalContent = '';
     let observedFinalEvent = false;
     let sessionId = null;
+    let providerAttempted = false;
     /** @type {string[]} */
     const errors = [];
     /** @type {ReturnType<typeof defaultFailureClassifier>} */
@@ -213,7 +217,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
                                   : null;
                         if (message) {
                             errors.push(message);
-                            providerFailure ??= classifyFailure(message);
+                            if (providerAttempted) providerFailure ??= classifyFailure(message);
                         }
                     },
                 });
@@ -224,6 +228,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
                     };
                     let reply;
                     try {
+                        providerAttempted = true;
                         reply = await sendAndWait(session, payload, timeoutMs);
                     } catch (error) {
                         try {
@@ -242,10 +247,11 @@ export async function runConfiguredByokChatProbe(options = {}) {
         );
     } catch (error) {
         errors.push(errorMessage(error));
-        providerFailure ??= classifyFailure(error);
+        if (providerAttempted) providerFailure ??= classifyFailure(error);
         return {
             ok: false,
             status: 'failed',
+            providerAttempted,
             elapsedMs: Date.now() - startedAt,
             ...baseResult,
             deltaCount,
@@ -264,6 +270,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
     return {
         ok,
         status: ok ? 'ok' : 'empty',
+        providerAttempted,
         elapsedMs: Date.now() - startedAt,
         ...baseResult,
         deltaCount,

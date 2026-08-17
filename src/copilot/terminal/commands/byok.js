@@ -42,6 +42,7 @@ import {
     DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
+    didConfiguredByokProbeAttemptProvider,
     evaluateModelGatewayCatalogEligibility,
     evaluateModelGatewayProviderEnvRequirements,
     explainModelGatewayAccountLimitOverlays,
@@ -7275,7 +7276,7 @@ async function recordByokProbeHealth(mode, probe) {
         providerId: probe.preset ?? probe.providerType,
         providerModel: probe.model,
     };
-    const providerAttempted = probe.status !== 'admission-blocked';
+    const providerAttempted = didConfiguredByokProbeAttemptProvider(probe);
     recordByokProviderModelProbeResult({
         ...healthIdentity,
         probeKind: mode,

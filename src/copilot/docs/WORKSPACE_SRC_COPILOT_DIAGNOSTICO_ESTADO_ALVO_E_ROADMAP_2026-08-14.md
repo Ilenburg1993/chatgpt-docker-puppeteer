@@ -4418,3 +4418,63 @@ Hardening adicional feito após a primeira publicação:
 - [x] hot reload final `mcp-reload-14d13bfb-b405-4166-92f6-4ab66928b37e` concluído; readiness reconciliado e smoke OAuth autenticado confirmou novamente **116/116 tools**, sem missing/unexpected; `mcp_tools_status` mostra `llmb_live_test_cancel` entre as cinco tools destructive e sem `openWorld`.
 
 Limitação externa observada nesta própria conversa: o servidor publica e audita a 116ª tool, mas o snapshot de schemas executáveis materializado pelo host ChatGPT nesta sessão ainda não expõe `llmb_live_test_cancel` como callable direto, mesmo quando a descoberta textual do MCP confirma sua existência. Portanto o ganho está ativo e provado no servidor, porém não foi correto contornar a limitação do host com shell, PID ou chamada arbitrária. A próxima sessão que materializar o schema atualizado poderá usá-la diretamente.
+
+### 104.13 Fronteira de atribuição: falha do controller não pode contaminar health do provider
+
+A investigação pós-503 revelou um problema conceitual mais profundo na telemetria de runtime: os probes BYOK são executados **dentro** de uma sessão descartável do Copilot SDK. Portanto existem duas fronteiras distintas que não podem ser confundidas:
+
+1. **controller/session substrate** — criação/conexão da sessão Copilot SDK e infraestrutura comum a todas as rotas;
+2. **provider boundary** — somente o instante em que `sendSessionAndWait` é efetivamente acionado com a rota BYOK já materializada.
+
+A implementação anterior classificava genericamente exceções de `withEphemeralSession` como falha do provider e inferia `providerAttempted` pelo status do probe. Na presença de um 503 do GitHub antes do primeiro `sendAndWait`, isso podia produzir health negativo contra ZAI, Gemini, Mistral etc. embora nenhum desses providers tivesse sido chamado. Em seguida o selector podia trocar de rota e repetir o mesmo defeito compartilhado, contaminando sucessivamente o ranking.
+
+A invariância corrigida é agora explícita: **provider health só pode ser alterado depois de prova de que a execução cruzou a fronteira da chamada ao provider**.
+
+Mudanças implementadas:
+
+- [x] criado `model-gateway/probes/attribution.js` com `didConfiguredByokProbeAttemptProvider` e `classifyConfiguredByokProbeFailureScope`;
+- [x] chat e agent probes começam com `providerAttempted=false` e só o elevam imediatamente antes de `sendSessionAndWait`;
+- [x] falha durante bootstrap da sessão retorna `status=failed`, `providerAttempted=false`, `providerFailure=null` e `failureScope=controller_substrate`;
+- [x] `session.error` e catches só passam pela taxonomia de provider depois da fronteira efetiva;
+- [x] `probe-execution` persiste `providerAttempted` e `failureScope`, inclusive no payload SQLite e na projeção de replay idempotente;
+- [x] os registros neutros de probe continuam observáveis no health store, mas `providerAttempted=false` já é respeitado por `isGatewayModelProbeFailed`/`isGatewayModelProbeVerified`, de modo que não bloqueiam nem promovem rota;
+- [x] o runtime selector não grava failure/success de provider quando a fronteira não foi cruzada e um throw externo ao contrato normal é classificado conservadoramente como `controller_substrate`;
+- [x] a decisão de retry para `controller_substrate` passou a ser `retryRoute=false` e `fallbackRoute=false`; o loop de fallback também foi corrigido para finalmente respeitar `fallbackRoute=false`, que antes era calculado mas não interrompia a progressão entre providers;
+- [x] o agent admission do harness interrompe imediatamente a rodada quando o controller falha antes do provider, não grava agent/call failure contra a candidata e passa a emitir `controller_substrate_unavailable` em vez de fingir `no_agent_capable_bootstrap_route`;
+- [x] o blocker externo distingue `byok-agent-admission-controller-substrate-unavailable` do caso genuíno de ausência de rota agent-capable;
+- [x] `model_gateway_probe_execute` e seus replays passam a expor `failureScope`, warning `controller_substrate_failed_before_provider_call`, erro `MODEL_GATEWAY_PROBE_CONTROLLER_SUBSTRATE_UNAVAILABLE` e next action `retry_controller_substrate_before_changing_provider` para que a LLM-B não troque de provider por uma falha compartilhada do controller;
+- [x] teste focado `test_probe_failure_attribution.spec.js` cobre chat, agent, provider-call real, persistência/replay, ausência de mutação de health e interrupção da cadeia de fallback; job final `9e38a58f-570b-4606-acff-b9a94d317f25` verde;
+- [x] suíte de contratos Model Gateway permaneceu verde, **229/229**, após adaptar o mock antigo de rate-limit para representar a fronteira real (`providerAttempted=true`), job `4a2aa9bf-66cc-47e9-ae28-37313bff5a92`;
+- [x] workflow plan verde no job `84585890-60fa-46de-8700-e28b025b66f5`;
+- [x] typecheck estrito final verde no job `39f06a9b-bb9a-4eda-b796-aa09584c2074` e lint final verde no job `e0a51ef2-a95e-4754-9ce5-6efbc0922ae2`.
+
+Consequência epistemológica para as evidências anteriores: a progressão de candidatas observada em `mcp-7b16c6a1-7dfc-47f5-bc50-c7e84170f6a9` continua provando a remoção do deadlock `require_runtime_proof`, mas **não deve mais ser interpretada automaticamente como cinco falhas independentes dos respectivos providers**. Parte dessa progressão pode ter refletido indisponibilidade do substrate Copilot SDK anterior à fronteira BYOK. Não há evidência suficiente no artefato para purgar seletivamente health histórico; a política correta é não inventar causalidade retroativa e impedir nova contaminação.
+
+Aceitação live realizada no run `mcp-32865f9c-da3d-416c-bd73-cd87bcea101c`. Nesta fotografia o Copilot SDK **já havia se recuperado o suficiente para cruzar a fronteira BYOK**, portanto materializou-se o segundo ramo esperado da aceitação, não o blocker de substrate:
+
+- [x] cinco candidatas distintas foram efetivamente chamadas em `repo_agent`: `zai/glm-4.5-air`, `zai/glm-4.6v`, `gemini/gemini-3.5-flash-lite`, `gemini/gemini-3.5-live-translate-preview` e `mistral/mistral-nemo-2407`;
+- [x] em todas as cinco, `providerAttempted=true` e `failureScope=provider`, prova explícita de que `sendSessionAndWait` foi alcançado antes da falha;
+- [x] ZAI retornou duas falhas classificadas como `timeout` após ~46,6 s e ~45,1 s; Gemini e Mistral falharam rapidamente depois da fronteira, ainda classificados como `unknown` nesta taxonomia;
+- [x] nenhuma candidata satisfez o agent admission; portanto o encerramento `byok-agent-admission-unavailable/no_agent_capable_bootstrap_route` foi coerente e o terminal não abriu;
+- [x] como este run cruzou a fronteira real em todas as tentativas, o rerank e as mutações de health desta execução são causalmente atribuíveis às rotas BYOK, ao contrário do caso hipotético de um 503 anterior à chamada;
+- [x] o run não produz winner adaptativo: ele apenas prova que a nova fronteira de atribuição distingue corretamente um provider realmente tentado.
+
+O ramo complementar `controller_substrate` permanece unitariamente coberto e será novamente observado em live somente quando houver uma nova indisponibilidade anterior a `sendSessionAndWait`; não há motivo para fabricar esse incidente ou degradar o ambiente para testá-lo.
+
+### 104.14 Import side effect no barrel do Model Gateway e latência fantasma de ~45 s por rerank
+
+O mesmo run `mcp-32865f9c...` expôs um segundo defeito, agora de composição de módulos. Os cinco probes consumiram, somados, ~94,4 s, mas o run bloqueado levou **319,1 s**. A diferença, ~224,7 s, corresponde praticamente a cinco blocos de ~45 s — exatamente o número de invocações dry-run do runtime selector (seleção inicial + reranks intermediários).
+
+A causa arquitetural encontrada é que `model-gateway/index.js` passou a reexportar o novo Controller Selection Plane. Seu `native-controller-runtime.js`, por sua vez, importava eagermente `#copilot/sdk/session/client` e `#copilot/sdk/telemetry/health`. Assim, um CLI que pretendia apenas ler catálogo/health e selecionar metadata podia carregar o substrate Copilot SDK inteiro só por importar o barrel. O `model-gateway-runtime-selector.mjs` só chama `shutdownClient()` quando `--execute` está ativo; no caminho dry-run, o import eager podia manter recursos SDK vivos até o fechamento tardio observado. Como `runRuntimeSelectorLiveRoute` usava `spawnSync` sem `timeout`, o harness também não possuía um limite próprio contra um child que deixasse de terminar.
+
+Correção em duas camadas:
+
+- [x] `native-controller-runtime.js` deixou de importar SDK/telemetria no top level; os módulos são carregados dinamicamente **somente quando `resolveModelGatewayNativeControllerSelection()` é efetivamente invocado** e alguma dependência não foi injetada;
+- [x] o Controller Selection Plane puro e o barrel principal voltam, assim, a ser importáveis sem boot implícito do client SDK;
+- [x] `runRuntimeSelectorLiveRoute` passou a aplicar `spawnSync.timeout` e `SIGTERM`: dry-run fica bounded a no máximo 45 s, enquanto execução real recebe orçamento proporcional a `timeoutMs × maxAttempts`, limitado a 10 minutos;
+- [x] erro de timeout/child agora entra explicitamente no `summaryError`, em vez de poder resultar em espera silenciosa;
+- [x] foi acrescentado teste subprocessual que importa `src/copilot/model-gateway/index.js` em um Node limpo e exige saída natural em menos de 8 s, protegendo contra regressão de side effects no barrel;
+- [x] `test_controller_selection.spec.js` passou com essa prova no job `7556e7e0-89e6-49aa-abbc-fa3c86362198`;
+- [x] typecheck pós-lazy-import passou no job `addcbba8-24f3-423c-ad72-cf7239e074b8`.
+
+A aceitação operacional foi feita **sem novo consumo de provider**, por subprocesso real do próprio CLI. `test_runtime_selector_cli_liveness.spec.js` executa `model-gateway-runtime-selector.mjs --json --profile=repo_agent --runtime-source=file --selection-policy=metadata_first` em um Node limpo, com hard timeout de 8 s, e exige JSON válido do `model-gateway-runtime-selector-plan`. O primeiro ciclo de construção do teste já mostrou que o processo encerrava em ~2,2 s, falhando apenas por uma expectativa semântica incorreta sobre o campo `mode`; corrigida a asserção para `policyResolution.mode`, o job `db317374-286c-4bd0-a9a9-4104f3b1088f` passou integralmente em 2,859 s. Isso reduz a antiga retenção de ~45 s por child para uma ordem de poucos segundos e prova diretamente o caminho dry-run que causava a latência fantasma, sem tocar provider ou quota. Lint final, já incluindo o novo teste subprocessual, verde no job `f3e757ff-9d4c-48e7-be5c-eb1ff3513f99`.

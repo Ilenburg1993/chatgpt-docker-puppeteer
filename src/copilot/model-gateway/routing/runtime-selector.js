@@ -9,7 +9,11 @@
 
 import { buildRouteDecisionEvent } from '../observability/events.js';
 import { recordModelGatewayRouteDecision } from '../observability/route-decision-ledger.js';
-import { runConfiguredByokChatProbe } from '../probes/chat-probe.js';
+import {
+    classifyConfiguredByokProbeFailureScope,
+    didConfiguredByokProbeAttemptProvider,
+    runConfiguredByokChatProbe,
+} from '../probes/index.js';
 import {
     flushByokProviderHealth,
     recordByokProviderModelCallFailure,
@@ -1507,6 +1511,7 @@ export function selectModelGatewayRuntimeRoute(plan, profileId) {
  *   route: ReturnType<typeof selectModelGatewayRuntimeRoute> | null;
  *   probe: Awaited<ReturnType<typeof runConfiguredByokChatProbe>> | null;
  *   providerFailure: ReturnType<typeof classifyByokProviderFailure> | Awaited<ReturnType<typeof runConfiguredByokChatProbe>>['providerFailure'] | null;
+ *   failureScope: 'provider' | 'controller_substrate' | 'preflight' | null;
  *   healthRecorded: boolean;
  *   routeDecisionRecordedCount: number;
  *   error: string | null;
@@ -1527,6 +1532,7 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             route: null,
             probe: null,
             providerFailure: null,
+            failureScope: null,
             healthRecorded: false,
             routeDecisionRecordedCount: 0,
             error: 'runtime_selector_route_unavailable',
@@ -1557,15 +1563,17 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             ...(options.prompt ? { prompt: options.prompt } : {}),
             deps: { classifyProviderFailure },
         });
+        const providerAttempted = didConfiguredByokProbeAttemptProvider(probe);
+        const failureScope = classifyConfiguredByokProbeFailureScope(probe);
         let healthRecorded = false;
-        if (recordHealth && probe.ok) {
+        if (recordHealth && probe.ok && providerAttempted) {
             recordSuccess({
                 ...identity,
                 successContext: 'runtime_selector_chat',
             });
             await flushHealth();
             healthRecorded = true;
-        } else if (recordHealth && probe.status !== 'unavailable' && probe.status !== 'admission-blocked') {
+        } else if (recordHealth && providerAttempted) {
             recordFailure({
                 ...identity,
                 message: probe.errors[0] ?? `runtime selector chat ${probe.status}`,
@@ -1578,7 +1586,11 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             await flushHealth();
             healthRecorded = true;
         }
-        const failure = probe.ok ? null : `runtime_probe_failed:${probe.status}`;
+        const failure = probe.ok
+            ? null
+            : providerAttempted
+              ? `runtime_probe_failed:${probe.status}`
+              : `runtime_controller_substrate_failed:${probe.status}`;
         if (tryRecordRouteDecision(recordRouteDecision, buildRuntimeOutcomeDecisionEvent(route, { ok: probe.ok, failure }))) {
             routeDecisionRecordedCount += 1;
         }
@@ -1589,33 +1601,23 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             profileId: route.profileId,
             route,
             probe,
-            providerFailure: probe.providerFailure ?? null,
+            providerFailure: providerAttempted ? (probe.providerFailure ?? null) : null,
+            failureScope,
             healthRecorded,
             routeDecisionRecordedCount,
             error: probe.ok ? null : (probe.errors[0] ?? probe.status),
         };
     } catch (error) {
-        const providerFailure = classifyProviderFailure(error);
-        let healthRecorded = false;
-        if (recordHealth) {
-            recordFailure({
-                ...identity,
-                message: providerFailure.message,
-                errorContext: providerFailure.errorContext,
-                failureKind: providerFailure.kind,
-                failureStatusCode: providerFailure.statusCode,
-                retryAfterSeconds: providerFailure.retryAfterSeconds,
-                resetAt: providerFailure.resetAt,
-            });
-            await flushHealth();
-            healthRecorded = true;
-        }
+        // `runConfiguredByokChatProbe` reports provider-call failures as a probe result. A throw escaping that contract
+        // therefore has no evidence that the BYOK provider boundary was crossed; treating it as provider health would
+        // poison every candidate when the shared Copilot SDK/session substrate is unavailable.
+        const message = error instanceof Error ? error.message : String(error);
         if (
             tryRecordRouteDecision(
                 recordRouteDecision,
                 buildRuntimeOutcomeDecisionEvent(route, {
                     ok: false,
-                    failure: `runtime_provider_failure:${providerFailure.kind ?? 'unknown'}`,
+                    failure: 'runtime_controller_substrate_failed:exception',
                 }),
             )
         ) {
@@ -1628,10 +1630,11 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             profileId: route.profileId,
             route,
             probe: null,
-            providerFailure,
-            healthRecorded,
+            providerFailure: null,
+            failureScope: 'controller_substrate',
+            healthRecorded: false,
             routeDecisionRecordedCount,
-            error: providerFailure.message,
+            error: message,
         };
     }
 }
@@ -1667,6 +1670,8 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
             resetWindow: null,
         };
     }
+    const failureScope =
+        optionalString(execution.failureScope) ?? classifyConfiguredByokProbeFailureScope(optionalRecord(execution.probe));
     const providerFailure = optionalRecord(execution.providerFailure) ?? optionalRecord(execution.probe?.providerFailure);
     const failureKind = optionalString(providerFailure?.['kind']);
     const retryAfterSeconds = optionalNumber(providerFailure?.['retryAfterSeconds']);
@@ -1692,6 +1697,20 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
             retryAfterSeconds,
             resetAt,
             resetWindow,
+        };
+    }
+    if (failureScope === 'controller_substrate') {
+        return {
+            schema: 'model-gateway-runtime-selector-retry-decision',
+            retryRoute: false,
+            fallbackRoute: false,
+            permanent: false,
+            waitMs: 0,
+            reason: 'controller_substrate_failure',
+            failureKind: null,
+            retryAfterSeconds: null,
+            resetAt: null,
+            resetWindow: null,
         };
     }
     if (
@@ -1895,8 +1914,12 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
                 ...(typeof options.maxRetryDelayMs === 'number' ? { maxRetryDelayMs: options.maxRetryDelayMs } : {}),
             });
             retryDecisions.push(retryDecision);
-            if (routeAttempt + 1 >= attemptsPerRoute || !retryDecision.retryRoute) break;
-            await wait(retryDecision.waitMs);
+            if (routeAttempt + 1 < attemptsPerRoute && retryDecision.retryRoute) {
+                await wait(retryDecision.waitMs);
+                continue;
+            }
+            if (!retryDecision.fallbackRoute) break routeLoop;
+            break;
         }
     }
     const final = attempts.at(-1) ?? null;

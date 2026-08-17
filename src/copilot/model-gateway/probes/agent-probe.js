@@ -91,6 +91,7 @@ function defaultAdmission(summary, mode, prompt) {
  * @returns {Promise<{
  *     ok: boolean;
  *     status: 'ok' | 'unavailable' | 'admission-blocked' | 'tool-missing' | 'ask-missing' | 'empty' | 'failed';
+ *     providerAttempted: boolean;
  *     elapsedMs: number;
  *     model: string | null;
  *     profile: string | null;
@@ -130,6 +131,7 @@ export async function runConfiguredByokAgentProbe(options = {}) {
         return {
             ok: false,
             status: 'unavailable',
+            providerAttempted: false,
             elapsedMs: Date.now() - startedAt,
             model: byokState.model ?? byokState.summary.model ?? null,
             profile: byokState.summary.profile ?? null,
@@ -175,6 +177,7 @@ export async function runConfiguredByokAgentProbe(options = {}) {
         return {
             ok: false,
             status: 'admission-blocked',
+            providerAttempted: false,
             elapsedMs: Date.now() - startedAt,
             ...baseResult,
             deltaCount: 0,
@@ -201,6 +204,7 @@ export async function runConfiguredByokAgentProbe(options = {}) {
     let userInputRequestCount = 0;
     let userInputAnswerCount = 0;
     let sessionId = null;
+    let providerAttempted = false;
     /** @type {string[]} */
     const errors = [];
     /** @type {ReturnType<typeof defaultFailureClassifier>} */
@@ -303,11 +307,12 @@ export async function runConfiguredByokAgentProbe(options = {}) {
                                   : null;
                         if (message) {
                             errors.push(message);
-                            providerFailure ??= classifyFailure(message);
+                            if (providerAttempted) providerFailure ??= classifyFailure(message);
                         }
                     },
                 });
                 try {
+                    providerAttempted = true;
                     const reply = await sendAndWait(session, { prompt }, timeoutMs);
                     const content = typeof reply?.data?.content === 'string' ? reply.data.content : '';
                     if (content) finalContent = content;
@@ -318,10 +323,11 @@ export async function runConfiguredByokAgentProbe(options = {}) {
         );
     } catch (error) {
         errors.push(errorMessage(error));
-        providerFailure ??= classifyFailure(error);
+        if (providerAttempted) providerFailure ??= classifyFailure(error);
         return {
             ok: false,
             status: 'failed',
+            providerAttempted,
             elapsedMs: Date.now() - startedAt,
             ...baseResult,
             deltaCount,
@@ -351,6 +357,7 @@ export async function runConfiguredByokAgentProbe(options = {}) {
     return {
         ok: status === 'ok',
         status,
+        providerAttempted,
         elapsedMs: Date.now() - startedAt,
         ...baseResult,
         deltaCount,

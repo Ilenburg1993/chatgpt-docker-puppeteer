@@ -18,6 +18,8 @@ import {
 } from '../health/index.js';
 import { buildProbeCompletedEvent } from '../observability/events.js';
 import {
+    classifyConfiguredByokProbeFailureScope,
+    didConfiguredByokProbeAttemptProvider,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
     runConfiguredByokJsonProbe,
@@ -89,7 +91,7 @@ function probeExecutionIdentity(probe, identityOverride = null) {
  */
 async function recordProbeHealth(kind, probe, identityOverride = null) {
     const identity = probeExecutionIdentity(probe, identityOverride);
-    const providerAttempted = probe['status'] !== 'admission-blocked';
+    const providerAttempted = didConfiguredByokProbeAttemptProvider(probe);
     recordByokProviderModelProbeResult({
         ...identity,
         probeKind: kind,
@@ -148,6 +150,7 @@ function persistedProbeResult(probe, kind, providerAttempted, observedAt, identi
             observedAt,
             elapsedMs: probe['elapsedMs'] ?? null,
             providerAttempted,
+            failureScope: classifyConfiguredByokProbeFailureScope(probe),
             errorCount: Array.isArray(probe['errors']) ? probe['errors'].length : 0,
             warningCount: Array.isArray(probe['warnings']) ? probe['warnings'].length : 0,
         })
@@ -161,6 +164,8 @@ function persistedProbeResult(probe, kind, providerAttempted, observedAt, identi
  */
 function projectProbeReplay(replay, operationId, idempotencyKey) {
     const payload = isRecord(replay['payload']) ? replay['payload'] : {};
+    const result = isRecord(payload['result']) ? payload['result'] : null;
+    const failureScope = typeof result?.['failureScope'] === 'string' ? result['failureScope'] : null;
     return {
         operationId,
         idempotencyKey,
@@ -168,7 +173,8 @@ function projectProbeReplay(replay, operationId, idempotencyKey) {
         status: replay['status'],
         ok: Number(replay['successCount'] ?? 0) > 0 && Number(replay['failureCount'] ?? 0) === 0,
         providerAttempted: payload['providerAttempted'] !== false,
-        result: isRecord(payload['result']) ? payload['result'] : null,
+        failureScope,
+        result,
         persistence: {
             runId: operationId,
             probeResults: Array.isArray(replay['results']) ? replay['results'].length : 0,
@@ -240,6 +246,7 @@ export async function executeModelGatewayProbe(input) {
         canonicalIdentity,
     );
     const observedAt = new Date(input.deps?.now?.() ?? Date.now()).toISOString();
+    const failureScope = classifyConfiguredByokProbeFailureScope(probe);
     const result = persistedProbeResult(probe, input.kind, providerAttempted, observedAt, canonicalIdentity);
     const status = probe['ok'] === true ? 'completed' : 'failed';
     const persistence = await sqliteStore.writeRuntimeProbeRun({
@@ -253,6 +260,7 @@ export async function executeModelGatewayProbe(input) {
             operationId,
             idempotencyKey: input.idempotencyKey,
             providerAttempted,
+            failureScope,
             result,
         },
         results: [result],
@@ -280,6 +288,7 @@ export async function executeModelGatewayProbe(input) {
         status,
         ok: probe['ok'] === true,
         providerAttempted,
+        failureScope,
         result,
         persistence,
         event,
