@@ -29,7 +29,12 @@ describe('MCP governed autonomy mutations', () => {
         assert.deepEqual(Object.keys(stagePlan.inputSchema).sort(), ['paths']);
 
         const push = tool(gitWriteTools, 'git_push');
-        assert.deepEqual(Object.keys(push.inputSchema).sort(), ['confirmPush', 'expectedHead', 'expectedUpstream']);
+        assert.deepEqual(Object.keys(push.inputSchema).sort(), [
+            'confirmPush',
+            'expectedHead',
+            'expectedUpstream',
+            'pushDryRunFirst',
+        ]);
         assert.equal('remote' in push.inputSchema, false);
         assert.equal('refspec' in push.inputSchema, false);
         assert.equal('force' in push.inputSchema, false);

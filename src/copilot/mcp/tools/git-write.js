@@ -465,10 +465,14 @@ export const gitWriteTools = [
         inputSchema: {
             expectedHead: z.string().min(7).max(64).describe('HEAD precondition obtained from git_commit/git_push_plan.'),
             expectedUpstream: z.string().min(1).max(256).describe('Expected existing upstream, for example origin/main.'),
+            pushDryRunFirst: z
+                .boolean()
+                .optional()
+                .describe('Run git push --dry-run before the real push. Default: false; git_push_plan remains available for explicit preflight.'),
             confirmPush: z.literal(true),
         },
         annotations: { ...destructiveAnnotations(), openWorldHint: true },
-        handler: async ({ expectedHead, expectedUpstream }) => {
+        handler: async ({ expectedHead, expectedUpstream, pushDryRunFirst }) => {
             const state = await buildPushState();
             const headError = validateExpectedHead(expectedHead, /** @type {string | null} */ (state['head']));
             if (headError) return errorResult(headError, { code: 'ERR_GIT_HEAD_PRECONDITION', expectedHead, head: state['head'] });
@@ -476,13 +480,34 @@ export const gitWriteTools = [
             if (!state['upstream'] || state['upstream'] !== expectedUpstream) {
                 return errorResult(`Upstream precondition failed: expected ${expectedUpstream}, actual ${String(state['upstream'])}.`, { code: 'ERR_GIT_UPSTREAM_PRECONDITION', state });
             }
-            const dryRun = await execGit(['push', '--dry-run', '--porcelain'], { timeoutMs: 60_000, maxBufferBytes: 2 * 1024 * 1024 });
-            if (!dryRun.success) return errorResult(dryRun.error ?? 'Git push dry-run failed.', { code: 'ERR_GIT_PUSH_DRY_RUN_FAILED', state, stderr: dryRun.stderr });
+            if (pushDryRunFirst === true) {
+                const dryRun = await execGit(['push', '--dry-run', '--porcelain'], {
+                    timeoutMs: 60_000,
+                    maxBufferBytes: 2 * 1024 * 1024,
+                });
+                if (!dryRun.success) {
+                    return errorResult(dryRun.error ?? 'Git push dry-run failed.', {
+                        code: 'ERR_GIT_PUSH_DRY_RUN_FAILED',
+                        state,
+                        stderr: dryRun.stderr,
+                    });
+                }
+            }
             const result = await execGit(['push', '--porcelain'], { timeoutMs: 120_000, maxBufferBytes: 4 * 1024 * 1024 });
             if (!result.success) return errorResult(result.error ?? 'Git push failed.', { code: 'ERR_GIT_PUSH_FAILED', state, stderr: result.stderr });
             const after = await buildPushState();
             await appendMcpAuditEvent({ event: 'git_push', tool: 'git_push', head: state['head'], branch: state['branch'], upstream: state['upstream'], aheadBefore: state['ahead'], aheadAfter: after['ahead'] });
-            return okResult({ success: true, before: state, after, output: result.stdout, stderr: result.stderr }, result.stdout || result.stderr || 'Push completed.');
+            return okResult(
+                {
+                    success: true,
+                    pushDryRunFirst: pushDryRunFirst === true,
+                    before: state,
+                    after,
+                    output: result.stdout,
+                    stderr: result.stderr,
+                },
+                result.stdout || result.stderr || 'Push completed.',
+            );
         },
     },
 ];

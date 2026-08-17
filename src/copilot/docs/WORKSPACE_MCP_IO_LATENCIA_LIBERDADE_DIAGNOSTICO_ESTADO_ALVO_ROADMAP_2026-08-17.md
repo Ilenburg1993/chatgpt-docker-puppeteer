@@ -1318,3 +1318,44 @@ Prova live após reload:
 
 A regra operacional fica explícita: status frequente deve trazer apenas informação necessária para decisão imediata; diagnóstico volumoso fica em tool dedicada sob demanda.
 
+### 22.14 Sublote — Git push single-RTT e health default novamente abaixo do SLO
+
+O dashboard após uso real mostrou duas oportunidades diferentes: `git_push` em **2.397 ms** no fluxo anterior e `mcp_runtime_health` com **16.134 bytes**, ligeiramente acima do SLO histórico de 15 KiB.
+
+**Git**
+
+`git_push` granular fazia `git push --dry-run --porcelain` e depois `git push --porcelain` sempre. Isso duplicava rede apesar de a tool já validar HEAD, branch e upstream e de existir `git_push_plan` para quem quiser preflight explícito. A semântica foi alinhada a `git_publish_changes`:
+
+- push real é única ida à rede por default;
+- `pushDryRunFirst=true` torna o dry-run opt-in;
+- `git_push_plan(runDryRun=true)` continua sendo a opção read-only de preflight;
+- force, arbitrary remote e arbitrary refspec continuam impossíveis.
+
+Prova live no mesmo HEAD/upstream sincronizados:
+
+- `git_push` sem dry-run: **749 ms**;
+- `git_push_plan` com dry-run: **660 ms**;
+- portanto o par de rede que o comportamento antigo exigiria nesse mesmo estado custa aproximadamente **1,409 s**, enquanto o apply default novo paga apenas a push real;
+- a observação histórica anterior de `git_push=2.397 ms` não é A/B puro por diferenças de rede/estado, mas é coerente com a remoção de um RTT remoto inteiro.
+
+**Runtime health**
+
+O default foi compactado sem remover `includeDetails=true`:
+
+- slowest tools: top 8 → top 5;
+- slowest phases: top 12 → top 6;
+- benchmark de cache: séries cold/L1/L2 saem do default; decisão final permanece;
+- TTL caches: totals + activeCount + top 3 ativos;
+- L2 plan no default mantém decisão/evidence e apenas `recommendationCount`;
+- teste exige default **<12 KiB** e, separadamente, prova que detail ainda contém `metrics.tools` e IO rico.
+
+Prova live:
+
+- `mcp_runtime_health`: **16.134 → 13.051 bytes** (**-19,1%**), novamente abaixo do SLO de 15 KiB;
+- handler observado: **114 ms**;
+- focused Git autonomy: **2,705 s**, passed;
+- focused runtime metrics: **3,624 s**, passed;
+- strict typecheck: **9,379 s**, passed.
+
+Próxima pressão indicada pelo dashboard: `mcp_latency_dashboard` tornou-se ele próprio um dos maiores payloads quando usado em modo detalhado (~10–12 KiB/call). O próximo lote deve separar default decision view de rankings detalhados, mantendo persist/history/detail sob demanda.
+

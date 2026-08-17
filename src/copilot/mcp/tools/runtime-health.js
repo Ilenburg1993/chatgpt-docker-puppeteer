@@ -156,7 +156,7 @@ function summarizeSlowestTools(tools) {
         }))
         .filter((item) => item.calls > 0)
         .sort((left, right) => (right.averageMs ?? 0) - (left.averageMs ?? 0))
-        .slice(0, 8);
+        .slice(0, 5);
 }
 
 /**
@@ -182,7 +182,7 @@ function summarizeSlowestPhases(tools) {
     return rows
         .filter((row) => row.calls > 0)
         .sort((left, right) => (right.averageMs ?? 0) - (left.averageMs ?? 0))
-        .slice(0, 12);
+        .slice(0, 6);
 }
 
 /**
@@ -264,33 +264,13 @@ function recordOrEmpty(value) {
 /** @param {Record<string, unknown> | null} state */
 function summarizeIoCacheBenchmark(state) {
     if (!state) return null;
-    const phases = recordOrEmpty(state['phases']);
-    /** @param {string} name */
-    const compactPhase = (name) => {
-        const phase = recordOrEmpty(phases[name]);
-        const latency = recordOrEmpty(phase['latency']);
-        return {
-            hits: phase['allExpectedCacheHits'] === true,
-            samples: phase['successfulSamples'] ?? null,
-            p50Ms: latency['p50Ms'] ?? null,
-            p95Ms: latency['p95Ms'] ?? null,
-            averageMs: latency['averageMs'] ?? null,
-        };
-    };
     const decision = recordOrEmpty(state['decision']);
     return {
         status: state['status'] ?? null,
         completedAt: state['completedAt'] ?? null,
-        phases: {
-            cold: compactPhase('cold'),
-            l1: compactPhase('l1'),
-            l2: compactPhase('l2'),
-        },
-        decision: {
-            representativeBenchmarkPassed: decision['representativeBenchmarkPassed'] === true,
-            l2ColdP95ImprovementPercent: decision['l2ColdP95ImprovementPercent'] ?? null,
-            recommendation: decision['recommendation'] ?? null,
-        },
+        representativeBenchmarkPassed: decision['representativeBenchmarkPassed'] === true,
+        l2ColdP95ImprovementPercent: decision['l2ColdP95ImprovementPercent'] ?? null,
+        recommendation: decision['recommendation'] ?? null,
         error: state['error'] ?? null,
     };
 }
@@ -304,15 +284,20 @@ function summarizeTtlCaches(caches) {
         misses: cache.misses,
         inFlight: cache.inFlight,
     }));
+    const active = rows
+        .filter((row) => Number(row.size ?? 0) > 0 || Number(row.hits ?? 0) > 0 || Number(row.misses ?? 0) > 0)
+        .sort(
+            (left, right) =>
+                Number(right.hits ?? 0) + Number(right.misses ?? 0) -
+                (Number(left.hits ?? 0) + Number(left.misses ?? 0)),
+        );
     return {
         count: rows.length,
+        activeCount: active.length,
         totalSize: rows.reduce((sum, row) => sum + Number(row.size ?? 0), 0),
         totalHits: rows.reduce((sum, row) => sum + Number(row.hits ?? 0), 0),
         totalMisses: rows.reduce((sum, row) => sum + Number(row.misses ?? 0), 0),
-        active: rows
-            .filter((row) => Number(row.size ?? 0) > 0 || Number(row.hits ?? 0) > 0 || Number(row.misses ?? 0) > 0)
-            .sort((left, right) => Number(right.hits ?? 0) + Number(right.misses ?? 0) - Number(left.hits ?? 0) - Number(left.misses ?? 0))
-            .slice(0, 6),
+        active: active.slice(0, 3),
     };
 }
 
@@ -586,7 +571,9 @@ export const mcpRuntimeHealthTool = {
                     ioCachePlan: {
                         l2Decision: ioCachePlanWithBenchmark.l2Decision,
                         evidence: ioCachePlanWithBenchmark.evidence,
-                        recommendations: ioCachePlanWithBenchmark.recommendations,
+                        recommendationCount: Array.isArray(ioCachePlanWithBenchmark.recommendations)
+                            ? ioCachePlanWithBenchmark.recommendations.length
+                            : 0,
                     },
                     ioParser: summarizeIoParser(recordOrEmpty(ioRuntime.parser)),
                     aiArtifacts: summarizeAiArtifacts(aiArtifacts),

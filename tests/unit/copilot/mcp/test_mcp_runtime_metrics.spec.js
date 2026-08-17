@@ -175,6 +175,14 @@ describe('copilot MCP runtime metrics', () => {
             averageMs: 8,
             lastMs: 8,
         });
+        assert.ok(Buffer.byteLength(JSON.stringify(result.structuredContent)) < 12 * 1024);
+
+        const detailed = await mcpRuntimeHealthTool.handler({ includeDetails: true });
+        assert.equal(detailed.isError, undefined);
+        assert.equal(detailed.structuredContent?.['detailsAvailable'], undefined);
+        const detailedMetrics = /** @type {Record<string, unknown>} */ (detailed.structuredContent?.['metrics']);
+        assert.equal(typeof detailedMetrics['tools'], 'object');
+        assert.equal(typeof detailedMetrics['ioCache'], 'object');
     });
 
     it('parses MCP index auto-build environment limits', () => {
