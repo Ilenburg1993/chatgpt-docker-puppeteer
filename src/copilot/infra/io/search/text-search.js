@@ -320,7 +320,16 @@ export async function searchText(targetPath, options) {
     let indexFallbackReason;
 
     try {
-        const indexStats = getIoIndexStats();
+        // `repo_search_text` is the completeness-oriented search surface. Prefer ripgrep whenever it is available:
+        // the persistent index can be temporarily incomplete immediately after a canonical invalidation, while a
+        // positive partial index hit cannot prove that no matches exist in the invalidated file(s). Dedicated
+        // `repo_index_search` remains available when callers explicitly want the derived index surface.
+        const ripgrepAvailable = await isRipgrepAvailable();
+        // Avoid the five aggregate SQLite queries in getIoIndexStats() on the normal rg path. The stats snapshot is
+        // needed only when we actually have to use the index because rg is unavailable.
+        const indexStats = ripgrepAvailable
+            ? /** @type {ReturnType<typeof getIoIndexStats>} */ ({})
+            : getIoIndexStats();
         const indexSearchOptions = {
             pattern: options.pattern,
             ...(options.isRegex !== undefined ? { isRegex: options.isRegex } : {}),
@@ -331,6 +340,7 @@ export async function searchText(targetPath, options) {
 
         const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
         const literalIndexEligible =
+            !ripgrepAvailable &&
             options.isRegex !== true &&
             (options.contextLines ?? 0) === 0 &&
             Boolean(indexStats?.available) &&
@@ -396,7 +406,7 @@ export async function searchText(targetPath, options) {
             }
         }
 
-        if (canUseIndexSearch(indexSearchOptions)) {
+        if (!ripgrepAvailable && canUseIndexSearch(indexSearchOptions)) {
             const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
             const indexRows =
                 Boolean(indexStats?.available) && freshFiles > 0
@@ -453,7 +463,12 @@ export async function searchText(targetPath, options) {
                         ? 'index-no-matches'
                         : 'index-unavailable-or-stale'
                     : 'index-filtered-out-by-glob';
-        } else if (options.isRegex === true && options.caseSensitive !== true && (options.contextLines ?? 0) === 0) {
+        } else if (
+            !ripgrepAvailable &&
+            options.isRegex === true &&
+            options.caseSensitive !== true &&
+            (options.contextLines ?? 0) === 0
+        ) {
             const terms = parseSimpleRegexAlternation(options.pattern);
             const freshFiles = 'freshFiles' in indexStats ? Number(indexStats.freshFiles ?? 0) : 0;
             const perTermRows =
@@ -529,11 +544,11 @@ export async function searchText(targetPath, options) {
                     : 'index-incomplete-term-coverage-for-regex-alternation'
                 : 'query-not-index-compatible';
         } else {
-            indexFallback = true;
-            indexFallbackReason = 'query-not-index-compatible';
+            indexFallback = !ripgrepAvailable;
+            indexFallbackReason = ripgrepAvailable ? null : 'query-not-index-compatible';
         }
 
-        if (await isRipgrepAvailable()) {
+        if (ripgrepAvailable) {
             try {
                 const streamingCollector = createStreamingSearchCollector(searchWindow);
                 const streamResult = await streamSearchFile(

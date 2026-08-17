@@ -147,7 +147,12 @@ describe('copilot MCP runtime metrics', () => {
                 validatedMutablePath?: Record<string, unknown>;
             };
             ioCachePlan?: { l2Decision?: string; recommendationCount?: number };
-            ioParser?: { fileContextSize?: number; workerFailures?: number };
+            ioParser?: {
+                fileContextSize?: number;
+                fileContextHashComputations?: number;
+                fileContextHashReuses?: number;
+                workerFailures?: number;
+            };
             aiArtifacts?: { jobs?: Record<string, unknown>; rollback?: Record<string, unknown> };
         }} */ (result.structuredContent.metrics);
         assert.equal(metrics.totals.calls, 2);
@@ -158,6 +163,8 @@ describe('copilot MCP runtime metrics', () => {
         assert.equal(typeof metrics.ioCachePlan?.l2Decision, 'string');
         assert.equal(typeof metrics.ioCachePlan?.recommendationCount, 'number');
         assert.equal(typeof metrics.ioParser?.fileContextSize, 'number');
+        assert.equal(typeof metrics.ioParser?.fileContextHashComputations, 'number');
+        assert.equal(typeof metrics.ioParser?.fileContextHashReuses, 'number');
         assert.equal(typeof metrics.ioParser?.workerFailures, 'number');
         assert.equal(typeof metrics.aiArtifacts?.jobs?.['cleanupCandidateCount'], 'number');
         assert.equal(typeof metrics.aiArtifacts?.rollback?.['enabled'], 'boolean');

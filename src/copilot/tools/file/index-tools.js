@@ -337,16 +337,18 @@ export const workspaceParseFileTool = buildTool({
         if (!pathCheck.ok) return { path: filePath, error: pathCheck.reason, success: false };
 
         let content;
+        let contentHash;
         try {
             const { createWorkspaceIo } = await import('#copilot/infra/public/workspace-io');
             const { readText } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
             const snapshot = await readText(pathCheck.resolved);
             content = snapshot.content;
+            contentHash = snapshot.contentHash;
         } catch (err) {
             return { path: filePath, error: toError(err).message, success: false };
         }
 
-        const parsed = await parseFileForContext(pathCheck.resolved, content);
+        const parsed = await parseFileForContext(pathCheck.resolved, content, { contentHash });
         const windowed = windowFileContext(parsed, {
             maxItems,
             maxBytes,

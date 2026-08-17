@@ -25,6 +25,7 @@ import {
     writeFileAtomic,
 } from '../../../../src/copilot/infra/io-engine.js';
 import { scanDirectory } from '../../../../src/copilot/infra/io-scanner.js';
+import { patchTextBatchLocked } from '../../../../src/copilot/infra/io/fs/locked-mutations.js';
 import { acquireIoResourceLock, getIoLockStats } from '../../../../src/copilot/infra/io-locks.js';
 import { getFileResourceLockPath } from '../../../../src/copilot/infra/locks/file-resource-lock.js';
 import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
@@ -533,6 +534,31 @@ describe('infra/io-engine', () => {
             code: 'EEXIST',
         });
         await expect(readFile(file, 'utf8')).resolves.toBe('existing');
+    });
+
+    it('patchTextBatchLocked encadeia hashes sem alterar preconditions ou hashes externos', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'hash-chain-patch.txt');
+        const initial = 'alpha beta gamma';
+        const afterFirst = 'alpha BETA gamma';
+        const final = 'alpha BETA GAMMA';
+        await writeFile(file, initial, 'utf8');
+
+        const result = await patchTextBatchLocked(file, {
+            dryRun: true,
+            operations: [
+                { oldString: 'beta', newString: 'BETA', expectedHash: sha256(initial) },
+                { oldString: 'gamma', newString: 'GAMMA', expectedHash: sha256(afterFirst) },
+            ],
+        });
+
+        expect(result.previousHash).toBe(sha256(initial));
+        expect(result.operations[0]?.['previousHash']).toBe(sha256(initial));
+        expect(result.operations[0]?.['contentHash']).toBe(sha256(afterFirst));
+        expect(result.operations[1]?.['previousHash']).toBe(sha256(afterFirst));
+        expect(result.operations[1]?.['contentHash']).toBe(sha256(final));
+        expect(result.contentHash).toBe(sha256(final));
+        await expect(readFile(file, 'utf8')).resolves.toBe(initial);
     });
 
     it('patchTextLocked respeita expectedHash antes de aplicar patch', async () => {

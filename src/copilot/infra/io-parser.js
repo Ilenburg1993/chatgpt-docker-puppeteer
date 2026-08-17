@@ -271,6 +271,8 @@ const _fileContextCacheStats = {
     clears: 0,
     bypasses: 0,
     rejected: 0,
+    hashComputations: 0,
+    hashReuses: 0,
 };
 
 /** @type {number} */
@@ -1109,11 +1111,12 @@ export function invalidateParserCache(filePath) {
  *
  * @param {string} filePath
  * @param {string} content
+ * @param {{ contentHash?: string }} [options]
  * @returns {Promise<FileContext>}
  */
-export async function parseFileForContext(filePath, content) {
+export async function parseFileForContext(filePath, content, options = {}) {
     ensureInvalidationHook();
-    const cacheKey = buildFileContextCacheKey(filePath, content);
+    const cacheKey = buildFileContextCacheKey(filePath, content, options.contentHash);
     if (cacheKey) {
         const cached = /** @type {FileContext | undefined} */ (_fileContextCache.get(cacheKey));
         if (cached) {
@@ -1286,12 +1289,19 @@ function clearFileContextCacheForNormalizedPath(normalizedPath, recursive) {
 /**
  * @param {string} filePath
  * @param {string} content
+ * @param {string | undefined} suppliedContentHash
  * @returns {string | null}
  */
-function buildFileContextCacheKey(filePath, content) {
+function buildFileContextCacheKey(filePath, content, suppliedContentHash) {
     if (!isFileContextCacheEnabled()) return null;
     const normalized = normalizeParserPath(filePath);
-    const hash = createHash('sha256').update(content).digest('hex');
+    const normalizedSuppliedHash =
+        typeof suppliedContentHash === 'string' && /^[0-9a-f]{64}$/iu.test(suppliedContentHash)
+            ? suppliedContentHash.toLowerCase()
+            : null;
+    const hash = normalizedSuppliedHash ?? createHash('sha256').update(content).digest('hex');
+    if (normalizedSuppliedHash) _fileContextCacheStats.hashReuses += 1;
+    else _fileContextCacheStats.hashComputations += 1;
     return `${normalized}\u0000${content.length}\u0000${hash}`;
 }
 
@@ -1321,6 +1331,8 @@ export function getParserCacheStats() {
             clears: _fileContextCacheStats.clears,
             bypasses: _fileContextCacheStats.bypasses,
             rejected: _fileContextCacheStats.rejected,
+            hashComputations: _fileContextCacheStats.hashComputations,
+            hashReuses: _fileContextCacheStats.hashReuses,
         },
         maxParseDurationMs: MAX_PARSE_DURATION_MS,
         maxParseLines: MAX_PARSE_LINE_GUARD,
@@ -1375,6 +1387,8 @@ export async function resetParserCacheForTest(options = {}) {
     _fileContextCacheStats.clears = 0;
     _fileContextCacheStats.bypasses = 0;
     _fileContextCacheStats.rejected = 0;
+    _fileContextCacheStats.hashComputations = 0;
+    _fileContextCacheStats.hashReuses = 0;
     _parserRuntimeStats.budgetExceeded = 0;
     _parserRuntimeStats.skippedByLineGuard = 0;
     _parserRuntimeStats.lastParseDurationMs = 0;

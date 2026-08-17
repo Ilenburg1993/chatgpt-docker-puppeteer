@@ -639,7 +639,9 @@ export const repoIndexTools = [
                     scannedFiles = 1;
                     try {
                         const text = await readTextValidated(resolved.validatedReadPath);
-                        const parsed = await parseFileForContext(resolved.resolved, text.content);
+                        const parsed = await parseFileForContext(resolved.resolved, text.content, {
+                            contentHash: text.contentHash,
+                        });
                         for (const importEntry of parsed.symbols.imports) {
                             const source = String(importEntry.source ?? '');
                             const dynamic = importEntry.isDynamic === true;

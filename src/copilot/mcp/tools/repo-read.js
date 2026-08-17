@@ -1248,7 +1248,9 @@ export const repoReadTools = [
             const resolved = await resolveReadPath(path, { issueReadCapability: true });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const snapshot = await readTextValidated(resolved.validatedReadPath);
-            const parsed = await parseFileForContext(resolved.resolved, snapshot.content);
+            const parsed = await parseFileForContext(resolved.resolved, snapshot.content, {
+                contentHash: snapshot.contentHash,
+            });
             const windowed = windowFileContext(parsed, {
                 maxItems,
                 maxBytes,

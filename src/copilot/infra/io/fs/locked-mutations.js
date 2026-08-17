@@ -690,15 +690,18 @@ export async function patchTextBatchLocked(filePath, options) {
                     const initialContent = typeof rawContent === 'string' ? rawContent : decodeUtf8Buffer(rawContent);
                     const previousHash = sha256(rawBuffer);
                     let currentContent = initialContent;
+                    // Hash identity flows with the virtual content. Reusing H(n-1) as the next previousHash preserves
+                    // every expectedHash precondition while avoiding a second full-content SHA pass per operation.
+                    let currentHash = previousHash;
                     /** @type {Record<string, unknown>[]} */
                     const operations = [];
 
                     for (const [index, operation] of options.operations.entries()) {
-                        const operationPreviousHash = sha256(currentContent);
+                        const operationPreviousHash = currentHash;
                         assertExpectedSha256Digest(operationPreviousHash, operation.expectedHash);
                         const patch = computeTextPatch(currentContent, operation);
                         const updated = patch.updated;
-                        const operationContentHash = sha256(updated);
+                        const operationContentHash = patch.noop ? operationPreviousHash : sha256(updated);
                         const diffContextLines = operation.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
                         const shouldComputeDiff = operation.computeDiff === true;
                         const diff = shouldComputeDiff
@@ -738,10 +741,11 @@ export async function patchTextBatchLocked(filePath, options) {
                             diffRangeOptimized: diff.rangeOptimized === true,
                         });
                         currentContent = updated;
+                        currentHash = operationContentHash;
                     }
 
                     const finalNoop = currentContent === initialContent;
-                    const contentHash = sha256(currentContent);
+                    const contentHash = currentHash;
                     const projectedBytes = utf8ByteLength(currentContent, 'patch batch result');
                     const previousSnapshot =
                         finalNoop || !captureRollback

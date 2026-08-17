@@ -129,6 +129,7 @@ function summarizeIndexAutoBuild(indexAutoBuild) {
  * @returns {Record<string, unknown>}
  */
 function summarizeIndexStats(stats) {
+    const autoRefresh = recordOrEmpty(stats['autoRefresh']);
     return {
         enabled: stats['enabled'] ?? null,
         available: stats['available'] ?? null,
@@ -138,6 +139,18 @@ function summarizeIndexStats(stats) {
         symbols: stats['symbols'] ?? null,
         chunks: stats['chunks'] ?? null,
         freshness: stats['freshness'] ?? null,
+        autoRefresh: {
+            enabled: autoRefresh['enabled'] ?? false,
+            pending: autoRefresh['pending'] ?? 0,
+            running: autoRefresh['running'] ?? false,
+            batches: autoRefresh['batches'] ?? 0,
+            requested: autoRefresh['requested'] ?? 0,
+            indexed: autoRefresh['indexed'] ?? 0,
+            failed: autoRefresh['failed'] ?? 0,
+            lastLagMs: autoRefresh['lastLagMs'] ?? null,
+            maxLagMs: autoRefresh['maxLagMs'] ?? 0,
+            highWater: autoRefresh['highWater'] ?? 0,
+        },
     };
 }
 
@@ -350,6 +363,8 @@ function summarizeIoParser(parser) {
     const fileContext = recordOrEmpty(parser['fileContext']);
     return {
         fileContextSize: fileContext['size'] ?? 0,
+        fileContextHashComputations: fileContext['hashComputations'] ?? 0,
+        fileContextHashReuses: fileContext['hashReuses'] ?? 0,
         workerQueueLength: parser['workerQueueLength'] ?? 0,
         workerQueueHighWater: parser['workerQueueHighWater'] ?? 0,
         workerFailures: parser['workerFailures'] ?? 0,

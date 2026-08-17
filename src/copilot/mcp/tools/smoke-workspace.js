@@ -120,7 +120,9 @@ export const mcpSmokeWorkspaceTool = {
             const resolved = await resolveReadPath('src/copilot/mcp/registry.js', { issueReadCapability: true });
             if (!resolved.ok) throw new Error(resolved.reason);
             const snapshot = await readTextValidated(resolved.validatedReadPath);
-            const parsed = await parseFileForContext(resolved.resolved, snapshot.content);
+            const parsed = await parseFileForContext(resolved.resolved, snapshot.content, {
+                contentHash: snapshot.contentHash,
+            });
             return { symbols: parsed.symbols.symbols.length, exports: parsed.symbols.exports.length };
         });
         await runCheck(checks, 'repo_index_status', async () => {

@@ -16,6 +16,7 @@ import { DEFAULT_INDEX_EXTENSIONS } from './index-store/index.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { statPathSnapshot } from './io/fs/stat.js';
 import { createIoIndexSqlite } from './io-index-sqlite.js';
+import { readEnvNonNegativeInt, readEnvPositiveInt } from './shared/env.js';
 
 /** @type {ReturnType<typeof createIoIndexSqlite> | null} */
 let _ioIndex = null;
@@ -25,13 +26,144 @@ const _inflightIndexBuilds = new Map();
 
 /** @type {(() => void) | null} */
 let _indexInvalidationUnregister = null;
+/** @type {string | null} */
+let _indexWorkspaceRoot = null;
+/** @type {Map<string, number>} */
+const _pendingIndexRefreshPaths = new Map();
+/** @type {NodeJS.Timeout | null} */
+let _indexRefreshTimer = null;
+let _indexRefreshRunning = false;
+const _indexAutoRefreshStats = {
+    queued: 0,
+    coalesced: 0,
+    recursiveSkipped: 0,
+    missingWorkspaceRoot: 0,
+    batches: 0,
+    requested: 0,
+    indexed: 0,
+    invalidated: 0,
+    unchanged: 0,
+    skipped: 0,
+    failed: 0,
+    lastDurationMs: /** @type {number | null} */ (null),
+    lastLagMs: /** @type {number | null} */ (null),
+    maxLagMs: 0,
+    highWater: 0,
+};
+
+/** Runtime configuration for the derived-state refresh scheduler. */
+export function readIoIndexAutoRefreshConfig() {
+    const enabledRaw = String(process.env['IO_INDEX_AUTO_REFRESH_ENABLED'] ?? '1').trim().toLowerCase();
+    return {
+        enabled: !['0', 'false', 'off'].includes(enabledRaw),
+        debounceMs: readEnvNonNegativeInt('IO_INDEX_AUTO_REFRESH_DEBOUNCE_MS', 100),
+        maxBatch: Math.min(512, readEnvPositiveInt('IO_INDEX_AUTO_REFRESH_MAX_BATCH', 64)),
+    };
+}
+
+/** @param {string} filePath @param {{ recursive?: boolean; source?: string }} [event] */
+function scheduleIoIndexAutoRefresh(filePath, event = {}) {
+    const config = readIoIndexAutoRefreshConfig();
+    if (!config.enabled) return;
+    if (event.recursive === true) {
+        _indexAutoRefreshStats.recursiveSkipped += 1;
+        return;
+    }
+    if (!_indexWorkspaceRoot) {
+        _indexAutoRefreshStats.missingWorkspaceRoot += 1;
+        return;
+    }
+    const normalized = resolve(filePath);
+    if (_pendingIndexRefreshPaths.has(normalized)) _indexAutoRefreshStats.coalesced += 1;
+    else {
+        _pendingIndexRefreshPaths.set(normalized, Date.now());
+        _indexAutoRefreshStats.queued += 1;
+        _indexAutoRefreshStats.highWater = Math.max(_indexAutoRefreshStats.highWater, _pendingIndexRefreshPaths.size);
+    }
+    armIoIndexAutoRefreshTimer(config.debounceMs);
+}
+
+/** @param {number} delayMs */
+function armIoIndexAutoRefreshTimer(delayMs) {
+    if (
+        _indexRefreshTimer ||
+        _indexRefreshRunning ||
+        _inflightIndexBuilds.size > 0 ||
+        _pendingIndexRefreshPaths.size === 0
+    )
+        return;
+    _indexRefreshTimer = setTimeout(() => {
+        _indexRefreshTimer = null;
+        void flushIoIndexAutoRefresh();
+    }, Math.max(0, delayMs));
+    _indexRefreshTimer.unref?.();
+}
+
+/**
+ * Flush pending path refreshes. Canonical writers never await this function; it exists so lifecycle code/tests can
+ * force convergence when needed without widening the write critical path.
+ */
+export async function flushIoIndexAutoRefresh() {
+    if (_indexRefreshTimer) {
+        clearTimeout(_indexRefreshTimer);
+        _indexRefreshTimer = null;
+    }
+    if (_indexRefreshRunning || _pendingIndexRefreshPaths.size === 0 || !_indexWorkspaceRoot) return null;
+    if (_inflightIndexBuilds.size > 0) {
+        armIoIndexAutoRefreshTimer(readIoIndexAutoRefreshConfig().debounceMs);
+        return null;
+    }
+
+    const config = readIoIndexAutoRefreshConfig();
+    const batchEntries = [..._pendingIndexRefreshPaths.entries()].slice(0, config.maxBatch);
+    for (const [filePath] of batchEntries) _pendingIndexRefreshPaths.delete(filePath);
+    const oldestQueuedAt = Math.min(...batchEntries.map(([, queuedAt]) => queuedAt));
+    const lagMs = Math.max(0, Date.now() - oldestQueuedAt);
+    _indexRefreshRunning = true;
+    try {
+        const result = await refreshIoIndexPaths(
+            batchEntries.map(([filePath]) => filePath),
+            { workspaceRoot: _indexWorkspaceRoot },
+        );
+        _indexAutoRefreshStats.batches += 1;
+        _indexAutoRefreshStats.requested += batchEntries.length;
+        _indexAutoRefreshStats.indexed += Number(result.indexed ?? 0);
+        _indexAutoRefreshStats.invalidated += Number(result.invalidated ?? 0);
+        _indexAutoRefreshStats.unchanged += Number(result.unchanged ?? 0);
+        _indexAutoRefreshStats.skipped += Number(result.skipped ?? 0);
+        _indexAutoRefreshStats.failed += Number(result.failed ?? 0);
+        _indexAutoRefreshStats.lastDurationMs = Number(result.durationMs ?? 0);
+        _indexAutoRefreshStats.lastLagMs = lagMs;
+        _indexAutoRefreshStats.maxLagMs = Math.max(_indexAutoRefreshStats.maxLagMs, lagMs);
+        return result;
+    } catch {
+        _indexAutoRefreshStats.failed += batchEntries.length;
+        return null;
+    } finally {
+        _indexRefreshRunning = false;
+        if (_pendingIndexRefreshPaths.size > 0) armIoIndexAutoRefreshTimer(config.debounceMs);
+    }
+}
+
+export function getIoIndexAutoRefreshStats() {
+    return {
+        ..._indexAutoRefreshStats,
+        enabled: readIoIndexAutoRefreshConfig().enabled,
+        pending: _pendingIndexRefreshPaths.size,
+        running: _indexRefreshRunning,
+        workspaceRootKnown: Boolean(_indexWorkspaceRoot),
+        debounceMs: readIoIndexAutoRefreshConfig().debounceMs,
+        maxBatch: readIoIndexAutoRefreshConfig().maxBatch,
+    };
+}
 
 function ensureIndexInvalidationHook() {
     if (_indexInvalidationUnregister) return;
     _indexInvalidationUnregister =
-        registerInvalidationHook((filePath) => {
+        registerInvalidationHook((filePath, event) => {
             try {
                 getIoIndex()?.invalidatePath(filePath);
+                scheduleIoIndexAutoRefresh(filePath, event);
             } catch {
                 /* invalidation hooks não devem derrubar o writer */
             }
@@ -61,9 +193,10 @@ export function getIoIndexStats() {
             enabled: false,
             available: false,
             reason: isDisabled() ? 'disabled-via-env' : 'unavailable',
+            autoRefresh: getIoIndexAutoRefreshStats(),
         };
     }
-    return index.getStats();
+    return { ...index.getStats(), autoRefresh: getIoIndexAutoRefreshStats() };
 }
 
 /**
@@ -71,6 +204,7 @@ export function getIoIndexStats() {
  * @param {Parameters<NonNullable<ReturnType<typeof getIoIndex>>['indexDirectory']>[1]} [options]
  */
 export async function buildIoIndexForDirectory(directory, options = {}) {
+    _indexWorkspaceRoot = resolve(options.workspaceRoot ?? directory);
     const index = getIoIndex();
     if (!index) {
         return {
@@ -113,6 +247,7 @@ export async function buildIoIndexForDirectory(directory, options = {}) {
         } finally {
             budget.finish();
             if (mayCoalesce) _inflightIndexBuilds.delete(key);
+            if (_pendingIndexRefreshPaths.size > 0) armIoIndexAutoRefreshTimer(readIoIndexAutoRefreshConfig().debounceMs);
         }
     })();
 
@@ -128,6 +263,7 @@ export async function buildIoIndexForDirectory(directory, options = {}) {
  * @param {{ workspaceRoot: string; extensions?: readonly string[]; signal?: AbortSignal }} options
  */
 export async function refreshIoIndexPaths(filePaths, options) {
+    _indexWorkspaceRoot = resolve(options.workspaceRoot);
     const index = getIoIndex();
     if (!index) return { available: false, requested: filePaths.length, indexed: 0, invalidated: 0, skipped: 0, failed: 0 };
     const workspaceRoot = resolve(options.workspaceRoot);
@@ -254,6 +390,30 @@ export function invalidateIoIndexPath(filePath) {
 export function resetIoIndexForTest() {
     _ioIndex = null;
     _inflightIndexBuilds.clear();
+    _indexWorkspaceRoot = null;
+    _pendingIndexRefreshPaths.clear();
+    if (_indexRefreshTimer) {
+        clearTimeout(_indexRefreshTimer);
+        _indexRefreshTimer = null;
+    }
+    _indexRefreshRunning = false;
+    Object.assign(_indexAutoRefreshStats, {
+        queued: 0,
+        coalesced: 0,
+        recursiveSkipped: 0,
+        missingWorkspaceRoot: 0,
+        batches: 0,
+        requested: 0,
+        indexed: 0,
+        invalidated: 0,
+        unchanged: 0,
+        skipped: 0,
+        failed: 0,
+        lastDurationMs: null,
+        lastLagMs: null,
+        maxLagMs: 0,
+        highWater: 0,
+    });
     _indexInvalidationUnregister?.();
     _indexInvalidationUnregister = null;
 }

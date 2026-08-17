@@ -42,7 +42,16 @@ import { fingerprintMatches, richFingerprintMatches } from './shared/fingerprint
 
 const DEFAULT_INDEX_BUILD_MAX_FILES = readEnvPositiveInt('IO_INDEX_BUILD_MAX_FILES', 10_000);
 const DEFAULT_INDEX_HASH_VERIFY_MAX_BYTES = readEnvPositiveInt('IO_INDEX_HASH_VERIFY_MAX_BYTES', 1024 * 1024);
-const DEFAULT_INDEX_HASH_VERIFY_INTERVAL_MS = readEnvPositiveInt('IO_INDEX_HASH_VERIFY_INTERVAL_MS', 30_000);
+// Content hashing is a cryptographic safety net, not a 30-second freshness clock. Canonical invalidation, Git evidence
+// and rich fs fingerprints catch normal changes; a 6h default keeps periodic verification without turning each
+// 30-minute safety reconcile into a full workspace read/hash sweep.
+const DEFAULT_INDEX_HASH_VERIFY_INTERVAL_MS = readEnvPositiveInt(
+    'IO_INDEX_HASH_VERIFY_INTERVAL_MS',
+    6 * 60 * 60 * 1000,
+);
+const DEFAULT_INDEX_RECHECK_UNCHANGED_SNAPSHOT = !['0', 'false', 'off'].includes(
+    String(process.env['IO_INDEX_RECHECK_UNCHANGED_SNAPSHOT'] ?? '0').trim().toLowerCase(),
+);
 const DEFAULT_INDEX_SNAPSHOT_RETRIES = 2;
 
 /**
@@ -125,6 +134,7 @@ function createStaleIndexSnapshotError(filePath, attempts) {
  *     now?: () => number;
  *     hashVerifyMaxBytes?: number;
  *     hashVerifyIntervalMs?: number;
+ *     recheckUnchangedSnapshot?: boolean;
  *     snapshotRetries?: number;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} options
@@ -141,6 +151,10 @@ export function createIoIndexSqlite(options) {
         Number.isFinite(options?.hashVerifyIntervalMs) && Number(options.hashVerifyIntervalMs) >= 0
             ? Math.floor(Number(options.hashVerifyIntervalMs))
             : DEFAULT_INDEX_HASH_VERIFY_INTERVAL_MS;
+    const recheckUnchangedSnapshot =
+        typeof options?.recheckUnchangedSnapshot === 'boolean'
+            ? options.recheckUnchangedSnapshot
+            : DEFAULT_INDEX_RECHECK_UNCHANGED_SNAPSHOT;
     const snapshotRetries =
         Number.isInteger(options?.snapshotRetries) && Number(options.snapshotRetries) >= 0
             ? Math.min(10, Number(options.snapshotRetries))
@@ -159,6 +173,8 @@ export function createIoIndexSqlite(options) {
         hashVerifications: 0,
         hashVerificationHits: 0,
         hashVerificationMisses: 0,
+        unchangedFingerprintFastPath: 0,
+        unchangedSnapshotRechecks: 0,
         snapshotConflicts: 0,
         errors: 0,
     };
@@ -789,6 +805,8 @@ export function createIoIndexSqlite(options) {
                     let buildHashVerifications = 0;
                     let buildHashVerificationHits = 0;
                     let buildHashVerificationMisses = 0;
+                    let buildUnchangedFingerprintFastPath = 0;
+                    let buildUnchangedSnapshotRechecks = 0;
                     let buildSnapshotConflicts = 0;
                     const indexed = [];
 
@@ -839,7 +857,19 @@ export function createIoIndexSqlite(options) {
                                         Number(existing?.sizeBytes) <= hashVerifyMaxBytes &&
                                         typeof existing?.contentHash === 'string';
                                     if (richFingerprintMatched && !periodicHashDue && scannerFingerprint) {
+                                        if (!recheckUnchangedSnapshot) {
+                                            // No index row is committed on this branch. Re-statting an unchanged file only narrows a
+                                            // TOCTOU window that remains open immediately afterwards, while adding one filesystem call
+                                            // per candidate. Canonical invalidation plus the next metadata reconcile remain the freshness
+                                            // backstop; callers can opt back into strict second-stat behavior when desired.
+                                            stats.unchangedFingerprintFastPath += 1;
+                                            buildUnchangedFingerprintFastPath += 1;
+                                            unchanged += 1;
+                                            return;
+                                        }
                                         try {
+                                            stats.unchangedSnapshotRechecks += 1;
+                                            buildUnchangedSnapshotRechecks += 1;
                                             await assertCurrentFileSnapshot(
                                                 normalizedFilePath,
                                                 {
@@ -999,6 +1029,8 @@ export function createIoIndexSqlite(options) {
                         hashVerifications: buildHashVerifications,
                         hashVerificationHits: buildHashVerificationHits,
                         hashVerificationMisses: buildHashVerificationMisses,
+                        unchangedFingerprintFastPath: buildUnchangedFingerprintFastPath,
+                        unchangedSnapshotRechecks: buildUnchangedSnapshotRechecks,
                         snapshotConflicts: buildSnapshotConflicts,
                         skipped,
                         failed,
@@ -1024,6 +1056,8 @@ export function createIoIndexSqlite(options) {
                         hashVerifications: buildHashVerifications,
                         hashVerificationHits: buildHashVerificationHits,
                         hashVerificationMisses: buildHashVerificationMisses,
+                        unchangedFingerprintFastPath: buildUnchangedFingerprintFastPath,
+                        unchangedSnapshotRechecks: buildUnchangedSnapshotRechecks,
                         snapshotConflicts: buildSnapshotConflicts,
                         failed,
                         pruned,
@@ -1034,6 +1068,7 @@ export function createIoIndexSqlite(options) {
                             strategy: 'mtime-size-ctime-dev-ino-periodic-hash',
                             hashVerifyMaxBytes,
                             hashVerifyIntervalMs,
+                            recheckUnchangedSnapshot,
                             snapshotRetries,
                         },
                     };
@@ -1211,6 +1246,7 @@ export function createIoIndexSqlite(options) {
                     strategy: 'mtime-size-ctime-dev-ino-periodic-hash',
                     hashVerifyMaxBytes,
                     hashVerifyIntervalMs,
+                    recheckUnchangedSnapshot,
                     snapshotRetries,
                 },
             };

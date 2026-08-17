@@ -422,6 +422,30 @@ describe('createIoIndexSqlite', () => {
         expect(second.indexed).toBe(0);
         expect(second.unchanged).toBe(3);
         expect(second.skipped).toBeGreaterThanOrEqual(3);
+        expect(second).toMatchObject({
+            unchangedFingerprintFastPath: 3,
+            unchangedSnapshotRechecks: 0,
+        });
+    });
+
+    it('mantém second-stat estrito como opção explícita para unchanged fingerprints', async () => {
+        expect(tmpDir).toBeTruthy();
+        const root = join(/** @type {string} */ (tmpDir), 'freshness-strict-recheck');
+        await mkdir(root);
+        await writeFile(join(root, 'freshness.md'), 'stable\n', 'utf8');
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db, recheckUnchangedSnapshot: true });
+        await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
+
+        const second = await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
+
+        expect(second).toMatchObject({
+            indexed: 0,
+            unchanged: 1,
+            unchangedFingerprintFastPath: 0,
+            unchangedSnapshotRechecks: 1,
+            freshnessPolicy: { recheckUnchangedSnapshot: true },
+        });
     });
 
     it('reindexa mudança externa same-size/same-mtime detectada por ctime e identidade', async () => {

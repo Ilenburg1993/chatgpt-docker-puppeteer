@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
 import { readTextFileSnapshot } from '../../../../src/copilot/infra/io/fs/read-text.js';
+import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 import { resolveBabelParserOptions } from '../../../../src/copilot/infra/parse/babel-policy.js';
 import {
     buildOutline,
@@ -724,6 +725,21 @@ describe('parseFileForContext', () => {
         assert.equal(afterSecond.fileContext.size, 1);
         assert.ok(afterSecond.fileContext.calculatedSize > 0);
         assert.ok(afterSecond.fileContext.calculatedSize <= afterSecond.fileContext.maxBytes);
+    });
+
+    it('reutiliza contentHash canônico no FileContext sem recalcular SHA-256', async () => {
+        const filePath = path.join(tmpDir, 'module.js');
+        await resetParserCacheForTest();
+        const snapshot = await readTextFileSnapshot(filePath);
+        const contentHash = sha256(snapshot.content);
+
+        const parsed = await parseFileForContext(filePath, snapshot.content, { contentHash });
+        const stats = getParserCacheStats();
+
+        assert.ok(parsed.symbols.symbols.length > 0);
+        assert.equal(stats.fileContext.hashReuses, 1);
+        assert.equal(stats.fileContext.hashComputations, 0);
+        assert.equal(stats.fileContext.misses, 1);
     });
 
     it('invalida FileContext quando invalidateParserCache é chamado', async () => {

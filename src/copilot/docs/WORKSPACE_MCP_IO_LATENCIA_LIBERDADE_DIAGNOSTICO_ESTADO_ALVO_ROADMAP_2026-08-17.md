@@ -1856,3 +1856,722 @@ Portanto o diff real agora elimina exatamente as **duas** avaliações redundant
 
 `CAPABILITIES_VERSION` permanece em **49**: a mudança é interna ao plano de I/O e não altera a superfície MCP externa.
 
+---
+
+# PARTE VI — REBASELINE PÓS-22.22 E SEGUNDA GERAÇÃO DO ESTADO-ALVO
+
+## 23. Nova investigação profunda — estado real em `8e918319c`
+
+A partir do commit **`8e918319c`** (`perf(io): reuse validated read pairs for diff`), a otimização desta frente entra em uma segunda geração. Vários itens que aparecem como “futuros” no roadmap original já foram implementados e provados: coherence cross-process, startup incremental do índice, batching read/search/patch, Git publish composto, validators bounded/batch, compactação do control plane, capabilities read/mutable, scan/diff/copy/move validated e redução do pós-reload a uma chamada. Portanto o critério de prioridade precisa mudar novamente.
+
+Estado reconciliado no início desta nova faixa:
+
+- branch **`main`**, HEAD **`8e918319c`**, upstream sincronizado;
+- worktree funcionalmente limpo para `src/copilot`; permanecem apenas `.vscode/settings.json` e untracked antigos/alheios, que não pertencem a esta frente;
+- MCP runtime `status=ok`, stateful ativo e sem stateless fallback;
+- índice: **2.226 arquivos / 2.226 fresh / 0 stale / 0 failed**, ~15,8 MiB, **12.172 símbolos**, 3.989 imports e 3.611 chunks;
+- validated read: **8 issued / 8 accepted / 0 rejects** no snapshot corrente;
+- validated mutable: **0/0/0** no snapshot corrente;
+- parser worker pool sem failures/timeouts/fallback pressure;
+- L2 blob cache continua **OFF**, conforme benchmark anterior em que perdeu para cold filesystem read;
+- amostra MCP imediatamente após reconnect é pequena, mas hot handlers observados continuam em dezenas de milissegundos ou menos. Não existe evidência de que `fs.readFile` isolado seja hoje o maior gargalo.
+
+A consequência metodológica é importante: **a próxima fronteira não é “fazer read 2 ms virar 1 ms”**. O maior retorno está em remover trabalho estrutural repetido que ainda aparece em manutenção de freshness, search routing, hashing/parsing e mutation pipelines.
+
+### 23.1 Novo gargalo P0 — safety full-reconcile do índice continua excessivamente caro
+
+O auto-index incremental funciona muito bem em steady state, mas a safety reconciliation periódica ainda cai no caminho antigo de scan + verificação criptográfica quase integral.
+
+Snapshot live desta investigação:
+
+- reason: `full-reconcile` / safety periódica;
+- **1.680 entries** escaneadas;
+- **1.445 candidates**;
+- **1.443 unchanged**;
+- **1.443 hash verifications / 1.443 hash hits / 0 misses**;
+- apenas **2 arquivos** efetivamente indexados;
+- duração: **1.948 ms**;
+- Git snapshot: **50 ms**.
+
+A causa arquitetural é a combinação de duas políticas temporais independentes:
+
+1. `COPILOT_MCP_INDEX_FULL_RECONCILE_INTERVAL_MS`: default **30 min**;
+2. `IO_INDEX_HASH_VERIFY_INTERVAL_MS`: default **30 s**.
+
+Quando a safety reconciliation de 30 min ocorre, praticamente qualquer arquivo ≤1 MiB está “hash due”. Assim, mesmo quando o scanner já encontra igualdade de **mtime + size + ctime + dev + ino**, o index lê e calcula SHA-256 de ~1,4 mil arquivos. Nesta amostra, 100% das verificações criptográficas apenas confirmaram o fingerprint rico já existente.
+
+Há ainda uma segunda redundância: quando o fingerprint rico coincide e o hash **não** está due, `indexDirectory()` chama `assertCurrentFileSnapshot()`, fazendo novo `stat` por arquivo embora o scan já tenha produzido fingerprint. Essa rechecagem reduz uma janela TOCTOU, mas para um arquivo classificado como “unchanged” nenhuma mutação é publicada no índice; portanto seu custo/benefício deve ser reavaliado separadamente do `confirmCurrent` necessário quando uma entrada é realmente reindexada/commitada.
+
+**Estado-alvo:** separar safety reconciliation de metadata/fingerprint da verificação criptográfica de conteúdo. Full reconcile não deve significar automaticamente full hash sweep.
+
+### 23.2 Novo gargalo P0/P1 — `searchText()` paga estatística diagnóstica antes de toda busca
+
+O search router está funcionalmente sofisticado: literal SQLite, FTS5, alternation assistida pelo índice e fallback streaming para ripgrep. Entretanto toda chamada inicia com `getIoIndexStats()`.
+
+Hoje `getIoIndexStats()` delega para `index.getStats()`, e `getStats()` executa **cinco agregações SQLite**:
+
+1. count/sum de files por status;
+2. count de symbols;
+3. count de imports;
+4. count de chunks;
+5. `MAX(refreshed_at_ms)`.
+
+Para decidir se tenta o índice, `searchText()` precisa essencialmente saber se a estrutura existe/tem linhas frescas; não precisa de counts de symbols/imports/chunks em todo hot search. Em index hits comuns, essas cinco queries são trabalho diagnóstico pago antes da query que realmente responde à busca.
+
+**Estado-alvo:** o fast search plane não deve chamar o full stats plane. Opções, em ordem de preferência:
+
+- tentar o índice diretamente e só materializar stats em fallback/diagnóstico;
+- ou criar um search-state/availability snapshot barato e generation-aware;
+- full `getIoIndexStats()` continua existindo para health/status, não para roteamento normal.
+
+SLO inicial: index/literal hit deve evitar completamente as cinco agregações de stats; `repo_search_text` hot p95 desejado **<30 ms** para queries indexáveis pequenas.
+
+### 23.3 Novo gargalo P1 — hashes duplicados em parsing/contexto
+
+`repo_file_outline` executa:
+
+`readTextValidated() → snapshot.contentHash → parseFileForContext(path, snapshot.content)`.
+
+Porém `parseFileForContext()` forma sua cache key executando novamente:
+
+`SHA256(content)`.
+
+Logo um hash que já foi calculado pelo snapshot canônico é recalculado sobre o mesmo conteúdo apenas para identificar o cache de contexto. O mesmo padrão pode ocorrer em outros callers que já possuem snapshot/hash.
+
+**Estado-alvo:** propagar o hash canônico já calculado até o parser/context cache. A API interna pode aceitar `contentHash`/snapshot evidence; callers sem hash continuam calculando localmente. Nenhum hash vindo de input MCP deve ser tratado como autoridade de filesystem — trata-se apenas de identidade de conteúdo para cache interno.
+
+Meta: **zero re-hash duplicado** em `read snapshot → outline/context parse`.
+
+### 23.4 Novo gargalo P1 — pipeline de hash em patch batch
+
+`patchTextBatchLocked()` já é eficiente em I/O: um lock, um read, sequência virtual e um write. O custo remanescente está em hashing do conteúdo virtual.
+
+No loop atual, para cada operação são calculados:
+
+- `sha256(currentContent)` como `operationPreviousHash`;
+- `sha256(updated)` como `operationContentHash`.
+
+Depois do loop, `sha256(currentContent)` é calculado novamente como hash final. Entretanto:
+
+- o `previousHash` da operação N é exatamente o `contentHash` da operação N−1;
+- para a primeira operação, o previous hash já foi calculado sobre o snapshot inicial;
+- o hash final é exatamente o último `operationContentHash`;
+- no-op pode reutilizar o hash anterior.
+
+Assim, a mesma sequência de hashes/preconditions pode ser preservada com aproximadamente **metade das passagens SHA-256** sobre o conteúdo virtual em batches grandes.
+
+**Estado-alvo:** hash pipeline incremental por reutilização de resultados, sem mudar qualquer `expectedHash`, output hash ou atomicidade.
+
+### 23.5 Cache — separar freshness canônica de revalidação redundante
+
+O L1 canônico possui:
+
+- invalidation ativa local;
+- journal cross-process com poll de 125 ms;
+- TTL 60 s;
+- stale probe rico a cada 2 s;
+- hash revalidation apenas quando fingerprint diverge e o arquivo é elegível.
+
+Esse desenho permanece bom. O L2 blob continua sem justificativa empírica.
+
+O response cache MCP de `repo_read_file`, contudo, mantém `COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS=0` por default. Portanto até um shaped-cache hit executa `statPathValidated()` novamente. Como writes canônicos locais e remotos já removem a entrada via invalidation bus/journal, esse stat serve essencialmente como defesa contra alteração externa não observada pelo journal.
+
+Não será ativado um trust window amplo por conveniência. A nova frente deverá comparar:
+
+- baseline atual `trust=0`;
+- lease muito curto (ex.: 100–500 ms);
+- ou uma estratégia generation/fingerprint em que invalidation observada invalida imediatamente e external-write safety continua com probe bounded.
+
+**Gate obrigatório:** ganho real em repeated-read workload + janela externa explicitamente quantificada. Sem benchmark, default continua 0.
+
+### 23.6 Index freshness durante runtime — invalidar é correto, mas reindexar pode ser mais autônomo
+
+O cross-process coherence plane já propaga mudanças. O index registry reage à invalidation removendo/inativando path, o que preserva segurança: buscas podem cair para ripgrep quando o índice deixa de estar fresco. Porém essa arquitetura ainda pode transformar uma sequência `patch → search` em fallback temporário mesmo quando a mudança veio de uma primitive canônica e o path exato é conhecido.
+
+Estado-alvo adicional: avaliar um **incremental refresh scheduler** bounded e debounce-aware alimentado pelos eventos já existentes. Após write/patch/move, o index pode reindexar os paths conhecidos em background/oportunisticamente, sem scan amplo. Requisitos:
+
+- nunca atrasar commit de arquivo;
+- coalescer múltiplas mudanças do mesmo path;
+- respeitar rename/delete;
+- zero loop de invalidation;
+- usar `refreshIoIndexPaths()` canônico;
+- fallback search por rg continua disponível até refresh concluir;
+- medir freshness lag e CPU/SQLite contention.
+
+Alvo inicial: canonical write → index fresh novamente em **<500 ms p95**, sem adicionar >2 ms ao write critical path.
+
+### 23.7 Parsing — worker pool saudável; otimizar cópias e identidade, não paralelismo por reflexo
+
+O worker pool atual está adaptativo (até 4), queue max 128 e sem pressure relevante. Não há evidência para ampliar workers.
+
+A prioridade de parser passa a ser:
+
+- reutilizar hash/snapshot;
+- evitar serialização/cópia de conteúdo quando o caller já possui resultado derivado apropriado;
+- explorar o índice persistido para responder navigation/outline quando ele já contém símbolos suficientes, sem reparse, **apenas se o contrato solicitado puder ser atendido integralmente**;
+- manter `parseFileForContext` como fallback canônico para top comments/outline rico.
+
+### 23.8 Search — nova política de roteamento e cache negativo apenas sob evidência
+
+O index-first router deve permanecer. Mudanças planejadas:
+
+- remover full stats do fast path;
+- medir index hit/miss/fallback por engine e duração;
+- evitar `rg` spawn quando o índice consegue provar resposta completa;
+- preservar rg para regex complexa, contexto e casos em que FTS/literal não prova completude;
+- considerar negative routing cache somente depois de medir queries repetidas; nenhum cache de “sem resultados” pode sobreviver a invalidation generation.
+
+### 23.9 Read — liberdade de payload sem sacrificar preconditions
+
+Reads já suportam batch, chunks, hash modes e shaped cache. A nova faixa não criará uma nova read tool sem necessidade. Melhorias potenciais:
+
+- tornar `hashMode` realmente custo-aware até a primitive baixa quando o caller explicitamente não precisa de full hash;
+- reutilizar hash já presente em L1/snapshot/index quando semanticamente equivalente;
+- manter full hash como default onde ele serve de precondition para patch/write;
+- medir repeated batch/singleflight e output/context, não apenas disco.
+
+### 23.10 Mutations/I/O — durability e rollback como políticas explícitas, nunca bypass implícito
+
+As primitives atuais incluem atomic rename/link, lock, hash precondition, capacity preflight, fsync/directory sync quando aplicável e rollback sidecar apenas quando habilitado. A investigação futura pode medir quanto durability domina writes pequenos.
+
+Qualquer opção nova de performance nesta área deve obedecer:
+
+- default permanece seguro;
+- nenhuma flag pública “unsafe/no-validation”;
+- se um perfil de durability local mais rápido for justificável, ele será nomeado explicitamente e restrito a operações/ambientes em que a perda de durability após power loss seja uma escolha consciente, não uma mudança silenciosa;
+- rollback automático permanece OFF até decisão separada.
+
+---
+
+# PARTE VII — ESTADO-ALVO V2
+
+## 24. Arquitetura-alvo depois da maturação do Bulk/Capability Plane
+
+### 24.1 Freshness Evidence Plane
+
+A decisão “preciso reler/hashar?” deve usar evidência em camadas:
+
+1. invalidation canônica local/cross-process;
+2. Git HEAD/worktree/committed diff;
+3. fingerprint rico do filesystem;
+4. hash criptográfico como verificação escalonada/safety net;
+5. full scan/hash apenas quando existe gap/incerteza/migration/manual forensic request.
+
+O hash deixa de ser um relógio global de 30 s e passa a ser **budgeted verification evidence**.
+
+### 24.2 Search Fast Plane — revisado pela evidência da Faixa 23
+
+A hipótese inicial `query → direct index attempt → rg fallback` foi **refutada empiricamente**.
+
+O contrato-alvo passa a ser:
+
+`repo_search_text → rg canônico quando disponível → índice apenas como fallback de disponibilidade`
+
+`repo_index_search` permanece a superfície explícita para discovery/FTS derivado.
+
+A razão é simultaneamente de performance e correção: uma row invalidada é removida imediatamente do índice; enquanto o derived-state refresh ainda não convergiu, um **hit parcial positivo** no índice não prova que todos os matches foram encontrados. `rg`, ao contrário, consulta o filesystem canônico atual. Além disso, o literal SQLite atual usa `instr(lower(content), lower(?))` sobre chunks e ficou muito mais caro sob cold/concurrent load.
+
+Full index stats/health ficam fora do caminho normal de `repo_search_text`. O índice continua valioso para símbolos, imports, FTS/discovery explícito e ambientes onde `rg` não esteja disponível.
+
+### 24.3 Snapshot Identity Plane
+
+Um conteúdo lido uma vez deve transportar sua identidade derivada:
+
+`read snapshot {content,fingerprint,hash} → parser/cache/index/patch preconditions`
+
+Sem recalcular hash idêntico em cada camada.
+
+### 24.4 Mutation Hash Pipeline
+
+Em operações sequenciais sobre o mesmo conteúdo virtual:
+
+`H0 → patch1 → H1 → patch2 → H2 ...`
+
+`Hn` deve ser reutilizado como `previousHash` da operação seguinte. O sistema mantém auditabilidade por operação sem re-hash do estado anterior.
+
+### 24.5 Background Derived-State Plane
+
+Índice, parser prefetch e outros estados derivados podem convergir em background após canonical invalidation, desde que:
+
+- canonical file commit já tenha terminado;
+- jobs sejam bounded/coalesced;
+- derived failure nunca reverta a mutação;
+- freshness explícita determine se search usa índice ou fallback.
+
+### 24.6 Profiled Performance sem weakening de policy
+
+Liberdade adicional deve vir de **políticas nomeadas e observáveis**, não de bypasses ocultos. Candidatos futuros:
+
+- index verification profile: `strict | balanced | throughput` interno/configurável;
+- response-cache external probe window bounded;
+- mutation durability profile apenas se benchmark justificar;
+- search engine choice já pode ser obtida pelas tools dedicadas (`repo_index_search` versus `repo_search_text`), evitando inflar schema sem necessidade.
+
+---
+
+## 25. SLOs V2
+
+### Index/freshness
+
+- steady startup skip/incremental: manter **<200 ms ideal**;
+- periodic metadata reconcile: alvo **<700 ms** no workspace atual;
+- periodic content-hash verification: **budgeted**, nunca ~1.400 reads por ciclo sem evidência;
+- full cryptographic sweep: manual/gap/migration ou política de baixa frequência mensurável;
+- canonical write → index fresh: alvo **<500 ms p95** se background refresh for habilitado.
+
+### Search
+
+- `repo_search_text` canônico via rg: warm p95 alvo **<100 ms** no workspace atual, preservando streaming/early-stop;
+- zero full `getIoIndexStats()` no successful rg hot path;
+- `repo_index_search` continua disponível explicitamente para FTS/discovery e deve convergir após canonical writes em <500 ms p95;
+- nenhum hit parcial de derived state pode ser tratado como prova de completude do filesystem;
+- route/engine permanece observável com custo desprezível.
+
+### Parsing
+
+- zero SHA-256 duplicado em `read snapshot → parseFileForContext` quando snapshot já fornece hash;
+- worker queue failures/timeouts = 0 no workload normal;
+- outline quente deve preferir cache/derivado antes de reparse.
+
+### Read/cache
+
+- repeated shaped read deve evitar stat redundante somente quando freshness lease/generation provar benefício;
+- external-write staleness window deve ser explicitamente bounded e observável;
+- L2 continua off enquanto não vencer benchmark representativo.
+
+### Patch
+
+- same-target batch mantém 1 lock/read/write;
+- aproximadamente **50% menos full-content SHA passes** no pipeline sequencial, preservando todos os hashes externos;
+- nenhum enfraquecimento de expectedHash/atomicity.
+
+### Context/round-trip
+
+- manter control-plane defaults compactos;
+- novas opções só entram se aumentarem capacidade líquida por byte/tool;
+- usar batch/bulk existente antes de criar novos nomes.
+
+---
+
+# PARTE VIII — ROADMAP V2: FAIXA 23
+
+## Fase 23.0 — Instrumentação causal e microbenchmarks reproduzíveis
+
+### 23.0.1 Index reconcile breakdown
+
+- [ ] medir scan/fingerprint, second-stat, file-read, hash, parse e SQLite commit separadamente;
+- [ ] registrar bytes hashed e arquivos verificados;
+- [ ] distinguir `metadataReconciled`, `contentVerified` e `contentReindexed`.
+
+### 23.0.2 Search route accounting
+
+- [ ] counters por `literal-index`, `fts5`, `regex-index`, `rg` e fallback reason;
+- [ ] medir custo de full index stats no baseline;
+- [ ] A/B sem full stats.
+
+### 23.0.3 Hash accounting
+
+- [ ] parser: cache-key hash computed versus reused;
+- [ ] patch batch: hash computations versus reused hashes.
+
+**Gate:** nenhuma otimização de freshness será aceita sem before/after causal.
+
+---
+
+## Fase 23.1 — Search hot path sem full stats — **primeiro sublote concluído**
+
+### 23.1.1 Canonical rg routing
+
+- [x] remover `getIoIndexStats()` do hot path quando rg está disponível;
+- [x] usar rg como busca textual completa/canônica;
+- [x] manter índice como fallback quando rg não existe;
+- [x] manter `repo_index_search` como opção explícita de derived-state search;
+- [x] impedir que hit parcial do índice masque arquivo invalidado ainda não reindexado.
+
+### 23.1.2 Search-state leve
+
+- [x] tornou-se desnecessário no caminho canônico: availability de rg decide diretamente;
+- [ ] reavaliar apenas se futura plataforma sem rg tornar o fallback dominante.
+
+### 23.1.3 Gates
+
+- [x] regressões `test_io_engine` e `test_mcp_tools` verdes;
+- [x] benchmark batch representativo;
+- [x] prova de completude: `patchTextBatchLocked(` retornou 5 matches via rg contra 4 no índice parcial anterior;
+- [x] seis searches concorrentes: ~88 ms no batch após ativação, contra ~6,8 s no cold literal-index baseline.
+
+---
+
+## Fase 23.2 — Index Safety Reconcile V2
+
+### 23.2.1 Desacoplar intervalos
+
+- [x] full metadata reconcile não implica full hash sweep;
+- [x] `IO_INDEX_HASH_VERIFY_INTERVAL_MS` default elevado de 30 s para **6 h**;
+- [x] removido o alinhamento patológico 30 min × 30 s;
+- [x] SHA periódico continua disponível como safety net e via override explícito.
+
+### 23.2.2 Budgeted/rotating hash verification
+
+- [ ] definir budget por files e/ou bytes por reconcile;
+- [ ] persistir age/coverage suficiente para rotacionar verificação;
+- [ ] priorizar arquivos com fingerprint pobre/incerteza;
+- [ ] permitir full cryptographic sweep explícito.
+
+### 23.2.3 Eliminar second-stat sem commit, se prova de segurança sustentar
+
+- [x] separado `unchanged observation` de `index commit`;
+- [x] default metadata-only aceita fingerprint rico sem second-stat adicional;
+- [x] `assertCurrentFileSnapshot` preservado antes de publicar/reindexar conteúdo;
+- [x] modo estrito reativável por `IO_INDEX_RECHECK_UNCHANGED_SNAPSHOT`;
+- [x] benchmark metadata-only reconcile: **496 ms**, 1.445 fast-path fingerprints, 0 second-stats/hashes.
+
+### 23.2.4 Journal/checkpoint V2
+
+- [ ] avaliar sequence/high-watermark persistido;
+- [ ] detectar journal gap explicitamente;
+- [ ] não substituir Git/fingerprint por journal; combinar evidências.
+
+**Gate:** safety reconcile normal <700 ms e sem sweep de ~1,4k hashes.
+
+---
+
+## Fase 23.3 — Runtime Incremental Index Refresh
+
+### 23.3.1 Scheduler
+
+- [x] fila/coalescing por normalized path;
+- [x] debounce default **100 ms**;
+- [x] refresh após canonical invalidation, fora do write critical path;
+- [x] batch bounded default 64; processamento interno permanece conservador/sequencial;
+- [x] full build tem precedência e pending refresh é retomado depois;
+- [x] stats próprios: queue/coalescing/batches/lag/failures/high-water.
+
+### 23.3.2 Rename/delete/subtree
+
+- [x] invalidar imediatamente antes da convergência derivada;
+- [x] missing/deleted file permanece invalidado após refresh scoped;
+- [x] recursive invalidation **não** é promovida implicitamente a scan; conta `recursiveSkipped`;
+- [ ] provar move source+destination live e decidir se subtree mutation merece scoped reconcile explícito.
+
+### 23.3.3 Cross-process proof
+
+- [ ] processo A patcha;
+- [ ] processo B/search index converge;
+- [ ] medir write→fresh lag.
+
+**Gate:** p95 <500 ms, sem loops, sem write latency material.
+
+---
+
+## Fase 23.4 — Snapshot/hash reuse em parser e outlines
+
+### 23.4.1 API interna
+
+- [x] `parseFileForContext(..., {contentHash})` implementado;
+- [x] hash fornecido só é aceito no formato SHA-256 hex e usado como identidade de cache interna;
+- [x] caller sem hash mantém fallback de cálculo atual;
+- [x] telemetry `hashComputations/hashReuses` adicionada.
+
+### 23.4.2 Migração
+
+- [x] `repo_file_outline`;
+- [x] orphan-import single-file path (`repo-index`);
+- [x] `mcp_smoke_workspace`;
+- [x] local LLM-B/index tool onde snapshot/hash já existe.
+
+### 23.4.3 Benchmark
+
+- [ ] arquivo pequeno, médio e grande;
+- [ ] cold parse versus file-context cache hit;
+- [ ] hash passes before/after.
+
+---
+
+## Fase 23.5 — Patch Hash Pipeline V2
+
+### 23.5.1 Reuse chain
+
+- [x] primeiro previous hash reutiliza snapshot inicial;
+- [x] operação seguinte reutiliza hash final anterior;
+- [x] final hash reutiliza última operação;
+- [x] no-op reutiliza hash sem SHA adicional.
+
+### 23.5.2 Segurança
+
+- [x] todos `expectedHash` mantêm semântica exata;
+- [x] hashes retornados por operação permanecem idênticos;
+- [x] atomicidade e rollback permanecem iguais;
+- [x] regressão dedicada valida cadeia H0→H1→H2 em dry-run sem alterar disco.
+
+### 23.5.3 Benchmark
+
+- [ ] 1, 8, 32 e 64 patches no mesmo arquivo;
+- [ ] tamanhos 10 KiB / 100 KiB / 1 MiB;
+- [ ] medir CPU/hash passes e wall time.
+
+---
+
+## Fase 23.6 — Read Response Cache V2
+
+### 23.6.1 Baseline
+
+- [ ] repeated same-window reads com trust=0;
+- [ ] medir stat cost e cache hit wall time;
+- [ ] medir singleflight em batch duplicado.
+
+### 23.6.2 Freshness lease/generation
+
+- [ ] comparar 100/250/500 ms;
+- [ ] canonical invalidation continua imediata;
+- [ ] external mutation test define janela máxima real.
+
+### 23.6.3 Rich fingerprint
+
+- [ ] shaped cache deve guardar ctime/dev/ino se continuar fazendo probe;
+- [ ] evitar regressão para mtime+size apenas.
+
+**Gate:** default só muda se A/B justificar; segurança externa documentada.
+
+---
+
+## Fase 23.7 — Parsing/index derived-state reuse
+
+- [ ] avaliar se outline/symbol requests podem ser satisfeitos diretamente pelo índice persistido quando contrato for completo;
+- [ ] reutilizar parser snapshots entre index build e tool navigation quando process-local;
+- [ ] evitar nova cache paralela se file-context/symbol cache já resolver;
+- [ ] manter worker pool atual enquanto não houver pressure.
+
+---
+
+## Fase 23.8 — Mutation durability e I/O baixo nível
+
+- [ ] decompor write latency: temp write, fsync, rename/link, directory fsync, capacity preflight, audit;
+- [ ] medir SSD/container atual;
+- [ ] manter default safe;
+- [ ] só desenhar perfil de durability alternativo se houver ganho grande e sem confundir segurança lógica com persistência após power-loss.
+
+---
+
+## Fase 23.9 — Registry/liberdade e novas opções
+
+- [ ] revisar quais opções já existem mas não estão materializadas pelo host atual;
+- [ ] preferir ampliar capacidade por primitives/bulk existentes;
+- [ ] nova tool somente se um workflow importante continuar exigindo múltiplos round-trips e não puder ser expresso pelo contrato atual;
+- [ ] manter `tools/list` com headroom e security metadata integral.
+
+---
+
+## Fase 23.10 — Gates contínuos e publicação por sublotes
+
+Cada sublote deve fechar:
+
+1. focused tests causais;
+2. strict typecheck quando source tipado for tocado;
+3. lint ao fechamento publicável;
+4. reload apenas quando runtime MCP exigir ativação;
+5. smoke composto único pós-reload;
+6. prova live before/after;
+7. atualização deste documento;
+8. stage por paths explícitos e publish governado.
+
+Validações amplas continuam raras; o objetivo é reduzir custo de iteração, não transformar toda microalteração em suíte total.
+
+---
+
+## 26. Ordem inicial de execução da Faixa 23
+
+### P0 imediato
+
+1. **Search hot path sem full stats** — baixo risco, alta frequência, remoção clara de trabalho redundante;
+2. **Patch hash pipeline** — transformação local, sem mudança de semântica e com ganho crescente com batch size;
+3. **Parser content-hash reuse** — remove hash duplicado em outline/contexto.
+
+### P0/P1 estrutural
+
+4. **Index Safety Reconcile V2** — maior custo periódico medido: 1,948 s / 1.443 hash reads inúteis na última amostra;
+5. **Runtime incremental index refresh** — reduz janela de fallback após writes e amplia autonomia MCP ↔ LLM-B.
+
+### P1 evidence-gated
+
+6. response-cache freshness lease/rich fingerprint;
+7. parser/index derived-state reuse;
+8. incremental refresh concurrency para dirty sets grandes.
+
+### P2
+
+9. durability profiling/opções;
+10. novas surfaces MCP somente se round-trip accounting demonstrar necessidade.
+
+A regra desta segunda geração é mais exigente que a anterior: **não basta uma ideia ser arquiteturalmente elegante; ela deve eliminar uma classe observável de trabalho, aumentar liberdade real ou fortalecer segurança/freshness com custo mensurável menor.**
+
+---
+
+# PARTE IX — EXECUÇÃO DA FAIXA 23
+
+## 27. Sublote 23.A — search completo, hash reuse e derived-state convergente
+
+Este sublote implementou os cinco primeiros eixos P0/P0-P1 da segunda geração em um único ciclo de ativação, mas com gates independentes por componente.
+
+### 27.1 Search — hipótese index-first refutada
+
+Benchmark baseline antes da mudança, seis buscas literais simultâneas em `src/copilot`:
+
+- cold literal SQLite: chamadas individuais ~**6,35–6,55 s**, batch **6.802 ms**;
+- segundo ciclo warm: ~**245–251 ms** por chamada;
+- comparação sequencial warm por `patchTextBatchLocked(`: SQLite **47,9 ms**, rg **38,3 ms**.
+
+Mais importante que a latência: SQLite retornou **4 matches**, enquanto rg retornou **5**. O match ausente estava neste próprio roadmap, cuja row havia sido invalidada pela edição corrente. Como ainda existiam outros hits frescos, a antiga estratégia index-first tratava o conjunto parcial como resposta suficiente e não fazia fallback.
+
+Correção:
+
+- `repo_search_text` prefere rg quando disponível;
+- o hot path de rg não chama `getIoIndexStats()`;
+- index literal/FTS permanece fallback quando rg não está disponível;
+- `repo_index_search` continua sendo a opção explícita para FTS/discovery derivado.
+
+Prova live pós-reload:
+
+- 6 searches concorrentes: **88 ms no batch inteiro**;
+- todas `engine=rg`;
+- `patchTextBatchLocked(` retornou **5 matches**, incluindo o roadmap recém-modificado;
+- o contrato de completude volta a ser o filesystem atual, não o derived state temporariamente incompleto.
+
+### 27.2 Patch hash pipeline — identidade virtual encadeada
+
+`patchTextBatchLocked()` passou de um esquema que recalculava o hash do estado anterior em cada operação e o hash final ao término para uma cadeia explícita:
+
+`H0 → patch1 → H1 → patch2 → H2 ...`
+
+Agora:
+
+- `H0` vem do snapshot inicial;
+- `Hn` é `previousHash` da operação seguinte;
+- no-op reutiliza `Hn-1` sem SHA adicional;
+- o hash final é o último hash já calculado;
+- `expectedHash` continua verificado exatamente no mesmo estado virtual;
+- nenhum lock/read/write/rollback mudou.
+
+Uma regressão dedicada com dois patches e dry-run valida `H0`, `H1`, `H2`, hashes por operação e ausência de escrita. `test_io_engine`: verde após correção do teste; strict typecheck também verde.
+
+### 27.3 Parser — snapshot content hash reutilizado
+
+`parseFileForContext()` agora aceita opcionalmente `{ contentHash }` para formar a identidade do file-context cache sem SHA duplicado. Regras:
+
+- somente SHA-256 hex de 64 chars é aceito como identidade fornecida;
+- é identidade de conteúdo/cache interna, **não** autoridade de filesystem;
+- caller sem hash continua calculando SHA localmente;
+- telemetry separa `hashComputations` e `hashReuses`.
+
+Migrados:
+
+- `repo_file_outline`;
+- orphan-import single-file path;
+- `mcp_smoke_workspace`;
+- local/index tool que já possuía `snapshot.contentHash`.
+
+Prova live no processo novo, antes de qualquer outline manual adicional:
+
+- `fileContextHashComputations=0`;
+- `fileContextHashReuses=1`;
+- worker failures/timeouts/fallbacks = 0.
+
+Isso prova que o próprio smoke/startup já atravessou o novo caminho sem re-hash.
+
+### 27.4 Safety Reconcile V2 — resultado causal
+
+Baseline imediatamente anterior:
+
+- 1.680 entries;
+- 1.445 candidates;
+- 1.443 unchanged;
+- **1.443 SHA-256 verifications / 1.443 hits**;
+- 2 arquivos reindexados;
+- **1.948 ms**.
+
+Mudança:
+
+- hash periodic default: **30 s → 6 h**;
+- metadata reconcile de 30 min continua intacto;
+- fingerprint rico `(mtime,size,ctime,dev,ino)` é suficiente para o branch unchanged sem publicação;
+- second-stat por unchanged deixa de ser default;
+- `IO_INDEX_RECHECK_UNCHANGED_SNAPSHOT` reativa explicitamente a postura estrita antiga;
+- `assertCurrentFileSnapshot` continua obrigatório antes de hash-refresh/index commit;
+- novos counters distinguem `unchangedFingerprintFastPath` e `unchangedSnapshotRechecks`.
+
+Prova live manual após reload, mesmo universo de **1.445 candidates**:
+
+- indexed: **0**;
+- unchanged: **1.445**;
+- hash verifications: **0**;
+- `unchangedFingerprintFastPath`: **1.445**;
+- `unchangedSnapshotRechecks`: **0**;
+- snapshot conflicts/failures: **0**;
+- duração: **496 ms**.
+
+Resultado: **1.948 → 496 ms (−74,5%)**, com eliminação de 1.443 file reads/hashes e ~1.445 second-stats no ciclo normal. O startup do mesmo processo já havia fechado seu `full-reconcile` em ~**583 ms**, corroborando a ordem de grandeza.
+
+### 27.5 Runtime incremental index refresh
+
+O index invalidation hook deixou de apenas apagar derived state. Fluxo novo:
+
+1. invalidation canônica local/cross-process chega ao hook;
+2. row do índice é invalidada imediatamente;
+3. path normalizado entra em fila coalescida;
+4. writer retorna sem esperar parser/SQLite;
+5. após debounce default de **100 ms**, paths são enviados em batch bounded (default 64) a `refreshIoIndexPaths()`;
+6. full build tem precedência; pending refresh é retomado depois;
+7. eventos recursivos não promovem scan implícito e incrementam `recursiveSkipped`.
+
+Configurações novas, internas e observáveis:
+
+- `IO_INDEX_AUTO_REFRESH_ENABLED` (default ON);
+- `IO_INDEX_AUTO_REFRESH_DEBOUNCE_MS` (default 100);
+- `IO_INDEX_AUTO_REFRESH_MAX_BATCH` (default 64);
+- `IO_INDEX_RECHECK_UNCHANGED_SNAPSHOT` para o perfil estrito de metadata reconcile.
+
+Stats de auto-refresh entram em `getIoIndexStats()`/runtime health: queue, coalescing, pending/running, batches, requested/indexed/invalidated/failed, lag, high-water.
+
+Prova live create:
+
+- arquivo JS temporário criado por `repo_create_file`;
+- write canônico: **153 ms**;
+- `repo_search_text` encontrou imediatamente via rg;
+- `repo_index_search` encontrou logo depois;
+- auto-refresh: `queued=1`, `batches=1`, `requested=1`, `indexed=1`, `failed=0`;
+- refresh work: **4 ms**;
+- lag: **100 ms**.
+
+Prova live delete do mesmo arquivo:
+
+- delete canônico: **13 ms**;
+- `repo_index_search` posterior: **0 matches**;
+- acumulado: `queued=2`, `batches=2`, `requested=2`, `indexed=1`, `invalidated=1`, `failed=0`;
+- último refresh: **1 ms**;
+- último lag: **101 ms**;
+- arquivo temporário removido do workspace.
+
+O gate local do scheduler também prova que duas invalidações do mesmo path coalescem para um refresh e que invalidation recursiva não dispara scan implícito.
+
+### 27.6 Gates do sublote até a ativação
+
+- `test_io_engine.spec.js`: verde, ~**4,257 s** no gate final relevante;
+- `test_io_parser.spec.js`: verde, ~**2,367 s**;
+- `test_io_index_sqlite.spec.js`: verde, ~**1,779 s**;
+- `test_io_index_registry.spec.js`: verde, ~**0,943 s**;
+- `test_mcp_runtime_metrics.spec.js`: verde, ~**3,913 s**;
+- strict typecheck: múltiplos gates verdes; último pré-reload relevante ~**8,880 s**;
+- reload QUIC controlado;
+- primeiro connector smoke caiu apenas na janela de restart; repetição canônica: `ready=true`, OAuth/SSE green, **119/119**, `tools/list=117.956 bytes`, total **1.117 ms**.
+
+### 27.7 Pendências que permanecem deliberadamente abertas
+
+- hash verification rotativo/budgeted por files/bytes continua útil como evolução posterior; o sublote atual apenas eliminou a cadência patológica;
+- journal/checkpoint high-watermark ainda não foi promovido a freshness evidence persistente;
+- cross-process write→refresh ainda requer prova live específica entre dois processos, embora o mesmo hook receba eventos do journal;
+- move source+destination deve ganhar prova live própria;
+- parser benchmark por 10 KiB/100 KiB/1 MiB e patch benchmark 1/8/32/64 operações continuam abertos;
+- response-cache lease, durability profiling e derived-state reuse avançado permanecem evidence-gated.
+
+A principal mudança de regime é que o sistema agora distingue claramente **fonte canônica** de **derived state**: rg/filesystem responde a busca completa; índice converge rapidamente para discovery; fingerprints sustentam freshness barata; SHA é safety evidence periódica; e hashes já derivados fluem entre camadas em vez de serem recalculados por hábito.
+

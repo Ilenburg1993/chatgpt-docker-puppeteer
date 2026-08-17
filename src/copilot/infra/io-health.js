@@ -11,7 +11,7 @@ import { getIoL2CacheStats } from './io-cache-l2-registry.js';
 import { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 import { getIoCacheStats } from './io-cache.js';
 import { getIoAdvisoryBudgetStats } from './io-advisory-budget.js';
-import { getIoIndexStats } from './io-index-registry.js';
+import { getIoIndexAutoRefreshStats, getIoIndexStats } from './io-index-registry.js';
 import { getIoLockStats } from './io-locks.js';
 import { getIoDurabilityStats, getIoLatencyStats } from './io-observability.js';
 import { getLineOffsetCacheStats } from './io/fs/line-offset-cache.js';
@@ -306,6 +306,7 @@ export function readIoRuntimeHealthSnapshot() {
             enabled: false,
             available: false,
             reason: 'error',
+            autoRefresh: getIoIndexAutoRefreshStats(),
         }),
         parser: readParserHealthStats(),
         latency: safeCall(getIoLatencyStats, {}),
