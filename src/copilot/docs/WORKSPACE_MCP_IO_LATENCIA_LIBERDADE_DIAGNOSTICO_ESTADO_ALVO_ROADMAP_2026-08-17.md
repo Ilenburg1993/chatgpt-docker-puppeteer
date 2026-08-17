@@ -1034,3 +1034,265 @@ Observabilidade foi adicionada ao runtime health (`ioCache.validatedReadPath`). 
 
 O ganho de latência absoluta por read é pequeno porque o hot path já estava em poucos milissegundos; o ganho principal é remover trabalho redundante em todas as chamadas read/search/stat sem enfraquecer a fronteira externa. O próximo critério continua sendo custo acumulado, round-trips e bytes, não micro-otimização isolada.
 
+## 22. Faixa nova — Bulk Execution Plane e compressão de round-trips
+
+### 22.1 Diagnóstico objetivo antes da implementação
+
+A investigação de 17/08/2026 passa a tratar **round-trip como recurso de primeira classe**, separado da latência interna da operação. O estado medido no início desta faixa é:
+
+- registry: **117 tools / 110.739 bytes**, com **20.333 bytes de headroom** sob o budget histórico de 128 KiB;
+- corpo HTTP MCP: limite default **2 MiB** (`COPILOT_MCP_MAX_REQUEST_BODY_BYTES`);
+- resultado MCP: limite default **2 MiB** (`COPILOT_MCP_REGISTRY_MAX_TOOL_RESULT_BYTES`), configurável até 64 MiB;
+- `repo_read_file` e `repo_search_text`: batch máximo **10**, concorrência fixa **4**;
+- prova live anterior: **4 reads em 1 call = 6 ms**; 4 searches em 1 call = 9 ms;
+- porém uma exceção lançada por qualquer worker de `repo_search_text(batch=...)` faz o `Promise.all` rejeitar e transforma o batch inteiro em `MCP_TOOL_EXECUTION_FAILED`, perdendo os resultados úteis das demais suboperações;
+- `repo_apply_patch_batch`: máximo **10** operações; para apply real executa **preflight completo** e depois executa novamente o conjunto;
+- o engine compartilhado `patchTextBatchLocked` já garante, por arquivo, **1 lock + 1 read + simulação sequencial completa + 1 write**, e só grava depois de todas as operações daquele arquivo terem sido validadas;
+- portanto o segundo passe de patch não é necessário para atomicidade **intra-target**, mas o preflight global atual fornece uma garantia adicional: nenhum target começa a gravar quando outro target já é inválido;
+- `repo_apply_file_batch`: preview global + apply serial; uma exceção é capturada no nível externo e pode ocultar qual parte do lote já foi processada, o que força chamadas extras de diagnóstico;
+- Git governado normalmente exige `stage_plan → stage → commit_plan → commit → push_plan → push`; além disso `git_push` repete um `push --dry-run` mesmo quando `git_push_plan` já fez um;
+- validators exigem hoje `run_copilot_validator` + 1–N `job_get_summary` e, em falha, `job_get_output`; typecheck/lint normalmente terminam dentro de uma janela em que uma única chamada poderia esperar de modo bounded;
+- a LLM-B local usa o mesmo `createWorkspaceIo`, caches, locks e invalidation plane, mas suas tools são distintas; `patch_file` continua single-operation. Logo otimizações que existam apenas no schema MCP não beneficiam o runtime local.
+
+O diagnóstico também revelou um ponto de governança de payload: `mcp_runtime_health` ainda retorna ~**37,6 KiB no modo default** e ~50–56 KiB em detail; a compactação default já estava em implementação quando esta faixa começou e deve ser concluída antes dos novos lotes.
+
+### 22.2 Estado-alvo arquitetural
+
+Será criado um **Bulk Execution Plane compartilhado**, com primitive em `infra` e adapters MCP/LLM-B independentes. O contrato arquitetural terá:
+
+1. **isolamento de falha por item**: exceção de uma suboperação não rejeita automaticamente o lote inteiro;
+2. **failure policy explícita**:
+   - `best-effort`: tenta todos os itens independentes;
+   - `fail-fast`: interrompe após a primeira falha e marca o restante como `skipped`;
+   - `atomic-per-target`: operações do mesmo target são sequenciais e atômicas sob um único lock; targets distintos continuam isolados;
+3. **concorrência bounded e observável**, com default adaptado ao tipo de workload em vez de `Promise.all` irrestrito;
+4. **budget duplo**: limite por número de operações **e por bytes agregados de input/output**;
+5. **batchId/trace + feedback completo**: attempted/succeeded/failed/skipped, duração por item/target, wall time, concurrency efetiva, códigos de erro e próximo passo;
+6. **result hints não enumeráveis** para o registry contabilizar `logicalOperations`, `failedOperations` e taxa de compressão de round-trip sem inflar o wire payload;
+7. **nenhum segundo caminho de filesystem**: adapters continuam usando `createWorkspaceIo`, locks, cache, coherence journal e validated-path capability;
+8. **segurança por capability**, não por repetição de validações: modos rápidos nunca recebem uma capability de write reutilizável fora da seção crítica;
+9. **fallback conservador** sempre disponível; otimizações de patch que reduzam preflight serão opt-in/explicitamente nomeadas quando alterarem semântica entre targets;
+10. **compatibilidade com LLM-B**: primitives de batch e métricas ficam abaixo do MCP; tools locais podem reutilizá-las sem compartilhar auth/schema MCP.
+
+### 22.3 Arquitetura de reads/searchs massivos
+
+O plano de leitura terá duas camadas:
+
+- ampliar `repo_read_file`/`repo_search_text` existentes para lotes maiores, mantendo compatibilidade e passando a capturar falha por item;
+- adicionar, se o custo de registry permanecer aceitável, uma **tool heterogênea de bulk read** capaz de combinar read/search/stat/outline/symbol em uma única chamada, com schema compacto (`op + args`) e validação interna específica.
+
+Meta inicial:
+
+- 32 operações por chamada como default hard cap inicial;
+- concurrency bounded 4–8;
+- `best-effort` default para reads;
+- 100% dos itens retornam status explícito;
+- nenhuma exceção de um item derruba resultados já disponíveis de outro;
+- `logicalOperations/call` exposto no dashboard.
+
+A elevação acima de 32 será condicionada ao budget de resultados, pois o gargalo real de leitura massiva passa a ser contexto/payload, não disco.
+
+### 22.4 Arquitetura de patch massivo
+
+Patch será tratado por **target groups**. O engine `patchTextBatchLocked` é a primitive canônica intra-arquivo. Dois modos de apply serão oferecidos:
+
+- `global-preflight`: semântica conservadora atual; todos os targets são simulados antes de qualquer write;
+- `per-target-fast`: elimina o passe global duplicado; cada target é validado e aplicado dentro de sua seção crítica atômica. Uma falha num target não invalida um target independente já concluído, e isso aparece explicitamente em `partial=true`/`failedTargets`.
+
+O segundo modo existe para ambientes confiáveis e iteração de alta performance; não será escondido sob o mesmo nome sem sinalização. A meta é elevar o batch para **32–64 operações**, com limite agregado de input e número de targets, e paralelismo apenas entre targets independentes.
+
+### 22.5 File mutations, Git e validators
+
+`repo_apply_file_batch` será reforçado para nunca perder informação em falha: retorno deve conter `planned`, `applied`, `failed`, `skipped` e `failureIndex`, inclusive em execução parcial.
+
+Será criada uma alternativa Git de alto nível, sem arbitrary shell/remotes/refspecs/force, que possa fazer **stage explícito + commit + push upstream** em uma chamada governada. As tools granulares continuam existindo como fallback e para investigações. O objetivo é reduzir o fluxo normal de 4–6 chamadas para 1, mantendo paths explícitos e HEAD/upstream preconditions.
+
+`run_copilot_validator` ganhará espera bounded opcional. Quando o job concluir dentro da janela, a mesma chamada retorna summary e, somente em falha, um tail curto; se não concluir, retorna job id/running como hoje. Isso elimina polling no caso comum sem transformar jobs longos em chamadas bloqueadas indefinidamente.
+
+### 22.6 Payload e transporte
+
+Não há razão imediata para elevar o limite global de resultados: **2 MiB** já é muito acima do payload desejável para interação normal. O corpo HTTP de **2 MiB** pode se tornar gargalo para patch massivo; antes de elevá-lo, o Bulk Execution Plane terá budget próprio por bytes. Se os benchmarks mostrarem necessidade real, o default MCP poderá subir para 4–8 MiB mantendo um limite de input menor por tool e rate limiting existente.
+
+O `tools/list` também não será artificialmente mantido abaixo de 128 KiB se isso impedir capacidades que eliminem muitos round-trips. O novo princípio é: **bytes de descriptor devem ser avaliados contra round-trips eliminados**, preservando security metadata e schemas que realmente validam.
+
+### 22.7 Roadmap operacional desta faixa
+
+**Fase R0 — concluir o lote interrompido**
+
+- corrigir a tipagem da compactação de `mcp_runtime_health`;
+- provar default <15 KiB e detail integral disponível.
+
+**Fase R1 — shared Bulk Execution Plane**
+
+- primitive bounded em infra;
+- policies `best-effort`/`fail-fast`;
+- metrics/result execution hint;
+- testes de exception isolation, order preservation e concurrency cap.
+
+**Fase R2 — read/search**
+
+- migrar batch atual para a primitive compartilhada;
+- 32 items;
+- falha por item;
+- métricas logicalOps/call;
+- avaliar/implementar bulk read heterogêneo.
+
+**Fase R3 — patches**
+
+- elevar operação/byte budgets;
+- target grouping compartilhado;
+- manter `global-preflight`;
+- adicionar `per-target-fast`;
+- feedback partial/failure/skipped sem segunda chamada diagnóstica.
+
+**Fase R4 — validators e Git**
+
+- bounded wait em validator;
+- combined governed Git publish;
+- manter tools granulares como fallback.
+
+**Fase R5 — LLM-B local**
+
+- reutilizar o bulk executor em read/patch tools locais;
+- sem compartilhar schemas MCP;
+- verificar coherence journal/cache/invalidation sob chamadas concorrentes dos dois runtimes.
+
+**Fase R6 — transport/payload tuning**
+
+- somente após medições dos lotes anteriores;
+- elevar request body/tools-list budgets se a capacidade nova justificar objetivamente.
+
+Critério de saída: uma investigação/edição típica que hoje requer 10–30 chamadas deve ser realizável com **2–6 chamadas**, mantendo feedback suficiente para continuar após falha sem reler estado desnecessariamente.
+
+### 22.8 Execução R0–R5 — implementação concluída e evidência
+
+A arquitetura acima foi implementada de forma compartilhada entre MCP e a tool layer local da LLM-B, sem criar um filesystem paralelo.
+
+**R0 — runtime health compacto**
+
+- `mcp_runtime_health` passou a separar default operacional e detail rico;
+- medição anterior desta mesma faixa: ~37,6 KiB → **14.180 bytes** no default, abaixo do SLO de 15 KiB;
+- detail continua opt-in por `includeDetails=true`;
+- após os reloads finais o runtime permaneceu `status=ok`, sem warnings/critical.
+
+**R1 — Bulk Execution Plane compartilhado**
+
+- nova primitive `src/copilot/infra/bulk-executor.js`;
+- policies `best-effort` e `fail-fast`;
+- ordem preservada, concorrência bounded, `executionId`, attempted/succeeded/failed/skipped e timings por item;
+- budgets por item count e bytes de input;
+- result execution hint não enumerável integrado ao registry/metrics;
+- teste focado `test_bulk_executor.spec.js`: passed; retomada pós-crash: **5,643 s**.
+
+**R2 — read/search massivos e bulk heterogêneo**
+
+- `repo_read_file.batch`: **10 → 32** itens no contrato canônico;
+- `repo_search_text.batch`: **10 → 32** itens;
+- default concurrency **6**, hard max **8**;
+- `best-effort` default; exceção/erro de um worker deixa de derrubar o batch inteiro;
+- budget agregado de output: **1 MiB default / 1,5 MiB máximo**; campos pesados `content`/`output` podem ser truncados sem perder status/hash/erros;
+- nova `repo_bulk_inspect`: até 32 operações heterogêneas `read | search | stat` no mesmo call, schema compacto `{op,args}` e validação específica interna;
+- live pós-reload: **10 operações lógicas em uma call**, concurrency 6, `9 succeeded / 1 failed / 0 skipped`, falha ENOENT isolada, **37,355 ms** de wall time interno, 5.441 bytes de resultado e zero truncamentos;
+- dashboard pós-prova: `repo_read_file logicalOperationsPerCall=10`, `compressedRoundTrips=9` para essa call.
+
+**R3 — patch massivo por target**
+
+- `repo_apply_patch_batch`: até **64 patches / 32 targets / 1,5 MiB de input**;
+- operações do mesmo arquivo usam `patchTextBatchLocked`: 1 lock + 1 read + simulação sequencial + 1 write atômico;
+- targets distintos passam pelo shared bulk executor;
+- `global-preflight` preserva a garantia conservadora de zero writes quando qualquer target falha na simulação;
+- `per-target-fast` elimina o passe global duplicado e permite partial success explícito entre targets independentes;
+- retorno inclui `partial`, failed/skipped counts, concurrency, duration e feedback por operação;
+- preflight bem-sucedido deixou de ser duplicado integralmente no resultado real: default retorna `preflightSummary`; detalhes completos são opt-in;
+- testes provaram zero-write global-preflight, partial success cross-target e atomicidade same-target;
+- plano com 12 patches passou, superando o limite legado de 10.
+
+Uma prova live revelou ainda um edge case de adapter: uma chamada enviada com `dryRun=false, confirmBatch=true` chegou ao handler como se `dryRun` tivesse sido omitido e foi conservadoramente tratada como dry-run. Foi introduzido `resolveBatchDryRun`: `dryRun=true` sempre vence; `dryRun=false` continua real apply; quando o boolean opcional some, **`confirmBatch=true` é tratado como a intenção explícita de escrita**. O mesmo resolver é usado nos batches de patch e file mutations. Prova live após reload: no-op permitido com apenas `confirmBatch=true` retornou `dryRun=false`, preflight global green e apply concluído em **9,939 ms**, sem alteração lógica do arquivo.
+
+**R4 — validators, file mutations e Git composto**
+
+- `repo_apply_file_batch`: limite canônico ampliado para 32 operações; execução dependente continua serial, mas uma falha agora devolve `planned`, `applied`, `appliedCount`, `failureIndex`, `skippedCount`, `partial` e fase, evitando releitura defensiva;
+- `run_copilot_validator` ganhou bounded wait in-memory; `unit-focused`, `typecheck` e `lint` usam inline completion por default e devolvem tail curto apenas em falha; suites amplas continuam assíncronas;
+- prova pós-WSL: strict typecheck terminou **na própria call** em **6,516 s**; run posterior após ajustes finais: **9,002 s**;
+- nova `git_publish_changes`: índice inicialmente limpo + paths explícitos + stage + commit + push opcional ao upstream já configurado, sem arbitrary remote/refspec/force; verifica após `git add` que nada fora dos paths explícitos entrou no index;
+- `push --dry-run` na tool composta é opt-in, evitando o round-trip de rede duplicado por default;
+- se push falhar depois do commit, o resultado informa `committed=true` e o HEAD criado, permitindo recuperação sem adivinhar estado;
+- metadata corrigida para representar `git_publish_changes` simultaneamente como destructive e `openWorldHint=true`; `mcp_tools_status` agora conta open-world pela annotation, não por um riskClass mutuamente exclusivo.
+
+Durante o gate final, `run_copilot_validator(unit-focused)` foi bloqueado **antes de chegar ao MCP** pela camada host da OpenAI (`CHATGPT_HOST_PRECALL_BLOCK`). `mcp_host_block_diagnostics` confirmou `mcpReachedServer=false`; a validação foi executada pelo fallback allowlisted `delegate_to_repo_autonomy_runner(validate-focused)` e passou em **5,347 s**. Isso deve ser tratado como host friction, não como falha do validator/repo.
+
+**R5 — LLM-B local**
+
+- nova `read_files_batch`: leitura UTF-8 massiva com o mesmo bulk executor e budget agregado de output;
+- nova `patch_files_batch`: same-target atômico via `patchTextBatchLocked`, independent targets via shared executor;
+- nenhuma tool local chama a tool MCP por baixo; MCP e LLM-B compartilham infra, locks, cache, validated-path/coherence plane, mas mantêm schemas/auth/presentation próprios;
+- teste `test_bulk_file_tools.spec.js`: passed; retomada pós-crash: **1,879 s**;
+- rollback automático permanece desligado nesse caminho.
+
+### 22.9 Accounting de round-trip e estado live final
+
+O registry agora contabiliza unidades lógicas sem inflar o payload do tool result. Snapshot live após o segundo reload:
+
+- MCP calls observadas no snapshot: **4**;
+- logical operations: **13**;
+- logical operations/call: **3,25**;
+- batch calls: **1**;
+- compressed round-trips: **9**;
+- batch `repo_read_file`: **10 logical ops/call**;
+- failed logical operations: **1**, preservando 9 resultados úteis;
+- handler médio global: **32 ms**;
+- authorization médio: **3 ms**;
+- slowest average tool no snapshot: **48 ms**;
+- status do dashboard: **ok**, sem regressão material contra o snapshot anterior.
+
+Payload/registry pós-implementação:
+
+- tools locais/remotos: **119/119**, parity integral;
+- authenticated remote `tools/list`: **116.092 bytes**;
+- audit in-memory: **115.901 bytes**;
+- headroom sob 128 KiB: **15.171 bytes**;
+- `inputSchema` continua sendo a maior família de bytes; não foi removida validação para ganhar espaço;
+- `mcp_tools_status`: `openWorldCount=4`, cobrindo `git_publish_changes`, `git_push`, `git_push_plan` e `llmb_live_test_run`;
+- `CAPABILITIES_VERSION=46`;
+- guidance operacional agora recomenda 2–32 reads/searches, `repo_bulk_inspect`, patch 64/32, inline validator completion e `git_publish_changes`.
+
+Connector pós-reload final:
+
+- permanent URL: `https://mcp.aurelin.org/mcp`;
+- transport: QUIC;
+- `mcp_post_restart_readiness`: **ready=true**;
+- connector smoke: **ok**;
+- OAuth authenticated smoke: **1.050 ms**;
+- orchestration total: **1.059 ms**;
+- SSE initial + reconnect: green;
+- authenticated tools/list: 119/119 e zero missing/unexpected.
+
+### 22.10 Incidente operacional — queda inesperada do WSL
+
+No meio dos gates finais o WSL caiu inesperadamente, derrubando origin MCP, Cloudflare child processes e o container de execução; as chamadas passaram a 502 e o fallback local retornou `ENOENT`. Nenhuma dessas falhas foi classificada como regressão de código.
+
+Após restart/reconnect:
+
+- branch `main`, HEAD `880d3b47c`, upstream sincronizado;
+- todo o lote não commitado sobreviveu no worktree;
+- tunnel permanente voltou healthy em QUIC;
+- strict typecheck inicialmente encontrou apenas um erro `exactOptionalPropertyTypes` no adapter `stat` de `repo_bulk_inspect`; corrigido sem mudança semântica;
+- gates pós-correção: typecheck green, Bulk Executor green, MCP tools green, jobs green, registry green, runtime metrics green e bulk tools LLM-B green;
+- dois reloads controlados foram suficientes para ativação e para o hotfix de `confirmBatch`; readiness final voltou a `true`.
+
+O incidente reforça uma propriedade desejável do desenho: estado de source/worktree, checkpoints SQLite e evidência de validators sobreviveram à perda abrupta do runtime, e a retomada pôde continuar por gates compactos sem refazer a investigação arquitetural.
+
+### 22.11 Decisão R6 — não elevar o ceiling global por enquanto
+
+A elevação global de `COPILOT_MCP_MAX_REQUEST_BODY_BYTES` / `COPILOT_MCP_REGISTRY_MAX_TOOL_RESULT_BYTES` fica **adiada por evidência**, não por limitação arquitetural. Os novos envelopes por tool (1–1,5 MiB para read/search output e 1,5 MiB para patch input) mantêm cada operação massiva abaixo do ceiling MCP atual de 2 MiB. O `tools/list` possui ~15 KiB de headroom mesmo com 119 tools.
+
+Portanto, elevar agora o default global para 4–8 MiB aumentaria blast radius/context pressure sem resolver um gargalo medido. R6 só deve reabrir quando telemetry mostrar rejeição real de input/output por ceiling global em workloads legítimos.
+
+### 22.12 Estado desta faixa
+
+R0–R5: **concluídos e provados**.
+
+R6: **evidence-gated / não necessário no estado atual**.
+
+Próximos ganhos de latência devem ser escolhidos pelo novo `highestCumulativeCost`, `highestCallPressure`, `highestResultVolume` e `roundTripAccounting`, evitando voltar ao padrão de otimizar apenas a chamada individual mais lenta.
+

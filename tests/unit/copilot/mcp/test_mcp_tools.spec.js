@@ -109,6 +109,99 @@ describe('copilot MCP tools', () => {
         assert.equal(legacyText.includes('Copilot MCP Server'), false);
     });
 
+    it('repo_read_file batch isolates one execution failure and supports more than ten logical reads', async () => {
+        const tool = findTool('repo_read_file');
+        const batch = Array.from({ length: 12 }, (_, index) => ({
+            path: index === 5 ? 'src/copilot/mcp/does-not-exist.js' : 'src/copilot/mcp/README.md',
+            startLine: 1,
+            endLine: 2,
+            hashMode: 'none',
+        }));
+        const result = await tool.handler({ batch });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['batch'], true);
+        assert.equal(result.structuredContent?.['requestCount'], 12);
+        assert.equal(result.structuredContent?.['attemptedCount'], 12);
+        assert.equal(result.structuredContent?.['succeededCount'], 11);
+        assert.equal(result.structuredContent?.['failedCount'], 1);
+        assert.equal(result.structuredContent?.['skippedCount'], 0);
+        const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['results']);
+        assert.equal(rows.length, 12);
+        assert.equal(rows[5]?.['status'], 'failed');
+        assert.equal(rows[5]?.['isError'], true);
+        assert.ok(String(rows[0]?.['content'] ?? '').includes('Copilot MCP Server'));
+        assert.ok(String(rows[11]?.['content'] ?? '').includes('Copilot MCP Server'));
+    });
+
+    it('repo_read_file batch bounds aggregate payload instead of risking whole-result rejection', async () => {
+        const jobsDir = join(process.cwd(), 'src/copilot/.ai/jobs');
+        await mkdir(jobsDir, { recursive: true });
+        const fixtureDir = await mkdtemp(join(jobsDir, 'mcp-read-budget-'));
+        const file = join(fixtureDir, 'large.txt');
+        const relativeFile = relative(process.cwd(), file).replaceAll('\\', '/');
+        await writeFile(file, `${'x'.repeat(80_000)}\n`, 'utf8');
+        try {
+            const tool = findTool('repo_read_file');
+            const result = await tool.handler({
+                batch: [
+                    { path: relativeFile, hashMode: 'none' },
+                    { path: relativeFile, hashMode: 'none' },
+                ],
+                batchResultBudgetBytes: 64 * 1024,
+            });
+            assert.equal(result.isError, undefined);
+            assert.equal(result.structuredContent?.['succeededCount'], 2);
+            assert.equal(result.structuredContent?.['resultBudgetBytes'], 64 * 1024);
+            assert.ok(Number(result.structuredContent?.['originalResultBytes']) > 64 * 1024);
+            assert.ok(Number(result.structuredContent?.['resultBytes']) <= 64 * 1024);
+            assert.ok(Number(result.structuredContent?.['payloadTruncatedCount']) >= 1);
+            const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['results']);
+            assert.equal(rows.length, 2);
+            assert.ok(rows.some((row) => row['payloadTruncated'] === true));
+        } finally {
+            await rm(fixtureDir, { recursive: true, force: true });
+        }
+    });
+
+    it('repo_bulk_inspect mixes read/search/stat while isolating one failed operation', async () => {
+        const tool = findTool('repo_bulk_inspect');
+        const result = await tool.handler({
+            operations: [
+                {
+                    op: 'read',
+                    args: { path: 'src/copilot/mcp/README.md', startLine: 1, endLine: 2, hashMode: 'none' },
+                },
+                {
+                    op: 'search',
+                    args: { path: 'src/copilot/mcp', pattern: 'MCP', maxResults: 3 },
+                },
+                {
+                    op: 'stat',
+                    args: { path: 'src/copilot/mcp/README.md', includeHash: false },
+                },
+                {
+                    op: 'stat',
+                    args: { path: 'src/copilot/mcp/does-not-exist.js' },
+                },
+            ],
+            failureMode: 'best-effort',
+            concurrency: 4,
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['bulkInspect'], true);
+        assert.equal(result.structuredContent?.['requestCount'], 4);
+        assert.equal(result.structuredContent?.['succeededCount'], 3);
+        assert.equal(result.structuredContent?.['failedCount'], 1);
+        const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['results']);
+        assert.deepEqual(rows.map((row) => row['op']), ['read', 'search', 'stat', 'stat']);
+        assert.equal(rows[0]?.['success'], true);
+        assert.equal(rows[1]?.['success'], true);
+        assert.equal(rows[2]?.['success'], true);
+        assert.equal(rows[3]?.['isError'], true);
+    });
+
     it('repo_read_file returns identical results for repeated same-window reads through the extracted cache module', async () => {
         resetRepoReadResponseCacheForTest();
         const tool = findTool('repo_read_file');
@@ -680,6 +773,7 @@ describe('copilot MCP tools', () => {
         assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_root_tree'));
         assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_symbol_search'));
         assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_find_symbol_usages'));
+        assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_bulk_inspect'));
         assert.ok(Array.isArray(structured['index']));
         assert.ok(/** @type {string[]} */ (structured['index']).includes('repo_index_status'));
         assert.ok(/** @type {string[]} */ (structured['runtime']).includes('delegate_to_repo_autonomy_runner'));
@@ -708,6 +802,9 @@ describe('copilot MCP tools', () => {
         assert.ok(Number(structured['readOnlyCount'] ?? 0) > 0);
         assert.ok(Number(structured['boundedWriteCount'] ?? 0) > 0);
         assert.ok(Number(structured['destructiveCount'] ?? 0) > 0);
+        assert.ok(Number(structured['openWorldCount'] ?? 0) >= 4);
+        assert.ok(/** @type {string[]} */ (structured['openWorldTools']).includes('git_publish_changes'));
+        assert.ok(/** @type {string[]} */ (structured['destructiveTools']).includes('git_publish_changes'));
         assert.ok(/** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('repo_apply_patch'));
         assert.ok(
             /** @type {string[]} */ (structured['rememberApprovalCandidates']).includes('repo_apply_patch_batch'),
@@ -993,6 +1090,66 @@ describe('copilot MCP tools', () => {
         assert.ok(/** @type {string[]} */ (auth['initialScopes']).includes('repo:write'));
     });
 
+    it('patch batch preserves global preflight safety and supports per-target-fast partial progress', async () => {
+        const jobsDir = join(process.cwd(), 'src/copilot/.ai/jobs');
+        await mkdir(jobsDir, { recursive: true });
+        const fixtureDir = await mkdtemp(join(jobsDir, 'mcp-patch-bulk-'));
+        const fileA = join(fixtureDir, 'a.txt');
+        const fileB = join(fixtureDir, 'b.txt');
+        const relativeA = relative(process.cwd(), fileA).replaceAll('\\', '/');
+        const relativeB = relative(process.cwd(), fileB).replaceAll('\\', '/');
+        await Promise.all([writeFile(fileA, 'alpha\n', 'utf8'), writeFile(fileB, 'beta\n', 'utf8')]);
+        try {
+            const planTool = findTool('repo_patch_batch_plan');
+            const twelveNoops = Array.from({ length: 12 }, () => ({
+                path: relativeA,
+                old_string: 'alpha',
+                new_string: 'alpha',
+                allowNoop: true,
+            }));
+            const largePlan = await planTool.handler({ operations: twelveNoops, targetConcurrency: 4 });
+            assert.equal(largePlan.isError, undefined);
+            assert.equal(largePlan.structuredContent?.['success'], true);
+            assert.equal(largePlan.structuredContent?.['operationCount'], 12);
+            assert.equal(largePlan.structuredContent?.['targetCount'], 1);
+
+            const applyTool = findTool('repo_apply_patch_batch');
+            const mixedOperations = [
+                { path: relativeA, old_string: 'alpha', new_string: 'ALPHA' },
+                { path: relativeB, old_string: 'does-not-exist', new_string: 'BETA' },
+            ];
+            const conservative = await applyTool.handler({
+                operations: mixedOperations,
+                dryRun: false,
+                confirmBatch: true,
+            });
+            assert.equal(conservative.isError, undefined);
+            assert.equal(conservative.structuredContent?.['success'], false);
+            assert.equal(conservative.structuredContent?.['preflightBlockedApply'], true);
+            assert.equal(await readFile(fileA, 'utf8'), 'alpha\n');
+            assert.equal(await readFile(fileB, 'utf8'), 'beta\n');
+
+            const fast = await applyTool.handler({
+                operations: mixedOperations,
+                dryRun: false,
+                confirmBatch: true,
+                applyMode: 'per-target-fast',
+                failureMode: 'best-effort',
+                targetConcurrency: 2,
+            });
+            assert.equal(fast.isError, undefined);
+            assert.equal(fast.structuredContent?.['success'], false);
+            assert.equal(fast.structuredContent?.['partial'], true);
+            assert.equal(fast.structuredContent?.['appliedCount'], 1);
+            assert.equal(fast.structuredContent?.['failedCount'], 1);
+            assert.equal(fast.structuredContent?.['skippedCount'], 0);
+            assert.equal(await readFile(fileA, 'utf8'), 'ALPHA\n');
+            assert.equal(await readFile(fileB, 'utf8'), 'beta\n');
+        } finally {
+            await rm(fixtureDir, { recursive: true, force: true });
+        }
+    });
+
     it('plan-only tools return read-only next-call previews for sensitive operations', async () => {
         const patchPlanTool = findTool('repo_patch_plan');
         const patchPlan = await patchPlanTool.handler({
@@ -1052,6 +1209,21 @@ describe('copilot MCP tools', () => {
         });
         assert.equal(applyPatchBatchWithoutConfirm.isError, true);
         assert.equal(applyPatchBatchWithoutConfirm.structuredContent?.['code'], 'ERR_PATCH_BATCH_CONFIRM_REQUIRED');
+
+        const applyPatchBatchConfirmedWithoutExplicitFalse = await applyPatchBatchTool.handler({
+            operations: [
+                {
+                    path: 'src/copilot/mcp/README.md',
+                    old_string: 'Copilot MCP Server',
+                    new_string: 'Copilot MCP Server',
+                    allowNoop: true,
+                },
+            ],
+            confirmBatch: true,
+        });
+        assert.equal(applyPatchBatchConfirmedWithoutExplicitFalse.isError, undefined);
+        assert.equal(applyPatchBatchConfirmedWithoutExplicitFalse.structuredContent?.['success'], true);
+        assert.equal(applyPatchBatchConfirmedWithoutExplicitFalse.structuredContent?.['dryRun'], false);
 
         const createPlanTool = findTool('repo_create_file_plan');
         const createPlan = await createPlanTool.handler({

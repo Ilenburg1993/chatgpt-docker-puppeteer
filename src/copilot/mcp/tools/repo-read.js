@@ -6,8 +6,9 @@
  */
 
 import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/core';
-import { parseFileForContext, windowFileContext } from '#copilot/infra';
+import { parseFileForContext, runBoundedOperationBatch, windowFileContext } from '#copilot/infra';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { truncateUtf8String } from '#copilot/infra/public/buffer';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { z } from 'zod';
 import {
@@ -16,6 +17,7 @@ import {
     estimateStructuredTextResultBytes,
     okResult,
     readOnlyAnnotations,
+    withResultExecutionHint,
     withResultSizeHint,
     resolveReadPath,
 } from '#copilot/mcp/control-plane';
@@ -38,8 +40,13 @@ const {
 });
 
 const DEFAULT_REPO_READ_PATH = 'src/copilot';
-const MAX_REPO_BATCH_REQUESTS = 10;
-const REPO_BATCH_CONCURRENCY = 4;
+const MAX_REPO_BATCH_REQUESTS = 32;
+const DEFAULT_REPO_BATCH_CONCURRENCY = 6;
+const MAX_REPO_BATCH_CONCURRENCY = 8;
+const MAX_REPO_BATCH_INPUT_BYTES = 1024 * 1024;
+const DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES = 1024 * 1024;
+const MIN_REPO_BATCH_RESULT_BUDGET_BYTES = 64 * 1024;
+const MAX_REPO_BATCH_RESULT_BUDGET_BYTES = 1536 * 1024;
 
 const repoReadBatchItemSchema = z.object({
     path: z.string().min(1),
@@ -61,30 +68,16 @@ const repoSearchBatchItemSchema = z.object({
     cursor: z.string().optional(),
 });
 
-/**
- * Run a small MCP batch with bounded concurrency. The concurrency cap protects the index/filesystem from a burst while
- * collapsing several host/model/tool round trips into one MCP call.
- *
- * @template T,U
- * @param {T[]} items
- * @param {(item: T, index: number) => Promise<U>} worker
- * @returns {Promise<U[]>}
- */
-async function runBoundedRepoBatch(items, worker) {
-    /** @type {U[]} */
-    const results = new Array(items.length);
-    let nextIndex = 0;
-    const workers = Array.from({ length: Math.min(REPO_BATCH_CONCURRENCY, items.length) }, async () => {
-        while (true) {
-            const index = nextIndex;
-            nextIndex += 1;
-            if (index >= items.length) return;
-            results[index] = await worker(/** @type {T} */ (items[index]), index);
-        }
-    });
-    await Promise.all(workers);
-    return results;
-}
+const repoStatBatchItemSchema = z.object({
+    path: z.string().min(1),
+    includeHash: z.boolean().optional(),
+    maxHashBytes: z.number().int().min(1).max(25 * 1024 * 1024).optional(),
+});
+
+const repoBulkInspectItemSchema = z.object({
+    op: z.enum(['read', 'search', 'stat']),
+    args: z.record(z.string(), z.unknown()),
+});
 
 /**
  * Convert a normal MCP call result into one compact batch row. Heavy text remains only in structuredContent, so batch
@@ -98,6 +91,131 @@ function compactBatchCallResult(index, result) {
         index,
         isError: result.isError === true,
         ...(result.structuredContent ?? {}),
+    };
+}
+
+/** @param {unknown} value */
+function estimateRepoBatchItemBytes(value) {
+    try {
+        return Buffer.byteLength(JSON.stringify(value), 'utf8') + 64;
+    } catch {
+        return MAX_REPO_BATCH_INPUT_BYTES + 1;
+    }
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof runBoundedOperationBatch<Record<string, unknown>, import('#copilot/mcp/control-plane').StructuredCallToolResult>>>} execution
+ */
+function compactRepoBulkExecution(execution) {
+    return execution.results.map((row) => {
+        if (row.status === 'skipped') {
+            return {
+                index: row.index,
+                status: row.status,
+                isError: true,
+                success: false,
+                skipped: true,
+                durationMs: row.durationMs,
+                code: 'ERR_BATCH_SKIPPED',
+                reason: row.reason,
+            };
+        }
+        if (row.status === 'succeeded') {
+            return {
+                ...compactBatchCallResult(row.index, row.value),
+                status: row.status,
+                durationMs: row.durationMs,
+            };
+        }
+        if ('value' in row && row.value) {
+            return {
+                ...compactBatchCallResult(row.index, row.value),
+                status: row.status,
+                durationMs: row.durationMs,
+            };
+        }
+        return {
+            index: row.index,
+            status: 'failed',
+            isError: true,
+            success: false,
+            durationMs: row.durationMs,
+            code: row.code ?? 'ERR_BATCH_ITEM_EXECUTION',
+            error: row.error ?? 'Batch item execution failed.',
+        };
+    });
+}
+
+/**
+ * Keep a successful bulk execution below the registry result ceiling without dropping item-level status/metadata.
+ * Only large textual payload fields are truncated; structural feedback remains available.
+ *
+ * @param {Record<string, unknown>[]} inputResults
+ * @param {number} budgetBytes
+ */
+function boundRepoBulkResultPayload(inputResults, budgetBytes) {
+    const effectiveBudget = Math.max(
+        MIN_REPO_BATCH_RESULT_BUDGET_BYTES,
+        Math.min(MAX_REPO_BATCH_RESULT_BUDGET_BYTES, Math.floor(budgetBytes)),
+    );
+    const originalResultBytes = Buffer.byteLength(JSON.stringify(inputResults), 'utf8');
+    if (originalResultBytes <= effectiveBudget) {
+        return {
+            results: inputResults,
+            resultBudgetBytes: effectiveBudget,
+            originalResultBytes,
+            resultBytes: originalResultBytes,
+            payloadTruncatedCount: 0,
+        };
+    }
+
+    const results = inputResults.map((row) => ({ ...row }));
+    /** @type {{ row: Record<string, unknown>; key: 'content' | 'output'; original: string; originalBytes: number }[]} */
+    const heavy = [];
+    for (const row of results) {
+        for (const key of /** @type {const} */ (['content', 'output'])) {
+            const value = row[key];
+            if (typeof value !== 'string' || value.length === 0) continue;
+            heavy.push({ row, key, original: value, originalBytes: Buffer.byteLength(value, 'utf8') });
+            row[key] = '';
+        }
+    }
+
+    const skeletonBytes = Buffer.byteLength(JSON.stringify(results), 'utf8');
+    let remaining = Math.max(0, effectiveBudget - skeletonBytes - 4096);
+    let remainingFields = heavy.length;
+    let payloadTruncatedCount = 0;
+    for (const field of heavy) {
+        const share = remainingFields > 0 ? Math.max(0, Math.floor(remaining / remainingFields)) : 0;
+        const bounded = truncateUtf8String(field.original, share);
+        field.row[field.key] = bounded.text;
+        if (bounded.truncated) {
+            field.row['payloadTruncated'] = true;
+            field.row['originalPayloadBytes'] = field.originalBytes;
+            payloadTruncatedCount += 1;
+        }
+        remaining = Math.max(0, remaining - Buffer.byteLength(bounded.text, 'utf8'));
+        remainingFields -= 1;
+    }
+
+    let resultBytes = Buffer.byteLength(JSON.stringify(results), 'utf8');
+    if (resultBytes > effectiveBudget) {
+        payloadTruncatedCount = 0;
+        for (const field of heavy) {
+            field.row[field.key] = '';
+            field.row['payloadTruncated'] = true;
+            field.row['payloadOmittedForBatchBudget'] = true;
+            field.row['originalPayloadBytes'] = field.originalBytes;
+            payloadTruncatedCount += 1;
+        }
+        resultBytes = Buffer.byteLength(JSON.stringify(results), 'utf8');
+    }
+    return {
+        results,
+        resultBudgetBytes: effectiveBudget,
+        originalResultBytes,
+        resultBytes,
+        payloadTruncatedCount,
     };
 }
 
@@ -259,6 +377,42 @@ async function runRepoSearchTextCall(input) {
         bytes: estimateStructuredTextResultBytes(structured, result.output),
         strategy: 'conservative-estimate',
         source: 'repo_search_text',
+    });
+}
+
+/** @param {{ path: string; includeHash?: boolean; maxHashBytes?: number }} input */
+async function runRepoFileStatsCall(input) {
+    const resolved = await resolveReadPath(input.path);
+    if (!resolved.ok) return errorResult(resolved.reason, resolved);
+    const statSnapshot = await statPathValidated(resolved.validatedReadPath);
+    const stats = statSnapshot.stats;
+    const isFile = stats.isFile();
+    const effectiveMaxHashBytes = input.maxHashBytes ?? 5 * 1024 * 1024;
+    const shouldHash = input.includeHash === true && isFile && stats.size <= effectiveMaxHashBytes;
+    const bytes = shouldHash ? await readBytesValidated(resolved.validatedReadPath) : null;
+    return okResult({
+        success: true,
+        path: resolved.relative,
+        absolutePath: resolved.resolved,
+        type: stats.isDirectory() ? 'directory' : isFile ? 'file' : 'other',
+        sizeBytes: stats.size,
+        mtimeMs: stats.mtimeMs,
+        ctimeMs: stats.ctimeMs,
+        birthtimeMs: stats.birthtimeMs,
+        mtimeIso: stats.mtime.toISOString(),
+        ctimeIso: stats.ctime.toISOString(),
+        birthtimeIso: stats.birthtime.toISOString(),
+        sha256: bytes?.contentHash ?? null,
+        hashComputed: Boolean(bytes),
+        hashSkippedReason: shouldHash
+            ? null
+            : input.includeHash === true && !isFile
+              ? 'not-a-file'
+              : input.includeHash === true && stats.size > effectiveMaxHashBytes
+                ? 'file-too-large'
+                : 'hash-not-requested',
+        maxHashBytes: effectiveMaxHashBytes,
+        engine: bytes?.io.engine ?? statSnapshot.io.engine,
     });
 }
 
@@ -431,43 +585,108 @@ export const repoReadTools = [
                 .min(1)
                 .max(MAX_REPO_BATCH_REQUESTS)
                 .optional()
-                .describe('Batch up to 10 read requests using path/startLine/endLine/hashMode; do not mix with single mode.'),
+                .describe('Batch up to 32 read requests using path/startLine/endLine/hashMode; do not mix with single mode.'),
+            batchFailureMode: z
+                .enum(['best-effort', 'fail-fast'])
+                .optional()
+                .describe('Batch failure policy. Default: best-effort.'),
+            batchConcurrency: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_REPO_BATCH_CONCURRENCY)
+                .optional()
+                .describe('Maximum parallel read operations. Default: 6, hard max: 8.'),
+            batchResultBudgetBytes: z
+                .number()
+                .int()
+                .min(MIN_REPO_BATCH_RESULT_BUDGET_BYTES)
+                .max(MAX_REPO_BATCH_RESULT_BUDGET_BYTES)
+                .optional()
+                .describe('Aggregate structured result budget. Default 1 MiB; hard max 1.5 MiB.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, startLine, endLine, hashMode, batch }) => {
+        handler: async ({
+            path,
+            startLine,
+            endLine,
+            hashMode,
+            batch,
+            batchFailureMode,
+            batchConcurrency,
+            batchResultBudgetBytes,
+        }) => {
             if (batch !== undefined) {
                 if (path !== undefined || startLine !== undefined || endLine !== undefined || hashMode !== undefined) {
                     return errorResult('Do not mix repo_read_file batch and single-request fields.', {
                         code: 'ERR_BATCH_CONFLICTING_MODE',
                     });
                 }
-                const parsedItems = [];
-                for (const [index, item] of batch.entries()) {
-                    const parsed = repoReadBatchItemSchema.safeParse(item);
-                    if (!parsed.success) {
-                        return errorResult(`Invalid repo_read_file batch item at index ${index}.`, {
-                            code: 'ERR_BATCH_INVALID_ITEM',
-                            index,
-                        });
-                    }
-                    parsedItems.push(parsed.data);
-                }
-                const calls = await runBoundedRepoBatch(parsedItems, (item) => runRepoReadFileCall(item));
-                const results = calls.map((result, index) => compactBatchCallResult(index, result));
-                const failedCount = results.filter((result) => result.isError).length;
+                const execution = await runBoundedOperationBatch(
+                    /** @type {Record<string, unknown>[]} */ (batch),
+                    async (item, index) => {
+                        const parsed = repoReadBatchItemSchema.safeParse(item);
+                        if (!parsed.success) {
+                            return errorResult(`Invalid repo_read_file batch item at index ${index}.`, {
+                                code: 'ERR_BATCH_INVALID_ITEM',
+                                index,
+                            });
+                        }
+                        return runRepoReadFileCall(parsed.data);
+                    },
+                    {
+                        concurrency: batchConcurrency ?? DEFAULT_REPO_BATCH_CONCURRENCY,
+                        failureMode: batchFailureMode ?? 'best-effort',
+                        maxItems: MAX_REPO_BATCH_REQUESTS,
+                        maxInputBytes: MAX_REPO_BATCH_INPUT_BYTES,
+                        estimateItemBytes: estimateRepoBatchItemBytes,
+                        isFailure: (result) => result.isError === true,
+                    },
+                );
+                const bounded = boundRepoBulkResultPayload(
+                    compactRepoBulkExecution(execution),
+                    batchResultBudgetBytes ?? DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES,
+                );
                 const structured = {
-                    success: failedCount === 0,
+                    success: execution.failedCount === 0 && execution.skippedCount === 0,
                     batch: true,
-                    requestCount: results.length,
-                    failedCount,
-                    concurrency: Math.min(REPO_BATCH_CONCURRENCY, results.length),
-                    results,
+                    executionId: execution.executionId,
+                    failureMode: execution.failureMode,
+                    requestCount: execution.requestCount,
+                    attemptedCount: execution.attemptedCount,
+                    succeededCount: execution.succeededCount,
+                    failedCount: execution.failedCount,
+                    skippedCount: execution.skippedCount,
+                    concurrency: execution.concurrency,
+                    maxInFlight: execution.maxInFlight,
+                    inputBytes: execution.inputBytes,
+                    durationMs: execution.durationMs,
+                    resultBudgetBytes: bounded.resultBudgetBytes,
+                    originalResultBytes: bounded.originalResultBytes,
+                    resultBytes: bounded.resultBytes,
+                    payloadTruncatedCount: bounded.payloadTruncatedCount,
+                    results: bounded.results,
                 };
-                const text = `Read batch completed: ${results.length - failedCount}/${results.length} succeeded; payloads are in structuredContent.results.`;
-                return withResultSizeHint(okResult(structured, text), {
+                const text = `Read batch completed: ${execution.succeededCount}/${execution.requestCount} succeeded, ${execution.failedCount} failed, ${execution.skippedCount} skipped; payloads are in structuredContent.results.`;
+                const result = withResultSizeHint(okResult(structured, text), {
                     bytes: estimateStructuredTextResultBytes(structured, text),
                     strategy: 'conservative-estimate',
                     source: 'repo_read_file.batch',
+                });
+                return withResultExecutionHint(result, {
+                    logicalOperations: execution.requestCount,
+                    failedOperations: execution.failedCount,
+                    skippedOperations: execution.skippedCount,
+                    mode: `read-batch:${execution.failureMode}`,
+                });
+            }
+            if (
+                batchFailureMode !== undefined ||
+                batchConcurrency !== undefined ||
+                batchResultBudgetBytes !== undefined
+            ) {
+                return errorResult('batchFailureMode/batchConcurrency/batchResultBudgetBytes require batch mode.', {
+                    code: 'ERR_BATCH_OPTIONS_WITHOUT_BATCH',
                 });
             }
             return runRepoReadFileCall({ path, startLine, endLine, hashMode });
@@ -493,38 +712,129 @@ export const repoReadTools = [
                 .describe('Maximum file size eligible for hashing. Default: 5 MiB.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, includeHash, maxHashBytes }) => {
-            const resolved = await resolveReadPath(path);
-            if (!resolved.ok) return errorResult(resolved.reason, resolved);
-            const statSnapshot = await statPathValidated(resolved.validatedReadPath);
-            const stats = statSnapshot.stats;
-            const isFile = stats.isFile();
-            const effectiveMaxHashBytes = maxHashBytes ?? 5 * 1024 * 1024;
-            const shouldHash = includeHash === true && isFile && stats.size <= effectiveMaxHashBytes;
-            const bytes = shouldHash ? await readBytesValidated(resolved.validatedReadPath) : null;
-            return okResult({
-                success: true,
-                path: resolved.relative,
-                absolutePath: resolved.resolved,
-                type: stats.isDirectory() ? 'directory' : isFile ? 'file' : 'other',
-                sizeBytes: stats.size,
-                mtimeMs: stats.mtimeMs,
-                ctimeMs: stats.ctimeMs,
-                birthtimeMs: stats.birthtimeMs,
-                mtimeIso: stats.mtime.toISOString(),
-                ctimeIso: stats.ctime.toISOString(),
-                birthtimeIso: stats.birthtime.toISOString(),
-                sha256: bytes?.contentHash ?? null,
-                hashComputed: Boolean(bytes),
-                hashSkippedReason: shouldHash
-                    ? null
-                    : includeHash === true && !isFile
-                      ? 'not-a-file'
-                      : includeHash === true && stats.size > effectiveMaxHashBytes
-                        ? 'file-too-large'
-                        : 'hash-not-requested',
-                maxHashBytes: effectiveMaxHashBytes,
-                engine: bytes?.io.engine ?? statSnapshot.io.engine,
+        handler: async ({ path, includeHash, maxHashBytes }) =>
+            runRepoFileStatsCall({ path, includeHash, maxHashBytes }),
+    },
+    {
+        name: 'repo_bulk_inspect',
+        title: 'Bulk repository inspect',
+        description:
+            'Mix up to 32 read, search and stat operations in one bounded read-only call with per-item failure isolation.',
+        inputSchema: {
+            operations: z
+                .array(repoBulkInspectItemSchema)
+                .min(1)
+                .max(MAX_REPO_BATCH_REQUESTS)
+                .describe('Ordered heterogeneous operations using {op: read|search|stat, args: {...}}.'),
+            failureMode: z.enum(['best-effort', 'fail-fast']).optional().describe('Default: best-effort.'),
+            concurrency: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_REPO_BATCH_CONCURRENCY)
+                .optional()
+                .describe('Maximum independent operations in flight. Default: 6, hard max: 8.'),
+            resultBudgetBytes: z
+                .number()
+                .int()
+                .min(MIN_REPO_BATCH_RESULT_BUDGET_BYTES)
+                .max(MAX_REPO_BATCH_RESULT_BUDGET_BYTES)
+                .optional()
+                .describe('Aggregate structured result budget. Default 1 MiB; hard max 1.5 MiB.'),
+        },
+        annotations: readOnlyAnnotations(),
+        handler: async ({ operations, failureMode, concurrency, resultBudgetBytes }) => {
+            const execution = await runBoundedOperationBatch(
+                /** @type {Record<string, unknown>[]} */ (operations),
+                async (raw, index) => {
+                    const item = repoBulkInspectItemSchema.safeParse(raw);
+                    if (!item.success) {
+                        return errorResult(`Invalid repo_bulk_inspect item at index ${index}.`, {
+                            code: 'ERR_BULK_INSPECT_INVALID_ITEM',
+                            index,
+                        });
+                    }
+                    const { op, args } = item.data;
+                    if (op === 'read') {
+                        const parsed = repoReadBatchItemSchema.safeParse(args);
+                        return parsed.success
+                            ? runRepoReadFileCall(parsed.data)
+                            : errorResult(`Invalid read args at repo_bulk_inspect index ${index}.`, {
+                                  code: 'ERR_BULK_INSPECT_INVALID_READ',
+                                  index,
+                              });
+                    }
+                    if (op === 'search') {
+                        const parsed = repoSearchBatchItemSchema.safeParse(args);
+                        return parsed.success && (parsed.data.pattern || parsed.data.query)
+                            ? runRepoSearchTextCall(parsed.data)
+                            : errorResult(`Invalid search args at repo_bulk_inspect index ${index}.`, {
+                                  code: 'ERR_BULK_INSPECT_INVALID_SEARCH',
+                                  index,
+                              });
+                    }
+                    const parsed = repoStatBatchItemSchema.safeParse(args);
+                    return parsed.success
+                        ? runRepoFileStatsCall({
+                              path: parsed.data.path,
+                              ...(parsed.data.includeHash === undefined ? {} : { includeHash: parsed.data.includeHash }),
+                              ...(parsed.data.maxHashBytes === undefined ? {} : { maxHashBytes: parsed.data.maxHashBytes }),
+                          })
+                        : errorResult(`Invalid stat args at repo_bulk_inspect index ${index}.`, {
+                              code: 'ERR_BULK_INSPECT_INVALID_STAT',
+                              index,
+                          });
+                },
+                {
+                    concurrency: concurrency ?? DEFAULT_REPO_BATCH_CONCURRENCY,
+                    failureMode: failureMode ?? 'best-effort',
+                    maxItems: MAX_REPO_BATCH_REQUESTS,
+                    maxInputBytes: MAX_REPO_BATCH_INPUT_BYTES,
+                    estimateItemBytes: estimateRepoBatchItemBytes,
+                    isFailure: (result) => result.isError === true,
+                },
+            );
+            const bounded = boundRepoBulkResultPayload(
+                compactRepoBulkExecution(execution).map((row, index) => ({
+                    ...row,
+                    op:
+                        operations[index] && typeof operations[index] === 'object' && 'op' in operations[index]
+                            ? operations[index].op
+                            : null,
+                })),
+                resultBudgetBytes ?? DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES,
+            );
+            const structured = {
+                success: execution.failedCount === 0 && execution.skippedCount === 0,
+                bulkInspect: true,
+                executionId: execution.executionId,
+                failureMode: execution.failureMode,
+                requestCount: execution.requestCount,
+                attemptedCount: execution.attemptedCount,
+                succeededCount: execution.succeededCount,
+                failedCount: execution.failedCount,
+                skippedCount: execution.skippedCount,
+                concurrency: execution.concurrency,
+                maxInFlight: execution.maxInFlight,
+                inputBytes: execution.inputBytes,
+                durationMs: execution.durationMs,
+                resultBudgetBytes: bounded.resultBudgetBytes,
+                originalResultBytes: bounded.originalResultBytes,
+                resultBytes: bounded.resultBytes,
+                payloadTruncatedCount: bounded.payloadTruncatedCount,
+                results: bounded.results,
+            };
+            const text = `Bulk inspect completed: ${execution.succeededCount}/${execution.requestCount} succeeded, ${execution.failedCount} failed, ${execution.skippedCount} skipped.`;
+            const result = withResultSizeHint(okResult(structured, text), {
+                bytes: estimateStructuredTextResultBytes(structured, text),
+                strategy: 'conservative-estimate',
+                source: 'repo_bulk_inspect',
+            });
+            return withResultExecutionHint(result, {
+                logicalOperations: execution.requestCount,
+                failedOperations: execution.failedCount,
+                skippedOperations: execution.skippedCount,
+                mode: `bulk-inspect:${execution.failureMode}`,
             });
         },
     },
@@ -646,7 +956,25 @@ export const repoReadTools = [
                 .min(1)
                 .max(MAX_REPO_BATCH_REQUESTS)
                 .optional()
-                .describe('Batch up to 10 search requests using the normal fields; do not mix with single mode.'),
+                .describe('Batch up to 32 search requests using the normal fields; do not mix with single mode.'),
+            batchFailureMode: z
+                .enum(['best-effort', 'fail-fast'])
+                .optional()
+                .describe('Batch failure policy. Default: best-effort.'),
+            batchConcurrency: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_REPO_BATCH_CONCURRENCY)
+                .optional()
+                .describe('Maximum parallel search operations. Default: 6, hard max: 8.'),
+            batchResultBudgetBytes: z
+                .number()
+                .int()
+                .min(MIN_REPO_BATCH_RESULT_BUDGET_BYTES)
+                .max(MAX_REPO_BATCH_RESULT_BUDGET_BYTES)
+                .optional()
+                .describe('Aggregate structured result budget. Default 1 MiB; hard max 1.5 MiB.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({
@@ -661,6 +989,9 @@ export const repoReadTools = [
             cursor,
             query,
             batch,
+            batchFailureMode,
+            batchConcurrency,
+            batchResultBudgetBytes,
         }) => {
             if (batch !== undefined) {
                 if (
@@ -679,33 +1010,71 @@ export const repoReadTools = [
                         code: 'ERR_BATCH_CONFLICTING_MODE',
                     });
                 }
-                const parsedItems = [];
-                for (const [index, item] of batch.entries()) {
-                    const parsed = repoSearchBatchItemSchema.safeParse(item);
-                    if (!parsed.success || (!parsed.data.pattern && !parsed.data.query)) {
-                        return errorResult(`Invalid repo_search_text batch item at index ${index}.`, {
-                            code: 'ERR_BATCH_INVALID_ITEM',
-                            index,
-                        });
-                    }
-                    parsedItems.push(parsed.data);
-                }
-                const calls = await runBoundedRepoBatch(parsedItems, (item) => runRepoSearchTextCall(item));
-                const results = calls.map((result, index) => compactBatchCallResult(index, result));
-                const failedCount = results.filter((result) => result.isError).length;
+                const execution = await runBoundedOperationBatch(
+                    /** @type {Record<string, unknown>[]} */ (batch),
+                    async (item, index) => {
+                        const parsed = repoSearchBatchItemSchema.safeParse(item);
+                        if (!parsed.success || (!parsed.data.pattern && !parsed.data.query)) {
+                            return errorResult(`Invalid repo_search_text batch item at index ${index}.`, {
+                                code: 'ERR_BATCH_INVALID_ITEM',
+                                index,
+                            });
+                        }
+                        return runRepoSearchTextCall(parsed.data);
+                    },
+                    {
+                        concurrency: batchConcurrency ?? DEFAULT_REPO_BATCH_CONCURRENCY,
+                        failureMode: batchFailureMode ?? 'best-effort',
+                        maxItems: MAX_REPO_BATCH_REQUESTS,
+                        maxInputBytes: MAX_REPO_BATCH_INPUT_BYTES,
+                        estimateItemBytes: estimateRepoBatchItemBytes,
+                        isFailure: (result) => result.isError === true,
+                    },
+                );
+                const bounded = boundRepoBulkResultPayload(
+                    compactRepoBulkExecution(execution),
+                    batchResultBudgetBytes ?? DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES,
+                );
                 const structured = {
-                    success: failedCount === 0,
+                    success: execution.failedCount === 0 && execution.skippedCount === 0,
                     batch: true,
-                    requestCount: results.length,
-                    failedCount,
-                    concurrency: Math.min(REPO_BATCH_CONCURRENCY, results.length),
-                    results,
+                    executionId: execution.executionId,
+                    failureMode: execution.failureMode,
+                    requestCount: execution.requestCount,
+                    attemptedCount: execution.attemptedCount,
+                    succeededCount: execution.succeededCount,
+                    failedCount: execution.failedCount,
+                    skippedCount: execution.skippedCount,
+                    concurrency: execution.concurrency,
+                    maxInFlight: execution.maxInFlight,
+                    inputBytes: execution.inputBytes,
+                    durationMs: execution.durationMs,
+                    resultBudgetBytes: bounded.resultBudgetBytes,
+                    originalResultBytes: bounded.originalResultBytes,
+                    resultBytes: bounded.resultBytes,
+                    payloadTruncatedCount: bounded.payloadTruncatedCount,
+                    results: bounded.results,
                 };
-                const text = `Search batch completed: ${results.length - failedCount}/${results.length} succeeded; outputs are in structuredContent.results.`;
-                return withResultSizeHint(okResult(structured, text), {
+                const text = `Search batch completed: ${execution.succeededCount}/${execution.requestCount} succeeded, ${execution.failedCount} failed, ${execution.skippedCount} skipped; outputs are in structuredContent.results.`;
+                const result = withResultSizeHint(okResult(structured, text), {
                     bytes: estimateStructuredTextResultBytes(structured, text),
                     strategy: 'conservative-estimate',
                     source: 'repo_search_text.batch',
+                });
+                return withResultExecutionHint(result, {
+                    logicalOperations: execution.requestCount,
+                    failedOperations: execution.failedCount,
+                    skippedOperations: execution.skippedCount,
+                    mode: `search-batch:${execution.failureMode}`,
+                });
+            }
+            if (
+                batchFailureMode !== undefined ||
+                batchConcurrency !== undefined ||
+                batchResultBudgetBytes !== undefined
+            ) {
+                return errorResult('batchFailureMode/batchConcurrency/batchResultBudgetBytes require batch mode.', {
+                    code: 'ERR_BATCH_OPTIONS_WITHOUT_BATCH',
                 });
             }
             return runRepoSearchTextCall({

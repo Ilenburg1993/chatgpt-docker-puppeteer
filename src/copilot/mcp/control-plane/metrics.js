@@ -32,6 +32,14 @@ const MAX_PHASE_METRICS_PER_TOOL = 64;
  *     lastStrategy: string | null;
  * }} resultSize
  * @property {Record<string, { calls: number; totalDurationMs: number; lastDurationMs: number | null }>} phases
+ * @property {{
+ *     batchCalls: number;
+ *     logicalOperations: number;
+ *     failedOperations: number;
+ *     skippedOperations: number;
+ *     lastLogicalOperations: number;
+ *     lastMode: string | null;
+ * }} execution
  */
 
 /** @type {Map<string, ToolMetric>} */
@@ -44,6 +52,7 @@ const TOOL_METRICS = new Map();
  *     isError: boolean;
  *     phases?: Record<string, number>;
  *     resultSize?: { strategy?: string; bytes?: number | null; rejected?: boolean };
+ *     execution?: { logicalOperations?: number; failedOperations?: number; skippedOperations?: number; mode?: string };
  * }} event
  * @returns {void}
  */
@@ -63,6 +72,7 @@ export function recordMcpHttpTransportMode(mode) {
  *     isError: boolean;
  *     phases?: Record<string, number>;
  *     resultSize?: { strategy?: string; bytes?: number | null; rejected?: boolean };
+ *     execution?: { logicalOperations?: number; failedOperations?: number; skippedOperations?: number; mode?: string };
  * }} event
  * @returns {void}
  */
@@ -84,6 +94,14 @@ export function recordMcpToolMetric(tool, event) {
             lastStrategy: null,
         },
         phases: Object.create(null),
+        execution: {
+            batchCalls: 0,
+            logicalOperations: 0,
+            failedOperations: 0,
+            skippedOperations: 0,
+            lastLogicalOperations: 1,
+            lastMode: null,
+        },
     };
     current.calls += 1;
     current.errors += event.isError ? 1 : 0;
@@ -91,6 +109,31 @@ export function recordMcpToolMetric(tool, event) {
     current.lastDurationMs = event.durationMs;
     current.lastCalledAt = Date.now();
     current.lastIsError = event.isError;
+    if (event.execution) {
+        const logicalOperations = Math.max(1, Math.floor(Number(event.execution.logicalOperations) || 1));
+        const failedOperations = Math.max(
+            0,
+            Math.min(logicalOperations, Math.floor(Number(event.execution.failedOperations) || 0)),
+        );
+        const skippedOperations = Math.max(
+            0,
+            Math.min(
+                logicalOperations - failedOperations,
+                Math.floor(Number(event.execution.skippedOperations) || 0),
+            ),
+        );
+        current.execution.logicalOperations += logicalOperations;
+        current.execution.failedOperations += failedOperations;
+        current.execution.skippedOperations += skippedOperations;
+        current.execution.lastLogicalOperations = logicalOperations;
+        current.execution.lastMode =
+            typeof event.execution.mode === 'string' && event.execution.mode.trim() ? event.execution.mode.trim() : null;
+        if (logicalOperations > 1) current.execution.batchCalls += 1;
+    } else {
+        current.execution.logicalOperations += 1;
+        current.execution.lastLogicalOperations = 1;
+        current.execution.lastMode = null;
+    }
     if (event.resultSize) {
         const strategy =
             event.resultSize.strategy === 'stringify' || event.resultSize.strategy === 'hint'

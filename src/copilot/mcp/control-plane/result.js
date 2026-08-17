@@ -17,9 +17,16 @@
  *     strategy: 'exact' | 'conservative-estimate';
  *     source: string;
  * }} ResultSizeHint
+ * @typedef {{
+ *     logicalOperations: number;
+ *     failedOperations?: number;
+ *     skippedOperations?: number;
+ *     mode?: string;
+ * }} ResultExecutionHint
  */
 
 const RESULT_SIZE_HINT_SYMBOL = Symbol.for('copilot.mcp.resultSizeHint');
+const RESULT_EXECUTION_HINT_SYMBOL = Symbol.for('copilot.mcp.resultExecutionHint');
 
 /**
  * @param {unknown} value
@@ -66,6 +73,54 @@ export function withResultSizeHint(result, hint) {
         configurable: true,
     });
     return result;
+}
+
+/**
+ * Attach internal logical-operation accounting for round-trip compression metrics. The hint is non-enumerable and never
+ * becomes part of the MCP wire payload.
+ *
+ * @template {StructuredCallToolResult} T
+ * @param {T} result
+ * @param {ResultExecutionHint} hint
+ * @returns {T}
+ */
+export function withResultExecutionHint(result, hint) {
+    const logicalOperations = Math.max(1, Math.floor(Number(hint.logicalOperations) || 1));
+    const failedOperations = Math.max(0, Math.min(logicalOperations, Math.floor(Number(hint.failedOperations) || 0)));
+    const skippedOperations = Math.max(
+        0,
+        Math.min(logicalOperations - failedOperations, Math.floor(Number(hint.skippedOperations) || 0)),
+    );
+    Object.defineProperty(result, RESULT_EXECUTION_HINT_SYMBOL, {
+        value: {
+            logicalOperations,
+            failedOperations,
+            skippedOperations,
+            mode: typeof hint.mode === 'string' && hint.mode.trim() ? hint.mode.trim().slice(0, 80) : undefined,
+        },
+        enumerable: false,
+        configurable: true,
+    });
+    return result;
+}
+
+/**
+ * @param {unknown} result
+ * @returns {ResultExecutionHint | null}
+ */
+export function getResultExecutionHint(result) {
+    if (!result || typeof result !== 'object') return null;
+    const hint = /** @type {Record<PropertyKey, unknown>} */ (result)[RESULT_EXECUTION_HINT_SYMBOL];
+    if (!hint || typeof hint !== 'object' || Array.isArray(hint)) return null;
+    const record = /** @type {Record<string, unknown>} */ (hint);
+    const logicalOperations = Number(record['logicalOperations']);
+    if (!Number.isFinite(logicalOperations) || logicalOperations < 1) return null;
+    return {
+        logicalOperations: Math.floor(logicalOperations),
+        failedOperations: Math.max(0, Math.floor(Number(record['failedOperations']) || 0)),
+        skippedOperations: Math.max(0, Math.floor(Number(record['skippedOperations']) || 0)),
+        ...(typeof record['mode'] === 'string' ? { mode: record['mode'] } : {}),
+    };
 }
 
 /**

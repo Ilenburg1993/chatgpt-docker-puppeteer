@@ -17,6 +17,7 @@ import {
     okResult,
     readOnlyAnnotations,
     resolveWritePath,
+    withResultExecutionHint,
 } from '#copilot/mcp/control-plane';
 import { execGit } from '#copilot/mcp/tools/shared';
 
@@ -158,6 +159,12 @@ async function buildPushState() {
     return { head, branch, upstream, ahead, behind };
 }
 
+/** @param {string} file @param {string[]} selected */
+function isFileCoveredBySelectedPaths(file, selected) {
+    const normalized = file.replaceAll('\\', '/');
+    return selected.some((candidate) => normalized === candidate || normalized.startsWith(`${candidate.replace(/\/$/u, '')}/`));
+}
+
 /** @type {import('../registry.js').McpToolDefinition[]} */
 export const gitWriteTools = [
     {
@@ -260,6 +267,195 @@ export const gitWriteTools = [
                 dryRun = { success: result.success, stdout: result.stdout, stderr: result.stderr, error: result.error ?? null };
             }
             return okResult({ success: true, ...state, dryRun, canPush: dryRun ? dryRun.success : true }, JSON.stringify({ ...state, dryRun }, null, 2));
+        },
+    },
+    {
+        name: 'git_publish_changes',
+        title: 'Stage, commit and optionally push explicit changes',
+        description:
+            'Governed one-call publish path: stage only explicit workspace paths, commit from a clean initial index, and optionally push only the current branch to its existing upstream.',
+        inputSchema: {
+            paths: explicitPathsSchema,
+            message: z.string().min(1).max(MAX_COMMIT_MESSAGE_CHARS),
+            expectedHead: z.string().max(64).optional().describe('Optional initial HEAD prefix precondition.'),
+            push: z.boolean().optional().describe('Push after commit. Default: true.'),
+            pushDryRunFirst: z
+                .boolean()
+                .optional()
+                .describe('Run one upstream push --dry-run before the real push. Default: false for lower network latency.'),
+            confirmPublish: z.literal(true).describe('Explicit acknowledgement of stage + commit + optional upstream push.'),
+        },
+        annotations: { ...destructiveAnnotations(), openWorldHint: true },
+        handler: async ({ paths, message, expectedHead, push, pushDryRunFirst }) => {
+            const startedAt = Date.now();
+            const initialHead = await readHead();
+            const headError = validateExpectedHead(expectedHead, initialHead);
+            if (headError) {
+                return errorResult(headError, {
+                    code: 'ERR_GIT_HEAD_PRECONDITION',
+                    expectedHead,
+                    head: initialHead,
+                });
+            }
+            const initialStaged = await readStagedSummary();
+            if (initialStaged.names.length > 0) {
+                return errorResult('Composite publish requires a clean Git index before staging explicit paths.', {
+                    code: 'ERR_GIT_PUBLISH_INDEX_NOT_CLEAN',
+                    stagedFiles: initialStaged.names,
+                    hint: 'Use the granular git_commit/git_push flow for intentionally pre-staged changes.',
+                });
+            }
+            const plan = await planStage(paths);
+            if (!plan.ok) return errorResult(plan.error, { code: 'ERR_GIT_STAGE_PLAN', path: plan.path ?? null });
+            if (plan.affectedCount === 0) {
+                return errorResult('No selected changes are available to publish.', {
+                    code: 'ERR_GIT_PUBLISH_NO_CHANGES',
+                    paths: plan.paths,
+                });
+            }
+
+            const stageStartedAt = Date.now();
+            const stage = await execGit(['add', '--', ...plan.paths], { timeoutMs: 30_000 });
+            if (!stage.success) {
+                return errorResult(stage.error ?? 'git add failed.', {
+                    code: 'ERR_GIT_STAGE_FAILED',
+                    paths: plan.paths,
+                });
+            }
+            const staged = await readStagedSummary();
+            const unexpectedStaged = staged.names.filter((file) => !isFileCoveredBySelectedPaths(file, plan.paths));
+            if (unexpectedStaged.length > 0) {
+                await execGit(['reset', '--', ...plan.paths], { timeoutMs: 30_000 });
+                return errorResult('Composite publish observed staged files outside the explicit selected path set.', {
+                    code: 'ERR_GIT_PUBLISH_STAGE_ESCAPE',
+                    unexpectedStaged,
+                    selectedPaths: plan.paths,
+                });
+            }
+            if (staged.names.length === 0) {
+                return errorResult('Selected changes produced an empty staged index.', { code: 'ERR_GIT_EMPTY_INDEX' });
+            }
+
+            const identity = await readCommitIdentity();
+            if (!identity.name || !identity.email) {
+                await execGit(['reset', '--', ...plan.paths], { timeoutMs: 30_000 });
+                return errorResult('Git user.name/user.email are not configured.', {
+                    code: 'ERR_GIT_IDENTITY_MISSING',
+                    identity,
+                });
+            }
+            const commitStartedAt = Date.now();
+            const commit = await execGit(['commit', '-m', message.trim()], {
+                timeoutMs: 120_000,
+                maxBufferBytes: 4 * 1024 * 1024,
+            });
+            if (!commit.success) {
+                return errorResult(commit.error ?? 'git commit failed.', {
+                    code: 'ERR_GIT_COMMIT_FAILED',
+                    previousHead: initialHead,
+                    stagedFiles: staged.names,
+                });
+            }
+            const committedHead = await readHead();
+            const shouldPush = push !== false;
+            let pushResult = null;
+            let pushStartedAt = null;
+            let beforePush = null;
+            let afterPush = null;
+            if (shouldPush) {
+                beforePush = await buildPushState();
+                if (!beforePush['branch']) {
+                    return errorResult('Commit created, but detached HEAD cannot be pushed by the governed tool.', {
+                        code: 'ERR_GIT_DETACHED_HEAD_AFTER_COMMIT',
+                        committedHead,
+                        committed: true,
+                    });
+                }
+                if (!beforePush['upstream']) {
+                    return errorResult('Commit created, but current branch has no configured upstream.', {
+                        code: 'ERR_GIT_UPSTREAM_MISSING_AFTER_COMMIT',
+                        committedHead,
+                        committed: true,
+                    });
+                }
+                if (pushDryRunFirst === true) {
+                    const dryRun = await execGit(['push', '--dry-run', '--porcelain'], {
+                        timeoutMs: 60_000,
+                        maxBufferBytes: 2 * 1024 * 1024,
+                    });
+                    if (!dryRun.success) {
+                        return errorResult(dryRun.error ?? 'Git push dry-run failed after commit.', {
+                            code: 'ERR_GIT_PUSH_DRY_RUN_FAILED_AFTER_COMMIT',
+                            committed: true,
+                            committedHead,
+                            state: beforePush,
+                            stderr: dryRun.stderr,
+                        });
+                    }
+                }
+                pushStartedAt = Date.now();
+                const pushed = await execGit(['push', '--porcelain'], {
+                    timeoutMs: 120_000,
+                    maxBufferBytes: 4 * 1024 * 1024,
+                });
+                pushResult = {
+                    success: pushed.success,
+                    stdout: pushed.stdout,
+                    stderr: pushed.stderr,
+                    error: pushed.error ?? null,
+                };
+                if (!pushed.success) {
+                    return errorResult(pushed.error ?? 'Git push failed after commit.', {
+                        code: 'ERR_GIT_PUSH_FAILED_AFTER_COMMIT',
+                        committed: true,
+                        committedHead,
+                        state: beforePush,
+                        stderr: pushed.stderr,
+                    });
+                }
+                afterPush = await buildPushState();
+            }
+
+            await appendMcpAuditEvent({
+                event: 'git_publish_changes',
+                tool: 'git_publish_changes',
+                previousHead: initialHead,
+                head: committedHead,
+                paths: plan.paths,
+                committedFiles: staged.names,
+                pushed: shouldPush,
+                upstream: afterPush?.['upstream'] ?? beforePush?.['upstream'] ?? null,
+            });
+            const structured = {
+                success: true,
+                previousHead: initialHead,
+                head: committedHead,
+                paths: plan.paths,
+                committedFiles: staged.names,
+                stat: staged.stat,
+                pushed: shouldPush,
+                pushDryRunFirst: pushDryRunFirst === true,
+                beforePush,
+                afterPush,
+                pushOutput: pushResult,
+                timings: {
+                    totalMs: Date.now() - startedAt,
+                    stageMs: commitStartedAt - stageStartedAt,
+                    commitMs: (pushStartedAt ?? Date.now()) - commitStartedAt,
+                    pushMs: pushStartedAt === null ? 0 : Date.now() - pushStartedAt,
+                },
+                nextAction: shouldPush
+                    ? 'Publish completed; no separate git_stage/git_commit/git_push calls are required.'
+                    : 'Commit completed locally; use git_push_plan/git_push later if remote publication is desired.',
+            };
+            const result = okResult(
+                structured,
+                shouldPush ? `Committed and pushed ${staged.names.length} file(s).` : `Committed ${staged.names.length} file(s).`,
+            );
+            return withResultExecutionHint(result, {
+                logicalOperations: shouldPush ? 3 : 2,
+                mode: shouldPush ? 'git-publish:stage-commit-push' : 'git-publish:stage-commit',
+            });
         },
     },
     {

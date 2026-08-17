@@ -5,7 +5,7 @@ import { stat as fsStat } from 'node:fs/promises';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
-import { readFileContentTool } from './read/index.js';
+import { readFileContentTool, readFilesBatchTool } from './read/index.js';
 /**
  * src/copilot/tools/file/read-tools.js
  *
@@ -26,7 +26,7 @@ import {
 
 const { diffText, scanDirectory } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
-export { readFileContentTool } from './read/index.js';
+export { readFileContentTool, readFilesBatchTool } from './read/index.js';
 
 /**
  * @typedef {object} IoScanEntry
@@ -208,6 +208,7 @@ export const diffFilesTool = buildTool({
  */
 export const fileReadTools = [
     withSkipPermission(readFileContentTool),
+    withSkipPermission(readFilesBatchTool),
     listDirectoryTool,
     diffFilesTool,
 ];

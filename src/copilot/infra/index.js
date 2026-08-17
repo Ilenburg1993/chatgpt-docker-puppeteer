@@ -25,6 +25,13 @@ export { getIoL2Cache, getIoL2CacheHealth, getIoL2CacheStats, resetIoL2CacheForT
 
 export { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 export {
+    DEFAULT_BULK_CONCURRENCY,
+    DEFAULT_BULK_MAX_ITEMS,
+    HARD_BULK_MAX_ITEMS,
+    MAX_BULK_CONCURRENCY,
+    runBoundedOperationBatch,
+} from './bulk-executor.js';
+export {
     beginIoAdvisoryBudget,
     getIoAdvisoryBudgetStats,
     resetIoAdvisoryBudgetForTest,

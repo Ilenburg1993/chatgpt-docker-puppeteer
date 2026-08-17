@@ -33,6 +33,7 @@ describe('copilot MCP registry', () => {
             'git_commit_plan',
             'git_diff',
             'git_log',
+            'git_publish_changes',
             'git_push',
             'git_push_plan',
             'git_stage',
@@ -98,6 +99,7 @@ describe('copilot MCP registry', () => {
             'repo_apply_file_batch_plan',
             'repo_apply_patch',
             'repo_apply_patch_batch',
+            'repo_bulk_inspect',
             'repo_create_file',
             'repo_create_file_plan',
             'repo_diff_files',
@@ -211,7 +213,7 @@ describe('copilot MCP registry', () => {
     it('uses explicit annotations on every initial tool', () => {
         const tools = getCanonicalMcpTools();
 
-        const expectedOpenWorld = new Set(['git_push_plan', 'git_push', 'llmb_live_test_run']);
+        const expectedOpenWorld = new Set(['git_push_plan', 'git_push', 'git_publish_changes', 'llmb_live_test_run']);
         for (const tool of tools) {
             assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', tool.name);
             assert.equal(tool.annotations.openWorldHint, expectedOpenWorld.has(tool.name), tool.name);

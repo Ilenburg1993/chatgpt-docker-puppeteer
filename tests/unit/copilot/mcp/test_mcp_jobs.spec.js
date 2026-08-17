@@ -287,6 +287,23 @@ describe('copilot MCP jobs', () => {
         assert.equal(unexpectedFile.structuredContent?.['code'], 'ERR_UNEXPECTED_FOCUSED_TEST_FILE');
     });
 
+    it('run_copilot_validator defaults focused validation to bounded inline completion without a follow-up poll', async () => {
+        const tool = jobTools.find((candidate) => candidate.name === 'run_copilot_validator');
+        assert.ok(tool);
+        const result = await tool.handler({
+            validator: 'unit-focused',
+            testFile: 'tests/unit/copilot/infra/test_bulk_executor.spec.js',
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['completedWithinWait'], true);
+        const job = /** @type {Record<string, unknown>} */ (result.structuredContent?.['job']);
+        assert.equal(job['status'], 'completed');
+        assert.equal(job['passed'], true);
+        assert.match(String(result.structuredContent?.['nextAction'] ?? ''), /No job_get_summary/u);
+    }, 45_000);
+
     it('job_list returns a structured job array', async () => {
         const tool = jobTools.find((candidate) => candidate.name === 'job_list');
         assert.ok(tool);

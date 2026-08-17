@@ -40,6 +40,36 @@ describe('copilot MCP runtime metrics', () => {
         assert.equal(repoStatus.averageDurationMs, 15);
     });
 
+    it('records logical-operation compression separately from MCP call count', () => {
+        recordMcpToolMetric('repo_read_file', {
+            durationMs: 12,
+            isError: false,
+            execution: {
+                logicalOperations: 12,
+                failedOperations: 1,
+                skippedOperations: 0,
+                mode: 'read-batch:best-effort',
+            },
+        });
+        recordMcpToolMetric('repo_status', { durationMs: 3, isError: false });
+
+        const snapshot = readMcpMetricsSnapshot();
+        const batch = snapshot.tools['repo_read_file'];
+        const single = snapshot.tools['repo_status'];
+        assert.ok(batch);
+        assert.ok(single);
+        assert.deepEqual(batch.execution, {
+            batchCalls: 1,
+            logicalOperations: 12,
+            failedOperations: 1,
+            skippedOperations: 0,
+            lastLogicalOperations: 12,
+            lastMode: 'read-batch:best-effort',
+        });
+        assert.equal(single.execution.logicalOperations, 1);
+        assert.equal(single.execution.batchCalls, 0);
+    });
+
     it('records per-tool phase averages', () => {
         recordMcpToolMetric('repo_status', {
             durationMs: 10,
@@ -109,18 +139,24 @@ describe('copilot MCP runtime metrics', () => {
             totals: { calls: number };
             phaseTotals: Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>;
             slowestPhases: Array<{ tool: string; phase: string; calls: number; averageMs: number | null }>;
-            ioCache?: { lineOffsets?: Record<string, unknown> };
+            ioCache?: {
+                l1?: Record<string, unknown>;
+                coherence?: { crossProcess?: Record<string, unknown> };
+                validatedReadPath?: Record<string, unknown>;
+            };
             ioCacheBenchmark?: Record<string, unknown> | null;
-            ioCachePlanWithBenchmark?: { l2Decision?: string; evidence?: Record<string, unknown> };
+            ioCachePlan?: { l2Decision?: string; evidence?: Record<string, unknown> };
             ioParser?: { fileContext?: Record<string, unknown> };
-            aiArtifacts?: Record<string, unknown>;
+            aiArtifacts?: { jobs?: Record<string, unknown>; rollback?: Record<string, unknown> };
         }} */ (result.structuredContent.metrics);
         assert.equal(metrics.totals.calls, 2);
-        assert.equal(typeof metrics.ioCache?.lineOffsets?.['size'], 'number');
-        assert.ok(metrics.ioCachePlanWithBenchmark);
-        assert.equal(typeof metrics.ioCachePlanWithBenchmark?.l2Decision, 'string');
+        assert.equal(typeof metrics.ioCache?.l1?.['size'], 'number');
+        assert.equal(typeof metrics.ioCache?.coherence?.crossProcess?.['pollMs'], 'number');
+        assert.ok(metrics.ioCachePlan);
+        assert.equal(typeof metrics.ioCachePlan?.l2Decision, 'string');
         assert.equal(typeof metrics.ioParser?.fileContext?.['size'], 'number');
-        assert.equal(typeof metrics.aiArtifacts?.['aiPath'], 'string');
+        assert.equal(typeof metrics.aiArtifacts?.jobs?.['artifactCount'], 'number');
+        assert.equal(typeof metrics.aiArtifacts?.rollback?.['enabled'], 'boolean');
         assert.deepEqual(Object.keys(metrics.phaseTotals), ['handler', 'authorization']);
         assert.deepEqual(metrics.phaseTotals['handler'], {
             calls: 2,

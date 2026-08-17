@@ -5,6 +5,7 @@
  * @module copilot/mcp/tools/repo-write
  */
 
+import { runBoundedOperationBatch } from '#copilot/infra';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     appendMcpAuditEvent,
@@ -18,6 +19,7 @@ import {
     resolveReadPath,
     resolveWritePath,
     toWorkspaceRelativePath,
+    withResultExecutionHint,
     withResultSizeHint,
 } from '#copilot/mcp/control-plane';
 import { createHash, randomUUID } from 'node:crypto';
@@ -40,7 +42,27 @@ const {
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 2000;
 const QUARANTINE_DIR = path.join(getMcpWorkspaceRoot(), 'src/copilot/.ai/quarantine');
-const MAX_BATCH_FILE_OPERATIONS = 10;
+const MAX_BATCH_FILE_OPERATIONS = 32;
+const MAX_PATCH_BATCH_OPERATIONS = 64;
+const MAX_PATCH_BATCH_TARGETS = 32;
+const MAX_PATCH_BATCH_INPUT_BYTES = 1536 * 1024;
+const DEFAULT_PATCH_PLAN_CONCURRENCY = 4;
+const DEFAULT_PATCH_FAST_CONCURRENCY = 4;
+const MAX_PATCH_TARGET_CONCURRENCY = 8;
+
+/**
+ * Resolve batch write intent defensively. Some connector/host adapters may omit an optional boolean when its value is
+ * false; confirmBatch=true is itself an explicit write acknowledgement, while dryRun=true always wins.
+ *
+ * @param {boolean | undefined} dryRun
+ * @param {boolean | undefined} confirmBatch
+ */
+function resolveBatchDryRun(dryRun, confirmBatch) {
+    if (dryRun === true) return true;
+    if (dryRun === false) return false;
+    return confirmBatch !== true;
+}
+
 const MAX_QUARANTINE_ID_LENGTH = 192;
 const quarantineIdSchema = z
     .string()
@@ -1125,6 +1147,116 @@ async function runPatchBatchOperations(operations, dryRun) {
     return results.sort((left, right) => Number(left['index'] ?? 0) - Number(right['index'] ?? 0));
 }
 
+/** @param {Record<string, unknown>[]} operations */
+function inspectPatchBatchEnvelope(operations) {
+    /** @type {number} */
+    let inputBytes;
+    try {
+        inputBytes = Buffer.byteLength(JSON.stringify(operations), 'utf8');
+    } catch {
+        return { ok: false, code: 'ERR_PATCH_BATCH_INPUT_SERIALIZATION', inputBytes: null, targetCount: 0 };
+    }
+    const targetCount = new Set(operations.map((operation) => String(operation['path'] ?? ''))).size;
+    if (operations.length > MAX_PATCH_BATCH_OPERATIONS) {
+        return { ok: false, code: 'ERR_PATCH_BATCH_OPERATION_LIMIT', inputBytes, targetCount };
+    }
+    if (targetCount > MAX_PATCH_BATCH_TARGETS) {
+        return { ok: false, code: 'ERR_PATCH_BATCH_TARGET_LIMIT', inputBytes, targetCount };
+    }
+    if (inputBytes > MAX_PATCH_BATCH_INPUT_BYTES) {
+        return { ok: false, code: 'ERR_PATCH_BATCH_INPUT_BYTES_LIMIT', inputBytes, targetCount };
+    }
+    return { ok: true, code: null, inputBytes, targetCount };
+}
+
+/**
+ * Execute independent patch targets through the shared bulk scheduler. Same-path operations continue to use
+ * runPatchBatchOperations, which collapses them into one patchTextBatchLocked lock/read/write cycle.
+ *
+ * @param {Record<string, unknown>[]} operations
+ * @param {boolean} dryRun
+ * @param {{ failureMode?: 'best-effort' | 'fail-fast'; concurrency?: number }} [options]
+ */
+async function runPatchBatchTargetGroups(operations, dryRun, options = {}) {
+    /** @type {{ path: string; entries: { operation: Record<string, unknown>; index: number }[] }[]} */
+    const groups = [];
+    /** @type {Map<string, typeof groups[number]>} */
+    const byPath = new Map();
+    for (const [index, operation] of operations.entries()) {
+        const pathKey = String(operation['path'] ?? '');
+        let group = byPath.get(pathKey);
+        if (!group) {
+            group = { path: pathKey, entries: [] };
+            byPath.set(pathKey, group);
+            groups.push(group);
+        }
+        group.entries.push({ operation, index });
+    }
+
+    const execution = await runBoundedOperationBatch(
+        groups,
+        async (group) => {
+            const local = await runPatchBatchOperations(
+                group.entries.map((entry) => entry.operation),
+                dryRun,
+            );
+            const rows = local.map((row) => {
+                const localIndex = Number(row['index'] ?? 0);
+                const originalIndex = group.entries[localIndex]?.index ?? localIndex;
+                return /** @type {Record<string, unknown>} */ ({ ...row, index: originalIndex });
+            });
+            return { path: group.path, success: rows.every((row) => row['success'] === true), rows };
+        },
+        {
+            concurrency: options.concurrency ?? 1,
+            failureMode: options.failureMode ?? 'best-effort',
+            maxItems: MAX_PATCH_BATCH_TARGETS,
+            isFailure: (group) => group.success !== true,
+        },
+    );
+
+    /** @type {Record<string, unknown>[]} */
+    const rows = [];
+    for (const executionRow of execution.results) {
+        const group = groups[executionRow.index];
+        if (!group) continue;
+        if (executionRow.status === 'skipped') {
+            for (const entry of group.entries) {
+                rows.push({
+                    index: entry.index,
+                    success: false,
+                    skipped: true,
+                    path: entry.operation['path'] ?? null,
+                    code: 'ERR_PATCH_BATCH_SKIPPED',
+                    reason: executionRow.reason,
+                });
+            }
+            continue;
+        }
+        if (executionRow.status === 'succeeded') {
+            rows.push(...executionRow.value.rows);
+            continue;
+        }
+        if ('value' in executionRow && executionRow.value) {
+            rows.push(...executionRow.value.rows);
+            continue;
+        }
+        for (const entry of group.entries) {
+            rows.push({
+                index: entry.index,
+                success: false,
+                path: entry.operation['path'] ?? null,
+                code: executionRow.code ?? 'ERR_PATCH_BATCH_TARGET_EXECUTION',
+                error: executionRow.error ?? 'Patch target execution failed.',
+            });
+        }
+    }
+    return {
+        operations: rows.sort((left, right) => Number(left['index'] ?? 0) - Number(right['index'] ?? 0)),
+        execution,
+    };
+}
+
 /**
  * @param {unknown} operation
  * @param {number} index
@@ -1295,43 +1427,86 @@ export const repoWriteTools = [
             operations: z
                 .array(patchBatchOperationSchema)
                 .min(1)
-                .max(MAX_BATCH_FILE_OPERATIONS)
-                .describe('Patch operations to validate in order. This tool never writes.'),
+                .max(MAX_PATCH_BATCH_OPERATIONS)
+                .describe('Patch operations to validate in order. This tool never writes; max 64 operations / 32 targets.'),
+            targetConcurrency: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_PATCH_TARGET_CONCURRENCY)
+                .optional()
+                .describe('Parallel target groups during planning. Default: 4; same-file operations remain sequential.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ operations }) => {
+        handler: async ({ operations, targetConcurrency }) => {
             const normalizedOperations = /** @type {Record<string, unknown>[]} */ (operations);
-            const planned = await runPatchBatchOperations(normalizedOperations, true);
+            const envelope = inspectPatchBatchEnvelope(normalizedOperations);
+            if (!envelope.ok) {
+                return errorResult('Patch batch exceeds its bounded execution envelope.', {
+                    code: envelope.code,
+                    operationCount: normalizedOperations.length,
+                    targetCount: envelope.targetCount,
+                    inputBytes: envelope.inputBytes,
+                    limits: {
+                        operations: MAX_PATCH_BATCH_OPERATIONS,
+                        targets: MAX_PATCH_BATCH_TARGETS,
+                        inputBytes: MAX_PATCH_BATCH_INPUT_BYTES,
+                    },
+                });
+            }
+            const run = await runPatchBatchTargetGroups(normalizedOperations, true, {
+                failureMode: 'best-effort',
+                concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
+            });
+            const planned = run.operations;
             const failed = planned.filter((operation) => operation['success'] !== true);
             await appendMcpAuditEvent({
                 event: 'repo_patch_batch_plan',
                 tool: 'repo_patch_batch_plan',
                 operationCount: planned.length,
+                targetCount: envelope.targetCount,
                 failedCount: failed.length,
+                executionId: run.execution.executionId,
             });
             const structured = {
                 success: failed.length === 0,
                 plannedTool: 'repo_apply_patch_batch',
                 dryRun: true,
+                executionId: run.execution.executionId,
                 operationCount: planned.length,
+                targetCount: envelope.targetCount,
+                inputBytes: envelope.inputBytes,
                 failedCount: failed.length,
+                concurrency: run.execution.concurrency,
+                maxInFlight: run.execution.maxInFlight,
+                durationMs: run.execution.durationMs,
                 operations: planned,
                 nextCall:
                     failed.length === 0
                         ? {
                               tool: 'repo_apply_patch_batch',
-                              args: { operations, dryRun: false, confirmBatch: true },
+                              args: {
+                                  operations,
+                                  dryRun: false,
+                                  confirmBatch: true,
+                                  applyMode: 'global-preflight',
+                              },
                           }
                         : null,
             };
             const text =
                 failed.length === 0
-                    ? `Planned ${planned.length} patch operation(s); no files modified.`
+                    ? `Planned ${planned.length} patch operation(s) across ${envelope.targetCount} target(s); no files modified.`
                     : `Planned ${planned.length} patch operation(s) with ${failed.length} failure(s); no files modified.`;
-            return withResultSizeHint(okResult(structured, text), {
+            const result = withResultSizeHint(okResult(structured, text), {
                 bytes: estimateStructuredTextResultBytes(structured, text),
                 strategy: 'conservative-estimate',
                 source: 'repo_patch_batch_plan',
+            });
+            return withResultExecutionHint(result, {
+                logicalOperations: normalizedOperations.length,
+                failedOperations: failed.length,
+                mode: 'patch-plan:best-effort',
             });
         },
     },
@@ -1344,76 +1519,224 @@ export const repoWriteTools = [
             operations: z
                 .array(patchBatchOperationSchema)
                 .min(1)
-                .max(MAX_BATCH_FILE_OPERATIONS)
-                .describe('Patch operations to validate or apply in order.'),
+                .max(MAX_PATCH_BATCH_OPERATIONS)
+                .describe('Patch operations to validate or apply; max 64 operations / 32 targets / 1.5 MiB input.'),
             dryRun: z.boolean().optional().describe('Validate all operations without writing. Default: true.'),
             confirmBatch: z
                 .boolean()
                 .optional()
                 .describe('Must be true when dryRun=false because this applies multiple patches.'),
+            applyMode: z
+                .enum(['global-preflight', 'per-target-fast'])
+                .optional()
+                .describe('Apply policy. Default global-preflight; per-target-fast skips the duplicate global dry-run.'),
+            failureMode: z
+                .enum(['best-effort', 'fail-fast'])
+                .optional()
+                .describe('Target failure policy during apply. Defaults fail-fast, or best-effort in per-target-fast mode.'),
+            targetConcurrency: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_PATCH_TARGET_CONCURRENCY)
+                .optional()
+                .describe('Parallel independent targets. Defaults 1 in global-preflight apply, 4 in per-target-fast.'),
+            includePreflightDetails: z
+                .boolean()
+                .optional()
+                .describe('Echo full successful preflight rows in real apply output. Default false to avoid payload duplication.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ operations, dryRun, confirmBatch }) => {
-            const isDryRun = dryRun !== false;
+        handler: async ({
+            operations,
+            dryRun,
+            confirmBatch,
+            applyMode,
+            failureMode,
+            targetConcurrency,
+            includePreflightDetails,
+        }) => {
+            const isDryRun = resolveBatchDryRun(dryRun, confirmBatch);
             const normalizedOperations = /** @type {Record<string, unknown>[]} */ (operations);
-            const planned = await runPatchBatchOperations(normalizedOperations, true);
-            const failedPreflight = planned.filter((operation) => operation['success'] !== true);
-            if (isDryRun || failedPreflight.length > 0) {
+            const envelope = inspectPatchBatchEnvelope(normalizedOperations);
+            if (!envelope.ok) {
+                return errorResult('Patch batch exceeds its bounded execution envelope.', {
+                    code: envelope.code,
+                    operationCount: normalizedOperations.length,
+                    targetCount: envelope.targetCount,
+                    inputBytes: envelope.inputBytes,
+                    limits: {
+                        operations: MAX_PATCH_BATCH_OPERATIONS,
+                        targets: MAX_PATCH_BATCH_TARGETS,
+                        inputBytes: MAX_PATCH_BATCH_INPUT_BYTES,
+                    },
+                });
+            }
+            const effectiveApplyMode = applyMode ?? 'global-preflight';
+            const effectiveFailureMode = failureMode ?? (effectiveApplyMode === 'per-target-fast' ? 'best-effort' : 'fail-fast');
+            const effectiveConcurrency =
+                targetConcurrency ?? (effectiveApplyMode === 'per-target-fast' ? DEFAULT_PATCH_FAST_CONCURRENCY : 1);
+
+            if (isDryRun) {
+                const dryRunResult = await runPatchBatchTargetGroups(normalizedOperations, true, {
+                    failureMode: 'best-effort',
+                    concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
+                });
+                const failed = dryRunResult.operations.filter((operation) => operation['success'] !== true);
                 const structured = {
-                    success: failedPreflight.length === 0,
+                    success: failed.length === 0,
                     dryRun: true,
-                    operationCount: planned.length,
-                    failedCount: failedPreflight.length,
-                    operations: planned,
-                    failures: failedPreflight,
+                    applyMode: effectiveApplyMode,
+                    executionId: dryRunResult.execution.executionId,
+                    operationCount: normalizedOperations.length,
+                    targetCount: envelope.targetCount,
+                    inputBytes: envelope.inputBytes,
+                    failedCount: failed.length,
+                    skippedCount: dryRunResult.execution.skippedCount,
+                    concurrency: dryRunResult.execution.concurrency,
+                    durationMs: dryRunResult.execution.durationMs,
+                    operations: dryRunResult.operations,
+                    failures: failed,
                     applied: [],
                 };
                 const text =
-                    failedPreflight.length === 0
-                        ? `Patch batch dry-run succeeded for ${planned.length} operation(s); no files modified.`
-                        : `Patch batch dry-run found ${failedPreflight.length} failure(s); no files modified.`;
-                return withResultSizeHint(okResult(structured, text), {
+                    failed.length === 0
+                        ? `Patch batch dry-run succeeded for ${normalizedOperations.length} operation(s); no files modified.`
+                        : `Patch batch dry-run found ${failed.length} failure(s); no files modified.`;
+                const result = withResultSizeHint(okResult(structured, text), {
                     bytes: estimateStructuredTextResultBytes(structured, text),
                     strategy: 'conservative-estimate',
                     source: 'repo_apply_patch_batch',
                 });
+                return withResultExecutionHint(result, {
+                    logicalOperations: normalizedOperations.length,
+                    failedOperations: failed.length,
+                    skippedOperations: dryRunResult.execution.skippedCount,
+                    mode: 'patch-dry-run:best-effort',
+                });
             }
+
             if (confirmBatch !== true) {
                 return errorResult('confirmBatch must be true when dryRun=false.', {
                     code: 'ERR_PATCH_BATCH_CONFIRM_REQUIRED',
-                    operationCount: planned.length,
+                    operationCount: normalizedOperations.length,
+                    applyMode: effectiveApplyMode,
                 });
             }
-            const applied = await runPatchBatchOperations(normalizedOperations, false);
-            const failedApply = applied.filter((operation) => operation['success'] !== true);
+
+            let preflight = null;
+            if (effectiveApplyMode === 'global-preflight') {
+                preflight = await runPatchBatchTargetGroups(normalizedOperations, true, {
+                    failureMode: 'best-effort',
+                    concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
+                });
+                const failedPreflight = preflight.operations.filter((operation) => operation['success'] !== true);
+                if (failedPreflight.length > 0) {
+                    const structured = {
+                        success: false,
+                        dryRun: false,
+                        applyMode: effectiveApplyMode,
+                        preflightBlockedApply: true,
+                        operationCount: normalizedOperations.length,
+                        targetCount: envelope.targetCount,
+                        inputBytes: envelope.inputBytes,
+                        failedCount: failedPreflight.length,
+                        skippedCount: 0,
+                        preflightSummary: {
+                            ran: true,
+                            success: false,
+                            executionId: preflight.execution.executionId,
+                            failedCount: failedPreflight.length,
+                            durationMs: preflight.execution.durationMs,
+                        },
+                        preflight: includePreflightDetails === true ? preflight.operations : [],
+                        applied: [],
+                        failures: failedPreflight,
+                    };
+                    const text = `Global preflight found ${failedPreflight.length} failure(s); no files modified.`;
+                    const result = withResultSizeHint(okResult(structured, text), {
+                        bytes: estimateStructuredTextResultBytes(structured, text),
+                        strategy: 'conservative-estimate',
+                        source: 'repo_apply_patch_batch',
+                    });
+                    return withResultExecutionHint(result, {
+                        logicalOperations: normalizedOperations.length,
+                        failedOperations: failedPreflight.length,
+                        mode: 'patch-apply:global-preflight-blocked',
+                    });
+                }
+            }
+
+            const applyRun = await runPatchBatchTargetGroups(normalizedOperations, false, {
+                failureMode: effectiveFailureMode,
+                concurrency: effectiveConcurrency,
+            });
+            const applied = applyRun.operations;
+            const succeeded = applied.filter((operation) => operation['success'] === true);
+            const skipped = applied.filter((operation) => operation['skipped'] === true);
+            const failedApply = applied.filter(
+                (operation) => operation['success'] !== true && operation['skipped'] !== true,
+            );
+            const partial = succeeded.length > 0 && (failedApply.length > 0 || skipped.length > 0);
             await appendMcpAuditEvent({
                 event:
-                    failedApply.length === 0
+                    failedApply.length === 0 && skipped.length === 0
                         ? 'repo_apply_patch_batch_applied'
                         : 'repo_apply_patch_batch_partial_failure',
                 tool: 'repo_apply_patch_batch',
-                operationCount: operations.length,
-                appliedCount: applied.filter((operation) => operation['success'] === true).length,
+                executionId: applyRun.execution.executionId,
+                applyMode: effectiveApplyMode,
+                failureMode: effectiveFailureMode,
+                operationCount: normalizedOperations.length,
+                targetCount: envelope.targetCount,
+                appliedCount: succeeded.length,
                 failedCount: failedApply.length,
+                skippedCount: skipped.length,
             });
             const structured = {
-                success: failedApply.length === 0,
+                success: failedApply.length === 0 && skipped.length === 0,
+                partial,
                 dryRun: false,
-                operationCount: operations.length,
-                appliedCount: applied.filter((operation) => operation['success'] === true).length,
+                applyMode: effectiveApplyMode,
+                failureMode: effectiveFailureMode,
+                executionId: applyRun.execution.executionId,
+                operationCount: normalizedOperations.length,
+                targetCount: envelope.targetCount,
+                inputBytes: envelope.inputBytes,
+                appliedCount: succeeded.length,
                 failedCount: failedApply.length,
-                preflight: planned,
+                skippedCount: skipped.length,
+                concurrency: applyRun.execution.concurrency,
+                maxInFlight: applyRun.execution.maxInFlight,
+                durationMs: applyRun.execution.durationMs,
+                preflightSummary: preflight
+                    ? {
+                          ran: true,
+                          success: true,
+                          executionId: preflight.execution.executionId,
+                          failedCount: 0,
+                          durationMs: preflight.execution.durationMs,
+                      }
+                    : { ran: false, success: null, executionId: null, failedCount: 0, durationMs: 0 },
+                preflight: includePreflightDetails === true ? preflight?.operations ?? [] : [],
                 applied,
                 failures: failedApply,
+                skipped,
             };
             const text =
-                failedApply.length === 0
-                    ? `Applied ${applied.length} patch operation(s).`
-                    : `Applied ${structured.appliedCount} patch operation(s) before ${failedApply.length} failure(s).`;
-            return withResultSizeHint(okResult(structured, text), {
+                structured.success
+                    ? `Applied ${succeeded.length} patch operation(s) across ${envelope.targetCount} target(s).`
+                    : `Patch batch completed partially: ${succeeded.length} applied, ${failedApply.length} failed, ${skipped.length} skipped.`;
+            const result = withResultSizeHint(okResult(structured, text), {
                 bytes: estimateStructuredTextResultBytes(structured, text),
                 strategy: 'conservative-estimate',
                 source: 'repo_apply_patch_batch',
+            });
+            return withResultExecutionHint(result, {
+                logicalOperations: normalizedOperations.length,
+                failedOperations: failedApply.length,
+                skippedOperations: skipped.length,
+                mode: `patch-apply:${effectiveApplyMode}:${effectiveFailureMode}`,
             });
         },
     },
@@ -1488,16 +1811,22 @@ export const repoWriteTools = [
         },
         annotations: destructiveAnnotations(),
         handler: async ({ operations, dryRun, confirmBatch }) => {
-            const isDryRun = dryRun !== false;
+            const isDryRun = resolveBatchDryRun(dryRun, confirmBatch);
             if (!isDryRun && confirmBatch !== true) {
                 return errorResult('confirmBatch deve ser true quando dryRun=false.', {
                     code: 'ERR_BATCH_CONFIRM_REQUIRED',
                 });
             }
+            /** @type {Record<string, unknown>[]} */
+            const previews = [];
+            /** @type {Record<string, unknown>[]} */
+            const applied = [];
+            let failureIndex = -1;
+            let phase = 'preflight';
             try {
-                const previews = [];
                 const previewContext = { virtualFiles: new Map() };
                 for (const [index, operation] of operations.entries()) {
+                    failureIndex = index;
                     previews.push(await previewBatchFileOperation(operation, index, previewContext));
                 }
                 if (isDryRun) {
@@ -1507,17 +1836,22 @@ export const repoWriteTools = [
                         operations: previews.map((preview) => preview['type']),
                         operationCount: previews.length,
                     });
-                    return okResult({
+                    const result = okResult({
                         success: true,
                         dryRun: true,
                         operationCount: previews.length,
                         operations: previews,
                         applied: [],
                     });
+                    return withResultExecutionHint(result, {
+                        logicalOperations: operations.length,
+                        mode: 'file-batch:dry-run',
+                    });
                 }
 
-                const applied = [];
+                phase = 'apply';
                 for (const [index, operation] of operations.entries()) {
+                    failureIndex = index;
                     applied.push(await applyBatchFileOperation(operation, index));
                 }
                 await appendMcpAuditEvent({
@@ -1526,16 +1860,44 @@ export const repoWriteTools = [
                     operations: applied.map((operation) => operation['type']),
                     operationCount: applied.length,
                 });
-                return okResult({
+                const result = okResult({
                     success: true,
                     dryRun: false,
                     operationCount: applied.length,
                     planned: previews,
                     applied,
+                    appliedCount: applied.length,
+                    failedCount: 0,
+                    skippedCount: 0,
+                });
+                return withResultExecutionHint(result, {
+                    logicalOperations: operations.length,
+                    mode: 'file-batch:apply-sequential',
                 });
             } catch (error) {
-                return errorResult(error instanceof Error ? error.message : String(error), {
+                const skippedCount = Math.max(0, operations.length - applied.length - (phase === 'apply' ? 1 : 0));
+                const partial = applied.length > 0;
+                const result = errorResult(error instanceof Error ? error.message : String(error), {
                     code: 'ERR_BATCH_FILE_OPERATION_FAILED',
+                    phase,
+                    partial,
+                    operationCount: operations.length,
+                    planned: previews,
+                    plannedCount: previews.length,
+                    applied,
+                    appliedCount: applied.length,
+                    failedCount: 1,
+                    failureIndex,
+                    skippedCount,
+                    nextAction: partial
+                        ? 'Do not repeat already-applied operations; inspect failureIndex and retry only the failed/skipped suffix after reconciling current state.'
+                        : 'No operation was applied; fix failureIndex and retry the batch.',
+                });
+                return withResultExecutionHint(result, {
+                    logicalOperations: operations.length,
+                    failedOperations: 1,
+                    skippedOperations: skippedCount,
+                    mode: `file-batch:${phase}-failure`,
                 });
             }
         },

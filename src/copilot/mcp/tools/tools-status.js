@@ -118,7 +118,7 @@ export const mcpToolsStatusTool = {
         const readOnly = summaries.filter((tool) => tool.annotations.readOnlyHint);
         const boundedWrite = summaries.filter((tool) => tool.riskClass === 'bounded-write');
         const destructive = summaries.filter((tool) => tool.riskClass === 'destructive');
-        const openWorld = summaries.filter((tool) => tool.riskClass === 'open-world');
+        const openWorld = summaries.filter((tool) => tool.annotations.openWorldHint);
         const auth = readMcpAuthConfig();
         const maxPowerRepoScopesByDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
         const outputSchemaCount = summaries.filter((tool) => tool.hasOutputSchema).length;
@@ -199,7 +199,7 @@ export const mcpAutonomyPowerScoreTool = {
         const readOnly = summaries.filter((tool) => tool.annotations.readOnlyHint);
         const boundedWrite = summaries.filter((tool) => tool.riskClass === 'bounded-write');
         const destructive = summaries.filter((tool) => tool.riskClass === 'destructive');
-        const openWorld = summaries.filter((tool) => tool.riskClass === 'open-world');
+        const openWorld = summaries.filter((tool) => tool.annotations.openWorldHint);
         const planOnly = summaries.filter((tool) => tool.name.endsWith('_plan') || tool.name.includes('_plan_'));
         const specificOutputSchemaCount = summaries.filter((tool) => tool.hasOutputSchema).length;
         const securityMetadataCoverage =

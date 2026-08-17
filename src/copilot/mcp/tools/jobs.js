@@ -15,6 +15,7 @@ import {
     readJobOutput,
     readOnlyAnnotations,
     spawnValidatorJob,
+    waitForJobCompletion,
 } from '#copilot/mcp/control-plane';
 import { projectDoctorTool } from './project-doctor.js';
 
@@ -35,6 +36,7 @@ const focusedTestFileSchema = z
     .describe('Explicit tests/unit/copilot/**/*.spec.js path for unit-focused.');
 const safeValidationSuiteSchema = z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']);
 const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
+const DEFAULT_INLINE_WAIT_VALIDATORS = new Set(['typecheck', 'lint', 'unit-focused']);
 
 /**
  * @param {import('../control-plane/jobs.js').PublicJobRecord} job
@@ -227,10 +229,28 @@ export const jobTools = [
         inputSchema: {
             validator: validatorSchema.describe('Validator; prefer unit-focused.'),
             testFile: focusedTestFileSchema.optional(),
-            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional timeout in ms.'),
+            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Optional validator timeout in ms.'),
+            waitForCompletion: z
+                .boolean()
+                .optional()
+                .describe('Wait in this same call. Defaults true for typecheck/lint/unit-focused and false for broad suites.'),
+            waitMs: z
+                .number()
+                .int()
+                .min(0)
+                .max(120000)
+                .optional()
+                .describe('Bounded completion wait. Default 30000ms when waitForCompletion=true.'),
+            failureTailBytes: z
+                .number()
+                .int()
+                .min(1000)
+                .max(12000)
+                .optional()
+                .describe('Short log tail returned in the same call only when a waited validator fails. Default 4000.'),
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ validator, testFile, timeoutMs }) => {
+        handler: async ({ validator, testFile, timeoutMs, waitForCompletion, waitMs, failureTailBytes }) => {
             const focused = validator === 'unit-focused';
             if (focused && !testFile) {
                 return errorResult('unit-focused requires testFile.', {
@@ -249,9 +269,46 @@ export const jobTools = [
                     ...(timeoutMs === undefined ? {} : { timeoutMs }),
                     ...(focused ? { testFiles: [testFile] } : {}),
                 });
+                const shouldWait =
+                    waitForCompletion !== false &&
+                    (waitForCompletion === true || waitMs !== undefined || DEFAULT_INLINE_WAIT_VALIDATORS.has(validator));
+                if (!shouldWait) {
+                    return okResult(
+                        { success: true, ...(focused ? { testFile } : {}), job },
+                        `Started job ${job.id} (${validator}).`,
+                    );
+                }
+                const effectiveWaitMs = waitMs ?? 30_000;
+                const waitedJob = await waitForJobCompletion(job.id, effectiveWaitMs);
+                if (!waitedJob) {
+                    return errorResult('Validator job disappeared while waiting for completion.', {
+                        code: 'ERR_VALIDATOR_JOB_WAIT_LOST',
+                        jobId: job.id,
+                    });
+                }
+                const summary = summarizeJob(waitedJob);
+                const completedWithinWait = waitedJob.status !== 'running';
+                const failed = waitedJob.status === 'failed';
+                const failureOutput = failed
+                    ? await readJobOutput(job.id, failureTailBytes ?? 4000)
+                    : { output: '' };
                 return okResult(
-                    { success: true, ...(focused ? { testFile } : {}), job },
-                    `Started job ${job.id} (${validator}).`,
+                    {
+                        success: waitedJob.status === 'completed',
+                        ...(focused ? { testFile } : {}),
+                        completedWithinWait,
+                        waitMs: effectiveWaitMs,
+                        job: summary,
+                        ...(failed && failureOutput.output ? { failureOutputTail: failureOutput.output } : {}),
+                        nextAction: completedWithinWait
+                            ? failed
+                                ? 'Fix the reported validation failure; the bounded failure tail is already included.'
+                                : 'No job_get_summary call is needed; validation completed in this response.'
+                            : 'The bounded wait expired while the job kept running; use job_get_summary only if needed.',
+                    },
+                    completedWithinWait
+                        ? `Validator ${validator} finished during the bounded wait.`
+                        : `Validator ${validator} is still running after ${effectiveWaitMs}ms; job ${job.id}.`,
                 );
             } catch (error) {
                 return errorResult('Validator job was rejected.', {

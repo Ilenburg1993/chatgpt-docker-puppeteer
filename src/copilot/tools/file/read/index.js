@@ -8,5 +8,6 @@
  */
 
 export { readFileContentTool } from './read-file-content.js';
+export { readFilesBatchTool } from './read-files-batch.js';
 export { buildReadFileMetadata } from './metadata.js';
 export { nextLineCursor, normalizeNonNegativeInteger, normalizePositiveInteger, parseReadCursor } from './window.js';

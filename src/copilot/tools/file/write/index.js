@@ -6,6 +6,7 @@
  */
 
 export { patchFileTool } from './patch-file.js';
+export { patchFilesBatchTool } from './patch-files-batch.js';
 export {
     ADVISORY_PATCH_SEGMENT_CHARS,
     ADVISORY_WRITE_CONTENT_BYTES,

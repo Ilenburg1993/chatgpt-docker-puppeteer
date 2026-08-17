@@ -360,6 +360,31 @@ export async function spawnValidatorJob(validator, options = {}) {
 }
 
 /**
+ * Wait only against an attached in-memory job record for a bounded window. Persisted/unattached jobs are read once.
+ *
+ * @param {string} id
+ * @param {number} [waitMs]
+ * @returns {Promise<PublicJobRecord | null>}
+ */
+export async function waitForJobCompletion(id, waitMs = 30_000) {
+    const boundedWaitMs = Math.max(0, Math.min(120_000, Math.floor(Number(waitMs) || 0)));
+    const attached = JOBS.get(id);
+    if (!attached) {
+        const persisted = await readJobManifest(id);
+        return persisted ? publicJobRecord(persisted) : null;
+    }
+    if (attached.status !== 'running' || boundedWaitMs === 0) return publicJobRecord(attached);
+
+    const deadline = Date.now() + boundedWaitMs;
+    while (attached.status === 'running') {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        await new Promise((resolve) => setTimeout(resolve, Math.min(50, remaining)));
+    }
+    return publicJobRecord(attached);
+}
+
+/**
  * @param {string} id
  * @param {number} [tailBytes]
  * @returns {Promise<{ job: PublicJobRecord | null; output: string }>}

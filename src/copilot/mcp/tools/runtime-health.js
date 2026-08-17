@@ -268,28 +268,169 @@ function summarizeIoCacheBenchmark(state) {
     /** @param {string} name */
     const compactPhase = (name) => {
         const phase = recordOrEmpty(phases[name]);
+        const latency = recordOrEmpty(phase['latency']);
         return {
-            allExpectedCacheHits: phase['allExpectedCacheHits'] === true,
-            successfulSamples: phase['successfulSamples'] ?? null,
-            latency: phase['latency'] ?? null,
+            hits: phase['allExpectedCacheHits'] === true,
+            samples: phase['successfulSamples'] ?? null,
+            p50Ms: latency['p50Ms'] ?? null,
+            p95Ms: latency['p95Ms'] ?? null,
+            averageMs: latency['averageMs'] ?? null,
         };
     };
+    const decision = recordOrEmpty(state['decision']);
     return {
         status: state['status'] ?? null,
-        requestId: state['requestId'] ?? null,
         completedAt: state['completedAt'] ?? null,
-        durationMs: state['durationMs'] ?? null,
-        sampleCountPerPhase: state['sampleCountPerPhase'] ?? null,
         phases: {
             cold: compactPhase('cold'),
             l1: compactPhase('l1'),
             l2: compactPhase('l2'),
         },
-        decision: state['decision'] ?? null,
-        isolatedDb: state['isolatedDb'] === true,
-        cleanedTemporaryDb: state['cleanedTemporaryDb'] === true,
-        autoEnable: state['autoEnable'] === true,
+        decision: {
+            representativeBenchmarkPassed: decision['representativeBenchmarkPassed'] === true,
+            l2ColdP95ImprovementPercent: decision['l2ColdP95ImprovementPercent'] ?? null,
+            recommendation: decision['recommendation'] ?? null,
+        },
         error: state['error'] ?? null,
+    };
+}
+
+/** @param {ReturnType<typeof getTtlCacheStats>} caches */
+function summarizeTtlCaches(caches) {
+    const rows = caches.map((cache) => ({
+        name: cache.name,
+        size: cache.size,
+        hits: cache.hits,
+        misses: cache.misses,
+        inFlight: cache.inFlight,
+    }));
+    return {
+        count: rows.length,
+        totalSize: rows.reduce((sum, row) => sum + Number(row.size ?? 0), 0),
+        totalHits: rows.reduce((sum, row) => sum + Number(row.hits ?? 0), 0),
+        totalMisses: rows.reduce((sum, row) => sum + Number(row.misses ?? 0), 0),
+        active: rows
+            .filter((row) => Number(row.size ?? 0) > 0 || Number(row.hits ?? 0) > 0 || Number(row.misses ?? 0) > 0)
+            .sort((left, right) => Number(right.hits ?? 0) + Number(right.misses ?? 0) - Number(left.hits ?? 0) - Number(left.misses ?? 0))
+            .slice(0, 6),
+    };
+}
+
+/** @param {Record<string, unknown>} stats */
+function summarizeAuthorizationCache(stats) {
+    return {
+        hits: stats['hits'] ?? 0,
+        misses: stats['misses'] ?? 0,
+        size: stats['size'] ?? 0,
+        evictions: stats['evictions'] ?? 0,
+        clears: stats['clears'] ?? 0,
+        disabled: stats['disabled'] ?? false,
+    };
+}
+
+/** @param {ReturnType<typeof readRepoReadFileResultCacheStats>} stats */
+function summarizeRepoReadCache(stats) {
+    return {
+        hits: stats['hits'],
+        misses: stats['misses'],
+        stale: stats['stale'],
+        singleflightJoins: stats['singleflightJoins'],
+        chunkHits: stats['chunkHits'],
+        chunkMisses: stats['chunkMisses'],
+        chunkStale: stats['chunkStale'],
+        chunkSingleflightJoins: stats['chunkSingleflightJoins'],
+        busInvalidations: stats['busInvalidations'],
+        recursiveInvalidations: stats['recursiveInvalidations'],
+        size: stats['size'],
+        chunkSize: stats['chunkSize'],
+        bytes: stats['bytes'],
+        chunkBytes: stats['chunkBytes'],
+    };
+}
+
+/** @param {ReturnType<typeof readIoRuntimeHealthSnapshot>['cache']} cache */
+function summarizeIoCache(cache) {
+    const l1 = recordOrEmpty(cache['l1']);
+    const l2 = recordOrEmpty(cache['l2']);
+    const coherence = recordOrEmpty(cache['coherence']);
+    const crossProcess = recordOrEmpty(coherence['crossProcess']);
+    const aggregate = recordOrEmpty(cache['aggregate']);
+    return {
+        l1: {
+            enabled: l1['enabled'] ?? null,
+            hits: l1['hits'] ?? 0,
+            misses: l1['misses'] ?? 0,
+            size: l1['size'] ?? 0,
+            bytesStored: l1['bytesStored'] ?? 0,
+            ttlMs: l1['ttlMs'] ?? null,
+        },
+        l2: {
+            enabled: l2['enabled'] ?? false,
+            profile: l2['profile'] ?? null,
+            reason: l2['reason'] ?? null,
+        },
+        coherence: {
+            hooks: coherence['hooks'] ?? 0,
+            pending: coherence['pending'] ?? 0,
+            crossProcess: {
+                enabled: crossProcess['enabled'] ?? false,
+                published: crossProcess['published'] ?? 0,
+                received: crossProcess['received'] ?? 0,
+                gapDetections: crossProcess['gapDetections'] ?? 0,
+                writeErrors: crossProcess['writeErrors'] ?? 0,
+                readErrors: crossProcess['readErrors'] ?? 0,
+                averagePublishDurationMs: crossProcess['averagePublishDurationMs'] ?? null,
+                averagePollDurationMs: crossProcess['averagePollDurationMs'] ?? null,
+                pollMs: crossProcess['pollMs'] ?? null,
+            },
+        },
+        validatedReadPath: cache['validatedReadPath'] ?? null,
+        aggregate: {
+            hits: aggregate['hits'] ?? 0,
+            misses: aggregate['misses'] ?? 0,
+            hitRatio: aggregate['hitRatio'] ?? 0,
+        },
+    };
+}
+
+/** @param {Record<string, unknown>} parser */
+function summarizeIoParser(parser) {
+    const fileContext = recordOrEmpty(parser['fileContext']);
+    return {
+        size: parser['size'] ?? 0,
+        fileContext: {
+            size: fileContext['size'] ?? 0,
+            hits: fileContext['hits'] ?? 0,
+            misses: fileContext['misses'] ?? 0,
+        },
+        workerEnabled: parser['workerEnabled'] ?? false,
+        workerPoolSize: parser['workerPoolSize'] ?? 0,
+        workerQueueLength: parser['workerQueueLength'] ?? 0,
+        workerQueueHighWater: parser['workerQueueHighWater'] ?? 0,
+        lastParseDurationMs: parser['lastParseDurationMs'] ?? null,
+        workerFailures: parser['workerFailures'] ?? 0,
+        workerTimeouts: parser['workerTimeouts'] ?? 0,
+        workerFallbacks: parser['workerFallbacks'] ?? 0,
+    };
+}
+
+/** @param {Record<string, unknown>} artifacts */
+function summarizeAiArtifacts(artifacts) {
+    const jobs = recordOrEmpty(artifacts['jobs']);
+    const rollback = recordOrEmpty(artifacts['rollback']);
+    return {
+        jobs: {
+            artifactCount: jobs['artifactCount'] ?? 0,
+            artifactBytes: jobs['artifactBytes'] ?? 0,
+            cleanupCandidateCount: jobs['cleanupCandidateCount'] ?? 0,
+            cleanupCandidateBytes: jobs['cleanupCandidateBytes'] ?? 0,
+        },
+        rollback: {
+            enabled: rollback['enabled'] ?? false,
+            sidecarCount: rollback['sidecarCount'] ?? 0,
+            sidecarBytes: rollback['sidecarBytes'] ?? 0,
+            ignoredEntryCount: rollback['ignoredEntryCount'] ?? 0,
+        },
     };
 }
 
@@ -436,15 +577,19 @@ export const mcpRuntimeHealthTool = {
                     slowestTools: summarizeSlowestTools(metrics.tools),
                     slowestPhases: summarizeSlowestPhases(metrics.tools),
                     phaseTotals: summarizePhaseTotals(metrics.tools),
-                    ttlCaches,
-                    authorizationConfigCache: authConfigCache,
-                    authorizationCache: authDecisionCache,
-                    repoReadFileCache,
-                    ioCache: ioRuntime.cache,
+                    ttlCaches: summarizeTtlCaches(ttlCaches),
+                    authorizationConfigCache: summarizeAuthorizationCache(recordOrEmpty(authConfigCache)),
+                    authorizationCache: summarizeAuthorizationCache(recordOrEmpty(authDecisionCache)),
+                    repoReadFileCache: summarizeRepoReadCache(repoReadFileCache),
+                    ioCache: summarizeIoCache(ioRuntime.cache),
                     ioCacheBenchmark,
-                    ioCachePlanWithBenchmark,
-                    ioParser: ioRuntime.parser,
-                    aiArtifacts,
+                    ioCachePlan: {
+                        l2Decision: ioCachePlanWithBenchmark.l2Decision,
+                        evidence: ioCachePlanWithBenchmark.evidence,
+                        recommendations: ioCachePlanWithBenchmark.recommendations,
+                    },
+                    ioParser: summarizeIoParser(recordOrEmpty(ioRuntime.parser)),
+                    aiArtifacts: summarizeAiArtifacts(aiArtifacts),
                 },
                 detailsAvailable: true,
             });

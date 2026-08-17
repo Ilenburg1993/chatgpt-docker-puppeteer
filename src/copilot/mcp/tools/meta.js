@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 44;
+const CAPABILITIES_VERSION = 46;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -22,6 +22,7 @@ const READ_TOOLS = [
     'repo_root_tree',
     'repo_root_redaction_status',
     'repo_read_file',
+    'repo_bulk_inspect',
     'repo_read_file_chunks',
     'repo_file_stats',
     'repo_diff_files',
@@ -70,6 +71,7 @@ const GIT_TOOLS = [
     'git_diff',
     'git_log',
     'git_branch_info',
+    'git_publish_changes',
     'git_stage_plan',
     'git_stage',
     'git_commit_plan',
@@ -169,7 +171,7 @@ const ANNOTATION_PROFILE = {
     boundedWriteTools: 'readOnlyHint=false, idempotentHint=false, destructiveHint=false, openWorldHint=false by default',
     destructiveTools: 'readOnlyHint=false, idempotentHint=false, destructiveHint=true, openWorldHint=false by default',
     openWorldExceptions:
-        'git_push_plan/git_push and llmb_live_test_run are explicitly open-world because they can contact configured upstream/provider services; their inputs remain closed/allowlisted.',
+        'git_push_plan/git_push/git_publish_changes and llmb_live_test_run are explicitly open-world because they can contact configured upstream/provider services; their inputs remain closed/allowlisted.',
     hostControl:
         'ChatGPT host authorization prompts are controlled by chatgpt.com; this MCP can reduce friction with precise annotations and narrow tools, but cannot disable host safety UI.',
 };
@@ -190,9 +192,9 @@ const IO_GUIDANCE = [
     'Use mcp_host_block_diagnostics after any ChatGPT host-side block to classify it and select a lower-friction replacement.',
     'Use plan-only tools such as repo_patch_plan includeDiffPreview=false, repo_quarantine_file_plan and repo_apply_file_batch_plan before write or destructive apply tools.',
     'Keep includeDiffPreview=false by default for repo_patch_plan, repo_create_file_plan, repo_apply_patch, repo_write_file, repo_create_file and repo_diff_files; request textual diffs only when explicitly needed.',
-    'Prefer repo_read_file.batch for 2-10 independent small/medium reads and repo_search_text.batch for 2-10 independent searches; this collapses repeated ChatGPT/MCP round trips while preserving per-item results.',
+    'Prefer repo_read_file.batch for 2-32 independent small/medium reads and repo_search_text.batch for 2-32 independent searches. Use repo_bulk_inspect when read/search/stat work can be mixed in one call; all three preserve per-item failures and bounded output payloads.',
     'Use repo_patch_batch_plan before several exact-string repo_apply_patch calls to validate all patch preconditions in one read-only planning step.',
-    'Use repo_apply_patch_batch dryRun=true first, then dryRun=false with confirmBatch=true for trusted batches; repeated paths are supported sequentially and are atomic per file.',
+    'Use repo_apply_patch_batch for up to 64 exact-string patches across up to 32 targets. Keep global-preflight for conservative all-target validation, or use per-target-fast when independent targets may apply/fail separately; repeated paths stay sequential and atomic per file.',
     'When several exact-string edits target one file, keep them in one repo_apply_patch_batch so the server performs one lock/read/write/cache-invalidation cycle instead of one cycle per edit.',
     'Use repo_apply_file_batch_plan first, then repo_apply_file_batch when several trusted file operations should be applied in one ChatGPT write confirmation.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
@@ -205,7 +207,7 @@ const IO_GUIDANCE = [
     'Use repo_find_orphan_imports before or after file moves to detect broken local imports.',
     'COPILOT_MCP_INDEX_AUTO_BUILD defaults to true so indexed navigation is warmed outside ChatGPT host calls.',
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
-    'Use mcp_validation_plan with no suite by default; prefer run_copilot_validator validator="unit-focused" with explicit causal .spec.js files, and escalate to mcp_run_safe_validation_suite only for cross-cutting risk or a deliberate release gate.',
+    'Use mcp_validation_plan with no suite by default; prefer run_copilot_validator validator="unit-focused" with explicit causal .spec.js files. Focused/typecheck/lint validators use bounded inline completion by default, so do not poll unless the returned wait expires; escalate to mcp_run_safe_validation_suite only for cross-cutting risk or a deliberate release gate.',
     'Use mcp_validation_dashboard, mcp_last_validation_summary and job_get_summary before job_get_output; read job logs only with small tailBytes and only when needed.',
     'Use repo_root_tree or repo_tree path="." for the real workspace root.',
     'Use repo_root_redaction_status to audit hidden/protected root redaction without returning hidden names.',
@@ -225,7 +227,7 @@ const IO_GUIDANCE = [
     'Use mcp_cloudflare_metrics_snapshot to inspect local cloudflared version, orchestration config version and registration counters.',
     'Use mcp_post_restart_readiness after any restart before starting heavy ChatGPT work.',
     'Use mcp_reload_plan then mcp_reload_schedule only when a new MCP source version must become live; read mcp_reload_status after reconnect.',
-    'Use git_stage_plan/git_commit_plan/git_push_plan before their mutation counterparts; governed Git never accepts force, arbitrary remote or arbitrary refspec.',
+    'Use git_publish_changes when a clean-index set of explicit paths should be staged, committed and optionally pushed in one governed call. Keep git_stage_plan/git_commit_plan/git_push_plan as granular fallback; governed Git never accepts force, arbitrary remote or arbitrary refspec.',
     'Use llmb_live_readiness and llmb_live_runs for read-only Model Gateway live evidence; llmb_live_test_run defaults control-only and requires explicit confirmation for real model/provider usage.',
     'Use claude_connector_profile when adding the same remote MCP server to claude.ai custom connectors.',
     'LLM-B remains a separate runtime process, but the MCP exposes an allowlisted control/test plane over its canonical live harness.',

@@ -20,6 +20,7 @@ import {
     appendMcpAuditEvent,
     authorizeMcpToolCall,
     errorResult,
+    getResultExecutionHint,
     getResultSizeHint,
     normalizeMcpToolDefinitions,
     recordMcpToolMetric,
@@ -571,6 +572,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
         const handlerStartedAt = startPhase('handler');
         const result = await runToolHandlerWithTimeout(tool, args, registryPolicy);
         finishPhase('handler', handlerStartedAt);
+        const executionMetric = getResultExecutionHint(result) ?? undefined;
         const resultSizeStartedAt = startPhase('resultSize');
         const resultSizeValidation = validateToolResultSize(result, registryPolicy);
         const resultSizeError =
@@ -630,6 +632,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             isError: result.isError === true,
             phases,
             ...(resultSizeMetric ? { resultSize: resultSizeMetric } : {}),
+            ...(executionMetric ? { execution: executionMetric } : {}),
         });
         return result;
     } catch (error) {

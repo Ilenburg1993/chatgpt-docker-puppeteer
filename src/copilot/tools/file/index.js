@@ -15,6 +15,7 @@ export {
     fileReadTools,
     listDirectoryTool,
     readFileContentTool,
+    readFilesBatchTool,
 } from './read-tools.js';
 
 export {
@@ -49,6 +50,7 @@ export {
     fileWriteTools,
     moveFileTool,
     patchFileTool,
+    patchFilesBatchTool,
     rollbackFileChangesTool,
     rollbackSidecarsStatusTool,
     writeFileContentTool,

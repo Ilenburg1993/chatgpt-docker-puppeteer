@@ -98,6 +98,7 @@ export const mcpLatencyDashboardTool = {
         const phaseRows = buildPhaseRows(metrics.tools, maxRows);
         const phaseTotals = buildPhaseTotals(metrics.tools);
         const byteAccounting = buildByteAccounting(metrics.tools);
+        const roundTripAccounting = buildRoundTripAccounting(metrics.tools, maxRows);
         const assessment = assessLatencySnapshot(metrics, phaseTotals, budgets);
         const dashboard = {
             timestamp: new Date().toISOString(),
@@ -114,6 +115,8 @@ export const mcpLatencyDashboardTool = {
                 ...assessment.summary,
                 largestAverageResultBytes: largestResultPayloads[0]?.averageBytes ?? 0,
                 highestResultVolumeBytes: highestResultVolume[0]?.totalBytes ?? 0,
+                logicalOperations: roundTripAccounting.logicalOperations,
+                logicalOperationsPerCall: roundTripAccounting.logicalOperationsPerCall,
             },
             critical: assessment.critical,
             warnings: assessment.warnings,
@@ -126,6 +129,7 @@ export const mcpLatencyDashboardTool = {
             slowestPhases: phaseRows,
             phaseTotals,
             byteAccounting,
+            roundTripAccounting,
             nextActions: buildNextActions(assessment, metrics.totals.calls, budgets),
         };
         const persistSnapshot = options['persistSnapshot'] === true;
@@ -462,6 +466,60 @@ function buildByteAccounting(tools) {
         averageBytes: calls > 0 ? Math.round(totals.totalBytes / calls) : null,
         hintRate: calls > 0 ? roundRatio(totals.hint / calls) : 0,
         stringifyRate: calls > 0 ? roundRatio(totals.stringify / calls) : 0,
+    };
+}
+
+/**
+ * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric & { averageDurationMs: number }>} tools
+ * @param {number} maxRows
+ */
+function buildRoundTripAccounting(tools, maxRows) {
+    let calls = 0;
+    let batchCalls = 0;
+    let logicalOperations = 0;
+    let failedOperations = 0;
+    let skippedOperations = 0;
+    const rows = [];
+    for (const [name, metric] of Object.entries(tools)) {
+        calls += metric.calls;
+        const execution = metric.execution;
+        const logical = Number(execution?.logicalOperations ?? metric.calls);
+        const batches = Number(execution?.batchCalls ?? 0);
+        const failed = Number(execution?.failedOperations ?? 0);
+        const skipped = Number(execution?.skippedOperations ?? 0);
+        logicalOperations += logical;
+        batchCalls += batches;
+        failedOperations += failed;
+        skippedOperations += skipped;
+        if (logical > metric.calls || batches > 0) {
+            rows.push({
+                name,
+                calls: metric.calls,
+                batchCalls: batches,
+                logicalOperations: logical,
+                logicalOperationsPerCall: metric.calls > 0 ? roundRatio(logical / metric.calls) : 0,
+                failedOperations: failed,
+                skippedOperations: skipped,
+                lastLogicalOperations: Number(execution?.lastLogicalOperations ?? 1),
+                lastMode: execution?.lastMode ?? null,
+            });
+        }
+    }
+    rows.sort(
+        (left, right) =>
+            right.logicalOperationsPerCall - left.logicalOperationsPerCall ||
+            right.logicalOperations - left.logicalOperations ||
+            left.name.localeCompare(right.name),
+    );
+    return {
+        calls,
+        batchCalls,
+        logicalOperations,
+        failedOperations,
+        skippedOperations,
+        logicalOperationsPerCall: calls > 0 ? roundRatio(logicalOperations / calls) : 0,
+        compressedRoundTrips: Math.max(0, logicalOperations - calls),
+        topCompressedTools: rows.slice(0, maxRows),
     };
 }
 
