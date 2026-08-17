@@ -1583,14 +1583,46 @@ Ativação final:
 - authenticated `tools/list`: **117.956 bytes**, exatamente sem crescimento de superfície pelo novo fast path;
 - smoke total: **1.009 ms**, authenticated OAuth **996 ms**.
 
-Prova causal no processo final:
+Prova causal inicial no processo final:
 
 1. baseline `validatedMutablePath`: **0 issued / 0 accepted / 0 rejects**;
 2. uma chamada real de `repo_apply_patch` em `dryRun=true` com no-op permitido atravessou o adapter MCP;
-3. a operação reportou **9 ms de I/O** e o handler **17 ms**;
-4. novo health: **1 issued / 1 accepted / 0 rejects**.
+3. a operação reportou I/O de poucos milissegundos e incrementou `issued/accepted` de forma pareada;
+4. portanto uma operação MCP real em patch eliminou uma segunda walk de path policy/realpath, observável em produção e não apenas inferida pela estrutura do código.
 
-Portanto uma operação MCP real em patch eliminou exatamente uma segunda walk de path policy/realpath, e o resultado é observável em produção em vez de inferido apenas pela estrutura do código.
+#### Refinamento final — autoridade mínima também na emissão
+
+A primeira ativação revelou um problema mais sutil que não era uma vulnerabilidade de escape, mas contrariava o princípio de menor autoridade: o adapter genérico `resolveWritePath()` pedia `validatedWritePath` para **todo** caminho de escrita. Assim, quarantine/remove/move e outros fluxos que continuavam corretamente no caminho string podiam receber uma capability que nunca seria consumida. Em uma prova controlada após patch + create + quarantine, os contadores chegaram a **12 issued / 11 accepted**. O reject count permaneceu zero, mas `issued != accepted` mostrou capacidade emitida sem utilidade.
+
+O contrato foi então endurecido em dois níveis:
+
+- `validatePath(..., {mode:'write'})` **não** emite mutable capability por default; exige `issueMutableCapability:true`;
+- `resolveWritePath(path)` também defaulta sem capability e aceita o mesmo opt-in interno;
+- apenas consumidores que entram em `writeFileAtomicValidated`, `createOrReplaceFileAtomicValidated`, `patchTextLockedValidated` ou `patchTextBatchLockedValidated` pedem explicitamente a capability;
+- `repo_write_file` e `repo_create_file` só pedem capability em apply real; seus dry-runs não recebem autoridade mutável desnecessária;
+- patch single/batch pede capability porque até o dry-run usa a primitive canônica de patch;
+- quarantine, remove, move, restore, Git paths e plans continuam sem emissão;
+- a LLM-B segue a mesma política: write/create/patch opt-in; delete/copy/move não opt-in.
+
+Teste adicional prova que `repo_remove_file` sem confirmação, embora execute a policy de path, deixa `validatedMutablePath` em **0 issued / 0 accepted**. Os testes locais também verificam que write/create solicitam explicitamente `issueMutableCapability:true`, enquanto delete e destinos de copy/move permanecem apenas em `{mode:'write'}`.
+
+Segunda ativação controlada, já com emissão mínima:
+
+1. baseline pós-reload: **0 issued / 0 accepted / 0 rejects**;
+2. patch dry-run/no-op controlado: I/O **1 ms**;
+3. create real temporário: I/O **15 ms**;
+4. quarantine reversível do temporário: move I/O **15 ms**, mas sem capability mutável própria;
+5. health final do processo: **3 issued / 3 accepted / 0 rejects**.
+
+O número absoluto 3 inclui atividade MCP do mesmo processo além das duas operações explicitamente disparadas para a prova; o sinal importante é mais forte: **toda capability emitida foi consumida** (`accepted == issued`) e quarantine não voltou a criar emissão órfã. O handler observado de quarantine ficou em ~74 ms enquanto o move subjacente consumiu ~15 ms, indicando que metadata/audit/transaction overhead — e não a segunda path walk removida — passa a dominar esse fluxo.
+
+Gates após o refinamento de autoridade mínima:
+
+- MCP repo-write: **passed em 5,085 s**;
+- LLM-B write tools: **passed em 1,986 s**;
+- LLM-B bulk file tools: **passed em 1,809 s**;
+- strict typecheck: **passed em 9,105 s**;
+- reload QUIC + `mcp_connector_smoke_refresh`: `ready=true`, OAuth/SSE green, **119/119** tools e authenticated `tools/list` **117.956 bytes**.
 
 `CAPABILITIES_VERSION` permanece em **49**: nenhuma tool, schema, permissão, annotation ou contrato MCP externo mudou; a transformação é interna ao plano de I/O. Uma elevação aqui confundiria versão de superfície anunciada com versão de implementação. A versão relevante para invalidação da capability é `IO_PATH_POLICY_VERSION=2026-08-17.r3.nearest-ancestor.v1`.
 
