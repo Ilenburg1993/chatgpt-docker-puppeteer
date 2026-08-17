@@ -7,6 +7,7 @@
 
 import { createTtlCache } from '#copilot/mcp/control-plane';
 import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
+import { readCloudflareRulesetSnapshot } from './ruleset-snapshot.js';
 
 /** @typedef {import('cloudflare').default} CloudflareEdgeAuditClient */
 
@@ -33,7 +34,7 @@ const SENSITIVE_HEADER_NAMES = [
 ];
 
 const INTERACTIVE_OR_BLOCKING_ACTIONS = ['managed_challenge', 'js_challenge', 'challenge', 'block'];
-const DEFAULT_EDGE_AUDIT_CACHE_TTL_MS = 5_000;
+const DEFAULT_EDGE_AUDIT_CACHE_TTL_MS = 60_000;
 
 /** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
 const edgeAuditCache = createTtlCache({
@@ -115,16 +116,21 @@ export async function auditCloudflareEdgeRulesets(options = {}) {
     const cacheKey = buildEdgeAuditCacheKey(edgeConfig);
     return edgeAuditCache.getOrLoad(
         cacheKey,
-        () => auditCloudflareEdgeRulesetsUncached(edgeConfig),
+        () =>
+            auditCloudflareEdgeRulesetsUncached(edgeConfig, {
+                forceRefresh: options.forceRefresh === true,
+                ...(options.cacheTtlMs === undefined ? {} : { cacheTtlMs: options.cacheTtlMs }),
+            }),
         { forceRefresh: options.forceRefresh === true, ttlMs: readEdgeAuditCacheTtlMs(options.cacheTtlMs) },
     );
 }
 
 /**
  * @param {EdgeAuditConfig} edgeConfig
+ * @param {{ forceRefresh?: boolean; cacheTtlMs?: number }} snapshotOptions
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
-async function auditCloudflareEdgeRulesetsUncached(edgeConfig) {
+async function auditCloudflareEdgeRulesetsUncached(edgeConfig, snapshotOptions) {
     const client = getCloudflareClient(edgeConfig.apiToken ?? '');
     const zoneResolution = await resolveZoneId(client, edgeConfig);
     if (!zoneResolution.zoneId) {
@@ -152,7 +158,18 @@ async function auditCloudflareEdgeRulesetsUncached(edgeConfig) {
     }
 
     try {
-        const rulesets = await readZoneRulesets(client, zoneResolution.zoneId);
+        const snapshot = await readCloudflareRulesetSnapshot({
+            apiToken: edgeConfig.apiToken ?? '',
+            zoneId: zoneResolution.zoneId,
+            forceRefresh: snapshotOptions.forceRefresh === true,
+            ...(snapshotOptions.cacheTtlMs === undefined ? {} : { cacheTtlMs: snapshotOptions.cacheTtlMs }),
+        });
+        const rulesets = snapshot.rulesets
+            .map(simplifyRuleset)
+            .filter((ruleset) => CLOUDFLARE_EDGE_PHASES.includes(ruleset.phase ?? ''))
+            .sort((left, right) =>
+                `${left.phase ?? ''}:${left.name ?? ''}`.localeCompare(`${right.phase ?? ''}:${right.name ?? ''}`),
+            );
         const analysis = analyzeEdgeRulesets(rulesets, {
             publicHostname: edgeConfig.publicHostname,
         });
@@ -207,7 +224,7 @@ async function auditCloudflareEdgeRulesetsUncached(edgeConfig) {
  */
 function readEdgeAuditCacheTtlMs(value) {
     if (value === undefined) return DEFAULT_EDGE_AUDIT_CACHE_TTL_MS;
-    return Number.isFinite(value) && value >= 0 && value <= 60_000 ? Math.floor(value) : DEFAULT_EDGE_AUDIT_CACHE_TTL_MS;
+    return Number.isFinite(value) && value >= 0 && value <= 300_000 ? Math.floor(value) : DEFAULT_EDGE_AUDIT_CACHE_TTL_MS;
 }
 
 /**
@@ -274,27 +291,6 @@ async function resolveZoneId(client, config) {
             warnings: [`Could not resolve Cloudflare zone ID: ${sanitizeError(error)}`],
         };
     }
-}
-
-/**
- * @param {CloudflareEdgeAuditClient} client
- * @param {string} zoneId
- * @returns {Promise<SimplifiedRuleset[]>}
- */
-async function readZoneRulesets(client, zoneId) {
-    /** @type {SimplifiedRuleset[]} */
-    const rulesets = [];
-    for await (const ruleset of client.rulesets.list({ zone_id: zoneId })) {
-        const summary = asRecord(ruleset);
-        const phase = typeof summary['phase'] === 'string' ? summary['phase'] : '';
-        if (!CLOUDFLARE_EDGE_PHASES.includes(phase)) continue;
-        const id = typeof summary['id'] === 'string' ? summary['id'] : '';
-        const detailed = id ? await client.rulesets.get(id, { zone_id: zoneId }) : summary;
-        rulesets.push(simplifyRuleset(detailed));
-    }
-    return rulesets.sort((left, right) =>
-        `${left.phase ?? ''}:${left.name ?? ''}`.localeCompare(`${right.phase ?? ''}:${right.name ?? ''}`),
-    );
 }
 
 /**

@@ -12,6 +12,7 @@
 import { createTtlCache } from '#copilot/mcp/control-plane';
 import { readBoundedResponseJson } from '#copilot/infra/public/http-response';
 import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
+import { readCloudflareRulesetSnapshot } from './ruleset-snapshot.js';
 
 /** @typedef {import('cloudflare').default} CloudflareConfigAuditClient */
 
@@ -19,7 +20,7 @@ const CONFIG_PHASE = 'http_config_settings';
 const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com/client/v4';
 
 const DYNAMIC_MCP_PATHS = ['/mcp', '/oauth/', '/.well-known/', '/health'];
-const DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS = 5_000;
+const DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS = 60_000;
 
 /** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
 const configAuditCache = createTtlCache({
@@ -170,16 +171,21 @@ export async function auditCloudflareConfigPosture(options = {}) {
     const cacheKey = buildConfigAuditCacheKey(auditConfig);
     return configAuditCache.getOrLoad(
         cacheKey,
-        () => auditCloudflareConfigPostureUncached(auditConfig),
+        () =>
+            auditCloudflareConfigPostureUncached(auditConfig, {
+                forceRefresh: options.forceRefresh === true,
+                ...(options.cacheTtlMs === undefined ? {} : { cacheTtlMs: options.cacheTtlMs }),
+            }),
         { forceRefresh: options.forceRefresh === true, ttlMs: readConfigAuditCacheTtlMs(options.cacheTtlMs) },
     );
 }
 
 /**
  * @param {ConfigAuditConfig} auditConfig
+ * @param {{ forceRefresh?: boolean; cacheTtlMs?: number }} snapshotOptions
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
-async function auditCloudflareConfigPostureUncached(auditConfig) {
+async function auditCloudflareConfigPostureUncached(auditConfig, snapshotOptions) {
     const client = getCloudflareClient(auditConfig.apiToken ?? '');
     const zoneResolution = await resolveZoneId(client, auditConfig);
     if (!zoneResolution.zoneId) {
@@ -209,7 +215,7 @@ async function auditCloudflareConfigPostureUncached(auditConfig) {
 
     const [zoneSettingsResult, configRulesetsResult] = await Promise.all([
         readZoneSettings(auditConfig.apiToken ?? '', zoneResolution.zoneId),
-        readConfigRulesets(client, zoneResolution.zoneId, auditConfig.publicHostname),
+        readConfigRulesets(auditConfig.apiToken ?? '', zoneResolution.zoneId, auditConfig.publicHostname, snapshotOptions),
     ]);
 
     const analysis = analyzeConfigPosture(zoneSettingsResult.settings, configRulesetsResult.rulesets, {
@@ -380,20 +386,24 @@ async function readZoneSetting(apiToken, zoneId, setting) {
 }
 
 /**
- * @param {CloudflareConfigAuditClient} client
+ * @param {string} apiToken
  * @param {string} zoneId
  * @param {string} publicHostname
+ * @param {{ forceRefresh?: boolean; cacheTtlMs?: number }} snapshotOptions
  * @returns {Promise<{ rulesets: ConfigRuleSummary[]; warnings: string[]; permissionGaps: string[] }>}
  */
-async function readConfigRulesets(client, zoneId, publicHostname) {
+async function readConfigRulesets(apiToken, zoneId, publicHostname, snapshotOptions) {
     const rules = [];
     try {
-        for await (const ruleset of client.rulesets.list({ zone_id: zoneId })) {
-            const summary = asRecord(ruleset);
-            if (summary['phase'] !== CONFIG_PHASE) continue;
-            const id = typeof summary['id'] === 'string' ? summary['id'] : '';
-            const detailed = id ? await client.rulesets.get(id, { zone_id: zoneId }) : summary;
-            const record = asRecord(detailed);
+        const snapshot = await readCloudflareRulesetSnapshot({
+            apiToken,
+            zoneId,
+            forceRefresh: snapshotOptions.forceRefresh === true,
+            ...(snapshotOptions.cacheTtlMs === undefined ? {} : { cacheTtlMs: snapshotOptions.cacheTtlMs }),
+        });
+        for (const ruleset of snapshot.rulesets) {
+            const record = asRecord(ruleset);
+            if (record['phase'] !== CONFIG_PHASE) continue;
             const rawRules = Array.isArray(record['rules']) ? record['rules'] : [];
             for (const rule of rawRules) rules.push(simplifyConfigRule(rule, publicHostname));
         }
@@ -437,7 +447,7 @@ function simplifyConfigRule(rule, publicHostname) {
  */
 function readConfigAuditCacheTtlMs(value) {
     if (value === undefined) return DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS;
-    return Number.isFinite(value) && value >= 0 && value <= 60_000 ? Math.floor(value) : DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS;
+    return Number.isFinite(value) && value >= 0 && value <= 300_000 ? Math.floor(value) : DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS;
 }
 
 /**

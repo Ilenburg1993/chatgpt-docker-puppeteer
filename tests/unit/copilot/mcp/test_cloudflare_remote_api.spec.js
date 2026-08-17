@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { compareRemoteConfig, parseEnvFile } from '#copilot/mcp/cloudflare';
 import { getCloudflareClient } from '../../../../src/copilot/mcp/cloudflare/remote-api.js';
+import { compactCloudflareRemoteAudit } from '../../../../src/copilot/mcp/tools/cloudflare-remote.js';
 
 /**
  * @returns {import('#copilot/mcp/cloudflare').CloudflareRemoteApiConfig}
@@ -76,6 +77,70 @@ EMPTY=
         ]);
         const remote = /** @type {{ config: { hostnameRule?: { matchesExpectedOrigin?: boolean } } }} */ (result.remote);
         expect(remote.config.hostnameRule?.matchesExpectedOrigin).toBe(false);
+    });
+
+    it('compacts remote MCP presentation without repeating the full desired origin profile', () => {
+        const compact = compactCloudflareRemoteAudit({
+            ok: true,
+            success: true,
+            mode: 'read-only',
+            credentials: { apiTokenPresent: true },
+            desired: {
+                tunnelName: 'workspace-mcp-dev',
+                publicHostname: 'mcp.aurelin.org',
+                publicMcpUrl: 'https://mcp.aurelin.org/mcp',
+                originService: 'https://127.0.0.1:3333',
+                zone: 'aurelin.org',
+                desiredOriginRequestProfile: { veryLargeRepeatedProfile: 'omit-me' },
+            },
+            remote: {
+                tunnel: {
+                    id: 'tunnel',
+                    name: 'workspace-mcp-dev',
+                    status: 'healthy',
+                    source: 'cfd_tunnel',
+                    connections: [
+                        { coloName: 'gru20', isPendingReconnect: false, clientVersion: '2026.5.2' },
+                        { coloName: 'gru21', isPendingReconnect: false, clientVersion: '2026.5.2' },
+                    ],
+                },
+                config: {
+                    source: 'cloudflare',
+                    version: 3,
+                    catchAllConfigured: true,
+                    hostnameRule: {
+                        hostname: 'mcp.aurelin.org',
+                        service: 'https://127.0.0.1:3333',
+                        matchesExpectedOrigin: true,
+                        originRequest: { http2Origin: true, noTLSVerify: false, keepAliveConnections: 100 },
+                        originRequestFindings: {
+                            score: { explicitMatches: 9, explicitRecommendedCount: 9, explicitCoverage: 1 },
+                            fieldFindings: [
+                                { key: 'http2Origin', status: 'ok' },
+                                { key: 'connectTimeout', status: 'warning', actualValue: '30s', recommendedValue: '5s', action: 'pin' },
+                            ],
+                            critical: [],
+                            warnings: ['one drift'],
+                            desired: { repeated: 'omit-me' },
+                        },
+                    },
+                },
+            },
+            dns: { checked: true, matchesExpectedTunnel: true, records: [], critical: [], warnings: [] },
+            critical: [],
+            warnings: [],
+            nextActions: [],
+        });
+
+        expect(compact.tunnel.connections).toEqual({
+            total: 2,
+            active: 2,
+            colos: ['gru20', 'gru21'],
+            clientVersions: ['2026.5.2'],
+        });
+        expect(compact.config.hostnameRule.drift).toHaveLength(1);
+        expect(JSON.stringify(compact)).not.toContain('veryLargeRepeatedProfile');
+        expect(JSON.stringify(compact)).not.toContain('repeated');
     });
 
     it('accepts the canonical permanent tunnel ingress', () => {

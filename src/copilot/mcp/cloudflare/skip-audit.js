@@ -9,9 +9,10 @@
  * @module copilot/mcp/cloudflare/skip-audit
  */
 
-import Cloudflare from 'cloudflare';
+import { createTtlCache } from '#copilot/mcp/control-plane';
 import { auditCloudflareConfigPosture } from './config-audit.js';
-import { readCloudflareRemoteApiConfig } from './remote-api.js';
+import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
+import { readCloudflareRulesetSnapshot } from './ruleset-snapshot.js';
 
 const SKIP_AUDIT_PHASES = [
     'http_request_firewall_custom',
@@ -33,8 +34,25 @@ const SKIPPABLE_PRODUCTS = [
     'rateLimit',
 ];
 const NON_SKIPPABLE_OR_CONFIG_FIRST_PRODUCTS = ['rocketLoader', 'rum', 'emailObfuscation', 'zaraz'];
+const DEFAULT_SKIP_AUDIT_CACHE_TTL_MS = 60_000;
+
+/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
+const skipAuditCache = createTtlCache({
+    name: 'cloudflare-skip-audit',
+    ttlMs: DEFAULT_SKIP_AUDIT_CACHE_TTL_MS,
+    maxEntries: 32,
+});
 
 /**
+ * @typedef {object} SkipAuditConfig
+ * @property {string | undefined} apiToken
+ * @property {string | undefined} accountId
+ * @property {string | undefined} zoneId
+ * @property {string} zone
+ * @property {string} publicHostname
+ * @property {string} expectedPublicMcpUrl
+ * @property {string[]} credentialSources
+ *
  * @typedef {object} SkipRuleSummary
  * @property {string | null} id
  * @property {string | null} ref
@@ -54,11 +72,12 @@ const NON_SKIPPABLE_OR_CONFIG_FIRST_PRODUCTS = ['rocketLoader', 'rum', 'emailObf
  */
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv }} [options]
+ * @param {{ env?: NodeJS.ProcessEnv; cacheTtlMs?: number; forceRefresh?: boolean }} [options]
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 export async function auditCloudflareSkipPosture(options = {}) {
     const config = await readCloudflareRemoteApiConfig(options.env ?? process.env);
+    /** @type {SkipAuditConfig} */
     const auditConfig = {
         apiToken: config.apiToken,
         accountId: config.accountId,
@@ -85,7 +104,20 @@ export async function auditCloudflareSkipPosture(options = {}) {
         };
     }
 
-    const client = new Cloudflare({ apiToken: auditConfig.apiToken ?? '', maxRetries: 1, timeout: 15000 });
+    const cacheKey = buildSkipAuditCacheKey(auditConfig);
+    return skipAuditCache.getOrLoad(
+        cacheKey,
+        () => auditCloudflareSkipPostureUncached(auditConfig, options),
+        { forceRefresh: options.forceRefresh === true, ttlMs: readSkipAuditCacheTtlMs(options.cacheTtlMs) },
+    );
+}
+
+/**
+ * @param {SkipAuditConfig} auditConfig
+ * @param {{ cacheTtlMs?: number; forceRefresh?: boolean }} options
+ */
+async function auditCloudflareSkipPostureUncached(auditConfig, options) {
+    const client = getCloudflareClient(auditConfig.apiToken ?? '');
     const zoneResolution = await resolveZoneId(client, auditConfig);
     if (!zoneResolution.zoneId) {
         return {
@@ -114,7 +146,7 @@ export async function auditCloudflareSkipPosture(options = {}) {
     }
 
     const [skipRulesResult, configBaseline] = await Promise.all([
-        readSkipRules(client, zoneResolution.zoneId, auditConfig.publicHostname),
+        readSkipRules(auditConfig.apiToken ?? '', zoneResolution.zoneId, auditConfig.publicHostname, options),
         auditCloudflareConfigPosture(options),
     ]);
     const analysis = analyzeSkipPosture(skipRulesResult.rules, configBaseline, {
@@ -230,22 +262,26 @@ export function analyzeSkipPosture(skipRules, configBaseline, context) {
 }
 
 /**
- * @param {Cloudflare} client
+ * @param {string} apiToken
  * @param {string} zoneId
  * @param {string} publicHostname
+ * @param {{ cacheTtlMs?: number; forceRefresh?: boolean }} options
  * @returns {Promise<{ rules: SkipRuleSummary[]; warnings: string[]; permissionGaps: string[] }>}
  */
-async function readSkipRules(client, zoneId, publicHostname) {
+async function readSkipRules(apiToken, zoneId, publicHostname, options) {
     /** @type {SkipRuleSummary[]} */
     const rules = [];
     try {
-        for await (const ruleset of client.rulesets.list({ zone_id: zoneId })) {
-            const summary = asRecord(ruleset);
-            const phase = typeof summary['phase'] === 'string' ? summary['phase'] : '';
+        const snapshot = await readCloudflareRulesetSnapshot({
+            apiToken,
+            zoneId,
+            forceRefresh: options.forceRefresh === true,
+            ...(options.cacheTtlMs === undefined ? {} : { cacheTtlMs: options.cacheTtlMs }),
+        });
+        for (const ruleset of snapshot.rulesets) {
+            const record = asRecord(ruleset);
+            const phase = typeof record['phase'] === 'string' ? record['phase'] : '';
             if (!SKIP_AUDIT_PHASES.includes(phase)) continue;
-            const id = typeof summary['id'] === 'string' ? summary['id'] : '';
-            const detailed = id ? await client.rulesets.get(id, { zone_id: zoneId }) : summary;
-            const record = asRecord(detailed);
             const rawRules = Array.isArray(record['rules']) ? record['rules'] : [];
             for (const rule of rawRules) {
                 const simplified = simplifySkipRule(rule, phase, publicHostname);
@@ -361,7 +397,7 @@ function buildEmptyFindings(publicHostname) {
 }
 
 /**
- * @param {Cloudflare} client
+ * @param {import('cloudflare').default} client
  * @param {{ zoneId: string | undefined; accountId: string | undefined; zone: string }} config
  * @returns {Promise<{ zoneId: string | null; source: string | null; zoneName: string; zoneIdRedaction: string | null; warnings: string[] }>}
  */
@@ -382,6 +418,25 @@ async function resolveZoneId(client, config) {
     } catch (error) {
         return { zoneId: null, source: null, zoneName: config.zone, zoneIdRedaction: null, warnings: [`Could not resolve Cloudflare zone ID: ${sanitizeError(error)}`] };
     }
+}
+
+/** @param {number | undefined} value */
+function readSkipAuditCacheTtlMs(value) {
+    if (value === undefined) return DEFAULT_SKIP_AUDIT_CACHE_TTL_MS;
+    return Number.isFinite(value) && value >= 0 && value <= 300_000
+        ? Math.floor(value)
+        : DEFAULT_SKIP_AUDIT_CACHE_TTL_MS;
+}
+
+/** @param {SkipAuditConfig} config */
+function buildSkipAuditCacheKey(config) {
+    return JSON.stringify({
+        accountId: config.accountId ?? null,
+        zoneId: config.zoneId ?? null,
+        zone: config.zone,
+        publicHostname: config.publicHostname,
+        expectedPublicMcpUrl: config.expectedPublicMcpUrl,
+    });
 }
 
 /**

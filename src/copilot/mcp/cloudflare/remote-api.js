@@ -16,7 +16,7 @@ import {
 } from './origin-request-profile.js';
 
 const DEFAULT_ENV_FILE = '.env.local';
-const DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS = 5_000;
+const DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS = 60_000;
 const DEFAULT_ENV_FILE_CACHE_TTL_MS = 2_000;
 
 /** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean }>} */
@@ -195,7 +195,9 @@ function buildRemoteAuditNextActions(h2Origin) {
  */
 function readCacheTtlMs(value) {
     if (value === undefined) return DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS;
-    return Number.isFinite(value) && value >= 0 && value <= 60_000 ? Math.floor(value) : DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS;
+    return Number.isFinite(value) && value >= 0 && value <= 300_000
+        ? Math.floor(value)
+        : DEFAULT_REMOTE_AUDIT_CACHE_TTL_MS;
 }
 
 /**

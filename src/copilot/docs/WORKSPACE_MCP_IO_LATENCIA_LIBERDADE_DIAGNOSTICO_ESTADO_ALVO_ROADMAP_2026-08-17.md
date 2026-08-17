@@ -975,3 +975,29 @@ O ESLint já usava cache persistente. Foi testado `--concurrency auto` de forma 
 
 A regra desta frente permanece: otimização de validator só entra quando preserva o mesmo conjunto de checks e vence benchmark real; mudanças que apenas parecem mais paralelas não são mantidas.
 
+### 21.6 Lote 6 — Cloudflare diagnostic plane compartilhado
+
+Os audits `edge`, `config` e `skip` inspecionavam famílias sobrepostas de zone rulesets, mas cada um pagava `rulesets.list` + `rulesets.get` próprios. Foi criado `cloudflare/ruleset-snapshot.js`: snapshot in-process de 60 s, chaveado por fingerprint não reversível do token + zone id, com `rulesets.get` em concorrência limitada a 6. O token nunca é retornado pelo snapshot. `forceRefresh` continua atravessando até a API e os caches aceitam override bounded.
+
+Também foram alinhados para uma janela diagnóstica default de 60 s:
+
+- edge audit;
+- config audit;
+- skip audit (que ganhou cache próprio);
+- remote tunnel/DNS audit.
+
+Medições live após reload, comparadas ao baseline frio anterior desta investigação:
+
+- edge: **4.606 ms → 3.028 ms** no primeiro fetch (-34%); repetição quente **4 ms**;
+- config: **2.721 ms → 1.564 ms** no primeiro fetch (-42%); repetição quente **14 ms**;
+- skip: **3.476 ms → 521 ms** no primeiro fetch após edge/config (-85%); repetição quente **7 ms**;
+- remote audit: cold ~**3.449–3.536 ms**, repetição quente **4 ms** com TTL 60 s.
+
+O remote audit ainda aparecia como maior payload de diagnóstico: ~**51.284 bytes** por chamada, porque repetia o perfil desejado de `originRequest` em múltiplas subárvores. A função canônica rica foi preservada para policy/diff/backup; apenas a tool MCP foi compactada para estado operacional, score, drift e campos efetivos. Prova live após reload:
+
+- `mcp_cloudflare_remote_audit`: **51.284 → 4.729 bytes** por resultado, redução de ~90,8%;
+- cold handler continuou dominado pela API externa (~3,45 s), mas warm handler ficou **3–4 ms**;
+- tunnel continua healthy, 4/4 conexões ativas, `http2Origin=true`, TLS verification ativa e DNS apontando para o tunnel esperado.
+
+Testes focados de edge audit, config, remote API/compact presentation e strict typecheck passaram. O diagnostic plane agora paga a rede uma vez por janela de investigação e reutiliza a mesma evidência sem enfraquecer `forceRefresh`.
+
