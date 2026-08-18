@@ -148,7 +148,7 @@ const _registry = new Map();
 const _warmPromises = new Map();
 /** @type {Map<string, AbortController>} */
 const _warmControllers = new Map();
-/** @type {Map<string, Promise<boolean>>} */
+/** @type {Map<string, Promise<'refreshed' | 'removed' | 'removed-failed' | 'failed'>>} */
 const _refreshingPaths = new Map();
 
 const MAX_ACTIVE_SCOPES = readEnvPositiveInt('IO_MAX_ACTIVE_SCOPES', 10);
@@ -205,6 +205,32 @@ function deleteScopeSymbols(scope, filePath) {
     scope.symbolIndex.delete(filePath);
     scope.symbolBytesByPath.delete(filePath);
     scope.symbolBytes = Math.max(0, scope.symbolBytes - previous);
+}
+
+/**
+ * Remove um arquivo que deixou de existir (ou deixou de ser arquivo) do working set sem fazer backfill silencioso.
+ * `candidateFiles`/selection permanecem como evidência da seleção original; `selectedFiles` acompanha o conjunto vivo.
+ *
+ * @param {_InternalScope} scope
+ * @param {string} filePath
+ */
+function removeScopePath(scope, filePath) {
+    const normalized = normalizeScopePath(filePath);
+    deleteScopeSymbols(scope, filePath);
+    scope.paths = scope.paths.filter((candidate) => normalizeScopePath(candidate) !== normalized);
+    for (const invalidatedPath of [...scope.invalidatedPaths]) {
+        if (normalizeScopePath(invalidatedPath) === normalized) scope.invalidatedPaths.delete(invalidatedPath);
+    }
+    scope.selectedFiles = scope.paths.length;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isScopePathRemovalError(error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code ?? '') : '';
+    return code === 'ENOENT' || code === 'ENOTDIR' || code === 'EISDIR';
 }
 
 /**
@@ -822,18 +848,19 @@ export function invalidateScopePath(sessionId, filePath) {
  *
  * @param {string} sessionId
  * @param {string[]} [modifiedPaths] - Paths explicitamente alterados; quando omitido usa somente invalidatedPaths.
- * @returns {Promise<{ refreshed: number; failed: number; skipped: number }>}
+ * @returns {Promise<{ refreshed: number; removed: number; failed: number; skipped: number }>}
  */
 export async function refreshScope(sessionId, modifiedPaths) {
     const scope = _registry.get(sessionId);
-    if (!scope) return { refreshed: 0, failed: 0, skipped: 0 };
+    if (!scope) return { refreshed: 0, removed: 0, failed: 0, skipped: 0 };
     touchScope(scope);
 
     const targets = [...new Set((modifiedPaths ?? [...scope.invalidatedPaths]).map(normalizeScopePath))];
     let refreshed = 0;
+    let removed = 0;
     let failed = 0;
     let skipped = 0;
-    if (targets.length === 0) return { refreshed, failed, skipped };
+    if (targets.length === 0) return { refreshed, removed, failed, skipped };
 
     const limit = pLimit(scope.refreshConcurrency);
     await Promise.all(
@@ -874,17 +901,50 @@ export async function refreshScope(sessionId, modifiedPaths) {
                         }
                         setScopeSymbols(scope, p, symbols);
                         scope.invalidatedPaths.delete(p);
-                        return true;
+                        return /** @type {const} */ ('refreshed');
                     } catch (error) {
+                        if (isScopePathRemovalError(error)) {
+                            let indexFailed = false;
+                            if (scope.indexMode !== 'off' && scope.workspaceRoot) {
+                                try {
+                                    const indexResult = await refreshIoIndexPaths([p], { workspaceRoot: scope.workspaceRoot });
+                                    if (Number(indexResult.failed ?? 0) > 0) {
+                                        indexFailed = true;
+                                        recordScopeFailure(
+                                            scope,
+                                            { code: 'EINDEXPARTIAL', name: 'ScopeIndexError' },
+                                            'index',
+                                            'índice do working set falhou ao convergir remoção',
+                                        );
+                                    }
+                                } catch (indexError) {
+                                    indexFailed = true;
+                                    recordScopeFailure(
+                                        scope,
+                                        indexError,
+                                        'index',
+                                        'índice do working set falhou ao convergir remoção',
+                                    );
+                                }
+                            }
+                            removeScopePath(scope, p);
+                            return indexFailed
+                                ? /** @type {const} */ ('removed-failed')
+                                : /** @type {const} */ ('removed');
+                        }
                         recordScopeFailure(scope, error, 'refresh', 'atualização do escopo falhou');
-                        return false;
+                        return /** @type {const} */ ('failed');
                     }
                 })();
                 _refreshingPaths.set(refreshKey, refreshPromise);
                 try {
-                    const succeeded = await refreshPromise;
-                    if (succeeded) refreshed++;
-                    else failed++;
+                    const outcome = await refreshPromise;
+                    if (outcome === 'refreshed') refreshed++;
+                    else if (outcome === 'removed') removed++;
+                    else if (outcome === 'removed-failed') {
+                        removed++;
+                        failed++;
+                    } else failed++;
                 } finally {
                     if (_refreshingPaths.get(refreshKey) === refreshPromise) _refreshingPaths.delete(refreshKey);
                 }
@@ -899,7 +959,7 @@ export async function refreshScope(sessionId, modifiedPaths) {
         scope.ready = false;
         scope.degraded = failed > 0;
     }
-    return { refreshed, failed, skipped };
+    return { refreshed, removed, failed, skipped };
 }
 
 /**

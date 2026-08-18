@@ -413,7 +413,12 @@ async function runRefresh(ctx, parts) {
     const modifiedPaths = args.rest.length > 0 ? args.rest : undefined;
     const result = await refreshScope(sessionId, modifiedPaths);
     ctx.println('');
-    ctx.println(terminalThemeRow('Escopo', `${sessionId} · atualizados ${result.refreshed} · falhas ${result.failed}`));
+    ctx.println(
+        terminalThemeRow(
+            'Escopo',
+            `${sessionId} · atualizados ${result.refreshed} · removidos ${result.removed} · falhas ${result.failed}`,
+        ),
+    );
     ctx.println('');
 }
 

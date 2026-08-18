@@ -258,7 +258,7 @@ export const repoWorkingSetTool = {
             const effectiveContextMode = contextMode ?? 'auto';
             const contextIncluded =
                 effectiveContextMode === 'include' ||
-                (effectiveContextMode === 'auto' && (result.refreshed > 0 || result.failed > 0));
+                (effectiveContextMode === 'auto' && (result.refreshed > 0 || result.removed > 0 || result.failed > 0));
             const context = contextIncluded
                 ? getScopeContext(owned.scopeId, {
                       maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
@@ -276,7 +276,7 @@ export const repoWorkingSetTool = {
             };
             return okResult(
                 structured,
-                `Refreshed working set ${workingSetId}: refreshed=${result.refreshed}, failed=${result.failed}, skipped=${result.skipped}, context=${contextIncluded ? 'included' : 'omitted'}.`,
+                `Refreshed working set ${workingSetId}: refreshed=${result.refreshed}, removed=${result.removed}, failed=${result.failed}, skipped=${result.skipped}, context=${contextIncluded ? 'included' : 'omitted'}.`,
             );
         }
 

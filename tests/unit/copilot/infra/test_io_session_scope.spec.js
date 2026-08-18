@@ -257,7 +257,7 @@ describe('refreshScope', () => {
 
         const result = await refreshScope(sessionId);
 
-        assert.deepEqual(result, { refreshed: 0, failed: 0, skipped: 0 });
+        assert.deepEqual(result, { refreshed: 0, removed: 0, failed: 0, skipped: 0 });
         assert.strictEqual(getScopeStats(sessionId)?.ready, true);
         closeScope(sessionId);
     });
@@ -314,24 +314,30 @@ describe('refreshScope', () => {
         closeScope(sessionId);
     });
 
-    it('mantém refresh com falha em degraded quando arquivo pertencente ao scope desaparece', async () => {
-        const sessionId = 'test-scope-refresh-degraded';
+    it('converge remoção legítima sem degradar nem preencher o slot com outro arquivo', async () => {
+        const sessionId = 'test-scope-refresh-removed';
         const vanishingPath = path.join(tmpDir, 'vanishing-refresh.js');
         await fs.writeFile(vanishingPath, "export function vanishing() { return true; }\n", 'utf8');
-        await declareScope({ sessionId, paths: [vanishingPath], parseSymbols: true }).awaitReady();
+        await declareScope({ sessionId, paths: [vanishingPath], parseSymbols: true, indexMode: 'off' }).awaitReady();
+        assert.strictEqual(findSymbol(sessionId, 'vanishing', { exactMatch: true }).length, 1);
         await fs.rm(vanishingPath, { force: true });
 
         const result = await refreshScope(sessionId, [vanishingPath]);
         const stats = getScopeStats(sessionId);
 
-        assert.strictEqual(result.failed, 1);
-        assert.strictEqual(result.skipped, 0);
+        assert.deepEqual(result, { refreshed: 0, removed: 1, failed: 0, skipped: 0 });
         assert.ok(stats !== null);
-        assert.strictEqual(stats.ready, false);
-        assert.strictEqual(stats.degraded, true);
-        assert.strictEqual(stats.status, 'degraded');
-        assert.strictEqual(stats.lastError?.phase, 'refresh');
-        assert.ok(!JSON.stringify(stats.lastError).includes(vanishingPath));
+        assert.strictEqual(stats.pathCount, 0);
+        assert.strictEqual(stats.candidateFiles, 1, 'candidateFiles preserva evidência da seleção original');
+        assert.strictEqual(stats.selectedFiles, 0);
+        assert.strictEqual(stats.parsed, 0);
+        assert.strictEqual(stats.symbolBytes, 0);
+        assert.strictEqual(stats.invalidated, 0);
+        assert.strictEqual(stats.ready, true);
+        assert.strictEqual(stats.degraded, false);
+        assert.strictEqual(stats.status, 'ready');
+        assert.strictEqual(stats.lastError, null);
+        assert.strictEqual(findSymbol(sessionId, 'vanishing', { exactMatch: true }).length, 0);
 
         closeScope(sessionId);
     });
@@ -345,7 +351,7 @@ describe('refreshScope', () => {
         const result = await refreshScope(sessionId, [pathB]);
         const stats = getScopeStats(sessionId);
 
-        assert.deepEqual(result, { refreshed: 0, failed: 0, skipped: 1 });
+        assert.deepEqual(result, { refreshed: 0, removed: 0, failed: 0, skipped: 1 });
         assert.strictEqual(stats?.pathCount, 1);
         assert.strictEqual(stats?.ready, true);
         closeScope(sessionId);

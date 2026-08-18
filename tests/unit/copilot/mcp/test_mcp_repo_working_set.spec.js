@@ -68,7 +68,7 @@ const mocks = vi.hoisted(() => {
                 symbol: { name: 'alpha', kind: 'function', line: 1, exported: true },
             },
         ]),
-        refreshScope: vi.fn(async () => ({ refreshed: 0, failed: 0, skipped: 0 })),
+        refreshScope: vi.fn(async () => ({ refreshed: 0, removed: 0, failed: 0, skipped: 0 })),
         closeScope: vi.fn(() => stats),
     };
 });
@@ -183,27 +183,34 @@ describe('mcp/repo_working_set', () => {
         const id = String(opened['workingSetId']);
         expect(mocks.getScopeContext).not.toHaveBeenCalled();
 
-        mocks.refreshScope.mockResolvedValueOnce({ refreshed: 1, failed: 0, skipped: 0 });
+        mocks.refreshScope.mockResolvedValueOnce({ refreshed: 1, removed: 0, failed: 0, skipped: 0 });
         const auto = structured(await repoWorkingSetTool.handler({ action: 'refresh', workingSetId: id }));
         assert.equal(auto['contextIncluded'], true);
         assert.ok(auto['context']);
         expect(mocks.getScopeContext).toHaveBeenCalledTimes(1);
 
-        mocks.refreshScope.mockResolvedValueOnce({ refreshed: 1, failed: 0, skipped: 0 });
+        mocks.refreshScope.mockResolvedValueOnce({ refreshed: 0, removed: 1, failed: 0, skipped: 0 });
+        const removed = structured(await repoWorkingSetTool.handler({ action: 'refresh', workingSetId: id }));
+        assert.equal(removed['removed'], 1);
+        assert.equal(removed['contextIncluded'], true);
+        assert.ok(removed['context']);
+        expect(mocks.getScopeContext).toHaveBeenCalledTimes(2);
+
+        mocks.refreshScope.mockResolvedValueOnce({ refreshed: 1, removed: 0, failed: 0, skipped: 0 });
         const omitted = structured(
             await repoWorkingSetTool.handler({ action: 'refresh', workingSetId: id, contextMode: 'omit' }),
         );
         assert.equal(omitted['contextIncluded'], false);
         assert.equal(omitted['context'], undefined);
-        expect(mocks.getScopeContext).toHaveBeenCalledTimes(1);
+        expect(mocks.getScopeContext).toHaveBeenCalledTimes(2);
 
-        mocks.refreshScope.mockResolvedValueOnce({ refreshed: 0, failed: 0, skipped: 0 });
+        mocks.refreshScope.mockResolvedValueOnce({ refreshed: 0, removed: 0, failed: 0, skipped: 0 });
         const included = structured(
             await repoWorkingSetTool.handler({ action: 'refresh', workingSetId: id, contextMode: 'include' }),
         );
         assert.equal(included['contextIncluded'], true);
         assert.ok(included['context']);
-        expect(mocks.getScopeContext).toHaveBeenCalledTimes(2);
+        expect(mocks.getScopeContext).toHaveBeenCalledTimes(3);
     });
 
     it('texto compacto evita duplicar um manifest grande no mesmo CallToolResult', async () => {

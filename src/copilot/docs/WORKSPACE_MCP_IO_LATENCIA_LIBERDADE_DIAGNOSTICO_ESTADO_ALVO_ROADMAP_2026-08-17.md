@@ -4640,4 +4640,268 @@ O broad open preservou 80/1.450 files, 27/27 buckets, 75 parsed e 630 symbols. A
 
 A Faixa 34 está fechada. A próxima lacuna descoberta durante a revisão é de correctness, não payload: `refreshScope()` atualmente tenta reler um arquivo removido e transforma delete legítimo em `failed/degraded`, em vez de convergir removendo path/symbols/index state do scope.
 
+---
+
+# 42. Faixa 35 — Working Set delete convergence V57 — 2026-08-18
+
+## 42.1 Problema confirmado
+
+A revisão integral do documento + código no HEAD `8269656f0` confirmou a lacuna registrada ao fim da Faixa 34:
+
+- `refreshScope()` invalida parser/L1 e chama `warmCacheForPaths(..., silent:false)`;
+- quando um arquivo selecionado foi legitimamente removido, o read lança `ENOENT`/equivalente;
+- o catch anterior tratava qualquer erro como `recordScopeFailure(..., 'refresh')`;
+- o resultado era `failed=1`, `degraded=true`, embora a verdade canônica fosse simplesmente “este arquivo não pertence mais ao conjunto vivo”.
+
+Isso era incompatível com a semântica incremental já adotada para working sets e com a própria primitiva `refreshIoIndexPaths()`, cujo contrato já invalida paths missing/non-indexable sem full scan.
+
+## 42.2 Arquitetura adotada
+
+A convergência de delete foi implementada no mesmo delta, sem `stat` redundante e sem scan do diretório:
+
+1. o prefetch canônico continua sendo a primeira tentativa de refresh;
+2. somente `ENOENT`, `ENOTDIR` e `EISDIR` são interpretados como remoção/non-file legítima;
+3. EACCES/EIO/parser/index failures continuam falhas reais e podem degradar o scope;
+4. em remoção legítima:
+   - símbolos e `symbolBytesByPath` são removidos;
+   - o path sai de `scope.paths`;
+   - invalidations correspondentes são limpas;
+   - `selectedFiles` passa a refletir o conjunto vivo;
+   - `candidateFiles` e estatísticas de seleção permanecem como evidência histórica da seleção inicial;
+   - não há backfill silencioso para ocupar o slot liberado;
+   - o índice global recebe `refreshIoIndexPaths([p])`, que converge o row missing;
+5. `refreshScope()` agora retorna `{refreshed, removed, failed, skipped}`;
+6. a projeção MCP inclui `removed` no texto decisório e `contextMode=auto` considera remoção um delta real, devolvendo o contexto atualizado;
+7. terminal/LLM-B recebem a mesma semântica shared;
+8. `CAPABILITIES_VERSION` avança para **57**.
+
+Se a remoção do arquivo for bem-sucedida mas a convergência do índice falhar, o path ainda sai do working set canônico, porém o resultado contabiliza `removed + failed` e o estado fica degraded por falha derivada — não se perde a verdade do filesystem para mascarar um erro de índice.
+
+## 42.3 Provas
+
+Gates focados verdes:
+
+- `tests/unit/copilot/infra/test_io_session_scope.spec.js`;
+- `tests/unit/copilot/mcp/test_mcp_repo_working_set.spec.js`;
+- strict typecheck `src/copilot`;
+- lint `src/copilot`.
+
+O teste da engine prova explicitamente:
+
+- `refreshed=0`;
+- `removed=1`;
+- `failed=0`;
+- `skipped=0`;
+- `pathCount 1→0`;
+- `selectedFiles 1→0`;
+- `candidateFiles=1` preservado como evidência da seleção original;
+- `parsed 1→0`;
+- `symbolBytes→0`;
+- `invalidated=0`;
+- `ready=true`;
+- `degraded=false`;
+- `lastError=null`;
+- símbolo removido deixa de ser encontrado.
+
+### Prova live pós-reload
+
+Foi criado um probe descartável `src/copilot/mcp/zz-working-set-delete-v57-probe.mjs`, fixado via `seedPaths` em um scope `maxFiles=1`, removido pela tool canônica `repo_remove_file` e em seguida atualizado via `repo_working_set refresh`.
+
+Resultado live:
+
+- open: `pathCount=1`, `selectedFiles=1`, `parsed=1`, `symbolBytes=371`, símbolo `workingSetDeleteV57Probe` presente;
+- delete: operação canônica `io-engine.fs.unlink`, sem rollback sidecar;
+- refresh: **`removed=1`, `failed=0`**;
+- após refresh: `pathCount=0`, `selectedFiles=0`, `parsed=0`, `symbolBytes=0`, `invalidated=0`, `ready=true`, `degraded=false`;
+- `contextMode=auto` incluiu manifest vazio atualizado;
+- probe apagado e working set fechado.
+
+A Faixa 35 está tecnicamente fechada; resta publicar o sublote depois de concluir a atualização documental desta rodada.
+
+---
+
+# 43. Investigação de conexão/rede — baseline completo de 2026-08-18
+
+## 43.1 Motivação e decomposição causal
+
+O sintoma raro observado na interface do ChatGPT — **“aguardando conexão”**, às vezes seguido de interrupção — não deve ser atribuído automaticamente ao MCP. O circuito tem pelo menos cinco legs independentes:
+
+1. **cliente ChatGPT ↔ infraestrutura OpenAI** — HTTPS/WebSocket da própria conversa e notificações;
+2. **infraestrutura OpenAI ↔ endpoint MCP público** — requests MCP/OAuth/SSE contra `https://mcp.aurelin.org/mcp`;
+3. **Cloudflare edge ↔ cloudflared** — quatro conexões HA, hoje QUIC;
+4. **cloudflared ↔ origin MCP local** — HTTPS/HTTP/2 para `https://127.0.0.1:3333`;
+5. **origin MCP ↔ runtime/IO/index/workspace** — Node, event loop, filesystem, SQLite/index e tools.
+
+Uma falha em (1) pode mostrar “aguardando conexão” mesmo se o MCP estiver perfeito. Uma falha/restart em (2–4) pode interromper um turno que esteja usando tools sem significar que a conexão cliente↔OpenAI caiu. Uma pausa extrema em (5) pode fazer o leg MCP parecer travado sem haver perda de rede.
+
+## 43.2 Evidência OpenAI/client-side
+
+Documentação oficial atual da OpenAI confirma que recursos do ChatGPT usam WebSocket seguro em `wss://ws.chatgpt.com` sobre TCP/443 e que proxy/firewall, inspeção TLS/SSL, filtragem web, VPN/security tooling, timeout de idle ou limites de frame/message podem produzir sessões que conectam e depois travam/desconectam.
+
+No momento desta investigação, a Statuspage oficial da OpenAI informava **fully operational / no known issues**. Isso reduz a probabilidade de uma indisponibilidade global corrente, mas não exclui perda transitória no ISP, roteador, cliente, sessão WebSocket ou edge específico do usuário.
+
+Consequência: o texto “aguardando conexão” é um **sinal da interface**, não um diagnóstico de que Cloudflare/MCP caiu.
+
+## 43.3 Estado live do MCP/Cloudflare após restart/reconnect do usuário
+
+### Runtime
+
+`mcp_runtime_health`:
+
+- status `ok`;
+- index disponível/fresco: 2.251 files, 12.285 symbols, 3.661 chunks;
+- Node **v24.15.0**;
+- compile cache `ENABLED`;
+- stateful MCP ativo, TTL 600 s, max 256 sessions;
+- external watch ativo, sem erro;
+- nenhum critical/warning de runtime além de dirty worktree e retenção de job artifacts.
+
+### Conector remoto
+
+Fresh connector smoke:
+
+- OAuth/health: green;
+- 120/120 tools;
+- `tools/list=123.643 B`;
+- SSE initial: green;
+- SSE reconnect: green;
+- Last-Event-ID: aceito.
+
+Após o reload V57, o smoke completou em **1.128 ms**, SSE/reconnect em **222 ms**.
+
+### Tunnel remoto
+
+`mcp_cloudflare_remote_audit`:
+
+- tunnel `workspace-mcp-dev`: **healthy**;
+- conexões: **4 total / 4 active**;
+- colos: GRU13/GRU08/GRU18;
+- client `cloudflared 2026.5.2`;
+- CNAME do hostname público converge para o tunnel esperado;
+- origin remoto: `https://127.0.0.1:3333`;
+- `http2Origin=true`;
+- TLS verification ativa (`noTLSVerify=false`);
+- keepalive origin explícito;
+- drift/critical/warnings: zero.
+
+### Edge
+
+A política host/path está correta:
+
+- cache bypass em `/mcp`, OAuth, `.well-known` e `/health`;
+- regra de passthrough desliga BIC/Rocket Loader/email obfuscation e `response_body_buffering=none` para o tráfego dinâmico;
+- nenhum challenge/block sobre `/mcp`;
+- nenhum sensitive-header transform;
+- rate-limit moderado em `/oauth/token`;
+- ausência de rate-limit explícito em `/mcp` é warning de abuso/segurança, não evidência de perda de conexão, e não deve ser corrigida com throttling sem necessidade.
+
+## 43.4 QUIC e a ruptura das 15:16:00
+
+O log do tunnel mostrou uma concentração de `Connection terminated`, datagram/control-stream errors e `context canceled` **exatamente às 15:16:00Z**, instante do restart do MCP/cloudflared feito pelo usuário. Depois dessa ruptura controlada, não houve nova sequência equivalente de transport failures; os eventos seguintes classificados pelo próprio diagnóstico foram `recentBenignOriginCancellations` de requests encerradas/canceladas.
+
+Métricas atuais do QUIC:
+
+- 4 conexões;
+- `closedConnections=0` no processo pós-restart;
+- RTT latest ~17–23 ms;
+- smoothed RTT ~20–25 ms;
+- MTU 1.344;
+- max UDP payload 1.360;
+- `packetTooBigDropped=0`.
+
+A documentação Cloudflare atual recomenda QUIC quando funciona e informa que `auto` cai para HTTP/2 quando UDP não pode ser estabelecido. Também alerta que sessões QUIC idle podem sofrer em NAT/firewalls com UDP idle timeout agressivo e recomenda comparar HTTP/2 quando há drops idle repetidos.
+
+**Decisão atual:** não trocar QUIC por H2/auto sem evidência. O transporte está saudável agora. Primeiro corrigir observabilidade; somente depois, se houver novos drops espontâneos fora de restart, executar benchmark controlado QUIC×H2×auto.
+
+## 43.5 `cloudflared_tunnel_request_errors`: por que o percentual bruto engana
+
+Antes do fresh smoke:
+
+- total requests = 71;
+- request errors = 14.
+
+Depois de um smoke **integralmente verde**:
+
+- total requests = 120;
+- request errors = 19.
+
+Ou seja, a janela green adicionou +49 requests e +5 ao contador chamado `request_errors`. Isso prova empiricamente que esse contador cumulativo, isoladamente, **não equivale a falha perceptível do connector**. OAuth 401 esperado, encerramentos SSE/cancelamentos e outras classes de request podem contaminar a leitura operacional.
+
+O código já inclui `requestErrorRateSemantics` avisando que é contador cumulativo de processo e exige delta + smoke/origin diagnostics. Ainda assim, a nomenclatura e o benchmark atual (`clean = requestErrors delta === 0`) podem superestimar sujeira de uma janela saudável. Estado-alvo: preservar o contador bruto como evidência, mas nunca promovê-lo sozinho a diagnóstico de transport loss.
+
+## 43.6 Payload/context como amplificador de fragilidade percebida
+
+A leitura integral deste documento em um único `repo_read_file_chunks` retornou aproximadamente **508,5 KiB** de tool result. O handler local gastou apenas ~29 ms, mas o payload representou ~88% do volume MCP da janela diagnóstica.
+
+Isso não prova causa do “aguardando conexão”, que pertence primariamente ao leg cliente↔OpenAI, mas respostas/tool results grandes aumentam serialização, ingestão e pressão de contexto no caminho host/model. Portanto:
+
+- leitura integral continuará possível quando semanticamente necessária;
+- operações ordinárias devem usar working sets, outlines, search/batches e budgets compactos;
+- o objetivo não é reduzir liberdade, mas evitar transferir centenas de KiB quando a decisão requer dezenas.
+
+## 43.7 Bug real: Network Control Plane do DevContainer está apontando para path inexistente
+
+A auditoria `mcp_devcontainer_network_posture_audit` retorna `controlPlane.status=skipped`.
+
+Causa fechada no repositório:
+
+- script real: `.devcontainer/scripts/network-control-plane-state.sh`;
+- referências incorretas: `.devcontainer/scripts/network/network-control-plane-state.sh`.
+
+Drift encontrado em três pontos:
+
+1. `.devcontainer/devcontainer.json` — `DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT`;
+2. `.devcontainer/scripts/post-create.sh` — default de `NETWORK_CONTROL_PLANE_SCRIPT`;
+3. `.devcontainer/scripts/post-start.sh` — default de `NETWORK_CONTROL_PLANE_SCRIPT`.
+
+O erro não derruba Cloudflare, mas deixa o agregador passivo de rede fora do boot e prejudica correlação/atribuição de incidentes.
+
+**Correção planejada:** alinhar os três consumidores ao script real e cobrir com validação estrutural para impedir novo drift.
+
+## 43.8 Falso warning: porta DNS “in-use” é o próprio dnsmasq gerenciado
+
+Estado live:
+
+- local DNS status `ok`;
+- resolver efetivo;
+- `/etc/resolv.conf → 127.0.0.1`;
+- probe local via `dig`: green;
+- warmup: 4/4;
+- `dnsmasq_process_status=running-managed`;
+- `dnsmasq_port_status=bound-managed`;
+- `dnsmasq_target_port_conflict_status=in-use`.
+
+A inspeção do produtor mostrou que `port_in_use()` define `in-use` para **qualquer** listener na porta alvo, antes de o mesmo fluxo identificar se o dono é o dnsmasq gerenciado. O consumidor MCP, por sua vez, transforma qualquer valor diferente de `none` em warning de conflito.
+
+Portanto o warning corrente não é evidência de port collision; é erro de semântica/observabilidade.
+
+**Estado-alvo:**
+
+- quando o listener é o dnsmasq gerenciado, `in-use` deve ser tratado como ocupação esperada, não conflito;
+- warning só quando a porta estiver tomada por owner incompatível/unmanaged ou ownership for realmente inseguro;
+- manter visível `dnsmasq_port_status` para auditoria.
+
+## 43.9 Roadmap imediato da frente de conexão
+
+Ordem de execução após esta atualização documental:
+
+1. publicar/fechar V57 Working Set;
+2. corrigir os três paths do Network Control Plane;
+3. corrigir a classificação de conflito DNS no produtor e no audit MCP, mantendo compatibilidade com artifacts antigos;
+4. adicionar testes estruturais/semânticos focados;
+5. revisar o `request_errors` do transport benchmark para separar `raw counter changed` de `window unhealthy`, sem apagar sinal bruto;
+6. reload único e gates live;
+7. repetir `mcp_devcontainer_network_posture_audit`, remote audit, metrics e connector smoke;
+8. somente se restarem drops espontâneos, fazer benchmark QUIC×H2×auto e considerar `auto`/H2;
+9. em episódio futuro de “aguardando conexão”, correlacionar timestamp exato com:
+   - status/log do cliente/OpenAI quando disponível;
+   - chegada/ausência de MCP request;
+   - cloudflared connection events;
+   - request-error deltas;
+   - SSE smoke/reconnect;
+   - origin cancellations/errors;
+   - event-loop/tool latency.
+
+A meta é reduzir tanto **quedas reais** quanto **falsos diagnósticos**, porque sem essa separação qualquer tuning de QUIC/DNS corre risco de trocar um sistema saudável por uma configuração inferior.
+
 
