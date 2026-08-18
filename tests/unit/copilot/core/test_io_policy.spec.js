@@ -51,10 +51,21 @@ describe('core/io-policy evaluateIoPathPolicy', () => {
         expect(result.code).toBe('PATH_BLOCKED');
     });
 
-    it('blocks write-only executable patterns while allowing read policy for same extension', () => {
-        const writeResult = evaluateIoPathPolicy('scripts/run.sh', { workspaceRoot, mode: 'write' });
-        expect(writeResult.ok).toBe(false);
-        if (!writeResult.ok) expect(writeResult.code).toBe('PATH_BLOCKED');
+    it('keeps secrets blocked even when their extension is a textual script', () => {
+        const result = evaluateIoPathPolicy('scripts/secret-bootstrap.sh', { workspaceRoot, mode: 'write' });
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.code).toBe('PATH_BLOCKED');
+    });
+
+    it('allows repository text scripts to be edited while keeping opaque native binaries blocked', () => {
+        for (const scriptPath of ['scripts/run.sh', 'scripts/run.ps1', 'scripts/run.bat', 'scripts/run.cmd']) {
+            const writeResult = evaluateIoPathPolicy(scriptPath, { workspaceRoot, mode: 'write' });
+            expect(writeResult.ok, scriptPath).toBe(true);
+        }
+
+        const binaryWrite = evaluateIoPathPolicy('bin/tool.exe', { workspaceRoot, mode: 'write' });
+        expect(binaryWrite.ok).toBe(false);
+        if (!binaryWrite.ok) expect(binaryWrite.code).toBe('PATH_BLOCKED');
 
         const readResult = evaluateIoPathPolicy('scripts/run.sh', { workspaceRoot, mode: 'read' });
         expect(readResult.ok).toBe(true);

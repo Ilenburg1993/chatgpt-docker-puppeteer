@@ -1197,6 +1197,7 @@ describe('copilot MCP tools', () => {
                 operations: mixedOperations,
                 dryRun: false,
                 confirmBatch: true,
+                applyMode: 'global-preflight',
             });
             assert.equal(conservative.isError, undefined);
             assert.equal(conservative.structuredContent?.['success'], false);
@@ -1208,13 +1209,14 @@ describe('copilot MCP tools', () => {
                 operations: mixedOperations,
                 dryRun: false,
                 confirmBatch: true,
-                applyMode: 'per-target-fast',
-                failureMode: 'best-effort',
                 targetConcurrency: 2,
             });
             assert.equal(fast.isError, undefined);
             assert.equal(fast.structuredContent?.['success'], false);
             assert.equal(fast.structuredContent?.['partial'], true);
+            assert.equal(fast.structuredContent?.['applyMode'], 'per-target-fast');
+            assert.equal(fast.structuredContent?.['failureMode'], 'best-effort');
+            assert.equal(fast.structuredContent?.['preflightElided'], true);
             assert.equal(fast.structuredContent?.['appliedCount'], 1);
             assert.equal(fast.structuredContent?.['failedCount'], 1);
             assert.equal(fast.structuredContent?.['skippedCount'], 0);

@@ -227,6 +227,36 @@ const batchOperationSchema = z.discriminatedUnion('type', [
 ]);
 
 /**
+ * File batches preserve order because later operations may depend on earlier ones. The adaptive default skips the
+ * duplicate whole-batch preview for operations whose failure cannot overwrite/delete existing data. Irreversible delete
+ * and overwrite stay behind the conservative preview gate unless the caller explicitly selects sequential-fast.
+ *
+ * @param {Record<string, unknown>[]} operations
+ * @param {'global-preflight' | 'sequential-fast' | undefined} requested
+ */
+function resolveFileBatchApplyMode(operations, requested) {
+    if (requested) return { mode: requested, reason: 'explicit', conservativeOperationIndices: [] };
+    const conservativeOperationIndices = [];
+    for (const [index, operation] of operations.entries()) {
+        const type = String(operation['type'] ?? '');
+        if (type === 'remove_file' || (type === 'move_file' && operation['overwrite'] === true)) {
+            conservativeOperationIndices.push(index);
+        }
+    }
+    return conservativeOperationIndices.length > 0
+        ? {
+              mode: /** @type {const} */ ('global-preflight'),
+              reason: 'adaptive-destructive-gate',
+              conservativeOperationIndices,
+          }
+        : {
+              mode: /** @type {const} */ ('sequential-fast'),
+              reason: 'adaptive-safe-sequential',
+              conservativeOperationIndices,
+          };
+}
+
+/**
  * @typedef {object} QuarantineMetadata
  * @property {string} quarantineId
  * @property {string} originalPath
@@ -976,12 +1006,16 @@ async function planPatchBatchOperation(operation, index) {
             }),
         };
     } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+        const details = patchBatchErrorDetails(error);
         return {
             index,
             success: false,
             path: resolved.relative,
             error: error instanceof Error ? error.message : String(error),
-            code: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
+            code,
+            ...(Object.keys(details).length > 0 ? { details } : {}),
+            nextAction: patchBatchNextAction(code, details),
         };
     }
 }
@@ -1056,12 +1090,16 @@ async function applyPatchBatchOperation(operation, index) {
             }),
         };
     } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+        const details = patchBatchErrorDetails(error);
         return {
             index,
             success: false,
             path: resolved.relative,
             error: error instanceof Error ? error.message : String(error),
-            code: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
+            code,
+            ...(Object.keys(details).length > 0 ? { details } : {}),
+            nextAction: patchBatchNextAction(code, details),
         };
     }
 }
@@ -1145,6 +1183,88 @@ function compactPatchBatchSuccessRow(row) {
         ...(typeof row['expectedHashMode'] === 'string'
             ? { expectedHashMode: row['expectedHashMode'] }
             : {}),
+    };
+}
+
+/** @param {unknown} error */
+function patchBatchErrorDetails(error) {
+    if (!error || typeof error !== 'object') return {};
+    const details = /** @type {Record<string, unknown>} */ (error)['details'];
+    return details && typeof details === 'object' && !Array.isArray(details)
+        ? /** @type {Record<string, unknown>} */ (details)
+        : {};
+}
+
+/** @param {unknown} code @param {Record<string, unknown>} [details] */
+function patchBatchNextAction(code, details = {}) {
+    if (code === 'ERR_PATCH_AMBIGUOUS_MATCH') {
+        const lines = Array.isArray(details['occurrenceLines']) ? details['occurrenceLines'] : [];
+        return lines.length > 0
+            ? `Retry with occurrence_index=1..${String(lines.length)} using occurrenceLines=${JSON.stringify(lines)}, or send a more specific old_string.`
+            : 'Retry with occurrence_index or send a more specific old_string.';
+    }
+    if (code === 'ERR_PATCH_EXPECTED_OCCURRENCES') {
+        return 'Adjust expected_occurrences from the returned occurrence evidence, or refine old_string.';
+    }
+    if (code === 'EEXPECTEDHASH') return 'Refresh only this target hash and retry; other independent targets need not be repeated.';
+    if (code === 'ERR_PATH_DENIED') return 'The target is outside the permitted repository write policy or is sensitive/binary; inspect the path-policy reason.';
+    if (code === 'ERR_PATCH_NOT_FOUND') return 'Refresh only this target or refine old_string; other independent targets need not be repeated.';
+    return 'Retry only the failed target after inspecting its causal error.';
+}
+
+/** @param {Record<string, unknown>[]} rows */
+function compactPatchBatchFailureRows(rows) {
+    /** @type {Map<string, Record<string, unknown>[]>} */
+    const groups = new Map();
+    for (const row of rows) {
+        const key = typeof row['path'] === 'string' ? row['path'] : `#${String(row['index'] ?? groups.size)}`;
+        const group = groups.get(key) ?? [];
+        group.push(row);
+        groups.set(key, group);
+    }
+    return [...groups.values()].map((group) => {
+        const ordered = [...group].sort((left, right) => Number(left['index'] ?? 0) - Number(right['index'] ?? 0));
+        const causal =
+            ordered.find((row) => row['causalFailure'] === true) ??
+            ordered.find((row) => row['code'] !== 'ERR_PATCH_BATCH_GROUP_ABORTED') ??
+            ordered[0] ?? {};
+        const details =
+            causal['details'] && typeof causal['details'] === 'object' && !Array.isArray(causal['details'])
+                ? /** @type {Record<string, unknown>} */ (causal['details'])
+                : {};
+        return {
+            index: causal['index'],
+            success: false,
+            path: causal['path'] ?? null,
+            code: causal['code'] ?? 'ERR_PATCH_BATCH_TARGET_EXECUTION',
+            error: causal['error'] ?? causal['reason'] ?? 'Patch target failed.',
+            affectedOperationIndices: ordered.map((row) => Number(row['index'] ?? 0)),
+            affectedOperationCount: ordered.length,
+            abortedOperationCount: ordered.filter((row) => row['code'] === 'ERR_PATCH_BATCH_GROUP_ABORTED').length,
+            ...(Object.keys(details).length > 0 ? { details } : {}),
+            nextAction:
+                typeof causal['nextAction'] === 'string'
+                    ? causal['nextAction']
+                    : patchBatchNextAction(causal['code'], details),
+        };
+    });
+}
+
+/** @param {Record<string, unknown>[]} rows */
+function summarizePatchBatchFailures(rows) {
+    const reported = compactPatchBatchFailureRows(rows);
+    /** @type {Record<string, number>} */
+    const causalByCode = {};
+    for (const row of reported) {
+        const code = String(row['code'] ?? 'ERR_PATCH_BATCH_TARGET_EXECUTION');
+        causalByCode[code] = (causalByCode[code] ?? 0) + 1;
+    }
+    return {
+        failedOperationCount: rows.length,
+        failedTargetCount: reported.length,
+        causalFailureCount: reported.length,
+        abortedOperationCount: rows.filter((row) => row['code'] === 'ERR_PATCH_BATCH_GROUP_ABORTED').length,
+        causalByCode,
     };
 }
 
@@ -1337,6 +1457,7 @@ async function runPatchBatchOperations(operations, dryRun) {
                 : null;
             const failurePhase =
                 typeof errorRecord['failurePhase'] === 'string' ? errorRecord['failurePhase'] : null;
+            const details = patchBatchErrorDetails(error);
             for (const [groupIndex, entry] of group.entries()) {
                 const causal = failedGroupOperationIndex === null || groupIndex === failedGroupOperationIndex;
                 results.push({
@@ -1354,6 +1475,8 @@ async function runPatchBatchOperations(operations, dryRun) {
                     completedOperationCount,
                     failurePhase,
                     causalFailure: causal,
+                    ...(causal && Object.keys(details).length > 0 ? { details } : {}),
+                    ...(causal ? { nextAction: patchBatchNextAction(originalCode, details) } : {}),
                 });
             }
             if (!dryRun) break;
@@ -1746,7 +1869,8 @@ export const repoWriteTools = [
                                   operations,
                                   dryRun: false,
                                   confirmBatch: true,
-                                  applyMode: 'global-preflight',
+                                  applyMode: 'per-target-fast',
+                                  failureMode: 'best-effort',
                               },
                           }
                         : null,
@@ -1771,7 +1895,7 @@ export const repoWriteTools = [
         name: 'repo_apply_patch_batch',
         title: 'Apply repository patch batch',
         description:
-            'Dry-run or apply a bounded exact-string patch batch. Real writes require confirmBatch=true; repeated paths are sequential and atomic per file, can reuse one baseline expectedHash, and single-target apply avoids a duplicate preflight read.',
+            'Dry-run or apply a bounded exact-string patch batch. Real writes require confirmBatch=true; repeated paths are sequential and atomic per file. Direct apply defaults to independent per-target atomic progress without a duplicate global preview; global-preflight remains opt-in when all-target preview gating is desired.',
         inputSchema: {
             operations: z
                 .array(patchBatchOperationSchema)
@@ -1786,18 +1910,18 @@ export const repoWriteTools = [
             applyMode: z
                 .enum(['global-preflight', 'per-target-fast'])
                 .optional()
-                .describe('Apply policy. Default global-preflight validates all targets first when there are multiple targets; a single target uses atomic compute-before-write without a duplicate dry-run. per-target-fast applies independent target groups directly.'),
+                .describe('Apply policy. Default per-target-fast applies independent target groups directly with atomic compute-before-write per file. global-preflight is opt-in and blocks all writes when any preview target already fails.'),
             failureMode: z
                 .enum(['best-effort', 'fail-fast'])
                 .optional()
-                .describe('Target failure policy during apply. Defaults fail-fast, or best-effort in per-target-fast mode.'),
+                .describe('Target failure policy during apply. Defaults best-effort for the default per-target-fast mode; global-preflight defaults fail-fast after its preview gate.'),
             targetConcurrency: z
                 .number()
                 .int()
                 .min(1)
                 .max(MAX_PATCH_TARGET_CONCURRENCY)
                 .optional()
-                .describe('Parallel independent targets. Defaults 1 in global-preflight apply, 4 in per-target-fast.'),
+                .describe('Parallel independent targets. Defaults 4 in per-target-fast; global-preflight apply uses 1 unless explicitly raised.'),
             resultMode: z
                 .enum(['compact', 'detailed'])
                 .optional()
@@ -1842,7 +1966,7 @@ export const repoWriteTools = [
                     },
                 });
             }
-            const effectiveApplyMode = applyMode ?? 'global-preflight';
+            const effectiveApplyMode = applyMode ?? 'per-target-fast';
             const effectiveFailureMode = failureMode ?? (effectiveApplyMode === 'per-target-fast' ? 'best-effort' : 'fail-fast');
             const effectiveConcurrency =
                 targetConcurrency ?? (effectiveApplyMode === 'per-target-fast' ? DEFAULT_PATCH_FAST_CONCURRENCY : 1);
@@ -1853,12 +1977,15 @@ export const repoWriteTools = [
                     concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
                 });
                 const failed = dryRunResult.operations.filter((operation) => operation['success'] !== true);
+                const failureSummary = summarizePatchBatchFailures(failed);
+                const outputFailures =
+                    resultSurface.resultMode === 'detailed' ? failed : compactPatchBatchFailureRows(failed);
                 const outputOperations =
                     resultSurface.resultMode === 'detailed'
                         ? dryRunResult.operations
-                        : dryRunResult.operations.map((operation) =>
-                              operation['success'] === true ? compactPatchBatchSuccessRow(operation) : operation,
-                          );
+                        : dryRunResult.operations
+                              .filter((operation) => operation['success'] === true)
+                              .map((operation) => compactPatchBatchSuccessRow(operation));
                 const targetSummaries = summarizePatchBatchTargets(dryRunResult.operations, true);
                 const structured = {
                     success: failed.length === 0,
@@ -1869,6 +1996,8 @@ export const repoWriteTools = [
                     targetCount: envelope.targetCount,
                     inputBytes: envelope.inputBytes,
                     failedCount: failed.length,
+                    reportedFailureCount: outputFailures.length,
+                    failureSummary,
                     skippedCount: dryRunResult.execution.skippedCount,
                     concurrency: dryRunResult.execution.concurrency,
                     durationMs: dryRunResult.execution.durationMs,
@@ -1878,13 +2007,13 @@ export const repoWriteTools = [
                     detailsAvailable: true,
                     targetSummaries,
                     operations: outputOperations,
-                    failures: failed,
+                    failures: outputFailures,
                     applied: [],
                 };
                 const text =
                     failed.length === 0
                         ? `Patch batch dry-run succeeded for ${normalizedOperations.length} operation(s); no files modified.`
-                        : `Patch batch dry-run found ${failed.length} failure(s); no files modified.`;
+                        : `Patch batch dry-run found ${failureSummary.causalFailureCount} causal target failure(s) affecting ${failureSummary.failedOperationCount} operation(s); no files modified.`;
                 const result = withResultSizeHint(okResult(structured, text), {
                     bytes: estimateStructuredTextResultBytes(structured, text),
                     strategy: 'conservative-estimate',
@@ -1908,6 +2037,13 @@ export const repoWriteTools = [
 
             const singleTargetAtomicPreflightElision =
                 effectiveApplyMode === 'global-preflight' && envelope.targetCount === 1;
+            const directFastPreflightElision = effectiveApplyMode === 'per-target-fast';
+            const preflightElided = singleTargetAtomicPreflightElision || directFastPreflightElision;
+            const preflightElisionReason = directFastPreflightElision
+                ? 'per-target-fast-direct-atomic-apply'
+                : singleTargetAtomicPreflightElision
+                  ? 'single-target-atomic-compute-before-write'
+                  : null;
             let preflight = null;
             if (effectiveApplyMode === 'global-preflight' && !singleTargetAtomicPreflightElision) {
                 preflight = await runPatchBatchTargetGroups(normalizedOperations, true, {
@@ -1916,6 +2052,11 @@ export const repoWriteTools = [
                 });
                 const failedPreflight = preflight.operations.filter((operation) => operation['success'] !== true);
                 if (failedPreflight.length > 0) {
+                    const failureSummary = summarizePatchBatchFailures(failedPreflight);
+                    const outputFailures =
+                        resultSurface.resultMode === 'detailed'
+                            ? failedPreflight
+                            : compactPatchBatchFailureRows(failedPreflight);
                     const structured = {
                         success: false,
                         dryRun: false,
@@ -1929,6 +2070,8 @@ export const repoWriteTools = [
                         resultModeForcedByDiffPreview: resultSurface.forcedByDiffPreview,
                         detailsAvailable: true,
                         failedCount: failedPreflight.length,
+                        reportedFailureCount: outputFailures.length,
+                        failureSummary,
                         skippedCount: 0,
                         preflightSummary: {
                             ran: true,
@@ -1939,9 +2082,9 @@ export const repoWriteTools = [
                         },
                         preflight: includePreflightDetails === true ? preflight.operations : [],
                         applied: [],
-                        failures: failedPreflight,
+                        failures: outputFailures,
                     };
-                    const text = `Global preflight found ${failedPreflight.length} failure(s); no files modified.`;
+                    const text = `Global preflight found ${failureSummary.causalFailureCount} causal target failure(s) affecting ${failureSummary.failedOperationCount} operation(s); no files modified.`;
                     const result = withResultSizeHint(okResult(structured, text), {
                         bytes: estimateStructuredTextResultBytes(structured, text),
                         strategy: 'conservative-estimate',
@@ -1966,6 +2109,9 @@ export const repoWriteTools = [
                 (operation) => operation['success'] !== true && operation['skipped'] !== true,
             );
             const partial = succeeded.length > 0 && (failedApply.length > 0 || skipped.length > 0);
+            const failureSummary = summarizePatchBatchFailures(failedApply);
+            const outputFailures =
+                resultSurface.resultMode === 'detailed' ? failedApply : compactPatchBatchFailureRows(failedApply);
             const targetSummaries = summarizePatchBatchTargets(succeeded, false);
             const outputApplied =
                 resultSurface.resultMode === 'detailed'
@@ -1983,7 +2129,7 @@ export const repoWriteTools = [
                 operationCount: normalizedOperations.length,
                 targetCount: envelope.targetCount,
                 resultMode: resultSurface.resultMode,
-                preflightElided: singleTargetAtomicPreflightElision,
+                preflightElided,
                 appliedCount: succeeded.length,
                 failedCount: failedApply.length,
                 skippedCount: skipped.length,
@@ -2000,6 +2146,8 @@ export const repoWriteTools = [
                 inputBytes: envelope.inputBytes,
                 appliedCount: succeeded.length,
                 failedCount: failedApply.length,
+                reportedFailureCount: outputFailures.length,
+                failureSummary,
                 skippedCount: skipped.length,
                 concurrency: applyRun.execution.concurrency,
                 maxInFlight: applyRun.execution.maxInFlight,
@@ -2009,10 +2157,8 @@ export const repoWriteTools = [
                 resultModeForcedByDiffPreview: resultSurface.forcedByDiffPreview,
                 detailsAvailable: true,
                 targetSummaries,
-                preflightElided: singleTargetAtomicPreflightElision,
-                preflightElisionReason: singleTargetAtomicPreflightElision
-                    ? 'single-target-atomic-compute-before-write'
-                    : null,
+                preflightElided,
+                preflightElisionReason,
                 preflightSummary: preflight
                     ? {
                           ran: true,
@@ -2024,13 +2170,13 @@ export const repoWriteTools = [
                     : { ran: false, success: null, executionId: null, failedCount: 0, durationMs: 0 },
                 preflight: includePreflightDetails === true ? preflight?.operations ?? [] : [],
                 applied: outputApplied,
-                failures: failedApply,
+                failures: outputFailures,
                 skipped,
             };
             const text =
                 structured.success
                     ? `Applied ${succeeded.length} patch operation(s) across ${envelope.targetCount} target(s).`
-                    : `Patch batch completed partially: ${succeeded.length} applied, ${failedApply.length} failed, ${skipped.length} skipped.`;
+                    : `Patch batch completed partially: ${succeeded.length} applied, ${failureSummary.causalFailureCount} causal target failure(s) affecting ${failureSummary.failedOperationCount} operation(s), ${skipped.length} skipped.`;
             const result = withResultSizeHint(okResult(structured, text), {
                 bytes: estimateStructuredTextResultBytes(structured, text),
                 strategy: 'conservative-estimate',
@@ -2098,7 +2244,7 @@ export const repoWriteTools = [
         name: 'repo_apply_file_batch',
         title: 'Apply repository file batch',
         description:
-            'Apply a bounded batch of workspace file operations in one tool call to reduce repeated ChatGPT write confirmations. Supports create_file, move_file, quarantine_file and explicit remove_file.',
+            'Apply a bounded ordered batch of workspace file operations in one tool call. Safe create/move-without-overwrite/quarantine sequences default to direct sequential apply; remove_file and overwrite moves retain a conservative whole-batch preflight unless applyMode is explicitly chosen.',
         inputSchema: {
             operations: z
                 .array(batchOperationSchema)
@@ -2116,7 +2262,7 @@ export const repoWriteTools = [
             applyMode: z
                 .enum(['global-preflight', 'sequential-fast'])
                 .optional()
-                .describe('Default global-preflight. sequential-fast validates/applies each operation in order and may return partial success.'),
+                .describe('Adaptive default: sequential-fast for create/move-without-overwrite/quarantine sequences; global-preflight when remove_file or overwrite move is present. Explicit value overrides the adaptive choice.'),
             includePreflightDetails: z
                 .boolean()
                 .optional()
@@ -2126,11 +2272,16 @@ export const repoWriteTools = [
         handler: async ({ operations, dryRun, confirmBatch, applyMode, includePreflightDetails }) => {
             const startedAt = performance.now();
             const isDryRun = resolveBatchDryRun(dryRun, confirmBatch);
-            const effectiveApplyMode = applyMode ?? 'global-preflight';
+            const applyModeDecision = resolveFileBatchApplyMode(
+                /** @type {Record<string, unknown>[]} */ (operations),
+                applyMode,
+            );
+            const effectiveApplyMode = applyModeDecision.mode;
             if (!isDryRun && confirmBatch !== true) {
                 return errorResult('confirmBatch deve ser true quando aplicando operações de arquivo.', {
                     code: 'ERR_BATCH_CONFIRM_REQUIRED',
                     applyMode: effectiveApplyMode,
+                    applyModeReason: applyModeDecision.reason,
                 });
             }
 
@@ -2145,6 +2296,8 @@ export const repoWriteTools = [
                         partial: false,
                         dryRun: isDryRun,
                         applyMode: effectiveApplyMode,
+                        applyModeReason: applyModeDecision.reason,
+                        conservativeOperationIndices: applyModeDecision.conservativeOperationIndices,
                         operationCount: operations.length,
                         planned: preflight.previews,
                         plannedCount: preflight.previews.length,
@@ -2181,6 +2334,8 @@ export const repoWriteTools = [
                     success: true,
                     dryRun: true,
                     applyMode: effectiveApplyMode,
+                    applyModeReason: applyModeDecision.reason,
+                    conservativeOperationIndices: applyModeDecision.conservativeOperationIndices,
                     operationCount: previews.length,
                     durationMs: preflight?.durationMs ?? 0,
                     operations: previews,
@@ -2216,6 +2371,8 @@ export const repoWriteTools = [
                     partial,
                     dryRun: false,
                     applyMode: effectiveApplyMode,
+                    applyModeReason: applyModeDecision.reason,
+                    conservativeOperationIndices: applyModeDecision.conservativeOperationIndices,
                     operationCount: operations.length,
                     preflightSummary,
                     planned: includePreflightDetails === true ? preflight?.previews ?? [] : [],
@@ -2245,6 +2402,7 @@ export const repoWriteTools = [
                 event: 'repo_apply_file_batch_applied',
                 tool: 'repo_apply_file_batch',
                 applyMode: effectiveApplyMode,
+                applyModeReason: applyModeDecision.reason,
                 operations: applied.map((operation) => operation['type']),
                 operationCount: applied.length,
             });
@@ -2252,6 +2410,8 @@ export const repoWriteTools = [
                 success: true,
                 dryRun: false,
                 applyMode: effectiveApplyMode,
+                applyModeReason: applyModeDecision.reason,
+                conservativeOperationIndices: applyModeDecision.conservativeOperationIndices,
                 operationCount: applied.length,
                 preflightSummary,
                 planned: includePreflightDetails === true ? preflight?.previews ?? [] : [],

@@ -46,13 +46,16 @@ export const mcpSessionProfileTool = {
                 {
                     task: 'patch',
                     flow: [
-                        'repo_apply_patch_batch dryRun=false confirmBatch=true when anchors/intent are already known',
-                        'repo_patch_batch_plan only when a separate preview or approval boundary is useful',
+                        'repo_apply_patch_batch dryRun=false confirmBatch=true when anchors/intent are already known; default per-target-fast+best-effort preserves atomicity per target and independent progress',
+                        'use applyMode=global-preflight only when all-target preview gating is deliberately desired; repo_patch_batch_plan only when a separate preview adds information',
                     ],
                 },
                 {
                     task: 'file-batch',
-                    flow: ['repo_apply_file_batch_plan', 'repo_apply_file_batch dryRun=false confirmBatch=true'],
+                    flow: [
+                        'repo_apply_file_batch dryRun=false confirmBatch=true (adaptive: safe sequences sequential-fast; delete/overwrite global-preflight)',
+                        'repo_apply_file_batch_plan only when an explicit preview adds information',
+                    ],
                 },
                 {
                     task: 'validate',

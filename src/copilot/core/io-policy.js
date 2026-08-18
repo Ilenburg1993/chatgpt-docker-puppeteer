@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { validateUrlString } from './security/url-validator.js';
 
-export const IO_POLICY_VERSION = '2026-08-17.r3.nearest-ancestor.v1';
+export const IO_POLICY_VERSION = '2026-08-18.r4.repo-text-scripts.v1';
 
 /**
  * Número máximo de redirects HTTP permitidos por política canônica. O valor é informativo; adaptadores que suportam
@@ -55,14 +55,17 @@ export const DEFAULT_BLOCKED_READ_PATH_PATTERNS = Object.freeze([
     /\.netrc$/i,
 ]);
 
-/** @type {ReadonlyArray<RegExp>} */
+/**
+ * Write policy blocks secrets/credential material and opaque native/binary executables.
+ * Textual scripts (.sh/.ps1/.bat/.cmd) remain repository source: editing them is not execution, and execution is
+ * governed by a separate tool boundary. Treating text scripts as unconditionally unwritable made legitimate
+ * DevContainer/CI maintenance impossible while JS/TS with equivalent execution power remained editable.
+ *
+ * @type {ReadonlyArray<RegExp>}
+ */
 export const DEFAULT_BLOCKED_WRITE_PATH_PATTERNS = Object.freeze([
     ...DEFAULT_BLOCKED_READ_PATH_PATTERNS,
     /\.exe$/i,
-    /\.bat$/i,
-    /\.cmd$/i,
-    /\.sh$/i,
-    /\.ps1$/i,
     /\.msi$/i,
     /\.dll$/i,
     /\.so$/i,

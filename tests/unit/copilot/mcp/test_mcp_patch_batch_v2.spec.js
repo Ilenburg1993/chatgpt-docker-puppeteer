@@ -61,7 +61,7 @@ describe('repo_apply_patch_batch V2', () => {
         assert.equal(result.structuredContent?.['preflightElided'], true);
         assert.equal(
             result.structuredContent?.['preflightElisionReason'],
-            'single-target-atomic-compute-before-write',
+            'per-target-fast-direct-atomic-apply',
         );
         assert.equal(result.structuredContent?.['preflightSummary']?.['ran'], false);
         assert.equal(result.structuredContent?.['resultMode'], 'compact');
@@ -156,19 +156,40 @@ describe('repo_apply_patch_batch V2', () => {
         assert.equal(result.structuredContent?.['resultMode'], 'compact');
         assert.equal(result.structuredContent?.['preflightElided'], true);
         const failures = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['failures']);
-        assert.equal(failures.length, 3);
-        const causal = failures.find((row) => row['causalFailure'] === true);
+        assert.equal(failures.length, 1, 'compact mode reports one causal failure per target');
+        assert.equal(result.structuredContent?.['reportedFailureCount'], 1);
+        assert.deepEqual(result.structuredContent?.['failureSummary'], {
+            failedOperationCount: 3,
+            failedTargetCount: 1,
+            causalFailureCount: 1,
+            abortedOperationCount: 2,
+            causalByCode: { ERR_PATCH_NOT_FOUND: 1 },
+        });
+        const causal = failures[0];
         assert.equal(causal?.['index'], 1);
         assert.equal(causal?.['code'], 'ERR_PATCH_NOT_FOUND');
-        assert.equal(causal?.['failedOperationIndex'], 1);
-        assert.equal(causal?.['failedGroupOperationIndex'], 1);
-        assert.equal(causal?.['completedOperationCount'], 1);
-        assert.equal(causal?.['failurePhase'], 'operation');
-        assert.equal(causal?.['expectedHashMode'], 'group-baseline');
-        const aborted = failures.filter((row) => row['causalFailure'] === false);
-        assert.equal(aborted.length, 2);
-        assert.equal(aborted.every((row) => row['code'] === 'ERR_PATCH_BATCH_GROUP_ABORTED'), true);
+        assert.deepEqual(causal?.['affectedOperationIndices'], [0, 1, 2]);
+        assert.equal(causal?.['affectedOperationCount'], 3);
+        assert.equal(causal?.['abortedOperationCount'], 2);
+        assert.match(String(causal?.['nextAction']), /failed target|target/i);
         assert.equal(await readFile(absolutePath, 'utf8'), initial);
+    });
+
+    it('returns bounded occurrence-line evidence for ambiguous retries without another file read', async () => {
+        const { repoPath } = await createRepoFile('ambiguous.txt', 'same\nmiddle\nsame\n');
+        const result = await findTool('repo_apply_patch_batch').handler({
+            operations: [{ path: repoPath, old_string: 'same', new_string: 'other' }],
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], false);
+        assert.equal(result.structuredContent?.['reportedFailureCount'], 1);
+        const failures = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['failures']);
+        assert.equal(failures.length, 1);
+        const failure = /** @type {Record<string, unknown>} */ (failures[0]);
+        assert.equal(failure['code'], 'ERR_PATCH_AMBIGUOUS_MATCH');
+        assert.deepEqual(/** @type {Record<string, unknown>} */ (failure['details'])['occurrenceLines'], [1, 3]);
+        assert.match(String(failure['nextAction']), /occurrence_index/);
     });
 
     it('keeps a representative 12-operation compact dry-run below 3 KiB', async () => {
@@ -192,7 +213,32 @@ describe('repo_apply_patch_batch V2', () => {
         assert.ok(resultBytes < 3 * 1024, `compact result should stay under 3 KiB; got ${resultBytes}`);
     });
 
-    it('keeps global preflight for multiple targets', async () => {
+    it('defaults multi-target apply to per-target-fast and preserves independent progress', async () => {
+        const first = await createRepoFile('fast-first.txt', 'alpha');
+        const second = await createRepoFile('fast-second.txt', 'beta');
+        const result = await findTool('repo_apply_patch_batch').handler({
+            operations: [
+                { path: first.repoPath, old_string: 'alpha', new_string: 'ALPHA' },
+                { path: second.repoPath, old_string: 'missing', new_string: 'BETA' },
+            ],
+            dryRun: false,
+            confirmBatch: true,
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], false);
+        assert.equal(result.structuredContent?.['partial'], true);
+        assert.equal(result.structuredContent?.['applyMode'], 'per-target-fast');
+        assert.equal(result.structuredContent?.['failureMode'], 'best-effort');
+        assert.equal(result.structuredContent?.['preflightElided'], true);
+        assert.equal(result.structuredContent?.['preflightElisionReason'], 'per-target-fast-direct-atomic-apply');
+        assert.equal(result.structuredContent?.['appliedCount'], 1);
+        assert.equal(result.structuredContent?.['reportedFailureCount'], 1);
+        assert.equal(await readFile(first.absolutePath, 'utf8'), 'ALPHA');
+        assert.equal(await readFile(second.absolutePath, 'utf8'), 'beta');
+    });
+
+    it('keeps global preflight as an explicit all-target preview gate', async () => {
         const first = await createRepoFile('first.txt', 'alpha');
         const second = await createRepoFile('second.txt', 'beta');
         const result = await findTool('repo_apply_patch_batch').handler({
@@ -202,10 +248,12 @@ describe('repo_apply_patch_batch V2', () => {
             ],
             dryRun: false,
             confirmBatch: true,
+            applyMode: 'global-preflight',
         });
 
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['applyMode'], 'global-preflight');
         assert.equal(result.structuredContent?.['preflightElided'], false);
         assert.equal(result.structuredContent?.['preflightSummary']?.['ran'], true);
         assert.equal(await readFile(first.absolutePath, 'utf8'), 'ALPHA');

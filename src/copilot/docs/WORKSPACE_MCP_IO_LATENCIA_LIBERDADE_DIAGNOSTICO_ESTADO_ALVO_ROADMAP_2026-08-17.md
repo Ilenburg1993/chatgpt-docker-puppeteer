@@ -4904,4 +4904,329 @@ Ordem de execução após esta atualização documental:
 
 A meta é reduzir tanto **quedas reais** quanto **falsos diagnósticos**, porque sem essa separação qualquer tuning de QUIC/DNS corre risco de trocar um sistema saudável por uma configuração inferior.
 
+---
+
+# 44. Faixa 36 — Patch/File Batch Autonomy V58: liberdade por target, causalidade compacta e policy por risco — 2026-08-18
+
+## 44.1 Motivação: o preflight estava protegendo mais do que realmente garantia
+
+Durante a continuação da investigação, o próprio fluxo de manutenção revelou que `repo_apply_patch_batch` ainda gerava atrito desproporcional em três pontos:
+
+1. `global-preflight` era o default multi-target e executava uma rodada completa de dry-run antes da rodada real de apply;
+2. uma falha em um target independente bloqueava todos os demais no modo conservador;
+3. a path policy classificava **qualquer** `.sh`, `.ps1`, `.bat` ou `.cmd` como path proibido para escrita, o que impedia manutenção legítima de scripts versionados do DevContainer/CI pelo mesmo agente que podia editar JS/TS com igual poder de execução potencial.
+
+A investigação do executor mostrou um fato arquitetural decisivo: o antigo `global-preflight` **não era uma transação multi-arquivo**. Ele apenas verificava todos os targets em uma primeira rodada e, depois, fazia outra rodada de apply. A atomicidade verdadeira continuava sendo por arquivo/target, via lock + read + compute virtual + atomic publish. Entre dry-run e apply ainda havia uma janela de mudança, mitigada por hashes/preconditions quando fornecidos, mas não eliminada pelo preflight.
+
+Portanto o custo extra estava sendo interpretado como uma garantia mais forte do que realmente era.
+
+## 44.2 Invariantes que foram preservados
+
+A mudança não removeu as proteções que carregam valor real:
+
+- containment dentro do workspace;
+- rejeição de traversal;
+- resolução do ancestral existente mais próximo para detectar symlink escape em targets ainda inexistentes;
+- private-branded validated capabilities ligadas ao `workspaceRoot` e à versão da path policy;
+- locks por recurso;
+- compute-before-write;
+- publicação atômica por arquivo;
+- `expectedHash`/baseline hash;
+- expected occurrence count;
+- bounded operations/targets/input size;
+- crash durability configurável;
+- segredos/credenciais, `.git`, `.ssh`, `.aws` e material equivalente continuam bloqueados;
+- extensões nativas/opacas (`.exe`, `.msi`, `.dll`, `.so`, `.dylib`) continuam proibidas para escrita;
+- deletes continuam exigindo confirmação explícita;
+- move overwrite continua exigindo overwrite + confirmação.
+
+A liberdade foi aumentada onde a restrição não acrescentava uma fronteira de segurança equivalente.
+
+## 44.3 Path policy V58 — script textual é código-fonte, não execução
+
+`DEFAULT_BLOCKED_WRITE_PATH_PATTERNS` deixou de bloquear automaticamente:
+
+- `.sh`;
+- `.ps1`;
+- `.bat`;
+- `.cmd`.
+
+A distinção adotada é arquitetural:
+
+> editar um arquivo textual não executa o arquivo; execução pertence a outra capability/tool boundary.
+
+Bloquear scripts de shell enquanto JS/TS permaneciam editáveis era uma classificação por extensão, não por autoridade efetiva. A policy foi versionada para:
+
+`IO_PATH_POLICY_VERSION = 2026-08-18.r4.repo-text-scripts.v1`
+
+Isso invalida capabilities emitidas sob a versão anterior e impede que a mudança seja absorvida silenciosamente por objetos validados stale.
+
+Regressões novas comprovam:
+
+- `.sh/.ps1/.bat/.cmd`: write permitido dentro do workspace;
+- `.exe`: write continua bloqueado;
+- nome/path contendo `secret`: continua bloqueado mesmo se terminar em `.sh`;
+- move source continua passando por **write policy**, provado com fixture `.exe` que seria legível pela read policy mas é proibido como origem mutável.
+
+## 44.4 `repo_apply_patch_batch`: novo default = `per-target-fast + best-effort`
+
+Quando `dryRun=false`, `confirmBatch=true` e o caller não especifica modo:
+
+- `applyMode = per-target-fast`;
+- `failureMode = best-effort`;
+- concurrency default = 4 targets;
+- `preflightElided=true`;
+- `preflightElisionReason=per-target-fast-direct-atomic-apply`.
+
+Semântica:
+
+- operações do **mesmo arquivo** continuam sequenciais no estado virtual e publicam atomicamente como um único target;
+- targets diferentes podem avançar/falhar independentemente;
+- falha de um target não reverte nem bloqueia outro target já válido;
+- `global-preflight` continua disponível explicitamente quando o operador quer que qualquer falha detectável no preview impeça **todos** os writes;
+- essa opção é descrita corretamente como **all-target preview gate**, não como cross-file transaction.
+
+O plan tool também passa a recomendar o caminho direto fast/best-effort quando um preview separado não agrega informação.
+
+## 44.5 Falhas causais compactas: de N clones para 1 causa por target
+
+A investigação reproduziu live o problema anterior em `repo-write.js`:
+
+- 23 operações no mesmo target;
+- a operação causal era uma única ambiguidade `ERR_PATCH_AMBIGUOUS_MATCH`;
+- o target foi corretamente abortado sem publicação parcial;
+- porém a resposta antiga devolveu **23 failure rows**: uma causal e 22 `ERR_PATCH_BATCH_GROUP_ABORTED`.
+
+O executor estava correto; a superfície de feedback não estava.
+
+V58 preserva duas contagens distintas:
+
+- `failedCount`: número completo de operações afetadas;
+- `reportedFailureCount`: número de causas compactas apresentadas.
+
+Além disso retorna `failureSummary`:
+
+- `failedOperationCount`;
+- `failedTargetCount`;
+- `causalFailureCount`;
+- `abortedOperationCount`;
+- `causalByCode`.
+
+No modo `compact`, `failures` contém **uma linha por target causal**, com:
+
+- `index` da operação causal;
+- `code`/erro;
+- `affectedOperationIndices`;
+- `affectedOperationCount`;
+- `abortedOperationCount`;
+- `details` relevantes;
+- `nextAction` específico.
+
+`resultMode=detailed` continua preservando a superfície forense completa quando explicitamente solicitada.
+
+## 44.6 Match ambíguo agora é autocorretivo sem reread ordinário
+
+`computeTextPatch()` passou a anexar evidência bounded de localização aos erros de ocorrência:
+
+- `occurrenceLines` — até 16 linhas físicas;
+- `occurrenceLinesTruncated`.
+
+`ERR_PATCH_AMBIGUOUS_MATCH` preserva também `occurrenceCount`, `firstMatchLine` e `lastMatchLine`.
+
+O MCP transforma isso em uma ação de correção concreta, por exemplo:
+
+`Retry with occurrence_index=1..2 using occurrenceLines=[1,3], or send a more specific old_string.`
+
+A consequência operacional é importante: um batch que falha por uma âncora curta não exige automaticamente `repo_read_file`/`repo_search_text` adicional apenas para descobrir onde estão as duas ocorrências.
+
+## 44.7 `repo_apply_file_batch`: default adaptativo por risco
+
+File batch é semanticamente diferente de patch batch porque contém operações ordenadas que podem depender das anteriores e pode incluir destruição real.
+
+Em vez de adotar fast indiscriminadamente, V58 resolve o modo automaticamente quando o caller não o especifica:
+
+### `adaptive-safe-sequential` → `sequential-fast`
+
+Para sequências compostas por:
+
+- `create_file`;
+- `move_file` sem overwrite;
+- `quarantine_file`.
+
+Nesses casos:
+
+- não há whole-batch preflight duplicado;
+- cada operação é validada/aplicada em ordem;
+- dependências `create → move` continuam funcionando;
+- falha posterior pode produzir partial prefix explícito;
+- quarantine permanece reversível.
+
+### `adaptive-destructive-gate` → `global-preflight`
+
+Se existir:
+
+- `remove_file`; ou
+- `move_file` com `overwrite=true`.
+
+O resultado também expõe `conservativeOperationIndices`, tornando visível **por que** o modo conservador foi escolhido.
+
+O caller ainda pode escolher explicitamente `global-preflight` ou `sequential-fast`; a automação é default inteligente, não retirada de liberdade.
+
+## 44.8 Prova incidental durante a própria refatoração
+
+Antes mesmo do reload, um batch de mudanças de testes continha três targets independentes:
+
+- dois targets tinham patches válidos;
+- um terceiro tinha uma precondition de ocorrência incorreta.
+
+Executado explicitamente em `per-target-fast + best-effort` pelo processo antigo:
+
+- os dois targets válidos foram publicados;
+- o terceiro target falhou;
+- as quatro operações internas desse terceiro arquivo foram **todas abortadas atomicamente**, deixando o arquivo intacto.
+
+Isso provou no próprio processo de construção a propriedade desejada:
+
+> progresso entre arquivos + atomicidade dentro do arquivo.
+
+## 44.9 Gates antes da ativação
+
+Verificações focadas:
+
+- core path policy: green;
+- patch engine: green;
+- patch batch V2: green;
+- repo-write: green após atualizar a antiga regressão `.sh` para uma fixture `.exe` realmente write-blocked;
+- MCP tools: green;
+- strict typecheck: green;
+- lint: green após remover um optional-chaining inseguro no teste.
+
+`CAPABILITIES_VERSION` foi elevado de **57 → 58**, pois defaults/feedback e orientação externa do MCP mudaram materialmente.
+
+## 44.10 Prova live V58 pós-reload
+
+Reload único preservando QUIC:
+
+- connector smoke: green;
+- 120/120 tools;
+- OAuth/health: green;
+- SSE initial/reconnect: green;
+- authenticated `tools/list`: **123.959 B** contra 123.643 B antes, acréscimo de apenas **316 B** apesar da orientação adicional.
+
+### Prova A — file batch seguro sem preflight
+
+Uma chamada sem `applyMode` criou quatro probes, inclusive um `.sh`:
+
+- `applyMode=sequential-fast`;
+- `applyModeReason=adaptive-safe-sequential`;
+- `preflightSummary.ran=false`;
+- 4/4 operações aplicadas.
+
+### Prova B — patch multi-target com falha independente + script textual
+
+Uma chamada sem `applyMode/failureMode` continha:
+
+1. patch válido em `.txt`;
+2. patch `old_string` inexistente em outro `.txt`;
+3. patch válido em `.sh`.
+
+Resultado:
+
+- `applyMode=per-target-fast`;
+- `failureMode=best-effort`;
+- `preflightElided=true`;
+- `appliedCount=2`;
+- `failedCount=1`;
+- `reportedFailureCount=1`;
+- `.txt` válido publicado;
+- `.sh` publicado pela mesma path policy governada;
+- target inválido preservado;
+- `nextAction` instruiu retentar **somente** o target falho.
+
+### Prova C — same-file atomic + ambiguidade compacta
+
+Probe inicial:
+
+```text
+same
+middle
+same
+```
+
+Três operações no mesmo target:
+
+1. `middle → MIDDLE`;
+2. `same → SAME` sem occurrence index, portanto ambígua;
+3. `MIDDLE → CENTER`.
+
+Resultado:
+
+- `appliedCount=0`;
+- `failedCount=3` — contabilidade completa;
+- `reportedFailureCount=1` — superfície causal;
+- `abortedOperationCount=2`;
+- `causalByCode={ERR_PATCH_AMBIGUOUS_MATCH:1}`;
+- `affectedOperationIndices=[0,1,2]`;
+- `occurrenceLines=[1,3]`;
+- `nextAction` autocorretivo;
+- read posterior confirmou o arquivo **byte-for-byte original**, portanto nenhuma operação virtual anterior vazou para o filesystem.
+
+Comparação direta do pior caso observado:
+
+| aspecto | antes V58 | V58 |
+|---|---:|---:|
+| causa real | 1 | 1 |
+| rows de failure retornadas | **23** | **1 por target** |
+| sibling aborts explícitos | 22 clones | contador + índices |
+| localização da ambiguidade | exigia investigação adicional | `occurrenceLines` inline |
+| publicação parcial same-file | não | não |
+
+### Prova D — destruição continua conservadora
+
+A limpeza dos quatro probes foi enviada em um único `repo_apply_file_batch` sem `applyMode`:
+
+- quatro `remove_file`, cada um com `confirm=true`;
+- resolved automaticamente para `applyMode=global-preflight`;
+- `applyModeReason=adaptive-destructive-gate`;
+- `conservativeOperationIndices=[0,1,2,3]`;
+- preflight executado e green;
+- 4/4 removes aplicados.
+
+Logo o ganho de autonomia não veio de remover indiscriminadamente as barreiras; veio de **mover cada barreira para a classe de risco onde ela realmente acrescenta valor**.
+
+## 44.11 Descriptor cache do host versus backend live
+
+Após o reload, o backend já executava V58 e `mcp_session_profile` devolvia as novas regras; `mcp_capabilities_summary` reportou:
+
+- `capabilitiesVersion=58`;
+- 120 tools;
+- OAuth max-power scopes;
+- guidance runtime atualizada.
+
+Entretanto a descrição/schema apresentado por uma nova descoberta `api_tool.list_resources` nesta mesma conversa ainda continha textos antigos como “Default global-preflight”. Isso indica cache/refresh de descriptor no **host da conversa**, não backend MCP stale: a execução observável usou os defaults novos.
+
+Implicação:
+
+- hot reload pode atualizar comportamento/runtime sem que o descriptor textual já carregado no host da mesma conversa seja re-hidratado;
+- `mcp_session_profile` e `mcp_capabilities_summary` passam a ser a superfície runtime autoritativa em sessões longas após mudanças de capabilities;
+- reconnect/new conversation continua sendo o mecanismo natural para renovar schemas carregados pelo host quando a forma externa muda;
+- diagnóstico futuro deve distinguir **host schema cache** de **backend capability drift**.
+
+## 44.12 Estado-alvo após V58
+
+A política operacional passa a ser:
+
+1. se âncoras/intenção já são conhecidas, usar `repo_apply_patch_batch` diretamente;
+2. não pagar plan separado por hábito;
+3. agrupar alterações do mesmo arquivo para uma única leitura/lock/publicação;
+4. deixar targets independentes avançarem por default;
+5. usar `global-preflight` explicitamente apenas quando a semântica do trabalho exigir all-target preview gating;
+6. em file batch, deixar a classificação adaptativa escolher preflight conforme risco, salvo override consciente;
+7. tratar erro ambíguo como feedback autocorretivo — usar `occurrenceLines/occurrence_index` antes de reler;
+8. editar scripts textuais versionados como código-fonte normal;
+9. manter segredos, metadata de VCS, symlink escapes e binários nativos sob bloqueio canônico;
+10. considerar, numa evolução futura, uma transação **prepare/commit multi-target verdadeira** somente se houver casos concretos em que atomicidade cross-file seja necessária. Não usar dry-run duplicado como substituto conceitual dessa garantia.
+
+A Faixa 36 está fechada tecnicamente e libera a continuação da frente de rede: os scripts DevContainer `.sh` antes bloqueados pela policy agora podem ser corrigidos diretamente, com as mesmas preconditions/locks/atomic publish das demais fontes.
+
 

@@ -23,13 +23,25 @@ describe('infra/io/patch', () => {
         expect(patch.bytesWritten).toBe(Buffer.byteLength('const x = 2;\n', 'utf8'));
     });
 
-    it('rejeita substituição ambígua sem replaceAll', () => {
-        expect(() =>
-            computeTextPatch('same same', {
+    it('rejeita substituição ambígua e devolve linhas suficientes para retry sem nova leitura', () => {
+        try {
+            computeTextPatch('same\nmiddle\nsame\n', {
                 oldString: 'same',
                 newString: 'other',
-            }),
-        ).toThrow('2 vezes');
+            });
+            throw new Error('patch deveria falhar');
+        } catch (error) {
+            expect(error).toMatchObject({
+                code: 'ERR_PATCH_AMBIGUOUS_MATCH',
+                details: {
+                    occurrenceCount: 2,
+                    firstMatchLine: 1,
+                    lastMatchLine: 3,
+                    occurrenceLines: [1, 3],
+                    occurrenceLinesTruncated: false,
+                },
+            });
+        }
     });
 
     it('interrompe a contagem quando expectedOccurrences já divergiu', () => {

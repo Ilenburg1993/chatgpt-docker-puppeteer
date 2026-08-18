@@ -62,6 +62,21 @@ function findOccurrenceOffsets(content, needle, maxOffsets = Number.POSITIVE_INF
 }
 
 /**
+ * Bounded line-location evidence for retrying an ambiguous exact-string patch without another file read.
+ *
+ * @param {string} content
+ * @param {number[]} offsets
+ * @param {number} [maxLines]
+ */
+function occurrenceLineEvidence(content, offsets, maxLines = 16) {
+    const selected = offsets.slice(0, maxLines);
+    return {
+        occurrenceLines: selected.map((offset) => lineNumberAtTextOffset(content, offset)),
+        occurrenceLinesTruncated: offsets.length > selected.length,
+    };
+}
+
+/**
  * @param {string} content
  * @param {{
  *     oldString: string;
@@ -125,6 +140,7 @@ export function computeTextPatch(content, options) {
                 expectedOccurrences: options.expectedOccurrences,
                 occurrenceCount: occurrences,
                 occurrenceCountExact: !occurrenceCountTruncated,
+                ...occurrenceLineEvidence(content, offsets),
             },
         );
     }
@@ -157,6 +173,7 @@ export function computeTextPatch(content, options) {
                 occurrenceCount: occurrences,
                 firstMatchLine: lineNumberAtTextOffset(content, offsets[0] ?? 0),
                 lastMatchLine: lineNumberAtTextOffset(content, offsets[offsets.length - 1] ?? 0),
+                ...occurrenceLineEvidence(content, offsets),
             },
         );
     }

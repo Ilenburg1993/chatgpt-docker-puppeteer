@@ -93,7 +93,7 @@ function buildApprovalFrictionProfile(summaries) {
         .sort();
     return {
         hostPolicy:
-            'Prefer direct bounded batch/write when intent is clear; plan only when preview or a separate approval boundary adds information; remember trusted approvals when the host offers it.',
+            'Prefer direct bounded batch/write when intent is clear. Patch batches default to atomic-per-target best-effort progress; file batches adapt preflight to destructive risk. Plan only when preview or a separate approval boundary adds information; remember trusted approvals when the host offers it.',
         firstRememberApprovalWave: remember.filter((name) =>
             [
                 'repo_apply_patch',

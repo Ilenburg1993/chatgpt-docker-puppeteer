@@ -188,16 +188,16 @@ describe('copilot MCP repo write tools', () => {
     it('uses write policy for move source even during dry-run', async () => {
         assert.ok(moveFileTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
-        const source = path.join(dir, 'blocked-source.sh');
+        const source = path.join(dir, 'blocked-source.exe');
         const destination = path.join(dir, 'destination.txt');
-        await fs.writeFile(source, '#!/bin/sh\necho blocked\n', 'utf8');
+        await fs.writeFile(source, 'opaque native-extension fixture\n', 'utf8');
         resetValidatedMutableWorkspacePathStatsForTest();
 
         const result = await moveFileTool.handler({ source, destination, dryRun: true });
 
         assert.equal(result.isError, true);
         assert.match(String(result.structuredContent?.error ?? result.content?.[0]?.text ?? ''), /blocked|denied|negado/i);
-        assert.equal(await fs.readFile(source, 'utf8'), '#!/bin/sh\necho blocked\n');
+        assert.equal(await fs.readFile(source, 'utf8'), 'opaque native-extension fixture\n');
         await assert.rejects(() => fs.access(destination));
         const stats = getValidatedMutableWorkspacePathStats();
         assert.equal(stats.issued, 0);
@@ -276,9 +276,10 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(applied.isError, undefined);
         assert.equal(applied.structuredContent.success, true);
         assert.equal(applied.structuredContent.operationCount, 2);
-        assert.equal(applied.structuredContent.applyMode, 'global-preflight');
-        assert.equal(applied.structuredContent.preflightSummary.ran, true);
-        assert.equal(applied.structuredContent.preflightSummary.plannedCount, 2);
+        assert.equal(applied.structuredContent.applyMode, 'sequential-fast');
+        assert.equal(applied.structuredContent.applyModeReason, 'adaptive-safe-sequential');
+        assert.equal(applied.structuredContent.preflightSummary.ran, false);
+        assert.equal(applied.structuredContent.preflightSummary.plannedCount, 0);
         assert.deepEqual(applied.structuredContent.planned, []);
         assert.equal(await fs.readFile(created, 'utf8'), 'batched\n');
         assert.equal(await fs.readFile(moved, 'utf8'), 'move in batch\n');
@@ -298,6 +299,7 @@ describe('copilot MCP repo write tools', () => {
                 { type: 'move_file', source: missingSource, destination },
             ],
             confirmBatch: true,
+            applyMode: 'global-preflight',
         });
         assert.equal(conservative.isError, true);
         const conservativeDetails = conservative.structuredContent.details;
@@ -312,16 +314,37 @@ describe('copilot MCP repo write tools', () => {
                 { type: 'move_file', source: missingSource, destination },
             ],
             confirmBatch: true,
-            applyMode: 'sequential-fast',
         });
         assert.equal(fast.isError, true);
         const fastDetails = fast.structuredContent.details;
         assert.equal(fastDetails.phase, 'apply');
+        assert.equal(fastDetails.applyMode, 'sequential-fast');
+        assert.equal(fastDetails.applyModeReason, 'adaptive-safe-sequential');
         assert.equal(fastDetails.partial, true);
         assert.equal(fastDetails.appliedCount, 1);
         assert.equal(fastDetails.failureIndex, 1);
         assert.equal(fastDetails.preflightSummary.ran, false);
         assert.equal(await fs.readFile(fastCreated, 'utf8'), 'fast\n');
+    });
+
+    it('keeps destructive file-batch operations behind adaptive global preflight by default', async () => {
+        assert.ok(applyFileBatchTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const removable = path.join(dir, 'adaptive-remove.txt');
+        await fs.writeFile(removable, 'remove me\n', 'utf8');
+
+        const result = await applyFileBatchTool.handler({
+            operations: [{ type: 'remove_file', path: removable, confirm: true }],
+            confirmBatch: true,
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent.success, true);
+        assert.equal(result.structuredContent.applyMode, 'global-preflight');
+        assert.equal(result.structuredContent.applyModeReason, 'adaptive-destructive-gate');
+        assert.deepEqual(result.structuredContent.conservativeOperationIndices, [0]);
+        assert.equal(result.structuredContent.preflightSummary.ran, true);
+        assert.equal(await pathExists(removable), false);
     });
 
     it('supports dependent create then move operations in one file batch', async () => {
