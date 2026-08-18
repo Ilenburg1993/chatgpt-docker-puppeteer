@@ -31,6 +31,7 @@ export const DEVCONTAINER_BASH_SYNTAX_FILES = Object.freeze([
     '.devcontainer/scripts/network/copilot-route-advisor.sh',
     '.devcontainer/scripts/network/github-api-route-fix.sh',
     '.devcontainer/scripts/network/github-copilot-network-manager.sh',
+    '.devcontainer/scripts/network/lib/endpoint-registry.sh',
     '.devcontainer/scripts/network/local-copilot-proxy.sh',
     '.devcontainer/scripts/network/local-dns-cache.sh',
 ]);

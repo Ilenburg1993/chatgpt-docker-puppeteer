@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # copilot-route-advisor.sh — Passive Copilot Route Advisor
-# Version: v1.1.0
+# Version: v1.2.0
 #
 # Purpose:
 #   Passive, runtime-only route advisory layer for GitHub/Copilot endpoints
@@ -19,6 +19,12 @@
 #   - Custom endpoint/probe hosts require explicit opt-in.
 #   - A worse candidate is not a failure; it is an observation.
 #   - Status is passive and does not truncate artifacts.
+#
+# v1.2.0 focus:
+#   - Consumes only endpoint registries that passed the shared structural audit.
+#   - Uses protected URL/expected-HTTP materialization and treats invalid registry
+#     data as non-authoritative, falling back to safe embedded defaults.
+#   - Keeps advisor-specific endpoint filtering separate from structural trust.
 #
 # v1.1.0 focus:
 #   - Aligns endpoint governance with DevContainer 5.8.0 and manager v1.6.0.
@@ -39,7 +45,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'copilot-route-advisor.sh' '1.1.0'
+        printf '%s v%s\n' 'copilot-route-advisor.sh' '1.2.0'
         exit 0
         ;;
     --help)
@@ -107,7 +113,7 @@ cfg_uint() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="copilot-route-advisor.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="1.1.0"
+SCRIPT_VERSION="1.2.0"
 readonly SCRIPT_VERSION
 RUN_ID="$(date '+%Y%m%dT%H%M%S%z' 2> /dev/null)-$$"
 readonly RUN_ID
@@ -120,6 +126,18 @@ else
     SCRIPT_DIR="$(pwd -P 2> /dev/null || printf '.')"
 fi
 readonly SCRIPT_DIR
+
+ENDPOINT_REGISTRY_LIBRARY_FILE="${SCRIPT_DIR}/lib/endpoint-registry.sh"
+ENDPOINT_REGISTRY_LIBRARY_STATUS="missing"
+if [[ -r "${ENDPOINT_REGISTRY_LIBRARY_FILE}" ]]; then
+    # shellcheck source=lib/endpoint-registry.sh
+    if source "${ENDPOINT_REGISTRY_LIBRARY_FILE}"; then
+        ENDPOINT_REGISTRY_LIBRARY_STATUS="ok"
+    else
+        ENDPOINT_REGISTRY_LIBRARY_STATUS="load-failed"
+    fi
+fi
+readonly ENDPOINT_REGISTRY_LIBRARY_FILE ENDPOINT_REGISTRY_LIBRARY_STATUS
 
 POSITIONAL_ACTION=""
 case "${1:-}" in
@@ -584,52 +602,33 @@ registry_expected_for_url() {
     local url file
     url="${1:-}"
     file="${ENDPOINT_REGISTRY_FILE:-none}"
-    [[ -r "${file}" && -n "${url}" ]] || return 0
-    awk -F'\t' -v u="${url}" '$1 == u && NF >= 5 {print $5; exit}' "${file}" 2> /dev/null
+    [[ -n "${url}" ]] || return 0
+    network_endpoint_registry_expected_http_v1 "${file}" "${url}" 2> /dev/null || true
 }
 
 audit_endpoint_registry_file() {
-    local file rows bad bad_urls skipped_api skipped_disallowed
+    local file skipped_api
     file="${1:-}"
-    [[ -r "${file}" ]] || return 1
-    rows="$(awk -F'\t' '/^[[:space:]]*#/ {next} NF == 0 {next} {c++} END {print c+0}' "${file}" 2> /dev/null || printf '0')"
-    bad="$(awk -F'\t' '
-        /^[[:space:]]*#/ { next }
-        NF == 0 { next }
-        NF != 5 { bad++; next }
-        $1 !~ /^https:\/\// { bad++; next }
-        $1 ~ /[[:space:]\\]/ { bad++; next }
-        $1 ~ /@/ { bad++; next }
-        END { print bad+0 }
-    ' "${file}" 2> /dev/null || printf '0')"
-    bad_urls="$(awk -F'\t' '
-        /^[[:space:]]*#/ { next }
-        NF == 0 { next }
-        NF == 5 && ($1 !~ /^https:\/\// || $1 ~ /[[:space:]\\]/ || $1 ~ /@/) { bad++ }
-        END { print bad+0 }
-    ' "${file}" 2> /dev/null || printf '0')"
-    skipped_api="$(awk -F'\t' '
-        /^[[:space:]]*#/ { next }
-        NF < 1 { next }
-        $1 ~ /^https:\/\/api\.github\.com/ { c++ }
-        END { print c+0 }
-    ' "${file}" 2> /dev/null || printf '0')"
-    skipped_disallowed="0"
-
-    ENDPOINT_REGISTRY_ROWS="${rows:-0}"
-    ENDPOINT_REGISTRY_BAD_ROWS="${bad:-0}"
-    ENDPOINT_REGISTRY_BAD_URLS="${bad_urls:-0}"
+    if [[ "${ENDPOINT_REGISTRY_LIBRARY_STATUS}" != "ok" ]]; then
+        ENDPOINT_REGISTRY_STATUS="validator-${ENDPOINT_REGISTRY_LIBRARY_STATUS}"
+        ENDPOINT_REGISTRY_ROWS="0"
+        ENDPOINT_REGISTRY_BAD_ROWS="1"
+        ENDPOINT_REGISTRY_BAD_URLS="0"
+        return 1
+    fi
+    if ! network_endpoint_registry_audit_v1 "${file}" "v1.2.0"; then
+        ENDPOINT_REGISTRY_STATUS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_STATUS}"
+        ENDPOINT_REGISTRY_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_ROWS}"
+        ENDPOINT_REGISTRY_BAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_TOTAL_BAD}"
+        ENDPOINT_REGISTRY_BAD_URLS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_BAD_URLS}"
+        return 1
+    fi
+    skipped_api="$(network_endpoint_registry_materialize_urls_v1 "${file}" "${MAX_ENDPOINTS}" | awk '$0 ~ /^https:\/\/api\.github\.com/ { c++ } END { print c+0 }' 2> /dev/null || printf '0')"
+    ENDPOINT_REGISTRY_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_ROWS}"
+    ENDPOINT_REGISTRY_BAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_TOTAL_BAD}"
+    ENDPOINT_REGISTRY_BAD_URLS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_BAD_URLS}"
     ENDPOINT_REGISTRY_SKIPPED_API="${skipped_api:-0}"
-    ENDPOINT_REGISTRY_SKIPPED_DISALLOWED="${skipped_disallowed}"
-
-    if [[ "${ENDPOINT_REGISTRY_ROWS}" == "0" ]]; then
-        ENDPOINT_REGISTRY_STATUS="empty"
-        return 1
-    fi
-    if [[ "${ENDPOINT_REGISTRY_BAD_ROWS}" != "0" ]]; then
-        ENDPOINT_REGISTRY_STATUS="invalid"
-        return 1
-    fi
+    ENDPOINT_REGISTRY_SKIPPED_DISALLOWED="0"
     ENDPOINT_REGISTRY_STATUS="ok"
     return 0
 }
@@ -638,27 +637,16 @@ read_registry_endpoint_urls() {
     local file max
     file="${1:-}"
     max="${2:-${MAX_ENDPOINTS}}"
-    [[ -r "${file}" ]] || return 1
-    awk -F'\t' -v max="${max}" -v include_api="${INCLUDE_GITHUB_API}" '
+    network_endpoint_registry_materialize_urls_v1 "${file}" "${max}" | awk -v include_api="${INCLUDE_GITHUB_API}" '
         function host_from_url(u,    x,a,h) {
             x=u; sub(/^https:\/\//, "", x); split(x,a,"/"); h=a[1]; sub(/:.*/, "", h); return tolower(h)
         }
-        /^[[:space:]]*#/ { next }
-        NF == 0 { next }
-        NF != 5 { next }
-        $1 !~ /^https:\/\// { next }
-        $1 ~ /[[:space:]\\]/ { next }
-        $1 ~ /@/ { next }
         {
-            h=host_from_url($1)
+            h=host_from_url($0)
             if (h == "api.github.com" && include_api != "true") next
-            if (!seen[$1]++) {
-                print $1
-                emitted++
-                if (emitted >= max) exit
-            }
+            print $0
         }
-    ' "${file}" 2> /dev/null
+    ' 2> /dev/null
 }
 
 filter_endpoint_lines() {
@@ -701,13 +689,16 @@ load_endpoints() {
             ENDPOINT_REGISTRY_SOURCE="legacy"
         fi
         if [[ "${ENDPOINT_REGISTRY_FILE}" != "none" ]]; then
-            audit_endpoint_registry_file "${ENDPOINT_REGISTRY_FILE}" || true
-            registry_urls="$(read_registry_endpoint_urls "${ENDPOINT_REGISTRY_FILE}" "${MAX_ENDPOINTS}" || true)"
-            endpoints_tmp="$(printf '%s\n' "${registry_urls}" | filter_endpoint_lines)"
-            if [[ -n "${endpoints_tmp}" ]]; then
-                ENDPOINT_SOURCE="registry"
+            if audit_endpoint_registry_file "${ENDPOINT_REGISTRY_FILE}"; then
+                registry_urls="$(read_registry_endpoint_urls "${ENDPOINT_REGISTRY_FILE}" "${MAX_ENDPOINTS}" || true)"
+                endpoints_tmp="$(printf '%s\n' "${registry_urls}" | filter_endpoint_lines)"
+                if [[ -n "${endpoints_tmp}" ]]; then
+                    ENDPOINT_SOURCE="registry"
+                else
+                    ENDPOINT_SOURCE="default-registry-filtered"
+                fi
             else
-                ENDPOINT_SOURCE="default-registry-empty-or-filtered"
+                ENDPOINT_SOURCE="default-registry-${ENDPOINT_REGISTRY_STATUS}"
             fi
         else
             ENDPOINT_REGISTRY_STATUS="missing"

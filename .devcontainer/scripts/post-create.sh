@@ -2,7 +2,7 @@
 # =============================================================================
 # post-create.sh — Inicialização Estrutural do DevContainer (CANÔNICO)
 #
-# Version: v1.2.3 (network path self-healing + runtime contract sync)
+# Version: v1.2.4 (shared endpoint-registry trust boundary + contract sync)
 #
 # PRINCÍPIO:
 #   Este script NÃO é conveniência de setup. É verificação estrutural.
@@ -137,6 +137,14 @@
 #     para network:state/control-plane, sem executar probes nem benchmarks.
 #   - Expande summary/report/manifesto com expected/detected/status de
 #     package, Makefile e network-control-plane.
+#
+# CHANGELOG v1.2.4:
+#   - Replaces duplicated endpoint-registry TSV audits with the shared structural
+#     contract used by manager/advisor/proxy.
+#   - Validates registry version, schema, IDs, URLs, criticality, expected HTTP
+#     outcomes and duplicates in one authoritative pass.
+#   - Synchronizes expected manager/advisor/proxy versions with the trust-boundary
+#     release while preserving post-create as a structural, non-network gate.
 #
 # CHANGELOG v1.2.3:
 #   - Sincroniza a matriz estrutural com devcontainer v5.9.1, Dockerfile v1.5.1,
@@ -430,68 +438,33 @@ artifact_readiness_status_extended() {
     fi
 }
 
-count_tsv_registry_rows() {
-    local file="${1:-}"
-    [[ -r "${file}" ]] || {
-        printf '0 0 0 0 0'
-        return 0
-    }
-    awk -F '\t' '
-        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
-        {
-            total++
-            bad_line=0
-            if (NF != 5) bad_line=1
-            if ($1 !~ /^https:\/\//) bad_line=1
-            if ($1 ~ /[*]/) wildcard++
-            if ($2 == "" || $3 == "" || $4 == "" || $5 == "") bad_line=1
-            if ($5 !~ /^[0-9][0-9][0-9]([|][0-9][0-9][0-9])*$/) bad_line=1
-            if (seen_url[$1]++) duplicate++
-            if (seen_id[$2]++) duplicate++
-            if (bad_line) bad++
-        }
-        END { print total+0, bad+0, wildcard+0, duplicate+0, (bad+wildcard+duplicate)+0 }
-    ' "${file}" 2> /dev/null || printf '0 0 0 0 0'
-}
+audit_endpoint_registry_shared() {
+    local file="${1:-}" expected_version="${2:-v1.2.0}"
+    POST_CREATE_ENDPOINT_REGISTRY_STATUS="degraded"
+    POST_CREATE_ENDPOINT_REGISTRY_ROWS="0"
+    POST_CREATE_ENDPOINT_REGISTRY_BAD_ROWS="1"
+    POST_CREATE_ENDPOINT_REGISTRY_DIAGNOSTICS="status=validator-unavailable"
 
-registry_status() {
-    local file="${1:-}" counts rows bad wildcard duplicate total_bad
-    [[ -n "${file}" ]] || {
-        printf 'unknown'
-        return 0
-    }
-    if [[ ! -r "${file}" ]]; then
-        printf 'absent'
+    if [[ "${ENDPOINT_REGISTRY_LIBRARY_STATUS:-missing}" != "ok" ]]; then
+        POST_CREATE_ENDPOINT_REGISTRY_DIAGNOSTICS="status=validator-${ENDPOINT_REGISTRY_LIBRARY_STATUS:-missing}"
+        return 1
+    fi
+    if network_endpoint_registry_audit_v1 "${file}" "${expected_version}"; then
+        POST_CREATE_ENDPOINT_REGISTRY_STATUS="ok"
+        POST_CREATE_ENDPOINT_REGISTRY_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_ROWS}"
+        POST_CREATE_ENDPOINT_REGISTRY_BAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_TOTAL_BAD}"
+        POST_CREATE_ENDPOINT_REGISTRY_DIAGNOSTICS="$(network_endpoint_registry_audit_summary_v1)"
         return 0
     fi
-    counts="$(count_tsv_registry_rows "${file}")"
-    IFS=' ' read -r rows bad wildcard duplicate total_bad <<< "${counts}"
-    if [[ "${rows}" =~ ^[0-9]+$ && "${total_bad}" =~ ^[0-9]+$ && "${rows}" -gt 0 && "${total_bad}" -eq 0 ]]; then
-        printf 'ok'
-    else
-        printf 'degraded'
-    fi
-}
 
-registry_row_count() {
-    local file="${1:-}" counts rows
-    counts="$(count_tsv_registry_rows "${file}")"
-    IFS=' ' read -r rows _ <<< "${counts}"
-    printf '%s' "${rows:-0}"
-}
-
-registry_bad_row_count() {
-    local file="${1:-}" counts _rows _bad _wild _dup total_bad
-    counts="$(count_tsv_registry_rows "${file}")"
-    IFS=' ' read -r _rows _bad _wild _dup total_bad <<< "${counts}"
-    printf '%s' "${total_bad:-0}"
-}
-
-registry_diagnostics() {
-    local file="${1:-}" counts rows bad wildcard duplicate total_bad
-    counts="$(count_tsv_registry_rows "${file}")"
-    IFS=' ' read -r rows bad wildcard duplicate total_bad <<< "${counts}"
-    printf 'rows=%s,bad=%s,wildcard=%s,duplicate=%s,total_bad=%s' "${rows:-0}" "${bad:-0}" "${wildcard:-0}" "${duplicate:-0}" "${total_bad:-0}"
+    case "${NETWORK_ENDPOINT_REGISTRY_AUDIT_STATUS}" in
+        missing) POST_CREATE_ENDPOINT_REGISTRY_STATUS="absent" ;;
+        *) POST_CREATE_ENDPOINT_REGISTRY_STATUS="degraded" ;;
+    esac
+    POST_CREATE_ENDPOINT_REGISTRY_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_ROWS}"
+    POST_CREATE_ENDPOINT_REGISTRY_BAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_TOTAL_BAD}"
+    POST_CREATE_ENDPOINT_REGISTRY_DIAGNOSTICS="$(network_endpoint_registry_audit_summary_v1)"
+    return 1
 }
 
 normalize_version_token() {
@@ -668,7 +641,7 @@ fi
 
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'post-create.sh' '1.2.3'
+        printf '%s v%s\n' 'post-create.sh' '1.2.4'
         exit 0
         ;;
     --help)
@@ -695,11 +668,11 @@ set +o posix 2> /dev/null || true
 # Identidade canônica do script (imutável)
 # ---------------------------------------------------------------------------
 SCRIPT_NAME="post-create.sh"
-SCRIPT_VERSION="1.2.3"
+SCRIPT_VERSION="1.2.4"
 readonly SCRIPT_NAME SCRIPT_VERSION
 
 # Matriz canônica sincronizada com devcontainer.json v5.9.1 / Dockerfile v1.5.1.
-EXPECTED_POST_CREATE_VERSION="v1.2.3"
+EXPECTED_POST_CREATE_VERSION="v1.2.4"
 EXPECTED_POST_START_VERSION="v3.0.3"
 EXPECTED_POST_ATTACH_VERSION="v5.9.0"
 EXPECTED_HEALTHCHECK_VERSION="v3.0.0"
@@ -707,9 +680,9 @@ EXPECTED_SYNC_LOCAL_AUTH_VERSION="v2.0.0"
 EXPECTED_NSS_GATEKEEPER_VERSION="v2.1.2"
 EXPECTED_LOCAL_DNS_VERSION="v1.8.1"
 EXPECTED_GITHUB_ROUTE_VERSION="v1.9.1"
-EXPECTED_COPILOT_MANAGER_VERSION="v1.6.1"
-EXPECTED_COPILOT_ADVISOR_VERSION="v1.1.0"
-EXPECTED_LOCAL_PROXY_VERSION="v1.3.1"
+EXPECTED_COPILOT_MANAGER_VERSION="v1.7.0"
+EXPECTED_COPILOT_ADVISOR_VERSION="v1.2.0"
+EXPECTED_LOCAL_PROXY_VERSION="v1.4.0"
 EXPECTED_NETWORK_CONTROL_PLANE_VERSION="v1.1.1"
 EXPECTED_ENDPOINT_REGISTRY_VERSION="v1.2.0"
 EXPECTED_PACKAGE_VERSION="v1.1.4"
@@ -736,6 +709,18 @@ LOG_DIR="${DEVCONTAINER_DIR}/logs"
 LOG_FILE="${LOG_DIR}/post-create.log"
 
 readonly SCRIPT_DIR PROJECT_ROOT DEVCONTAINER_DIR
+
+ENDPOINT_REGISTRY_LIBRARY_FILE="${DEVCONTAINER_DIR}/scripts/network/lib/endpoint-registry.sh"
+ENDPOINT_REGISTRY_LIBRARY_STATUS="missing"
+if [[ -r "${ENDPOINT_REGISTRY_LIBRARY_FILE}" ]]; then
+    # shellcheck source=network/lib/endpoint-registry.sh
+    if source "${ENDPOINT_REGISTRY_LIBRARY_FILE}"; then
+        ENDPOINT_REGISTRY_LIBRARY_STATUS="ok"
+    else
+        ENDPOINT_REGISTRY_LIBRARY_STATUS="load-failed"
+    fi
+fi
+readonly ENDPOINT_REGISTRY_LIBRARY_FILE ENDPOINT_REGISTRY_LIBRARY_STATUS
 
 # ---------------------------------------------------------------------------
 # Markers transacionais (definidos cedo para recovery em falha precoce)
@@ -1840,11 +1825,12 @@ _audit_one_script "copilot-route-advisor" "${COPILOT_ADVISOR_SCRIPT}" "${EXPECTE
 _audit_one_script "local-copilot-proxy" "${LOCAL_PROXY_SCRIPT}" "${EXPECTED_LOCAL_PROXY_VERSION}"
 _audit_one_script "network-control-plane-state" "${NETWORK_CONTROL_PLANE_SCRIPT}" "${EXPECTED_NETWORK_CONTROL_PLANE_VERSION}"
 
-ENDPOINT_REGISTRY_STATUS="$(registry_status "${ENDPOINT_REGISTRY_FILE}")"
-ENDPOINT_REGISTRY_ROWS="$(registry_row_count "${ENDPOINT_REGISTRY_FILE}")"
-ENDPOINT_REGISTRY_BAD_ROWS="$(registry_bad_row_count "${ENDPOINT_REGISTRY_FILE}")"
+audit_endpoint_registry_shared "${ENDPOINT_REGISTRY_FILE}" "${EXPECTED_ENDPOINT_REGISTRY_VERSION}" || true
+ENDPOINT_REGISTRY_STATUS="${POST_CREATE_ENDPOINT_REGISTRY_STATUS}"
+ENDPOINT_REGISTRY_ROWS="${POST_CREATE_ENDPOINT_REGISTRY_ROWS}"
+ENDPOINT_REGISTRY_BAD_ROWS="${POST_CREATE_ENDPOINT_REGISTRY_BAD_ROWS}"
 ENDPOINT_REGISTRY_ARTIFACT_STATE="$(artifact_readiness_status_extended "${ENDPOINT_REGISTRY_FILE}" "${ARTIFACT_MAX_AGE_SECONDS}")"
-ENDPOINT_REGISTRY_DIAGNOSTICS="$(registry_diagnostics "${ENDPOINT_REGISTRY_FILE}")"
+ENDPOINT_REGISTRY_DIAGNOSTICS="${POST_CREATE_ENDPOINT_REGISTRY_DIAGNOSTICS}"
 readonly ENDPOINT_REGISTRY_STATUS ENDPOINT_REGISTRY_ROWS ENDPOINT_REGISTRY_BAD_ROWS ENDPOINT_REGISTRY_ARTIFACT_STATE ENDPOINT_REGISTRY_DIAGNOSTICS
 
 if [[ "${ENDPOINT_REGISTRY_STATUS}" != "ok" ]]; then

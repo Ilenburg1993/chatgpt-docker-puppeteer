@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # local-copilot-proxy.sh — Optional Local HTTP CONNECT Proxy Manager
-# Version: v1.3.1
+# Version: v1.4.0
 #
 # Purpose:
 #   Manage an optional loopback-only HTTP CONNECT proxy for GitHub/Copilot
@@ -47,6 +47,12 @@
 #   - Emits endpoint registry status, row counts and probe source in report and
 #     summary artifacts.
 #
+# v1.4.0 focus:
+#   - Moves endpoint-registry structure to the shared validator/materializer.
+#   - Encodes actuator fail-closed semantics: start/restart/probe/benchmark paths
+#     are blocked before tinyproxy actuation when the enabled registry is invalid.
+#   - Keeps stop/status/env/doctor available for recovery and observability.
+#
 # v1.3.1 focus:
 #   - Fixes ShellCheck SC2221/SC2222 by removing a redundant Azure Front Door
 #     case pattern that was fully covered by the broader Copilot reports glob.
@@ -68,7 +74,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'local-copilot-proxy.sh' '1.3.1'
+        printf '%s v%s\n' 'local-copilot-proxy.sh' '1.4.0'
         exit 0
         ;;
     --help)
@@ -180,7 +186,7 @@ count_space_list() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="local-copilot-proxy.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="1.3.1"
+SCRIPT_VERSION="1.4.0"
 readonly SCRIPT_VERSION
 
 SCRIPT_DIR=""
@@ -191,6 +197,18 @@ else
     SCRIPT_DIR="$(pwd -P 2> /dev/null || printf '.')"
 fi
 readonly SCRIPT_DIR
+
+ENDPOINT_REGISTRY_LIBRARY_FILE="${SCRIPT_DIR}/lib/endpoint-registry.sh"
+ENDPOINT_REGISTRY_LIBRARY_STATUS="missing"
+if [[ -r "${ENDPOINT_REGISTRY_LIBRARY_FILE}" ]]; then
+    # shellcheck source=lib/endpoint-registry.sh
+    if source "${ENDPOINT_REGISTRY_LIBRARY_FILE}"; then
+        ENDPOINT_REGISTRY_LIBRARY_STATUS="ok"
+    else
+        ENDPOINT_REGISTRY_LIBRARY_STATUS="load-failed"
+    fi
+fi
+readonly ENDPOINT_REGISTRY_LIBRARY_FILE ENDPOINT_REGISTRY_LIBRARY_STATUS
 
 REQUESTED_ACTION="${DEVCONTAINER_LOCAL_COPILOT_PROXY_ACTION:-${1:-start}}"
 case "${REQUESTED_ACTION}" in
@@ -277,53 +295,35 @@ PROBE_REGISTRY_FILE="none"
 PROBE_REGISTRY_STATUS="not-used"
 PROBE_REGISTRY_ROWS="0"
 PROBE_REGISTRY_BAD_ROWS="0"
+PROBE_REGISTRY_BLOCKING="false"
 PROBE_URL_COUNT="0"
+
+audit_endpoint_registry_contract() {
+    local file
+    file="${1:-}"
+    if [[ "${ENDPOINT_REGISTRY_LIBRARY_STATUS}" != "ok" ]]; then
+        PROBE_REGISTRY_STATUS="validator-${ENDPOINT_REGISTRY_LIBRARY_STATUS}"
+        PROBE_REGISTRY_ROWS="0"
+        PROBE_REGISTRY_BAD_ROWS="1"
+        return 1
+    fi
+    if network_endpoint_registry_audit_v1 "${file}" "v1.2.0"; then
+        PROBE_REGISTRY_STATUS="ok"
+        PROBE_REGISTRY_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_ROWS}"
+        PROBE_REGISTRY_BAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_TOTAL_BAD}"
+        return 0
+    fi
+    PROBE_REGISTRY_STATUS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_STATUS}"
+    PROBE_REGISTRY_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_ROWS}"
+    PROBE_REGISTRY_BAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_TOTAL_BAD}"
+    return 1
+}
 
 read_registry_probe_urls() {
     local file max
     file="${1:-}"
     max="${2:-${MAX_PROBE_URLS}}"
-    [[ -r "${file}" ]] || return 1
-    awk -F'	' -v max="${max}" '
-        /^[[:space:]]*#/ { next }
-        NF == 0 { next }
-        NF != 5 { next }
-        $1 ~ /^https:\/\// && $1 !~ /[[:space:]\\]/ && $1 !~ /@/ {
-            if (!seen[$1]++) {
-                print $1
-                emitted++
-                if (emitted >= max) exit
-            }
-        }
-    ' "${file}" 2> /dev/null
-}
-
-audit_endpoint_registry_file() {
-    local file rows bad
-    file="${1:-}"
-    [[ -r "${file}" ]] || return 1
-    rows="$(awk -F'	' '/^[[:space:]]*#/ {next} NF == 0 {next} {c++} END {print c+0}' "${file}" 2> /dev/null || printf '0')"
-    bad="$(awk -F'	' '
-        /^[[:space:]]*#/ { next }
-        NF == 0 { next }
-        NF != 5 { bad++; next }
-        $1 !~ /^https:\/\// { bad++; next }
-        $1 ~ /[[:space:]\\]/ { bad++; next }
-        $1 ~ /@/ { bad++; next }
-        END { print bad+0 }
-    ' "${file}" 2> /dev/null || printf '0')"
-    PROBE_REGISTRY_ROWS="${rows:-0}"
-    PROBE_REGISTRY_BAD_ROWS="${bad:-0}"
-    if [[ "${PROBE_REGISTRY_BAD_ROWS}" != "0" ]]; then
-        PROBE_REGISTRY_STATUS="invalid"
-        return 1
-    fi
-    if [[ "${PROBE_REGISTRY_ROWS}" == "0" ]]; then
-        PROBE_REGISTRY_STATUS="empty"
-        return 1
-    fi
-    PROBE_REGISTRY_STATUS="ok"
-    return 0
+    network_endpoint_registry_materialize_urls_v1 "${file}" "${max}"
 }
 
 if [[ -n "${DEVCONTAINER_LOCAL_COPILOT_PROXY_PROBE_URLS:-}${DEVCONTAINER_LOCAL_COPILOT_PROXY_PROBE_URL:-}" ]]; then
@@ -336,19 +336,20 @@ elif [[ "${USE_ENDPOINT_REGISTRY}" == "true" ]]; then
         PROBE_REGISTRY_FILE="${ENDPOINT_REGISTRY_LEGACY_FILE}"
     fi
     if [[ "${PROBE_REGISTRY_FILE}" != "none" ]]; then
-        audit_endpoint_registry_file "${PROBE_REGISTRY_FILE}" || true
-        REGISTRY_PROBE_URLS="$(read_registry_probe_urls "${PROBE_REGISTRY_FILE}" "${MAX_PROBE_URLS}" | awk 'NF { printf "%s%s", sep, $0; sep=" " }' 2> /dev/null || true)"
-        if [[ -n "${REGISTRY_PROBE_URLS}" ]]; then
+        if audit_endpoint_registry_contract "${PROBE_REGISTRY_FILE}"; then
+            REGISTRY_PROBE_URLS="$(read_registry_probe_urls "${PROBE_REGISTRY_FILE}" "${MAX_PROBE_URLS}" | awk 'NF { printf "%s%s", sep, $0; sep=" " }' 2> /dev/null || true)"
             PROBE_URLS="$(normalize_space_list "${REGISTRY_PROBE_URLS}")"
             PROBE_URL_SOURCE="registry"
         else
-            PROBE_URLS="$(normalize_space_list "${DEFAULT_PROBE_URLS}")"
-            PROBE_URL_SOURCE="default-registry-empty"
+            PROBE_REGISTRY_BLOCKING="true"
+            PROBE_URLS=""
+            PROBE_URL_SOURCE="blocked-registry-${PROBE_REGISTRY_STATUS}"
         fi
     else
         PROBE_REGISTRY_STATUS="missing"
-        PROBE_URLS="$(normalize_space_list "${DEFAULT_PROBE_URLS}")"
-        PROBE_URL_SOURCE="default-registry-missing"
+        PROBE_REGISTRY_BLOCKING="true"
+        PROBE_URLS=""
+        PROBE_URL_SOURCE="blocked-registry-missing"
     fi
 else
     PROBE_REGISTRY_STATUS="disabled"
@@ -356,7 +357,7 @@ else
     PROBE_URL_SOURCE="default-registry-disabled"
 fi
 PROBE_URL_COUNT="$(count_space_list "${PROBE_URLS}")"
-readonly DEFAULT_PROBE_URLS PROBE_URLS PROBE_URL_SOURCE PROBE_REGISTRY_FILE PROBE_REGISTRY_STATUS PROBE_REGISTRY_ROWS PROBE_REGISTRY_BAD_ROWS PROBE_URL_COUNT
+readonly DEFAULT_PROBE_URLS PROBE_URLS PROBE_URL_SOURCE PROBE_REGISTRY_FILE PROBE_REGISTRY_STATUS PROBE_REGISTRY_ROWS PROBE_REGISTRY_BAD_ROWS PROBE_REGISTRY_BLOCKING PROBE_URL_COUNT
 CONNECT_TIMEOUT="$(cfg_uint "${DEVCONTAINER_LOCAL_COPILOT_PROXY_CONNECT_TIMEOUT:-4}" 4 1 60)"
 readonly CONNECT_TIMEOUT
 MAX_TIME="$(cfg_uint "${DEVCONTAINER_LOCAL_COPILOT_PROXY_MAX_TIME:-12}" 12 2 180)"
@@ -2096,6 +2097,21 @@ main_unlocked() {
     log_debug "PROXY_URL=${PROXY_URL}; PROBE_URL_SOURCE=${PROBE_URL_SOURCE}; PROBE_URL_COUNT=${PROBE_URL_COUNT}"
     log_debug "RUNTIME_DIR=${RUNTIME_DIR}"
     log_debug "CONNECT_PORTS=${CONNECT_PORTS}"
+
+    case "${ACTION}" in
+        stop | status | env | doctor) : ;;
+        *)
+            if [[ "${PROXY_MODE}" != "off" && "${PROBE_REGISTRY_BLOCKING}" == "true" ]]; then
+                LAST_REASON="endpoint-registry-${PROBE_REGISTRY_STATUS}"
+                append_report "result=blocked reason=${LAST_REASON} registry=${PROBE_REGISTRY_FILE} rows=${PROBE_REGISTRY_ROWS} bad_rows=${PROBE_REGISTRY_BAD_ROWS}"
+                write_status "blocked"
+                write_env_hint 0
+                write_summary "degraded" "${LAST_REASON}"
+                log_warn "Actuation bloqueada: endpoint registry não confiável (${PROBE_REGISTRY_STATUS})."
+                return 1
+            fi
+            ;;
+    esac
 
     case "${ACTION}" in
         stop)

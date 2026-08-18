@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # github-copilot-network-manager.sh — GitHub/Copilot Network Orchestrator
-# Version: v1.6.1
+# Version: v1.7.0
 #
 # Purpose:
 #   Runtime-only GitHub/Copilot network manager for DevContainers. Intended to be
@@ -42,6 +42,14 @@
 #   - Tightens registry audit and keeps all route/proxy mutations delegated or
 #     opt-in by policy.
 #
+# v1.7.0 focus:
+#   - Introduces a shared structural endpoint-registry trust boundary: full-file
+#     validation now precedes any materialization/consumption.
+#   - Uses the shared protected materializer and keeps only provider-specific
+#     GitHub/Copilot host policy in the manager.
+#   - Invalid registries fall back to embedded safe defaults and remain explicit
+#     in endpoint_source instead of leaking superficially valid rows.
+#
 # v1.6.1 focus:
 #   - Reconciles endpoint registry v1.2.0 with the manager allowlist, including
 #     Copilot reports hosts and official diagnostic _ping endpoints.
@@ -69,7 +77,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'github-copilot-network-manager.sh' '1.6.1'
+        printf '%s v%s\n' 'github-copilot-network-manager.sh' '1.7.0'
         exit 0
         ;;
     --help)
@@ -130,7 +138,7 @@ cfg_uint() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="github-copilot-network-manager.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="1.6.1"
+SCRIPT_VERSION="1.7.0"
 readonly SCRIPT_VERSION
 
 SCRIPT_DIR=""
@@ -141,6 +149,18 @@ else
     SCRIPT_DIR="$(pwd -P 2> /dev/null || printf '.')"
 fi
 readonly SCRIPT_DIR
+
+ENDPOINT_REGISTRY_LIBRARY_FILE="${SCRIPT_DIR}/lib/endpoint-registry.sh"
+ENDPOINT_REGISTRY_LIBRARY_STATUS="missing"
+if [[ -r "${ENDPOINT_REGISTRY_LIBRARY_FILE}" ]]; then
+    # shellcheck source=lib/endpoint-registry.sh
+    if source "${ENDPOINT_REGISTRY_LIBRARY_FILE}"; then
+        ENDPOINT_REGISTRY_LIBRARY_STATUS="ok"
+    else
+        ENDPOINT_REGISTRY_LIBRARY_STATUS="load-failed"
+    fi
+fi
+readonly ENDPOINT_REGISTRY_LIBRARY_FILE ENDPOINT_REGISTRY_LIBRARY_STATUS
 
 RUN_ID="$(date '+%Y%m%dT%H%M%S%z' 2> /dev/null)-$$"
 readonly RUN_ID
@@ -375,17 +395,29 @@ readonly ENDPOINT_REGISTRY_FILE ENDPOINT_REGISTRY_SOURCE
 USE_ENDPOINT_REGISTRY="$(cfg_bool "${DEVCONTAINER_COPILOT_USE_ENDPOINT_REGISTRY:-true}" true)"
 readonly USE_ENDPOINT_REGISTRY
 REGISTRY_ENDPOINTS=""
-if [[ "${USE_ENDPOINT_REGISTRY}" == "true" && -r "${ENDPOINT_REGISTRY_FILE}" ]]; then
-    REGISTRY_ENDPOINTS="$(awk -F'	' -v max="${MAX_ENDPOINTS}" '
-        /^[[:space:]]*#/ { next }
-        NF == 0 { next }
-        NF == 5 && $1 ~ /^https:\/\// && $1 !~ /[[:space:]\\]/ && $1 !~ /@/ {
-            print $1
-            emitted++
-            if (emitted >= max) exit
-        }
-    ' "${ENDPOINT_REGISTRY_FILE}" 2> /dev/null | tr '
-' ' ')"
+ENDPOINT_REGISTRY_PRELOAD_STATUS="not-used"
+ENDPOINT_REGISTRY_PRELOAD_ROWS="0"
+ENDPOINT_REGISTRY_PRELOAD_BAD_ROWS="0"
+ENDPOINT_REGISTRY_PRELOAD_BAD_URLS="0"
+if [[ "${USE_ENDPOINT_REGISTRY}" == "true" ]]; then
+    if [[ "${ENDPOINT_REGISTRY_LIBRARY_STATUS}" != "ok" ]]; then
+        ENDPOINT_REGISTRY_PRELOAD_STATUS="validator-${ENDPOINT_REGISTRY_LIBRARY_STATUS}"
+    elif network_endpoint_registry_audit_v1 "${ENDPOINT_REGISTRY_FILE}" "v1.2.0"; then
+        ENDPOINT_REGISTRY_PRELOAD_STATUS="ok"
+        ENDPOINT_REGISTRY_PRELOAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_ROWS}"
+        ENDPOINT_REGISTRY_PRELOAD_BAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_TOTAL_BAD}"
+        ENDPOINT_REGISTRY_PRELOAD_BAD_URLS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_BAD_URLS}"
+    else
+        ENDPOINT_REGISTRY_PRELOAD_STATUS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_STATUS}"
+        ENDPOINT_REGISTRY_PRELOAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_ROWS}"
+        ENDPOINT_REGISTRY_PRELOAD_BAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_TOTAL_BAD}"
+        ENDPOINT_REGISTRY_PRELOAD_BAD_URLS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_BAD_URLS}"
+    fi
+else
+    ENDPOINT_REGISTRY_PRELOAD_STATUS="disabled"
+fi
+if [[ "${ENDPOINT_REGISTRY_PRELOAD_STATUS}" == "ok" ]]; then
+    REGISTRY_ENDPOINTS="$(network_endpoint_registry_materialize_urls_v1 "${ENDPOINT_REGISTRY_FILE}" "${MAX_ENDPOINTS}" | awk 'NF { printf "%s%s", sep, $0; sep=" " }' 2> /dev/null || true)"
 fi
 ENDPOINT_SOURCE="default"
 if [[ -n "${DEVCONTAINER_COPILOT_PROBE_ENDPOINTS:-}" ]]; then
@@ -396,12 +428,13 @@ elif [[ -n "${REGISTRY_ENDPOINTS}" ]]; then
     ENDPOINT_SOURCE="registry"
 elif [[ "${ENABLE_EXTENDED_ALLOWLIST_PROBES}" == "true" ]]; then
     ENDPOINTS="${DEFAULT_ENDPOINTS} ${EXTENDED_ENDPOINTS}"
-    ENDPOINT_SOURCE="extended-default"
+    ENDPOINT_SOURCE="extended-default-registry-${ENDPOINT_REGISTRY_PRELOAD_STATUS}"
 else
     ENDPOINTS="${DEFAULT_ENDPOINTS}"
-    ENDPOINT_SOURCE="default"
+    ENDPOINT_SOURCE="default-registry-${ENDPOINT_REGISTRY_PRELOAD_STATUS}"
 fi
 readonly DEFAULT_ENDPOINTS EXTENDED_ENDPOINTS REGISTRY_ENDPOINTS ENDPOINTS ENDPOINT_SOURCE
+readonly ENDPOINT_REGISTRY_PRELOAD_STATUS ENDPOINT_REGISTRY_PRELOAD_ROWS ENDPOINT_REGISTRY_PRELOAD_BAD_ROWS ENDPOINT_REGISTRY_PRELOAD_BAD_URLS
 
 # Global history analysis outputs. Avoid using shell return codes for counts.
 HISTORY_STATUS="unknown"
@@ -468,10 +501,10 @@ PROXY_ARTIFACT_STATE="unknown"
 GITHUB_API_SOFT_DEGRADED_COUNT="0"
 OVERALL_SOFT_DEGRADED_COUNT="0"
 GITHUB_API_SOFT_DEGRADED_REASON="unknown"
-ENDPOINT_REGISTRY_STATUS="unknown"
-ENDPOINT_REGISTRY_ROWS="0"
-ENDPOINT_REGISTRY_BAD_ROWS="0"
-ENDPOINT_REGISTRY_BAD_URLS="0"
+ENDPOINT_REGISTRY_STATUS="${ENDPOINT_REGISTRY_PRELOAD_STATUS}"
+ENDPOINT_REGISTRY_ROWS="${ENDPOINT_REGISTRY_PRELOAD_ROWS}"
+ENDPOINT_REGISTRY_BAD_ROWS="${ENDPOINT_REGISTRY_PRELOAD_BAD_ROWS}"
+ENDPOINT_REGISTRY_BAD_URLS="${ENDPOINT_REGISTRY_PRELOAD_BAD_URLS}"
 ENDPOINT_REGISTRY_BAD_HOSTS="0"
 ENDPOINT_REGISTRY_BAD_URL_EXAMPLES="none"
 ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES="none"
@@ -2129,86 +2162,65 @@ history_action() {
 }
 
 validate_endpoint_registry() {
-    local rows bad_rows bad_urls bad_hosts url line nf host bad_url_examples bad_host_examples
-    ENDPOINT_REGISTRY_STATUS="missing"
-    ENDPOINT_REGISTRY_ROWS="0"
-    ENDPOINT_REGISTRY_BAD_ROWS="0"
-    ENDPOINT_REGISTRY_BAD_URLS="0"
+    local bad_hosts url host bad_host_examples
     ENDPOINT_REGISTRY_BAD_HOSTS="0"
     ENDPOINT_REGISTRY_BAD_URL_EXAMPLES="none"
     ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES="none"
 
     if [[ "${USE_ENDPOINT_REGISTRY}" != "true" ]]; then
         ENDPOINT_REGISTRY_STATUS="disabled"
+        ENDPOINT_REGISTRY_ROWS="0"
+        ENDPOINT_REGISTRY_BAD_ROWS="0"
+        ENDPOINT_REGISTRY_BAD_URLS="0"
         return 0
     fi
-    if [[ ! -r "${ENDPOINT_REGISTRY_FILE}" ]]; then
-        ENDPOINT_REGISTRY_STATUS="missing"
-        return 0
+    if [[ "${ENDPOINT_REGISTRY_LIBRARY_STATUS}" != "ok" ]]; then
+        ENDPOINT_REGISTRY_STATUS="validator-${ENDPOINT_REGISTRY_LIBRARY_STATUS}"
+        ENDPOINT_REGISTRY_ROWS="0"
+        ENDPOINT_REGISTRY_BAD_ROWS="1"
+        ENDPOINT_REGISTRY_BAD_URLS="0"
+        append_report "endpoint_registry_audit status=${ENDPOINT_REGISTRY_STATUS} file=${ENDPOINT_REGISTRY_FILE} source=${ENDPOINT_REGISTRY_SOURCE}"
+        return 1
+    fi
+    if ! network_endpoint_registry_audit_v1 "${ENDPOINT_REGISTRY_FILE}" "v1.2.0"; then
+        ENDPOINT_REGISTRY_STATUS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_STATUS}"
+        ENDPOINT_REGISTRY_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_ROWS}"
+        ENDPOINT_REGISTRY_BAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_TOTAL_BAD}"
+        ENDPOINT_REGISTRY_BAD_URLS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_BAD_URLS}"
+        append_report "endpoint_registry_audit $(network_endpoint_registry_audit_summary_v1) file=${ENDPOINT_REGISTRY_FILE} source=${ENDPOINT_REGISTRY_SOURCE}"
+        return 1
     fi
 
-    rows="$(awk -F'\t' '/^[[:space:]]*#/ {next} NF == 0 {next} {c++} END{print c+0}' "${ENDPOINT_REGISTRY_FILE}" 2> /dev/null || printf '0')"
-    bad_rows="$(awk -F'\t' '
-        /^[[:space:]]*#/ {next}
-        NF == 0 {next}
-        NF != 5 {bad++; next}
-        $1 !~ /^https:\/\// {bad++; next}
-        $1 ~ /[[:space:]\\]/ {bad++; next}
-        $1 ~ /@/ {bad++; next}
-        END {print bad+0}
-    ' "${ENDPOINT_REGISTRY_FILE}" 2> /dev/null || printf '0')"
-
-    bad_urls=0
+    ENDPOINT_REGISTRY_STATUS="ok"
+    ENDPOINT_REGISTRY_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_ROWS}"
+    ENDPOINT_REGISTRY_BAD_ROWS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_TOTAL_BAD}"
+    ENDPOINT_REGISTRY_BAD_URLS="${NETWORK_ENDPOINT_REGISTRY_AUDIT_BAD_URLS}"
     bad_hosts=0
-    bad_url_examples=""
     bad_host_examples=""
-    while IFS= read -r line || [[ -n "${line}" ]]; do
-        case "${line}" in
-            '' | \#*) continue ;;
-        esac
-        nf="$(awk -F'\t' '{print NF; exit}' <<< "${line}" 2> /dev/null || printf '0')"
-        [[ "${nf}" == "5" ]] || continue
-        url="${line%%$'\t'*}"
-        if [[ "${url}" != https://* || "${url}" == *[[:space:]]* || "${url}" == *\\* || "${url}" == *@* ]]; then
-            bad_urls=$((bad_urls + 1))
-            if [[ -z "${bad_url_examples}" ]]; then
-                bad_url_examples="${url}"
-            else
-                bad_url_examples="${bad_url_examples},${url}"
-            fi
-            continue
-        fi
+    while IFS= read -r url; do
+        [[ -n "${url}" ]] || continue
         if ! is_safe_https_url "${url}"; then
             bad_hosts=$((bad_hosts + 1))
             host="$(url_host "${url}")"
             if [[ -z "${bad_host_examples}" ]]; then
-                bad_host_examples="${host}"
+                bad_host_examples="${host:-unknown}"
             else
                 case ",${bad_host_examples}," in
                     *,"${host}",*) : ;;
-                    *) bad_host_examples="${bad_host_examples},${host}" ;;
+                    *) bad_host_examples="${bad_host_examples},${host:-unknown}" ;;
                 esac
             fi
         fi
-    done < "${ENDPOINT_REGISTRY_FILE}"
+    done < <(network_endpoint_registry_materialize_urls_v1 "${ENDPOINT_REGISTRY_FILE}" "${MAX_ENDPOINTS}")
 
-    ENDPOINT_REGISTRY_ROWS="${rows:-0}"
-    ENDPOINT_REGISTRY_BAD_ROWS="${bad_rows:-0}"
-    ENDPOINT_REGISTRY_BAD_URLS="${bad_urls:-0}"
-    ENDPOINT_REGISTRY_BAD_HOSTS="${bad_hosts:-0}"
-    ENDPOINT_REGISTRY_BAD_URL_EXAMPLES="${bad_url_examples:-none}"
+    ENDPOINT_REGISTRY_BAD_HOSTS="${bad_hosts}"
     ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES="${bad_host_examples:-none}"
-    if [[ "${bad_rows:-0}" != "0" || "${bad_urls:-0}" != "0" || "${bad_hosts:-0}" != "0" ]]; then
-        ENDPOINT_REGISTRY_STATUS="invalid"
-        append_report "endpoint_registry_audit status=invalid file=${ENDPOINT_REGISTRY_FILE} source=${ENDPOINT_REGISTRY_SOURCE} rows=${ENDPOINT_REGISTRY_ROWS} bad_rows=${ENDPOINT_REGISTRY_BAD_ROWS} bad_urls=${ENDPOINT_REGISTRY_BAD_URLS} bad_hosts=${ENDPOINT_REGISTRY_BAD_HOSTS} bad_url_examples=${ENDPOINT_REGISTRY_BAD_URL_EXAMPLES} bad_host_examples=${ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES}"
+    if ((bad_hosts > 0)); then
+        ENDPOINT_REGISTRY_STATUS="invalid-policy"
+        append_report "endpoint_registry_audit status=invalid-policy file=${ENDPOINT_REGISTRY_FILE} source=${ENDPOINT_REGISTRY_SOURCE} rows=${ENDPOINT_REGISTRY_ROWS} bad_hosts=${ENDPOINT_REGISTRY_BAD_HOSTS} bad_host_examples=${ENDPOINT_REGISTRY_BAD_HOST_EXAMPLES}"
         return 1
     fi
-    if [[ "${rows:-0}" == "0" ]]; then
-        ENDPOINT_REGISTRY_STATUS="empty"
-        append_report "endpoint_registry_audit status=empty file=${ENDPOINT_REGISTRY_FILE} source=${ENDPOINT_REGISTRY_SOURCE}"
-        return 1
-    fi
-    ENDPOINT_REGISTRY_STATUS="ok"
+
     append_report "endpoint_registry_audit status=ok file=${ENDPOINT_REGISTRY_FILE} source=${ENDPOINT_REGISTRY_SOURCE} rows=${ENDPOINT_REGISTRY_ROWS} endpoint_source=${ENDPOINT_SOURCE}"
     return 0
 }

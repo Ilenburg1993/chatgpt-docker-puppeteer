@@ -1554,32 +1554,32 @@ Legenda:
 
 ### Fase B0 — shared Bash primitives
 
-- [ ] **B0.1** Criar `network-common.sh` mínimo.
+- [ ] **B0.1** Criar `network-common.sh` mínimo. Adiado deliberadamente até haver pelo menos dois/ três helpers comprovadamente estáveis além do registry; não criar uma “god library”.
 - [ ] **B0.2** Centralizar boolean/env parsing.
 - [ ] **B0.3** Centralizar timestamp/age/freshness.
 - [ ] **B0.4** Centralizar safe one-line normalization.
 - [ ] **B0.5** Centralizar bounded list/CSV parsing.
-- [ ] **B0.6** Evitar abstrações prematuras de helpers usados por apenas um owner.
-- [ ] **B0.7** Adicionar nova library à allowlist `devcontainer-shell`.
+- [x] **B0.6** Evitar abstrações prematuras de helpers usados por apenas um owner. O primeiro shared owner ficou especializado em endpoint registry, sem absorver host policy, lifecycle, DNS ou mutação.
+- [x] **B0.7** Adicionar nova library à allowlist `devcontainer-shell`. `network/lib/endpoint-registry.sh` é validada junto aos demais scripts; gate passou 13/13.
 
 ### Fase B1 — canonical registry validator
 
-- [ ] **B1.1** Definir owner único de validation.
-- [ ] **B1.2** Validar header/version.
-- [ ] **B1.3** Validar row field count.
-- [ ] **B1.4** Validar unique IDs.
-- [ ] **B1.5** Validar URL/scheme.
-- [ ] **B1.6** Validar expected outcomes.
-- [ ] **B1.7** Expor immutable materialization.
+- [x] **B1.1** Definir owner único de validation: `.devcontainer/scripts/network/lib/endpoint-registry.sh` v1.0.0.
+- [x] **B1.2** Validar header/version. O contrato v1 exige declaração compatível com `v1.2.0` e distingue `missing`/`mismatch`.
+- [x] **B1.3** Validar row field count e registry não vazio.
+- [x] **B1.4** Validar IDs/capabilities e unicidade de IDs/URLs.
+- [x] **B1.5** Validar HTTPS URL/scheme e forma estrutural sem introduzir allowlist provider-specific no owner neutro.
+- [x] **B1.6** Validar criticality e expected unauthenticated HTTP outcomes.
+- [x] **B1.7** Expor materialização protegida. `network_endpoint_registry_materialize_urls_v1` e `network_endpoint_registry_expected_http_v1` recusam uso (`64`) se o mesmo arquivo não for o último auditado integralmente como `ok` naquela shell.
 
 ### Fase B2 — consumers fail-closed
 
-- [ ] **B2.1** Manager: validate-before-consume.
-- [ ] **B2.2** Proxy: invalid registry não gera config/actuation.
-- [ ] **B2.3** Advisor: invalid registry não gera recommendation autoritativa.
-- [ ] **B2.4** Post-create: usar o mesmo validator/contract.
+- [x] **B2.1** Manager: `validate → materialize → consume`; registry globalmente inválido nunca alimenta `ENDPOINTS`, e o observer cai para defaults com `endpoint_source=default-registry-<status>`. Host policy GitHub/Copilot permanece separada e local.
+- [x] **B2.2** Proxy: invalid/missing enabled registry não gera config/actuation. `start/restart/probe/benchmark/...` falham antes de tinyproxy; `stop/status/env/doctor` permanecem disponíveis para recuperação.
+- [x] **B2.3** Advisor: invalid registry é non-authoritative e cai para defaults; expected HTTP e URLs só são lidos após o audit compartilhado.
+- [x] **B2.4** Post-create: removidos cinco helpers TSV duplicados; um único audit compartilhado projeta os campos de compatibilidade estrutural.
 
-**Gate B:** fixtures valid/invalid + bash syntax + focused tests.
+**Gate B:** concluído em 2026-08-18. Provas finais: `devcontainer-shell` 13/13 (`dd4080cd-ce35-4715-a658-ab5b92828e1e`), contrato/consumer focused test com 6 casos (`335a4de0-6964-4010-b666-864e8485339a`), typecheck estrito (`9838610e-e1a1-470b-aad3-682002b80baf`) e lint (`663e2f2e-b67d-4fd9-aca1-b22d31aa0cbd`) — todos verdes após cleanup e version sync. Releases desta onda: manager v1.7.0, advisor v1.2.0, proxy v1.4.0 e post-create v1.2.4.
 
 ---
 
