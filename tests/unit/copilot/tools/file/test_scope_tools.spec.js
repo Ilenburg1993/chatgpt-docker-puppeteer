@@ -77,12 +77,56 @@ describe('tools/file/scope-tools', () => {
             maxFiles: 50,
             parseSymbols: undefined,
             indexMode: undefined,
+            selectionMode: undefined,
+            preferredPaths: [],
+            seedSymbols: undefined,
             concurrency: undefined,
             include: undefined,
             exclude: undefined,
             recursive: undefined,
         });
         expect(out.sessionId).toBe('s1');
+    });
+
+    it('workspace_scope_declare encaminha selection e seeds bounded para a engine compartilhada', async () => {
+        const handler = getHandler(workspaceScopeDeclareTool);
+        mocks.declareScope.mockResolvedValue({ sessionId: 'seeded' });
+
+        const out = await handler({
+            sessionId: 'seeded',
+            directory: 'src/copilot/mcp',
+            maxFiles: 8,
+            selectionMode: 'coverage',
+            seedPaths: ['src/copilot/mcp/README.md'],
+            seedSymbols: ['repoWriteTools'],
+        });
+
+        expect(out.sessionId).toBe('seeded');
+        expect(mocks.declareScope).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sessionId: 'seeded',
+                maxFiles: 8,
+                selectionMode: 'coverage',
+                preferredPaths: [expect.stringMatching(/src[/\\]copilot[/\\]mcp[/\\]README\.md$/u)],
+                seedSymbols: ['repoWriteTools'],
+            }),
+        );
+        expect(out.advisoryLimits).toEqual(
+            expect.objectContaining({ selectionMode: 'coverage', seedPathCount: 1, seedSymbolCount: 1 }),
+        );
+    });
+
+    it('workspace_scope_declare rejeita seedPath fora do directory declarado', async () => {
+        const handler = getHandler(workspaceScopeDeclareTool);
+        const out = await handler({
+            sessionId: 'seed-outside',
+            directory: 'src/copilot/mcp',
+            seedPaths: ['package.json'],
+        });
+
+        expect(out.success).toBe(false);
+        expect(out.code).toBe('ERR_SCOPE_SEED_OUTSIDE_ROOT');
+        expect(mocks.declareScope).not.toHaveBeenCalled();
     });
 
     it('workspace_scope_declare usa sessionId como efetivo, scopeName é apenas label', async () => {

@@ -19,7 +19,7 @@ import {
 } from '#copilot/infra/public/session';
 import { errorResult, getMcpWorkspaceRoot, okResult, readOnlyAnnotations, resolveReadPath } from '#copilot/mcp/control-plane';
 import { randomUUID } from 'node:crypto';
-import { relative } from 'node:path';
+import { isAbsolute, relative } from 'node:path';
 import { z } from 'zod';
 
 const DEFAULT_PATH = 'src/copilot';
@@ -83,6 +83,20 @@ export const repoWorkingSetTool = {
         concurrency: z.number().int().min(1).max(8).optional().describe('Bounded open/refresh concurrency. Default: 4.'),
         parseSymbols: z.boolean().optional().describe('Parse symbols/imports during open. Default: true.'),
         indexMode: z.enum(['auto', 'off']).optional().describe('auto refreshes only selected paths in the shared index. Default: auto.'),
+        selectionMode: z
+            .enum(['coverage', 'lexical'])
+            .optional()
+            .describe('Directory selection inside maxFiles. Default coverage; lexical preserves historical prefix ordering.'),
+        seedPaths: z
+            .array(z.string().min(1))
+            .max(32)
+            .optional()
+            .describe('Preferred workspace-relative files for open. Eligible seeds count inside the same maxFiles cap.'),
+        seedSymbols: z
+            .array(z.string().min(1).max(256))
+            .max(32)
+            .optional()
+            .describe('Exact symbols resolved from the local index into preferred files inside the same maxFiles cap.'),
         include: z.array(z.string().min(1)).max(32).optional(),
         exclude: z.array(z.string().min(1)).max(32).optional(),
         modifiedPaths: z.array(z.string().min(1)).max(128).optional().describe('Explicit changed paths for action=refresh; omitted means known invalidations only.'),
@@ -100,6 +114,9 @@ export const repoWorkingSetTool = {
         concurrency,
         parseSymbols,
         indexMode,
+        selectionMode,
+        seedPaths,
+        seedSymbols,
         include,
         exclude,
         modifiedPaths,
@@ -110,6 +127,20 @@ export const repoWorkingSetTool = {
         if (action === 'open') {
             const resolved = await resolveReadPath((path ?? '').trim() || DEFAULT_PATH);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
+            /** @type {string[]} */
+            const preferredPaths = [];
+            for (const candidate of seedPaths ?? []) {
+                const seed = await resolveReadPath(candidate);
+                if (!seed.ok) return errorResult(seed.reason, seed);
+                const fromRoot = relative(resolved.resolved, seed.resolved);
+                if (fromRoot === '..' || fromRoot.startsWith('../') || fromRoot.startsWith('..\\') || isAbsolute(fromRoot)) {
+                    return errorResult('Working-set seed path must stay inside the opened root.', {
+                        code: 'ERR_WORKING_SET_SEED_OUTSIDE_ROOT',
+                        seedPath: candidate,
+                    });
+                }
+                preferredPaths.push(seed.resolved);
+            }
             evictOldestOwnedWorkingSetIfNeeded();
             const id = `mcp-ws-${randomUUID()}`;
             const now = Date.now();
@@ -120,6 +151,9 @@ export const repoWorkingSetTool = {
                 maxFiles: maxFiles ?? DEFAULT_MAX_FILES,
                 parseSymbols: parseSymbols ?? true,
                 indexMode: indexMode ?? 'auto',
+                selectionMode: selectionMode ?? 'coverage',
+                preferredPaths,
+                seedSymbols,
                 concurrency: concurrency ?? DEFAULT_CONCURRENCY,
                 include,
                 exclude,

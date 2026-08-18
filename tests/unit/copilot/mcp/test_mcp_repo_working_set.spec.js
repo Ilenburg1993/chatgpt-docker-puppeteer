@@ -10,6 +10,15 @@ const mocks = vi.hoisted(() => {
         candidateFiles: 3,
         selectedFiles: 2,
         hardLimitReached: true,
+        selection: {
+            mode: 'coverage',
+            candidateBuckets: 3,
+            selectedBuckets: 2,
+            preferredRequested: 1,
+            preferredSelected: 1,
+            seedSymbolsRequested: 1,
+            seedSymbolPathsResolved: 1,
+        },
         preloaded: 2,
         parsed: 2,
         failed: 0,
@@ -94,6 +103,9 @@ describe('mcp/repo_working_set', () => {
             concurrency: 2,
             parseSymbols: true,
             indexMode: 'auto',
+            selectionMode: 'coverage',
+            seedPaths: ['src/copilot/mcp/README.md'],
+            seedSymbols: ['repoWriteTools'],
         });
         const out = structured(result);
 
@@ -111,12 +123,27 @@ describe('mcp/repo_working_set', () => {
                 concurrency: 2,
                 parseSymbols: true,
                 indexMode: 'auto',
+                selectionMode: 'coverage',
+                preferredPaths: [expect.stringMatching(/src[/\\]copilot[/\\]mcp[/\\]README\.md$/u)],
+                seedSymbols: ['repoWriteTools'],
             }),
         );
         expect(mocks.getScopeContext).toHaveBeenCalledWith(out['workingSetId'], {
             maxFiles: 2,
             maxBytes: 4096,
         });
+    });
+
+    it('rejeita seed legível que esteja fora do root aberto', async () => {
+        const result = await repoWorkingSetTool.handler({
+            action: 'open',
+            path: 'src/copilot/mcp',
+            seedPaths: ['package.json'],
+        });
+
+        expect(result.isError).toBe(true);
+        expect(structured(result)['code']).toBe('ERR_WORKING_SET_SEED_OUTSIDE_ROOT');
+        expect(mocks.declareScope).not.toHaveBeenCalled();
     });
 
     it('rejeita id forjado antes de chamar find/refresh/close da engine compartilhada', async () => {

@@ -239,6 +239,98 @@ describe('warmFromDirectory', () => {
         assert.strictEqual(result.advisoryLimits.hardLimitReached, true);
     });
 
+    it('coverage distribui o hard cap entre buckets top-level', async () => {
+        const root = path.join(tmpDir, 'selection-coverage');
+        for (const bucket of ['alpha', 'beta', 'gamma']) {
+            await fs.mkdir(path.join(root, bucket), { recursive: true });
+            await fs.writeFile(path.join(root, bucket, 'one.js'), `export const ${bucket}One = true;`, 'utf8');
+            await fs.writeFile(path.join(root, bucket, 'two.js'), `export const ${bucket}Two = true;`, 'utf8');
+        }
+        resetIoL1CacheForTest();
+
+        const result = await warmFromDirectory(root, {
+            extensions: ['.js'],
+            maxFiles: 3,
+            selectionMode: 'coverage',
+        });
+        const buckets = new Set(result.paths.map((filePath) => path.relative(root, filePath).split(path.sep)[0]));
+
+        assert.strictEqual(result.paths.length, 3);
+        assert.strictEqual(buckets.size, 3);
+        assert.deepStrictEqual(result.advisoryLimits.selection, {
+            mode: 'coverage',
+            candidateBuckets: 3,
+            selectedBuckets: 3,
+            preferredRequested: 0,
+            preferredSelected: 0,
+        });
+    });
+
+    it('coverage prioriza source code sobre documentação dentro de cada bucket', async () => {
+        const root = path.join(tmpDir, 'selection-utility');
+        const bucket = path.join(root, 'feature');
+        await fs.mkdir(path.join(bucket, 'deep'), { recursive: true });
+        await fs.writeFile(path.join(bucket, 'README.md'), '# docs', 'utf8');
+        await fs.writeFile(path.join(bucket, 'deep', 'runtime.js'), 'export const runtime = true;', 'utf8');
+        resetIoL1CacheForTest();
+
+        const result = await warmFromDirectory(root, {
+            extensions: ['.js', '.md'],
+            maxFiles: 1,
+            selectionMode: 'coverage',
+        });
+
+        assert.strictEqual(result.paths.length, 1);
+        assert.ok(result.paths[0]?.endsWith(path.join('feature', 'deep', 'runtime.js')));
+    });
+
+    it('lexical preserva exatamente o prefixo histórico de candidatos', async () => {
+        const root = path.join(tmpDir, 'selection-lexical');
+        for (const bucket of ['alpha', 'beta', 'gamma']) {
+            await fs.mkdir(path.join(root, bucket), { recursive: true });
+            await fs.writeFile(path.join(root, bucket, 'one.js'), `export const ${bucket}One = true;`, 'utf8');
+            await fs.writeFile(path.join(root, bucket, 'two.js'), `export const ${bucket}Two = true;`, 'utf8');
+        }
+        resetIoL1CacheForTest();
+
+        const full = await warmFromDirectory(root, {
+            extensions: ['.js'],
+            maxFiles: 100,
+            selectionMode: 'lexical',
+        });
+        const limited = await warmFromDirectory(root, {
+            extensions: ['.js'],
+            maxFiles: 2,
+            selectionMode: 'lexical',
+        });
+
+        assert.deepStrictEqual(limited.paths, full.paths.slice(0, 2));
+        assert.strictEqual(limited.advisoryLimits.selection.mode, 'lexical');
+    });
+
+    it('preferredPaths entram primeiro, são deduplicados e continuam dentro de maxFiles', async () => {
+        const root = path.join(tmpDir, 'selection-preferred');
+        for (const bucket of ['alpha', 'beta', 'gamma']) {
+            await fs.mkdir(path.join(root, bucket), { recursive: true });
+            await fs.writeFile(path.join(root, bucket, 'one.js'), `export const ${bucket}One = true;`, 'utf8');
+        }
+        const preferred = path.join(root, 'gamma', 'one.js');
+        resetIoL1CacheForTest();
+
+        const result = await warmFromDirectory(root, {
+            extensions: ['.js'],
+            maxFiles: 2,
+            selectionMode: 'coverage',
+            preferredPaths: [preferred, preferred, path.join(root, 'missing.js')],
+        });
+
+        assert.strictEqual(result.paths.length, 2);
+        assert.strictEqual(result.paths[0], preferred);
+        assert.strictEqual(result.advisoryLimits.selection.preferredRequested, 2);
+        assert.strictEqual(result.advisoryLimits.selection.preferredSelected, 1);
+        assert.strictEqual(result.advisoryLimits.hardLimitReached, true);
+    });
+
     it('aplica braces e exclusão por diretório com a política glob canônica', async () => {
         const nested = path.join(tmpDir, 'glob-nested');
         const excluded = path.join(tmpDir, 'glob-excluded');

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterAll, beforeEach, describe, it } from 'vitest';
 
 import { resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
+import { refreshIoIndexPaths } from '../../../../src/copilot/infra/io-index-registry.js';
 import {
     closeScope,
     declareScope,
@@ -28,6 +29,34 @@ afterAll(async () => {
 });
 
 describe('Working Set V2 integration', () => {
+    it('seedSymbols resolve um arquivo profundo pelo índice dentro do mesmo hard cap', async () => {
+        const repoWritePath = join(TOOLS_DIR, 'repo-write.js');
+        const indexed = await refreshIoIndexPaths([repoWritePath], { workspaceRoot: WORKSPACE_ROOT });
+        assert.equal(indexed.available, true);
+
+        const sessionId = 'working-set-symbol-seed';
+        const stats = await declareScope({
+            sessionId,
+            directory: join(WORKSPACE_ROOT, 'src/copilot/mcp'),
+            workspaceRoot: WORKSPACE_ROOT,
+            maxFiles: 1,
+            seedSymbols: ['repoWriteTools'],
+            parseSymbols: true,
+            indexMode: 'off',
+            concurrency: 2,
+            silent: false,
+        }).awaitReady();
+        const matches = findSymbol(sessionId, 'repoWriteTools', { exactMatch: true });
+
+        assert.equal(stats.pathCount, 1);
+        assert.equal(stats.selection.mode, 'coverage');
+        assert.equal(stats.selection.seedSymbolsRequested, 1);
+        assert.equal(stats.selection.seedSymbolPathsResolved, 1);
+        assert.equal(stats.selection.preferredSelected, 1);
+        assert.ok(matches.some((entry) => entry.filePath.endsWith('/repo-write.js')));
+        closeScope(sessionId);
+    });
+
     it('encadeia prefetch -> parser e serve context/find/refresh sem reread global', async () => {
         const sessionId = 'working-set-integration';
         const startedAt = performance.now();

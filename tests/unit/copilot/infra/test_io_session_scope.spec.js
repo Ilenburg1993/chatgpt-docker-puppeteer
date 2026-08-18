@@ -66,6 +66,7 @@ describe('declareScope + getScopeStats', () => {
         assert.strictEqual(stats.degraded, false);
         assert.strictEqual(stats.lastError, null);
         assert.ok(stats.pathCount === 2, `pathCount=${stats.pathCount}`);
+        assert.strictEqual(stats.selection.mode, 'explicit');
         assert.ok(stats.preloaded >= 0);
         assert.ok(stats.parsed >= 0);
 
@@ -87,6 +88,8 @@ describe('declareScope + getScopeStats', () => {
         assert.strictEqual(stats.pathCount, 1);
         assert.ok(stats.candidateFiles > stats.selectedFiles);
         assert.strictEqual(stats.hardLimitReached, true);
+        assert.strictEqual(stats.selection.mode, 'coverage');
+        assert.ok(stats.selection.candidateBuckets >= stats.selection.selectedBuckets);
         closeScope(sessionId);
     });
 

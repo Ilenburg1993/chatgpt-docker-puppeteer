@@ -27,7 +27,7 @@
 import * as nodePath from 'node:path';
 import pLimit from 'p-limit';
 import { invalidateIoCachePath, registerInvalidationHook } from './io-cache.js';
-import { refreshIoIndexPaths } from './io-index-registry.js';
+import { findIoIndexSymbol, refreshIoIndexPaths } from './io-index-registry.js';
 import { invalidateParserCache, parseAndCacheSymbols } from './io-parser.js';
 import { endSessionScope, startSessionScope, warmCacheForPaths, warmFromDirectory } from './io-prefetch.js';
 import { publishIoLifecycleEvent } from './io-observability.js';
@@ -47,6 +47,9 @@ import { readEnvPositiveInt } from './shared/env.js';
  * @property {number} [maxFiles=500] - Limite efetivo de arquivos selecionados no scan de diretório. Default is `500`
  * @property {string[]} [include] - Padrões glob simples para incluir arquivos no escopo.
  * @property {string[]} [exclude] - Padrões glob simples para excluir arquivos do escopo.
+ * @property {'coverage' | 'lexical'} [selectionMode='coverage'] - Política bounded de seleção em directory scopes.
+ * @property {string[]} [preferredPaths] - Candidatos elegíveis a priorizar dentro do mesmo hard maxFiles cap.
+ * @property {string[]} [seedSymbols] - Símbolos exatos resolvidos pelo índice local para preferred paths dentro do cap.
  * @property {boolean} [recursive=true] - Se false, declara apenas arquivos imediatos do diretório. Default is `true`
  * @property {boolean} [parseSymbols=true] - Se true, parseia símbolos JS/TS em background. Default is `true`
  * @property {'auto' | 'off'} [indexMode='auto'] - Se auto, materializa índice L2/FTS para diretórios declarados.
@@ -56,12 +59,25 @@ import { readEnvPositiveInt } from './shared/env.js';
  */
 
 /**
+ * @typedef {{
+ *     mode: 'coverage' | 'lexical' | 'explicit';
+ *     candidateBuckets: number;
+ *     selectedBuckets: number;
+ *     preferredRequested: number;
+ *     preferredSelected: number;
+ *     seedSymbolsRequested: number;
+ *     seedSymbolPathsResolved: number;
+ * }} ScopeSelectionStats
+ */
+
+/**
  * @typedef {object} ScopeStats
  * @property {string} sessionId
  * @property {number} pathCount - Total de arquivos selecionados no escopo.
  * @property {number} candidateFiles - Arquivos candidatos antes do maxFiles no scan de diretório.
  * @property {number} selectedFiles - Arquivos efetivamente selecionados.
  * @property {boolean} hardLimitReached - Indica se maxFiles cortou candidatos do diretório.
+ * @property {ScopeSelectionStats} selection - Resumo compacto da política de seleção aplicada.
  * @property {number} preloaded - Arquivos carregados no L1.
  * @property {number} parsed - Arquivos parseados.
  * @property {number} failed - Arquivos com falha.
@@ -106,6 +122,7 @@ import { readEnvPositiveInt } from './shared/env.js';
  * @property {number} candidateFiles
  * @property {number} selectedFiles
  * @property {boolean} hardLimitReached
+ * @property {ScopeSelectionStats} selection
  * @property {number} refreshConcurrency
  * @property {'auto' | 'off'} indexMode
  * @property {number} preloaded
@@ -344,6 +361,9 @@ export function declareScope(opts) {
         extensions,
         include,
         exclude,
+        selectionMode = 'coverage',
+        preferredPaths = [],
+        seedSymbols = [],
         recursive = true,
         maxFiles = 500,
         parseSymbols = true,
@@ -370,6 +390,17 @@ export function declareScope(opts) {
         candidateFiles: explicitPaths?.length ?? 0,
         selectedFiles: explicitPaths?.length ?? 0,
         hardLimitReached: false,
+        selection: {
+            mode: directory ? (selectionMode === 'lexical' ? 'lexical' : 'coverage') : 'explicit',
+            candidateBuckets: 0,
+            selectedBuckets: 0,
+            preferredRequested: directory ? new Set(preferredPaths.map(normalizeScopePath)).size : 0,
+            preferredSelected: 0,
+            seedSymbolsRequested: directory
+                ? new Set(seedSymbols.map((value) => String(value).trim()).filter(Boolean)).size
+                : 0,
+            seedSymbolPathsResolved: 0,
+        },
         refreshConcurrency: Math.max(1, Math.min(32, Math.floor(concurrency))),
         indexMode,
         preloaded: 0,
@@ -401,9 +432,37 @@ export function declareScope(opts) {
             // Se um diretório foi fornecido, seleciona um working set bounded e aquece somente o L1 textual. O snapshot
             // retornado é efêmero e atravessa parser/index neste mesmo pipeline; não vira uma quarta cópia persistente.
             if (directory) {
+                const uniqueSeedSymbols = [
+                    ...new Set(seedSymbols.map((value) => String(value).trim()).filter(Boolean)),
+                ].slice(0, 32);
+                const symbolPreferredPaths = new Set();
+                for (const seedSymbol of uniqueSeedSymbols) {
+                    const rows = findIoIndexSymbol(seedSymbol, {
+                        pathPrefix: directory,
+                        exactMatch: true,
+                        caseSensitive: false,
+                        maxResults: 4,
+                    });
+                    for (const row of rows) {
+                        if (typeof row.filePath === 'string' && row.filePath) symbolPreferredPaths.add(row.filePath);
+                    }
+                }
+                const effectivePreferredPaths = [
+                    ...new Set([...preferredPaths.map(normalizeScopePath), ...symbolPreferredPaths]),
+                ];
+                scope.selection.seedSymbolsRequested = uniqueSeedSymbols.length;
+                scope.selection.seedSymbolPathsResolved = symbolPreferredPaths.size;
                 const scanResult = await warmFromDirectory(
                     directory,
-                    { extensions, maxFiles, include, exclude, recursive },
+                    {
+                        extensions,
+                        maxFiles,
+                        include,
+                        exclude,
+                        selectionMode,
+                        preferredPaths: effectivePreferredPaths,
+                        recursive,
+                    },
                     {
                         concurrency,
                         silent,
@@ -420,6 +479,16 @@ export function declareScope(opts) {
                 scope.candidateFiles = Number(scanResult.advisoryLimits['candidateFiles'] ?? scanResult.paths.length);
                 scope.selectedFiles = Number(scanResult.advisoryLimits['selectedFiles'] ?? scanResult.paths.length);
                 scope.hardLimitReached = Boolean(scanResult.advisoryLimits['hardLimitReached']);
+                const selection = /** @type {Omit<ScopeSelectionStats, 'seedSymbolsRequested' | 'seedSymbolPathsResolved'> | undefined} */ (
+                    scanResult.advisoryLimits['selection']
+                );
+                if (selection) {
+                    scope.selection = {
+                        ...selection,
+                        seedSymbolsRequested: uniqueSeedSymbols.length,
+                        seedSymbolPathsResolved: symbolPreferredPaths.size,
+                    };
+                }
                 for (const [filePath, snapshot] of scanResult.snapshots ?? []) warmSnapshots.set(filePath, snapshot);
 
                 resolvedPaths = [...new Set([...resolvedPaths, ...scanResult.paths])];
@@ -540,6 +609,7 @@ export function declareScope(opts) {
                     candidateFiles: 0,
                     selectedFiles: 0,
                     hardLimitReached: false,
+                    selection: { ...scope.selection },
                     preloaded: 0,
                     parsed: 0,
                     failed: 0,
@@ -582,6 +652,7 @@ export function getScopeStats(sessionId) {
         candidateFiles: scope.candidateFiles,
         selectedFiles: scope.selectedFiles,
         hardLimitReached: scope.hardLimitReached,
+        selection: { ...scope.selection },
         preloaded: scope.preloaded,
         parsed: scope.symbolIndex.size,
         failed: scope.failed,

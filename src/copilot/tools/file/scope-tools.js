@@ -1,4 +1,5 @@
 // @ts-check
+import { isAbsolute, relative } from 'node:path';
 import { z } from 'zod/v3';
 import { buildTool } from '../infra/tool-factory.js';
 import { validatePath, WORKSPACE_ROOT } from './shared.js';
@@ -33,6 +34,20 @@ const ScopeDeclareParameters = z.object({
         .enum(['auto', 'off'])
         .optional()
         .describe('auto converge somente os paths selecionados no índice global; off desativa indexação do scope.'),
+    selectionMode: z
+        .enum(['coverage', 'lexical'])
+        .optional()
+        .describe('Seleção bounded do diretório. Default: coverage; lexical preserva o prefixo histórico.'),
+    seedPaths: z
+        .array(z.string().min(1))
+        .max(32)
+        .optional()
+        .describe('Arquivos preferenciais dentro do diretório, sempre contando no mesmo maxFiles.'),
+    seedSymbols: z
+        .array(z.string().min(1).max(256))
+        .max(32)
+        .optional()
+        .describe('Símbolos exatos resolvidos pelo índice local para arquivos preferenciais dentro do mesmo maxFiles.'),
     concurrency: z.number().int().positive().optional().describe('Concorrência efetiva/bounded do warm-up e refresh.'),
     include: z.array(z.string().min(1)).optional().describe('Padrões include.'),
     exclude: z.array(z.string().min(1)).optional().describe('Padrões exclude.'),
@@ -78,6 +93,9 @@ export const workspaceScopeDeclareTool = buildTool({
         maxFiles,
         parseSymbols,
         indexMode,
+        selectionMode,
+        seedPaths,
+        seedSymbols,
         concurrency,
         include,
         exclude,
@@ -99,6 +117,38 @@ export const workspaceScopeDeclareTool = buildTool({
             }
             resolvedDirectory = pathCheck.resolved;
         }
+        if ((seedPaths?.length || seedSymbols?.length) && !resolvedDirectory) {
+            return {
+                success: false,
+                error: 'seedPaths/seedSymbols exigem directory para manter containment e seleção bounded.',
+                code: 'ERR_SCOPE_SEED_REQUIRES_DIRECTORY',
+                sessionId: effectiveSessionId,
+            };
+        }
+        /** @type {string[]} */
+        const preferredPaths = [];
+        for (const candidate of seedPaths ?? []) {
+            const pathCheck = await validatePath(candidate, { mode: 'read' });
+            if (!pathCheck.ok) {
+                return {
+                    success: false,
+                    error: pathCheck.reason,
+                    sessionId: effectiveSessionId,
+                };
+            }
+            if (resolvedDirectory) {
+                const fromRoot = relative(resolvedDirectory, pathCheck.resolved);
+                if (fromRoot === '..' || fromRoot.startsWith('../') || fromRoot.startsWith('..\\') || isAbsolute(fromRoot)) {
+                    return {
+                        success: false,
+                        error: 'seedPath deve permanecer dentro do directory declarado.',
+                        code: 'ERR_SCOPE_SEED_OUTSIDE_ROOT',
+                        sessionId: effectiveSessionId,
+                    };
+                }
+            }
+            preferredPaths.push(pathCheck.resolved);
+        }
         const scope = await Promise.resolve(
             declareScope({
                 sessionId: effectiveSessionId,
@@ -107,6 +157,9 @@ export const workspaceScopeDeclareTool = buildTool({
                 maxFiles,
                 parseSymbols,
                 indexMode,
+                selectionMode,
+                preferredPaths,
+                seedSymbols,
                 concurrency,
                 include,
                 exclude,
@@ -116,6 +169,9 @@ export const workspaceScopeDeclareTool = buildTool({
         const advisoryLimits = {
             requestedMaxFiles: maxFiles ?? null,
             requestedConcurrency: concurrency ?? null,
+            selectionMode: selectionMode ?? 'coverage',
+            seedPathCount: seedPaths?.length ?? 0,
+            seedSymbolCount: seedSymbols?.length ?? 0,
             includePatternCount: include?.length ?? 0,
             excludePatternCount: exclude?.length ?? 0,
             recursive: recursive ?? true,

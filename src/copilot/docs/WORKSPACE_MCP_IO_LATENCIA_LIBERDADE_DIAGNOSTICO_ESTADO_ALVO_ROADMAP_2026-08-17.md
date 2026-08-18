@@ -4340,3 +4340,188 @@ Prova live do modo detalhado por compatibilidade: o binding desta conversa ainda
 
 A Faixa 32 está fechada: batches maiores agora reduzem simultaneamente **round-trips** e **payload/contexto**, sem remover failures diagnósticas nem o modo forense completo.
 
+---
+
+# 40. Faixa 33 — Working Set Selection V3: cobertura estrutural + seeds bounded — 2026-08-18
+
+## 40.1 Evidência live que abriu a faixa
+
+Após a reconexão do ChatGPT, `repo_working_set` tornou-se finalmente invocável diretamente neste binding. O primeiro `open(path="src/copilot", maxFiles=80)` mostrou:
+
+- candidates: **1.450**;
+- selected: **80**;
+- hardLimitReached: true;
+- parsed: 78;
+- preload: 80;
+- contexto ~16 KiB conforme budget;
+- porém o manifest ficou concentrado quase integralmente no primeiro subtree lexical, `src/copilot/agent/...`.
+
+Prova causal: `find(symbol="repo_apply_patch_batch")` no working set retornou **0 matches**, apesar de o símbolo existir e a própria tool MCP estar ativa. Logo o problema não é parser/index nem budget; é a política de seleção inicial.
+
+A implementação confirmou a causa: `warmFromDirectory()` calcula candidatos corretamente e depois executa `allCandidateFiles.slice(0, effectiveMaxFiles)`.
+
+## 40.2 Estado-alvo
+
+Preservar integralmente os invariantes da Working Set V2:
+
+- hard selected-file cap;
+- snapshot reuse prefetch→parser→index;
+- selected-path index refresh;
+- refresh O(delta)/O(1) quando vazio;
+- context budgeted;
+- ownership/lifecycle MCP;
+- nenhuma expansão silenciosa do escopo.
+
+Alterar apenas **quais candidatos entram no hard cap**.
+
+### `selectionMode=coverage|lexical`
+
+- `coverage` passa a ser o default para session scopes/working sets;
+- `lexical` preserva explicitamente a semântica V2 para compatibilidade/testes;
+- nenhum novo scan ou stat: a política opera somente sobre a lista de candidatos já produzida pelo scanner.
+
+### Coverage-first determinístico
+
+1. normalizar candidatos relativos ao directory root;
+2. separar por bucket top-level (`agent`, `infra`, `mcp`, `model-gateway`, root, etc.);
+3. ordenar os arquivos dentro de cada bucket por menor profundidade e depois lexicalmente;
+4. selecionar em round-robin entre buckets até atingir `maxFiles`;
+5. nenhum arquivo pode ultrapassar o hard cap;
+6. mesma entrada produz sempre a mesma seleção.
+
+Isso evita gastar todo o orçamento no primeiro subtree e dá cobertura estrutural ampla sem inferência semântica cara.
+
+### `preferredPaths` / MCP `seedPaths`
+
+- seeds são paths explícitos do caller e têm prioridade antes do round-robin;
+- contam **dentro** do mesmo hard cap;
+- somente candidatos elegíveis pelo scan/include/exclude podem ser selecionados como seed;
+- seeds duplicados não consomem slots extras;
+- paths fora do working-set root são rejeitados no adapter MCP;
+- nenhum seed permite acessar path que a read policy já bloquearia.
+
+## 40.3 Observabilidade compacta
+
+`ScopeStats` passa a carregar somente:
+
+- `selection.mode`;
+- `candidateBuckets`;
+- `selectedBuckets`;
+- `preferredRequested`;
+- `preferredSelected`;
+- `seedSymbolsRequested`;
+- `seedSymbolPathsResolved`.
+
+Não retornar buckets/path lists adicionais em stats para evitar aumentar payload.
+
+## 40.4 SLOs e provas
+
+- fixture com ≥3 top-level buckets e `maxFiles` menor que candidates deve selecionar de mais de um bucket em `coverage`;
+- `lexical` deve reproduzir o prefixo antigo;
+- seeds elegíveis entram primeiro e contam dentro de `maxFiles`;
+- seeds não elegíveis não aumentam `pathCount`;
+- broad live `src/copilot maxFiles=80` deve cobrir múltiplos top-level buckets;
+- `find` deve localizar um símbolo de `src/copilot/mcp` que antes ficava fora do prefixo lexical;
+- open/context payload continuam bounded;
+- zero reread regressions no integration test;
+- strict typecheck + focused prefetch/session/MCP/working-set tests + lint;
+- reload + prova live comparando V2 lexical bias vs V3 coverage.
+
+## 40.5 Prova live intermediária V54 — breadth resolvida, precisão ainda insuficiente
+
+O primeiro reload da faixa ativou `coverage` sem ainda incluir `seedSymbols`/source-first:
+
+- connector smoke green;
+- **120/120 tools**;
+- `tools/list`: **123.240 B**;
+- broad open idêntico ao baseline: `path=src/copilot`, `maxFiles=80`, `maxBytes=16 KiB`;
+- candidates: **1.450**;
+- selected: **80**;
+- `selection.mode=coverage`;
+- `candidateBuckets=27`;
+- `selectedBuckets=27` — cobertura de **100% dos buckets top-level presentes nos candidatos**;
+- contexto: **14.937 B**, abaixo do budget;
+- index selected-path refresh: 80 requested / 80 unchanged / 9 ms.
+
+Isso eliminou o viés lexical global. Porém o primeiro representative de muitos buckets ainda era `README.md`, e apenas **53/80** arquivos foram parseados como source. Além disso, `find(repoWriteTools)` — símbolo JS real persistido no índice global em `src/copilot/mcp/tools/repo-write.js` — continuou retornando 0 no broad set. Com 80 slots distribuídos por 27 buckets, coverage breadth não pode garantir sozinho um arquivo profundo específico.
+
+Conclusão: aumentar `maxFiles` seria desperdício de memória/parse. A resposta correta é aumentar **utilidade por slot** e permitir precisão causal bounded.
+
+## 40.6 Refinamento V55 — source-first + `seedSymbols`
+
+### Source-first dentro de cada bucket
+
+Coverage continua top-level round-robin, mas a ordenação interna passa a priorizar:
+
+1. source parseável JS/TS/MJS/CJS/JSX/TSX/MTS/CTS;
+2. JSON;
+3. Markdown;
+4. demais extensões;
+5. dentro da mesma classe, menor profundidade e depois ordem lexical.
+
+Assim README/docs deixam de consumir os primeiros slots quando há código elegível no mesmo bucket. `lexical` permanece exatamente sem esse ranking, preservando a compatibilidade histórica.
+
+### `seedSymbols`
+
+`declareScope()` agora aceita símbolos exatos como hints causais:
+
+- dedupe + hard max interno de 32 symbols;
+- resolução por `findIoIndexSymbol(... exactMatch=true, pathPrefix=directory)` no índice local já materializado;
+- no máximo 4 rows por símbolo antes de dedupe;
+- nenhum fallback para scan/search adicional se o índice não retornar match;
+- paths do índice entram apenas como preferred candidates; `warmFromDirectory` ainda exige que estejam no conjunto elegível depois de extensão/include/exclude/gitignore;
+- todos continuam contando dentro do mesmo `maxFiles`.
+
+O MCP expõe `seedPaths` + `seedSymbols`; a LLM-B `workspace_scope_declare` recebeu a mesma superfície e o mesmo containment de seed path. Isso colapsa o workflow `index_find_symbol → declare/open scope` em **uma chamada** quando o símbolo causal já é conhecido.
+
+Observabilidade bounded adicionada:
+
+- `seedSymbolsRequested`;
+- `seedSymbolPathsResolved`.
+
+### Provas automatizadas
+
+Verdes:
+
+- coverage em 3 buckets com cap=3 seleciona 3 buckets;
+- lexical limitado reproduz exatamente o prefixo lexical ilimitado;
+- source-first escolhe JS profundo sobre README raso no mesmo bucket com cap=1;
+- preferred path é priorizado, deduplicado e não ultrapassa `maxFiles`;
+- MCP rejeita seed path legível porém fora do root aberto;
+- LLM-B encaminha coverage/seedPaths/seedSymbols e rejeita seed fora do directory;
+- integration real: um único `refreshIoIndexPaths(repo-write.js)` prepara o símbolo; `declareScope(directory=src/copilot/mcp,maxFiles=1,seedSymbols=['repoWriteTools'])` resolve exatamente um preferred path e `findSymbol` encontra `repo-write.js` dentro desse único slot;
+- integration V2 continua com 48 supplied snapshots e **0 snapshot rereads**;
+- strict typecheck green.
+
+O último integration benchmark representativo permaneceu saudável: 48/48 files, 48 supplied snapshots, 0 rereads, context 11.449 B, local find ~0,20 ms e empty refresh ~0,41 ms.
+
+## 40.7 Runtime final V55
+
+Reload final pós-refinamento:
+
+- connector smoke green;
+- OAuth/SSE green;
+- **120/120 tools**;
+- `tools/list`: **123.452 B**;
+- `mcp_capabilities_summary.capabilitiesVersion=55`;
+- guidance remota já recomenda source-first coverage + `seedPaths/seedSymbols`.
+
+O host desta conversa redescobriu `repo_working_set` após o reload, mas o wrapper materializado continuou expondo o schema anterior sem os novos argumentos. Portanto `seedSymbols` não pôde ser enviado live por este binding sem uma nova reconexão manual; a semântica ficou coberta pelo integration test real com índice e hard cap=1. O runtime remoto, entretanto, confirma V55 e a guidance nova.
+
+A repetição live do mesmo broad open `src/copilot`, `maxFiles=80`, `maxBytes=16 KiB` mostrou:
+
+- candidates: **1.450**;
+- selected: **80**;
+- `candidateBuckets=27`;
+- `selectedBuckets=27`;
+- parsed: **75/80**, contra **53/80** no primeiro coverage V54 — aumento de **~41,5%** na densidade de arquivos parseáveis sem ampliar o cap;
+- symbols: **630**, contra **334** em V54 — aumento de **~88,6%** na superfície simbólica disponível;
+- context: **15.866 B / 16.384 B**;
+- selected-path index refresh: 80 unchanged / 9 ms;
+- `findSymbol('parseTransport')` encontrou `src/copilot/mcp/cli.js` diretamente no working set;
+- refresh sem delta retornou `{refreshed:0, failed:0, skipped:0}`;
+- close liberou o working set e deixou `activeOwnedWorkingSets=0`.
+
+Conclusão da Faixa 33: o hard cap deixou de ser uma janela lexical. Broad scopes agora maximizam cobertura estrutural e source utility; causal scopes podem fixar arquivos diretamente ou resolver símbolos no índice dentro do mesmo open, e MCP/LLM-B compartilham a mesma fundação e invariantes.
+
+
