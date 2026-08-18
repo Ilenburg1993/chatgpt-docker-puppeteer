@@ -3049,11 +3049,11 @@ Pendente apenas um A/B diretamente invocado pelo ChatGPT host após a próxima r
 
 ## Fase 30.6 — P1: Compile Cache V2
 
-- [ ] provar env em validator/job children;
-- [ ] ativar cedo no terminal/LLM-B;
-- [ ] avaliar `flushCompileCache()` depois do boot/warm graph;
-- [ ] medir cold/warm process startup;
-- [ ] expor health compacto.
+- [x] tornar herança explícita em validator/job children via `withCopilotNodeCompileCacheEnv`;
+- [x] ativar cedo no terminal/LLM-B com launcher mínimo + dynamic import do runtime pesado;
+- [x] avaliar `flushCompileCache()` depois do boot/warm graph;
+- [x] medir cold/warm process startup e parent→child pre-exit;
+- [x] expor health compacto sem revelar diretório real.
 
 ## Fase 30.7 — P2: Native Glob Experiment
 
@@ -3388,4 +3388,159 @@ Não substituem:
 - rich fingerprint/journal para correctness de freshness.
 
 O estado-alvo é complementar: **search global para descoberta; working set para foco persistente e barato depois que a área de trabalho foi escolhida.**
+
+---
+
+# 33. Execução da Faixa 30.C — Compile Cache V2 / Node 24 process plane
+
+## 33.1 Problema real encontrado
+
+O MCP já ativava `enableCompileCache()`, mas a cobertura tinha duas lacunas arquiteturais:
+
+1. o helper vivia em `mcp/runtime`, embora compile cache seja uma primitive de processo Node compartilhável por MCP, terminal/LLM-B e filhos;
+2. `terminal/bootstrap.js` carregava todo o grafo pesado por imports estáticos **antes** de qualquer oportunidade de ativar o cache;
+3. `mcp/cli.js` também importava `logMcp`/control-plane estaticamente antes do `enableCompileCache()`;
+4. validator jobs copiavam `process.env` e portanto herdavam cache apenas por efeito colateral da ordem do bootstrap MCP.
+
+Em ESM, ligar compile cache no corpo do módulo não retroage sobre dependencies estáticas já avaliadas. Portanto a correção precisava acontecer no **launcher**, não em uma linha tardia do runtime.
+
+## 33.2 Fundação compartilhada
+
+Criada `infra/runtime/node-compile-cache.js`, exposta por facade mínima `infra/public/node-runtime.js`.
+
+Responsabilidades:
+
+- `enableCopilotNodeCompileCache()`;
+- `withCopilotNodeCompileCacheEnv()`;
+- `flushCopilotNodeCompileCache()`;
+- `getCopilotNodeCompileCacheHealth()`;
+- estado de enable/flush apenas para observabilidade;
+- failures permanecem não-fatais: compile cache é otimização, nunca requisito de correctness.
+
+O caminho histórico `mcp/runtime/node-compile-cache.js` virou re-export de compatibilidade para não quebrar safe-suite/importers existentes.
+
+## 33.3 Terminal/LLM-B — bootstrap realmente precoce
+
+O antigo corpo de `terminal/bootstrap.js` foi movido para `terminal/bootstrap-runtime.js`.
+
+Novo launcher mínimo:
+
+1. importa somente a facade mínima de Node runtime;
+2. carrega `bootstrap-dotenv.js` dinamicamente;
+3. executa `enableCopilotNodeCompileCache()`;
+4. importa `bootstrap-runtime.js` dinamicamente;
+5. executa `flushCopilotNodeCompileCache()` após o grafo pesado ter sido compilado.
+
+Isso preserva `.env` antes da configuração do cache e coloca SDK/model gateway/tools/observability/runtime-bootstrap sob compile cache desde sua primeira importação relevante.
+
+## 33.4 MCP CLI — ordem ESM corrigida
+
+`mcp/cli.js` agora:
+
+- importa apenas a foundation de compile cache antes do enable;
+- remove import estático de `logMcp`;
+- carrega control-plane logger lazily depois do enable;
+- continua carregando adapters dinamicamente;
+- flush após adapter/server warm-up em HTTP;
+- flush após carregar adapters e antes do loop longo de stdio.
+
+Consequência adicional: importar `parseTransport` em teste não precisa mais carregar o control-plane inteiro antes de o cache ser configurado.
+
+## 33.5 Herança explícita em validator jobs
+
+`spawnValidatorJob()` passou de:
+
+`env: { ...process.env, NO_COLOR: '' }`
+
+para:
+
+`env: withCopilotNodeCompileCacheEnv({ ...process.env, NO_COLOR: '' })`.
+
+Logo, a propagação não depende mais de o caller ter sido iniciado pelo MCP CLI. O safe validation runner mantém o re-export histórico e continua compatível.
+
+## 33.6 Benchmark cold/warm representativo
+
+Grafo medido em subprocessos Node 24 isolados:
+
+- `terminal/index.js`;
+- `boot/runtime-bootstrap.js`.
+
+Primeira rodada:
+
+- compile cache disabled wall median: **1.182,168 ms**;
+- warm wall median: **1.040,149 ms**;
+- ganho wall: **12,01%**;
+- disabled import median: **1.097,124 ms**;
+- warm import median: **957,871 ms**;
+- ganho imports: **12,69%**;
+- primeira população: ~**1.648 ms wall**, mais lenta como esperado.
+
+Repetição durante o A/B de flush:
+
+- disabled wall median: **1.151,035 ms**;
+- warm wall median: **920,489 ms**;
+- ganho wall: **20,03%**;
+- disabled import median: **1.065,339 ms**;
+- warm import median: **860,487 ms**;
+- ganho imports: **19,23%**.
+
+Interpretação: cold population paga overhead; o benefício aparece em reloads/restarts recorrentes, exatamente o perfil operacional do MCP/terminal.
+
+## 33.7 Benchmark `flushCompileCache()` parent→child
+
+Cenário específico recomendado pela API do Node: pai aquece o grafo, lança filho **antes de encerrar** e ambos compartilham o mesmo compile-cache dir.
+
+- sem flush, child import median: **1.363,399 ms**;
+- com flush antes do spawn, child import median: **913,781 ms**;
+- ganho: **32,98%**.
+
+Isso justifica flush explícito depois do warm graph. A API oficial existe precisamente porque, sem flush, o code cache acumulado no processo tende a ser persistido apenas no exit e ainda não está disponível ao filho pré-exit.
+
+## 33.8 Observabilidade
+
+`mcp_runtime_health` passa a expor somente:
+
+- `nodeVersion`;
+- compile cache enabled/statusName;
+- portable;
+- `directoryKnown` boolean;
+- último flush: success/duration/error.
+
+O diretório real não é devolvido no default, evitando payload/path leakage desnecessário.
+
+## 33.9 Política final
+
+- compile cache **default on**;
+- explicit disable permanece possível por `COPILOT_NODE_COMPILE_CACHE_DISABLED`;
+- portable segue preferido e possui fallback;
+- failures de enable/flush nunca tornam o runtime incorreto;
+- flush só é feito depois que um grafo relevante foi carregado;
+- não adicionar package externo para module caching: Node 24 já fornece a primitive adequada;
+- benchmark pesado usado para a decisão não permanece na suíte unitária normal, evitando acrescentar ~20 s a validações futuras.
+
+## 33.10 Prova live após reload
+
+MCP real após ativação:
+
+- Node: **v24.15.0**;
+- compile cache: `enabled=true`;
+- status: `ALREADY_ENABLED`;
+- `portable=true`;
+- `directoryKnown=true` sem expor path;
+- último flush: **success**, ~**39,458 ms**;
+- connector smoke: green;
+- tools: **120/120**;
+- `tools/list`: **121.987 bytes**.
+
+O launcher LLM-B também foi exercitado pelo harness real em modo `control-only`, sem abrir turno/modelo/provider:
+
+- run: `terminal-live:2026-08-18T03-39-56-369Z:control_only`;
+- status: **passed**;
+- duração: **29.814 ms**;
+- exit code: **0**;
+- critérios: **27/27 green**;
+- terminal atingiu `ready`, REPL/TTY funcional, SSE conectado, zero terminal errors e clean `/quit`.
+
+Portanto a refatoração de bootstrap não é apenas tipada/testada: o terminal permanente inicia corretamente pelo novo launcher mínimo em cenário operacional real.
+
 

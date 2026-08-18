@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { buildIoCacheTierPlan } from '#copilot/infra/public/cache';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/health';
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
+import { getCopilotNodeCompileCacheHealth } from '#copilot/infra/public/node-runtime';
 import {
     readCloudflareTunnelConfig,
     readConnectorSmokeState,
@@ -505,6 +506,7 @@ export const mcpRuntimeHealthTool = {
         const startupMaintenance = readMcpStartupMaintenanceState();
         const lastWorkspaceSmoke = readMcpWorkspaceSmokeSummary();
         const statefulPolicy = readStatefulRuntimePolicySnapshot();
+        const compileCache = getCopilotNodeCompileCacheHealth();
         const warnings = [];
         const critical = [];
         const informational = [];
@@ -584,6 +586,22 @@ export const mcpRuntimeHealthTool = {
                         lastSmokeAgeMinutes: connectorSmoke.ageMinutes,
                     },
                     statefulPolicy,
+                    nodeRuntime: {
+                        nodeVersion: process.version,
+                        compileCache: {
+                            enabled: compileCache.enabled,
+                            statusName: compileCache.statusName,
+                            portable: compileCache.portable,
+                            directoryKnown: compileCache.directoryKnown,
+                            lastFlush: compileCache.lastFlush
+                                ? {
+                                      flushed: compileCache.lastFlush.flushed,
+                                      durationMs: Math.round(compileCache.lastFlush.durationMs * 1000) / 1000,
+                                      error: compileCache.lastFlush.error,
+                                  }
+                                : null,
+                        },
+                    },
                 },
                 indexStats: summarizeIndexStats(indexStats),
                 metrics: {
@@ -648,6 +666,10 @@ export const mcpRuntimeHealthTool = {
                     ignoredForOperationalReadiness: permanentMode,
                 },
                 statefulPolicy,
+                nodeRuntime: {
+                    nodeVersion: process.version,
+                    compileCache,
+                },
             },
             indexStats,
             metrics: {

@@ -121,6 +121,15 @@ describe('copilot MCP runtime metrics', () => {
         assert.equal(typeof result.structuredContent.workspaceRoot, 'string');
         assert.ok(result.structuredContent.operationalSignals);
         assert.ok(result.structuredContent.operationalSignals.indexAutoBuild);
+        assert.equal(typeof result.structuredContent.operationalSignals.nodeRuntime?.nodeVersion, 'string');
+        assert.equal(
+            typeof result.structuredContent.operationalSignals.nodeRuntime?.compileCache?.enabled,
+            'boolean',
+        );
+        assert.equal(
+            typeof result.structuredContent.operationalSignals.nodeRuntime?.compileCache?.directoryKnown,
+            'boolean',
+        );
         assert.deepEqual(result.structuredContent.operationalSignals.startupMaintenance, {
             scheduled: false,
             running: false,

@@ -11,6 +11,7 @@ import { lstat, mkdir, open, readFile, readdir, realpath } from 'node:fs/promise
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appendTextLocked, writeFileAtomic } from '#copilot/infra/public/io';
+import { withCopilotNodeCompileCacheEnv } from '#copilot/infra/public/node-runtime';
 import { getMcpWorkspaceRoot } from './paths.js';
 
 const MCP_JOBS_DIR = fileURLToPath(new URL('../../.ai/jobs/', import.meta.url));
@@ -292,7 +293,7 @@ export async function spawnValidatorJob(validator, options = {}) {
 
     const child = spawn(command.command, command.args, {
         cwd: getMcpWorkspaceRoot(),
-        env: { ...process.env, NO_COLOR: '' },
+        env: withCopilotNodeCompileCacheEnv({ ...process.env, NO_COLOR: '' }),
         stdio: ['ignore', 'pipe', 'pipe'],
     });
 

@@ -1,44 +1,19 @@
 // @ts-check
 /**
- * src/copilot/terminal/bootstrap.js — entry point canônico para o Terminal Permanente LLM-B.
+ * Minimal launcher for the permanent LLM-B terminal.
  *
- * Invocado por `npm run terminal:llm-b` e pelo processo PM2 `llm-b-terminal`.
+ * Dotenv is loaded before compile-cache configuration; the heavy terminal/runtime graph is imported only after the
+ * Node 24 module compile cache is active.
  *
  * @module copilot/terminal/bootstrap
  */
 
-import './bootstrap-dotenv.js';
+import {
+    enableCopilotNodeCompileCache,
+    flushCopilotNodeCompileCache,
+} from '#copilot/infra/public/node-runtime';
 
-import { bootCopilot } from '../boot/runtime-bootstrap.js';
-import { log } from '../observability/logger.js';
-import { handleTerminalBootFailure, registerTerminalShutdownSignals } from './bootstrap-lifecycle.js';
-import { broadcastSse } from './dialog/index.js';
-import { startDevWatch } from './dev-watch.js';
-import * as terminal from './index.js';
-
-/**
- * Adapta a surface SSE do terminal para o contrato genérico do boot.
- *
- * @param {string} event
- * @param {unknown} [payload]
- * @returns {void}
- */
-function broadcastBootSse(event, payload) {
-    const data = payload && typeof payload === 'object' ? payload : { value: payload ?? null };
-    broadcastSse(event, data);
-}
-
-registerTerminalShutdownSignals();
-
-if (typeof log.setConsoleLevel === 'function') {
-    const consoleLevel = (
-        process.env['COPILOT_TERMINAL_CONSOLE_LOG_LEVEL'] ??
-        process.env['COPILOT_CONSOLE_LOG_LEVEL'] ??
-        'ERROR'
-    ).toUpperCase();
-    log.setConsoleLevel(/** @type {'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL'} */ (consoleLevel));
-}
-
-bootCopilot({ terminal, broadcastSse: broadcastBootSse })
-    .then(() => { startDevWatch(); })
-    .catch((err) => void handleTerminalBootFailure(err));
+await import('./bootstrap-dotenv.js');
+enableCopilotNodeCompileCache();
+await import('./bootstrap-runtime.js');
+flushCopilotNodeCompileCache();

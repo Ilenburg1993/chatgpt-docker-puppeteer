@@ -10,12 +10,27 @@
  * @module copilot/mcp/cli
  */
 
+import {
+    enableCopilotNodeCompileCache,
+    flushCopilotNodeCompileCache,
+} from '#copilot/infra/public/node-runtime';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { logMcp } from '#copilot/mcp/control-plane';
-import { enableCopilotNodeCompileCache } from './runtime/node-compile-cache.js';
 
 enableCopilotNodeCompileCache();
+
+/** @typedef {typeof import('#copilot/mcp/control-plane').logMcp} McpLogger */
+/** @type {McpLogger | null} */
+let cachedLogMcp = null;
+
+/** @returns {Promise<McpLogger>} */
+async function getLogMcp() {
+    if (cachedLogMcp) return cachedLogMcp;
+    const controlPlane = await import('#copilot/mcp/control-plane');
+    const logger = controlPlane.logMcp;
+    cachedLogMcp = logger;
+    return logger;
+}
 
 const VALID_TRANSPORTS = /** @type {const} */ (['http', 'http2', 'stdio']);
 const SHUTDOWN_GRACE_MS = 5000;
@@ -72,12 +87,13 @@ function normalizeTransport(value) {
  */
 async function main() {
     const transport = parseTransport(process.argv.slice(2));
+    const logMcp = await getLogMcp();
     if (transport === 'stdio') {
         await startStdioTransport();
         return;
     }
-    const server = await startHttpTransport(transport);
-    installHttpShutdownHandlers(server, transport);
+    const server = await startHttpTransport(transport, logMcp);
+    installHttpShutdownHandlers(server, transport, logMcp);
 }
 
 /**
@@ -87,6 +103,7 @@ async function startStdioTransport() {
     const restoreStdout = redirectStdoutDuringBootstrap();
     try {
         const { startStdioMcpServer } = await import('#copilot/mcp/adapters');
+        flushCopilotNodeCompileCache();
         restoreStdout();
         await startStdioMcpServer();
     } catch (error) {
@@ -97,11 +114,13 @@ async function startStdioTransport() {
 
 /**
  * @param {'http' | 'http2'} transport
+ * @param {McpLogger} logMcp
  * @returns {Promise<ClosableMcpServer>}
  */
-async function startHttpTransport(transport) {
+async function startHttpTransport(transport, logMcp) {
     const adapters = await import('#copilot/mcp/adapters');
     const server = transport === 'http2' ? await adapters.startHttp2McpServer() : await adapters.startHttpMcpServer();
+    flushCopilotNodeCompileCache();
     logMcp('INFO', 'MCP HTTP server started.', { transport });
     return server;
 }
@@ -109,9 +128,10 @@ async function startHttpTransport(transport) {
 /**
  * @param {ClosableMcpServer} server
  * @param {'http' | 'http2'} transport
+ * @param {McpLogger} logMcp
  * @returns {void}
  */
-function installHttpShutdownHandlers(server, transport) {
+function installHttpShutdownHandlers(server, transport, logMcp) {
     let closing = false;
     const shutdown = (/** @type {NodeJS.Signals} */ signal) => {
         if (closing) return;
@@ -158,10 +178,15 @@ function redirectStdoutDuringBootstrap() {
 }
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
-    main().catch((error) => {
-        logMcp('ERROR', 'Fatal MCP server error.', {
-            error: error instanceof Error ? error.message : String(error),
-        });
+    main().catch(async (error) => {
+        try {
+            const logMcp = await getLogMcp();
+            logMcp('ERROR', 'Fatal MCP server error.', {
+                error: error instanceof Error ? error.message : String(error),
+            });
+        } catch {
+            process.stderr.write(`[mcp:fatal] ${error instanceof Error ? error.message : String(error)}\n`);
+        }
         process.exitCode = 1;
     });
 }
