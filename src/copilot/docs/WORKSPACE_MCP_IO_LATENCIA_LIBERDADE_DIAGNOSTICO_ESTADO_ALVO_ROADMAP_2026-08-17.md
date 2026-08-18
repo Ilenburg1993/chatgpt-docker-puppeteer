@@ -3878,3 +3878,147 @@ Regressões adicionais verdes:
 
 Esse refinamento será publicado como follow-up sem reescrever o commit 30.9 original, pois foi derivado de evidência da primeira ativação live.
 
+## 36.11 Prova live final — high-watermark fechado end-to-end
+
+Após publicar o refinamento em `5ac2f670a`, a sequência de provas foi concluída em quatro boots controlados.
+
+### Boot 1 — migração/safety full
+
+- checkpoint legado sem watermark útil;
+- replay `0 → 3721`;
+- 74 rows ainda retidas;
+- gap detectado;
+- full reconcile sobre **1.450 candidates / 1.450 unchanged**;
+- ~**398 ms**;
+- sem failure.
+
+### Boot 2 — composição Git + journal
+
+HEAD mudou de `918d9fa93` para `5ac2f670a`:
+
+- reason: `head-changed`;
+- replay `3721 → 3761`;
+- 40 rows;
+- **27 hidden rows** removidas pelo domain preflight;
+- 3 outside-scope;
+- 5 paths admissíveis;
+- Git diff também trouxe os mesmos 5 paths;
+- dedupe final: **5 requests, não 10**;
+- 5 unchanged, 0 failed;
+- incremental ~**110 ms**.
+
+### Boot 3 — recuperação puramente pelo journal
+
+Com HEAD já estável em `5ac2f670a`, foi criado e removido `src/copilot/journal-replay-live-probe.js` pelo writer canônico. Antes do restart:
+
+- Git voltou ao baseline sem qualquer dirty path em `src/copilot`;
+- journal runtime registrou **2 publishes**, sequences **3762/3763**;
+- external watcher marcou as duas como canonical-suppressed;
+- create/delete já convergiram no runtime atual.
+
+No restart seguinte:
+
+- reason: **`journal-replay`**;
+- mode: incremental;
+- Git changed paths: **0**;
+- replay `3761 → 3764`;
+- 3 rows totais, incluindo 1 hidden operacional;
+- create+delete do mesmo path deduplicado para **1 replayable path**;
+- requested: **1**;
+- como o arquivo já não existia, `invalidated=1`;
+- `failed=0`;
+- gap/truncated/invalid/recursive: todos zero;
+- incremental completo: **71 ms**.
+
+Isso prova a janela de recuperação que antes não existia: uma mutação canônica pode ocorrer, convergir no processo atual e desaparecer do estado Git final, mas ainda assim o próximo processo reconcilia explicitamente aquele path usando o watermark persistido.
+
+### Boot 4 — estado realmente limpo
+
+Sem nova mutação admissível de source:
+
+- status: **skipped**;
+- reason: **`head-and-worktree-unchanged`**;
+- replay `3764 → 3765`;
+- 1 row, inteiramente hidden operacional;
+- contained/replayable paths: **0**;
+- scannedEntries: **0**;
+- candidateFiles: **0**;
+- indexed/invalidated/hashVerifications: **0**;
+- gap/truncated/invalid/recursive: zero;
+- decisão completa: **53 ms**.
+
+A Faixa 30.9 está encerrada: startup do índice agora possui recuperação bounded entre processos/restarts sem transformar journal em authority única e sem transformar ruído operacional hidden em trabalho de indexação.
+
+---
+
+# 37. Faixa 30.8 — Dependency/runtime hygiene — 2026-08-18
+
+## 37.1 Auditoria global
+
+A busca foi ampliada para `src`, `scripts`, `tests`, `config`, `package.json` e `package-lock.json`.
+
+Resultados:
+
+- `xxhash-wasm ^1.1.0` está em `dependencies`, mas não possui import/require em source, script, config ou teste executável;
+- as únicas menções fora de package metadata são documentação histórica e `tests/fixtures/rag/sample.json`, que modela um package fictício e não carrega a library;
+- `p-limit ^7.3.0` é runtime dependency legítima, com consumers em scanner, prefetch, session scope e SQLite index;
+- `ignore ^7.0.5` é runtime dependency legítima, usada pelo scanner e pela policy `.gitignore` compartilhada;
+- `minimatch ^10.2.5` sustenta a policy glob canônica em produção (`infra/scan/glob.js`), mas está incorretamente em `devDependencies`.
+
+## 37.2 Correções-alvo
+
+1. remover `xxhash-wasm` de `dependencies` e do root lock graph;
+2. remover a entrada `node_modules/xxhash-wasm` do lockfile;
+3. promover `minimatch ^10.2.5` para `dependencies` e removê-lo de `devDependencies`;
+4. reconciliar lockfile v3: `node_modules/minimatch`, `brace-expansion` e `balanced-match` deixam de ser `dev:true`, pois agora fazem parte da árvore de produção;
+5. manter `p-limit` e `ignore` em runtime dependencies;
+6. não adicionar packages novos nesta faixa.
+
+A mudança corrige um bug real de packaging: um deployment `npm install --omit=dev` podia omitir `minimatch` apesar de o scanner/import graph de produção depender dele.
+
+## 37.3 Relação com Node 24
+
+A remoção de `xxhash-wasm` é consequência do Estado-Alvo V3: hashing one-shot/seguro já usa `node:crypto.hash()` e o scanner incremental demonstrou que rich fingerprint + hash periódico satisfazem os requisitos atuais. Não existe workload medido que justifique manter um WASM hash package órfão.
+
+Isso **não** significa substituir toda dependency por stdlib. A Faixa 30.7 demonstrou o contrário: `path.matchesGlob()` não preserva o contrato dotfile e `fs.promises.glob()` ficou mais lento que o traversal atual; por isso `minimatch` permanece conscientemente como runtime dependency.
+
+## 37.4 Gates
+
+- package/lock root graphs devem concordar;
+- nenhum `xxhash-wasm` executável/importável deve permanecer fora de docs/fixture histórica;
+- `minimatch` deve estar em root `dependencies`, não `devDependencies`;
+- lock entries de `minimatch → brace-expansion → balanced-match` devem ser production-reachable (`dev` ausente/false);
+- teste glob canônico green;
+- scanner/index/working-set focused gates green;
+- strict typecheck green;
+- lint antes do publish;
+- nenhum reload necessário: package metadata não muda source já carregado; runtime atual já possui `minimatch` instalado.
+
+## 37.5 Execução
+
+Aplicado sem installer/lifecycle scripts:
+
+- `package.json`: `minimatch ^10.2.5` movido de `devDependencies` para `dependencies`;
+- `package.json`: `xxhash-wasm` removido;
+- root package do lockfile reconciliado da mesma forma;
+- `node_modules/xxhash-wasm` removido do lock;
+- `dev:true` removido de `node_modules/minimatch`, `brace-expansion` e `balanced-match`.
+
+Foi adicionado `tests/unit/copilot/infra/test_runtime_dependency_contract.spec.js`, que parseia `package.json` e `package-lock.json` e impede regressão futura desse contrato.
+
+Gates executados e verdes:
+
+- runtime dependency contract;
+- canonical glob policy;
+- I/O scanner;
+- strict typecheck.
+
+Verificação negativa posterior:
+
+- `package.json`: **0** ocorrências de `xxhash-wasm`;
+- `package-lock.json`: **0** ocorrências de `xxhash-wasm`;
+- root `package.json` contém uma única declaração de `minimatch`, em `dependencies`;
+- lock entries production-reachable da cadeia não possuem `dev:true`.
+
+A mudança não pretende melhorar hot-path latency diretamente. Ela reduz supply-chain/install surface por um package WASM órfão e, mais importante, corrige um deployment hazard real em instalações `--omit=dev`.
+

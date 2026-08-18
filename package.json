@@ -764,6 +764,7 @@
     "js-yaml": "^4.2.0",
     "jsonwebtoken": "^9.0.3",
     "lru-cache": "^11.5.1",
+    "minimatch": "^10.2.5",
     "node-html-parser": "^7.1.0",
     "openai": "^6.42.0",
     "p-limit": "^7.3.0",
@@ -781,7 +782,6 @@
     "uuid": "^14.0.0",
     "vscode-jsonrpc": "^9.0.0",
     "ws": "^8.21.0",
-    "xxhash-wasm": "^1.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -824,7 +824,6 @@
     "jscpd": "^5.0.4",
     "madge": "^8.0.0",
     "mermaid": "^11.15.0",
-    "minimatch": "^10.2.5",
     "nodemon": "^3.1.14",
     "npm-check-updates": "^22.2.3",
     "pino-pretty": "^13.1.3",
