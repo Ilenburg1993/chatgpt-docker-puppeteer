@@ -177,8 +177,18 @@ export function readIoRuntimeHealthSnapshot() {
         operationsWithMetadata: 0,
         fileFlushRequested: 0,
         modes: { none: 0, file: 0, 'file-and-directory': 0 },
-        fileSync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0 },
-        directorySync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0 },
+        fileSync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0, totalDurationMs: 0, maxDurationMs: 0 },
+        directorySync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0, totalDurationMs: 0, maxDurationMs: 0 },
+        atomicWritePhases: {
+            observed: 0,
+            tempPathMs: 0,
+            capacityPreflightMs: 0,
+            tempWriteMs: 0,
+            prePublishCheckMs: 0,
+            publishMs: 0,
+            directorySyncMs: 0,
+            totalMs: 0,
+        },
         lastFailure: null,
     });
     const locks = getIoLockStats();

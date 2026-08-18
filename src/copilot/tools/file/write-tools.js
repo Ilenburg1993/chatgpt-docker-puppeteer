@@ -133,8 +133,12 @@ const writeFileContentTool = buildTool({
             .string()
             .optional()
             .describe('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, a escrita falha sem aplicar.'),
+        durability: z
+            .enum(['file-and-directory', 'file', 'none'])
+            .optional()
+            .describe('Perfil de persistência após crash; default file-and-directory. Não altera atomicidade, locks ou path policy.'),
     }),
-    handler: async ({ path: filePath, content, encoding, expectedHash }) => {
+    handler: async ({ path: filePath, content, encoding, expectedHash, durability }) => {
         const { ok, reason, resolved, validatedWritePath } = await validatePath(filePath, { mode: 'write', issueMutableCapability: true });
         if (!ok) {
             return pathFailureResult('write_file_content', reason ?? 'Caminho inválido.', {
@@ -176,6 +180,7 @@ const writeFileContentTool = buildTool({
                 requireExists: true,
                 captureRollback: true,
                 ...(expectedHash ? { expectedHash } : {}),
+                ...(durability ? { durability } : {}),
                 riskClass: IO_RISK.high,
                 advisoryLimits: {
                     advisoryWriteContentBytes: ADVISORY_WRITE_CONTENT_BYTES,
@@ -271,8 +276,12 @@ const createFileTool = buildTool({
             .optional()
             .default(false)
             .describe('Se true, sobrescreve o arquivo se já existir (⚠️ destrutivo)'),
+        durability: z
+            .enum(['file-and-directory', 'file', 'none'])
+            .optional()
+            .describe('Perfil de persistência após crash; default file-and-directory. Atomicidade e policy permanecem ativas.'),
     }),
-    handler: async ({ path: filePath, content, encoding, createParentDirs, overwrite }) => {
+    handler: async ({ path: filePath, content, encoding, createParentDirs, overwrite, durability }) => {
         const { ok, reason, resolved, validatedWritePath } = await validatePath(filePath, { mode: 'write', issueMutableCapability: true });
         if (!ok) {
             return pathFailureResult('create_file', reason ?? 'Caminho inválido.', {
@@ -317,6 +326,7 @@ const createFileTool = buildTool({
                 createParentDirs,
                 failIfExists: !overwrite,
                 captureRollback: overwrite,
+                ...(durability ? { durability } : {}),
                 riskClass,
                 advisoryLimits: {
                     advisoryWriteContentBytes: ADVISORY_WRITE_CONTENT_BYTES,

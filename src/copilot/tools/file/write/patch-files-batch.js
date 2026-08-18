@@ -67,8 +67,12 @@ export const patchFilesBatchTool = buildTool({
         dryRun: z.boolean().optional().default(false),
         failureMode: z.enum(['best-effort', 'fail-fast']).optional().default('best-effort'),
         targetConcurrency: z.number().int().min(1).max(MAX_PATCH_CONCURRENCY).optional().default(4),
+        durability: z
+            .enum(['file-and-directory', 'file', 'none'])
+            .optional()
+            .describe('Perfil de persistência após crash; default file-and-directory. Atomicidade e preconditions permanecem ativas.'),
     }),
-    handler: async ({ operations, dryRun, failureMode, targetConcurrency }) => {
+    handler: async ({ operations, dryRun, failureMode, targetConcurrency, durability }) => {
         const inputBytes = estimatePatchInputBytes(operations);
         if (inputBytes > MAX_PATCH_INPUT_BYTES) {
             return {
@@ -170,6 +174,7 @@ export const patchFilesBatchTool = buildTool({
                         })),
                         dryRun,
                         captureRollback: false,
+                        ...(durability ? { durability } : {}),
                         advisoryLimits: {
                             tool: 'patch_files_batch',
                             operationCount: group.entries.length,

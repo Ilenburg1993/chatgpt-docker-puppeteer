@@ -205,6 +205,41 @@ describe('infra/io-engine', () => {
         expect(writeResult.io.advisoryLimits?.durability).toEqual(writeResult.durability);
     });
 
+    it('expõe perfis de durability sem alterar atomic publish, policy ou conteúdo final', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'durability-profiles.txt');
+        await writeFile(file, 'initial', 'utf8');
+
+        const fileProfile = await writeFileAtomic(file, 'file-profile', { durability: 'file' });
+        expect(fileProfile.durability).toMatchObject({
+            durability: 'file',
+            fileFlushRequested: true,
+            directorySync: null,
+            phaseTimings: expect.objectContaining({
+                tempWriteMs: expect.any(Number),
+                publishMs: expect.any(Number),
+                totalMs: expect.any(Number),
+            }),
+        });
+        expect(fileProfile.durability.phaseTimings.totalMs).toBeGreaterThanOrEqual(
+            fileProfile.durability.phaseTimings.publishMs,
+        );
+        await expect(readFile(file, 'utf8')).resolves.toBe('file-profile');
+
+        const noneProfile = await writeFileAtomic(file, 'none-profile', { durability: 'none' });
+        expect(noneProfile.durability).toMatchObject({
+            durability: 'none',
+            fileFlushRequested: false,
+            directorySync: null,
+            phaseTimings: expect.objectContaining({
+                tempWriteMs: expect.any(Number),
+                publishMs: expect.any(Number),
+                totalMs: expect.any(Number),
+            }),
+        });
+        await expect(readFile(file, 'utf8')).resolves.toBe('none-profile');
+    });
+
     it('writeFileAtomic com failIfExists preserva ENOTDIR em componente intermediário', async () => {
         const dir = await createTempDir();
         const fileComponent = join(dir, 'not-a-dir');

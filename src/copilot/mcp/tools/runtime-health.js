@@ -146,6 +146,8 @@ function summarizeIndexStats(stats) {
             batches: autoRefresh['batches'] ?? 0,
             requested: autoRefresh['requested'] ?? 0,
             indexed: autoRefresh['indexed'] ?? 0,
+            domainSkipped: autoRefresh['domainSkipped'] ?? 0,
+            gitignoredSkipped: autoRefresh['gitignoredSkipped'] ?? 0,
             failed: autoRefresh['failed'] ?? 0,
             lastLagMs: autoRefresh['lastLagMs'] ?? null,
             maxLagMs: autoRefresh['maxLagMs'] ?? 0,
@@ -358,6 +360,52 @@ function summarizeIoCache(cache) {
     };
 }
 
+/** @param {Record<string, unknown>} durability */
+function summarizeIoDurability(durability) {
+    const fileSync = recordOrEmpty(durability['fileSync']);
+    const directorySync = recordOrEmpty(durability['directorySync']);
+    const atomic = recordOrEmpty(durability['atomicWritePhases']);
+    const observed = Number(atomic['observed'] ?? 0);
+    /** @param {string} field */
+    const average = (field) =>
+        observed > 0 ? Math.round((Number(atomic[field] ?? 0) / observed) * 1000) / 1000 : 0;
+    /** @param {Record<string, unknown>} stats */
+    const averageSync = (stats) => {
+        const attempted = Number(stats['attempted'] ?? 0);
+        return attempted > 0
+            ? Math.round((Number(stats['totalDurationMs'] ?? 0) / attempted) * 1000) / 1000
+            : 0;
+    };
+    return {
+        modes: durability['modes'] ?? null,
+        fileFlushRequested: durability['fileFlushRequested'] ?? 0,
+        fileSync: {
+            attempted: fileSync['attempted'] ?? 0,
+            confirmed: fileSync['confirmed'] ?? 0,
+            failed: fileSync['failed'] ?? 0,
+            averageMs: averageSync(fileSync),
+            maxMs: fileSync['maxDurationMs'] ?? 0,
+        },
+        directorySync: {
+            attempted: directorySync['attempted'] ?? 0,
+            confirmed: directorySync['confirmed'] ?? 0,
+            failed: directorySync['failed'] ?? 0,
+            averageMs: averageSync(directorySync),
+            maxMs: directorySync['maxDurationMs'] ?? 0,
+        },
+        atomicWrite: {
+            observed,
+            averageTotalMs: average('totalMs'),
+            averageTempPathMs: average('tempPathMs'),
+            averageCapacityPreflightMs: average('capacityPreflightMs'),
+            averageTempWriteMs: average('tempWriteMs'),
+            averagePrePublishCheckMs: average('prePublishCheckMs'),
+            averagePublishMs: average('publishMs'),
+            averageDirectorySyncMs: average('directorySyncMs'),
+        },
+    };
+}
+
 /** @param {Record<string, unknown>} parser */
 function summarizeIoParser(parser) {
     const fileContext = recordOrEmpty(parser['fileContext']);
@@ -541,6 +589,7 @@ export const mcpRuntimeHealthTool = {
                     authorizationCache: summarizeAuthorizationCache(recordOrEmpty(authDecisionCache)),
                     repoReadFileCache: summarizeRepoReadCache(repoReadFileCache),
                     ioCache: summarizeIoCache(ioRuntime.cache),
+                    ioDurability: summarizeIoDurability(recordOrEmpty(ioRuntime.durability)),
                     ioCachePlan: {
                         l2Decision: ioCachePlanWithBenchmark.l2Decision,
                         recommendationCount: Array.isArray(ioCachePlanWithBenchmark.recommendations)
@@ -595,6 +644,7 @@ export const mcpRuntimeHealthTool = {
                 authorizationCache: authDecisionCache,
                 repoReadFileCache,
                 ioCache: ioRuntime.cache,
+                ioDurability: ioRuntime.durability,
                 ioCacheBenchmark,
                 ioCachePlanWithBenchmark,
                 ioParser: ioRuntime.parser,

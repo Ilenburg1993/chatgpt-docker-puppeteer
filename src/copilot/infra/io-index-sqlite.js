@@ -294,6 +294,11 @@ export function createIoIndexSqlite(options) {
             AND (? = '[]' OR extension IN (SELECT value FROM json_each(?)))
         ORDER BY file_path ASC
     `);
+    const stmtListIndexedFiles = db.prepare(`
+        SELECT file_path as filePath, extension, metadata_json as metadataJson
+        FROM copilot_io_index_files
+        ORDER BY file_path ASC
+    `);
     const stmtCountFiles = db.prepare(`
         SELECT
             COUNT(*) as total,
@@ -706,6 +711,12 @@ export function createIoIndexSqlite(options) {
                         snapshot,
                         { mtimeToleranceMs: 0 },
                     ),
+            );
+        },
+
+        listIndexedFiles() {
+            return /** @type {{ filePath: string; extension: string; metadataJson: string | null }[]} */ (
+                stmtListIndexedFiles.all()
             );
         },
 

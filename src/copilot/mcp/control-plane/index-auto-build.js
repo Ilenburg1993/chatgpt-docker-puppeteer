@@ -8,6 +8,7 @@
 import {
     buildIoIndexForDirectory,
     getIoIndexStats,
+    reconcileIoIndexAutoRefreshDomain,
     refreshIoIndexPaths,
 } from '#copilot/infra/public/indexing';
 import { WORKSPACE_ROOT } from '#copilot/tools';
@@ -279,7 +280,12 @@ async function runIndexAutoBuild(config) {
                 changes = [...changes, ...committed.changes];
             }
             const explicitPaths = normalizeGitChangePaths(changes, config.path);
-            const incremental = await refreshIoIndexPaths(explicitPaths, { workspaceRoot: WORKSPACE_ROOT });
+            const incremental = await refreshIoIndexPaths(explicitPaths, {
+                workspaceRoot: WORKSPACE_ROOT,
+                scopeRoot: resolved.resolved,
+                respectGitignore: config.respectGitignore,
+            });
+            const domainReconcile = await reconcileIoIndexAutoRefreshDomain();
             if (incremental.available === false || incremental.failed > 0) {
                 return await runFullReconcile(config, resolved.resolved, gitSnapshot, schemaVersion, startupStartedAt, {
                     fallbackReason: 'incremental-refresh-failed',
@@ -298,6 +304,7 @@ async function runIndexAutoBuild(config) {
                 reason: plan.reason,
                 result: {
                     ...incremental,
+                    domainReconcile,
                     mode: 'incremental',
                     changedPathCount: explicitPaths.length,
                     scannedEntries: 0,
@@ -341,7 +348,9 @@ async function runFullReconcile(config, resolvedPath, gitSnapshot, schemaVersion
         respectGitignore: config.respectGitignore,
         maxFiles: config.maxFiles,
         concurrency: config.concurrency,
+        adoptAutoRefreshDomain: true,
     });
+    const domainReconcile = await reconcileIoIndexAutoRefreshDomain();
     if (result.available !== false && gitSnapshot.head && !gitSnapshot.uncertain) {
         writeIndexStartupCheckpoint({
             scopePath: config.path,
@@ -355,6 +364,7 @@ async function runFullReconcile(config, resolvedPath, gitSnapshot, schemaVersion
         reason: result.available === false ? 'index-unavailable' : 'full-reconcile',
         result: /** @type {Record<string, unknown>} */ ({
             ...result,
+            domainReconcile,
             mode: 'full-reconcile',
             ...evidence,
             durationMs: Math.max(0, Date.now() - startupStartedAt),

@@ -662,6 +662,7 @@ export async function moveFileLocked(source, destination, options = {}) {
  *     dryRun?: boolean;
  *     captureRollback?: boolean;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     durability?: import('./durability.js').IoDurabilityMode;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
  */
@@ -760,6 +761,7 @@ export async function patchTextBatchLocked(filePath, options) {
                             durability = await writeAtomicFileUnlocked(filePath, currentContent, {
                                 expectedHash: previousHash,
                                 ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
+                                ...(options.durability === undefined ? {} : { durability: options.durability }),
                             });
                         } catch (error) {
                             if (isUnpublishedSnapshotConflict(error)) {
@@ -784,6 +786,7 @@ export async function patchTextBatchLocked(filePath, options) {
                         previousSnapshotTruncated: previousSnapshot.snapshotTruncated,
                         previousRollbackSidecar: previousSnapshot.rollbackSidecar,
                         capacityPreflight: durability?.capacityPreflight ?? null,
+                        durability,
                     };
                 });
             } finally {
@@ -812,6 +815,7 @@ export async function patchTextBatchLocked(filePath, options) {
                     projectedBytes: value.projectedBytes,
                     byteDelta: value.byteDelta,
                     capacityPreflight: value.capacityPreflight,
+                    durability: value.durability,
                     rollbackCaptureEnabled: value.rollbackCaptureEnabled,
                 },
             }),
@@ -855,6 +859,7 @@ export async function patchTextBatchLocked(filePath, options) {
  *     computeDiff?: boolean;
  *     captureRollback?: boolean;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     durability?: import('./durability.js').IoDurabilityMode;
  *     advisoryLimits?: Record<string, unknown>;
  * }} options
  */
@@ -911,6 +916,7 @@ export async function patchTextLocked(filePath, options) {
                             durability = await writeAtomicFileUnlocked(filePath, updated, {
                                 expectedHash: previousHash,
                                 ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
+                                ...(options.durability === undefined ? {} : { durability: options.durability }),
                             });
                         } catch (error) {
                             if (isUnpublishedSnapshotConflict(error)) {
@@ -948,6 +954,7 @@ export async function patchTextLocked(filePath, options) {
                         previousSnapshotTruncated: previousSnapshot.snapshotTruncated,
                         previousRollbackSidecar: previousSnapshot.rollbackSidecar,
                         capacityPreflight: durability?.capacityPreflight ?? null,
+                        durability,
                     };
                 });
             } finally {
@@ -981,6 +988,7 @@ export async function patchTextLocked(filePath, options) {
                     projectedBytes: value.projectedBytes,
                     byteDelta: value.byteDelta,
                     capacityPreflight: value.capacityPreflight,
+                    durability: value.durability,
                     rollbackCaptureEnabled: value.rollbackCaptureEnabled,
                     rollbackSidecar: value.previousRollbackSidecar
                         ? {

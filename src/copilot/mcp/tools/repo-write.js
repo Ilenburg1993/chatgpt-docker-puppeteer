@@ -132,6 +132,18 @@ const quarantineIdSchema = z
     .min(1)
     .max(MAX_QUARANTINE_ID_LENGTH)
     .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/, 'quarantineId must be a safe basename');
+const durabilitySchema = z
+    .enum(['file-and-directory', 'file', 'none'])
+    .optional()
+    .describe(
+        'Crash-durability profile. Default file-and-directory. file skips parent-directory fsync; none also skips file flush. Atomic publish, locks, path policy and hash preconditions remain enforced.',
+    );
+
+/** @param {unknown} value @returns {{ durability: import('#copilot/infra/io/fs/durability.js').IoDurabilityMode } | {}} */
+function durabilityOption(value) {
+    return value === 'file-and-directory' || value === 'file' || value === 'none' ? { durability: value } : {};
+}
+
 const quarantineTransactionSchema = z.object({
     kind: z.enum(['quarantine', 'restore']),
     destinationPath: z.string().min(1).max(4096).nullable(),
@@ -188,6 +200,7 @@ const batchOperationSchema = z.discriminatedUnion('type', [
         path: z.string().min(1).describe('Workspace-relative file path to create.'),
         content: z.string().optional().describe('Initial UTF-8 content. Default: empty string.'),
         createParentDirs: z.boolean().optional().describe('Create parent directories. Default: true.'),
+        durability: durabilitySchema,
     }),
     z.object({
         type: z.literal('move_file'),
@@ -999,6 +1012,7 @@ async function applyPatchBatchOperation(operation, index) {
             diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
             maxDiffLines: optionalInteger(operation['maxDiffLines']) ?? 160,
             computeDiff: operation['includeDiffPreview'] === true,
+            ...durabilityOption(operation['durability']),
             advisoryLimits: {
                 tool: 'repo_apply_patch_batch',
                 index,
@@ -1146,6 +1160,7 @@ async function runPatchBatchOperations(operations, dryRun) {
                 operations: group.map(({ operation }) => toLockedPatchBatchOperation(operation)),
                 dryRun,
                 captureRollback: false,
+                ...durabilityOption(first.operation['durability']),
                 advisoryLimits: {
                     tool: dryRun ? 'repo_patch_batch_plan' : 'repo_apply_patch_batch',
                     groupedSameFile: true,
@@ -1451,6 +1466,7 @@ async function applyBatchFileOperation(operation, index) {
             encoding: 'utf8',
             createParentDirs: item['createParentDirs'] !== false,
             failIfExists: true,
+            ...durabilityOption(item['durability']),
             riskClass: 'medium',
             advisoryLimits: { tool: 'repo_apply_file_batch', operation: type, contentChars: content.length },
         });
@@ -1649,6 +1665,7 @@ export const repoWriteTools = [
                 .boolean()
                 .optional()
                 .describe('Echo full successful preflight rows in real apply output. Default false to avoid payload duplication.'),
+            durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({
@@ -1659,9 +1676,15 @@ export const repoWriteTools = [
             failureMode,
             targetConcurrency,
             includePreflightDetails,
+            durability,
         }) => {
             const isDryRun = resolveBatchDryRun(dryRun, confirmBatch);
-            const normalizedOperations = /** @type {Record<string, unknown>[]} */ (operations);
+            const normalizedOperations = /** @type {Record<string, unknown>[]} */ (
+                operations.map((/** @type {Record<string, unknown>} */ operation) => ({
+                    ...operation,
+                    ...(durability ? { durability } : {}),
+                }))
+            );
             const envelope = inspectPatchBatchEnvelope(normalizedOperations);
             if (!envelope.ok) {
                 return errorResult('Patch batch exceeds its bounded execution envelope.', {
@@ -2087,6 +2110,7 @@ export const repoWriteTools = [
                 .boolean()
                 .optional()
                 .describe('Include textual diffPreview in the tool result. Default: false.'),
+            durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({
@@ -2097,6 +2121,7 @@ export const repoWriteTools = [
             diffContextLines,
             maxDiffLines,
             includeDiffPreview,
+            durability,
         }) => {
             const resolved = await resolveWritePath(path, { issueMutableCapability: dryRun !== true });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
@@ -2130,6 +2155,7 @@ export const repoWriteTools = [
                 const write = await writeResolvedTarget(resolved, content, {
                     requireExists: true,
                     ...(typeof expectedHash === 'string' && expectedHash ? { expectedHash } : {}),
+                    ...(durability ? { durability } : {}),
                     riskClass: 'high',
                     advisoryLimits: {
                         tool: 'repo_write_file',
@@ -2191,9 +2217,10 @@ export const repoWriteTools = [
                 .boolean()
                 .optional()
                 .describe('Include textual diffPreview in the tool result. Default: false.'),
+            durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
-        handler: async ({ path, content, createParentDirs, dryRun, maxDiffLines, includeDiffPreview }) => {
+        handler: async ({ path, content, createParentDirs, dryRun, maxDiffLines, includeDiffPreview, durability }) => {
             const resolved = await resolveWritePath(path, { issueMutableCapability: dryRun !== true });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const initialContent = typeof content === 'string' ? content : '';
@@ -2227,6 +2254,7 @@ export const repoWriteTools = [
                     encoding: 'utf8',
                     createParentDirs: createParentDirs !== false,
                     failIfExists: true,
+                    ...(durability ? { durability } : {}),
                     riskClass: 'medium',
                     advisoryLimits: {
                         tool: 'repo_create_file',
@@ -2304,6 +2332,7 @@ export const repoWriteTools = [
                 .boolean()
                 .optional()
                 .describe('Include textual diffPreview in the tool result. Default: false.'),
+            durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({
@@ -2319,6 +2348,7 @@ export const repoWriteTools = [
             diffContextLines,
             maxDiffLines,
             includeDiffPreview,
+            durability,
         }) => {
             const resolved = await resolveWritePath(path, { issueMutableCapability: true });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
@@ -2346,6 +2376,7 @@ export const repoWriteTools = [
                     diffContextLines: optionalInteger(diffContextLines) ?? 3,
                     maxDiffLines: optionalInteger(maxDiffLines) ?? 160,
                     computeDiff: includeDiffPreview === true,
+                    ...(durability ? { durability } : {}),
                     advisoryLimits: {
                         tool: 'repo_apply_patch',
                         oldStringChars: old_string.length,

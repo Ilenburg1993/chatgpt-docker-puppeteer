@@ -188,6 +188,10 @@ export const patchFileTool = buildTool({
             .optional()
             .default(160)
             .describe('Máximo de linhas no diffPreview retornado.'),
+        durability: z
+            .enum(['file-and-directory', 'file', 'none'])
+            .optional()
+            .describe('Perfil de persistência após crash; default file-and-directory. Não altera atomicidade ou preconditions.'),
     }),
     handler: async ({
         path: filePath,
@@ -201,6 +205,7 @@ export const patchFileTool = buildTool({
         allowNoop,
         diffContextLines,
         maxDiffLines,
+        durability,
     }) => {
         const v = await validatePath(filePath, { mode: 'write', issueMutableCapability: true });
         const receivedParameters = {
@@ -215,6 +220,7 @@ export const patchFileTool = buildTool({
             allowNoop,
             diffContextLines,
             maxDiffLines,
+            durability,
         };
         if (!v.ok) {
             return pathFailureResult('patch_file', v.reason ?? 'Caminho inválido.', receivedParameters);
@@ -254,6 +260,7 @@ export const patchFileTool = buildTool({
                 allowNoop,
                 diffContextLines,
                 maxDiffLines,
+                ...(durability ? { durability } : {}),
                 advisoryLimits: {
                     advisoryPatchSegmentChars: ADVISORY_PATCH_SEGMENT_CHARS,
                     oldStringChars: old_string.length,

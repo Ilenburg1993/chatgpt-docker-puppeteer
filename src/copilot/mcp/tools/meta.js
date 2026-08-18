@@ -8,7 +8,7 @@
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 49;
+const CAPABILITIES_VERSION = 50;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -198,9 +198,10 @@ const IO_GUIDANCE = [
     'When several exact-string edits target one file, keep them in one repo_apply_patch_batch so the server performs one lock/read/write/cache-invalidation cycle instead of one cycle per edit.',
     'Use repo_apply_file_batch directly for trusted multi-file operations: global-preflight is conservative default, while sequential-fast skips the duplicate global preview and reports partial prefix state. Use repo_apply_file_batch_plan only when a separate read-only preview is actually needed.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
+    'Write/create/patch tools accept durability=file-and-directory|file|none. Keep file-and-directory as the default for strongest crash durability; file skips parent-directory fsync; none also skips file flush but still preserves path policy, locks, atomic publish and hash preconditions.',
     'Use repo_quarantine_file before repo_remove_file when reversible cleanup is acceptable.',
     'Use repo_read_file_chunks for large files instead of requesting entire content.',
-    'Prefer fixed-string repo_search_text with contextLines=0 when exact source text is enough; the shared SQLite literal index can answer punctuation-heavy queries without spawning rg. Add context only when needed.',
+    'Use repo_search_text as the completeness-oriented filesystem search; it prefers rg when available and avoids treating temporarily partial derived-index hits as complete. Use repo_index_search explicitly for FTS/discovery over the convergent SQLite index.',
     'Use repo_search_text.contextLines for investigation and cursor/nextCursor for pagination.',
     'Use repo_find_symbol_usages for impact analysis before refactors.',
     'Use repo_index_build then repo_index_search/repo_index_find_symbol/repo_find_imports for indexed navigation.',

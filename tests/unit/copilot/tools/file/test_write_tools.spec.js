@@ -310,6 +310,28 @@ describe('F35 — write_file_content (F181-F182)', () => {
         expect(fsMock.rename).toHaveBeenCalledWith(tmpPath, '/workspace/f.txt');
     });
 
+    it('durability=none preserva temp+rename mas desativa flush de persistência', async () => {
+        pathOk('/workspace/fast.txt');
+        fsMock.access.mockResolvedValue(undefined);
+        fsMock.writeFile.mockResolvedValue(undefined);
+        fsMock.rename.mockResolvedValue(undefined);
+
+        const result = await handler({
+            path: 'fast.txt',
+            content: 'ok',
+            encoding: 'utf8',
+            durability: 'none',
+        });
+
+        expect(result.success).toBe(true);
+        const tmpPath = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[0]);
+        const writeOptions = /** @type {Record<string, unknown>} */ (fsMock.writeFile.mock.calls[0]?.[2]);
+        expect(tmpPath).toContain('.tmp');
+        expect(writeOptions).toMatchObject({ flag: 'wx' });
+        expect('flush' in writeOptions).toBe(false);
+        expect(fsMock.rename).toHaveBeenCalledWith(tmpPath, '/workspace/fast.txt');
+    });
+
     it('loga a operação de escrita', async () => {
         pathOk('/workspace/logged.txt');
         fsMock.access.mockResolvedValue(undefined);

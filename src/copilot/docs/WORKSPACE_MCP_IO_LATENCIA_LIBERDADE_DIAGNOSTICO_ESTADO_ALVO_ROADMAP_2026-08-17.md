@@ -2245,7 +2245,12 @@ Liberdade adicional deve vir de **políticas nomeadas e observáveis**, não de 
 - [x] refresh após canonical invalidation, fora do write critical path;
 - [x] batch bounded default 64; processamento interno permanece conservador/sequencial;
 - [x] full build tem precedência e pending refresh é retomado depois;
-- [x] stats próprios: queue/coalescing/batches/lag/failures/high-water.
+- [x] derived refresh herda o **mesmo domínio semântico canônico** do lifecycle: scope root, extensions, hidden policy, `.gitignore`, include/exclude;
+- [x] somente auto-build/startup adotam ou atualizam esse domínio; `repo_index_build` manual pode materializar outras slices sem redefinir a policy de convergência do runtime;
+- [x] startup incremental recebe `scopeRoot`/`respectGitignore` e aplica a mesma policy antes de indexar explicit paths;
+- [x] paths hidden/out-of-scope são descartados antes da fila; gitignored são filtrados por batch antes de `indexTextFile`;
+- [x] domain reconciliation no lifecycle remove apenas rows históricas `refreshMode='explicit-path'` incompatíveis, preservando rows de builds manuais;
+- [x] stats próprios: queue/coalescing/batches/lag/failures/high-water + `domainSkipped/gitignoredSkipped/domainReconciliations/domainPruned`.
 
 ### 23.3.2 Rename/delete/subtree
 
@@ -2349,12 +2354,31 @@ Liberdade adicional deve vir de **políticas nomeadas e observáveis**, não de 
 
 ---
 
-## Fase 23.8 — Mutation durability e I/O baixo nível
+## Fase 23.8 — Mutation durability e I/O baixo nível — **concluída com perfis evidence-gated**
 
-- [ ] decompor write latency: temp write, fsync, rename/link, directory fsync, capacity preflight, audit;
-- [ ] medir SSD/container atual;
-- [ ] manter default safe;
-- [ ] só desenhar perfil de durability alternativo se houver ganho grande e sem confundir segurança lógica com persistência após power-loss.
+- [x] decompor atomic write em `tempPath`, capacity preflight, temp write + file flush, pre-publish hash check, publish rename/link, directory fsync e total;
+- [x] medir o filesystem/container real com batches de 8 creates idênticos por perfil;
+- [x] manter `file-and-directory` como default seguro e compatível;
+- [x] expor apenas os três perfis internos já existentes, sem criar bypass de policy:
+  - `file-and-directory`: file flush + directory fsync;
+  - `file`: file flush, sem directory fsync;
+  - `none`: sem pedido de file flush nem directory fsync;
+- [x] preservar em **todos** os perfis path policy, validated capabilities, locks, capacity guards, temp sibling, atomic rename/link, expectedHash e rollback/audit aplicáveis;
+- [x] instrumentar durability no runtime health com contagem por modo e médias bounded das fases;
+- [x] levar a opção às mutações atomic-writer MCP e LLM-B: write/create/patch single, patch batch e create via file batch;
+- [x] elevar `CAPABILITIES_VERSION` para **50** e documentar a diferença entre segurança lógica/transacional e persistência após crash/power-loss.
+
+Benchmark warm no mesmo processo, 8 arquivos por grupo, payload idêntico:
+
+- **`file-and-directory`: ~23,98 ms/write** no atomic writer;
+- **`file`: ~14,18 ms/write** — ~**40,9%** abaixo do strict;
+- **`none`: ~6,95 ms/write** — ~**71,0%** abaixo do strict e ~**51,0%** abaixo de `file`;
+- directory fsync no strict warm: ~**6,55 ms/write**;
+- capacity preflight: ~**0,01–0,03 ms/write**, irrelevante como gargalo;
+- publish rename/link: ordem de ~**1,8–2,7 ms/write** nos grupos warm;
+- `tempWriteMs` inclui a escrita e, quando solicitada, a flush do arquivo; por isso a diferença `file → none` captura o custo agregado dessa garantia sem fingir uma medição isolada de fsync interno do `fs.writeFile({flush:true})`.
+
+**Decisão:** a liberdade adicional é material e justificada, mas o default **não muda**. Perfis mais rápidos são escolha explícita do caller quando throughput interativo importa mais que a garantia de persistência pós-crash.
 
 ---
 
@@ -2576,7 +2600,170 @@ O gate local do scheduler também prova que duas invalidações do mesmo path co
 - cross-process write→refresh ainda requer prova live específica entre dois processos, embora o mesmo hook receba eventos do journal;
 - move source+destination deve ganhar prova live própria;
 - parser benchmark por 10 KiB/100 KiB/1 MiB e patch benchmark 1/8/32/64 operações continuam abertos;
-- response-cache lease, durability profiling e derived-state reuse avançado permanecem evidence-gated.
+- response-cache lease default foi rejeitada por evidência; derived-state reuse avançado e journal/checkpoint high-watermark permanecem evidence-gated.
 
 A principal mudança de regime é que o sistema agora distingue claramente **fonte canônica** de **derived state**: rg/filesystem responde a busca completa; índice converge rapidamente para discovery; fingerprints sustentam freshness barata; SHA é safety evidence periódica; e hashes já derivados fluem entre camadas em vez de serem recalculados por hábito.
+
+---
+
+## 28. Sublote 23.C — durability mensurável e liberdade explícita sem weakening lógico
+
+A investigação de durability começou sem alterar qualquer default. Primeiro, o low-level atomic writer passou a expor `phaseTimings` bounded e o runtime health ganhou um resumo de custo por fase. A decomposição cobre:
+
+- sibling temp-path preparation;
+- capacity preflight;
+- temp write e file flush quando solicitado;
+- reread/hash precondition antes do publish quando aplicável;
+- atomic rename/link;
+- parent-directory fsync;
+- total atomic writer.
+
+A telemetria também passou a registrar duração acumulada/máxima de syncs e distribuição dos modos de durability observados.
+
+### 28.1 Baseline strict e identificação do gargalo
+
+Em 8 creates reais, o primeiro profile strict mostrou atomic write médio ~**17,88 ms**, com directory fsync ~**5,36 ms** e temp write + flush ~**6,48 ms**. O primeiro grupo ainda continha cold-start overhead em temp-path preparation, portanto não foi usado isoladamente para decidir a API.
+
+A evidência, contudo, mostrou que persistência pós-crash era uma fração material do write total e justificava comparar os modos já existentes internamente.
+
+### 28.2 Perfis expostos
+
+A superfície MCP/LLM-B agora aceita opcionalmente:
+
+- `durability='file-and-directory'` — **default**; flush do arquivo + fsync do diretório;
+- `durability='file'` — mantém file flush e omite apenas o directory fsync;
+- `durability='none'` — não solicita file flush nem directory fsync.
+
+A opção foi levada apenas aos caminhos que realmente atravessam o atomic writer:
+
+- MCP `repo_write_file`;
+- MCP `repo_create_file`;
+- MCP `repo_apply_patch`;
+- MCP `repo_apply_patch_batch`;
+- `create_file` dentro de `repo_apply_file_batch`;
+- LLM-B `write_file_content`;
+- LLM-B `create_file`;
+- LLM-B `patch_file`;
+- LLM-B `patch_files_batch`.
+
+Move/delete/quarantine/copy não receberam uma opção que não corresponde ao seu primitive real.
+
+Batch records passam por `durabilityOption()`, que só produz o union canônico `file-and-directory | file | none`; strings internas arbitrárias não chegam às primitives mesmo se um caller contornar o Zod externo.
+
+### 28.3 Fronteira de segurança
+
+Nenhum perfil altera:
+
+- path policy ou containment/symlink checks;
+- validated path capabilities;
+- locks;
+- capacity preflight;
+- sibling temp file;
+- atomic rename/link publication;
+- expectedHash/preconditions;
+- rollback/audit aplicáveis.
+
+A diferença é **somente** a garantia de persistência depois que o syscall de write/publish retorna, especialmente diante de crash/power-loss. Assim, `none` não é um modo “unsafe/no-validation”; é um perfil de crash durability mais fraco, apropriado apenas quando o caller conscientemente prefere throughput/latência.
+
+### 28.4 Benchmark warm no mesmo processo
+
+Foram executados grupos de 8 creates, mesmo payload e mesmo diretório, no mesmo processo MCP. Depois do cold group inicial, a comparação warm foi:
+
+- `file-and-directory`: ~**23,98 ms/write** no atomic writer;
+- `file`: ~**14,18 ms/write**;
+- `none`: ~**6,95 ms/write**.
+
+Deltas aproximados:
+
+- `file` vs strict: **−40,9%**;
+- `none` vs strict: **−71,0%**;
+- `none` vs `file`: **−51,0%**.
+
+No strict warm:
+
+- directory fsync: ~**6,55 ms/write**;
+- temp-path preparation: ~**0,055 ms/write**;
+- capacity preflight: ~**0,011 ms/write**;
+- publish: ~**2,27 ms/write**;
+- temp write + file flush: ~**14,59 ms/write**.
+
+No grupo `none`, `tempWriteMs` caiu para ~**4,11 ms/write** e directory sync foi zero. Como `fs.writeFile({flush:true})` faz a flush internamente, essa métrica agrega write+flush; o documento não a apresenta falsamente como um fsync isolado.
+
+### 28.5 Superfície e gates
+
+`CAPABILITIES_VERSION` passou de **49 → 50**.
+
+Authenticated `tools/list` passou de **117.956 → 119.654 bytes**: +**1.698 bytes** (~**+1,44%**) para adicionar a opção às mutações existentes, sem criar nova tool; 119/119 parity permaneceu integral.
+
+Gates funcionais antes/depois da ativação:
+
+- low-level I/O engine: green;
+- fault injection: green;
+- observability bounds: green;
+- MCP repo-write: green;
+- LLM-B write: green;
+- LLM-B bulk: green;
+- registry: green;
+- runtime metrics: green;
+- strict typecheck: green;
+- regressões adicionais provam `file` e `none` no low-level, `none` mantendo temp+rename com ausência de `flush`, e MCP aceitando perfil explícito sem alterar o default.
+
+Reload v50: primeira tentativa caiu apenas na janela de restart; smoke canônico subsequente `ready=true`, OAuth/SSE green, **119/119** tools.
+
+Todos os **32 arquivos temporários** dos quatro grupos de benchmark foram removidos em uma única file-batch, zero failures; o index auto-refresh recebe as invalidações e converge sem full scan.
+
+### 28.6 Decisão operacional
+
+O default continua `file-and-directory`. O ganho de `file` e `none` é grande o bastante para justificar a nova liberdade, mas insuficiente para justificar uma mudança silenciosa de persistência.
+
+Regra prática:
+
+- source/artefato valioso e operação normal: `file-and-directory`;
+- workload regenerável ou iteração de desenvolvimento em que directory durability é dispensável: `file`;
+- temporários/derived state/regeneráveis em que crash persistence não é requisito: `none`.
+
+Essa separação transforma durability de custo oculto em **política explícita, mensurável e opt-in**, preservando a segurança lógica do write plane.
+
+### 28.7 Correção pós-benchmark — auto-refresh não pode ampliar o domínio do índice
+
+A limpeza dos 32 artefatos de benchmark e a leitura posterior de `repo_index_status` revelaram um efeito colateral do scheduler introduzido no 23.A: o full build normal trabalha com `showHidden=false` e `respectGitignore=true`, mas `refreshIoIndexPaths()` originalmente filtrava apenas extensão. Assim, mutações em `.ai/jobs/*.json|*.txt` — extensões formalmente indexáveis — podiam inserir derived rows que um full scan jamais criaria.
+
+Isso explica por que o número de indexed files não retornou imediatamente ao baseline depois da remoção dos benchmarks: validators e outros artefatos hidden continuavam gerando invalidations e refreshes scoped.
+
+Correção:
+
+- o registry memoriza `scopeRoot`, `workspaceRoot`, extensions, `respectGitignore`, include e exclude do último build/startup refresh canônico;
+- filtro lexical barato recusa out-of-scope, hidden e extensão/pattern incompatível **antes da fila**;
+- `.gitignore` é aplicado uma vez por batch antes do refresh;
+- `refreshIoIndexPaths(scopeRoot=...)` aplica a mesma policy, fechando também o startup incremental;
+- paths recusados continuam invalidados; apenas não podem ser reintroduzidos no derived state;
+- regressões provam:
+  1. `.ai/jobs/job.json` não entra na fila;
+  2. `ignored.js` entra no debounce mas é filtrado antes de `indexTextFile`;
+  3. incremental startup com `.hidden.js` retorna `skipped=1` e não indexa.
+
+Essa correção reforça um princípio do Estado-Alvo V2: **convergência não é apenas voltar a ter uma row; é convergir para exatamente o mesmo conjunto semântico que o build canônico produziria.**
+
+Refinamento posterior necessário para preservar liberdade de indexação explícita:
+
+- um `repo_index_build` manual em outro scope **não** passa a redefinir o domínio canônico do scheduler;
+- somente o lifecycle de auto-build/full reconcile adota `adoptAutoRefreshDomain=true`;
+- o startup incremental configura o domínio explicitamente via `scopeRoot`;
+- `reconcileIoIndexAutoRefreshDomain()` lista as rows persistidas e considera para cleanup apenas `metadata.refreshMode='explicit-path'`;
+- rows produzidas por `directory-scan`/builds manuais fora do scope são preservadas;
+- a reconciliação é executada depois de startup incremental e full auto-build, e o resultado entra no próprio `indexAutoBuild.result`.
+
+Prova unitária adicional constrói uma canonical domain, executa depois um build manual fora dela e confirma que o scheduler continua aceitando apenas o path canônico. Outra regressão oferece cinco rows persistidas — quatro `explicit-path` e uma manual — e exige exatamente **3 prunes**, preservando a row manual.
+
+Prova live após o reload final:
+
+- startup `full-reconcile`: **1.445 candidates / 1.445 unchanged**, 0 hashes, 0 second-stats, ~**601 ms**;
+- domain reconciliation: **2.242 rows inspecionadas**, **30 explicit-refresh rows**, **10 podadas**;
+- o índice global ficou em **2.232 rows** porque outras slices produzidas por builds explícitos legítimos foram deliberadamente preservadas;
+- um arquivo temporário `src/copilot/.ai/jobs/domain-filter-live-20260818.txt` com token único foi criado normalmente e encontrado pelo `repo_search_text` canônico via **rg (1 match)**;
+- `repo_index_search` para o mesmo token retornou **0 matches**;
+- auto-refresh reportou `domainSkipped=1`, `queued=0`, `requested=0`, provando que o hidden write jamais entrou na fila derivada;
+- o arquivo temporário foi removido imediatamente após a prova.
+
+O cleanup histórico, portanto, é deliberadamente seletivo: corrige a contaminação causada pelo scheduler antigo sem transformar o domínio canônico numa proibição de indexes ad hoc.
 

@@ -11,9 +11,11 @@ const mocks = vi.hoisted(() => ({
     findSymbol: vi.fn(() => []),
     findImports: vi.fn(() => []),
     matchesFileFingerprint: vi.fn(() => false),
+    listIndexedFiles: vi.fn(() => []),
     indexTextFile: vi.fn(),
     statPathSnapshot: vi.fn(),
     readTextFileSnapshot: vi.fn(),
+    loadGitignoreMatcher: vi.fn(),
     getCopilotDb: vi.fn(() => ({})),
     registerInvalidationHook: vi.fn(),
     unregisterInvalidationHook: vi.fn(),
@@ -35,6 +37,10 @@ vi.mock('../../../../src/copilot/infra/io/fs/read-text.js', () => ({
     readTextFileSnapshot: mocks.readTextFileSnapshot,
 }));
 
+vi.mock('../../../../src/copilot/infra/scan/gitignore.js', () => ({
+    loadGitignoreMatcher: mocks.loadGitignoreMatcher,
+}));
+
 vi.mock('../../../../src/copilot/infra/io-index-sqlite.js', () => ({
     createIoIndexSqlite: () => ({
         indexDirectory: mocks.indexDirectory,
@@ -44,6 +50,7 @@ vi.mock('../../../../src/copilot/infra/io-index-sqlite.js', () => ({
         findSymbol: mocks.findSymbol,
         findImports: mocks.findImports,
         matchesFileFingerprint: mocks.matchesFileFingerprint,
+        listIndexedFiles: mocks.listIndexedFiles,
         indexTextFile: mocks.indexTextFile,
     }),
 }));
@@ -52,6 +59,8 @@ import {
     buildIoIndexForDirectory,
     flushIoIndexAutoRefresh,
     getIoIndexStats,
+    reconcileIoIndexAutoRefreshDomain,
+    refreshIoIndexPaths,
     resetIoIndexForTest,
 } from '../../../../src/copilot/infra/io-index-registry.js';
 
@@ -60,8 +69,9 @@ beforeEach(() => {
     resetIoIndexForTest();
     mocks.registerInvalidationHook.mockClear();
     mocks.indexDirectory.mockReset();
-    mocks.invalidatePath.mockClear();
+    mocks.invalidatePath.mockReset().mockReturnValue(true);
     mocks.matchesFileFingerprint.mockReset().mockReturnValue(false);
+    mocks.listIndexedFiles.mockReset().mockReturnValue([]);
     mocks.indexTextFile.mockReset().mockResolvedValue({});
     mocks.statPathSnapshot.mockReset().mockResolvedValue({
         isFile: () => true,
@@ -78,6 +88,9 @@ beforeEach(() => {
         ctimeMs: 11,
         dev: 1,
         ino: 2,
+    });
+    mocks.loadGitignoreMatcher.mockReset().mockResolvedValue({
+        ignores: (value) => String(value).includes('ignored'),
     });
     mocks.unregisterInvalidationHook.mockReset();
     vi.stubEnv('IO_INDEX_AUTO_REFRESH_ENABLED', '1');
@@ -151,7 +164,7 @@ describe('io-index-registry build coalescing', () => {
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         const workspaceRoot = '/tmp/ws-auto-refresh';
         const filePath = `${workspaceRoot}/changed.js`;
-        await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot });
+        await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
         const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
@@ -177,7 +190,7 @@ describe('io-index-registry build coalescing', () => {
     it('não promove invalidation recursiva a scan implícito', async () => {
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         const workspaceRoot = '/tmp/ws-recursive-refresh';
-        await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot });
+        await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
         const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
@@ -187,5 +200,133 @@ describe('io-index-registry build coalescing', () => {
         expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, recursiveSkipped: 1 });
         expect(await flushIoIndexAutoRefresh()).toBeNull();
         expect(mocks.indexTextFile).not.toHaveBeenCalled();
+    });
+
+    it('não reindexa artefatos hidden como .ai/jobs fora do domínio do full build', async () => {
+        mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
+        const workspaceRoot = '/tmp/ws-domain';
+        const scopeRoot = `${workspaceRoot}/src/copilot`;
+        await buildIoIndexForDirectory(scopeRoot, {
+            workspaceRoot,
+            respectGitignore: true,
+            adoptAutoRefreshDomain: true,
+        });
+        const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
+        assert.equal(typeof hook, 'function');
+
+        hook(`${scopeRoot}/.ai/jobs/job.json`, { recursive: false, source: 'validator-artifact' });
+
+        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, domainSkipped: 1 });
+        expect(await flushIoIndexAutoRefresh()).toBeNull();
+        expect(mocks.indexTextFile).not.toHaveBeenCalled();
+    });
+
+    it('filtra gitignored path antes do derived-state refresh', async () => {
+        mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
+        const workspaceRoot = '/tmp/ws-gitignore';
+        const scopeRoot = `${workspaceRoot}/src/copilot`;
+        await buildIoIndexForDirectory(scopeRoot, {
+            workspaceRoot,
+            respectGitignore: true,
+            adoptAutoRefreshDomain: true,
+        });
+        const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
+        assert.equal(typeof hook, 'function');
+
+        hook(`${scopeRoot}/ignored.js`, { recursive: false, source: 'ignored-write' });
+        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 1 });
+
+        const result = await flushIoIndexAutoRefresh();
+
+        expect(result).toMatchObject({ requested: 0, indexed: 0, failed: 0 });
+        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, gitignoredSkipped: 1, requested: 0 });
+        expect(mocks.indexTextFile).not.toHaveBeenCalled();
+    });
+
+    it('aplica o mesmo domínio no refresh incremental de startup', async () => {
+        const workspaceRoot = '/tmp/ws-incremental-domain';
+        const scopeRoot = `${workspaceRoot}/src/copilot`;
+        const result = await refreshIoIndexPaths([`${scopeRoot}/.hidden.js`], {
+            workspaceRoot,
+            scopeRoot,
+            respectGitignore: true,
+        });
+
+        expect(result).toMatchObject({ requested: 1, indexed: 0, skipped: 1, failed: 0 });
+        expect(mocks.indexTextFile).not.toHaveBeenCalled();
+    });
+
+    it('build manual não redefine o domínio canônico adotado pelo lifecycle', async () => {
+        mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
+        const workspaceRoot = '/tmp/ws-canonical-domain';
+        const scopeRoot = `${workspaceRoot}/src/copilot`;
+        await buildIoIndexForDirectory(scopeRoot, {
+            workspaceRoot,
+            respectGitignore: true,
+            adoptAutoRefreshDomain: true,
+        });
+        await buildIoIndexForDirectory('/tmp/manual-index-slice', { workspaceRoot: '/tmp' });
+        const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
+        assert.equal(typeof hook, 'function');
+
+        hook(`${scopeRoot}/kept.js`, { recursive: false, source: 'canonical-write' });
+        hook('/tmp/manual-index-slice/manual.js', { recursive: false, source: 'manual-slice-write' });
+
+        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 1, queued: 1, domainSkipped: 1 });
+    });
+
+    it('reconcilia apenas rows explicit-path contaminadas e preserva build manual legítimo', async () => {
+        mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
+        const workspaceRoot = '/tmp/ws-domain-reconcile';
+        const scopeRoot = `${workspaceRoot}/src/copilot`;
+        await buildIoIndexForDirectory(scopeRoot, {
+            workspaceRoot,
+            respectGitignore: true,
+            adoptAutoRefreshDomain: true,
+        });
+        mocks.invalidatePath.mockClear();
+        mocks.listIndexedFiles.mockReturnValue([
+            {
+                filePath: `${scopeRoot}/valid.js`,
+                extension: '.js',
+                metadataJson: JSON.stringify({ refreshMode: 'explicit-path' }),
+            },
+            {
+                filePath: `${scopeRoot}/.ai/jobs/job.json`,
+                extension: '.json',
+                metadataJson: JSON.stringify({ refreshMode: 'explicit-path' }),
+            },
+            {
+                filePath: `${scopeRoot}/ignored.js`,
+                extension: '.js',
+                metadataJson: JSON.stringify({ refreshMode: 'explicit-path' }),
+            },
+            {
+                filePath: `${workspaceRoot}/tests/outside.js`,
+                extension: '.js',
+                metadataJson: JSON.stringify({ refreshMode: 'explicit-path' }),
+            },
+            {
+                filePath: '/tmp/manual-index-slice/manual.js',
+                extension: '.js',
+                metadataJson: JSON.stringify({ refreshMode: 'directory-scan' }),
+            },
+        ]);
+
+        const result = await reconcileIoIndexAutoRefreshDomain();
+
+        expect(result).toEqual({
+            available: true,
+            domainKnown: true,
+            inspected: 5,
+            explicitRefreshRows: 4,
+            pruned: 3,
+        });
+        expect(mocks.invalidatePath).toHaveBeenCalledTimes(3);
+        expect(mocks.invalidatePath).toHaveBeenCalledWith(`${scopeRoot}/.ai/jobs/job.json`);
+        expect(mocks.invalidatePath).toHaveBeenCalledWith(`${scopeRoot}/ignored.js`);
+        expect(mocks.invalidatePath).toHaveBeenCalledWith(`${workspaceRoot}/tests/outside.js`);
+        expect(mocks.invalidatePath).not.toHaveBeenCalledWith('/tmp/manual-index-slice/manual.js');
+        expect(getIoIndexStats().autoRefresh).toMatchObject({ domainReconciliations: 1, domainPruned: 3 });
     });
 });

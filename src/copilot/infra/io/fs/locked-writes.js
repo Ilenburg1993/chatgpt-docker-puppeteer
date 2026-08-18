@@ -73,6 +73,7 @@ function normalizeCreateExclusiveError(filePath, error) {
  *     lockTimeoutMs?: number;
  *     signal?: AbortSignal;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ *     durability?: import('./durability.js').IoDurabilityMode;
  *     advisoryLimits?: Record<string, unknown>;
  *     captureRollback?: boolean;
  * }} [options]
@@ -169,6 +170,7 @@ export async function writeFileAtomic(filePath, content, options = {}) {
                               ? {}
                               : { expectedHash: options.expectedHash }),
                         ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
+                        ...(options.durability === undefined ? {} : { durability: options.durability }),
                     });
                     return {
                         path: filePath,

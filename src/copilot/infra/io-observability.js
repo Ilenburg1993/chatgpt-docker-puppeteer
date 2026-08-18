@@ -38,8 +38,18 @@ const _durabilityStats = {
     operationsWithMetadata: 0,
     fileFlushRequested: 0,
     modes: { none: 0, file: 0, 'file-and-directory': 0 },
-    fileSync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0 },
-    directorySync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0 },
+    fileSync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0, totalDurationMs: 0, maxDurationMs: 0 },
+    directorySync: { attempted: 0, confirmed: 0, skipped: 0, failed: 0, totalDurationMs: 0, maxDurationMs: 0 },
+    atomicWritePhases: {
+        observed: 0,
+        tempPathMs: 0,
+        capacityPreflightMs: 0,
+        tempWriteMs: 0,
+        prePublishCheckMs: 0,
+        publishMs: 0,
+        directorySyncMs: 0,
+        totalMs: 0,
+    },
     /** @type {{ kind: 'file' | 'directory'; operation: string; errorCode: string | null; at: number } | null} */
     lastFailure: null,
 };
@@ -107,6 +117,7 @@ function recordIoDurability(io) {
         const mode = durability['durability'];
         if (mode === 'none' || mode === 'file' || mode === 'file-and-directory') _durabilityStats.modes[mode] += 1;
         if (durability['fileFlushRequested'] === true) _durabilityStats.fileFlushRequested += 1;
+        recordAtomicWritePhaseTimings(durability['phaseTimings']);
         recordSyncResult('directory', durability['directorySync'], io.operation);
     }
     const syncFields = /** @type {const} */ ([
@@ -132,6 +143,11 @@ function recordSyncResult(kind, value, operation) {
     if (!result || result['attempted'] !== true) return;
     const counters = kind === 'file' ? _durabilityStats.fileSync : _durabilityStats.directorySync;
     counters.attempted += 1;
+    const durationMs = Number(result['durationMs'] ?? 0);
+    if (Number.isFinite(durationMs) && durationMs >= 0) {
+        counters.totalDurationMs += durationMs;
+        counters.maxDurationMs = Math.max(counters.maxDurationMs, durationMs);
+    }
     if (result['ok'] === true) {
         counters.confirmed += 1;
         return;
@@ -147,6 +163,29 @@ function recordSyncResult(kind, value, operation) {
         errorCode: typeof result['errorCode'] === 'string' ? result['errorCode'] : null,
         at: Date.now(),
     };
+}
+
+/** @param {unknown} value */
+function recordAtomicWritePhaseTimings(value) {
+    const timings = asRecord(value);
+    if (!timings) return;
+    const fields = /** @type {const} */ ([
+        'tempPathMs',
+        'capacityPreflightMs',
+        'tempWriteMs',
+        'prePublishCheckMs',
+        'publishMs',
+        'directorySyncMs',
+        'totalMs',
+    ]);
+    let observed = false;
+    for (const field of fields) {
+        const duration = Number(timings[field] ?? 0);
+        if (!Number.isFinite(duration) || duration < 0) continue;
+        _durabilityStats.atomicWritePhases[field] += duration;
+        observed = true;
+    }
+    if (observed) _durabilityStats.atomicWritePhases.observed += 1;
 }
 
 /**
@@ -197,6 +236,7 @@ export function getIoDurabilityStats() {
         modes: { ..._durabilityStats.modes },
         fileSync: { ..._durabilityStats.fileSync },
         directorySync: { ..._durabilityStats.directorySync },
+        atomicWritePhases: { ..._durabilityStats.atomicWritePhases },
         lastFailure: _durabilityStats.lastFailure ? { ..._durabilityStats.lastFailure } : null,
     };
 }

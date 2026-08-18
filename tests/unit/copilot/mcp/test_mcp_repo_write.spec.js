@@ -120,6 +120,21 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(duplicate.structuredContent.success, false);
     });
 
+    it('accepts explicit durability profiles while keeping strict as the implicit default', async () => {
+        assert.ok(createFileTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const strictPath = path.join(dir, 'strict.txt');
+        const fastPath = path.join(dir, 'none.txt');
+
+        const strict = await createFileTool.handler({ path: strictPath, content: 'strict\n' });
+        const none = await createFileTool.handler({ path: fastPath, content: 'none\n', durability: 'none' });
+
+        assert.equal(strict.isError, undefined);
+        assert.equal(none.isError, undefined);
+        assert.equal(await fs.readFile(strictPath, 'utf8'), 'strict\n');
+        assert.equal(await fs.readFile(fastPath, 'utf8'), 'none\n');
+    });
+
     it('applies exact-string patches with diff previews', async () => {
         assert.ok(applyPatchTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));

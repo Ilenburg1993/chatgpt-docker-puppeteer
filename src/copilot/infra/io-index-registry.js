@@ -9,13 +9,15 @@
  */
 
 import { getCopilotDb } from '#copilot/db';
-import { extname, resolve } from 'node:path';
+import { extname, relative, resolve } from 'node:path';
 import { beginIoAdvisoryBudget } from './io-advisory-budget.js';
 import { registerInvalidationHook } from './io-cache.js';
 import { DEFAULT_INDEX_EXTENSIONS } from './index-store/index.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { statPathSnapshot } from './io/fs/stat.js';
 import { createIoIndexSqlite } from './io-index-sqlite.js';
+import { loadGitignoreMatcher } from './scan/gitignore.js';
+import { matchesAnyPattern } from './scan/glob.js';
 import { readEnvNonNegativeInt, readEnvPositiveInt } from './shared/env.js';
 
 /** @type {ReturnType<typeof createIoIndexSqlite> | null} */
@@ -28,6 +30,8 @@ const _inflightIndexBuilds = new Map();
 let _indexInvalidationUnregister = null;
 /** @type {string | null} */
 let _indexWorkspaceRoot = null;
+/** @type {{ scopeRoot: string; workspaceRoot: string; extensions: Set<string>; respectGitignore: boolean; include: string[]; exclude: string[] } | null} */
+let _indexAutoRefreshDomain = null;
 /** @type {Map<string, number>} */
 const _pendingIndexRefreshPaths = new Map();
 /** @type {NodeJS.Timeout | null} */
@@ -38,6 +42,10 @@ const _indexAutoRefreshStats = {
     coalesced: 0,
     recursiveSkipped: 0,
     missingWorkspaceRoot: 0,
+    domainSkipped: 0,
+    gitignoredSkipped: 0,
+    domainReconciliations: 0,
+    domainPruned: 0,
     batches: 0,
     requested: 0,
     indexed: 0,
@@ -61,6 +69,40 @@ export function readIoIndexAutoRefreshConfig() {
     };
 }
 
+/**
+ * Keep runtime refresh inside the exact semantic domain of the last canonical build/startup refresh.
+ * @param {string} scopeRoot
+ * @param {{ workspaceRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[] }} [options]
+ */
+function configureIndexAutoRefreshDomain(scopeRoot, options = {}) {
+    const workspaceRoot = resolve(options.workspaceRoot ?? scopeRoot);
+    _indexWorkspaceRoot = workspaceRoot;
+    _indexAutoRefreshDomain = {
+        scopeRoot: resolve(scopeRoot),
+        workspaceRoot,
+        extensions: new Set(
+            (options.extensions ?? DEFAULT_INDEX_EXTENSIONS).map((extension) => String(extension).toLowerCase()),
+        ),
+        respectGitignore: options.respectGitignore !== false,
+        include: [...(options.include ?? [])].map(String),
+        exclude: [...(options.exclude ?? [])].map(String),
+    };
+}
+
+/** @param {string} filePath */
+function isIndexAutoRefreshDomainCandidate(filePath) {
+    const domain = _indexAutoRefreshDomain;
+    if (!domain) return false;
+    const normalized = resolve(filePath);
+    const relativeToScope = relative(domain.scopeRoot, normalized).replace(/\\/gu, '/');
+    if (!relativeToScope || relativeToScope === '..' || relativeToScope.startsWith('../')) return false;
+    if (relativeToScope.split('/').some((segment) => segment.startsWith('.') && segment.length > 1)) return false;
+    if (!domain.extensions.has(extname(normalized).toLowerCase())) return false;
+    if (domain.include.length > 0 && !matchesAnyPattern(normalized, domain.scopeRoot, domain.include)) return false;
+    if (domain.exclude.length > 0 && matchesAnyPattern(normalized, domain.scopeRoot, domain.exclude)) return false;
+    return true;
+}
+
 /** @param {string} filePath @param {{ recursive?: boolean; source?: string }} [event] */
 function scheduleIoIndexAutoRefresh(filePath, event = {}) {
     const config = readIoIndexAutoRefreshConfig();
@@ -69,11 +111,15 @@ function scheduleIoIndexAutoRefresh(filePath, event = {}) {
         _indexAutoRefreshStats.recursiveSkipped += 1;
         return;
     }
-    if (!_indexWorkspaceRoot) {
+    if (!_indexWorkspaceRoot || !_indexAutoRefreshDomain) {
         _indexAutoRefreshStats.missingWorkspaceRoot += 1;
         return;
     }
     const normalized = resolve(filePath);
+    if (!isIndexAutoRefreshDomainCandidate(normalized)) {
+        _indexAutoRefreshStats.domainSkipped += 1;
+        return;
+    }
     if (_pendingIndexRefreshPaths.has(normalized)) _indexAutoRefreshStats.coalesced += 1;
     else {
         _pendingIndexRefreshPaths.set(normalized, Date.now());
@@ -119,14 +165,37 @@ export async function flushIoIndexAutoRefresh() {
     for (const [filePath] of batchEntries) _pendingIndexRefreshPaths.delete(filePath);
     const oldestQueuedAt = Math.min(...batchEntries.map(([, queuedAt]) => queuedAt));
     const lagMs = Math.max(0, Date.now() - oldestQueuedAt);
+    const domain = _indexAutoRefreshDomain;
+    let refreshPaths = batchEntries.map(([filePath]) => filePath);
+    if (domain?.respectGitignore) {
+        const matcher = await loadGitignoreMatcher(domain.workspaceRoot);
+        refreshPaths = refreshPaths.filter((filePath) => {
+            const relativePath = relative(domain.workspaceRoot, filePath).replace(/\\/gu, '/');
+            const ignored = Boolean(relativePath && matcher.ignores(relativePath));
+            if (ignored) _indexAutoRefreshStats.gitignoredSkipped += 1;
+            return !ignored;
+        });
+    }
     _indexRefreshRunning = true;
     try {
-        const result = await refreshIoIndexPaths(
-            batchEntries.map(([filePath]) => filePath),
-            { workspaceRoot: _indexWorkspaceRoot },
-        );
+        const result =
+            refreshPaths.length > 0
+                ? await refreshIoIndexPaths(refreshPaths, {
+                      workspaceRoot: _indexWorkspaceRoot,
+                      ...(domain ? { extensions: [...domain.extensions] } : {}),
+                  })
+                : {
+                      available: true,
+                      requested: 0,
+                      indexed: 0,
+                      invalidated: 0,
+                      unchanged: 0,
+                      skipped: 0,
+                      failed: 0,
+                      durationMs: 0,
+                  };
         _indexAutoRefreshStats.batches += 1;
-        _indexAutoRefreshStats.requested += batchEntries.length;
+        _indexAutoRefreshStats.requested += refreshPaths.length;
         _indexAutoRefreshStats.indexed += Number(result.indexed ?? 0);
         _indexAutoRefreshStats.invalidated += Number(result.invalidated ?? 0);
         _indexAutoRefreshStats.unchanged += Number(result.unchanged ?? 0);
@@ -143,6 +212,37 @@ export async function flushIoIndexAutoRefresh() {
         _indexRefreshRunning = false;
         if (_pendingIndexRefreshPaths.size > 0) armIoIndexAutoRefreshTimer(config.debounceMs);
     }
+}
+
+export async function reconcileIoIndexAutoRefreshDomain() {
+    const index = getIoIndex();
+    const domain = _indexAutoRefreshDomain;
+    if (!index || !domain) {
+        return { available: Boolean(index), domainKnown: Boolean(domain), inspected: 0, explicitRefreshRows: 0, pruned: 0 };
+    }
+    const matcher = domain.respectGitignore ? await loadGitignoreMatcher(domain.workspaceRoot) : null;
+    const rows = index.listIndexedFiles();
+    let explicitRefreshRows = 0;
+    let pruned = 0;
+    for (const row of rows) {
+        /** @type {Record<string, unknown> | null} */
+        let metadata;
+        try {
+            metadata = row.metadataJson ? JSON.parse(row.metadataJson) : null;
+        } catch {
+            continue;
+        }
+        if (!metadata || metadata['refreshMode'] !== 'explicit-path') continue;
+        explicitRefreshRows += 1;
+        const candidate = isIndexAutoRefreshDomainCandidate(row.filePath);
+        const relativePath = relative(domain.workspaceRoot, row.filePath).replace(/\\/gu, '/');
+        const ignored = Boolean(candidate && matcher && relativePath && matcher.ignores(relativePath));
+        if (candidate && !ignored) continue;
+        if (index.invalidatePath(row.filePath)) pruned += 1;
+    }
+    _indexAutoRefreshStats.domainReconciliations += 1;
+    _indexAutoRefreshStats.domainPruned += pruned;
+    return { available: true, domainKnown: true, inspected: rows.length, explicitRefreshRows, pruned };
 }
 
 export function getIoIndexAutoRefreshStats() {
@@ -201,10 +301,10 @@ export function getIoIndexStats() {
 
 /**
  * @param {string} directory
- * @param {Parameters<NonNullable<ReturnType<typeof getIoIndex>>['indexDirectory']>[1]} [options]
+ * @param {(Parameters<NonNullable<ReturnType<typeof getIoIndex>>['indexDirectory']>[1] & { adoptAutoRefreshDomain?: boolean })} [options]
  */
 export async function buildIoIndexForDirectory(directory, options = {}) {
-    _indexWorkspaceRoot = resolve(options.workspaceRoot ?? directory);
+    if (options.adoptAutoRefreshDomain === true) configureIndexAutoRefreshDomain(directory, options);
     const index = getIoIndex();
     if (!index) {
         return {
@@ -260,14 +360,17 @@ export async function buildIoIndexForDirectory(directory, options = {}) {
  * used by incremental startup so MCP/LLM-B edits do not require a directory-wide scan.
  *
  * @param {readonly string[]} filePaths
- * @param {{ workspaceRoot: string; extensions?: readonly string[]; signal?: AbortSignal }} options
+ * @param {{ workspaceRoot: string; scopeRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[]; signal?: AbortSignal }} options
  */
 export async function refreshIoIndexPaths(filePaths, options) {
-    _indexWorkspaceRoot = resolve(options.workspaceRoot);
+    if (options.scopeRoot) configureIndexAutoRefreshDomain(options.scopeRoot, options);
+    else _indexWorkspaceRoot = resolve(options.workspaceRoot);
     const index = getIoIndex();
     if (!index) return { available: false, requested: filePaths.length, indexed: 0, invalidated: 0, skipped: 0, failed: 0 };
     const workspaceRoot = resolve(options.workspaceRoot);
     const extensions = new Set((options.extensions ?? DEFAULT_INDEX_EXTENSIONS).map((value) => String(value).toLowerCase()));
+    const domain = options.scopeRoot ? _indexAutoRefreshDomain : null;
+    const gitignore = domain?.respectGitignore ? await loadGitignoreMatcher(domain.workspaceRoot) : null;
     let indexed = 0;
     let invalidated = 0;
     let unchanged = 0;
@@ -276,6 +379,19 @@ export async function refreshIoIndexPaths(filePaths, options) {
     const startedAt = Date.now();
     for (const rawPath of new Set(filePaths.map((value) => resolve(value)))) {
         options.signal?.throwIfAborted();
+        if (domain && !isIndexAutoRefreshDomainCandidate(rawPath)) {
+            if (index.invalidatePath(rawPath)) invalidated += 1;
+            skipped += 1;
+            continue;
+        }
+        if (gitignore) {
+            const relativePath = relative(domain?.workspaceRoot ?? workspaceRoot, rawPath).replace(/\\/gu, '/');
+            if (relativePath && gitignore.ignores(relativePath)) {
+                if (index.invalidatePath(rawPath)) invalidated += 1;
+                skipped += 1;
+                continue;
+            }
+        }
         if (!extensions.has(extname(rawPath).toLowerCase())) {
             if (index.invalidatePath(rawPath)) invalidated += 1;
             skipped += 1;
@@ -391,6 +507,7 @@ export function resetIoIndexForTest() {
     _ioIndex = null;
     _inflightIndexBuilds.clear();
     _indexWorkspaceRoot = null;
+    _indexAutoRefreshDomain = null;
     _pendingIndexRefreshPaths.clear();
     if (_indexRefreshTimer) {
         clearTimeout(_indexRefreshTimer);
@@ -402,6 +519,10 @@ export function resetIoIndexForTest() {
         coalesced: 0,
         recursiveSkipped: 0,
         missingWorkspaceRoot: 0,
+        domainSkipped: 0,
+        gitignoredSkipped: 0,
+        domainReconciliations: 0,
+        domainPruned: 0,
         batches: 0,
         requested: 0,
         indexed: 0,
