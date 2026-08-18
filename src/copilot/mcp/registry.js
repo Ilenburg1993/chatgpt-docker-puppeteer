@@ -75,6 +75,7 @@ import {
     repoIndexTools,
     repoPlanTools,
     repoReadTools,
+    repoWorkingSetTool,
     repoWriteTools,
 } from '#copilot/mcp/tools';
 import { createHash, randomUUID } from 'node:crypto';
@@ -319,6 +320,7 @@ function buildCanonicalMcpToolList() {
         ...repoReadTools,
         ...repoPlanTools,
         ...repoIndexTools,
+        repoWorkingSetTool,
         ...gitReadTools,
         ...gitWriteTools,
         projectDoctorTool,

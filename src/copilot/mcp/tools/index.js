@@ -41,6 +41,7 @@ export * from './repo-plan.js';
 export * from './repo-read.js';
 export * from './repo-status.js';
 export * from './repo-write.js';
+export * from './repo-working-set.js';
 export * from './restart-control.js';
 export * from './runtime-health.js';
 export * from './session-profile.js';

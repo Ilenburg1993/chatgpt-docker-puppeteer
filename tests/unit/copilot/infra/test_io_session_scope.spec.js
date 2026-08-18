@@ -72,6 +72,24 @@ describe('declareScope + getScopeStats', () => {
         closeScope(sessionId);
     });
 
+    it('aplica maxFiles como hard cap no working set de diretório', async () => {
+        const sessionId = 'test-scope-directory-cap';
+        const stats = await declareScope({
+            sessionId,
+            directory: tmpDir,
+            workspaceRoot: tmpDir,
+            maxFiles: 1,
+            parseSymbols: false,
+            indexMode: 'off',
+        }).awaitReady();
+
+        assert.strictEqual(stats.selectedFiles, 1);
+        assert.strictEqual(stats.pathCount, 1);
+        assert.ok(stats.candidateFiles > stats.selectedFiles);
+        assert.strictEqual(stats.hardLimitReached, true);
+        closeScope(sessionId);
+    });
+
     it('getScopeStats retorna null para escopo inexistente', () => {
         const result = getScopeStats('nao-existe-xxxxxxxxxxx');
         assert.strictEqual(result, null);
@@ -120,15 +138,25 @@ describe('getScopeContext', () => {
     it('retorna contexto com contagem de files e símbolos', async () => {
         const sessionId = 'test-scope-context-1';
         const paths = [path.join(tmpDir, 'a.js'), path.join(tmpDir, 'b.js')];
-        const handle = declareScope({ sessionId, paths, parseSymbols: true });
+        const handle = declareScope({
+            sessionId,
+            paths,
+            workspaceRoot: tmpDir,
+            parseSymbols: true,
+            indexMode: 'off',
+        });
         await handle.awaitReady();
 
-        const ctx = getScopeContext(sessionId);
+        const ctx = getScopeContext(sessionId, { maxFiles: 10, maxBytes: 16 * 1024 });
         assert.ok(ctx !== null, 'getScopeContext deve retornar dados');
-        // files é número (count de paths)
         assert.ok(typeof ctx.files === 'number', `files deve ser number, got ${typeof ctx.files}`);
         assert.ok(ctx.files >= 1, `files count=${ctx.files}`);
         assert.ok(Array.isArray(ctx.topExports), 'topExports deve ser array');
+        assert.ok(ctx.symbolBytes > 0);
+        assert.ok(ctx.contextBytes <= 16 * 1024);
+        assert.ok(Buffer.byteLength(JSON.stringify(ctx), 'utf8') <= 16 * 1024);
+        assert.strictEqual(ctx.manifest.length, 2);
+        assert.ok(ctx.manifest.some((entry) => entry.path === 'b.js' && entry.imports.includes('./a.js')));
 
         closeScope(sessionId);
     });
@@ -219,6 +247,18 @@ describe('refreshScope', () => {
         closeScope(sessionId);
     });
 
+    it('refresh sem delta conhecido é no-op e não reparseia o working set inteiro', async () => {
+        const sessionId = 'test-scope-refresh-no-delta';
+        const pathA = path.join(tmpDir, 'a.js');
+        await declareScope({ sessionId, paths: [pathA], parseSymbols: true, indexMode: 'off' }).awaitReady();
+
+        const result = await refreshScope(sessionId);
+
+        assert.deepEqual(result, { refreshed: 0, failed: 0, skipped: 0 });
+        assert.strictEqual(getScopeStats(sessionId)?.ready, true);
+        closeScope(sessionId);
+    });
+
     it('deduplica refresh concorrente do mesmo path sem anunciar ready cedo', async () => {
         const sessionId = 'test-scope-refresh-dedup';
         const pathA = path.join(tmpDir, 'a.js');
@@ -271,23 +311,40 @@ describe('refreshScope', () => {
         closeScope(sessionId);
     });
 
-    it('mantém refresh com falha em degraded em vez de anunciar ready', async () => {
+    it('mantém refresh com falha em degraded quando arquivo pertencente ao scope desaparece', async () => {
         const sessionId = 'test-scope-refresh-degraded';
-        const pathA = path.join(tmpDir, 'a.js');
-        const missingPath = path.join(tmpDir, 'missing-refresh.js');
-        await declareScope({ sessionId, paths: [pathA], parseSymbols: true }).awaitReady();
+        const vanishingPath = path.join(tmpDir, 'vanishing-refresh.js');
+        await fs.writeFile(vanishingPath, "export function vanishing() { return true; }\n", 'utf8');
+        await declareScope({ sessionId, paths: [vanishingPath], parseSymbols: true }).awaitReady();
+        await fs.rm(vanishingPath, { force: true });
 
-        const result = await refreshScope(sessionId, [missingPath]);
+        const result = await refreshScope(sessionId, [vanishingPath]);
         const stats = getScopeStats(sessionId);
 
         assert.strictEqual(result.failed, 1);
+        assert.strictEqual(result.skipped, 0);
         assert.ok(stats !== null);
         assert.strictEqual(stats.ready, false);
         assert.strictEqual(stats.degraded, true);
         assert.strictEqual(stats.status, 'degraded');
         assert.strictEqual(stats.lastError?.phase, 'refresh');
-        assert.ok(!JSON.stringify(stats.lastError).includes(missingPath));
+        assert.ok(!JSON.stringify(stats.lastError).includes(vanishingPath));
 
+        closeScope(sessionId);
+    });
+
+    it('não expande o working set ao receber refresh de path externo ao scope', async () => {
+        const sessionId = 'test-scope-refresh-outside';
+        const pathA = path.join(tmpDir, 'a.js');
+        const pathB = path.join(tmpDir, 'b.js');
+        await declareScope({ sessionId, paths: [pathA], parseSymbols: true }).awaitReady();
+
+        const result = await refreshScope(sessionId, [pathB]);
+        const stats = getScopeStats(sessionId);
+
+        assert.deepEqual(result, { refreshed: 0, failed: 0, skipped: 1 });
+        assert.strictEqual(stats?.pathCount, 1);
+        assert.strictEqual(stats?.ready, true);
         closeScope(sessionId);
     });
 

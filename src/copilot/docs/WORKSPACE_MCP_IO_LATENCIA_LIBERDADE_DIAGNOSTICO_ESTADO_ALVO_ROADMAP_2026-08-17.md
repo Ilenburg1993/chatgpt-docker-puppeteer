@@ -3029,21 +3029,23 @@ Estado-alvo:
 
 ### 30.5.1 Corrigir infra compartilhada
 
-- [ ] corrigir contrato `maxFiles`;
-- [ ] separar `selectedFiles/candidateFiles/hardLimitReached`;
-- [ ] parser reuse por snapshot/contentHash;
-- [ ] não rebuildar L2 se cobertura existente puder ser reutilizada;
-- [ ] refresh paralelo bounded para changed paths;
-- [ ] stats de bytes/memory/eviction.
+- [x] corrigir contrato `maxFiles` como hard selection cap para directory scopes;
+- [x] separar `selectedFiles/candidateFiles/hardLimitReached`;
+- [x] parser reuse por snapshot já aquecido;
+- [x] remover full L2 directory rebuild implícito; `auto` converge apenas selected paths com workspace root canônico;
+- [x] refresh paralelo bounded para changed paths e no-op O(1) sem delta;
+- [x] stats de bytes/memory (`symbolBytes`) e ownership/eviction bounded na superfície MCP.
 
 ### 30.5.2 MCP compact surface
 
-- [ ] investigar binding com MCP stateful session;
-- [ ] preferir uma `repo_working_set` composta;
-- [ ] open/context/find/refresh/close;
-- [ ] scopeId opaco se transport binding não estiver disponível ao handler;
-- [ ] benchmark calls/bytes vs workflow sem working set;
-- [ ] anunciar por default somente se ganho real.
+- [x] investigar binding com MCP stateful session; o handler atual não recebe transport context estável como authority;
+- [x] expor uma única `repo_working_set` composta;
+- [x] `open|context|find|refresh|status|close`, com `open` retornando contexto imediatamente;
+- [x] scopeId opaco UUID + registry MCP-local, isolado dos scopes LLM-B;
+- [x] benchmark integration-level de open/context/find/refresh e payload;
+- [x] anunciar por default após ganho real, mantendo apenas +1 tool no registry.
+
+Pendente apenas um A/B diretamente invocado pelo ChatGPT host após a próxima reconexão do connector, porque o binding desta conversa não hot-injeta novas funções adicionadas durante a própria sessão apesar de `tools/list` remoto já anunciar a tool.
 
 ## Fase 30.6 — P1: Compile Cache V2
 
@@ -3238,4 +3240,152 @@ Gates executados durante o sublote:
 - reloads controlados com connector smoke 119/119, OAuth/SSE green.
 
 Próxima faixa operacional: **30.5 Working Set / Scope V2**, começando pela correção da infra compartilhada antes de anunciar qualquer nova tool MCP.
+
+---
+
+# 32. Execução da Faixa 30.B — Working Set / Scope V2
+
+## 32.1 Diagnóstico do Scope V1
+
+A investigação da implementação que já atendia a LLM-B confirmou que `workspace_scope_*` era uma capacidade real de working set, mas não estava pronta para ser copiada ao MCP. Os problemas encontrados foram:
+
+1. `maxFiles` era descrito como advisory, porém `warmFromDirectory()` aplicava `slice(0, maxFiles)` e portanto já era um hard cap de seleção;
+2. `indexMode='auto'` fazia `buildIoIndexForDirectory(directory)` depois de scan+prefetch+parse, pagando trabalho O(diretório) e podendo reescrever `workspace_root/relative_path` das mesmas rows com o subdiretório como nova raiz;
+3. prefetch aquecia o L1, mas o parser não recebia o snapshot já lido;
+4. o índice podia reler/reparsear o mesmo conteúdo que o pipeline acabara de produzir;
+5. `refreshScope()` sem delta conhecido reparseava o escopo inteiro;
+6. refresh invalidava caches antes de reconstruir e processava paths sequencialmente;
+7. contexto de scope trazia contagens/topExports, mas não um manifest útil para reduzir reads/searches posteriores;
+8. expor as sete tools LLM-B diretamente aumentaria demais `tools/list` e a decisão do modelo.
+
+## 32.2 Pipeline encadeado — prefetch → parser → índice
+
+O working set agora compõe evidência em vez de reconstruí-la:
+
+- `warmTextSnapshotsForPaths()` aquece somente o L1 textual e retorna `TextFileSnapshot` efêmero;
+- se o texto já está em L1 e foi revalidado, o snapshot é reconstruído a partir da própria entrada sem copiar o conteúdo;
+- working sets usam `cacheBytes=false`, evitando primar uma segunda representação bytes desnecessária;
+- `parseAndCacheSymbols()` recebe `snapshot` fornecido;
+- `refreshIoIndexPaths()` aceita `snapshots` e `parsedSymbols`;
+- snapshot fornecido só é aceito se sua rich fingerprint ainda coincidir exatamente com o `stat` atual;
+- se divergir, o índice faz fallback para a leitura canônica normal;
+- `indexTextFile()` aceita símbolos já parseados como opção interna, eliminando parse duplicado.
+
+Counters causais adicionados ao refresh do índice:
+
+- `snapshotReuses`;
+- `parsedSymbolReuses`.
+
+Regressão dedicada exige `snapshotReuses=1`, `parsedSymbolReuses=1`, zero `readTextFileSnapshot` e entrega dos símbolos fornecidos ao index writer.
+
+## 32.3 Scope lifecycle V2
+
+Mudanças de contrato:
+
+- `workspaceRoot` canônico explícito;
+- `maxFiles` = hard selected-file limit em directory scope;
+- stats separados: `candidateFiles`, `selectedFiles`, `hardLimitReached`;
+- `symbolBytes` estima memória do estado simbólico por scope;
+- `indexMode='auto'` nunca mais faz full directory build implícito: executa apenas selected-path refresh no índice global;
+- refresh é bounded/concurrent por `p-limit`;
+- sem `modifiedPaths` e sem invalidations pendentes, refresh é **O(1) no-op**;
+- path explícito fora do working set é `skipped`, não expande silenciosamente o escopo;
+- arquivo pertencente ao escopo que desaparece durante refresh mantém o scope `degraded`;
+- invalidation continua removendo somente estado derivado do scope; o L1 global não é desmontado no close.
+
+## 32.4 Contexto bounded de verdade
+
+`getScopeContext()` agora produz um manifest por arquivo sem conteúdo integral:
+
+- path relativo ao workspace;
+- symbol count;
+- exports bounded;
+- imports bounded;
+- flag `stale`;
+- top exports gerais;
+- contagens de seleção/invalidation/memória.
+
+Budgets:
+
+- `maxFiles` default 40, hard max 200;
+- `maxBytes` default 16 KiB, hard max 64 KiB;
+- o budget cobre o **JSON completo** retornado, não apenas a soma das entries do manifest;
+- manifest/topExports são reduzidos até o payload total caber no budget.
+
+## 32.5 Superfície MCP compacta
+
+Em vez de sete tools, foi adicionada apenas:
+
+> `repo_working_set`
+
+Ações:
+
+- `open` — cria working set e já devolve `stats + context` no mesmo round-trip;
+- `context` — reemite decision surface bounded;
+- `find` — symbol lookup no índice process-local do scope;
+- `refresh` — somente delta explícito/conhecido;
+- `status`;
+- `close`.
+
+Segurança/ownership:
+
+- ID sempre gerado pelo servidor como `mcp-ws-<UUID>`;
+- registry MCP-local aceita somente IDs criados por essa própria tool;
+- ID forjado é rejeitado antes de chegar à engine compartilhada;
+- máximo de **8 working sets MCP-owned**; ao atingir o limite, somente o working set MCP-owned menos recente é elegível a eviction;
+- scopes internos da LLM-B não são endereçáveis por IDs inventados no MCP;
+- annotation correta: `readOnlyHint=true`, `idempotentHint=false`, porque o repositório não é modificado, mas open/close alteram estado derivado em memória.
+
+## 32.6 Evidência integration-level real
+
+Teste executado sobre o diretório real `src/copilot/mcp/tools`, com parser/cache/filesystem reais e `indexMode=off` para isolar o working-set plane:
+
+- candidates: **48**;
+- selected: **48**;
+- parsed: **48**;
+- preloaded: **48**;
+- parser `suppliedSnapshots`: **48**;
+- parser `snapshotReads`: **0**;
+- `symbolBytes`: ~**138,8 KiB**;
+- open em duas execuções representativas: **359,502–391,382 ms**;
+- context: **1,108–1,166 ms**;
+- contexto total: **11.725 bytes** em ambas;
+- manifest: **40 files**;
+- `findSymbol('repoWorkingSetTool')`: **0,266–0,286 ms**, 1 match;
+- refresh sem delta: **0,115–0,146 ms**, `{refreshed:0, failed:0, skipped:0}`.
+
+A evidência comprova o objetivo do scope: o custo maior é pago uma vez na abertura; operações posteriores de contexto/símbolo/delta tornam-se process-local e submilissegundo/low-ms sem nova busca global.
+
+## 32.7 Custo de superfície e runtime remoto
+
+Após reload v52:
+
+- connector smoke: green, OAuth/SSE green;
+- tools: **120/120**;
+- `tools/list`: **121.987 bytes**;
+- baseline v51: 119.810 bytes;
+- custo incremental de uma única working-set tool: **+2.177 bytes (~1,8%)**;
+- `CAPABILITIES_VERSION=52`;
+- capabilities manifest remoto confirma `repo_working_set` no grupo read.
+
+O binding de tools desta conversa não hot-injetou a nova função adicionada durante a própria sessão, embora o servidor remoto a anuncie corretamente. Por isso a prova operacional nesta rodada foi integration-level sobre a mesma engine real; uma invocação direta pelo ChatGPT host poderá ser feita após reconexão, sem mudança adicional de código.
+
+## 32.8 Conclusão sobre scopes
+
+A resposta arquitetural é **sim: scopes/working sets são úteis para o MCP**, mas não na forma original de sete tools da LLM-B.
+
+Eles são especialmente úteis quando:
+
+- a investigação é concentrada numa subárvore por vários turnos;
+- contexto/imports/símbolos serão consultados repetidamente;
+- queremos reduzir `search → read → outline → read` repetidos;
+- mudanças posteriores são poucas e podem ser atualizadas em O(delta).
+
+Não substituem:
+
+- `repo_search_text` como superfície completeness-oriented global;
+- full index navigation quando a pergunta atravessa o repositório inteiro;
+- rich fingerprint/journal para correctness de freshness.
+
+O estado-alvo é complementar: **search global para descoberta; working set para foco persistente e barato depois que a área de trabalho foi escolhida.**
 

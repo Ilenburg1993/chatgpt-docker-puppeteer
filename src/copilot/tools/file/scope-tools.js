@@ -1,7 +1,7 @@
 // @ts-check
 import { z } from 'zod/v3';
 import { buildTool } from '../infra/tool-factory.js';
-import { validatePath } from './shared.js';
+import { validatePath, WORKSPACE_ROOT } from './shared.js';
 
 import {
     closeScope,
@@ -27,13 +27,13 @@ const ScopeDeclareParameters = z.object({
         .int()
         .positive()
         .optional()
-        .describe('Quantidade sugerida/advisory para planejamento do escopo; não bloqueia a operação.'),
+        .describe('Limite efetivo de arquivos selecionados quando directory é usado. Default: 500.'),
     parseSymbols: z.boolean().optional().describe('Executa parse simbólico com Babel parser (default: true).'),
     indexMode: z
         .enum(['auto', 'off'])
         .optional()
-        .describe('Controla indexação L2/FTS do diretório declarado. Default: auto.'),
-    concurrency: z.number().int().positive().optional().describe('Concorrência sugerida/advisory do warm-up.'),
+        .describe('auto converge somente os paths selecionados no índice global; off desativa indexação do scope.'),
+    concurrency: z.number().int().positive().optional().describe('Concorrência efetiva/bounded do warm-up e refresh.'),
     include: z.array(z.string().min(1)).optional().describe('Padrões include.'),
     exclude: z.array(z.string().min(1)).optional().describe('Padrões exclude.'),
     recursive: z.boolean().optional().describe('Mantido para compatibilidade (advisory).'),
@@ -47,6 +47,8 @@ const ScopeIdParameters = z.object({
 
 const ScopeContextParameters = z.object({
     sessionId: z.string().min(1).describe('ID do escopo.'),
+    maxFiles: z.number().int().positive().max(200).optional().describe('Máximo de entries no manifest. Default: 40.'),
+    maxBytes: z.number().int().positive().max(65536).optional().describe('Budget UTF-8 do manifest. Default: 16 KiB.'),
 });
 
 const ScopeInvalidatePathParameters = z.object({
@@ -101,6 +103,7 @@ export const workspaceScopeDeclareTool = buildTool({
             declareScope({
                 sessionId: effectiveSessionId,
                 directory: resolvedDirectory,
+                workspaceRoot: WORKSPACE_ROOT,
                 maxFiles,
                 parseSymbols,
                 indexMode,
@@ -116,7 +119,7 @@ export const workspaceScopeDeclareTool = buildTool({
             includePatternCount: include?.length ?? 0,
             excludePatternCount: exclude?.length ?? 0,
             recursive: recursive ?? true,
-            limitMode: 'informative',
+            limitMode: directory ? 'enforced-max-files' : 'explicit-paths',
         };
 
         if (awaitReady && typeof scope.awaitReady === 'function') {
@@ -141,7 +144,7 @@ export const workspaceScopeDeclareTool = buildTool({
 
 export const workspaceScopeRefreshTool = buildTool({
     name: 'workspace_scope_refresh',
-    description: 'Atualiza o escopo de trabalho declarado para refletir alterações recentes de arquivos.',
+    description: 'Atualiza somente paths modificados/invalidados do escopo; sem delta conhecido é no-op.',
     parameters: ScopeIdParameters,
     handler: async ({ sessionId, modifiedPaths }) => {
         if (!modifiedPaths || modifiedPaths.length === 0) {
@@ -198,8 +201,8 @@ export const workspaceScopeContextTool = buildTool({
     description:
         'Retorna contexto resumido do escopo (arquivos quentes, símbolos e imports) para orientar próximas leituras da LLM-B.',
     parameters: ScopeContextParameters,
-    handler: async ({ sessionId }) => {
-        return getScopeContext(sessionId);
+    handler: async ({ sessionId, maxFiles, maxBytes }) => {
+        return getScopeContext(sessionId, { maxFiles, maxBytes });
     },
 });
 

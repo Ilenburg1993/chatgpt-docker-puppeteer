@@ -25,10 +25,11 @@
  */
 
 import * as nodePath from 'node:path';
+import pLimit from 'p-limit';
 import { invalidateIoCachePath, registerInvalidationHook } from './io-cache.js';
-import { buildIoIndexForDirectory } from './io-index-registry.js';
+import { refreshIoIndexPaths } from './io-index-registry.js';
 import { invalidateParserCache, parseAndCacheSymbols } from './io-parser.js';
-import { endSessionScope, startSessionScope, warmFromDirectory } from './io-prefetch.js';
+import { endSessionScope, startSessionScope, warmCacheForPaths, warmFromDirectory } from './io-prefetch.js';
 import { publishIoLifecycleEvent } from './io-observability.js';
 import { readEnvPositiveInt } from './shared/env.js';
 
@@ -41,8 +42,9 @@ import { readEnvPositiveInt } from './shared/env.js';
  * @property {string} sessionId - ID único da sessão LLM-B.
  * @property {string[]} [paths] - Lista explícita de paths a incluir no escopo.
  * @property {string} [directory] - Diretório raiz a escanear (alternativo a paths).
+ * @property {string} [workspaceRoot] - Raiz canônica usada pelo índice compartilhado; obrigatória para auto-index seguro.
  * @property {string[]} [extensions] - Extensões a incluir no scan de diretório.
- * @property {number} [maxFiles=500] - Quantidade sugerida/advisory para o scan. Não corta o escopo. Default is `500`
+ * @property {number} [maxFiles=500] - Limite efetivo de arquivos selecionados no scan de diretório. Default is `500`
  * @property {string[]} [include] - Padrões glob simples para incluir arquivos no escopo.
  * @property {string[]} [exclude] - Padrões glob simples para excluir arquivos do escopo.
  * @property {boolean} [recursive=true] - Se false, declara apenas arquivos imediatos do diretório. Default is `true`
@@ -56,12 +58,16 @@ import { readEnvPositiveInt } from './shared/env.js';
 /**
  * @typedef {object} ScopeStats
  * @property {string} sessionId
- * @property {number} pathCount - Total de arquivos no escopo.
+ * @property {number} pathCount - Total de arquivos selecionados no escopo.
+ * @property {number} candidateFiles - Arquivos candidatos antes do maxFiles no scan de diretório.
+ * @property {number} selectedFiles - Arquivos efetivamente selecionados.
+ * @property {boolean} hardLimitReached - Indica se maxFiles cortou candidatos do diretório.
  * @property {number} preloaded - Arquivos carregados no L1.
  * @property {number} parsed - Arquivos parseados.
  * @property {number} failed - Arquivos com falha.
  * @property {number} invalidated - Arquivos do escopo invalidados desde o último refresh.
- * @property {{ available: boolean; indexed: number; failed: number; durationMs: number } | null} index
+ * @property {{ available: boolean; requested: number; indexed: number; unchanged: number; invalidated: number; snapshotReuses: number; parsedSymbolReuses: number; failed: number; durationMs: number; mode: 'selected-path-refresh' } | null} index
+ * @property {number} symbolBytes - Estimativa UTF-8 do estado simbólico mantido pelo escopo.
  * @property {number} warmDurationMs - Duração do warm-up em ms.
  * @property {boolean} ready - Se o escopo está pronto (prefetch completo).
  * @property {boolean} degraded - Se o último warm-up/refresh terminou com falha.
@@ -91,12 +97,21 @@ import { readEnvPositiveInt } from './shared/env.js';
 /**
  * @typedef {object} _InternalScope
  * @property {string} sessionId
+ * @property {string | null} workspaceRoot
+ * @property {string | null} directory
  * @property {string[]} paths
  * @property {Map<string, import('./io-parser.js').FileSymbols>} symbolIndex
+ * @property {Map<string, number>} symbolBytesByPath
+ * @property {number} symbolBytes
+ * @property {number} candidateFiles
+ * @property {number} selectedFiles
+ * @property {boolean} hardLimitReached
+ * @property {number} refreshConcurrency
+ * @property {'auto' | 'off'} indexMode
  * @property {number} preloaded
  * @property {number} failed
  * @property {Set<string>} invalidatedPaths
- * @property {{ available: boolean; indexed: number; failed: number; durationMs: number } | null} index
+ * @property {{ available: boolean; requested: number; indexed: number; unchanged: number; invalidated: number; snapshotReuses: number; parsedSymbolReuses: number; failed: number; durationMs: number; mode: 'selected-path-refresh' } | null} index
  * @property {number} warmDurationMs
  * @property {boolean} ready
  * @property {boolean} degraded
@@ -140,6 +155,42 @@ function isSymbolParseTarget(filePath) {
 }
 
 /**
+ * @param {import('./io-parser.js').FileSymbols} symbols
+ * @returns {number}
+ */
+function estimateSymbolBytes(symbols) {
+    try {
+        return Buffer.byteLength(JSON.stringify(symbols), 'utf8');
+    } catch {
+        return 0;
+    }
+}
+
+/**
+ * @param {_InternalScope} scope
+ * @param {string} filePath
+ * @param {import('./io-parser.js').FileSymbols} symbols
+ */
+function setScopeSymbols(scope, filePath, symbols) {
+    const previous = scope.symbolBytesByPath.get(filePath) ?? 0;
+    const next = estimateSymbolBytes(symbols);
+    scope.symbolIndex.set(filePath, symbols);
+    scope.symbolBytesByPath.set(filePath, next);
+    scope.symbolBytes = Math.max(0, scope.symbolBytes - previous + next);
+}
+
+/**
+ * @param {_InternalScope} scope
+ * @param {string} filePath
+ */
+function deleteScopeSymbols(scope, filePath) {
+    const previous = scope.symbolBytesByPath.get(filePath) ?? 0;
+    scope.symbolIndex.delete(filePath);
+    scope.symbolBytesByPath.delete(filePath);
+    scope.symbolBytes = Math.max(0, scope.symbolBytes - previous);
+}
+
+/**
  * @param {_InternalScope} scope
  * @param {string} filePath
  * @param {{ recursive?: boolean }} [options]
@@ -171,7 +222,7 @@ function markScopePathInvalidated(scope, filePath, options = {}) {
             normalizedIndexedPath === normalized ||
             (options.recursive === true && normalizedIndexedPath.startsWith(`${normalized}${nodePath.sep}`))
         ) {
-            scope.symbolIndex.delete(indexedPath);
+            deleteScopeSymbols(scope, indexedPath);
         }
     }
     for (const scopedPath of scope.paths) {
@@ -310,8 +361,17 @@ export function declareScope(opts) {
     /** @type {_InternalScope} */
     const scope = {
         sessionId,
+        workspaceRoot: opts.workspaceRoot ? normalizeScopePath(opts.workspaceRoot) : null,
+        directory: directory ? normalizeScopePath(directory) : null,
         paths: explicitPaths ? [...explicitPaths] : [],
         symbolIndex: new Map(),
+        symbolBytesByPath: new Map(),
+        symbolBytes: 0,
+        candidateFiles: explicitPaths?.length ?? 0,
+        selectedFiles: explicitPaths?.length ?? 0,
+        hardLimitReached: false,
+        refreshConcurrency: Math.max(1, Math.min(32, Math.floor(concurrency))),
+        indexMode,
         preloaded: 0,
         failed: 0,
         invalidatedPaths: new Set(),
@@ -335,41 +395,55 @@ export function declareScope(opts) {
             }
 
             let resolvedPaths = [...(explicitPaths ?? [])];
+            /** @type {Map<string, import('./io/fs/read-text.js').TextFileSnapshot>} */
+            const warmSnapshots = new Map();
 
-            // Se um diretório foi fornecido, escaneia e combina
+            // Se um diretório foi fornecido, seleciona um working set bounded e aquece somente o L1 textual. O snapshot
+            // retornado é efêmero e atravessa parser/index neste mesmo pipeline; não vira uma quarta cópia persistente.
             if (directory) {
                 const scanResult = await warmFromDirectory(
                     directory,
                     { extensions, maxFiles, include, exclude, recursive },
-                    { concurrency, silent, textMode: true, signal: warmController.signal },
+                    {
+                        concurrency,
+                        silent,
+                        textMode: true,
+                        captureTextSnapshots: true,
+                        cacheBytes: false,
+                        signal: warmController.signal,
+                    },
                 );
                 if (warmController.signal.aborted) return;
                 scope.preloaded += scanResult.preloaded;
                 scope.failed += scanResult.failed;
                 scope.warmDurationMs += scanResult.durationMs;
+                scope.candidateFiles = Number(scanResult.advisoryLimits['candidateFiles'] ?? scanResult.paths.length);
+                scope.selectedFiles = Number(scanResult.advisoryLimits['selectedFiles'] ?? scanResult.paths.length);
+                scope.hardLimitReached = Boolean(scanResult.advisoryLimits['hardLimitReached']);
+                for (const [filePath, snapshot] of scanResult.snapshots ?? []) warmSnapshots.set(filePath, snapshot);
 
                 resolvedPaths = [...new Set([...resolvedPaths, ...scanResult.paths])];
             } else if (explicitPaths && explicitPaths.length > 0) {
-                // Prefetch direto dos paths explícitos
                 const warm = await startSessionScope(sessionId, explicitPaths, {
                     concurrency,
                     silent,
+                    captureTextSnapshots: true,
+                    cacheBytes: false,
                     signal: warmController.signal,
                 });
                 if (warmController.signal.aborted) return;
                 scope.preloaded += warm.preloaded;
                 scope.failed += warm.failed;
                 scope.warmDurationMs += warm.durationMs;
+                scope.candidateFiles = explicitPaths.length;
+                scope.selectedFiles = explicitPaths.length;
+                for (const [filePath, snapshot] of warm.snapshots ?? []) warmSnapshots.set(filePath, snapshot);
             }
 
             scope.paths = resolvedPaths;
 
-            // Parse simbólico em background
             if (parseSymbols && resolvedPaths.length > 0) {
-                const jsExts = new Set(['.js', '.ts', '.mjs', '.cjs', '.jsx', '.tsx', '.mts', '.cts']);
-                const parseTargets = resolvedPaths.filter((p) => jsExts.has(nodePath.extname(p).toLowerCase()));
-
-                let parsed = 0;
+                const parseTargets = resolvedPaths.filter(isSymbolParseTarget);
                 let idx = 0;
 
                 const parseWorker = async () => {
@@ -378,9 +452,12 @@ export function declareScope(opts) {
                         const p = parseTargets[idx++];
                         if (!p) continue;
                         try {
-                            const symbols = await parseAndCacheSymbols(p, { signal: warmController.signal });
-                            scope.symbolIndex.set(p, symbols);
-                            parsed++;
+                            const snapshot = warmSnapshots.get(p);
+                            const symbols = await parseAndCacheSymbols(p, {
+                                ...(snapshot ? { snapshot } : {}),
+                                signal: warmController.signal,
+                            });
+                            setScopeSymbols(scope, p, symbols);
                         } catch (parseErr) {
                             if (!silent) throw parseErr;
                             scope.failed++;
@@ -390,33 +467,36 @@ export function declareScope(opts) {
                 };
 
                 await Promise.all(
-                    Array.from({ length: Math.min(concurrency, parseTargets.length || 1) }, () => parseWorker()),
+                    Array.from({ length: Math.min(scope.refreshConcurrency, parseTargets.length || 1) }, () => parseWorker()),
                 );
-
-                void parsed; // usado acima
             }
 
-            if (directory && indexMode !== 'off') {
+            // `auto` significa convergir apenas o working set selecionado no índice global. Nunca faz full directory build
+            // implícito e nunca redefine workspaceRoot/relative_path usando o subdiretório do escopo.
+            if (indexMode !== 'off' && scope.workspaceRoot && resolvedPaths.length > 0) {
                 if (warmController.signal.aborted) return;
-                /** @type {Parameters<typeof buildIoIndexForDirectory>[1]} */
-                const indexOptions = {
-                    recursive,
-                    concurrency,
+                const indexResult = await refreshIoIndexPaths(resolvedPaths, {
+                    workspaceRoot: scope.workspaceRoot,
+                    ...(extensions !== undefined ? { extensions } : {}),
+                    snapshots: warmSnapshots,
+                    parsedSymbols: scope.symbolIndex,
                     signal: warmController.signal,
-                };
-                if (extensions !== undefined) indexOptions.extensions = extensions;
-                if (include !== undefined) indexOptions.include = include;
-                if (exclude !== undefined) indexOptions.exclude = exclude;
-                const indexResult = await buildIoIndexForDirectory(directory, indexOptions);
+                });
                 scope.index = {
                     available: Boolean(indexResult.available),
+                    requested: Number(indexResult.requested ?? resolvedPaths.length),
                     indexed: Number(indexResult.indexed ?? 0),
+                    unchanged: Number(indexResult.unchanged ?? 0),
+                    invalidated: Number(indexResult.invalidated ?? 0),
+                    snapshotReuses: Number(indexResult.snapshotReuses ?? 0),
+                    parsedSymbolReuses: Number(indexResult.parsedSymbolReuses ?? 0),
                     failed: Number(indexResult.failed ?? 0),
                     durationMs: Number(indexResult.durationMs ?? 0),
+                    mode: 'selected-path-refresh',
                 };
                 if (scope.index.failed > 0) {
                     scope.failed += scope.index.failed;
-                    recordScopeFailure(scope, { code: 'EINDEXPARTIAL', name: 'ScopeIndexError' }, 'index', 'índice do escopo terminou com falhas');
+                    recordScopeFailure(scope, { code: 'EINDEXPARTIAL', name: 'ScopeIndexError' }, 'index', 'índice do working set terminou com falhas');
                 }
             }
 
@@ -457,11 +537,15 @@ export function declareScope(opts) {
                 getScopeStats(sessionId) ?? {
                     sessionId,
                     pathCount: 0,
+                    candidateFiles: 0,
+                    selectedFiles: 0,
+                    hardLimitReached: false,
                     preloaded: 0,
                     parsed: 0,
                     failed: 0,
                     invalidated: 0,
                     index: null,
+                    symbolBytes: 0,
                     warmDurationMs: 0,
                     ready: false,
                     degraded: true,
@@ -495,11 +579,15 @@ export function getScopeStats(sessionId) {
     return {
         sessionId,
         pathCount: scope.paths.length,
+        candidateFiles: scope.candidateFiles,
+        selectedFiles: scope.selectedFiles,
+        hardLimitReached: scope.hardLimitReached,
         preloaded: scope.preloaded,
         parsed: scope.symbolIndex.size,
         failed: scope.failed,
         invalidated: scope.invalidatedPaths.size,
         index: scope.index,
+        symbolBytes: scope.symbolBytes,
         warmDurationMs: scope.warmDurationMs,
         ready: scope.ready,
         degraded: scope.degraded,
@@ -525,37 +613,90 @@ export function getScopeSymbolIndex(sessionId) {
 }
 
 /**
- * Retorna contexto resumido da sessão para incluir em um turno LLM-B. Inclui: lista de arquivos, total de símbolos,
- * exports mais relevantes.
+ * Retorna uma decision surface bounded do working set: contagens, exports e um manifest compacto por arquivo com imports.
+ * Conteúdo integral nunca é duplicado no contexto.
  *
  * @param {string} sessionId
- * @returns {{ sessionId: string; files: number; symbols: number; topExports: string[]; ready: boolean; degraded: boolean; status: ScopeStats['status']; lastError: ScopeFailureSummary | null } | null}
+ * @param {{ maxFiles?: number; maxBytes?: number }} [options]
+ * @returns {{ sessionId: string; files: number; candidateFiles: number; selectedFiles: number; hardLimitReached: boolean; symbols: number; symbolBytes: number; invalidated: number; topExports: string[]; manifest: Array<{ path: string; symbolCount: number; exports: string[]; imports: string[]; stale: boolean }>; manifestTruncated: boolean; contextBytes: number; ready: boolean; degraded: boolean; status: ScopeStats['status']; lastError: ScopeFailureSummary | null } | null}
  */
-export function getScopeContext(sessionId) {
+export function getScopeContext(sessionId, options = {}) {
     const scope = _registry.get(sessionId);
     if (!scope) return null;
     touchScope(scope);
 
+    const requestedFiles = Number(options.maxFiles ?? 40);
+    const requestedBytes = Number(options.maxBytes ?? 16 * 1024);
+    const maxFiles = Number.isFinite(requestedFiles) ? Math.max(1, Math.min(200, Math.floor(requestedFiles))) : 40;
+    const maxBytes = Number.isFinite(requestedBytes)
+        ? Math.max(1024, Math.min(64 * 1024, Math.floor(requestedBytes)))
+        : 16 * 1024;
     let totalSymbols = 0;
     const allExports = /** @type {string[]} */ ([]);
+    /** @type {Array<{ path: string; symbolCount: number; exports: string[]; imports: string[]; stale: boolean }>} */
+    const manifest = [];
+    let manifestBytes = 0;
+    let manifestTruncated = false;
+    const manifestBudget = Math.max(0, maxBytes - 2048);
 
-    for (const [filePath, symbols] of scope.symbolIndex) {
-        totalSymbols += symbols.symbols.length;
-        for (const s of symbols.symbols.filter((sym) => sym.exported)) {
-            allExports.push(`${nodePath.basename(filePath)}::${s.name}(${s.kind})`);
+    for (const filePath of scope.paths) {
+        const symbols = scope.symbolIndex.get(filePath);
+        if (symbols) {
+            totalSymbols += symbols.symbols.length;
+            for (const s of symbols.symbols.filter((sym) => sym.exported)) {
+                allExports.push(`${nodePath.basename(filePath)}::${s.name}(${s.kind})`);
+            }
         }
+        if (manifest.length >= maxFiles) {
+            manifestTruncated = true;
+            continue;
+        }
+        const entry = {
+            path: scope.workspaceRoot
+                ? nodePath.relative(scope.workspaceRoot, filePath).replace(/\\/gu, '/')
+                : filePath,
+            symbolCount: symbols?.symbols.length ?? 0,
+            exports: (symbols?.symbols ?? []).filter((symbol) => symbol.exported).slice(0, 12).map((symbol) => symbol.name),
+            imports: [...new Set((symbols?.imports ?? []).map((entry) => entry.source))].slice(0, 12),
+            stale: scope.invalidatedPaths.has(filePath),
+        };
+        const entryBytes = Buffer.byteLength(JSON.stringify(entry), 'utf8');
+        if (manifestBytes + entryBytes > manifestBudget) {
+            manifestTruncated = true;
+            continue;
+        }
+        manifest.push(entry);
+        manifestBytes += entryBytes;
     }
 
-    return {
+    const result = {
         sessionId,
         files: scope.paths.length,
+        candidateFiles: scope.candidateFiles,
+        selectedFiles: scope.selectedFiles,
+        hardLimitReached: scope.hardLimitReached,
         symbols: totalSymbols,
-        topExports: allExports.slice(0, 50),
+        symbolBytes: scope.symbolBytes,
+        invalidated: scope.invalidatedPaths.size,
+        topExports: allExports.slice(0, 24),
+        manifest,
+        manifestTruncated,
+        contextBytes: 0,
+        contextBudgetBytes: maxBytes,
         ready: scope.ready,
         degraded: scope.degraded,
         status: getScopeStatus(scope),
         lastError: scope.lastError,
     };
+    const measure = () => Buffer.byteLength(JSON.stringify(result), 'utf8');
+    while (measure() > maxBytes && result.manifest.length > 0) {
+        result.manifest.pop();
+        result.manifestTruncated = true;
+    }
+    while (measure() > maxBytes && result.topExports.length > 0) result.topExports.pop();
+    result.contextBytes = measure();
+    result.contextBytes = measure();
+    return result;
 }
 
 /**
@@ -605,58 +746,80 @@ export function invalidateScopePath(sessionId, filePath) {
 }
 
 /**
- * Re-parseia arquivos do escopo que foram modificados (sem re-warm de L1). Útil quando a LLM-B faz edições e quer
- * manter o índice fresco.
+ * Atualiza somente o delta conhecido do working set. Sem modifiedPaths e sem invalidations pendentes, é no-op O(1);
+ * refresh integral exige que o caller forneça explicitamente os paths.
  *
  * @param {string} sessionId
- * @param {string[]} [modifiedPaths] - Se fornecido, re-parseia só esses. Senão, re-parseia tudo.
- * @returns {Promise<{ refreshed: number; failed: number }>}
+ * @param {string[]} [modifiedPaths] - Paths explicitamente alterados; quando omitido usa somente invalidatedPaths.
+ * @returns {Promise<{ refreshed: number; failed: number; skipped: number }>}
  */
 export async function refreshScope(sessionId, modifiedPaths) {
     const scope = _registry.get(sessionId);
-    if (!scope) return { refreshed: 0, failed: 0 };
+    if (!scope) return { refreshed: 0, failed: 0, skipped: 0 };
     touchScope(scope);
 
-    const invalidatedTargets = [...scope.invalidatedPaths];
-    const targets =
-        modifiedPaths ??
-        (invalidatedTargets.length > 0
-            ? invalidatedTargets
-            : scope.paths.filter((p) => scope.symbolIndex.has(p) || isSymbolParseTarget(p)));
+    const targets = [...new Set((modifiedPaths ?? [...scope.invalidatedPaths]).map(normalizeScopePath))];
     let refreshed = 0;
     let failed = 0;
+    let skipped = 0;
+    if (targets.length === 0) return { refreshed, failed, skipped };
 
-    if (targets.length === 0) {
-        return { refreshed, failed };
-    }
-
-    for (const p of targets) {
-        const refreshKey = `${sessionId}\u0000${normalizeScopePath(p)}`;
-        const inProgress = _refreshingPaths.get(refreshKey);
-        if (inProgress) {
-            await inProgress;
-            continue;
-        }
-        const refreshPromise = (async () => {
-            try {
-                invalidateParserCache(p);
-                invalidateIoCachePath(p);
-                const symbols = await parseAndCacheSymbols(p);
-                if (!scopeContainsPath(scope, p)) scope.paths.push(p);
-                scope.symbolIndex.set(p, symbols);
-                scope.invalidatedPaths.delete(p);
-                return true;
-            } catch (error) {
-                recordScopeFailure(scope, error, 'refresh', 'atualização do escopo falhou');
-                return false;
-            }
-        })();
-        _refreshingPaths.set(refreshKey, refreshPromise);
-        const succeeded = await refreshPromise;
-        if (_refreshingPaths.get(refreshKey) === refreshPromise) _refreshingPaths.delete(refreshKey);
-        if (succeeded) refreshed++;
-        else failed++;
-    }
+    const limit = pLimit(scope.refreshConcurrency);
+    await Promise.all(
+        targets.map((p) =>
+            limit(async () => {
+                if (!scopeContainsPath(scope, p)) {
+                    skipped++;
+                    return;
+                }
+                const refreshKey = `${sessionId}\u0000${p}`;
+                const inProgress = _refreshingPaths.get(refreshKey);
+                if (inProgress) {
+                    await inProgress;
+                    return;
+                }
+                const refreshPromise = (async () => {
+                    try {
+                        invalidateParserCache(p);
+                        invalidateIoCachePath(p);
+                        const warm = await warmCacheForPaths([p], {
+                            concurrency: 1,
+                            silent: false,
+                            captureTextSnapshots: true,
+                            cacheBytes: false,
+                        });
+                        const snapshot = warm.snapshots?.get(p);
+                        if (!snapshot) throw new Error('scope refresh snapshot unavailable');
+                        const symbols = await parseAndCacheSymbols(p, { snapshot });
+                        if (scope.indexMode !== 'off' && scope.workspaceRoot) {
+                            const indexResult = await refreshIoIndexPaths([p], {
+                                workspaceRoot: scope.workspaceRoot,
+                                snapshots: new Map([[p, snapshot]]),
+                                parsedSymbols: new Map([[p, symbols]]),
+                            });
+                            if (Number(indexResult.failed ?? 0) > 0) {
+                                throw new Error('scope refresh index update failed');
+                            }
+                        }
+                        setScopeSymbols(scope, p, symbols);
+                        scope.invalidatedPaths.delete(p);
+                        return true;
+                    } catch (error) {
+                        recordScopeFailure(scope, error, 'refresh', 'atualização do escopo falhou');
+                        return false;
+                    }
+                })();
+                _refreshingPaths.set(refreshKey, refreshPromise);
+                try {
+                    const succeeded = await refreshPromise;
+                    if (succeeded) refreshed++;
+                    else failed++;
+                } finally {
+                    if (_refreshingPaths.get(refreshKey) === refreshPromise) _refreshingPaths.delete(refreshKey);
+                }
+            }),
+        ),
+    );
 
     scope.completedAt = Date.now();
     if (failed === 0 && scope.invalidatedPaths.size === 0) {
@@ -665,7 +828,7 @@ export async function refreshScope(sessionId, modifiedPaths) {
         scope.ready = false;
         scope.degraded = failed > 0;
     }
-    return { refreshed, failed };
+    return { refreshed, failed, skipped };
 }
 
 /**

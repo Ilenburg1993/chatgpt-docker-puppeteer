@@ -53,6 +53,27 @@ describe('warmCacheForPaths', () => {
         assert.ok(stats.size >= 1);
     });
 
+    it('retorna snapshots textuais efêmeros e os reutiliza do L1 sem reread', async () => {
+        resetIoL1CacheForTest();
+        const paths = [path.join(tmpDir, 'a.js'), path.join(tmpDir, 'b.js')];
+        const first = await warmCacheForPaths(paths, {
+            captureTextSnapshots: true,
+            cacheBytes: false,
+        });
+
+        assert.strictEqual(first.failed, 0);
+        assert.strictEqual(first.snapshots?.size, 2);
+        assert.ok(first.snapshots?.get(paths[0] ?? '')?.content.includes('export function a'));
+
+        const second = await warmCacheForPaths(paths, {
+            captureTextSnapshots: true,
+            cacheBytes: false,
+        });
+        assert.strictEqual(second.failed, 0);
+        assert.strictEqual(second.skipped, 2);
+        assert.strictEqual(second.snapshots?.size, 2);
+    });
+
     it('pula arquivos já no cache (skipped)', async () => {
         // Aquece novamente — já está no cache
         const paths = [path.join(tmpDir, 'a.js')];

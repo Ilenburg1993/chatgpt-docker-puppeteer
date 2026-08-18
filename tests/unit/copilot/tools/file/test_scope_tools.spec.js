@@ -73,6 +73,7 @@ describe('tools/file/scope-tools', () => {
         expect(mocks.declareScope).toHaveBeenCalledWith({
             sessionId: 's1',
             directory: expect.stringMatching(/src[/\\]copilot$/),
+            workspaceRoot: expect.stringMatching(/chatgpt-docker-puppeteer$/),
             maxFiles: 50,
             parseSymbols: undefined,
             indexMode: undefined,
@@ -136,7 +137,7 @@ describe('tools/file/scope-tools', () => {
         expect(mocks.getScopeStats).toHaveBeenCalledWith('abc');
         expect(mocks.refreshScope).toHaveBeenCalledWith('abc', [expect.stringMatching(/src[/\\]a\.ts$/)]);
         expect(mocks.invalidateScopePath).toHaveBeenCalledWith('abc', expect.stringMatching(/src[/\\]a\.ts$/));
-        expect(mocks.getScopeContext).toHaveBeenCalledWith('abc');
+        expect(mocks.getScopeContext).toHaveBeenCalledWith('abc', { maxFiles: undefined, maxBytes: undefined });
         expect(mocks.findSymbol).toHaveBeenCalledWith('abc', 'buildTool', { exactMatch: undefined });
         expect(mocks.closeScope).toHaveBeenCalledWith('abc');
     });

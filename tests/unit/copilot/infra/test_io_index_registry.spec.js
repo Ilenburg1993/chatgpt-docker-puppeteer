@@ -243,6 +243,49 @@ describe('io-index-registry build coalescing', () => {
         expect(mocks.indexTextFile).not.toHaveBeenCalled();
     });
 
+    it('reutiliza snapshot e símbolos fornecidos sem reread/reparse no refresh explícito', async () => {
+        const workspaceRoot = '/tmp/ws-snapshot-reuse';
+        const filePath = `${workspaceRoot}/src/reused.js`;
+        const snapshot = {
+            path: filePath,
+            content: 'export const reused = true;\n',
+            bytesRead: 28,
+            sizeBytes: 12,
+            mtimeMs: 10,
+            ctimeMs: 11,
+            dev: 1,
+            ino: 2,
+            attempts: 1,
+            consistent: /** @type {const} */ (true),
+        };
+        const parsedSymbols = {
+            filePath,
+            symbols: [],
+            imports: [],
+            exports: [],
+            parseError: null,
+        };
+
+        const result = await refreshIoIndexPaths([filePath], {
+            workspaceRoot,
+            snapshots: new Map([[filePath, snapshot]]),
+            parsedSymbols: new Map([[filePath, /** @type {any} */ (parsedSymbols)]]),
+        });
+
+        expect(result).toMatchObject({
+            requested: 1,
+            indexed: 1,
+            snapshotReuses: 1,
+            parsedSymbolReuses: 1,
+            failed: 0,
+        });
+        expect(mocks.readTextFileSnapshot).not.toHaveBeenCalled();
+        expect(mocks.indexTextFile).toHaveBeenCalledWith(
+            expect.objectContaining({ filePath, workspaceRoot, content: snapshot.content }),
+            expect.objectContaining({ parsedSymbols }),
+        );
+    });
+
     it('aplica o mesmo domínio no refresh incremental de startup', async () => {
         const workspaceRoot = '/tmp/ws-incremental-domain';
         const scopeRoot = `${workspaceRoot}/src/copilot`;

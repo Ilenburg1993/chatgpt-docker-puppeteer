@@ -547,7 +547,7 @@ export function createIoIndexSqlite(options) {
      *     ino?: number | null;
      *     metadata?: Record<string, unknown>;
      * }} input
-     * @param {{ confirmCurrent?: boolean; attempt?: number; signal?: AbortSignal }} [internal]
+     * @param {{ confirmCurrent?: boolean; attempt?: number; signal?: AbortSignal; parsedSymbols?: import('./io-parser.js').FileSymbols }} [internal]
      */
     async function indexTextFile(input, internal = {}) {
         internal.signal?.throwIfAborted();
@@ -558,9 +558,9 @@ export function createIoIndexSqlite(options) {
         const contentHash = sha256(input.content);
         const indexedAtMs = now();
 
-        let symbols = /** @type {import('./io-parser.js').FileSymbols | null} */ (null);
-        let parseError = /** @type {string | null} */ (null);
-        if (SYMBOL_EXTENSIONS.has(extension)) {
+        let symbols = /** @type {import('./io-parser.js').FileSymbols | null} */ (internal.parsedSymbols ?? null);
+        let parseError = symbols?.parseError ?? /** @type {string | null} */ (null);
+        if (SYMBOL_EXTENSIONS.has(extension) && !symbols) {
             try {
                 symbols = await parseFileSymbols(
                     filePath,

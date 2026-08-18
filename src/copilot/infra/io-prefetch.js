@@ -25,6 +25,8 @@ import { sha256 } from './shared/hash.js';
  * @property {number} [concurrency=8] Default is `8`
  * @property {boolean} [textMode=true] Default is `true`
  * @property {boolean} [silent=true] Default is `true`
+ * @property {boolean} [captureTextSnapshots=false] Retorna snapshots textuais efêmeros para encadear parser/index sem reread.
+ * @property {boolean} [cacheBytes=true] Quando captureTextSnapshots=true, também prima a entrada bytes. Default: true.
  * @property {AbortSignal} [signal]
  */
 
@@ -139,11 +141,113 @@ async function warmSinglePath(filePath, textMode, cachedBytes, cachedText, signa
 }
 
 /**
+ * Converte uma entrada textual L1 já verificada no shape do snapshot baixo, sem copiar conteúdo.
+ *
+ * @param {string} filePath
+ * @param {import('./io-cache.js').IoCacheEntry | null} entry
+ * @returns {import('./io/fs/read-text.js').TextFileSnapshot | null}
+ */
+function textSnapshotFromCacheEntry(filePath, entry) {
+    if (
+        !entry ||
+        typeof entry.content !== 'string' ||
+        !Number.isFinite(entry.size) ||
+        !Number.isFinite(entry.mtime) ||
+        !Number.isFinite(entry.ctime) ||
+        !Number.isFinite(entry.dev) ||
+        !Number.isFinite(entry.ino)
+    ) {
+        return null;
+    }
+    return {
+        path: filePath,
+        content: entry.content,
+        bytesRead: entry.bytes,
+        sizeBytes: Number(entry.size),
+        mtimeMs: Number(entry.mtime),
+        ctimeMs: Number(entry.ctime),
+        dev: Number(entry.dev),
+        ino: Number(entry.ino),
+        attempts: 0,
+        consistent: true,
+    };
+}
+
+/**
+ * Aquece somente o L1 textual e retorna snapshots efêmeros para composição com parser/index. Não mantém uma segunda
+ * cópia de conteúdo: o Map aponta para a mesma string usada para primar/reusar o L1 e deve ser descartado pelo caller
+ * após o pipeline de warm-up.
+ *
  * @param {string[]} paths
  * @param {PrefetchOptions} [opts]
- * @returns {Promise<{ preloaded: number; failed: number; skipped: number; durationMs: number }>}
+ * @returns {Promise<{ preloaded: number; failed: number; skipped: number; durationMs: number; snapshots: Map<string, import('./io/fs/read-text.js').TextFileSnapshot> }>}
+ */
+export async function warmTextSnapshotsForPaths(paths, opts = {}) {
+    const { concurrency = 8, silent = true, signal, cacheBytes = false } = opts;
+    const t0 = performance.now();
+    let preloaded = 0;
+    let failed = 0;
+    let skipped = 0;
+    /** @type {Map<string, import('./io/fs/read-text.js').TextFileSnapshot>} */
+    const snapshots = new Map();
+    const normalizedConcurrency = Number.isFinite(concurrency) ? Math.max(1, Math.floor(concurrency)) : 8;
+    const limit = pLimit(normalizedConcurrency);
+
+    await Promise.all(
+        paths.map((filePath) =>
+            limit(async () => {
+                signal?.throwIfAborted();
+                const normalized = normalizeIoCacheKey(filePath);
+                const textKey = makeTextKey(normalized, undefined, undefined);
+                try {
+                    const cachedText = await getVerifiedIoL1Entry(textKey, filePath);
+                    signal?.throwIfAborted();
+                    let snapshot = textSnapshotFromCacheEntry(filePath, cachedText);
+                    if (snapshot) {
+                        skipped += 1;
+                    } else {
+                        snapshot = await readTextFileSnapshot(filePath, signal ? { signal } : {});
+                        const contentHash = sha256(snapshot.content);
+                        primeIoL1Entry(textKey, snapshot.content, {
+                            sizeBytes: snapshot.sizeBytes,
+                            mtimeMs: snapshot.mtimeMs,
+                            ctimeMs: snapshot.ctimeMs,
+                            dev: snapshot.dev,
+                            ino: snapshot.ino,
+                            contentHash,
+                        });
+                        if (cacheBytes) {
+                            primeIoL1Entry(makeBytesKey(normalized), toOwnedBuffer(snapshot.content), {
+                                sizeBytes: snapshot.sizeBytes,
+                                mtimeMs: snapshot.mtimeMs,
+                                ctimeMs: snapshot.ctimeMs,
+                                dev: snapshot.dev,
+                                ino: snapshot.ino,
+                                contentHash,
+                            });
+                        }
+                        preloaded += 1;
+                    }
+                    snapshots.set(filePath, snapshot);
+                } catch (err) {
+                    signal?.throwIfAborted();
+                    if (!silent) throw err;
+                    failed += 1;
+                }
+            }),
+        ),
+    );
+
+    return { preloaded, failed, skipped, durationMs: Math.max(0, performance.now() - t0), snapshots };
+}
+
+/**
+ * @param {string[]} paths
+ * @param {PrefetchOptions} [opts]
+ * @returns {Promise<{ preloaded: number; failed: number; skipped: number; durationMs: number; snapshots?: Map<string, import('./io/fs/read-text.js').TextFileSnapshot> }>}
  */
 export async function warmCacheForPaths(paths, opts = {}) {
+    if (opts.captureTextSnapshots === true) return warmTextSnapshotsForPaths(paths, opts);
     const { concurrency = 8, textMode = true, silent = true, signal } = opts;
     const t0 = performance.now();
     let preloaded = 0;
@@ -193,7 +297,7 @@ export async function warmCacheForPaths(paths, opts = {}) {
  * @param {string} sessionId
  * @param {string[]} paths
  * @param {PrefetchOptions} [opts]
- * @returns {Promise<SessionScopeStats>}
+ * @returns {Promise<SessionScopeStats & { snapshots?: Map<string, import('./io/fs/read-text.js').TextFileSnapshot> }>}
  */
 export async function startSessionScope(sessionId, paths, opts = {}) {
     /** @type {_SessionScope} */
@@ -214,7 +318,10 @@ export async function startSessionScope(sessionId, paths, opts = {}) {
     scope.failed = result.failed;
     scope.skipped = result.skipped;
 
-    return _toStats(scope, result.durationMs);
+    return {
+        ..._toStats(scope, result.durationMs),
+        ...(result.snapshots ? { snapshots: result.snapshots } : {}),
+    };
 }
 
 /**
@@ -269,6 +376,7 @@ export function listSessionScopes() {
  *     durationMs: number;
  *     paths: string[];
  *     advisoryLimits: Record<string, unknown>;
+ *     snapshots?: Map<string, import('./io/fs/read-text.js').TextFileSnapshot>;
  * }>}
  */
 export async function warmFromDirectory(directory, opts = {}, prefetchOpts = {}) {

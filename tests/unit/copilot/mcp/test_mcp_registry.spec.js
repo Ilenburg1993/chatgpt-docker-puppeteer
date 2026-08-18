@@ -132,6 +132,7 @@ describe('copilot MCP registry', () => {
             'repo_status',
             'repo_symbol_search',
             'repo_tree',
+            'repo_working_set',
             'repo_write_file',
             'run_copilot_validator',
             'run_lint_copilot',
@@ -214,12 +215,17 @@ describe('copilot MCP registry', () => {
         const tools = getCanonicalMcpTools();
 
         const expectedOpenWorld = new Set(['git_push_plan', 'git_push', 'git_publish_changes', 'llmb_live_test_run']);
+        const statefulReadOnly = new Set(['repo_working_set']);
         for (const tool of tools) {
             assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', tool.name);
             assert.equal(tool.annotations.openWorldHint, expectedOpenWorld.has(tool.name), tool.name);
             assert.equal(typeof tool.annotations.destructiveHint, 'boolean', tool.name);
             assert.equal(typeof tool.annotations.idempotentHint, 'boolean', tool.name);
-            assert.equal(tool.annotations.idempotentHint, tool.annotations.readOnlyHint === true, tool.name);
+            assert.equal(
+                tool.annotations.idempotentHint,
+                tool.annotations.readOnlyHint === true && !statefulReadOnly.has(tool.name),
+                tool.name,
+            );
         }
         assert.equal(tools.find((tool) => tool.name === 'repo_remove_file')?.annotations.destructiveHint, true);
     });

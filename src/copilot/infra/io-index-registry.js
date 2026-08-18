@@ -19,6 +19,7 @@ import { createIoIndexSqlite } from './io-index-sqlite.js';
 import { loadGitignoreMatcher } from './scan/gitignore.js';
 import { matchesAnyPattern } from './scan/glob.js';
 import { readEnvNonNegativeInt, readEnvPositiveInt } from './shared/env.js';
+import { richFingerprintMatches } from './shared/fingerprint-match.js';
 
 /** @type {ReturnType<typeof createIoIndexSqlite> | null} */
 let _ioIndex = null;
@@ -360,7 +361,7 @@ export async function buildIoIndexForDirectory(directory, options = {}) {
  * used by incremental startup so MCP/LLM-B edits do not require a directory-wide scan.
  *
  * @param {readonly string[]} filePaths
- * @param {{ workspaceRoot: string; scopeRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[]; signal?: AbortSignal }} options
+ * @param {{ workspaceRoot: string; scopeRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[]; snapshots?: ReadonlyMap<string, import('./io/fs/read-text.js').TextFileSnapshot>; parsedSymbols?: ReadonlyMap<string, import('./io-parser.js').FileSymbols>; signal?: AbortSignal }} options
  */
 export async function refreshIoIndexPaths(filePaths, options) {
     if (options.scopeRoot) configureIndexAutoRefreshDomain(options.scopeRoot, options);
@@ -374,6 +375,8 @@ export async function refreshIoIndexPaths(filePaths, options) {
     let indexed = 0;
     let invalidated = 0;
     let unchanged = 0;
+    let snapshotReuses = 0;
+    let parsedSymbolReuses = 0;
     let skipped = 0;
     let failed = 0;
     const startedAt = Date.now();
@@ -416,7 +419,31 @@ export async function refreshIoIndexPaths(filePaths, options) {
                 unchanged += 1;
                 continue;
             }
-            const snapshot = await readTextFileSnapshot(rawPath, options.signal ? { signal: options.signal } : {});
+            const suppliedSnapshot = options.snapshots?.get(rawPath) ?? null;
+            const snapshot =
+                suppliedSnapshot &&
+                richFingerprintMatches(
+                    {
+                        sizeBytes: suppliedSnapshot.sizeBytes,
+                        mtimeMs: suppliedSnapshot.mtimeMs,
+                        ctimeMs: suppliedSnapshot.ctimeMs,
+                        dev: suppliedSnapshot.dev,
+                        ino: suppliedSnapshot.ino,
+                    },
+                    {
+                        sizeBytes: stat.size,
+                        mtimeMs: stat.mtimeMs,
+                        ctimeMs: stat.ctimeMs,
+                        dev: Number(stat.dev),
+                        ino: Number(stat.ino),
+                    },
+                    { mtimeToleranceMs: 0 },
+                )
+                    ? suppliedSnapshot
+                    : await readTextFileSnapshot(rawPath, options.signal ? { signal: options.signal } : {});
+            if (snapshot === suppliedSnapshot) snapshotReuses += 1;
+            const suppliedSymbols = snapshot === suppliedSnapshot ? options.parsedSymbols?.get(rawPath) : undefined;
+            if (suppliedSymbols) parsedSymbolReuses += 1;
             await index.indexTextFile(
                 {
                     filePath: rawPath,
@@ -429,7 +456,10 @@ export async function refreshIoIndexPaths(filePaths, options) {
                     ino: snapshot.ino,
                     metadata: { refreshMode: 'explicit-path' },
                 },
-                options.signal ? { signal: options.signal } : {},
+                {
+                    ...(options.signal ? { signal: options.signal } : {}),
+                    ...(suppliedSymbols ? { parsedSymbols: suppliedSymbols } : {}),
+                },
             );
             indexed += 1;
         } catch (error) {
@@ -448,6 +478,8 @@ export async function refreshIoIndexPaths(filePaths, options) {
         indexed,
         invalidated,
         unchanged,
+        snapshotReuses,
+        parsedSymbolReuses,
         skipped,
         failed,
         durationMs: Math.max(0, Date.now() - startedAt),
