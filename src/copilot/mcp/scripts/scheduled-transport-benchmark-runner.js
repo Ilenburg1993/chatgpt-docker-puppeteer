@@ -174,6 +174,7 @@ function compactMetrics(snapshot) {
         ok: snapshot.ok,
         totalRequests: numberOrNull(operational['totalRequests']),
         requestErrors: numberOrNull(operational['requestErrors']),
+        responseCodes: numericRecord(operational['responseCodes']),
         haConnections: numberOrNull(operational['haConnections']),
         rpcClientLatency: {
             count: numberOrNull(rpc['count']),
@@ -200,10 +201,11 @@ function compactMetrics(snapshot) {
  * @param {Record<string, unknown>} before
  * @param {Record<string, unknown>} after
  */
-function buildMetricDelta(before, after) {
+export function buildTransportMetricDelta(before, after) {
     return {
         totalRequests: numericDelta(before['totalRequests'], after['totalRequests']),
         requestErrors: numericDelta(before['requestErrors'], after['requestErrors']),
+        responseCodes: numericRecordDelta(before['responseCodes'], after['responseCodes']),
     };
 }
 
@@ -245,6 +247,31 @@ function numberOrNull(value) {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+/** @param {unknown} value */
+function numericRecord(value) {
+    const record = recordOrEmpty(value);
+    /** @type {Record<string, number>} */
+    const output = {};
+    for (const [key, candidate] of Object.entries(record)) {
+        if (typeof candidate === 'number' && Number.isFinite(candidate)) output[key] = candidate;
+    }
+    return output;
+}
+
+/** @param {unknown} before @param {unknown} after */
+function numericRecordDelta(before, after) {
+    const beforeRecord = numericRecord(before);
+    const afterRecord = numericRecord(after);
+    const keys = [...new Set([...Object.keys(beforeRecord), ...Object.keys(afterRecord)])].sort();
+    /** @type {Record<string, number>} */
+    const output = {};
+    for (const key of keys) {
+        const delta = (afterRecord[key] ?? 0) - (beforeRecord[key] ?? 0);
+        if (delta !== 0) output[key] = delta;
+    }
+    return output;
+}
+
 /** @param {unknown} before @param {unknown} after */
 function numericDelta(before, after) {
     return typeof before === 'number' && typeof after === 'number' ? after - before : null;
@@ -266,7 +293,7 @@ function reloadProfileForProtocol(profile) {
  * @param {Record<string, unknown>[]} windows
  * @param {string} controlProfile
  */
-function buildComparison(windows, controlProfile) {
+export function buildComparison(windows, controlProfile) {
     const control = windows.find((window) => window['profile'] === controlProfile);
     const controlP95 = numberOrNull(recordOrEmpty(control?.['smokeLatency'])['p95Ms']);
     const candidates = windows.map((window) => {
@@ -275,28 +302,50 @@ function buildComparison(windows, controlProfile) {
             controlP95 && p95Ms !== null ? Number((((p95Ms - controlP95) / controlP95) * 100).toFixed(2)) : null;
         const comparable = window['comparable'] === true;
         const clean = window['clean'] === true;
+        const requestErrorReview = window['reviewRequired'] === true;
+        const withinP95Budget =
+            window['profile'] === controlProfile ||
+            (regressionPercent !== null && regressionPercent <= MAX_P95_REGRESSION_PERCENT);
         return {
             profile: window['profile'],
             p95Ms,
             regressionPercent,
             comparable,
+            hardGatesPassed: comparable,
             clean,
-            withinP95Budget:
-                window['profile'] === controlProfile ||
-                (regressionPercent !== null && regressionPercent <= MAX_P95_REGRESSION_PERCENT),
-            eligibleForDecision:
-                comparable &&
-                clean &&
-                (window['profile'] === controlProfile ||
-                    (regressionPercent !== null && regressionPercent <= MAX_P95_REGRESSION_PERCENT)),
+            requestErrorReview,
+            withinP95Budget,
+            eligibleForDecision: comparable && withinP95Budget,
         };
     });
     return {
         controlProfile,
         controlP95Ms: controlP95,
         maxP95RegressionPercent: MAX_P95_REGRESSION_PERCENT,
+        requestErrorPolicy: 'advisory: raw cloudflared origin-proxy error deltas require review alongside response-code deltas and fresh smoke/origin diagnostics; they do not veto an otherwise green comparable window',
         autoPromotion: false,
         candidates,
+    };
+}
+
+/**
+ * @param {{ allSmokesPassed: boolean; smokeSampleCount: number; requiredSampleCount: number; beforeOk: boolean; afterOk: boolean; haConnections: number | null; requestErrorsDelta: number | null }} input
+ */
+export function classifyTransportWindow(input) {
+    const comparable =
+        input.allSmokesPassed &&
+        input.smokeSampleCount >= input.requiredSampleCount &&
+        input.beforeOk &&
+        input.afterOk &&
+        input.haConnections === 4;
+    const requestErrorsChanged = comparable && input.requestErrorsDelta !== null && input.requestErrorsDelta !== 0;
+    return {
+        comparable,
+        hardGatesPassed: comparable,
+        clean: comparable && !requestErrorsChanged,
+        reviewRequired: requestErrorsChanged,
+        requestErrorSignal: requestErrorsChanged ? 'changed-advisory' : comparable ? 'unchanged' : 'not-comparable',
+        requestErrorPolicy: 'advisory-not-eligibility-gate',
     };
 }
 
@@ -350,16 +399,18 @@ async function main() {
             }
             const after = compactMetrics(await readMetricsWithRetry());
             const durations = smokeRuns.filter((run) => run.exitCode === 0).map((run) => run.durationMs);
-            const metricDelta = buildMetricDelta(before, after);
+            const metricDelta = buildTransportMetricDelta(before, after);
             const smokeLatency = summarizeDurations(durations);
             const allSmokesPassed = smokeRuns.length === SAMPLE_COUNT && smokeRuns.every((run) => run.exitCode === 0);
-            const comparable =
-                allSmokesPassed &&
-                smokeLatency.count >= SAMPLE_COUNT &&
-                before['ok'] === true &&
-                after['ok'] === true &&
-                after['haConnections'] === 4;
-            const clean = comparable && metricDelta.requestErrors === 0;
+            const windowHealth = classifyTransportWindow({
+                allSmokesPassed,
+                smokeSampleCount: smokeLatency.count,
+                requiredSampleCount: SAMPLE_COUNT,
+                beforeOk: before['ok'] === true,
+                afterOk: after['ok'] === true,
+                haConnections: numberOrNull(after['haConnections']),
+                requestErrorsDelta: metricDelta.requestErrors,
+            });
             const window = {
                 profile,
                 restart,
@@ -369,9 +420,7 @@ async function main() {
                 metricsAfter: after,
                 metricDelta,
                 allSmokesPassed,
-                comparable,
-                clean,
-                reviewRequired: comparable && metricDelta.requestErrors !== 0,
+                ...windowHealth,
             };
             windows.push(window);
             await writeState({

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # local-dns-cache.sh — DevContainer Local DNS Cache Manager
-# Version: v1.8.0
+# Version: v1.8.1
 #
 # Purpose:
 #   Optional runtime-only DNS cache layer for DevContainers. Intended to be
@@ -96,6 +96,13 @@
 #   - Adds richer proof/summary fields for default-on governance: local probe
 #     tool/proof, Docker split domains, resolv.conf write privilege, and target
 #     port conflict status.
+#
+# v1.8.1 focus:
+#   - Separa ocupação esperada da porta alvo pelo dnsmasq gerenciado de conflito
+#     real com owner incompatível; o summary deixa de chamar o próprio listener
+#     saudável de `in-use`/conflito semântico.
+#   - Mantém compatibilidade observacional através de dnsmasq_port_status e
+#     produz tokens `conflict-*` específicos para ownership não gerenciado.
 # =============================================================================
 
 set +e
@@ -108,7 +115,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'local-dns-cache.sh' '1.8.0'
+        printf '%s v%s\n' 'local-dns-cache.sh' '1.8.1'
         exit 0
         ;;
     --help)
@@ -141,6 +148,10 @@ v1.8.0 makes default-on operation stricter: /etc/resolv.conf is not rewritten
 unless the local cache is proven by dig/drill/nslookup, Docker embedded DNS is
 split-routed by default when detected, and ranked mode avoids live boot
 benchmarks unless explicitly enabled.
+
+v1.8.1 reports a managed dnsmasq bound to the configured target port as expected
+ownership (`dnsmasq_target_port_conflict_status=none`). Unmanaged/ambiguous owners
+remain explicit `conflict-*` evidence instead of sharing the same `in-use` token.
 
 This script is runtime-only. It may start a bounded loopback dnsmasq helper and
 may rewrite /etc/resolv.conf when explicitly enabled by configuration.
@@ -249,7 +260,7 @@ sanitize_resolv_options() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="local-dns-cache.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="1.8.0"
+SCRIPT_VERSION="1.8.1"
 readonly SCRIPT_VERSION
 
 POSITIONAL_ACTION=""
@@ -1146,17 +1157,32 @@ collect_runtime_health() {
     collect_socket_pid_state
     if [[ "${STRICT_PORT_CHECK}" == "true" ]] && port_in_use "${DNS_BIND_ADDRESS}" "${DNS_BIND_PORT}"; then
         case "${DNSMASQ_PROCESS_STATUS}" in
-            running-managed) DNSMASQ_PORT_STATUS="bound-managed" ;;
-            running-managed-no-pidfile) DNSMASQ_PORT_STATUS="bound-managed-no-pidfile" ;;
-            running-managed-stale-pidfile) DNSMASQ_PORT_STATUS="bound-managed-stale-pidfile" ;;
-            running-dnsmasq-unmanaged-pidfile) DNSMASQ_PORT_STATUS="bound-dnsmasq-unmanaged-pidfile" ;;
+            running-managed)
+                DNSMASQ_PORT_STATUS="bound-managed"
+                DNSMASQ_TARGET_PORT_CONFLICT_STATUS="none"
+                ;;
+            running-managed-no-pidfile)
+                DNSMASQ_PORT_STATUS="bound-managed-no-pidfile"
+                DNSMASQ_TARGET_PORT_CONFLICT_STATUS="none"
+                ;;
+            running-managed-stale-pidfile)
+                DNSMASQ_PORT_STATUS="bound-managed-stale-pidfile"
+                DNSMASQ_TARGET_PORT_CONFLICT_STATUS="none"
+                ;;
+            running-dnsmasq-unmanaged-pidfile)
+                DNSMASQ_PORT_STATUS="bound-dnsmasq-unmanaged-pidfile"
+                DNSMASQ_TARGET_PORT_CONFLICT_STATUS="conflict-dnsmasq-unmanaged-pidfile"
+                ;;
             *)
                 if [[ "${DNSMASQ_SOCKET_DNSMASQ_PIDS}" != "none" && "${DNSMASQ_SOCKET_DNSMASQ_PIDS}" != "unavailable" ]]; then
                     DNSMASQ_PORT_STATUS="bound-dnsmasq-unmanaged"
+                    DNSMASQ_TARGET_PORT_CONFLICT_STATUS="conflict-dnsmasq-unmanaged"
                 elif [[ "${DNSMASQ_SOCKET_OWNER_VISIBILITY}" != "visible" && "${DNSMASQ_SOCKET_OWNER_VISIBILITY}" != "none" ]]; then
                     DNSMASQ_PORT_STATUS="bound-owner-unavailable"
+                    DNSMASQ_TARGET_PORT_CONFLICT_STATUS="conflict-owner-unavailable"
                 else
                     DNSMASQ_PORT_STATUS="bound-unmanaged"
+                    DNSMASQ_TARGET_PORT_CONFLICT_STATUS="conflict-unmanaged"
                 fi
                 ;;
         esac

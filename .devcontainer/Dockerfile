@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# Dockerfile v1.5.0 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
+# Dockerfile v1.5.1 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
 # Base: Node.js 24 + Debian Bookworm (Microsoft DevContainers)
 # hadolint global ignore=DL3008,DL3059,DL3009
 #
-# OBJETIVO MACRO (v1.5.0)
+# OBJETIVO MACRO (v1.5.1)
 #   Este Dockerfile define uma imagem DEV (apenas desenvolvimento) com foco em:
 #   - Estabilidade máxima do VS Code Server (Remote - Containers / Dev Containers)
 #   - Compatibilidade alta com GitHub Copilot / Copilot Chat e fluxos de agente
@@ -26,8 +26,14 @@
 #   altos no host (na prática, root-equivalent). Isso é deliberado para DEV.
 #
 # VERSÃO
-#   - Todas as versões/contratos internos nesta imagem usam "1.5.0".
-#   - ARG VERSION default é 1.5.0 e é propagado para contratos e labels OCI.
+#   - Todas as versões/contratos internos nesta imagem usam "1.5.1".
+#   - ARG VERSION default é 1.5.1 e é propagado para contratos e labels OCI.
+#
+# CHANGELOG v1.5.1:
+#   - Sincroniza a imagem com devcontainer.json v5.9.1 e o control plane atual.
+#   - Alinha post-start v3.0.3, local-dns-cache v1.8.1 e network-control-plane-state v1.1.1.
+#   - Corrige geração/labels ativos e documenta a recuperação do caminho canônico do agregador passivo.
+#   - Preserva a topologia de rede: DNS fail-safe default-on, proxy opt-in e nenhum benchmark longo no build/boot.
 #
 # CHANGELOG v1.5.0:
 #   - Sincroniza a imagem com devcontainer.json v5.9.0 e com o control plane
@@ -119,9 +125,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # ---------------------------------------------------------------------------
 # Build-time metadata (OCI)
-# - VERSION deve ser "1.5.0" para o release canônico (pode ser override via build-arg).
+# - VERSION deve ser "1.5.1" para o release canônico (pode ser override via build-arg).
 # ---------------------------------------------------------------------------
-ARG VERSION=1.5.0
+ARG VERSION=1.5.1
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG IMAGE_NAME=chatgpt-docker-puppeteer
@@ -134,9 +140,9 @@ LABEL org.opencontainers.image.title="${IMAGE_NAME}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.environment="${BUILD_ENV}" \
-    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.5.0" \
-    devcontainer.image.version="1.5.0" \
-    devcontainer.control-plane.generation="network-control-plane-v5.9.0"
+    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.5.1" \
+    devcontainer.image.version="1.5.1" \
+    devcontainer.control-plane.generation="network-control-plane-v5.9.1"
 
 # ---------------------------------------------------------------------------
 # Build-time feedback (logs)
@@ -738,14 +744,14 @@ RUN mkdir -p /etc/powershell \
 RUN cat > /etc/powershell/PowerShell.Contract.ps1 <<'EOF'
 # =============================================================================
 # PowerShell Contract — DevContainer
-# Version: 1.5.0
+# Version: 1.5.1
 #
 # Authority Model:
 #   • PowerShell  → Instrumental (subordinado)
 #   • Bash        → Canonical (autoridade)
 # =============================================================================
 
-$env:POWERSHELL_CONTRACT_VERSION = "1.5.0"
+$env:POWERSHELL_CONTRACT_VERSION = "1.5.1"
 $env:POWERSHELL_CONTRACT_LOADED  = "true"
 $env:POWERSHELL_ROLE             = "instrumental"
 $env:POWERSHELL_AUTHORITY        = "subordinate"
@@ -862,7 +868,7 @@ RUN set -e; \
 RUN set -e; \
     echo ""; \
     echo "═══════════════════════════════════════════════════"; \
-    echo " Tool Validation Gate — DevContainer v1.5.0"; \
+    echo " Tool Validation Gate — DevContainer v1.5.1"; \
     echo "═══════════════════════════════════════════════════"; \
     _ok=0; _fail=0; _warn=0; \
     _check() { \
@@ -1030,7 +1036,7 @@ RUN mkdir -p \
 
 
 # =============================================================================
-# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.5.0
+# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.5.1
 #
 # Hierarquia prática (maior prioridade -> menor):
 #   1) devcontainer.json: remoteEnv (processos geridos pelo VS Code)
@@ -1088,7 +1094,7 @@ ENV PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
     MOCK_CHROME=0 \
     ENABLE_STATE_FILE=true
 
-# CHROME PROXY SERVICE (v1.5.0)
+# CHROME PROXY SERVICE (v1.5.1)
 ENV WS_IDLE_TIMEOUT_MS=300000 \
     ALLOWED_ORIGINS="http://localhost:3008,http://127.0.0.1:3008"
 
@@ -1099,7 +1105,7 @@ ENV WS_IDLE_TIMEOUT_MS=300000 \
 ENV UV_THREADPOOL_SIZE=16
 
 # GitHub/Copilot network architecture defaults (runtime-only).
-# v1.5.0 aligns image defaults with devcontainer.json v5.9.0.
+# v1.5.1 aligns image defaults with devcontainer.json v5.9.1.
 # These remain bounded and non-daemonizing at build time:
 #   - tools are installed in the image;
 #   - DNS cache is default-on only when lifecycle scripts run and prove safety;
@@ -1177,7 +1183,7 @@ ENV DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE=true \
 
 
 # =============================================================================
-# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.5.0)
+# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.5.1)
 #
 # Objetivos:
 #   [A] Infra: bash-completion + dumb-init (entrypoint)
@@ -1223,7 +1229,7 @@ RUN command -v dumb-init >/dev/null 2>&1
 RUN mkdir -p /etc/profile.d \
     && printf '%s\n' \
     '# Canonical Runtime Shell Contract' \
-    '# Version: 1.5.0' \
+    '# Version: 1.5.1' \
     '# Declarative only — no logic, no side effects' \
     '# AI-AWARE CONTRACT (Semantic Hints Only)' \
     '' \
@@ -1271,7 +1277,7 @@ RUN mkdir -p /etc/profile.d \
 #   - Deve poder ser sourceado por /etc/profile.
 RUN cat > /etc/profile.d/10-gatekeeper-nss.sh <<'EOF'
 # DevContainer Gatekeeper — NSS Wrapper
-# Version: 1.5.0
+# Version: 1.5.1
 # Scope: Universal (all shells)
 # Mutability: READ-ONLY (Image-level)
 # Behavior: Fail-safe; canonicalizes LD_PRELOAD and binds NSS to valid files.
@@ -1396,7 +1402,7 @@ RUN sed -i 's/\r$//' /usr/local/bin/nss-gatekeeper \
 # Healthcheck e utilitário de JSONC (image-level, independentes do workspace).
 RUN cat > /usr/local/bin/devcontainer-healthcheck.sh <<'EOF'
 #!/usr/bin/env bash
-# Image-level healthcheck shim — DevContainer v1.5.0
+# Image-level healthcheck shim — DevContainer v1.5.1
 #
 # Contract:
 # - Prefer the workspace canonical healthcheck when the workspace is mounted.

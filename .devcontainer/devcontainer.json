@@ -1,5 +1,5 @@
 // ============================================================================
-// DevContainer — Ambiente de Desenvolvimento Controlado - v5.9.0
+// DevContainer — Ambiente de Desenvolvimento Controlado - v5.9.1
 // Projeto: chatgpt-docker-puppeteer
 //
 // Propósito:
@@ -28,17 +28,26 @@
 //   inferência. Quando declaradas, são forwardadas explicitamente e com política
 //   de UX silenciosa/ignore. O acesso operacional continua decidido pelo runtime.
 //
+// CHANGELOG v5.9.1 (2026-08-18):
+// 🌐 NETWORK OBSERVABILITY + CONTROL-PLANE PATH SELF-HEALING
+// ✅ ALINHADO: Dockerfile v1.5.1; post-create v1.2.3; post-start v3.0.3.
+// ✅ ALINHADO: local-dns-cache v1.8.1; network-control-plane-state v1.1.1.
+// ✅ CORRIGIDO: caminho canônico do Network Control Plane sem o segmento `network/` espúrio.
+// ✅ CORRIGIDO: versões/labels ativos do DevContainer e da imagem, antes divergentes do Dockerfile canônico.
+// ✅ ENDURECIDO: hooks recuperam override runtime stale/ilegível usando o script canônico existente.
+// ✅ MANTIDO: DNS default-on fail-safe; proxy local opt-in; benchmarks longos fora do boot.
+//
 // CHANGELOG v5.9.0 (2026-05-20):
 // 🌐 DEFAULT-ON DNS + POST-START 3.0.2 + CONTROL PLANE STATE SYNC
 // ✅ ALINHADO: Dockerfile v1.4.2
 // ✅ ALINHADO: package.json v1.1.3
 // ✅ ALINHADO: Makefile v4.3.0
-// ✅ ALINHADO: post-create v1.1.0
+// ✅ ALINHADO: post-create v1.2.2
 // ✅ ALINHADO: post-start v3.0.2
 // ✅ ALINHADO: post-attach v5.9.0
 // ✅ ALINHADO: healthcheck v3.0.0
 // ✅ ALINHADO: sync-local-auth v2.0.0
-// ✅ ALINHADO: network-control-plane-state v1.0.0
+// ✅ ALINHADO: network-control-plane-state v1.1.0
 // ✅ ALINHADO: github-api-route-fix v1.9.1
 // ✅ ALINHADO: local-dns-cache v1.8.0
 // ✅ ALINHADO: local-copilot-proxy v1.3.1
@@ -167,7 +176,7 @@
 // ============================================================================
 {
   // ============================================================
-  // BUILD CONFIGURATION (v5.9.0 — Dockerfile v1.4.2 sync)
+  // BUILD CONFIGURATION (v5.9.1 — Dockerfile v1.5.1 sync)
   // ============================================================
   "build": {
     "args": {
@@ -186,7 +195,7 @@
       "REMOTE_USER": "node",
       "VCS_REF": "${localEnv:GIT_COMMIT}",
       // --- METADATA & VERSIONING ---
-      "VERSION": "1.4.2",
+      "VERSION": "1.5.1",
       // --- NETWORK CONTROL PLANE DEFAULTS ---
       // Usados apenas como defaults de imagem; benchmark longo permanece manual.
       "NETWORK_BENCHMARK_DURATION_SECONDS": "${localEnv:NETWORK_BENCHMARK_DURATION_SECONDS:600}",
@@ -197,7 +206,7 @@
     "dockerfile": "Dockerfile"
   },
   // ============================================================
-  // CONTAINER ENVIRONMENT VARIABLES (v5.9.0 — NSS/Dockerfile/network sync)
+  // CONTAINER ENVIRONMENT VARIABLES (v5.9.1 — NSS/Dockerfile/network sync)
   // ============================================================
   "containerEnv": {
     // canonical shell contract mirrored from /etc/profile.d/00-runtime.sh
@@ -211,13 +220,13 @@
     "APP_ENV": "dev",
     "APP_NAME": "chatgpt-docker-puppeteer",
     "APP_ROLE": "agent",
-    "DEVCONTAINER_VERSION": "5.9.0",
-    "DEVCONTAINER_CONTROL_PLANE_GENERATION": "network-control-plane-v5.9.0",
+    "DEVCONTAINER_VERSION": "5.9.1",
+    "DEVCONTAINER_CONTROL_PLANE_GENERATION": "network-control-plane-v5.9.1",
     "DEVCONTAINER_CANONICAL_ENDPOINT_REGISTRY": "${containerWorkspaceFolder}/.devcontainer/scripts/network/endpoints.github-copilot.tsv",
-    "DEVCONTAINER_POST_START_SCRIPT_VERSION_EXPECTED": "3.0.2",
+    "DEVCONTAINER_POST_START_SCRIPT_VERSION_EXPECTED": "3.0.3",
     "DEVCONTAINER_POST_ATTACH_SCRIPT_VERSION_EXPECTED": "5.9.0",
     "DEVCONTAINER_HEALTHCHECK_SCRIPT_VERSION_EXPECTED": "3.0.0",
-    "DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT_VERSION_EXPECTED": "1.0.0",
+    "DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT_VERSION_EXPECTED": "1.1.1",
     "DEVCONTAINER_SYNC_LOCAL_AUTH_SCRIPT_VERSION_EXPECTED": "2.0.0",
     // CHOKIDAR_USEPOLLING e CHOKIDAR_INTERVAL removidos em v5.4.0:
     // O workspace é montado como ext4 (inotify nativo funciona).
@@ -392,7 +401,7 @@
     "DEVCONTAINER_LOCAL_DNS_STATUS_STALE_MAX_SECONDS": "300",
     "DEVCONTAINER_LOCAL_DNS_FAST_RETRY": "false",
 
-    // Proxy HTTP CONNECT local: disponível na imagem v1.4.2, mas desligado por padrão.
+    // Proxy HTTP CONNECT local: disponível na imagem v1.5.1, mas desligado por padrão.
     // Para habilitar de forma explícita: DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY=true
     // e DEVCONTAINER_COPILOT_PROXY_MODE=local.
     "DEVCONTAINER_ENABLE_LOCAL_COPILOT_PROXY": "false",
@@ -424,7 +433,7 @@
     "DEVCONTAINER_ENABLE_NETWORK_CONTROL_PLANE_STATE": "true",
     "DEVCONTAINER_NETWORK_CONTROL_PLANE_POST_START_ACTION": "summary",
     "DEVCONTAINER_NETWORK_CONTROL_PLANE_TIMEOUT_SECONDS": "10",
-    "DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT": "${containerWorkspaceFolder}/.devcontainer/scripts/network/network-control-plane-state.sh",
+    "DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT": "${containerWorkspaceFolder}/.devcontainer/scripts/network-control-plane-state.sh",
     "DEVCONTAINER_HEALTHCHECK_MIN_NODE_MAJOR": "24",
     // Safe to globalize as long as NSS_WRAPPER_* points at files that always exist.
     // This keeps base container processes (including VS Code bootstrap paths)
@@ -1538,17 +1547,17 @@
     "--sysctl",
     "net.ipv4.tcp_fin_timeout=30",
     "--network=bridge",
-    // METADATA: sincronizado com Dockerfile v1.4.2 e devcontainer v5.9.0
+    // METADATA: sincronizado com Dockerfile v1.5.1 e devcontainer v5.9.1
     "--label",
     "project=chatgpt-docker-puppeteer",
     "--label",
     "role=devcontainer",
     "--label",
-    "version=1.4.2",
+    "version=1.5.1",
     "--label",
-    "image.version=1.4.2",
+    "image.version=1.5.1",
     "--label",
-    "devcontainer.version=5.9.0"
+    "devcontainer.version=5.9.1"
   ],
   // ============================================================
   // LIFECYCLE FINALIZATION

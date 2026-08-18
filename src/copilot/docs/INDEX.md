@@ -2,7 +2,7 @@
 
 > Autoridade documental para navegação, precedência e status dos documentos sob `src/copilot/docs`.
 >
-> Atualizado em: 2026-08-14.
+> Atualizado em: 2026-08-18.
 
 ## 1. Como usar este índice
 
@@ -31,9 +31,11 @@ Para trabalho amplo via WORKSPACE, comece pela menor fotografia operacional úti
 Depois navegue preferencialmente por símbolo/outline, use plan + precondition/hash em writes e quarantine antes de delete
 quando a remoção puder ser reversível.
 
-## 2. Documento de coordenação ativo
+## 2. Documentos de coordenação ativos
 
-- `WORKSPACE_SRC_COPILOT_DIAGNOSTICO_ESTADO_ALVO_E_ROADMAP_2026-08-14.md` — diagnóstico amplo, estado-alvo, execução e roadmap mestre. É a referência primária para a transformação atual e deve receber a revisão final de cada grande onda de trabalho. A Parte XIV governa a segunda onda: billing/usage AI-credit-first, Git stage/commit/push governado, reload do MCP e control plane MCP↔LLM-B; decomposição de hotspots está explicitamente adiada.
+- `WORKSPACE_MCP_IO_LATENCIA_LIBERDADE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-17.md` — roadmap mestre mais recente para MCP, I/O, latência, liberdade operacional, tool surface, round-trips e evolução do workspace. É a referência de coordenação geral desta onda.
+- `DEVCONTAINER_NETWORK_CONTROL_PLANE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-18.md` — referência especializada canônica para DevContainer, Network Control Plane, DNS, GitHub/Copilot/OpenAI/ChatGPT reachability, Cloudflare/MCP, autoridade temporal, lifecycle e roadmap provider-neutral. Em decisões dessa frente, prevalece sobre roadmaps de rede anteriores, sempre subordinado ao código/testes validados.
+- `WORKSPACE_SRC_COPILOT_DIAGNOSTICO_ESTADO_ALVO_E_ROADMAP_2026-08-14.md` — diagnóstico amplo predecessor. Permanece útil para contexto e decisões ainda não superseded, mas deve ser reconciliado com os documentos de 17–18 de agosto antes de orientar nova implementação.
 
 ## 3. Mapas arquiteturais canônicos
 
@@ -59,6 +61,7 @@ quando a remoção puder ser reversível.
 
 ### Arquitetura e roadmaps especializados
 
+- `DEVCONTAINER_NETWORK_CONTROL_PLANE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-18.md` — arquitetura e roadmap ativo do NCP/DevContainer e do circuito ChatGPT/OpenAI↔MCP/Cloudflare; contém o estado-alvo provider-neutral e os gates atuais.
 - `MCP_CANONICAL_ARCHITECTURE_2026-06-01.md` — arquitetura MCP consolidada da onda de junho.
 - `MIGRACAO-MCP-STATEFUL-STREAMABLE-HTTP-ROADMAP-2026-06-13.md` — histórico da migração stateful; verificar estado atual antes de executar itens abertos.
 - `CLOUDFLARE_EDGE_CANONICAL_ROADMAP_2026-05-24.md` — histórico/planejamento de edge; alterações remotas devem partir dos audits e plans atuais, nunca apenas deste documento.

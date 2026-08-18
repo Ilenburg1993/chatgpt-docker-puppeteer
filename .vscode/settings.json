@@ -1115,4 +1115,8 @@
   "workbench.browser.showInTitleBar": true,
   "workbench.browser.enableChatTools": true,
   "kilo-code.new.browserAutomation.enabled": true,
+  "workbench.browser.experimentalUserTools.enabled": true,
+  "github.copilot.chat.localIndex.enabled": true,
+  "editor.experimentalGpuAcceleration": "off",
+  "terminal.integrated.enableWin32InputMode": true,
 }

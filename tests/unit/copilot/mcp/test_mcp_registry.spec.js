@@ -72,6 +72,7 @@ describe('copilot MCP registry', () => {
             'mcp_cloudflare_transport_benchmark_plan',
             'mcp_connection_readiness',
             'mcp_connector_smoke_refresh',
+            'mcp_devcontainer_network_control_plane_refresh',
             'mcp_devcontainer_network_posture_audit',
             'mcp_golden_prompts',
             'mcp_host_block_diagnostics',
@@ -189,7 +190,7 @@ describe('copilot MCP registry', () => {
         const oldMax = process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'];
         const oldPercent = process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'];
         try {
-            process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'] = '120';
+            process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'] = '130';
             process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'] = '80';
             resetCanonicalMcpToolsCacheForTests();
             getCanonicalMcpTools();

@@ -2,7 +2,7 @@
 # =============================================================================
 # post-create.sh — Inicialização Estrutural do DevContainer (CANÔNICO)
 #
-# Version: v1.2.2 (toolchain/control-plane sync + structural audit hardening)
+# Version: v1.2.3 (network path self-healing + runtime contract sync)
 #
 # PRINCÍPIO:
 #   Este script NÃO é conveniência de setup. É verificação estrutural.
@@ -137,6 +137,13 @@
 #     para network:state/control-plane, sem executar probes nem benchmarks.
 #   - Expande summary/report/manifesto com expected/detected/status de
 #     package, Makefile e network-control-plane.
+#
+# CHANGELOG v1.2.3:
+#   - Sincroniza a matriz estrutural com devcontainer v5.9.1, Dockerfile v1.5.1,
+#     post-start v3.0.3 e local-dns-cache v1.8.1.
+#   - Corrige o caminho canônico do network-control-plane-state.sh e recupera
+#     automaticamente um override de ambiente stale quando o canonical existe.
+#   - Mantém post-create estritamente estrutural: nenhuma sonda ou mutação de rede.
 #
 # =============================================================================
 
@@ -661,7 +668,7 @@ fi
 
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'post-create.sh' '1.2.2'
+        printf '%s v%s\n' 'post-create.sh' '1.2.3'
         exit 0
         ;;
     --help)
@@ -688,27 +695,27 @@ set +o posix 2> /dev/null || true
 # Identidade canônica do script (imutável)
 # ---------------------------------------------------------------------------
 SCRIPT_NAME="post-create.sh"
-SCRIPT_VERSION="1.2.2"
+SCRIPT_VERSION="1.2.3"
 readonly SCRIPT_NAME SCRIPT_VERSION
 
-# Matriz canônica sincronizada com devcontainer.json v5.9.0 / Dockerfile v1.5.0.
-EXPECTED_POST_CREATE_VERSION="v1.2.2"
-EXPECTED_POST_START_VERSION="v3.0.2"
+# Matriz canônica sincronizada com devcontainer.json v5.9.1 / Dockerfile v1.5.1.
+EXPECTED_POST_CREATE_VERSION="v1.2.3"
+EXPECTED_POST_START_VERSION="v3.0.3"
 EXPECTED_POST_ATTACH_VERSION="v5.9.0"
 EXPECTED_HEALTHCHECK_VERSION="v3.0.0"
 EXPECTED_SYNC_LOCAL_AUTH_VERSION="v2.0.0"
 EXPECTED_NSS_GATEKEEPER_VERSION="v2.1.2"
-EXPECTED_LOCAL_DNS_VERSION="v1.8.0"
+EXPECTED_LOCAL_DNS_VERSION="v1.8.1"
 EXPECTED_GITHUB_ROUTE_VERSION="v1.9.1"
 EXPECTED_COPILOT_MANAGER_VERSION="v1.6.1"
 EXPECTED_COPILOT_ADVISOR_VERSION="v1.1.0"
 EXPECTED_LOCAL_PROXY_VERSION="v1.3.1"
-EXPECTED_NETWORK_CONTROL_PLANE_VERSION="v1.1.0"
+EXPECTED_NETWORK_CONTROL_PLANE_VERSION="v1.1.1"
 EXPECTED_ENDPOINT_REGISTRY_VERSION="v1.2.0"
 EXPECTED_PACKAGE_VERSION="v1.1.4"
 EXPECTED_MAKEFILE_VERSION="v4.4.0"
-EXPECTED_DEVCONTAINER_VERSION="v5.9.0"
-EXPECTED_DOCKERFILE_VERSION="v1.5.0"
+EXPECTED_DEVCONTAINER_VERSION="v5.9.1"
+EXPECTED_DOCKERFILE_VERSION="v1.5.1"
 readonly EXPECTED_POST_CREATE_VERSION EXPECTED_POST_START_VERSION EXPECTED_POST_ATTACH_VERSION EXPECTED_HEALTHCHECK_VERSION EXPECTED_SYNC_LOCAL_AUTH_VERSION
 readonly EXPECTED_NSS_GATEKEEPER_VERSION EXPECTED_LOCAL_DNS_VERSION EXPECTED_GITHUB_ROUTE_VERSION EXPECTED_COPILOT_MANAGER_VERSION EXPECTED_COPILOT_ADVISOR_VERSION EXPECTED_LOCAL_PROXY_VERSION
 readonly EXPECTED_NETWORK_CONTROL_PLANE_VERSION EXPECTED_ENDPOINT_REGISTRY_VERSION EXPECTED_PACKAGE_VERSION EXPECTED_MAKEFILE_VERSION EXPECTED_DEVCONTAINER_VERSION EXPECTED_DOCKERFILE_VERSION
@@ -1694,7 +1701,10 @@ GITHUB_ROUTE_SCRIPT="${DEVCONTAINER_GITHUB_API_ROUTE_SCRIPT:-${DEVCONTAINER_DIR}
 COPILOT_MANAGER_SCRIPT="${DEVCONTAINER_COPILOT_NETWORK_MANAGER_SCRIPT:-${DEVCONTAINER_DIR}/scripts/network/github-copilot-network-manager.sh}"
 COPILOT_ADVISOR_SCRIPT="${DEVCONTAINER_COPILOT_ROUTE_ADVISOR_SCRIPT:-${DEVCONTAINER_DIR}/scripts/network/copilot-route-advisor.sh}"
 LOCAL_PROXY_SCRIPT="${DEVCONTAINER_LOCAL_COPILOT_PROXY_SCRIPT:-${DEVCONTAINER_DIR}/scripts/network/local-copilot-proxy.sh}"
-NETWORK_CONTROL_PLANE_SCRIPT="${DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT:-${DEVCONTAINER_DIR}/scripts/network/network-control-plane-state.sh}"
+NETWORK_CONTROL_PLANE_SCRIPT="${DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT:-${DEVCONTAINER_DIR}/scripts/network-control-plane-state.sh}"
+if [[ ! -r "${NETWORK_CONTROL_PLANE_SCRIPT}" && -r "${DEVCONTAINER_DIR}/scripts/network-control-plane-state.sh" ]]; then
+    NETWORK_CONTROL_PLANE_SCRIPT="${DEVCONTAINER_DIR}/scripts/network-control-plane-state.sh"
+fi
 DEVCONTAINER_JSON_FILE="${DEVCONTAINER_JSON_FILE:-${DEVCONTAINER_DIR}/devcontainer.json}"
 DOCKERFILE_FILE="${DEVCONTAINER_DOCKERFILE_FILE:-}"
 if [[ -z "${DOCKERFILE_FILE}" ]]; then

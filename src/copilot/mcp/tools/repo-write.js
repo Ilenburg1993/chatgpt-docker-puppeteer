@@ -217,6 +217,11 @@ const batchOperationSchema = z.discriminatedUnion('type', [
         path: z.string().min(1).describe('Workspace-relative file path to move into reversible quarantine.'),
     }),
     z.object({
+        type: z.literal('set_executable'),
+        path: z.string().min(1).describe('Workspace-relative regular file whose executable bits should be toggled.'),
+        executable: z.boolean().describe('When true, add POSIX executable bits; when false, remove only executable bits.'),
+    }),
+    z.object({
         type: z.literal('remove_file'),
         path: z
             .string()
@@ -1654,6 +1659,24 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
             virtualSource: Boolean(virtualSource),
         };
     }
+    if (type === 'set_executable') {
+        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
+        const stats = await fs.stat(resolved.resolved);
+        if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
+        const currentMode = stats.mode & 0o777;
+        const targetMode = item['executable'] === true ? currentMode | 0o111 : currentMode & ~0o111;
+        return {
+            index,
+            type,
+            path: resolved.relative,
+            executable: item['executable'] === true,
+            currentMode: `0${currentMode.toString(8).padStart(3, '0')}`,
+            targetMode: `0${targetMode.toString(8).padStart(3, '0')}`,
+            wouldChange: targetMode !== currentMode,
+            metadataOnly: true,
+        };
+    }
     if (type === 'quarantine_file' || type === 'remove_file') {
         const resolved = await resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
@@ -1759,6 +1782,29 @@ async function applyBatchFileOperation(operation, index) {
             sourceHash: moved.sourceHash,
             destinationPreviousHash: moved.destinationPreviousHash,
             traceId: moved.io.traceId ?? null,
+        };
+    }
+    if (type === 'set_executable') {
+        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
+        const { value, waitMs } = await withIoResourceLock(resolved.resolved, async () => {
+            const stats = await fs.stat(resolved.resolved);
+            if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
+            const currentMode = stats.mode & 0o777;
+            const targetMode = item['executable'] === true ? currentMode | 0o111 : currentMode & ~0o111;
+            if (targetMode !== currentMode) await fs.chmod(resolved.resolved, targetMode);
+            return { currentMode, targetMode };
+        });
+        return {
+            index,
+            type,
+            path: resolved.relative,
+            executable: item['executable'] === true,
+            previousMode: `0${value.currentMode.toString(8).padStart(3, '0')}`,
+            mode: `0${value.targetMode.toString(8).padStart(3, '0')}`,
+            changed: value.targetMode !== value.currentMode,
+            metadataOnly: true,
+            lockWaitMs: waitMs,
         };
     }
     if (type === 'quarantine_file') {
@@ -2244,7 +2290,7 @@ export const repoWriteTools = [
         name: 'repo_apply_file_batch',
         title: 'Apply repository file batch',
         description:
-            'Apply a bounded ordered batch of workspace file operations in one tool call. Safe create/move-without-overwrite/quarantine sequences default to direct sequential apply; remove_file and overwrite moves retain a conservative whole-batch preflight unless applyMode is explicitly chosen.',
+            'Apply a bounded ordered batch of workspace file operations in one tool call. Supports create, move, quarantine, metadata-only executable-bit repair and explicit removal. Safe non-destructive sequences default to direct sequential apply; remove_file and overwrite moves retain a conservative whole-batch preflight unless applyMode is explicitly chosen.',
         inputSchema: {
             operations: z
                 .array(batchOperationSchema)

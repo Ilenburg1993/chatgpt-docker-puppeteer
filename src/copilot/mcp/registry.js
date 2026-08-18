@@ -57,6 +57,7 @@ import {
     mcpCloudflareSkipAuditTool,
     mcpCloudflareTransportBenchmarkPlanTool,
     mcpConnectorSmokeRefreshTool,
+    mcpDevcontainerNetworkControlPlaneRefreshTool,
     mcpDevcontainerNetworkPostureAuditTool,
     mcpGoldenPromptsTool,
     mcpHostBlockDiagnosticsTool,
@@ -89,7 +90,7 @@ import {
 export const COPILOT_MCP_REGISTRY_IMPLEMENTATION_NAME = 'copilot-mcp-registry';
 export const COPILOT_MCP_REGISTRY_IMPLEMENTATION_VERSION = '1.1.0';
 
-const devcontainerNetworkTools = [mcpDevcontainerNetworkPostureAuditTool];
+const devcontainerNetworkTools = [mcpDevcontainerNetworkPostureAuditTool, mcpDevcontainerNetworkControlPlaneRefreshTool];
 
 /** @type {WeakMap<McpToolDefinition, { risk: ReturnType<typeof classifyMcpToolRisk>; requiredScopes: string[] }>} */
 const TOOL_RUNTIME_CONTEXT_CACHE = new WeakMap();

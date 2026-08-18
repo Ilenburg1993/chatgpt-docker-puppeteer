@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # network-control-plane-state.sh — Passive Network/Copilot Control Plane State
-# Version: v1.1.0
+# Version: v1.1.1
 #
 # Purpose:
 #   Aggregate the local DevContainer network/Copilot control-plane artifacts into
@@ -19,6 +19,13 @@
 #   - Separates runtime route state from action/benchmark artifacts.
 #   - Exits 0 by default even when state is degraded; --strict makes degraded+
 #     return non-zero for manual validation/CI.
+#
+# v1.1.1 focus:
+#   - Separa presença de artifact de autoridade temporal: route summaries stale
+#     permanecem evidência histórica/advisory, mas não governam o runtime atual.
+#   - Mantém degradação para contrato realmente violado em artifact fresco
+#     (por exemplo benchmark/action publicado como runtime summary).
+#   - Expõe route_authority_state no summary para tornar a decisão auditável.
 # =============================================================================
 
 set +e
@@ -27,7 +34,7 @@ set +o pipefail 2> /dev/null || true
 trap - ERR EXIT INT TERM 2> /dev/null || true
 
 SCRIPT_NAME="network-control-plane-state.sh"
-SCRIPT_VERSION="1.1.0"
+SCRIPT_VERSION="1.1.1"
 
 ACTION="summary"
 STRICT_MODE="false"
@@ -468,6 +475,7 @@ DNS_DRIFT="unknown"
 MANAGER_STATE="unknown"
 ROUTE_STATE="unknown"
 ROUTE_RUNTIME_KIND="unknown"
+ROUTE_AUTHORITY_STATE="unknown"
 ROUTE_ACTION_STATE="unknown"
 PROXY_STATE="unknown"
 ADVISOR_STATE="unknown"
@@ -670,9 +678,10 @@ inspect_manager() {
 }
 
 inspect_route() {
-    local action action_status selected_ip current_ip verify_status apply_status runtime_route_status
+    local action action_status selected_ip current_ip verify_status apply_status runtime_route_status route_summary_state route_summary_age original_route_state
     ROUTE_STATE="$(status_from_status_summary "${ROUTE_STATUS}" "${ROUTE_SUMMARY}" status)"
     ROUTE_RUNTIME_KIND="$(kv_or "${ROUTE_SUMMARY}" summary_kind legacy-runtime-summary)"
+    ROUTE_AUTHORITY_STATE="unknown"
     ROUTE_ACTION_STATE="$(kv_or "${ROUTE_ACTION_SUMMARY}" status unknown)"
     action="$(kv_or "${ROUTE_ACTION_SUMMARY}" action unknown)"
     action_status="$(kv_or "${ROUTE_ACTION_SUMMARY}" action_status unknown)"
@@ -683,6 +692,7 @@ inspect_route() {
     runtime_route_status="$(kv_or "${ROUTE_SUMMARY}" runtime_route_status "${ROUTE_STATE}")"
 
     if [[ ! -r "${ROUTE_SUMMARY}" ]]; then
+        ROUTE_AUTHORITY_STATE="missing"
         if [[ -r "${ROUTE_ACTION_SUMMARY}" ]]; then
             add_event advisory route runtime-summary-missing "runtime route summary missing; action summary present action=${action}; status=${ROUTE_ACTION_STATE}/${action_status}"
         else
@@ -690,6 +700,26 @@ inspect_route() {
         fi
         add_next_action "npm run network:route:doctor"
         return 0
+    fi
+
+    route_summary_state="$(artifact_state "${ROUTE_SUMMARY}" "${MAX_AGE_SECONDS}")"
+    route_summary_age="$(file_age_seconds "${ROUTE_SUMMARY}")"
+    if [[ "${route_summary_state}" == "stale" ]]; then
+        original_route_state="${ROUTE_STATE}"
+        ROUTE_AUTHORITY_STATE="stale-nonauthoritative"
+        ROUTE_STATE="stale"
+        add_event advisory route stale-summary-not-authoritative "age=${route_summary_age}s; summary_kind=${ROUTE_RUNTIME_KIND}; historical_status=${original_route_state}; current hosts fact=${CURRENT_HOSTS_API_IP}"
+        add_next_action "npm run network:route:doctor"
+        if [[ -r "${ROUTE_ACTION_SUMMARY}" ]]; then
+            add_event info route action-summary "action=${action}; status=${ROUTE_ACTION_STATE}; action_status=${action_status}; age=$(file_age_seconds "${ROUTE_ACTION_SUMMARY}")s"
+        fi
+        return 0
+    fi
+
+    if [[ "${ROUTE_RUNTIME_KIND}" == "runtime-route" ]]; then
+        ROUTE_AUTHORITY_STATE="fresh-runtime"
+    else
+        ROUTE_AUTHORITY_STATE="fresh-nonruntime"
     fi
 
     if [[ "${ROUTE_RUNTIME_KIND}" != "runtime-route" && "${ROUTE_STATE}" == benchmark* ]]; then
@@ -837,6 +867,7 @@ manager_recommended_transport=$(kv_any_or "${MANAGER_SUMMARY}" unknown manager_r
 manager_next_diagnostic_actions=$(kv_any_or "${MANAGER_SUMMARY}" none next_diagnostic_actions manager_next_diagnostic_actions)
 route_status=${ROUTE_STATE}
 route_summary_kind=${ROUTE_RUNTIME_KIND}
+route_authority_state=${ROUTE_AUTHORITY_STATE}
 route_action_status=${ROUTE_ACTION_STATE}
 route_selected_ip=$(kv_or "${ROUTE_SUMMARY}" selected_ip none)
 route_current_ip=$(kv_or "${ROUTE_SUMMARY}" current_ip unknown)
@@ -876,8 +907,8 @@ build_report_content() {
             "$(kv_or "${LOCAL_DNS_SUMMARY}" resolv_conf_points_to_cache unknown)" "$(kv_or "${LOCAL_DNS_SUMMARY}" bind_address unknown)" \
             "$(kv_or "${LOCAL_DNS_SUMMARY}" local_probe_proven unknown)" "$(kv_or "${LOCAL_DNS_SUMMARY}" docker_embedded_split_status unknown)" "$(kv_or "${LOCAL_DNS_SUMMARY}" warmup_status unknown)"
         printf 'GitHub API Route\n----------------\n'
-        printf 'route_status=%s\nsummary_kind=%s\naction_status=%s\nselected_ip=%s\ncurrent_ip=%s\nverify=%s\nhosts_api_ip=%s\n\n' \
-            "${ROUTE_STATE}" "${ROUTE_RUNTIME_KIND}" "${ROUTE_ACTION_STATE}" "$(kv_or "${ROUTE_SUMMARY}" selected_ip none)" "$(kv_or "${ROUTE_SUMMARY}" current_ip unknown)" "$(kv_or "${ROUTE_SUMMARY}" verify_status unknown)" "${CURRENT_HOSTS_API_IP}"
+        printf 'route_status=%s\nsummary_kind=%s\nauthority=%s\naction_status=%s\nselected_ip=%s\ncurrent_ip=%s\nverify=%s\nhosts_api_ip=%s\n\n' \
+            "${ROUTE_STATE}" "${ROUTE_RUNTIME_KIND}" "${ROUTE_AUTHORITY_STATE}" "${ROUTE_ACTION_STATE}" "$(kv_or "${ROUTE_SUMMARY}" selected_ip none)" "$(kv_or "${ROUTE_SUMMARY}" current_ip unknown)" "$(kv_or "${ROUTE_SUMMARY}" verify_status unknown)" "${CURRENT_HOSTS_API_IP}"
         printf 'Copilot Manager\n---------------\n'
         printf 'manager_status=%s\nplanes=%s/%s/%s\nendpoints=%s/%s\nregistry=%s\nrecommendation=%s/%s\nnext_diagnostic_actions=%s\n\n' \
             "${MANAGER_STATE}" "$(kv_or "${MANAGER_SUMMARY}" plane_overall_status unknown)" "$(kv_or "${MANAGER_SUMMARY}" plane_github_api_status unknown)" "$(kv_or "${MANAGER_SUMMARY}" plane_copilot_transport_status unknown)" \
@@ -942,7 +973,7 @@ print_human_summary() {
     printf '  • post-start:          %s\n' "${POST_START_STATE}"
     printf '  • registry:            %s rows=%s bad=%s\n' "${REGISTRY_STATUS}" "${REGISTRY_ROWS}" "${REGISTRY_BAD_ROWS}"
     printf '  • DNS:                 %s drift=%s current_ns=%s probe=%s split=%s\n' "${DNS_STATE}" "${DNS_DRIFT}" "${CURRENT_RESOLV_FIRST_NS}" "$(kv_or "${LOCAL_DNS_SUMMARY}" local_probe_proven unknown)" "$(kv_or "${LOCAL_DNS_SUMMARY}" docker_embedded_split_status unknown)"
-    printf '  • route-fix:           %s kind=%s action=%s\n' "${ROUTE_STATE}" "${ROUTE_RUNTIME_KIND}" "${ROUTE_ACTION_STATE}"
+    printf '  • route-fix:           %s kind=%s authority=%s action=%s\n' "${ROUTE_STATE}" "${ROUTE_RUNTIME_KIND}" "${ROUTE_AUTHORITY_STATE}" "${ROUTE_ACTION_STATE}"
     printf '  • Copilot manager:     %s endpoints=%s/%s registry=%s\n' "${MANAGER_STATE}" "$(kv_or "${MANAGER_SUMMARY}" endpoints_ok 0)" "$(kv_or "${MANAGER_SUMMARY}" endpoints_total 0)" "$(kv_or "${MANAGER_SUMMARY}" endpoint_registry_status unknown)"
     printf '  • proxy/advisor:       %s / %s\n' "${PROXY_STATE}" "${ADVISOR_STATE}"
     printf '  • events:              ok=%s advisory=%s warning=%s degraded=%s failed=%s fatal=%s\n' "${OK_COUNT}" "${ADVISORY_COUNT}" "${WARNING_COUNT}" "${DEGRADED_COUNT}" "${FAILED_COUNT}" "${FATAL_COUNT}"

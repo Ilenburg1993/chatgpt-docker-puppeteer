@@ -126,6 +126,7 @@ const CLOUDFLARE_SURFACE_TOOL_NAMES = new Set([
     'mcp_cloudflare_plan_capabilities_audit',
     'mcp_cloudflare_skip_audit',
     'mcp_devcontainer_network_posture_audit',
+    'mcp_devcontainer_network_control_plane_refresh',
     'mcp_validation_dashboard',
     'mcp_run_safe_validation_suite',
     'job_get_summary',

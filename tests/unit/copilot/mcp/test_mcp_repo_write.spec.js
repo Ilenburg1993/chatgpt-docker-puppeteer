@@ -285,6 +285,33 @@ describe('copilot MCP repo write tools', () => {
         assert.equal(await fs.readFile(moved, 'utf8'), 'move in batch\n');
     });
 
+    it.skipIf(process.platform === 'win32')('previews and applies executable-bit repair as a bounded metadata-only batch operation', async () => {
+        assert.ok(applyFileBatchTool);
+        const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));
+        const script = path.join(dir, 'repair-mode.sh');
+        await fs.writeFile(script, '#!/usr/bin/env bash\nexit 0\n', 'utf8');
+        await fs.chmod(script, 0o644);
+        const operations = [{ type: 'set_executable', path: script, executable: true }];
+
+        const dryRun = await applyFileBatchTool.handler({ operations });
+        assert.equal(dryRun.isError, undefined);
+        assert.equal(dryRun.structuredContent.operations[0].currentMode, '0644');
+        assert.equal(dryRun.structuredContent.operations[0].targetMode, '0755');
+        assert.equal((await fs.stat(script)).mode & 0o777, 0o644);
+
+        const applied = await applyFileBatchTool.handler({
+            operations,
+            dryRun: false,
+            confirmBatch: true,
+            applyMode: 'global-preflight',
+        });
+        assert.equal(applied.isError, undefined);
+        assert.equal(applied.structuredContent.applied[0].metadataOnly, true);
+        assert.equal(applied.structuredContent.applied[0].previousMode, '0644');
+        assert.equal(applied.structuredContent.applied[0].mode, '0755');
+        assert.equal((await fs.stat(script)).mode & 0o777, 0o755);
+    });
+
     it('keeps global file-batch preflight zero-write and allows explicit sequential partial apply', async () => {
         assert.ok(applyFileBatchTool);
         const dir = await fs.mkdtemp(path.join(process.cwd(), 'src/copilot/.ai/jobs/mcp-write-test-'));

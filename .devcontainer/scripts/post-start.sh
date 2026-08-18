@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # post-start.sh — DevContainer Start Hook (Fail-Safe Network/NSS Orchestrator)
-# Version: v3.0.2
+# Version: v3.0.3
 #
 # Purpose:
 #   Runtime-only DevContainer post-start orchestration for a GitHub/Copilot-first
@@ -78,6 +78,14 @@
 #   - Keeps subscript environment isolation without relying on assignments made
 #     inside `( ... )` groups.
 #   - Adds a generic run_env_with_timeout helper for external bash subscripts.
+#
+# v3.0.3 focus:
+#   - Corrige o caminho canônico do Network Control Plane para
+#     .devcontainer/scripts/network-control-plane-state.sh.
+#   - Autocorrige override runtime stale/ilegível do script, usando o caminho
+#     canônico quando ele existe, sem exigir rebuild apenas para recuperar o hook.
+#   - Torna explícita a compatibilidade com artifacts DNS legados que reportam
+#     in-use para a porta pertencente ao próprio dnsmasq já provado como managed.
 # =============================================================================
 
 # Fail-safe shell posture. This script may be launched by strict parent shells,
@@ -92,7 +100,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 # -----------------------------------------------------------------------------
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'post-start.sh' '3.0.2'
+        printf '%s v%s\n' 'post-start.sh' '3.0.3'
         exit 0
         ;;
     --help)
@@ -104,13 +112,13 @@ network/NSS orchestration and always exits 0 during normal hook execution.
 Long-running benchmark/compare jobs are intentionally not run from post-start;
 use npm run network:* or make network-* for prolonged benchmark collection.
 
-Endpoint registry policy in v3.0.2:
+Endpoint registry policy in v3.0.3:
   canonical: .devcontainer/scripts/network/endpoints.github-copilot.tsv
   legacy:    .devcontainer/network/endpoints.github-copilot.tsv (fallback only)
   manager:   receives explicit DEVCONTAINER_COPILOT_PROBE_ENDPOINTS only when
              the operator supplied that env var; otherwise the registry governs.
 
-DNS policy in v3.0.2:
+DNS policy in v3.0.3:
   local DNS cache is enabled by default and delegated to local-dns-cache.sh.
   Success requires strong runtime proof from local-dns-cache.sh v1.8.0+.
   Baseline resolv.conf fallback remains fail-safe, but preserves Docker DNS
@@ -182,7 +190,7 @@ space_list_contains() {
 # -----------------------------------------------------------------------------
 SCRIPT_NAME="post-start.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="3.0.2"
+SCRIPT_VERSION="3.0.3"
 readonly SCRIPT_VERSION
 
 SCRIPT_DIR=""
@@ -276,7 +284,10 @@ POST_START_REPORT_FILE="${DEVCONTAINER_POST_START_REPORT_FILE:-/tmp/devcontainer
 readonly POST_START_REPORT_FILE
 POST_START_SUMMARY_FILE="${DEVCONTAINER_POST_START_SUMMARY_FILE:-/tmp/devcontainer-post-start.summary}"
 readonly POST_START_SUMMARY_FILE
-NETWORK_CONTROL_PLANE_SCRIPT="${DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT:-${SCRIPT_DIR}/network/network-control-plane-state.sh}"
+NETWORK_CONTROL_PLANE_SCRIPT="${DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT:-${SCRIPT_DIR}/network-control-plane-state.sh}"
+if [[ ! -r "${NETWORK_CONTROL_PLANE_SCRIPT}" && -r "${SCRIPT_DIR}/network-control-plane-state.sh" ]]; then
+    NETWORK_CONTROL_PLANE_SCRIPT="${SCRIPT_DIR}/network-control-plane-state.sh"
+fi
 readonly NETWORK_CONTROL_PLANE_SCRIPT
 NETWORK_CONTROL_PLANE_STATUS_FILE="${DEVCONTAINER_NETWORK_CONTROL_PLANE_STATUS_FILE:-/tmp/devcontainer-network-control-plane.status}"
 readonly NETWORK_CONTROL_PLANE_STATUS_FILE
@@ -853,8 +864,9 @@ local_dns_cache_proven_ok() {
         *) return 1 ;;
     esac
     case "${target_conflict}" in
-        '' | unknown | none | ok | no-conflict | target-free | managed | bound-managed | controlled) : ;;
+        '' | unknown | none | free | in-use | ok | no-conflict | target-free | managed | bound-managed | controlled) : ;;
         conflict* | bound-unmanaged | bound-owner-unavailable | port-in-use*) return 1 ;;
+        *) return 1 ;;
     esac
 
     # v1.8.0+ strong proof: process presence is not enough.  The DNS cache must

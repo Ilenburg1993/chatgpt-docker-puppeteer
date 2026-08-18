@@ -98,8 +98,8 @@ function summarizeResponseCodes(samples) {
     /** @type {Record<string, number>} */
     const output = {};
     for (const sample of samples.filter((item) => item.name === 'cloudflared_tunnel_response_by_code')) {
-        const code = sample.labels['code'] ?? sample.labels['status'] ?? 'unknown';
-        output[code] = sample.value;
+        const code = sample.labels['status_code'] ?? sample.labels['code'] ?? sample.labels['status'] ?? 'unknown';
+        output[code] = (output[code] ?? 0) + sample.value;
     }
     return output;
 }

@@ -1,6 +1,6 @@
 // @ts-check
 
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -203,6 +203,22 @@ describe('infra/io-engine', () => {
             }),
         );
         expect(writeResult.io.advisoryLimits?.durability).toEqual(writeResult.durability);
+    });
+
+    it.skipIf(process.platform === 'win32')('preserva permissões POSIX existentes quando atomic replace não recebe mode explícito', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'executable-script.sh');
+        await writeFile(file, '#!/usr/bin/env bash\necho before\n', 'utf8');
+        await chmod(file, 0o755);
+
+        const result = await writeFileAtomic(file, '#!/usr/bin/env bash\necho after\n');
+        const info = await stat(file);
+
+        expect(info.mode & 0o777).toBe(0o755);
+        expect(result.durability).toMatchObject({
+            effectiveMode: 0o755,
+            modeSource: 'preserved-existing',
+        });
     });
 
     it('expõe perfis de durability sem alterar atomic publish, policy ou conteúdo final', async () => {

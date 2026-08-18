@@ -24,6 +24,24 @@ const MAX_JOB_OUTPUT_TAIL_BYTES = 1024 * 1024;
 const MAX_FOCUSED_UNIT_TEST_FILES = 12;
 const FOCUSED_UNIT_TEST_PREFIX = 'tests/unit/copilot/';
 const FOCUSED_UNIT_TEST_SUFFIX = '.spec.js';
+/** @type {ReadonlyArray<CopilotValidatorName>} */
+export const COPILOT_VALIDATOR_NAMES = Object.freeze([
+    'typecheck',
+    'lint',
+    'unit-mcp',
+    'unit-copilot',
+    'unit-focused',
+    'devcontainer-shell',
+    'suite-mcp-fast',
+    'suite-mcp-full',
+    'suite-copilot-fast',
+]);
+
+/** @param {unknown} value @returns {value is CopilotValidatorName} */
+export function isCopilotValidatorName(value) {
+    return typeof value === 'string' && COPILOT_VALIDATOR_NAMES.includes(/** @type {CopilotValidatorName} */ (value));
+}
+
 const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 /**
@@ -32,6 +50,7 @@ const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]
  *     | 'unit-mcp'
  *     | 'unit-copilot'
  *     | 'unit-focused'
+ *     | 'devcontainer-shell'
  *     | 'suite-mcp-fast'
  *     | 'suite-mcp-full'
  *     | 'suite-copilot-fast'} CopilotValidatorName
@@ -235,6 +254,8 @@ export function resolveValidatorCommand(validator, options = {}) {
             return { command: 'npm', args: ['run', 'test:copilot:unit'] };
         case 'unit-focused':
             return resolveFocusedUnitTestCommand(options.testFiles);
+        case 'devcontainer-shell':
+            return { command: 'node', args: ['src/copilot/mcp/scripts/validate-devcontainer-shell.js'] };
         case 'suite-mcp-fast':
             return {
                 command: 'node',

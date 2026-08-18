@@ -46,6 +46,28 @@ export function normalizeWritePayload(filePath, content, encoding) {
 }
 
 /**
+ * Resolve o modo do inode temporário sem transformar uma escrita de conteúdo em
+ * uma mutação implícita de permissões. Em replacement, o modo POSIX existente é
+ * preservado quando o caller não forneceu um override explícito.
+ *
+ * @param {string} filePath
+ * @param {{ mode?: number; exclusive?: boolean }} options
+ * @returns {Promise<{ mode: number | null; source: 'explicit' | 'preserved-existing' | 'default' }>}
+ */
+async function resolveAtomicWriteMode(filePath, options) {
+    if (options.mode !== undefined) return { mode: options.mode, source: 'explicit' };
+    if (options.exclusive) return { mode: null, source: 'default' };
+    try {
+        const info = await fs.stat(filePath);
+        return { mode: info.mode & 0o777, source: 'preserved-existing' };
+    } catch (error) {
+        const code = /** @type {{ code?: unknown }} */ (error)?.code;
+        if (code === 'ENOENT' || code === 'ENOTDIR') return { mode: null, source: 'default' };
+        throw error;
+    }
+}
+
+/**
  * Escrita atômica sem lock. O caller deve segurar o lock correto quando necessário.
  *
  * @param {string} filePath
@@ -62,6 +84,8 @@ export function normalizeWritePayload(filePath, content, encoding) {
  * @returns {Promise<{
  *     durability: import('./durability.js').IoDurabilityMode;
  *     tempPath: string | null;
+ *     effectiveMode: number | null;
+ *     modeSource: 'explicit' | 'preserved-existing' | 'default';
  *     fileFlushRequested: boolean;
  *     directorySync: Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null;
  *     capacityPreflight: Awaited<ReturnType<typeof preflightIoCapacity>>;
@@ -95,6 +119,7 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
     const capacityStartedAt = performance.now();
     const capacityPreflight = await (options.capacityPreflight ?? preflightIoCapacity)(filePath, writePayload.byteLength);
     phaseTimings.capacityPreflightMs = Math.max(0, performance.now() - capacityStartedAt);
+    const resolvedMode = await resolveAtomicWriteMode(filePath, options);
     /** @type {Awaited<ReturnType<typeof syncParentDirectoryBestEffort>> | null} */
     let directorySync = null;
     let tmpCreated = false;
@@ -111,24 +136,42 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
                 writePayload,
                 {
                     flag: 'wx',
-                    ...(options.mode === undefined ? {} : { mode: options.mode }),
+                    ...(resolvedMode.mode === null ? {} : { mode: resolvedMode.mode }),
                     ...(fileFlushRequested ? { flush: true } : {}),
                 },
             );
             phaseTimings.tempWriteMs = Math.max(0, performance.now() - directWriteStartedAt);
             if (shouldSyncDirectory(durability)) directorySync = await syncWriteDirectory(options, filePath);
-            return { durability, tempPath: null, fileFlushRequested, directorySync, capacityPreflight, phaseTimings: finish() };
+            return {
+                durability,
+                tempPath: null,
+                effectiveMode: resolvedMode.mode,
+                modeSource: resolvedMode.source,
+                fileFlushRequested,
+                directorySync,
+                capacityPreflight,
+                phaseTimings: finish(),
+            };
         }
 
         const tempWriteStartedAt = performance.now();
         await fs.writeFile(tmpPath, writePayload, {
             flag: 'wx',
-            ...(options.mode === undefined ? {} : { mode: options.mode }),
+            ...(resolvedMode.mode === null ? {} : { mode: resolvedMode.mode }),
             ...(fileFlushRequested ? { flush: true } : {}),
         });
         phaseTimings.tempWriteMs = Math.max(0, performance.now() - tempWriteStartedAt);
         tmpCreated = true;
-        await emitMutationPhase(options, 'temp-written', { filePath, tmpPath, bytes: writePayload.byteLength });
+        if (resolvedMode.source === 'preserved-existing' && resolvedMode.mode !== null) {
+            await fs.chmod(tmpPath, resolvedMode.mode);
+        }
+        await emitMutationPhase(options, 'temp-written', {
+            filePath,
+            tmpPath,
+            bytes: writePayload.byteLength,
+            effectiveMode: resolvedMode.mode,
+            modeSource: resolvedMode.source,
+        });
 
         if (options.exclusive) {
             const publishStartedAt = performance.now();
@@ -139,7 +182,16 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
             phaseTimings.publishMs = Math.max(0, performance.now() - publishStartedAt);
             tmpCreated = false;
             if (shouldSyncDirectory(durability)) directorySync = await syncWriteDirectory(options, filePath);
-            return { durability, tempPath: tmpPath, fileFlushRequested, directorySync, capacityPreflight, phaseTimings: finish() };
+            return {
+                durability,
+                tempPath: tmpPath,
+                effectiveMode: resolvedMode.mode,
+                modeSource: resolvedMode.source,
+                fileFlushRequested,
+                directorySync,
+                capacityPreflight,
+                phaseTimings: finish(),
+            };
         }
 
         await emitMutationPhase(options, 'before-publish', { filePath, tmpPath, exclusive: false });
@@ -155,7 +207,16 @@ export async function writeAtomicFileUnlocked(filePath, payload, options = {}) {
         tmpCreated = false;
         await emitMutationPhase(options, 'after-publish', { filePath, tmpPath, exclusive: false });
         if (shouldSyncDirectory(durability)) directorySync = await syncWriteDirectory(options, filePath);
-        return { durability, tempPath: tmpPath, fileFlushRequested, directorySync, capacityPreflight, phaseTimings: finish() };
+        return {
+            durability,
+            tempPath: tmpPath,
+            effectiveMode: resolvedMode.mode,
+            modeSource: resolvedMode.source,
+            fileFlushRequested,
+            directorySync,
+            capacityPreflight,
+            phaseTimings: finish(),
+        };
     } catch (error) {
         if (tmpCreated) {
             try {

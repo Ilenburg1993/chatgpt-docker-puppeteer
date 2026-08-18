@@ -10,7 +10,9 @@ import { runBoundedOperationBatch } from '#copilot/infra';
 import {
     boundedWriteAnnotations,
     cancelJob,
+    COPILOT_VALIDATOR_NAMES,
     errorResult,
+    isCopilotValidatorName,
     listJobs,
     okResult,
     readJobOutput,
@@ -21,16 +23,14 @@ import {
 } from '#copilot/mcp/control-plane';
 import { projectDoctorTool } from './project-doctor.js';
 
-const validatorSchema = z.enum([
-    'typecheck',
-    'lint',
-    'unit-mcp',
-    'unit-copilot',
-    'unit-focused',
-    'suite-mcp-fast',
-    'suite-mcp-full',
-    'suite-copilot-fast',
-]);
+const validatorSchema = z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9-]+$/u)
+    .describe(
+        'Allowlisted validator name. The descriptor intentionally uses a bounded string instead of an enum so newly added fixed validators do not require a host-schema refresh; the server still enforces the current runtime allowlist.',
+    );
 const focusedTestFileSchema = z
     .string()
     .min(1)
@@ -51,7 +51,7 @@ const MAX_VALIDATOR_BATCH_REQUESTS = 8;
 const MAX_VALIDATOR_BATCH_CONCURRENCY = 2;
 const safeValidationSuiteSchema = z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']);
 const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
-const DEFAULT_INLINE_WAIT_VALIDATORS = new Set(['typecheck', 'lint', 'unit-focused']);
+const DEFAULT_INLINE_WAIT_VALIDATORS = new Set(['typecheck', 'lint', 'unit-focused', 'devcontainer-shell']);
 
 /**
  * @param {import('../control-plane/jobs.js').PublicJobRecord} job
@@ -101,6 +101,7 @@ const EFFECTIVE_CHECKS_BY_VALIDATOR = {
     'unit-mcp': ['unit-mcp'],
     'unit-copilot': ['unit-copilot'],
     'unit-focused': ['unit-focused'],
+    'devcontainer-shell': ['devcontainer-shell'],
     'suite-mcp-fast': ['typecheck', 'unit-mcp'],
     'suite-mcp-full': ['typecheck', 'lint', 'unit-mcp'],
     'suite-copilot-fast': ['typecheck', 'lint', 'unit-copilot'],
@@ -164,7 +165,7 @@ const SAFE_VALIDATION_SUITE_TO_VALIDATOR = {
  * Execute one validator request through the canonical job manager. Single-call and batch modes share this exact path.
  *
  * @param {{
- *   validator: import('../control-plane/jobs.js').CopilotValidatorName;
+ *   validator: string;
  *   testFile?: string;
  *   timeoutMs?: number;
  *   waitForCompletion?: boolean;
@@ -175,6 +176,14 @@ const SAFE_VALIDATION_SUITE_TO_VALIDATOR = {
  */
 async function executeValidatorRequest(request) {
     const { validator, testFile, timeoutMs, waitForCompletion, waitMs, failureTailBytes } = request;
+    if (!isCopilotValidatorName(validator)) {
+        return errorResult('Unsupported validator.', {
+            code: 'ERR_UNSUPPORTED_VALIDATOR',
+            validator,
+            allowedValidators: COPILOT_VALIDATOR_NAMES,
+            hint: 'Choose one validator from allowedValidators; arbitrary commands are never accepted.',
+        });
+    }
     const focused = validator === 'unit-focused';
     if (focused && !testFile) {
         return errorResult('unit-focused requires testFile.', {
@@ -368,13 +377,13 @@ export const jobTools = [
         description:
             'Run one allowlisted validator or batch up to 8 validator requests in one call. Batch defaults sequential to avoid CPU/memory contention.',
         inputSchema: {
-            validator: validatorSchema.optional().describe('Single validator; required outside batch mode. Prefer unit-focused.'),
+            validator: validatorSchema.optional().describe('Single allowlisted validator name; required outside batch mode. Prefer unit-focused for JS/TS causal gates.'),
             testFile: focusedTestFileSchema.optional(),
             timeoutMs: validatorTimeoutMsSchema.optional().describe('Optional validator timeout in ms.'),
             waitForCompletion: z
                 .boolean()
                 .optional()
-                .describe('Wait in this same call. Defaults true for typecheck/lint/unit-focused and false for broad suites.'),
+                .describe('Wait in this same call. Defaults true for typecheck/lint/unit-focused/devcontainer-shell and false for broad suites.'),
             waitMs: validatorWaitMsSchema
                 .optional()
                 .describe('Bounded completion wait. Default 30000ms when waitForCompletion=true.'),
@@ -529,6 +538,13 @@ export const jobTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ status, validator, limit, includeCompleted }) => {
+            if (validator !== undefined && !isCopilotValidatorName(validator)) {
+                return errorResult('Unsupported validator filter.', {
+                    code: 'ERR_UNSUPPORTED_VALIDATOR',
+                    validator,
+                    allowedValidators: COPILOT_VALIDATOR_NAMES,
+                });
+            }
             const jobs = await listJobs({ status, validator, limit, includeCompleted });
             return okResult({
                 success: true,
@@ -548,6 +564,13 @@ export const jobTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ validator, includeOutputTail, tailBytes }) => {
+            if (validator !== undefined && !isCopilotValidatorName(validator)) {
+                return errorResult('Unsupported validator filter.', {
+                    code: 'ERR_UNSUPPORTED_VALIDATOR',
+                    validator,
+                    allowedValidators: COPILOT_VALIDATOR_NAMES,
+                });
+            }
             const jobs = await listJobs({ validator, includeCompleted: true, limit: 200 });
             const latestByValidator = latestJobsByValidator(jobs);
             const selected = validator

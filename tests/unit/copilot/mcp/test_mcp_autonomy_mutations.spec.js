@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { gitWriteTools } from '../../../../src/copilot/mcp/tools/git-write.js';
+import { gitWriteTools, isAccidentalExecutableModeDrift } from '../../../../src/copilot/mcp/tools/git-write.js';
 import {
     llmBLiveTools,
     reapCompletedDetachedLiveRuns,
@@ -17,6 +17,13 @@ function tool(definitions, name) {
 }
 
 describe('MCP governed autonomy mutations', () => {
+    it('repairs only the narrow HEAD-executable + shebang + missing-x-bit regression class', () => {
+        assert.equal(isAccidentalExecutableModeDrift({ headMode: '100755', currentMode: 0o644, hasShebang: true }), true);
+        assert.equal(isAccidentalExecutableModeDrift({ headMode: '100755', currentMode: 0o755, hasShebang: true }), false);
+        assert.equal(isAccidentalExecutableModeDrift({ headMode: '100644', currentMode: 0o644, hasShebang: true }), false);
+        assert.equal(isAccidentalExecutableModeDrift({ headMode: '100755', currentMode: 0o644, hasShebang: false }), false);
+    });
+
     it('rejects implicit/pathspec Git staging and exposes no arbitrary Git command surface', async () => {
         const stagePlan = tool(gitWriteTools, 'git_stage_plan');
         const dot = await stagePlan.handler({ paths: ['.'] });

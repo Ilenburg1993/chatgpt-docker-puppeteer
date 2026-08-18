@@ -9,7 +9,7 @@ import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } fro
 import { z } from 'zod';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 58;
+const CAPABILITIES_VERSION = 59;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -82,7 +82,10 @@ const GIT_TOOLS = [
     'git_push',
 ];
 
-const DEV_TOOLS = ['mcp_' + 'dev' + 'container_' + 'network_' + 'posture_' + 'audit'];
+const DEV_TOOLS = [
+    'mcp_' + 'dev' + 'container_' + 'network_' + 'posture_' + 'audit',
+    'mcp_' + 'dev' + 'container_' + 'network_' + 'control_' + 'plane_' + 'refresh',
+];
 
 const VALIDATION_TOOLS = [
     'mcp_run_safe_validation_suite',
@@ -212,7 +215,7 @@ const IO_GUIDANCE = [
     'COPILOT_MCP_INDEX_AUTO_BUILD defaults to true so indexed navigation is warmed outside ChatGPT host calls.',
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
     'Use repo_working_set when repeated work is concentrated in a subtree: open defaults to source-first coverage selection, find stays process-local, and refresh defaults to O(delta). Add seedPaths for known causal files or seedSymbols to resolve exact symbols through the local index in the same open call; both stay inside maxFiles. Refresh converges legitimate file removals by shrinking the live set without silent backfill, and contextMode=auto omits empty-delta manifests while keeping changed/removed/failure context inline; use include/omit only when explicitly desired. Use lexical only for explicit historical prefix ordering.',
-    'Use mcp_validation_plan with no suite by default. For one gate, use run_copilot_validator validator="unit-focused"; for several causal gates, use run_copilot_validator.batch so focused test(s), typecheck and lint share one MCP round-trip. Batch defaults concurrency=1 to avoid CPU thrashing; use 2 only for genuinely independent focused tests. Inline completion means no polling unless a returned wait expires; escalate to mcp_run_safe_validation_suite only for cross-cutting risk or a deliberate release gate.',
+    'Use mcp_validation_plan with no suite by default. For one JS/TS gate, use run_copilot_validator validator="unit-focused"; after DevContainer Bash changes use validator="devcontainer-shell", which is fixed to bash -n over the canonical allowlisted scripts and accepts no caller command/path. For several causal gates, use run_copilot_validator.batch so focused test(s), shell syntax, typecheck and lint can share one MCP round-trip. Batch defaults concurrency=1 to avoid CPU thrashing; use 2 only for genuinely independent gates. Inline completion means no polling unless a returned wait expires; escalate to mcp_run_safe_validation_suite only for cross-cutting risk or a deliberate release gate.',
     'Use mcp_validation_dashboard, mcp_last_validation_summary and job_get_summary before job_get_output; read job logs only with small tailBytes and only when needed.',
     'Use repo_root_tree or repo_tree path="." for the real workspace root.',
     'Use repo_root_redaction_status to audit hidden/protected root redaction without returning hidden names.',
@@ -229,7 +232,8 @@ const IO_GUIDANCE = [
     'Use mcp_cloudflare_edge_backup_create to persist that snapshot locally before changing Cloudflare cache, WAF or rate-limit policy.',
     'Use mcp_cloudflare_edge_backups_list to find the latest rollback reference before and after Cloudflare policy changes.',
     'Use mcp_cloudflare_edge_policy_apply dryRun=true first; real Cloudflare mutation requires dryRun=false and confirmApply=true.',
-    'Use mcp_cloudflare_metrics_snapshot to inspect local cloudflared version, orchestration config version and registration counters.',
+    'Use mcp_cloudflare_metrics_snapshot to inspect local cloudflared version, orchestration config version, registration counters and response-code counters. Treat cloudflared_tunnel_request_errors as a process-lifetime origin-proxy signal that is advisory by itself: correlate its window delta with HTTP status-code deltas, fresh connector smoke, origin cancellations/errors and HA connection state before classifying transport health.',
+    'Use mcp_devcontainer_network_posture_audit to distinguish current DNS/control-plane faults from stale DevContainer metadata. The canonical Network Control Plane script is .devcontainer/scripts/network-control-plane-state.sh; lifecycle hooks self-heal an unreadable stale configured path when that canonical script is available. Use mcp_devcontainer_network_control_plane_refresh when only the passive aggregated /tmp state needs regeneration: it accepts no command/path, runs exactly bash <canonical-script> --quiet summary with bounds, performs no external network probes, then returns a fresh posture audit.',
     'Use mcp_post_restart_readiness as a read-only diagnostic fallback when you do not want to refresh connector smoke; it is no longer a mandatory step after a successful smoke refresh.',
     'Use mcp_reload_plan then mcp_reload_schedule only when a new MCP source version must become live; after reconnect prefer one mcp_connector_smoke_refresh call. Read mcp_reload_status separately only when reload/smoke reports failure or ambiguity.',
     'Use git_publish_changes when a clean-index set of explicit paths should be staged, committed and optionally pushed in one governed call. Keep git_stage_plan/git_commit_plan/git_push_plan as granular fallback; governed Git never accepts force, arbitrary remote or arbitrary refspec.',

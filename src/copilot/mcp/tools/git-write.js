@@ -20,6 +20,7 @@ import {
     withResultExecutionHint,
 } from '#copilot/mcp/control-plane';
 import { execGit } from '#copilot/mcp/tools/shared';
+import fs from 'node:fs/promises';
 
 const MAX_STAGE_PATHS = 200;
 const MAX_STAGE_FILES = 500;
@@ -91,9 +92,89 @@ async function normalizeExplicitPaths(paths) {
 }
 
 /**
+ * Git records only an executable/non-executable bit, not the full POSIX mode. This
+ * guard identifies the narrow regression produced by an atomic replacement that
+ * accidentally recreated a tracked executable script without any x-bit.
+ *
+ * @param {{ headMode: string; currentMode: number; hasShebang: boolean }} input
+ */
+export function isAccidentalExecutableModeDrift(input) {
+    return input.headMode === '100755' && (input.currentMode & 0o111) === 0 && input.hasShebang;
+}
+
+/** @param {string} filePath */
+async function fileHasShebang(filePath) {
+    const handle = await fs.open(filePath, 'r');
+    try {
+        const prefix = Buffer.allocUnsafe(2);
+        const { bytesRead } = await handle.read(prefix, 0, 2, 0);
+        return bytesRead === 2 && prefix[0] === 0x23 && prefix[1] === 0x21;
+    } finally {
+        await handle.close();
+    }
+}
+
+/**
+ * @param {string[]} paths
+ * @returns {Promise<Array<{ path: string; headMode: string; currentMode: number; targetMode: number }>>}
+ */
+async function inspectAccidentalExecutableModeDrift(paths) {
+    const tracked = await execGit(['ls-files', '--stage', '-z', '--', ...paths], { maxBufferBytes: 4 * 1024 * 1024 });
+    if (!tracked.success || !tracked.stdout) return [];
+    const rows = [];
+    for (const record of tracked.stdout.split('\0').filter(Boolean)) {
+        const match = /^(\d{6})\s+[0-9a-f]+\s+\d+\t(.+)$/iu.exec(record);
+        if (!match) continue;
+        const headMode = match[1];
+        const relative = match[2];
+        if (headMode !== '100755' || !relative) continue;
+        const resolved = await resolveWritePath(relative);
+        if (!resolved.ok) continue;
+        let stats;
+        try {
+            stats = await fs.stat(resolved.resolved);
+        } catch {
+            continue;
+        }
+        if (!stats.isFile()) continue;
+        const currentMode = stats.mode & 0o777;
+        if ((currentMode & 0o111) !== 0) continue;
+        let hasShebang;
+        try {
+            hasShebang = await fileHasShebang(resolved.resolved);
+        } catch {
+            continue;
+        }
+        if (!isAccidentalExecutableModeDrift({ headMode, currentMode, hasShebang })) continue;
+        rows.push({ path: resolved.relative, headMode, currentMode, targetMode: currentMode | 0o111 });
+    }
+    return rows;
+}
+
+/**
+ * @param {string[]} paths
+ */
+async function repairAccidentalExecutableModeDrift(paths) {
+    const drift = await inspectAccidentalExecutableModeDrift(paths);
+    const repaired = [];
+    for (const row of drift) {
+        const resolved = await resolveWritePath(row.path);
+        if (!resolved.ok) continue;
+        await fs.chmod(resolved.resolved, row.targetMode);
+        repaired.push({
+            path: row.path,
+            previousMode: `0${row.currentMode.toString(8).padStart(3, '0')}`,
+            mode: `0${row.targetMode.toString(8).padStart(3, '0')}`,
+            reason: 'head-executable-shebang-xbit-loss',
+        });
+    }
+    return repaired;
+}
+
+/**
  * @param {string[]} paths
  * @returns {Promise<
- *   | { ok: true; paths: string[]; affected: string[]; affectedCount: number }
+ *   | { ok: true; paths: string[]; affected: string[]; affectedCount: number; executableModeDrift: Array<{ path: string; headMode: string; currentMode: number; targetMode: number }> }
  *   | { ok: false; error: string; path?: string }
  * >}
  */
@@ -114,7 +195,8 @@ async function planStage(paths) {
             error: `Selected paths expand to ${affected.length} changed files; maximum bounded staging set is ${MAX_STAGE_FILES}.`,
         };
     }
-    return { ok: true, paths: normalized.paths, affected, affectedCount: affected.length };
+    const executableModeDrift = await inspectAccidentalExecutableModeDrift(normalized.paths);
+    return { ok: true, paths: normalized.paths, affected, affectedCount: affected.length, executableModeDrift };
 }
 
 /** @returns {Promise<{ names: string[]; stat: string }>} */
@@ -199,11 +281,12 @@ export const gitWriteTools = [
             if (plan.affectedCount === 0) {
                 return okResult({ success: true, staged: false, reason: 'no-selected-changes', paths: plan.paths, head }, 'No selected changes to stage.');
             }
+            const repairedExecutableModes = await repairAccidentalExecutableModeDrift(plan.paths);
             const result = await execGit(['add', '--', ...plan.paths], { timeoutMs: 30_000 });
             if (!result.success) return errorResult(result.error ?? 'git add failed.', { code: 'ERR_GIT_STAGE_FAILED', paths: plan.paths });
             const staged = await readStagedSummary();
-            await appendMcpAuditEvent({ event: 'git_stage', tool: 'git_stage', head, paths: plan.paths, affectedCount: plan.affectedCount, stagedCount: staged.names.length });
-            return okResult({ success: true, staged: true, head, paths: plan.paths, affected: plan.affected, stagedFiles: staged.names, stat: staged.stat }, staged.stat || staged.names.join('\n'));
+            await appendMcpAuditEvent({ event: 'git_stage', tool: 'git_stage', head, paths: plan.paths, affectedCount: plan.affectedCount, stagedCount: staged.names.length, repairedExecutableModes });
+            return okResult({ success: true, staged: true, head, paths: plan.paths, affected: plan.affected, executableModeDrift: plan.executableModeDrift, repairedExecutableModes, stagedFiles: staged.names, stat: staged.stat }, staged.stat || staged.names.join('\n'));
         },
     },
     {
@@ -315,6 +398,7 @@ export const gitWriteTools = [
             }
 
             const stageStartedAt = Date.now();
+            const repairedExecutableModes = await repairAccidentalExecutableModeDrift(plan.paths);
             const stage = await execGit(['add', '--', ...plan.paths], { timeoutMs: 30_000 });
             if (!stage.success) {
                 return errorResult(stage.error ?? 'git add failed.', {
@@ -433,6 +517,8 @@ export const gitWriteTools = [
                 paths: plan.paths,
                 committedFiles: staged.names,
                 stat: staged.stat,
+                executableModeDrift: plan.executableModeDrift,
+                repairedExecutableModes,
                 pushed: shouldPush,
                 pushDryRunFirst: pushDryRunFirst === true,
                 beforePush,

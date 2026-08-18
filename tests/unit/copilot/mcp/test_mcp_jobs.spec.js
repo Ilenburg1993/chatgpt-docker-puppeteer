@@ -4,6 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -21,6 +22,7 @@ import {
 } from '#copilot/mcp/control-plane';
 import { resolveSafeValidationSuite } from '#copilot/mcp/scripts';
 import { jobTools } from '#copilot/mcp/tools';
+import { validateDevcontainerBashFile } from '../../../../src/copilot/mcp/scripts/validate-devcontainer-shell.js';
 
 describe('copilot MCP jobs', () => {
     it('resolves only allowlisted validator commands', () => {
@@ -55,6 +57,10 @@ describe('copilot MCP jobs', () => {
                 ],
             },
         );
+        assert.deepEqual(resolveValidatorCommand('devcontainer-shell'), {
+            command: 'node',
+            args: ['src/copilot/mcp/scripts/validate-devcontainer-shell.js'],
+        });
         assert.deepEqual(resolveValidatorCommand('suite-mcp-fast'), {
             command: 'node',
             args: ['src/copilot/mcp/scripts/run-safe-validation-suite.js', 'mcp-fast'],
@@ -67,6 +73,31 @@ describe('copilot MCP jobs', () => {
             command: 'node',
             args: ['src/copilot/mcp/scripts/run-safe-validation-suite.js', 'copilot-fast'],
         });
+    });
+
+    it('validates Bash syntax one file per bounded process and attributes syntax failures', async () => {
+        const dir = await mkdir(join(process.cwd(), 'src/copilot/.ai/jobs/devcontainer-shell-validator-test'), {
+            recursive: true,
+        }).then(() => join(process.cwd(), 'src/copilot/.ai/jobs/devcontainer-shell-validator-test'));
+        const valid = join(dir, 'valid.sh');
+        const invalid = join(dir, 'invalid.sh');
+        await Promise.all([
+            writeFile(valid, '#!/usr/bin/env bash\necho ok\n', 'utf8'),
+            writeFile(invalid, '#!/usr/bin/env bash\nif true; then\n', 'utf8'),
+        ]);
+        try {
+            const [validResult, invalidResult] = await Promise.all([
+                validateDevcontainerBashFile(valid, { timeoutMs: 2_000 }),
+                validateDevcontainerBashFile(invalid, { timeoutMs: 2_000 }),
+            ]);
+            assert.equal(validResult.ok, true);
+            assert.equal(validResult.timedOut, false);
+            assert.equal(invalidResult.ok, false);
+            assert.equal(invalidResult.timedOut, false);
+            assert.notEqual(invalidResult.exitCode, 0);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
     });
 
     it('rejects unsupported validators', () => {
@@ -270,6 +301,20 @@ describe('copilot MCP jobs', () => {
         assert.ok(names.includes('run_project_doctor'));
         assert.ok(names.includes('mcp_run_safe_validation_suite'));
         assert.ok(names.includes('job_list'));
+    });
+
+    it('keeps the exposed validator schema future-proof while enforcing the runtime allowlist server-side', async () => {
+        const tool = jobTools.find((candidate) => candidate.name === 'run_copilot_validator');
+        assert.ok(tool);
+
+        const rejected = await tool.handler({ validator: 'future-unsafe-command' });
+        assert.equal(rejected.isError, true);
+        assert.equal(rejected.structuredContent?.['code'], 'ERR_UNSUPPORTED_VALIDATOR');
+        const details = /** @type {Record<string, unknown>} */ (rejected.structuredContent?.['details']);
+        const allowed = /** @type {string[]} */ (details['allowedValidators']);
+        assert.ok(allowed.includes('devcontainer-shell'));
+        assert.ok(allowed.includes('unit-focused'));
+        assert.equal(allowed.includes('future-unsafe-command'), false);
     });
 
     it('requires explicit focused files only for validator=unit-focused', async () => {
