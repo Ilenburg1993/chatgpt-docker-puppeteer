@@ -34,6 +34,7 @@ export { searchText, searchWorkspaceSymbols } from '../io/search/index.js';
 export { warmReadThroughContext } from '../io-prefetch.js';
 export { scanDirectory } from '../io-scanner.js';
 export { getIoExternalWatchStats, startIoExternalWatch, stopIoExternalWatch } from '../io/invalidation/external-watch.js';
+export { readCrossProcessInvalidationReplay } from '../io/invalidation/cross-process-journal.js';
 
 // Observabilidade de IO em tempo de execução
 export { readIoRuntimeHealthSnapshot } from '../io-health.js';

@@ -10,7 +10,10 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { afterEach, describe, it } from 'vitest';
 
-import { createCrossProcessInvalidationJournal } from '../../../../src/copilot/infra/io/invalidation/cross-process-journal.js';
+import {
+    createCrossProcessInvalidationJournal,
+    readCrossProcessInvalidationReplay,
+} from '../../../../src/copilot/infra/io/invalidation/cross-process-journal.js';
 
 /** @type {string[]} */
 const tempDirs = [];
@@ -74,6 +77,56 @@ describe('cross-process IO invalidation journal', () => {
         assert.equal(consumer.getStats().gapDetections, 0);
         dbA.close();
         dbB.close();
+    });
+
+    it('reads a bounded startup replay window without mutating the runtime poll cursor', async () => {
+        const db = new Database(':memory:');
+        let now = 1_000;
+        const journal = createCrossProcessInvalidationJournal({
+            db,
+            processInstance: 'startup-replay-producer',
+            now: () => now,
+            config: {
+                enabled: true,
+                pollMs: 25,
+                batchMax: 64,
+                maxRows: 1000,
+                retentionMs: 60_000,
+                cleanupIntervalMs: 60_000,
+            },
+        });
+        const seq1 = journal.publish('/workspace/src/copilot/a.js', { source: 'a' });
+        now += 1;
+        const seq2 = journal.publish('/workspace/src/copilot/b.js', { source: 'b' });
+        now += 1;
+        const seq3 = journal.publish('/workspace/src/copilot/c.js', { source: 'c' });
+
+        const replay = readCrossProcessInvalidationReplay({ afterSequence: seq1, maxRows: 16, db });
+        assert.equal(replay.available, true);
+        assert.equal(replay.afterSequence, seq1);
+        assert.equal(replay.highWatermark, seq3);
+        assert.equal(replay.gapDetected, false);
+        assert.equal(replay.truncated, false);
+        assert.deepEqual(replay.rows.map((row) => row.sequence), [seq2, seq3]);
+        assert.equal(journal.getStats().lastSeenSequence, 0);
+
+        const truncated = readCrossProcessInvalidationReplay({ afterSequence: 0, maxRows: 1, db });
+        assert.equal(truncated.truncated, true);
+        assert.equal(truncated.rowCount, 1);
+
+        db.prepare('DELETE FROM copilot_io_invalidation_journal WHERE sequence = ?').run(seq2);
+        const gap = readCrossProcessInvalidationReplay({ afterSequence: seq1, maxRows: 16, db });
+        assert.equal(gap.gapDetected, true);
+
+        const reset = readCrossProcessInvalidationReplay({ afterSequence: seq3 + 50, maxRows: 16, db });
+        assert.equal(reset.gapDetected, true);
+
+        db.prepare('DELETE FROM copilot_io_invalidation_journal').run();
+        const cleanedThroughCheckpoint = readCrossProcessInvalidationReplay({ afterSequence: seq3, maxRows: 16, db });
+        assert.equal(cleanedThroughCheckpoint.highWatermark, seq3);
+        assert.equal(cleanedThroughCheckpoint.rowCount, 0);
+        assert.equal(cleanedThroughCheckpoint.gapDetected, false);
+        db.close();
     });
 
     it('propagates a real event between two Node processes within the bounded polling window', async () => {

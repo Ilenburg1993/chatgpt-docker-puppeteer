@@ -5,6 +5,7 @@
  * @module copilot/mcp/control-plane/index-auto-build
  */
 
+import { readCrossProcessInvalidationReplay } from '#copilot/infra/public/io';
 import {
     buildIoIndexForDirectory,
     getIoIndexStats,
@@ -14,6 +15,7 @@ import {
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { isAbsolute, relative, resolve } from 'node:path';
 import {
+    classifyIndexJournalReplayRows,
     planIndexStartup,
     readCommittedIndexChanges,
     readIndexGitSnapshot,
@@ -31,6 +33,7 @@ import { resolveReadPath } from './paths.js';
  * @property {number} concurrency
  * @property {boolean} respectGitignore
  * @property {number} fullReconcileIntervalMs
+ * @property {number} journalReplayMaxRows
  */
 
 /**
@@ -50,6 +53,7 @@ const DEFAULT_AUTO_BUILD_MAX_FILES = 5000;
 const DEFAULT_AUTO_BUILD_DEPTH = 20;
 const DEFAULT_AUTO_BUILD_CONCURRENCY = 4;
 const DEFAULT_FULL_RECONCILE_INTERVAL_MS = 30 * 60 * 1000;
+const DEFAULT_JOURNAL_REPLAY_MAX_ROWS = 2048;
 
 /** @type {McpIndexAutoBuildState | null} */
 let autoBuildState = null;
@@ -119,6 +123,11 @@ export function readMcpIndexAutoBuildConfig(env = process.env) {
             env['COPILOT_MCP_INDEX_FULL_RECONCILE_INTERVAL_MS'],
             DEFAULT_FULL_RECONCILE_INTERVAL_MS,
             { min: 60_000, max: 24 * 60 * 60 * 1000 },
+        ),
+        journalReplayMaxRows: envInt(
+            env['COPILOT_MCP_INDEX_JOURNAL_REPLAY_MAX_ROWS'],
+            DEFAULT_JOURNAL_REPLAY_MAX_ROWS,
+            { min: 64, max: 10_000 },
         ),
     };
 }
@@ -225,14 +234,42 @@ async function runIndexAutoBuild(config) {
         const indexStats = /** @type {Record<string, unknown>} */ (getIoIndexStats());
         const schemaVersion = Number(indexStats['schemaVersion'] ?? 0);
         const indexFiles = Number(indexStats['files'] ?? 0);
-        const gitSnapshot = await readIndexGitSnapshot({ workspaceRoot: WORKSPACE_ROOT, scopePath: config.path });
         const checkpoint = readIndexStartupCheckpoint(config.path);
+        const journalReplay = readCrossProcessInvalidationReplay({
+            afterSequence: checkpoint?.journalSequence ?? 0,
+            maxRows: config.journalReplayMaxRows,
+        });
+        const journalScope = classifyIndexJournalReplayRows(journalReplay.rows, resolved.resolved);
+        const journalEvidence = {
+            available: journalReplay.available,
+            gapDetected: journalReplay.gapDetected,
+            truncated: journalReplay.truncated,
+            replayablePathCount: journalScope.replayablePathCount,
+            recursiveScopeInvalidation: journalScope.recursiveScopeInvalidation,
+            invalidPathRows: journalScope.invalidPathRows,
+        };
+        const journalSummary = {
+            available: journalReplay.available,
+            afterSequence: journalReplay.afterSequence,
+            highWatermark: journalReplay.highWatermark,
+            rowCount: journalReplay.rowCount,
+            replayablePathCount: journalScope.replayablePathCount,
+            outsideScopeRows: journalScope.outsideScopeRows,
+            invalidPathRows: journalScope.invalidPathRows,
+            recursiveScopeInvalidation: journalScope.recursiveScopeInvalidation,
+            gapDetected: journalReplay.gapDetected,
+            truncated: journalReplay.truncated,
+            error: journalReplay.error,
+        };
+        const checkpointJournalSequence = journalReplay.available ? journalReplay.highWatermark : undefined;
+        const gitSnapshot = await readIndexGitSnapshot({ workspaceRoot: WORKSPACE_ROOT, scopePath: config.path });
         const plan = planIndexStartup({
             checkpoint,
             gitSnapshot,
             schemaVersion,
             indexFiles,
             fullReconcileIntervalMs: config.fullReconcileIntervalMs,
+            journalReplay: journalEvidence,
         });
 
         if (plan.mode === 'skip' && gitSnapshot.head) {
@@ -241,6 +278,7 @@ async function runIndexAutoBuild(config) {
                 head: gitSnapshot.head,
                 schemaVersion,
                 mode: 'skip',
+                ...(checkpointJournalSequence === undefined ? {} : { journalSequence: checkpointJournalSequence }),
             });
             return makeState({
                 status: 'skipped',
@@ -253,6 +291,7 @@ async function runIndexAutoBuild(config) {
                     indexed: 0,
                     invalidated: 0,
                     hashVerifications: 0,
+                    journalReplay: journalSummary,
                     gitSnapshotDurationMs: gitSnapshot.durationMs,
                     durationMs: Math.max(0, Date.now() - startupStartedAt),
                 },
@@ -272,14 +311,24 @@ async function runIndexAutoBuild(config) {
                 });
                 committedDiffDurationMs = committed.durationMs;
                 if (!committed.available || committed.uncertain) {
-                    return await runFullReconcile(config, resolved.resolved, gitSnapshot, schemaVersion, startupStartedAt, {
-                        fallbackReason: 'committed-diff-uncertain',
-                        gitSnapshotDurationMs: gitSnapshot.durationMs,
-                    });
+                    return await runFullReconcile(
+                        config,
+                        resolved.resolved,
+                        gitSnapshot,
+                        schemaVersion,
+                        startupStartedAt,
+                        {
+                            fallbackReason: 'committed-diff-uncertain',
+                            gitSnapshotDurationMs: gitSnapshot.durationMs,
+                            journalReplay: journalSummary,
+                        },
+                        checkpointJournalSequence,
+                    );
                 }
                 changes = [...changes, ...committed.changes];
             }
-            const explicitPaths = normalizeGitChangePaths(changes, config.path);
+            const gitPaths = normalizeGitChangePaths(changes, config.path);
+            const explicitPaths = [...new Set([...gitPaths, ...journalScope.paths])];
             const incremental = await refreshIoIndexPaths(explicitPaths, {
                 workspaceRoot: WORKSPACE_ROOT,
                 scopeRoot: resolved.resolved,
@@ -287,17 +336,27 @@ async function runIndexAutoBuild(config) {
             });
             const domainReconcile = await reconcileIoIndexAutoRefreshDomain();
             if (incremental.available === false || incremental.failed > 0) {
-                return await runFullReconcile(config, resolved.resolved, gitSnapshot, schemaVersion, startupStartedAt, {
-                    fallbackReason: 'incremental-refresh-failed',
-                    gitSnapshotDurationMs: gitSnapshot.durationMs,
-                    incrementalFailed: incremental.failed,
-                });
+                return await runFullReconcile(
+                    config,
+                    resolved.resolved,
+                    gitSnapshot,
+                    schemaVersion,
+                    startupStartedAt,
+                    {
+                        fallbackReason: 'incremental-refresh-failed',
+                        gitSnapshotDurationMs: gitSnapshot.durationMs,
+                        incrementalFailed: incremental.failed,
+                        journalReplay: journalSummary,
+                    },
+                    checkpointJournalSequence,
+                );
             }
             writeIndexStartupCheckpoint({
                 scopePath: config.path,
                 head: gitSnapshot.head,
                 schemaVersion,
                 mode: 'incremental',
+                ...(checkpointJournalSequence === undefined ? {} : { journalSequence: checkpointJournalSequence }),
             });
             return makeState({
                 status: 'completed',
@@ -307,6 +366,10 @@ async function runIndexAutoBuild(config) {
                     domainReconcile,
                     mode: 'incremental',
                     changedPathCount: explicitPaths.length,
+                    gitChangedPathCount: gitPaths.length,
+                    journalReplay: journalSummary,
+                    journalReplayPathCount: journalScope.replayablePathCount,
+                    journalOutsideScopeRows: journalScope.outsideScopeRows,
                     scannedEntries: 0,
                     candidateFiles: explicitPaths.length,
                     hashVerifications: 0,
@@ -318,10 +381,19 @@ async function runIndexAutoBuild(config) {
             });
         }
 
-        return await runFullReconcile(config, resolved.resolved, gitSnapshot, schemaVersion, startupStartedAt, {
-            fallbackReason: plan.reason,
-            gitSnapshotDurationMs: gitSnapshot.durationMs,
-        });
+        return await runFullReconcile(
+            config,
+            resolved.resolved,
+            gitSnapshot,
+            schemaVersion,
+            startupStartedAt,
+            {
+                fallbackReason: plan.reason,
+                gitSnapshotDurationMs: gitSnapshot.durationMs,
+                journalReplay: journalSummary,
+            },
+            checkpointJournalSequence,
+        );
     } catch (error) {
         return makeState({
             status: 'failed',
@@ -339,8 +411,9 @@ async function runIndexAutoBuild(config) {
  * @param {number} schemaVersion
  * @param {number} startupStartedAt
  * @param {Record<string, unknown>} evidence
+ * @param {number | undefined} journalSequence
  */
-async function runFullReconcile(config, resolvedPath, gitSnapshot, schemaVersion, startupStartedAt, evidence) {
+async function runFullReconcile(config, resolvedPath, gitSnapshot, schemaVersion, startupStartedAt, evidence, journalSequence) {
     const result = await buildIoIndexForDirectory(resolvedPath, {
         workspaceRoot: WORKSPACE_ROOT,
         recursive: true,
@@ -357,6 +430,7 @@ async function runFullReconcile(config, resolvedPath, gitSnapshot, schemaVersion
             head: gitSnapshot.head,
             schemaVersion,
             mode: 'full-reconcile',
+            ...(journalSequence === undefined ? {} : { journalSequence }),
         });
     }
     return makeState({

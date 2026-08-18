@@ -3671,3 +3671,172 @@ Durante o restart houve um único 502 transitório ao consultar status enquanto 
 
 Conclusão: o blocker mostrado pelo portal ChatGPT foi removido no servidor. O portal ainda pode exibir o snapshot antigo até executar novo **Scan Tools/reconnect/rescan**; isso é refresh de metadata do host, não mudança adicional necessária no MCP.
 
+---
+
+# 35. Faixa 30.7 — Native Glob Experiment — concluída sem migração — 2026-08-18
+
+## 35.1 Hipótese
+
+O runtime Node **v24.15.0** já possui `path.matchesGlob()` estável e `fs.promises.glob()` estável. A hipótese era reduzir dependência/runtime overhead de `minimatch` e/ou tornar candidate enumeration mais barata usando primitives nativas.
+
+A comparação foi feita sem alterar produção, preservando o contrato atual:
+
+- dotfiles habilitados (`dot:true`);
+- `!` e `#` literais (`nonegate/nocomment`);
+- globstar/braces/extglob/classes;
+- Windows separator normalization;
+- matchBase para padrões sem `/`;
+- plain path/segment subtree (`src/copilot`, `node_modules`) como compatibilidade histórica.
+
+## 35.2 Matcher — resultado
+
+Uma adaptação `path.matchesGlob + matchesPlainPathPattern + basename fallback` preservou 9/11 casos do corpus de contrato, mas divergiu em exatamente os dois casos de dotfiles:
+
+- `src/copilot/.hidden.ts` vs `src/**/*.ts`;
+- `.hidden.ts` vs `*.ts`.
+
+O contrato atual retorna `true`; `path.matchesGlob()` retorna `false` nesses casos e não oferece option equivalente a `dot:true` nessa API.
+
+Performance sobre arquivos reais de `src/copilot`, 200 iterações do workload de padrões:
+
+- execução A: `minimatch` **55,524 ms**, native candidate **55,776 ms** (**-0,45%** para o nativo);
+- execução B: `minimatch` **57,431 ms**, native candidate **56,291 ms** (**+1,98%** para o nativo).
+
+Conclusão: diferença dentro de ruído; não existe ganho de throughput que justifique uma dual-path dotfile fallback nem troca de semântica.
+
+## 35.3 Candidate enumeration — resultado
+
+Mesmo conjunto visível de **1.470 arquivos** em `src/copilot`:
+
+- recursive `readdir`: **25,342 ms**;
+- `fs.promises.glob`: **49,075 ms**;
+- `rg --files --no-ignore`: **14,058 ms**.
+
+`fs.promises.glob` ficou ~**1,94x** mais lento que o traversal atual no workload representativo. `rg` foi ~11 ms mais rápido e, com `--no-ignore`, cobriu os mesmos 1.470 arquivos, mas a economia potencial é pequena frente ao full reconcile atual (~275–310 ms) e introduziria subprocess semantics, depth/ignore translation e uma segunda implementação de traversal na fundação.
+
+Um detalhe de API também foi confirmado empiricamente: em Node 24.15, `exclude` com `withFileTypes:true` recebe um `Dirent`, não string; o benchmark inicialmente assumia string e falhou antes de ser corrigido.
+
+## 35.4 Decisão
+
+- **não migrar** o matcher canônico para `path.matchesGlob()`;
+- **não migrar** o scanner rico para `fs.promises.glob()`;
+- **não introduzir** `rg --files` no rich scanner por ~11 ms de ganho de enumeração;
+- manter `minimatch-v10` como engine única da policy glob enquanto o contrato exigir dot/matchBase/plain-path;
+- continuar usando APIs Node nativas quando elas vencem por evidência (`crypto.hash`, recursive watch, compile cache), não por preferência estética.
+
+`minimatch` possui hoje um único import direto em produção (`infra/scan/glob.js`), mas esse import sustenta `matchesGlobPattern` e `simpleGlobToRegExp`; removê-lo agora exigiria reimplementar semântica sem ganho mensurável.
+
+O benchmark temporário não permanece na suíte normal.
+
+## 35.5 Dependency hygiene derivada
+
+A busca de produção também confirmou novamente que `xxhash-wasm` permanece declarado em `package.json`, mas **não possui consumer em `src/copilot`**. A Fase 30.8 pode removê-lo de forma governada quando package/package-lock forem tratados como um sublote próprio; isso é hygiene/supply-chain, não hot-path performance.
+
+---
+
+# 36. Faixa 30.9 — Journal/checkpoint high-watermark V2 — implementação pré-live — 2026-08-18
+
+## 36.1 Problema de recuperação identificado
+
+O journal cross-process atual possui sequence monotônica, gap detection e retenção bounded, mas cada runtime inicializa seu cursor contínuo em `MAX(sequence)` no momento do boot. Isso é correto para propagação **daquele ponto em diante**, porém significa que um restart não usa rows persistidas anteriores ao novo processo para complementar o checkpoint do índice.
+
+O checkpoint do startup, por sua vez, conhecia apenas `HEAD/schema/timestamps`. Git cobre tracked/dirty/untracked, e full reconcile periódico cobre o safety net de filesystem, mas faltava um high-watermark que dissesse até qual journal sequence já havia sido reconciliada pelo último startup bem-sucedido.
+
+## 36.2 Princípio de segurança
+
+O journal continua **não sendo autoridade única de freshness**. O novo fluxo combina:
+
+> `checkpoint journal watermark + bounded journal replay + Git status/diff + rich filesystem fingerprint/full reconcile`.
+
+Regras:
+
+- runtime consumer contínuo permanece inalterado e continua iniciando no latest;
+- startup replay usa uma API separada e nunca move o cursor do consumer;
+- o watermark é capturado **antes** do Git snapshot/reconcile;
+- checkpoint só persiste esse watermark depois de skip/incremental/full bem-sucedido;
+- nunca se grava “latest depois do scan”, evitando marcar uma mutação concorrente como coberta sem evidência;
+- journal vazio nunca suprime Git status/diff ou o full reconcile periódico.
+
+## 36.3 Replay SQLite bounded e transacional
+
+Nova primitive `readCrossProcessInvalidationReplay()`:
+
+- lê em uma transaction o intervalo `sequence > checkpoint && sequence <= highWatermark`;
+- default max rows **2.048** no startup, configurável por `COPILOT_MCP_INDEX_JOURNAL_REPLAY_MAX_ROWS` (64–10.000);
+- retorna somente evidence bounded: rows, contagem, earliest/high-watermark, gap/truncation/error;
+- não altera `lastSeenSequence` do journal runtime;
+- `sqlite_sequence` é combinado com `MAX(sequence)` para preservar o high-watermark emitido mesmo quando retention cleanup remove todas as rows antigas.
+
+Essa última regra evita um falso gap importante: tabela vazia depois de cleanup, mas checkpoint exatamente no último sequence emitido, é estado válido e não exige full reconcile.
+
+## 36.4 Fail-closed conditions
+
+Startup força full reconcile quando:
+
+- replay indisponível;
+- sequence gap detectado;
+- checkpoint sequence maior que o high-watermark realmente emitido (reset/rollback de DB);
+- replay excede maxRows/truncation;
+- row contém path inválido/não absoluto;
+- uma invalidation recursiva ou da raiz do scope aparece dentro do domínio.
+
+Rows fora do scope são apenas contadas e ignoradas. Rows de arquivo válidas dentro do scope são deduplicadas com paths derivados de Git e alimentam a mesma `refreshIoIndexPaths()`.
+
+## 36.5 Classificação de paths sem confused authority
+
+`classifyIndexJournalReplayRows()` é uma função pura:
+
+- exige paths absolutos;
+- faz containment lexical contra o scope já resolvido pelo startup;
+- deduplica paths in-scope;
+- separa `outsideScopeRows` e `invalidPathRows`;
+- recursive/root invalidation não é convertida artificialmente em refresh de arquivo; ela exige full reconcile.
+
+O journal, portanto, continua sendo **hint/evidence**, não substituto da path policy nem autorização para acessar filesystem arbitrário.
+
+## 36.6 Checkpoint backward-compatible
+
+A tabela `copilot_mcp_index_startup_checkpoint` ganhou:
+
+`journal_sequence INTEGER NOT NULL DEFAULT 0`.
+
+Migração é idempotente via `PRAGMA table_info + ALTER TABLE` quando a coluna não existe. Um checkpoint legado começa em sequence 0; se retention já removeu o prefixo necessário, o primeiro boot novo faz um full reconcile de segurança e grava um watermark contemporâneo.
+
+`full-reconcile`, `incremental` e `skip` preservam/avançam o watermark capturado. Se o journal estiver indisponível, a chave é omitida e o checkpoint anterior não é artificialmente avançado.
+
+## 36.7 Planner e resultado compacto
+
+`planIndexStartup()` agora aceita journal evidence adicional:
+
+- replayable path com Git limpo → `mode=incremental`, `reason=journal-replay`;
+- Git dirty/head changed continua levando ao incremental normal, com journal paths adicionados/deduplicados;
+- qualquer uncertainty do journal listada acima → full reconcile;
+- zero replay path + Git/head estáveis → skip normal.
+
+O resultado do auto-build guarda apenas `journalSummary` (watermark/contagens/flags), nunca as rows/paths completos, evitando payload/context leakage.
+
+## 36.8 Gates pré-live
+
+Regressões já verdes:
+
+- replay seq1→seq3 após checkpoint seq1 devolve somente seq2/seq3 e não move cursor runtime;
+- truncation detectada;
+- gap interno detectado;
+- DB sequence menor que checkpoint detectado;
+- cleanup de todas as rows **até o próprio checkpoint** preserva high-watermark via `sqlite_sequence` e não cria gap falso;
+- classifier deduplica in-scope, ignora outside-scope, marca path relativo inválido e recursive invalidation;
+- planner produz `journal-replay` e fail-closed reasons esperadas;
+- migração de tabela legada sem `journal_sequence` retorna 0 e adiciona a coluna;
+- checkpoint full seq7 → incremental seq9 preserva last-full clock e avança sequence;
+- strict typecheck: green.
+
+## 36.9 Prova live planejada pós-publish
+
+Para isolar journal de Git, a prova será feita somente depois de publicar o source e deixar o worktree de `src/copilot` limpo:
+
+1. primeiro reload: migração do checkpoint antigo; se houver gap de retention, espera-se um **full reconcile de segurança único**;
+2. com checkpoint novo estabilizado, criar e remover um arquivo temporário não-hidden via writer canônico, deixando Git novamente limpo mas produzindo journal rows;
+3. segundo reload: Git limpo + replay path deve gerar `reason=journal-replay`, incremental bounded do path final inexistente e novo watermark;
+4. terceiro reload sem novas mutações: espera-se `skip`/`head-and-worktree-unchanged` com replay vazio;
+5. qualquer gap/truncation inesperado invalida a prova e mantém full reconcile como fallback correto.
+

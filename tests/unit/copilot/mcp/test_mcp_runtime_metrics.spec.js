@@ -217,6 +217,7 @@ describe('copilot MCP runtime metrics', () => {
             COPILOT_MCP_INDEX_AUTO_BUILD_DEPTH: '9',
             COPILOT_MCP_INDEX_AUTO_BUILD_CONCURRENCY: '3',
             COPILOT_MCP_INDEX_AUTO_BUILD_IGNORE_GITIGNORE: '1',
+            COPILOT_MCP_INDEX_JOURNAL_REPLAY_MAX_ROWS: '777',
         });
 
         assert.equal(config.enabled, true);
@@ -225,5 +226,6 @@ describe('copilot MCP runtime metrics', () => {
         assert.equal(config.depth, 9);
         assert.equal(config.concurrency, 3);
         assert.equal(config.respectGitignore, false);
+        assert.equal(config.journalReplayMaxRows, 777);
     });
 });

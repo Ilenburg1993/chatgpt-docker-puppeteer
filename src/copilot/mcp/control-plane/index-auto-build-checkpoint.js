@@ -11,6 +11,7 @@
 
 import { getCopilotDb } from '#copilot/db';
 import { execFile } from 'node:child_process';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -34,7 +35,16 @@ const GIT_MAX_BUFFER = 16 * 1024 * 1024;
  *     schemaVersion: number;
  *     completedAtMs: number;
  *     lastFullReconcileAtMs: number;
+ *     journalSequence: number;
  * }} IndexStartupCheckpoint
+ * @typedef {{
+ *     available: boolean;
+ *     gapDetected: boolean;
+ *     truncated: boolean;
+ *     replayablePathCount: number;
+ *     recursiveScopeInvalidation: boolean;
+ *     invalidPathRows?: number;
+ * }} IndexJournalReplayEvidence
  */
 
 /**
@@ -47,9 +57,14 @@ function ensureCheckpointSchema(db = getCopilotDb()) {
             head TEXT NOT NULL,
             schema_version INTEGER NOT NULL,
             completed_at_ms INTEGER NOT NULL,
-            last_full_reconcile_at_ms INTEGER NOT NULL
+            last_full_reconcile_at_ms INTEGER NOT NULL,
+            journal_sequence INTEGER NOT NULL DEFAULT 0
         ) STRICT;
     `);
+    const columns = /** @type {Array<{ name?: string }>} */ (db.prepare(`PRAGMA table_info(${TABLE})`).all());
+    if (!columns.some((column) => column.name === 'journal_sequence')) {
+        db.exec(`ALTER TABLE ${TABLE} ADD COLUMN journal_sequence INTEGER NOT NULL DEFAULT 0`);
+    }
     return db;
 }
 
@@ -60,7 +75,8 @@ export function readIndexStartupCheckpoint(scopePath, db = getCopilotDb()) {
         db
             .prepare(
                 `SELECT scope_path AS scopePath, head, schema_version AS schemaVersion,
-                        completed_at_ms AS completedAtMs, last_full_reconcile_at_ms AS lastFullReconcileAtMs
+                        completed_at_ms AS completedAtMs, last_full_reconcile_at_ms AS lastFullReconcileAtMs,
+                        journal_sequence AS journalSequence
                  FROM ${TABLE} WHERE scope_path = ?`,
             )
             .get(scopePath)
@@ -69,7 +85,7 @@ export function readIndexStartupCheckpoint(scopePath, db = getCopilotDb()) {
 }
 
 /**
- * @param {{ scopePath: string; head: string; schemaVersion: number; mode: 'full-reconcile' | 'incremental' | 'skip'; nowMs?: number }} input
+ * @param {{ scopePath: string; head: string; schemaVersion: number; mode: 'full-reconcile' | 'incremental' | 'skip'; nowMs?: number; journalSequence?: number }} input
  * @param {import('better-sqlite3').Database} [db]
  */
 export function writeIndexStartupCheckpoint(input, db = getCopilotDb()) {
@@ -78,21 +94,24 @@ export function writeIndexStartupCheckpoint(input, db = getCopilotDb()) {
     const nowMs = input.nowMs ?? Date.now();
     const lastFullReconcileAtMs =
         input.mode === 'full-reconcile' ? nowMs : (previous?.lastFullReconcileAtMs ?? nowMs);
+    const journalSequence = normalizeJournalSequence(input.journalSequence, previous?.journalSequence ?? 0);
     db.prepare(
-        `INSERT INTO ${TABLE}(scope_path, head, schema_version, completed_at_ms, last_full_reconcile_at_ms)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO ${TABLE}(scope_path, head, schema_version, completed_at_ms, last_full_reconcile_at_ms, journal_sequence)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(scope_path) DO UPDATE SET
              head = excluded.head,
              schema_version = excluded.schema_version,
              completed_at_ms = excluded.completed_at_ms,
-             last_full_reconcile_at_ms = excluded.last_full_reconcile_at_ms`,
-    ).run(input.scopePath, input.head, input.schemaVersion, nowMs, lastFullReconcileAtMs);
+             last_full_reconcile_at_ms = excluded.last_full_reconcile_at_ms,
+             journal_sequence = excluded.journal_sequence`,
+    ).run(input.scopePath, input.head, input.schemaVersion, nowMs, lastFullReconcileAtMs, journalSequence);
     return {
         scopePath: input.scopePath,
         head: input.head,
         schemaVersion: input.schemaVersion,
         completedAtMs: nowMs,
         lastFullReconcileAtMs,
+        journalSequence,
     };
 }
 
@@ -181,6 +200,7 @@ export async function readCommittedIndexChanges(input) {
  *     indexFiles: number;
  *     nowMs?: number;
  *     fullReconcileIntervalMs: number;
+ *     journalReplay?: IndexJournalReplayEvidence;
  * }} input
  */
 export function planIndexStartup(input) {
@@ -195,6 +215,23 @@ export function planIndexStartup(input) {
     }
     if (nowMs - input.checkpoint.lastFullReconcileAtMs >= input.fullReconcileIntervalMs) {
         return { mode: 'full-reconcile', reason: 'periodic-safety-reconcile', worktreeChanges: [] };
+    }
+    if (input.journalReplay) {
+        if (!input.journalReplay.available) {
+            return { mode: 'full-reconcile', reason: 'journal-evidence-unavailable', worktreeChanges: [] };
+        }
+        if (input.journalReplay.gapDetected) {
+            return { mode: 'full-reconcile', reason: 'journal-gap-detected', worktreeChanges: [] };
+        }
+        if (input.journalReplay.truncated) {
+            return { mode: 'full-reconcile', reason: 'journal-replay-truncated', worktreeChanges: [] };
+        }
+        if (Number(input.journalReplay.invalidPathRows ?? 0) > 0) {
+            return { mode: 'full-reconcile', reason: 'journal-invalid-path', worktreeChanges: [] };
+        }
+        if (input.journalReplay.recursiveScopeInvalidation) {
+            return { mode: 'full-reconcile', reason: 'journal-recursive-invalidation', worktreeChanges: [] };
+        }
     }
     if (input.checkpoint.head !== input.gitSnapshot.head) {
         return {
@@ -212,7 +249,57 @@ export function planIndexStartup(input) {
             needsCommittedDiff: false,
         };
     }
+    if (Number(input.journalReplay?.replayablePathCount ?? 0) > 0) {
+        return {
+            mode: 'incremental',
+            reason: 'journal-replay',
+            worktreeChanges: [],
+            needsCommittedDiff: false,
+        };
+    }
     return { mode: 'skip', reason: 'head-and-worktree-unchanged', worktreeChanges: [], needsCommittedDiff: false };
+}
+
+/**
+ * Classify replay rows against one already-resolved startup scope.
+ *
+ * Journal paths are hints, not path authority: malformed/non-absolute rows are unsafe, outside-scope rows are ignored,
+ * and recursive/root invalidations require a full reconcile.
+ *
+ * @param {Array<{ filePath?: unknown; recursive?: unknown }>} rows
+ * @param {string} scopeRoot
+ */
+export function classifyIndexJournalReplayRows(rows, scopeRoot) {
+    const normalizedScopeRoot = resolve(scopeRoot);
+    const uniquePaths = new Set();
+    let outsideScopeRows = 0;
+    let invalidPathRows = 0;
+    let recursiveScopeInvalidation = false;
+    for (const row of rows) {
+        if (typeof row.filePath !== 'string' || !row.filePath || !isAbsolute(row.filePath)) {
+            invalidPathRows += 1;
+            continue;
+        }
+        const candidate = resolve(row.filePath);
+        const rel = relative(normalizedScopeRoot, candidate);
+        const insideScope = rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+        if (!insideScope) {
+            outsideScopeRows += 1;
+            continue;
+        }
+        if (rel === '' || Number(row.recursive ?? 0) === 1 || row.recursive === true) {
+            recursiveScopeInvalidation = true;
+            continue;
+        }
+        uniquePaths.add(candidate);
+    }
+    return {
+        paths: [...uniquePaths],
+        replayablePathCount: uniquePaths.size,
+        outsideScopeRows,
+        invalidPathRows,
+        recursiveScopeInvalidation,
+    };
 }
 
 /** @param {string} output */
@@ -248,6 +335,12 @@ export function parseGitNameStatusZ(output) {
         changes.push({ status, path: filePath, deleted: status.startsWith('D') });
     }
     return { changes, uncertain };
+}
+
+/** @param {unknown} value @param {number} fallback */
+function normalizeJournalSequence(value, fallback) {
+    const parsed = Number(value ?? fallback);
+    return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 /** @param {string} cwd @param {string[]} args */
