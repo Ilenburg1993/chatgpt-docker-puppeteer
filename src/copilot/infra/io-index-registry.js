@@ -31,7 +31,8 @@ const _inflightIndexBuilds = new Map();
 let _indexInvalidationUnregister = null;
 /** @type {string | null} */
 let _indexWorkspaceRoot = null;
-/** @type {{ scopeRoot: string; workspaceRoot: string; extensions: Set<string>; respectGitignore: boolean; include: string[]; exclude: string[] } | null} */
+/** @typedef {{ scopeRoot: string; workspaceRoot: string; extensions: Set<string>; respectGitignore: boolean; include: string[]; exclude: string[] }} IndexAutoRefreshDomain */
+/** @type {IndexAutoRefreshDomain | null} */
 let _indexAutoRefreshDomain = null;
 /** @type {Map<string, number>} */
 const _pendingIndexRefreshPaths = new Map();
@@ -76,9 +77,19 @@ export function readIoIndexAutoRefreshConfig() {
  * @param {{ workspaceRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[] }} [options]
  */
 function configureIndexAutoRefreshDomain(scopeRoot, options = {}) {
+    const domain = createIndexAutoRefreshDomain(scopeRoot, options);
+    _indexWorkspaceRoot = domain.workspaceRoot;
+    _indexAutoRefreshDomain = domain;
+}
+
+/**
+ * @param {string} scopeRoot
+ * @param {{ workspaceRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[] }} [options]
+ * @returns {IndexAutoRefreshDomain}
+ */
+function createIndexAutoRefreshDomain(scopeRoot, options = {}) {
     const workspaceRoot = resolve(options.workspaceRoot ?? scopeRoot);
-    _indexWorkspaceRoot = workspaceRoot;
-    _indexAutoRefreshDomain = {
+    return {
         scopeRoot: resolve(scopeRoot),
         workspaceRoot,
         extensions: new Set(
@@ -90,10 +101,8 @@ function configureIndexAutoRefreshDomain(scopeRoot, options = {}) {
     };
 }
 
-/** @param {string} filePath */
-function isIndexAutoRefreshDomainCandidate(filePath) {
-    const domain = _indexAutoRefreshDomain;
-    if (!domain) return false;
+/** @param {string} filePath @param {IndexAutoRefreshDomain} domain */
+function isIndexRefreshDomainCandidate(filePath, domain) {
     const normalized = resolve(filePath);
     const relativeToScope = relative(domain.scopeRoot, normalized).replace(/\\/gu, '/');
     if (!relativeToScope || relativeToScope === '..' || relativeToScope.startsWith('../')) return false;
@@ -102,6 +111,48 @@ function isIndexAutoRefreshDomainCandidate(filePath) {
     if (domain.include.length > 0 && !matchesAnyPattern(normalized, domain.scopeRoot, domain.include)) return false;
     if (domain.exclude.length > 0 && matchesAnyPattern(normalized, domain.scopeRoot, domain.exclude)) return false;
     return true;
+}
+
+/** @param {string} filePath */
+function isIndexAutoRefreshDomainCandidate(filePath) {
+    const domain = _indexAutoRefreshDomain;
+    return domain ? isIndexRefreshDomainCandidate(filePath, domain) : false;
+}
+
+/**
+ * Preflight explicit paths against the same semantic domain used by runtime auto-refresh, without mutating global
+ * scheduler state. Intended for startup/checkpoint replay and other evidence-gathering callers.
+ *
+ * @param {readonly string[]} filePaths
+ * @param {{ scopeRoot: string; workspaceRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[] }} options
+ */
+export async function filterIoIndexRefreshDomainPaths(filePaths, options) {
+    const domain = createIndexAutoRefreshDomain(options.scopeRoot, options);
+    const unique = [...new Set(filePaths.map((value) => resolve(value)))];
+    const candidates = [];
+    let domainSkipped = 0;
+    for (const filePath of unique) {
+        if (!isIndexRefreshDomainCandidate(filePath, domain)) {
+            domainSkipped += 1;
+            continue;
+        }
+        candidates.push(filePath);
+    }
+    if (!domain.respectGitignore || candidates.length === 0) {
+        return { paths: candidates, requested: unique.length, domainSkipped, gitignoredSkipped: 0 };
+    }
+    const matcher = await loadGitignoreMatcher(domain.workspaceRoot);
+    const paths = [];
+    let gitignoredSkipped = 0;
+    for (const filePath of candidates) {
+        const relativePath = relative(domain.workspaceRoot, filePath).replace(/\\/gu, '/');
+        if (relativePath && matcher.ignores(relativePath)) {
+            gitignoredSkipped += 1;
+            continue;
+        }
+        paths.push(filePath);
+    }
+    return { paths, requested: unique.length, domainSkipped, gitignoredSkipped };
 }
 
 /** @param {string} filePath @param {{ recursive?: boolean; source?: string }} [event] */

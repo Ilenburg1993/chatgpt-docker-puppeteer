@@ -8,6 +8,7 @@
 import { readCrossProcessInvalidationReplay } from '#copilot/infra/public/io';
 import {
     buildIoIndexForDirectory,
+    filterIoIndexRefreshDomainPaths,
     getIoIndexStats,
     reconcileIoIndexAutoRefreshDomain,
     refreshIoIndexPaths,
@@ -240,11 +241,16 @@ async function runIndexAutoBuild(config) {
             maxRows: config.journalReplayMaxRows,
         });
         const journalScope = classifyIndexJournalReplayRows(journalReplay.rows, resolved.resolved);
+        const journalDomain = await filterIoIndexRefreshDomainPaths(journalScope.paths, {
+            scopeRoot: resolved.resolved,
+            workspaceRoot: WORKSPACE_ROOT,
+            respectGitignore: config.respectGitignore,
+        });
         const journalEvidence = {
             available: journalReplay.available,
             gapDetected: journalReplay.gapDetected,
             truncated: journalReplay.truncated,
-            replayablePathCount: journalScope.replayablePathCount,
+            replayablePathCount: journalDomain.paths.length,
             recursiveScopeInvalidation: journalScope.recursiveScopeInvalidation,
             invalidPathRows: journalScope.invalidPathRows,
         };
@@ -253,8 +259,12 @@ async function runIndexAutoBuild(config) {
             afterSequence: journalReplay.afterSequence,
             highWatermark: journalReplay.highWatermark,
             rowCount: journalReplay.rowCount,
-            replayablePathCount: journalScope.replayablePathCount,
+            containedPathCount: journalScope.replayablePathCount,
+            replayablePathCount: journalDomain.paths.length,
             outsideScopeRows: journalScope.outsideScopeRows,
+            hiddenScopeRows: journalScope.hiddenScopeRows,
+            domainSkippedRows: journalDomain.domainSkipped,
+            gitignoredSkippedRows: journalDomain.gitignoredSkipped,
             invalidPathRows: journalScope.invalidPathRows,
             recursiveScopeInvalidation: journalScope.recursiveScopeInvalidation,
             gapDetected: journalReplay.gapDetected,
@@ -328,7 +338,7 @@ async function runIndexAutoBuild(config) {
                 changes = [...changes, ...committed.changes];
             }
             const gitPaths = normalizeGitChangePaths(changes, config.path);
-            const explicitPaths = [...new Set([...gitPaths, ...journalScope.paths])];
+            const explicitPaths = [...new Set([...gitPaths, ...journalDomain.paths])];
             const incremental = await refreshIoIndexPaths(explicitPaths, {
                 workspaceRoot: WORKSPACE_ROOT,
                 scopeRoot: resolved.resolved,
@@ -368,7 +378,7 @@ async function runIndexAutoBuild(config) {
                     changedPathCount: explicitPaths.length,
                     gitChangedPathCount: gitPaths.length,
                     journalReplay: journalSummary,
-                    journalReplayPathCount: journalScope.replayablePathCount,
+                    journalReplayPathCount: journalDomain.paths.length,
                     journalOutsideScopeRows: journalScope.outsideScopeRows,
                     scannedEntries: 0,
                     candidateFiles: explicitPaths.length,

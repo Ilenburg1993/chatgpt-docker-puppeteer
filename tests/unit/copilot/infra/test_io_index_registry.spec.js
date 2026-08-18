@@ -57,6 +57,7 @@ vi.mock('../../../../src/copilot/infra/io-index-sqlite.js', () => ({
 
 import {
     buildIoIndexForDirectory,
+    filterIoIndexRefreshDomainPaths,
     flushIoIndexAutoRefresh,
     getIoIndexStats,
     reconcileIoIndexAutoRefreshDomain,
@@ -219,6 +220,30 @@ describe('io-index-registry build coalescing', () => {
         expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, domainSkipped: 1 });
         expect(await flushIoIndexAutoRefresh()).toBeNull();
         expect(mocks.indexTextFile).not.toHaveBeenCalled();
+    });
+
+    it('pré-filtra replay paths com o mesmo domínio de hidden/extensão/gitignore sem mutar scheduler', async () => {
+        const workspaceRoot = '/tmp/ws-domain-preflight';
+        const scopeRoot = `${workspaceRoot}/src/copilot`;
+        const result = await filterIoIndexRefreshDomainPaths(
+            [
+                `${scopeRoot}/kept.js`,
+                `${scopeRoot}/kept.js`,
+                `${scopeRoot}/.ai/jobs/job.json`,
+                `${scopeRoot}/notes.log`,
+                `${scopeRoot}/ignored.ts`,
+                `${workspaceRoot}/outside.js`,
+            ],
+            { scopeRoot, workspaceRoot, respectGitignore: true },
+        );
+
+        expect(result).toEqual({
+            paths: [`${scopeRoot}/kept.js`],
+            requested: 5,
+            domainSkipped: 3,
+            gitignoredSkipped: 1,
+        });
+        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, queued: 0, domainSkipped: 0 });
     });
 
     it('filtra gitignored path antes do derived-state refresh', async () => {

@@ -3840,3 +3840,41 @@ Para isolar journal de Git, a prova será feita somente depois de publicar o sou
 4. terceiro reload sem novas mutações: espera-se `skip`/`head-and-worktree-unchanged` com replay vazio;
 5. qualquer gap/truncation inesperado invalida a prova e mantém full reconcile como fallback correto.
 
+## 36.10 Primeira ativação live e refinamento de domínio
+
+A primeira ativação do código publicado em `918d9fa93` produziu exatamente o safety behavior esperado para um checkpoint legado:
+
+- `indexAutoBuild.mode=full-reconcile`;
+- 1.450 candidates / 1.450 unchanged;
+- full reconcile ~**398 ms**;
+- journal replay `afterSequence=0`;
+- `highWatermark=3721`;
+- 74 rows retidas;
+- `gapDetected=true`;
+- 22 paths inicialmente classificados por containment;
+- 3 rows fora do scope;
+- full build preservou 2.245 rows do índice e não reportou failure.
+
+O planner registrou `periodic-safety-reconcile` porque a janela periódica já havia vencido e essa condição tem precedência sobre o gap; o resultado, porém, preservou `journalReplay.gapDetected=true`. Um único full reconcile cobre simultaneamente as duas razões sem necessidade de dois scans.
+
+A observação live revelou uma segunda questão: o journal é global e também recebe invalidations de artefatos operacionais dentro de `src/copilot/.ai` e paths não indexáveis. Containment sozinho era correto para segurança, mas insuficiente para decidir se havia trabalho de índice: um `.ai/jobs/*.json` poderia produzir `journal-replay` mesmo sendo posteriormente descartado por `refreshIoIndexPaths`.
+
+Refinamento implementado após a primeira prova:
+
+- `io-index-registry` expõe `filterIoIndexRefreshDomainPaths()` como preflight **sem mutar scheduler state**;
+- essa primitive usa a mesma construção de domínio do auto-refresh: scope, hidden segments, extensões, include/exclude e `.gitignore`;
+- startup replay passa por `containment/classifier → index-domain preflight → planner`;
+- `journalEvidence.replayablePathCount` conta somente paths realmente admissíveis pelo índice;
+- `journalSummary` separa `containedPathCount`, `hiddenScopeRows`, `domainSkippedRows` e `gitignoredSkippedRows`;
+- invalidação recursiva hidden (`.ai`, `.git`, etc.) é ignorada como ruído operacional antes de marcar `recursiveScopeInvalidation`;
+- recursive não-hidden dentro do scope continua fail-closed/full reconcile.
+
+Regressões adicionais verdes:
+
+- domain preflight deduplica path, rejeita `.ai`, extensão não indexável, outside-scope e gitignored path, preservando apenas o `.js` admissível;
+- o preflight não altera counters/fila do scheduler;
+- classifier comprova que `.ai/jobs` recursivo é `hiddenScopeRows`, enquanto uma subtree recursiva visível continua `recursiveScopeInvalidation=true`;
+- strict typecheck: green.
+
+Esse refinamento será publicado como follow-up sem reescrever o commit 30.9 original, pois foi derivado de evidência da primeira ativação live.
+

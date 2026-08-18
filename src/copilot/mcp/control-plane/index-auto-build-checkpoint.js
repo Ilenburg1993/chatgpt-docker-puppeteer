@@ -273,6 +273,7 @@ export function classifyIndexJournalReplayRows(rows, scopeRoot) {
     const normalizedScopeRoot = resolve(scopeRoot);
     const uniquePaths = new Set();
     let outsideScopeRows = 0;
+    let hiddenScopeRows = 0;
     let invalidPathRows = 0;
     let recursiveScopeInvalidation = false;
     for (const row of rows) {
@@ -287,6 +288,10 @@ export function classifyIndexJournalReplayRows(rows, scopeRoot) {
             outsideScopeRows += 1;
             continue;
         }
+        if (rel.split('/').some((segment) => segment.startsWith('.') && segment.length > 1)) {
+            hiddenScopeRows += 1;
+            continue;
+        }
         if (rel === '' || Number(row.recursive ?? 0) === 1 || row.recursive === true) {
             recursiveScopeInvalidation = true;
             continue;
@@ -297,6 +302,7 @@ export function classifyIndexJournalReplayRows(rows, scopeRoot) {
         paths: [...uniquePaths],
         replayablePathCount: uniquePaths.size,
         outsideScopeRows,
+        hiddenScopeRows,
         invalidPathRows,
         recursiveScopeInvalidation,
     };

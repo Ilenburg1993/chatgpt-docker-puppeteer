@@ -122,6 +122,7 @@ describe('MCP index startup checkpoint', () => {
                 { filePath: '/workspace/src/copilot/a.js', recursive: 0 },
                 { filePath: '/workspace/src/copilot/a.js', recursive: 0 },
                 { filePath: '/workspace/src/copilot/subtree', recursive: 1 },
+                { filePath: '/workspace/src/copilot/.ai/jobs', recursive: 1 },
                 { filePath: '/workspace/src/server/outside.js', recursive: 0 },
                 { filePath: 'src/copilot/relative.js', recursive: 0 },
             ],
@@ -130,6 +131,7 @@ describe('MCP index startup checkpoint', () => {
         assert.deepEqual(classified.paths, ['/workspace/src/copilot/a.js']);
         assert.equal(classified.replayablePathCount, 1);
         assert.equal(classified.outsideScopeRows, 1);
+        assert.equal(classified.hiddenScopeRows, 1);
         assert.equal(classified.invalidPathRows, 1);
         assert.equal(classified.recursiveScopeInvalidation, true);
     });

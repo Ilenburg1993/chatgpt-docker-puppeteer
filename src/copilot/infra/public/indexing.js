@@ -10,6 +10,7 @@ export {
     findIoIndexImports,
     findIoIndexImportsByPath,
     findIoIndexSymbol,
+    filterIoIndexRefreshDomainPaths,
     getIoIndexStats,
     invalidateIoIndexPath,
     reconcileIoIndexAutoRefreshDomain,
