@@ -4524,4 +4524,120 @@ A repetição live do mesmo broad open `src/copilot`, `maxFiles=80`, `maxBytes=1
 
 Conclusão da Faixa 33: o hard cap deixou de ser uma janela lexical. Broad scopes agora maximizam cobertura estrutural e source utility; causal scopes podem fixar arquivos diretamente ou resolver símbolos no índice dentro do mesmo open, e MCP/LLM-B compartilham a mesma fundação e invariantes.
 
+---
+
+# 41. Faixa 34 — Working Set Result Flow V4: text dedupe + context-aware refresh — 2026-08-18
+
+## 41.1 Evidência que abriu a faixa
+
+Dashboard pós-V55, após o ciclo live `open → find → refresh → close`:
+
+- 16 MCP calls / 0 errors;
+- `repo_working_set`: **4 calls**, 25% da pressão de chamadas;
+- `repo_working_set`: **77.820 B** de resultados, **67,9% de todo o volume** da janela;
+- média: **19.455 B/call**;
+- handler médio ~161 ms; portanto o problema dominante é payload/context, não CPU.
+
+A revisão do handler encontrou duas fontes de redundância:
+
+1. `action=refresh` sempre chama e retorna `getScopeContext()`, inclusive em delta vazio `{refreshed:0,failed:0,skipped:0}`;
+2. `okResult(structuredContent)` sem `text` chama `stringifyForModel(structuredContent)`, duplicando o objeto completo em `content[0].text` e `structuredContent`. Como `repo_working_set` não fornece texto explícito em nenhuma action, manifests grandes são serializados duas vezes no mesmo tool result.
+
+## 41.2 Estado-alvo
+
+### Texto decisório compacto
+
+Todas as actions passam a fornecer `okResult(structured, conciseText)`:
+
+- `open`: id/path/selected/parsed/context bytes;
+- `context`: files/symbols/context bytes;
+- `find`: símbolo + matchCount;
+- `refresh`: refreshed/failed/skipped + se contexto foi incluído;
+- `status`: status/pathCount/parsed/invalidated;
+- `close`: confirmação + activeOwnedWorkingSets.
+
+`structuredContent` continua sendo a fonte rica e machine-readable; o texto não replica JSON/manifest.
+
+### `contextMode=auto|include|omit`
+
+Um único input controla contexto inline sem criar nova tool:
+
+- `open`: `auto` equivale a include; `omit` abre/preaquece e retorna ID/stats sem manifest;
+- `refresh`: default `auto`; inclui contexto somente se houve `refreshed>0` ou `failed>0`; refresh vazio não repete manifest;
+- `include`: força contexto em open/refresh;
+- `omit`: nunca inclui contexto em open/refresh;
+- `context`: sempre retorna contexto, independentemente de `contextMode`;
+- `find/status/close`: não incluem contexto.
+
+Isso evita um round-trip extra quando a mudança real exige contexto, mas elimina custo no caso comum de refresh vazio.
+
+## 41.3 Invariantes
+
+- nenhuma mudança na engine shared scope/cache/parser/index;
+- IDs/ownership/eviction inalterados;
+- context budgets e manifest limits inalterados;
+- failures não compactadas a ponto de perder diagnóstico;
+- nenhum contexto é omitido da action `context`;
+- clientes sem o novo parâmetro continuam válidos: open continua trazendo contexto e refresh vazio fica mais compacto por default.
+
+## 41.4 SLOs e provas
+
+- open default ainda retorna structured context;
+- open `contextMode=omit` não chama `getScopeContext`;
+- refresh vazio default não chama `getScopeContext`, retorna `contextIncluded=false` e `contextAvailable=true`;
+- refresh com `refreshed>0` em auto inclui contexto;
+- refresh `contextMode=omit` não inclui mesmo com delta;
+- refresh `contextMode=include` inclui mesmo vazio;
+- action=context sempre inclui;
+- `content[0].text` deve ser curto e não conter manifest/JSON serializado;
+- teste com contexto representativo deve mostrar redução substancial de bytes do CallToolResult;
+- focused MCP tests + strict typecheck + lint;
+- reload + A/B live comparando o ciclo open/refresh vazio com a janela V55.
+
+## 41.5 Execução e A/B live V56
+
+Implementação concluída na projeção MCP, sem alterar a engine shared scope:
+
+- `contextMode=auto|include|omit` adicionado;
+- open `auto` continua trazendo contexto; `omit` aquece e retorna ID/stats sem chamar `getScopeContext`;
+- refresh `auto` inclui contexto somente se `refreshed>0 || failed>0`;
+- refresh vazio retorna `contextIncluded=false`, `contextAvailable=true` e não materializa manifest;
+- action=context sempre materializa manifest;
+- todas as actions usam texto decisório curto em `okResult(structured, text)`, evitando a serialização textual automática de todo o structured payload;
+- race rara de contexto indisponível ganhou `ERR_WORKING_SET_CONTEXT_UNAVAILABLE` explícito em vez de non-null assertion;
+- `CAPABILITIES_VERSION` avançou para **56**.
+
+Provas automatizadas verdes:
+
+- open default mantém contexto;
+- open omit não chama `getScopeContext`;
+- refresh vazio auto não chama `getScopeContext` novamente;
+- refresh delta auto inclui;
+- refresh omit nunca inclui;
+- refresh include inclui mesmo vazio;
+- texto de decisão permanece curto e não contém manifest;
+- fixture de manifest grande demonstra CallToolResult <70% do tamanho legacy-like com JSON estruturado duplicado no texto;
+- strict typecheck e lint green.
+
+Reload V56:
+
+- connector/OAuth/SSE green;
+- **120/120 tools**;
+- `tools/list`: **123.643 B**;
+- `mcp_capabilities_summary.capabilitiesVersion=56`.
+
+A/B live repetindo o mesmo ciclo broad de quatro calls `open → find(parseTransport) → refresh vazio → close`:
+
+| métrica | V55 | V56 | variação |
+|---|---:|---:|---:|
+| `repo_working_set` calls | 4 | 4 | igual |
+| total result bytes | **77.820 B** | **19.566 B** | **-74,9%** |
+| average result bytes | **19.455 B** | **4.892 B** | **-74,9%** |
+| refresh vazio | repetia contexto | `contextIncluded=false` | manifest eliminado |
+| errors | 0 | 0 | igual |
+
+O broad open preservou 80/1.450 files, 27/27 buckets, 75 parsed e 630 symbols. A economia portanto não veio de reduzir a informação inicial útil, e sim de eliminar **duplicação intra-result** e **reenvio de contexto sem delta**.
+
+A Faixa 34 está fechada. A próxima lacuna descoberta durante a revisão é de correctness, não payload: `refreshScope()` atualmente tenta reler um arquivo removido e transforma delete legítimo em `failed/degraded`, em vez de convergir removendo path/symbols/index state do scope.
+
 

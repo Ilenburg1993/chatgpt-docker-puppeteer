@@ -9,7 +9,7 @@ import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } fro
 import { z } from 'zod';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 55;
+const CAPABILITIES_VERSION = 56;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -211,7 +211,7 @@ const IO_GUIDANCE = [
     'Use repo_find_orphan_imports before or after file moves to detect broken local imports.',
     'COPILOT_MCP_INDEX_AUTO_BUILD defaults to true so indexed navigation is warmed outside ChatGPT host calls.',
     'Use repo_symbol_search and repo_file_outline before edits that need code navigation.',
-    'Use repo_working_set when repeated work is concentrated in a subtree: open defaults to source-first coverage selection, find stays process-local, and refresh defaults to O(delta). Add seedPaths for known causal files or seedSymbols to resolve exact symbols through the local index in the same open call; both stay inside maxFiles. Use lexical only for explicit historical prefix ordering.',
+    'Use repo_working_set when repeated work is concentrated in a subtree: open defaults to source-first coverage selection, find stays process-local, and refresh defaults to O(delta). Add seedPaths for known causal files or seedSymbols to resolve exact symbols through the local index in the same open call; both stay inside maxFiles. Refresh uses contextMode=auto: empty deltas omit repeated manifests, while real refresh/failure keeps updated context inline; use include/omit only when explicitly desired. Use lexical only for explicit historical prefix ordering.',
     'Use mcp_validation_plan with no suite by default. For one gate, use run_copilot_validator validator="unit-focused"; for several causal gates, use run_copilot_validator.batch so focused test(s), typecheck and lint share one MCP round-trip. Batch defaults concurrency=1 to avoid CPU thrashing; use 2 only for genuinely independent focused tests. Inline completion means no polling unless a returned wait expires; escalate to mcp_run_safe_validation_suite only for cross-cutting risk or a deliberate release gate.',
     'Use mcp_validation_dashboard, mcp_last_validation_summary and job_get_summary before job_get_output; read job logs only with small tailBytes and only when needed.',
     'Use repo_root_tree or repo_tree path="." for the real workspace root.',
@@ -241,7 +241,7 @@ const IO_GUIDANCE = [
 const DEFAULT_IO_GUIDANCE = Object.freeze([
     'Start broad work with mcp_session_profile and mcp_tools_status; request the full capabilities manifest only when needed.',
     'Batch independent reads/searches with repo_read_file.batch, repo_search_text.batch or repo_bulk_inspect to reduce round-trips.',
-    'Use repo_working_set when repeated context/symbol work benefits from one bounded prewarmed manifest and O(delta) refresh; broad opens use source-first coverage, while known files or exact symbols can be pinned with seedPaths/seedSymbols inside the same cap.',
+    'Use repo_working_set when repeated context/symbol work benefits from one bounded prewarmed manifest and O(delta) refresh; broad opens use source-first coverage, known files/symbols can be pinned inside the same cap, and empty refreshes omit duplicate context by default.',
     'Use repo_apply_patch_batch for several exact edits; repeated paths remain sequential and atomic per file.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls and keep file-and-directory durability as the normal default.',
     'Use repo_search_text for completeness-oriented filesystem search; use repo_index_search explicitly for convergent FTS/discovery.',

@@ -80,6 +80,10 @@ export const repoWorkingSetTool = {
         path: z.string().optional().describe('Repository directory for action=open. Default: src/copilot.'),
         maxFiles: z.number().int().min(1).max(500).optional().describe('Hard selected-file cap for open, or manifest cap for context. Open default: 80.'),
         maxBytes: z.number().int().min(1024).max(65536).optional().describe('Context manifest UTF-8 budget. Default: 16 KiB.'),
+        contextMode: z
+            .enum(['auto', 'include', 'omit'])
+            .optional()
+            .describe('Inline context policy for open/refresh. Open auto includes; refresh auto includes only after refresh/failure.'),
         concurrency: z.number().int().min(1).max(8).optional().describe('Bounded open/refresh concurrency. Default: 4.'),
         parseSymbols: z.boolean().optional().describe('Parse symbols/imports during open. Default: true.'),
         indexMode: z.enum(['auto', 'off']).optional().describe('auto refreshes only selected paths in the shared index. Default: auto.'),
@@ -111,6 +115,7 @@ export const repoWorkingSetTool = {
         path,
         maxFiles,
         maxBytes,
+        contextMode,
         concurrency,
         parseSymbols,
         indexMode,
@@ -166,18 +171,30 @@ export const repoWorkingSetTool = {
                 mcpWorkingSets.delete(id);
                 return errorResult('Working set closed or evicted before becoming ready.', { code: 'ERR_WORKING_SET_EVICTED' });
             }
-            const context = getScopeContext(id, {
-                maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
-                maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
-            });
-            return okResult({
+            const effectiveContextMode = contextMode ?? 'auto';
+            const contextIncluded = effectiveContextMode !== 'omit';
+            const context = contextIncluded
+                ? getScopeContext(id, {
+                      maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
+                      maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
+                  })
+                : null;
+            const repoPath = toRepoPath(resolved.resolved);
+            const structured = {
                 workingSetId: id,
-                path: toRepoPath(resolved.resolved),
+                path: repoPath,
                 stats,
-                context,
+                contextMode: effectiveContextMode,
+                contextIncluded,
+                contextAvailable: true,
+                ...(context ? { context } : {}),
                 activeOwnedWorkingSets: mcpWorkingSets.size,
                 maxOwnedWorkingSets: MAX_MCP_WORKING_SETS,
-            });
+            };
+            return okResult(
+                structured,
+                `Opened working set ${id} for ${repoPath}: selected=${stats.selectedFiles}/${stats.candidateFiles}, parsed=${stats.parsed}, context=${contextIncluded ? `${Number(context?.contextBytes ?? 0)}B` : 'omitted'}.`,
+            );
         }
 
         const owned = getOwnedWorkingSet(workingSetId);
@@ -189,17 +206,28 @@ export const repoWorkingSetTool = {
         }
 
         if (action === 'context') {
-            return okResult({
-                workingSetId,
-                context: getScopeContext(owned.scopeId, {
-                    maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
-                    maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
-                }),
+            const context = getScopeContext(owned.scopeId, {
+                maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
+                maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
             });
+            if (!context) {
+                return errorResult('Working set context became unavailable.', {
+                    code: 'ERR_WORKING_SET_CONTEXT_UNAVAILABLE',
+                    workingSetId,
+                });
+            }
+            return okResult(
+                { workingSetId, context },
+                `Working set ${workingSetId} context: files=${context.files}, symbols=${context.symbols}, bytes=${context.contextBytes}.`,
+            );
         }
 
         if (action === 'status') {
-            return okResult({ workingSetId, stats: getScopeStats(owned.scopeId) });
+            const stats = getScopeStats(owned.scopeId);
+            return okResult(
+                { workingSetId, stats },
+                `Working set ${workingSetId}: status=${stats?.status ?? 'unknown'}, selected=${stats?.selectedFiles ?? 0}, parsed=${stats?.parsed ?? 0}, invalidated=${stats?.invalidated ?? 0}.`,
+            );
         }
 
         if (action === 'find') {
@@ -209,7 +237,10 @@ export const repoWorkingSetTool = {
                 path: toRepoPath(entry.filePath),
                 symbol: entry.symbol,
             }));
-            return okResult({ workingSetId, symbol, exactMatch: exactMatch ?? false, matchCount: matches.length, matches });
+            return okResult(
+                { workingSetId, symbol, exactMatch: exactMatch ?? false, matchCount: matches.length, matches },
+                `Working set ${workingSetId}: ${matches.length} match(es) for symbol ${symbol}.`,
+            );
         }
 
         if (action === 'refresh') {
@@ -224,20 +255,38 @@ export const repoWorkingSetTool = {
                 }
             }
             const result = await refreshScope(owned.scopeId, resolvedPaths);
-            return okResult({
+            const effectiveContextMode = contextMode ?? 'auto';
+            const contextIncluded =
+                effectiveContextMode === 'include' ||
+                (effectiveContextMode === 'auto' && (result.refreshed > 0 || result.failed > 0));
+            const context = contextIncluded
+                ? getScopeContext(owned.scopeId, {
+                      maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
+                      maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
+                  })
+                : null;
+            const structured = {
                 workingSetId,
                 ...result,
+                contextMode: effectiveContextMode,
+                contextIncluded,
+                contextAvailable: true,
                 stats: getScopeStats(owned.scopeId),
-                context: getScopeContext(owned.scopeId, {
-                    maxFiles: Math.min(maxFiles ?? DEFAULT_CONTEXT_FILES, 200),
-                    maxBytes: maxBytes ?? DEFAULT_CONTEXT_BYTES,
-                }),
-            });
+                ...(context ? { context } : {}),
+            };
+            return okResult(
+                structured,
+                `Refreshed working set ${workingSetId}: refreshed=${result.refreshed}, failed=${result.failed}, skipped=${result.skipped}, context=${contextIncluded ? 'included' : 'omitted'}.`,
+            );
         }
 
         const stats = closeScope(owned.scopeId);
         mcpWorkingSets.delete(workingSetId ?? '');
-        return okResult({ workingSetId, closed: true, stats, activeOwnedWorkingSets: mcpWorkingSets.size });
+        const structured = { workingSetId, closed: true, stats, activeOwnedWorkingSets: mcpWorkingSets.size };
+        return okResult(
+            structured,
+            `Closed working set ${workingSetId}; activeOwnedWorkingSets=${mcpWorkingSets.size}.`,
+        );
     },
 };
 
