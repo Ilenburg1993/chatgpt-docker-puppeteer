@@ -4210,3 +4210,133 @@ Dashboard pós-prova:
 
 A Faixa 31 está operacionalmente fechada: o principal motivo observado para decompor same-file patch batches foi removido sem reduzir stale-write protection, atomicity ou feedback causal.
 
+---
+
+# 39. Faixa 32 — Patch Batch Result Surface V2 — 2026-08-18
+
+## 39.1 Evidência que abriu a faixa
+
+Depois da Faixa 31, batches maiores passam a ser o workflow preferido. Isso desloca o custo potencial de round-trip para **payload de resposta**.
+
+Medição live com `repo_apply_patch_batch` em dry-run, um único target, 12 operações noop e sem diff preview:
+
+- operationCount: **12**;
+- inputBytes: 2.449;
+- duration: ~**9,1 ms**;
+- result bytes observados pelo dashboard: **8.193 bytes**;
+- ~**683 bytes/operação**;
+- o resultado repete path, byte counts, hashes, line metadata, diff flags e hash mode em todas as rows.
+
+Escala aproximada linear: 64 operações podem ultrapassar ~40 KiB mesmo sem diff preview. Portanto a compactação de round-trips da Faixa 31 precisa ser acompanhada por compactação de decision surface.
+
+## 39.2 Auditoria de consumers
+
+Nos testes/callers atuais:
+
+- successes usam principalmente status, grouped same-file e algumas evidências de hash/trace em testes de prova;
+- nenhum consumer operacional depende por default de `previousBytes/projectedBytes/firstMatchLine/lastMatchLine/diffPreview*`;
+- failures dependem de detalhe causal e **não serão compactadas**;
+- `includeDiffPreview=true` já representa intenção explícita de obter detalhe.
+
+## 39.3 Estado-alvo
+
+Adicionar `resultMode: compact | detailed`, default **compact**.
+
+### compact
+
+- successes retornam rows mínimas de decisão;
+- metadata compartilhada por arquivo sobe para `targetSummaries` uma única vez;
+- hashes intermediários, line metadata, byte accounting por operação e flags de diff repetitivas ficam fora;
+- failures permanecem detalhadas, inclusive `failedOperationIndex`, code e failurePhase;
+- top-level continua com execution/preflight/apply counters;
+- resposta declara `resultMode` e `detailsAvailable=true`.
+
+`targetSummaries` deve conter, no máximo por target:
+
+- path;
+- operationIndices;
+- operationCount;
+- expectedHashMode;
+- traceId quando apply real;
+- initialHash;
+- final/projected hash;
+- bytesWritten/projectedBytes quando disponível;
+- noopCount/replacedOccurrences agregados.
+
+Success row compacta:
+
+- index;
+- success;
+- path;
+- noop;
+- replacedOccurrences;
+- expectedHashMode.
+
+### detailed
+
+- preserva a superfície atual integral das rows de sucesso;
+- usado para debugging/forensics ou quando o caller pedir explicitamente;
+- `includeDiffPreview=true` força effective detailed mesmo se `resultMode` for omitido/compact.
+
+## 39.4 Compatibilidade e versionamento
+
+- failures não perdem informação;
+- nenhum input antigo deixa de ser aceito;
+- o default de **output** muda, portanto `CAPABILITIES_VERSION` deve subir de 52 para **53**;
+- schema ganha apenas um enum pequeno; o aumento de `tools/list` deve ser muito menor que a redução de payload em batches médios/grandes;
+- guidance deve preferir compact e pedir detailed somente para investigação.
+
+## 39.5 SLOs
+
+- 12-op dry-run representativo: **<3 KiB** structured result;
+- redução de payload ≥60% versus baseline 8.193 bytes;
+- 3-op apply live mantém informação suficiente para confirmar target/hash/trace no `targetSummary`;
+- failure live/unit continua detalhada e causal;
+- detailed mode reproduz campos atuais (`previousHash`, `contentHash/projectedHash`, line/diff metadata);
+- includeDiffPreview força detailed;
+- strict typecheck + focused MCP tests + lint;
+- reload e A/B live repetindo o mesmo dry-run de 12 no-ops.
+
+## 39.6 Execução e prova live
+
+Implementação concluída:
+
+- `repo_apply_patch_batch` ganhou `resultMode=compact|detailed`, default `compact`;
+- `includeDiffPreview=true` promove automaticamente para `detailed`;
+- success rows compactas mantêm apenas a decision surface por operação;
+- metadata compartilhada foi elevada para `targetSummaries` por arquivo;
+- failures continuam detalhadas e causais;
+- `CAPABILITIES_VERSION` avançou para **53**;
+- guidance passou a preferir compact e detailed somente quando necessário.
+
+Durante o primeiro gate, o SLO de payload falhou por margem pequena: **3.141 B** para o teste representativo, contra teto de 3.072 B. O limite não foi relaxado. A causa residual era `groupedSameFile=true` repetido em todas as success rows compactas, embora a informação já estivesse implícita no summary do target. O campo foi removido somente do modo compacto; permanece disponível em `detailed`. O gate foi repetido e ficou verde.
+
+Gates finais verdes:
+
+- `tests/unit/copilot/mcp/test_mcp_patch_batch_v2.spec.js`;
+- `tests/unit/copilot/mcp/test_mcp_tools.spec.js`;
+- strict typecheck;
+- lint.
+
+Reload controlado pós-implementação:
+
+- connector ready;
+- **120/120 tools**;
+- OAuth/SSE green;
+- `tools/list`: **122.864 B**, aumento de apenas **231 B** versus 122.633 B da Faixa 31.
+
+A/B live usando exatamente o workload baseline: 12 no-ops same-file em `src/copilot/mcp/README.md`, mesmo baseline SHA, sem diff preview:
+
+- baseline Faixa 31: **8.193 B**;
+- Result Surface V2: **3.029 B**;
+- redução: **~63,0%**;
+- duração: ~**8 ms**;
+- `logicalOperationsPerCall`: 12 para essa chamada;
+- `resultMode=compact`;
+- uma única `targetSummary` com hash inicial/final e índices 0..11;
+- failures vazias.
+
+Prova live do modo detalhado por compatibilidade: o binding desta conversa ainda não hot-injetou o novo parâmetro `resultMode` em seu wrapper já materializado após o reload, porém `includeDiffPreview=true` — parâmetro já conhecido pelo host — forçou corretamente `resultMode=detailed`. A resposta devolveu `previousHash`, `projectedHash`, line/byte metadata e diff preview. Portanto clientes com descriptor antigo ainda conseguem acionar detalhe explicitamente via preview, enquanto a nova superfície remota já está ativa no MCP.
+
+A Faixa 32 está fechada: batches maiores agora reduzem simultaneamente **round-trips** e **payload/contexto**, sem remover failures diagnósticas nem o modo forense completo.
+

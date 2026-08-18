@@ -1341,7 +1341,7 @@ describe('copilot MCP tools', () => {
                 { path: repoPath, old_string: 'alpha', new_string: 'beta' },
                 { path: repoPath, old_string: 'beta', new_string: 'gamma' },
             ];
-            const dryRun = await tool.handler({ operations });
+            const dryRun = await tool.handler({ operations, resultMode: 'detailed' });
             assert.equal(dryRun.isError, undefined);
             assert.equal(dryRun.structuredContent?.['success'], true);
             const planned = /** @type {Record<string, unknown>[]} */ (dryRun.structuredContent?.['operations']);
@@ -1349,7 +1349,12 @@ describe('copilot MCP tools', () => {
             assert.equal(planned[0]?.['groupedSameFile'], true);
             assert.equal(planned[1]?.['groupedSameFile'], true);
 
-            const applied = await tool.handler({ operations, dryRun: false, confirmBatch: true });
+            const applied = await tool.handler({
+                operations,
+                dryRun: false,
+                confirmBatch: true,
+                resultMode: 'detailed',
+            });
             assert.equal(applied.isError, undefined);
             assert.equal(applied.structuredContent?.['success'], true);
             assert.equal(applied.structuredContent?.['appliedCount'], 2);

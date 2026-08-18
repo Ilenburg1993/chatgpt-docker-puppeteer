@@ -1121,6 +1121,81 @@ function buildLockedPatchBatchGroup(group) {
 }
 
 /**
+ * @param {Record<string, unknown>} args
+ * @param {Record<string, unknown>[]} operations
+ */
+function resolvePatchBatchResultMode(args, operations) {
+    const requestedResultMode = args['resultMode'] === 'detailed' ? 'detailed' : 'compact';
+    const forcedByDiffPreview = operations.some((operation) => operation['includeDiffPreview'] === true);
+    return {
+        requestedResultMode,
+        resultMode: forcedByDiffPreview ? 'detailed' : requestedResultMode,
+        forcedByDiffPreview,
+    };
+}
+
+/** @param {Record<string, unknown>} row */
+function compactPatchBatchSuccessRow(row) {
+    return {
+        index: row['index'],
+        success: true,
+        path: row['path'],
+        noop: row['noop'] === true,
+        replacedOccurrences: row['replacedOccurrences'],
+        ...(typeof row['expectedHashMode'] === 'string'
+            ? { expectedHashMode: row['expectedHashMode'] }
+            : {}),
+    };
+}
+
+/**
+ * @param {Record<string, unknown>[]} rows
+ * @param {boolean} dryRun
+ */
+function summarizePatchBatchTargets(rows, dryRun) {
+    /** @type {Map<string, Record<string, unknown>[]>} */
+    const groups = new Map();
+    for (const row of rows) {
+        if (row['success'] !== true || typeof row['path'] !== 'string') continue;
+        const group = groups.get(row['path']) ?? [];
+        group.push(row);
+        groups.set(row['path'], group);
+    }
+    return [...groups.entries()].map(([path, group]) => {
+        const ordered = [...group].sort((left, right) => Number(left['index'] ?? 0) - Number(right['index'] ?? 0));
+        const first = /** @type {Record<string, unknown>} */ (ordered[0] ?? {});
+        const last = /** @type {Record<string, unknown>} */ (ordered.at(-1) ?? {});
+        const traceId = ordered.find((row) => typeof row['traceId'] === 'string')?.['traceId'];
+        const replacedOccurrences = ordered.reduce(
+            (sum, row) => sum + Number(row['replacedOccurrences'] ?? 0),
+            0,
+        );
+        return {
+            path,
+            operationIndices: ordered.map((row) => Number(row['index'] ?? 0)),
+            operationCount: ordered.length,
+            noopCount: ordered.filter((row) => row['noop'] === true).length,
+            replacedOccurrences,
+            ...(typeof first['expectedHashMode'] === 'string'
+                ? { expectedHashMode: first['expectedHashMode'] }
+                : {}),
+            ...(typeof first['previousHash'] === 'string' ? { initialHash: first['previousHash'] } : {}),
+            ...(typeof (dryRun ? last['projectedHash'] : last['contentHash']) === 'string'
+                ? { finalHash: dryRun ? last['projectedHash'] : last['contentHash'] }
+                : {}),
+            ...(Number.isFinite(Number(last['projectedBytes']))
+                ? { projectedBytes: Number(last['projectedBytes']) }
+                : {}),
+            ...(!dryRun &&
+            Number.isFinite(Number(first['batchBytesWritten'] ?? last['bytesWritten']))
+                ? { bytesWritten: Number(first['batchBytesWritten'] ?? last['bytesWritten']) }
+                : {}),
+            ...(typeof traceId === 'string' ? { traceId } : {}),
+        };
+    });
+}
+
+/**
  * Run patch-batch planning/application while collapsing repeated same-file operations into one lock/read/write cycle.
  * Same-file operations are sequential and atomic; distinct files preserve the existing partial-batch behavior.
  *
@@ -1723,6 +1798,10 @@ export const repoWriteTools = [
                 .max(MAX_PATCH_TARGET_CONCURRENCY)
                 .optional()
                 .describe('Parallel independent targets. Defaults 1 in global-preflight apply, 4 in per-target-fast.'),
+            resultMode: z
+                .enum(['compact', 'detailed'])
+                .optional()
+                .describe('Successful operation result detail. Default compact; detailed preserves full per-operation hashes/line/byte metadata. includeDiffPreview forces detailed.'),
             includePreflightDetails: z
                 .boolean()
                 .optional()
@@ -1737,6 +1816,7 @@ export const repoWriteTools = [
             applyMode,
             failureMode,
             targetConcurrency,
+            resultMode,
             includePreflightDetails,
             durability,
         }) => {
@@ -1747,6 +1827,7 @@ export const repoWriteTools = [
                     ...(durability ? { durability } : {}),
                 }))
             );
+            const resultSurface = resolvePatchBatchResultMode({ resultMode }, normalizedOperations);
             const envelope = inspectPatchBatchEnvelope(normalizedOperations);
             if (!envelope.ok) {
                 return errorResult('Patch batch exceeds its bounded execution envelope.', {
@@ -1772,6 +1853,13 @@ export const repoWriteTools = [
                     concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
                 });
                 const failed = dryRunResult.operations.filter((operation) => operation['success'] !== true);
+                const outputOperations =
+                    resultSurface.resultMode === 'detailed'
+                        ? dryRunResult.operations
+                        : dryRunResult.operations.map((operation) =>
+                              operation['success'] === true ? compactPatchBatchSuccessRow(operation) : operation,
+                          );
+                const targetSummaries = summarizePatchBatchTargets(dryRunResult.operations, true);
                 const structured = {
                     success: failed.length === 0,
                     dryRun: true,
@@ -1784,7 +1872,12 @@ export const repoWriteTools = [
                     skippedCount: dryRunResult.execution.skippedCount,
                     concurrency: dryRunResult.execution.concurrency,
                     durationMs: dryRunResult.execution.durationMs,
-                    operations: dryRunResult.operations,
+                    requestedResultMode: resultSurface.requestedResultMode,
+                    resultMode: resultSurface.resultMode,
+                    resultModeForcedByDiffPreview: resultSurface.forcedByDiffPreview,
+                    detailsAvailable: true,
+                    targetSummaries,
+                    operations: outputOperations,
                     failures: failed,
                     applied: [],
                 };
@@ -1831,6 +1924,10 @@ export const repoWriteTools = [
                         operationCount: normalizedOperations.length,
                         targetCount: envelope.targetCount,
                         inputBytes: envelope.inputBytes,
+                        requestedResultMode: resultSurface.requestedResultMode,
+                        resultMode: resultSurface.resultMode,
+                        resultModeForcedByDiffPreview: resultSurface.forcedByDiffPreview,
+                        detailsAvailable: true,
                         failedCount: failedPreflight.length,
                         skippedCount: 0,
                         preflightSummary: {
@@ -1869,6 +1966,11 @@ export const repoWriteTools = [
                 (operation) => operation['success'] !== true && operation['skipped'] !== true,
             );
             const partial = succeeded.length > 0 && (failedApply.length > 0 || skipped.length > 0);
+            const targetSummaries = summarizePatchBatchTargets(succeeded, false);
+            const outputApplied =
+                resultSurface.resultMode === 'detailed'
+                    ? applied
+                    : succeeded.map((operation) => compactPatchBatchSuccessRow(operation));
             await appendMcpAuditEvent({
                 event:
                     failedApply.length === 0 && skipped.length === 0
@@ -1880,6 +1982,7 @@ export const repoWriteTools = [
                 failureMode: effectiveFailureMode,
                 operationCount: normalizedOperations.length,
                 targetCount: envelope.targetCount,
+                resultMode: resultSurface.resultMode,
                 preflightElided: singleTargetAtomicPreflightElision,
                 appliedCount: succeeded.length,
                 failedCount: failedApply.length,
@@ -1901,6 +2004,11 @@ export const repoWriteTools = [
                 concurrency: applyRun.execution.concurrency,
                 maxInFlight: applyRun.execution.maxInFlight,
                 durationMs: applyRun.execution.durationMs,
+                requestedResultMode: resultSurface.requestedResultMode,
+                resultMode: resultSurface.resultMode,
+                resultModeForcedByDiffPreview: resultSurface.forcedByDiffPreview,
+                detailsAvailable: true,
+                targetSummaries,
                 preflightElided: singleTargetAtomicPreflightElision,
                 preflightElisionReason: singleTargetAtomicPreflightElision
                     ? 'single-target-atomic-compute-before-write'
@@ -1915,7 +2023,7 @@ export const repoWriteTools = [
                       }
                     : { ran: false, success: null, executionId: null, failedCount: 0, durationMs: 0 },
                 preflight: includePreflightDetails === true ? preflight?.operations ?? [] : [],
-                applied,
+                applied: outputApplied,
                 failures: failedApply,
                 skipped,
             };

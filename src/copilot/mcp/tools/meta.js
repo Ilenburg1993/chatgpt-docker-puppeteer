@@ -9,7 +9,7 @@ import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } fro
 import { z } from 'zod';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 52;
+const CAPABILITIES_VERSION = 53;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -197,7 +197,8 @@ const IO_GUIDANCE = [
     'Prefer repo_read_file.batch for 2-32 independent small/medium reads and repo_search_text.batch for 2-32 independent searches. Use repo_bulk_inspect when read/search/stat work can be mixed in one call; all three preserve per-item failures and bounded output payloads.',
     'Prefer repo_apply_patch_batch directly when exact-string anchors and intent are already known; use repo_patch_batch_plan only when a separate read-only preview or approval boundary adds information.',
     'Use repo_apply_patch_batch for up to 64 exact-string patches across up to 32 targets. Global-preflight remains conservative across multiple targets; for one target, apply computes every operation atomically before publish and elides the duplicate dry-run. Use per-target-fast when independent targets may apply/fail separately.',
-    'When several exact-string edits target one file, keep them in one repo_apply_patch_batch so the server performs one lock/read/write/cache-invalidation cycle instead of one cycle per edit. A sha256 read once may be repeated as expectedHash on all same-file operations; the server treats identical supplied hashes beginning at operation 1 as one target-baseline precondition.',
+    'When several exact-string edits target one file, keep them in one repo_apply_patch_batch so the server performs one lock/read/write/cache-invalidation cycle instead of one cycle per edit. Put a sha256 read once on the first same-file operation; it may also be repeated on later operations, and identical supplied hashes are treated as one target-baseline precondition.',
+    'Keep repo_apply_patch_batch resultMode=compact by default for low-context success feedback; request detailed only for forensic per-operation hash/line/byte metadata. includeDiffPreview automatically forces detailed output.',
     'Use repo_apply_file_batch directly for trusted multi-file operations: global-preflight is conservative default, while sequential-fast skips the duplicate global preview and reports partial prefix state. Use repo_apply_file_batch_plan only when a separate read-only preview is actually needed.',
     'Use repo_read_file.sha256 as expectedHash for safe write/patch calls.',
     'Write/create/patch tools accept durability=file-and-directory|file|none. Keep file-and-directory as the default for strongest crash durability; file skips parent-directory fsync; none also skips file flush but still preserves path policy, locks, atomic publish and hash preconditions.',

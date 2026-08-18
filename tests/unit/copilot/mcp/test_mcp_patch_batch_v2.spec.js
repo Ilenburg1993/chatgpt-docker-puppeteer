@@ -64,11 +64,75 @@ describe('repo_apply_patch_batch V2', () => {
             'single-target-atomic-compute-before-write',
         );
         assert.equal(result.structuredContent?.['preflightSummary']?.['ran'], false);
+        assert.equal(result.structuredContent?.['resultMode'], 'compact');
+        assert.equal(result.structuredContent?.['detailsAvailable'], true);
         const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['applied']);
         assert.equal(rows.length, 3);
         assert.equal(rows.every((row) => row['expectedHashMode'] === 'group-baseline'), true);
-        assert.equal(new Set(rows.map((row) => row['traceId'])).size, 1);
+        assert.equal(rows.every((row) => !('traceId' in row) && !('previousHash' in row)), true);
+        const targetSummaries = /** @type {Record<string, unknown>[]} */ (
+            result.structuredContent?.['targetSummaries']
+        );
+        assert.equal(targetSummaries.length, 1);
+        assert.deepEqual(targetSummaries[0]?.['operationIndices'], [0, 1, 2]);
+        assert.equal(targetSummaries[0]?.['initialHash'], baseline);
+        assert.equal(targetSummaries[0]?.['finalHash'], sha256('ALPHA BETA GAMMA'));
+        assert.equal(typeof targetSummaries[0]?.['traceId'], 'string');
+        assert.equal(targetSummaries[0]?.['bytesWritten'], Buffer.byteLength('ALPHA BETA GAMMA'));
         assert.equal(await readFile(absolutePath, 'utf8'), 'ALPHA BETA GAMMA');
+    });
+
+    it('preserves full successful row details when resultMode=detailed', async () => {
+        const initial = 'alpha beta';
+        const { absolutePath, repoPath } = await createRepoFile('detailed.txt', initial);
+        const baseline = sha256(initial);
+        const result = await findTool('repo_apply_patch_batch').handler({
+            operations: [
+                { path: repoPath, old_string: 'alpha', new_string: 'ALPHA', expectedHash: baseline },
+                { path: repoPath, old_string: 'beta', new_string: 'BETA', expectedHash: baseline },
+            ],
+            dryRun: false,
+            confirmBatch: true,
+            resultMode: 'detailed',
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['requestedResultMode'], 'detailed');
+        assert.equal(result.structuredContent?.['resultMode'], 'detailed');
+        const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['applied']);
+        assert.equal(rows.length, 2);
+        assert.equal(rows.every((row) => typeof row['traceId'] === 'string'), true);
+        assert.equal(rows.every((row) => typeof row['previousHash'] === 'string'), true);
+        assert.equal(rows.every((row) => typeof row['contentHash'] === 'string'), true);
+        assert.equal(rows.every((row) => typeof row['firstMatchLine'] === 'number'), true);
+        assert.equal(await readFile(absolutePath, 'utf8'), 'ALPHA BETA');
+    });
+
+    it('forces detailed results when a diff preview is explicitly requested', async () => {
+        const initial = 'alpha beta';
+        const { repoPath } = await createRepoFile('diff-preview.txt', initial);
+        const result = await findTool('repo_apply_patch_batch').handler({
+            operations: [
+                {
+                    path: repoPath,
+                    old_string: 'alpha',
+                    new_string: 'ALPHA',
+                    includeDiffPreview: true,
+                },
+            ],
+            resultMode: 'compact',
+        });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['requestedResultMode'], 'compact');
+        assert.equal(result.structuredContent?.['resultMode'], 'detailed');
+        assert.equal(result.structuredContent?.['resultModeForcedByDiffPreview'], true);
+        const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['operations']);
+        assert.equal(rows.length, 1);
+        assert.equal(typeof rows[0]?.['projectedHash'], 'string');
+        assert.equal(typeof rows[0]?.['diffPreview'], 'string');
     });
 
     it('identifies the causal operation and aborts the rest without publishing partial content', async () => {
@@ -89,6 +153,7 @@ describe('repo_apply_patch_batch V2', () => {
 
         assert.equal(result.isError, undefined);
         assert.equal(result.structuredContent?.['success'], false);
+        assert.equal(result.structuredContent?.['resultMode'], 'compact');
         assert.equal(result.structuredContent?.['preflightElided'], true);
         const failures = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['failures']);
         assert.equal(failures.length, 3);
@@ -104,6 +169,27 @@ describe('repo_apply_patch_batch V2', () => {
         assert.equal(aborted.length, 2);
         assert.equal(aborted.every((row) => row['code'] === 'ERR_PATCH_BATCH_GROUP_ABORTED'), true);
         assert.equal(await readFile(absolutePath, 'utf8'), initial);
+    });
+
+    it('keeps a representative 12-operation compact dry-run below 3 KiB', async () => {
+        const initial = 'alpha';
+        const { repoPath } = await createRepoFile('compact-payload.txt', initial);
+        const baseline = sha256(initial);
+        const operations = Array.from({ length: 12 }, () => ({
+            path: repoPath,
+            old_string: 'alpha',
+            new_string: 'alpha',
+            allowNoop: true,
+            expectedHash: baseline,
+        }));
+        const result = await findTool('repo_apply_patch_batch').handler({ operations });
+
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], true);
+        assert.equal(result.structuredContent?.['resultMode'], 'compact');
+        assert.equal(result.structuredContent?.['operationCount'], 12);
+        const resultBytes = Buffer.byteLength(JSON.stringify(result.structuredContent), 'utf8');
+        assert.ok(resultBytes < 3 * 1024, `compact result should stay under 3 KiB; got ${resultBytes}`);
     });
 
     it('keeps global preflight for multiple targets', async () => {
