@@ -8,6 +8,12 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { getMcpWorkspaceRoot, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { buildCompanyKnowledgeWidgetResource } from './apps-sdk-resources.js';
+import {
+    COMPANY_KNOWLEDGE_FETCH_TOOL_NAME,
+    COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME,
+    companyKnowledgeTools,
+} from './company-knowledge.js';
 
 /** @type {Record<string, string>} */
 const MARKERS = {
@@ -21,6 +27,9 @@ const MARKERS = {
     resourceDomains: 'resourceDomains',
     frameDomains: 'frameDomains',
     widgetDescription: 'openai/widgetDescription',
+    widgetDomain: 'openai/widgetDomain',
+    uiDomain: 'domain: widgetDomain',
+    resourceUri: 'resourceUri',
     outputTemplate: 'openai/outputTemplate',
     companySearchTool: "COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME = 'search'",
     companyFetchTool: "COMPANY_KNOWLEDGE_FETCH_TOOL_NAME = 'fetch'",
@@ -103,8 +112,31 @@ export const mcpAppsSdkReadinessTool = {
             (found['csp'] ?? []).length > 0;
         const hasFrameDomains = (found['frameDomains'] ?? []).length > 0;
         const hasWidgetDescription = (found['widgetDescription'] ?? []).length > 0;
-        const searchFetchToolsDetected =
-            (found['companySearchTool'] ?? []).length > 0 && (found['companyFetchTool'] ?? []).length > 0;
+        const resource = buildCompanyKnowledgeWidgetResource();
+        const resourceMeta = recordOrEmpty(resource._meta);
+        const uiMeta = recordOrEmpty(resourceMeta['ui']);
+        const widgetDomain = typeof uiMeta['domain'] === 'string' ? uiMeta['domain'] : null;
+        const legacyWidgetDomain =
+            typeof resourceMeta['openai/widgetDomain'] === 'string' ? resourceMeta['openai/widgetDomain'] : null;
+        const hasWidgetDomain = isHttpsOrigin(widgetDomain);
+        const widgetDomainAliasesMatch = hasWidgetDomain && legacyWidgetDomain === widgetDomain;
+        const searchTool = companyKnowledgeTools.find((tool) => tool.name === COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME);
+        const fetchTool = companyKnowledgeTools.find((tool) => tool.name === COMPANY_KNOWLEDGE_FETCH_TOOL_NAME);
+        const searchFetchToolsDetected = Boolean(searchTool && fetchTool);
+        const hasStandardResourceUri = [searchTool, fetchTool].every((tool) => {
+            const toolMeta = recordOrEmpty(tool?._meta);
+            return recordOrEmpty(toolMeta['ui'])['resourceUri'] === resource.uri;
+        });
+        const hasLegacyOutputTemplate = [searchTool, fetchTool].every(
+            (tool) => recordOrEmpty(tool?._meta)['openai/outputTemplate'] === resource.uri,
+        );
+        const submissionReady =
+            hasWidgetResource &&
+            hasCsp &&
+            hasWidgetDomain &&
+            widgetDomainAliasesMatch &&
+            hasStandardResourceUri &&
+            hasLegacyOutputTemplate;
         return okResult({
             success: true,
             scannedFiles: files.length,
@@ -114,6 +146,12 @@ export const mcpAppsSdkReadinessTool = {
                 hasCsp,
                 hasFrameDomains,
                 hasWidgetDescription,
+                hasWidgetDomain,
+                widgetDomain,
+                widgetDomainAliasesMatch,
+                hasStandardResourceUri,
+                hasLegacyOutputTemplate,
+                submissionReady,
                 markerFiles: found,
             },
             promptFrictionImpact: hasWidgetResource
@@ -129,6 +167,14 @@ export const mcpAppsSdkReadinessTool = {
             },
             recommendedActions: [
                 hasWidgetResource ? 'Keep _meta.ui.csp explicit for every widget resource.' : 'Do not spend prompt-friction time on CSP until a widget resource is added.',
+                hasWidgetResource && !hasWidgetDomain
+                    ? 'Add a dedicated HTTPS _meta.ui.domain plus matching openai/widgetDomain before plugin submission.'
+                    : widgetDomainAliasesMatch
+                      ? 'Keep the widget domain dedicated to this plugin and verify the production domain before submission.'
+                      : 'Make _meta.ui.domain and openai/widgetDomain identical.',
+                hasWidgetResource && !hasStandardResourceUri
+                    ? 'Link UI tools with _meta.ui.resourceUri; keep openai/outputTemplate only as a compatibility alias.'
+                    : 'Standard MCP Apps resource linkage is present.',
                 hasWidgetResource && !hasWidgetDescription
                     ? 'Add openai/widgetDescription to reduce redundant widget narration.'
                     : 'Keep descriptions concise and tool-focused.',
@@ -137,3 +183,21 @@ export const mcpAppsSdkReadinessTool = {
         });
     },
 };
+
+/** @param {unknown} value */
+function recordOrEmpty(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
+}
+
+/** @param {unknown} value */
+function isHttpsOrigin(value) {
+    if (typeof value !== 'string' || !value) return false;
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === 'https:' && parsed.origin === value && parsed.pathname === '/';
+    } catch {
+        return false;
+    }
+}

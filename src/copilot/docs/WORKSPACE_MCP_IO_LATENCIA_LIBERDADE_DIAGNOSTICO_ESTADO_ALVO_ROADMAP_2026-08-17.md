@@ -3543,4 +3543,131 @@ O launcher LLM-B também foi exercitado pelo harness real em modo `control-only`
 
 Portanto a refatoração de bootstrap não é apenas tipada/testada: o terminal permanente inicia corretamente pelo novo launcher mínimo em cenário operacional real.
 
+---
+
+# 34. Faixa 30.D — MCP Apps / Widget submission readiness e correção do blocker de domínio — 2026-08-18
+
+## 34.1 Evidência externa que abriu a faixa
+
+A tela de informações do plugin no ChatGPT passou a reportar, para `ui://copilot/company-knowledge.html`:
+
+> `Domínio de widget não definido para este modelo. É necessário um domínio exclusivo para submeter o aplicativo.`
+
+A documentação oficial atual da OpenAI confirma que plugins com UI precisam declarar um origin dedicado em `_meta.ui.domain`; o origin deve ser HTTPS e único por plugin. O alias ChatGPT `_meta["openai/widgetDomain"]` permanece suportado.
+
+O diagnóstico interno `mcp_apps_sdk_readiness` não detectava esse blocker: ele verificava resource/MIME/CSP/widgetDescription/search+fetch, mas não procurava domínio. Isso é uma lacuna da própria observabilidade e será corrigido junto com o resource.
+
+## 34.2 Auditoria do estado atual
+
+`src/copilot/mcp/tools/apps-sdk-resources.js` já possui:
+
+- `text/html;profile=mcp-app`;
+- `_meta.ui.prefersBorder`;
+- `_meta.ui.csp`;
+- aliases `openai/widgetDescription`, `openai/widgetPrefersBorder` e `openai/widgetCSP`.
+
+Lacunas encontradas:
+
+1. não existe `_meta.ui.domain`;
+2. não existe `_meta["openai/widgetDomain"]`;
+3. `_meta.ui.csp` contém `redirectDomains`, embora o schema padrão documentado aceite somente `connectDomains`, `resourceDomains` e `frameDomains`; redirects continuam no alias legado `openai/widgetCSP.redirect_domains`;
+4. `search` e `fetch` associam a UI somente por `_meta["openai/outputTemplate"]`, sem `_meta.ui.resourceUri`;
+5. o HTML afirma que renderiza os resultados, mas é estático e não consome `ui/notifications/tool-result`;
+6. `mcp_apps_sdk_readiness` produz um falso-green para submission readiness porque não verifica domínio nem standard resource linkage.
+
+## 34.3 Estado-alvo do resource
+
+- `COPILOT_MCP_WIDGET_DOMAIN` passa a ser override explícito;
+- fallback do deployment atual: origin dedicado já existente `https://mcp.aurelin.org`;
+- normalização estrita: HTTPS origin, sem path/query/hash/userinfo;
+- resource publica simultaneamente:
+  - `_meta.ui.domain`;
+  - `_meta["openai/widgetDomain"]`;
+  - `_meta.ui.csp` standard;
+  - `_meta["openai/widgetCSP"]` compatibility;
+- standard CSP não carrega redirects; `redirect_domains` permanece apenas na compatibilidade ChatGPT quando necessário;
+- nenhuma dependência frontend ou package novo será adicionada nesta etapa: o widget é pequeno e pode usar JS/DOM/bridge nativos;
+- `@modelcontextprotocol/ext-apps/server` foi considerado, mas não é necessário para corrigir a submissão: `McpServer.registerResource` + MIME correto já satisfaz o contrato atual e evita adicionar dependency sem ganho mensurável.
+
+## 34.4 Estado-alvo das tools e UI
+
+- `search/fetch` passam a anunciar `_meta.ui.resourceUri` e mantêm `openai/outputTemplate` como alias;
+- o widget escuta o bridge MCP Apps `ui/notifications/tool-result` via `postMessage` e renderiza `structuredContent` de search/fetch;
+- conteúdo recebido é tratado como untrusted: DOM criado por `textContent`, sem `innerHTML` dinâmico;
+- links externos, se renderizados, são limitados a URLs HTTPS recebidas do corpus e abrem por link normal; nenhum token/secret entra no DOM;
+- a tool continua útil sem iframe, preservando Company Knowledge data-first semantics.
+
+## 34.5 Readiness V2
+
+`mcp_apps_sdk_readiness` passará a reportar explicitamente:
+
+- `hasWidgetDomain`;
+- `hasStandardResourceUri`;
+- `submissionReady` para a parte de UI metadata;
+- markers de `_meta.ui.domain`, `openai/widgetDomain`, `ui.resourceUri` e legacy output template;
+- ação de correção quando UI existe sem domínio.
+
+Critério: a readiness interna não pode voltar a dar green quando o portal ChatGPT ainda detectaria ausência de widget domain.
+
+## 34.6 Gates
+
+- regressão unitária do resource exigindo domain standard + alias idênticos;
+- regressão de CSP exigindo ausência de `redirectDomains` no standard e manutenção de `redirect_domains` somente no legacy quando configurado;
+- regressão de search/fetch exigindo `_meta.ui.resourceUri` + alias;
+- regressão do HTML exigindo bridge `ui/notifications/tool-result` e render seguro;
+- regressão do readiness exigindo `hasWidgetDomain=true`, `hasStandardResourceUri=true`, `submissionReady=true`;
+- strict typecheck + lint;
+- reload controlado;
+- connector smoke 120/120 ou novo count esperado caso nenhuma tool seja adicionada;
+- `mcp_apps_sdk_readiness` live deve ficar green;
+- leitura live do resource deve confirmar metadata enviada pelo servidor, não apenas o source.
+
+A Faixa 30.7 (native glob) e a Faixa 30.9 (journal/checkpoint high-watermark) permanecem abertas e serão retomadas imediatamente após esse blocker de submissão ser removido.
+
+## 34.7 Execução e prova live
+
+Implementado:
+
+- resource URI versionado para `ui://copilot/company-knowledge/v2.html` para evitar reuse de cache do HTML antigo;
+- `_meta.ui.domain` + `_meta["openai/widgetDomain"]` com o mesmo origin;
+- override `COPILOT_MCP_WIDGET_DOMAIN` validado como origin HTTPS puro;
+- fallback derivado do public MCP URL e, no deployment atual, `https://mcp.aurelin.org`;
+- standard `_meta.ui.csp` contém apenas `connectDomains/resourceDomains/frameDomains`;
+- `redirect_domains` permanece apenas no alias legado `openai/widgetCSP`;
+- `search/fetch` publicam `_meta.ui.resourceUri` e preservam `openai/outputTemplate`;
+- widget passou de HTML estático a renderer bridge-first de `ui/notifications/tool-result`, sem dependency frontend nova;
+- dados dinâmicos entram no DOM via `textContent`; `innerHTML` dinâmico não é usado; links são aceitos somente se HTTPS;
+- `mcp_apps_sdk_readiness` passou de scanner marker-only para inspeção semântica do resource/tool descriptor real.
+
+Gates focados:
+
+- Company Knowledge/resource metadata: green;
+- MCP tools/readiness: green;
+- protocol-level resource test com `Client + InMemoryTransport + createCopilotMcpServer`: green;
+- strict typecheck: green.
+
+Prova protocol-level:
+
+- `resources/list` anunciou o resource v2 com MIME `text/html;profile=mcp-app`;
+- `resources/read` devolveu o mesmo URI/HTML;
+- descriptor e content carregam `ui.domain` HTTPS e `openai/widgetDomain` idêntico;
+- o HTML servido contém o handler `ui/notifications/tool-result`.
+
+Prova live após reload:
+
+- connector smoke: green;
+- OAuth/health/SSE: green;
+- tools: **120/120**;
+- `tools/list`: **122.117 bytes**, contra 121.987 antes — somente **+130 bytes** pela linkage standard `ui.resourceUri`;
+- `mcp_apps_sdk_readiness` live:
+  - `hasWidgetDomain=true`;
+  - `widgetDomain=https://mcp.aurelin.org`;
+  - `widgetDomainAliasesMatch=true`;
+  - `hasStandardResourceUri=true`;
+  - `hasLegacyOutputTemplate=true`;
+  - `submissionReady=true`.
+
+Durante o restart houve um único 502 transitório ao consultar status enquanto a origem estava sendo substituída; o estado persistido terminou `completed`/exit 0 e o smoke canônico pós-reload ficou integralmente green.
+
+Conclusão: o blocker mostrado pelo portal ChatGPT foi removido no servidor. O portal ainda pode exibir o snapshot antigo até executar novo **Scan Tools/reconnect/rescan**; isso é refresh de metadata do host, não mudança adicional necessária no MCP.
 

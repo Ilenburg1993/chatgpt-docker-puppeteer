@@ -30,6 +30,8 @@ describe('MCP Company Knowledge tools', () => {
         assert.equal(fetch.annotations.readOnlyHint, true);
         assert.equal(search.annotations.openWorldHint, false);
         assert.equal(fetch.annotations.openWorldHint, false);
+        assert.equal(search._meta?.['ui']?.['resourceUri'], COMPANY_KNOWLEDGE_WIDGET_URI);
+        assert.equal(fetch._meta?.['ui']?.['resourceUri'], COMPANY_KNOWLEDGE_WIDGET_URI);
         assert.equal(search._meta?.['openai/outputTemplate'], COMPANY_KNOWLEDGE_WIDGET_URI);
         assert.equal(fetch._meta?.['openai/outputTemplate'], COMPANY_KNOWLEDGE_WIDGET_URI);
     });
@@ -82,17 +84,39 @@ describe('MCP Company Knowledge tools', () => {
         assert.equal(companyKnowledgeTestHarness.decodeCompanyKnowledgeDocumentId(id), 'src/copilot/mcp/README.md');
     });
 
-    it('registers a static Apps SDK widget resource with explicit CSP metadata', () => {
-        const resource = buildCompanyKnowledgeWidgetResource();
+    it('registers a versioned MCP Apps widget with dedicated domain, standard CSP and bridge rendering', () => {
+        const resource = buildCompanyKnowledgeWidgetResource({
+            COPILOT_MCP_WIDGET_DOMAIN: 'https://workspace-widget.example.com',
+        });
         const meta = /** @type {Record<string, any>} */ (resource._meta);
         const ui = /** @type {Record<string, any>} */ (meta['ui']);
         const csp = /** @type {Record<string, unknown[]>} */ (ui['csp']);
+        const legacyCsp = /** @type {Record<string, unknown[]>} */ (meta['openai/widgetCSP']);
 
         assert.equal(resource.uri, COMPANY_KNOWLEDGE_WIDGET_URI);
+        assert.equal(COMPANY_KNOWLEDGE_WIDGET_URI, 'ui://copilot/company-knowledge/v2.html');
         assert.equal(resource.mimeType, 'text/html;profile=mcp-app');
         assert.equal(meta['openai/widgetDescription'], 'Renders read-only Company Knowledge search and fetch results from the current workspace corpus.');
+        assert.equal(ui['domain'], 'https://workspace-widget.example.com');
+        assert.equal(meta['openai/widgetDomain'], ui['domain']);
         assert.deepEqual(csp['connectDomains'], []);
         assert.deepEqual(csp['resourceDomains'], []);
         assert.deepEqual(csp['frameDomains'], []);
+        assert.equal(csp['redirectDomains'], undefined);
+        assert.deepEqual(legacyCsp['redirect_domains'], ['https://github.com']);
+        assert.match(resource.text, /ui\/notifications\/tool-result/u);
+        assert.match(resource.text, /\.textContent\s*=/u);
+        assert.doesNotMatch(resource.text, /\.innerHTML\s*=/u);
+    });
+
+    it('rejects an explicit widget domain that is not a dedicated HTTPS origin', () => {
+        assert.throws(
+            () => buildCompanyKnowledgeWidgetResource({ COPILOT_MCP_WIDGET_DOMAIN: 'http://example.com' }),
+            /Invalid COPILOT_MCP_WIDGET_DOMAIN/u,
+        );
+        assert.throws(
+            () => buildCompanyKnowledgeWidgetResource({ COPILOT_MCP_WIDGET_DOMAIN: 'https://example.com/widget' }),
+            /Invalid COPILOT_MCP_WIDGET_DOMAIN/u,
+        );
     });
 });

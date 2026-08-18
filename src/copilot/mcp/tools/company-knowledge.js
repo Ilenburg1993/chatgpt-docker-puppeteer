@@ -17,7 +17,7 @@ import { z } from 'zod';
 
 export const COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME = 'search';
 export const COMPANY_KNOWLEDGE_FETCH_TOOL_NAME = 'fetch';
-export const COMPANY_KNOWLEDGE_WIDGET_URI = 'ui://copilot/company-knowledge.html';
+export const COMPANY_KNOWLEDGE_WIDGET_URI = 'ui://copilot/company-knowledge/v2.html';
 
 const DEFAULT_REPOSITORY_WEB_BASE = 'https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/blob/main';
 const DEFAULT_SEARCH_RESULT_LIMIT = 10;
@@ -447,6 +447,7 @@ export const companyKnowledgeTools = [
         },
         annotations: readOnlyAnnotations(),
         _meta: {
+            ui: { resourceUri: COMPANY_KNOWLEDGE_WIDGET_URI },
             'openai/outputTemplate': COMPANY_KNOWLEDGE_WIDGET_URI,
             'openai/toolInvocation/invoking': 'Buscando conhecimento...',
             'openai/toolInvocation/invoked': 'Busca concluida',
@@ -474,6 +475,7 @@ export const companyKnowledgeTools = [
         },
         annotations: readOnlyAnnotations(),
         _meta: {
+            ui: { resourceUri: COMPANY_KNOWLEDGE_WIDGET_URI },
             'openai/outputTemplate': COMPANY_KNOWLEDGE_WIDGET_URI,
             'openai/toolInvocation/invoking': 'Lendo conhecimento...',
             'openai/toolInvocation/invoked': 'Leitura concluida',
